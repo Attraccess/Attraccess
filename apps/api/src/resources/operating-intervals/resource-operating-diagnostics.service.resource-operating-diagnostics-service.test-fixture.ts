@@ -1,7 +1,6 @@
-import { ResourceFlowNode, ResourceOperatingInterval } from '@attraccess/database-entities';
-import { ResourceType } from '@attraccess/application-models';
-import { Repository } from 'typeorm';
+import type { OperatingIntervalRecord } from '@attraccess/application-models';
 import { OperatingMetricsRecorder } from '../../metrics/instrumentation/operating/operating.helper';
+import type { OperatingTimelineStore } from './operating-timeline.port';
 import {
   ResourceOperatingAttributionService,
   ResourceOperatingAttributionSummary,
@@ -10,8 +9,16 @@ import { ResourceOperatingDiagnosticsService } from './resource-operating-diagno
 
 const at = (day: number, time: string) => new Date(`2026-09-${String(day).padStart(2, '0')}T${time}.000Z`);
 
-const interval = (id: number, startTime: Date, endTime: Date | null): ResourceOperatingInterval =>
-  ({ id, resourceId: 1, startTime, endTime }) as ResourceOperatingInterval;
+const interval = (id: number, startTime: Date, endTime: Date | null): OperatingIntervalRecord => ({
+  id,
+  resourceId: 1,
+  startTime,
+  endTime,
+  startFlowNodeId: null,
+  startFlowRunId: null,
+  endFlowNodeId: null,
+  endFlowRunId: null,
+});
 
 function summary(overrides: Partial<ResourceOperatingAttributionSummary> = {}): ResourceOperatingAttributionSummary {
   return {
@@ -29,13 +36,23 @@ function summary(overrides: Partial<ResourceOperatingAttributionSummary> = {}): 
     ...overrides,
   };
 }
-export function registerResourceOperatingDiagnosticsServiceFixture() {
-  let intervalRepository: jest.Mocked<
-    Pick<Repository<ResourceOperatingInterval>, 'findOne' | 'find' | 'findAndCount' | 'count'>
-  >;
 
-  let flowNodeRepository: jest.Mocked<Pick<Repository<ResourceFlowNode>, 'count'>> & {
-    manager: { findOne: jest.Mock };
+type DiagnosticsReads = Pick<
+  OperatingTimelineStore,
+  | 'findCurrentState'
+  | 'pageIntervals'
+  | 'findIntervalsActiveSince'
+  | 'countOpenIntervals'
+  | 'countTrackingNodes'
+  | 'findIntervals'
+>;
+
+export function registerResourceOperatingDiagnosticsServiceFixture() {
+  let timeline: {
+    [Method in keyof DiagnosticsReads]: jest.Mock<
+      ReturnType<DiagnosticsReads[Method]>,
+      Parameters<DiagnosticsReads[Method]>
+    >;
   };
 
   let attributionService: jest.Mocked<Pick<ResourceOperatingAttributionService, 'getForResource'>>;
@@ -45,15 +62,13 @@ export function registerResourceOperatingDiagnosticsServiceFixture() {
   let service: ResourceOperatingDiagnosticsService;
 
   beforeEach(() => {
-    intervalRepository = {
-      findOne: jest.fn(),
-      find: jest.fn().mockResolvedValue([]),
-      findAndCount: jest.fn().mockResolvedValue([[], 0]),
-      count: jest.fn().mockResolvedValue(0),
-    };
-    flowNodeRepository = {
-      count: jest.fn().mockResolvedValue(0),
-      manager: { findOne: jest.fn().mockResolvedValue({ id: 1, type: ResourceType.Machine }) },
+    timeline = {
+      findCurrentState: jest.fn().mockResolvedValue({ open: null, latest: null }),
+      pageIntervals: jest.fn().mockResolvedValue({ intervals: [], total: 0 }),
+      findIntervalsActiveSince: jest.fn().mockResolvedValue([]),
+      countOpenIntervals: jest.fn().mockResolvedValue(0),
+      countTrackingNodes: jest.fn().mockResolvedValue(0),
+      findIntervals: jest.fn().mockResolvedValue([]),
     };
     attributionService = { getForResource: jest.fn().mockResolvedValue(summary()) };
     operatingMetrics = {
@@ -62,8 +77,7 @@ export function registerResourceOperatingDiagnosticsServiceFixture() {
       recordDataQualityFailures: jest.fn(),
     };
     service = new ResourceOperatingDiagnosticsService(
-      intervalRepository as unknown as Repository<ResourceOperatingInterval>,
-      flowNodeRepository as unknown as Repository<ResourceFlowNode>,
+      timeline as unknown as OperatingTimelineStore,
       attributionService as unknown as ResourceOperatingAttributionService,
       operatingMetrics,
     );
@@ -78,11 +92,8 @@ export function registerResourceOperatingDiagnosticsServiceFixture() {
     get summary() {
       return summary;
     },
-    get intervalRepository() {
-      return intervalRepository;
-    },
-    get flowNodeRepository() {
-      return flowNodeRepository;
+    get timeline() {
+      return timeline;
     },
     get attributionService() {
       return attributionService;

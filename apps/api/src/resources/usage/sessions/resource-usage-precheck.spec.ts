@@ -69,7 +69,7 @@ describe('ResourceUsageService.precheckStart', () => {
 
   it('tells the lifecycle check whether the machine is shared, like the real start', async () => {
     await scope.service.precheckStart(3, user, {});
-    expect(internals.assertLifecycleAvailable).toHaveBeenLastCalledWith(expect.anything(), 3, false);
+    expect(internals.assertLifecycleAvailable).toHaveBeenLastCalledWith(undefined, 3, false);
     internals.getSessionLimit.mockResolvedValue(2);
     internals.getResource.mockResolvedValue(machine({ maxParallelSessions: 2 }));
     // The caller's own session ends the shared-machine precheck before any slot is counted.
@@ -77,7 +77,7 @@ describe('ResourceUsageService.precheckStart', () => {
       .spyOn(usageInternals(scope.service).records as never, 'getActiveSessionsForResource')
       .mockResolvedValue([{ userId: 7 }] as never);
     await expect(scope.service.precheckStart(3, user, {})).rejects.toBeInstanceOf(AlreadyHasActiveSessionError);
-    expect(internals.assertLifecycleAvailable).toHaveBeenLastCalledWith(expect.anything(), 3, true);
+    expect(internals.assertLifecycleAvailable).toHaveBeenLastCalledWith(undefined, 3, true);
   });
 
   it('refuses a user who has not completed the introduction', async () => {

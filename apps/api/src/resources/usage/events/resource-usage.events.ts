@@ -2,22 +2,22 @@
  * Events emitted when resource usage status changes
  */
 
-import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
+import type { UsageSession, UsageSessionResource, UsageSessionUser } from '@attraccess/application-models';
 
 export class ResourceSessionStartedEvent {
   public static readonly EVENT_NAME = 'resource.usage.session_started';
 
-  constructor(public readonly usage: ResourceUsage) {}
+  constructor(public readonly usage: UsageSession) {}
 }
 
 export class ResourceUsageSessionTakenOverEvent {
   public static readonly EVENT_NAME = 'resource.usage.session_taken_over';
 
   constructor(
-    public readonly resource: Pick<Resource, 'id' | 'name'>,
+    public readonly resource: Pick<UsageSessionResource, 'id' | 'name'>,
     public readonly takeoverTime: Date,
-    public readonly newUser: User,
-    public readonly previousUser: User | null, // Previous user might not exist if resource was free
+    public readonly newUser: UsageSessionUser,
+    public readonly previousUser: UsageSessionUser | null, // Previous user might not exist if resource was free
   ) {}
 }
 
@@ -25,8 +25,8 @@ export class ResourceUsageSessionEndedEvent {
   public static readonly EVENT_NAME = 'resource.usage.session_ended';
 
   constructor(
-    public readonly usage: ResourceUsage,
-    public readonly endedBy: Pick<User, 'id' | 'username'> | null,
+    public readonly usage: UsageSession,
+    public readonly endedBy: Pick<UsageSessionUser, 'id' | 'username'> | null,
   ) {}
 }
 
@@ -41,7 +41,7 @@ export class ResourceUsageNoteAddedEvent {
     public readonly resourceId: number,
     public readonly note: string,
     public readonly phase: 'start' | 'end',
-    public readonly author: Pick<User, 'id' | 'username'>,
+    public readonly author: Pick<UsageSessionUser, 'id' | 'username'>,
   ) {}
 }
 

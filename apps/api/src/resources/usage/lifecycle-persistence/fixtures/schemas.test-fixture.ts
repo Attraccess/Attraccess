@@ -75,6 +75,7 @@ const schemas = [
       creditsPerUsage: { type: Number, nullable: true },
       billingFactor: { type: Number, nullable: true },
       attributedOperatingDurationInMinutes: { type: Number, nullable: true },
+      meterRates: { type: 'simple-json', nullable: true },
     },
     relations: {
       resource: { type: 'many-to-one', target: 'Resource', joinColumn: { name: 'resourceId' } },

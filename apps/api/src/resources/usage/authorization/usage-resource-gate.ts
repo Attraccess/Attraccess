@@ -1,5 +1,6 @@
-import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
+import { Resource, User } from '@attraccess/database-entities';
 import { SupervisionMode } from '@attraccess/application-models';
+import type { UsageSession, UsageSessionUser } from '@attraccess/application-models';
 
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
@@ -8,6 +9,8 @@ import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { EntityManager, Repository } from 'typeorm';
+
+import { asLegacy } from '../legacy-seams';
 
 import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../../exceptions/resource.maintenance.inUse.exception';
 
@@ -46,7 +49,7 @@ export class UsageResourceGate {
 
   async getResource(
     resourceId: number,
-    user: User,
+    user: UsageSessionUser,
     opts: { checkMaintenance: boolean; checkControlPermission: boolean },
     transactionalEntityManager?: EntityManager,
   ): Promise<Resource> {
@@ -74,7 +77,7 @@ export class UsageResourceGate {
       if (hasActiveMaintenance) {
         // Check if user can manage maintenance (which allows them to use during maintenance)
         const canManageMaintenance = await this.resourceMaintenanceService.canManageMaintenance(
-          user,
+          asLegacy(user),
           resourceId,
           transactionalEntityManager,
         );
@@ -94,7 +97,7 @@ export class UsageResourceGate {
       const isUnhealthy = await this.resourceHealthService.isResourceUnhealthy(resourceId, transactionalEntityManager);
       if (isUnhealthy) {
         const canManageMaintenance = await this.resourceMaintenanceService.canManageMaintenance(
-          user,
+          asLegacy(user),
           resourceId,
           transactionalEntityManager,
         );
@@ -134,7 +137,7 @@ export class UsageResourceGate {
    */
   public async validateSupervisedStart(
     resourceId: number,
-    requester: User,
+    requester: UsageSessionUser,
     supervisorUserId: number,
     transactionalEntityManager?: EntityManager,
     preloadedResource?: Resource,
@@ -196,7 +199,7 @@ export class UsageResourceGate {
   }
 
   /** Owners, supervisors, resource managers and maintainers may end a session; returns whether `user` owns it. */
-  async assertMayEndSession(activeSession: ResourceUsage, user: User): Promise<boolean> {
+  async assertMayEndSession(activeSession: UsageSession, user: UsageSessionUser): Promise<boolean> {
     // Prefer already-populated effectivePermissions on the request-bound user (set by SessionStrategy)
     const userPermissions =
       (user as AuthenticatedUser).effectivePermissions ?? (await this.rbacService.getEffectivePermissions(user.id));

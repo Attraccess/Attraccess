@@ -1,10 +1,10 @@
+import { createOperatingTimelineStore } from '../database/adapters/operating-intervals/typeorm-operating-timeline.store';
 import {
   BillingTransaction,
   entities,
   Resource,
   ResourceOperatingInterval,
   ResourceUsage,
-  ResourceUsageLifecycleAttempt,
 } from '@attraccess/database-entities';
 import { ResourceUsageAction } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
@@ -51,11 +51,7 @@ describe('AnalyticsService resource hours summary (SQLite)', () => {
     }).initialize();
     await source.query('PRAGMA foreign_keys = OFF');
     await source.query("INSERT INTO user (username, email) VALUES ('owner', 'owner@example.test')");
-    attribution = new ResourceOperatingAttributionService(
-      source.getRepository(ResourceOperatingInterval),
-      source.getRepository(ResourceUsage),
-      source.getRepository(ResourceUsageLifecycleAttempt),
-    );
+    attribution = new ResourceOperatingAttributionService(createOperatingTimelineStore(source));
     service = new AnalyticsService(
       source.getRepository(ResourceUsage),
       source.getRepository(BillingTransaction),

@@ -1,18 +1,22 @@
-import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
-import { ResourceType, ResourceUsageAction } from '@attraccess/application-models';
+import type { UsageSession, UsageSessionResource, UsageSessionUser } from '@attraccess/application-models';
+import { ResourceType } from '@attraccess/application-models';
 import { BadRequestException } from '@nestjs/common';
-import { EntityManager, FindOptionsWhere, IsNull } from 'typeorm';
 import { NoOwnActiveSessionError } from '../errors/no-own-active-session.error';
+import { publishedState } from './published-state';
 
-const publishedState = { usageAction: ResourceUsageAction.Usage, isFinalized: true, lifecyclePending: false };
+// The queries behind "active sessions" belong to the persistence adapter; they stay importable from here for the
+// features that have not moved to the usage session port yet.
+export {
+  activeUsageSql,
+  activeUsageWhere,
+  countOccupiedSlots,
+  findActiveUsage,
+  findActiveUsages,
+  findOccupyingUserIds,
+} from '../../../database/adapters/usage/active-usage-queries';
 
-/** Published, usable machine session. Reservations are protected by the lifecycle gate. */
-export function activeUsageWhere(): FindOptionsWhere<ResourceUsage> {
-  return { ...publishedState, endTime: IsNull() };
-}
-
-/** In-memory counterpart of {@link activeUsageWhere}, for usages that were loaded without that filter. */
-export function isActiveUsage(usage: ResourceUsage): boolean {
+/** In-memory counterpart of the active-sessions query, for usages that were loaded without that filter. */
+export function isActiveUsage(usage: Pick<UsageSession, 'endTime' | keyof typeof publishedState>): boolean {
   return (
     usage.endTime == null &&
     Object.entries(publishedState).every(([column, value]) => usage[column as keyof typeof publishedState] === value)
@@ -20,69 +24,15 @@ export function isActiveUsage(usage: ResourceUsage): boolean {
 }
 
 /**
- * The machine's one active session. With parallel sessions the earliest started; on a machine limited to one
- * session, legacy duplicates resolve to the newest. Select it before resolving optional related records such as
- * meter sessions.
- */
-export async function findActiveUsage(manager: EntityManager, resourceId: number): Promise<ResourceUsage | null> {
-  const sessions = await manager.find(ResourceUsage, {
-    where: { resourceId, ...activeUsageWhere() },
-    order: { startTime: 'ASC', id: 'ASC' },
-  });
-  if (sessions.length <= 1) return sessions[0] ?? null;
-  const resource = await manager.findOne(Resource, {
-    where: { id: resourceId },
-    select: { id: true, type: true, maxParallelSessions: true },
-  });
-  return resource && getSessionCapacity(resource, sessions.length).maxParallelSessions > 1
-    ? sessions[0]
-    : sessions[sessions.length - 1];
-}
-
-export function activeUsageSql(alias: string): string {
-  return `${alias}.endTime IS NULL AND ${Object.entries(publishedState)
-    .map(([column, value]) => `${alias}.${column} = ${typeof value === 'boolean' ? Number(value) : `'${value}'`}`)
-    .join(' AND ')}`;
-}
-
-/** All published sessions of a machine, earliest first. */
-export function findActiveUsages(manager: EntityManager, resourceId: number): Promise<ResourceUsage[]> {
-  return manager.find(ResourceUsage, {
-    where: { resourceId, ...activeUsageWhere() },
-    order: { startTime: 'ASC', id: 'ASC' },
-  });
-}
-
-/** Published sessions plus pending starts occupy a slot. Supervisors never take one. */
-export function countOccupiedSlots(manager: EntityManager, resourceId: number): Promise<number> {
-  return occupiedSlotsQuery(manager, resourceId).getCount();
-}
-
-/** The users behind {@link countOccupiedSlots}, one entry per occupied slot. */
-export async function findOccupyingUserIds(manager: EntityManager, resourceId: number): Promise<number[]> {
-  const rows = await occupiedSlotsQuery(manager, resourceId).select('usage.userId', 'userId').getRawMany();
-  return rows.map((row: { userId: number }) => Number(row.userId));
-}
-
-function occupiedSlotsQuery(manager: EntityManager, resourceId: number) {
-  return manager
-    .createQueryBuilder(ResourceUsage, 'usage')
-    .where('usage.resourceId = :resourceId', { resourceId })
-    .andWhere('usage.usageAction = :action', { action: ResourceUsageAction.Usage })
-    .andWhere('usage.endTime IS NULL')
-    .andWhere('(usage.isFinalized = 1 OR usage.lifecyclePending = 1)');
-}
-
-/**
  * Without a usageId the caller's own session is ended, never somebody else's. Only on a machine with an
  * effective limit of 1 may a single remaining session be ended without naming it (force-stop as before).
  */
-export function pickSessionToEnd(
-  sessions: ResourceUsage[],
-  user: User,
+export function pickSessionToEnd<T extends Pick<UsageSession, 'id' | 'userId'>>(
+  sessions: T[],
+  user: Pick<UsageSessionUser, 'id'>,
   usageId: number | undefined,
   sessionLimit: number,
-): ResourceUsage {
+): T {
   if (usageId !== undefined) {
     const target = sessions.find((session) => session.id === usageId);
     if (!target) throw new BadRequestException('No active session found');
@@ -96,14 +46,16 @@ export function pickSessionToEnd(
   throw new NoOwnActiveSessionError();
 }
 
+type CapacityResource = Pick<UsageSessionResource, 'type'> & { maxParallelSessions?: number | null };
+
 /** Effective number of parallel sessions. Doors and unknown resources behave like a limit of 1. */
-export function sessionLimitOf(resource: Pick<Resource, 'type' | 'maxParallelSessions'> | null | undefined): number {
+export function sessionLimitOf(resource: CapacityResource | null | undefined): number {
   return resource?.type === ResourceType.Machine ? Math.max(1, resource.maxParallelSessions ?? 1) : 1;
 }
 
 /** Slot usage for display and gating. Doors always behave like a limit of 1. */
 export function getSessionCapacity(
-  resource: Pick<Resource, 'type' | 'maxParallelSessions'>,
+  resource: CapacityResource,
   activeSessionCount: number,
 ): { activeSessionCount: number; maxParallelSessions: number; isFull: boolean } {
   const maxParallelSessions = sessionLimitOf(resource);

@@ -1,8 +1,8 @@
-import { User } from '@attraccess/database-entities';
+import type { UsageSessionUser } from '@attraccess/application-models';
 
 import { Injectable, Logger } from '@nestjs/common';
 
-import { EntityManager } from 'typeorm';
+import type { LegacyTransactionHandle } from '../lifecycle/usage-lifecycle';
 
 import { ResourceGroupsIntroductionsService } from '../../groups/introductions/resourceGroups.introductions.service';
 
@@ -31,9 +31,9 @@ export class UsageAccessRules {
 
   async canControl(
     resourceId: number,
-    user: User,
+    user: UsageSessionUser,
     canUpdateResource: boolean,
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: LegacyTransactionHandle,
   ): Promise<boolean> {
     if (canUpdateResource) {
       return true;

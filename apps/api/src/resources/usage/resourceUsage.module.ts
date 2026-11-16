@@ -22,6 +22,7 @@ import { ResourceHealthModule } from '../health/resource-health.module';
 import { ResourceRetrainingModule } from '../retraining/resourceRetraining.module';
 import { ResourceOperatingIntervalModule } from '../operating-intervals/resource-operating-interval.module';
 import { ResourceTransactionsModule } from '../../database/resource-transactions.module';
+import { UsagePersistenceModule } from '../../database/adapters/usage/usage-persistence.module';
 import { ResourceMeteringModule } from '../metering/resource-metering.module';
 import { ReaderUiModule } from '../../plugin-system/reader-ui/reader-ui.module';
 import { PreStartService } from './pre-start/pre-start.service';
@@ -33,6 +34,7 @@ import { ResourceUsageFlowsBridge } from './sessions/resource-usage-flows.bridge
 @Module({
   imports: [
     ResourceTransactionsModule,
+    UsagePersistenceModule,
     TypeOrmModule.forFeature([ResourceUsage, Resource, ResourceIntroducer, User]),
     RbacModule,
     SettingsModule,

@@ -1,4 +1,4 @@
-import { User } from '@attraccess/database-entities';
+import type { UsageSessionUser } from '@attraccess/application-models';
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
@@ -8,7 +8,7 @@ import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 
 import { Redis } from 'ioredis';
 
-import { EntityManager } from 'typeorm';
+import type { LegacyTransactionHandle } from '../lifecycle/usage-lifecycle';
 
 import { MetricsService } from '../../../metrics/metrics.service';
 
@@ -79,8 +79,8 @@ export class UsageAccessCache {
 
   async canControllResource(
     resourceId: number,
-    user: User,
-    transactionalEntityManager?: EntityManager,
+    user: UsageSessionUser,
+    transactionalEntityManager?: LegacyTransactionHandle,
   ): Promise<boolean> {
     const requestPermissions = (user as AuthenticatedUser).effectivePermissions;
     // API tokens may have a narrower effective permission set than their owning user session.
@@ -153,9 +153,9 @@ export class UsageAccessCache {
   private async resolveAuthorizationCacheMiss(
     key: string,
     resourceId: number,
-    user: User,
+    user: UsageSessionUser,
     canUpdateResource: boolean,
-    transactionalEntityManager: EntityManager | undefined,
+    transactionalEntityManager: LegacyTransactionHandle | undefined,
     generation: number,
   ): Promise<boolean> {
     const result = await this.rules.canControl(resourceId, user, canUpdateResource, transactionalEntityManager);

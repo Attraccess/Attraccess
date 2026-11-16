@@ -1,15 +1,13 @@
-import { FormSubmission, ResourceUsage, ResourceUsageLifecycleAttempt, User } from '@attraccess/database-entities';
 import { ResourceFlowNodeType, ResourceFormAction, ResourceType } from '@attraccess/application-models';
+import type { UsageFormSubmissionDraft, UsageSession, UsageSessionUser } from '@attraccess/application-models';
 
 import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 
 import { randomUUID } from 'node:crypto';
 
-import { EntityManager, IsNull } from 'typeorm';
-
 import { AUDIT_RECORDER, AuditActor, AuditRecorder, SYSTEM_AUDIT_ACTOR } from '../../../audit/recorder/audit-event';
 
-import { runSerializedTransaction } from '../../../database/sqlite/run-serialized-transaction';
+import type { TransactionContext } from '../../../database/transaction-context';
 
 import { NoUsageSessionError } from '../../flows/errors/no-usage-session.error';
 
@@ -34,7 +32,7 @@ import {
 
 import { usageFlowPayload } from '../lifecycle/usage-flow-payload';
 
-import { activeUsageWhere, pickSessionToEnd } from './active-usage';
+import { pickSessionToEnd } from './active-usage';
 
 import { SessionChangeTurns } from './session-change-turns';
 
@@ -71,10 +69,10 @@ export class UsageSessionEnds {
 
   async endSession(
     resourceId: number,
-    user: User,
+    user: UsageSessionUser,
     dto: EndUsageSessionDto,
     options: EndSessionOptions = {},
-  ): Promise<ResourceUsage> {
+  ): Promise<UsageSession> {
     const attemptId = randomUUID();
     return this.runSessionChange(
       resourceId,
@@ -86,11 +84,11 @@ export class UsageSessionEnds {
 
   private async endSessionNow(
     resourceId: number,
-    user: User,
+    user: UsageSessionUser,
     dto: EndUsageSessionDto,
     options: EndSessionOptions,
     attemptId: string,
-  ): Promise<ResourceUsage> {
+  ): Promise<UsageSession> {
     // skipNoteNotification: flow-ended sessions carry an auto-generated note, not a human one — skip personnel notification.
     const { skipFormSubmissions = false, skipNoteNotification = false } = options;
     const auditOrigin = options.auditOrigin ?? ({ id: user.id, authenticationMethod: 'session' } satisfies AuditActor);
@@ -98,27 +96,22 @@ export class UsageSessionEnds {
     this.logger.debug(`Ending session for resource ${resourceId} by user ${user.id}`, { dto });
 
     // Defer event emission until after the transaction commits to avoid stale reads in listeners
-    let activeSession: ResourceUsage | null = null;
+    let activeSession: UsageSession | null = null;
     let endedUsageIdToEmit: number | null = null;
-    let formSubmissions: FormSubmission[] = [];
+    let formSubmissions: UsageFormSubmissionDraft[] = [];
     let activeSessionCounts: ActiveSessionCounts | undefined;
-    const prepared = await runSerializedTransaction(this.lifecycle.manager, async (transactionalEntityManager) => {
-      const sessionLimit = await this.lifecycle.getSessionLimit(transactionalEntityManager, resourceId);
+    const prepared = await this.lifecycle.transaction(async (scope) => {
+      const sessionLimit = await this.lifecycle.getSessionLimit(scope, resourceId);
       const sharedMachine = sessionLimit > 1;
-      await this.lifecycle.assertLifecycleAvailable(transactionalEntityManager, resourceId, sharedMachine);
-      const activeSessions = await this.records.getActiveSessionsForResource(resourceId, transactionalEntityManager);
+      await this.lifecycle.assertLifecycleAvailable(scope, resourceId, sharedMachine);
+      const activeSessions = await this.records.getActiveSessionsForResource(resourceId, scope);
       activeSession = pickSessionToEnd(activeSessions, user, dto.usageId, sessionLimit);
       activeSessionCounts = {
         before: activeSessions.length,
         after: Math.max(0, activeSessions.length - 1),
         limit: sessionLimit,
       };
-      if (
-        sharedMachine &&
-        (await transactionalEntityManager.findOne(ResourceUsageLifecycleAttempt, {
-          where: { previousUsageId: activeSession.id },
-        }))
-      ) {
+      if (sharedMachine && (await this.lifecycle.sessions.isSessionBeingEnded(activeSession.id, scope))) {
         // Changes of this machine take turns, so this is a stop cut off by a crash that is not cleaned up yet.
         throw new MachineBusyError();
       }
@@ -145,24 +138,27 @@ export class UsageSessionEnds {
           submissions: dto.formSubmissions,
           userId: user.id,
           resourceUsageId: activeSession.id,
-          manager: transactionalEntityManager,
+          manager: this.lifecycle.legacyHandle(scope),
         });
       }
 
-      const attempt = await transactionalEntityManager.save(ResourceUsageLifecycleAttempt, {
-        id: attemptId,
-        resourceId,
-        kind: 'end',
-        candidateUsageId: null,
-        previousUsageId: activeSession.id,
-        transitionTime: endTime,
-        formSubmissions,
-        billingItems: [],
-      });
+      const attempt = await this.lifecycle.sessions.saveAttempt(
+        {
+          id: attemptId,
+          resourceId,
+          kind: 'end',
+          candidateUsageId: null,
+          previousUsageId: activeSession.id,
+          transitionTime: endTime,
+          formSubmissions,
+          billingItems: [],
+        },
+        scope,
+      );
       return { activeSession, updateData, attempt };
     });
 
-    let updatedUsage: ResourceUsage;
+    let updatedUsage: UsageSession;
     let chargeTransactionId: number | undefined;
     try {
       await this.lifecycle.runUsageFlow(
@@ -183,21 +179,22 @@ export class UsageSessionEnds {
         prepared.activeSession.id,
         prepared.attempt.transitionTime,
       );
-      updatedUsage = await runSerializedTransaction(this.lifecycle.manager, async (manager) => {
-        const attempt = await this.lifecycle.getLifecycleAttempt(manager, attemptId, resourceId);
-        await this.lifecycle.applyLifecycleDrafts(manager, attempt);
-        const result = await manager.update(
-          ResourceUsage,
-          { id: prepared.activeSession.id, endTime: IsNull() },
+      updatedUsage = await this.lifecycle.transaction(async (scope) => {
+        const attempt = await this.lifecycle.getLifecycleAttempt(scope, attemptId, resourceId);
+        await this.lifecycle.applyLifecycleDrafts(scope, attempt);
+        const ended = await this.lifecycle.sessions.endSessionIfOpen(
+          prepared.activeSession.id,
           prepared.updateData,
+          scope,
         );
-        if (result.affected === 0) throw new ConflictException('Usage session changed while ending');
-        const endedSession = await manager.findOneOrFail(ResourceUsage, {
-          where: { id: prepared.activeSession.id },
-          relations: ['user', 'resource'],
-        });
-        chargeTransactionId = await this.lifecycle.settleEndedSession(manager, endedSession, final);
-        await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
+        if (!ended) throw new ConflictException('Usage session changed while ending');
+        const endedSession = await this.lifecycle.sessions.findSessionWithRelations(
+          prepared.activeSession.id,
+          'ended',
+          scope,
+        );
+        chargeTransactionId = await this.lifecycle.settleEndedSession(scope, endedSession, final);
+        await this.lifecycle.sessions.deleteAttempt(attemptId, resourceId, scope);
         await this.audit.record(
           {
             domain: 'resource',
@@ -210,7 +207,7 @@ export class UsageSessionEnds {
               ...(options.triggeredByUserId === undefined ? {} : { triggeredByUserId: options.triggeredByUserId }),
             },
           },
-          manager,
+          this.lifecycle.legacyHandle(scope),
         );
         return endedSession;
       });
@@ -293,7 +290,7 @@ export class UsageSessionEnds {
     resourceId: number,
     target: SessionEndTarget,
     notes: string,
-    manager?: EntityManager,
+    manager?: TransactionContext,
     triggeredByUserId?: number,
   ): Promise<void> {
     const sessions = await this.findEndableSessions(resourceId, target, manager);
@@ -308,7 +305,7 @@ export class UsageSessionEnds {
     resourceId: number,
     target: SessionEndTarget,
     notes: string,
-    manager?: EntityManager,
+    manager?: TransactionContext,
     triggeredByUserId?: number,
   ): Promise<void> {
     const sessions = await this.findEndableSessions(resourceId, target, manager);
@@ -327,7 +324,7 @@ export class UsageSessionEnds {
     usageIds: number[],
     notes: string,
     withinSessionChange: boolean,
-    manager?: EntityManager,
+    manager?: TransactionContext,
     triggeredByUserId?: number,
   ): Promise<void> {
     let firstError: unknown;
@@ -358,37 +355,26 @@ export class UsageSessionEnds {
   }
 
   /** The published session, unless it has ended or another stop is already ending it. */
-  private async findEndableSession(
+  private findEndableSession(
     resourceId: number,
     usageId: number,
-    manager: EntityManager = this.lifecycle.manager,
-  ): Promise<ResourceUsage | null> {
-    const session = await manager.findOne(ResourceUsage, {
-      where: { id: usageId, resourceId, ...activeUsageWhere() },
-      relations: ['user'],
-    });
-    if (!session) return null;
-    const beingEnded = await manager.exists(ResourceUsageLifecycleAttempt, {
-      where: { resourceId, kind: 'end', previousUsageId: usageId },
-    });
-    return beingEnded ? null : session;
+    context?: TransactionContext,
+  ): Promise<UsageSession | null> {
+    return this.lifecycle.sessions.findEndableSession(resourceId, usageId, context);
   }
 
   /** A named user without any active session fails (NO_USAGE_SESSION); one whose session is ending is skipped. */
   private async findEndableSessions(
     resourceId: number,
     target: SessionEndTarget,
-    manager?: EntityManager,
-  ): Promise<ResourceUsage[]> {
-    const sessions = (await this.records.getActiveSessionsForResource(resourceId, manager)).filter(
+    context?: TransactionContext,
+  ): Promise<UsageSession[]> {
+    const sessions = (await this.records.getActiveSessionsForResource(resourceId, context)).filter(
       (session) => target.kind === 'all' || session.userId === target.userId,
     );
     if (target.kind === 'user' && sessions.length === 0) throw new NoUsageSessionError();
     if (sessions.length === 0) return sessions;
-    const beingEnded = await (manager ?? this.lifecycle.manager).find(ResourceUsageLifecycleAttempt, {
-      where: { resourceId, kind: 'end' },
-    });
-    const endingIds = new Set(beingEnded.map((attempt) => attempt.previousUsageId));
+    const endingIds = await this.lifecycle.sessions.findSessionIdsBeingEnded(resourceId, context);
     return sessions.filter((session) => !endingIds.has(session.id));
   }
 }

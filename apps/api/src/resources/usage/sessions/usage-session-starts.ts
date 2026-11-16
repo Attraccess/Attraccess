@@ -1,17 +1,13 @@
-import { ResourceUsage, ResourceUsageLifecycleAttempt, User } from '@attraccess/database-entities';
 import { ResourceFlowNodeType } from '@attraccess/application-models';
+import type { UsageSession, UsageSessionUser } from '@attraccess/application-models';
 
 import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 
 import { randomUUID } from 'node:crypto';
 
-import { IsNull } from 'typeorm';
-
 import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../../../audit/recorder/audit-event';
 
 import { BillingService } from '../../../billing/charges/billing.service';
-
-import { runSerializedTransaction } from '../../../database/sqlite/run-serialized-transaction';
 
 import { FinalCollection } from '../../metering/resource-metering.service';
 
@@ -22,6 +18,8 @@ import { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
 import { TentativeSessionCancelledError } from '../errors/tentative-session-cancelled.error';
 
 import { RESOURCE_USAGE_LOG_CONTEXT, StartSessionOptions, UsageLifecycle } from '../lifecycle/usage-lifecycle';
+
+import { asLegacy } from '../legacy-seams';
 
 import { usageFlowPayload } from '../lifecycle/usage-flow-payload';
 
@@ -48,10 +46,10 @@ export class UsageSessionStarts {
 
   async startSession(
     resourceId: number,
-    user: User,
+    user: UsageSessionUser,
     dto: StartUsageSessionDto,
     options: StartSessionOptions = {},
-  ): Promise<ResourceUsage> {
+  ): Promise<UsageSession> {
     const attemptId = randomUUID();
     return this.ends.runSessionChange(resourceId, attemptId, () =>
       this.startSessionNow(resourceId, user, dto, options, attemptId),
@@ -60,11 +58,11 @@ export class UsageSessionStarts {
 
   private async startSessionNow(
     resourceId: number,
-    user: User,
+    user: UsageSessionUser,
     dto: StartUsageSessionDto,
     options: StartSessionOptions,
     attemptId: string,
-  ): Promise<ResourceUsage> {
+  ): Promise<UsageSession> {
     this.logger.debug(`Starting session for resource ${resourceId} by user ${user.id}`, { dto, options });
 
     const supervisorUserId = options.supervisorUserId ?? null;
@@ -72,7 +70,7 @@ export class UsageSessionStarts {
 
     // Defer event emission until after the transaction commits to avoid stale reads in listeners
     let startedUsageIdToEmit: number | null = null;
-    let takeoverEndedUser: User | null = null;
+    let takeoverEndedUser: UsageSessionUser | null = null;
 
     let chargeTransactionId: number | undefined;
     const prepared = await this.preparation.prepareSessionStart(
@@ -85,7 +83,7 @@ export class UsageSessionStarts {
     );
     takeoverEndedUser = prepared.existingActiveSession?.user ?? null;
 
-    let newSession: ResourceUsage;
+    let newSession: UsageSession;
     try {
       const { createdSession, existingActiveSession, formSubmissions, attempt, activeSessions } = prepared;
       // The outgoing session's total must be read before the meter is re-initialized for the next one.
@@ -117,8 +115,10 @@ export class UsageSessionStarts {
         // The starter, or the supervisor who started it for them.
         { lifecycleAttemptId: attemptId, actorUserId: auditOrigin.id ?? user.id },
       );
-      newSession = await runSerializedTransaction(this.lifecycle.manager, async (manager) => {
-        const currentAttempt = await this.lifecycle.getLifecycleAttempt(manager, attemptId, resourceId);
+      newSession = await this.lifecycle.transaction(async (scope) => {
+        // Collaborators that have not moved to scopes yet take the engine handle of this transaction.
+        const manager = this.lifecycle.legacyHandle(scope);
+        const currentAttempt = await this.lifecycle.getLifecycleAttempt(scope, attemptId, resourceId);
         if (currentAttempt.candidateUsageId !== createdSession.id) {
           throw new TentativeSessionCancelledError();
         }
@@ -131,30 +131,31 @@ export class UsageSessionStarts {
           manager,
         );
         if (existingActiveSession) {
-          await this.lifecycle.applyLifecycleDrafts(manager, currentAttempt);
-          const result = await manager.update(
-            ResourceUsage,
-            { id: existingActiveSession.id, endTime: IsNull() },
+          await this.lifecycle.applyLifecycleDrafts(scope, currentAttempt);
+          const ended = await this.lifecycle.sessions.endSessionIfOpen(
+            existingActiveSession.id,
             {
               endTime: currentAttempt.transitionTime,
               endNotes: `Session ended due to takeover by user ${user.id}`,
             },
+            scope,
           );
-          if (result.affected === 0) throw new ConflictException('Usage session changed during takeover');
-          const endedSession = await manager.findOneOrFail(ResourceUsage, {
-            where: { id: existingActiveSession.id },
-            relations: ['user', 'resource'],
-          });
-          chargeTransactionId = await this.lifecycle.settleEndedSession(manager, endedSession, outgoingFinal);
+          if (!ended) throw new ConflictException('Usage session changed during takeover');
+          const endedSession = await this.lifecycle.sessions.findSessionWithRelations(
+            existingActiveSession.id,
+            'ended',
+            scope,
+          );
+          chargeTransactionId = await this.lifecycle.settleEndedSession(scope, endedSession, outgoingFinal);
         } else {
           startedUsageIdToEmit = createdSession.id;
         }
         // The outgoing charge must affect the final balance check, including same-user takeovers.
         // Both changes remain atomic if the replacement can no longer be afforded.
-        await this.billingService.handleResourceUsageStart(resourceId, createdSession, user, manager);
-        if (!existingActiveSession) await this.lifecycle.applyLifecycleDrafts(manager, currentAttempt);
-        await manager.update(ResourceUsage, createdSession.id, { isFinalized: true, lifecyclePending: false });
-        await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
+        await this.billingService.handleResourceUsageStart(resourceId, createdSession, asLegacy(user), manager);
+        if (!existingActiveSession) await this.lifecycle.applyLifecycleDrafts(scope, currentAttempt);
+        await this.lifecycle.sessions.publishSession(createdSession.id, scope);
+        await this.lifecycle.sessions.deleteAttempt(attemptId, resourceId, scope);
         // Audit rows commit or roll back with the session change they describe.
         if (existingActiveSession) {
           await this.audit.record(
@@ -182,10 +183,7 @@ export class UsageSessionStarts {
           },
           manager,
         );
-        return manager.findOneOrFail(ResourceUsage, {
-          where: { id: createdSession.id },
-          relations: ['resource', 'user', 'project'],
-        });
+        return this.lifecycle.sessions.findSessionWithRelations(createdSession.id, 'started', scope);
       });
     } catch (error) {
       await this.lifecycle.abortLifecycleAttempt(attemptId, resourceId);

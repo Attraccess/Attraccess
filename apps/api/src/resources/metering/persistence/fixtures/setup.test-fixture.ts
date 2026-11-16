@@ -1,3 +1,4 @@
+import { createOperatingTimelineStore } from '../../../../database/adapters/operating-intervals/typeorm-operating-timeline.store';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Logger } from '@nestjs/common';
 import {
@@ -9,9 +10,7 @@ import {
   ResourceFlowNode,
   ResourceMeteringOperation,
   ResourceMeteringSession,
-  ResourceOperatingInterval,
   ResourceUsage,
-  ResourceUsageLifecycleAttempt,
   User,
 } from '@attraccess/database-entities';
 import {
@@ -142,11 +141,7 @@ export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
     } as never,
     new EventEmitter2(),
     billing as never,
-    new ResourceOperatingAttributionService(
-      scope.source.getRepository(ResourceOperatingInterval),
-      scope.source.getRepository(ResourceUsage),
-      scope.source.getRepository(ResourceUsageLifecycleAttempt),
-    ),
+    new ResourceOperatingAttributionService(createOperatingTimelineStore(scope.source)),
     scope.flows as never,
     {} as never,
     { prepareRequiredSubmissions: jest.fn().mockResolvedValue([]) } as never,

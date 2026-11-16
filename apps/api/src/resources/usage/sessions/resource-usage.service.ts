@@ -1,8 +1,8 @@
-import { LifecycleBillingItem, Resource, ResourceUsage, User } from '@attraccess/database-entities';
+import type { UsageBillingItemDraft, UsageSession, UsageSessionUser } from '@attraccess/application-models';
 
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 
-import { EntityManager } from 'typeorm';
+import type { TransactionContext } from '../../../database/transaction-context';
 
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
@@ -35,6 +35,9 @@ import { UsageSessionStartPreparation } from './usage-session-start-preparation'
 import { UsageSessionStarts } from './usage-session-starts';
 
 export { EndSessionOptions, StartSessionOptions } from '../lifecycle/usage-lifecycle';
+
+/** The resource record the supervision checks work with. */
+type GateResource = Awaited<ReturnType<UsageResourceGate['assertSupportsSupervision']>>;
 
 /**
  * Usage sessions of resources: starts, stops, takeovers, door actions and their reads. The work is done by the
@@ -72,21 +75,21 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
    */
   public async getActiveSession(
     resourceId: number,
-    transactionalEntityManager?: EntityManager,
+    transactionalEntityManager?: TransactionContext,
     preferUserId?: number,
-  ): Promise<ResourceUsage | null> {
+  ): Promise<UsageSession | null> {
     return this.records.getActiveSession(resourceId, transactionalEntityManager, preferUserId);
   }
 
   /** All active sessions of one resource, earliest started first. */
   public async getActiveSessionsForResource(
     resourceId: number,
-    transactionalEntityManager?: EntityManager,
-  ): Promise<ResourceUsage[]> {
+    transactionalEntityManager?: TransactionContext,
+  ): Promise<UsageSession[]> {
     return this.records.getActiveSessionsForResource(resourceId, transactionalEntityManager);
   }
 
-  public async getActiveSessions(resourceIds: number[]): Promise<Map<number, ResourceUsage[]>> {
+  public async getActiveSessions(resourceIds: number[]): Promise<Map<number, UsageSession[]>> {
     return this.records.getActiveSessions(resourceIds);
   }
 
@@ -94,8 +97,8 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     resourceId: number,
     userId: number,
   ): Promise<{
-    usage: ResourceUsage | null;
-    usages: ResourceUsage[];
+    usage: UsageSession | null;
+    usages: UsageSession[];
     activeSessionCount: number;
     maxParallelSessions: number;
     isFull: boolean;
@@ -113,8 +116,8 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     usageId: number,
     user: AuthenticatedUser,
     canViewAll = false,
-    redact?: (usage: ResourceUsage) => ResourceUsage,
-  ): Promise<ResourceUsage> {
+    redact?: (usage: UsageSession) => UsageSession,
+  ): Promise<UsageSession> {
     return this.records.getSessionDetails(resourceId, usageId, user, canViewAll, redact);
   }
 
@@ -123,28 +126,28 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     page = 1,
     limit = 10,
     userId?: number,
-  ): Promise<{ data: ResourceUsage[]; total: number }> {
+  ): Promise<{ data: UsageSession[]; total: number }> {
     return this.records.getResourceUsageHistory(resourceId, page, limit, userId);
   }
 
   async updateSessionProject(
     resourceId: number,
     usageId: number,
-    user: User,
+    user: UsageSessionUser,
     dto: UpdateUsageSessionProjectDto,
-  ): Promise<ResourceUsage> {
+  ): Promise<UsageSession> {
     return this.records.updateSessionProject(resourceId, usageId, user, dto);
   }
 
-  async lockDoor(resourceId: number, user: User): Promise<ResourceUsage> {
+  async lockDoor(resourceId: number, user: UsageSessionUser): Promise<UsageSession> {
     return this.doors.lockDoor(resourceId, user);
   }
 
-  async unlockDoor(resourceId: number, user: User): Promise<ResourceUsage> {
+  async unlockDoor(resourceId: number, user: UsageSessionUser): Promise<UsageSession> {
     return this.doors.unlockDoor(resourceId, user);
   }
 
-  async unlatchDoor(resourceId: number, user: User): Promise<ResourceUsage> {
+  async unlatchDoor(resourceId: number, user: UsageSessionUser): Promise<UsageSession> {
     return this.doors.unlatchDoor(resourceId, user);
   }
 
@@ -154,7 +157,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
    */
   async precheckStart(
     resourceId: number,
-    user: User,
+    user: UsageSessionUser,
     dto: { forceTakeOver?: boolean },
     supervisorUserId: number | null = null,
   ): Promise<void> {
@@ -163,19 +166,19 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
 
   async startSession(
     resourceId: number,
-    user: User,
+    user: UsageSessionUser,
     dto: StartUsageSessionDto,
     options: StartSessionOptions = {},
-  ): Promise<ResourceUsage> {
+  ): Promise<UsageSession> {
     return this.starts.startSession(resourceId, user, dto, options);
   }
 
   async endSession(
     resourceId: number,
-    user: User,
+    user: UsageSessionUser,
     dto: EndUsageSessionDto,
     options: EndSessionOptions = {},
-  ): Promise<ResourceUsage> {
+  ): Promise<UsageSession> {
     return this.ends.endSession(resourceId, user, dto, options);
   }
 
@@ -188,7 +191,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     resourceId: number,
     target: SessionEndTarget,
     notes: string,
-    manager?: EntityManager,
+    manager?: TransactionContext,
     triggeredByUserId?: number,
   ): Promise<void> {
     return this.ends.deferSessionEnds(attemptId, resourceId, target, notes, manager, triggeredByUserId);
@@ -199,7 +202,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     resourceId: number,
     target: SessionEndTarget,
     notes: string,
-    manager?: EntityManager,
+    manager?: TransactionContext,
     triggeredByUserId?: number,
   ): Promise<void> {
     return this.ends.endSessionsOfTarget(resourceId, target, notes, manager, triggeredByUserId);
@@ -228,7 +231,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     attemptId: string,
     resourceId: number,
     usageId: number | undefined,
-    item: Omit<LifecycleBillingItem, 'usageId'>,
+    item: Omit<UsageBillingItemDraft, 'usageId'>,
   ): Promise<void> {
     return this.lifecycle.stageLifecycleBillingItem(attemptId, resourceId, usageId, item);
   }
@@ -240,34 +243,42 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
 
   public async validateSupervisedStart(
     resourceId: number,
-    requester: User,
+    requester: UsageSessionUser,
     supervisorUserId: number,
-    transactionalEntityManager?: EntityManager,
-    preloadedResource?: Resource,
+    transactionalEntityManager?: TransactionContext,
+    preloadedResource?: GateResource,
   ): Promise<void> {
     return this.gate.validateSupervisedStart(
       resourceId,
       requester,
       supervisorUserId,
-      transactionalEntityManager,
+      transactionalEntityManager && this.lifecycle.legacyHandle(transactionalEntityManager),
       preloadedResource,
     );
   }
 
   public async assertSupportsSupervision(
     resourceId: number,
-    transactionalEntityManager?: EntityManager,
-    preloadedResource?: Resource,
-  ): Promise<Resource> {
-    return this.gate.assertSupportsSupervision(resourceId, transactionalEntityManager, preloadedResource);
+    transactionalEntityManager?: TransactionContext,
+    preloadedResource?: GateResource,
+  ): Promise<GateResource> {
+    return this.gate.assertSupportsSupervision(
+      resourceId,
+      transactionalEntityManager && this.lifecycle.legacyHandle(transactionalEntityManager),
+      preloadedResource,
+    );
   }
 
   public async canControllResource(
     resourceId: number,
-    user: User,
-    transactionalEntityManager?: EntityManager,
+    user: UsageSessionUser,
+    transactionalEntityManager?: TransactionContext,
   ): Promise<boolean> {
-    return this.access.canControllResource(resourceId, user, transactionalEntityManager);
+    return this.access.canControllResource(
+      resourceId,
+      user,
+      transactionalEntityManager && this.lifecycle.legacyHandle(transactionalEntityManager),
+    );
   }
 
   // The access cache listens to these events itself; the handlers stay callable here as before.

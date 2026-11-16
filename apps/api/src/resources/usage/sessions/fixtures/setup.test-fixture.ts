@@ -1,3 +1,4 @@
+import { fakedOrmPersistenceProviders } from './persistence.test-fixture';
 import { AUDIT_RECORDER } from '../../../../audit/recorder/audit-event';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResourceUsageService } from '../resource-usage.service';
@@ -34,6 +35,7 @@ export async function resetTestFixture(scope: ResourceUsageServiceTestScope) {
     providers: [
       ResourceUsageService,
       ...RESOURCE_USAGE_COLLABORATORS,
+      ...fakedOrmPersistenceProviders(),
       {
         provide: getRepositoryToken(Resource),
         useFactory: scope.mockRepository,

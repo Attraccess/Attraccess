@@ -1,19 +1,12 @@
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Logger } from '@nestjs/common';
-import {
-  BillingTransaction,
-  Form,
-  Resource,
-  ResourceOperatingInterval,
-  ResourceUsage,
-  ResourceUsageLifecycleAttempt,
-  User,
-} from '@attraccess/database-entities';
+import { BillingTransaction, Form, Resource, ResourceUsage, User } from '@attraccess/database-entities';
 import { BillingTransactionStatus, ResourceType, SupervisionMode } from '@attraccess/application-models';
 import { DataSource, EntityManager } from 'typeorm';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createOperatingTimelineStore } from '../../../../database/adapters/operating-intervals/typeorm-operating-timeline.store';
 import { ResourceOperatingIntervalService } from '../../../operating-intervals/resource-operating-interval.service';
 import { ResourceOperatingAttributionService } from '../../../operating-intervals/resource-operating-attribution.service';
 import { USAGE_RECOVERY_TABLE_SQL } from '../../../../database/resource-usage-integrity';
@@ -46,7 +39,7 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
   await scope.source.getRepository(Form).save({ id: 11, name: 'Safety checklist' });
   scope.events = new EventEmitter2();
   scope.operating = new ResourceOperatingIntervalService(
-    scope.source.getRepository(ResourceOperatingInterval),
+    createOperatingTimelineStore(scope.source),
     {
       recordTransition: jest.fn(),
       setResourceState: jest.fn(),
@@ -102,11 +95,7 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
     scope.maintenance as never,
     scope.events,
     scope.billing as never,
-    new ResourceOperatingAttributionService(
-      scope.source.getRepository(ResourceOperatingInterval),
-      scope.source.getRepository(ResourceUsage),
-      scope.source.getRepository(ResourceUsageLifecycleAttempt),
-    ),
+    new ResourceOperatingAttributionService(createOperatingTimelineStore(scope.source)),
     scope.flow as never,
     {} as never,
     {

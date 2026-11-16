@@ -1,58 +1,51 @@
-import { ResourceOperatingInterval, ResourceUsage, ResourceUsageLifecycleAttempt } from '@attraccess/database-entities';
+import type { OperatingIntervalRecord, OperatingTimelineSession } from '@attraccess/application-models';
 import { ResourceUsageAction } from '@attraccess/application-models';
-import { Repository } from 'typeorm';
 import { ResourceOperatingAttributionService } from './resource-operating-attribution.service';
+import type { OperatingTimelineStore } from './operating-timeline.port';
 
 const at = (time: string) => new Date(`2026-08-28T${time}.000Z`);
 
-const operating = (id: number, startTime: string, endTime: string | null): ResourceOperatingInterval =>
-  ({ id, resourceId: 1, startTime: at(startTime), endTime: endTime ? at(endTime) : null }) as ResourceOperatingInterval;
+const operating = (id: number, startTime: string, endTime: string | null): OperatingIntervalRecord => ({
+  id,
+  resourceId: 1,
+  startTime: at(startTime),
+  endTime: endTime ? at(endTime) : null,
+  startFlowNodeId: null,
+  startFlowRunId: null,
+  endFlowNodeId: null,
+  endFlowRunId: null,
+});
 
-const usage = (id: number, startTime: string, endTime: string | null): ResourceUsage =>
-  ({
-    id,
-    resourceId: 1,
-    usageAction: ResourceUsageAction.Usage,
-    startTime: at(startTime),
-    endTime: endTime ? at(endTime) : null,
-  }) as ResourceUsage;
+const usage = (id: number, startTime: string, endTime: string | null): OperatingTimelineSession => ({
+  id,
+  resourceId: 1,
+  usageAction: ResourceUsageAction.Usage,
+  lifecyclePending: false,
+  operatingDurationCreditsPerMinute: null,
+  startTime: at(startTime),
+  endTime: endTime ? at(endTime) : null,
+});
+
+type ReadSide = Pick<
+  OperatingTimelineStore,
+  'findIntervals' | 'findSessions' | 'findResourcesWithIntervals' | 'findPendingSessionEnds'
+>;
+
 export function registerResourceOperatingAttributionServiceFixture() {
   const asOf = at('12:00:00');
 
   let service: ResourceOperatingAttributionService;
 
-  let intervalRepository: jest.Mocked<
-    Pick<Repository<ResourceOperatingInterval>, 'createQueryBuilder' | 'find' | 'existsBy'>
-  >;
-
-  let usageRepository: jest.Mocked<Pick<Repository<ResourceUsage>, 'find'>>;
-
-  let lifecycleAttemptRepository: jest.Mocked<Pick<Repository<ResourceUsageLifecycleAttempt>, 'find'>>;
-
-  let availabilityQuery: {
-    select: jest.Mock;
-    where: jest.Mock;
-    getRawMany: jest.Mock;
-  };
+  let timeline: { [Method in keyof ReadSide]: jest.Mock<ReturnType<ReadSide[Method]>, Parameters<ReadSide[Method]>> };
 
   beforeEach(() => {
-    availabilityQuery = {
-      select: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      getRawMany: jest.fn().mockResolvedValue([]),
+    timeline = {
+      findIntervals: jest.fn().mockResolvedValue([]),
+      findSessions: jest.fn().mockResolvedValue([]),
+      findResourcesWithIntervals: jest.fn(async (resourceIds: number[]) => new Set(resourceIds)),
+      findPendingSessionEnds: jest.fn().mockResolvedValue(new Map()),
     };
-    intervalRepository = {
-      find: jest.fn(),
-      existsBy: jest.fn().mockResolvedValue(true),
-      createQueryBuilder: jest.fn().mockReturnValue(availabilityQuery),
-    };
-    usageRepository = { find: jest.fn() };
-    lifecycleAttemptRepository = { find: jest.fn().mockResolvedValue([]) };
-    service = new ResourceOperatingAttributionService(
-      intervalRepository as unknown as Repository<ResourceOperatingInterval>,
-      usageRepository as unknown as Repository<ResourceUsage>,
-      lifecycleAttemptRepository as Repository<ResourceUsageLifecycleAttempt>,
-    );
+    service = new ResourceOperatingAttributionService(timeline as unknown as OperatingTimelineStore);
   });
   return {
     get at() {
@@ -70,14 +63,8 @@ export function registerResourceOperatingAttributionServiceFixture() {
     get service() {
       return service;
     },
-    get intervalRepository() {
-      return intervalRepository;
-    },
-    get usageRepository() {
-      return usageRepository;
-    },
-    get availabilityQuery() {
-      return availabilityQuery;
+    get timeline() {
+      return timeline;
     },
   };
 }

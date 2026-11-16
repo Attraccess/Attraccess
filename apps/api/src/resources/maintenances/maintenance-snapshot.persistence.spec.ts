@@ -1,3 +1,4 @@
+import { createOperatingTimelineStore } from '../../database/adapters/operating-intervals/typeorm-operating-timeline.store';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -124,11 +125,7 @@ describe('Maintenance snapshots (file-backed SQLite)', () => {
       if (target === ResourceMaintenanceSchedule) return { find: schedules } as never;
       return getRepository.call(this, target) as never;
     });
-    const attribution = new ResourceOperatingAttributionService(
-      source.getRepository(ResourceOperatingInterval),
-      source.getRepository(ResourceUsage),
-      source.getRepository(ResourceUsageLifecycleAttempt),
-    );
+    const attribution = new ResourceOperatingAttributionService(createOperatingTimelineStore(source));
     durationScan = jest.fn(async (windows: ResourceDurationWindow[], now: Date, manager?: EntityManager) => {
       const durations = await attribution.getDurationsForWindows(windows, now, manager);
       // Pause after reading real history but before returning its result. A queued

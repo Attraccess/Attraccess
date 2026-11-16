@@ -1,3 +1,4 @@
+import { fakedOrmPersistenceProviders } from './persistence.test-fixture';
 import { AUDIT_RECORDER } from '../../../../audit/recorder/audit-event';
 import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -46,6 +47,7 @@ export function createResourceUsageTestingModule(mocks: ReturnType<typeof create
     providers: [
       ResourceUsageService,
       ...RESOURCE_USAGE_COLLABORATORS,
+      ...fakedOrmPersistenceProviders(),
       {
         provide: getRepositoryToken(Resource),
         useFactory: mockRepository,

@@ -1,15 +1,13 @@
-import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
 import { ResourceUsageAction } from '@attraccess/application-models';
+import type { UsageSession, UsageSessionResource, UsageSessionUser } from '@attraccess/application-models';
 
 import { SystemEvent } from '@attraccess/plugins-backend-sdk';
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { EntityManager, Repository } from 'typeorm';
+import type { TransactionContext } from '../../../database/transaction-context';
 
 import { BillingService } from '../../../billing/charges/billing.service';
 
@@ -36,6 +34,10 @@ import { emitPluginSessionEnded, emitPluginSessionStart } from '../events/plugin
 
 import { RESOURCE_USAGE_LOG_CONTEXT } from '../lifecycle/usage-lifecycle';
 
+import { USAGE_SESSION_STORE, UsageSessionStore } from '../usage-session-store.port';
+
+import { asLegacy } from '../legacy-seams';
+
 import { type PreparedSessionStart } from './usage-session-start-preparation';
 
 /** Charges, events, plugin events and metrics once a usage change has committed. */
@@ -44,8 +46,7 @@ export class UsageSessionNotifications {
   private readonly logger = new Logger(RESOURCE_USAGE_LOG_CONTEXT);
 
   constructor(
-    @InjectRepository(ResourceUsage)
-    private readonly resourceUsageRepository: Repository<ResourceUsage>,
+    @Inject(USAGE_SESSION_STORE) private readonly sessions: UsageSessionStore,
     private readonly eventEmitter: EventEmitter2,
     private readonly billingService: BillingService,
     private readonly metricsService: MetricsService,
@@ -55,13 +56,13 @@ export class UsageSessionNotifications {
 
   async notifySessionStarted(
     resourceId: number,
-    user: User,
+    user: UsageSessionUser,
     dto: StartUsageSessionDto,
     supervisorUserId: number | null,
     prepared: PreparedSessionStart,
-    newSession: ResourceUsage,
+    newSession: UsageSession,
     startedUsageIdToEmit: number | null,
-    takeoverEndedUser: User | null,
+    takeoverEndedUser: UsageSessionUser | null,
     chargeTransactionId: number | undefined,
   ): Promise<void> {
     if (chargeTransactionId !== undefined) await this.billingService.notifyResourceUsageCharge(chargeTransactionId);
@@ -129,11 +130,11 @@ export class UsageSessionNotifications {
 
   async notifySessionEnded(
     resourceId: number,
-    user: User,
+    user: UsageSessionUser,
     dto: EndUsageSessionDto,
-    updatedUsage: ResourceUsage,
+    updatedUsage: UsageSession,
     endedUsageIdToEmit: number | null,
-    activeSession: ResourceUsage | null,
+    activeSession: UsageSession | null,
     skipNoteNotification: boolean,
     chargeTransactionId: number | undefined,
   ): Promise<void> {
@@ -190,15 +191,8 @@ export class UsageSessionNotifications {
     }
   }
 
-  async emitUsageEvent(usageId: number, transactionalEntityManager?: EntityManager): Promise<void> {
-    const resourceUsageRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(ResourceUsage)
-      : this.resourceUsageRepository;
-
-    const usage = await resourceUsageRepository.findOne({
-      where: { id: usageId },
-      relations: ['resource', 'user'],
-    });
+  async emitUsageEvent(usageId: number, context?: TransactionContext): Promise<void> {
+    const usage = await this.sessions.findSessionForEvent(usageId, context);
     // An ended usage session is announced by ResourceUsageSessionEndedEvent (or the take-over event), never as a
     // start. Door actions are stored already ended and still fire this event.
     if (usage?.usageAction === ResourceUsageAction.Usage && usage.endTime) return;
@@ -207,14 +201,14 @@ export class UsageSessionNotifications {
 
   private emitSystemUsageEvent(
     event: SystemEvent.RESOURCE_USAGE_STARTED | SystemEvent.RESOURCE_USAGE_ENDED,
-    resource: Resource | undefined,
-    user: User | undefined,
+    resource: UsageSessionResource | undefined,
+    user: UsageSessionUser | undefined,
   ): void {
     if (!resource || !user) {
       return;
     }
     try {
-      this.pluginEvents.emit(event, { resource, user });
+      this.pluginEvents.emit(event, { resource: asLegacy(resource), user: asLegacy(user) });
     } catch (error) {
       this.logger.error(`Failed to emit plugin SystemEvent ${event}`, (error as Error).stack);
     }

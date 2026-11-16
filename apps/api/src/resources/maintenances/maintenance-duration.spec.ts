@@ -1,3 +1,4 @@
+import { createOperatingTimelineStore } from '../../database/adapters/operating-intervals/typeorm-operating-timeline.store';
 import { DataSource, EntitySchema } from 'typeorm';
 import {
   ResourceOperatingInterval,
@@ -77,11 +78,7 @@ describe('Maintenance duration from authoritative intervals', () => {
       entities: [UsageSchema, IntervalSchema, AttemptSchema],
     }).initialize();
     const usageRepository = dataSource.getRepository(ResourceUsage);
-    attribution = new ResourceOperatingAttributionService(
-      dataSource.getRepository(ResourceOperatingInterval),
-      usageRepository,
-      dataSource.getRepository(ResourceUsageLifecycleAttempt),
-    );
+    attribution = new ResourceOperatingAttributionService(createOperatingTimelineStore(dataSource));
     evaluator = new MaintenanceScheduleEvaluatorService(
       {} as never,
       {} as never,
