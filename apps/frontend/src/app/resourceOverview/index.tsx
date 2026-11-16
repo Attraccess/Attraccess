@@ -6,7 +6,8 @@ import {
 } from '@attraccess/react-query-client';
 import { Toolbar } from './toolbar/toolbar';
 import { ResourceGroupCard } from './resourceGroupCard';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useDebounce } from '@attraccess/plugins-frontend-ui';
 import { NoResourcesFound } from './noResourcesFound';
 import { ActiveUsageSessionsBanner } from './activeUsageSessionsBanner';
@@ -42,15 +43,28 @@ export function ResourceOverview() {
   const [createOpen, setCreateOpen] = useState(false);
   const { data: groups } = useResourcesServiceResourceGroupsGetMany();
 
-  const [searchValue, setSearchValue] = useState('');
-  const [filterByOnlyInUseByMe, setFilterByOnlyInUseByMeState] = useState(
-    () => getValueFromLocalStorage(PersistedFilterProps.onlyInUseByMe, false),
+  // The dashboard's resource search opens this page with `?q=`. The term only fills the search field; the field is
+  // local state, so `q` leaves the URL, where it would bring back a search the user has since cleared.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchValue, setSearchValue] = useState(() => searchParams.get('q') ?? '');
+  useEffect(() => {
+    if (!searchParams.has('q')) return;
+    setSearchParams(
+      (params) => {
+        params.delete('q');
+        return params;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
+  const [filterByOnlyInUseByMe, setFilterByOnlyInUseByMeState] = useState(() =>
+    getValueFromLocalStorage(PersistedFilterProps.onlyInUseByMe, false),
   );
-  const [filterByOnlyWithPermissions, setFilterByOnlyWithPermissionsState] = useState(
-    () => getValueFromLocalStorage(PersistedFilterProps.onlyWithPermissions, true),
+  const [filterByOnlyWithPermissions, setFilterByOnlyWithPermissionsState] = useState(() =>
+    getValueFromLocalStorage(PersistedFilterProps.onlyWithPermissions, true),
   );
-  const [filterByHideEmptyResourceGroups, setFilterByHideEmptyResourceGroupsState] = useState(
-    () => getValueFromLocalStorage(PersistedFilterProps.hideEmptyResourceGroups, true),
+  const [filterByHideEmptyResourceGroups, setFilterByHideEmptyResourceGroupsState] = useState(() =>
+    getValueFromLocalStorage(PersistedFilterProps.hideEmptyResourceGroups, true),
   );
 
   const debouncedSearchValue = useDebounce(searchValue, 250);

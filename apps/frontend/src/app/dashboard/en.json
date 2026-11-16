@@ -1,0 +1,76 @@
+{
+  "title": "Dashboard",
+  "subtitle": "Your widgets, pinned pages and resources",
+  "empty": {
+    "title": "Nothing pinned yet",
+    "description": "Add widgets with \"Add widget\", or open a page or a resource and select the star in its header. Once something is on it, the dashboard also becomes your start page.",
+    "browseResources": "Browse resources"
+  },
+  "loadError": {
+    "title": "Could not load your dashboard",
+    "description": "Your dashboard could not be loaded. Check your connection and try again.",
+    "retry": "Retry"
+  },
+  "pin": {
+    "add": "Pin to dashboard",
+    "remove": "Unpin from dashboard",
+    "saveError": "Your dashboard could not be saved. Please try again."
+  },
+  "card": {
+    "dragHandle": "Reorder {{title}}",
+    "unavailable": "No longer accessible",
+    "unavailableDescription": "You can no longer open this page. Its permission may have been removed or its plugin is not available.",
+    "remove": "Remove from dashboard",
+    "removeLabel": "Remove {{title}} from dashboard",
+    "resourceLoadError": "This resource could not be loaded.",
+    "unavailableWidgetDescription": "You can no longer use this widget. Its permission or license may have been removed or its plugin is not available.",
+    "widgetLabel": "{{title}} widget",
+    "sizeLabel": "Change size of {{title}}"
+  },
+  "drag": {
+    "instructions": "To pick up a card, press space or enter. Use the arrow keys to move it. Press space or enter again to drop it in its new place, or press escape to cancel.",
+    "start": "Picked up {{title}}.",
+    "over": "{{title}} was moved over {{target}}.",
+    "outside": "{{title}} is no longer over another card.",
+    "end": "{{title}} was dropped in the place of {{target}}.",
+    "endOutside": "{{title}} was dropped.",
+    "cancel": "Moving {{title}} was cancelled."
+  },
+  "reorderError": "The new order could not be saved. Your dashboard shows the saved order again.",
+  "edit": {
+    "start": "Edit dashboard",
+    "done": "Done",
+    "add": "Add widget",
+    "hint": "Drag a tile by its handle to move it, change its size with the size button, or remove it with the button in its corner. Changes are saved right away."
+  },
+  "resizeError": "The new size could not be saved.",
+  "sizes": {
+    "small": "Small",
+    "medium": "Medium",
+    "large": "Large"
+  },
+  "gallery": {
+    "title": "Add widget",
+    "searchLabel": "Search widgets",
+    "noMatch": "No widgets match \"{{term}}\"",
+    "add": "Add",
+    "added": "Added",
+    "addWidgetLabel": "Add {{title}} widget",
+    "addShortcutLabel": "Add {{title}} shortcut",
+    "addedWidgetLabel": "{{title}} widget added",
+    "addedShortcutLabel": "{{title}} shortcut added",
+    "addResourceLabel": "Add the chosen resource",
+    "sizeLabel": "Size",
+    "loading": "Loading…",
+    "close": "Close",
+    "shortcutDescription": "A shortcut to this page",
+    "resource": {
+      "title": "Resource",
+      "description": "Pin one resource with its status and session controls",
+      "choose": "Choose resource",
+      "sampleName": "Laser cutter",
+      "sampleStatus": "Available",
+      "sampleStart": "Start session"
+    }
+  }
+}

@@ -1642,7 +1642,7 @@
   "getPlugins": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "caa8f359"
+    "shape": "f4b4fce2"
   },
   "uploadPlugin": {
     "decision": "deny",
@@ -1948,6 +1948,16 @@
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
     "shape": "3a8d32ca"
+  },
+  "dashboardGetPins": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "a514cf61"
+  },
+  "dashboardUpdatePins": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "e078a73b"
   },
   "getMcpOAuthRequest": {
     "decision": "deny",

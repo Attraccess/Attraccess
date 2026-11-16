@@ -1,4 +1,5 @@
 import { pairedReadersOnly } from '../cardWriting';
+import { isReaderStale } from '../readerStaleness';
 import {
   Button,
   Card,
@@ -96,9 +97,7 @@ export function useAttractapListState() {
     const active = [];
     // Readers that are not paired are only listed in the Not paired card until they are paired.
     for (const reader of pairedReadersOnly(allReaders)) {
-      const lastConnection = new Date(reader.lastConnection);
-      const isStale = lastConnection.getTime() < now.getTime() - 24 * 60 * 60 * 1000;
-      if (isStale) {
+      if (isReaderStale(reader, now)) {
         stale.push(reader);
       } else {
         active.push(reader);

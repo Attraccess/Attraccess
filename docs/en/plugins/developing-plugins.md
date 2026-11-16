@@ -66,6 +66,7 @@ keyword and an `attraccess` object:
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
     "styles": "frontend/style.css",
+    "dashboardPaths": ["/hello-world"],
     "permissions": ["READ_USERS", "LISTEN_EVENTS"],
     "sdk": { "backend": "^1.9.0", "frontend": "^1.9.0" }
   }
@@ -78,6 +79,8 @@ keyword and an `attraccess` object:
 | `version`                                    | yes          | Your plugin's semantic version.                                                                        |
 | `attraccess.backend` / `attraccess.frontend` | at least one | Relative package entry point.                                                                          |
 | `attraccess.styles`                          | no           | Stylesheet alongside the frontend entry point.                                                         |
+| `attraccess.dashboardPaths`                  | no           | Sidebar paths users may pin to their dashboard. See [Dashboard pins](#dashboard-pins).                 |
+| `attraccess.dashboardWidgets`                | no           | Ids of the dashboard widgets the plugin offers. See [Dashboard widgets](#dashboard-widgets).           |
 | `attraccess.migrations`                      | no           | Module exporting TypeORM migration classes. See [Database Migrations](plugins/database-migrations.md). |
 | `attraccess.host`                            | yes          | Compatible Attraccess host semver range.                                                               |
 | `attraccess.permissions`                     | no           | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`.      |
@@ -1057,6 +1060,132 @@ The host collects all group declarations before placing entries. A plugin may
 also reference a group declared only by another plugin, but should declare the
 group itself if it needs to work independently. Without any declaration, the
 existing root fallback applies.
+
+### Dashboard pins
+
+Users can pin pages to their personal dashboard with the star in the page
+header. Plugin pages are pinnable only when the plugin opts in: list the
+sidebar paths in `attraccess.dashboardPaths` in `package.json` (or
+`main.frontend.dashboardPaths` in `plugin.json`):
+
+```json
+"dashboardPaths": ["/my-plugin/tools"]
+```
+
+Each path must also be returned by `getSidebarItems()` and `getRoutes()`, made
+of plain segments, and outside `/kiosk` and `/dashboard`. The API refuses pins
+for paths no active plugin lists. The host shows the star in the first
+`PageHeader` from `@attraccess/plugins-frontend-ui` on that page, so render one
+as your page title; you need no other code. The page also appears as a small
+shortcut tile in your plugin's group of the "Add widget" gallery. The tile uses
+your sidebar entry's label and icon, and its route permissions decide whether the
+user may open it. When a user loses access, or your plugin is disabled or no
+longer lists the path, the card is shown as no longer accessible until the
+user removes it.
+
+### Dashboard widgets
+
+Besides pinned pages, users can add **widgets** to their dashboard: tiles with
+live content and quick actions, which they pick from the "Add widget" gallery. A plugin offers widgets in two steps.
+
+1. List the widget ids in `attraccess.dashboardWidgets` in `package.json` (or
+   `main.frontend.dashboardWidgets` in `plugin.json`). Ids are lowercase
+   kebab-case, at most 64 characters, and are stored in users' dashboards, so
+   never rename one:
+
+   ```json
+   "dashboardWidgets": ["my-plugin-summary"]
+   ```
+
+2. Return the widgets the current user may use from `getDashboardWidgets()`:
+
+   ```tsx
+   import type { AttraccessFrontendPlugin, PluginDashboardWidget } from '@attraccess/plugins-frontend-sdk';
+
+   export default class MyPlugin implements AttraccessFrontendPlugin {
+     private readonly widgetListeners = new Set<() => void>();
+
+     getDashboardWidgets(): PluginDashboardWidget[] {
+       return [
+         {
+           id: 'my-plugin-summary',
+           title: 'Summary', // translate it: the host asks again when the language changes
+           description: 'What happened today', // one line in the "Add widget" gallery
+           icon: <ChartIcon />,
+           href: '/my-plugin/summary', // the header links here outside edit mode
+           sizes: ['small', 'medium'], // default ['medium']
+           defaultSize: 'medium', // default: the first entry of sizes
+           group: 'My plugin', // gallery group; default: your plugin's group, titled after the first group a widget names, else the manifest name
+           keywords: ['report', 'statistics'], // extra search terms for the gallery
+           render: ({ size, isPreview }) => <SummaryWidget size={size} isPreview={isPreview} />,
+         },
+       ];
+     }
+
+     // Optional: call the listeners when the answer of getDashboardWidgets() changes,
+     // for example after an async permission check.
+     onDashboardWidgetsChange(listener: () => void): () => void {
+       this.widgetListeners.add(listener);
+       return () => this.widgetListeners.delete(listener);
+     }
+     // ...
+   }
+   ```
+
+The host renders the card: its header with your icon and title, the edit
+controls and an error boundary. `render()` returns only the body. A body that
+throws shows an error inside its card; the rest of the dashboard keeps
+working. Set `hasFields: true` when the body holds form fields: the host then
+renders the widget on an outlined section instead of a card surface, where
+fields would disappear. Outside edit mode the header links to `href`, so do not
+repeat an "Open …" link in the body.
+
+#### Sizes
+
+Tiles sit in a grid with a fixed row height, like widgets on a phone home
+screen. There are three sizes:
+
+| Size     | Grid cells         |
+| -------- | ------------------ |
+| `small`  | 1 column × 1 row   |
+| `medium` | 2 columns × 1 row  |
+| `large`  | 2 columns × 2 rows |
+
+List the sizes your widget supports in `sizes`; users pick one when they add
+it and can change it in edit mode. `render()` receives the tile's `size`. A
+tile never grows with its content, so show a fixed number of items per size
+(for example 1, 3 and 7) instead of measuring, and truncate long text. Content
+that still does not fit is clipped. A stored size your widget no longer
+supports renders at `defaultSize`.
+
+#### Previews
+
+The "Add widget" gallery shows a live preview of each widget at the selected
+size. The host calls `render()` with `isPreview: true` and places the result in
+an `inert` frame that is hidden from assistive technology: nothing in it can be
+focused or clicked. Load your data as usual, but do not open dialogs, navigate
+or start anything (for example a timer that writes, or a request that changes
+data) when `isPreview` is set.
+
+#### Older widgets
+
+All new fields are optional. A widget without `sizes` supports `medium` only,
+and a `render()` that takes no argument keeps working: it renders at its
+default size.
+
+A widget is offered only while your plugin is active, lists its id in the
+manifest and returns it from `getDashboardWidgets()`. The API refuses to add
+ids that no active plugin lists. A built-in widget id always wins over yours
+(the host ignores yours and logs a warning). Return only what the current user
+may use, and gate every link and action in the body by the same rule as its
+target. Hiding a widget is not access control: any user can pin a declared id,
+so your backend endpoints must check access themselves. The host asks again when the user or the language changes and after
+`onDashboardWidgetsChange` fires. When a user loses access, or your plugin is
+disabled or stops returning the widget, the card shows as no longer accessible
+until the user removes it.
+
+The Reservations plugin's `reservations-upcoming` widget
+(`apps/plugins/reservations/frontend/src/dashboard/`) is a complete example.
 
 ### Slots (embedded extension points)
 

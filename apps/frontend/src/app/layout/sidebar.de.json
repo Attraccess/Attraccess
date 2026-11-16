@@ -19,6 +19,7 @@
   "groups": {
     "##default##": {
       "items": {
+        "dashboard": "Dashboard",
         "resources": "Ressourcen",
         "projects": "Projekte",
         "messages": "Nachrichten",

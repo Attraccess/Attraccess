@@ -1,6 +1,7 @@
 import { DateTimePreferences, getSupportedDeviceLanguage, validateDateTimeLocale } from '@attraccess/shared';
 import {
   AuthenticationDetail,
+  DashboardPin,
   ResourceUsage,
   Session,
   SSOProviderType,
@@ -413,6 +414,8 @@ export class UsersService {
 
       await authRepo.delete({ userId: user.id });
       await sessionRepo.delete({ userId: user.id });
+      // The user row stays (soft delete), so its ON DELETE CASCADE never removes the pins.
+      await em.getRepository(DashboardPin).delete({ userId: user.id });
 
       await repo.update(user.id, {
         username: anonymizedUsername,

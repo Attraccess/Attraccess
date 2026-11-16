@@ -134,6 +134,7 @@
   - [Logging In](end-user/login.md)
   - [My Account](end-user/account.md)
   - [Using Resources](end-user/using-resources.md)
+  - [Dashboard](end-user/dashboard.md)
   - [Mobile Usage (PWA)](end-user/mobile-pwa.md)
 
 - **FAQ & Help**

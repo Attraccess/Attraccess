@@ -263,6 +263,7 @@ export function usePluginProviderStateOutput(model: ReturnType<typeof usePluginP
     } finally {
       arePluginsLoaded.current = true;
       loadingPlugins.current = false;
+      usePluginState.getState().setInitialized(true);
       console.debug('Attraccess Plugin System: All plugins loaded');
     }
   }, [
