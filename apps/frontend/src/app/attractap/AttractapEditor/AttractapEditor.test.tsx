@@ -72,6 +72,9 @@ describe('AttractapEditor plugin Bluetooth opt-in', () => {
     render(<AttractapEditor readerId={1} isOpen onSave={vi.fn()} onCancel={vi.fn()} />);
     expect(screen.getByRole('switch', { name: 'allowPluginBle' })).not.toBeChecked();
     expect(screen.getByText('allowPluginBleDescription')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'allowPluginBle' })).toHaveAccessibleDescription(
+      'allowPluginBleDescription',
+    );
   });
 
   it('shows the saved value', () => {

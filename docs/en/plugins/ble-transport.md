@@ -70,8 +70,8 @@ const profile = context.ble.registerProfile({
 - **Keys** (`/^[a-zA-Z][a-zA-Z0-9_-]{0,31}$/`) are profile-local names. **Operations always name a characteristic by key, never by UUID.** An unknown key rejects with `UNKNOWN_CHARACTERISTIC`.
 - **Operations** are a non-empty list without duplicates from `read`, `write`, `writeWithoutResponse`, `notify`, `indicate`. Using an operation a key does not allow rejects with `OPERATION_NOT_ALLOWED`.
 - **Bounds** (`maxReadBytes`, `maxWriteBytes`, `maxNotificationBytes`, 1..512) are required for every allowed operation. A write above its bound rejects with `PAYLOAD_TOO_LARGE` **before** anything reaches the reader. A read result or notification above its bound also rejects with `PAYLOAD_TOO_LARGE`.
-- **`advertisement`** filters scans: a scan returns only advertisements that match every criterion you set (any listed service UUID, any listed manufacturer id from 0 to 0xffff, and the name prefix). A profile without an advertisement filter cannot scan (`OPERATION_NOT_ALLOWED`).
-- **`limits`** raise the session lease up to 15 minutes (`maxSessionMs`, default 30 s) and the notification queue up to 256 (`maxNotificationQueue`, default 32). Values above the host caps are rejected with `INVALID_PROFILE`.
+- **`advertisement`** filters scans: a scan returns only advertisements that match every criterion you set (any listed service UUID, any listed manufacturer id from 0 to 0xffff, and the name prefix). A filter must set at least one of the three, otherwise `INVALID_PROFILE`. A profile without an advertisement filter cannot scan (`OPERATION_NOT_ALLOWED`).
+- **`limits`** set the session lease cap (`maxSessionMs`, 1 ms up to 15 minutes; the default lease is 30 s or `maxSessionMs` if that is lower) and the notification queue up to 256 (`maxNotificationQueue`, default 32). Values above the host caps are rejected with `INVALID_PROFILE`.
 
 The returned profile is deep-frozen. Invalid definitions throw `PluginBleError('INVALID_PROFILE')` with a message that names the field, for example `services[0].characteristics[1].maxReadBytes: is required for the allowed operations`.
 
@@ -149,7 +149,7 @@ Rules:
 
 - **One open session per endpoint.** A second `openSession` rejects with `ENDPOINT_BUSY` (retryable). There is no queue in the contract; serializing access per reader is the transport's job.
 - **Operations run one at a time, in call order.**
-- **Notifications** arrive in order per subscription, only to the owning session, in a bounded queue (default 32, profile maximum 256). When the queue overflows, the stream fails with `NOTIFICATION_OVERFLOW` instead of dropping data silently; the session stays open. Consume notifications promptly. The async iterator ends when the stream is unsubscribed or the session closes.
+- **Notifications** arrive in order per subscription, only to the owning session, in a bounded queue (default 32, profile maximum 256). When the queue overflows, the host discards the queued notifications and fails the stream at once instead of dropping data silently: every pending and later `next()` rejects with `NOTIFICATION_OVERFLOW`, while the session stays open. Call `session.unsubscribe(key)` and subscribe again to resume. Subscribing to a key that is already subscribed rejects with `INVALID_ARGUMENT`. Consume notifications promptly. The async iterator ends when the stream is unsubscribed or the session closes.
 - **After `close`**, every further operation rejects with `SESSION_CLOSED`. Operations that were pending when the session closed reject once: `DISCONNECTED` if the device disconnected, `CANCELLED` if the open signal aborted, `SESSION_CLOSED` otherwise.
 - **`closed` reasons:** `closed`, `lease-expired`, `cancelled`, `disconnected`, `reader-access-revoked`, `endpoint-deleted`, `shutdown`, `error`.
 - **Cancellation.** Every method accepts an `AbortSignal`. Aborting rejects that pending call with `CANCELLED`. Aborting the signal you passed to `openSession` closes the session. A timed-out or cancelled operation does **not** close the session, unless the transport reports the link lost.
@@ -213,14 +213,14 @@ Your plugin should:
 
 The host cleans up for you:
 
-| Event                                                         | What happens                                                            |
-| ------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Your plugin module is destroyed                               | Its sessions close with `shutdown`. Endpoints stay.                     |
-| An administrator turns the reader off                         | Its sessions close with `reader-access-revoked`. Endpoints stay.        |
-| A reader is deleted                                           | Sessions close with `reader-access-revoked`; its endpoints are deleted. |
-| An endpoint is deleted, or moved to another reader or address | Its session closes with `endpoint-deleted`.                             |
-| A lease expires                                               | The session closes with `lease-expired`.                                |
-| Your plugin is uninstalled                                    | Its endpoints are deleted.                                              |
+| Event                                                                                                          | What happens                                                            |
+| -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Your plugin module is destroyed                                                                                | Its sessions close with `shutdown`. Endpoints stay.                     |
+| An administrator turns the reader off                                                                          | Its sessions close with `reader-access-revoked`. Endpoints stay.        |
+| A reader is deleted                                                                                            | Sessions close with `reader-access-revoked`; its endpoints are deleted. |
+| An endpoint is deleted, or its reader, address or address type changes (a label-only update keeps the session) | Its session closes with `endpoint-deleted`.                             |
+| A lease expires                                                                                                | The session closes with `lease-expired`.                                |
+| Your plugin is uninstalled                                                                                     | Its endpoints are deleted.                                              |
 
 Every close aborts pending operations and subscriptions, tells the transport to disconnect and settles each pending promise exactly once.
 
@@ -246,7 +246,19 @@ it('unlocks and waits for the confirmation', async () => {
   });
 
   const ble = host.contextFor('my-plugin');
-  ble.registerProfile(profileDefinition);
+  ble.registerProfile({
+    id: 'door-lock',
+    advertisement: { serviceUuids: ['fff0'] },
+    services: [
+      {
+        uuid: 'fff0',
+        characteristics: [
+          { key: 'command', uuid: 'fff1', operations: ['write'], maxWriteBytes: 20 },
+          { key: 'status', uuid: 'fff2', operations: ['read', 'notify'], maxReadBytes: 4, maxNotificationBytes: 20 },
+        ],
+      },
+    ],
+  });
   const [found] = await ble.scan(1, 'door-lock');
   const endpoint = await ble.createEndpoint({
     readerId: 1,
@@ -258,7 +270,9 @@ it('unlocks and waits for the confirmation', async () => {
   const confirmation = await ble.withSession(endpoint.id, async (session) => {
     const events = await session.subscribe('status');
     await session.write('command', Uint8Array.of(1));
-    return (await events.next()).value[0];
+    const first = (await events.next()).value[0];
+    await session.unsubscribe('status');
+    return first;
   });
 
   expect(confirmation).toBe(2);
@@ -275,17 +289,17 @@ it('unlocks and waits for the confirmation', async () => {
 
 Control surface of the fake host:
 
-| Member                                                                                           | Purpose                                                                                          |
-| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| `contextFor(pluginId)`                                                                           | A `PluginBleContext` for one plugin.                                                             |
-| `addReader({ readerId, name, allowPluginBle?, available? })`, `setReaderAccess(id, allowed)`     | Readers and the administrator opt-in (default off).                                              |
-| `addPeripheral({ readerId \| readerIds, address, addressType, advertisement, characteristics })` | A device. Characteristics are keyed by UUID and take `value`, `onRead`, `onWrite` and `delayMs`. |
-| `notify(address, uuid, bytes)`                                                                   | The device sends a notification.                                                                 |
-| `disconnect(address)`                                                                            | The device drops the link: sessions close with `disconnected`.                                   |
-| `failNext(op, code, { detail })`                                                                 | The next `scan`, `connect`, `read`, `write`, `subscribe`, `unsubscribe` or `disconnect` fails.   |
-| `advance(ms)`                                                                                    | Moves the manual clock: fires timeouts and lease expiry. No real timers are used.                |
-| `transcript`, `openSessions()`                                                                   | Every validated primitive that reached the transport, in order, and the open sessions.           |
-| `createFakeBleHost({ ready: false })`, `setReady(true)`                                          | Simulate calls before bootstrap (`NOT_READY`).                                                   |
+| Member                                              | Purpose                                                                                                                                                                                   |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `contextFor(pluginId)`                              | A `PluginBleContext` for one plugin.                                                                                                                                                      |
+| `addReader(reader)`, `setReaderAccess(id, allowed)` | Readers (`readerId`, `name`, `allowPluginBle?`, `available?`) and the administrator opt-in (default off).                                                                                 |
+| `addPeripheral(peripheral)`                         | A device: `readerId` or `readerIds`, `address`, `addressType`, `advertisement`, `characteristics`. Characteristics are keyed by UUID and take `value`, `onRead`, `onWrite` and `delayMs`. |
+| `notify(address, uuid, bytes)`                      | The device sends a notification.                                                                                                                                                          |
+| `disconnect(address)`                               | The device drops the link: sessions close with `disconnected`.                                                                                                                            |
+| `failNext(op, code, { detail })`                    | The next `scan`, `connect`, `read`, `write`, `subscribe`, `unsubscribe` or `disconnect` fails.                                                                                            |
+| `advance(ms)`                                       | Moves the manual clock: fires timeouts and lease expiry. No real timers are used.                                                                                                         |
+| `transcript`, `openSessions()`                      | Every validated primitive that reached the transport, in order, and the open sessions.                                                                                                    |
+| `createFakeBleHost({ ready })`, `setReady(ready)`   | Simulate calls before bootstrap (`NOT_READY`).                                                                                                                                            |
 
 To test a timeout, give a characteristic a `delayMs` longer than the timeout, start the call, then `await host.advance(timeoutMs)`.
 

@@ -70,8 +70,8 @@ const profile = context.ble.registerProfile({
 - **Schlüssel** (`/^[a-zA-Z][a-zA-Z0-9_-]{0,31}$/`) sind profillokale Namen. **Operationen benennen eine Characteristic immer über den Schlüssel, nie über die UUID.** Ein unbekannter Schlüssel endet mit `UNKNOWN_CHARACTERISTIC`.
 - **Operationen** sind eine nicht leere Liste ohne Duplikate aus `read`, `write`, `writeWithoutResponse`, `notify`, `indicate`. Eine Operation, die der Schlüssel nicht erlaubt, endet mit `OPERATION_NOT_ALLOWED`.
 - **Grenzen** (`maxReadBytes`, `maxWriteBytes`, `maxNotificationBytes`, 1..512) sind für jede erlaubte Operation Pflicht. Ein Schreiben über der Grenze endet mit `PAYLOAD_TOO_LARGE`, **bevor** etwas den Reader erreicht. Auch ein gelesener Wert oder eine Benachrichtigung über der Grenze endet mit `PAYLOAD_TOO_LARGE`.
-- **`advertisement`** filtert Scans: Ein Scan liefert nur Advertisements, die jedes gesetzte Kriterium erfüllen (eine der genannten Service-UUIDs, eine der genannten Hersteller-IDs von 0 bis 0xffff und das Namenspräfix). Ein Profil ohne Advertisement-Filter kann nicht scannen (`OPERATION_NOT_ALLOWED`).
-- **`limits`** erhöhen das Sitzungs-Lease bis auf 15 Minuten (`maxSessionMs`, Standard 30 s) und die Benachrichtigungswarteschlange bis auf 256 (`maxNotificationQueue`, Standard 32). Werte über den Host-Grenzen werden mit `INVALID_PROFILE` abgelehnt.
+- **`advertisement`** filtert Scans: Ein Scan liefert nur Advertisements, die jedes gesetzte Kriterium erfüllen (eine der genannten Service-UUIDs, eine der genannten Hersteller-IDs von 0 bis 0xffff und das Namenspräfix). Ein Filter muss mindestens eines der drei Kriterien setzen, sonst `INVALID_PROFILE`. Ein Profil ohne Advertisement-Filter kann nicht scannen (`OPERATION_NOT_ALLOWED`).
+- **`limits`** legen die Obergrenze des Sitzungs-Leases fest (`maxSessionMs`, 1 ms bis 15 Minuten; das Standard-Lease beträgt 30 s oder `maxSessionMs`, falls das kleiner ist) und die Benachrichtigungswarteschlange bis auf 256 (`maxNotificationQueue`, Standard 32). Werte über den Host-Grenzen werden mit `INVALID_PROFILE` abgelehnt.
 
 Das zurückgegebene Profil ist tief eingefroren. Ungültige Definitionen werfen `PluginBleError('INVALID_PROFILE')` mit einer Meldung, die das Feld nennt, zum Beispiel `services[0].characteristics[1].maxReadBytes: is required for the allowed operations`.
 
@@ -143,13 +143,13 @@ const result = await context.ble.withSession(
 | `subscribe(key, { signal })`                  | Startet Benachrichtigungen (`notify` oder `indicate`). Liefert einen Stream mit `next({ timeoutMs, signal })`, einem asynchronen Iterator und `unsubscribe()`. |
 | `unsubscribe(key)`                            | Beendet ein Abonnement. Ohne Abonnement passiert nichts.                                                                                                       |
 | `close()`                                     | Idempotent. Trennt die Verbindung und beendet die Sitzung.                                                                                                     |
-| `closed`                                      | Ein Promise, das (nie mit Fehler) mit `{ reason }` aufgelöst wird, wenn die Sitzung endete.                                                                    |
+| `closed`                                      | Ein Promise, das mit `{ reason }` aufgelöst wird, sobald die Sitzung endete (es wird nie abgelehnt).                                                           |
 
 Regeln:
 
 - **Eine offene Sitzung pro Endpunkt.** Ein zweites `openSession` endet mit `ENDPOINT_BUSY` (wiederholbar). Der Vertrag kennt keine Warteschlange; die Serialisierung pro Reader ist Aufgabe des Transports.
 - **Operationen laufen nacheinander in der Reihenfolge der Aufrufe.**
-- **Benachrichtigungen** kommen pro Abonnement in Reihenfolge und nur bei der besitzenden Sitzung an, in einer begrenzten Warteschlange (Standard 32, Profilmaximum 256). Läuft die Warteschlange über, schlägt der Stream mit `NOTIFICATION_OVERFLOW` fehl, statt Daten stillschweigend zu verwerfen; die Sitzung bleibt offen. Verarbeiten Sie Benachrichtigungen zügig. Der asynchrone Iterator endet, wenn der Stream beendet wird oder die Sitzung schließt.
+- **Benachrichtigungen** kommen pro Abonnement in Reihenfolge und nur bei der besitzenden Sitzung an, in einer begrenzten Warteschlange (Standard 32, Profilmaximum 256). Läuft die Warteschlange über, verwirft der Host die wartenden Benachrichtigungen und lässt den Stream sofort fehlschlagen, statt Daten stillschweigend zu verwerfen: jedes wartende und spätere `next()` endet mit `NOTIFICATION_OVERFLOW`, die Sitzung bleibt offen. Rufen Sie `session.unsubscribe(key)` auf und abonnieren Sie erneut, um fortzufahren. Wer einen bereits abonnierten Key erneut abonniert, erhält `INVALID_ARGUMENT`. Verarbeiten Sie Benachrichtigungen zügig. Der asynchrone Iterator endet, wenn der Stream beendet wird oder die Sitzung schließt.
 - **Nach `close`** enden alle weiteren Operationen mit `SESSION_CLOSED`. Operationen, die beim Schließen noch liefen, enden einmalig: mit `DISCONNECTED`, wenn das Gerät die Verbindung trennte, mit `CANCELLED`, wenn das Open-Signal abbrach, sonst mit `SESSION_CLOSED`.
 - **Gründe in `closed`:** `closed`, `lease-expired`, `cancelled`, `disconnected`, `reader-access-revoked`, `endpoint-deleted`, `shutdown`, `error`.
 - **Abbruch.** Jede Methode akzeptiert ein `AbortSignal`. Ein Abbruch beendet den wartenden Aufruf mit `CANCELLED`. Bricht das Signal ab, das Sie an `openSession` übergeben haben, schließt die Sitzung. Eine Operation mit Zeitüberschreitung oder Abbruch schließt die Sitzung **nicht**, es sei denn, der Transport meldet die Verbindung als verloren.
@@ -213,14 +213,14 @@ Ihr Plugin sollte:
 
 Der Host räumt für Sie auf:
 
-| Ereignis                                                                                  | Was passiert                                                                      |
-| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Ihr Plugin-Modul wird zerstört                                                            | Seine Sitzungen schließen mit `shutdown`. Endpunkte bleiben.                      |
-| Ein Administrator schaltet den Reader ab                                                  | Seine Sitzungen schließen mit `reader-access-revoked`. Endpunkte bleiben.         |
-| Ein Reader wird gelöscht                                                                  | Sitzungen schließen mit `reader-access-revoked`; seine Endpunkte werden gelöscht. |
-| Ein Endpunkt wird gelöscht oder auf einen anderen Reader oder eine andere Adresse verlegt | Seine Sitzung schließt mit `endpoint-deleted`.                                    |
-| Ein Lease läuft ab                                                                        | Die Sitzung schließt mit `lease-expired`.                                         |
-| Ihr Plugin wird deinstalliert                                                             | Seine Endpunkte werden gelöscht.                                                  |
+| Ereignis                                                                                                                                                    | Was passiert                                                                      |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Ihr Plugin-Modul wird zerstört                                                                                                                              | Seine Sitzungen schließen mit `shutdown`. Endpunkte bleiben.                      |
+| Ein Administrator schaltet den Reader ab                                                                                                                    | Seine Sitzungen schließen mit `reader-access-revoked`. Endpunkte bleiben.         |
+| Ein Reader wird gelöscht                                                                                                                                    | Sitzungen schließen mit `reader-access-revoked`; seine Endpunkte werden gelöscht. |
+| Ein Endpunkt wird gelöscht oder sein Reader, seine Adresse oder sein Adresstyp ändert sich (eine reine Änderung der Bezeichnung lässt die Sitzung bestehen) | Seine Sitzung schließt mit `endpoint-deleted`.                                    |
+| Ein Lease läuft ab                                                                                                                                          | Die Sitzung schließt mit `lease-expired`.                                         |
+| Ihr Plugin wird deinstalliert                                                                                                                               | Seine Endpunkte werden gelöscht.                                                  |
 
 Jedes Schließen bricht wartende Operationen und Abonnements ab, weist den Transport zum Trennen an und beendet jedes wartende Promise genau einmal.
 
@@ -246,7 +246,19 @@ it('entsperrt und wartet auf die Bestätigung', async () => {
   });
 
   const ble = host.contextFor('my-plugin');
-  ble.registerProfile(profileDefinition);
+  ble.registerProfile({
+    id: 'door-lock',
+    advertisement: { serviceUuids: ['fff0'] },
+    services: [
+      {
+        uuid: 'fff0',
+        characteristics: [
+          { key: 'command', uuid: 'fff1', operations: ['write'], maxWriteBytes: 20 },
+          { key: 'status', uuid: 'fff2', operations: ['read', 'notify'], maxReadBytes: 4, maxNotificationBytes: 20 },
+        ],
+      },
+    ],
+  });
   const [found] = await ble.scan(1, 'door-lock');
   const endpoint = await ble.createEndpoint({
     readerId: 1,
@@ -258,7 +270,9 @@ it('entsperrt und wartet auf die Bestätigung', async () => {
   const confirmation = await ble.withSession(endpoint.id, async (session) => {
     const events = await session.subscribe('status');
     await session.write('command', Uint8Array.of(1));
-    return (await events.next()).value[0];
+    const first = (await events.next()).value[0];
+    await session.unsubscribe('status');
+    return first;
   });
 
   expect(confirmation).toBe(2);
@@ -275,17 +289,17 @@ it('entsperrt und wartet auf die Bestätigung', async () => {
 
 Bedienfläche des Fake-Hosts:
 
-| Mitglied                                                                                         | Zweck                                                                                                      |
-| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| `contextFor(pluginId)`                                                                           | Ein `PluginBleContext` für ein Plugin.                                                                     |
-| `addReader({ readerId, name, allowPluginBle?, available? })`, `setReaderAccess(id, allowed)`     | Reader und die Administrator-Freigabe (Standard aus).                                                      |
-| `addPeripheral({ readerId \| readerIds, address, addressType, advertisement, characteristics })` | Ein Gerät. Characteristics sind nach UUID benannt und nehmen `value`, `onRead`, `onWrite` und `delayMs`.   |
-| `notify(address, uuid, bytes)`                                                                   | Das Gerät sendet eine Benachrichtigung.                                                                    |
-| `disconnect(address)`                                                                            | Das Gerät trennt die Verbindung: Sitzungen schließen mit `disconnected`.                                   |
-| `failNext(op, code, { detail })`                                                                 | Das nächste `scan`, `connect`, `read`, `write`, `subscribe`, `unsubscribe` oder `disconnect` schlägt fehl. |
-| `advance(ms)`                                                                                    | Bewegt die manuelle Uhr: löst Timeouts und Lease-Ablauf aus. Es werden keine echten Timer genutzt.         |
-| `transcript`, `openSessions()`                                                                   | Jedes validierte Primitiv, das den Transport erreichte, der Reihe nach, und die offenen Sitzungen.         |
-| `createFakeBleHost({ ready: false })`, `setReady(true)`                                          | Simulieren Aufrufe vor dem Host-Start (`NOT_READY`).                                                       |
+| Mitglied                                            | Zweck                                                                                                                                                                                                        |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `contextFor(pluginId)`                              | Ein `PluginBleContext` für ein Plugin.                                                                                                                                                                       |
+| `addReader(reader)`, `setReaderAccess(id, allowed)` | Reader (`readerId`, `name`, `allowPluginBle?`, `available?`) und die Administrator-Freigabe (Standard aus).                                                                                                  |
+| `addPeripheral(peripheral)`                         | Ein Gerät: `readerId` oder `readerIds`, `address`, `addressType`, `advertisement`, `characteristics`. Characteristics werden über ihre UUID angegeben und nehmen `value`, `onRead`, `onWrite` und `delayMs`. |
+| `notify(address, uuid, bytes)`                      | Das Gerät sendet eine Benachrichtigung.                                                                                                                                                                      |
+| `disconnect(address)`                               | Das Gerät trennt die Verbindung: Sitzungen schließen mit `disconnected`.                                                                                                                                     |
+| `failNext(op, code, { detail })`                    | Das nächste `scan`, `connect`, `read`, `write`, `subscribe`, `unsubscribe` oder `disconnect` schlägt fehl.                                                                                                   |
+| `advance(ms)`                                       | Bewegt die manuelle Uhr: löst Timeouts und Lease-Ablauf aus. Es werden keine echten Timer genutzt.                                                                                                           |
+| `transcript`, `openSessions()`                      | Jedes validierte Primitiv, das den Transport erreichte, der Reihe nach, und die offenen Sitzungen.                                                                                                           |
+| `createFakeBleHost({ ready })`, `setReady(ready)`   | Simuliert Aufrufe vor dem Host-Start (`NOT_READY`).                                                                                                                                                          |
 
 Um einen Timeout zu testen, geben Sie einer Characteristic ein `delayMs`, das länger als der Timeout ist, starten den Aufruf und rufen dann `await host.advance(timeoutMs)` auf.
 

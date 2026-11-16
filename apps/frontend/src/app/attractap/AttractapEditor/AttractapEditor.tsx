@@ -23,7 +23,7 @@ import {
   Tabs,
 } from '@heroui/react';
 import { TextField, Label, Input } from '@heroui/react';
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useAttractapServiceGetReaderById,
@@ -58,6 +58,7 @@ export function AttractapEditor(props: Readonly<Props>) {
   const [name, setName] = useState('');
   const [ledBrightness, setLedBrightness] = useState<number>(255);
   const [allowPluginBle, setAllowPluginBle] = useState(false);
+  const allowPluginBleDescriptionId = useId();
   const [connectedResourceIds, setConnectedResourceIds] = useState<number[]>([]);
   const [selectedTab, setSelectedTab] = useState<'general' | 'resources' | 'readerUi' | 'security'>('general');
   const updateReaderMutation = useAttractapServiceUpdateReader({
@@ -175,11 +176,14 @@ export function AttractapEditor(props: Readonly<Props>) {
                     <LabeledSwitch
                       isSelected={allowPluginBle}
                       onChange={setAllowPluginBle}
+                      aria-describedby={allowPluginBleDescriptionId}
                       data-cy="attractap-editor-allow-plugin-ble-switch"
                     >
                       {t('allowPluginBle')}
                     </LabeledSwitch>
-                    <p className="text-sm text-default-500">{t('allowPluginBleDescription')}</p>
+                    <p id={allowPluginBleDescriptionId} className="text-sm text-default-500">
+                      {t('allowPluginBleDescription')}
+                    </p>
                   </div>
                 </div>
               </TabPanel>
