@@ -1,7 +1,8 @@
 import { promises as fs } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import type { DataSource, DataSourceOptions } from 'typeorm';
+import type { DataSource } from 'typeorm';
+import { closeTestDataSource, createTestDataSource } from '../../test-utils/test-database';
 
 jest.setTimeout(600_000);
 
@@ -105,14 +106,8 @@ describe('DropBooleanPermissions migration (e2e)', () => {
     process.env.STORAGE_ROOT = tmpRoot;
     process.env.AUTH_SESSION_SECRET = process.env.AUTH_SESSION_SECRET || 'migration-test-secret';
 
-    // Import the shared config (computed from STORAGE_ROOT set above) but create a dedicated
-    // DataSource with migrationsRun: false so initialize() does NOT auto-run migrations.
-    // The shared datasource has migrationsRun: true which leaves internal TypeORM connection
-    // state that can prevent subsequently inserted rows from being visible inside runMigrations().
-    const { DataSource } = await import('typeorm');
-    const { dataSourceConfig } = await import('../../database/datasource');
-    dataSource = new DataSource({ ...(dataSourceConfig as DataSourceOptions), migrationsRun: false });
-    await dataSource.initialize();
+    // A dedicated DataSource that does not auto-run migrations: the test chooses how far to migrate.
+    dataSource = await createTestDataSource({ location: path.join(tmpRoot, 'attraccess.sqlite') });
 
     // Apply every migration, then undo until we reach the pre-DropBooleanPermissions
     // state where boolean columns still exist. We loop instead of calling
@@ -139,7 +134,7 @@ describe('DropBooleanPermissions migration (e2e)', () => {
 
   afterAll(async () => {
     if (dataSource?.isInitialized) {
-      await dataSource.destroy();
+      await closeTestDataSource(dataSource);
     }
     await fs.rm(tmpRoot, { recursive: true, force: true });
   });

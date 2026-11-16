@@ -89,3 +89,41 @@ The authoritative, current list is `scripts/persistence-boundaries.baseline.json
 HTTP and WebSocket responses keep their shape. When a service stops returning ORM entities it maps explicitly to a DTO.
 Swagger and AsyncAPI are regenerated with `api:export-swagger` and `api:export-asyncapi` and compared; generated
 clients are not committed.
+
+### Comparing the contract of two commits
+
+`node scripts/compare-api-contracts.mjs <base.json> <head.json>` diffs two generated `swagger.json` or `asyncapi.json`
+files and prints only what a client could notice: paths and methods, parameters, request and response bodies, schemas,
+properties, required fields, enum values, types and `$ref`s. Descriptions, examples, titles, tags, servers, the
+document version and the order of keys are ignored. Each difference is `breaking` (something removed or made
+stricter), `changed` (worth a review) or `added`; `--json` prints them as data and `--fail-on-breaking` makes the exit
+status 1 when something is breaking.
+
+Generate the two files on the commits to compare and keep them outside the repository (generated contracts are never
+committed):
+
+```bash
+pnpm nx run api:export-swagger     # dist/apps/api-swagger/swagger.json
+pnpm nx run api:export-asyncapi    # dist/apps/api/asyncapi.json
+node scripts/compare-api-contracts.mjs /tmp/base/swagger.json dist/apps/api-swagger/swagger.json
+```
+
+An empty report means the refactoring left the HTTP and WebSocket contract unchanged.
+
+### Tooling follows the selected backend
+
+Everything that opens a database is routed through `DATABASE_TYPE`, and an unsupported value stops it before anything
+is created or changed:
+
+- The migration datasource (`database/datasource.ts`) uses the backend's migration track.
+  `apps/api/migration-tracks.cjs` maps each database type to its track directory for the migration build
+  (`api:build-migration-datasource`), so `api:migrations-run`, `api:migration-generate` and `api:migration-revert` build
+  and run the track of the selected backend. A second backend adds its directory there and its `MigrationTrack`.
+- The dev seed (`api:seed-dev`) and `reencrypt-card-keys` use a database provider (`apps/api/scripts/lib/database-provider.mjs`).
+  `scripts/setup-dev-dependencies.sh`, `scripts/setup-workspace.sh` and `scripts/create-worktree.sh` validate
+  `DATABASE_TYPE` first (`scripts/check-database-type.sh`).
+- Tests open databases through `apps/api/src/test-utils/test-database.ts`, which uses the backend's connection factory.
+
+The real-database lifecycle tests live in `apps/api/src/e2e/migrations/migration-lifecycle.e2e.spec.ts` (fresh install,
+upgrade from four older release states with data, failure recovery, seeding). The export, import and backup contract
+is tested by `database/conformance/transfer.conformance.test-fixture.ts` through `api:test-conformance`.

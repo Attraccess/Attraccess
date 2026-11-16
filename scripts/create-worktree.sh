@@ -8,6 +8,8 @@ if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
 fi
 
 repo_root=$(git rev-parse --show-toplevel)
+# The bootstrap runs migrations for the selected backend: refuse an unsupported DATABASE_TYPE before the worktree exists.
+"$repo_root/scripts/check-database-type.sh" >/dev/null
 worktree_path=$1
 case "$worktree_path" in
     /*) ;;
