@@ -64,7 +64,7 @@ Each widget is offered only to users who may open the page it stands for. Each b
 | **Resources**   | A search that opens the resource overview with your search term, and buttons for all resources, creating a resource, flows, MQTT servers, readers and usage reports. | Everyone; each button only with its permission                   |
 | **Users**       | A search that opens the user list with your search term, and buttons for all users, unverified email addresses, inviting a user and roles.                           | Users who may see the user list                                  |
 | **Balance**     | Your credit balance in the configured currency, with **Top up** and **Transactions**.                                                                                | Instances with the billing module                                |
-| **Readers**     | How many readers are paired and how many have not connected for 24 hours, the three of those that connected longest ago, and **All readers**.                        | Users who manage readers, on instances with the Attractap module |
+| **Readers**     | How many readers are paired and how many have not connected for 24 hours, the three of those that went quiet most recently, and **All readers**.                     | Users who manage readers, on instances with the Attractap module |
 
 Plugins can add their own widgets. For example, the Reservations plugin offers **Upcoming reservations**: your next three bookings, **My reservations** and, for people who manage reservations, **Manage**.
 
