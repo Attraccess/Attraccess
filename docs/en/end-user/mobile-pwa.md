@@ -16,7 +16,7 @@ A Progressive Web App runs in your browser but can be installed on your home scr
 
 1. Open **Safari** and navigate to your Attraccess instance
 2. Log in to your account
-3. Tap the **Share** button (the square with an arrow pointing up)
+3. Tap the **Share** button (the square with an arrow pointing up). If you don't see it, tap **•••** first
 4. Scroll down and tap **Add to Home Screen**
 5. Give the app a name (or keep the default) and tap **Add**
 6. Attraccess now appears on your home screen

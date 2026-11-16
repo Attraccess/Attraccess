@@ -11,7 +11,7 @@
   "ios": {
     "title": "Install Attraccess",
     "intro": "Add Attraccess to your home screen in Safari:",
-    "step1": "Tap the Share button (the square with an arrow pointing up).",
+    "step1": "Tap the Share button (the square with an arrow pointing up). If you don't see it, tap ••• first.",
     "step2": "Choose \"Add to Home Screen\".",
     "step3": "Tap \"Add\"."
   }

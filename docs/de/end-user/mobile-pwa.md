@@ -16,7 +16,7 @@ Eine Progressive Web App läuft in Ihrem Browser, kann aber auf Ihrem Startbilds
 
 1. Öffnen Sie **Safari** und navigieren Sie zu Ihrer Attraccess-Instanz
 2. Melden Sie sich bei Ihrem Konto an
-3. Tippen Sie auf die **Teilen**-Schaltfläche (das Quadrat mit dem Pfeil nach oben)
+3. Tippen Sie auf die **Teilen**-Schaltfläche (das Quadrat mit dem Pfeil nach oben). Sehen Sie sie nicht, tippen Sie zuerst auf **•••**
 4. Scrollen Sie nach unten und tippen Sie auf **Zum Home-Bildschirm**
 5. Geben Sie der App einen Namen (oder behalten Sie den Standard) und tippen Sie auf **Hinzufügen**
 6. Attraccess erscheint jetzt auf Ihrem Startbildschirm
