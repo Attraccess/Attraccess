@@ -57,6 +57,10 @@ Nach der Kopplung des Lesers muessen Sie festlegen, welche Ressource(n) er steue
 
 <!-- TODO: Screenshot der Ressourcenzuweisung zu einem Leser -->
 
+### Optional: Plugins die Bluetooth-Nutzung erlauben
+
+Im Tab **Allgemein** des Reader-Editors ist der Schalter **Plugins die Bluetooth-Nutzung erlauben** standardmäßig aus. Schalten Sie ihn nur ein, wenn installierte Plugins mit der Berechtigung `BLE_TRANSPORT` in der Nähe dieses Readers nach den für sie eingerichteten Bluetooth-Geräten suchen und sich mit ihnen verbinden dürfen. Beim Ausschalten werden alle Bluetooth-Verbindungen von Plugins über diesen Reader sofort beendet. Plugins können nur die Bluetooth-Profile nutzen, die sie selbst registriert haben; siehe [Bluetooth-Transport für Plugins](plugins/ble-transport.md).
+
 ## Schritt 4: Setup testen
 
 1. Halten Sie eine registrierte RFID-Karte an den Leser

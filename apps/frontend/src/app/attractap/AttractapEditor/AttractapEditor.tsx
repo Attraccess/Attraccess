@@ -1,4 +1,10 @@
-import { Button, ResourceSelector, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  Button,
+  LabeledSwitch,
+  ResourceSelector,
+  StandardDrawer,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import de from './AttractapEditor.de.json';
 import en from './AttractapEditor.en.json';
 import {
@@ -51,6 +57,7 @@ export function AttractapEditor(props: Readonly<Props>) {
 
   const [name, setName] = useState('');
   const [ledBrightness, setLedBrightness] = useState<number>(255);
+  const [allowPluginBle, setAllowPluginBle] = useState(false);
   const [connectedResourceIds, setConnectedResourceIds] = useState<number[]>([]);
   const [selectedTab, setSelectedTab] = useState<'general' | 'resources' | 'readerUi' | 'security'>('general');
   const updateReaderMutation = useAttractapServiceUpdateReader({
@@ -73,6 +80,7 @@ export function AttractapEditor(props: Readonly<Props>) {
   useEffect(() => {
     setName(reader?.name ?? '');
     setLedBrightness(reader?.ledBrightness ?? 255);
+    setAllowPluginBle(reader?.allowPluginBle ?? false);
     setConnectedResourceIds(reader?.resources.map((r) => r.id) ?? []);
   }, [reader]);
 
@@ -87,9 +95,10 @@ export function AttractapEditor(props: Readonly<Props>) {
         name,
         connectedResourceIds,
         ledBrightness,
+        allowPluginBle,
       },
     });
-  }, [name, connectedResourceIds, ledBrightness, props, updateReaderMutation]);
+  }, [name, connectedResourceIds, ledBrightness, allowPluginBle, props, updateReaderMutation]);
 
   const onSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -162,6 +171,16 @@ export function AttractapEditor(props: Readonly<Props>) {
                       </SliderTrack>
                     </Slider>
                   )}
+                  <div className="flex flex-col gap-1">
+                    <LabeledSwitch
+                      isSelected={allowPluginBle}
+                      onChange={setAllowPluginBle}
+                      data-cy="attractap-editor-allow-plugin-ble-switch"
+                    >
+                      {t('allowPluginBle')}
+                    </LabeledSwitch>
+                    <p className="text-sm text-default-500">{t('allowPluginBleDescription')}</p>
+                  </div>
                 </div>
               </TabPanel>
               <TabPanel id="resources" className="pt-4">

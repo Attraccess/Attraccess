@@ -90,6 +90,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Overview](https://docs.attraccess.org/en/plugins/overview.md): Introduces the plugin system that extends Attraccess with frontend pages and backend endpoints, plugin management and SDKs.
 - [Installing Plugins](https://docs.attraccess.org/en/plugins/installing-plugins.md): How to upload, enable, disable and remove plugins in the web interface, with troubleshooting.
 - [Developing Plugins](https://docs.attraccess.org/en/plugins/developing-plugins.md): Developer guide to building Attraccess plugins: anatomy, SDKs, backend plugins, dependencies and reader UI integration.
+- [Bluetooth transport for plugins](https://docs.attraccess.org/en/plugins/ble-transport.md): Describes the BLE transport contract that backend plugins use to talk to Bluetooth devices through Attractap readers: profiles, endpoints, sessions, errors, limits and testing with the fake.
 - [Database Migrations](https://docs.attraccess.org/en/plugins/database-migrations.md): How a plugin ships TypeORM migrations for its own tables: declaring, writing and bundling the migrations entry.
 
 ## English: Reservations
@@ -235,6 +236,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Überblick](https://docs.attraccess.org/de/plugins/overview.md): Stellt das Plugin-System vor, das Attraccess um Frontend-Seiten und Backend-Endpunkte erweitert, mit Verwaltung und SDKs.
 - [Plugins installieren](https://docs.attraccess.org/de/plugins/installing-plugins.md): Plugins über die Weboberfläche hochladen, aktivieren, deaktivieren und entfernen, mit Fehlerbehebung.
 - [Plugins entwickeln](https://docs.attraccess.org/de/plugins/developing-plugins.md): Entwicklerleitfaden für Attraccess-Plugins: SDKs, Frontend- und Backend-Plugins, Abhängigkeiten, Reader-UI und Start-Hooks.
+- [Bluetooth-Transport für Plugins](https://docs.attraccess.org/de/plugins/ble-transport.md): Beschreibt den BLE-Transportvertrag, über den Backend-Plugins mit Bluetooth-Geräten über Attractap-Reader sprechen: Profile, Endpunkte, Sitzungen, Fehler, Grenzwerte und Tests mit dem Fake.
 
 ## Deutsch: Reservierungen
 - [Überblick](https://docs.attraccess.org/de/plugins/reservations/overview.md): Das Plugin Reservierungen lässt Mitglieder eine Ressource für ein Zeitfenster buchen; Überblick, Voraussetzungen und Links zu Mitglieder-, Administrations- und API-Seiten.

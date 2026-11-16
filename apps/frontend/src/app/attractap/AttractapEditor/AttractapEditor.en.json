@@ -12,6 +12,8 @@
   "readerUpdated": "Reader updated",
   "readerUpdatedDescription": "Reader updated successfully",
   "ledBrightness": "LED Brightness",
+  "allowPluginBle": "Allow plugins to use Bluetooth",
+  "allowPluginBleDescription": "Plugins that have the Bluetooth permission can then scan for and connect to the Bluetooth devices configured for them near this reader. Turning this off immediately ends their Bluetooth connections through this reader.",
   "tabs": {
     "general": "General",
     "resources": "Resources",

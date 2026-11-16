@@ -63,6 +63,10 @@ After pairing the reader, you need to assign which resource(s) it controls:
 
 <!-- TODO: Screenshot of assigning a resource to a reader -->
 
+### Optional: Allow plugins to use Bluetooth
+
+On the **General** tab of the reader editor, the switch **Allow plugins to use Bluetooth** is off by default. Turn it on only if you want installed plugins that have the `BLE_TRANSPORT` permission to scan for and connect to the Bluetooth devices configured for them near this reader. Turning it off immediately ends all plugin Bluetooth connections through this reader. Plugins can only use the Bluetooth profiles they registered themselves; see [Bluetooth transport for plugins](plugins/ble-transport.md).
+
 ## Step 4: Test the Setup
 
 1. Hold a registered RFID card to the reader

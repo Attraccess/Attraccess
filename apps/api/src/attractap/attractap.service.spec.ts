@@ -205,6 +205,17 @@ describe('AttractapService reader maintenance and crash reports', () => {
     expect(readers.save).toHaveBeenCalledWith(result);
     expect(events.emit).toHaveBeenCalledTimes(1);
   });
+  it('persists the plugin BLE opt-in only when it is given', async () => {
+    const { service, readers, reader } = setup();
+    await service.updateReader(4, { name: 'Kept' }, false);
+    expect(readers.save).toHaveBeenLastCalledWith(expect.not.objectContaining({ allowPluginBle: true }));
+    const enabled = await service.updateReader(4, { allowPluginBle: true }, false);
+    expect(enabled.allowPluginBle).toBe(true);
+    expect(readers.save).toHaveBeenLastCalledWith(expect.objectContaining({ allowPluginBle: true }));
+    const disabled = await service.updateReader(4, { allowPluginBle: false }, false);
+    expect(disabled.allowPluginBle).toBe(false);
+    expect(reader.allowPluginBle).toBe(false);
+  });
   it('allows resource selection when supported and can clear attachments without emitting an event', async () => {
     const { service, reader, events } = setup();
     reader.firmware.capabilities.resourceSelection = true;
