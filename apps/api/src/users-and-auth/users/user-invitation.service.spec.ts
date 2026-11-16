@@ -93,7 +93,7 @@ describe('CSV invitations', () => {
     const service = new UserInvitationService(users as never, auth as never, email as never);
     return { service, users, auth, email, manager };
   };
-  it('parses the config and sends invitations in the user creation transaction', async () => {
+  it('parses the config and sends invitations after the user creation transaction', async () => {
     const { service, users, auth, email, manager } = setup();
     const result = await service.inviteUsersFromCsv(
       file('email,username,role\nalex@example.com,Alex,operator\n'),
@@ -108,7 +108,10 @@ describe('CSV invitations', () => {
       { grantAllPermissionsToFirst: true, manager, actorId: 9 },
     );
     expect(auth.generateEmailVerificationToken).toHaveBeenCalledWith(result[0], manager);
-    expect(email.sendUserInvitationEmail).toHaveBeenCalledWith(result[0], 'verification-token', manager);
+    expect(email.sendUserInvitationEmail).toHaveBeenCalledWith(result[0], 'verification-token');
+    expect(users.withTransaction.mock.invocationCallOrder[0]).toBeLessThan(
+      email.sendUserInvitationEmail.mock.invocationCallOrder[0],
+    );
   });
   it('flags CSV rows whose emails differ only by case', async () => {
     const { service, users } = setup();
@@ -219,6 +222,7 @@ describe('single invitations', () => {
       ensureLicenseForNewUsers: jest.fn(),
       withTransaction: jest.fn(async (run) => run({})),
       createMany: jest.fn().mockResolvedValue([{ id: 7, username: 'alex', email: 'alex@example.com' }]),
+      deleteUnacceptedInvitations: jest.fn().mockResolvedValue(undefined),
     };
     const auth = { generateEmailVerificationToken: jest.fn().mockResolvedValue('verification-token') };
     const email = { sendUserInvitationEmail: jest.fn() };
@@ -265,5 +269,24 @@ describe('single invitations', () => {
     });
     expect(users.createMany).toHaveBeenCalledTimes(1);
     expect(email.sendUserInvitationEmail).toHaveBeenCalledTimes(1);
+    expect(users.deleteUnacceptedInvitations).not.toHaveBeenCalled();
+  });
+
+  it('takes the invitation back when its email cannot be sent', async () => {
+    const { service, users, email } = setup();
+    email.sendUserInvitationEmail.mockRejectedValue(Object.assign(new Error('connect'), { code: 'ECONNREFUSED' }));
+    await expect(service.inviteUser({ username: 'alex', email: 'alex@example.com' })).rejects.toThrow(
+      'EmailSendFailed',
+    );
+    expect(users.deleteUnacceptedInvitations).toHaveBeenCalledWith([7]);
+  });
+
+  it('still reports the email failure when taking the invitation back fails', async () => {
+    const { service, users, email } = setup();
+    email.sendUserInvitationEmail.mockRejectedValue(new Error('SMTP configuration not set'));
+    users.deleteUnacceptedInvitations.mockRejectedValue(new Error('database gone'));
+    await expect(service.inviteUser({ username: 'alex', email: 'alex@example.com' })).rejects.toThrow(
+      'SMTP is not configured',
+    );
   });
 });
