@@ -13,6 +13,7 @@ import {
   ValidatorConstraintInterface,
 } from 'class-validator';
 import type { DashboardPinItemType } from '@attraccess/database-entities';
+import { DASHBOARD_WIDGET_ID_PATTERN } from '../../plugin-system/runtime/manifest-schema';
 
 export const DASHBOARD_PIN_ITEM_TYPES: DashboardPinItemType[] = ['page', 'resource', 'widget'];
 export const DASHBOARD_PIN_OPERATIONS = ['add', 'remove', 'move'] as const;
@@ -23,7 +24,7 @@ export type DashboardPinOperationKind = (typeof DASHBOARD_PIN_OPERATIONS)[number
 const ITEM_ID_PATTERNS: Record<DashboardPinItemType, RegExp> = {
   page: /^(\/[A-Za-z0-9_-]+)+$/,
   resource: /^[1-9][0-9]{0,14}$/,
-  widget: /^(?=.{1,64}$)[a-z0-9]+(?:-[a-z0-9]+)*$/,
+  widget: DASHBOARD_WIDGET_ID_PATTERN,
 };
 
 @ValidatorConstraint({ name: 'dashboardPinItemId' })

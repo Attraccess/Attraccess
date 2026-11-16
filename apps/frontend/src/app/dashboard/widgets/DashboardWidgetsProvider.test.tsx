@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
+import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { LicenseService } from '@attraccess/react-query-client';
 import type { AttraccessFrontendPlugin, PluginDashboardWidget } from '@attraccess/plugins-frontend-sdk';
@@ -89,11 +90,63 @@ describe('DashboardWidgetsProvider', () => {
     await waitFor(() => expect(widgetIds()).toContain(id));
   });
 
-  it('is not ready before the license and the plugins have loaded', async () => {
+  it('is not ready while the plugins load, even with the license loaded', async () => {
     usePluginState.setState({ isInitialized: false });
     renderProvider();
     await waitFor(() => expect(LicenseService.getLicenseInformation).toHaveBeenCalled());
+    // Lets the resolved license reach the query cache.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
     expect(screen.getByRole('status', { name: 'ready' })).toHaveTextContent('false');
+    act(() => usePluginState.setState({ isInitialized: true }));
+    expect(screen.getByRole('status', { name: 'ready' })).toHaveTextContent('true');
+  });
+
+  it('is not ready while the license loads, even with the plugins loaded', async () => {
+    let resolveLicense: (license: unknown) => void = () => undefined;
+    vi.spyOn(LicenseService, 'getLicenseInformation').mockReturnValue(
+      new Promise((resolve) => (resolveLicense = resolve)) as never,
+    );
+    renderProvider();
+    await waitFor(() => expect(LicenseService.getLicenseInformation).toHaveBeenCalled());
+    expect(screen.getByRole('status', { name: 'ready' })).toHaveTextContent('false');
+    await act(async () => resolveLicense({ modules: [] }));
+    await waitFor(() => expect(screen.getByRole('status', { name: 'ready' })).toHaveTextContent('true'));
+  });
+
+  it('ignores a plugin whose getDashboardWidgets() returns no array or whose change hook throws', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    installPlugin(() => 'oops' as never, ['reservations-upcoming'], {
+      onDashboardWidgetsChange: () => {
+        throw new Error('boom');
+      },
+    });
+    renderProvider();
+    await waitFor(() => expect(screen.getByRole('status', { name: 'ready' })).toHaveTextContent('true'));
+    expect(widgetIds()).toEqual(['messages', 'my-sessions', 'resources']);
+  });
+
+  it('asks plugins again once the plugin provider has passed them the user', async () => {
+    let hasUser = false;
+    installPlugin(() => (hasUser ? [reservations] : []), ['reservations-upcoming'], {
+      onApiAuthStateChange: () => undefined,
+    });
+    // Mimics the plugin provider, which hands plugins the user in an effect after this render asked them.
+    function PassUser() {
+      useEffect(() => {
+        hasUser = true;
+      }, []);
+      return null;
+    }
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <DashboardWidgetsProvider>
+          <PassUser />
+          <Probe />
+        </DashboardWidgetsProvider>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(widgetIds()).toContain('reservations-upcoming'));
   });
 
   it('offers a plugin widget the plugin returns and its manifest declares', async () => {

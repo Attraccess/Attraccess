@@ -7,14 +7,20 @@ import {
   useResourcesServiceGetAllResources,
   useResourcesServiceGetAllResourcesKey,
   useResourcesServiceResourceUsageGetActiveSession,
+  UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useAuth } from '../../../hooks/useAuth';
-import { MY_SESSIONS_QUERY } from '../../resourceOverview/activeUsageSessionsBanner/mySessionsQuery';
+import { useLiveUpdates } from '../../../utils/live-updates';
+import {
+  MY_SESSIONS_QUERY,
+  mySessionsQueryKey,
+} from '../../resourceOverview/activeUsageSessionsBanner/mySessionsQuery';
 import {
   useEndOwnSession,
   useEndSessionErrorMessage,
 } from '../../resourceOverview/activeUsageSessionsBanner/useEndOwnSession';
+import { SESSION_EVENTS } from '../../resources/usage/sessionEvents';
 import { SessionTimer } from '../../resources/usage/components/SessionTimer';
 import { WidgetEmpty, WidgetError, WidgetLinkButton, WidgetLoading } from './widgetParts';
 import de from './de.json';
@@ -29,8 +35,20 @@ function SessionRow({ resource }: Readonly<{ resource: { id: number; name: strin
   const endSessionErrorMessage = useEndSessionErrorMessage();
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
-  // Shares its cache with the resource card and detail page, whose live updates keep it current.
+  // Shares its cache with the resource card and detail page.
   const { data: activeSession } = useResourcesServiceResourceUsageGetActiveSession({ resourceId: resource.id });
+  // The resource need not be pinned, so the row follows its session itself, e.g. one ended at the reader.
+  useLiveUpdates({
+    topic: 'resource',
+    resourceId: resource.id,
+    onUpdate: (data) => {
+      if (!data.eventType || !SESSION_EVENTS.has(data.eventType)) return;
+      void queryClient.invalidateQueries({
+        queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId: resource.id }),
+      });
+      void queryClient.invalidateQueries({ queryKey: mySessionsQueryKey(), exact: true });
+    },
+  });
   const ownSession = activeSession?.usages.find((usage) => usage.userId === user?.id);
 
   const stop = async () => {

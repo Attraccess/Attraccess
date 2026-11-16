@@ -3,6 +3,7 @@
  * exactly these (BUILT_IN_DASHBOARD_WIDGET_IDS in apps/api/src/dashboard/dashboard-items.ts); a spec there fails when
  * both lists drift apart. Keep one id per line.
  */
+// prettier-ignore
 export const BUILT_IN_WIDGET_IDS = [
   'messages',
   'resources',

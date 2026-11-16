@@ -1,6 +1,7 @@
 {
   "loadError": "This widget could not be loaded.",
   "crashed": "This widget stopped working. Reload the page to try again.",
+  "loading": "Loading…",
   "search": "Search",
   "messages": {
     "title": "Messages",

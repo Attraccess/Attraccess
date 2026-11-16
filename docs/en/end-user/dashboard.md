@@ -31,7 +31,7 @@ As long as your dashboard is empty, Attraccess still opens on the resource overv
 
 Normally the dashboard is a clean view: you can use everything on the cards, but there are no handles or remove buttons. To change the dashboard, select **Edit dashboard**. While you edit:
 
-- every card shows a handle to move it and a remove button (**Remove … from dashboard**)
+- every card shows a handle to move it and a remove button (**Remove … from dashboard**, for a widget **Remove … widget from dashboard**); a card that is no longer accessible keeps its own **Remove from dashboard** button instead
 - **Add to dashboard** opens the list of widgets and pages
 - every change is saved immediately
 
@@ -57,14 +57,14 @@ The cards update live while sessions start and end.
 
 Each widget is offered only to users who may open the page it stands for. Each button inside a widget appears only if you may use what it opens.
 
-| Widget          | Shows                                                                                                                                                                | Who sees it                                                      |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| **Messages**    | The number of unread messages, your five latest conversations with a preview and their unread counts, and **Open inbox**. Select a conversation to open it.          | Everyone                                                         |
-| **My sessions** | Your running sessions with a timer each, and **Stop** to end one after a confirmation.                                                                               | Everyone                                                         |
-| **Resources**   | A search that opens the resource overview with your search term, and buttons for all resources, creating a resource, flows, MQTT servers, readers and usage reports. | Everyone; each button only with its permission                   |
-| **Users**       | A search that opens the user list with your search term, and buttons for all users, unverified email addresses, inviting a user and roles.                           | Users who may see the user list                                  |
-| **Balance**     | Your credit balance in the configured currency, with **Top up** and **Transactions**.                                                                                | Instances with the billing module                                |
-| **Readers**     | How many readers are paired and how many have not connected for 24 hours, the three of those that went quiet most recently, and **All readers**.                     | Users who manage readers, on instances with the Attractap module |
+| Widget          | Shows                                                                                                                                                                | Who sees it                                                                                  |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **Messages**    | The number of unread messages, your five latest conversations with a preview and their unread counts, and **Open inbox**. Select a conversation to open it.          | Everyone                                                                                     |
+| **My sessions** | Your running sessions with a timer each, and **Stop** to end one after a confirmation.                                                                               | Everyone                                                                                     |
+| **Resources**   | A search that opens the resource overview with your search term, and buttons for all resources, creating a resource, flows, MQTT servers, readers and usage reports. | Everyone; each button only with its permission, Readers also only with the Attractap license |
+| **Users**       | A search that opens the user list with your search term, and buttons for all users, unverified email addresses, inviting a user and roles.                           | Users who may see the user list                                                              |
+| **Balance**     | Your credit balance in the configured currency, with **Top up** and **Transactions**.                                                                                | Instances with the billing module                                                            |
+| **Readers**     | How many readers are paired and how many have not connected for 24 hours, the three of those that went quiet most recently, and **All readers**.                     | Users who manage readers, on instances with the Attractap module                             |
 
 Plugins can add their own widgets. For example, the Reservations plugin offers **Upcoming reservations**: your next three bookings, **My reservations** and, for people who manage reservations, **Manage**.
 

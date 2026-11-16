@@ -1,6 +1,7 @@
 {
   "loadError": "Dieses Widget konnte nicht geladen werden.",
   "crashed": "Dieses Widget funktioniert nicht mehr. Laden Sie die Seite neu, um es erneut zu versuchen.",
+  "loading": "Wird geladen…",
   "search": "Suchen",
   "messages": {
     "title": "Nachrichten",
@@ -35,7 +36,7 @@
   "my-sessions": {
     "title": "Meine Sitzungen",
     "description": "Ihre laufenden Sitzungen, jeweils mit einer Schaltfläche zum Beenden",
-    "empty": "Keine Sitzung läuft.",
+    "empty": "Keine laufende Sitzung.",
     "browse": "Ressourcen durchsuchen",
     "stop": "Beenden",
     "stopLabel": "Ihre Sitzung an {{name}} beenden",

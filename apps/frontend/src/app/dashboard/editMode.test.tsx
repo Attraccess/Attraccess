@@ -111,7 +111,7 @@ describe('dashboard edit mode', () => {
     expect(await screen.findByText('Inbox body')).toBeInTheDocument();
     expect(screen.getByText('2 unread')).toBeInTheDocument();
     expect(container.querySelector('[data-cy="dashboard-card-drag-handle"]')).toBeNull();
-    expect(container.querySelector('[data-cy="dashboard-card-unpin"]')).toBeNull();
+    expect(container.querySelector('[data-cy="dashboard-card-remove-control"]')).toBeNull();
     expect(container.querySelector('[aria-roledescription="sortable"]')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Add to dashboard' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Remove /gone from dashboard' })).toBeInTheDocument();
@@ -128,7 +128,7 @@ describe('dashboard edit mode', () => {
     expect(done).toHaveAttribute('aria-pressed', 'true');
     expect(done).toHaveFocus();
     expect(container.querySelectorAll('[data-cy="dashboard-card-drag-handle"]')).toHaveLength(3);
-    for (const title of ['Projects', 'Lathe', 'Messages']) {
+    for (const title of ['Projects', 'Lathe', 'Messages widget']) {
       expect(screen.getByRole('button', { name: `Remove ${title} from dashboard` })).toBeInTheDocument();
     }
     expect(screen.getByRole('button', { name: 'Add to dashboard' })).toBeInTheDocument();
@@ -186,7 +186,7 @@ describe('Add to dashboard picker', () => {
     expect(within(pages).queryByText('Projects')).toBeNull();
     expect(within(pages).getByRole('button', { name: 'Add Billing to dashboard' })).toBeInTheDocument();
 
-    await userEvent.click(within(widgets).getByRole('button', { name: 'Add Users to dashboard' }));
+    await userEvent.click(within(widgets).getByRole('button', { name: 'Add Users widget to dashboard' }));
 
     expect(add).toHaveBeenCalledWith({ requestBody: { kind: 'add', item: widget('users') } });
     expect(await within(widgets).findByText('Everything is already on your dashboard.')).toBeInTheDocument();
@@ -220,7 +220,7 @@ describe('widget pins', () => {
     state.widgets = { widgets: [], titleOf: (id) => (id === 'readers' ? 'Readers' : undefined), isReady: false };
     const { rerender } = renderDashboard([widget('readers')]);
 
-    expect(await screen.findByText('Readers')).toBeInTheDocument();
+    expect(await screen.findByText('Readers widget')).toBeInTheDocument();
     expect(screen.queryByText('No longer accessible')).toBeNull();
 
     state.widgets = { ...state.widgets, isReady: true };
@@ -234,7 +234,7 @@ describe('widget pins', () => {
 
     expect(await screen.findByText('No longer accessible')).toBeInTheDocument();
     expect(screen.getByText(/You can no longer use this widget/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Remove Readers from dashboard' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Readers widget from dashboard' })).toBeInTheDocument();
   });
 
   it('keeps a crashing widget inside its card', async () => {
@@ -253,5 +253,81 @@ describe('widget pins', () => {
 
     expect(await screen.findByText('This widget stopped working. Reload the page to try again.')).toBeInTheDocument();
     expect(screen.getByText('Inbox body')).toBeInTheDocument();
+  });
+
+  it('keeps a widget inside its card when its render function itself throws, as a plugin render() may', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    state.widgets = {
+      ...state.widgets,
+      widgets: [
+        ...state.widgets.widgets,
+        {
+          ...messagesWidget,
+          id: 'plugin-broken',
+          title: 'Plugin broken',
+          renderHeaderExtra: () => {
+            throw new Error('header boom');
+          },
+          renderBody: () => {
+            throw new Error('boom');
+          },
+          plugin: { pluginName: 'broken-plugin', manifestName: 'broken-plugin' },
+        },
+      ],
+    };
+    renderDashboard([widget('plugin-broken'), widget('messages')]);
+
+    expect(await screen.findAllByText('This widget stopped working. Reload the page to try again.')).toHaveLength(2);
+    expect(screen.getByText('Inbox body')).toBeInTheDocument();
+  });
+
+  it('renders the body a plugin widget returns', async () => {
+    state.widgets = {
+      ...state.widgets,
+      widgets: [
+        ...state.widgets.widgets,
+        {
+          id: 'report-summary',
+          title: 'Report summary',
+          description: 'From a plugin',
+          icon: null,
+          renderBody: () => <p>Plugin body</p>,
+          plugin: { pluginName: 'report', manifestName: 'report' },
+        },
+      ],
+    };
+    renderDashboard([widget('report-summary')]);
+
+    expect(await screen.findByText('Plugin body')).toBeInTheDocument();
+    expect(screen.getByText('Report summary')).toBeInTheDocument();
+  });
+
+  it('names widget controls apart from those of the page with the same title', async () => {
+    state.pinnable = {
+      ...state.pinnable,
+      pages: [...state.pinnable.pages, { path: '/messages', title: 'Messages', icon: null }],
+    };
+    renderDashboard([widget('messages'), page('/messages')]);
+    await userEvent.click(await editToggle('Edit dashboard'));
+
+    expect(screen.getByRole('button', { name: 'Remove Messages widget from dashboard' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Messages from dashboard' })).toBeInTheDocument();
+  });
+
+  it('moves focus to the next card after removing one', async () => {
+    state.pinnable = {
+      ...state.pinnable,
+      pages: [...state.pinnable.pages, { path: '/messages', title: 'Messages', icon: null }],
+    };
+    const update = updatePins().mockResolvedValue([widget('messages')] as never);
+    renderDashboard([page('/messages'), widget('messages')]);
+    await userEvent.click(await editToggle('Edit dashboard'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Messages from dashboard' }));
+
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Remove Messages widget from dashboard' })).toHaveFocus(),
+    );
   });
 });

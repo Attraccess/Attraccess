@@ -2,6 +2,7 @@ import { PropsWithChildren, useEffect, useMemo, useRef, useState } from 'react';
 import { PuzzleIcon } from 'lucide-react';
 import { useTranslations, useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
+import type { PluginDashboardWidget } from '@attraccess/plugins-frontend-sdk';
 import { useAuth } from '../../../hooks/useAuth';
 import usePluginState from '../../plugins/plugin.state';
 import { useCanOpenPage } from './access';
@@ -24,26 +25,38 @@ function usePluginWidgets(): DashboardWidget[] {
   // Plugins decide per account (permissions, language) and may report a change of their own, e.g. after an async check.
   const [revision, setRevision] = useState(0);
   useEffect(() => {
-    const unsubscribe = plugins.map((manifest) =>
-      manifest.plugin.onDashboardWidgetsChange?.(() => setRevision((current) => current + 1)),
-    );
-    return () => unsubscribe.forEach((stop) => stop?.());
+    const unsubscribe = plugins.map((manifest) => {
+      try {
+        return manifest.plugin.onDashboardWidgetsChange?.(() => setRevision((current) => current + 1));
+      } catch (error) {
+        console.error(`Attraccess Plugin System: onDashboardWidgetsChange() of plugin "${manifest.name}" threw`, error);
+        return undefined;
+      }
+    });
+    return () => unsubscribe.forEach((stop) => (typeof stop === 'function' ? stop() : undefined));
   }, [plugins]);
+  // The plugin provider passes plugins the signed-in user in an effect, after this render asked them. Ask again then.
+  const userId = user?.id;
+  useEffect(() => setRevision((current) => current + 1), [plugins, userId]);
 
   return useMemo(() => {
     const seen = new Set<string>();
     return plugins.flatMap((manifest) => {
       const pluginName = manifest.plugin.getPluginName();
       const declared = new Set(manifest.main.frontend?.dashboardWidgets ?? []);
-      let offered;
+      let offered: unknown;
       try {
         offered = manifest.plugin.getDashboardWidgets?.() ?? [];
       } catch (error) {
         console.error(`Attraccess Plugin System: getDashboardWidgets() of plugin "${pluginName}" threw`, error);
         return [];
       }
-      return offered.flatMap((widget): DashboardWidget[] => {
-        if (!declared.has(widget.id) || seen.has(widget.id)) return [];
+      if (!Array.isArray(offered)) {
+        console.error(`Attraccess Plugin System: getDashboardWidgets() of plugin "${pluginName}" returned no array`);
+        return [];
+      }
+      return (offered as PluginDashboardWidget[]).flatMap((widget): DashboardWidget[] => {
+        if (typeof widget?.render !== 'function' || !declared.has(widget.id) || seen.has(widget.id)) return [];
         if (BUILT_IN_IDS.has(widget.id)) {
           console.warn(`Attraccess Plugin System: plugin "${pluginName}" offers the built-in widget id "${widget.id}"`);
           return [];
@@ -63,7 +76,7 @@ function usePluginWidgets(): DashboardWidget[] {
       });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- user, language and revision make the plugins answer anew.
-  }, [plugins, user, language, revision]);
+  }, [plugins, userId, language, revision]);
 }
 
 function useComputedDashboardWidgets(): DashboardWidgets {

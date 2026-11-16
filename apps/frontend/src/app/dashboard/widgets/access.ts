@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
 import { SIDEBAR_ITEMS, SidebarItem } from '../../layout/sidebar/navigation';
 import { useShowNavItem } from '../../layout/sidebar/HelpfulLinks';
+import { useAuth } from '../../../hooks/useAuth';
 
 // The license module the sidebar requires for a path, from the entry itself or its group.
 const LICENSE_MODULE_BY_PATH = new Map(
@@ -18,7 +19,9 @@ const LICENSE_MODULE_BY_PATH = new Map(
  */
 export function useCanOpenPage() {
   const showNavItem = useShowNavItem();
-  const { data: license } = useLicenseServiceGetLicenseInformation();
+  const { isAuthenticated } = useAuth();
+  // Also used on the logged-out pages of the layout, where the license cannot be read.
+  const { data: license } = useLicenseServiceGetLicenseInformation(undefined, { enabled: isAuthenticated });
 
   return useCallback(
     (path: string) => {

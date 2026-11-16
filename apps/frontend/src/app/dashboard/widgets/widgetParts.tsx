@@ -2,7 +2,9 @@ import { PropsWithChildren, ReactNode, useState } from 'react';
 import { Button, cn, Label, Link, SearchField, Skeleton } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { SearchIcon } from 'lucide-react';
-import { StatusAlert } from '@attraccess/plugins-frontend-ui';
+import { StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
+import de from './de.json';
+import en from './en.json';
 
 /** A quick action that opens a page, styled as a button. */
 export function WidgetLinkButton({
@@ -63,8 +65,10 @@ export function WidgetSearch({
 }
 
 export function WidgetLoading() {
+  const { t } = useTranslations({ en, de });
   return (
-    <div className="flex flex-col gap-2" data-cy="dashboard-widget-loading">
+    <div className="flex flex-col gap-2" role="status" data-cy="dashboard-widget-loading">
+      <span className="sr-only">{t('loading')}</span>
       <Skeleton className="h-6 w-full rounded-lg" />
       <Skeleton className="h-6 w-2/3 rounded-lg" />
     </div>

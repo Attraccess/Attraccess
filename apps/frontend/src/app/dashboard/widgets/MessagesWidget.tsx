@@ -13,17 +13,23 @@ const MAX_CONVERSATIONS = 5;
 
 const countLabel = (count: number) => (count > 99 ? '99+' : count);
 
+// A chip is a plain span, whose aria-label screen readers skip; the count is spoken from hidden text instead.
+function UnreadChip({ count }: Readonly<{ count: number }>) {
+  const { t } = useTranslations({ en, de });
+  return (
+    <Chip size="sm" color="accent" variant="primary">
+      <span aria-hidden>{countLabel(count)}</span>
+      <span className="sr-only">{t('messages.unread', { count })}</span>
+    </Chip>
+  );
+}
+
 /** The total unread count, the same as the sidebar badge. GlobalMessagingLive keeps it current. */
 export function MessagesUnreadChip() {
-  const { t } = useTranslations({ en, de });
   const { data: unread } = useMessagingServiceMessagingGetUnreadCount();
   if (!unread?.total) return null;
 
-  return (
-    <Chip size="sm" color="accent" variant="primary" aria-label={t('messages.unread', { count: unread.total })}>
-      {countLabel(unread.total)}
-    </Chip>
-  );
+  return <UnreadChip count={unread.total} />;
 }
 
 function ConversationRow({ conversation }: Readonly<{ conversation: ConversationListItemDto }>) {
@@ -39,7 +45,7 @@ function ConversationRow({ conversation }: Readonly<{ conversation: Conversation
         data-cy="dashboard-messages-conversation"
       >
         <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-default text-sm font-medium uppercase">
-          {name.charAt(0)}
+          <span aria-hidden>{name.charAt(0)}</span>
           {conversation.otherParticipantOnline && (
             <span
               className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-success"
@@ -59,16 +65,7 @@ function ConversationRow({ conversation }: Readonly<{ conversation: Conversation
             {conversation.lastMessage?.content ?? t('messages.noMessages')}
           </span>
         </span>
-        {conversation.unreadCount > 0 && (
-          <Chip
-            size="sm"
-            color="accent"
-            variant="primary"
-            aria-label={t('messages.unread', { count: conversation.unreadCount })}
-          >
-            {countLabel(conversation.unreadCount)}
-          </Chip>
-        )}
+        {conversation.unreadCount > 0 && <UnreadChip count={conversation.unreadCount} />}
       </Link>
     </li>
   );

@@ -18,7 +18,6 @@
   },
   "card": {
     "dragHandle": "Reorder {{title}}",
-    "unpin": "Remove {{title}} from dashboard",
     "open": "Open",
     "openResource": "Open {{title}}",
     "unavailable": "No longer accessible",
@@ -26,7 +25,8 @@
     "remove": "Remove from dashboard",
     "removeLabel": "Remove {{title}} from dashboard",
     "resourceLoadError": "This resource could not be loaded.",
-    "unavailableWidgetDescription": "You can no longer use this widget. Its permission or license may have been removed or its plugin is not available."
+    "unavailableWidgetDescription": "You can no longer use this widget. Its permission or license may have been removed or its plugin is not available.",
+    "widgetLabel": "{{title}} widget"
   },
   "drag": {
     "instructions": "To pick up a card, press space or enter. Use the arrow keys to move it. Press space or enter again to drop it in its new place, or press escape to cancel.",
@@ -51,6 +51,8 @@
     "add": "Add",
     "addLabel": "Add {{title}} to dashboard",
     "allAdded": "Everything is already on your dashboard.",
-    "close": "Close"
+    "close": "Close",
+    "addWidgetLabel": "Add {{title}} widget to dashboard",
+    "loading": "Loading…"
   }
 }

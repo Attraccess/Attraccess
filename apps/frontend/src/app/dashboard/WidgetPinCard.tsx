@@ -5,6 +5,8 @@ import { StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { CardHeading, PinCardProps } from './PinCards';
 import { SortablePinCard, SortablePinSection } from './SortablePinCard';
 import { DashboardWidget } from './widgets/widgetsContext';
+import dashboardDe from './de.json';
+import dashboardEn from './en.json';
 import de from './widgets/de.json';
 import en from './widgets/en.json';
 
@@ -37,10 +39,15 @@ class WidgetBoundary extends Component<
   }
 }
 
+// Calls the widget's render function as a child of the boundary, so a render function that throws is caught too.
+function Rendered({ render }: Readonly<{ render: () => ReactNode }>) {
+  return <>{render()}</>;
+}
+
 function WidgetBody({ widget }: Readonly<{ widget: DashboardWidget }>) {
   const body = (
     <WidgetBoundary widgetId={widget.id} pluginName={widget.plugin?.pluginName}>
-      {widget.renderBody()}
+      <Rendered render={widget.renderBody} />
     </WidgetBoundary>
   );
   if (!widget.plugin) return body;
@@ -56,14 +63,19 @@ export function WidgetPinCard({
   isEditing,
   onRemove,
 }: Readonly<PinCardProps & { widget: DashboardWidget }>) {
+  const { t } = useTranslations({ en: dashboardEn, de: dashboardDe });
+  // Names the edit controls apart from those of the page with the same title, e.g. the Messages page.
+  const label = t('card.widgetLabel', { title: widget.title });
   // The header extra is the widget's own content too, so it shares the boundary.
   const headerExtra = widget.renderHeaderExtra && (
-    <WidgetBoundary widgetId={widget.id}>{widget.renderHeaderExtra()}</WidgetBoundary>
+    <WidgetBoundary widgetId={widget.id}>
+      <Rendered render={widget.renderHeaderExtra} />
+    </WidgetBoundary>
   );
 
   if (widget.hasFields) {
     return (
-      <SortablePinSection id={id} title={widget.title} isEditing={isEditing} onRemove={onRemove}>
+      <SortablePinSection id={id} title={label} isEditing={isEditing} onRemove={onRemove}>
         {(controls) => (
           <>
             <header className="flex flex-row items-center gap-3" data-cy={`dashboard-widget-${widget.id}`}>
@@ -81,7 +93,7 @@ export function WidgetPinCard({
   }
 
   return (
-    <SortablePinCard id={id} title={widget.title} isEditing={isEditing} onRemove={onRemove}>
+    <SortablePinCard id={id} title={label} isEditing={isEditing} onRemove={onRemove}>
       {(controls) => (
         <>
           <CardHeading

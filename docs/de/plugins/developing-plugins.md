@@ -112,7 +112,10 @@ Manifest auflistet und es aus `getDashboardWidgets()` zurückgibt. Die API lehnt
 IDs ab, die kein aktives Plugin auflistet. Eine eingebaute Widget-ID hat immer
 Vorrang vor Ihrer (der Host ignoriert Ihre und protokolliert eine Warnung).
 Geben Sie nur zurück, was der aktuelle Benutzer verwenden darf, und prüfen Sie
-jeden Link und jede Aktion im Inhalt nach derselben Regel wie ihr Ziel. Der
+jeden Link und jede Aktion im Inhalt nach derselben Regel wie ihr Ziel.
+Ein verborgenes Widget ist keine Zugriffskontrolle: Jeder Benutzer kann eine
+deklarierte ID anheften, daher müssen Ihre Backend-Endpunkte den Zugriff selbst
+prüfen. Der
 Host fragt erneut, wenn sich Benutzer oder Sprache ändern und nachdem
 `onDashboardWidgetsChange` ausgelöst wurde. Verliert ein Benutzer den Zugriff
 oder ist Ihr Plugin deaktiviert bzw. gibt das Widget nicht mehr zurück, wird

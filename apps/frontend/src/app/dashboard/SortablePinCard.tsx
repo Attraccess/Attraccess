@@ -39,7 +39,7 @@ function useSortablePin({ id, title, isEditing, onRemove }: Omit<SortablePinCard
             {...attributes}
             {...listeners}
             aria-label={t('card.dragHandle', { title })}
-            className="cursor-grab touch-none rounded text-muted outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            className="flex size-6 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted outline-none focus-visible:ring-2 focus-visible:ring-focus"
             data-cy="dashboard-card-drag-handle"
           >
             <GripVerticalIcon className="w-4 h-4" aria-hidden />
@@ -50,9 +50,9 @@ function useSortablePin({ id, title, isEditing, onRemove }: Omit<SortablePinCard
             isIconOnly
             size="sm"
             variant="ghost"
-            aria-label={t('card.unpin', { title })}
+            aria-label={t('card.removeLabel', { title })}
             onPress={onRemove}
-            data-cy="dashboard-card-unpin"
+            data-cy="dashboard-card-remove-control"
           >
             <XIcon className="w-4 h-4" />
           </Button>

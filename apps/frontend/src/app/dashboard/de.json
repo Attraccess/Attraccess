@@ -18,7 +18,6 @@
   },
   "card": {
     "dragHandle": "{{title}} verschieben",
-    "unpin": "{{title}} vom Dashboard entfernen",
     "open": "Öffnen",
     "openResource": "{{title}} öffnen",
     "unavailable": "Nicht mehr zugänglich",
@@ -26,7 +25,8 @@
     "remove": "Vom Dashboard entfernen",
     "removeLabel": "{{title}} vom Dashboard entfernen",
     "resourceLoadError": "Diese Ressource konnte nicht geladen werden.",
-    "unavailableWidgetDescription": "Sie können dieses Widget nicht mehr verwenden. Möglicherweise wurde die Berechtigung oder Lizenz entfernt, oder sein Plugin ist nicht verfügbar."
+    "unavailableWidgetDescription": "Sie können dieses Widget nicht mehr verwenden. Möglicherweise wurde die Berechtigung oder Lizenz entfernt, oder sein Plugin ist nicht verfügbar.",
+    "widgetLabel": "Widget {{title}}"
   },
   "drag": {
     "instructions": "Um eine Karte aufzunehmen, drücken Sie die Leertaste oder Enter. Verschieben Sie sie mit den Pfeiltasten. Drücken Sie erneut die Leertaste oder Enter, um sie an der neuen Stelle abzulegen, oder Escape, um abzubrechen.",
@@ -51,6 +51,8 @@
     "add": "Hinzufügen",
     "addLabel": "{{title}} zum Dashboard hinzufügen",
     "allAdded": "Alles ist bereits auf Ihrem Dashboard.",
-    "close": "Schließen"
+    "close": "Schließen",
+    "addWidgetLabel": "Widget {{title}} zum Dashboard hinzufügen",
+    "loading": "Wird geladen…"
   }
 }

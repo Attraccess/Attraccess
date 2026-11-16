@@ -31,7 +31,7 @@ Solange Ihr Dashboard leer ist, öffnet Attraccess weiterhin die Ressourcenüber
 
 Normalerweise ist das Dashboard eine aufgeräumte Ansicht: Sie können alles auf den Karten verwenden, aber es gibt keine Griffe und keine Schaltflächen zum Entfernen. Um das Dashboard zu ändern, wählen Sie **Dashboard bearbeiten**. Während Sie bearbeiten:
 
-- zeigt jede Karte einen Griff zum Verschieben und eine Schaltfläche zum Entfernen (**… vom Dashboard entfernen**)
+- zeigt jede Karte einen Griff zum Verschieben und eine Schaltfläche zum Entfernen (**… vom Dashboard entfernen**, bei einem Widget **Widget … vom Dashboard entfernen**); eine nicht mehr zugängliche Karte behält stattdessen ihre eigene Schaltfläche **Vom Dashboard entfernen**
 - öffnet **Zum Dashboard hinzufügen** die Liste der Widgets und Seiten
 - wird jede Änderung sofort gespeichert
 
@@ -57,14 +57,14 @@ Die Karten aktualisieren sich live, wenn Sitzungen beginnen und enden.
 
 Jedes Widget wird nur Personen angeboten, die die Seite öffnen dürfen, für die es steht. Jede Schaltfläche in einem Widget erscheint nur, wenn Sie verwenden dürfen, was sie öffnet.
 
-| Widget              | Zeigt                                                                                                                                                                                            | Wer es sieht                                                              |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
-| **Nachrichten**     | Die Zahl der ungelesenen Nachrichten, Ihre fünf neuesten Unterhaltungen mit Vorschau und ungelesenen Nachrichten sowie **Posteingang öffnen**. Wählen Sie eine Unterhaltung, um sie zu öffnen.   | Alle                                                                      |
-| **Meine Sitzungen** | Ihre laufenden Sitzungen mit je einem Timer und **Beenden**, um eine nach einer Bestätigung zu beenden.                                                                                          | Alle                                                                      |
-| **Ressourcen**      | Eine Suche, die die Ressourcenübersicht mit Ihrem Suchbegriff öffnet, und Schaltflächen für alle Ressourcen, das Erstellen einer Ressource, Flows, MQTT-Server, Lesegeräte und Nutzungsberichte. | Alle; jede Schaltfläche nur mit ihrer Berechtigung                        |
-| **Benutzer**        | Eine Suche, die die Benutzerliste mit Ihrem Suchbegriff öffnet, und Schaltflächen für alle Benutzer, unbestätigte E-Mail-Adressen, das Einladen eines Benutzers und Rollen.                      | Personen, die die Benutzerliste sehen dürfen                              |
-| **Guthaben**        | Ihr Guthaben in der eingestellten Währung, mit **Aufladen** und **Transaktionen**.                                                                                                               | Instanzen mit dem Abrechnungsmodul                                        |
-| **Lesegeräte**      | Wie viele Lesegeräte gekoppelt sind und wie viele sich seit 24 Stunden nicht verbunden haben, die drei davon, die zuletzt verbunden waren, sowie **Alle Lesegeräte**.                            | Personen, die Lesegeräte verwalten, auf Instanzen mit dem Attractap-Modul |
+| Widget              | Zeigt                                                                                                                                                                                            | Wer es sieht                                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| **Nachrichten**     | Die Zahl der ungelesenen Nachrichten, Ihre fünf neuesten Unterhaltungen mit Vorschau und ungelesenen Nachrichten sowie **Posteingang öffnen**. Wählen Sie eine Unterhaltung, um sie zu öffnen.   | Alle                                                                                                   |
+| **Meine Sitzungen** | Ihre laufenden Sitzungen mit je einem Timer und **Beenden**, um eine nach einer Bestätigung zu beenden.                                                                                          | Alle                                                                                                   |
+| **Ressourcen**      | Eine Suche, die die Ressourcenübersicht mit Ihrem Suchbegriff öffnet, und Schaltflächen für alle Ressourcen, das Erstellen einer Ressource, Flows, MQTT-Server, Lesegeräte und Nutzungsberichte. | Alle; jede Schaltfläche nur mit ihrer Berechtigung, Lesegeräte zusätzlich nur mit der Attractap-Lizenz |
+| **Benutzer**        | Eine Suche, die die Benutzerliste mit Ihrem Suchbegriff öffnet, und Schaltflächen für alle Benutzer, unbestätigte E-Mail-Adressen, das Einladen eines Benutzers und Rollen.                      | Personen, die die Benutzerliste sehen dürfen                                                           |
+| **Guthaben**        | Ihr Guthaben in der eingestellten Währung, mit **Aufladen** und **Transaktionen**.                                                                                                               | Instanzen mit dem Abrechnungsmodul                                                                     |
+| **Lesegeräte**      | Wie viele Lesegeräte gekoppelt sind und wie viele sich seit 24 Stunden nicht verbunden haben, die drei davon, die zuletzt verbunden waren, sowie **Alle Lesegeräte**.                            | Personen, die Lesegeräte verwalten, auf Instanzen mit dem Attractap-Modul                              |
 
 Plugins können eigene Widgets hinzufügen. Das Reservierungs-Plugin bietet zum Beispiel **Anstehende Reservierungen** an: Ihre nächsten drei Buchungen, **Meine Reservierungen** und, für Personen, die Reservierungen verwalten, **Verwalten**.
 

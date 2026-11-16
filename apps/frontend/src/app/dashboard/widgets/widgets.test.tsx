@@ -7,6 +7,8 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { AttractapService, BillingService, MessagingService, ResourcesService } from '@attraccess/react-query-client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BalanceWidget } from './BalanceWidget';
+import { BUILT_IN_WIDGETS } from './builtInWidgets';
+import { BUILT_IN_WIDGET_IDS } from './ids';
 import { MessagesUnreadChip, MessagesWidget } from './MessagesWidget';
 import { MySessionsWidget } from './MySessionsWidget';
 import { ReadersWidget } from './ReadersWidget';
@@ -91,7 +93,7 @@ describe('MessagesWidget', () => {
     expect(await screen.findByText('Hello 1')).toBeInTheDocument();
     expect(screen.queryByText('Hello 6')).toBeNull();
     expect(hrefs()).toEqual([1, 2, 3, 4, 5].map((id) => `/messages?conversation=${id}`).concat('/messages'));
-    expect(screen.getByLabelText('4 unread')).toHaveTextContent('4');
+    expect(screen.getByText('4 unread').parentElement).toHaveTextContent(/^4/);
     expect(screen.getByRole('img', { name: 'Online' })).toBeInTheDocument();
   });
 
@@ -109,7 +111,7 @@ describe('MessagesWidget', () => {
   it('shows the total unread count in its header', async () => {
     vi.spyOn(MessagingService, 'messagingGetUnreadCount').mockResolvedValue({ total: 120 } as never);
     renderWidget(<MessagesUnreadChip />);
-    expect(await screen.findByLabelText('120 unread')).toHaveTextContent('99+');
+    expect((await screen.findByText('120 unread')).parentElement).toHaveTextContent(/^99\+/);
   });
 });
 
@@ -259,5 +261,11 @@ describe('ReadersWidget', () => {
     vi.spyOn(AttractapService, 'getReaders').mockResolvedValue([] as never);
     renderWidget(<ReadersWidget />);
     expect(await screen.findByText('Every reader connected within the last 24 hours.')).toBeInTheDocument();
+  });
+});
+
+describe('BUILT_IN_WIDGETS', () => {
+  it('has one entry for each built-in id the API accepts', () => {
+    expect(BUILT_IN_WIDGETS.map((widget) => widget.id).sort()).toEqual([...BUILT_IN_WIDGET_IDS].sort());
   });
 });

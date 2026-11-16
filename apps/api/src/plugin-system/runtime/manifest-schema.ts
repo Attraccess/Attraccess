@@ -11,12 +11,16 @@ export const dashboardPathsSchema = z.array(
   }),
 );
 
-/** Dashboard widget ids a plugin contributes through getDashboardWidgets(): lowercase kebab-case, at most 64 characters. */
+/** A dashboard widget id: lowercase kebab-case, at most 64 characters. Pins of widgets are validated with it too. */
+export const DASHBOARD_WIDGET_ID_PATTERN = /^(?=.{1,64}$)[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/** Dashboard widget ids a plugin contributes through getDashboardWidgets(). */
 export const dashboardWidgetsSchema = z.array(
   z
     .string()
-    .max(64)
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, { message: 'must be a lowercase kebab-case widget id' }),
+    .regex(DASHBOARD_WIDGET_ID_PATTERN, {
+      message: 'must be a lowercase kebab-case widget id of at most 64 characters',
+    }),
 );
 
 export const mainSchema = z.object({

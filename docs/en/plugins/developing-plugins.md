@@ -1136,7 +1136,8 @@ manifest and returns it from `getDashboardWidgets()`. The API refuses to add
 ids that no active plugin lists. A built-in widget id always wins over yours
 (the host ignores yours and logs a warning). Return only what the current user
 may use, and gate every link and action in the body by the same rule as its
-target. The host asks again when the user or the language changes and after
+target. Hiding a widget is not access control: any user can pin a declared id,
+so your backend endpoints must check access themselves. The host asks again when the user or the language changes and after
 `onDashboardWidgetsChange` fires. When a user loses access, or your plugin is
 disabled or stops returning the widget, the card shows as no longer accessible
 until the user removes it.

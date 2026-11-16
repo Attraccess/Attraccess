@@ -92,7 +92,11 @@ export function useDragAccessibility(
  * The pinned cards in the user's order. Outside edit mode they are a read-only view: no edit controls, and no sensor
  * that could pick a card up. In edit mode dragging a card saves the new order at once.
  */
-export function DashboardGrid({ pins, isEditing }: Readonly<{ pins: DashboardPin[]; isEditing: boolean }>) {
+export function DashboardGrid({
+  pins,
+  isEditing,
+  onRemoved,
+}: Readonly<{ pins: DashboardPin[]; isEditing: boolean; onRemoved?: (index: number) => void }>) {
   const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
   const { mutate } = useUpdateDashboardPins();
@@ -107,15 +111,18 @@ export function DashboardGrid({ pins, isEditing }: Readonly<{ pins: DashboardPin
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const remove = (pin: DashboardPin) =>
+  const remove = (pin: DashboardPin, index: number) => {
+    onRemoved?.(index);
     mutate(
       { requestBody: { kind: DashboardPinOperationKind.REMOVE, item: itemOf(pin) } },
       { onError: () => toast.error({ title: t('pin.saveError') }) },
     );
+  };
 
   const pinTitle = (pin: DashboardPin) => {
     if (pin.itemType === DashboardPinItemType.RESOURCE) return pin.resourceName ?? pin.itemId;
-    if (pin.itemType === DashboardPinItemType.WIDGET) return widgets.titleOf(pin.itemId) ?? pin.itemId;
+    if (pin.itemType === DashboardPinItemType.WIDGET)
+      return t('card.widgetLabel', { title: widgets.titleOf(pin.itemId) ?? pin.itemId });
     return pages.find((page) => page.path === pin.itemId)?.title ?? titleOf(pin.itemId) ?? pin.itemId;
   };
   const accessibility = useDragAccessibility((id) => {
@@ -127,9 +134,9 @@ export function DashboardGrid({ pins, isEditing }: Readonly<{ pins: DashboardPin
     if (over) reorder(String(active.id), String(over.id));
   };
 
-  const renderCard = (pin: DashboardPin) => {
+  const renderCard = (pin: DashboardPin, index: number) => {
     const id = pinKey(pin);
-    const props = { id, isEditing, onRemove: () => remove(pin) };
+    const props = { id, isEditing, onRemove: () => remove(pin, index) };
     if (pin.itemType === DashboardPinItemType.RESOURCE) return <ResourcePinCard key={id} {...props} pin={pin} />;
 
     const isWidget = pin.itemType === DashboardPinItemType.WIDGET;
