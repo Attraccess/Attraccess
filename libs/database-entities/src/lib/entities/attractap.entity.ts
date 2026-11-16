@@ -203,6 +203,15 @@ export class Attractap {
   })
   ledBrightness!: number;
 
+  @Column({ type: 'boolean', nullable: false, default: false })
+  @ApiProperty({
+    description:
+      'Whether backend plugins with the BLE_TRANSPORT permission may scan for and connect to Bluetooth devices through this reader',
+    example: false,
+    default: false,
+  })
+  allowPluginBle!: boolean;
+
   @Column(() => AttractapFirmwareVersion, { prefix: 'firmware' })
   @ApiProperty({ description: 'The firmware of the reader', type: () => AttractapFirmwareVersion })
   firmware!: AttractapFirmwareVersion;

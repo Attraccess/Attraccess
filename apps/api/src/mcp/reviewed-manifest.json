@@ -1642,7 +1642,7 @@
   "getPlugins": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "c9cb1542"
+    "shape": "caa8f359"
   },
   "uploadPlugin": {
     "decision": "deny",
@@ -1672,12 +1672,12 @@
   "updateReader": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "9cde0c27"
+    "shape": "8770aa15"
   },
   "getReaderById": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "5c867131"
+    "shape": "e5d411ea"
   },
   "deleteReader": {
     "decision": "allow",
@@ -1687,12 +1687,12 @@
   "getReaders": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "6b03ad0c"
+    "shape": "976ecc51"
   },
   "getReadersToPair": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "f5b8f9b6"
+    "shape": "54f503fb"
   },
   "getReaderCrashReports": {
     "decision": "allow",
@@ -1752,12 +1752,12 @@
   "getResourceAttractaps": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "5e4878c3"
+    "shape": "17cb3e74"
   },
   "getResourceGroupAttractaps": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "6ac19d6c"
+    "shape": "cc6861f1"
   },
   "getPairings": {
     "decision": "allow",

@@ -275,6 +275,7 @@ export class AttractapService {
       connectedResourceIds?: number[];
       firmware?: AttractapFirmwareVersion;
       ledBrightness?: number;
+      allowPluginBle?: boolean;
     },
     emitEvent = true,
   ): Promise<Attractap> {
@@ -290,6 +291,10 @@ export class AttractapService {
 
     if (updateData.ledBrightness !== undefined) {
       reader.ledBrightness = updateData.ledBrightness;
+    }
+
+    if (updateData.allowPluginBle !== undefined) {
+      reader.allowPluginBle = updateData.allowPluginBle;
     }
 
     if (updateData.firmware) {

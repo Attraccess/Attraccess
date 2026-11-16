@@ -82,6 +82,7 @@
   - [Überblick](plugins/overview.md)
   - [Plugins installieren](plugins/installing-plugins.md)
   - [Plugins entwickeln](plugins/developing-plugins.md)
+  - [Bluetooth-Transport für Plugins](plugins/ble-transport.md)
   - **Reservierungen**
     - [Überblick](plugins/reservations/overview.md)
     - [Reservierungen nutzen](plugins/reservations/using-reservations.md)

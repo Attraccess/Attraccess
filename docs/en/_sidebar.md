@@ -83,6 +83,7 @@
   - [Overview](plugins/overview.md)
   - [Installing Plugins](plugins/installing-plugins.md)
   - [Developing Plugins](plugins/developing-plugins.md)
+  - [Bluetooth Transport for Plugins](plugins/ble-transport.md)
   - [Database Migrations](plugins/database-migrations.md)
   - **Reservations**
     - [Overview](plugins/reservations/overview.md)

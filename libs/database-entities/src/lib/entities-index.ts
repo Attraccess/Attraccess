@@ -7,6 +7,7 @@ export type { McpOAuthTokenKind } from './entities/mcp-oauth-token.entity';
 export { Attractap, AttractapFirmwareVersion } from './entities/attractap.entity';
 export { AttractapCrashReport } from './entities/attractapCrashReport.entity';
 export { AttractapCredentialEvent } from './entities/attractap-credential-event.entity';
+export { PluginBleEndpointEntity } from './entities/plugin-ble-endpoint.entity';
 export { AttractapInstallation } from './entities/attractap-installation.entity';
 export { AttractapSecureBootKey } from './entities/attractap-secure-boot-key.entity';
 export type { SecureBootKeyRole } from './entities/attractap-secure-boot-key.entity';
@@ -158,6 +159,7 @@ import { McpOAuthToken } from './entities/mcp-oauth-token.entity';
 import { Attractap } from './entities/attractap.entity';
 import { AttractapCrashReport } from './entities/attractapCrashReport.entity';
 import { AttractapCredentialEvent } from './entities/attractap-credential-event.entity';
+import { PluginBleEndpointEntity } from './entities/plugin-ble-endpoint.entity';
 import { AttractapInstallation } from './entities/attractap-installation.entity';
 import { AttractapSecureBootKey } from './entities/attractap-secure-boot-key.entity';
 import {
@@ -247,6 +249,7 @@ export const entities = {
   Attractap,
   AttractapCrashReport,
   AttractapCredentialEvent,
+  PluginBleEndpointEntity,
   AttractapInstallation,
   AttractapSecureBootKey,
   ReaderUiAlert,

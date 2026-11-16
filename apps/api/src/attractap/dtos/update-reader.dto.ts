@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsArray, IsBoolean, IsNotEmpty, IsNumber, IsOptional, IsString, Max, Min, ValidateIf } from 'class-validator';
 
 export class UpdateReaderDto {
   @ApiProperty({
@@ -31,4 +32,17 @@ export class UpdateReaderDto {
   @Min(0)
   @Max(255)
   ledBrightness?: number;
+
+  @ApiProperty({
+    description:
+      'Allow backend plugins with the BLE_TRANSPORT permission to use the Bluetooth radio of this reader. Turning it off closes active plugin BLE sessions on the reader. Omit to keep the current setting.',
+    example: false,
+    required: false,
+  })
+  // Strict: the global implicit conversion would turn the string "false" into true, and null would reach
+  // the NOT NULL column. Only a real boolean, or an omitted field, is valid for this permission switch.
+  @Transform(({ obj, key }) => obj[key])
+  @ValidateIf((_, value) => value !== undefined)
+  @IsBoolean()
+  allowPluginBle?: boolean;
 }

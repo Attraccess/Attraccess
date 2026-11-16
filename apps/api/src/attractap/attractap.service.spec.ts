@@ -1,6 +1,7 @@
 import { DeleteResult, Repository } from 'typeorm';
 import { Attractap, AttractapCrashReport, NFCCard, Resource, User } from '@attraccess/database-entities';
 import { AttractapService } from './attractap.service';
+import { ReaderUpdatedEvent } from './events';
 import { EncryptionService } from '../encryption/encryption.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { CoredumpSymbolicationService } from './coredump-symbolication.service';
@@ -204,6 +205,39 @@ describe('AttractapService reader maintenance and crash reports', () => {
     expect(result).toMatchObject({ name: 'Renamed', ledBrightness: 0, resources: [{ id: 1 }] });
     expect(readers.save).toHaveBeenCalledWith(result);
     expect(events.emit).toHaveBeenCalledTimes(1);
+  });
+  it('persists the plugin BLE opt-in only when it is given', async () => {
+    const { service, readers, reader } = setup();
+    await service.updateReader(4, { name: 'Kept' }, false);
+    expect(readers.save).toHaveBeenLastCalledWith(expect.not.objectContaining({ allowPluginBle: true }));
+    const enabled = await service.updateReader(4, { allowPluginBle: true }, false);
+    expect(enabled.allowPluginBle).toBe(true);
+    expect(readers.save).toHaveBeenLastCalledWith(expect.objectContaining({ allowPluginBle: true }));
+    const disabled = await service.updateReader(4, { allowPluginBle: false }, false);
+    expect(disabled.allowPluginBle).toBe(false);
+    expect((reader as { allowPluginBle?: boolean }).allowPluginBle).toBe(false);
+  });
+  it('keeps the plugin BLE opt-in when other reader fields change', async () => {
+    const { service, readers, reader: fixture, events } = setup();
+    const reader = Object.assign(fixture, { allowPluginBle: true });
+    const renamed = await service.updateReader(4, { name: 'Renamed' });
+    expect(renamed.allowPluginBle).toBe(true);
+    expect(readers.save).toHaveBeenLastCalledWith(expect.objectContaining({ allowPluginBle: true }));
+    expect(events.emit).toHaveBeenLastCalledWith(
+      ReaderUpdatedEvent.EVENT_NAME,
+      expect.objectContaining({ reader: expect.objectContaining({ allowPluginBle: true }) }),
+    );
+    await service.updateReader(4, { ledBrightness: 5, connectedResourceIds: [1] });
+    expect(readers.save).toHaveBeenLastCalledWith(expect.objectContaining({ allowPluginBle: true }));
+    const firmware = {
+      name: 'Reader',
+      variant: 'standard',
+      version: '2.0',
+      capabilities: { resourceSelection: false },
+    };
+    await service.updateReaderFirmware(4, firmware as never);
+    expect(readers.save).toHaveBeenLastCalledWith(expect.objectContaining({ allowPluginBle: true, firmware }));
+    expect(reader.allowPluginBle).toBe(true);
   });
   it('allows resource selection when supported and can clear attachments without emitting an event', async () => {
     const { service, reader, events } = setup();

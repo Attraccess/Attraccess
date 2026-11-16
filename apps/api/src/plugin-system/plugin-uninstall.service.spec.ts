@@ -9,7 +9,8 @@ import { PluginUninstallService } from './plugin-uninstall.service';
 describe('PluginUninstallService', () => {
   const fixture = registerPluginServiceFixture();
 
-  const uninstaller = () => new PluginUninstallService(new PluginService());
+  const bleEndpoints = { deleteAllForPlugin: jest.fn().mockResolvedValue(undefined) };
+  const uninstaller = () => new PluginUninstallService(new PluginService(), bleEndpoints as never);
 
   function writeDeletablePlugin(migrations?: { directory: string; entryPoint: string }) {
     fixture.writePlugin(fixture.root, 'delete-me', {
@@ -24,6 +25,17 @@ describe('PluginUninstallService', () => {
 
   it('throws when the plugin id is unknown', async () => {
     await expect(uninstaller().deletePlugin('nope')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('deletes the BLE endpoints the plugin owns, and still uninstalls when that fails', async () => {
+    const plugin = writeDeletablePlugin();
+    await uninstaller().deletePlugin(plugin.id, true);
+    expect(bleEndpoints.deleteAllForPlugin).toHaveBeenCalledWith(plugin.id);
+
+    const second = writeDeletablePlugin();
+    bleEndpoints.deleteAllForPlugin.mockRejectedValueOnce(new Error('db locked'));
+    await uninstaller().deletePlugin(second.id, true);
+    expect(existsSync(join(fixture.root, 'delete-me'))).toBe(false);
   });
 
   it('removes the plugin folder and schedules a restart', async () => {
