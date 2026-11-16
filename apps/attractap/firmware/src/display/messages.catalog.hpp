@@ -284,6 +284,10 @@ enum class Message {
     ErrorEnrollNotConfirmed, ErrorNoFreeKeySlot, ErrorCardNotFactory, ErrorResetNotConfirmed, ErrorWrongCard,
     ErrorCardKeyUnavailable, ErrorFirmwareUpdateRequired, ErrorReaderNotAllowedToWriteCards,
     ErrorCardOperationExpired,
+    NetworkStatus, NetworkStatusShort, ConnectionQuality, ConnectionQualityGood, ConnectionQualityDegraded, ConnectionQualityOffline,
+    LastMessageAge, LatestPing, AveragePing, PingTrend, ReconnectsLastMinute, SendQueueDepth, SendQueueFullLastMinute,
+    SendFailuresLastMinute, ConnectionTimeoutsLastMinute, PingTimeoutsLastMinute, PingLossLastMinute,
+    MissedHeartbeatsLastMinute, NotAvailable, Milliseconds, Percent,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };

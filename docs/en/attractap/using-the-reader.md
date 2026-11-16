@@ -1,4 +1,5 @@
 # Using the Attractap Reader
+
 <!-- llms-description: How to use an Attractap touch reader: sign in with a card, start or stop machines, open doors, view usage and complete forms. -->
 
 Use your RFID card and the Attractap touch display to start or stop a machine, open a door, or request supervision. The reader shows the machines and doors assigned to it and the actions available to you.
@@ -161,6 +162,33 @@ After signing out, you can scan your card again to continue. Any running machine
 | Your card does not sign you in     | Try again and keep the card in place until sign-in finishes. If it still fails, ask your administrator to check that the card is registered to your account. |
 | A start, stop or door action fails | Read the message and check the resource's current status before trying again. If the problem continues, contact the resource maintainer or resource manager. |
 | The reader loses its connection    | Wait for the connection to return, then sign in again. A lost connection does not end running machine usage.                                                 |
+
+### Network badge and connection status
+
+While the connection to the server is good, the reader shows no network badge. A badge in the top right corner appears only when there is a problem:
+
+| Badge     | Meaning                                                                                                                                     |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **! NET** | The connection is degraded: messages arrive late, pings are slow or lost, or sending failed. The reader keeps working but may react slowly. |
+| **x NET** | The reader is offline and cannot reach the server. It reconnects automatically.                                                             |
+
+For details, open the maintenance drawer (pull down the handle at the top edge), tap **Network** and enter the device PIN. The **Network status** screen shows the live connection health and refreshes every second. The reader stays connected while it is open, so you can watch the connection change. The back arrow returns to the previous screen, or to the start screen if the connection dropped in the meantime:
+
+| Value                       | Meaning                                                                                  |
+| --------------------------- | ---------------------------------------------------------------------------------------- |
+| Connection quality          | **Good**, **Degraded** or **Offline**, the same assessment as the badge.                 |
+| Time since last message     | How long ago the reader last received anything from the server or connected to it.       |
+| Latest ping / Average ping  | Round-trip time of the most recent ping and the average over the last minute.            |
+| Ping trend                  | Change between the oldest and newest ping of the last minute; positive means slower.     |
+| Reconnects (1 min)          | How often the connection was re-established in the last minute.                          |
+| Send queue                  | Messages waiting to be sent.                                                             |
+| Queue full (1 min)          | How often a message could not be queued because the send queue was full.                 |
+| Send failures (1 min)       | Messages that could not be sent.                                                         |
+| Connection timeouts (1 min) | Times the server stayed silent for too long and the reader dropped the connection.       |
+| Ping timeouts / Ping loss   | Pings without an answer, as a count and as a share of all pings sent in the last minute. |
+| Missed heartbeats (1 min)   | Heartbeats the reader could not send on time.                                            |
+
+**Not available** means there is no measurement: the pings show it until the first ping is answered after the reader starts, and the average and trend also show it when no ping was answered in the last minute.
 
 > [!NOTE]
 > Reader firmware and server ship together. The server updates readers automatically to its bundled firmware version (see [Firmware Updates](attractap/firmware-updates.md)).

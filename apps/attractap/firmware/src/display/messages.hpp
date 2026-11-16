@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include "../state/language.hpp"
-#include "messages.catalog.card-relay.hpp"
+#include "messages.catalog.network-status.hpp"
 
 // Firmware-owned text is identified independently of its displayed wording.
 namespace FirmwareI18n {
@@ -16,7 +16,10 @@ inline const char *messageText(Message id, const std::string &locale) {
         return "Something went wrong. Please try again.";
     }
     constexpr size_t mainEntries = sizeof(catalog) / sizeof(catalog[0]);
-    const auto &entry = index < mainEntries ? catalog[index] : cardRelayCatalog[index - mainEntries];
+    constexpr size_t cardRelayEnd = mainEntries + sizeof(cardRelayCatalog) / sizeof(cardRelayCatalog[0]);
+    const auto &entry = index < mainEntries    ? catalog[index]
+                        : index < cardRelayEnd ? cardRelayCatalog[index - mainEntries]
+                                               : networkStatusCatalog[index - cardRelayEnd];
     return Language::text(entry.en, entry.de, locale);
 }
 

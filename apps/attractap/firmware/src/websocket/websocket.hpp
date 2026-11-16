@@ -51,6 +51,7 @@ public:
 
 private:
     friend struct WebsocketPongProbeTest;
+    friend struct WebsocketNetworkQualityTest;
     std::function<void(const char *, size_t)> messageCallbackRaw;
     std::function<void(esp_websocket_event_data_t)> binaryDataCallback;
     std::function<bool(const uint8_t *, size_t)> rawBinaryCallback;
@@ -156,6 +157,8 @@ private:
     uint8_t missedHeartbeatEventNextIndex = 0;
     uint8_t pongRttSampleNextIndex = 0;
     uint32_t lastPongRttMs = 0;
+    // Stays set across reconnects: stale samples still age out of the averages.
+    bool hasPongRttSample = false;
     uint32_t lastPongProbeTime = 0;
     uint32_t pendingPongProbeTime = 0;
     uint32_t pendingPongProbeToken = 0;

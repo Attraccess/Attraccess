@@ -21,6 +21,4 @@ inline constexpr Entry cardRelayCatalog[] = {
     {Message::ErrorReaderNotAllowedToWriteCards, "Dieses Lesegerät darf keine Karten beschreiben", "This reader may not write cards"},
     {Message::ErrorCardOperationExpired, "Zeit abgelaufen, bitte erneut starten", "Timed out, please start again"},
 };
-static_assert(sizeof(catalog) / sizeof(Entry) + sizeof(cardRelayCatalog) / sizeof(Entry) == static_cast<size_t>(Message::Count),
-              "every firmware message needs a catalog entry, in enum order");
 } // namespace FirmwareI18n
