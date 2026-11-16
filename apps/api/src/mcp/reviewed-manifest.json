@@ -582,27 +582,27 @@
   "previewAdminPasswordPolicy": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "98f5b61e"
+    "shape": "0d063b4f"
   },
   "listPasswordPolicyOverrides": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "92ece3cd"
+    "shape": "95d71bed"
   },
   "getPasswordPolicyOverride": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "f41c9397"
+    "shape": "a7f3cc77"
   },
   "upsertPasswordPolicyOverride": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "6d792ae9"
+    "shape": "07a99849"
   },
   "deletePasswordPolicyOverride": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "1f6cc9aa"
+    "shape": "579522ae"
   },
   "notificationsLive": {
     "decision": "deny",

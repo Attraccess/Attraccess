@@ -239,7 +239,7 @@
       "outputs": ["{workspaceRoot}/dist/apps/migrations"],
       "options": {
         "cwd": "apps/api",
-        "command": "webpack-cli build --config webpack.config.migrations.js --node-env=production"
+        "command": "webpack-cli build --config webpack.config.migrations.js --config-node-env=production"
       }
     },
     "migration-generate": {
