@@ -26,16 +26,18 @@ A token can use exactly the permissions on its allow-list that its owner still h
 
 MCP clients that support the MCP authorization flow need no token. They find everything on their own:
 
-1. The client calls `/api/mcp` without credentials and gets `401` with a `WWW-Authenticate` header that points at `/.well-known/oauth-protected-resource`.
-2. It reads `/.well-known/oauth-authorization-server` and registers itself (Dynamic Client Registration, RFC 7591). Only public clients with PKCE (`S256`) are supported. Redirect URIs must use `https`, or `http` on `localhost`, `127.0.0.1` or `[::1]`.
+1. The client calls `/api/mcp` without credentials and gets `401` with a `WWW-Authenticate` header that points at the protected-resource metadata (`/.well-known/oauth-protected-resource/api/mcp`).
+2. It reads `/.well-known/oauth-authorization-server` and registers itself (Dynamic Client Registration, RFC 7591). Only public clients with PKCE (`S256`) are supported. Redirect URIs must use `https`, or `http` on `localhost`, `127.0.0.1` or `[::1]`, with 1 to 10 URIs and no fragment. The client then sends the MCP endpoint URL as `resource` (RFC 8707) with the authorization and token requests; anything else is refused with `invalid_target`.
 3. The browser opens the Attraccess consent page. If you are not signed in you sign in first (including two-factor authentication or SSO) and return to the page. The page shows the app's name, where it returns to and the permissions it asks for.
-4. **Allow** sends the client its tokens. **Deny** sends it `access_denied`.
+4. **Allow** sends the client a one-time authorization code (valid for 2 minutes) that it exchanges for tokens at the token endpoint. **Deny** sends it `access_denied`. A consent request that nobody answers expires after 10 minutes.
 
 Access tokens last 15 minutes. Refresh tokens rotate on every use and stop working after 7 days in total. If an already-used refresh token is presented again, the whole connection is revoked.
 
 A client can name the permissions it needs as a space-separated `scope`. Without a scope it asks for all your permissions. The consent page refuses permissions you do not have. At every request the client has the permissions that were granted **and** that you hold right now, so removing a role in Attraccess removes the access on the next call.
 
 An OAuth access token works only at `/api/mcp`. REST endpoints reject it.
+
+Per IP address, the endpoints allow 600 requests per minute at `/api/mcp`, 60 per minute at the authorization, token and consent endpoints and 20 registrations per hour.
 
 ### Static clients
 
@@ -44,6 +46,8 @@ Clients that cannot register themselves can be configured with the optional `MCP
 ```bash
 MCP_OAUTH_CLIENTS='[{"client_id":"my-agent","client_name":"My agent","redirect_uris":["http://localhost:8123/callback"]}]'
 ```
+
+An invalid `MCP_OAUTH_CLIENTS` value is ignored with an error in the log; Attraccess still starts.
 
 ### HTTPS requirement
 

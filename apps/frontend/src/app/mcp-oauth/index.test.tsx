@@ -143,6 +143,16 @@ it('reports a request that is missing, expired or failed', () => {
   expect(screen.getByText('error.generic')).toBeTruthy();
 });
 
+it('sends the user to the app when the error dialog is closed and the browser keeps the window open', () => {
+  const close = vi.spyOn(window, 'close').mockImplementation(() => undefined);
+  state.consent = { data: undefined, isError: true, error: { status: 404 } };
+  render(<McpOAuthAuthorizePage />);
+  fireEvent.click(screen.getByText('error.close'));
+  expect(close).toHaveBeenCalled();
+  expect(state.leave).toHaveBeenCalledWith('/');
+  close.mockRestore();
+});
+
 it('ships matching English and German strings', () => {
   const keys = (value: unknown, prefix = ''): string[] =>
     Object.entries(value as Record<string, unknown>).flatMap(([key, child]) =>

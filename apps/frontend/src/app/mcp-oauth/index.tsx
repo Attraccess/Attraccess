@@ -15,6 +15,12 @@ import de from './de.json';
 type ApiFailure = { status?: number };
 type Decision = 'approve' | 'deny';
 
+/** Browsers only let a script close a window that a script opened; otherwise the user lands on the app instead. */
+function leaveThePage() {
+  window.close();
+  window.location.assign('/');
+}
+
 /**
  * The consent step of the MCP OAuth flow. The API sends the browser here with an opaque `request` id; the route
  * needs a signed-in user, so signed-out users reach the login first and land back on this page afterwards.
@@ -87,7 +93,7 @@ export function McpOAuthAuthorizePage() {
           status="error"
           title={t('error.title')}
           closeLabel={t('error.close')}
-          onClose={() => window.close()}
+          onClose={leaveThePage}
           data-cy="mcp-oauth-error-dialog"
         >
           {message}
@@ -101,7 +107,7 @@ export function McpOAuthAuthorizePage() {
     <UnauthorizedLayout>
       <Card className="w-full" data-cy="mcp-oauth-consent">
         <Card.Header>
-          <Card.Title>
+          <Card.Title className="break-words">
             {view ? t('title', { client: view.clientName }) : <Skeleton className="h-6 w-64 rounded-md" />}
           </Card.Title>
           <Card.Description>{t('intro')}</Card.Description>

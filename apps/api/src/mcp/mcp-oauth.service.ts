@@ -414,6 +414,12 @@ export class McpOAuthService {
     ) {
       throw new McpOAuthError('invalid_grant', 'The grant is no longer valid');
     }
+    const user = await this.users.findOneBy({ id: grant.userId });
+    if (!user || user.isDisabled) {
+      // The owner was deleted or disabled: nothing this grant issues would be accepted, so end it instead of rotating.
+      await this.revokeGrant(grant.id);
+      throw new McpOAuthError('invalid_grant', 'The grant is no longer valid');
+    }
     if (!(await this.consume(row.tokenHash))) {
       // The token was already rotated: someone holds a stale copy. Revoke the whole family.
       await this.revokeGrant(grant.id);

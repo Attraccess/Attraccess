@@ -2,7 +2,7 @@
 
 <!-- llms-description: Erklärt, wie MCP-Clients per API-Token oder OAuth mit Attraccess verbunden werden, welche Tools es gibt, wie Berechtigungen wirken und wie das geprüfte Manifest gepflegt wird. -->
 
-Attraccess stellt seine REST-API als [Model-Context-Protocol](https://modelcontextprotocol.io/)-Server (MCP) bereit. KI-Clients wie Claude Code, MCP Inspector oder eigene Agenten können damit nach denselben Regeln wie alle anderen Daten lesen und ändern.
+Attraccess stellt seine REST-API als [Model-Context-Protocol](https://modelcontextprotocol.io/)-Server (MCP) bereit. KI-Clients wie Claude Code, MCP Inspector oder eigene Agenten können damit nach denselben Regeln wie jeder andere Zugriff Daten lesen und ändern.
 
 - **Endpunkt:** `https://<deine-attraccess-adresse>/api/mcp` (Streamable HTTP, nur Tools).
 - **Tools:** ein Tool pro REST-Operation. Der Tool-Name ist die Operation-ID aus dem OpenAPI-Dokument (zum Beispiel `getAllResources`). Die Tools werden aus der laufenden API erzeugt und passen deshalb immer zu ihr.
@@ -10,7 +10,7 @@ Attraccess stellt seine REST-API als [Model-Context-Protocol](https://modelconte
 
 ## Mit einem API-Token verbinden
 
-1. Erstelle auf der Seite zur Kontosicherheit einen Token und gib ihm nur die Berechtigungen, die der Client braucht ([API-Referenz](developer/api-reference.md#authentifizierung)).
+1. Erstelle in deinem Konto unter **API-Token** einen Token und gib ihm nur die Berechtigungen, die der Client braucht.
 2. Sende ihn als `Authorization: Bearer <token>`.
 
 ```bash
@@ -20,22 +20,24 @@ claude mcp add --transport http attraccess https://deine-attraccess-adresse/api/
 
 API-Token (und damit der MCP-Zugriff mit ihnen) brauchen Valkey (`VALKEY_URL`) für ihr Anfragelimit.
 
-Ein Token kann genau die Berechtigungen seiner Positivliste nutzen, die sein Besitzer noch hat. Verliert der Besitzer eine Berechtigung oder `users.api-tokens.manage`, wird der nächste Aufruf abgelehnt. Widerrufene, abgelaufene und Token gelöschter Besitzer erhalten `401`.
+Ein Token kann genau die Berechtigungen seiner Positivliste nutzen, die sein Besitzer noch hat. Verliert der Besitzer eine Berechtigung oder `users.api-tokens.manage`, wird der nächste Aufruf abgelehnt. Widerrufene und abgelaufene Token sowie Token gelöschter Besitzer erhalten `401`.
 
 ## Mit OAuth verbinden
 
 MCP-Clients, die den MCP-Autorisierungsablauf unterstützen, brauchen keinen Token. Sie finden alles selbst:
 
-1. Der Client ruft `/api/mcp` ohne Zugangsdaten auf und erhält `401` mit einem `WWW-Authenticate`-Header, der auf `/.well-known/oauth-protected-resource` zeigt.
-2. Er liest `/.well-known/oauth-authorization-server` und registriert sich selbst (Dynamic Client Registration, RFC 7591). Unterstützt werden nur öffentliche Clients mit PKCE (`S256`). Weiterleitungs-URIs müssen `https` nutzen, oder `http` auf `localhost`, `127.0.0.1` oder `[::1]`.
+1. Der Client ruft `/api/mcp` ohne Zugangsdaten auf und erhält `401` mit einem `WWW-Authenticate`-Header, der auf die Metadaten der geschützten Ressource zeigt (`/.well-known/oauth-protected-resource/api/mcp`).
+2. Er liest `/.well-known/oauth-authorization-server` und registriert sich selbst (Dynamic Client Registration, RFC 7591). Unterstützt werden nur öffentliche Clients mit PKCE (`S256`). Weiterleitungs-URIs müssen `https` nutzen, oder `http` auf `localhost`, `127.0.0.1` oder `[::1]`, mit 1 bis 10 URIs und ohne Fragment. Der Client sendet bei Autorisierungs- und Token-Anfragen die URL des MCP-Endpunkts als `resource` (RFC 8707); alles andere wird mit `invalid_target` abgelehnt.
 3. Der Browser öffnet die Attraccess-Zustimmungsseite. Bist du nicht angemeldet, meldest du dich zuerst an (auch mit Zwei-Faktor-Authentifizierung oder SSO) und kehrst zur Seite zurück. Die Seite zeigt den Namen der App, wohin sie zurückkehrt und welche Berechtigungen sie anfragt.
-4. **Erlauben** sendet dem Client seine Token. **Ablehnen** sendet ihm `access_denied`.
+4. **Erlauben** sendet dem Client einen einmaligen Autorisierungscode (2 Minuten gültig), den er am Token-Endpunkt gegen Token eintauscht. **Ablehnen** sendet ihm `access_denied`. Eine unbeantwortete Zustimmungsanfrage läuft nach 10 Minuten ab.
 
-Zugriffstoken gelten 15 Minuten. Refresh-Token werden bei jeder Nutzung erneuert und enden nach insgesamt 7 Tagen. Wird ein bereits benutzter Refresh-Token erneut vorgelegt, wird die gesamte Verbindung widerrufen.
+Zugriffstoken gelten 15 Minuten. Refresh-Token werden bei jeder Nutzung rotiert und enden nach insgesamt 7 Tagen. Wird ein bereits benutzter Refresh-Token erneut vorgelegt, wird die gesamte Verbindung widerrufen.
 
 Ein Client kann die benötigten Berechtigungen als durch Leerzeichen getrennten `scope` nennen. Ohne Scope fragt er alle deine Berechtigungen an. Die Zustimmungsseite verweigert Berechtigungen, die du nicht hast. Bei jeder Anfrage hat der Client die Berechtigungen, die gewährt wurden **und** die du gerade hast. Entfernst du in Attraccess eine Rolle, entfällt der Zugriff beim nächsten Aufruf.
 
 Ein OAuth-Zugriffstoken funktioniert nur unter `/api/mcp`. REST-Endpunkte lehnen ihn ab.
+
+Pro IP-Adresse erlauben die Endpunkte 600 Anfragen pro Minute unter `/api/mcp`, 60 pro Minute an den Autorisierungs-, Token- und Zustimmungsendpunkten und 20 Registrierungen pro Stunde.
 
 ### Statische Clients
 
@@ -44,6 +46,8 @@ Clients, die sich nicht selbst registrieren können, lassen sich über die optio
 ```bash
 MCP_OAUTH_CLIENTS='[{"client_id":"mein-agent","client_name":"Mein Agent","redirect_uris":["http://localhost:8123/callback"]}]'
 ```
+
+Ein ungültiger Wert für `MCP_OAUTH_CLIENTS` wird mit einem Fehler im Log ignoriert; Attraccess startet trotzdem.
 
 ### HTTPS-Voraussetzung
 

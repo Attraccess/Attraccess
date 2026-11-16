@@ -444,6 +444,23 @@ describe('MCP OAuth (real application)', () => {
       await t.db.query(`UPDATE "user" SET isDisabled = 1 WHERE id = ?`, [user.id]);
       expect((await t.callTool(tokens.body.access_token, 'listRoles')).status).toBe(401);
     });
+
+    it('does not refresh the tokens of a disabled user and ends the grant', async () => {
+      const user = await t.createUser(ADMIN_PERMISSIONS);
+      const { clientId, tokens } = await fullFlow(user.id);
+      await t.db.query(`UPDATE "user" SET isDisabled = 1 WHERE id = ?`, [user.id]);
+      const refreshed = await tokenRequest({
+        grant_type: 'refresh_token',
+        client_id: clientId,
+        refresh_token: tokens.body.refresh_token,
+        resource: RESOURCE,
+      });
+      expect(refreshed.status).toBe(400);
+      expect(refreshed.body.error).toBe('invalid_grant');
+      // The grant is gone for good: re-enabling the user does not bring the old tokens back.
+      await t.db.query(`UPDATE "user" SET isDisabled = 0 WHERE id = ?`, [user.id]);
+      expect((await t.callTool(tokens.body.access_token, 'listRoles')).status).toBe(401);
+    });
   });
 
   describe('rate limiting', () => {
