@@ -248,7 +248,7 @@ describe('persisted audit names', () => {
         action,
         actor: { id: 7, authenticationMethod: 'session' },
         subject: { type: 'plugin-package', id: 4242 },
-        details: { pluginId: 'hashedPluginId', pluginName: 'my-plugin', pluginVersion: '1.2.3', restartRequested: 1 },
+        details: { pluginId: 'my-plugin-dir', pluginName: 'my-plugin', pluginVersion: '1.2.3', restartRequested: 1 },
       });
     }
     const { items } = await controller.list({ domain: 'administration' });

@@ -84,7 +84,7 @@ export function EntryDetails({ entry, t }: { entry: AuditEntryDto; t: Translate 
           {entry.subjectLabelSource && <p className="text-xs text-muted">{t(`${entry.subjectLabelSource}Name`)}</p>}
         </dd>
         <dt className="text-muted">{t('source')}</dt>
-        <dd>{entry.authenticationMethod ?? entry.pluginId ?? t('notRecorded')}</dd>
+        <dd className="break-all">{entry.authenticationMethod ?? entry.pluginId ?? t('notRecorded')}</dd>
         {typeof entry.apiTokenId === 'number' && (
           <>
             <dt className="text-muted">{t('apiTokenId')}</dt>

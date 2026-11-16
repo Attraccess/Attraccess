@@ -4,10 +4,10 @@ import { randomUUID } from 'crypto';
 
 import {
   AdministrationAuditAction,
+  auditPluginIdentity,
   auditSubjectKeyId,
   safeAuditOrigin,
   safeRequestedSpec,
-  text,
 } from '../audit/policies/administration';
 
 import { AUDIT_RECORDER, AuditActor, AuditDetails, AuditRecorder } from '../audit/recorder/audit-event';
@@ -167,8 +167,8 @@ export class PluginAdministrationService {
 
     PluginService.clearPluginQuarantine(plugin.pluginDirectory);
     await this.record(actor, 'plugin.retry_requested', auditSubjectKeyId(plugin.name), 'plugin-package', {
+      ...auditPluginIdentity(plugin),
       pluginId,
-      ...pluginIdentityDetails(plugin),
       restartRequested: 1,
     });
     this.pluginService.requestRestart();
@@ -177,8 +177,7 @@ export class PluginAdministrationService {
   async uploadPlugin(file: FileUpload, actor?: AuditActor) {
     const plugin = await this.pluginService.uploadPlugin(file, Boolean(actor));
     await this.record(actor, 'plugin.zip_uploaded', auditSubjectKeyId(plugin.name), 'plugin-package', {
-      pluginName: plugin.name,
-      pluginVersion: plugin.version,
+      ...auditPluginIdentity(plugin),
       restartRequested: 1,
     });
     if (actor) this.pluginService.requestRestart();
@@ -201,8 +200,8 @@ export class PluginAdministrationService {
     }
     await this.pluginUninstall.deletePlugin(pluginId, Boolean(actor));
     await this.record(actor, 'plugin.zip_deleted', auditSubjectKeyId(plugin?.name ?? pluginId), 'plugin-package', {
+      ...auditPluginIdentity(plugin),
       pluginId,
-      ...pluginIdentityDetails(plugin),
       restartRequested: 1,
     });
     if (actor) this.pluginService.requestRestart();
@@ -304,18 +303,6 @@ export class PluginAdministrationService {
       details,
     });
   }
-}
-
-/**
- * The manifest name and version for an audit entry's label. A value the policy would reject (empty, over
- * 256 characters, control characters) is left out, so an odd manifest never makes the whole event drop.
- */
-function pluginIdentityDetails(plugin: { name?: string; version?: string } | undefined): AuditDetails {
-  const usable = (value: string | undefined): value is string => Boolean(value) && text(value);
-  return {
-    ...(usable(plugin?.name) ? { pluginName: plugin.name } : {}),
-    ...(usable(plugin?.version) ? { pluginVersion: plugin.version } : {}),
-  };
 }
 
 function lifecycleDetails(state: NpmPluginAuditState): AuditDetails {

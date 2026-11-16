@@ -53,6 +53,19 @@ export type PreviousAuditSettings = { enabled: boolean; domains: readonly string
 export const text: Check = (v) =>
   typeof v === 'string' && v.length <= 256 && Array.from(v).every((character) => character.charCodeAt(0) >= 32);
 
+/**
+ * A plugin manifest's name and version as `pluginName`/`pluginVersion` details, which label the audit target.
+ * Blank values are left out, as is anything `text` rejects (over 256 characters, characters below U+0020, not a
+ * string), so an odd manifest never makes the whole event drop.
+ */
+export function auditPluginIdentity(manifest: { name?: unknown; version?: unknown } | undefined) {
+  const usable = (value: unknown): value is string => typeof value === 'string' && value.trim() !== '' && text(value);
+  return {
+    ...(usable(manifest?.name) ? { pluginName: manifest.name } : {}),
+    ...(usable(manifest?.version) ? { pluginVersion: manifest.version } : {}),
+  };
+}
+
 export const flag: Check = (v) => v === 0 || v === 1;
 
 export const enumeration =
