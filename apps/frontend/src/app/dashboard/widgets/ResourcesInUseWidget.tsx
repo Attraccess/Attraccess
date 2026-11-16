@@ -44,7 +44,7 @@ function InUseRow({ resource }: Readonly<{ resource: Resource }>) {
   return (
     <li className="flex min-w-0 items-center justify-between gap-2" data-cy="dashboard-in-use-row">
       <span className="flex min-w-0 flex-col">
-        <Link href={`/resources/${resource.id}`} className="min-w-0 truncate text-sm leading-tight">
+        <Link href={`/resources/${resource.id}`} className="block min-w-0 max-w-full truncate text-sm leading-tight">
           {resource.name}
         </Link>
         {userName && <span className="truncate text-xs text-muted">{userName}</span>}
@@ -68,13 +68,7 @@ export function ResourcesInUseWidget({ size }: Readonly<DashboardWidgetRenderPro
   if (isPending) return <WidgetLoading />;
   if (isError || !data) return <WidgetError title={t('loadError')} />;
   if (size === 'small') {
-    return (
-      <BigNumber
-        value={data.length}
-        label={t('resources-in-use.countLabel')}
-        data-cy="dashboard-in-use-count"
-      />
-    );
+    return <BigNumber value={data.length} label={t('resources-in-use.countLabel')} data-cy="dashboard-in-use-count" />;
   }
   if (data.length === 0) return <WidgetEmpty>{t('resources-in-use.empty')}</WidgetEmpty>;
 

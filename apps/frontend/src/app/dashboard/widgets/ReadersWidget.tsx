@@ -47,7 +47,10 @@ export function ReadersWidget({ size }: Readonly<DashboardWidgetRenderProps>) {
           <WidgetList>
             {stale.slice(0, MAX_STALE_READERS).map((reader) => (
               <li key={reader.id} className="flex min-w-0 items-center justify-between gap-2 text-sm">
-                <Link href={`/attractap/readers/${reader.id}/diagnostics`} className="min-w-0 truncate leading-tight">
+                <Link
+                  href={`/attractap/readers/${reader.id}/diagnostics`}
+                  className="block min-w-0 max-w-full truncate leading-tight"
+                >
                   {reader.name}
                 </Link>
                 <span className="shrink-0 text-xs text-muted">{formatDateTime(reader.lastConnection)}</span>

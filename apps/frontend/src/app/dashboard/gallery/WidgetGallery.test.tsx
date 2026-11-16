@@ -84,8 +84,7 @@ function renderGallery(pins: DashboardPinDto[] = []) {
   );
 }
 
-const groupTitles = () =>
-  screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent);
+const groupTitles = () => screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent);
 // Widgets come before page shortcuts of the same title, e.g. the Messages widget and the Messages page.
 const entryNamed = (title: string) =>
   screen.getAllByRole('heading', { level: 4, name: title })[0].closest('li') as HTMLElement;
@@ -191,7 +190,11 @@ describe('WidgetGallery', () => {
     rerender(
       <QueryClientProvider client={client}>
         <MemoryRouter>
-          <WidgetGallery isOpen onOpenChange={() => undefined} pins={[pin(DashboardPinItemType.WIDGET, 'billing-balance')]} />
+          <WidgetGallery
+            isOpen
+            onOpenChange={() => undefined}
+            pins={[pin(DashboardPinItemType.WIDGET, 'billing-balance')]}
+          />
         </MemoryRouter>
       </QueryClientProvider>,
     );
@@ -226,6 +229,24 @@ describe('WidgetGallery', () => {
     expect(add).toHaveBeenCalledWith({
       requestBody: { kind: 'add', item: { itemType: 'resource', itemId: '6' }, size: 'small' },
     });
+  });
+
+  it('searches resources as the user types and keeps the list open while results load', async () => {
+    const search = vi.spyOn(ResourcesService, 'getAllResources').mockImplementation(((params?: { search?: string }) => {
+      const resources = [
+        { id: 5, name: 'Lathe' },
+        { id: 6, name: 'Laser cutter' },
+      ].filter((resource) => resource.name.toLowerCase().includes((params?.search ?? '').toLowerCase()));
+      return Promise.resolve({ data: resources, total: resources.length });
+    }) as never);
+    renderGallery();
+    const entry = await waitFor(() => entryNamed('Resource'));
+
+    await userEvent.type(within(entry).getByRole('combobox', { name: 'Choose resource' }), 'Las');
+
+    await waitFor(() => expect(search).toHaveBeenCalledWith(expect.objectContaining({ search: 'Las' })));
+    expect(await screen.findByRole('option', { name: 'Laser cutter' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('option', { name: 'Lathe' })).toBeNull());
   });
 
   it('waits for the license and plugins before calling the list complete', async () => {

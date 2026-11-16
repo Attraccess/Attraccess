@@ -133,9 +133,10 @@ export function PagePinCard({
             <div className="flex min-h-0 flex-1 flex-col justify-end gap-2">{body}</div>
           </>
         ) : (
+          // items-stretch: HeroUI's link centres its content, which would pull the icon, badge and title to the middle.
           <Link
             href={page.path}
-            className="flex h-full w-full min-h-0 flex-col justify-between gap-2 no-underline"
+            className="flex h-full w-full min-h-0 flex-col items-stretch justify-between gap-2 no-underline"
             data-cy="dashboard-page-card-link"
           >
             {body}

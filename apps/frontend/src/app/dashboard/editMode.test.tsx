@@ -109,6 +109,8 @@ beforeEach(() => {
   state.toastError.mockReset();
   vi.spyOn(ResourcesService, 'getOneResourceById').mockResolvedValue({ id: 5, name: 'Lathe' } as never);
   vi.spyOn(ResourcesService, 'resourceUsageGetActiveSession').mockResolvedValue({ usages: [] } as never);
+  // The gallery's Resource entry searches resources as soon as it opens.
+  vi.spyOn(ResourcesService, 'getAllResources').mockResolvedValue({ data: [], total: 0 } as never);
 });
 
 afterEach(() => {
@@ -164,6 +166,24 @@ describe('dashboard edit mode', () => {
     expect(await editToggle('Edit dashboard')).toHaveFocus();
     expect(container.querySelector('[data-cy="dashboard-card-drag-handle"]')).toBeNull();
     expect(container.querySelector('[data-cy="dashboard-edit-hint"]')).toBeNull();
+  });
+
+  it('moves tiles while dragging without scaling them to the shape of another size', async () => {
+    const { container } = renderDashboard([page('/projects'), widget('messages')]);
+    await userEvent.click(await editToggle('Edit dashboard'));
+
+    const handle = screen.getByRole('button', { name: 'Reorder Projects' });
+    handle.focus();
+    await userEvent.keyboard(' ');
+    await waitFor(() => expect(handle).toHaveAttribute('aria-pressed', 'true'));
+    await userEvent.keyboard('{ArrowRight}');
+
+    const transforms = [...container.querySelectorAll<HTMLElement>('[data-cy="dashboard-card"]')].map(
+      (tile) => tile.style.transform,
+    );
+    expect(transforms.some((transform) => transform.startsWith('translate3d'))).toBe(true);
+    expect(transforms.filter((transform) => transform.includes('scale'))).toEqual([]);
+    await userEvent.keyboard('{Escape}');
   });
 
   it('switches modes without React errors', async () => {

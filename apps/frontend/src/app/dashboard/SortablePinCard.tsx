@@ -124,7 +124,9 @@ function useSortablePin({ id, title, size, sizes, isEditing, onRemove, onResize 
       }
     : NO_EDIT_CONTROLS;
   const style: CSSProperties = {
-    transform: CSS.Transform.toString(transform),
+    // Moves tiles without scaling them: with mixed sizes the sorting strategy would stretch a tile to the shape of the
+    // one whose place it takes, distorting its content while dragging.
+    transform: CSS.Translate.toString(transform),
     transition,
     zIndex: isDragging ? 1 : undefined,
   };

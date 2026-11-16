@@ -81,7 +81,10 @@ function SessionRow({
   return (
     <li className="@container flex min-w-0 items-center gap-2" data-cy="dashboard-my-sessions-row">
       <div className="flex min-w-0 flex-1 flex-col">
-        <Link href={`/resources/${resource.id}`} className="min-w-0 truncate text-sm font-medium leading-tight">
+        <Link
+          href={`/resources/${resource.id}`}
+          className="block min-w-0 max-w-full truncate text-sm font-medium leading-tight"
+        >
           {resource.name}
         </Link>
         {ownSession && <SessionTimer startTime={ownSession.startTime} variant="compact" />}

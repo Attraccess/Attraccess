@@ -153,7 +153,11 @@ describe('MySessionsWidget', () => {
       data: resources(count),
       total: count,
     } as never);
-    vi.spyOn(ResourcesService, 'resourceUsageGetActiveSession').mockImplementation((({ resourceId }: { resourceId: number }) =>
+    vi.spyOn(ResourcesService, 'resourceUsageGetActiveSession').mockImplementation((({
+      resourceId,
+    }: {
+      resourceId: number;
+    }) =>
       Promise.resolve({
         usages: [{ id: 30 + resourceId, userId: 7, startTime: `2026-11-16T08:0${resourceId % 10}:00.000Z` }],
       })) as never);
@@ -177,6 +181,13 @@ describe('MySessionsWidget', () => {
     } else {
       expect(more(container)).toBeNull();
     }
+  });
+
+  it('cuts long resource names short instead of running them under Stop', async () => {
+    runSessions(1);
+    renderWidget(<MySessionsWidget {...at('medium')} />);
+    // HeroUI links are as wide as their text; only a block capped at the row's width can end in an ellipsis.
+    expect(await screen.findByRole('link', { name: 'Machine 1' })).toHaveClass('block', 'max-w-full', 'truncate');
   });
 
   it('names Stop after its resource, and shows only the icon on a small tile', async () => {
@@ -285,7 +296,11 @@ describe('ResourcesInUseWidget', () => {
 
   it('lists who uses what, naming a user only when the API shares one', async () => {
     vi.spyOn(ResourcesService, 'getAllResourcesInUse').mockResolvedValue(inUse(5) as never);
-    vi.spyOn(ResourcesService, 'resourceUsageGetActiveSession').mockImplementation((({ resourceId }: { resourceId: number }) =>
+    vi.spyOn(ResourcesService, 'resourceUsageGetActiveSession').mockImplementation((({
+      resourceId,
+    }: {
+      resourceId: number;
+    }) =>
       Promise.resolve({
         usages: [
           {
@@ -302,6 +317,8 @@ describe('ResourcesInUseWidget', () => {
     expect(await screen.findByText('ada')).toBeInTheDocument();
     expect(await screen.findByText('Running since 2026-11-16T08:02:00.000Z')).toBeInTheDocument();
     expect(screen.getAllByText(/^ada$/)).toHaveLength(1);
+    // Long names end in an ellipsis instead of running into the timer.
+    expect(screen.getByRole('link', { name: 'Machine 1' })).toHaveClass('block', 'max-w-full', 'truncate');
   });
 
   it('says so when nothing is in use', async () => {
@@ -386,7 +403,13 @@ describe('BalanceWidget', () => {
     configure(1250);
     const transactions = vi.spyOn(BillingService, 'getBillingTransactions').mockResolvedValue({
       data: [
-        { id: 1, amount: -200, createdAt: '2026-11-16T08:00:00.000Z', resourceUsageId: 5, resourceUsage: { resource: { name: 'Lathe' } } },
+        {
+          id: 1,
+          amount: -200,
+          createdAt: '2026-11-16T08:00:00.000Z',
+          resourceUsageId: 5,
+          resourceUsage: { resource: { name: 'Lathe' } },
+        },
         { id: 2, amount: 1000, createdAt: '2026-11-15T08:00:00.000Z', externalReference: 'sumup-1' },
         { id: 3, amount: -50, createdAt: '2026-11-14T08:00:00.000Z', initiatorId: 2 },
         { id: 4, amount: 5, createdAt: '2026-11-13T08:00:00.000Z' },
@@ -429,7 +452,12 @@ describe('ReadersWidget', () => {
 
   it('lists up to three stale readers on a medium tile, linking to their diagnostics', async () => {
     vi.spyOn(AttractapService, 'getReaders').mockResolvedValue(
-      ids(4).map((id) => ({ id, name: `Reader ${id}`, pairingState: 'paired', lastConnection: hoursAgo(24 + id) })) as never,
+      ids(4).map((id) => ({
+        id,
+        name: `Reader ${id}`,
+        pairingState: 'paired',
+        lastConnection: hoursAgo(24 + id),
+      })) as never,
     );
     renderWidget(<ReadersWidget {...at('medium')} />);
 

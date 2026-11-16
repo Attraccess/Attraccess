@@ -27,7 +27,7 @@ function Results({ term, limit }: Readonly<{ term: string; limit: number }>) {
         <li key={resource.id} className="flex min-w-0 items-center justify-between gap-2">
           <Link
             href={`/resources/${resource.id}`}
-            className="min-w-0 truncate text-sm leading-tight"
+            className="block min-w-0 max-w-full truncate text-sm leading-tight"
             data-cy="dashboard-resources-result"
           >
             {resource.name}
