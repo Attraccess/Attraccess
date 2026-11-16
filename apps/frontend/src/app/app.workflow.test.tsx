@@ -53,9 +53,9 @@ vi.mock('../components/themeToggle', () => ({ ThemeToggle: () => <button>Theme</
 vi.mock('../components/bootScreen', () => ({ BootScreen: () => <p>Starting app</p> }));
 vi.mock('./unauthorized/unauthorized', () => ({ Unauthorized: () => <p>Sign in</p> }));
 vi.mock('./unauthorized/unauthorized-layout/layout', () => ({
-  UnauthorizedLayout: ({ children }: PropsWithChildren) => children,
+  UnauthorizedLayout: ({ children }: PropsWithChildren) => <div data-testid="unauthorized-layout">{children}</div>,
 }));
-vi.mock('./verify-email', () => ({ VerifyEmail: () => null }));
+vi.mock('./verify-email', () => ({ VerifyEmail: () => <p>Verify email page</p> }));
 vi.mock('./reset-password/resetPassword', () => ({ ResetPassword: () => null }));
 vi.mock('./accept-invitation', () => ({ AcceptInvitation: () => null }));
 vi.mock('./two-factor-gate', () => ({ TwoFactorGate: ({ children }: PropsWithChildren) => children }));
@@ -127,6 +127,15 @@ it('shows boot and theme controls before initialization, then routes the authent
   expect(screen.getByText('Session billing listener')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Theme' })).toBeNull();
   expect(state.sync).toHaveBeenCalled();
+});
+it('renders /verify-email inside the unauthorized layout so its actions stay scrollable on small phones', () => {
+  state.initialized = true;
+  render(
+    <MemoryRouter initialEntries={['/verify-email?token=t&email=a%40b.c']}>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(screen.getByTestId('unauthorized-layout')).toContainElement(screen.getByText('Verify email page'));
 });
 it('allows theme switching during two-factor setup and refreshes queries only for touch devices', () => {
   state.authenticated = true;

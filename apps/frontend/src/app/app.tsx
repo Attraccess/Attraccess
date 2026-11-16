@@ -113,7 +113,14 @@ export function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route
+        path="/verify-email"
+        element={
+          <UnauthorizedLayout>
+            <VerifyEmail />
+          </UnauthorizedLayout>
+        }
+      />
       <Route
         path="/accept-invitation"
         element={
