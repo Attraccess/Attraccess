@@ -5,7 +5,7 @@ export interface ProjectAuditInput {
   action: (typeof PROJECT_AUDIT_ACTIONS)[number];
   operationId: string;
   actorId: number;
-  authenticationMethod?: 'session' | 'api-token';
+  authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
   apiTokenId?: number;
   subjectType: 'project' | 'project.member' | 'project.invitation';
   subjectId: number;
@@ -76,9 +76,10 @@ export function projectProjectAuditEvent(input: ProjectAuditInput): ProjectAudit
   if (
     (input.authenticationMethod !== undefined &&
       input.authenticationMethod !== 'session' &&
-      input.authenticationMethod !== 'api-token') ||
+      input.authenticationMethod !== 'api-token' &&
+      input.authenticationMethod !== 'mcp-oauth') ||
     (authenticationMethod === 'api-token' && !positive(input.apiTokenId)) ||
-    (authenticationMethod === 'session' && input.apiTokenId !== undefined)
+    (authenticationMethod !== 'api-token' && input.apiTokenId !== undefined)
   ) {
     return null;
   }

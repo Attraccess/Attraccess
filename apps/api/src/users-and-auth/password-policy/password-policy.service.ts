@@ -79,7 +79,7 @@ export interface ValidateOptions {
 export interface AuditContext {
   actorId: number | null;
   actorUsername: string | null;
-  authenticationMethod: 'session' | 'api-token';
+  authenticationMethod: 'session' | 'api-token' | 'mcp-oauth';
   apiTokenId: number | null;
   ip: string | null;
   userAgent: string | null;

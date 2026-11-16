@@ -128,7 +128,7 @@ export class SupervisionService {
   public async approve(
     requestId: string,
     supervisor: User,
-    authenticationMethod: 'session' | 'api-token' | null = 'session',
+    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' | null = 'session',
     apiTokenId?: number,
   ): Promise<ResourceUsage> {
     const request = this.getPendingForSupervisorOrThrow(requestId, supervisor, { allowAnyAuthorized: true });
@@ -185,7 +185,7 @@ export class SupervisionService {
   public reject(
     requestId: string,
     supervisor: User,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' = 'session',
     apiTokenId?: number,
   ): SupervisionDecisionResponseDto {
     const request = this.getPendingForSupervisorOrThrow(requestId, supervisor);

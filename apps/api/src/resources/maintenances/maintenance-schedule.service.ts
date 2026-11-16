@@ -137,7 +137,7 @@ export class MaintenanceScheduleService {
     resourceId: number,
     dto: CreateMaintenanceScheduleDto,
     actorId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' = 'session',
     apiTokenId?: number,
   ): Promise<ResourceMaintenanceSchedule> {
     const resource = await this.ensureResourceExists(resourceId);
@@ -175,7 +175,7 @@ export class MaintenanceScheduleService {
     scheduleId: number,
     dto: UpdateMaintenanceScheduleDto,
     actorId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' = 'session',
     apiTokenId?: number,
   ): Promise<ResourceMaintenanceSchedule> {
     const schedule = await this.getOne(resourceId, scheduleId);
@@ -227,7 +227,7 @@ export class MaintenanceScheduleService {
     resourceId: number,
     scheduleId: number,
     actorId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' = 'session',
     apiTokenId?: number,
   ): Promise<void> {
     const schedule = await this.getOne(resourceId, scheduleId);

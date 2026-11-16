@@ -1,0 +1,35 @@
+{
+  "title": "Allow {{client}} to use Attraccess?",
+  "intro": "This app asks to act on your behalf through the Attraccess MCP interface. It can only do what is listed below, and only what you are allowed to do yourself.",
+  "client": "App",
+  "returnTo": "After your decision you are sent back to",
+  "loopback": {
+    "title": "App on this device",
+    "message": "The app returns to {{host}}, which is this device. Only continue if you started it yourself."
+  },
+  "external": {
+    "title": "Check the address",
+    "message": "The app returns to {{host}}. Only continue if you recognise and trust it."
+  },
+  "permissions": {
+    "title": "Requested permissions",
+    "all": "The app did not name specific permissions, so it asks for everything you can do today ({{count}} permissions).",
+    "none": "You currently hold no permissions that the app could use."
+  },
+  "unavailable": {
+    "title": "Not allowed for your account",
+    "message": "The app asks for permissions you do not have: {{permissions}}. Allowing it sends an error back to the app."
+  },
+  "approve": "Allow",
+  "deny": "Deny",
+  "returning": "Returning to the app…",
+  "notice": "Access lasts up to 7 days, and you lose nothing by denying it. If a permission is taken from you in Attraccess, the app loses it too.",
+  "error": {
+    "title": "This request cannot be answered",
+    "expired": "The authorization request has expired or was already answered. Start the connection again from your app.",
+    "generic": "Something went wrong. Start the connection again from your app.",
+    "missing": "The link is incomplete. Start the connection again from your app.",
+    "disabled": "MCP sign-in is not available on this server. Use an API token instead.",
+    "close": "Close"
+  }
+}

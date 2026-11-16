@@ -124,7 +124,7 @@ export class ResourceGroupsService {
 
   public async createOne(
     dto: CreateResourceGroupDto,
-    actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+    actor?: { id: number; authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth'; apiTokenId?: number },
   ): Promise<ResourceGroup> {
     const resourceGroup = this.resourceGroupRepository.create({
       name: dto.name,
@@ -155,7 +155,7 @@ export class ResourceGroupsService {
   public async updateOneById(
     id: number,
     updateDto: UpdateResourceGroupDto,
-    actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+    actor?: { id: number; authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth'; apiTokenId?: number },
   ): Promise<ResourceGroup> {
     const resourceGroup = await this.getOne({ id });
     const before = {
@@ -227,7 +227,7 @@ export class ResourceGroupsService {
 
   public async deleteOne(
     groupId: number,
-    actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+    actor?: { id: number; authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth'; apiTokenId?: number },
   ): Promise<void> {
     const resourceGroup = await this.getOne({ id: groupId }, ['resources']);
     const result = await this.resourceGroupRepository.delete(groupId);
@@ -286,7 +286,7 @@ export class ResourceGroupsService {
   public async addResource(
     groupId: number,
     resourceId: number,
-    actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+    actor?: { id: number; authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth'; apiTokenId?: number },
   ): Promise<void> {
     const resourceGroup = await this.getOne({ id: groupId }, ['resources']);
 
@@ -326,7 +326,7 @@ export class ResourceGroupsService {
   public async removeResource(
     groupId: number,
     resourceId: number,
-    actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+    actor?: { id: number; authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth'; apiTokenId?: number },
   ): Promise<void> {
     const resourceGroup = await this.getOne({ id: groupId }, ['resources']);
     const resource = resourceGroup.resources.find((resource) => resource.id === resourceId);
