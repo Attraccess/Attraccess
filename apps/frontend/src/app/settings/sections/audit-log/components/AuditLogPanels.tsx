@@ -63,7 +63,7 @@ export function EntryDetails({ entry, t }: { entry: AuditEntryDto; t: Translate 
       >
         {t(`outcomes.${entry.outcome}`)}
       </Chip>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-5 gap-y-3 text-sm">
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-5 gap-y-3 text-sm">
         <dt className="text-muted">{t('eventType')}</dt>
         <dd className="break-all">{entry.action}</dd>
         <dt className="text-muted">{t('time')}</dt>
@@ -84,7 +84,7 @@ export function EntryDetails({ entry, t }: { entry: AuditEntryDto; t: Translate 
           {entry.subjectLabelSource && <p className="text-xs text-muted">{t(`${entry.subjectLabelSource}Name`)}</p>}
         </dd>
         <dt className="text-muted">{t('source')}</dt>
-        <dd>{entry.authenticationMethod ?? entry.pluginId ?? t('notRecorded')}</dd>
+        <dd className="break-all">{entry.authenticationMethod ?? entry.pluginId ?? t('notRecorded')}</dd>
         {typeof entry.apiTokenId === 'number' && (
           <>
             <dt className="text-muted">{t('apiTokenId')}</dt>
@@ -569,7 +569,7 @@ export function MobileEntries({ items, t, domainLabel, setSelected }: Props) {
               </time>
             </div>
             <Card.Title>{auditLabel('events', entry.action, t)}</Card.Title>
-            <Card.Description>
+            <Card.Description className="break-words">
               {actor(entry, t)} · {target(entry, t)}
             </Card.Description>
           </Card.Header>

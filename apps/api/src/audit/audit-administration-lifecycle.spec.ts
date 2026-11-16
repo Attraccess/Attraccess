@@ -1,4 +1,5 @@
 import { EmailTemplateType, MqttServer } from '@attraccess/database-entities';
+import { NotFoundException } from '@nestjs/common';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { EmailLayoutController } from '../email-layout/email-layout.controller';
 import { EmailLayoutService } from '../email-layout/email-layout.service';
@@ -12,6 +13,7 @@ import { PluginController } from '../plugin-system/plugin.controller';
 import { PluginService } from '../plugin-system/plugin.service';
 import { SettingsController } from '../settings/settings.controller';
 import { SettingsAdministrationService } from '../settings/settings-administration.service';
+import { auditPluginIdentity, auditSubjectKeyId } from './policies/administration';
 import { projectAuditRow } from './recorder/audit-row';
 const req = { user: { id: 42, authenticationMethod: 'api-token', apiTokenId: 9 } } as AuthenticatedRequest;
 const secret = 'SECRET_MUST_NOT_BE_RECORDED';
@@ -274,10 +276,87 @@ describe('administration lifecycle hooks', () => {
         'plugin.zip_deleted',
         'plugin.retry_requested',
       ]);
+      const [, deleted, retried] = recorded(audit);
+      for (const event of [deleted, retried]) {
+        expect(event.subject).toEqual({ type: 'plugin-package', id: auditSubjectKeyId('Example') });
+        expect(event.details).toMatchObject({
+          pluginId: 'zip-plugin',
+          pluginName: 'Example',
+          pluginVersion: '1.0.0',
+          restartRequested: 1,
+        });
+      }
     } finally {
       get.mockRestore();
       quarantined.mockRestore();
       clear.mockRestore();
+    }
+  });
+
+  it.each([
+    ['an over-long version', { version: `1.0.0-${'v'.repeat(300)}` }, { pluginName: 'Example' }],
+    ['an over-long name', { name: 'x'.repeat(300) }, { pluginVersion: '1.0.0' }],
+    ['a control character', { name: 'Exa\tmple', version: '1.0.0\n' }, {}],
+    ['blank values', { name: '   ', version: '' }, {}],
+  ])('still records ZIP upload, deletion and retry when the manifest has %s', async (_case, overrides, identity) => {
+    const audit = recorder();
+    const manifest = { id: 'zip-plugin', name: 'Example', version: '1.0.0', pluginDirectory: 'example', ...overrides };
+    const service = {
+      uploadPlugin: jest.fn().mockResolvedValue(manifest),
+      deletePlugin: jest.fn().mockResolvedValue(undefined),
+      requestRestart: jest.fn(),
+    };
+    const npm = { findInstalledByPluginId: jest.fn(), listInstalled: jest.fn().mockReturnValue([]) };
+    const controller = pluginController(service, npm, audit);
+    const get = jest.spyOn(PluginService, 'getManifestById').mockReturnValue(manifest as never);
+    const quarantined = jest.spyOn(PluginService, 'isPluginQuarantined').mockReturnValue(true);
+    const clear = jest.spyOn(PluginService, 'clearPluginQuarantine').mockImplementation(() => undefined);
+    try {
+      await controller.uploadPlugin(
+        { originalname: 'example.zip', buffer: Buffer.alloc(0) } as never,
+        {} as never,
+        req,
+      );
+      await controller.deletePlugin('zip-plugin', req);
+      await controller.retryPlugin('zip-plugin', req);
+      const events = recorded(audit);
+      expect(events.map((event) => event.action)).toEqual([
+        'plugin.zip_uploaded',
+        'plugin.zip_deleted',
+        'plugin.retry_requested',
+      ]);
+      const [uploaded, deleted, retried] = events;
+      expect(uploaded.details).toEqual({ ...identity, restartRequested: 1 });
+      for (const event of [deleted, retried]) {
+        expect(event.details).toEqual({ ...identity, pluginId: 'zip-plugin', restartRequested: 1 });
+      }
+    } finally {
+      get.mockRestore();
+      quarantined.mockRestore();
+      clear.mockRestore();
+    }
+  });
+
+  it('leaves non-string manifest names and versions out of the plugin identity details', () => {
+    expect(auditPluginIdentity({ name: 42, version: { major: 1 } })).toEqual({});
+    expect(auditPluginIdentity(undefined)).toEqual({});
+  });
+
+  it('records nothing and requests no restart when the ZIP plugin to delete is not found', async () => {
+    const audit = recorder();
+    const service = {
+      deletePlugin: jest.fn().mockRejectedValue(new NotFoundException('Plugin not found')),
+      requestRestart: jest.fn(),
+    };
+    const npm = { findInstalledByPluginId: jest.fn(), listInstalled: jest.fn().mockReturnValue([]) };
+    const controller = pluginController(service, npm, audit);
+    const get = jest.spyOn(PluginService, 'getManifestById').mockReturnValue(undefined);
+    try {
+      await expect(controller.deletePlugin('missing', req)).rejects.toThrow(NotFoundException);
+      expect(audit.record).not.toHaveBeenCalled();
+      expect(service.requestRestart).not.toHaveBeenCalled();
+    } finally {
+      get.mockRestore();
     }
   });
 
