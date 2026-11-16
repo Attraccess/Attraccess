@@ -20,7 +20,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: '3.15'
+          # semgrep-core segfaults (exit -11) on Python 3.15; stay on 3.12 until semgrep supports it.
+          python-version: '3.12'
 
       - name: Install Semgrep
         run: python -m pip install semgrep
