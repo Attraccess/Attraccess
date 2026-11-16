@@ -10,6 +10,7 @@ import { ToastProvider } from '../../components/toastProvider';
 import { Providers } from '@attraccess/ui';
 import en from './en.json';
 import de from './de.json';
+import { viewportHeightClasses } from '../../test-utils/helpers';
 
 const verifyMutateMock = vi.fn();
 const resendMutateMock = vi.fn();
@@ -92,14 +93,6 @@ function renderWithRoute(initialEntry: string, strict = false) {
     </QueryClientProvider>
   );
   return render(strict ? <React.StrictMode>{content}</React.StrictMode> : content);
-}
-
-const VIEWPORT_HEIGHT_CLASS = /(^|:)(min-)?h-(screen|[dsl]vh|\[[^\]]*vh[^\]]*\])$/;
-
-function viewportHeightClasses(container: HTMLElement): string[] {
-  return Array.from(container.querySelectorAll('[class]')).flatMap((el) =>
-    Array.from(el.classList).filter((token) => VIEWPORT_HEIGHT_CLASS.test(token)),
-  );
 }
 
 describe('VerifyEmail', () => {

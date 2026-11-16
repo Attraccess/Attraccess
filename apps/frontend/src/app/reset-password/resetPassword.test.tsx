@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import en from './en.json';
 import de from './de.json';
 import { ResetPassword } from './resetPassword';
+import { viewportHeightClasses } from '../../test-utils/helpers';
 
 const navigateMock = vi.fn();
 
@@ -37,14 +38,6 @@ vi.mock('@attraccess/react-query-client', () => ({
   usePasswordPolicyServiceGetPublicPasswordPolicy: () => ({ data: undefined }),
 }));
 vi.mock('../../components/toastProvider', () => ({ useToastMessage: () => ({ error: vi.fn(), success: vi.fn() }) }));
-
-const VIEWPORT_HEIGHT_CLASS = /(^|:)(min-)?h-(screen|[dsl]vh|\[[^\]]*vh[^\]]*\])$/;
-
-function viewportHeightClasses(container: HTMLElement): string[] {
-  return Array.from(container.querySelectorAll('[class]')).flatMap((el) =>
-    Array.from(el.classList).filter((token) => VIEWPORT_HEIGHT_CLASS.test(token)),
-  );
-}
 
 beforeEach(() => {
   navigateMock.mockReset();

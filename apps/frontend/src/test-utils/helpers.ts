@@ -97,3 +97,23 @@ export function createMockKeyboardEvent(
     ...values,
   };
 }
+
+/**
+ * Matches Tailwind utilities that tie an element's height to the viewport
+ * (`h-screen`, `min-h-dvh`, `h-[100vh]`, with variant prefixes and the `!`
+ * important modifier). Auth pages render inside UnauthorizedLayout's scroll
+ * container and must not add one of their own, or their CTAs fall below the
+ * fold on small phones.
+ */
+export const VIEWPORT_HEIGHT_CLASS = /(^|:)!?(min-)?h-(screen|[dsl]vh|\[[^\]]*vh[^\]]*\])!?$/;
+
+/**
+ * Returns every viewport-height utility class in the rendered subtree. Render
+ * the page without UnauthorizedLayout: the layout's own
+ * `h-[var(--vvh,100dvh)]` scroll container matches on purpose.
+ */
+export function viewportHeightClasses(container: HTMLElement): string[] {
+  return Array.from(container.querySelectorAll('[class]')).flatMap((el) =>
+    Array.from(el.classList).filter((token) => VIEWPORT_HEIGHT_CLASS.test(token)),
+  );
+}
