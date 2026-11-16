@@ -618,6 +618,26 @@ static void busyServerRetries()
     expectStoredAndCleared(h, makeDump(5000));
 }
 
+static void transientBeginErrorRetries()
+{
+    // A server-side store error is temporary: neither a record nor an orphan may be given up for it.
+    Harness h;
+    h.reader.crash(5000);
+    h.server.overrideNext["READER_COREDUMP_BEGIN"] = R"({"reportId":100,"error":"CRASH_REPORT_STORE_FAILED"})";
+    h.connect();
+    h.run(200, 1000);
+    require(h.server.reports.size() == 1, "record dropped and its dump reported again as an orphan");
+    expectStoredAndCleared(h, makeDump(5000));
+
+    Harness orphan;
+    orphan.reader.dump = makeDump(10000, 4);
+    orphan.server.overrideNext["READER_COREDUMP_BEGIN"] = R"({"reportId":100,"error":"CRASH_REPORT_STORE_FAILED"})";
+    orphan.connect();
+    orphan.run(200, 1000);
+    require(orphan.server.reports.size() == 1, "orphan reported twice after a temporary server error");
+    expectStoredAndCleared(orphan, makeDump(10000, 4));
+}
+
 static void storedBeforeLostConfirmation()
 {
     Harness h;
@@ -730,6 +750,7 @@ int main()
         {"record without dump, then orphan", recordWithoutDumpThenOrphan},
         {"report gone falls back to orphan once", reportGoneFallsBackToOrphanOnce},
         {"busy server", busyServerRetries},
+        {"temporary BEGIN error retries", transientBeginErrorRetries},
         {"stored before a lost confirmation", storedBeforeLostConfirmation},
         {"stale dump never attached", staleDumpIsNeverAttached},
         {"pending record versions", pendingBlobVersions},

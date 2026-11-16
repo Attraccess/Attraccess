@@ -99,6 +99,19 @@ bool shouldAttachDump(bool crashReset, const CrashDumpFingerprint &flashDump, co
            flashDump != claimed;
 }
 
+/** BEGIN errors that say this report will never take this dump; anything else is worth a retry. */
+static bool reportRefusesDump(const char *error)
+{
+    static constexpr const char *permanent[] = {"COREDUMP_REPORT_NOT_FOUND", "COREDUMP_MISMATCH",
+                                                "COREDUMP_ALREADY_STORED", "COREDUMP_NOT_EXPECTED",
+                                                "INVALID_COREDUMP"};
+    for (const char *candidate : permanent)
+    {
+        if (strcmp(error, candidate) == 0) return true;
+    }
+    return false;
+}
+
 bool isOrphanDump(const CrashDumpFingerprint &flashDump, const PendingCrashBootRecord *pending,
                   const CrashDumpFingerprint &done)
 {
@@ -504,10 +517,14 @@ void Uploader::onBeginAck(JsonObjectConst payload, uint32_t nowMs)
         {
             giveUpDump(nowMs, error);
         }
-        else
+        else if (reportRefusesDump(error))
         {
             // The report is gone or does not expect this dump: report the dump on its own instead.
             dropRecord(nowMs, error);
+        }
+        else
+        {
+            fail(nowMs, error); // e.g. CRASH_REPORT_STORE_FAILED: the server could not look the report up
         }
         return;
     }

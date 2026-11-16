@@ -562,16 +562,16 @@ loop with one message in flight. Chunks are read from flash 4 KiB at a time,
 so the upload needs about 10 KiB of heap whatever the dump size; it waits
 while the free heap is low or an OTA update runs.
 
-| Direction       | Event                      | Payload                                                                                                           |
-| --------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Reader → server | `READER_CRASH_REPORT`      | crash metadata, `firmwareVersion` (null if unknown), `coredumpSize`, `coredumpCrc32`                              |
-| Server → reader | `READER_CRASH_REPORT`      | `received`, `id`, `coredumpUpload: {reportId, chunkSize}`, or `coredumpRejected` (e.g. `COREDUMP_TOO_LARGE`)      |
-| Reader → server | `READER_COREDUMP_BEGIN`    | `reportId`, `size`, `crc32`; also after a reconnect or reboot, for the same report                                |
-| Server → reader | `READER_COREDUMP_BEGIN`    | `reportId`, `chunkSize`, `nextOffset`, or `coredumpStored: true` when an earlier upload was stored, or `error`     |
-| Reader → server | `READER_COREDUMP_CHUNK`    | `reportId`, `offset`, `data` (base64 of at most `chunkSize` bytes)                                                |
-| Server → reader | `READER_COREDUMP_CHUNK`    | `reportId`, `nextOffset`, or `error` (`COREDUMP_OUT_OF_ORDER` comes with `expectedOffset` to resync)              |
-| Reader → server | `READER_COREDUMP_COMPLETE` | `reportId`, `totalSize`, `crc32`                                                                                  |
-| Server → reader | `READER_COREDUMP_COMPLETE` | `reportId`, `coredumpStored: true` once the verified dump is stored and symbolicated, or `error`                 |
+| Direction       | Event                      | Payload                                                                                                                                |
+| --------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Reader → server | `READER_CRASH_REPORT`      | crash metadata, `firmwareVersion` (null if unknown), `coredumpSize`, `coredumpCrc32`                                                   |
+| Server → reader | `READER_CRASH_REPORT`      | `received`, `id`, `coredumpUpload: {reportId, chunkSize}` or `coredumpRejected` (`COREDUMP_TOO_LARGE`, `INVALID_COREDUMP`); or `error` |
+| Reader → server | `READER_COREDUMP_BEGIN`    | `reportId`, `size`, `crc32`; also after a reconnect or reboot, for the same report                                                     |
+| Server → reader | `READER_COREDUMP_BEGIN`    | `reportId`, `chunkSize`, `nextOffset`, or `coredumpStored: true` when an earlier upload was stored, or `error`                         |
+| Reader → server | `READER_COREDUMP_CHUNK`    | `reportId`, `offset`, `data` (base64 of at most `chunkSize` bytes)                                                                     |
+| Server → reader | `READER_COREDUMP_CHUNK`    | `reportId`, `nextOffset`, or `error` (`COREDUMP_OUT_OF_ORDER` comes with `expectedOffset` to resync)                                   |
+| Reader → server | `READER_COREDUMP_COMPLETE` | `reportId`, `totalSize`, `crc32`                                                                                                       |
+| Server → reader | `READER_COREDUMP_COMPLETE` | `reportId`, `coredumpStored: true` once the verified dump is stored and symbolicated, or `error`                                       |
 
 The `READER_COREDUMP_*` replies are not acknowledged; the reader retries a
 step after 20 s without a reply (120 s for the completion). The record and the
@@ -586,7 +586,10 @@ firmware before ATT-1144 after a metadata-only acknowledgement) is uploaded as
 a report of its own, with reset reason `UNKNOWN`, no firmware version and
 `rebootReason: COREDUMP_ORPHAN`; symbolication reads the build id from the
 dump. A dump the server refuses for good is kept in flash for a USB readout
-but never offered again (`bootdiag/cddone`). Firmware before ATT-1144 sent the
+but never offered again (`bootdiag/cddone`); its report shows the dump as
+rejected. A metadata `error` reply keeps the record for the next connection, and
+a temporary server error on `READER_COREDUMP_BEGIN` (`CRASH_REPORT_STORE_FAILED`)
+counts as a failed attempt instead of dropping the record. Firmware before ATT-1144 sent the
 dump inline as `coredumpBase64` (32 KiB at most); the server still accepts it.
 The secure profile has no coredumps and uploads the record only.
 
