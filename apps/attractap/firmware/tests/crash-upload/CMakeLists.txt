@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.24)
-project(attractap_crash_upload_tests LANGUAGES CXX)
+project(attractap_crash_upload_tests LANGUAGES C CXX)
 
 get_filename_component(FIRMWARE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+# The chunk encoder uses mbedTLS base64, as on the reader.
+include("${FIRMWARE_DIR}/tools/mbedtls_host.cmake")
 include(FetchContent)
 FetchContent_Declare(ArduinoJson
     URL https://codeload.github.com/bblanchon/ArduinoJson/tar.gz/refs/tags/v7.4.2
@@ -14,7 +16,7 @@ target_compile_features(crash-upload PRIVATE cxx_std_17)
 target_compile_definitions(crash-upload PRIVATE LOGGER_LEVEL_NUM=0)
 target_compile_options(crash-upload PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
 target_include_directories(crash-upload PRIVATE "${FIRMWARE_DIR}/src")
-target_link_libraries(crash-upload PRIVATE ArduinoJson)
+target_link_libraries(crash-upload PRIVATE ArduinoJson ${ATTRACTAP_MBEDTLS_LIBRARIES})
 
 enable_testing()
 add_test(NAME crash-upload COMMAND crash-upload)

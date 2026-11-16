@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AttractapDiagnostics } from './diagnostics/index';
+import { hasPendingCoredump, PENDING_COREDUMP_POLL_WINDOW_MS } from './diagnostics/useDiagnostics';
 const state = vi.hoisted(() => ({
   reports: [] as unknown[],
   loading: false,
@@ -163,6 +164,9 @@ it('tells a coredump that is still being uploaded and a recovered one apart from
   expect(reports[1].querySelector('[data-cy="attractap-diagnostics-orphan-coredump"]')?.textContent).toBe(
     'orphanCoredump',
   );
+  expect(reports[1].querySelector('[data-cy="attractap-diagnostics-orphan-coredump"]')?.className).toContain(
+    'chip--default',
+  );
   expect(reports[1].querySelector('[data-cy="attractap-diagnostics-reboot-reason"]')).toBeNull();
   expect(reports[1].querySelector('[data-cy="attractap-diagnostics-orphan-hint"]')).toBeTruthy();
   expect(reports[1].querySelector('[data-cy="attractap-diagnostics-download-coredump"]')).toBeTruthy();
@@ -170,31 +174,77 @@ it('tells a coredump that is still being uploaded and a recovered one apart from
   expect(reports[2].querySelector('[data-cy="attractap-diagnostics-coredump-pending"]')).toBeNull();
 });
 it('shows a coredump the server refused instead of claiming there was none', () => {
+  const refused = { createdAt: report.createdAt, resetReason: 'PANIC', coredumpStatus: 'rejected', coredumpSize: null };
   state.reports = [
-    {
-      id: 14,
-      createdAt: report.createdAt,
-      resetReason: 'PANIC',
-      coredumpStatus: 'rejected',
-      coredumpExpectedSize: 140000,
-      coredumpSize: null,
-    },
+    { ...refused, id: 14, coredumpExpectedSize: 140000 },
+    { ...refused, id: 15, coredumpExpectedSize: null },
   ];
   const { container } = render(<AttractapDiagnostics readerId={7} />);
-  expect(container.querySelector('[data-cy="attractap-diagnostics-coredump-rejected"]')?.textContent).toBe(
+  const reports = container.querySelectorAll('[data-cy="attractap-diagnostics-report"]');
+  expect(reports[0].querySelector('[data-cy="attractap-diagnostics-coredump-rejected"]')?.textContent).toBe(
     'coredumpRejected',
   );
-  expect(container.querySelector('[data-cy="attractap-diagnostics-coredump-rejected-hint"]')).toBeTruthy();
+  // A refused dump is still in the reader's flash: worth a look, unlike a recovered one.
+  expect(reports[0].querySelector('[data-cy="attractap-diagnostics-coredump-rejected"]')?.className).toContain(
+    'chip--warning',
+  );
+  expect(reports[0].querySelector('[data-cy="attractap-diagnostics-coredump-rejected-hint"]')?.textContent).toBe(
+    'coredumpRejectedHint',
+  );
+  // Without a valid announced size the hint does not show a placeholder size.
+  expect(reports[1].querySelector('[data-cy="attractap-diagnostics-coredump-rejected-hint"]')?.textContent).toBe(
+    'coredumpRejectedHintNoSize',
+  );
   expect(container.textContent).not.toContain('noCoredump');
 });
-it('refreshes the reports only while a coredump upload is still owed', () => {
+it('refreshes the reports while a recent coredump is still being uploaded or symbolicated', () => {
   render(<AttractapDiagnostics readerId={7} />);
   const { refetchInterval } = state.query.mock.calls[0][2] as {
     refetchInterval: (query: { state: { data?: unknown[] } }) => number | false;
   };
-  expect(refetchInterval({ state: { data: [{ coredumpStatus: 'awaiting' }, { coredumpStatus: 'stored' }] } })).toBe(
-    10_000,
-  );
-  expect(refetchInterval({ state: { data: [{ coredumpStatus: 'stored' }] } })).toBe(false);
+  const recent = new Date(Date.now() - 60_000).toISOString();
+  expect(
+    refetchInterval({
+      state: {
+        data: [
+          { coredumpStatus: 'awaiting', createdAt: recent },
+          { coredumpStatus: 'stored', createdAt: recent },
+        ],
+      },
+    }),
+  ).toBe(10_000);
+  // The server stores an uploaded dump before it symbolicates it.
+  expect(
+    refetchInterval({
+      state: { data: [{ coredumpStatus: 'stored', symbolicationStatus: 'pending', createdAt: recent }] },
+    }),
+  ).toBe(10_000);
+  expect(
+    refetchInterval({
+      state: { data: [{ coredumpStatus: 'stored', symbolicationStatus: 'success', createdAt: recent }] },
+    }),
+  ).toBe(false);
   expect(refetchInterval({ state: {} })).toBe(false);
+});
+it('stops refreshing for a pending report older than an hour', () => {
+  const now = Date.parse('2026-09-22T12:00:00Z');
+  const at = (ageMs: number) => new Date(now - ageMs).toISOString();
+  expect(
+    hasPendingCoredump([{ coredumpStatus: 'awaiting', createdAt: at(PENDING_COREDUMP_POLL_WINDOW_MS - 1) }], now),
+  ).toBe(true);
+  expect(
+    hasPendingCoredump([{ coredumpStatus: 'awaiting', createdAt: at(PENDING_COREDUMP_POLL_WINDOW_MS) }], now),
+  ).toBe(false);
+  expect(
+    hasPendingCoredump(
+      [
+        {
+          coredumpStatus: 'stored',
+          symbolicationStatus: 'pending',
+          createdAt: at(2 * PENDING_COREDUMP_POLL_WINDOW_MS),
+        },
+      ],
+      now,
+    ),
+  ).toBe(false);
 });

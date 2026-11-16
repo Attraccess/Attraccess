@@ -16,4 +16,8 @@ std::unique_ptr<crashupload::Ports> makeCrashUploadPorts(std::function<bool(cons
 // Size and CRC-32 of the valid coredump in flash (read once per boot); size 0 when there is none,
 // it fails its checksum, or coredumps are compiled out (secure profile).
 CrashDumpFingerprint crashFlashDumpFingerprint();
+// The dump in flash, claimed for a new crash record when crashupload::shouldAttachDump allows it
+// (the claim is stored); size 0 when the record gets no dump. Used for new records and for records
+// upgraded from version 1, so both follow the same rule.
+CrashDumpFingerprint crashClaimFlashDump(bool crashReset);
 #endif

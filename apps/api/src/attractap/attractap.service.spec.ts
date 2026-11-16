@@ -1,6 +1,6 @@
 import { DeleteResult, Repository } from 'typeorm';
 import { Attractap, AttractapCrashReport, NFCCard, Resource, User } from '@attraccess/database-entities';
-import { AttractapService } from './attractap.service';
+import { AttractapService, SYMBOLICATION_CONCURRENCY } from './attractap.service';
 import { ReaderUpdatedEvent } from './events';
 import { EncryptionService } from '../encryption/encryption.service';
 import { MetricsService } from '../metrics/metrics.service';
@@ -350,6 +350,57 @@ describe('AttractapService reader maintenance and crash reports', () => {
     expect((reports as unknown as { findOne: jest.Mock }).findOne).toHaveBeenCalledWith({
       where: { id: 7, attractapId: 5 },
     });
+  });
+  it('finds the newest report of the reader that still awaits exactly the announced dump', async () => {
+    const { service, reports } = setup();
+    const findOne = jest.fn().mockResolvedValue({ id: 7 });
+    Object.assign(reports, { findOne });
+    expect(await service.findAwaitingCrashReport(4, { size: 43776, crc32: 0xdeadbeef })).toEqual({ id: 7 });
+    expect(findOne).toHaveBeenCalledWith({
+      where: {
+        attractapId: 4,
+        coredumpStatus: 'awaiting',
+        coredumpExpectedSize: 43776,
+        coredumpExpectedCrc32: 0xdeadbeef,
+      },
+      order: { createdAt: 'DESC', id: 'DESC' },
+    });
+  });
+  it(`symbolicates at most ${SYMBOLICATION_CONCURRENCY} coredumps at once, inline and uploaded alike`, async () => {
+    const { service, reports, symbolication } = setup();
+    reports.update.mockResolvedValue({ affected: 1 });
+    const running: Array<() => void> = [];
+    symbolication.symbolicate.mockImplementation(
+      () =>
+        new Promise((resolve) => running.push(() => resolve({ buildId: 'build', status: 'success', backtrace: 'bt' }))),
+    );
+    const settle = () => new Promise(setImmediate);
+    const dump = Buffer.from('dump');
+
+    const done = [
+      service.createCrashReport(4, { resetReason: 'PANIC', coredumpBase64: dump.toString('base64') } as never),
+      service.storeUploadedCoredump({ id: 8, attractapId: 4 } as never, dump),
+      service.storeUploadedCoredump({ id: 9, attractapId: 4 } as never, dump),
+    ];
+    await settle();
+    expect(symbolication.symbolicate).toHaveBeenCalledTimes(2);
+
+    running.shift()?.();
+    await settle();
+    expect(symbolication.symbolicate).toHaveBeenCalledTimes(3);
+    running.splice(0).forEach((finish) => finish());
+    await Promise.all(done);
+    expect(reports.update).toHaveBeenCalledWith(9, expect.objectContaining({ symbolicationStatus: 'success' }));
+  });
+  it('frees the symbolication slot when symbolication fails', async () => {
+    const { service, reports, symbolication } = setup();
+    reports.update.mockResolvedValue({ affected: 1 });
+    symbolication.symbolicate.mockRejectedValue(new Error('gdb crashed'));
+    jest.spyOn(service['logger'], 'error').mockImplementation(() => undefined);
+    for (const id of [1, 2, 3]) {
+      await service.storeUploadedCoredump({ id, attractapId: 4 } as never, Buffer.from('dump'));
+    }
+    expect(symbolication.symbolicate).toHaveBeenCalledTimes(3);
   });
   it('looks up installed and server firmware while listing crash reports', async () => {
     const { service, firmware, readers } = setup();

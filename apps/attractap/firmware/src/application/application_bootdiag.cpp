@@ -52,6 +52,20 @@ void Application::setupBootDiagnostics() {
     bool shouldReport = isCrash ||
                         (reason == ESP_RST_POWERON &&
                          prior.uptimeMs > BOOT_DIAG_SILENT_HANG_MIN_UPTIME_MS);
+    // Tie the dump to this crash only when this crash wrote it (ATT-1144).
+    // A dump an earlier record already claimed stays with that one.
+    CrashDumpFingerprint flash = {};
+    CrashDumpFingerprint dump = {};
+    if (shouldReport) {
+      flash = crashFlashDumpFingerprint();
+      dump = crashClaimFlashDump(isCrash);
+      if (dump.present()) {
+        this->logger.infof("Coredump of this crash: %u bytes", (unsigned)dump.size);
+      } else if (flash.present()) {
+        this->logger.infof("Coredump in flash (%u bytes) is not from this reset",
+                           (unsigned)flash.size);
+      }
+    }
     this->bootDiagPreferences.begin(BOOT_DIAG_NAMESPACE, false);
     if (shouldReport) {
       static_assert(sizeof(BootDiagnostics_t) == sizeof(CrashBootRecord),
@@ -61,35 +75,37 @@ void Application::setupBootDiagnostics() {
       pending.resetReason = (uint8_t)reason;
       pending.version = BOOT_DIAG_PENDING_VERSION;
       pending.phase = (uint8_t)CrashUploadPhase::MetadataPending;
+      pending.dump = dump;
       // The image that crashed is still the one running: the report keeps its
       // version even when an OTA update lands before the upload.
       snprintf(pending.firmwareVersion, sizeof(pending.firmwareVersion), "%s",
                FIRMWARE_VERSION);
 
-      // Tie the dump to this crash only when this crash wrote it (ATT-1144).
-      // A dump an earlier record already claimed stays with that one.
-      const CrashDumpFingerprint dump = crashFlashDumpFingerprint();
-      CrashDumpFingerprint claimed = {};
-      if (this->bootDiagPreferences.getBytes(BOOT_DIAG_DUMP_CLAIMED_KEY, &claimed,
-                                             sizeof(claimed)) != sizeof(claimed)) {
-        claimed = {};
+      // A crash whose details and dump have not been reported yet outranks a
+      // reset without a dump of its own (see keepPendingRecord).
+      PendingCrashBootRecord stored = {};
+      PendingCrashBootRecord existing = {};
+      const size_t storedLength = this->bootDiagPreferences.getBytes(
+          BOOT_DIAG_PENDING_KEY, &stored, sizeof(stored));
+      const bool haveExisting =
+          storedLength != 0 &&
+          crashupload::decodePendingBlob(&stored, storedLength, existing) !=
+              crashupload::PendingBlobKind::Invalid;
+      if (crashupload::keepPendingRecord(haveExisting ? &existing : nullptr,
+                                         flash, pending.dump.present())) {
+        this->logger.errorf("Keeping the pending crash report that owns the "
+                            "coredump; this reset (%s) is only logged",
+                            crashResetReasonToString((uint8_t)reason));
+        // This reset's reboot marker must not relabel the older crash.
+        this->bootDiagPreferences.remove(BOOT_DIAG_REBOOT_REASON_KEY);
+      } else {
+        // Preserve actual failures for upload after the next successful connect
+        // (ATT-474) as one blob so its reset reason cannot be paired with a
+        // different snapshot after a partial NVS write.
+        this->bootDiagPreferences.putBytes(BOOT_DIAG_PENDING_KEY, &pending,
+                                           sizeof(pending));
+        this->bootDiagPreferences.remove(BOOT_DIAG_PENDING_REASON_KEY);
       }
-      if (crashupload::shouldAttachDump(isCrash, dump, claimed)) {
-        pending.dump = dump;
-        this->bootDiagPreferences.putBytes(BOOT_DIAG_DUMP_CLAIMED_KEY, &dump,
-                                           sizeof(dump));
-        this->logger.infof("Coredump of this crash: %u bytes", (unsigned)dump.size);
-      } else if (dump.present()) {
-        this->logger.infof("Coredump in flash (%u bytes) is not from this reset",
-                           (unsigned)dump.size);
-      }
-
-      // Preserve actual failures for upload after the next successful connect
-      // (ATT-474) as one blob so its reset reason cannot be paired with a
-      // different snapshot after a partial NVS write.
-      this->bootDiagPreferences.putBytes(BOOT_DIAG_PENDING_KEY, &pending,
-                                         sizeof(pending));
-      this->bootDiagPreferences.remove(BOOT_DIAG_PENDING_REASON_KEY);
     } else if (reason == ESP_RST_SW) {
       // The reset is intentionally ignored. Keep a prior unacknowledged crash,
       // but discard this reboot's marker so it cannot relabel that crash.

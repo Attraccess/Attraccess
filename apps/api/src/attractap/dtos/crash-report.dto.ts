@@ -1,3 +1,4 @@
+import type { CoredumpStatus } from '@attraccess/database-entities';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class AttractapCrashReportDto {
@@ -81,7 +82,7 @@ export class AttractapCrashReportDto {
     enum: ['awaiting', 'stored', 'rejected'],
     nullable: true,
   })
-  coredumpStatus!: 'awaiting' | 'stored' | 'rejected' | null;
+  coredumpStatus!: CoredumpStatus | null;
 
   @ApiProperty({
     description:

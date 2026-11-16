@@ -576,10 +576,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     // the supervisor's web popup) are torn down.
     this.resetReaderConnectionState(socket, readerId, 'READER_UNREACHABLE');
 
-    // Open reader UI steps, timers and the OTA file descriptor.
-    cleanupSocketState(socket, { uiHandler: this.uiHandler });
-    // A partial coredump upload is restarted by the reader after it reconnects.
-    this.crashReportHandler.discardCoredumpUpload(socket.id);
+    // Open reader UI steps, timers, the OTA file descriptor and a partial coredump upload.
+    cleanupSocketState(socket, { uiHandler: this.uiHandler, crashReportHandler: this.crashReportHandler });
     this.websocketService.sockets.delete(socket.id);
     this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
   }

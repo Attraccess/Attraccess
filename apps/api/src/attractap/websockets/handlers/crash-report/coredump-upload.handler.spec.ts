@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { crc32 } from 'zlib';
+import { WebSocket } from 'ws';
 import { AttractapCrashReportHandler } from './crash-report.handler';
 import { COREDUMP_CHUNK_BYTES, COREDUMP_MAX_ASSEMBLIES, COREDUMP_MAX_BYTES } from './coredump-assembly';
 import { AttractapEventType } from '../../websocket.types';
@@ -26,7 +27,8 @@ describe('AttractapCrashReportHandler chunked coredump upload', () => {
 
   const reader = (readerId = 42, id = `sock-${readerId}`) => ({
     id,
-    readerId,
+    readerId: readerId as number | null,
+    readyState: WebSocket.OPEN as number,
     state: {},
     sendMessage: jest.fn().mockResolvedValue(true),
     sendRaw: jest.fn().mockReturnValue(true),
@@ -97,6 +99,18 @@ describe('AttractapCrashReportHandler chunked coredump upload', () => {
         };
         reports.set(stored.id, stored);
         return { ...stored, coredump: null };
+      }),
+      findAwaitingCrashReport: jest.fn(async (readerId: number, expected: { size: number; crc32: number }) => {
+        const found = [...reports.values()]
+          .reverse()
+          .find(
+            (stored) =>
+              stored.attractapId === readerId &&
+              stored.coredumpStatus === 'awaiting' &&
+              stored.coredumpExpectedSize === expected.size &&
+              stored.coredumpExpectedCrc32 === expected.crc32,
+          );
+        return found ? { ...found, coredump: null } : null;
       }),
       findCrashReportOfReader: jest.fn(async (id: number, readerId: number) => {
         const found = reports.get(id);
@@ -346,5 +360,128 @@ describe('AttractapCrashReportHandler chunked coredump upload', () => {
     await upload(socket, id, dump);
     expect(lastRaw(socket).payload).toEqual({ reportId: id, error: 'CRASH_REPORT_STORE_FAILED' });
     expect(reports.get(id)?.coredumpStatus).toBe('awaiting');
+  });
+  /** A promise the test settles itself, to hold a handler at its await. */
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((settle) => (resolve = settle));
+    return { promise, resolve };
+  }
+  const assemblies = () => (handler as any).coredumpUploads.size as number;
+
+  it('acknowledges metadata sent again (lost acknowledgement) with the same report, audited and counted once', async () => {
+    const socket = reader();
+    const dump = dumpOf(43776);
+    const id = await announce(socket, dump);
+    const firstAck = lastAck(socket);
+
+    await report(socket, { resetReason: 'PANIC', coredumpSize: dump.length, coredumpCrc32: crc32(dump) });
+
+    expect(lastAck(socket)).toEqual(firstAck);
+    expect(lastAck(socket)).toEqual({
+      received: true,
+      id,
+      coredumpUpload: { reportId: id, chunkSize: COREDUMP_CHUNK_BYTES },
+    });
+    expect(service.createCrashReport).toHaveBeenCalledTimes(1);
+    expect(audit.record).toHaveBeenCalledTimes(1);
+    expect(metrics.attractapCrashReportsTotal.inc).toHaveBeenCalledTimes(1);
+    expect(service.findAwaitingCrashReport).toHaveBeenLastCalledWith(42, { size: dump.length, crc32: crc32(dump) });
+  });
+
+  it('creates a new report for a different dump, another reader or once the dump is stored', async () => {
+    const socket = reader();
+    const dump = dumpOf(9000);
+    const id = await announce(socket, dump);
+
+    expect(await announce(socket, dumpOf(9000, 2))).not.toBe(id);
+    expect(await announce(reader(43), dump)).not.toBe(id);
+    await upload(socket, id, dump);
+    expect(await announce(socket, dump)).not.toBe(id);
+    expect(service.createCrashReport).toHaveBeenCalledTimes(4);
+    // Reports without an announced dump never look for an earlier one.
+    service.findAwaitingCrashReport.mockClear();
+    await report(socket, { resetReason: 'POWERON' });
+    expect(service.findAwaitingCrashReport).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['the connection closed', (socket: Reader) => (socket.readyState = WebSocket.CLOSED)],
+    ['the disconnect cleared the reader', (socket: Reader) => (socket.readerId = null)],
+  ])('starts no upload when %s while the report was looked up', async (_label, disconnect) => {
+    const socket = reader();
+    const dump = dumpOf(9000);
+    const id = await announce(socket, dump);
+    const lookup = deferred<unknown>();
+    service.findCrashReportOfReader.mockReturnValueOnce(lookup.promise);
+
+    const pending = begin(socket, id, dump);
+    disconnect(socket);
+    lookup.resolve({ ...reports.get(id) });
+    await pending;
+
+    expect(service.findCrashReportOfReader).toHaveBeenCalledWith(id, 42);
+    expect(assemblies()).toBe(0);
+    expect(socket.sendRaw).not.toHaveBeenCalled();
+  });
+
+  it('keeps the new upload when the old connection of a reconnected reader is noticed closed late', async () => {
+    const first = reader(42, 'sock-a');
+    const dump = dumpOf(12000);
+    const id = await announce(first, dump);
+    await begin(first, id, dump);
+    chunk(first, id, 0, dump.subarray(0, 4096));
+
+    const second = reader(42, 'sock-b');
+    await begin(second, id, dump);
+    expect(lastRaw(second).payload).toEqual({ reportId: id, chunkSize: COREDUMP_CHUNK_BYTES, nextOffset: 0 });
+    handler.discardCoredumpUpload('sock-a');
+
+    for (let offset = 0; offset < dump.length; offset += COREDUMP_CHUNK_BYTES) {
+      chunk(second, id, offset, dump.subarray(offset, offset + COREDUMP_CHUNK_BYTES));
+    }
+    await complete(second, id, dump);
+    expect(lastRaw(second).payload).toEqual({ reportId: id, coredumpStored: true });
+    expect(reports.get(id)?.coredump?.equals(dump)).toBe(true);
+  });
+
+  it('confirms a completed upload only after the dump is stored', async () => {
+    const socket = reader();
+    const dump = dumpOf(5000);
+    const id = await announce(socket, dump);
+    await begin(socket, id, dump);
+    chunk(socket, id, 0, dump.subarray(0, 4096));
+    chunk(socket, id, 4096, dump.subarray(4096));
+    const store = deferred<boolean>();
+    service.storeUploadedCoredump.mockReturnValueOnce(store.promise);
+    const replies = socket.sendRaw.mock.calls.length;
+
+    const pending = complete(socket, id, dump);
+    await new Promise(setImmediate);
+    expect(service.storeUploadedCoredump).toHaveBeenCalledTimes(1);
+    expect(socket.sendRaw).toHaveBeenCalledTimes(replies);
+
+    store.resolve(true);
+    await pending;
+    expect(lastRaw(socket).payload).toEqual({ reportId: id, coredumpStored: true });
+  });
+
+  it('stores a verified dump for the reader that sent it even when the connection closes meanwhile', async () => {
+    const socket = reader();
+    const dump = dumpOf(5000);
+    const id = await announce(socket, dump);
+    await begin(socket, id, dump);
+    chunk(socket, id, 0, dump.subarray(0, 4096));
+    chunk(socket, id, 4096, dump.subarray(4096));
+    const lookup = deferred<unknown>();
+    service.findCrashReportOfReader.mockReturnValueOnce(lookup.promise);
+
+    const pending = complete(socket, id, dump);
+    socket.readerId = null;
+    lookup.resolve({ ...reports.get(id) });
+    await pending;
+
+    expect(service.findCrashReportOfReader).toHaveBeenLastCalledWith(id, 42);
+    expect(reports.get(id)?.coredump?.equals(dump)).toBe(true);
   });
 });

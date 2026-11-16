@@ -1,368 +1,6 @@
 // Crash report and chunked coredump upload (ATT-1144): the real state machine against a fake server that
 // implements the protocol, with in-memory NVS and coredump flash.
-#include "api/diagnostics/coredump-upload.hpp"
-#include <cstring>
-#include <functional>
-#include <iostream>
-#include <map>
-#include <optional>
-#include <stdexcept>
-#include <string>
-#include <vector>
-
-using namespace crashupload;
-
-Logger::Logger(const char *name) : name(name) {}
-void Logger::error(const char *) {}
-void Logger::errorf(const char *, ...) {}
-
-static void require(bool condition, const std::string &message)
-{
-    if (!condition) throw std::runtime_error(message);
-}
-
-static constexpr uint32_t PARTITION = CRASH_COREDUMP_PARTITION_BYTES;
-static constexpr size_t SESSION_FRAME_LIMIT = 64 * 1024;
-
-static std::vector<uint8_t> makeDump(size_t size, uint8_t seed = 1)
-{
-    std::vector<uint8_t> dump(size);
-    uint32_t x = 0x12345678u ^ seed;
-    for (auto &byte : dump)
-    {
-        x = x * 1664525u + 1013904223u;
-        byte = static_cast<uint8_t>(x >> 24);
-    }
-    return dump;
-}
-
-static CrashDumpFingerprint fingerprintOf(const std::vector<uint8_t> &dump)
-{
-    if (dump.empty()) return {};
-    return {static_cast<uint32_t>(dump.size()), crc32Update(0, dump.data(), dump.size())};
-}
-
-static std::vector<uint8_t> base64Decode(const std::string &text)
-{
-    auto value = [](char c) -> int {
-        if (c >= 'A' && c <= 'Z') return c - 'A';
-        if (c >= 'a' && c <= 'z') return c - 'a' + 26;
-        if (c >= '0' && c <= '9') return c - '0' + 52;
-        if (c == '+') return 62;
-        if (c == '/') return 63;
-        return -1;
-    };
-    std::vector<uint8_t> out;
-    uint32_t buffer = 0;
-    int bits = 0;
-    for (char c : text)
-    {
-        if (c == '=') break;
-        const int v = value(c);
-        require(v >= 0, "invalid base64 character");
-        buffer = (buffer << 6) | static_cast<uint32_t>(v);
-        bits += 6;
-        if (bits >= 8)
-        {
-            bits -= 8;
-            out.push_back(static_cast<uint8_t>(buffer >> bits));
-        }
-    }
-    return out;
-}
-
-// In-memory NVS, coredump partition and transport.
-struct Reader : Ports
-{
-    std::optional<PendingCrashBootRecord> pending;
-    std::string reboot;
-    CrashDumpFingerprint claimed{};
-    CrashDumpFingerprint done{};
-    std::vector<uint8_t> dump;
-    bool heapOk = true;
-    bool ota = false;
-    bool sendOk = true;
-    unsigned erases = 0;
-    size_t largestMessage = 0;
-    size_t largestHeapRequest = 0;
-    std::vector<std::string> outbox;
-
-    bool loadPending(PendingCrashBootRecord &out) override
-    {
-        if (!pending) return false;
-        out = *pending;
-        return true;
-    }
-    void savePending(const PendingCrashBootRecord &record) override { pending = record; }
-    void clearPending() override
-    {
-        pending.reset();
-        reboot.clear();
-    }
-    std::string rebootReason() override { return reboot; }
-    CrashDumpFingerprint claimedDump() override { return claimed; }
-    void setClaimedDump(const CrashDumpFingerprint &fingerprint) override { claimed = fingerprint; }
-    CrashDumpFingerprint doneDump() override { return done; }
-    void setDoneDump(const CrashDumpFingerprint &fingerprint) override { done = fingerprint; }
-    CrashDumpFingerprint flashDump() override { return fingerprintOf(dump); }
-    bool readDump(uint32_t offset, uint8_t *out, size_t length) override
-    {
-        require(offset + length <= dump.size(), "read past the dump");
-        memcpy(out, dump.data() + offset, length);
-        return true;
-    }
-    bool eraseDump() override
-    {
-        ++erases;
-        dump.clear();
-        return true;
-    }
-    bool heapAvailable(size_t bytes) override
-    {
-        largestHeapRequest = std::max(largestHeapRequest, bytes);
-        return heapOk;
-    }
-    bool otaInProgress() override { return ota; }
-    bool send(const char *json, size_t length) override
-    {
-        if (!sendOk) return false;
-        largestMessage = std::max(largestMessage, length);
-        outbox.emplace_back(json, length);
-        return true;
-    }
-    const char *resetReasonName(uint8_t reason) override { return reason == 4 ? "PANIC" : "UNKNOWN"; }
-
-    void crash(size_t dumpSize, uint8_t seed = 1, const char *firmware = "1.7.0")
-    {
-        dump = makeDump(dumpSize, seed);
-        PendingCrashBootRecord record{};
-        record.record.magic = BOOT_DIAG_MAGIC;
-        record.record.uptimeMs = 120000;
-        record.record.freeInternalHeap = 40000;
-        record.resetReason = 4;
-        record.version = BOOT_DIAG_PENDING_VERSION;
-        snprintf(record.firmwareVersion, sizeof(record.firmwareVersion), "%s", firmware);
-        if (shouldAttachDump(true, flashDump(), claimed))
-        {
-            record.dump = flashDump();
-            claimed = record.dump;
-        }
-        pending = record;
-    }
-};
-
-// The server side of the protocol (crash-report.handler.ts), reduced to what the reader can observe.
-struct Server
-{
-    struct Report
-    {
-        JsonDocument metadata;
-        CrashDumpFingerprint expected{};
-        std::optional<std::vector<uint8_t>> stored;
-    };
-    struct Assembly
-    {
-        uint32_t reportId;
-        CrashDumpFingerprint declared;
-        std::vector<uint8_t> bytes;
-    };
-    std::map<uint32_t, Report> reports;
-    std::optional<Assembly> assembly;
-    uint32_t nextId = 100;
-    unsigned metadataMessages = 0;
-    unsigned beginMessages = 0;
-    unsigned chunkMessages = 0;
-    // Test hooks: answer the next message of this type with this payload instead.
-    std::map<std::string, std::string> overrideNext;
-    std::map<std::string, unsigned> dropNext;
-
-    std::optional<std::pair<std::string, JsonDocument>> handle(const std::string &message)
-    {
-        JsonDocument in;
-        require(!deserializeJson(in, message), "reader sent invalid JSON");
-        require(std::string(in["event"] | "") == "EVENT", "reader message is not an EVENT");
-        const std::string type = in["data"]["type"] | "";
-        JsonObjectConst p = in["data"]["payload"];
-        JsonDocument out;
-        if (type == "READER_CRASH_REPORT") ++metadataMessages;
-        if (type == "READER_COREDUMP_BEGIN") ++beginMessages;
-        if (type == "READER_COREDUMP_CHUNK") ++chunkMessages;
-
-        if (dropNext[type] > 0)
-        {
-            --dropNext[type];
-            if (type == "READER_COREDUMP_CHUNK") apply(type, p, out); // received, but the reply is lost
-            return std::nullopt;
-        }
-        if (overrideNext.count(type))
-        {
-            require(!deserializeJson(out, overrideNext[type]), "bad override");
-            overrideNext.erase(type);
-            return std::make_pair(type, std::move(out));
-        }
-        apply(type, p, out);
-        return std::make_pair(type, std::move(out));
-    }
-
-    void apply(const std::string &type, JsonObjectConst p, JsonDocument &out)
-    {
-        if (type == "READER_CRASH_REPORT")
-        {
-            const uint32_t id = nextId++;
-            Report &report = reports[id];
-            report.metadata.set(p);
-            out["received"] = true;
-            out["id"] = id;
-            const uint32_t size = p["coredumpSize"] | 0u;
-            if (size > PARTITION)
-            {
-                out["coredumpRejected"] = "COREDUMP_TOO_LARGE";
-            }
-            else if (size > 0)
-            {
-                report.expected = {size, p["coredumpCrc32"] | 0u};
-                out["coredumpUpload"]["reportId"] = id;
-                out["coredumpUpload"]["chunkSize"] = 4096;
-            }
-        }
-        else if (type == "READER_COREDUMP_BEGIN")
-        {
-            const uint32_t id = p["reportId"] | 0u;
-            out["reportId"] = id;
-            const CrashDumpFingerprint declared{p["size"] | 0u, p["crc32"] | 0u};
-            auto report = reports.find(id);
-            if (report == reports.end()) out["error"] = "COREDUMP_REPORT_NOT_FOUND";
-            else if (declared.size > PARTITION) out["error"] = "COREDUMP_TOO_LARGE";
-            else if (report->second.stored && declared == report->second.expected) out["coredumpStored"] = true;
-            else if (report->second.stored) out["error"] = "COREDUMP_ALREADY_STORED";
-            else if (declared != report->second.expected) out["error"] = "COREDUMP_MISMATCH";
-            else
-            {
-                assembly = Assembly{id, declared, {}};
-                out["chunkSize"] = 4096;
-                out["nextOffset"] = 0;
-            }
-        }
-        else if (type == "READER_COREDUMP_CHUNK")
-        {
-            const uint32_t id = p["reportId"] | 0u;
-            out["reportId"] = id;
-            if (!assembly || assembly->reportId != id)
-            {
-                out["error"] = "COREDUMP_NO_UPLOAD";
-                return;
-            }
-            const uint32_t offset = p["offset"] | 0u;
-            const std::vector<uint8_t> data = base64Decode(p["data"] | "");
-            require(!data.empty() && data.size() <= CHUNK_MAX_BYTES, "chunk size out of range");
-            const uint32_t received = static_cast<uint32_t>(assembly->bytes.size());
-            if (offset < received && offset + data.size() <= received)
-            {
-                out["nextOffset"] = received; // duplicate: re-ack
-            }
-            else if (offset != received)
-            {
-                out["error"] = "COREDUMP_OUT_OF_ORDER";
-                out["expectedOffset"] = received;
-            }
-            else
-            {
-                require(received + data.size() <= assembly->declared.size, "chunk past the declared size");
-                assembly->bytes.insert(assembly->bytes.end(), data.begin(), data.end());
-                out["nextOffset"] = static_cast<uint32_t>(assembly->bytes.size());
-            }
-        }
-        else if (type == "READER_COREDUMP_COMPLETE")
-        {
-            const uint32_t id = p["reportId"] | 0u;
-            out["reportId"] = id;
-            if (!assembly || assembly->reportId != id)
-            {
-                out["error"] = "COREDUMP_NO_UPLOAD";
-                return;
-            }
-            const CrashDumpFingerprint got = fingerprintOf(assembly->bytes);
-            const CrashDumpFingerprint declared{p["totalSize"] | 0u, p["crc32"] | 0u};
-            if (got != assembly->declared || declared != assembly->declared)
-            {
-                out["error"] = got.size != declared.size ? "COREDUMP_SIZE_MISMATCH" : "COREDUMP_CHECKSUM_MISMATCH";
-                assembly.reset();
-                return;
-            }
-            reports[id].stored = assembly->bytes;
-            assembly.reset();
-            out["coredumpStored"] = true;
-        }
-        else
-        {
-            require(false, "unexpected reader event " + type);
-        }
-    }
-};
-
-struct Harness
-{
-    Reader reader;
-    Server server;
-    Logger logger{"test"};
-    std::optional<Uploader> uploader;
-    uint32_t now = 1000;
-
-    Harness() { uploader.emplace(reader, logger); }
-    void reboot() { uploader.emplace(reader, logger); }
-    void connect() { uploader->onAuthenticated(now); }
-    void disconnect()
-    {
-        uploader->onDisconnected();
-        reader.outbox.clear();
-        server.assembly.reset(); // the server drops a partial upload with the socket
-    }
-
-    // One API loop iteration: tick, then deliver the server's replies.
-    void step(uint32_t advanceMs = 10)
-    {
-        uploader->tick(now);
-        deliver();
-        now += advanceMs;
-    }
-    void deliver()
-    {
-        while (!reader.outbox.empty())
-        {
-            const std::string message = reader.outbox.front();
-            reader.outbox.erase(reader.outbox.begin());
-            auto reply = server.handle(message);
-            if (reply) uploader->onResponse(reply->first.c_str(), reply->second.as<JsonObjectConst>(), now);
-        }
-    }
-    void run(unsigned iterations = 200, uint32_t advanceMs = 10)
-    {
-        for (unsigned i = 0; i < iterations && uploader->step() != Uploader::Step::Idle; ++i) step(advanceMs);
-    }
-    // Iterations until `chunks` coredump chunks went out.
-    void runChunks(unsigned chunks)
-    {
-        const unsigned target = server.chunkMessages + chunks;
-        for (unsigned i = 0; i < 1000 && server.chunkMessages < target; ++i) step();
-    }
-    const Server::Report &onlyReport()
-    {
-        require(server.reports.size() == 1, "expected exactly one report, got " + std::to_string(server.reports.size()));
-        return server.reports.begin()->second;
-    }
-};
-
-static void expectStoredAndCleared(Harness &h, const std::vector<uint8_t> &dump)
-{
-    const auto &report = h.onlyReport();
-    require(report.stored.has_value(), "the dump was not stored");
-    require(*report.stored == dump, "stored dump differs from flash");
-    require(!h.reader.pending, "pending record not cleared after coredumpStored");
-    require(h.reader.erases == 1, "dump not erased exactly once");
-    require(h.reader.dump.empty(), "dump still in flash");
-    require(h.reader.done == fingerprintOf(dump), "done fingerprint not recorded");
-    require(h.uploader->step() == Uploader::Step::Idle, "uploader did not settle");
-}
+#include "crash_upload_harness.hpp"
 
 static void uploadsDumpOfSize(size_t size)
 {
@@ -500,7 +138,7 @@ static void lostChunkReplyTimesOutAndRetries()
     expectStoredAndCleared(h, dump);
 }
 
-static void checksumMismatchRetriesThenWaitsForNextConnection()
+static void checksumMismatchBacksOffThenRetries()
 {
     Harness h;
     h.reader.crash(9000);
@@ -511,10 +149,13 @@ static void checksumMismatchRetriesThenWaitsForNextConnection()
         h.server.overrideNext["READER_COREDUMP_COMPLETE"] = R"({"reportId":100,"error":"COREDUMP_CHECKSUM_MISMATCH"})";
         for (int j = 0; j < 100 && !h.server.overrideNext.empty(); ++j) h.step(1000);
     }
-    require(h.uploader->step() == Uploader::Step::Idle, "kept retrying past the limit");
+    require(h.server.completeMessages == 3, "unexpected completion attempts");
+    require(h.uploader->step() == Uploader::Step::Start, "a paused upload must resume on its own");
     require(h.reader.pending && !h.reader.dump.empty(), "gave up the dump");
-    h.disconnect();
-    h.connect();
+    // A paired reader can stay signed in for days: the upload resumes after the pause, not at sign-in.
+    const unsigned begins = h.server.beginMessages;
+    for (uint32_t waited = 0; waited + 2000 < LONG_RETRY_MS; waited += 1000) h.step(1000);
+    require(h.server.beginMessages == begins, "retried before the long pause was over");
     h.run(200, 1000);
     expectStoredAndCleared(h, dump);
 }
@@ -527,10 +168,9 @@ static void rejectedMetadataKeepsRecord()
     h.connect();
     h.run();
     require(h.reader.pending && h.reader.pending->phase == 0, "record dropped after a rejection");
-    require(h.uploader->step() == Uploader::Step::Idle, "retried in a loop after a rejection");
-    h.connect();
-    h.run();
-    require(h.server.reports.size() == 1 && h.server.reports.begin()->second.stored, "retry after reconnect failed");
+    // A temporary server failure is retried on the same connection, after a pause.
+    h.run(200, 1000);
+    require(h.server.reports.size() == 1 && h.server.reports.begin()->second.stored, "retry on the connection failed");
 }
 
 static void tooLargeIsGivenUpOnce()
@@ -592,12 +232,43 @@ static void recordWithoutDumpThenOrphan()
 
 static void reportGoneFallsBackToOrphanOnce()
 {
-    Harness h;
-    h.reader.crash(10000);
-    h.connect();
-    h.server.overrideNext["READER_COREDUMP_BEGIN"] = R"({"reportId":100,"error":"COREDUMP_REPORT_NOT_FOUND"})";
-    h.run();
-    require(h.server.reports.size() == 2 && h.server.reports[101].stored, "dump not recovered as an orphan");
+    // Each BEGIN refusal comes from server state that agrees with it, so the orphan's metadata is not
+    // matched to the refused report.
+    const std::vector<std::pair<std::string, std::function<void(Server &)>>> refusals = {
+        {"COREDUMP_REPORT_NOT_FOUND", [](Server &server) { server.reports.erase(100); }},
+        {"COREDUMP_NOT_EXPECTED", [](Server &server) { server.reports[100].expected = {}; }},
+        {"COREDUMP_ALREADY_STORED",
+         [](Server &server) {
+             server.reports[100].expected = {3, 3};
+             server.reports[100].stored = std::vector<uint8_t>{1, 2, 3};
+         }},
+        {"COREDUMP_MISMATCH", [](Server &server) { server.reports[100].expected.crc32 ^= 1; }},
+    };
+    for (const auto &[error, makeState] : refusals)
+    {
+        Harness h;
+        h.reader.crash(10000);
+        const auto dump = h.reader.dump;
+        h.server.beforeNextBegin = makeState;
+        h.connect();
+        h.run();
+        require(h.server.reports.count(101) && h.server.reports[101].stored && *h.server.reports[101].stored == dump,
+                error + ": dump not recovered as an orphan");
+        require(std::string(h.server.reports[101].metadata["rebootReason"] | "") == ORPHAN_REBOOT_REASON,
+                error + ": recovered dump not marked as an orphan");
+        require(!h.reader.pending && h.reader.dump.empty(), error + ": state not cleaned up");
+    }
+
+    // A malformed request is refused the same way every time: the record is dropped, then the orphan.
+    Harness invalid;
+    invalid.reader.crash(10000);
+    invalid.server.overrideAlways["READER_COREDUMP_BEGIN"] = R"({"reportId":100,"error":"INVALID_COREDUMP"})";
+    invalid.connect();
+    invalid.run();
+    require(invalid.server.reports.size() == 1, "orphan metadata created a second report for the same dump");
+    require(invalid.server.beginMessages == 2, "refused upload retried in a loop");
+    require(invalid.reader.done == fingerprintOf(invalid.reader.dump), "refused dump not marked done");
+    require(!invalid.reader.pending && invalid.uploader->step() == Uploader::Step::Idle, "did not settle");
 
     Harness orphan;
     orphan.reader.dump = makeDump(10000, 4);
@@ -657,11 +328,12 @@ static void storedBeforeLostConfirmation()
 static void staleDumpIsNeverAttached()
 {
     const auto dump = fingerprintOf(makeDump(43776));
-    require(shouldAttachDump(true, dump, {}), "fresh crash dump not attached");
-    require(!shouldAttachDump(false, dump, {}), "dump attached to a non-crash reset");
-    require(!shouldAttachDump(true, dump, dump), "already claimed dump attached again");
-    require(!shouldAttachDump(true, {}, {}), "missing dump attached");
-    require(!shouldAttachDump(true, {PARTITION + 1, 1}, {}), "oversized dump attached");
+    require(shouldAttachDump(true, dump, {}, {}), "fresh crash dump not attached");
+    require(!shouldAttachDump(false, dump, {}, {}), "dump attached to a non-crash reset");
+    require(!shouldAttachDump(true, dump, dump, {}), "already claimed dump attached again");
+    require(!shouldAttachDump(true, dump, {}, dump), "finished dump attached again");
+    require(!shouldAttachDump(true, {}, {}, {}), "missing dump attached");
+    require(!shouldAttachDump(true, {PARTITION + 1, 1}, {}, {}), "oversized dump attached");
 
     PendingCrashBootRecord owner{};
     owner.dump = dump;
@@ -669,12 +341,150 @@ static void staleDumpIsNeverAttached()
     require(isOrphanDump(dump, nullptr, {}), "unowned dump not an orphan");
     require(!isOrphanDump(dump, nullptr, dump), "finished dump treated as orphan");
 
-    // A later crash whose dump write failed leaves the claimed dump (same bytes): the new record gets none.
+    // A later crash whose dump write failed leaves the claimed dump (same bytes): once the record that
+    // claimed it is gone, the new record gets none.
     Harness h;
     h.reader.crash(43776);
     require(h.reader.pending->dump.present(), "first crash lost its dump");
+    h.reader.pending.reset();
     h.reader.crash(43776);
-    require(!h.reader.pending->dump.present(), "stale dump attached to a newer crash");
+    require(h.reader.pending && !h.reader.pending->dump.present(), "stale dump attached to a newer crash");
+}
+
+static void keepRecordThatOwnsTheDump()
+{
+    const auto dump = fingerprintOf(makeDump(43776));
+    PendingCrashBootRecord owner{};
+    owner.dump = dump;
+    PendingCrashBootRecord dumpless{};
+    require(keepPendingRecord(&owner, dump, false), "record that owns the dump replaced by a dumpless reset");
+    require(!keepPendingRecord(&owner, dump, true), "record kept over a reset with a dump of its own");
+    require(!keepPendingRecord(&owner, {}, false), "record kept although its dump is gone");
+    require(!keepPendingRecord(&owner, fingerprintOf(makeDump(43776, 2)), false), "record kept for another dump");
+    require(!keepPendingRecord(&dumpless, dump, false), "dumpless record kept");
+    require(!keepPendingRecord(nullptr, dump, false), "kept a record that does not exist");
+    PendingCrashBootRecord reported = owner;
+    reported.phase = static_cast<uint8_t>(CrashUploadPhase::DumpPending);
+    require(!keepPendingRecord(&reported, dump, false), "kept a record whose report is on the server already");
+    PendingCrashBootRecord orphan = owner;
+    orphan.flags = CRASH_PENDING_FLAG_ORPHAN;
+    require(!keepPendingRecord(&orphan, dump, false), "an orphan record outranked a real reset");
+
+    // Before the metadata went up: a silent hang after the crash keeps the crash and its dump.
+    Harness h;
+    h.reader.crash(43776);
+    const auto bytes = h.reader.dump;
+    h.reader.hang();
+    require(h.reader.pending->resetReason == 4 && h.reader.pending->dump == dump, "crash record replaced");
+    h.connect();
+    h.run();
+    expectStoredAndCleared(h, bytes);
+    require(std::string(h.onlyReport().metadata["resetReason"] | "") == "PANIC", "hang reported instead");
+
+    // Mid-upload: a crash that wrote no dump of its own is reported, and the dump still goes to the report
+    // that awaits it (as an orphan whose fingerprint the server answers with that report).
+    Harness mid;
+    mid.reader.crash(43776);
+    mid.connect();
+    mid.runChunks(3);
+    mid.disconnect();
+    mid.reboot();
+    mid.reader.boot(true, "1.7.1"); // crash-class reset, the dump write failed
+    require(mid.reader.pending->reportId == 0 && !mid.reader.pending->dump.present(), "new reset not recorded");
+    mid.connect();
+    mid.run();
+    require(mid.server.reports.size() == 2, "expected the first report and one for the new reset");
+    const auto &awaited = mid.server.reports.at(100);
+    require(awaited.stored && *awaited.stored == bytes, "dump not stored into the report that awaited it");
+    require(!mid.reader.pending && mid.reader.dump.empty() && mid.reader.erases == 1, "dump or record left behind");
+
+    // A record whose dump is gone is replaced as before.
+    Harness gone;
+    gone.reader.crash(43776);
+    gone.reader.dump.clear();
+    gone.reader.hang();
+    require(gone.reader.pending->resetReason == 1, "record without its dump outranked a new reset");
+}
+
+static void dumpVanishedFromFlash()
+{
+    // The report already exists and only the dump was owed: the record is dropped, no BEGIN goes out.
+    Harness h;
+    h.reader.crash(20000);
+    h.connect();
+    h.runChunks(2);
+    h.disconnect();
+    h.reader.dump.clear(); // erased behind the uploader's back, e.g. over USB
+    h.reboot();
+    const unsigned begins = h.server.beginMessages;
+    h.connect();
+    h.run();
+    require(h.server.beginMessages == begins, "upload started for a dump that is gone");
+    require(!h.reader.pending && h.uploader->step() == Uploader::Step::Idle, "record of a vanished dump kept");
+    require(h.server.reports.size() == 1, "a vanished dump was reported");
+
+    // Before the metadata: the report goes up without the dump.
+    Harness early;
+    early.reader.crash(5000);
+    early.reader.dump.clear();
+    early.connect();
+    early.run();
+    const auto &metadata = early.onlyReport().metadata;
+    require(metadata["coredumpSize"].isNull() && metadata["coredumpCrc32"].isNull(), "vanished dump announced");
+    require(early.server.beginMessages == 0, "upload started for a dump that is gone");
+    require(!early.reader.pending, "record kept after a metadata-only report");
+}
+
+static void lostMetadataAckCreatesNoDuplicate()
+{
+    Harness h;
+    h.reader.crash(43776);
+    const auto dump = h.reader.dump;
+    h.server.dropNext["READER_CRASH_REPORT"] = 1; // the report is stored, its ack is lost
+    h.connect();
+    h.run(400, 1000);
+    require(h.server.metadataMessages == 2, "metadata not resent after the lost ack");
+    expectStoredAndCleared(h, dump);
+}
+
+static void oddMetadataReplyKeepsTheDump()
+{
+    // Neither an upload offer nor a refusal: a transient failure, never a reason to give the dump up.
+    Harness h;
+    h.reader.crash(43776);
+    const auto dump = h.reader.dump;
+    h.server.overrideNext["READER_CRASH_REPORT"] = R"({"received":true,"id":100})";
+    h.connect();
+    for (int i = 0; i < 3; ++i) h.step();
+    require(h.reader.pending && h.reader.pending->dump == fingerprintOf(dump), "dump given up");
+    require(!h.reader.done.present(), "dump marked done without a refusal");
+    require(h.uploader->step() == Uploader::Step::Start, "no retry scheduled");
+    h.run(200, 1000);
+    expectStoredAndCleared(h, dump);
+}
+
+static void noProgressChunkRepliesBackOff()
+{
+    const char *replies[] = {
+        R"({"reportId":100,"error":"COREDUMP_OUT_OF_ORDER","expectedOffset":0})", // asks for the refused chunk
+        R"({"reportId":100,"nextOffset":0})",                                      // acks without progress
+    };
+    for (const char *reply : replies)
+    {
+        Harness h;
+        h.reader.crash(20000);
+        const auto dump = h.reader.dump;
+        h.server.overrideAlways["READER_COREDUMP_CHUNK"] = reply;
+        h.connect();
+        for (int i = 0; i < 120; ++i) h.step(1000);
+        require(h.server.chunkMessages == FAILURES_BEFORE_LONG_RETRY,
+                std::string("chunk resent without progress: ") + reply);
+        require(h.uploader->step() == Uploader::Step::Start, "upload not paused");
+        require(h.reader.pending && !h.reader.dump.empty(), "dump given up");
+        h.server.overrideAlways.clear();
+        h.run(600, 1000);
+        expectStoredAndCleared(h, dump);
+    }
 }
 
 static void pendingBlobVersions()
@@ -712,9 +522,10 @@ static void pendingBlobVersions()
 
 static void encoders()
 {
+    // crash-report.cpp chains esp_rom_crc32_le over 512-byte reads; the server checks zlib's CRC-32.
     const uint8_t check[] = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
-    require(crc32Update(0, check, sizeof(check)) == 0xCBF43926u, "crc32 check value");
-    require(crc32Update(crc32Update(0, check, 4), check + 4, 5) == 0xCBF43926u, "crc32 is not incremental");
+    require(esp_rom_crc32_le(0, check, sizeof(check)) == 0xCBF43926u, "crc32 check value");
+    require(esp_rom_crc32_le(esp_rom_crc32_le(0, check, 4), check + 4, 5) == 0xCBF43926u, "crc32 is not incremental");
     const uint8_t text[] = {'f', 'o', 'o', 'b', 'a', 'r'};
     const char *expected[] = {"", "Zg==", "Zm8=", "Zm9v", "Zm9vYg==", "Zm9vYmE=", "Zm9vYmFy"};
     for (size_t n = 0; n <= sizeof(text); ++n)
@@ -725,6 +536,8 @@ static void encoders()
     }
     char tiny[3];
     require(base64Encode(text, 3, tiny, sizeof(tiny)) == 0, "base64 overflow not refused");
+    char noTerminator[4];
+    require(base64Encode(text, 3, noTerminator, sizeof(noTerminator)) == 0, "no room for the terminator accepted");
 }
 
 int main()
@@ -744,7 +557,7 @@ int main()
         {"no upload during OTA", otaBlocksTheUpload},
         {"out-of-order resync", outOfOrderResyncs},
         {"lost chunk reply", lostChunkReplyTimesOutAndRetries},
-        {"checksum mismatch", checksumMismatchRetriesThenWaitsForNextConnection},
+        {"checksum mismatch backs off", checksumMismatchBacksOffThenRetries},
         {"rejected metadata", rejectedMetadataKeepsRecord},
         {"orphan dump", orphanDumpIsReportedOnItsOwn},
         {"record without dump, then orphan", recordWithoutDumpThenOrphan},
@@ -753,6 +566,11 @@ int main()
         {"temporary BEGIN error retries", transientBeginErrorRetries},
         {"stored before a lost confirmation", storedBeforeLostConfirmation},
         {"stale dump never attached", staleDumpIsNeverAttached},
+        {"record that owns the dump is kept", keepRecordThatOwnsTheDump},
+        {"dump vanished from flash", dumpVanishedFromFlash},
+        {"lost metadata ack", lostMetadataAckCreatesNoDuplicate},
+        {"metadata reply without an upload offer", oddMetadataReplyKeepsTheDump},
+        {"chunk replies without progress back off", noProgressChunkRepliesBackOff},
         {"pending record versions", pendingBlobVersions},
         {"crc32 and base64", encoders},
     };

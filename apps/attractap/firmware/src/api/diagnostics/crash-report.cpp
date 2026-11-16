@@ -2,6 +2,7 @@
 // FEATURE: api-diag
 
 #include "crash-report.hpp"
+#include <algorithm>
 #include <cstring>
 
 #ifdef ESP_PLATFORM
@@ -9,6 +10,7 @@
 #include "esp_system.h"
 #include "esp_heap_caps.h"
 #include "esp_partition.h"
+#include "esp_rom_crc.h"
 #include "sdkconfig.h"
 #if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
 #include "esp_core_dump.h" // absent when coredumps are off (secure profile)
@@ -103,6 +105,22 @@ const esp_partition_t *coredumpPartition()
 {
     return esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_COREDUMP, NULL);
 }
+
+// Small reads keep the flash bus free for the RGB panel's PSRAM framebuffer.
+constexpr size_t COREDUMP_READ_PIECE_BYTES = 512;
+
+bool readCoredumpPartition(const esp_partition_t *part, size_t offset, uint8_t *out, size_t length)
+{
+    for (size_t done = 0; done < length; done += COREDUMP_READ_PIECE_BYTES)
+    {
+        const size_t piece = length - done < COREDUMP_READ_PIECE_BYTES ? length - done : COREDUMP_READ_PIECE_BYTES;
+        if (esp_partition_read(part, offset + done, out + done, piece) != ESP_OK)
+        {
+            return false;
+        }
+    }
+    return true;
+}
 #endif
 
 class ReaderCrashUploadPorts : public crashupload::Ports
@@ -148,13 +166,7 @@ public:
 
         // Written by firmware before ATT-1144, which tied no dump to the record. A crash keeps the
         // dump it would have uploaded; the conversion is stored so it happens only once.
-        const CrashDumpFingerprint dump = flashDump();
-        if (crashupload::shouldAttachDump(crashResetIsCrash(out.resetReason), dump, claimedDump()) &&
-            dump != doneDump())
-        {
-            out.dump = dump;
-            setClaimedDump(dump);
-        }
+        out.dump = crashClaimFlashDump(crashResetIsCrash(out.resetReason));
         savePending(out);
         return true;
     }
@@ -204,7 +216,7 @@ public:
     {
 #if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
         const esp_partition_t *part = coredumpPartition();
-        return part && esp_partition_read(part, offset, out, length) == ESP_OK;
+        return part && readCoredumpPartition(part, offset, out, length);
 #else
         (void)offset;
         (void)out;
@@ -224,11 +236,17 @@ public:
 #endif
     }
 
-    bool heapAvailable(size_t bytes) override
+    bool heapAvailable(size_t rawBytes, size_t messageBytes) override
     {
-        // Chunk buffers are small enough to land in internal RAM; keep headroom there for TLS and LVGL.
-        return heap_caps_get_free_size(MALLOC_CAP_INTERNAL) >= bytes + CRASH_UPLOAD_INTERNAL_HEADROOM_BYTES &&
-               heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT) >= bytes;
+        // Chunk buffers are below the PSRAM malloc threshold, so they and every copy of the message
+        // land in internal RAM. Sending a message on the secure session copies it about 2.4 times
+        // more (session frame, TLS records in the outbox, websocket TX queue), so the budget counts
+        // the message 3 times, the raw chunk once, and keeps headroom for TLS and LVGL. For a 4 KiB
+        // chunk (~5.6 KB message) that is ~44 KiB free internal RAM; the HIL upload saw at least 83 KB.
+        // The largest block check uses internal RAM only: with PSRAM in MALLOC_CAP_DEFAULT it always passed.
+        return heap_caps_get_free_size(MALLOC_CAP_INTERNAL) >=
+                   CRASH_UPLOAD_MESSAGE_COPIES * messageBytes + rawBytes + CRASH_UPLOAD_INTERNAL_HEADROOM_BYTES &&
+               heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) >= std::max(rawBytes, messageBytes);
     }
 
     bool otaInProgress() override { return otaRunning(); }
@@ -237,6 +255,7 @@ public:
 
 private:
     static constexpr size_t CRASH_UPLOAD_INTERNAL_HEADROOM_BYTES = 24 * 1024;
+    static constexpr size_t CRASH_UPLOAD_MESSAGE_COPIES = 3;
     std::function<bool(const char *, size_t)> sendMessage;
     std::function<bool()> otaRunning;
 };
@@ -258,21 +277,33 @@ CrashDumpFingerprint crashFlashDumpFingerprint()
     {
         return cachedFlashDump;
     }
-    // Small reads keep the flash bus free for the RGB panel's PSRAM framebuffer.
-    uint8_t buffer[512];
+    uint8_t buffer[COREDUMP_READ_PIECE_BYTES];
     uint32_t crc = 0;
     for (size_t offset = 0; offset < size; offset += sizeof(buffer))
     {
         const size_t length = size - offset < sizeof(buffer) ? size - offset : sizeof(buffer);
-        if (esp_partition_read(part, offset, buffer, length) != ESP_OK)
+        if (!readCoredumpPartition(part, offset, buffer, length))
         {
             return cachedFlashDump;
         }
-        crc = crashupload::crc32Update(crc, buffer, length);
+        // The ROM CRC-32 inverts in and out, so chaining it gives the zlib CRC-32 the server checks.
+        crc = esp_rom_crc32_le(crc, buffer, static_cast<uint32_t>(length));
     }
     cachedFlashDump = {static_cast<uint32_t>(size), crc};
 #endif
     return cachedFlashDump;
+}
+
+CrashDumpFingerprint crashClaimFlashDump(bool crashReset)
+{
+    const CrashDumpFingerprint dump = crashFlashDumpFingerprint();
+    if (!crashupload::shouldAttachDump(crashReset, dump, readFingerprint(BOOT_DIAG_DUMP_CLAIMED_KEY),
+                                       readFingerprint(BOOT_DIAG_DUMP_DONE_KEY)))
+    {
+        return {};
+    }
+    writeFingerprint(BOOT_DIAG_DUMP_CLAIMED_KEY, dump);
+    return dump;
 }
 
 std::unique_ptr<crashupload::Ports> makeCrashUploadPorts(std::function<bool(const char *, size_t)> send,
@@ -298,7 +329,7 @@ public:
     CrashDumpFingerprint flashDump() override { return {}; }
     bool readDump(uint32_t, uint8_t *, size_t) override { return false; }
     bool eraseDump() override { return false; }
-    bool heapAvailable(size_t) override { return false; }
+    bool heapAvailable(size_t, size_t) override { return false; }
     bool otaInProgress() override { return false; }
     bool send(const char *, size_t) override { return false; }
     const char *resetReasonName(uint8_t) override { return "UNKNOWN"; }

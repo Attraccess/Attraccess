@@ -7,44 +7,18 @@
 #include <cstring>
 #include <memory>
 #include <new>
+#include "mbedtls/base64.h"
 
 namespace crashupload
 {
-uint32_t crc32Update(uint32_t crc, const uint8_t *data, size_t length)
-{
-    crc = ~crc;
-    for (size_t i = 0; i < length; ++i)
-    {
-        crc ^= data[i];
-        for (int bit = 0; bit < 8; ++bit)
-        {
-            crc = (crc >> 1) ^ (0xEDB88320u & (0u - (crc & 1u)));
-        }
-    }
-    return ~crc;
-}
-
 size_t base64Encode(const uint8_t *data, size_t length, char *out, size_t outCapacity)
 {
-    static const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    const size_t needed = base64Length(length);
-    if (outCapacity < needed)
+    size_t written = 0;
+    if (mbedtls_base64_encode(reinterpret_cast<unsigned char *>(out), outCapacity, &written, data, length) != 0)
     {
         return 0;
     }
-    size_t o = 0;
-    for (size_t i = 0; i < length; i += 3)
-    {
-        const uint32_t remaining = static_cast<uint32_t>(length - i);
-        uint32_t triple = static_cast<uint32_t>(data[i]) << 16;
-        if (remaining > 1) triple |= static_cast<uint32_t>(data[i + 1]) << 8;
-        if (remaining > 2) triple |= data[i + 2];
-        out[o++] = alphabet[(triple >> 18) & 0x3F];
-        out[o++] = alphabet[(triple >> 12) & 0x3F];
-        out[o++] = remaining > 1 ? alphabet[(triple >> 6) & 0x3F] : '=';
-        out[o++] = remaining > 2 ? alphabet[triple & 0x3F] : '=';
-    }
-    return o;
+    return written;
 }
 
 PendingBlobKind decodePendingBlob(const void *blob, size_t length, PendingCrashBootRecord &out)
@@ -93,10 +67,20 @@ PendingBlobKind decodePendingBlob(const void *blob, size_t length, PendingCrashB
     return PendingBlobKind::Invalid;
 }
 
-bool shouldAttachDump(bool crashReset, const CrashDumpFingerprint &flashDump, const CrashDumpFingerprint &claimed)
+bool shouldAttachDump(bool crashReset, const CrashDumpFingerprint &flashDump, const CrashDumpFingerprint &claimed,
+                      const CrashDumpFingerprint &done)
 {
     return crashReset && flashDump.present() && flashDump.size <= CRASH_COREDUMP_PARTITION_BYTES &&
-           flashDump != claimed;
+           flashDump != claimed && flashDump != done;
+}
+
+bool keepPendingRecord(const PendingCrashBootRecord *existing, const CrashDumpFingerprint &flashDump,
+                       bool newRecordClaimsDump)
+{
+    // An awaited report gets its dump back as an orphan (matched by fingerprint); an orphan has no details.
+    return existing != nullptr && !newRecordClaimsDump && existing->dump.present() && existing->dump == flashDump &&
+           existing->phase == static_cast<uint8_t>(CrashUploadPhase::MetadataPending) &&
+           (existing->flags & CRASH_PENDING_FLAG_ORPHAN) == 0;
 }
 
 /** BEGIN errors that say this report will never take this dump; anything else is worth a retry. */
@@ -124,6 +108,7 @@ bool isOrphanDump(const CrashDumpFingerprint &flashDump, const PendingCrashBootR
 
 void Uploader::onAuthenticated(uint32_t nowMs)
 {
+    std::lock_guard<std::mutex> lock(mutex);
     currentStep = Step::Start;
     notBeforeMs = nowMs;
     failures = 0;
@@ -132,6 +117,7 @@ void Uploader::onAuthenticated(uint32_t nowMs)
 
 void Uploader::onDisconnected()
 {
+    std::lock_guard<std::mutex> lock(mutex);
     if (currentStep != Step::Idle && currentStep != Step::Start)
     {
         logger.info("Crash report upload interrupted by the disconnect; it resumes after the next sign-in");
@@ -141,6 +127,7 @@ void Uploader::onDisconnected()
 
 void Uploader::tick(uint32_t nowMs)
 {
+    std::lock_guard<std::mutex> lock(mutex);
     switch (currentStep)
     {
     case Step::Idle:
@@ -183,6 +170,7 @@ void Uploader::tick(uint32_t nowMs)
 
 bool Uploader::onResponse(const char *eventType, JsonObjectConst payload, uint32_t nowMs)
 {
+    std::lock_guard<std::mutex> lock(mutex);
     // Replies that do not match the step (late, or for an attempt given up already) are ignored.
     if (strcmp(eventType, "READER_CRASH_REPORT") == 0)
     {
@@ -312,12 +300,12 @@ void Uploader::sendMetadata(uint32_t nowMs)
     logger.infof("Uploading crash report: reset=%s orphan=%d uptime=%ums coredump=%u bytes",
                  ports.resetReasonName(pending.resetReason), isOrphan() ? 1 : 0,
                  static_cast<unsigned>(pending.record.uptimeMs), static_cast<unsigned>(pending.dump.size));
+    // The step is set first, so it never lags behind the message (fail() replaces it if sending fails).
+    await(Step::AwaitMetadata, nowMs);
     if (!sendEvent("READER_CRASH_REPORT", payload))
     {
         fail(nowMs, "the crash report could not be sent");
-        return;
     }
-    await(Step::AwaitMetadata, nowMs);
 }
 
 void Uploader::sendBegin(uint32_t nowMs)
@@ -328,12 +316,11 @@ void Uploader::sendBegin(uint32_t nowMs)
     payload["crc32"] = pending.dump.crc32;
     currentOffset = 0;
     lastProgressQuarter = 0;
+    await(Step::AwaitBegin, nowMs);
     if (!sendEvent("READER_COREDUMP_BEGIN", payload))
     {
         fail(nowMs, "the coredump upload could not be started");
-        return;
     }
-    await(Step::AwaitBegin, nowMs);
 }
 
 void Uploader::sendChunk(uint32_t nowMs)
@@ -355,7 +342,7 @@ void Uploader::sendChunk(uint32_t nowMs)
     // One raw chunk and one message at a time: memory use depends on the chunk, never on the dump.
     std::unique_ptr<uint8_t[]> raw;
     std::unique_ptr<char[]> message;
-    if (ports.heapAvailable(length + messageLength))
+    if (ports.heapAvailable(length, messageLength))
     {
         raw.reset(new (std::nothrow) uint8_t[length]);
         message.reset(new (std::nothrow) char[messageLength]);
@@ -379,15 +366,15 @@ void Uploader::sendChunk(uint32_t nowMs)
         return;
     }
     memcpy(message.get(), head, static_cast<size_t>(headLength));
-    base64Encode(raw.get(), length, message.get() + headLength, base64Length(length));
+    // The encoder's terminator lands where the tail goes and is overwritten by it.
+    base64Encode(raw.get(), length, message.get() + headLength, base64Length(length) + sizeof(tail) - 1);
     memcpy(message.get() + headLength + base64Length(length), tail, sizeof(tail) - 1);
     raw.reset();
+    await(Step::AwaitChunk, nowMs);
     if (!ports.send(message.get(), messageLength))
     {
         fail(nowMs, "a coredump chunk could not be sent");
-        return;
     }
-    await(Step::AwaitChunk, nowMs);
 }
 
 void Uploader::sendComplete(uint32_t nowMs)
@@ -396,12 +383,11 @@ void Uploader::sendComplete(uint32_t nowMs)
     payload["reportId"] = pending.reportId;
     payload["totalSize"] = pending.dump.size;
     payload["crc32"] = pending.dump.crc32;
+    await(Step::AwaitComplete, nowMs);
     if (!sendEvent("READER_COREDUMP_COMPLETE", payload))
     {
         fail(nowMs, "the coredump upload could not be completed");
-        return;
     }
-    await(Step::AwaitComplete, nowMs);
 }
 
 void Uploader::await(Step next, uint32_t nowMs)
@@ -418,10 +404,13 @@ void Uploader::retryLater(uint32_t nowMs, uint32_t delayMs)
 
 void Uploader::fail(uint32_t nowMs, const char *what)
 {
-    if (++failures >= MAX_FAILURES_PER_CONNECTION)
+    if (++failures >= FAILURES_BEFORE_LONG_RETRY)
     {
-        logger.errorf("Crash report upload failed (%s); trying again after the next sign-in", what);
-        currentStep = Step::Idle;
+        // A paired reader may stay signed in for days: pause instead of waiting for the next sign-in.
+        logger.errorf("Crash report upload failed %u times (%s); trying again in %u minutes",
+                      static_cast<unsigned>(failures), what, static_cast<unsigned>(LONG_RETRY_MS / 60000));
+        failures = 0;
+        retryLater(nowMs, LONG_RETRY_MS);
         return;
     }
     logger.errorf("Crash report upload failed (%s); retrying", what);
@@ -474,9 +463,8 @@ void Uploader::onMetadataAck(JsonObjectConst payload, uint32_t nowMs)
 {
     if (!(payload["received"] | false))
     {
-        logger.errorf("Crash report rejected by the server (%s); keeping it for the next connection",
-                      payload["error"] | "no reason");
-        currentStep = Step::Idle;
+        // e.g. CRASH_REPORT_STORE_FAILED: a database hiccup on the server. The record stays and is retried.
+        fail(nowMs, payload["error"] | "crash report rejected by the server");
         return;
     }
     const uint32_t reportId = payload["id"] | 0u;
@@ -486,10 +474,17 @@ void Uploader::onMetadataAck(JsonObjectConst payload, uint32_t nowMs)
         finishRecord(nowMs);
         return;
     }
+    const char *rejected = payload["coredumpRejected"] | static_cast<const char *>(nullptr);
+    if (rejected)
+    {
+        giveUpDump(nowMs, rejected);
+        return;
+    }
     JsonObjectConst upload = payload["coredumpUpload"];
     if (upload.isNull() || reportId == 0)
     {
-        giveUpDump(nowMs, payload["coredumpRejected"] | "no upload offered");
+        // Neither an upload nor a refusal (an odd or stale reply): only an explicit refusal gives the dump up.
+        fail(nowMs, "the crash report reply offers no coredump upload");
         return;
     }
     pending.reportId = reportId;
@@ -550,7 +545,12 @@ void Uploader::onChunkAck(JsonObjectConst payload, uint32_t nowMs)
     if (error)
     {
         const uint32_t expected = payload["expectedOffset"] | UINT32_MAX;
-        if (strcmp(error, "COREDUMP_OUT_OF_ORDER") == 0 && expected <= pending.dump.size)
+        if (strcmp(error, "COREDUMP_OUT_OF_ORDER") == 0 && expected == currentOffset)
+        {
+            // Refused, yet the server wants this very chunk: resending it would loop without progress.
+            fail(nowMs, "the server refuses the chunk it asks for");
+        }
+        else if (strcmp(error, "COREDUMP_OUT_OF_ORDER") == 0 && expected <= pending.dump.size)
         {
             logger.infof("Coredump upload resyncs at offset %u", static_cast<unsigned>(expected));
             currentOffset = expected;
@@ -567,6 +567,12 @@ void Uploader::onChunkAck(JsonObjectConst payload, uint32_t nowMs)
     if (nextOffset > pending.dump.size)
     {
         fail(nowMs, "invalid chunk acknowledgement");
+        return;
+    }
+    if (nextOffset <= currentOffset)
+    {
+        // The server did not take the chunk (every ack moves past the chunk it acknowledges).
+        fail(nowMs, "a chunk acknowledgement without progress");
         return;
     }
     currentOffset = nextOffset;

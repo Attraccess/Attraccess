@@ -9,12 +9,47 @@ export const COREDUMP_ASSEMBLY_IDLE_MS = 120_000;
 /** Uploads in progress across all readers: at most 2 MiB of assembly buffers. */
 export const COREDUMP_MAX_ASSEMBLIES = 16;
 
-export type CoredumpUploadError =
+/**
+ * Every error a crash report or coredump upload reply carries. The firmware (coredump-upload.cpp) gives
+ * up the upload for good on REPORT_NOT_FOUND, MISMATCH, ALREADY_STORED, NOT_EXPECTED and INVALID_COREDUMP,
+ * gives up the dump on TOO_LARGE, retries BUSY later and retries the others (restarting the upload where
+ * needed). INVALID_CRASH_REPORT refuses the metadata itself. A new code must be placed in one of these
+ * groups on both sides.
+ */
+export const COREDUMP_ERRORS = {
+  INVALID_CRASH_REPORT: 'INVALID_CRASH_REPORT',
+  INVALID_COREDUMP: 'INVALID_COREDUMP',
+  COREDUMP_TOO_LARGE: 'COREDUMP_TOO_LARGE',
+  COREDUMP_REPORT_NOT_FOUND: 'COREDUMP_REPORT_NOT_FOUND',
+  COREDUMP_ALREADY_STORED: 'COREDUMP_ALREADY_STORED',
+  COREDUMP_NOT_EXPECTED: 'COREDUMP_NOT_EXPECTED',
+  COREDUMP_MISMATCH: 'COREDUMP_MISMATCH',
+  COREDUMP_BUSY: 'COREDUMP_BUSY',
+  CRASH_REPORT_STORE_FAILED: 'CRASH_REPORT_STORE_FAILED',
+  COREDUMP_NO_UPLOAD: 'COREDUMP_NO_UPLOAD',
+  COREDUMP_OUT_OF_ORDER: 'COREDUMP_OUT_OF_ORDER',
+  COREDUMP_INVALID_CHUNK: 'COREDUMP_INVALID_CHUNK',
+  COREDUMP_SIZE_MISMATCH: 'COREDUMP_SIZE_MISMATCH',
+  COREDUMP_CHECKSUM_MISMATCH: 'COREDUMP_CHECKSUM_MISMATCH',
+} as const;
+export type CoredumpError = (typeof COREDUMP_ERRORS)[keyof typeof COREDUMP_ERRORS];
+
+/** The errors of the in-memory assembly itself. */
+export type CoredumpUploadError = Extract<
+  CoredumpError,
   | 'COREDUMP_NO_UPLOAD'
   | 'COREDUMP_OUT_OF_ORDER'
   | 'COREDUMP_INVALID_CHUNK'
   | 'COREDUMP_SIZE_MISMATCH'
-  | 'COREDUMP_CHECKSUM_MISMATCH';
+  | 'COREDUMP_CHECKSUM_MISMATCH'
+>;
+
+/** A coredump upload reply body (the handler adds the reportId). */
+export type CoredumpReply =
+  | { error: CoredumpError; expectedOffset?: number }
+  | { chunkSize: number; nextOffset: number }
+  | { nextOffset: number }
+  | { coredumpStored: true };
 
 export interface DeclaredCoredump {
   size: number;

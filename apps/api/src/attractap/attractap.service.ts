@@ -28,10 +28,13 @@ import { CoredumpSymbolicationService } from './coredump-symbolication.service';
 import { AttractapFirmwareService } from './firmware.service';
 
 import { AttractapCrashReportDto } from './dtos/crash-report.dto';
+import { toCrashReportDto } from './dtos/crash-report.mapper';
 
 import { ReaderCrashReportPayload } from './websockets/websocket.types';
 
 import { randomBytes } from 'crypto';
+
+import { Semaphore } from 'async-mutex';
 
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from './events';
 
@@ -47,6 +50,12 @@ import * as en from './rfid-card-notification.en.json';
 import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 export const t = createTranslator({ en, de });
+
+/**
+ * Coredumps symbolicated at once. Each run spawns esp-coredump and gdb; after a rollout many readers upload
+ * their stranded dumps together, and the rest wait their turn.
+ */
+export const SYMBOLICATION_CONCURRENCY = 2;
 
 /** Written only by the credential registry; general reader updates must leave them alone. */
 const CREDENTIAL_COLUMNS = [
@@ -82,6 +91,8 @@ export class AttractapService {
   ) {}
 
   protected readonly logger = new Logger(AttractapService.name);
+
+  protected readonly symbolicationSlots = new Semaphore(SYMBOLICATION_CONCURRENCY);
 
   /**
    * Stores a crash report. A legacy reader sends its dump inline; a newer one announces `expectedCoredump`
@@ -134,6 +145,25 @@ export class AttractapService {
   }
 
   /**
+   * The newest report of the reader that still awaits exactly this dump: metadata the reader sent again
+   * because the acknowledgement got lost.
+   */
+  public async findAwaitingCrashReport(
+    readerId: number,
+    expectedCoredump: { size: number; crc32: number },
+  ): Promise<AttractapCrashReport | null> {
+    return this.crashReportRepository.findOne({
+      where: {
+        attractapId: readerId,
+        coredumpStatus: 'awaiting',
+        coredumpExpectedSize: expectedCoredump.size,
+        coredumpExpectedCrc32: expectedCoredump.crc32,
+      },
+      order: { createdAt: 'DESC', id: 'DESC' },
+    });
+  }
+
+  /**
    * Saves a verified chunked upload to its waiting report and symbolicates it like an inline dump.
    * False when the report no longer waits for a dump (already stored, or deleted meanwhile).
    */
@@ -159,9 +189,9 @@ export class AttractapService {
       const reader = await this.readerRepository.findOne({ where: { id: readerId } });
       // No explicit buildId: the symbolication service extracts the truncated app ELF
       // SHA256 from the coredump itself and matches it against published firmware ELFs.
-      const result = await this.coredumpSymbolicationService.symbolicate(coredump, {
-        variant: reader?.firmware?.variant ?? null,
-      });
+      const result = await this.symbolicationSlots.runExclusive(() =>
+        this.coredumpSymbolicationService.symbolicate(coredump, { variant: reader?.firmware?.variant ?? null }),
+      );
       await this.crashReportRepository.update(report.id, {
         coredumpBuildId: result.buildId,
         symbolicationStatus: result.status,
@@ -197,57 +227,10 @@ export class AttractapService {
         : null;
 
     return reports.map((report) =>
-      this.toCrashReportDto(report, currentReaderFirmwareVersion, latestServerFirmwareVersion),
+      toCrashReportDto(report, currentReaderFirmwareVersion, latestServerFirmwareVersion, (buildId) =>
+        this.firmwareService.hasSymbolForBuildId(buildId),
+      ),
     );
-  }
-
-  protected toCrashReportDto(
-    report: AttractapCrashReport,
-    currentReaderFirmwareVersion: string | null,
-    latestServerFirmwareVersion: string | null,
-  ): AttractapCrashReportDto {
-    const firmwareMatchesCurrentReader = this.compareNullableVersions(
-      report.firmwareVersion,
-      currentReaderFirmwareVersion,
-    );
-    const firmwareMatchesLatestServer = this.compareNullableVersions(
-      report.firmwareVersion,
-      latestServerFirmwareVersion,
-    );
-
-    return {
-      id: report.id,
-      attractapId: report.attractapId,
-      resetReason: report.resetReason,
-      rebootReason: report.rebootReason,
-      heapFreeBytes: report.heapFreeBytes,
-      largestFreeBlockBytes: report.largestFreeBlockBytes,
-      uptimeBeforeResetMs: report.uptimeBeforeResetMs,
-      wsState: report.wsState,
-      wifiState: report.wifiState,
-      firmwareVersion: report.firmwareVersion,
-      currentReaderFirmwareVersion,
-      latestServerFirmwareVersion,
-      firmwareMatchesCurrentReader,
-      firmwareMatchesLatestServer,
-      coredumpSize: report.coredumpSize,
-      coredumpStatus: report.coredumpStatus ?? null,
-      coredumpExpectedSize: report.coredumpExpectedSize ?? null,
-      coredumpBuildId: report.coredumpBuildId,
-      coredumpBuildIdKnown: report.coredumpBuildId
-        ? this.firmwareService.hasSymbolForBuildId(report.coredumpBuildId)
-        : null,
-      symbolicationStatus: report.symbolicationStatus,
-      symbolizedBacktrace: report.symbolizedBacktrace,
-      createdAt: report.createdAt,
-    };
-  }
-
-  protected compareNullableVersions(left: string | null, right: string | null): boolean | null {
-    if (!left || !right) {
-      return null;
-    }
-    return left === right;
   }
 
   public async getCrashReportCoredump(

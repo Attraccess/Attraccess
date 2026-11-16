@@ -83,7 +83,7 @@ export function renderAttractapDiagnosticsReports(
             </Chip>
           )}
           {report.coredumpStatus === 'rejected' && (
-            <Chip color="default" variant="soft" size="sm" data-cy="attractap-diagnostics-coredump-rejected">
+            <Chip color="warning" variant="soft" size="sm" data-cy="attractap-diagnostics-coredump-rejected">
               {t('coredumpRejected')}
             </Chip>
           )}
@@ -206,7 +206,9 @@ export function renderAttractapDiagnosticsReports(
           </span>
         ) : report.coredumpStatus === 'rejected' ? (
           <span className="text-xs text-default-500" data-cy="attractap-diagnostics-coredump-rejected-hint">
-            {t('coredumpRejectedHint', { size: formatBytes(report.coredumpExpectedSize, fallback) })}
+            {report.coredumpExpectedSize === null || report.coredumpExpectedSize === undefined
+              ? t('coredumpRejectedHintNoSize')
+              : t('coredumpRejectedHint', { size: formatBytes(report.coredumpExpectedSize, fallback) })}
           </span>
         ) : (
           <span className="text-xs text-default-400">{t('noCoredump')}</span>

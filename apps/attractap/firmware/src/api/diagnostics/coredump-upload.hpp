@@ -12,6 +12,7 @@
 #include <ArduinoJson.h>
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include "crash-record.hpp"
 #include "../../logger/logger.hpp"
@@ -27,13 +28,14 @@ constexpr uint32_t HEAP_RETRY_MIN_MS = 2000;
 constexpr uint32_t HEAP_RETRY_MAX_MS = 30000;
 constexpr uint32_t BUSY_RETRY_MS = 5000;
 constexpr uint32_t ERROR_RETRY_MS = 10000;
-// Failed attempts per connection before the upload waits for the next connection.
-constexpr uint8_t MAX_FAILURES_PER_CONNECTION = 3;
+// After this many failed attempts in a row the upload pauses for LONG_RETRY_MS, then starts over.
+constexpr uint8_t FAILURES_BEFORE_LONG_RETRY = 3;
+constexpr uint32_t LONG_RETRY_MS = 5 * 60 * 1000;
 constexpr const char *ORPHAN_REBOOT_REASON = "COREDUMP_ORPHAN";
 
-uint32_t crc32Update(uint32_t crc, const uint8_t *data, size_t length);
 constexpr size_t base64Length(size_t rawLength) { return 4 * ((rawLength + 2) / 3); }
-// Writes base64Length(length) characters (no terminator); returns that count, 0 if out is too small.
+// mbedTLS base64: writes base64Length(length) characters and a terminator, so outCapacity must be at
+// least base64Length(length) + 1. Returns the character count, 0 if out is too small.
 size_t base64Encode(const uint8_t *data, size_t length, char *out, size_t outCapacity);
 
 enum class PendingBlobKind
@@ -47,8 +49,14 @@ enum class PendingBlobKind
 PendingBlobKind decodePendingBlob(const void *blob, size_t length, PendingCrashBootRecord &out);
 
 // A dump in flash belongs to a new crash record only when the reset was a crash, the dump is
-// valid, and it is not a dump that an earlier record or upload already claimed.
-bool shouldAttachDump(bool crashReset, const CrashDumpFingerprint &flashDump, const CrashDumpFingerprint &claimed);
+// valid, and it is not a dump that an earlier record or upload already claimed or finished.
+bool shouldAttachDump(bool crashReset, const CrashDumpFingerprint &flashDump, const CrashDumpFingerprint &claimed,
+                      const CrashDumpFingerprint &done);
+// A new crash or hang record replaces the pending one, except when the pending record still owns the
+// dump in flash, has not reported its metadata yet and is no orphan, and the new record brings no dump
+// of its own: the new reset is then only logged, so the crash keeps its details and its dump.
+bool keepPendingRecord(const PendingCrashBootRecord *existing, const CrashDumpFingerprint &flashDump,
+                       bool newRecordClaimsDump);
 // A valid dump that the pending record does not own and that is not finished yet.
 bool isOrphanDump(const CrashDumpFingerprint &flashDump, const PendingCrashBootRecord *pending,
                   const CrashDumpFingerprint &done);
@@ -68,12 +76,16 @@ public:
     virtual CrashDumpFingerprint flashDump() = 0; // the valid dump in flash; size 0 = none
     virtual bool readDump(uint32_t offset, uint8_t *out, size_t length) = 0;
     virtual bool eraseDump() = 0;
-    virtual bool heapAvailable(size_t bytes) = 0; // room for one chunk upload of this size
+    // Room for one chunk upload: the raw chunk and its JSON message, plus what sending the message costs.
+    virtual bool heapAvailable(size_t rawBytes, size_t messageBytes) = 0;
     virtual bool otaInProgress() = 0;
+    // Queues the message; must never deliver a reply synchronously (Uploader::onResponse is not reentrant).
     virtual bool send(const char *json, size_t length) = 0;
     virtual const char *resetReasonName(uint8_t reason) = 0; // esp_reset_reason_t as text
 };
 
+// The public calls may come from different tasks (on the token channel the replies arrive on the
+// websocket task, tick runs on the main loop); a mutex serializes them.
 class Uploader
 {
 public:
@@ -103,6 +115,7 @@ public:
 private:
     Ports &ports;
     Logger &logger;
+    std::mutex mutex;
     Step currentStep = Step::Idle;
     PendingCrashBootRecord pending{};
     uint32_t currentOffset = 0;
