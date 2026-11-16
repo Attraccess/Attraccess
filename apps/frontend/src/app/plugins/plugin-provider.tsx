@@ -206,7 +206,10 @@ export function usePluginProviderStateOutput(model: ReturnType<typeof usePluginP
       const dependencyFailure = (manifest: LoadedPluginManifest, path: string[] = []): string | null => {
         if (path.includes(manifest.name)) return `Plugin dependency cycle: ${[...path, manifest.name].join(' → ')}`;
         if (dependencyFailures.has(manifest.name)) return dependencyFailures.get(manifest.name);
-        let failure: string | null = manifest.status === 'error' ? (manifest.error ?? 'Plugin failed to load') : null;
+        let failure: string | null =
+          manifest.status === 'error' || manifest.status === 'license_missing'
+            ? (manifest.error ?? 'Plugin failed to load')
+            : null;
         if (!failure) {
           for (const dependency of manifest.dependencies ?? []) {
             if (!dependency.required) continue;
@@ -247,7 +250,8 @@ export function usePluginProviderStateOutput(model: ReturnType<typeof usePluginP
             if (installed) pluginStore.uninstall(installed.plugin.getPluginName());
             removePlugin(manifest.name);
             loadedManifests.current.delete(manifest.name);
-            if (!warnedFailures.current.has(key)) {
+            // A missing license is an expected state, shown in Settings > Plugins: no toast.
+            if (manifest.status !== 'license_missing' && !warnedFailures.current.has(key)) {
               warnedFailures.current.add(key);
               toastRef.current.warning({ title: `Plugin "${manifest.name}" is disabled`, description: failure });
             }

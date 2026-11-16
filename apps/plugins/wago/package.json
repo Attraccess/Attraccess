@@ -8,7 +8,7 @@
     "wago",
     "cc100"
   ],
-  "license": "AGPL-3.0-only",
+  "license": "SEE LICENSE IN LICENSE.md",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Attraccess/Attraccess.git",
@@ -30,11 +30,17 @@
   "attraccess": {
     "displayName": "WAGO CC100",
     "description": "Discover, claim, and monitor WAGO CC100 controllers.",
-    "host": "^1.11.0-0",
+    "host": "^1.11.0-beta.1",
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
     "migrations": "dist/migrations.js",
     "styles": "frontend/style.css",
+    "license": {
+      "required": true,
+      "modules": [
+        "wago"
+      ]
+    },
     "permissions": [
       "DATABASE_ACCESS",
       "ACCESS_MQTT_SERVERS",

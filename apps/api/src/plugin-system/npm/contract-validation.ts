@@ -4,6 +4,7 @@ import * as semver from 'semver';
 import { z } from 'zod';
 import { PluginDependenciesSchema } from '../runtime/dependencies';
 import { PluginManifest, PluginManifestSchema } from '../plugin.manifest';
+import { PluginLicenseDeclarationSchema } from '../license/plugin-license';
 
 const entryPath = z
   .string()
@@ -33,6 +34,8 @@ const packageSchema = z
       migrations: entryPath.optional(),
       styles: entryPath.optional(),
       permissions: z.array(z.nativeEnum(PluginPermission)).default([]),
+      // npm installs get a synthesized plugin.json, so the license requirement travels in package.json.
+      license: PluginLicenseDeclarationSchema.optional(),
       sdk: z
         .object({
           backend: z.string().optional(),
@@ -104,6 +107,7 @@ export function parseNpmPluginPackage(
       attraccessVersion: { exact: hostVersion },
       permissions: pkg.attraccess.permissions,
       dependencies: pkg.attraccess.dependencies,
+      license: pkg.attraccess.license,
     }),
   };
 }

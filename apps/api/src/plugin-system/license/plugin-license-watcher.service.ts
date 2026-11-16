@@ -1,0 +1,42 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
+import { OnEvent } from '@nestjs/event-emitter';
+import { LicenseService } from '../../license/license.service';
+import { LICENSE_KEY_CHANGED_EVENT } from '../../settings/constants';
+import { arePluginsDisabled } from '../plugins-disabled';
+import { PluginService } from '../plugin.service';
+import type { PluginLicenseSnapshot } from './plugin-license';
+
+/**
+ * Plugin load decisions are made once at startup. After the license key changed, this restarts the API exactly when
+ * that would change the decision of at least one license-gated plugin. There is no periodic re-check (expiry is
+ * picked up by the next startup).
+ */
+@Injectable()
+export class PluginLicenseWatcher {
+  private readonly logger = new Logger(PluginLicenseWatcher.name);
+
+  constructor(
+    private readonly moduleRef: ModuleRef,
+    private readonly pluginService: PluginService,
+  ) {}
+
+  @OnEvent(LICENSE_KEY_CHANGED_EVENT)
+  async onLicenseKeyChanged(): Promise<void> {
+    if (arePluginsDisabled()) return;
+
+    let snapshot: PluginLicenseSnapshot = null;
+    try {
+      const data = await this.moduleRef.get(LicenseService, { strict: false }).getLicenseData();
+      snapshot = { valid: data.valid, modules: data.modules };
+    } catch (error) {
+      // An unverifiable key grants nothing, exactly as at startup.
+      this.logger.warn(`Could not verify the new license key: ${String(error)}`);
+    }
+
+    if (PluginService.licenseDecisionChanges(snapshot)) {
+      this.logger.log('The license change affects which plugins load; restarting.');
+      this.pluginService.requestRestart();
+    }
+  }
+}

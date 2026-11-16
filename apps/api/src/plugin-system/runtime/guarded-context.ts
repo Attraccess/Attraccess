@@ -46,6 +46,8 @@ export function createGuardedContext(
     audit: base.audit,
     liveUpdates: base.liveUpdates,
     logger: base.logger,
+    // The license is the installation's, not a host capability: it needs no permission.
+    license: base.license,
     mqtt: {
       subscribe(serverId, topicFilter, handler) {
         require(PluginPermission.ACCESS_MQTT_SERVERS, `mqtt.subscribe(${serverId}, ${topicFilter})`);

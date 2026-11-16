@@ -24,6 +24,12 @@ import { PluginSandboxService } from './plugin-sandbox.service';
 
 import { INTERNAL_PLUGIN_DIRECTORIES } from './runtime/boot-guard';
 
+import {
+  missingLicenseReason,
+  PluginLicenseDeclarationSchema,
+  type PluginLicenseSnapshot,
+} from './license/plugin-license';
+
 function getImplementationClass(): typeof PluginService {
   return require('./plugin.service').PluginService;
 }
@@ -38,6 +44,12 @@ export class PluginService {
   protected static loadedPlugins: Set<string> = new Set();
 
   protected static pluginLoadErrors: Map<string, Error> = new Map();
+
+  /**
+   * The license as it was at startup, which decided which plugins loaded. `null` until the startup evaluation ran
+   * (and while plugins are disabled); a gate with a `null` snapshot means the license could not be determined.
+   */
+  protected static licenseGate: { snapshot: PluginLicenseSnapshot } | null = null;
 
   protected static logger = new Logger('PluginService');
 
@@ -95,6 +107,7 @@ export class PluginService {
     getImplementationClass().plugins = null; // Discovery may have been cached with an unset path before configure() ran; force a re-scan.
     getImplementationClass().loadedPlugins.clear();
     getImplementationClass().pluginLoadErrors.clear();
+    getImplementationClass().licenseGate = null;
     PluginBootGuard.loadFailures(getImplementationClass().PLUGIN_PATH);
     getImplementationClass().logger.log(
       `PluginService configured. Path: ${getImplementationClass().PLUGIN_PATH}, RestartByExit: ${getImplementationClass().RESTART_BY_EXIT_FLAG}`,
@@ -102,6 +115,33 @@ export class PluginService {
     if (!getImplementationClass().PLUGIN_PATH) {
       getImplementationClass().logger.error('PLUGIN_DIR is not configured in AppConfig! Plugin system may not work.');
     }
+  }
+
+  /** Records the license the startup evaluation saw. Must run before PluginModule.forRoot() decides what loads. */
+  public static setLicenseSnapshot(snapshot: PluginLicenseSnapshot): void {
+    getImplementationClass().licenseGate = { snapshot };
+  }
+
+  /** Why the startup license does not satisfy the plugin's `license` block; null when it does or none is declared. */
+  public static getLicenseMissingReason(manifest: Pick<LoadedPluginManifest, 'license'>): string | null {
+    const gate = getImplementationClass().licenseGate;
+    return gate ? missingLicenseReason(manifest.license, gate.snapshot) : null;
+  }
+
+  /**
+   * Whether `next` would change the load decision of at least one license-gated plugin compared to the license
+   * the process started with. Without a startup evaluation (plugins disabled) nothing is gated, so nothing changes.
+   */
+  public static licenseDecisionChanges(next: PluginLicenseSnapshot): boolean {
+    const gate = getImplementationClass().licenseGate;
+    if (!gate) return false;
+    return getImplementationClass()
+      .getPlugins()
+      .some(
+        (manifest) =>
+          (missingLicenseReason(manifest.license, gate.snapshot) === null) !==
+          (missingLicenseReason(manifest.license, next) === null),
+      );
   }
 
   // Returns the discovered plugins enriched with their backend load status so the
@@ -301,6 +341,11 @@ export class PluginService {
       .getPlugins()
       .map((manifest) => {
         const key = `${manifest.name}@${manifest.version}`;
+        const licenseMissing = getImplementationClass().getLicenseMissingReason(manifest);
+        if (licenseMissing) {
+          return { ...manifest, status: 'license_missing' as const, error: licenseMissing };
+        }
+
         const error = getImplementationClass().pluginLoadErrors.get(key);
 
         let status: LoadedPluginManifest['status'] = 'unknown';
@@ -403,6 +448,23 @@ export class PluginService {
         } catch (error) {
           getImplementationClass().setPluginLoadError(`${manifest.name}@${manifest.version}`, error as Error);
           return null;
+        }
+
+        // Like invalid permissions, a malformed license block means the plugin is not loaded: the host could not
+        // tell what the plugin requires, and guessing would risk loading a paid plugin without its license.
+        if (manifest.license !== undefined) {
+          const parsed = PluginLicenseDeclarationSchema.safeParse(manifest.license);
+          if (!parsed.success) {
+            const detail = parsed.error.issues
+              .map((issue) => `${issue.path.join('.') || 'license'}: ${issue.message}`)
+              .join('; ');
+            getImplementationClass().setPluginLoadError(
+              `${manifest.name}@${manifest.version}`,
+              new Error(`Plugin ${manifest.name} declares an invalid license block (${detail})`),
+            );
+            return null;
+          }
+          manifest.license = parsed.data;
         }
 
         return manifest;

@@ -157,7 +157,7 @@ describe('LicenseService', () => {
     settingsServiceGetBackendUrlMock.mockResolvedValue('https://frontend.example');
 
     await expect(service.verifyLicense({ modules: [LicenseModuleType.SSO] })).rejects.toThrow(
-      'Trying to use module(s) that are not included in the license: sso'
+      'Trying to use module(s) that are not included in the license: sso',
     );
   });
 
@@ -198,7 +198,7 @@ describe('LicenseService', () => {
     settingsServiceGetBackendUrlMock.mockResolvedValue('https://frontend.example');
 
     await expect(service.verifyLicense({ usageLimits: { [LicenseUsageLimitType.USERS]: 10 } })).rejects.toThrow(
-      'Trying to use more than the allowed amount of users'
+      'Trying to use more than the allowed amount of users',
     );
   });
 
@@ -215,5 +215,29 @@ describe('LicenseService', () => {
     await expect(service.verifyLicense({ modules: [LicenseModuleType.ATTRACTAP] })).resolves.toMatchObject({
       valid: true,
     });
+  });
+
+  it('never grants plugin modules with the non-profit key', async () => {
+    configServiceGetMock.mockReturnValue({ ...baseAppConfig });
+    settingsServiceGetLicenseKeyMock.mockResolvedValue(NON_PROFIT_KEY);
+
+    const data = await service.getLicenseData();
+
+    expect(data.modules).not.toContain('wago');
+    await expect(service.verifyLicense({ modules: ['wago'] })).rejects.toThrow(
+      'Trying to use module(s) that are not included in the license: wago',
+    );
+  });
+
+  it('grants a plugin module that a Licenso license contains', async () => {
+    (verifyLicense as jest.Mock).mockResolvedValue({
+      valid: true,
+      payload: { cfg: { modules: { wago: true, attractap: false }, usageLimits: {} } },
+    });
+    configServiceGetMock.mockReturnValue({ ...baseAppConfig });
+    settingsServiceGetLicenseKeyMock.mockResolvedValue('standard-key');
+
+    await expect(service.verifyLicense({ modules: ['wago'] })).resolves.toMatchObject({ modules: ['wago'] });
+    await expect(service.verifyLicense({ modules: ['wago', 'attractap'] })).rejects.toThrow('attractap');
   });
 });

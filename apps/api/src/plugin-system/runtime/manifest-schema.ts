@@ -1,6 +1,7 @@
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 import { z } from 'zod';
 import { PluginDependenciesSchema } from './dependencies';
+import { PluginLicenseDeclarationSchema } from '../license/plugin-license';
 export const mainSchema = z.object({
   directory: z.string(),
   entryPoint: z.string(),
@@ -45,4 +46,5 @@ export const PluginManifestSchema = z.object({
     .array(z.nativeEnum(PluginPermission, { message: 'unknown plugin permission' }))
     .optional()
     .default([]),
+  license: PluginLicenseDeclarationSchema.optional(),
 });

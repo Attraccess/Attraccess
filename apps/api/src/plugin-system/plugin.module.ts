@@ -79,6 +79,8 @@ import { LoadedPluginManifest } from './plugin.manifest';
 
 import { PluginService } from './plugin.service';
 
+import { PluginLicenseWatcher } from './license/plugin-license-watcher.service';
+
 import { dataSourceConfig } from '../database/datasource';
 
 import { EncryptionService } from '../encryption/encryption.service';
@@ -98,6 +100,10 @@ import {
   createHostResourceAccessContext,
   PluginHostRefs,
 } from './runtime/host-contexts';
+
+import { LicenseService } from '../license/license.service';
+
+import { createPluginLicenseContext } from './runtime/plugin-license-context';
 
 import { createPluginRunSerialized } from './runtime/plugin-serialized';
 
@@ -165,6 +171,13 @@ export class PluginModule {
     const modulesByName = new Map<string, DynamicModule>();
     const active = new Set<string>();
     for (const manifest of ordered) {
+      // Not a failure: no quarantine, no boot-guard entry. The plugin loads after a restart once it is licensed.
+      if (PluginService.getLicenseMissingReason(manifest)) {
+        getImplementationClass().logger.log(
+          `Plugin ${manifest.name} is not loaded: ${PluginService.getLicenseMissingReason(manifest)}`,
+        );
+        continue;
+      }
       if (
         PluginService.isPluginQuarantined(manifest) ||
         PluginService.getPluginsWithLoadStatus().find((plugin) => plugin.name === manifest.name)?.status === 'error'
@@ -226,6 +239,7 @@ export class PluginModule {
         PluginClassificationService,
         PluginLiveUpdatesService,
         PluginSystemEventsBridge,
+        PluginLicenseWatcher,
         ReaderUiWiring,
       ],
       exports: [PluginEventsService],
@@ -502,6 +516,7 @@ export class PluginModule {
           decrypt: (ciphertext) => encryption.decryptForPlugin(manifest.id, ciphertext),
         };
       },
+      license: createPluginLicenseContext(() => getImplementationClass().hostRefs().get(LicenseService)),
       notifications: createHostNotificationsContext(manifest.name, getImplementationClass().hostRefs()),
       resourceAccess: createHostResourceAccessContext(getImplementationClass().hostRefs()),
       runSerialized: createPluginRunSerialized(

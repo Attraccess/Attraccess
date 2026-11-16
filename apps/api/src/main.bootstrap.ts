@@ -10,6 +10,7 @@ import { NpmPluginService } from './plugin-system/npm-plugin.service';
 import { PluginMigrationService } from './plugin-system/plugin-migration.service';
 import { PluginModule } from './plugin-system/plugin.module';
 import { PluginService } from './plugin-system/plugin.service';
+import { evaluateStartupLicense } from './plugin-system/license/startup-license';
 import { SettingsService } from './settings/settings.service';
 import { createWsAdapter } from './common/text-frame-ws-adapter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -291,6 +292,12 @@ export async function bootstrap() {
   // Record active plugins before migrations or module loading execute plugin code.
   const shouldGuardPluginLifecycle = !earlyConfig.DISABLE_PLUGINS && Boolean(earlyConfig.PLUGIN_DIR);
   if (shouldGuardPluginLifecycle) PluginService.beginBootGuard();
+
+  // Decide which license-gated plugins may load. PluginModule.forRoot() is synchronous, so the license is read here,
+  // before AppModule is imported. A failure never aborts boot: gated plugins then count as unlicensed.
+  if (!earlyConfig.DISABLE_PLUGINS && earlyConfig.PLUGIN_DIR) {
+    PluginService.setLicenseSnapshot(await evaluateStartupLicense(earlyConfig, bootstrapLogger));
+  }
 
   // Run plugin-shipped up-migrations BEFORE AppModule is imported, so every
   // plugin's tables exist before any plugin code (its onModuleInit) runs. This

@@ -1,4 +1,5 @@
 # WAGO
+
 <!-- llms-description: Das Plugin WAGO verbindet WAGO-CC100-Controller über MQTT, um Ausgänge zu schalten, Eingänge und Modbus-Zähler zu lesen und Flows auszulösen; Überblick und Voraussetzungen. -->
 
 > [!NOTE]
@@ -16,6 +17,12 @@ im Browser in Betrieb, benennen seine Ein- und Ausgänge, lesen Modbus-Zähler u
 
 ## Voraussetzungen
 
+- Eine bezahlte Attraccess-Lizenz, die das Lizenzmodul **`wago`** enthält. Das WAGO-Plugin ist ein kommerzielles Add-on:
+  Der Schlüssel für gemeinnützige Nutzung schaltet es **nicht** frei, eine kostenlose Nutzung gibt es nicht. Ohne das
+  Modul wird das Plugin nicht geladen und erscheint in **Einstellungen > Plugins** als **Lizenz fehlt**. Speichern Sie
+  einen Lizenzschlüssel mit dem Modul, startet Attraccess neu und lädt das Plugin. Siehe
+  [Plugins installieren](plugins/installing-plugins.md#lizenz-fehlt). Lizenzen:
+  [contact@attraccess.org](mailto:contact@attraccess.org).
 - Attraccess 1.11.0 oder neuer und das Plugin `wago`, installiert wie unter
   [Plugins installieren](plugins/installing-plugins.md) beschrieben. Es benötigt die Berechtigungen `DATABASE_ACCESS`,
   `ACCESS_MQTT_SERVERS`, `TRIGGER_FLOWS` und `MANAGE_SECRETS`.

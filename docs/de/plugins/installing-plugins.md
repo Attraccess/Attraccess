@@ -1,4 +1,5 @@
 # Plugins installieren
+
 <!-- llms-description: Plugins über die Weboberfläche hochladen, aktivieren, deaktivieren und entfernen, mit Fehlerbehebung. -->
 
 Plugins werden durch Hochladen ueber die Attraccess-Weboberflaeche installiert. Diese Seite erklaert, wie Sie Plugins hochladen, aktivieren und verwalten.
@@ -59,6 +60,20 @@ Plugins koennen ein- oder ausgeschaltet werden, ohne sie zu entfernen:
 > [!WARNING]
 > Das Deaktivieren eines Plugins entfernt dessen Seiten aus dem Frontend und dessen API-Endpunkte aus dem Backend. Benutzer koennen auf die vom Plugin bereitgestellten Funktionen nicht mehr zugreifen, bis es wieder aktiviert wird.
 
+## Lizenz fehlt
+
+Einige Plugins brauchen ein bezahltes Lizenzmodul. Das Plugin **WAGO** braucht zum Beispiel das Modul `wago`. Der
+Schluessel fuer gemeinnuetzige Nutzung enthaelt es nicht.
+
+Deckt die Lizenz ein Plugin nicht ab, zeigt **Einstellungen > Plugins** es mit dem Status **Lizenz fehlt** und nennt, was
+es braucht, zum Beispiel "Benoetigt das Lizenzmodul: wago". Das Plugin wird nicht geladen: Es hat keine Menueeintraege,
+Seiten, Flow-Knoten oder Hintergrundaktivitaet, und Attraccess zeigt dafuer keine Fehlermeldung.
+
+Speichern Sie unter **Einstellungen > Allgemein** einen Lizenzschluessel, der aendert, welche Plugins geladen werden
+duerfen, startet Attraccess automatisch neu und das Plugin wird geladen (oder nicht mehr geladen). Betrifft die
+Aenderung kein Plugin, gibt es keinen Neustart. Eine Lizenz, die waehrend des Betriebs ablaeuft, wirkt ab dem naechsten
+Start.
+
 ## Plugin entfernen
 
 1. Oeffnen Sie **Einstellungen** in der Seitenleiste und waehlen Sie den Bereich **Plugins**
@@ -74,6 +89,7 @@ Plugins koennen ein- oder ausgeschaltet werden, ohne sie zu entfernen:
 Wenn ein Plugin nicht wie erwartet funktioniert:
 
 - Pruefen Sie, ob das Plugin in der Plugin-Liste **aktiviert** ist
+- Pruefen Sie, ob sein Status nicht **Lizenz fehlt** lautet (siehe [Lizenz fehlt](#lizenz-fehlt))
 - Stellen Sie sicher, dass die Umgebungsvariable `DISABLE_PLUGINS` nicht auf `true` gesetzt ist
 - Pruefen Sie die Server-Logs auf Fehlermeldungen im Zusammenhang mit dem Plugin
 - Kontaktieren Sie den Plugin-Entwickler fuer Unterstuetzung

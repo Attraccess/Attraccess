@@ -35,6 +35,25 @@ describe('parseNpmPluginPackage', () => {
     });
   });
 
+  it('carries the license requirement of package.json into the synthesized manifest', () => {
+    const license = { required: true, modules: ['wago'] };
+    const { manifest } = parseNpmPluginPackage(
+      { ...validPackage, attraccess: { ...validPackage.attraccess, license } },
+      '1.9.0',
+    );
+    expect(manifest.license).toEqual(license);
+    expect(parseNpmPluginPackage(validPackage, '1.9.0').manifest.license).toBeUndefined();
+  });
+
+  it('rejects an invalid license requirement', () => {
+    expect(() =>
+      parseNpmPluginPackage(
+        { ...validPackage, attraccess: { ...validPackage.attraccess, license: { modules: 'wago' } } },
+        '1.9.0',
+      ),
+    ).toThrow();
+  });
+
   it('accepts unrelated standard npm package manifest fields', () => {
     expect(() =>
       parseNpmPluginPackage(

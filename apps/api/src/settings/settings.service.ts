@@ -23,6 +23,7 @@ import {
   MetricsSubsystem,
   AUTH_KEYS,
   AUTH_PARENT,
+  LICENSE_KEY_CHANGED_EVENT,
   MESSAGING_KEYS,
   MESSAGING_PARENT,
   MESSAGING_RATE_LIMIT_DEFAULTS,
@@ -231,6 +232,7 @@ export class SettingsService {
     }
     if (Object.prototype.hasOwnProperty.call(update, 'licenseKey')) {
       await this.settingsStore.setSecretSetting(APP_PARENT, APP_KEYS.licenseKey, update.licenseKey ?? null);
+      this.eventEmitter?.emit(LICENSE_KEY_CHANGED_EVENT);
     }
     if (update.defaultLanguage !== undefined) {
       await this.settingsStore.setPlainSetting(APP_PARENT, APP_KEYS.defaultLanguage, update.defaultLanguage);

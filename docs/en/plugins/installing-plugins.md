@@ -1,4 +1,5 @@
 # Installing Plugins
+
 <!-- llms-description: How to upload, enable, disable and remove plugins in the web interface, with troubleshooting. -->
 
 Plugins are installed by uploading them through the Attraccess web interface. This page explains how to upload, enable and manage plugins.
@@ -59,6 +60,19 @@ Plugins can be toggled on or off without removing them:
 > [!WARNING]
 > Disabling a plugin removes its pages from the frontend and its API endpoints from the backend. Users will no longer be able to access features provided by the plugin until it is re-enabled.
 
+## License missing
+
+Some plugins need a paid license module. The **WAGO** plugin, for example, needs the `wago` module. The key for
+non-profit use does not include it.
+
+If the license does not cover a plugin, **Settings > Plugins** shows it with the status **License missing** and names
+what it needs, for example "Requires license module: wago". The plugin is not loaded: it has no menu entries, pages,
+flow nodes or background activity, and Attraccess shows no error message for it.
+
+When you save a license key in **Settings > General** that changes which plugins may load, Attraccess restarts
+automatically and the plugin loads (or stops loading). If the change affects no plugin, there is no restart. A license
+that expires while Attraccess runs takes effect at the next start.
+
 ## Removing a Plugin
 
 1. Open **Settings** in the sidebar and select the **Plugins** section
@@ -74,6 +88,7 @@ Plugins can be toggled on or off without removing them:
 If a plugin does not work as expected:
 
 - Check that the plugin is **enabled** in the plugin list
+- Check that its status is not **License missing** (see [License missing](#license-missing))
 - Verify that the `DISABLE_PLUGINS` environment variable is not set to `true`
 - Check the server logs for error messages related to the plugin
 - Contact the plugin developer for support
