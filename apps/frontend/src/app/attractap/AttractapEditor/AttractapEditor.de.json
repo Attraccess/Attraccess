@@ -12,8 +12,8 @@
   "readerUpdated": "Reader aktualisiert",
   "readerUpdatedDescription": "Reader erfolgreich aktualisiert",
   "ledBrightness": "LED Helligkeit",
-  "allowPluginBle": "Plugins die Bluetooth-Nutzung erlauben",
-  "allowPluginBleDescription": "Plugins mit der Bluetooth-Berechtigung können dann nach den für sie eingerichteten Bluetooth-Geräten in der Nähe dieses Readers suchen und sich mit ihnen verbinden. Beim Ausschalten werden ihre Bluetooth-Verbindungen über diesen Reader sofort beendet.",
+  "allowPluginBle": "Bluetooth-Nutzung durch Plugins erlauben",
+  "allowPluginBleDescription": "Wenn aktiviert, können Plugins mit der Berechtigung BLE_TRANSPORT in der Nähe dieses Readers nach Bluetooth-Geräten der von ihnen unterstützten Art suchen und sich mit den für sie eingerichteten Geräten verbinden. Beim Ausschalten werden ihre Bluetooth-Verbindungen über diesen Reader sofort beendet.",
   "tabs": {
     "general": "Allgemein",
     "resources": "Ressourcen",

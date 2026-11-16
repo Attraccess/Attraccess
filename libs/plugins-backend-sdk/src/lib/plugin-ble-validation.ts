@@ -30,11 +30,28 @@ function invalid(code: ErrorCode, field: string, problem: string): never {
   throw new PluginBleError(code, `${field}: ${problem}`, { detail: field });
 }
 
+// The intrinsic %TypedArray%.prototype[@@toStringTag] getter reads the internal slot, so a Proxy, a subclass
+// with lying getters or a plain object tagged 'Uint8Array' cannot pass for real bytes (it works across realms).
+const typedArrayTag = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype), Symbol.toStringTag)
+  ?.get as (this: unknown) => string | undefined;
+
 export function isBleBytes(value: unknown): value is Uint8Array {
-  return (
-    value instanceof Uint8Array ||
-    (typeof value === 'object' && value !== null && Object.prototype.toString.call(value) === '[object Uint8Array]')
-  );
+  return typeof value === 'object' && value !== null && typedArrayTag.call(value) === 'Uint8Array';
+}
+
+/**
+ * Returns a private copy of real `Uint8Array` bytes, or `null` for anything else. The copy is taken through the
+ * typed-array constructor, which reads the internal slots and never calls plugin-overridable getters or
+ * iterators, so bounds are always checked on exactly the bytes that are passed on.
+ */
+export function copyBleBytes(value: unknown): Uint8Array | null {
+  if (!isBleBytes(value)) return null;
+  try {
+    return new Uint8Array(value);
+  } catch {
+    // A view on a detached buffer.
+    return null;
+  }
 }
 
 /** Normalizes a 16-, 32- or 128-bit UUID to lowercase 128-bit with dashes. */
@@ -107,7 +124,7 @@ function normalizeCharacteristic(
   if (uuids.has(uuid)) return invalid('INVALID_PROFILE', `${path}.uuid`, 'duplicate characteristic UUID in service');
   uuids.add(uuid);
 
-  const operations = c.operations;
+  const operations: unknown = c.operations;
   if (!Array.isArray(operations) || operations.length === 0) {
     return invalid('INVALID_PROFILE', `${path}.operations`, 'must be a non-empty array');
   }
@@ -122,16 +139,23 @@ function normalizeCharacteristic(
   }
   const allows = (...ops: PluginBleOperation[]) => ops.some((op) => seen.has(op));
   const bound = (field: string, needed: boolean): number | undefined => {
-    if (!needed) return undefined;
-    if (c[field] === undefined)
-      return invalid('INVALID_PROFILE', `${path}.${field}`, 'is required for the allowed operations');
-    return boundedInteger(c[field], `${path}.${field}`, 1, PLUGIN_BLE_LIMITS.payloadMaxBytes, 'INVALID_PROFILE');
+    const value = c[field];
+    if (value === undefined) {
+      return needed
+        ? invalid('INVALID_PROFILE', `${path}.${field}`, 'is required for the allowed operations')
+        : undefined;
+    }
+    // A bound for an operation that is not allowed is still range-checked, then dropped.
+    const checked = boundedInteger(value, `${path}.${field}`, 1, PLUGIN_BLE_LIMITS.payloadMaxBytes, 'INVALID_PROFILE');
+    return needed ? checked : undefined;
   };
   const maxReadBytes = bound('maxReadBytes', allows('read'));
   const maxWriteBytes = bound('maxWriteBytes', allows('write', 'writeWithoutResponse'));
   const maxNotificationBytes = bound('maxNotificationBytes', allows('notify', 'indicate'));
 
-  const result: Record<string, unknown> = { key, uuid, operations: [...(operations as PluginBleOperation[])] };
+  // Canonical order (built from the checked set, not a second read of the input) keeps re-registration idempotent.
+  const ordered = PLUGIN_BLE_OPERATIONS.filter((op) => seen.has(op));
+  const result: Record<string, unknown> = { key, uuid, operations: ordered };
   if (maxReadBytes !== undefined) result.maxReadBytes = maxReadBytes;
   if (maxWriteBytes !== undefined) result.maxWriteBytes = maxWriteBytes;
   if (maxNotificationBytes !== undefined) result.maxNotificationBytes = maxNotificationBytes;
@@ -144,24 +168,27 @@ function normalizeAdvertisement(raw: unknown): PluginBleProfile['advertisement']
   if (typeof a !== 'object' || a === null) return invalid('INVALID_PROFILE', 'advertisement', 'must be an object');
   const uuids = a.serviceUuids === undefined ? [] : a.serviceUuids;
   if (!Array.isArray(uuids)) return invalid('INVALID_PROFILE', 'advertisement.serviceUuids', 'must be an array');
-  const serviceUuids = uuids.map((uuid, index) => normalizeBleUuid(uuid, `advertisement.serviceUuids[${index}]`));
+  const serviceUuids = uuids
+    .map((uuid, index) => normalizeBleUuid(uuid, `advertisement.serviceUuids[${index}]`))
+    .sort();
   if (new Set(serviceUuids).size !== serviceUuids.length) {
     return invalid('INVALID_PROFILE', 'advertisement.serviceUuids', 'contains a duplicate UUID');
   }
   const ids = a.manufacturerIds === undefined ? [] : a.manufacturerIds;
   if (!Array.isArray(ids)) return invalid('INVALID_PROFILE', 'advertisement.manufacturerIds', 'must be an array');
-  const manufacturerIds = ids.map((id, index) =>
-    boundedInteger(id, `advertisement.manufacturerIds[${index}]`, 0, 0xffff, 'INVALID_PROFILE'),
-  );
+  const manufacturerIds = ids
+    .map((id, index) => boundedInteger(id, `advertisement.manufacturerIds[${index}]`, 0, 0xffff, 'INVALID_PROFILE'))
+    .sort((x, y) => x - y);
   if (new Set(manufacturerIds).size !== manufacturerIds.length) {
     return invalid('INVALID_PROFILE', 'advertisement.manufacturerIds', 'contains a duplicate id');
   }
+  const rawPrefix: unknown = a.namePrefix;
   let namePrefix: string | undefined;
-  if (a.namePrefix !== undefined) {
-    if (typeof a.namePrefix !== 'string' || a.namePrefix.length < 1 || a.namePrefix.length > MAX_NAME_PREFIX) {
+  if (rawPrefix !== undefined) {
+    if (typeof rawPrefix !== 'string' || rawPrefix.length < 1 || rawPrefix.length > MAX_NAME_PREFIX) {
       return invalid('INVALID_PROFILE', 'advertisement.namePrefix', `must be 1..${MAX_NAME_PREFIX} characters`);
     }
-    namePrefix = a.namePrefix;
+    namePrefix = rawPrefix;
   }
   if (!serviceUuids.length && !manufacturerIds.length && namePrefix === undefined) {
     return invalid('INVALID_PROFILE', 'advertisement', 'needs serviceUuids, manufacturerIds or namePrefix');
@@ -273,11 +300,18 @@ function requireBleKey(profile: PluginBleProfile, key: unknown, operation: strin
   return target;
 }
 
+function operationHint(target: BleCharacteristicTarget, operation: PluginBleOperation): string {
+  const ops = target.characteristic.operations;
+  if (operation === 'write' && ops.includes('writeWithoutResponse')) return '; pass { withoutResponse: true }';
+  if (operation === 'writeWithoutResponse' && ops.includes('write')) return '; omit withoutResponse';
+  return '';
+}
+
 function requireOperation(target: BleCharacteristicTarget, operation: PluginBleOperation, label: string) {
   if (!target.characteristic.operations.includes(operation)) {
     throw new PluginBleError(
       'OPERATION_NOT_ALLOWED',
-      `Characteristic "${target.characteristic.key}" does not allow "${operation}"`,
+      `Characteristic "${target.characteristic.key}" does not allow "${operation}"${operationHint(target, operation)}`,
       { operation: label, detail: target.characteristic.key },
     );
   }
@@ -297,17 +331,18 @@ export function prepareBleWrite(
 ): BleCharacteristicTarget & { value: Uint8Array; withoutResponse: boolean } {
   const target = requireBleKey(profile, key, 'write');
   requireOperation(target, withoutResponse ? 'writeWithoutResponse' : 'write', 'write');
-  if (!isBleBytes(value)) return invalid('INVALID_ARGUMENT', 'value', 'must be a Uint8Array');
-  if (value.byteLength === 0) return invalid('INVALID_ARGUMENT', 'value', 'must not be empty');
+  // Copy first and validate the copy, so the plugin cannot change the bytes (or lie about their size).
+  const copy = copyBleBytes(value);
+  if (!copy) return invalid('INVALID_ARGUMENT', 'value', 'must be a Uint8Array');
+  if (copy.byteLength === 0) return invalid('INVALID_ARGUMENT', 'value', 'must not be empty');
   const max = target.characteristic.maxWriteBytes ?? 0;
-  if (value.byteLength > max) {
+  if (copy.byteLength > max) {
     throw new PluginBleError('PAYLOAD_TOO_LARGE', `Write to "${target.characteristic.key}" exceeds ${max} bytes`, {
       operation: 'write',
-      detail: `${value.byteLength} > ${max} bytes`,
+      detail: `${copy.byteLength} > ${max} bytes`,
     });
   }
-  // Copy so the plugin cannot change the bytes after validation.
-  return { ...target, value: Uint8Array.from(value), withoutResponse };
+  return { ...target, value: copy, withoutResponse };
 }
 
 export function prepareBleSubscribe(
@@ -328,14 +363,20 @@ export function checkBleInboundPayload(
   kind: 'read' | 'notification',
   value: Uint8Array,
 ): Uint8Array {
-  const max = (kind === 'read' ? characteristic.maxReadBytes : characteristic.maxNotificationBytes) ?? 0;
-  if (value.byteLength > max) {
-    throw new PluginBleError('PAYLOAD_TOO_LARGE', `A ${kind} from "${characteristic.key}" exceeds ${max} bytes`, {
+  const copy = copyBleBytes(value);
+  if (!copy) {
+    throw new PluginBleError('INTERNAL', `The transport returned a ${kind} that is not a Uint8Array`, {
       operation: kind,
-      detail: `${value.byteLength} > ${max} bytes`,
     });
   }
-  return Uint8Array.from(value);
+  const max = (kind === 'read' ? characteristic.maxReadBytes : characteristic.maxNotificationBytes) ?? 0;
+  if (copy.byteLength > max) {
+    throw new PluginBleError('PAYLOAD_TOO_LARGE', `A ${kind} from "${characteristic.key}" exceeds ${max} bytes`, {
+      operation: kind,
+      detail: `${copy.byteLength} > ${max} bytes`,
+    });
+  }
+  return copy;
 }
 
 export function resolveBleTimeout(value: unknown, defaultMs: number, maxMs: number, field = 'timeoutMs'): number {
@@ -353,7 +394,13 @@ export function resolveBleSessionOptions(
 ): { leaseMs: number; connectTimeoutMs: number } {
   const cap = profile.limits.maxSessionMs;
   return {
-    leaseMs: resolveBleTimeout(options?.leaseMs, Math.min(PLUGIN_BLE_LIMITS.leaseDefaultMs, cap), cap, 'leaseMs'),
+    // The field name tells the plugin author where the cap comes from.
+    leaseMs: resolveBleTimeout(
+      options?.leaseMs,
+      Math.min(PLUGIN_BLE_LIMITS.leaseDefaultMs, cap),
+      cap,
+      'leaseMs (capped by profile limits.maxSessionMs)',
+    ),
     connectTimeoutMs: resolveBleTimeout(
       options?.connectTimeoutMs,
       PLUGIN_BLE_LIMITS.connectTimeoutDefaultMs,
@@ -417,13 +464,26 @@ export function normalizeBleAdvertisement(raw: PluginBleAdvertisement): PluginBl
     serviceUuids: (raw.serviceUuids ?? []).map((uuid) =>
       normalizeBleUuid(uuid, 'advertisement.serviceUuids', 'INVALID_ARGUMENT'),
     ),
-    manufacturerData: (raw.manufacturerData ?? []).map((entry) => ({
-      companyId: entry.companyId,
-      data: Uint8Array.from(entry.data),
-    })),
+    manufacturerData: (raw.manufacturerData ?? []).map((entry, index) => {
+      const field = `advertisement.manufacturerData[${index}]`;
+      const data = copyBleBytes(entry?.data);
+      // An advertisement carries at most 31 bytes (extended: 255), so 512 is a generous sanity bound.
+      if (!data || data.byteLength > PLUGIN_BLE_LIMITS.payloadMaxBytes) {
+        return invalid('INVALID_ARGUMENT', `${field}.data`, 'must be a Uint8Array of at most 512 bytes');
+      }
+      return { companyId: boundedInteger(entry.companyId, `${field}.companyId`, 0, 0xffff, 'INVALID_ARGUMENT'), data };
+    }),
   };
-  if (raw.rssi !== undefined) result.rssi = raw.rssi;
-  if (raw.name !== undefined) result.name = raw.name;
+  if (raw.rssi !== undefined) {
+    if (typeof raw.rssi !== 'number' || !Number.isFinite(raw.rssi)) {
+      return invalid('INVALID_ARGUMENT', 'advertisement.rssi', 'must be a finite number');
+    }
+    result.rssi = raw.rssi;
+  }
+  if (raw.name !== undefined) {
+    if (typeof raw.name !== 'string') return invalid('INVALID_ARGUMENT', 'advertisement.name', 'must be a string');
+    result.name = raw.name;
+  }
   return result;
 }
 

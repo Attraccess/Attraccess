@@ -62,10 +62,10 @@ describe('plugin BLE through the plugin module', () => {
   let harness: HostBleHarness;
   const moduleRefGet = jest.fn();
 
-  const writePlugin = (name: string) => {
-    mkdirSync(join(fixture.root, name, 'dist'), { recursive: true });
+  const writePlugin = (name: string, directory = name) => {
+    mkdirSync(join(fixture.root, directory, 'dist'), { recursive: true });
     writeFileSync(
-      join(fixture.root, name, 'plugin.json'),
+      join(fixture.root, directory, 'plugin.json'),
       JSON.stringify({
         name,
         version: '1.0.0',
@@ -74,7 +74,7 @@ describe('plugin BLE through the plugin module', () => {
         attraccessVersion: { min: '1.0.0' },
       }),
     );
-    writeFileSync(join(fixture.root, name, 'dist', 'index.js'), pluginSource(name));
+    writeFileSync(join(fixture.root, directory, 'dist', 'index.js'), pluginSource(name));
   };
 
   const bootstrap = () => {
@@ -115,42 +115,49 @@ describe('plugin BLE through the plugin module', () => {
   it.each([
     ['alpha', 'beta'],
     ['beta', 'alpha'],
-  ])('registers profiles before bootstrap and keeps ownership (%s binds first, %s second)', async (first, second) => {
-    writePlugin(first);
-    writePlugin(second);
+  ])(
+    'registers profiles before bootstrap and keeps ownership (%s loads and binds first, %s second)',
+    async (first, second) => {
+      // Plugins load in directory order, so the directory names decide which manifest registers first.
+      writePlugin(second, '2-plugin');
+      writePlugin(first, '1-plugin');
 
-    // Plugins always load in directory order; the roles swap instead: `first` binds the device, `second` tries too.
-    const plugins = loaded(PluginModule.forRoot());
-    const one = required(plugins.find((plugin) => plugin.name === first));
-    const two = required(plugins.find((plugin) => plugin.name === second));
+      const plugins = loaded(PluginModule.forRoot());
+      // The plugin modules come back in the order their register() ran.
+      expect(plugins.map((plugin) => plugin.name)).toEqual([first, second]);
+      const one = required(plugins.find((plugin) => plugin.name === first));
+      const two = required(plugins.find((plugin) => plugin.name === second));
 
-    // Loading registered both profiles without touching a single host singleton.
-    expect(moduleRefGet).not.toHaveBeenCalled();
-    expect(one.registered).toMatchObject({ id: 'shared-profile' });
-    // A provider constructor may register again before any host reference exists; it is idempotent.
-    expect(one.construct()).toBe(one.registered);
+      // Loading registered both profiles without touching a single host singleton.
+      expect(moduleRefGet).not.toHaveBeenCalled();
+      expect(one.registered).toMatchObject({ id: 'shared-profile' });
+      // A provider constructor may register again before any host reference exists; it is idempotent.
+      expect(one.construct()).toBe(one.registered);
 
-    for (const plugin of [one, two]) {
-      let call: Promise<unknown> | undefined;
-      expect(() => (call = plugin.ble.openSession('anything'))).not.toThrow();
-      await expect(call).rejects.toMatchObject({ code: 'NOT_READY', retryable: true });
-      await expect(plugin.ble.listReaders()).rejects.toBeInstanceOf(PluginBleError);
-    }
+      for (const plugin of [one, two]) {
+        let call: Promise<unknown> | undefined;
+        expect(() => (call = plugin.ble.openSession('anything'))).not.toThrow();
+        await expect(call).rejects.toMatchObject({ code: 'NOT_READY', retryable: true });
+        await expect(plugin.ble.listReaders()).rejects.toBeInstanceOf(PluginBleError);
+      }
 
-    bootstrap();
+      bootstrap();
 
-    const created = await one.ble.createEndpoint(input);
-    await expect(two.ble.getEndpoint(created.id)).rejects.toMatchObject({ code: 'ENDPOINT_NOT_FOUND' });
-    await expect(two.ble.openSession(created.id)).rejects.toMatchObject({ code: 'ENDPOINT_NOT_FOUND' });
-    await expect(two.ble.createEndpoint(input)).rejects.toMatchObject({ code: 'ENDPOINT_CONFLICT' });
-    await expect(two.ble.listEndpoints()).resolves.toEqual([]);
-    await expect(one.ble.listEndpoints()).resolves.toHaveLength(1);
+      const created = await one.ble.createEndpoint(input);
+      await expect(two.ble.getEndpoint(created.id)).rejects.toMatchObject({ code: 'ENDPOINT_NOT_FOUND' });
+      await expect(two.ble.openSession(created.id)).rejects.toMatchObject({ code: 'ENDPOINT_NOT_FOUND' });
+      await expect(two.ble.createEndpoint(input)).rejects.toMatchObject({ code: 'ENDPOINT_CONFLICT' });
+      await expect(two.ble.listEndpoints()).resolves.toEqual([]);
+      await expect(one.ble.listEndpoints()).resolves.toHaveLength(1);
 
-    harness.setTransportAvailable(false);
-    await expect(one.ble.openSession(created.id)).rejects.toMatchObject({ code: 'TRANSPORT_UNAVAILABLE' });
-    harness.setTransportAvailable(true);
-    await expect(one.ble.withSession(created.id, (session) => session.read('info'))).resolves.toEqual(Uint8Array.of(1));
-  });
+      harness.setTransportAvailable(false);
+      await expect(one.ble.openSession(created.id)).rejects.toMatchObject({ code: 'TRANSPORT_UNAVAILABLE' });
+      harness.setTransportAvailable(true);
+      await expect(one.ble.withSession(created.id, (session) => session.read('info'))).resolves.toEqual(
+        Uint8Array.of(1),
+      );
+    },
+  );
 
   it('registers the same profiles again in the real app after the temporary configuration app', () => {
     writePlugin('alpha');

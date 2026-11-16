@@ -17,11 +17,11 @@ export interface BleContractSubject {
 
 export type BleContractFactory = (options?: { ready?: boolean }) => Promise<BleContractSubject>;
 
-const SERVICE = 'fff0';
-const ADDRESS = 'aa:bb:cc:dd:ee:01';
-const NORMALIZED = 'AA:BB:CC:DD:EE:01';
+export const SERVICE = 'fff0';
+export const ADDRESS = 'aa:bb:cc:dd:ee:01';
+export const NORMALIZED = 'AA:BB:CC:DD:EE:01';
 
-const PROFILE: PluginBleProfileDefinition = {
+export const PROFILE: PluginBleProfileDefinition = {
   id: 'demo-device',
   advertisement: { serviceUuids: [SERVICE], namePrefix: 'Demo' },
   services: [
@@ -38,12 +38,42 @@ const PROFILE: PluginBleProfileDefinition = {
   limits: { maxSessionMs: 60_000, maxNotificationQueue: 2 },
 };
 
-const bytes = (...values: number[]) => Uint8Array.from(values);
-const capture = <T>(promise: Promise<T>) =>
+export const bytes = (...values: number[]) => Uint8Array.from(values);
+export const capture = <T>(promise: Promise<T>) =>
   promise.then(
     (value) => ({ ok: true as const, value }),
-    (error: { code?: string; retryable?: boolean }) => ({ ok: false as const, error }),
+    (error: { code?: string; retryable?: boolean; message?: string }) => ({ ok: false as const, error }),
   );
+
+/** Readers 1 and 2 (opted in) and 3 (not), the demo device near readers 1 and 2, and plugin A's profile. */
+export async function seedBleContract(host: FakeBleHost, a: PluginBleContext): Promise<void> {
+  await host.addReader({ readerId: 1, name: 'Workshop', allowPluginBle: true });
+  await host.addReader({ readerId: 2, name: 'Office', allowPluginBle: true });
+  await host.addReader({ readerId: 3, name: 'Closed', allowPluginBle: false });
+  host.addPeripheral({
+    readerIds: [1, 2],
+    address: ADDRESS,
+    addressType: 'public',
+    advertisement: { name: 'Demo lock', rssi: -50, serviceUuids: [SERVICE] },
+    characteristics: {
+      fff1: { value: bytes(1, 2, 3) },
+      fff2: {},
+      fff3: {},
+      fff4: { value: bytes(9), delayMs: 20_000 },
+    },
+  });
+  host.addPeripheral({
+    readerId: 1,
+    address: '11:22:33:44:55:66',
+    addressType: 'random',
+    advertisement: { name: 'Other thing', serviceUuids: ['180f'] },
+    characteristics: {},
+  });
+  a.registerProfile(PROFILE);
+}
+
+/** How often each transport primitive appears in the transcript. */
+export const countOps = (host: FakeBleHost, op: string) => host.transcript.filter((entry) => entry.op === op).length;
 
 export function defineBleContractSuite(name: string, create: BleContractFactory): void {
   describe(`plugin BLE contract: ${name}`, () => {
@@ -52,43 +82,18 @@ export function defineBleContractSuite(name: string, create: BleContractFactory)
     let a: PluginBleContext;
     let b: PluginBleContext;
 
-    const seed = async () => {
-      await host.addReader({ readerId: 1, name: 'Workshop', allowPluginBle: true });
-      await host.addReader({ readerId: 2, name: 'Office', allowPluginBle: true });
-      await host.addReader({ readerId: 3, name: 'Closed', allowPluginBle: false });
-      host.addPeripheral({
-        readerIds: [1, 2],
-        address: ADDRESS,
-        addressType: 'public',
-        advertisement: { name: 'Demo lock', rssi: -50, serviceUuids: [SERVICE] },
-        characteristics: {
-          fff1: { value: bytes(1, 2, 3) },
-          fff2: {},
-          fff3: {},
-          fff4: { value: bytes(9), delayMs: 20_000 },
-        },
-      });
-      host.addPeripheral({
-        readerId: 1,
-        address: '11:22:33:44:55:66',
-        addressType: 'random',
-        advertisement: { name: 'Other thing', serviceUuids: ['180f'] },
-        characteristics: {},
-      });
-      a.registerProfile(PROFILE);
-    };
-
     const endpoint = async (ctx = a, readerId = 1) =>
       ctx.createEndpoint({ readerId, address: ADDRESS, addressType: 'public', profileId: PROFILE.id, label: 'Door' });
 
     const ops = () => host.transcript.map((entry) => entry.op);
+    const disconnects = () => countOps(host, 'disconnect');
 
     beforeEach(async () => {
       subject = await create();
       host = subject.host;
       a = host.contextFor('plugin-a');
       b = host.contextFor('plugin-b');
-      await seed();
+      await seedBleContract(host, a);
     });
 
     afterEach(async () => {
@@ -112,11 +117,16 @@ export function defineBleContractSuite(name: string, create: BleContractFactory)
       });
 
       it.each([
-        ['malformed uuid', { services: [{ uuid: 'xyz', characteristics: PROFILE.services[0].characteristics }] }],
-        ['bad profile id', { id: 'Bad Id' }],
-        ['no services', { services: [] }],
+        [
+          'malformed uuid',
+          'services[0].uuid',
+          { services: [{ uuid: 'xyz', characteristics: PROFILE.services[0].characteristics }] },
+        ],
+        ['bad profile id', 'id', { id: 'Bad Id' }],
+        ['no services', 'services', { services: [] }],
         [
           'duplicate key',
+          'services[0].characteristics[1].key',
           {
             services: [
               {
@@ -131,25 +141,67 @@ export function defineBleContractSuite(name: string, create: BleContractFactory)
         ],
         [
           'unknown operation',
+          'services[0].characteristics[0].operations',
           { services: [{ uuid: SERVICE, characteristics: [{ key: 'k', uuid: 'a001', operations: ['erase'] }] }] },
         ],
         [
           'missing bound',
+          'services[0].characteristics[0].maxWriteBytes',
           { services: [{ uuid: SERVICE, characteristics: [{ key: 'k', uuid: 'a001', operations: ['write'] }] }] },
         ],
         [
           'bound above 512',
+          'services[0].characteristics[0].maxReadBytes',
           {
             services: [
               { uuid: SERVICE, characteristics: [{ key: 'k', uuid: 'a001', operations: ['read'], maxReadBytes: 513 }] },
             ],
           },
         ],
-        ['lease above the cap', { limits: { maxSessionMs: 15 * 60_000 + 1 } }],
-        ['queue above the cap', { limits: { maxNotificationQueue: 257 } }],
-      ])('rejects %s with INVALID_PROFILE naming the field', (_label, override) => {
+        [
+          'out-of-range bound for an operation that is not allowed',
+          'services[0].characteristics[0].maxWriteBytes',
+          {
+            services: [
+              {
+                uuid: SERVICE,
+                characteristics: [
+                  { key: 'k', uuid: 'a001', operations: ['read'], maxReadBytes: 4, maxWriteBytes: 513 },
+                ],
+              },
+            ],
+          },
+        ],
+        ['lease above the cap', 'limits.maxSessionMs', { limits: { maxSessionMs: 15 * 60_000 + 1 } }],
+        ['queue above the cap', 'limits.maxNotificationQueue', { limits: { maxNotificationQueue: 257 } }],
+      ])('rejects %s with INVALID_PROFILE naming the field (%s)', (_label, field, override) => {
         const definition = { ...PROFILE, id: 'other', ...override } as unknown as PluginBleProfileDefinition;
-        expect(() => a.registerProfile(definition)).toThrow(expect.objectContaining({ code: 'INVALID_PROFILE' }));
+        expect(() => a.registerProfile(definition)).toThrow(
+          expect.objectContaining({ code: 'INVALID_PROFILE', message: expect.stringContaining(field) }),
+        );
+      });
+
+      it('registers the same profile whatever order operations and advertisement lists come in', () => {
+        const characteristic = (operations: string[]) => ({
+          key: 'k',
+          uuid: 'a001',
+          operations,
+          maxReadBytes: 4,
+          maxWriteBytes: 4,
+          maxNotificationBytes: 4,
+        });
+        const define = (operations: string[], serviceUuids: string[], manufacturerIds: number[]) =>
+          ({
+            id: 'ordered',
+            advertisement: { serviceUuids, manufacturerIds },
+            services: [{ uuid: SERVICE, characteristics: [characteristic(operations)] }],
+          }) as unknown as PluginBleProfileDefinition;
+        const first = a.registerProfile(define(['write', 'notify', 'read'], ['fff0', '180f'], [2, 1]));
+        expect(a.registerProfile(define(['read', 'write', 'notify'], ['180f', 'fff0'], [1, 2]))).toBe(first);
+        expect(first.services[0].characteristics[0].operations).toEqual(['read', 'write', 'notify']);
+        expect(() => a.registerProfile(define(['read', 'write'], ['180f', 'fff0'], [1, 2]))).toThrow(
+          expect.objectContaining({ code: 'PROFILE_CONFLICT' }),
+        );
       });
 
       it('keeps profiles per plugin', async () => {
@@ -408,6 +460,8 @@ export function defineBleContractSuite(name: string, create: BleContractFactory)
         await expect(session.closed).resolves.toEqual({ reason: 'cancelled' });
         await expect(pending).resolves.toMatchObject({ ok: false, error: { code: 'CANCELLED' } });
         await expect(session.read('info')).rejects.toMatchObject({ code: 'SESSION_CLOSED' });
+        expect(disconnects()).toBe(1);
+        expect(host.openSessions()).toEqual([]);
       });
 
       it('cancels a connect through the open signal', async () => {
@@ -462,6 +516,8 @@ export function defineBleContractSuite(name: string, create: BleContractFactory)
         await expect(pending).resolves.toMatchObject({ ok: false, error: { code: 'DISCONNECTED', retryable: true } });
         await expect(session.write('info', bytes(1))).rejects.toMatchObject({ code: 'SESSION_CLOSED' });
         expect(host.openSessions()).toEqual([]);
+        // The link is already gone: the host must not try to disconnect it again.
+        expect(ops()).not.toContain('disconnect');
       });
 
       it('closes when the lease expires', async () => {
@@ -472,10 +528,12 @@ export function defineBleContractSuite(name: string, create: BleContractFactory)
         await host.advance(1);
         await expect(session.closed).resolves.toEqual({ reason: 'lease-expired' });
         await expect(session.read('info')).rejects.toMatchObject({ code: 'SESSION_CLOSED' });
+        expect(disconnects()).toBe(1);
         const long = await a.openSession(created.id, { leaseMs: 60_000 });
         await host.advance(59_999);
         expect(host.openSessions()).toHaveLength(1);
         await long.close();
+        expect(disconnects()).toBe(2);
         await expect(a.openSession(created.id, { leaseMs: 60_001 })).rejects.toMatchObject({
           code: 'INVALID_ARGUMENT',
         });
@@ -489,7 +547,17 @@ export function defineBleContractSuite(name: string, create: BleContractFactory)
         host.notify(ADDRESS, 'fff2', bytes(2));
         host.notify(ADDRESS, 'fff2', bytes(3));
         await expect(stream.next()).rejects.toMatchObject({ code: 'NOTIFICATION_OVERFLOW' });
+        // The stream stays failed, the link subscription is torn down, and later notifications go nowhere.
+        await expect(stream.next()).rejects.toMatchObject({ code: 'NOTIFICATION_OVERFLOW' });
+        expect(ops()).toContain('unsubscribe');
+        host.notify(ADDRESS, 'fff2', bytes(4));
+        await expect(stream.next({ timeoutMs: 100 })).rejects.toMatchObject({ code: 'NOTIFICATION_OVERFLOW' });
         expect(host.openSessions()).toHaveLength(1);
+        await expect(session.read('info')).resolves.toEqual(bytes(1, 2, 3));
+        // The key is free again for a fresh subscription.
+        const again = await session.subscribe('events');
+        host.notify(ADDRESS, 'fff2', bytes(5));
+        expect((await again.next()).value).toEqual(bytes(5));
         await session.close();
       });
 
@@ -550,8 +618,17 @@ export function defineBleContractSuite(name: string, create: BleContractFactory)
       it('runs operations one at a time in call order', async () => {
         const created = await endpoint();
         const session = await a.openSession(created.id);
+        // The slow read answers after 20 s; the writes queued behind it must not reach the transport before.
+        const read = capture(session.read('slow', { timeoutMs: 30_000 }));
         const writes = [bytes(1), bytes(2), bytes(3)].map((value) => session.write('info', value));
+        await host.advance(1);
+        expect(ops()).toEqual(['connect', 'read']);
+        await host.advance(19_998);
+        expect(ops()).toEqual(['connect', 'read']);
+        await host.advance(1);
+        await expect(read).resolves.toEqual({ ok: true, value: bytes(9) });
         await Promise.all(writes);
+        expect(ops()).toEqual(['connect', 'read', 'write', 'write', 'write']);
         const written = host.transcript.filter((entry) => entry.op === 'write').map((entry) => entry.bytes?.[0]);
         expect(written).toEqual([1, 2, 3]);
         await session.close();
@@ -590,18 +667,27 @@ export function defineBleContractSuite(name: string, create: BleContractFactory)
         ).rejects.toThrow('plugin bug');
         expect(host.openSessions()).toEqual([]);
         await expect(captured?.closed).resolves.toEqual({ reason: 'closed' });
+        expect(disconnects()).toBe(2);
+      });
+
+      it('withSession closes with "cancelled" when its signal aborts', async () => {
+        const created = await endpoint();
         const controller = new AbortController();
-        await expect(
-          a.withSession(
-            created.id,
-            async (session) => {
-              const pending = capture(session.read('slow'));
-              controller.abort();
-              return pending;
-            },
-            { signal: controller.signal },
-          ),
-        ).resolves.toMatchObject({ ok: false });
+        let captured: PluginBleSession | undefined;
+        const outcome = await a.withSession(
+          created.id,
+          async (session) => {
+            captured = session;
+            const pending = capture(session.read('slow'));
+            await host.advance(1);
+            controller.abort();
+            return pending;
+          },
+          { signal: controller.signal },
+        );
+        expect(outcome).toMatchObject({ ok: false, error: { code: 'CANCELLED' } });
+        await expect(captured?.closed).resolves.toEqual({ reason: 'cancelled' });
+        expect(ops()).toEqual(['connect', 'read', 'disconnect']);
         expect(host.openSessions()).toEqual([]);
       });
     });
@@ -616,6 +702,8 @@ export function defineBleContractSuite(name: string, create: BleContractFactory)
         await expect(session.closed).resolves.toEqual({ reason });
         await expect(pending).resolves.toMatchObject({ ok: false });
         expect(host.openSessions()).toEqual([]);
+        // Every host-initiated close releases the link.
+        expect(ops()).toEqual(['connect', 'read', 'disconnect']);
         return created;
       };
 
@@ -645,6 +733,7 @@ export function defineBleContractSuite(name: string, create: BleContractFactory)
         const session = await a.openSession(created.id);
         await a.deleteEndpoint(created.id);
         await expect(session.closed).resolves.toEqual({ reason: 'endpoint-deleted' });
+        expect(ops()).toEqual(['connect', 'disconnect']);
       });
 
       it('closes with "endpoint-deleted" when the endpoint moves, but not for a label change', async () => {
@@ -654,14 +743,17 @@ export function defineBleContractSuite(name: string, create: BleContractFactory)
         expect(host.openSessions()).toHaveLength(1);
         await a.updateEndpoint(created.id, { readerId: 2 });
         await expect(session.closed).resolves.toEqual({ reason: 'endpoint-deleted' });
+        expect(ops()).toEqual(['connect', 'disconnect']);
       });
 
       it('removes the plugin’s endpoints on uninstall', async () => {
         const created = await endpoint();
         const session = await a.openSession(created.id);
         await host.uninstallPlugin('plugin-a');
-        await expect(session.closed).resolves.toBeDefined();
+        await expect(session.closed).resolves.toEqual({ reason: 'endpoint-deleted' });
         await expect(a.listEndpoints()).resolves.toEqual([]);
+        expect(ops()).toEqual(['connect', 'disconnect']);
+        expect(host.openSessions()).toEqual([]);
       });
     });
 

@@ -1,11 +1,11 @@
-# Bluetooth transport for plugins
+# Bluetooth Transport for Plugins
 
 <!-- llms-description: Describes the BLE transport contract that backend plugins use to talk to Bluetooth devices through Attractap readers: profiles, endpoints, sessions, errors, limits and testing with the fake. -->
 
 Backend plugins with the `BLE_TRANSPORT` permission can talk to Bluetooth Low Energy (BLE) devices through Attractap readers. The transport is deliberately **not** a raw GATT API: every operation goes through a profile your plugin registered and an endpoint your plugin owns. Core enforces the boundaries; your plugin supplies the vendor semantics.
 
 > [!NOTE]
-> This page defines the contract and ships the SDK types, the permission, endpoint storage, the per-reader opt-in and a deterministic fake for tests. The real reader transport (the websocket protocol and firmware that carry BLE traffic) arrives with ATT-1033. Until then `scan` and `openSession` reject with `TRANSPORT_UNAVAILABLE`, while profiles and endpoints already work and you can test everything against the fake.
+> This page defines the contract and ships the SDK types, the permission, endpoint storage, the per-reader opt-in and a deterministic fake for tests. The real reader transport (the websocket protocol and firmware that carry BLE traffic) arrives with ATT-1033. Until then `scan` and `openSession` reject with `TRANSPORT_UNAVAILABLE`, while profiles and endpoints already work and you can test everything against the fake. Do not retry `TRANSPORT_UNAVAILABLE` in a tight loop: it stays unavailable until a host transport is installed, so back off between attempts.
 
 ## Trust boundary
 
@@ -22,34 +22,40 @@ Enforcement always runs in the host. The validation helpers are exported from th
 Administrators stay in control: a reader is closed to plugins by default. An administrator enables **Allow plugins to use Bluetooth** in the reader editor (General tab). Turning it off ends all plugin BLE sessions on that reader immediately; existing endpoints stay, but scans, new endpoints and sessions fail with `READER_ACCESS_DENIED`.
 
 > [!WARNING]
-> `BLE_TRANSPORT` does not fence off the escape hatches of other permissions. `DATABASE_ACCESS` bypasses ownership because it reads every table, and `RESOLVE_HOST_PROVIDERS` (`context.get`) can reach internal host services. Only install plugins you trust with those permissions, and never use them to read or change the `plugin_ble_endpoint` rows: use `context.ble` instead.
+> `BLE_TRANSPORT` does not fence off the escape hatches of other permissions. `DATABASE_ACCESS` bypasses ownership because it reads every table, and `RESOLVE_HOST_PROVIDERS` (`context.get`) can reach internal host services. Only install plugins you trust with those permissions, and never use them to read or change the `plugin_ble_endpoint` rows: use `context.ble` instead. Never use `context.get` to reach the BLE transport either: that skips every check on this page.
 
 ## Lifecycle
 
 `context.ble` is available when the plugin declares `BLE_TRANSPORT`; without it the getter throws `PluginPermissionError`. The property is optional in the type so a plugin still type-checks against hosts that predate it.
 
 ```ts
-import { PluginPermission, type PluginBackendModule } from '@attraccess/plugins-backend-sdk';
+import type { PluginBackendModule } from '@attraccess/plugins-backend-sdk';
 
 const plugin: PluginBackendModule = {
   register(context) {
-    context.ble?.registerProfile({/* ... */});
+    const ble = context.ble;
+    if (!ble) throw new Error('This plugin needs a host with BLE transport support');
+    ble.registerProfile({/* ... */});
     return { module: MyModule };
   },
 };
 ```
 
+The examples below use this `ble`.
+
 - **`registerProfile` is synchronous.** It needs no host service, so you may call it from `register(context)`, a provider constructor or module scope, in any plugin load order.
 - **Every other method is asynchronous and never throws synchronously.** Called before the host finished bootstrapping, it rejects with `PluginBleError('NOT_READY')` (retryable). It never waits. Call it from a lifecycle hook, a request handler or an event handler, or retry on `NOT_READY`.
 - **The host builds your plugin twice.** At start-up a throwaway configuration app loads your plugin modules and is closed again, then the real application loads them. Your registrations run in both. Registering an identical definition again is idempotent, so this works without any code on your side. Registering a _different_ definition under an existing id throws `PROFILE_CONFLICT` and your plugin fails to load.
 - Profiles are kept in memory per plugin id. Endpoints are stored by core in its database and survive restarts. After a restart an endpoint whose profile your plugin has not registered (yet) can be listed, updated and deleted, but opening a session fails with `PROFILE_NOT_REGISTERED`.
+- **A profile cannot change while the API runs.** Once registered, a profile id keeps its definition until the API restarts (installing or updating plugins restarts it). A plugin that builds a profile from its settings gets `PROFILE_CONFLICT` after a settings change until the next restart.
+- **Profiles have no version.** When a plugin update changes a profile under the same id, existing endpoints are interpreted with the new definition. Use a new profile id for incompatible changes.
 
 ## Profiles
 
 A profile is immutable and lists exactly what your plugin may do with a kind of device.
 
 ```ts
-const profile = context.ble.registerProfile({
+const profile = ble.registerProfile({
   id: 'door-lock', // /^[a-z0-9][a-z0-9-]{0,63}$/, unique per plugin
   advertisement: { serviceUuids: ['fff0'], namePrefix: 'Lock' }, // optional; needed to scan
   services: [
@@ -69,19 +75,20 @@ const profile = context.ble.registerProfile({
 - **UUIDs** may be 16-bit (`"180f"`), 32-bit or 128-bit. They are normalized to lowercase 128-bit with dashes. Malformed or duplicate UUIDs are rejected.
 - **Keys** (`/^[a-zA-Z][a-zA-Z0-9_-]{0,31}$/`) are profile-local names. **Operations always name a characteristic by key, never by UUID.** An unknown key rejects with `UNKNOWN_CHARACTERISTIC`.
 - **Operations** are a non-empty list without duplicates from `read`, `write`, `writeWithoutResponse`, `notify`, `indicate`. Using an operation a key does not allow rejects with `OPERATION_NOT_ALLOWED`.
-- **Bounds** (`maxReadBytes`, `maxWriteBytes`, `maxNotificationBytes`, 1..512) are required for every allowed operation. A write above its bound rejects with `PAYLOAD_TOO_LARGE` **before** anything reaches the reader. A read result or notification above its bound also rejects with `PAYLOAD_TOO_LARGE`.
+- **List order does not matter.** `registerProfile` sorts `operations` and the advertisement filter lists into a canonical order, so registering the same definition with the lists in another order is idempotent.
+- **Bounds** (`maxReadBytes`, `maxWriteBytes`, `maxNotificationBytes`, 1..512) are required for every allowed operation. A bound you set for an operation the key does not allow must still be within 1..512. A write above its bound rejects with `PAYLOAD_TOO_LARGE` **before** anything reaches the reader. A read result above its bound also rejects with `PAYLOAD_TOO_LARGE`; a notification above its bound fails its stream (see [Sessions](#sessions)).
 - **`advertisement`** filters scans: a scan returns only advertisements that match every criterion you set (any listed service UUID, any listed manufacturer id from 0 to 0xffff, and the name prefix). A filter must set at least one of the three, otherwise `INVALID_PROFILE`. A profile without an advertisement filter cannot scan (`OPERATION_NOT_ALLOWED`).
-- **`limits`** set the session lease cap (`maxSessionMs`, 1 ms up to 15 minutes; the default lease is 30 s or `maxSessionMs` if that is lower) and the notification queue up to 256 (`maxNotificationQueue`, default 32). Values above the host caps are rejected with `INVALID_PROFILE`.
+- **`limits`** set the session lease cap (`maxSessionMs`, 1 ms up to 15 minutes, default 30 s; the default lease is 30 s or `maxSessionMs` if that is lower) and the notification queue up to 256 (`maxNotificationQueue`, default 32). Because `maxSessionMs` defaults to 30 s, a `leaseMs` above 30 s needs `limits.maxSessionMs` in the profile. Values above the host caps are rejected with `INVALID_PROFILE`.
 
 The returned profile is deep-frozen. Invalid definitions throw `PluginBleError('INVALID_PROFILE')` with a message that names the field, for example `services[0].characteristics[1].maxReadBytes: is required for the allowed operations`.
 
 ## Readers and scanning
 
 ```ts
-const readers = await context.ble.listReaders();
+const readers = await ble.listReaders();
 // [{ readerId: 3, name: 'Workshop door', available: true }]
 
-const advertisements = await context.ble.scan(readers[0].readerId, 'door-lock', {
+const advertisements = await ble.scan(readers[0].readerId, 'door-lock', {
   durationMs: 5000, // default 5 s, max 15 s
   signal,
 });
@@ -91,12 +98,14 @@ const advertisements = await context.ble.scan(readers[0].readerId, 'door-lock', 
 
 `listReaders` returns only readers an administrator opened for plugins. `available` is false when the host has no transport driver or the reader cannot do BLE right now.
 
+`scan` has a host-side deadline: if the transport does not answer within `durationMs` plus 5 s, it rejects with `TIMEOUT`. Advertisements the reader reports in a malformed form are skipped; they do not fail the scan.
+
 ## Endpoints
 
 An endpoint binds one device address on one reader to one of your profiles. Core stores it, and exactly one plugin owns it.
 
 ```ts
-const endpoint = await context.ble.createEndpoint({
+const endpoint = await ble.createEndpoint({
   readerId: 3,
   address: 'aa:bb:cc:dd:ee:01', // normalized to AA:BB:CC:DD:EE:01
   addressType: 'public',
@@ -105,10 +114,10 @@ const endpoint = await context.ble.createEndpoint({
 });
 // endpoint.id is an opaque UUID: store it in your own records.
 
-await context.ble.listEndpoints(); // your endpoints only
-await context.ble.getEndpoint(endpoint.id);
-await context.ble.updateEndpoint(endpoint.id, { label: null, readerId: 4 }); // profileId is immutable
-await context.ble.deleteEndpoint(endpoint.id);
+await ble.listEndpoints(); // your endpoints only
+await ble.getEndpoint(endpoint.id);
+await ble.updateEndpoint(endpoint.id, { label: null, readerId: 4 }); // profileId is immutable
+await ble.deleteEndpoint(endpoint.id);
 ```
 
 - `profileId` must be registered by **your** plugin, otherwise `PROFILE_NOT_REGISTERED`.
@@ -120,7 +129,7 @@ await context.ble.deleteEndpoint(endpoint.id);
 ## Sessions
 
 ```ts
-const result = await context.ble.withSession(
+const result = await ble.withSession(
   endpoint.id,
   async (session) => {
     const events = await session.subscribe('status');
@@ -135,28 +144,31 @@ const result = await context.ble.withSession(
 
 `openSession(endpointId, { signal, leaseMs, connectTimeoutMs })` returns a session; `withSession` opens one, runs your function and **always closes the session**, also when your function throws or the signal aborts. Prefer it.
 
-| Member                                        | Behaviour                                                                                                                                  |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `id`, `endpointId`                            | Identify the session and its endpoint.                                                                                                     |
-| `read(key, { signal, timeoutMs })`            | Reads a characteristic; resolves with a copy of the bytes.                                                                                 |
-| `write(key, value, { withoutResponse, ... })` | Writes. `withoutResponse` needs the `writeWithoutResponse` operation; otherwise `write` is required. Use it for bulk transfers.            |
-| `subscribe(key, { signal })`                  | Starts notifications (`notify` or `indicate`). Returns a stream with `next({ timeoutMs, signal })`, an async iterator and `unsubscribe()`. |
-| `unsubscribe(key)`                            | Stops a subscription. Unsubscribing without a subscription does nothing.                                                                   |
-| `close()`                                     | Idempotent. Disconnects and ends the session.                                                                                              |
-| `closed`                                      | A promise that resolves (never rejects) with `{ reason }` when the session ended.                                                          |
+| Member                                        | Behaviour                                                                                                                                                                                                                                                           |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`, `endpointId`                            | Identify the session and its endpoint.                                                                                                                                                                                                                              |
+| `read(key, { signal, timeoutMs })`            | Reads a characteristic; resolves with a copy of the bytes.                                                                                                                                                                                                          |
+| `write(key, value, { withoutResponse, ... })` | Writes. An empty value rejects with `INVALID_ARGUMENT`. `withoutResponse` needs the `writeWithoutResponse` operation; otherwise `write` is required, so a key that allows only `writeWithoutResponse` needs `{ withoutResponse: true }`. Use it for bulk transfers. |
+| `subscribe(key, { signal })`                  | Starts notifications (`notify` or `indicate`). Returns a stream with `next({ timeoutMs, signal })`, an async iterator and `unsubscribe()`.                                                                                                                          |
+| `unsubscribe(key)`                            | Stops a subscription. Unsubscribing without a subscription does nothing.                                                                                                                                                                                            |
+| `close()`                                     | Idempotent. Disconnects and ends the session.                                                                                                                                                                                                                       |
+| `closed`                                      | A promise that resolves (never rejects) with `{ reason }` once the session ended and the host finished disconnecting the link.                                                                                                                                      |
 
 Rules:
 
 - **One open session per endpoint.** A second `openSession` rejects with `ENDPOINT_BUSY` (retryable). There is no queue in the contract; serializing access per reader is the transport's job.
 - **Operations run one at a time, in call order.**
-- **Notifications** arrive in order per subscription, only to the owning session, in a bounded queue (default 32, profile maximum 256). When the queue overflows, the host discards the queued notifications and fails the stream at once instead of dropping data silently: every pending and later `next()` rejects with `NOTIFICATION_OVERFLOW`, while the session stays open. Call `session.unsubscribe(key)` and subscribe again to resume. Subscribing to a key that is already subscribed rejects with `INVALID_ARGUMENT`. Consume notifications promptly. The async iterator ends when the stream is unsubscribed or the session closes.
-- **After `close`**, every further operation rejects with `SESSION_CLOSED`. Operations that were pending when the session closed reject once: `DISCONNECTED` if the device disconnected, `CANCELLED` if the open signal aborted, `SESSION_CLOSED` otherwise.
+- **Notifications** arrive in order per subscription, only to the owning session, in a bounded queue (default 32, profile maximum 256). Consume them promptly. Subscribing to a key that is already subscribed rejects with `INVALID_ARGUMENT`.
+- **A failing stream never drops data silently.** When the queue overflows, the host discards the queued notifications and fails the stream at once with `NOTIFICATION_OVERFLOW`. A notification above `maxNotificationBytes` fails the stream the same way with `PAYLOAD_TOO_LARGE`. Every pending and later `next()` then rejects with that code, while the session stays open. Call `session.unsubscribe(key)` and subscribe again to resume.
+- **How a stream ends.** The async iterator ends quietly when the stream is unsubscribed or the session closes normally (`close()`, lease expiry, revocation, shutdown). It throws when the device disconnects (`DISCONNECTED`), on overflow and on an oversized notification. `stream.unsubscribe()`, like breaking out of `for await`, does nothing once the stream has ended or the session is closed. It only ever tears down that stream, never a newer subscription on the same key.
+- **After `close`**, every further operation rejects with `SESSION_CLOSED`. Operations that were pending when the session closed reject immediately, exactly once: `DISCONNECTED` if the device disconnected, `CANCELLED` if the signal passed to `openSession` aborted, `SESSION_CLOSED` otherwise.
+- **`closed` waits for the disconnect.** It resolves once the host has finished disconnecting the link (bounded by a host deadline), so opening a new session right after `closed` resolves does not hit `ENDPOINT_BUSY`. After a connect timeout or a cancelled open, the endpoint stays busy (`ENDPOINT_BUSY`, retryable) until the reader's connect attempt has ended, at most 10 s.
 - **`closed` reasons:** `closed`, `lease-expired`, `cancelled`, `disconnected`, `reader-access-revoked`, `endpoint-deleted`, `shutdown`, `error`.
-- **Cancellation.** Every method accepts an `AbortSignal`. Aborting rejects that pending call with `CANCELLED`. Aborting the signal you passed to `openSession` closes the session. A timed-out or cancelled operation does **not** close the session, unless the transport reports the link lost.
+- **Cancellation.** `scan`, `openSession`, `withSession`, `read`, `write`, `subscribe` and `next` accept an `AbortSignal`. Aborting rejects that pending call with `CANCELLED`. Aborting the signal you passed to `openSession` closes the session. A timed-out or cancelled operation does **not** close the session, unless the transport reports the link lost.
 
 ## Errors
 
-Every failure is a `PluginBleError` with a stable `code`, a `retryable` flag, an optional `operation` and an optional `detail`. `detail` is a safe diagnostic and never contains payload bytes. Permission failures stay `PluginPermissionError`. Input validation errors (`INVALID_PROFILE`, `INVALID_ARGUMENT`) name the offending field in the message.
+Every failure is a `PluginBleError` with a stable `code`, a `retryable` flag, an optional `operation` and an optional `detail`. `detail` is a safe diagnostic and never contains payload bytes. Permission failures stay `PluginPermissionError`. Input validation errors (`INVALID_PROFILE`, `INVALID_ARGUMENT`) name the offending field in the message. `retryable` means a later attempt can succeed, not that you should retry at once: back off between attempts.
 
 | Code                     | Retryable | Meaning                                                                |
 | ------------------------ | --------- | ---------------------------------------------------------------------- |
@@ -189,15 +201,15 @@ Every failure is a `PluginBleError` with a stable `code`, a `retryable` flag, an
 
 ## Limits and caps
 
-| Limit                                | Default | Maximum                                |
-| ------------------------------------ | ------- | -------------------------------------- |
-| Operation timeout (`timeoutMs`)      | 10 s    | 60 s                                   |
-| Connect timeout (`connectTimeoutMs`) | 15 s    | 60 s                                   |
-| Session lease (`leaseMs`)            | 30 s    | profile `maxSessionMs`, at most 15 min |
-| Scan duration (`durationMs`)         | 5 s     | 15 s                                   |
-| Notification queue per subscription  | 32      | 256 (profile `maxNotificationQueue`)   |
-| Payload per characteristic           | -       | 1..512 bytes, set in the profile       |
-| Endpoint label                       | -       | 100 characters                         |
+| Limit                                | Default | Maximum                                               |
+| ------------------------------------ | ------- | ----------------------------------------------------- |
+| Operation timeout (`timeoutMs`)      | 10 s    | 60 s                                                  |
+| Connect timeout (`connectTimeoutMs`) | 15 s    | 60 s                                                  |
+| Session lease (`leaseMs`)            | 30 s    | profile `maxSessionMs` (default 30 s), at most 15 min |
+| Scan duration (`durationMs`)         | 5 s     | 15 s                                                  |
+| Notification queue per subscription  | 32      | 256 (profile `maxNotificationQueue`)                  |
+| Payload per characteristic           | -       | 1..512 bytes, set in the profile                      |
+| Endpoint label                       | -       | 100 characters                                        |
 
 Values above a cap are rejected with `INVALID_ARGUMENT` (or `INVALID_PROFILE` in a profile); they are never silently clamped. The constants are exported as `PLUGIN_BLE_LIMITS`.
 
@@ -216,7 +228,7 @@ The host cleans up for you:
 | Event                                                                                                          | What happens                                                            |
 | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | Your plugin module is destroyed                                                                                | Its sessions close with `shutdown`. Endpoints stay.                     |
-| An administrator turns the reader off                                                                          | Its sessions close with `reader-access-revoked`. Endpoints stay.        |
+| An administrator turns off **Allow plugins to use Bluetooth** on the reader                                    | Its sessions close with `reader-access-revoked`. Endpoints stay.        |
 | A reader is deleted                                                                                            | Sessions close with `reader-access-revoked`; its endpoints are deleted. |
 | An endpoint is deleted, or its reader, address or address type changes (a label-only update keeps the session) | Its session closes with `endpoint-deleted`.                             |
 | A lease expires                                                                                                | The session closes with `lease-expired`.                                |
@@ -293,6 +305,9 @@ Control surface of the fake host:
 | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `contextFor(pluginId)`                              | A `PluginBleContext` for one plugin.                                                                                                                                                      |
 | `addReader(reader)`, `setReaderAccess(id, allowed)` | Readers (`readerId`, `name`, `allowPluginBle?`, `available?`) and the administrator opt-in (default off).                                                                                 |
+| `removeReader(id)`                                  | Deletes a reader: sessions close with `reader-access-revoked`, its endpoints are deleted.                                                                                                 |
+| `setReaderAvailable(id, available)`                 | `false`: scans and sessions on the reader fail with `READER_OFFLINE`.                                                                                                                     |
+| `setTransportAvailable(available)`                  | `false`: a host without a transport (`TRANSPORT_UNAVAILABLE`).                                                                                                                            |
 | `addPeripheral(peripheral)`                         | A device: `readerId` or `readerIds`, `address`, `addressType`, `advertisement`, `characteristics`. Characteristics are keyed by UUID and take `value`, `onRead`, `onWrite` and `delayMs`. |
 | `notify(address, uuid, bytes)`                      | The device sends a notification.                                                                                                                                                          |
 | `disconnect(address)`                               | The device drops the link: sessions close with `disconnected`.                                                                                                                            |
@@ -300,6 +315,9 @@ Control surface of the fake host:
 | `advance(ms)`                                       | Moves the manual clock: fires timeouts and lease expiry. No real timers are used.                                                                                                         |
 | `transcript`, `openSessions()`                      | Every validated primitive that reached the transport, in order, and the open sessions.                                                                                                    |
 | `createFakeBleHost({ ready })`, `setReady(ready)`   | Simulate calls before bootstrap (`NOT_READY`).                                                                                                                                            |
+| `createFakeBleHost({ startTime })`                  | Wall-clock start of the fake clock in ms (default 2026-01-01T00:00:00Z).                                                                                                                  |
+| `shutdownPlugin(pluginId)`                          | The plugin module is destroyed: its sessions close with `shutdown`.                                                                                                                       |
+| `uninstallPlugin(pluginId)`                         | The plugin is uninstalled: its sessions close, its endpoints are deleted.                                                                                                                 |
 
 To test a timeout, give a characteristic a `delayMs` longer than the timeout, start the call, then `await host.advance(timeoutMs)`.
 

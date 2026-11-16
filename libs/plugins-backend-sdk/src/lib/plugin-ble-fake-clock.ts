@@ -37,6 +37,6 @@ export class FakeBleClock {
   }
 }
 
-export async function flushMicrotasks(rounds = 25): Promise<void> {
+export async function flushMicrotasks(rounds = 100): Promise<void> {
   for (let index = 0; index < rounds; index++) await Promise.resolve();
 }

@@ -29,6 +29,7 @@ import {
   useAttractapServiceGetReaderById,
   useAttractapServiceGetReadersKey,
   useAttractapServiceUpdateReader,
+  UseAttractapServiceGetReaderByIdKeyFn,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { ReaderSecurity } from '../pairing/ReaderSecurity';
@@ -62,8 +63,11 @@ export function AttractapEditor(props: Readonly<Props>) {
   const [connectedResourceIds, setConnectedResourceIds] = useState<number[]>([]);
   const [selectedTab, setSelectedTab] = useState<'general' | 'resources' | 'readerUi' | 'security'>('general');
   const updateReaderMutation = useAttractapServiceUpdateReader({
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: [useAttractapServiceGetReadersKey] });
+      queryClient.invalidateQueries({
+        queryKey: UseAttractapServiceGetReaderByIdKeyFn({ readerId: variables.readerId }),
+      });
       toast.success({
         title: t('readerUpdated'),
         description: t('readerUpdatedDescription'),
@@ -90,16 +94,19 @@ export function AttractapEditor(props: Readonly<Props>) {
       return;
     }
 
+    // Only send the opt-in when the administrator changed it, so a save with a stale or not yet loaded value
+    // can never switch plugin Bluetooth access off as a side effect (for example on a rename).
+    const allowPluginBleChanged = reader !== undefined && allowPluginBle !== (reader.allowPluginBle ?? false);
     updateReaderMutation.mutate({
       readerId: props.readerId,
       requestBody: {
         name,
         connectedResourceIds,
         ledBrightness,
-        allowPluginBle,
+        ...(allowPluginBleChanged ? { allowPluginBle } : {}),
       },
     });
-  }, [name, connectedResourceIds, ledBrightness, allowPluginBle, props, updateReaderMutation]);
+  }, [name, connectedResourceIds, ledBrightness, allowPluginBle, reader, props, updateReaderMutation]);
 
   const onSubmit = useCallback(
     async (e: React.FormEvent) => {

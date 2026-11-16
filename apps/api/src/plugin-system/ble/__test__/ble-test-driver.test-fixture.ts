@@ -44,8 +44,15 @@ export class ManualClock {
   }
 }
 
-export async function flush(rounds = 40): Promise<void> {
+export async function flush(rounds = 100): Promise<void> {
   for (let index = 0; index < rounds; index++) await Promise.resolve();
+}
+
+interface LinkState {
+  readerId: number;
+  address: string;
+  subscribers: Map<string, (b: Uint8Array) => void>;
+  lost: Array<() => void>;
 }
 
 interface Peripheral {
@@ -64,12 +71,30 @@ export class BleTestDriver implements BleTransportDriver {
   readonly available = new Map<number, boolean>();
   private readonly peripherals = new Map<string, Peripheral>();
   private readonly failures = new Map<FakeBleOperation, PluginBleError[]>();
-  private readonly links = new Map<
-    string,
-    { subscribers: Map<string, (b: Uint8Array) => void>; lost: Array<() => void> }
-  >();
+  private readonly syncFailures = new Map<FakeBleOperation, Error[]>();
+  /** Every live link, one per connect, so two sessions to one address (through two readers) stay apart. */
+  private readonly links = new Set<LinkState>();
+  /** How long `connect` takes, in fake time. */
+  connectDelayMs = 0;
+  /** `false` simulates a transport that ignores the abort signal, so its link arrives after the host gave up. */
+  connectHonoursAbort = true;
 
   constructor(private readonly clock: ManualClock) {}
+
+  /** Makes the next call of `op` throw synchronously (not reject), like a careless driver would. */
+  throwSyncNext(
+    op: FakeBleOperation,
+    error: Error = new PluginBleError('GATT_ERROR', `Injected sync ${op} throw`),
+  ): void {
+    const queue = this.syncFailures.get(op) ?? [];
+    queue.push(error);
+    this.syncFailures.set(op, queue);
+  }
+
+  private throwIfSyncFailure(op: FakeBleOperation): void {
+    const failure = this.syncFailures.get(op)?.shift();
+    if (failure) throw failure;
+  }
 
   addPeripheral(peripheral: FakeBlePeripheral): void {
     const characteristics = new Map<string, FakeBleCharacteristic>();
@@ -90,14 +115,28 @@ export class BleTestDriver implements BleTransportDriver {
     this.failures.set(op, queue);
   }
 
+  /** Delivers to every live link to the address, whichever reader it runs through. */
   notify(address: string, uuid: string, bytes: Uint8Array): void {
-    this.links.get(normalizeBleAddress(address))?.subscribers.get(normalizeBleUuid(uuid))?.(Uint8Array.from(bytes));
+    const normalized = normalizeBleAddress(address);
+    const characteristicUuid = normalizeBleUuid(uuid);
+    for (const link of [...this.links]) {
+      if (link.address === normalized) link.subscribers.get(characteristicUuid)?.(Uint8Array.from(bytes));
+    }
   }
 
-  dropLink(address: string): void {
-    const link = this.links.get(normalizeBleAddress(address));
-    this.links.delete(normalizeBleAddress(address));
-    link?.lost.forEach((listener) => listener());
+  /** The peripheral drops every link to it (or only the one through `readerId`). */
+  dropLink(address: string, readerId?: number): void {
+    const normalized = normalizeBleAddress(address);
+    for (const link of [...this.links]) {
+      if (link.address !== normalized || (readerId !== undefined && link.readerId !== readerId)) continue;
+      this.links.delete(link);
+      link.lost.forEach((listener) => listener());
+    }
+  }
+
+  /** Number of links the driver still holds (a leaked link stays counted). */
+  get liveLinks(): number {
+    return this.links.size;
   }
 
   isReaderAvailable(readerId: number): boolean {
@@ -134,15 +173,23 @@ export class BleTestDriver implements BleTransportDriver {
       }));
   }
 
-  async connect(request: Parameters<BleTransportDriver['connect']>[0]): Promise<BleDriverLink> {
-    const { readerId, address, addressType } = request;
+  connect(request: Parameters<BleTransportDriver['connect']>[0]): Promise<BleDriverLink> {
+    this.throwIfSyncFailure('connect');
+    return this.connectAsync(request);
+  }
+
+  private async connectAsync(request: Parameters<BleTransportDriver['connect']>[0]): Promise<BleDriverLink> {
+    const { readerId, address, addressType, signal } = request;
     this.record({ op: 'connect', readerId, address, addressType });
     const peripheral = this.peripherals.get(address);
     if (!peripheral || !peripheral.readerIds.has(readerId)) {
       throw new PluginBleError('DEVICE_NOT_FOUND', 'The device was not found near the reader');
     }
-    const state = { subscribers: new Map<string, (b: Uint8Array) => void>(), lost: [] as Array<() => void> };
-    this.links.set(address, state);
+    if (this.connectDelayMs > 0) {
+      await this.sleep(this.connectDelayMs, this.connectHonoursAbort ? signal : new AbortController().signal);
+    }
+    const state: LinkState = { readerId, address, subscribers: new Map(), lost: [] };
+    this.links.add(state);
     const characteristic = (uuid: string) => {
       const found = peripheral.characteristics.get(uuid);
       if (!found) throw new PluginBleError('GATT_ERROR', 'Characteristic not found on the device');
@@ -151,7 +198,7 @@ export class BleTestDriver implements BleTransportDriver {
     const delayed = async (spec: FakeBleCharacteristic, signal: AbortSignal) => {
       if (spec.delayMs) await this.sleep(spec.delayMs, signal);
     };
-    return {
+    const link: BleDriverLink = {
       read: async ({ serviceUuid, characteristicUuid, signal }) => {
         this.record({ op: 'read', readerId, address, serviceUuid, characteristicUuid });
         const spec = characteristic(characteristicUuid);
@@ -175,10 +222,28 @@ export class BleTestDriver implements BleTransportDriver {
         state.subscribers.delete(characteristicUuid);
       },
       disconnect: async () => {
-        this.links.delete(address);
+        this.links.delete(state);
         this.record({ op: 'disconnect', readerId, address });
       },
-      onDisconnected: (listener) => state.lost.push(listener),
+      onDisconnected: (listener) => void state.lost.push(listener),
+    };
+    // Each call can be made to throw synchronously before its async body runs.
+    const guard =
+      <A, R>(op: FakeBleOperation, call: (request: A) => Promise<R>) =>
+      (request: A): Promise<R> => {
+        this.throwIfSyncFailure(op);
+        return call(request);
+      };
+    return {
+      ...link,
+      read: guard('read', link.read),
+      write: guard('write', link.write),
+      subscribe: guard('subscribe', link.subscribe),
+      unsubscribe: guard('unsubscribe', link.unsubscribe),
+      disconnect: () => {
+        this.throwIfSyncFailure('disconnect');
+        return link.disconnect();
+      },
     };
   }
 }

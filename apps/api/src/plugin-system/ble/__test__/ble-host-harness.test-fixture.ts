@@ -106,20 +106,13 @@ export async function createHostBleHarness(
     shutdownPlugin: (pluginId) => service.closePluginSessions(pluginId, 'shutdown'),
     uninstallPlugin: (pluginId) => service.deleteAllForPlugin(pluginId),
     openSessions: (): FakeBleOpenSession[] =>
-      [...(service as unknown as { sessions: Map<string, never> }).sessions.values()].map(
-        (entry: {
-          session: { id: string; endpointId: string };
-          pluginId: string;
-          readerId: number;
-          address: string;
-        }) => ({
-          id: entry.session.id,
-          pluginId: entry.pluginId,
-          endpointId: entry.session.endpointId,
-          readerId: entry.readerId,
-          address: entry.address,
-        }),
-      ),
+      service.listOpenSessions().map(({ sessionId, pluginId, endpointId, readerId, address }) => ({
+        id: sessionId,
+        pluginId,
+        endpointId,
+        readerId,
+        address,
+      })),
   };
   return host;
 }

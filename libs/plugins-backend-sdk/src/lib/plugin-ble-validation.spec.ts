@@ -141,6 +141,10 @@ describe('profile normalization', () => {
     ['bound zero', tweak((p) => (p.services[0].characteristics[0].maxReadBytes = 0))],
     ['bound fraction', tweak((p) => (p.services[0].characteristics[0].maxReadBytes = 1.5))],
     ['bound above 512', tweak((p) => (p.services[0].characteristics[0].maxReadBytes = 513))],
+    // 'evt' only indicates: a read bound is not needed there, but one that is given must still be in range.
+    ['disallowed-op bound above 512', tweak((p) => (p.services[0].characteristics[1].maxReadBytes = 513))],
+    ['disallowed-op bound zero', tweak((p) => (p.services[0].characteristics[1].maxWriteBytes = 0))],
+    ['disallowed-op bound not a number', tweak((p) => (p.services[0].characteristics[1].maxReadBytes = '4'))],
     ['advertisement not object', tweak((p) => (p.advertisement = 'x'))],
     ['advertisement empty', tweak((p) => (p.advertisement = {}))],
     ['advertisement uuids not array', tweak((p) => (p.advertisement.serviceUuids = 'fff0'))],
@@ -153,6 +157,46 @@ describe('profile normalization', () => {
     ['session limit too high', tweak((p) => (p.limits = { maxSessionMs: PLUGIN_BLE_LIMITS.leaseMaxMs + 1 }))],
     ['queue limit too high', tweak((p) => (p.limits = { maxNotificationQueue: 257 }))],
   ])('rejects %s with INVALID_PROFILE', (_name, build) => expect(code(build)).toBe('INVALID_PROFILE'));
+
+  it('drops an in-range bound for an operation that is not allowed', () => {
+    const copy = JSON.parse(JSON.stringify(base));
+    copy.services[0].characteristics[1].maxReadBytes = 8;
+    const normalized = normalizeBleProfile(copy);
+    expect(normalized.services[0].characteristics[1]).not.toHaveProperty('maxReadBytes');
+    expect(bleProfilesEqual(normalized, profile)).toBe(true);
+  });
+
+  it('normalizes operations, service UUIDs and manufacturer ids into one canonical order', () => {
+    const define = (operations: string[], serviceUuids: string[], manufacturerIds: number[]) =>
+      normalizeBleProfile({
+        id: 'ordered',
+        advertisement: { serviceUuids, manufacturerIds },
+        services: [
+          {
+            uuid: 'fff0',
+            characteristics: [
+              { key: 'k', uuid: 'fff1', operations, maxReadBytes: 4, maxWriteBytes: 4, maxNotificationBytes: 4 },
+            ],
+          },
+        ],
+      } as never);
+    const one = define(['indicate', 'write', 'read', 'writeWithoutResponse', 'notify'], ['fff0', '180f'], [9, 1, 5]);
+    const two = define(['read', 'notify', 'writeWithoutResponse', 'indicate', 'write'], ['180f', 'fff0'], [5, 9, 1]);
+    expect(one.services[0].characteristics[0].operations).toEqual([
+      'read',
+      'write',
+      'writeWithoutResponse',
+      'notify',
+      'indicate',
+    ]);
+    expect(one.advertisement?.serviceUuids).toEqual([
+      '0000180f-0000-1000-8000-00805f9b34fb',
+      '0000fff0-0000-1000-8000-00805f9b34fb',
+    ]);
+    expect(one.advertisement?.manufacturerIds).toEqual([1, 5, 9]);
+    expect(bleProfilesEqual(one, two)).toBe(true);
+    expect(bleProfilesEqual(one, define(['read', 'write'], ['180f', 'fff0'], [5, 9, 1]))).toBe(false);
+  });
 
   it('accepts a profile with the maximum caps and without an advertisement filter', () => {
     const open = normalizeBleProfile({
@@ -186,6 +230,70 @@ describe('operation checks', () => {
     expect(prepared.value).toEqual(Uint8Array.of(1, 2));
     expect(prepared.withoutResponse).toBe(true);
     expect(prepareBleWrite(profile, 'cmd', Buffer.from([1])).value).toEqual(Uint8Array.of(1));
+  });
+
+  describe('judges bytes by their internal slots, never by overridable properties', () => {
+    const bulk = normalizeBleProfile({
+      id: 'bulk',
+      services: [
+        {
+          uuid: 'fff0',
+          characteristics: [
+            { key: 'data', uuid: 'fff1', operations: ['write', 'read'], maxWriteBytes: 20, maxReadBytes: 20 },
+          ],
+        },
+      ],
+    });
+    const data = bulk.services[0].characteristics[0];
+    class LyingBytes extends Uint8Array {}
+    Object.defineProperty(LyingBytes.prototype, 'byteLength', { get: () => 1 });
+    Object.defineProperty(LyingBytes.prototype, 'length', { get: () => 1 });
+
+    it('bounds a subclass with a lying byteLength on its real 100 bytes', () => {
+      const lying = new LyingBytes(100);
+      expect(lying.byteLength).toBe(1);
+      expect(code(() => prepareBleWrite(bulk, 'data', lying))).toBe('PAYLOAD_TOO_LARGE');
+      expect(code(() => checkBleInboundPayload(data, 'read', lying))).toBe('PAYLOAD_TOO_LARGE');
+      const small = prepareBleWrite(bulk, 'data', new LyingBytes([1, 2, 3])).value;
+      expect(small).toEqual(Uint8Array.of(1, 2, 3));
+      expect(small.byteLength).toBe(3);
+      expect(Object.getPrototypeOf(small)).toBe(Uint8Array.prototype);
+    });
+
+    it('ignores an overridden iterator when copying', () => {
+      const tricky = Uint8Array.of(1, 2);
+      Object.defineProperty(tricky, Symbol.iterator, {
+        value: function* () {
+          yield* [7, 7, 7, 7];
+        },
+      });
+      expect(prepareBleWrite(bulk, 'data', tricky).value).toEqual(Uint8Array.of(1, 2));
+    });
+
+    it.each([
+      ['a Proxy over a big Uint8Array', new Proxy(new Uint8Array(100), {})],
+      ['a Proxy over a small Uint8Array', new Proxy(Uint8Array.of(1), {})],
+      ['a plain object tagged Uint8Array', { [Symbol.toStringTag]: 'Uint8Array', byteLength: 1, length: 1, 0: 1 }],
+      ['an object inheriting from Uint8Array.prototype', Object.create(Uint8Array.prototype)],
+      ['another typed array', Uint16Array.of(1)],
+      ['a DataView', new DataView(new ArrayBuffer(1))],
+      ['an ArrayBuffer', new ArrayBuffer(1)],
+      ['a number array', [1, 2]],
+    ])('rejects %s with INVALID_ARGUMENT', (_label, value) => {
+      expect(code(() => prepareBleWrite(bulk, 'data', value))).toBe('INVALID_ARGUMENT');
+      expect(code(() => checkBleInboundPayload(data, 'read', value as Uint8Array))).toBe('INTERNAL');
+    });
+
+    it('takes a private copy, so later changes to the caller’s buffer do not travel', () => {
+      const source = Uint8Array.of(1, 2, 3);
+      const prepared = prepareBleWrite(bulk, 'data', source);
+      source.fill(9);
+      expect(prepared.value).toEqual(Uint8Array.of(1, 2, 3));
+      expect(prepared.value.buffer).not.toBe(source.buffer);
+      const shared = new Uint8Array(new ArrayBuffer(8), 2, 3);
+      shared.set([4, 5, 6]);
+      expect(prepareBleWrite(bulk, 'data', shared).value).toEqual(Uint8Array.of(4, 5, 6));
+    });
   });
 
   it('prefers notify over indicate and falls back to indicate', () => {

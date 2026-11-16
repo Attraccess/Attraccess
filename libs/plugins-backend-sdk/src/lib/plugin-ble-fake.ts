@@ -11,7 +11,7 @@ import {
   PluginBleSession,
 } from './plugin-ble';
 import { FakeBleClock } from './plugin-ble-fake-clock';
-import { FakeSession, FakeSessionLink } from './plugin-ble-fake-session';
+import { BleSessionEngine, BleSessionLink } from './plugin-ble-session-engine';
 import {
   bleProfilesEqual,
   matchesBleAdvertisement,
@@ -128,7 +128,7 @@ interface StoredEndpoint extends PluginBleEndpoint {
 }
 
 interface SessionEntry {
-  session: FakeSession;
+  session: BleSessionEngine;
   pluginId: string;
   endpoint: StoredEndpoint;
 }
@@ -167,7 +167,8 @@ export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost
   const profiles = new Map<string, Map<string, PluginBleProfile>>();
   const endpoints = new Map<string, StoredEndpoint>();
   const sessions = new Map<string, SessionEntry>();
-  const links = new Map<string, Map<string, (bytes: Uint8Array) => void>>();
+  // Per address, the notification routes of every link to it (one per session, also across readers).
+  const links = new Map<string, Set<Map<string, (bytes: Uint8Array) => void>>>();
   const failures = new Map<FakeBleOperation, PluginBleError[]>();
   let ready = options.ready ?? true;
   let transportAvailable = true;
@@ -209,11 +210,13 @@ export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost
     if (!reader.available) throw new PluginBleError('READER_OFFLINE', `Reader ${readerId} cannot do BLE right now`);
   };
 
-  const createLink = (readerId: number, address: string): FakeSessionLink => {
+  const createLink = (readerId: number, address: string): BleSessionLink => {
     const peripheral = peripherals.get(address);
     if (!peripheral) throw new PluginBleError('DEVICE_NOT_FOUND', 'The device was not found near the reader');
     const subscribers = new Map<string, (bytes: Uint8Array) => void>();
-    links.set(address, subscribers);
+    const routes = links.get(address) ?? new Set();
+    routes.add(subscribers);
+    links.set(address, routes);
     const characteristic = (uuid: string) => {
       const found = peripheral.characteristics.get(uuid);
       if (!found)
@@ -247,7 +250,7 @@ export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost
         subscribers.delete(characteristicUuid);
       },
       async disconnect() {
-        links.delete(address);
+        links.get(address)?.delete(subscribers);
         record({ op: 'disconnect', readerId, address });
       },
     };
@@ -304,7 +307,7 @@ export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost
       if (sessions.has(endpoint.id)) {
         throw new PluginBleError('ENDPOINT_BUSY', 'The endpoint already has an open session', { detail: endpoint.id });
       }
-      const session = new FakeSession({
+      const session: BleSessionEngine = new BleSessionEngine({
         id: randomUUID(),
         endpointId: endpoint.id,
         profile,
@@ -327,9 +330,10 @@ export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost
           return createLink(endpoint.readerId, endpoint.address);
         },
       });
-      sessions.set(endpoint.id, { session, pluginId, endpoint });
+      // A snapshot: the session stays bound to the reader and address it was opened on.
+      sessions.set(endpoint.id, { session, pluginId, endpoint: { ...endpoint } });
       await session.open({ signal: sessionOptions?.signal, ...resolved });
-      return session;
+      return session.handle;
     });
 
   const host: FakeBleHost = {
@@ -422,15 +426,16 @@ export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost
               readerId !== endpoint.readerId ||
               address !== endpoint.address ||
               (changes.addressType ?? endpoint.addressType) !== endpoint.addressType;
-            if (moved) await closeWhere((entry) => entry.endpoint.id === endpoint.id, 'endpoint-deleted');
+            // Changed first, then closed, like the host: an open racing this sees the new endpoint.
             Object.assign(endpoint, changes, { updatedAt: new Date(clock.now()) });
+            if (moved) await closeWhere((entry) => entry.endpoint.id === endpoint.id, 'endpoint-deleted');
             return copyEndpoint(endpoint);
           }),
         deleteEndpoint: (id) =>
           guard(async () => {
             const endpoint = findEndpoint(pluginId, id);
-            await closeWhere((entry) => entry.endpoint.id === endpoint.id, 'endpoint-deleted');
             endpoints.delete(endpoint.id);
+            await closeWhere((entry) => entry.endpoint.id === endpoint.id, 'endpoint-deleted');
           }),
         openSession: (endpointId, sessionOptions) => openSession(pluginId, endpointId, sessionOptions),
         async withSession(endpointId, fn, sessionOptions) {
@@ -486,9 +491,10 @@ export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost
       });
     },
     notify(address, uuid, bytes) {
-      links.get(normalizeBleAddress(address))?.get(normalizeBleUuid(uuid, 'uuid', 'INVALID_ARGUMENT'))?.(
-        Uint8Array.from(bytes),
-      );
+      const characteristicUuid = normalizeBleUuid(uuid, 'uuid', 'INVALID_ARGUMENT');
+      for (const routes of [...(links.get(normalizeBleAddress(address)) ?? [])]) {
+        routes.get(characteristicUuid)?.(Uint8Array.from(bytes));
+      }
     },
     disconnect: (address) => {
       const normalized = normalizeBleAddress(address);

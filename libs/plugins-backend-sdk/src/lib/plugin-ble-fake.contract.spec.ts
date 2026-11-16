@@ -1,7 +1,11 @@
 import { createFakeBleHost } from './plugin-ble-fake';
-import { defineBleContractSuite } from './plugin-ble-contract.test-cases';
+import { defineBleContractSessionSuite } from './plugin-ble-contract-sessions.test-cases';
+import { defineBleContractSuite, type BleContractFactory } from './plugin-ble-contract.test-cases';
 
-defineBleContractSuite('SDK fake transport', async (options) => ({
+const fake: BleContractFactory = async (options) => ({
   host: createFakeBleHost(options),
   dispose: async () => undefined,
-}));
+});
+
+defineBleContractSuite('SDK fake transport', fake);
+defineBleContractSessionSuite('SDK fake transport', fake);

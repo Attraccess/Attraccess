@@ -13,6 +13,7 @@ vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQue
 vi.mock('@attraccess/react-query-client', () => ({
   useAttractapServiceGetReaderById: () => ({ data: state.reader }),
   useAttractapServiceGetReadersKey: 'readers',
+  UseAttractapServiceGetReaderByIdKeyFn: () => ['reader'],
   useAttractapServiceUpdateReader: () => ({ mutate: state.mutate, isPending: false }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
@@ -92,5 +93,16 @@ describe('AttractapEditor plugin Bluetooth opt-in', () => {
       readerId: 1,
       requestBody: expect.objectContaining({ name: 'Door', allowPluginBle: true }),
     });
+  });
+
+  it('does not send the opt-in on a name-only save', () => {
+    state.reader = reader(true);
+    render(<AttractapEditor readerId={1} isOpen onSave={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText('enterReaderName'), { target: { value: 'Front door' } });
+    fireEvent.click(screen.getByRole('button', { name: 'save' }));
+    expect(state.mutate).toHaveBeenCalledTimes(1);
+    const [{ requestBody }] = state.mutate.mock.calls[0];
+    expect(requestBody).toEqual(expect.objectContaining({ name: 'Front door' }));
+    expect(requestBody).not.toHaveProperty('allowPluginBle');
   });
 });

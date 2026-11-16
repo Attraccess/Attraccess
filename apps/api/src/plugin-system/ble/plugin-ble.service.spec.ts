@@ -1,6 +1,6 @@
 import { Attractap } from '@attraccess/database-entities';
 import { PluginBleError, type PluginBleContext } from '@attraccess/plugins-backend-sdk';
-import { ReaderUpdatedEvent } from '../../attractap/events';
+import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../../attractap/events';
 import { createHostBleHarness, type HostBleHarness } from './__test__/ble-host-harness.test-fixture';
 import { BleTestDriver } from './__test__/ble-test-driver.test-fixture';
 import { createPluginBleContext } from './plugin-ble-context';
@@ -19,6 +19,7 @@ const PROFILE = {
   ],
 };
 const ADDRESS = 'AA:BB:CC:DD:EE:01';
+const silent = { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() };
 
 describe('PluginBleService (host details)', () => {
   let harness: HostBleHarness;
@@ -77,8 +78,81 @@ describe('PluginBleService (host details)', () => {
     expect(harness.openSessions()).toHaveLength(1);
     await harness.service.onReaderUpdated(new ReaderUpdatedEvent({ id: 2, allowPluginBle: false } as Attractap));
     expect(harness.openSessions()).toHaveLength(1);
+    // The event bus is shared with plugins: a forged event cannot revoke while the database still says yes.
     await harness.service.onReaderUpdated(new ReaderUpdatedEvent({ id: 1, allowPluginBle: false } as Attractap));
+    expect(harness.openSessions()).toHaveLength(1);
+    await harness.service.onReaderDeleted(new ReaderDeletedEvent(1));
+    expect(harness.openSessions()).toHaveLength(1);
+    await harness.setReaderAccess(1, false);
     await expect(session.closed).resolves.toEqual({ reason: 'reader-access-revoked' });
+  });
+
+  it('fails an open that was in flight when the reader was turned off', async () => {
+    const created = await endpoint();
+    let release!: (available: boolean) => void;
+    jest
+      .spyOn(harness.driver, 'isReaderAvailable')
+      .mockImplementationOnce(() => new Promise<boolean>((resolve) => (release = resolve)) as never);
+    const opening = ble.openSession(created.id).catch((error: PluginBleError) => error);
+    while (!release) await new Promise((resolve) => setImmediate(resolve));
+    await harness.setReaderAccess(1, false);
+    release(true);
+    await expect(opening).resolves.toMatchObject({ code: 'READER_ACCESS_DENIED' });
+    expect(harness.openSessions()).toHaveLength(0);
+    expect(harness.transcript.map((entry) => entry.op)).not.toContain('connect');
+  });
+
+  it('fails an open that was in flight when its endpoint was deleted', async () => {
+    const created = await endpoint();
+    let release!: (available: boolean) => void;
+    jest
+      .spyOn(harness.driver, 'isReaderAvailable')
+      .mockImplementationOnce(() => new Promise<boolean>((resolve) => (release = resolve)) as never);
+    const opening = ble.openSession(created.id).catch((error: PluginBleError) => error);
+    while (!release) await new Promise((resolve) => setImmediate(resolve));
+    await ble.deleteEndpoint(created.id);
+    release(true);
+    await expect(opening).resolves.toMatchObject({ code: 'ENDPOINT_NOT_FOUND' });
+    expect(harness.transcript.map((entry) => entry.op)).not.toContain('connect');
+  });
+
+  it('rejects a scan with TIMEOUT when the transport does not answer in time', async () => {
+    let started = false;
+    const waitForScan = async () => {
+      while (!started) await new Promise((resolve) => setImmediate(resolve));
+    };
+    jest.spyOn(harness.driver, 'scan').mockImplementationOnce(() => {
+      started = true;
+      return new Promise(() => undefined);
+    });
+    const scanning = ble.scan(1, 'demo', { durationMs: 1000 }).catch((error: PluginBleError) => error);
+    await waitForScan();
+    await harness.advance(5999);
+    await harness.advance(1);
+    await expect(scanning).resolves.toMatchObject({ code: 'TIMEOUT', retryable: true });
+  });
+
+  it('skips malformed advertisements from the transport instead of failing the scan', async () => {
+    jest.spyOn(harness.driver, 'scan').mockResolvedValueOnce([
+      { address: 'not-an-address', addressType: 'public', serviceUuids: ['fff0'], manufacturerData: [] },
+      { address: ADDRESS, addressType: 'public', serviceUuids: ['fff0'], manufacturerData: [] },
+    ] as never);
+    const results = await ble.scan(1, 'demo');
+    expect(results.map((result) => result.address)).toEqual([ADDRESS]);
+  });
+
+  it('serializes endpoint writes so two plugins cannot bind one address at the same time', async () => {
+    const other = createPluginBleContext({ id: 'plugin-b', logger: silent }, () => harness.service);
+    other.registerProfile(PROFILE as never);
+    await harness.addReader({ readerId: 2, name: 'Reader 2', allowPluginBle: true });
+    const outcomes = await Promise.allSettled([
+      ble.createEndpoint({ readerId: 1, address: ADDRESS, addressType: 'public', profileId: 'demo' }),
+      other.createEndpoint({ readerId: 2, address: ADDRESS, addressType: 'public', profileId: 'demo' }),
+    ]);
+    expect(outcomes.map((outcome) => outcome.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(outcomes.find((outcome) => outcome.status === 'rejected')).toMatchObject({
+      reason: { code: 'ENDPOINT_CONFLICT' },
+    });
   });
 
   it('closes every session on module destroy', async () => {
@@ -97,7 +171,9 @@ describe('PluginBleService (host details)', () => {
     const lines = debug.mock.calls.map(([line]) => String(line));
     expect(lines.some((line) => /write .* ok \d+ms/.test(line))).toBe(true);
     expect(lines.some((line) => /read .* ok \d+ms/.test(line))).toBe(true);
-    expect(lines.join('\n')).not.toMatch(/222|173|190|239|dead|beef/i);
+    // Random ids could contain the hex digits by chance, so strip them before looking for the payload.
+    const text = lines.join('\n').replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '<id>');
+    expect(text).not.toMatch(/222|173|190|239|dead|beef|de ?ad ?be ?ef|\[222/i);
   });
 
   it('applies the profile filter even when the driver returns unrelated advertisements', async () => {
@@ -118,7 +194,9 @@ describe('PluginBleService (host details)', () => {
     jest.spyOn(driver, 'connect').mockRejectedValue(new Error('secret key 0xdeadbeef'));
     const failure = await ble.openSession(created.id).catch((error: PluginBleError) => error);
     expect(failure).toMatchObject({ code: 'INTERNAL', retryable: false });
-    expect(JSON.stringify([failure.message, (failure as PluginBleError).detail])).not.toContain('deadbeef');
+    expect(JSON.stringify([(failure as PluginBleError).message, (failure as PluginBleError).detail])).not.toContain(
+      'deadbeef',
+    );
   });
 
   it('turns a unique-index race into ENDPOINT_CONFLICT', async () => {

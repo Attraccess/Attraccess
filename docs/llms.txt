@@ -90,7 +90,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Overview](https://docs.attraccess.org/en/plugins/overview.md): Introduces the plugin system that extends Attraccess with frontend pages and backend endpoints, plugin management and SDKs.
 - [Installing Plugins](https://docs.attraccess.org/en/plugins/installing-plugins.md): How to upload, enable, disable and remove plugins in the web interface, with troubleshooting.
 - [Developing Plugins](https://docs.attraccess.org/en/plugins/developing-plugins.md): Developer guide to building Attraccess plugins: anatomy, SDKs, backend plugins, dependencies and reader UI integration.
-- [Bluetooth transport for plugins](https://docs.attraccess.org/en/plugins/ble-transport.md): Describes the BLE transport contract that backend plugins use to talk to Bluetooth devices through Attractap readers: profiles, endpoints, sessions, errors, limits and testing with the fake.
+- [Bluetooth Transport for Plugins](https://docs.attraccess.org/en/plugins/ble-transport.md): Describes the BLE transport contract that backend plugins use to talk to Bluetooth devices through Attractap readers: profiles, endpoints, sessions, errors, limits and testing with the fake.
 - [Database Migrations](https://docs.attraccess.org/en/plugins/database-migrations.md): How a plugin ships TypeORM migrations for its own tables: declaring, writing and bundling the migrations entry.
 
 ## English: Reservations

@@ -6,16 +6,24 @@ type BleContractFactory = (options?: { ready?: boolean }) => Promise<{ host: Fak
 
 // The suite lives with the SDK so the fake's own coverage includes it; the host runs the very same cases.
 // It is loaded by path because the SDK's public entry deliberately does not export test code.
-const { defineBleContractSuite } = require(
-  resolve(__dirname, '../../../../../../libs/plugins-backend-sdk/src/lib/plugin-ble-contract.test-cases'),
-) as { defineBleContractSuite(name: string, create: BleContractFactory): void };
+const sdkLib = resolve(__dirname, '../../../../../../libs/plugins-backend-sdk/src/lib');
+const { defineBleContractSuite } = require(resolve(sdkLib, 'plugin-ble-contract.test-cases')) as {
+  defineBleContractSuite(name: string, create: BleContractFactory): void;
+};
+const { defineBleContractSessionSuite } = require(resolve(sdkLib, 'plugin-ble-contract-sessions.test-cases')) as {
+  defineBleContractSessionSuite(name: string, create: BleContractFactory): void;
+};
 
-defineBleContractSuite('SDK fake transport', async (options) => ({
+const fake: BleContractFactory = async (options) => ({
   host: createFakeBleHost(options),
   dispose: async () => undefined,
-}));
-
-defineBleContractSuite('host service with a test driver', async (options) => {
+});
+const hostService: BleContractFactory = async (options) => {
   const harness = await createHostBleHarness(options);
   return { host: harness, dispose: () => harness.dispose() };
-});
+};
+
+for (const define of [defineBleContractSuite, defineBleContractSessionSuite]) {
+  define('SDK fake transport', fake);
+  define('host service with a test driver', hostService);
+}
