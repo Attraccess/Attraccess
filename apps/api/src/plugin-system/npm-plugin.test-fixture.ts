@@ -53,7 +53,7 @@ async function packageTarball(name: string, permissions: string[] = []): Promise
         peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
         attraccess: {
           displayName: name,
-          host: '*',
+          host: '>=2.0.0-0',
           backend: 'dist/index.js',
           permissions,
           sdk: { backend: '*' },

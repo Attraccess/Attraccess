@@ -15,7 +15,7 @@ const otherPlugin = {
 
 describe('Matter plugin host compatibility', () => {
   it('is accepted by a supported host', () => {
-    const { manifest } = parseNpmPluginPackage(matterPackage, '1.11.0');
+    const { manifest } = parseNpmPluginPackage(matterPackage, '2.0.0');
     expect(manifest.name).toBe(matterPackage.name);
     expect(matterPackage.attraccess.host).toBe(COMPATIBILITY_TABLE[0].attraccess);
   });

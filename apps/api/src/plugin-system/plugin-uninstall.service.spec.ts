@@ -16,7 +16,8 @@ describe('PluginUninstallService', () => {
       name: 'delete-me',
       version: '1.0.0',
       main: { backend: { directory: 'dist', entryPoint: 'index.js' }, migrations },
-      attraccessVersion: { min: '1.0.0' },
+      attraccessVersion: { min: '2.0.0-0' },
+      persistence: { backends: ['sqlite'] },
     });
     const [plugin] = PluginService.getPlugins();
     return plugin;

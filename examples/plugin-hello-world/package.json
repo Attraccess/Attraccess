@@ -24,8 +24,8 @@
     "frontend"
   ],
   "peerDependencies": {
-    "@attraccess/plugins-backend-sdk": "^1.9.0",
-    "@attraccess/plugins-frontend-sdk": "^1.9.0",
+    "@attraccess/plugins-backend-sdk": "^2.0.0-0",
+    "@attraccess/plugins-frontend-sdk": "^2.0.0-0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/event-emitter": "^3.0.0",
     "typeorm": "^0.3.0"
@@ -33,7 +33,7 @@
   "attraccess": {
     "displayName": "Hello World",
     "description": "Example Attraccess plugin.",
-    "host": "^1.9.0",
+    "host": "^2.0.0-0",
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
     "styles": "frontend/style.css",
@@ -42,8 +42,8 @@
       "LISTEN_EVENTS"
     ],
     "sdk": {
-      "backend": "^1.9.0",
-      "frontend": "^1.9.0"
+      "backend": "^2.0.0-0",
+      "frontend": "^2.0.0-0"
     }
   },
   "devDependencies": {

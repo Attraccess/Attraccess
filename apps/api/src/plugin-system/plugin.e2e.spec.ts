@@ -89,7 +89,8 @@ const PLUGIN_JSON = {
     frontend: { directory: 'frontend', entryPoint: 'index.mjs' },
     backend: { directory: 'dist', entryPoint: 'index.js' },
   },
-  attraccessVersion: { min: '1.0.0' },
+  attraccessVersion: { min: '2.0.0-0' },
+  persistence: { backends: ['sqlite'] },
   permissions: ALL_PERMISSIONS,
 };
 
@@ -200,7 +201,7 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
       pluginDirectory: PLUGIN_NAME,
       permissions: [PluginPermission.LISTEN_EVENTS],
       main: PLUGIN_JSON.main,
-      attraccessVersion: { min: '1.0.0' },
+      attraccessVersion: { min: '2.0.0-0' },
     } as unknown as LoadedPluginManifest;
 
     const ctx = (

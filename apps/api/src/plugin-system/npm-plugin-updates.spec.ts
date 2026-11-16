@@ -37,7 +37,7 @@ describe('NpmPluginService', () => {
           version: '1.1.0',
           keywords: ['attraccess-plugin'],
           peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
-          attraccess: { displayName: 'Plugin', host: '*', backend: 'index.js', permissions: [], sdk: { backend: '*' } },
+          attraccess: { displayName: 'Plugin', host: '>=2.0.0-0', backend: 'index.js', permissions: [], sdk: { backend: '*' } },
         },
         '1.2.0': {
           name: '@attraccess/plugin',
@@ -46,7 +46,7 @@ describe('NpmPluginService', () => {
           peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
           attraccess: {
             displayName: 'Plugin',
-            host: '*',
+            host: '>=2.0.0-0',
             backend: 'index.js',
             permissions: ['DATABASE_ACCESS'],
             sdk: { backend: '*' },
@@ -59,7 +59,7 @@ describe('NpmPluginService', () => {
           peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
           attraccess: {
             displayName: 'Plugin',
-            host: '*',
+            host: '>=2.0.0-0',
             backend: 'index.js',
             permissions: ['DATABASE_ACCESS', 'READ_USERS'],
             sdk: { backend: '*' },
@@ -67,7 +67,7 @@ describe('NpmPluginService', () => {
         },
       },
     });
-    jest.spyOn(npmInternals(service).catalog as unknown as ServiceInternals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog as unknown as ServiceInternals, 'hostVersion').mockReturnValue('2.0.0');
 
     await expect(service.installedVersionCandidates('@attraccess/plugin')).resolves.toEqual([
       expect.objectContaining({ version: '1.3.0', direction: 'newer', permissionAdditions: ['READ_USERS'] }),
@@ -106,7 +106,7 @@ describe('NpmPluginService', () => {
           peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
           attraccess: {
             displayName: 'Example',
-            host: '*',
+            host: '>=2.0.0-0',
             backend: 'index.js',
             permissions: [],
             sdk: { backend: '*' },
@@ -114,7 +114,7 @@ describe('NpmPluginService', () => {
         },
       },
     });
-    jest.spyOn(npmInternals(service).catalog as unknown as ServiceInternals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog as unknown as ServiceInternals, 'hostVersion').mockReturnValue('2.0.0');
 
     await expect(service.installedVersionCandidates('@attraccess/plugin-example')).resolves.toEqual([
       expect.objectContaining({
@@ -211,7 +211,7 @@ describe('NpmPluginService', () => {
         },
       },
     });
-    jest.spyOn(npmInternals(service).catalog as unknown as ServiceInternals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog as unknown as ServiceInternals, 'hostVersion').mockReturnValue('2.0.0');
     jest.spyOn(npmInternals(service).registry as unknown as ServiceInternals, 'download').mockResolvedValue(tarball);
 
     await expect(service.replaceInstalled(name, '1.2.3', [])).rejects.toThrow(
@@ -332,11 +332,11 @@ describe('NpmPluginService', () => {
           version: '2.0.0-beta.1',
           keywords: ['attraccess-plugin'],
           peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
-          attraccess: { displayName: 'Plugin', host: '*', backend: 'index.js', permissions: [], sdk: { backend: '*' } },
+          attraccess: { displayName: 'Plugin', host: '>=2.0.0-0', backend: 'index.js', permissions: [], sdk: { backend: '*' } },
         },
       },
     });
-    jest.spyOn(npmInternals(service).catalog as unknown as ServiceInternals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog as unknown as ServiceInternals, 'hostVersion').mockReturnValue('2.0.0');
 
     await expect(service.installedVersionCandidates('@attraccess/plugin')).resolves.toEqual([
       expect.objectContaining({ version: '2.0.0-beta.1', semverImpact: 'major' }),

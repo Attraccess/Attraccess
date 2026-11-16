@@ -7,7 +7,7 @@ const BASE = {
     frontend: { directory: 'frontend', entryPoint: 'index.mjs' },
     backend: { directory: 'dist', entryPoint: 'index.js' },
   },
-  attraccessVersion: { min: '1.0.0' },
+  attraccessVersion: { min: '2.0.0-0' },
   permissions: [],
 };
 

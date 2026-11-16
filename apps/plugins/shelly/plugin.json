@@ -17,7 +17,8 @@
     }
   },
   "attraccessVersion": {
-    "min": "1.11.0-0"
+    "min": "2.0.0-0"
   },
+  "persistence": { "backends": ["sqlite"] },
   "permissions": ["DATABASE_ACCESS"]
 }

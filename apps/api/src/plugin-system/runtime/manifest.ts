@@ -137,6 +137,13 @@ export class PluginManifest {
   attraccessVersion: PluginAttraccessVersion;
 
   @ApiProperty({
+    description: 'Database engines the plugin supports for its own data (required when it stores data)',
+    required: false,
+    example: { backends: ['sqlite'] },
+  })
+  persistence?: { backends: string[] };
+
+  @ApiProperty({
     description: 'Host capabilities this plugin is permitted to use at runtime',
     enum: PluginPermission,
     isArray: true,

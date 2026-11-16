@@ -34,7 +34,7 @@ export function hintKey(status: ConnectionStatus): string {
   return `hint.${status.reason ?? 'unavailable'}`;
 }
 
-/** The lowest Attraccess version of the first supported combination, e.g. `1.11.0` for `^1.11.0`. */
+/** The lowest Attraccess version of the first supported combination, e.g. `2.0.0` for `^2.0.0`. */
 function minimumAttraccess(status: ConnectionStatus): string {
   const range = status.supported[0]?.attraccess ?? '';
   return range.match(/\d+\.\d+\.\d+/)?.[0] ?? range;

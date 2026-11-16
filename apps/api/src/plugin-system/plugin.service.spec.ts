@@ -53,7 +53,7 @@ describe('PluginService', () => {
         name: 'my-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
 
       const plugins = PluginService.getPlugins();
@@ -69,7 +69,7 @@ describe('PluginService', () => {
         name: 'stable-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
 
       const first = PluginService.getPlugins()[0].id;
@@ -83,13 +83,13 @@ describe('PluginService', () => {
         name: 'plugin-ok',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
       fixture.writePlugin(fixture.root, 'plugin-bad', {
         name: 'plugin-bad',
         version: '2.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
 
       PluginService.getPlugins();
@@ -108,7 +108,7 @@ describe('PluginService', () => {
         name: 'crashing-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
       const [plugin] = PluginService.getPlugins();
 
@@ -127,7 +127,7 @@ describe('PluginService', () => {
         name: 'crashing-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
       const [plugin] = PluginService.getPlugins();
       jest
@@ -148,7 +148,7 @@ describe('PluginService', () => {
         name: 'repaired-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
       const [plugin] = PluginService.getPlugins();
       PluginService.quarantinePlugin(plugin, new Error('prior crash'));
@@ -164,7 +164,7 @@ describe('PluginService', () => {
         name: 'repaired-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
       const [plugin] = PluginService.getPlugins();
       PluginService.quarantinePlugin(plugin, new Error('prior crash'));
@@ -186,7 +186,7 @@ describe('PluginService', () => {
         name: 'previously-active',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
 
       PluginService.beginBootGuard();
@@ -206,7 +206,7 @@ describe('PluginService', () => {
         name: 'unrelated-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
 
       PluginService.beginBootGuard();
@@ -226,7 +226,7 @@ describe('PluginService', () => {
         name: 'installed-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
       jest.spyOn(process, 'kill').mockImplementation(() => true);
       const existing = new Set(process.listeners(signal));
@@ -253,7 +253,7 @@ describe('PluginService', () => {
         name: 'plugin-a',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
 
       const first = PluginService.getPlugins();
@@ -273,7 +273,7 @@ describe('PluginService', () => {
         name: 'stale-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
 
       expect(PluginService.getPlugins()).toEqual([]);
@@ -284,7 +284,7 @@ describe('PluginService', () => {
         name: 'uploaded-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
 
       expect(PluginService.getPlugins()).toEqual([]);
@@ -295,7 +295,7 @@ describe('PluginService', () => {
         name: 'bad-perms',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
         permissions: ['NOT_A_REAL_PERMISSION'],
       });
 
@@ -309,7 +309,7 @@ describe('PluginService', () => {
         name: 'find-me',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       });
 
       const [plugin] = PluginService.getPlugins();

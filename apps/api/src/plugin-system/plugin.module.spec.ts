@@ -50,7 +50,8 @@ describe('PluginModule', () => {
             version: '1.0.0',
             main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
             permissions: allowed ? [PluginPermission.DATABASE_ACCESS] : [],
-            attraccessVersion: { min: '1.0.0' },
+            persistence: { backends: ['sqlite'] },
+            attraccessVersion: { min: '2.0.0-0' },
           }),
         );
         writeFileSync(
@@ -60,6 +61,36 @@ describe('PluginModule', () => {
         PluginModule.forRoot();
         expect(registry.length).toBe(previous.length + (allowed ? 1 : 0));
         if (allowed) expect((registry.at(-1) as { name: string }).name).toBe('Widget');
+      } finally {
+        registry.splice(0, registry.length, ...previous);
+      }
+    });
+
+    it('refuses an SDK 1.x plugin before it loads, registers entities or reaches the database', () => {
+      const registry = dataSourceConfig.entities as unknown[];
+      const previous = [...registry];
+      try {
+        mkdirSync(join(fixture.root, 'legacy/dist'), { recursive: true });
+        writeFileSync(
+          join(fixture.root, 'legacy/plugin.json'),
+          JSON.stringify({
+            name: 'legacy',
+            version: '1.0.0',
+            main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+            permissions: [PluginPermission.DATABASE_ACCESS],
+            persistence: { backends: ['sqlite'] },
+            attraccessVersion: { min: '1.11.0-0' },
+          }),
+        );
+        writeFileSync(
+          join(fixture.root, 'legacy/dist/index.js'),
+          'throw new Error("a refused plugin must never be required");',
+        );
+        const module = PluginModule.forRoot();
+        expect(registry).toEqual(previous);
+        expect(module.imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule]);
+        const errors = (PluginService as unknown as { pluginLoadErrors: Map<string, Error> }).pluginLoadErrors;
+        expect(errors.get('legacy@1.0.0')?.message).toContain('migrating-to-2');
       } finally {
         registry.splice(0, registry.length, ...previous);
       }
@@ -99,7 +130,7 @@ describe('PluginModule', () => {
           name: 'broken',
           version: '1.0.0',
           main: { backend: { directory: 'dist', entryPoint: 'missing.js' } },
-          attraccessVersion: { min: '1.0.0' },
+          attraccessVersion: { min: '2.0.0-0' },
         }),
       );
 
@@ -119,7 +150,7 @@ describe('PluginModule', () => {
           name: 'quarantined',
           version: '1.0.0',
           main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-          attraccessVersion: { min: '1.0.0' },
+          attraccessVersion: { min: '2.0.0-0' },
         }),
       );
       writeFileSync(join(fixture.root, 'quarantined', 'dist', 'index.js'), 'throw new Error("must not be imported");');
@@ -138,7 +169,7 @@ describe('PluginModule', () => {
           name: 'broken-provider',
           version: '1.0.0',
           main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-          attraccessVersion: { min: '1.0.0' },
+          attraccessVersion: { min: '2.0.0-0' },
         }),
       );
       writeFileSync(
@@ -173,7 +204,7 @@ describe('PluginModule', () => {
           version: '1.0.0',
           main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
           permissions: [PluginPermission.ACCESS_HOOKS],
-          attraccessVersion: { min: '1.0.0' },
+          attraccessVersion: { min: '2.0.0-0' },
         }),
       );
       writeFileSync(
@@ -201,7 +232,7 @@ describe('PluginModule', () => {
           name: 'needs-host-dep',
           version: '1.0.0',
           main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-          attraccessVersion: { min: '1.0.0' },
+          attraccessVersion: { min: '2.0.0-0' },
         }),
       );
       writeFileSync(
@@ -429,7 +460,7 @@ describe('PluginModule', () => {
           version: '1.0.0',
           main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
           permissions,
-          attraccessVersion: { min: '1.0.0' },
+          attraccessVersion: { min: '2.0.0-0' },
         }),
       );
       writeFileSync(join(fixture.root, name, 'dist', 'index.js'), `module.exports = { default: { ${body} } };`);

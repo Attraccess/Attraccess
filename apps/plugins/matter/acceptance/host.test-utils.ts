@@ -31,7 +31,7 @@ import { MatterConnectionService } from '../backend/connection/connection.servic
 import sourcePlugin from '../backend/plugin';
 
 export const PLUGIN_ID = 'MatterAcceptance21chr';
-export const HOST_VERSION = '1.11.0';
+export const HOST_VERSION = '2.0.0';
 
 @Controller('unrelated')
 class UnrelatedController {

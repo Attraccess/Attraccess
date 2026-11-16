@@ -143,7 +143,7 @@ export async function createHarness() {
     return next;
   };
   const context = {
-    hostVersion: '1.11.0',
+    hostVersion: '2.0.0',
     manifest: { id: 'matter', name: 'matter', version: '0.4.0-alpha.0', pluginDirectory: 'matter' },
     logger: { debug: jest.fn(), warn: jest.fn(), error: jest.fn(), log: jest.fn() },
     getRepository: (entity: never) => dataSource.getRepository(entity),

@@ -24,7 +24,8 @@ describe('plugin dependency activation', () => {
       JSON.stringify({
         name,
         version: '1.0.0',
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
+        persistence: { backends: ['sqlite'] },
         dependencies: dependencies.map((name) => ({ name, version: '^1.0.0', required: true })),
         main: {
           backend: { directory: 'dist', entryPoint: 'index.js' },

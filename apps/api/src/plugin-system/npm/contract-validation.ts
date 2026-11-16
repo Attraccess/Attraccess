@@ -1,6 +1,8 @@
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 import { BadRequestException } from '@nestjs/common';
 import * as semver from 'semver';
+import { SUPPORTED_DATABASE_TYPES } from '../../database/backend/database-backend';
+import { assertHostRangeTargetsSdk2 } from '../runtime/plugin-compatibility';
 import { z } from 'zod';
 import { PluginDependenciesSchema } from '../runtime/dependencies';
 import { PluginManifest, PluginManifestSchema } from '../plugin.manifest';
@@ -33,6 +35,7 @@ const packageSchema = z
       migrations: entryPath.optional(),
       styles: entryPath.optional(),
       permissions: z.array(z.nativeEnum(PluginPermission)).default([]),
+      persistence: z.object({ backends: z.array(z.enum(SUPPORTED_DATABASE_TYPES)).min(1) }).optional(),
       sdk: z
         .object({
           backend: z.string().optional(),
@@ -62,6 +65,11 @@ export function parseNpmPluginPackage(
   }
   if (!semver.satisfies(hostVersion, pkg.attraccess.host, { includePrerelease: true })) {
     throw new BadRequestException(`Plugin is not compatible with Attraccess ${hostVersion}`);
+  }
+  try {
+    assertHostRangeTargetsSdk2(pkg.name, pkg.attraccess.host);
+  } catch (error) {
+    throw new BadRequestException((error as Error).message);
   }
   validateSdkPeerDependency(
     pkg,
@@ -101,7 +109,8 @@ export function parseNpmPluginPackage(
       name: pkg.name,
       version: pkg.version,
       main,
-      attraccessVersion: { exact: hostVersion },
+      attraccessVersion: { min: semver.minVersion(pkg.attraccess.host)?.version, exact: hostVersion },
+      persistence: pkg.attraccess.persistence,
       permissions: pkg.attraccess.permissions,
       dependencies: pkg.attraccess.dependencies,
     }),

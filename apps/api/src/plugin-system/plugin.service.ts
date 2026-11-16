@@ -18,6 +18,9 @@ import { PluginManifestSchema, LoadedPluginManifest, PluginManifest } from './pl
 
 import { type PluginManifestInfo } from '@attraccess/plugins-backend-sdk';
 
+import { PluginPermission } from '@attraccess/plugins-backend-sdk';
+import { resolveDatabaseBackend } from '../database/backend';
+import { assertPluginSupportsBackend, assertPluginTargetsSdk2 } from './runtime/plugin-compatibility';
 import { PluginBootGuard } from './runtime/boot-guard';
 
 import { PluginSandboxService } from './plugin-sandbox.service';
@@ -166,6 +169,12 @@ export class PluginService {
       // validate manifest
       PluginService.logger.debug(`Validating manifest`, manifestContent);
       const manifest = PluginManifestSchema.parse(manifestContent);
+      try {
+        PluginService.assertManifestCompatible(manifest);
+      } catch (error) {
+        // Refused before anything moves into the plugins folder: no files and no database change.
+        throw new BadRequestException((error as Error).message);
+      }
 
       const pluginName = PluginService.safePluginName(manifest.name);
       await PluginService.withPluginUploadLock(pluginName, async () => {
@@ -399,6 +408,7 @@ export class PluginService {
         }
 
         try {
+          PluginService.assertManifestCompatible(manifest);
           manifest.permissions = PluginSandboxService.validateDeclaredPermissions(manifest.name, manifest.permissions);
         } catch (error) {
           getImplementationClass().setPluginLoadError(`${manifest.name}@${manifest.version}`, error as Error);
@@ -408,6 +418,17 @@ export class PluginService {
         return manifest;
       })
       .filter((manifest) => manifest !== null);
+  }
+
+  /** SDK 2.0 and engine support, checked before a plugin is installed, started or migrated. */
+  protected static assertManifestCompatible(manifest: PluginManifest): void {
+    assertPluginTargetsSdk2(manifest.name, manifest.attraccessVersion?.min);
+    assertPluginSupportsBackend(
+      manifest.name,
+      manifest.persistence?.backends,
+      Boolean(manifest.main?.migrations) || (manifest.permissions ?? []).includes(PluginPermission.DATABASE_ACCESS),
+      resolveDatabaseBackend().type,
+    );
   }
 
   protected static findPluginManifestInPluginFolder(rootFolder: string, pluginFolder: string): PluginManifest | null {

@@ -37,7 +37,8 @@ function writeMigrationPlugin(root: string, folder: string, name: string): void 
         backend: { directory: 'dist', entryPoint: 'index.js' },
         migrations: { directory: 'mig', entryPoint: 'index.js' },
       },
-      attraccessVersion: { min: '1.0.0' },
+      attraccessVersion: { min: '2.0.0-0' },
+      persistence: { backends: ['sqlite'] },
       permissions: [],
     }),
   );
@@ -158,7 +159,8 @@ describe('PluginMigrationService', () => {
           frontend: { directory: 'frontend', entryPoint: 'index.mjs' },
           backend: { directory: 'dist', entryPoint: 'index.js' },
         },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
+        persistence: { backends: ['sqlite'] },
         permissions: [],
       }),
     );

@@ -194,7 +194,7 @@ describe('audit recorded through flows, MQTT and the plugin context', () => {
         pluginDirectory: pluginName,
         permissions,
         main: { backend: { directory: `${pluginName}/dist`, entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       } as LoadedPluginManifest);
     }
 

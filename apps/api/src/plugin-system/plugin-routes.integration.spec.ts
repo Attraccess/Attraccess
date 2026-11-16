@@ -104,7 +104,7 @@ const PLUGIN_JSON = {
     frontend: { directory: 'frontend', entryPoint: 'index.mjs' },
     backend: { directory: 'dist', entryPoint: 'index.js' },
   },
-  attraccessVersion: { min: '1.0.0' },
+  attraccessVersion: { min: '2.0.0-0' },
   // No DATABASE_ACCESS needed: the controller mounts without touching the DB,
   // so nothing queries during the route-mount assertions below.
   permissions: [],

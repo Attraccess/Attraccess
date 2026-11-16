@@ -20,7 +20,7 @@ function frontendPlugin(name: string): LoadedPluginManifest {
     pluginDirectory: name,
     permissions: [],
     main: { frontend: { directory: join(name, 'frontend'), entryPoint: 'index.mjs' } },
-    attraccessVersion: { min: '1.0.0' },
+    attraccessVersion: { min: '2.0.0-0' },
   } as LoadedPluginManifest;
 }
 

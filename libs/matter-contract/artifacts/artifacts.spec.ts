@@ -195,7 +195,7 @@ describe('exported artifacts', () => {
     expect(
       check('SupportedCombination', {
         wireVersion: 1,
-        attraccess: '^1.11.0',
+        attraccess: '^2.0.0',
         plugin: '0.1.0',
         sidecar: '0.1.0',
         matterJs: '0.18.0',
@@ -204,7 +204,7 @@ describe('exported artifacts', () => {
     expect(
       check('SupportedCombination', {
         wireVersion: 2,
-        attraccess: '^1.11.0',
+        attraccess: '^2.0.0',
         plugin: '0.1.0',
         sidecar: '0.1.0',
         matterJs: '0.18.0',

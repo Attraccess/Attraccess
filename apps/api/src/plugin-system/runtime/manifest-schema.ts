@@ -1,5 +1,6 @@
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 import { z } from 'zod';
+import { SUPPORTED_DATABASE_TYPES } from '../../database/backend/database-backend';
 import { PluginDependenciesSchema } from './dependencies';
 export const mainSchema = z.object({
   directory: z.string(),
@@ -41,6 +42,8 @@ export const PluginManifestSchema = z.object({
       },
       { message: 'min, max or exact must be provided' },
     ),
+  /** Database engines this plugin's own persistence supports. Required when the plugin stores data. */
+  persistence: z.object({ backends: z.array(z.enum(SUPPORTED_DATABASE_TYPES)).min(1) }).optional(),
   permissions: z
     .array(z.nativeEnum(PluginPermission, { message: 'unknown plugin permission' }))
     .optional()
