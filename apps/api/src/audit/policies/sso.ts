@@ -5,7 +5,7 @@ export type SsoAuditInput = {
   action: string;
   operationId: string;
   actorId: number | null;
-  authenticationMethod: 'session' | 'api-token' | null;
+  authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' | null;
   apiTokenId?: number;
   subject: { type: 'sso.provider' | 'user'; id: number };
   details: Record<string, string>;
@@ -355,7 +355,9 @@ export function projectSsoAuditEvent(input: unknown): SsoAuditInput | null {
     if (event.authenticationMethod !== null || event.apiTokenId !== undefined) return null;
   } else if (
     !positive(event.actorId) ||
-    (event.authenticationMethod !== 'session' && event.authenticationMethod !== 'api-token')
+    (event.authenticationMethod !== 'session' &&
+      event.authenticationMethod !== 'api-token' &&
+      event.authenticationMethod !== 'mcp-oauth')
   ) {
     return null;
   }

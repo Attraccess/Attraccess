@@ -123,6 +123,7 @@
   - [Architektur](developer/architecture.md)
   - [API-Log-Ziele](developer/logging.md)
   - [API-Referenz](developer/api-reference.md)
+  - [MCP-Server (KI-Clients)](developer/mcp.md)
   - [KI-Agenten (llms.txt & WebMCP)](developer/ai-agents.md)
   - [Mitwirken](developer/contributing.md)
 

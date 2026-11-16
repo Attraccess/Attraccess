@@ -16,6 +16,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import { SqliteReadonlyFilter } from './exceptions/sqlite-readonly.filter';
+import { ValkeyUnavailableFilter } from './exceptions/valkey-unavailable.filter';
 import { isValidTrustProxyValue, resolveTrustProxySetting } from './trust-proxy';
 import { HttpsOptions } from '@nestjs/common/interfaces/external/https-options.interface';
 import { existsSync } from 'fs';
@@ -24,6 +25,9 @@ import type { Request } from 'express';
 import type { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 import { ApprovedOriginsService } from './common/security/approved-origins.service';
 import { createCA, createCert } from 'mkcert';
+import { McpToolRegistry } from './mcp/mcp-tool-registry';
+import type { OpenApiDocument } from './mcp/openapi-tools';
+import { MCP_UNPREFIXED_ROUTES } from './mcp/mcp-routes';
 import { join } from 'path';
 
 /** SAML state may carry authentication context. HTTPS is required even when
@@ -40,7 +44,8 @@ export function samlSession(secret: string) {
 
 export function configureBootstrapApi(app: NestExpressApplication, appConfig: AppConfigType, bootstrapLogger: Logger) {
   const globalPrefix = appConfig.GLOBAL_PREFIX;
-  app.setGlobalPrefix(globalPrefix);
+  // OAuth discovery documents live at the well-known locations of the origin, not below the API prefix.
+  app.setGlobalPrefix(globalPrefix, { exclude: [...MCP_UNPREFIXED_ROUTES] });
 
   app.useWebSocketAdapter(createWsAdapter(app));
 
@@ -75,6 +80,14 @@ export function configureBootstrapApi(app: NestExpressApplication, appConfig: Ap
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, documentFactory);
+  // MCP tools come from this same document, filtered by the reviewed manifest.
+  try {
+    app
+      .get(McpToolRegistry, { strict: false })
+      .setDocumentFactory(() => documentFactory() as unknown as OpenApiDocument);
+  } catch (error) {
+    bootstrapLogger.warn(`MCP tools are unavailable: ${(error as Error).message}`);
+  }
 
   return { globalPrefix, documentFactory };
 }
@@ -104,7 +117,7 @@ export function configureBootstrapHttp(app: NestExpressApplication, appConfig: A
     app.set('trust proxy', false);
   }
 
-  app.useGlobalFilters(new SqliteReadonlyFilter(app.get(HttpAdapterHost)));
+  app.useGlobalFilters(new ValkeyUnavailableFilter(new SqliteReadonlyFilter(app.get(HttpAdapterHost))));
 
   app.use(cookieParser());
 

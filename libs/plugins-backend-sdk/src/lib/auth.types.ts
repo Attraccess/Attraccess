@@ -3,7 +3,7 @@ import { Request as BaseRequest } from 'express';
 
 export interface AuthenticatedUser extends User {
   jwtTokenId: string;
-  authenticationMethod?: 'session' | 'api-token';
+  authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
   apiTokenId?: number;
   /**
    * Effective permissions for this user. Stored as a Set for O(1) has() lookups.

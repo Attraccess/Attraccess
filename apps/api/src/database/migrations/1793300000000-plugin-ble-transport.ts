@@ -1,8 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 /** Plugin BLE transport: per-reader admin opt-in and the endpoints plugins bind to devices near a reader. */
-export class PluginBleTransport1793200000000 implements MigrationInterface {
-  name = 'PluginBleTransport1793200000000';
+export class PluginBleTransport1793300000000 implements MigrationInterface {
+  name = 'PluginBleTransport1793300000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     if (!(await queryRunner.hasColumn('attractap', 'allowPluginBle'))) {

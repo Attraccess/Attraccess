@@ -154,7 +154,7 @@ export class ResourceGroupsIntroductionsService {
     data?: UpdateResourceGroupIntroductionDto,
     tutorUserId?: number,
     performedByUserId?: number | null,
-    authenticationMethod?: 'session' | 'api-token' | null,
+    authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth' | null,
     apiTokenId?: number | null,
   ): Promise<ResourceIntroductionHistoryItem> {
     let existingIntroduction = await this.resourceIntroductionRepository.findOne({
@@ -234,7 +234,7 @@ export class ResourceGroupsIntroductionsService {
     options?: {
       tutorUserId?: number;
       performedByUserId?: number | null;
-      authenticationMethod?: 'session' | 'api-token' | null;
+      authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth' | null;
       apiTokenId?: number | null;
     },
   ): Promise<ResourceIntroductionHistoryItem> {
@@ -256,7 +256,7 @@ export class ResourceGroupsIntroductionsService {
     data?: UpdateResourceGroupIntroductionDto,
     options?: {
       performedByUserId?: number | null;
-      authenticationMethod?: 'session' | 'api-token' | null;
+      authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth' | null;
       apiTokenId?: number | null;
     },
   ): Promise<ResourceIntroductionHistoryItem> {

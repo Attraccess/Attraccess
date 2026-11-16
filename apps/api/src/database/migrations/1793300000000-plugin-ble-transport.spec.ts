@@ -1,9 +1,9 @@
 import { DataSource } from 'typeorm';
-import { PluginBleTransport1793200000000 } from './1793200000000-plugin-ble-transport';
+import { PluginBleTransport1793300000000 } from './1793300000000-plugin-ble-transport';
 
-describe('PluginBleTransport1793200000000', () => {
+describe('PluginBleTransport1793300000000', () => {
   let source: DataSource;
-  const migration = new PluginBleTransport1793200000000();
+  const migration = new PluginBleTransport1793300000000();
 
   beforeEach(async () => {
     source = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();

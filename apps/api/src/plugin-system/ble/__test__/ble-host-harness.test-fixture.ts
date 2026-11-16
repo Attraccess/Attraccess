@@ -8,7 +8,7 @@ import {
 } from '@attraccess/plugins-backend-sdk';
 import type { ModuleRef } from '@nestjs/core';
 import { DataSource, Table } from 'typeorm';
-import { PluginBleTransport1793200000000 } from '../../../database/migrations/1793200000000-plugin-ble-transport';
+import { PluginBleTransport1793300000000 } from '../../../database/migrations/1793300000000-plugin-ble-transport';
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../../../attractap/events';
 import { BLE_TRANSPORT_DRIVER } from '../ble-transport-driver';
 import { createPluginBleContext } from '../plugin-ble-context';
@@ -38,7 +38,7 @@ export async function createHostBleHarness(
   try {
     await queryRunner.createTable(Table.create(source.getMetadata(Attractap), source.driver));
     // The real migration creates the endpoint table, including its cascading foreign key to the reader.
-    await new PluginBleTransport1793200000000().up(queryRunner);
+    await new PluginBleTransport1793300000000().up(queryRunner);
   } finally {
     await queryRunner.release();
   }

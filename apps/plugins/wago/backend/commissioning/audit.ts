@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 // stack can load before that SDK addition; it never supplies a second sink.
 export interface CommissioningPrincipal {
   userId: number;
-  authenticationMethod: 'session' | 'api-token';
+  authenticationMethod: 'session' | 'api-token' | 'mcp-oauth';
   apiTokenId?: number;
 }
 
