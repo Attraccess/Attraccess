@@ -1,5 +1,5 @@
 import { InputGroup, Label, Link, TextField } from '@heroui/react';
-import { Copy, ExternalLink } from 'lucide-react';
+import { Copy } from 'lucide-react';
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useMcpServiceGetMcpConnectionInfo } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -76,7 +76,7 @@ export function McpConnectionCard({ connection, canUseApiTokens }: McpConnection
 
       <Link href={t('docsUrl')} target="_blank" rel="noreferrer" className="text-sm" data-cy="mcp-connection-docs">
         {t('docs')}
-        <ExternalLink size={14} aria-hidden />
+        <Link.Icon />
       </Link>
     </div>
   );
