@@ -23,13 +23,11 @@ body,
   overflow: hidden;
 }
 
-/* PullToRefresh wraps the app in .ptr__children. Keep real app scrolling in nested
-   containers such as main; otherwise focus/scrollIntoView can park scrollTop on
-   this wrapper and shift the entire app shell upward. */
-.ptr__children {
-  overflow: clip !important;
-  overflow-x: clip !important;
-  overflow-y: clip !important;
+/* Our pull-to-refresh lets the first ~10px of a touch pass natively (so long-press Paste works), so the browser
+   could start its own pull-to-refresh or overscroll on the root first. Only ours should run. */
+html,
+body {
+  overscroll-behavior-y: none;
 }
 
 /* Keep long routed pages from contributing scroll height to the document root.

@@ -1,12 +1,11 @@
 import { LiveUpdatesProvider } from '../utils/live-updates';
 import { TwoFactorGate } from './two-factor-gate/index';
 import { KioskGuard } from './kiosk/KioskGuard';
-import { useNavigate, Outlet, Route, Routes } from 'react-router-dom';
+import { useLocation, useNavigate, Outlet, Route, Routes } from 'react-router-dom';
 import { PropsWithChildren, useMemo, useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { ToastProvider } from '../components/toastProvider';
 import { I18nProvider, RouterProvider, Spinner } from '@heroui/react';
-import PullToRefresh from 'react-simple-pull-to-refresh';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './app.de.json';
@@ -19,6 +18,8 @@ import { EnrollLinkDialog } from './attractap/pairing/EnrollLinkDialog';
 import { MassIntroductionRedeemModal } from './mass-introduction/MassIntroductionRedeemModal';
 import { PwaUpdateIndicator } from '../pwa-update/PwaUpdateIndicator';
 import { ThemeToggle } from '../components/themeToggle';
+import { PullToRefresh } from '../components/pullToRefresh';
+import { InstallAppButton, InstallAppPrompts } from '../pwa-install';
 import { SessionBillingSummary } from './billing/sessionSummary/index';
 import { Layout } from './layout/layout';
 import { useAllRoutes } from './routes/index';
@@ -158,6 +159,7 @@ export function AppLayout(props: PropsWithChildren) {
   const { isAuthenticated, needsTwoFactorSetup, user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const isKiosk = useLocation().pathname.startsWith('/kiosk/');
 
   const { t, language } = useTranslations({ de, en });
 
@@ -170,11 +172,13 @@ export function AppLayout(props: PropsWithChildren) {
       <I18nProvider locale={language}>
         <ToastProvider>
           {(!isAuthenticated || needsTwoFactorSetup) && (
-            <div className="fixed top-4 right-4 z-30">
+            <div className="fixed top-4 right-4 z-30 flex gap-1">
+              {!isKiosk && <InstallAppButton />}
               <ThemeToggle />
             </div>
           )}
           <PwaUpdateIndicator />
+          {!isKiosk && <InstallAppPrompts />}
           <ReactFlowProvider>
             <AttraccessUserActionsBridge>
               {props.children}
@@ -200,9 +204,8 @@ export function AppLayout(props: PropsWithChildren) {
 
   return (
     <PullToRefresh
-      className="[&_.ptr__pull-down]:z-10"
       onRefresh={() => queryClient.invalidateQueries()}
-      pullDownThreshold={90}
+      threshold={90}
       refreshingContent={
         <div className="flex h-[90px] items-center justify-center pt-[env(safe-area-inset-top)]">
           <Spinner size="sm" />
@@ -214,7 +217,6 @@ export function AppLayout(props: PropsWithChildren) {
           <div className="text-2xl leading-none">↓</div>
         </div>
       }
-      isPullable
     >
       {content}
     </PullToRefresh>

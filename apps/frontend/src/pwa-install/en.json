@@ -1,0 +1,18 @@
+{
+  "install": "Install app",
+  "installTooltip": "Install Attraccess as an app",
+  "banner": {
+    "title": "Install Attraccess",
+    "description": "Open it from your home screen like any other app.",
+    "install": "Install",
+    "dismiss": "Not now",
+    "label": "Install app"
+  },
+  "ios": {
+    "title": "Install Attraccess",
+    "intro": "Add Attraccess to your home screen in Safari:",
+    "step1": "Tap the Share button (the square with an arrow pointing up).",
+    "step2": "Choose \"Add to Home Screen\".",
+    "step3": "Tap \"Add\"."
+  }
+}

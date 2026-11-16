@@ -61,8 +61,12 @@ vi.mock('./accept-invitation', () => ({ AcceptInvitation: () => null }));
 vi.mock('./two-factor-gate', () => ({ TwoFactorGate: ({ children }: PropsWithChildren) => children }));
 vi.mock('./kiosk/KioskGuard', () => ({ KioskGuard: () => null }));
 vi.mock('./not-found', () => ({ NotFound: () => <p>Not found</p> }));
-vi.mock('react-simple-pull-to-refresh', () => ({
-  default: ({ children, onRefresh }: PropsWithChildren<{ onRefresh: () => void }>) => (
+vi.mock('../pwa-install', () => ({
+  InstallAppButton: () => <button>Install app</button>,
+  InstallAppPrompts: () => <p>Install prompts</p>,
+}));
+vi.mock('../components/pullToRefresh', () => ({
+  PullToRefresh: ({ children, onRefresh }: PropsWithChildren<{ onRefresh: () => void }>) => (
     <>
       <button onClick={onRefresh}>Refresh gesture</button>
       {children}
@@ -172,4 +176,36 @@ it('waits for two-factor status and required setup before enabling the live tran
     </MemoryRouter>,
   );
   expect(state.liveUserId).toBe(1);
+});
+
+it('offers the install action next to the theme toggle when signed out, but not in kiosk mode', () => {
+  const view = render(
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole('button', { name: 'Install app' })).toBeInTheDocument();
+  expect(screen.getByText('Install prompts')).toBeInTheDocument();
+  view.unmount();
+
+  render(
+    <MemoryRouter initialEntries={['/kiosk/resources/1']}>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole('button', { name: 'Theme' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Install app' })).toBeNull();
+  expect(screen.queryByText('Install prompts')).toBeNull();
+});
+
+it('keeps the install action out of the signed-in shell, which offers it in the user menu', () => {
+  state.initialized = true;
+  state.authenticated = true;
+  render(
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(screen.queryByRole('button', { name: 'Install app' })).toBeNull();
+  expect(screen.getByText('Install prompts')).toBeInTheDocument();
 });

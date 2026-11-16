@@ -26,19 +26,26 @@ Eine Progressive Web App läuft in Ihrem Browser, kann aber auf Ihrem Startbilds
 > [!NOTE]
 > Auf iOS müssen Sie Safari verwenden, um PWAs zu installieren. Andere Browser (Chrome, Firefox) unterstützen diese Funktion auf iOS nicht.
 
+> [!TIP]
+> In Safari bietet Attraccess dieselbe Aktion **App installieren** wie auf Android (siehe unten). Auf iPhone und iPad zeigt sie statt einer direkten Installation diese Schritte an.
+
 ## Installation auf Android
 
 1. Öffnen Sie **Chrome** und navigieren Sie zu Ihrer Attraccess-Instanz
-2. Melden Sie sich bei Ihrem Konto an
-3. Tippen Sie auf das **Drei-Punkte-Menü** in der oberen rechten Ecke
-4. Tippen Sie auf **App installieren** (oder "Zum Startbildschirm hinzufügen")
-5. Bestätigen Sie mit **Installieren**
-6. Attraccess erscheint jetzt auf Ihrem Startbildschirm und in Ihrer App-Übersicht
+2. Wählen Sie **App installieren**:
+   - **Angemeldet:** Öffnen Sie das Benutzermenü (das Zahnrad unten in der Seitenleiste) und tippen Sie auf **App installieren**
+   - **Abgemeldet:** Tippen Sie auf das Download-Symbol neben dem Schalter für den dunklen Modus oben rechts
+   - Oder tippen Sie in der kleinen Karte **Attraccess installieren** unten auf der Seite auf **Installieren**
+3. Bestätigen Sie mit **Installieren**
+4. Attraccess erscheint jetzt auf Ihrem Startbildschirm und in Ihrer App-Übersicht
 
 <!-- TODO: Screenshot der Chrome-Installationsaufforderung -->
 
-> [!NOTE]
-> Auf manchen Android-Geräten erscheint ein Banner am unteren Bildschirmrand, das Sie zur Installation der App auffordert. Tippen Sie darauf, um direkt zu installieren.
+Die Aktion **App installieren** erscheint nur, wenn Chrome Attraccess installieren kann. Nach der Installation und auf Kiosk-Bildschirmen ist sie ausgeblendet. Chrome bietet die Installation unter Umständen erst an, nachdem Sie die Seite einen Moment genutzt haben.
+
+Die Installationskarte erscheint von selbst, solange Attraccess installiert werden kann. Mit **Nicht jetzt** blenden Sie sie für 30 Tage aus; die Aktion **App installieren** bleibt verfügbar.
+
+**Wenn Sie „App installieren“ nicht sehen:** Tippen Sie in Chrome auf das **Drei-Punkte-Menü** oben rechts, dann auf **App installieren** (oder „Zum Startbildschirm hinzufügen“), und bestätigen Sie mit **Installieren**. Auf einem Computer funktioniert das in Chrome oder Edge genauso, über das Installationssymbol in der Adressleiste oder das Browsermenü.
 
 ## Attraccess auf dem Handy verwenden
 

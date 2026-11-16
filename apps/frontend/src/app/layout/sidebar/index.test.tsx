@@ -7,6 +7,7 @@ import { Providers } from '@attraccess/ui';
 import { Sidebar } from './index';
 import userEvent from '@testing-library/user-event';
 import { PlugIcon } from 'lucide-react';
+import { useInstallPromptStore, type BeforeInstallPromptEvent } from '../../../pwa-install/installPrompt';
 
 const state = vi.hoisted(() => ({
   items: [] as PluginSidebarItem[],
@@ -371,6 +372,30 @@ describe('user menu preferences', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Account' }));
 
     expect(screen.getByLabelText('Current path')).toHaveTextContent('/account');
+  });
+
+  it('offers "Install app" only while the browser can install Attraccess', async () => {
+    const user = userEvent.setup();
+    const prompt = vi.fn(() => Promise.resolve());
+    useInstallPromptStore.setState({ deferredPrompt: null });
+    renderSidebar();
+
+    await user.click(screen.getByRole('button', { name: 'User menu' }));
+    expect(screen.queryByRole('menuitem', { name: 'Install app' })).toBeNull();
+    await user.keyboard('{Escape}');
+
+    useInstallPromptStore.setState({
+      deferredPrompt: Object.assign(new Event('beforeinstallprompt'), {
+        prompt,
+        userChoice: Promise.resolve({ outcome: 'dismissed' as const, platform: 'web' }),
+      }) as BeforeInstallPromptEvent,
+    });
+    await user.click(screen.getByRole('button', { name: 'User menu' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Install app' }));
+
+    expect(prompt).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole('button', { name: 'User menu' }));
+    expect(screen.queryByRole('menuitem', { name: 'Install app' })).toBeNull();
   });
 });
 

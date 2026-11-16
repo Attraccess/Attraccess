@@ -26,19 +26,26 @@ A Progressive Web App runs in your browser but can be installed on your home scr
 > [!NOTE]
 > On iOS, you must use Safari for installing PWAs. Other browsers (Chrome, Firefox) do not support this feature on iOS.
 
+> [!TIP]
+> In Safari, Attraccess offers the same **Install app** action as on Android (see below). On iPhone and iPad it shows these steps instead of installing directly.
+
 ## Install on Android
 
 1. Open **Chrome** and navigate to your Attraccess instance
-2. Log in to your account
-3. Tap the **three-dot menu** in the top right corner
-4. Tap **Install app** (or "Add to Home screen")
-5. Confirm by tapping **Install**
-6. Attraccess now appears on your home screen and in your app drawer
+2. Choose **Install app**:
+   - **Signed in:** open the user menu (the gear icon at the bottom of the sidebar) and tap **Install app**
+   - **Signed out:** tap the download icon next to the dark-mode toggle in the top right corner
+   - Or tap **Install** in the small **Install Attraccess** card at the bottom of the page
+3. Confirm by tapping **Install**
+4. Attraccess now appears on your home screen and in your app drawer
 
 <!-- TODO: Screenshot of Chrome install app prompt -->
 
-> [!NOTE]
-> On some Android devices, you may see a banner at the bottom of the page prompting you to install the app. Tap it to install directly.
+The **Install app** action only appears when Chrome can install Attraccess. It is hidden once Attraccess is installed and on kiosk screens. Chrome may also need you to use the page for a moment before it offers installation.
+
+The install card appears on its own while Attraccess can be installed. Tap **Not now** to hide it for 30 days; the **Install app** action stays available.
+
+**If you don't see Install app:** tap the **three-dot menu** in the top right corner of Chrome, tap **Install app** (or "Add to Home screen"), and confirm with **Install**. The same works in Chrome or Edge on a computer, from the install icon in the address bar or the browser menu.
 
 ## Using Attraccess on Mobile
 

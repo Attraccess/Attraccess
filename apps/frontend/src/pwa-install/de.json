@@ -1,0 +1,18 @@
+{
+  "install": "App installieren",
+  "installTooltip": "Attraccess als App installieren",
+  "banner": {
+    "title": "Attraccess installieren",
+    "description": "Öffne es wie jede andere App von deinem Startbildschirm.",
+    "install": "Installieren",
+    "dismiss": "Nicht jetzt",
+    "label": "App installieren"
+  },
+  "ios": {
+    "title": "Attraccess installieren",
+    "intro": "Füge Attraccess in Safari zu deinem Home-Bildschirm hinzu:",
+    "step1": "Tippe auf „Teilen“ (das Quadrat mit dem Pfeil nach oben).",
+    "step2": "Wähle „Zum Home-Bildschirm“.",
+    "step3": "Tippe auf „Hinzufügen“."
+  }
+}
