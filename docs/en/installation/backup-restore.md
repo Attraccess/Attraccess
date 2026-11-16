@@ -54,6 +54,20 @@ docker run --rm \
 find $BACKUP_DIR -name "attraccess-*.tar.gz" -mtime +$DAYS_TO_KEEP -delete
 ```
 
+## What a Backup Contains and Requires
+
+The SQLite database holds the core data **and the tables of all plugins** together with their migration state (the core
+`migrations` table and one migrations table per plugin). A backup is therefore one consistent unit:
+
+- Stop the container, or use a consistent SQLite copy, so the file is not copied mid-write.
+- Restore the database together with the `plugins/` folder, and start the Attraccess version the backup was made with
+  or a newer one. Newer versions upgrade the database on start; an older version cannot open a database that a newer
+  one has migrated.
+- Balances, price snapshots and meter values are stored as exact values and come back unchanged.
+
+The same requirements (stable identifiers, timestamps, exact values, plugin data and migration state) define the
+[export and import contract](developer/adding-a-database-backend.md) for other database engines.
+
 ## Restoring a Backup
 
 ```bash

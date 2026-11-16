@@ -47,6 +47,14 @@ Configuration changes take effect after restarting the API. Buffered startup log
 
 In containers, give the API write access to the file path and mount its directory if logs must survive container replacement. Rotation, retention, remote drivers, per-driver levels and live reconfiguration are not included. Only API application/framework logs are routed: persisted audit records, opt-in flow recordings, frontend, firmware, companion and dev-launcher output retain their own behavior. Generated `storage/` and `log/` files are gitignored. Developers can [register another transport](developer/logging.md).
 
+## Database
+
+| Variable        | Default  | Description                                                                                                          |
+| --------------- | -------- | -------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_TYPE` | `sqlite` | Database engine. Only `sqlite` is supported; any other value stops the start before a database or plugin is touched. |
+
+See [Adding a Database Backend](developer/adding-a-database-backend.md) for the engine seam.
+
 ## Storage
 
 | Variable              | Default        | Description                                    |

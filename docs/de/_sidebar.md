@@ -82,6 +82,7 @@
   - [Überblick](plugins/overview.md)
   - [Plugins installieren](plugins/installing-plugins.md)
   - [Plugins entwickeln](plugins/developing-plugins.md)
+  - [Plugins auf SDK 2.0 umstellen](plugins/migrating-to-2.md)
   - **Reservierungen**
     - [Überblick](plugins/reservations/overview.md)
     - [Reservierungen nutzen](plugins/reservations/using-reservations.md)
@@ -120,6 +121,9 @@
 - **Für Entwickler**
   - [Überblick](developer/overview.md)
   - [Architektur](developer/architecture.md)
+  - [Persistenz-Architektur](developer/persistence-architecture.md)
+  - [Persistenz-Garantien](developer/persistence-guarantees.md)
+  - [Datenbank-Backend hinzufügen](developer/adding-a-database-backend.md)
   - [API-Log-Ziele](developer/logging.md)
   - [API-Referenz](developer/api-reference.md)
   - [KI-Agenten (llms.txt & WebMCP)](developer/ai-agents.md)

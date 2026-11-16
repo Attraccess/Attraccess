@@ -90,6 +90,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Overview](https://docs.attraccess.org/en/plugins/overview.md): Introduces the plugin system that extends Attraccess with frontend pages and backend endpoints, plugin management and SDKs.
 - [Installing Plugins](https://docs.attraccess.org/en/plugins/installing-plugins.md): How to upload, enable, disable and remove plugins in the web interface, with troubleshooting.
 - [Developing Plugins](https://docs.attraccess.org/en/plugins/developing-plugins.md): Developer guide to building Attraccess plugins: anatomy, SDKs, backend plugins, dependencies and reader UI integration.
+- [Migrating Plugins to SDK 2.0](https://docs.attraccess.org/en/plugins/migrating-to-2.md): What plugin developers must change for Attraccess 2.0: the minimum host version, the declared database engines and how the host refuses older plugins.
 - [Database Migrations](https://docs.attraccess.org/en/plugins/database-migrations.md): How a plugin ships TypeORM migrations for its own tables: declaring, writing and bundling the migrations entry.
 
 ## English: Reservations
@@ -134,6 +135,9 @@ The documentation pages are plain Markdown files. English pages live under https
 ## English: Developer Guide
 - [Overview](https://docs.attraccess.org/en/developer/overview.md): Developer entry point: tech stack, prerequisites, getting started, development workflow, project structure and useful commands.
 - [Architecture](https://docs.attraccess.org/en/developer/architecture.md): Describes the Attraccess NX monorepo: applications, libraries, database, authentication and NestJS API conventions.
+- [Persistence Architecture](https://docs.attraccess.org/en/developer/persistence-architecture.md): Who owns database access in Attraccess: neutral models, SQLite schema, backend seam, ports and adapters, the enforced import boundary and ownership per feature area.
+- [Persistence Guarantees](https://docs.attraccess.org/en/developer/persistence-guarantees.md): The transaction and concurrency contract of the persistence layer, which guarantee is tested where, and which assumptions only hold for a single API instance.
+- [Adding a Database Backend](https://docs.attraccess.org/en/developer/adding-a-database-backend.md): Exact steps to add another relational backend to Attraccess, the export, import and backup contract, and the concrete deliverables that remain for PostgreSQL (ATT-584).
 - [API Log Destinations](https://docs.attraccess.org/en/developer/logging.md): How the API routes logs to destinations with RoutedLogger, including registering a driver and startup ownership.
 - [API Reference](https://docs.attraccess.org/en/developer/api-reference.md): Describes the REST API and its OpenAPI docs, the generated API client and React Query hooks, authentication and key modules.
 - [AI Agents (llms.txt & WebMCP)](https://docs.attraccess.org/en/developer/ai-agents.md): Explains the llms.txt index and the experimental WebMCP tools of the docs site, how to try them in Chrome and how to add pages.
@@ -161,7 +165,7 @@ The documentation pages are plain Markdown files. English pages live under https
 ## Deutsch: Installation
 - [Docker Compose](https://docs.attraccess.org/de/installation/docker-compose.md): Empfohlene Produktivinstallation von Attraccess mit Docker Compose, inklusive Projektverzeichnis, Umgebungsvariablen und erstem Start.
 - [Portainer](https://docs.attraccess.org/de/installation/portainer.md): Installation von Attraccess als Stack in Portainer, inklusive Umgebungsvariablen, Deployment, Ersteinrichtung und Stack-Update.
-- [Umgebungsvariablen](https://docs.attraccess.org/de/installation/environment-variables.md): Referenz aller Umgebungsvariablen zur Konfiguration von Attraccess: Pflichteinstellungen, Anwendung, Logs, Speicher, SMTP und TLS.
+- [Umgebungsvariablen](https://docs.attraccess.org/de/installation/environment-variables.md): Referenz aller Umgebungsvariablen zur Konfiguration von Attraccess: Pflichteinstellungen, Anwendung, Logs, Datenbank, Speicher, SMTP und TLS.
 - [SSL einrichten](https://docs.attraccess.org/de/installation/ssl-setup.md): Wie Attraccess per HTTPS bereitgestellt wird: Reverse Proxy, selbst-signierte oder eigene Zertifikate und Anforderungen für SSO.
 - [Aktualisierung](https://docs.attraccess.org/de/installation/updating.md): So prüfen Sie auf neue Attraccess-Versionen und aktualisieren mit Docker Compose, Docker oder Portainer oder legen eine feste Version fest.
 - [Backup & Wiederherstellung](https://docs.attraccess.org/de/installation/backup-restore.md): Erklärt, welche Attraccess-Daten gesichert werden, wie Sie ein Backup erstellen und wiederherstellen.
@@ -235,6 +239,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Überblick](https://docs.attraccess.org/de/plugins/overview.md): Stellt das Plugin-System vor, das Attraccess um Frontend-Seiten und Backend-Endpunkte erweitert, mit Verwaltung und SDKs.
 - [Plugins installieren](https://docs.attraccess.org/de/plugins/installing-plugins.md): Plugins über die Weboberfläche hochladen, aktivieren, deaktivieren und entfernen, mit Fehlerbehebung.
 - [Plugins entwickeln](https://docs.attraccess.org/de/plugins/developing-plugins.md): Entwicklerleitfaden für Attraccess-Plugins: SDKs, Frontend- und Backend-Plugins, Abhängigkeiten, Reader-UI und Start-Hooks.
+- [Plugins auf SDK 2.0 umstellen](https://docs.attraccess.org/de/plugins/migrating-to-2.md): Was Plugin-Entwickler für Attraccess 2.0 ändern müssen: die Mindest-Host-Version, die deklarierten Datenbank-Engines und wie der Host ältere Plugins verweigert.
 
 ## Deutsch: Reservierungen
 - [Überblick](https://docs.attraccess.org/de/plugins/reservations/overview.md): Das Plugin Reservierungen lässt Mitglieder eine Ressource für ein Zeitfenster buchen; Überblick, Voraussetzungen und Links zu Mitglieder-, Administrations- und API-Seiten.
@@ -278,6 +283,9 @@ The documentation pages are plain Markdown files. English pages live under https
 ## Deutsch: Für Entwickler
 - [Überblick](https://docs.attraccess.org/de/developer/overview.md): Einstieg für Entwickler: Technologie-Stack, Voraussetzungen, erste Schritte, Entwicklungsablauf, Projektstruktur und nützliche Befehle.
 - [Architektur](https://docs.attraccess.org/de/developer/architecture.md): Beschreibt das Attraccess-NX-Monorepo: Anwendungen, Bibliotheken, Datenbank und Authentifizierung.
+- [Persistenz-Architektur](https://docs.attraccess.org/de/developer/persistence-architecture.md): Wer in Attraccess den Datenbankzugriff besitzt: neutrale Modelle, SQLite-Schema, Backend-Naht, Ports und Adapter, die erzwungene Importgrenze und die Zuständigkeit je Bereich.
+- [Persistenz-Garantien](https://docs.attraccess.org/de/developer/persistence-guarantees.md): Der Transaktions- und Nebenläufigkeitsvertrag der Persistenzschicht, wo welche Garantie getestet wird und welche Annahmen nur für eine einzelne API-Instanz gelten.
+- [Datenbank-Backend hinzufügen](https://docs.attraccess.org/de/developer/adding-a-database-backend.md): Genaue Schritte, um Attraccess ein weiteres relationales Backend hinzuzufügen, der Export-, Import- und Backup-Vertrag und die verbleibenden konkreten Lieferungen für PostgreSQL (ATT-584).
 - [API-Log-Ziele](https://docs.attraccess.org/de/developer/logging.md): Wie die API Logs mit RoutedLogger an Ziele leitet, inklusive Treiber-Registrierung und Start-Lebenszyklus.
 - [API-Referenz](https://docs.attraccess.org/de/developer/api-reference.md): Beschreibt die REST-API mit OpenAPI-Dokumentation, generiertem API-Client und React-Query-Hooks, Authentifizierung und wichtigen Modulen.
 - [KI-Agenten (llms.txt & WebMCP)](https://docs.attraccess.org/de/developer/ai-agents.md): Erklärt den llms.txt-Index und die experimentellen WebMCP-Tools der Dokumentation, das Ausprobieren in Chrome und das Hinzufügen von Seiten.

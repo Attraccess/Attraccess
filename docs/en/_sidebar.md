@@ -83,6 +83,7 @@
   - [Overview](plugins/overview.md)
   - [Installing Plugins](plugins/installing-plugins.md)
   - [Developing Plugins](plugins/developing-plugins.md)
+  - [Migrating Plugins to SDK 2.0](plugins/migrating-to-2.md)
   - [Database Migrations](plugins/database-migrations.md)
   - **Reservations**
     - [Overview](plugins/reservations/overview.md)
@@ -122,6 +123,9 @@
 - **Developer Guide**
   - [Overview](developer/overview.md)
   - [Architecture](developer/architecture.md)
+  - [Persistence Architecture](developer/persistence-architecture.md)
+  - [Persistence Guarantees](developer/persistence-guarantees.md)
+  - [Adding a Database Backend](developer/adding-a-database-backend.md)
   - [API Log Destinations](developer/logging.md)
   - [API Reference](developer/api-reference.md)
   - [AI Agents (llms.txt & WebMCP)](developer/ai-agents.md)
