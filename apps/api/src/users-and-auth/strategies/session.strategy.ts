@@ -1,4 +1,10 @@
-import { ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-custom';
 import { Request } from 'express';
@@ -15,6 +21,15 @@ import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { isValkeyUnavailableError, valkeyUnavailableException } from '../../valkey/valkey-unavailable';
 
 const TWO_FACTOR_SETUP_ALLOWED_PREFIXES = ['/auth/two-factor', '/auth/session', '/users/me'];
+
+const DATABASE_BUSY_MESSAGE = 'The database is busy; try again shortly';
+
+/** SQLITE_BUSY as raised by the connection guard (error.code) or by the driver (QueryFailedError.driverError.code). */
+function isSqliteBusyError(error: unknown): boolean {
+  const code = (error as { code?: unknown; driverError?: { code?: unknown } } | null)?.code;
+  const driverCode = (error as { driverError?: { code?: unknown } } | null)?.driverError?.code;
+  return code === 'SQLITE_BUSY' || driverCode === 'SQLITE_BUSY';
+}
 
 // ponytail: Set serializes as {} over JSON; this subclass emits an array so plugins/responses are safe
 class SerializablePermissionSet extends Set<string> {
@@ -43,7 +58,11 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
       return await this.resolveUser(req);
     } catch (error) {
       // An unreachable Valkey is not a failed sign-in: answer 503 (the auth guard passes 5xx through) instead of 401.
-      throw isValkeyUnavailableError(error) ? valkeyUnavailableException(error as Error) : error;
+      if (isValkeyUnavailableError(error)) throw valkeyUnavailableException(error as Error);
+      // Neither is a busy database (a request that waited too long for another request's transaction): answering 401
+      // would make clients drop a valid session.
+      if (isSqliteBusyError(error)) throw new ServiceUnavailableException(DATABASE_BUSY_MESSAGE);
+      throw error;
     }
   }
 
