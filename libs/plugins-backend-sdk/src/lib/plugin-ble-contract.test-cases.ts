@@ -260,6 +260,22 @@ export function defineBleContractSuite(name: string, create: BleContractFactory)
         host.setReaderAvailable(1, false);
         await expect(a.scan(1, PROFILE.id)).rejects.toMatchObject({ code: 'READER_OFFLINE', retryable: true });
       });
+
+      it('reports READER_UNSUPPORTED, not retryable, when the reader firmware cannot do plugin BLE', async () => {
+        host.setReaderSupported(1, false, 'protocol-version:2');
+        const created = await endpoint();
+        await expect(a.scan(1, PROFILE.id)).rejects.toMatchObject({
+          code: 'READER_UNSUPPORTED',
+          retryable: false,
+          detail: 'protocol-version:2',
+        });
+        await expect(a.openSession(created.id)).rejects.toMatchObject({ code: 'READER_UNSUPPORTED' });
+        expect((await a.listReaders()).find((reader) => reader.readerId === 1)?.available).toBe(false);
+        expect(host.transcript).toHaveLength(0);
+        host.setReaderSupported(1, true);
+        const session = await a.openSession(created.id);
+        await session.close();
+      });
     });
 
     describe('endpoints and ownership', () => {
@@ -613,6 +629,53 @@ export function defineBleContractSuite(name: string, create: BleContractFactory)
         await open.value.close();
         const reopened = await a.openSession(created.id);
         await reopened.close();
+      });
+
+      it('reports the negotiated MTU and bounds writes without response by it', async () => {
+        a.registerProfile({
+          id: 'bulk-device',
+          services: [
+            {
+              uuid: SERVICE,
+              characteristics: [
+                { key: 'bulk', uuid: 'fff3', operations: ['write', 'writeWithoutResponse'], maxWriteBytes: 512 },
+              ],
+            },
+          ],
+        });
+        const created = await a.createEndpoint({
+          readerId: 1,
+          address: ADDRESS,
+          addressType: 'public',
+          profileId: 'bulk-device',
+        });
+        const standard = await a.openSession(created.id);
+        expect(standard.mtu).toBe(247);
+        await standard.close();
+
+        host.setMtu(100);
+        const session = await a.openSession(created.id);
+        expect(session.mtu).toBe(100);
+        const before = host.transcript.length;
+        await session.write('bulk', new Uint8Array(97), { withoutResponse: true });
+        await expect(session.write('bulk', new Uint8Array(98), { withoutResponse: true })).rejects.toMatchObject({
+          code: 'PAYLOAD_TOO_LARGE',
+          detail: 'exceeds-mtu',
+        });
+        // A write with response may use the long-write procedure up to the profile bound.
+        await session.write('bulk', new Uint8Array(512));
+        expect(host.transcript.slice(before).map((entry) => [entry.op, entry.bytes?.length])).toEqual([
+          ['write', 97],
+          ['write', 512],
+        ]);
+        await session.close();
+        expect(session.mtu).toBe(100);
+
+        host.setMtu(517);
+        const large = await a.openSession(created.id);
+        expect(large.mtu).toBe(517);
+        await large.write('bulk', new Uint8Array(512), { withoutResponse: true });
+        await large.close();
       });
 
       it('runs operations one at a time in call order', async () => {

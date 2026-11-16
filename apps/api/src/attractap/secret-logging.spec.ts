@@ -264,6 +264,25 @@ describe('secrets in logs', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('the plugin BLE host never logs device payloads, keys or tokens', () => {
+    const offenders = ['apps/api/src/plugin-system/ble', 'apps/api/src/attractap/websockets/handlers/ble'].flatMap(
+      (root) => scan(root, ['.ts'], API_LOG_CALL, (file) => /\.(spec|test-fixture)\.ts$/.test(file)),
+    );
+    expect(offenders).toEqual([]);
+    // Read results, written values and notifications are plain `value`/`bytes`: none of them is ever interpolated.
+    const bytesInLogs = ['apps/api/src/plugin-system/ble', 'apps/api/src/attractap/websockets/handlers/ble'].flatMap(
+      (root) =>
+        sourceFiles(join(REPOSITORY_ROOT, root), ['.ts'])
+          .filter((path) => !/\.(spec|test-fixture)\.ts$/.test(path))
+          .flatMap((path) =>
+            logCalls(readFileSync(path, 'utf8'), API_LOG_CALL)
+              .filter(({ call }) => /\$\{[^}]*\b(?:value|bytes|data)\b[^}]*\}/.test(call))
+              .map(({ call }) => `${relative(REPOSITORY_ROOT, path)}: ${call.slice(0, 140)}`),
+          ),
+    );
+    expect(bytesInLogs).toEqual([]);
+  });
+
   it('the reader firmware never logs keys, tokens, PINs, passwords or card traffic', () => {
     const offenders = scan('apps/attractap/firmware/src', ['.cpp', '.hpp', '.h', '.c'], FIRMWARE_LOG_CALL, (file) =>
       FIRMWARE_LOG_IMPLEMENTATIONS.some((prefix) => file.startsWith(prefix)),

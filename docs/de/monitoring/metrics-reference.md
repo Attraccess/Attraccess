@@ -175,6 +175,31 @@ histogram_quantile(0.95, sum by (event, le) (rate(attraccess_ws_message_duration
 sum by (event) (rate(attraccess_ws_messages_total{status="error"}[5m]))
 ```
 
+## Plugin-Bluetooth (BLE)
+
+Plugins mit der Berechtigung `BLE_TRANSPORT` sprechen über Attractap-Reader mit Bluetooth-Geräten. Die Labels haben wenige Ausprägungen: Reader-, Endpunkt- und Sitzungs-IDs stehen nur in den API-Logs (Zeilen `ble op=...`).
+
+| Metrik | Typ | Labels | Beschreibung |
+|--------|-----|--------|--------------|
+| `attraccess_plugin_ble_operations_total` | Counter | `operation`, `outcome` | Plugin-BLE-Operationen (`scan`, `read`, `write`, `subscribe`, `unsubscribe`, ...); `outcome` ist `ok` oder der Fehlercode |
+| `attraccess_plugin_ble_operation_duration_seconds` | Histogram | `operation` | Dauer erfolgreicher Operationen, einschließlich des Roundtrips zum Reader |
+| `attraccess_plugin_ble_sessions_active` | Gauge | -- | Offene Plugin-BLE-Sitzungen |
+| `attraccess_plugin_ble_session_closes_total` | Counter | `reason` | Geschlossene Sitzungen nach Grund (`closed`, `lease-expired`, `disconnected`, `cancelled`, ...) |
+| `attraccess_plugin_ble_rejections_total` | Counter | `code` | Aufrufe, die Profil, Reader-Allowlist oder ein Größenlimit abgelehnt haben (`OPERATION_NOT_ALLOWED`, `UNKNOWN_CHARACTERISTIC`, `PAYLOAD_TOO_LARGE`) |
+| `attraccess_plugin_ble_notifications_total` | Counter | `outcome` | Benachrichtigungen nach Ergebnis: `delivered`, `overflow`, `oversized`, `malformed` |
+
+**Buckets der Operationsdauer:** 10ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s, 30s, 60s
+
+### Beispiel-PromQL-Abfragen
+
+```promql
+# Fehlgeschlagene Plugin-BLE-Operationen nach Code
+sum by (operation, outcome) (rate(attraccess_plugin_ble_operations_total{outcome!="ok"}[5m]))
+
+# Benachrichtigungs-Streams, die gescheitert sind, statt zuzustellen
+sum by (outcome) (increase(attraccess_plugin_ble_notifications_total{outcome!="delivered"}[1h]))
+```
+
 ## Cron-Jobs
 
 | Metrik | Typ | Labels | Beschreibung |

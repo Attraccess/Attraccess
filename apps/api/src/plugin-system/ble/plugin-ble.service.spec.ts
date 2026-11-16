@@ -1,6 +1,7 @@
 import { Attractap } from '@attraccess/database-entities';
 import { PluginBleError, type PluginBleContext } from '@attraccess/plugins-backend-sdk';
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../../attractap/events';
+import type { BleReaderStatus } from './ble-transport-driver';
 import { createHostBleHarness, type HostBleHarness } from './__test__/ble-host-harness.test-fixture';
 import { BleTestDriver } from './__test__/ble-test-driver.test-fixture';
 import { createPluginBleContext } from './plugin-ble-context';
@@ -89,14 +90,14 @@ describe('PluginBleService (host details)', () => {
 
   it('fails an open that was in flight when the reader was turned off', async () => {
     const created = await endpoint();
-    let release!: (available: boolean) => void;
+    let release!: (status: BleReaderStatus) => void;
     jest
-      .spyOn(harness.driver, 'isReaderAvailable')
-      .mockImplementationOnce(() => new Promise<boolean>((resolve) => (release = resolve)) as never);
+      .spyOn(harness.driver, 'readerStatus')
+      .mockImplementationOnce(() => new Promise<BleReaderStatus>((resolve) => (release = resolve)) as never);
     const opening = ble.openSession(created.id).catch((error: PluginBleError) => error);
     while (!release) await new Promise((resolve) => setImmediate(resolve));
     await harness.setReaderAccess(1, false);
-    release(true);
+    release({ status: 'available' });
     await expect(opening).resolves.toMatchObject({ code: 'READER_ACCESS_DENIED' });
     expect(harness.openSessions()).toHaveLength(0);
     expect(harness.transcript.map((entry) => entry.op)).not.toContain('connect');
@@ -104,14 +105,14 @@ describe('PluginBleService (host details)', () => {
 
   it('fails an open that was in flight when its endpoint was deleted', async () => {
     const created = await endpoint();
-    let release!: (available: boolean) => void;
+    let release!: (status: BleReaderStatus) => void;
     jest
-      .spyOn(harness.driver, 'isReaderAvailable')
-      .mockImplementationOnce(() => new Promise<boolean>((resolve) => (release = resolve)) as never);
+      .spyOn(harness.driver, 'readerStatus')
+      .mockImplementationOnce(() => new Promise<BleReaderStatus>((resolve) => (release = resolve)) as never);
     const opening = ble.openSession(created.id).catch((error: PluginBleError) => error);
     while (!release) await new Promise((resolve) => setImmediate(resolve));
     await ble.deleteEndpoint(created.id);
-    release(true);
+    release({ status: 'available' });
     await expect(opening).resolves.toMatchObject({ code: 'ENDPOINT_NOT_FOUND' });
     expect(harness.transcript.map((entry) => entry.op)).not.toContain('connect');
   });

@@ -5,7 +5,7 @@
 Backend-Plugins mit der Berechtigung `BLE_TRANSPORT` können über Attractap-Reader mit Bluetooth-Low-Energy-Geräten (BLE) sprechen. Der Transport ist bewusst **keine** rohe GATT-Schnittstelle: Jede Operation läuft über ein Profil, das Ihr Plugin registriert hat, und einen Endpunkt, den Ihr Plugin besitzt. Der Kern setzt die Grenzen durch; Ihr Plugin liefert die herstellerspezifische Semantik.
 
 > [!NOTE]
-> Diese Seite beschreibt den Vertrag und das, was mitgeliefert wird: die SDK-Typen, die Berechtigung, die Speicherung der Endpunkte, die Freigabe pro Reader und einen deterministischen Fake für Tests. Der eigentliche Reader-Transport (Websocket-Protokoll und Firmware, die den BLE-Verkehr tragen) folgt mit ATT-1033. Bis dahin enden `scan` und `openSession` mit `TRANSPORT_UNAVAILABLE`, während Profile und Endpunkte bereits funktionieren und sich alles gegen den Fake testen lässt. Wiederholen Sie `TRANSPORT_UNAVAILABLE` nicht in einer engen Schleife: Der Fehler bleibt bestehen, bis ein Host-Transport installiert ist; warten Sie deshalb zwischen den Versuchen immer länger.
+> Für Plugin-Bluetooth brauchen Reader die Attractap-Firmware **2.2.0 oder neuer**. Mit älterer Firmware enden `scan` und `openSession` mit `READER_UNSUPPORTED`. `TRANSPORT_UNAVAILABLE` tritt nur auf Hosts ohne Reader-Transport auf (zum Beispiel auf einem Test-Host); wiederholen Sie den Fehler nicht in einer engen Schleife.
 
 ## Vertrauensgrenze
 
@@ -96,7 +96,9 @@ const advertisements = await ble.scan(readers[0].readerId, 'door-lock', {
 //    serviceUuids: ['0000fff0-...'], manufacturerData: [{ companyId: 0x1234, data: Uint8Array }] }]
 ```
 
-`listReaders` liefert nur Reader, die ein Administrator für Plugins freigegeben hat. `available` ist false, wenn der Host keinen Transporttreiber hat oder der Reader gerade kein BLE unterstützt.
+`listReaders` liefert nur Reader, die ein Administrator für Plugins freigegeben hat. `available` ist true, solange der Reader online ist und seine Firmware Plugin-Bluetooth unterstützt. Es ist false, wenn der Host keinen Transporttreiber hat, der Reader offline ist oder seine Firmware zu alt ist. Ein Reader, der gerade die Sitzung eines anderen Plugins bedient, bleibt `available`.
+
+Ein Reader erledigt **eine BLE-Aufgabe zur Zeit**: einen Scan oder eine Sitzung, für alle Plugins zusammen. Ein `scan` oder `openSession`, während ein anderer Scan oder eine andere Sitzung den Reader nutzt, endet sofort mit `READER_BUSY` (wiederholbar). Es gibt keine Warteschlange. Ein Scan liefert höchstens 32 Advertisements, nach Adresse dedupliziert.
 
 `scan` hat eine Frist im Host: Antwortet der Transport nicht innerhalb von `durationMs` plus 5 s, endet der Scan mit `TIMEOUT`. Advertisements, die der Reader fehlerhaft meldet, werden übersprungen; sie lassen den Scan nicht scheitern.
 
@@ -147,6 +149,7 @@ const result = await ble.withSession(
 | Eigenschaft/Methode                           | Verhalten                                                                                                                                                                                                                                                                  |
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`, `endpointId`                            | Identifizieren Sitzung und Endpunkt.                                                                                                                                                                                                                                       |
+| `mtu`                                         | Die ausgehandelte ATT-MTU (23..517). Ein Schreiben ohne Antwort trägt höchstens `mtu - 3` Bytes; mehr endet mit `PAYLOAD_TOO_LARGE` (Detail `exceeds-mtu`). Schreiben mit Antwort nutzt bis zur Profilgrenze das Long-Write-Verfahren.                                     |
 | `read(key, { signal, timeoutMs })`            | Liest eine Characteristic; liefert eine Kopie der Bytes.                                                                                                                                                                                                                   |
 | `write(key, value, { withoutResponse, ... })` | Schreibt. Ein leerer Wert endet mit `INVALID_ARGUMENT`. `withoutResponse` braucht die Operation `writeWithoutResponse`, sonst ist `write` nötig; ein Schlüssel, der nur `writeWithoutResponse` erlaubt, braucht also `{ withoutResponse: true }`. Für Massenübertragungen. |
 | `subscribe(key, { signal })`                  | Startet Benachrichtigungen (`notify` oder `indicate`). Liefert einen Stream mit `next({ timeoutMs, signal })`, einem asynchronen Iterator und `unsubscribe()`.                                                                                                             |
@@ -156,7 +159,9 @@ const result = await ble.withSession(
 
 Regeln:
 
-- **Eine offene Sitzung pro Endpunkt.** Ein zweites `openSession` endet mit `ENDPOINT_BUSY` (wiederholbar). Der Vertrag kennt keine Warteschlange; die Serialisierung pro Reader ist Aufgabe des Transports.
+- **Eine offene Sitzung pro Endpunkt.** Ein zweites `openSession` endet mit `ENDPOINT_BUSY` (wiederholbar). Es gibt keine Warteschlange.
+- **Eine Sitzung pro Reader.** Ein Reader hält eine BLE-Verbindung zur Zeit, für alle Plugins. Solange eine Sitzung oder ein Scan ihn nutzt, enden `openSession` und `scan` über diesen Reader mit `READER_BUSY` (wiederholbar). Eine lange Sitzung, etwa ein Firmware-Update eines Geräts, blockiert den Reader für alle Plugins, bis sie endet. Halten Sie Sitzungen deshalb so kurz, wie die Aufgabe es erlaubt.
+- **Schreiben ohne Antwort läuft im Pipelining.** `write(..., { withoutResponse: true })` ist erledigt, sobald die Reader-Verbindung den Schreibvorgang in Reihenfolge eingereiht hat, nicht erst nach einem Roundtrip. So bleiben große Übertragungen schnell. Scheitert einer davon später am Reader, endet der nächste Aufruf der Sitzung mit diesem Fehler. Teilen Sie große Daten in Stücke von `session.mtu - 3` Bytes.
 - **Operationen laufen nacheinander in der Reihenfolge der Aufrufe.**
 - **Benachrichtigungen** kommen pro Abonnement in Reihenfolge und nur bei der besitzenden Sitzung an, in einer begrenzten Warteschlange (Standard 32, Profilmaximum 256). Verarbeiten Sie sie zügig. Wer einen bereits abonnierten Schlüssel erneut abonniert, erhält `INVALID_ARGUMENT`.
 - **Ein fehlschlagender Stream verwirft nie stillschweigend Daten.** Läuft die Warteschlange über, verwirft der Host die wartenden Benachrichtigungen und lässt den Stream sofort mit `NOTIFICATION_OVERFLOW` fehlschlagen. Eine Benachrichtigung über `maxNotificationBytes` lässt den Stream ebenso mit `PAYLOAD_TOO_LARGE` fehlschlagen. Jedes wartende und spätere `next()` endet dann mit diesem Code, die Sitzung bleibt offen. Rufen Sie `session.unsubscribe(key)` auf und abonnieren Sie erneut, um fortzufahren.
@@ -164,40 +169,40 @@ Regeln:
 - **Nach `close`** enden alle weiteren Operationen mit `SESSION_CLOSED`. Operationen, die beim Schließen noch liefen, enden sofort und genau einmal: mit `DISCONNECTED`, wenn das Gerät die Verbindung trennte, mit `CANCELLED`, wenn das an `openSession` übergebene Signal abbrach, sonst mit `SESSION_CLOSED`.
 - **`closed` wartet auf das Trennen.** Es wird erst aufgelöst, wenn der Host die Verbindung getrennt hat (begrenzt durch eine Frist im Host). Eine neue Sitzung direkt danach zu öffnen, scheitert deshalb nicht mit `ENDPOINT_BUSY`. Nach einer Zeitüberschreitung beim Verbinden oder einem abgebrochenen Öffnen bleibt der Endpunkt belegt (`ENDPOINT_BUSY`, wiederholbar), bis der Verbindungsversuch des Readers beendet ist, höchstens 10 s.
 - **Gründe in `closed`:** `closed`, `lease-expired`, `cancelled`, `disconnected`, `reader-access-revoked`, `endpoint-deleted`, `shutdown`, `error`.
-- **Abbruch.** `scan`, `openSession`, `withSession`, `read`, `write`, `subscribe` und `next` akzeptieren ein `AbortSignal`. Ein Abbruch beendet den wartenden Aufruf mit `CANCELLED`. Bricht das Signal ab, das Sie an `openSession` übergeben haben, schließt die Sitzung. Eine Operation mit Zeitüberschreitung oder Abbruch schließt die Sitzung **nicht**, es sei denn, der Transport meldet die Verbindung als verloren.
+- **Abbruch.** `scan`, `openSession`, `withSession`, `read`, `write`, `subscribe` und `next` akzeptieren ein `AbortSignal`. Ein Abbruch beendet den wartenden Aufruf mit `CANCELLED`. Bricht das Signal ab, das Sie an `openSession` übergeben haben, schließt die Sitzung. Eine Operation mit Zeitüberschreitung oder Abbruch schließt die Sitzung **nicht**, es sei denn, der Transport meldet die Verbindung als verloren. An einem echten Reader erreicht der Abbruch den Reader: Ein Scan stoppt, ein laufender Verbindungsaufbau wird abgebrochen und der Reader freigegeben. Ein Lese- oder Schreibvorgang, den das Funkmodul schon begonnen hat, lässt sich nicht mittendrin abbrechen: Ihr Aufruf endet sofort, der Reader verwirft das späte Ergebnis, und die nächste Operation beginnt, sobald das Funkmodul fertig ist.
 
 ## Fehler
 
 Jeder Fehler ist ein `PluginBleError` mit stabilem `code`, einem `retryable`-Flag, optional `operation` und optional `detail`. `detail` ist eine unbedenkliche Diagnose und enthält nie Nutzdaten-Bytes. Berechtigungsfehler bleiben `PluginPermissionError`. Validierungsfehler (`INVALID_PROFILE`, `INVALID_ARGUMENT`) nennen das betroffene Feld in der Meldung. `retryable` bedeutet, dass ein späterer Versuch gelingen kann, nicht, dass Sie sofort wiederholen sollen: Warten Sie zwischen den Versuchen.
 
-| Code                     | Wiederholbar | Bedeutung                                                                       |
-| ------------------------ | ------------ | ------------------------------------------------------------------------------- |
-| `NOT_READY`              | ja           | Der Host hat den Start noch nicht abgeschlossen.                                |
-| `TRANSPORT_UNAVAILABLE`  | ja           | Der Host hat keinen Reader-Transport (bis ATT-1033 erscheint).                  |
-| `READER_NOT_FOUND`       | nein         | Der Reader existiert nicht.                                                     |
-| `READER_ACCESS_DENIED`   | nein         | Ein Administrator hat den Reader nicht für Plugins freigegeben.                 |
-| `READER_OFFLINE`         | ja           | Der Reader ist nicht verbunden oder unterstützt gerade kein BLE.                |
-| `READER_UNSUPPORTED`     | nein         | Die Firmware des Readers unterstützt kein BLE.                                  |
-| `READER_BUSY`            | ja           | Der Reader bedient eine andere BLE-Verbindung.                                  |
-| `PROFILE_NOT_REGISTERED` | nein         | Ihr Plugin hat dieses Profil in diesem Prozess nicht registriert.               |
-| `PROFILE_CONFLICT`       | nein         | Unter dieser ID ist bereits eine andere Definition registriert.                 |
-| `INVALID_PROFILE`        | nein         | Die Profildefinition ist ungültig.                                              |
-| `INVALID_ARGUMENT`       | nein         | Ein Argument ist ungültig (die Meldung nennt das Feld).                         |
-| `ENDPOINT_NOT_FOUND`     | nein         | Der Endpunkt existiert nicht oder gehört einem anderen Plugin.                  |
-| `ENDPOINT_CONFLICT`      | nein         | Die Adresse ist bereits gebunden (an ein anderes Plugin oder an diesem Reader). |
-| `ENDPOINT_BUSY`          | ja           | Der Endpunkt hat bereits eine offene Sitzung.                                   |
-| `UNKNOWN_CHARACTERISTIC` | nein         | Der Schlüssel ist nicht im Profil.                                              |
-| `OPERATION_NOT_ALLOWED`  | nein         | Das Profil erlaubt diese Operation für den Schlüssel (oder das Scannen) nicht.  |
-| `PAYLOAD_TOO_LARGE`      | nein         | Nutzdaten überschreiten ihre Profilgrenze.                                      |
-| `TIMEOUT`                | ja           | Eine Frist ist abgelaufen.                                                      |
-| `CANCELLED`              | nein         | Der Aufruf wurde über sein `AbortSignal` abgebrochen.                           |
-| `SESSION_CLOSED`         | nein         | Die Sitzung ist geschlossen.                                                    |
-| `DEVICE_NOT_FOUND`       | ja           | Das Gerät wurde in der Nähe des Readers nicht gefunden.                         |
-| `CONNECTION_FAILED`      | ja           | Der Verbindungsaufbau ist fehlgeschlagen.                                       |
-| `DISCONNECTED`           | ja           | Das Gerät hat die Verbindung getrennt.                                          |
-| `GATT_ERROR`             | nein         | Das Gerät antwortete mit einem GATT-Fehler.                                     |
-| `NOTIFICATION_OVERFLOW`  | nein         | Die Benachrichtigungswarteschlange ist übergelaufen.                            |
-| `INTERNAL`               | nein         | Ein unerwarteter Host-Fehler. Die Meldung enthält nie Nutzdaten.                |
+| Code                     | Wiederholbar | Bedeutung                                                                                        |
+| ------------------------ | ------------ | ------------------------------------------------------------------------------------------------ |
+| `NOT_READY`              | ja           | Der Host hat den Start noch nicht abgeschlossen.                                                 |
+| `TRANSPORT_UNAVAILABLE`  | ja           | Der Host läuft ohne Reader-Transport (zum Beispiel ein Test-Host).                               |
+| `READER_NOT_FOUND`       | nein         | Der Reader existiert nicht.                                                                      |
+| `READER_ACCESS_DENIED`   | nein         | Ein Administrator hat den Reader nicht für Plugins freigegeben.                                  |
+| `READER_OFFLINE`         | ja           | Der Reader ist nicht verbunden oder unterstützt gerade kein BLE.                                 |
+| `READER_UNSUPPORTED`     | nein         | Die Firmware des Readers unterstützt kein Plugin-BLE (`detail` nennt den Grund).                 |
+| `READER_BUSY`            | ja           | Ein anderer Scan oder eine andere Sitzung nutzt den Reader, oder er aktualisiert seine Firmware. |
+| `PROFILE_NOT_REGISTERED` | nein         | Ihr Plugin hat dieses Profil in diesem Prozess nicht registriert.                                |
+| `PROFILE_CONFLICT`       | nein         | Unter dieser ID ist bereits eine andere Definition registriert.                                  |
+| `INVALID_PROFILE`        | nein         | Die Profildefinition ist ungültig.                                                               |
+| `INVALID_ARGUMENT`       | nein         | Ein Argument ist ungültig (die Meldung nennt das Feld).                                          |
+| `ENDPOINT_NOT_FOUND`     | nein         | Der Endpunkt existiert nicht oder gehört einem anderen Plugin.                                   |
+| `ENDPOINT_CONFLICT`      | nein         | Die Adresse ist bereits gebunden (an ein anderes Plugin oder an diesem Reader).                  |
+| `ENDPOINT_BUSY`          | ja           | Der Endpunkt hat bereits eine offene Sitzung.                                                    |
+| `UNKNOWN_CHARACTERISTIC` | nein         | Der Schlüssel ist nicht im Profil.                                                               |
+| `OPERATION_NOT_ALLOWED`  | nein         | Das Profil erlaubt diese Operation für den Schlüssel (oder das Scannen) nicht.                   |
+| `PAYLOAD_TOO_LARGE`      | nein         | Nutzdaten überschreiten ihre Profilgrenze.                                                       |
+| `TIMEOUT`                | ja           | Eine Frist ist abgelaufen.                                                                       |
+| `CANCELLED`              | nein         | Der Aufruf wurde über sein `AbortSignal` abgebrochen.                                            |
+| `SESSION_CLOSED`         | nein         | Die Sitzung ist geschlossen.                                                                     |
+| `DEVICE_NOT_FOUND`       | ja           | Das Gerät wurde in der Nähe des Readers nicht gefunden.                                          |
+| `CONNECTION_FAILED`      | ja           | Der Verbindungsaufbau ist fehlgeschlagen.                                                        |
+| `DISCONNECTED`           | ja           | Das Gerät hat die Verbindung getrennt.                                                           |
+| `GATT_ERROR`             | nein         | Das Gerät antwortete mit einem GATT-Fehler.                                                      |
+| `NOTIFICATION_OVERFLOW`  | nein         | Die Benachrichtigungswarteschlange ist übergelaufen.                                             |
+| `INTERNAL`               | nein         | Ein unerwarteter Host-Fehler. Die Meldung enthält nie Nutzdaten.                                 |
 
 ## Grenzwerte
 
@@ -212,6 +217,17 @@ Jeder Fehler ist ein `PluginBleError` mit stabilem `code`, einem `retryable`-Fla
 | Endpunkt-Bezeichnung                          | -        | 100 Zeichen                                                  |
 
 Werte über einer Grenze werden mit `INVALID_ARGUMENT` abgelehnt (in einem Profil mit `INVALID_PROFILE`); sie werden nie stillschweigend gekürzt. Die Konstanten sind als `PLUGIN_BLE_LIMITS` exportiert.
+
+## Echte Reader
+
+Die Reader-Firmware (2.2.0 oder neuer) meldet Plugin-Bluetooth beim Verbinden an. Host und Reader setzen die Regeln beide durch:
+
+- **Kompatibilität.** Ein Reader ohne diese Fähigkeit oder mit einer Protokollversion, die der Host nicht unterstützt, lässt `scan` und `openSession` mit `READER_UNSUPPORTED` enden. `detail` ist `no-ble-capability`, `protocol-version:<n>` oder `missing-operation:<op>`. Ein Profil mit mehr Characteristics, als der Reader annimmt (16), endet mit `READER_UNSUPPORTED`, Detail `allowlist-too-large:<n>`. Im ersten Fall hilft ein Firmware-Update des Readers (OTA vom Server).
+- **Durchsetzung am Reader.** Mit jeder Sitzung schickt der Host dem Reader das Profil als Allowlist: die gebundene Adresse und je Characteristic den Service, die Operationen und die Größenlimits. Der Reader lehnt alles andere ab, bevor er das Funkmodul benutzt. Das schützt vor Fehlern im Host, nicht vor einem kompromittierten Server, der jede beliebige Allowlist schicken könnte.
+- **Fristen am Reader.** Der Reader hält eigene Fristen für den Lease (Ihr Lease plus 10 s) und für Operationen. Schweigt der Server oder verliert der Reader die Verbindung zum Server, trennt der Reader das Gerät selbst.
+- **Benachrichtigungen** puffert der Reader (32 Benachrichtigungen oder 16 KiB pro Sitzung) und leitet sie in Reihenfolge mit einer Sequenznummer weiter. Ein voller Puffer am Reader beendet den Stream mit `NOTIFICATION_OVERFLOW`, eine Lücke oder ein Duplikat mit `INTERNAL` (Detail `malformed-notification`). Nichts geht stillschweigend verloren.
+- **Diagnose.** Funkfehler werden auf die Codes oben abgebildet; `detail` enthält den Rohgrund als sicheren Text, zum Beispiel `nimble:rc=13`, `hci:0x3e`, `att:0x0a` oder `reason:0x08`.
+- **Firmware-Updates.** Startet ein Reader ein Firmware-Update, beendet er seine BLE-Sitzung (`disconnected`) und lehnt neue BLE-Arbeit bis zum Neustart mit `READER_BUSY` (Detail `ota`) ab.
 
 ## Pflichten beim Aufräumen
 
@@ -308,6 +324,8 @@ Bedienfläche des Fake-Hosts:
 | `removeReader(id)`                                  | Löscht einen Reader: Sitzungen schließen mit `reader-access-revoked`, seine Endpunkte werden gelöscht.                                                                                                       |
 | `setReaderAvailable(id, available)`                 | `false`: Scans und Sitzungen am Reader scheitern mit `READER_OFFLINE`.                                                                                                                                       |
 | `setTransportAvailable(available)`                  | `false`: ein Host ohne Transport (`TRANSPORT_UNAVAILABLE`).                                                                                                                                                  |
+| `setReaderSupported(id, supported, detail?)`        | `false`: Reader-Firmware ohne Plugin-BLE; Scans und Sitzungen scheitern mit `READER_UNSUPPORTED` und `detail` (Standard `no-ble-capability`).                                                                |
+| `setMtu(mtu)`                                       | Die ATT-MTU künftig geöffneter Verbindungen (Standard 247, auch als `createFakeBleHost({ mtu })`).                                                                                                           |
 | `addPeripheral(peripheral)`                         | Ein Gerät: `readerId` oder `readerIds`, `address`, `addressType`, `advertisement`, `characteristics`. Characteristics werden über ihre UUID angegeben und nehmen `value`, `onRead`, `onWrite` und `delayMs`. |
 | `notify(address, uuid, bytes)`                      | Das Gerät sendet eine Benachrichtigung.                                                                                                                                                                      |
 | `disconnect(address)`                               | Das Gerät trennt die Verbindung: Sitzungen schließen mit `disconnected`.                                                                                                                                     |
@@ -321,6 +339,6 @@ Bedienfläche des Fake-Hosts:
 
 Um einen Timeout zu testen, geben Sie einer Characteristic ein `delayMs`, das länger als der Timeout ist, starten den Aufruf und rufen dann `await host.advance(timeoutMs)` auf.
 
-## Echte Reader
+## Der Fake und echte Reader
 
-Fake und Host teilen dieselbe Validierung und werden von einer gemeinsamen Vertrags-Testsuite geprüft. Der Transport, der BLE-Verkehr über echte Attractap-Reader trägt (Websocket-Protokoll und Firmware), folgt mit ATT-1033. Benachrichtigungen, Abbruch und Telemetrie auf echter Hardware folgen mit ATT-1036. An Ihrem Plugin ändert sich nichts, wenn er erscheint; ein Administrator aktiviert dann **Bluetooth-Nutzung durch Plugins erlauben** an einem Reader.
+Fake und Host teilen dieselbe Validierung und werden von einer gemeinsamen Vertrags-Testsuite geprüft. Sie läuft gegen den Fake, gegen den Host mit einem Testtreiber und gegen den Host mit dem echten Reader-Treiber, der mit einem simulierten Reader spricht. Ein Plugin, dessen Tests gegen den Fake bestehen, verhält sich an einem echten Reader genauso; dort aktiviert ein Administrator **Bluetooth-Nutzung durch Plugins erlauben** an einem Reader mit Firmware 2.2.0 oder neuer.

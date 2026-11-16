@@ -25,27 +25,44 @@ import { BleNotificationStream, cancelledBleCall } from './plugin-ble-notificati
  * they receive a `PluginBleSession` from `context.ble`.
  */
 
-/** A connected peripheral, as the session engine sees it. Receives only validated, normalized primitives. */
+/**
+ * A connected peripheral, as the session engine sees it. Receives only validated, normalized primitives.
+ * `timeoutMs` is the engine's own deadline for the call, so a transport can enforce it on its side as well.
+ */
 export interface BleSessionLink {
-  read(request: { serviceUuid: string; characteristicUuid: string; signal: AbortSignal }): Promise<Uint8Array>;
+  /** Negotiated ATT MTU. A link without one counts as the BLE minimum (23). */
+  readonly mtu?: number;
+  read(request: {
+    serviceUuid: string;
+    characteristicUuid: string;
+    signal: AbortSignal;
+    timeoutMs?: number;
+  }): Promise<Uint8Array>;
   write(request: {
     serviceUuid: string;
     characteristicUuid: string;
     value: Uint8Array;
     withoutResponse: boolean;
     signal: AbortSignal;
+    timeoutMs?: number;
   }): Promise<void>;
   subscribe(request: {
     serviceUuid: string;
     characteristicUuid: string;
     indicate: boolean;
     signal: AbortSignal;
+    timeoutMs?: number;
     onNotification(value: Uint8Array): void;
+    /** The transport failed the stream (overflow, malformed or oversized notification); it is torn down. */
+    onError?(error: PluginBleError): void;
   }): Promise<void>;
-  unsubscribe(request: { serviceUuid: string; characteristicUuid: string }): Promise<void>;
+  unsubscribe(request: { serviceUuid: string; characteristicUuid: string; timeoutMs?: number }): Promise<void>;
   disconnect(): Promise<void>;
-  /** Registers the callback for a lost link. A link already lost must call it right away. */
-  onDisconnected?(listener: () => void): void;
+  /**
+   * Registers the callback for a lost link. A link already lost must call it right away. `detail` is a safe
+   * diagnostic (e.g. `reader-link-lost`) that pending calls fail with.
+   */
+  onDisconnected?(listener: (detail?: string) => void): void;
 }
 
 export interface BleSessionClock {
@@ -63,12 +80,14 @@ export interface BleSessionEngineDeps {
   onClosed(engine: BleSessionEngine): void;
   /** Debug logging of operation, outcome and duration. Never receives payload bytes. */
   log?(operation: string, outcome: string, durationMs: number): void;
+  /** A call the engine refused before it reached the link (validation, bounds, closed session). */
+  onRejected?(operation: string, error: PluginBleError): void;
 }
 
 /** How long a close waits for the link to disconnect before the session counts as closed anyway. */
 const DISCONNECT_DEADLINE_MS = PLUGIN_BLE_LIMITS.opTimeoutDefaultMs;
 
-type Executor<T> = (signal: AbortSignal, link: BleSessionLink) => Promise<T>;
+type Executor<T> = (signal: AbortSignal, link: BleSessionLink, timeoutMs: number) => Promise<T>;
 type Target = ReturnType<typeof prepareBleRead>;
 
 interface ActiveOperation {
@@ -77,13 +96,20 @@ interface ActiveOperation {
   fail(error: PluginBleError): void;
 }
 
-function closeError(reason: PluginBleCloseReason, operation: string): PluginBleError {
-  if (reason === 'disconnected') return new PluginBleError('DISCONNECTED', 'The device disconnected', { operation });
+function closeError(reason: PluginBleCloseReason, operation: string, detail?: string): PluginBleError {
+  if (reason === 'disconnected') {
+    return new PluginBleError('DISCONNECTED', 'The device disconnected', { operation, detail });
+  }
   if (reason === 'cancelled') return new PluginBleError('CANCELLED', 'The session was cancelled', { operation });
   return new PluginBleError('SESSION_CLOSED', 'The session is closed', { operation, detail: reason });
 }
 
 const cancelled = cancelledBleCall;
+
+function normalizeMtu(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isInteger(value)) return PLUGIN_BLE_LIMITS.mtuMin;
+  return Math.min(Math.max(value, PLUGIN_BLE_LIMITS.mtuMin), PLUGIN_BLE_LIMITS.mtuMax);
+}
 
 /** Calls `fn` so that a synchronous throw becomes a rejection. */
 function attempt<T>(fn: () => Promise<T>): Promise<T> {
@@ -118,20 +144,28 @@ export class BleSessionEngine {
   private detachOpenSignal: (() => void) | null = null;
   private closing: Promise<void> | null = null;
   private closeReason: PluginBleCloseReason = 'closed';
+  /** Why the link was lost, for the DISCONNECTED errors of pending calls. */
+  private lostDetail: string | undefined;
   /** Settles once `open()` adopted or released its link. */
   private openSettled: Promise<void> = Promise.resolve();
   /** Settles once the transport's connect call returned and a link that arrived too late was released. */
   private connectWork: Promise<void> = Promise.resolve();
   private connectPending = false;
+  private linkMtu: number = PLUGIN_BLE_LIMITS.mtuMin;
 
   constructor(private readonly deps: BleSessionEngineDeps) {
     this.id = deps.id;
     this.endpointId = deps.endpointId;
     this.closed = new Promise((resolve) => (this.resolveClosed = resolve));
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- the frozen handle reads the live MTU
+    const engine = this;
     this.handle = Object.freeze({
       id: this.id,
       endpointId: this.endpointId,
       closed: this.closed,
+      get mtu() {
+        return engine.mtu;
+      },
       read: (key: string, options?: PluginBleCallOptions) => this.read(key, options),
       write: (key: string, value: Uint8Array, options?: PluginBleWriteOptions) => this.write(key, value, options),
       subscribe: (key: string, options?: { signal?: AbortSignal }) => this.subscribe(key, options),
@@ -142,6 +176,11 @@ export class BleSessionEngine {
 
   get isClosed(): boolean {
     return this.state === 'closed';
+  }
+
+  /** The link's negotiated ATT MTU, kept after the session closed. */
+  get mtu(): number {
+    return this.linkMtu;
   }
 
   /** Connects the link. Rejects, with the session closed, when the connect fails, times out or is cancelled. */
@@ -176,10 +215,11 @@ export class BleSessionEngine {
       throw closeError(this.closeReason, 'connect');
     }
     this.link = link;
+    this.linkMtu = normalizeMtu(link.mtu);
     this.state = 'open';
     this.cancelLease = this.deps.clock.setTimeout(() => void this.close('lease-expired'), options.leaseMs);
     try {
-      link.onDisconnected?.(() => this.linkLost());
+      link.onDisconnected?.((detail) => this.linkLost(detail));
     } catch (error) {
       markOpenSettled();
       await this.close('error');
@@ -241,7 +281,8 @@ export class BleSessionEngine {
   }
 
   /** Called by the transport when the link was lost. */
-  linkLost(): void {
+  linkLost(detail?: string): void {
+    if (!this.closing) this.lostDetail = typeof detail === 'string' ? detail : undefined;
     void this.close('disconnected');
   }
 
@@ -258,7 +299,7 @@ export class BleSessionEngine {
     this.rejectConnect?.(closeError(reason, 'connect'));
     for (const operation of [...this.active]) {
       operation.controller.abort();
-      operation.fail(closeError(reason, 'operation'));
+      operation.fail(closeError(reason, 'operation', this.lostDetail));
     }
     for (const { stream } of this.subscriptions.values()) stream.end(closeError(reason, 'subscribe'));
     for (const stream of this.starting.values()) stream.end(closeError(reason, 'subscribe'));
@@ -288,11 +329,12 @@ export class BleSessionEngine {
   read(key: string, options: PluginBleCallOptions = {}): Promise<Uint8Array> {
     return this.run('read', options, () => {
       const target = prepareBleRead(this.deps.profile, key);
-      return async (signal, link) => {
+      return async (signal, link, timeoutMs) => {
         const value = await link.read({
           serviceUuid: target.serviceUuid,
           characteristicUuid: target.characteristic.uuid,
           signal,
+          timeoutMs,
         });
         return checkBleInboundPayload(target.characteristic, 'read', value);
       };
@@ -302,13 +344,22 @@ export class BleSessionEngine {
   write(key: string, value: Uint8Array, options: PluginBleWriteOptions = {}): Promise<void> {
     return this.run('write', options, () => {
       const prepared = prepareBleWrite(this.deps.profile, key, value, options.withoutResponse === true);
-      return (signal, link) =>
+      // A write without response travels in one ATT packet: three bytes of it are the ATT header.
+      if (prepared.withoutResponse && prepared.value.byteLength > this.linkMtu - 3) {
+        throw new PluginBleError(
+          'PAYLOAD_TOO_LARGE',
+          `A write without response to "${prepared.characteristic.key}" exceeds the MTU payload of ${this.linkMtu - 3} bytes`,
+          { operation: 'write', detail: 'exceeds-mtu' },
+        );
+      }
+      return (signal, link, timeoutMs) =>
         link.write({
           serviceUuid: prepared.serviceUuid,
           characteristicUuid: prepared.characteristic.uuid,
           value: prepared.value,
           withoutResponse: prepared.withoutResponse,
           signal,
+          timeoutMs,
         });
     });
   }
@@ -322,7 +373,7 @@ export class BleSessionEngine {
       }
       this.subscribing.add(key);
       reserved = true;
-      return (signal, link) => this.startSubscription(key, target, signal, link);
+      return (signal, link, timeoutMs) => this.startSubscription(key, target, signal, link, timeoutMs);
     });
     if (reserved) {
       const release = () => void this.subscribing.delete(key);
@@ -336,6 +387,7 @@ export class BleSessionEngine {
     target: ReturnType<typeof prepareBleSubscribe>,
     signal: AbortSignal,
     link: BleSessionLink,
+    timeoutMs: number,
   ): Promise<PluginBleNotificationStream> {
     const stream: BleNotificationStream = new BleNotificationStream(
       key,
@@ -351,7 +403,9 @@ export class BleSessionEngine {
         ...ref,
         indicate: target.indicate,
         signal,
+        timeoutMs,
         onNotification: (bytes) => this.deliver(key, stream, target, bytes),
+        onError: (error) => this.failStream(key, stream, target, toBleError(error, 'subscribe')),
       });
     } finally {
       if (this.starting.get(key) === stream) this.starting.delete(key);
@@ -395,12 +449,26 @@ export class BleSessionEngine {
   }
 
   private deliver(key: string, stream: BleNotificationStream, target: Target, bytes: Uint8Array): void {
-    if (this.subscriptions.get(key)?.stream !== stream && this.starting.get(key) !== stream) return;
+    if (!this.owns(key, stream)) return;
     try {
       stream.push(checkBleInboundPayload(target.characteristic, 'notification', bytes));
     } catch (error) {
       stream.end(toBleError(error, 'subscribe'));
     }
+    this.dropIfEnded(key, stream, target);
+  }
+
+  private owns(key: string, stream: BleNotificationStream): boolean {
+    return this.subscriptions.get(key)?.stream === stream || this.starting.get(key) === stream;
+  }
+
+  private failStream(key: string, stream: BleNotificationStream, target: Target, error: PluginBleError): void {
+    if (!this.owns(key, stream)) return;
+    stream.end(error);
+    this.dropIfEnded(key, stream, target);
+  }
+
+  private dropIfEnded(key: string, stream: BleNotificationStream, target: Target): void {
     if (stream.ended) {
       this.subscriptions.delete(key);
       // Overflow tears the subscription down on the link as well.
@@ -435,6 +503,11 @@ export class BleSessionEngine {
       execute = prepare();
       if (options.signal?.aborted) throw cancelled(operation);
     } catch (error) {
+      try {
+        this.deps.onRejected?.(operation, toBleError(error, operation));
+      } catch {
+        // Reporting never changes the outcome of a call.
+      }
       return Promise.reject(error);
     }
     return new Promise<T>((resolve, reject) => {
@@ -474,7 +547,7 @@ export class BleSessionEngine {
           op.controller.abort();
           op.fail(new PluginBleError('TIMEOUT', `${operation} timed out`, { operation }));
         }, timeoutMs);
-        const call = attempt(() => execute(op.controller.signal, link)).then(
+        const call = attempt(() => execute(op.controller.signal, link, timeoutMs)).then(
           (value) => settle(() => resolve(value), 'ok'),
           (error) => {
             const failure = toBleError(error, operation);

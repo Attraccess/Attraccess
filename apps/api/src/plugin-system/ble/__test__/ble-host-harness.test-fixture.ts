@@ -15,18 +15,39 @@ import { createPluginBleContext } from '../plugin-ble-context';
 import { clearPluginBleProfiles } from '../plugin-ble-profile-registry';
 import { PluginBleService } from '../plugin-ble.service';
 import { BleTestDriver, ManualClock } from './ble-test-driver.test-fixture';
+import {
+  createFakeReaderSocket,
+  FAKE_READER_BLE_CAPABILITY,
+  type FakeBleReaderFirmware,
+} from '../../../attractap/websockets/handlers/ble/__test__/fake-ble-reader.test-fixture';
+import { parseBleCapability } from '../../../attractap/websockets/handlers/ble/ble-wire';
+import { ReaderBleDriver } from '../../../attractap/websockets/handlers/ble/reader-ble.driver';
+import { WebsocketService } from '../../../attractap/websockets/websocket.service';
+import type { AuthenticatedWebSocket } from '../../../attractap/websockets/websocket.types';
 
 /** The host implementation behind the same control surface as the SDK fake, for the shared contract suite. */
 export interface HostBleHarness extends FakeBleHost {
   service: PluginBleService;
+  /** The in-memory radio: the driver itself, or the radio behind the fake readers (`reader-websocket`). */
   driver: BleTestDriver;
+  /** `reader-websocket` only: the real reader driver and the fake reader connection of each reader. */
+  readerDriver?: ReaderBleDriver;
+  readers: Map<number, { socket: AuthenticatedWebSocket; firmware: FakeBleReaderFirmware }>;
+  /** `reader-websocket` only: the reader drops its websocket and reconnects on a new one. */
+  reconnectReader(readerId: number): void;
+  clock: ManualClock;
   dispose(): Promise<void>;
 }
 
 const silentLogger = { log: () => undefined, error: () => undefined, warn: () => undefined, debug: () => undefined };
 
 export async function createHostBleHarness(
-  options: { ready?: boolean; withDriver?: boolean } = {},
+  options: {
+    ready?: boolean;
+    withDriver?: boolean;
+    /** `reader-websocket`: the real `ReaderBleDriver`, talking protocol v1 to fake reader firmware. */
+    transport?: 'test-driver' | 'reader-websocket';
+  } = {},
 ): Promise<HostBleHarness> {
   clearPluginBleProfiles();
   const source = await new DataSource({
@@ -47,9 +68,37 @@ export async function createHostBleHarness(
   const driver = new BleTestDriver(clock);
   let driverPresent = options.withDriver ?? true;
   let ready = options.ready ?? true;
+
+  const websocket = options.transport === 'reader-websocket';
+  const websocketService = new WebsocketService();
+  const readerDriver = websocket ? new ReaderBleDriver(websocketService) : undefined;
+  if (readerDriver) readerDriver.clock = clock;
+  const readers: HostBleHarness['readers'] = new Map();
+  let connections = 0;
+  const connectReader = (readerId: number) => {
+    if (!readerDriver) return;
+    const reader = createFakeReaderSocket({
+      id: `fake-${++connections}`,
+      readerId,
+      radio: driver,
+      deliver: (socket, eventData) => readerDriver.handleMessage(socket, eventData),
+    });
+    readers.set(readerId, reader);
+    websocketService.sockets.set(reader.socket.id, reader.socket);
+  };
+  const dropReader = (readerId: number) => {
+    const reader = readers.get(readerId);
+    if (!reader || !readerDriver) return;
+    readers.delete(readerId);
+    (reader.socket as unknown as { readyState: number }).readyState = 3;
+    websocketService.sockets.delete(reader.socket.id);
+    reader.firmware.linkLost();
+    readerDriver.socketClosed(reader.socket);
+  };
+
   const moduleRef = {
     get: (token: unknown) => {
-      if (token === BLE_TRANSPORT_DRIVER && driverPresent) return driver;
+      if (token === BLE_TRANSPORT_DRIVER && driverPresent) return readerDriver ?? driver;
       throw new Error('not found');
     },
   } as unknown as ModuleRef;
@@ -59,6 +108,13 @@ export async function createHostBleHarness(
   const host: HostBleHarness = {
     service,
     driver,
+    readerDriver,
+    readers,
+    clock,
+    reconnectReader: (readerId) => {
+      dropReader(readerId);
+      connectReader(readerId);
+    },
     transcript: driver.transcript,
     dispose: async () => {
       await service.onModuleDestroy();
@@ -78,6 +134,7 @@ export async function createHostBleHarness(
         allowPluginBle: reader.allowPluginBle ?? false,
       } as Attractap);
       driver.available.set(reader.readerId, reader.available ?? true);
+      if (reader.available ?? true) connectReader(reader.readerId);
     }) as FakeBleHost['addReader'],
     async removeReader(readerId) {
       await source.getRepository(Attractap).delete(readerId);
@@ -88,7 +145,19 @@ export async function createHostBleHarness(
       await source.getRepository(Attractap).update(readerId, { allowPluginBle: allowed });
       await service.onReaderUpdated(new ReaderUpdatedEvent({ id: readerId, allowPluginBle: allowed } as Attractap));
     },
-    setReaderAvailable: (readerId, available) => void driver.available.set(readerId, available),
+    setReaderAvailable: (readerId, available) => {
+      driver.available.set(readerId, available);
+      if (!available) dropReader(readerId);
+      else if (!readers.has(readerId)) connectReader(readerId);
+    },
+    setReaderSupported: (readerId, supported, detail = 'no-ble-capability') => {
+      if (supported) driver.unsupported.delete(readerId);
+      else driver.unsupported.set(readerId, detail);
+      const socket = readers.get(readerId)?.socket;
+      if (socket) {
+        socket.state.ble = supported ? parseBleCapability(FAKE_READER_BLE_CAPABILITY) : { supported: false, detail };
+      }
+    },
     setTransportAvailable: (available) => {
       driverPresent = available;
     },
@@ -100,6 +169,9 @@ export async function createHostBleHarness(
     disconnect: async (address) => {
       driver.dropLink(normalizeBleAddress(address));
       await clock.advance(0);
+    },
+    setMtu: (mtu) => {
+      driver.mtu = mtu;
     },
     failNext: (op: FakeBleOperation, code, failOptions) => driver.failNext(op, code, failOptions?.detail),
     advance: (ms) => clock.advance(ms),

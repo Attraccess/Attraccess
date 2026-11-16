@@ -97,7 +97,12 @@ export interface FakeBleHostOptions {
   ready?: boolean;
   /** Wall-clock start of the fake clock (ms since 1970). Default 2026-01-01T00:00:00Z. */
   startTime?: number;
+  /** ATT MTU every new connection negotiates (23..517). Default 247. */
+  mtu?: number;
 }
+
+/** The MTU the fake negotiates unless a test sets another one. */
+export const FAKE_BLE_DEFAULT_MTU = 247;
 
 export interface FakeBleHost {
   contextFor(pluginId: string): PluginBleContext;
@@ -105,6 +110,8 @@ export interface FakeBleHost {
   removeReader(readerId: number): Promise<void>;
   setReaderAccess(readerId: number, allowed: boolean): Promise<void>;
   setReaderAvailable(readerId: number, available: boolean): void;
+  /** `false` simulates reader firmware without plugin BLE support (`READER_UNSUPPORTED` with `detail`). */
+  setReaderSupported(readerId: number, supported: boolean, detail?: string): void;
   /** `false` simulates a host without a transport driver (`TRANSPORT_UNAVAILABLE`). */
   setTransportAvailable(available: boolean): void;
   setReady(ready: boolean): void;
@@ -112,6 +119,8 @@ export interface FakeBleHost {
   notify(address: string, uuid: string, bytes: Uint8Array): void;
   /** The peripheral drops the link: sessions to it close with `disconnected`. */
   disconnect(address: string): Promise<void>;
+  /** ATT MTU for connections opened from now on (23..517). */
+  setMtu(mtu: number): void;
   /** Makes the next occurrence of `op` fail with `code`. */
   failNext(op: FakeBleOperation, code: PluginBleErrorCode, options?: { detail?: string }): void;
   advance(ms: number): Promise<void>;
@@ -154,7 +163,7 @@ function copyEndpoint(endpoint: StoredEndpoint): PluginBleEndpoint {
 export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost {
   const clock = new FakeBleClock(options.startTime ?? Date.UTC(2026, 0, 1));
   const transcript: FakeBleTranscriptEntry[] = [];
-  const readers = new Map<number, { name: string; allow: boolean; available: boolean }>();
+  const readers = new Map<number, { name: string; allow: boolean; available: boolean; unsupported?: string }>();
   const peripherals = new Map<
     string,
     {
@@ -172,6 +181,7 @@ export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost
   const failures = new Map<FakeBleOperation, PluginBleError[]>();
   let ready = options.ready ?? true;
   let transportAvailable = true;
+  let mtu = options.mtu ?? FAKE_BLE_DEFAULT_MTU;
 
   const record = (entry: FakeBleTranscriptEntry) => {
     transcript.push(entry);
@@ -208,6 +218,11 @@ export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost
     const reader = requireReader(readerId);
     if (!transportAvailable) throw new PluginBleError('TRANSPORT_UNAVAILABLE', 'No BLE transport is available');
     if (!reader.available) throw new PluginBleError('READER_OFFLINE', `Reader ${readerId} cannot do BLE right now`);
+    if (reader.unsupported !== undefined) {
+      throw new PluginBleError('READER_UNSUPPORTED', `The firmware of reader ${readerId} cannot do plugin BLE`, {
+        detail: reader.unsupported,
+      });
+    }
   };
 
   const createLink = (readerId: number, address: string): BleSessionLink => {
@@ -227,6 +242,7 @@ export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost
       if (spec.delayMs) await sleep(spec.delayMs, signal);
     };
     return {
+      mtu,
       async read({ serviceUuid, characteristicUuid, signal }) {
         record({ op: 'read', readerId, address, serviceUuid, characteristicUuid });
         const spec = characteristic(characteristicUuid);
@@ -363,7 +379,7 @@ export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost
               .map(([readerId, reader]) => ({
                 readerId,
                 name: reader.name,
-                available: transportAvailable && reader.available,
+                available: transportAvailable && reader.available && reader.unsupported === undefined,
               })),
           ),
         scan: (readerId, profileId, scanOptions) =>
@@ -469,6 +485,10 @@ export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost
       const reader = readers.get(readerId);
       if (reader) reader.available = available;
     },
+    setReaderSupported(readerId, supported, detail = 'no-ble-capability') {
+      const reader = readers.get(readerId);
+      if (reader) reader.unsupported = supported ? undefined : detail;
+    },
     setTransportAvailable(available) {
       transportAvailable = available;
     },
@@ -500,6 +520,9 @@ export function createFakeBleHost(options: FakeBleHostOptions = {}): FakeBleHost
       const normalized = normalizeBleAddress(address);
       links.delete(normalized);
       return closeWhere((entry) => entry.endpoint.address === normalized, 'disconnected');
+    },
+    setMtu(value) {
+      mtu = value;
     },
     failNext(op, code, failOptions = {}) {
       const queue = failures.get(op) ?? [];

@@ -5,7 +5,7 @@
 Backend plugins with the `BLE_TRANSPORT` permission can talk to Bluetooth Low Energy (BLE) devices through Attractap readers. The transport is deliberately **not** a raw GATT API: every operation goes through a profile your plugin registered and an endpoint your plugin owns. Core enforces the boundaries; your plugin supplies the vendor semantics.
 
 > [!NOTE]
-> This page defines the contract and ships the SDK types, the permission, endpoint storage, the per-reader opt-in and a deterministic fake for tests. The real reader transport (the websocket protocol and firmware that carry BLE traffic) arrives with ATT-1033. Until then `scan` and `openSession` reject with `TRANSPORT_UNAVAILABLE`, while profiles and endpoints already work and you can test everything against the fake. Do not retry `TRANSPORT_UNAVAILABLE` in a tight loop: it stays unavailable until a host transport is installed, so back off between attempts.
+> Readers need Attractap firmware **2.2.0 or later** for plugin Bluetooth. On older firmware `scan` and `openSession` reject with `READER_UNSUPPORTED`. `TRANSPORT_UNAVAILABLE` only occurs on hosts that run without the reader transport (for example a test host); do not retry it in a tight loop.
 
 ## Trust boundary
 
@@ -96,7 +96,9 @@ const advertisements = await ble.scan(readers[0].readerId, 'door-lock', {
 //    serviceUuids: ['0000fff0-...'], manufacturerData: [{ companyId: 0x1234, data: Uint8Array }] }]
 ```
 
-`listReaders` returns only readers an administrator opened for plugins. `available` is false when the host has no transport driver or the reader cannot do BLE right now.
+`listReaders` returns only readers an administrator opened for plugins. `available` is true while the reader is online and its firmware supports plugin Bluetooth. It is false when the host has no transport driver, the reader is offline, or its firmware is too old. A reader that is busy with another plugin's session stays `available`.
+
+A reader runs **one BLE job at a time**: one scan or one session, for all plugins together. A `scan` or `openSession` while another scan or session uses the reader rejects at once with `READER_BUSY` (retryable). Nothing is queued. A scan returns at most 32 advertisements, deduplicated by address.
 
 `scan` has a host-side deadline: if the transport does not answer within `durationMs` plus 5 s, it rejects with `TIMEOUT`. Advertisements the reader reports in a malformed form are skipped; they do not fail the scan.
 
@@ -147,6 +149,7 @@ const result = await ble.withSession(
 | Member                                        | Behaviour                                                                                                                                                                                                                                                           |
 | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`, `endpointId`                            | Identify the session and its endpoint.                                                                                                                                                                                                                              |
+| `mtu`                                         | The negotiated ATT MTU (23..517). A write without response carries at most `mtu - 3` bytes; a larger one rejects with `PAYLOAD_TOO_LARGE` (detail `exceeds-mtu`). Writes with response use the long-write procedure up to the profile bound.                        |
 | `read(key, { signal, timeoutMs })`            | Reads a characteristic; resolves with a copy of the bytes.                                                                                                                                                                                                          |
 | `write(key, value, { withoutResponse, ... })` | Writes. An empty value rejects with `INVALID_ARGUMENT`. `withoutResponse` needs the `writeWithoutResponse` operation; otherwise `write` is required, so a key that allows only `writeWithoutResponse` needs `{ withoutResponse: true }`. Use it for bulk transfers. |
 | `subscribe(key, { signal })`                  | Starts notifications (`notify` or `indicate`). Returns a stream with `next({ timeoutMs, signal })`, an async iterator and `unsubscribe()`.                                                                                                                          |
@@ -156,7 +159,9 @@ const result = await ble.withSession(
 
 Rules:
 
-- **One open session per endpoint.** A second `openSession` rejects with `ENDPOINT_BUSY` (retryable). There is no queue in the contract; serializing access per reader is the transport's job.
+- **One open session per endpoint.** A second `openSession` rejects with `ENDPOINT_BUSY` (retryable). There is no queue.
+- **One session per reader.** A reader holds one BLE connection at a time, for all plugins. While a session or scan uses it, `openSession` and `scan` through that reader reject with `READER_BUSY` (retryable). A long session, such as a firmware update of a device, blocks that reader for every plugin until it ends, so keep sessions as short as the job allows.
+- **Writes without response are pipelined.** `write(..., { withoutResponse: true })` resolves once the reader link queued the write in order, not after a round trip, so bulk transfers are fast. If the reader later fails one of them, the next call on the session rejects with that error. Chunk bulk data to `session.mtu - 3` bytes.
 - **Operations run one at a time, in call order.**
 - **Notifications** arrive in order per subscription, only to the owning session, in a bounded queue (default 32, profile maximum 256). Consume them promptly. Subscribing to a key that is already subscribed rejects with `INVALID_ARGUMENT`.
 - **A failing stream never drops data silently.** When the queue overflows, the host discards the queued notifications and fails the stream at once with `NOTIFICATION_OVERFLOW`. A notification above `maxNotificationBytes` fails the stream the same way with `PAYLOAD_TOO_LARGE`. Every pending and later `next()` then rejects with that code, while the session stays open. Call `session.unsubscribe(key)` and subscribe again to resume.
@@ -164,7 +169,7 @@ Rules:
 - **After `close`**, every further operation rejects with `SESSION_CLOSED`. Operations that were pending when the session closed reject immediately, exactly once: `DISCONNECTED` if the device disconnected, `CANCELLED` if the signal passed to `openSession` aborted, `SESSION_CLOSED` otherwise.
 - **`closed` waits for the disconnect.** It resolves once the host has finished disconnecting the link (bounded by a host deadline), so opening a new session right after `closed` resolves does not hit `ENDPOINT_BUSY`. After a connect timeout or a cancelled open, the endpoint stays busy (`ENDPOINT_BUSY`, retryable) until the reader's connect attempt has ended, at most 10 s.
 - **`closed` reasons:** `closed`, `lease-expired`, `cancelled`, `disconnected`, `reader-access-revoked`, `endpoint-deleted`, `shutdown`, `error`.
-- **Cancellation.** `scan`, `openSession`, `withSession`, `read`, `write`, `subscribe` and `next` accept an `AbortSignal`. Aborting rejects that pending call with `CANCELLED`. Aborting the signal you passed to `openSession` closes the session. A timed-out or cancelled operation does **not** close the session, unless the transport reports the link lost.
+- **Cancellation.** `scan`, `openSession`, `withSession`, `read`, `write`, `subscribe` and `next` accept an `AbortSignal`. Aborting rejects that pending call with `CANCELLED`. Aborting the signal you passed to `openSession` closes the session. A timed-out or cancelled operation does **not** close the session, unless the transport reports the link lost. On a real reader the cancellation reaches the reader: a scan stops, a pending connect is cancelled and the reader is released. A read or write the radio has already started cannot be aborted mid-air: your call rejects at once, the reader discards the late result, and the next operation starts when the radio finished.
 
 ## Errors
 
@@ -173,12 +178,12 @@ Every failure is a `PluginBleError` with a stable `code`, a `retryable` flag, an
 | Code                     | Retryable | Meaning                                                                |
 | ------------------------ | --------- | ---------------------------------------------------------------------- |
 | `NOT_READY`              | yes       | The host has not finished bootstrapping.                               |
-| `TRANSPORT_UNAVAILABLE`  | yes       | The host has no reader transport (until ATT-1033 ships).               |
+| `TRANSPORT_UNAVAILABLE`  | yes       | The host runs without a reader transport (for example a test host).    |
 | `READER_NOT_FOUND`       | no        | The reader does not exist.                                             |
 | `READER_ACCESS_DENIED`   | no        | An administrator has not opened the reader for plugins.                |
 | `READER_OFFLINE`         | yes       | The reader is not connected or cannot do BLE now.                      |
-| `READER_UNSUPPORTED`     | no        | The reader's firmware does not support BLE.                            |
-| `READER_BUSY`            | yes       | The reader is serving another BLE connection.                          |
+| `READER_UNSUPPORTED`     | no        | The reader's firmware does not support plugin BLE (`detail` says why). |
+| `READER_BUSY`            | yes       | Another scan or session uses the reader, or it updates its firmware.   |
 | `PROFILE_NOT_REGISTERED` | no        | Your plugin did not register this profile in this process.             |
 | `PROFILE_CONFLICT`       | no        | A different definition is already registered under this id.            |
 | `INVALID_PROFILE`        | no        | The profile definition is invalid.                                     |
@@ -212,6 +217,17 @@ Every failure is a `PluginBleError` with a stable `code`, a `retryable` flag, an
 | Endpoint label                       | -       | 100 characters                                        |
 
 Values above a cap are rejected with `INVALID_ARGUMENT` (or `INVALID_PROFILE` in a profile); they are never silently clamped. The constants are exported as `PLUGIN_BLE_LIMITS`.
+
+## Real readers
+
+The reader firmware (2.2.0 or later) announces plugin Bluetooth when it connects. The host and the reader both enforce the rules:
+
+- **Compatibility.** A reader without the capability, or with a protocol version the host does not support, makes `scan` and `openSession` reject with `READER_UNSUPPORTED`. `detail` is `no-ble-capability`, `protocol-version:<n>` or `missing-operation:<op>`. A profile with more characteristics than the reader accepts (16) rejects with `READER_UNSUPPORTED`, detail `allowlist-too-large:<n>`. Update the reader firmware (OTA from the server) to fix the first case.
+- **Enforcement on the reader.** With each session the host sends the reader the profile as an allowlist: the bound address and, per characteristic, the service, the operations and the payload bounds. The reader refuses anything else before it touches the radio. This protects against host bugs, not against a compromised server, which could send any allowlist.
+- **Deadlines on the reader.** The reader keeps its own lease (your lease plus 10 s) and operation deadlines. When the server goes silent or the reader loses its connection to the server, the reader disconnects the device on its own.
+- **Notifications** are buffered on the reader (32 notifications or 16 KiB per session) and forwarded in order with a sequence number. A full reader buffer fails the stream with `NOTIFICATION_OVERFLOW`; a gap or duplicate fails it with `INTERNAL` (detail `malformed-notification`). Nothing is dropped silently.
+- **Diagnostics.** Radio failures map to the codes above; `detail` carries the raw reason as safe text, for example `nimble:rc=13`, `hci:0x3e`, `att:0x0a` or `reason:0x08`.
+- **Firmware updates.** A reader that starts a firmware update ends its BLE session (`disconnected`) and refuses new BLE work with `READER_BUSY` (detail `ota`) until it restarted.
 
 ## Cleanup obligations
 
@@ -308,6 +324,8 @@ Control surface of the fake host:
 | `removeReader(id)`                                  | Deletes a reader: sessions close with `reader-access-revoked`, its endpoints are deleted.                                                                                                 |
 | `setReaderAvailable(id, available)`                 | `false`: scans and sessions on the reader fail with `READER_OFFLINE`.                                                                                                                     |
 | `setTransportAvailable(available)`                  | `false`: a host without a transport (`TRANSPORT_UNAVAILABLE`).                                                                                                                            |
+| `setReaderSupported(id, supported, detail?)`        | `false`: reader firmware without plugin BLE; scans and sessions fail with `READER_UNSUPPORTED` and `detail` (default `no-ble-capability`).                                                |
+| `setMtu(mtu)`                                       | The ATT MTU of connections opened from now on (default 247, also settable as `createFakeBleHost({ mtu })`).                                                                               |
 | `addPeripheral(peripheral)`                         | A device: `readerId` or `readerIds`, `address`, `addressType`, `advertisement`, `characteristics`. Characteristics are keyed by UUID and take `value`, `onRead`, `onWrite` and `delayMs`. |
 | `notify(address, uuid, bytes)`                      | The device sends a notification.                                                                                                                                                          |
 | `disconnect(address)`                               | The device drops the link: sessions close with `disconnected`.                                                                                                                            |
@@ -321,6 +339,6 @@ Control surface of the fake host:
 
 To test a timeout, give a characteristic a `delayMs` longer than the timeout, start the call, then `await host.advance(timeoutMs)`.
 
-## Real readers
+## The fake and real readers
 
-The fake and the host share the same validation and are checked by one contract test suite. The transport that carries BLE traffic through real Attractap readers (reader websocket protocol and firmware) arrives with ATT-1033. Notifications, cancellation and telemetry on real hardware follow with ATT-1036. Nothing in your plugin changes when it arrives; an administrator then enables **Allow plugins to use Bluetooth** on a reader.
+The fake and the host share the same validation and are checked by one contract test suite, which runs against the fake, against the host with a test driver, and against the host with the real reader driver talking to a simulated reader. A plugin that passes its tests against the fake behaves the same on a real reader; there, an administrator enables **Allow plugins to use Bluetooth** on a reader that runs firmware 2.2.0 or later.
