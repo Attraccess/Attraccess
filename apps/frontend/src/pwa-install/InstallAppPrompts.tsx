@@ -21,6 +21,7 @@ function InstallBanner({ t }: { t: Translate }) {
       aria-label={t('banner.label')}
       className="fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-30 sm:right-auto sm:max-w-sm md:[:root:has([data-sidebar=expanded])_&]:left-68 md:[:root:has([data-sidebar=collapsed])_&]:left-20"
       data-cy="install-app-banner"
+      data-install-banner
     >
       <Alert status="accent" className="shadow-overlay">
         <Alert.Indicator>
