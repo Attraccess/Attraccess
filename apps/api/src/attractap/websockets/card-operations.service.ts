@@ -20,7 +20,11 @@ import { AttractapService } from '../attractap.service';
 import { CardConversationFailure, CardConversationService } from './card-conversation.service';
 import { AuthenticatedWebSocket, CardDetection } from './websocket.types';
 
-export type AuditPrincipal = { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number };
+export type AuditPrincipal = {
+  userId: number;
+  authenticationMethod: 'session' | 'api-token' | 'mcp-oauth';
+  apiTokenId?: number;
+};
 
 export type CardOutcome<T = unknown> = { ok: boolean; error?: string } & Partial<T>;
 

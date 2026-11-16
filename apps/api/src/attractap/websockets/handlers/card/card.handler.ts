@@ -200,7 +200,7 @@ export class AttractapCardHandler {
     readerId: number;
     userId: number;
     cardId: number;
-    authenticationMethod?: 'session' | 'api-token';
+    authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
     apiTokenId?: number;
   }) {
     const reader = await this.attractapService.findReaderById(data.readerId);
@@ -296,7 +296,7 @@ export class AttractapCardHandler {
     readerId: number;
     userId: number;
     actorId?: number;
-    authenticationMethod?: 'session' | 'api-token';
+    authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
     apiTokenId?: number;
   }) {
     const reader = await this.attractapService.findReaderById(data.readerId);

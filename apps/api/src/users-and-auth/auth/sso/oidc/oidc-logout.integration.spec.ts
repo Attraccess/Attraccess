@@ -130,6 +130,12 @@ describe('Signed OIDC logout with a local discovery/JWKS provider', () => {
     expect(sessions.revokeSsoSessions).toHaveBeenCalledTimes(3);
   });
 
+  it('lets an unreachable Valkey surface (503) instead of calling the notification invalid', async () => {
+    const unavailable = new Error('Connection is closed.');
+    sessions.revokeSsoSessions.mockRejectedValueOnce(unavailable);
+    await expect(service.backchannel(1, await token())).rejects.toBe(unavailable);
+  });
+
   it.each([
     { exp: Math.floor(Date.now() / 1000) + 3600 },
     { events: { 'http://schemas.openid.net/event/backchannel-logout': { reason: 'user_logout' } } },

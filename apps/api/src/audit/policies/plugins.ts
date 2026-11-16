@@ -10,7 +10,7 @@ export interface ProjectedPluginAuditEvent {
   operationId: string;
   outcome: 'attempted' | 'succeeded' | 'failed';
   actorId: number;
-  authenticationMethod: 'session' | 'api-token';
+  authenticationMethod: 'session' | 'api-token' | 'mcp-oauth';
   apiTokenId?: number;
   subjectType: string;
   subjectId: number;
@@ -42,7 +42,7 @@ function pluginPrincipal(
   const principal = dataFields(value, ['userId', 'authenticationMethod', 'apiTokenId']);
   if (!principal || !positive(principal.userId)) return null;
   const method = principal.authenticationMethod;
-  if (method !== 'session' && method !== 'api-token') return null;
+  if (method !== 'session' && method !== 'api-token' && method !== 'mcp-oauth') return null;
   const apiTokenId = principal.apiTokenId;
   if (method === 'api-token' ? !positive(apiTokenId) : apiTokenId !== undefined) return null;
   return {

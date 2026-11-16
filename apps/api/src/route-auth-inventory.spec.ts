@@ -70,6 +70,38 @@ const REVIEWED_PUBLIC_ROUTES: Record<string, ReviewedPublicRoute> = {
     reason: 'first-time setup; refuses once setup is complete',
     credential: 'none',
   },
+  'McpController.handle': {
+    reason: 'MCP endpoint: authenticates a bearer API token or MCP OAuth access token itself (401 otherwise)',
+    credential: 'random-token',
+    rateLimit: true,
+  },
+  'McpController.methodNotAllowed': {
+    reason: 'answers 405 for GET and DELETE on the MCP endpoint',
+    credential: 'none',
+  },
+  'McpOAuthController.protectedResource': {
+    reason: 'OAuth protected-resource metadata (RFC 9728)',
+    credential: 'none',
+  },
+  'McpOAuthController.authorizationServer': {
+    reason: 'OAuth authorization-server metadata (RFC 8414)',
+    credential: 'none',
+  },
+  'McpOAuthController.register': {
+    reason: 'OAuth Dynamic Client Registration for public clients (RFC 7591)',
+    credential: 'none',
+    rateLimit: true,
+  },
+  'McpOAuthController.authorize': {
+    reason: 'OAuth authorization request; only redirects the browser to the consent page after validating it',
+    credential: 'none',
+    rateLimit: true,
+  },
+  'McpOAuthController.token': {
+    reason: 'OAuth token endpoint for public clients: single-use code with PKCE, or rotating refresh token',
+    credential: 'random-token',
+    rateLimit: true,
+  },
   'AuthController.createSession': { reason: 'password sign-in', credential: 'password', rateLimit: true },
   'PasskeyController.authenticationOptions': { reason: 'passkey sign-in', credential: 'signature', rateLimit: true },
   'PasskeyController.createSession': { reason: 'passkey sign-in', credential: 'signature', rateLimit: true },
@@ -188,7 +220,7 @@ const REVIEWED_PUBLIC_ROUTES: Record<string, ReviewedPublicRoute> = {
 };
 
 /** Rate limit guards and interceptors the scanner recognises. */
-const RATE_LIMIT_GUARD = 'LoginRateLimitGuard';
+const RATE_LIMIT_GUARDS = new Set(['LoginRateLimitGuard', 'McpRateLimitGuard']);
 const RATE_LIMIT_INTERCEPTOR = 'AuthRateLimitInterceptor';
 const RATE_LIMIT_DECORATOR = 'AuthRateLimit';
 /** The limiter call that in-handler throttling goes through. */
@@ -263,7 +295,7 @@ function hasDetectableRateLimit(
     ...decoratorArguments(declaration.getDecorators(), 'UseGuards'),
     ...decoratorArguments(method.getDecorators(), 'UseGuards'),
   ];
-  if (guards.some((argument) => argument.getText() === RATE_LIMIT_GUARD)) return true;
+  if (guards.some((argument) => RATE_LIMIT_GUARDS.has(argument.getText()))) return true;
   const interceptors = [
     ...decoratorArguments(declaration.getDecorators(), 'UseInterceptors'),
     ...decoratorArguments(method.getDecorators(), 'UseInterceptors'),

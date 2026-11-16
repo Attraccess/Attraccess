@@ -31,7 +31,7 @@ export class AuditLog {
   actorId!: number | null;
 
   @Column({ type: 'varchar', nullable: true })
-  authenticationMethod!: 'session' | 'api-token' | null;
+  authenticationMethod!: 'session' | 'api-token' | 'mcp-oauth' | null;
 
   @Column({ type: 'integer', nullable: true })
   apiTokenId!: number | null;

@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class DashboardPins1793200000000 implements MigrationInterface {
-  name = 'DashboardPins1793200000000';
+export class DashboardPins1793300000000 implements MigrationInterface {
+  name = 'DashboardPins1793300000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

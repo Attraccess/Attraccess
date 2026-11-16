@@ -1,4 +1,4 @@
-import { Injectable, ExecutionContext, UnauthorizedException, Logger } from '@nestjs/common';
+import { Injectable, ExecutionContext, HttpException, UnauthorizedException, Logger } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 
 @Injectable()
@@ -16,12 +16,12 @@ export class DualAuthGuard extends AuthGuard('session') {
       return result as boolean;
     } catch (error) {
       this.logger.debug(`Authentication failed: ${error.message}`);
-      
+
       // Re-throw with consistent error message for both cookie and header failures
       if (error instanceof UnauthorizedException) {
         throw new UnauthorizedException('Authentication required');
       }
-      
+
       throw error;
     }
   }
@@ -29,29 +29,29 @@ export class DualAuthGuard extends AuthGuard('session') {
   /**
    * Handles authentication errors with proper error messages
    */
-  handleRequest<TUser = unknown>(
-    err: unknown,
-    user: unknown,
-    info: unknown,
-    context: ExecutionContext,
-  ): TUser {
+  handleRequest<TUser = unknown>(err: unknown, user: unknown, info: unknown, context: ExecutionContext): TUser {
+    // A server-side failure (e.g. 503 while the session store is unreachable) is not a failed sign-in.
+    if (err instanceof HttpException && err.getStatus() >= 500) {
+      throw err;
+    }
+
     if (err || !user) {
       const request = context.switchToHttp().getRequest();
       const hasAuthHeader = request.headers.authorization?.startsWith('Bearer ');
       const hasCookie = request.cookies?.['auth-session'];
-      
+
       let errorMessage = 'Authentication required';
-      
+
       if (hasAuthHeader) {
         errorMessage = 'Invalid or expired authorization token';
       } else if (hasCookie) {
         errorMessage = 'Invalid or expired session cookie';
       }
-      
+
       this.logger.debug(`Authentication failed: ${errorMessage}`);
       throw new UnauthorizedException(errorMessage);
     }
-    
+
     return user as TUser;
   }
 }

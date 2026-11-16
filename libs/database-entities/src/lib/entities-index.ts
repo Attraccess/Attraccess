@@ -1,5 +1,9 @@
 export { ApiTokenPermission } from './entities/api-token-permission.entity';
 export { ApiToken } from './entities/api-token.entity';
+export { McpOAuthClient } from './entities/mcp-oauth-client.entity';
+export { McpOAuthGrant } from './entities/mcp-oauth-grant.entity';
+export { McpOAuthToken } from './entities/mcp-oauth-token.entity';
+export type { McpOAuthTokenKind } from './entities/mcp-oauth-token.entity';
 export { Attractap, AttractapFirmwareVersion } from './entities/attractap.entity';
 export { AttractapCrashReport } from './entities/attractapCrashReport.entity';
 export { AttractapCredentialEvent } from './entities/attractap-credential-event.entity';
@@ -148,6 +152,9 @@ export { User } from './entities/user.entity';
 export { UsageDurationUnit } from './types/usageDurationUnit.enum';
 import { ApiTokenPermission } from './entities/api-token-permission.entity';
 import { ApiToken } from './entities/api-token.entity';
+import { McpOAuthClient } from './entities/mcp-oauth-client.entity';
+import { McpOAuthGrant } from './entities/mcp-oauth-grant.entity';
+import { McpOAuthToken } from './entities/mcp-oauth-token.entity';
 import { Attractap } from './entities/attractap.entity';
 import { AttractapCrashReport } from './entities/attractapCrashReport.entity';
 import { AttractapCredentialEvent } from './entities/attractap-credential-event.entity';
@@ -288,6 +295,9 @@ export const entities = {
   UserRole,
   ApiToken,
   ApiTokenPermission,
+  McpOAuthClient,
+  McpOAuthGrant,
+  McpOAuthToken,
   ResourceOperatingInterval,
   ResourceUsageLifecycleAttempt,
   ResourceMeteringSession,

@@ -57,7 +57,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     await this.lifecycle.recoverInterruptedLifecycles();
     this.access.startCleanup();
     this.lifecycle.startSweep();
-    await this.access.subscribe();
+    this.access.subscribe();
   }
 
   onModuleDestroy(): void {

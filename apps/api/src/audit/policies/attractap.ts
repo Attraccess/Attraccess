@@ -6,7 +6,7 @@ export interface AttractapAuditInput {
   /** Defaults to attractap.reader. `ui.*` events may use the resource or an alert as subject. */
   subjectType?: 'attractap.reader' | 'attractap.installation' | 'resource' | 'attractap.ui-alert';
   actorId: number | null;
-  authenticationMethod: 'session' | 'api-token' | null;
+  authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' | null;
   apiTokenId?: number;
   subjectId: number;
   details: Record<string, string | number | boolean>;
@@ -189,7 +189,12 @@ export function projectAttractapAuditEvent(input: AttractapAuditInput): Attracta
   if (!positive(input.subjectId) || !attractapDetails[input.action]) return null;
   const deviceActor = input.authenticationMethod === null;
   if (deviceActor ? input.actorId !== null || input.apiTokenId !== undefined : !positive(input.actorId)) return null;
-  if (!deviceActor && input.authenticationMethod !== 'session' && input.authenticationMethod !== 'api-token')
+  if (
+    !deviceActor &&
+    input.authenticationMethod !== 'session' &&
+    input.authenticationMethod !== 'api-token' &&
+    input.authenticationMethod !== 'mcp-oauth'
+  )
     return null;
   if (input.authenticationMethod === 'api-token' ? !positive(input.apiTokenId) : input.apiTokenId !== undefined)
     return null;
