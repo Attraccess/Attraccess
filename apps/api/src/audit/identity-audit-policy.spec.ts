@@ -26,6 +26,37 @@ describe('identity audit policy', () => {
     });
   });
 
+  it('projects a verification email resend', () => {
+    expect(
+      projectIdentityAuditEvent({
+        action: 'verification_email_resent',
+        operationId: randomUUID(),
+        outcome: 'failed',
+        details: { reason: 'rate_limited' },
+        request: { ipAddress: '203.0.113.7' },
+      }),
+    ).toMatchObject({
+      action: 'identity.verification_email_resent',
+      outcome: 'failed',
+      actorId: null,
+      subjectId: null,
+      details: { reason: 'rate_limited' },
+      ipAddress: '203.0.113.7',
+    });
+  });
+
+  it('drops a verification email resend carrying unexpected details', () => {
+    expect(
+      projectIdentityAuditEvent({
+        action: 'verification_email_resent',
+        operationId: randomUUID(),
+        outcome: 'failed',
+        details: { reason: 'rate_limited', email: 'a@example.com' },
+        request: { ipAddress: '203.0.113.7' },
+      }),
+    ).toBeNull();
+  });
+
   it('retains events with oversized client metadata', () => {
     expect(
       projectIdentityAuditEvent({
