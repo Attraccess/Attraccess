@@ -5,8 +5,9 @@ the API it starts) and select these tests with ``-k ble``. The devices are confi
 
 - ``BLE_PERIPHERAL_ADDRESS``: the generic GATT test peripheral (apps/attractap-lab/ble-test-peripheral) in range
   of the reader, e.g. a second lab place flashed with it. Without it the peripheral tests skip.
-- ``SOLO_ADDRESS`` and ``SOLO_USER_CODE``: a PS Locks SOLO BT in factory CRYPT_OFF mode. The code comes only
-  from the environment and is never committed. Without both, the real-lock smoke skips.
+- ``SOLO_USER_CODE`` (and optionally ``SOLO_ADDRESS``, else the first lock the scan finds): a PS Locks SOLO BT in
+  factory CRYPT_OFF mode. The code comes only from the environment and is never committed. Without it, the
+  real-lock smoke skips.
 - ``HIL_BLE_LONG=1``: the 10-minute transfer (>= 256 KiB of MTU-sized writes without response with acks).
 
 Results (throughput, notification rate, heap before and after BLE init) land in ``ble-*.json`` artifacts.
@@ -199,12 +200,14 @@ def test_ble_long_session_throughput(ble, peripheral, reader, artifacts):
     assert result["closed"] == {"reason": "closed"}, result
 
 
-@pytest.mark.skipif(not (SOLO and SOLO_CODE), reason="set SOLO_ADDRESS and SOLO_USER_CODE (CRYPT_OFF lock)")
+@pytest.mark.skipif(not SOLO_CODE, reason="set SOLO_USER_CODE (CRYPT_OFF lock)")
 def test_ble_solo_bt_smoke(ble, reader, artifacts):
     """Real lock: scan, endpoint, read the crypt token, subscribe to the state, plaintext unlock, state notification."""
     found = ble("scan", {"readerId": reader["id"], "profileId": "solo-bt", "durationMs": 8000})
-    assert SOLO in [ad["address"] for ad in found.get("advertisements", [])], found
-    endpoint = ble("endpoints", {"readerId": reader["id"], "address": SOLO, "addressType": "public",
+    locks = {ad["address"]: ad["addressType"] for ad in found.get("advertisements", [])}
+    address = SOLO or next(iter(locks), "")
+    assert address in locks, found
+    endpoint = ble("endpoints", {"readerId": reader["id"], "address": address, "addressType": locks[address],
                                  "profileId": "solo-bt"})["id"]
     unlock = (SOLO_CODE + "00").encode().hex() + "31"  # user code, two ASCII zeroes, UNLOCK_NORMAL
     result = run(ble, endpoint, [

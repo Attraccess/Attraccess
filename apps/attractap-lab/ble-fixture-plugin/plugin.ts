@@ -100,11 +100,19 @@ const failure = (error: unknown): StepResult =>
     ? { ok: false, code: error.code, detail: error.detail ?? null, retryable: error.retryable }
     : { ok: false, code: 'THROWN', detail: (error as Error)?.message ?? String(error) };
 
+/** Delays from a request, capped at the longest session (15 min). */
+const MAX_DELAY_MS = 900_000;
+function boundedMs(value: unknown): number {
+  const ms = Number(value);
+  if (!Number.isFinite(ms) || ms < 0) return 0;
+  return ms > MAX_DELAY_MS ? MAX_DELAY_MS : ms;
+}
+
 /** A signal that aborts after `ms` (cancellation tests); none without `ms`. */
 function abortAfter(ms: unknown): AbortSignal | undefined {
   if (typeof ms !== 'number') return undefined;
   const controller = new AbortController();
-  setTimeout(() => controller.abort(), ms).unref?.();
+  setTimeout(() => controller.abort(), boundedMs(ms)).unref?.();
   return controller.signal;
 }
 
@@ -143,42 +151,44 @@ async function drain(state: ScriptState, step: Step): Promise<StepResult> {
   return { ok: true, count: step.count, perSecond: Number(step.count) / seconds };
 }
 
-const STEPS: Record<string, (state: ScriptState, step: Step) => Promise<StepResult>> = {
-  read: async ({ session }, step) => ({
-    ok: true,
-    value: hex(await session.read(String(step.key), { signal: abortAfter(step.abortAfterMs) })),
+const STEPS = new Map<string, (state: ScriptState, step: Step) => Promise<StepResult>>(
+  Object.entries({
+    read: async ({ session }, step) => ({
+      ok: true,
+      value: hex(await session.read(String(step.key), { signal: abortAfter(step.abortAfterMs) })),
+    }),
+    write: async ({ session }, step) => {
+      await session.write(String(step.key), bytes(step.value), { withoutResponse: step.withoutResponse === true });
+      return { ok: true };
+    },
+    subscribe: async (state, step) => {
+      state.streams.set(String(step.key), await state.session.subscribe(String(step.key)));
+      return { ok: true };
+    },
+    next: async (state, step) => {
+      const notification = await stream(state, step.key).next({
+        timeoutMs: Number(step.timeoutMs ?? 10_000),
+        signal: abortAfter(step.abortAfterMs),
+      });
+      return { ok: true, value: hex(notification.value) };
+    },
+    unsubscribe: async (state, step) => {
+      await state.session.unsubscribe(String(step.key));
+      state.streams.delete(String(step.key));
+      return { ok: true };
+    },
+    sleep: async (_state, step) => {
+      await new Promise((resolve) => setTimeout(resolve, boundedMs(step.ms)));
+      return { ok: true };
+    },
+    mtu: async ({ session }) => ({ ok: true, mtu: session.mtu }),
+    transfer,
+    drain,
   }),
-  write: async ({ session }, step) => {
-    await session.write(String(step.key), bytes(step.value), { withoutResponse: step.withoutResponse === true });
-    return { ok: true };
-  },
-  subscribe: async (state, step) => {
-    state.streams.set(String(step.key), await state.session.subscribe(String(step.key)));
-    return { ok: true };
-  },
-  next: async (state, step) => {
-    const notification = await stream(state, step.key).next({
-      timeoutMs: Number(step.timeoutMs ?? 10_000),
-      signal: abortAfter(step.abortAfterMs),
-    });
-    return { ok: true, value: hex(notification.value) };
-  },
-  unsubscribe: async (state, step) => {
-    await state.session.unsubscribe(String(step.key));
-    state.streams.delete(String(step.key));
-    return { ok: true };
-  },
-  sleep: async (_state, step) => {
-    await new Promise((resolve) => setTimeout(resolve, Number(step.ms)));
-    return { ok: true };
-  },
-  mtu: async ({ session }) => ({ ok: true, mtu: session.mtu }),
-  transfer,
-  drain,
-};
+);
 
 async function runStep(state: ScriptState, step: Step): Promise<StepResult> {
-  const handler = STEPS[step.op];
+  const handler = STEPS.get(step.op);
   if (!handler) return { ok: false, code: 'UNKNOWN_STEP', detail: step.op };
   return handler(state, step).catch(failure);
 }

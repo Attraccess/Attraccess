@@ -505,7 +505,8 @@ directory of the API it starts. The devices come from the environment:
 - `BLE_PERIPHERAL_ADDRESS`: the generic GATT test peripheral (`ble-test-peripheral/`, see its README) in range of
   the reader, for example a second lab place flashed with it inside its own labgrid session for the duration of the
   run. It prints its address at boot (`ready address=...`).
-- `SOLO_ADDRESS` and `SOLO_USER_CODE`: a PS Locks SOLO BT in factory `CRYPT_OFF` mode for the real-lock smoke. The
+- `SOLO_USER_CODE` (and optionally `SOLO_ADDRESS`, else the first lock the scan finds): a PS Locks SOLO BT in
+  factory `CRYPT_OFF` mode for the real-lock smoke. The
   code is only ever passed through the environment.
 - `HIL_BLE_LONG=1` adds the 10-minute transfer (at least 256 KiB of MTU-sized writes without response, each
   acknowledged by a notification).

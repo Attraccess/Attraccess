@@ -370,14 +370,19 @@ static void advertise(void)
     if (rc != 0 && rc != BLE_HS_EALREADY) ESP_LOGE(TAG, "adv start rc=%d", rc);
 }
 
+// Repeated every 10 s, so a harness that attaches to the console after boot still learns the address.
+static char ready_line[96];
+
 static void on_sync(void)
 {
     ble_hs_util_ensure_addr(0);
     ble_hs_id_infer_auto(0, &own_addr_type);
     uint8_t addr[6] = {0};
     ble_hs_id_copy_addr(own_addr_type, addr, NULL);
-    ESP_LOGI(TAG, "ready address=%02X:%02X:%02X:%02X:%02X:%02X type=%s name=%s", addr[5], addr[4], addr[3], addr[2],
-             addr[1], addr[0], own_addr_type == BLE_OWN_ADDR_PUBLIC ? "public" : "random", ble_svc_gap_device_name());
+    snprintf(ready_line, sizeof ready_line, "ready address=%02X:%02X:%02X:%02X:%02X:%02X type=%s name=%s", addr[5],
+             addr[4], addr[3], addr[2], addr[1], addr[0], own_addr_type == BLE_OWN_ADDR_PUBLIC ? "public" : "random",
+             ble_svc_gap_device_name());
+    ESP_LOGI(TAG, "%s", ready_line);
     advertise();
 }
 
@@ -419,4 +424,9 @@ void app_main(void)
     ble_att_set_preferred_mtu(517);
 
     nimble_port_freertos_init(host_task);
+
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(10000));
+        if (ready_line[0]) ESP_LOGI(TAG, "%s", ready_line);
+    }
 }

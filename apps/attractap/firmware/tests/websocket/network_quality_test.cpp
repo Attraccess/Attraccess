@@ -30,6 +30,7 @@ void Websocket::setSubprotocol(const std::string &) {}
 bool Websocket::sendBinary(const uint8_t *, size_t) { return true; }
 void Websocket::setRawBinaryCallback(std::function<bool(const uint8_t *, size_t)>) {}
 void Websocket::setConnectionCallback(std::function<void(bool)>) {}
+bool Websocket::sendQueueHasRoom(size_t) const { return true; }
 static void require(bool condition, const char *message)
 {
     if (!condition) throw std::runtime_error(message);
