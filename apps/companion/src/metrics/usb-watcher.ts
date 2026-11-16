@@ -12,22 +12,31 @@ interface UsbConnectionEvent {
   device: UsbDevice;
 }
 
-// usb 3 replaced the legacy `on('attach')` emitter with WebUSB. Its `usb` export is a WebUSB
-// instance that already allows every device, so connect/disconnect fire for any physical change.
-type UsbLib = {
-  usb: {
-    addEventListener(type: 'connect' | 'disconnect', cb: (ev: UsbConnectionEvent) => void): void;
-    removeEventListener(type: 'connect' | 'disconnect', cb: (ev: UsbConnectionEvent) => void): void;
-  };
+interface UsbTarget {
+  addEventListener(type: 'connect' | 'disconnect', cb: (ev: UsbConnectionEvent) => void): void;
+  removeEventListener(type: 'connect' | 'disconnect', cb: (ev: UsbConnectionEvent) => void): void;
+  isPotentialSystemDevice(device: unknown): boolean;
+}
+
+// usb 3 replaced the legacy `on('attach')` emitter with WebUSB. WebUSB silently drops connect
+// events for "potential system devices" (HID, hubs, mass storage, smart cards, audio, video), so
+// the watcher uses its own allow-all instance with that filter switched off.
+export type UsbLib = {
+  WebUSB: new (options: { allowAllDevices: boolean }) => UsbTarget;
 };
 
 // ponytail: lazy require keeps the native usb module out of jest/test contexts, and the
 // catch keeps a packaged build without the prebuilt binary from taking down the whole app —
 // USB triggers just go silent instead.
-export function startUsbWatcher(onAdd: (d: UsbDeviceInfo) => void, onRemove: (d: UsbDeviceInfo) => void): () => void {
-  let usb: UsbLib['usb'];
+export function startUsbWatcher(
+  onAdd: (d: UsbDeviceInfo) => void,
+  onRemove: (d: UsbDeviceInfo) => void,
+  loadUsb: () => UsbLib = () => require('usb') as UsbLib,
+): () => void {
+  let usb: UsbTarget;
   try {
-    usb = (require('usb') as UsbLib).usb;
+    usb = new (loadUsb().WebUSB)({ allowAllDevices: true });
+    usb.isPotentialSystemDevice = () => false;
   } catch (err) {
     console.warn('[usb] native module unavailable, USB device events disabled:', err);
     return () => undefined;
