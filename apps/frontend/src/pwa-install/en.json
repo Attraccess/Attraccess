@@ -6,7 +6,7 @@
     "description": "Open it from your home screen like any other app.",
     "install": "Install",
     "dismiss": "Not now",
-    "label": "Install app"
+    "showHow": "Show me how"
   },
   "ios": {
     "title": "Install Attraccess",

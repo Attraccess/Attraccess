@@ -13,11 +13,17 @@ function setup(onRefresh = vi.fn(() => Promise.resolve())) {
       pullingContent={<p>Pull hint</p>}
       refreshingContent={<p>Spinner</p>}
     >
-      <main data-cy="scroller">
+      <main data-cy="scroller" style={{ overflowY: 'auto' }}>
+        <div style={{ overflowY: 'hidden' }} data-cy="clipper">
+          <p>Nested text</p>
+        </div>
         <p>Plain text</p>
         <input aria-label="Username" />
         <input aria-label="Password" type="password" />
         <textarea aria-label="Notes" />
+        <select aria-label="Role">
+          <option>Admin</option>
+        </select>
         <div contentEditable aria-label="Editor" suppressContentEditableWarning>
           <span>Rich text</span>
         </div>
@@ -42,6 +48,7 @@ describe('PullToRefresh', () => {
     ['a text input', () => screen.getByLabelText('Username')],
     ['a password input', () => screen.getByLabelText('Password')],
     ['a textarea', () => screen.getByLabelText('Notes')],
+    ['a select', () => screen.getByLabelText('Role')],
     ['a contenteditable child', () => screen.getByText('Rich text')],
   ])('leaves a touch on %s native, even when it moves down', (_, target) => {
     const { content } = setup();
@@ -63,7 +70,7 @@ describe('PullToRefresh', () => {
       [102, 103],
       [97, 106],
       [104, 95],
-      [100, 108],
+      [100, 107],
       [100, 100],
     ]);
     fireEvent.touchEnd(screen.getByText('Plain text'));
@@ -81,7 +88,7 @@ describe('PullToRefresh', () => {
     fireEvent.touchStart(target, at(100, 100));
     expect(fireEvent.touchMove(target, at(100, 115))).toBe(false);
     expect(screen.getByText('Pull hint')).toBeInTheDocument();
-    expect(content.style.transform).toBe('translateY(5px)');
+    expect(content.style.transform).toBe('translateY(7px)');
 
     fireEvent.touchMove(target, at(102, 210));
     expect(screen.getByText('Spinner')).toBeInTheDocument();
@@ -118,12 +125,48 @@ describe('PullToRefresh', () => {
     expect(onRefresh).not.toHaveBeenCalled();
   });
 
-  it('does not start when the scroll container is scrolled down', () => {
+  it('counts the finger travel against the threshold, as the old library did', async () => {
+    const { onRefresh } = setup();
+    const target = screen.getByText('Plain text');
+
+    drag(target, [[100, 190]]);
+    expect(screen.getByText('Spinner')).toBeInTheDocument();
+    fireEvent.touchEnd(target);
+
+    await vi.waitFor(() => expect(onRefresh).toHaveBeenCalledOnce());
+  });
+
+  it('does not start a second refresh while one is running, and resets when it fails', async () => {
+    let fail: (reason: Error) => void = () => undefined;
+    const { content, onRefresh } = setup(vi.fn(() => new Promise<void>((_, reject) => (fail = reject))));
+    const target = screen.getByText('Plain text');
+
+    drag(target, [[100, 250]]);
+    fireEvent.touchEnd(target);
+    await vi.waitFor(() => expect(onRefresh).toHaveBeenCalledOnce());
+    expect(drag(target, [[100, 250]])).toBe(false);
+    fireEvent.touchEnd(target);
+    expect(onRefresh).toHaveBeenCalledOnce();
+
+    await act(async () => fail(new Error('offline')));
+    expect(screen.queryByText('Spinner')).toBeNull();
+    expect(content.style.transform).toBe('');
+  });
+
+  it('does not start when a scrollable ancestor is scrolled down, even several levels up', () => {
     const { content } = setup();
     Object.defineProperty(screen.getByRole('main'), 'scrollTop', { value: 40, configurable: true });
 
-    expect(drag(screen.getByText('Plain text'), [[100, 250]])).toBe(false);
+    expect(drag(screen.getByText('Nested text'), [[100, 250]])).toBe(false);
     expect(content.style.transform).toBe('');
+  });
+
+  it('ignores a scroll offset left on an ancestor that clips instead of scrolling', () => {
+    setup();
+    const clipper = screen.getByText('Nested text').parentElement as HTMLElement;
+    Object.defineProperty(clipper, 'scrollTop', { value: 40, configurable: true });
+
+    expect(drag(screen.getByText('Nested text'), [[100, 250]])).toBe(true);
   });
 
   it.each([
@@ -155,6 +198,25 @@ describe('PullToRefresh', () => {
       ],
     });
     expect(fireEvent.touchMove(target, at(100, 250))).toBe(true);
+  });
+
+  it('snaps back when a second finger joins a pull', () => {
+    const { content, onRefresh } = setup();
+    const target = screen.getByText('Plain text');
+
+    drag(target, [[100, 150]]);
+    expect(content.style.transform).not.toBe('');
+    fireEvent.touchStart(target, {
+      touches: [
+        { clientX: 100, clientY: 150 },
+        { clientX: 200, clientY: 150 },
+      ],
+    });
+    fireEvent.touchEnd(target);
+
+    expect(content.style.transform).toBe('');
+    expect(screen.queryByText('Pull hint')).toBeNull();
+    expect(onRefresh).not.toHaveBeenCalled();
   });
 
   it('removes its listeners on unmount', () => {

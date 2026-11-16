@@ -3,7 +3,7 @@ import { usePullToRefresh } from './usePullToRefresh';
 
 interface Props {
   onRefresh: () => Promise<unknown>;
-  /** Pull distance in px that triggers a refresh on release. */
+  /** Finger travel in px that triggers a refresh on release. */
   threshold: number;
   pullingContent: ReactNode;
   /** Shown once the threshold is reached and while onRefresh runs. */

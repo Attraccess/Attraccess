@@ -12,7 +12,8 @@ interface Gesture {
   startX: number;
   startY: number;
   armed: boolean;
-  distance: number;
+  /** Finger travel since touchstart; the threshold applies to it, as with the old library. */
+  travel: number;
 }
 
 const SNAP_BACK = 'transform 0.2s cubic-bezier(0, 0, 0.31, 1)';
@@ -46,11 +47,13 @@ export function usePullToRefresh({ onRefresh, threshold }: Options) {
     };
 
     const onTouchStart = (event: TouchEvent) => {
+      // A second finger mid-pull ends the pull; without the reset the app would stay shifted down.
+      if (gesture?.armed) reset();
       gesture = null;
       if (refreshing || event.touches.length !== 1 || isEditableTarget(event.target)) return;
       if (!isScrolledToTop(event.target) || content.getBoundingClientRect().top < 0) return;
       const touch = event.touches[0];
-      gesture = { startX: touch.clientX, startY: touch.clientY, armed: false, distance: 0 };
+      gesture = { startX: touch.clientX, startY: touch.clientY, armed: false, travel: 0 };
     };
 
     const onTouchMove = (event: TouchEvent) => {
@@ -74,16 +77,16 @@ export function usePullToRefresh({ onRefresh, threshold }: Options) {
       }
 
       if (event.cancelable) event.preventDefault();
-      gesture.distance = pullDistance(dy);
-      show(gesture.distance, false);
-      setPhase(gesture.distance >= latest.current.threshold ? 'ready' : 'pulling');
+      gesture.travel = dy;
+      show(pullDistance(dy), false);
+      setPhase(dy >= latest.current.threshold ? 'ready' : 'pulling');
     };
 
     const onTouchEnd = (event: TouchEvent) => {
       const finished = gesture;
       gesture = null;
       if (!finished?.armed) return;
-      if (event.type !== 'touchend' || finished.distance < latest.current.threshold) {
+      if (event.type !== 'touchend' || finished.travel < latest.current.threshold) {
         reset();
         return;
       }

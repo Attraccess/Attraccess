@@ -24,6 +24,10 @@ function mockDisplayMode(standalone: boolean) {
   );
 }
 
+const IOS_SAFARI =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 let unregister: () => void = () => undefined;
 
 beforeEach(() => {
@@ -55,6 +59,7 @@ describe('registerInstallPrompt', () => {
     unregister = registerInstallPrompt();
 
     expect(useInstallPromptStore.getState().deferredPrompt).toBe(event);
+    expect(window.__attraccessInstallPrompt).toBeNull();
   });
 
   it('forgets the event once the app is installed', () => {
@@ -125,7 +130,7 @@ describe('useInstallApp', () => {
   });
 
   it('opens the Add to Home Screen help on iOS, which has no prompt API', () => {
-    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)');
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(IOS_SAFARI);
     const { result } = renderHook(() => useInstallApp());
 
     expect(result.current.mode).toBe('ios');
@@ -133,8 +138,33 @@ describe('useInstallApp', () => {
     expect(useInstallPromptStore.getState().isIosHelpOpen).toBe(true);
   });
 
+  it.each([
+    [
+      'Chrome',
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/131.0 Mobile/15E148 Safari/604.1',
+    ],
+    [
+      'an in-app browser',
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 350.0',
+    ],
+  ])('offers no Safari steps in %s on iOS', (_, userAgent) => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(userAgent);
+    const { result } = renderHook(() => useInstallApp());
+    expect(result.current.mode).toBeNull();
+  });
+
+  it('recognises iPadOS, which reports itself as a Mac', () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
+    );
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel');
+    vi.spyOn(navigator, 'maxTouchPoints', 'get').mockReturnValue(5);
+    const { result } = renderHook(() => useInstallApp());
+    expect(result.current.mode).toBe('ios');
+  });
+
   it('treats a home-screen launch on iOS as installed', () => {
-    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)');
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(IOS_SAFARI);
     Object.defineProperty(navigator, 'standalone', { value: true, configurable: true });
     try {
       const { result } = renderHook(() => useInstallApp());
@@ -153,8 +183,25 @@ describe('banner snooze', () => {
     expect(readBannerDismissed()).toBe(true);
   });
 
-  it('brings the banner back after 30 days', () => {
-    localStorage.setItem('pwa-install-banner-dismissed-at', String(Date.now() - 31 * 24 * 60 * 60 * 1000));
+  it.each([
+    [29, true],
+    [31, false],
+    [-1, false],
+  ])('treats a dismissal %i days ago as snoozed=%s', (daysAgo, snoozed) => {
+    localStorage.setItem('pwa-install-banner-dismissed-at', String(Date.now() - daysAgo * DAY_MS));
+    expect(readBannerDismissed()).toBe(snoozed);
+  });
+
+  it('keeps working when storage is blocked', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+
     expect(readBannerDismissed()).toBe(false);
+    useInstallPromptStore.getState().dismissBanner();
+    expect(useInstallPromptStore.getState().isBannerDismissed).toBe(true);
   });
 });

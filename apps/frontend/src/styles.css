@@ -23,7 +23,7 @@ body,
   overflow: hidden;
 }
 
-/* Our pull-to-refresh lets the first ~10px of a touch pass natively (so long-press Paste works), so the browser
+/* Our pull-to-refresh lets the first ~8px of a touch pass natively (so long-press Paste works), so the browser
    could start its own pull-to-refresh or overscroll on the root first. Only ours should run. */
 html,
 body {

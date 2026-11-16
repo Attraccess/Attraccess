@@ -1,6 +1,8 @@
+import { useId } from 'react';
 import { Alert, Button } from '@heroui/react';
 import { Download } from 'lucide-react';
 import { StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { usePwaUpdateStore } from '../pwa-update/updateController';
 import { useInstallPromptStore } from './installPrompt';
 import { useInstallApp } from './useInstallApp';
 import en from './en.json';
@@ -13,13 +15,17 @@ function InstallBanner({ t }: { t: Translate }) {
   const { mode, install } = useInstallApp();
   const isBannerDismissed = useInstallPromptStore((state) => state.isBannerDismissed);
   const dismissBanner = useInstallPromptStore((state) => state.dismissBanner);
+  // On phones the full-width card shares the bottom edge with the update indicator; the update matters more, so
+  // the card waits for it there. Wider screens have room for both.
+  const isUpdating = usePwaUpdateStore((state) => state.status !== 'idle');
+  const titleId = useId();
   if (!mode || isBannerDismissed) return null;
 
   // From md up the sidebar (z-50) is part of the page, so the card moves right of it instead of hiding behind it.
   return (
     <section
-      aria-label={t('banner.label')}
-      className="fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-30 sm:right-auto sm:max-w-sm md:[:root:has([data-sidebar=expanded])_&]:left-68 md:[:root:has([data-sidebar=collapsed])_&]:left-20"
+      aria-labelledby={titleId}
+      className={`fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-30 sm:right-auto sm:max-w-sm md:[:root:has([data-sidebar=expanded])_&]:left-68 md:[:root:has([data-sidebar=collapsed])_&]:left-20${isUpdating ? ' max-sm:hidden' : ''}`}
       data-cy="install-app-banner"
       data-install-banner
     >
@@ -28,7 +34,7 @@ function InstallBanner({ t }: { t: Translate }) {
           <Download aria-hidden className="size-5" />
         </Alert.Indicator>
         <Alert.Content>
-          <Alert.Title>{t('banner.title')}</Alert.Title>
+          <Alert.Title id={titleId}>{t('banner.title')}</Alert.Title>
           <Alert.Description>{t('banner.description')}</Alert.Description>
           <div className="mt-2 flex gap-2">
             <Button
@@ -40,9 +46,9 @@ function InstallBanner({ t }: { t: Translate }) {
               }}
               data-cy="install-app-banner-install"
             >
-              {t('banner.install')}
+              {mode === 'ios' ? t('banner.showHow') : t('banner.install')}
             </Button>
-            <Button size="sm" variant="ghost" onPress={dismissBanner} data-cy="install-app-banner-dismiss">
+            <Button size="sm" variant="secondary" onPress={dismissBanner} data-cy="install-app-banner-dismiss">
               {t('banner.dismiss')}
             </Button>
           </div>

@@ -20,7 +20,9 @@ const BANNER_SNOOZE_MS = 30 * 24 * 60 * 60 * 1000;
 export function readBannerDismissed(): boolean {
   try {
     const dismissedAt = Number(localStorage.getItem(BANNER_DISMISSED_KEY));
-    return dismissedAt > 0 && Date.now() - dismissedAt < BANNER_SNOOZE_MS;
+    const elapsed = Date.now() - dismissedAt;
+    // A timestamp in the future (clock moved back) does not count, or the banner could stay away for good.
+    return dismissedAt > 0 && elapsed >= 0 && elapsed < BANNER_SNOOZE_MS;
   } catch {
     return false;
   }
@@ -57,6 +59,8 @@ export const useInstallPromptStore = create<InstallPromptState>((set) => ({
 export function registerInstallPrompt(target: Window = window): () => void {
   const earlyEvent = target.__attraccessInstallPrompt;
   if (earlyEvent) useInstallPromptStore.setState({ deferredPrompt: earlyEvent });
+  // The store owns the event from here; a second registration (HMR) must not bring back a spent one.
+  target.__attraccessInstallPrompt = null;
 
   const onBeforeInstallPrompt = (event: Event) => {
     // Stops Chrome's own mini-infobar / install pop-up; Attraccess offers the prompt on demand instead.
@@ -97,4 +101,11 @@ export function isIos(): boolean {
   return (
     /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
   );
+}
+
+// The iOS steps describe Safari's menus. Other iOS browsers and in-app web views (which usually lack the Safari
+// token) get no install action; the docs cover them.
+export function isIosSafari(): boolean {
+  const ua = navigator.userAgent;
+  return isIos() && /Safari\//.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS|GSA\//.test(ua);
 }

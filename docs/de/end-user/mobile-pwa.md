@@ -27,13 +27,13 @@ Eine Progressive Web App läuft in Ihrem Browser, kann aber auf Ihrem Startbilds
 > Auf iOS müssen Sie Safari verwenden, um PWAs zu installieren. Andere Browser (Chrome, Firefox) unterstützen diese Funktion auf iOS nicht.
 
 > [!TIP]
-> In Safari bietet Attraccess dieselbe Aktion **App installieren** wie auf Android (siehe unten). Auf iPhone und iPad zeigt sie statt einer direkten Installation diese Schritte an.
+> In Safari auf iPhone und iPad bietet Attraccess dieselbe Aktion **App installieren** und dieselbe Karte **Attraccess installieren** wie auf Android (siehe unten). Da Safari nicht direkt installieren kann, zeigen sie stattdessen diese Schritte an.
 
 ## Installation auf Android
 
 1. Öffnen Sie **Chrome** und navigieren Sie zu Ihrer Attraccess-Instanz
 2. Wählen Sie **App installieren**:
-   - **Angemeldet:** Öffnen Sie das Benutzermenü (das Zahnrad unten in der Seitenleiste) und tippen Sie auf **App installieren**
+   - **Angemeldet:** Öffnen Sie das Menü (☰ oben links), dann das Benutzermenü (das Zahnrad unten in der Seitenleiste), und tippen Sie auf **App installieren**
    - **Abgemeldet:** Tippen Sie auf das Download-Symbol neben dem Schalter für den dunklen Modus oben rechts
    - Oder tippen Sie in der kleinen Karte **Attraccess installieren** unten auf der Seite auf **Installieren**
 3. Bestätigen Sie mit **Installieren**
