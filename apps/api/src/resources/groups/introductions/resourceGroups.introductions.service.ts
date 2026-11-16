@@ -26,6 +26,7 @@ import { NotificationCategory } from '../../../notifications/notification-types'
 import { UpdateResourceGroupIntroductionDto } from './dtos/update.request.dto';
 
 import { ResourceGroupIntroductionChangedEvent } from './events/resource-group-introduction-changed.event';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 @Injectable()
 export class ResourceGroupsIntroductionsService {
@@ -154,7 +155,7 @@ export class ResourceGroupsIntroductionsService {
     data?: UpdateResourceGroupIntroductionDto,
     tutorUserId?: number,
     performedByUserId?: number | null,
-    authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth' | null,
+    authenticationMethod?: AuthenticationMethod | null,
     apiTokenId?: number | null,
   ): Promise<ResourceIntroductionHistoryItem> {
     let existingIntroduction = await this.resourceIntroductionRepository.findOne({
@@ -234,7 +235,7 @@ export class ResourceGroupsIntroductionsService {
     options?: {
       tutorUserId?: number;
       performedByUserId?: number | null;
-      authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth' | null;
+      authenticationMethod?: AuthenticationMethod | null;
       apiTokenId?: number | null;
     },
   ): Promise<ResourceIntroductionHistoryItem> {
@@ -256,7 +257,7 @@ export class ResourceGroupsIntroductionsService {
     data?: UpdateResourceGroupIntroductionDto,
     options?: {
       performedByUserId?: number | null;
-      authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth' | null;
+      authenticationMethod?: AuthenticationMethod | null;
       apiTokenId?: number | null;
     },
   ): Promise<ResourceIntroductionHistoryItem> {

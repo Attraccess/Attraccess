@@ -46,6 +46,7 @@ import { readerHeartbeat } from './websocket-reader-payloads';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
 import { randomBytes } from 'crypto';
 import type { IncomingMessage } from 'http';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 /**
  * The only events a reader that is not paired may send: signing in again, the firmware update, its crash
@@ -267,7 +268,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     readerId: number;
     userId: number;
     actorId?: number;
-    authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
+    authenticationMethod?: AuthenticationMethod;
     apiTokenId?: number;
   }) {
     return this.cardHandler.startEnrollOfNewNfcCard(data);
@@ -277,7 +278,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     readerId: number;
     userId: number;
     cardId: number;
-    authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
+    authenticationMethod?: AuthenticationMethod;
     apiTokenId?: number;
   }) {
     return this.cardHandler.startResetOfNfcCard(data);

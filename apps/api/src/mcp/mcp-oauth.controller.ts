@@ -22,11 +22,13 @@ import { McpOAuthError, McpOAuthService } from './mcp-oauth.service';
 import { McpEndpoints, McpPublicUrls } from './mcp-public-urls.service';
 import { McpRateLimit, McpRateLimitGuard } from './mcp-rate-limit.guard';
 
-const escapeHtml = (value: string): string =>
-  value.replace(
-    /[&<>"']/g,
-    (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char,
-  );
+/** Sends the browser to the frontend error page. Only a fixed error code travels, never client-supplied text. */
+function errorPage(res: Response, endpoints: McpEndpoints, code: string): void {
+  const url = new URL(endpoints.errorPageUrl);
+  url.searchParams.set('error', code);
+  res.setHeader('Cache-Control', 'no-store');
+  res.redirect(302, url.toString());
+}
 
 const text = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined);
 
@@ -41,7 +43,7 @@ async function oauthEndpoints(urls: McpPublicUrls, request: Request): Promise<Mc
   if (!endpoints.oauthEnabled) {
     throw new HttpException(
       {
-        error: 'not_found',
+        error: 'oauth_disabled',
         error_description: 'MCP OAuth requires an https or loopback public URL; use an API token.',
       },
       404,
@@ -133,7 +135,11 @@ export class McpOAuthController {
         endpoints.resource,
       );
       if ('redirectError' in result) {
-        res.redirect(302, this.oauth.buildErrorRedirect(result.redirectError, endpoints.origin));
+        if (result.redirectError.trusted) {
+          res.redirect(302, this.oauth.buildErrorRedirect(result.redirectError, endpoints.origin));
+        } else {
+          errorPage(res, endpoints, result.redirectError.error);
+        }
         return;
       }
       const consent = new URL(endpoints.consentUrl);
@@ -142,14 +148,8 @@ export class McpOAuthController {
       res.redirect(302, consent.toString());
     } catch (error) {
       if (!(error instanceof McpOAuthError)) throw error;
-      // The client or redirect URI could not be verified: show the problem here, never redirect to it.
-      res
-        .status(400)
-        .type('html')
-        .send(
-          `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Authorization failed</title></head>` +
-            `<body><h1>Authorization failed</h1><p>${escapeHtml(error.message)}</p></body></html>`,
-        );
+      // The client or redirect URI could not be verified: show the problem in Attraccess, never redirect to it.
+      errorPage(res, endpoints, error.code === 'invalid_client' ? 'invalid_client' : 'invalid_redirect_uri');
     }
   }
 

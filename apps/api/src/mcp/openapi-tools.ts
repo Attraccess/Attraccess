@@ -125,10 +125,11 @@ function resolveSchema(
     resolved[keyword] = branches.map((branch) => resolveSchema(branch, schemas, stack));
   }
   const allOf = resolved.allOf as Schema[] | undefined;
-  if (allOf?.length === 1) {
+  const single = allOf?.length === 1 ? allOf[0] : undefined;
+  if (single) {
     const others = { ...resolved };
     delete others.allOf;
-    resolved = { ...allOf[0], ...others };
+    resolved = { ...single, ...others };
   }
   if (resolved.type === 'object' || resolved.properties) {
     const properties = rest.properties as Record<string, Schema> | undefined;
@@ -150,7 +151,16 @@ function resolveSchema(
   ) {
     throw new Error(`Unsupported schema type ${String(resolved.type)}`);
   }
+  if (single) mergeExtendedBase(resolved, single, rest.required);
   return nullable === true ? withNull(resolved) : resolved;
+}
+
+/** `{ allOf: [Base], properties: {...} }` extends Base: keep Base's properties and required fields. */
+function mergeExtendedBase(resolved: Schema, base: Schema, ownRequired: unknown): void {
+  if (!isSchema(base.properties) || !isSchema(resolved.properties) || resolved.properties === base.properties) return;
+  resolved.properties = { ...base.properties, ...resolved.properties };
+  const required = [base.required, ownRequired].flatMap((list) => (Array.isArray(list) ? list : []));
+  if (required.length) resolved.required = [...new Set(required)];
 }
 
 function referencedSchemaNames(value: unknown, schemas: Record<string, unknown>, found: Set<string>): void {

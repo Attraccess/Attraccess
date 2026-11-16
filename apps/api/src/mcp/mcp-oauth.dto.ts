@@ -1,8 +1,27 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+export class McpOAuthConsentPermissionDto {
+  @ApiProperty({ example: 'resources.read' })
+  key!: string;
+
+  @ApiProperty({ description: 'English label from the permission catalog; the frontend translates by key.' })
+  label!: string;
+
+  @ApiProperty()
+  description!: string;
+
+  @ApiProperty({ example: 'resources' })
+  category!: string;
+}
+
 export class McpOAuthConsentDto {
   @ApiProperty({ description: 'Name the client registered with. Not verified: never treat it as an identity.' })
   clientName!: string;
+
+  @ApiProperty({
+    description: 'True when the operator pre-registered the client; false for a self-registered (DCR) client.',
+  })
+  registeredByOperator!: boolean;
 
   @ApiProperty({ description: 'Where the browser returns to after the decision.' })
   redirectUri!: string;
@@ -13,8 +32,8 @@ export class McpOAuthConsentDto {
   @ApiProperty({ description: 'True when the client runs on this device (localhost redirect).' })
   loopbackRedirect!: boolean;
 
-  @ApiProperty({ type: [String], description: 'Permissions the client asks for.' })
-  permissions!: string[];
+  @ApiProperty({ type: [McpOAuthConsentPermissionDto], description: 'Permissions the client asks for.' })
+  permissions!: McpOAuthConsentPermissionDto[];
 
   @ApiProperty({ description: 'True when the client did not name permissions and asks for all of yours.' })
   requestedAll!: boolean;

@@ -301,5 +301,14 @@ describe('PreStartService', () => {
         jest.useRealTimers();
       }
     });
+
+    it('audits a step of an MCP OAuth client as mcp-oauth, not as a browser session', async () => {
+      const { service, audit } = setup(confirmOutcome);
+      const mcp = { origin: 'api' as const, authenticationMethod: 'mcp-oauth' as const };
+      await catchError(service.gateHttp(3, user, {}, mcp));
+      const [event] = audit.record.mock.calls[0];
+      expect(event.actor.authenticationMethod).toBe('mcp-oauth');
+      expect(projectAuditRow(event)).not.toBeNull();
+    });
   });
 });

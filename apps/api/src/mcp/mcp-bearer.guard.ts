@@ -1,7 +1,7 @@
 import { ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request, Response } from 'express';
-import { setMcpDelegation } from './mcp-delegation';
+import { setMcpDelegation } from '../users-and-auth/strategies/mcp-delegation';
 import { McpOAuthService } from './mcp-oauth.service';
 import { ACCESS_TOKEN_PREFIX } from './mcp-oauth-rules';
 import { McpPublicUrls } from './mcp-public-urls.service';

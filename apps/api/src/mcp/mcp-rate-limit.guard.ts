@@ -2,6 +2,7 @@ import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable, S
 import { Reflector } from '@nestjs/core';
 import type { Request, Response } from 'express';
 import { FixedWindowCounterStore, WindowCounterEntry } from '../common/rate-limiting/fixed-window-counter';
+import { addressBucket } from '../device-enrollment/client-address';
 import { resolveIp } from '../users-and-auth/rate-limiting/login.rate-limit.guard';
 
 export type McpRateLimitName = 'mcp' | 'authorize' | 'token' | 'register' | 'consent';
@@ -19,10 +20,19 @@ const LIMITS: Record<McpRateLimitName, { limit: number; windowMs: number }> = {
 const MCP_RATE_LIMIT = 'mcp_rate_limit';
 export const McpRateLimit = (name: McpRateLimitName) => SetMetadata(MCP_RATE_LIMIT, name);
 
-/** Per-client-IP fixed window for the MCP and OAuth endpoints. State is per process, like the other in-memory limiters. */
+/** JSON-RPC batch: every message counts, so one POST cannot carry a hundred tool calls for the price of one. */
+function requestCost(request: Request): number {
+  return Array.isArray(request.body) ? Math.max(1, request.body.length) : 1;
+}
+
+/**
+ * Per-client-address fixed window for the MCP and OAuth endpoints (IPv6 bucketed by /64). State is per process, like
+ * the other in-memory limiters. Each limit has its own store, so evicting one limit's stale windows never resets
+ * another limit with a longer window.
+ */
 @Injectable()
 export class McpRateLimitGuard implements CanActivate {
-  private readonly counters = new FixedWindowCounterStore<string, WindowCounterEntry>(10_000);
+  private readonly counters = new Map<McpRateLimitName, FixedWindowCounterStore<string, WindowCounterEntry>>();
 
   constructor(private readonly reflector: Reflector) {}
 
@@ -34,20 +44,30 @@ export class McpRateLimitGuard implements CanActivate {
     if (!name) return true;
     const { limit, windowMs } = LIMITS[name];
     const request = context.switchToHttp().getRequest<Request>();
-    const key = `${name}:${resolveIp(request)}`;
+    const key = addressBucket(resolveIp(request));
+    const counters = this.store(name);
     const now = Date.now();
-    let entry = this.counters.get(key);
+    let entry = counters.get(key);
     if (!entry || now - entry.firstAt >= windowMs) {
-      this.counters.evict((candidate) => now - candidate.firstAt >= windowMs);
+      counters.evict((candidate) => now - candidate.firstAt >= windowMs);
       entry = { count: 0, firstAt: now };
-      this.counters.set(key, entry);
+      counters.set(key, entry);
     }
-    entry.count += 1;
+    entry.count += name === 'mcp' ? requestCost(request) : 1;
     if (entry.count > limit) {
       const retryAfter = Math.max(1, Math.ceil((entry.firstAt + windowMs - now) / 1000));
       context.switchToHttp().getResponse<Response>().setHeader('Retry-After', String(retryAfter));
       throw new HttpException('Too many requests', HttpStatus.TOO_MANY_REQUESTS);
     }
     return true;
+  }
+
+  private store(name: McpRateLimitName): FixedWindowCounterStore<string, WindowCounterEntry> {
+    let store = this.counters.get(name);
+    if (!store) {
+      store = new FixedWindowCounterStore<string, WindowCounterEntry>(10_000);
+      this.counters.set(name, store);
+    }
+    return store;
   }
 }

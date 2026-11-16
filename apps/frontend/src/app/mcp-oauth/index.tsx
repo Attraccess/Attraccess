@@ -5,20 +5,36 @@ import {
   useMcpOauthServiceApproveMcpOauthRequest,
   useMcpOauthServiceDenyMcpOauthRequest,
   useMcpOauthServiceGetMcpOauthRequest,
-  useRbacServiceListPermissions,
 } from '@attraccess/react-query-client';
 import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
+import { PermissionChipGroups } from '../../components/permissionList';
 import { useRbacCatalogTranslations } from '../../hooks/useRbacCatalogTranslations';
 import en from './en.json';
 import de from './de.json';
 
-type ApiFailure = { status?: number };
+type ApiFailure = { status?: number; body?: { error?: unknown } };
 type Decision = 'approve' | 'deny';
+type Failure = 'expired' | 'generic' | 'disabled' | 'framed';
 
 /** Browsers only let a script close a window that a script opened; otherwise the user lands on the app instead. */
-function leaveThePage() {
+export function leaveThePage() {
   window.close();
   window.location.assign('/');
+}
+
+function classify(error: unknown): Failure {
+  const failure = error as ApiFailure | undefined;
+  if (failure?.status === 404) return failure.body?.error === 'oauth_disabled' ? 'disabled' : 'expired';
+  return 'generic';
+}
+
+/** A consent page inside a frame could be overlaid to trick the user into clicking Allow. */
+function isFramed(): boolean {
+  try {
+    return window.top !== window.self;
+  } catch {
+    return true;
+  }
 }
 
 /**
@@ -29,51 +45,34 @@ export function McpOAuthAuthorizePage() {
   const { t } = useTranslations({ en, de });
   const query = useUrlQuery();
   const requestId = query.get('request');
-  const { permissionLabel, permissionDescription, permissionCategory } = useRbacCatalogTranslations();
+  const { permissionLabel } = useRbacCatalogTranslations();
   const [decided, setDecided] = useState<Decision | null>(null);
-  const [failure, setFailure] = useState<'expired' | 'generic' | 'disabled' | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
+  const [failure, setFailure] = useState<Failure | null>(() => (isFramed() ? 'framed' : null));
 
   const consent = useMcpOauthServiceGetMcpOauthRequest({ requestId: requestId ?? '' }, undefined, {
-    enabled: Boolean(requestId),
+    enabled: Boolean(requestId) && failure !== 'framed',
     retry: false,
   });
-  const { data: catalog } = useRbacServiceListPermissions();
 
-  const classify = (error: unknown): 'expired' | 'generic' | 'disabled' => {
-    const status = (error as ApiFailure | undefined)?.status;
-    if (status === 404) return 'expired';
-    return 'generic';
+  const handlers = {
+    onSuccess: ({ redirectUrl }: { redirectUrl: string }) => {
+      setRedirecting(true);
+      window.location.assign(redirectUrl);
+    },
+    onError: (error: unknown) => {
+      setDecided(null);
+      setFailure(classify(error));
+    },
   };
+  const approve = useMcpOauthServiceApproveMcpOauthRequest(handlers);
+  const deny = useMcpOauthServiceDenyMcpOauthRequest(handlers);
 
-  const leave = { onSuccess: ({ redirectUrl }: { redirectUrl: string }) => window.location.assign(redirectUrl) };
-  const approve = useMcpOauthServiceApproveMcpOauthRequest({
-    ...leave,
-    onError: (error) => {
-      setDecided(null);
-      setFailure(classify(error));
-    },
-  });
-  const deny = useMcpOauthServiceDenyMcpOauthRequest({
-    ...leave,
-    onError: (error) => {
-      setDecided(null);
-      setFailure(classify(error));
-    },
-  });
-
-  const groups = useMemo(() => {
-    const byKey = new Map((catalog ?? []).map((permission) => [permission.key, permission]));
-    const grouped = new Map<string, Array<{ key: string; label: string; description: string }>>();
-    for (const key of consent.data?.permissions ?? []) {
-      const permission = byKey.get(key) ?? { key, label: key, description: '', category: 'other' };
-      const category = permissionCategory(permission.category ?? 'other');
-      grouped.set(category, [
-        ...(grouped.get(category) ?? []),
-        { key, label: permissionLabel(permission), description: permissionDescription(permission) },
-      ]);
-    }
-    return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [catalog, consent.data?.permissions, permissionCategory, permissionLabel, permissionDescription]);
+  const view = consent.data;
+  const unavailableLabels = useMemo(() => {
+    const byKey = new Map((view?.permissions ?? []).map((permission) => [permission.key, permission]));
+    return (view?.unavailablePermissions ?? []).map((key) => permissionLabel(byKey.get(key) ?? { key })).join(', ');
+  }, [view, permissionLabel]);
 
   const decide = (decision: Decision) => {
     if (!requestId || decided) return;
@@ -81,11 +80,8 @@ export function McpOAuthAuthorizePage() {
     (decision === 'approve' ? approve : deny).mutate({ requestId });
   };
 
-  const loadFailure = consent.isError ? classify(consent.error) : null;
-  const problem = !requestId ? 'missing' : (failure ?? loadFailure);
-
+  const problem = !requestId ? 'missing' : (failure ?? (consent.isError ? classify(consent.error) : null));
   if (problem) {
-    const message = t(`error.${problem === 'missing' ? 'missing' : problem}`);
     return (
       <UnauthorizedLayout>
         <StatusDialog
@@ -96,13 +92,15 @@ export function McpOAuthAuthorizePage() {
           onClose={leaveThePage}
           data-cy="mcp-oauth-error-dialog"
         >
-          {message}
+          {t(`error.${problem}`)}
         </StatusDialog>
       </UnauthorizedLayout>
     );
   }
 
-  const view = consent.data;
+  // Every self-registered client and every redirect to this device deserves a second look; only an
+  // operator-registered client returning to a public https address is shown as a plain notice.
+  const warn = view ? view.loopbackRedirect || !view.registeredByOperator : false;
   return (
     <UnauthorizedLayout>
       <Card className="w-full" data-cy="mcp-oauth-consent">
@@ -117,11 +115,12 @@ export function McpOAuthAuthorizePage() {
             <Skeleton className="h-32 w-full rounded-md" />
           ) : (
             <>
-              <Alert status={view.loopbackRedirect ? 'warning' : 'default'} data-cy="mcp-oauth-redirect-notice">
+              <Alert status={warn ? 'warning' : 'default'} data-cy="mcp-oauth-redirect-notice">
                 <AlertContent>
                   <AlertTitle>{view.loopbackRedirect ? t('loopback.title') : t('external.title')}</AlertTitle>
                   <AlertDescription>
                     {t(view.loopbackRedirect ? 'loopback.message' : 'external.message', { host: view.redirectHost })}
+                    {view.registeredByOperator ? null : ` ${t('selfRegistered')}`}
                   </AlertDescription>
                 </AlertContent>
               </Alert>
@@ -130,55 +129,52 @@ export function McpOAuthAuthorizePage() {
                 <Alert status="danger" data-cy="mcp-oauth-unavailable">
                   <AlertContent>
                     <AlertTitle>{t('unavailable.title')}</AlertTitle>
-                    <AlertDescription>
-                      {t('unavailable.message', { permissions: view.unavailablePermissions.join(', ') })}
-                    </AlertDescription>
+                    <AlertDescription>{t('unavailable.message', { permissions: unavailableLabels })}</AlertDescription>
                   </AlertContent>
                 </Alert>
               )}
 
               <section aria-labelledby="mcp-oauth-permissions" className="flex flex-col gap-3">
-                <h2 id="mcp-oauth-permissions" className="text-base font-semibold">
+                <h4 id="mcp-oauth-permissions" className="text-base font-semibold">
                   {t('permissions.title')}
-                </h2>
+                </h4>
                 {view.requestedAll && (
                   <p className="text-sm text-muted">{t('permissions.all', { count: view.permissions.length })}</p>
                 )}
-                {groups.length === 0 && <p className="text-sm text-muted">{t('permissions.none')}</p>}
-                {groups.map(([category, items]) => (
-                  <div key={category} data-cy="mcp-oauth-permission-group">
-                    <h3 className="text-sm font-medium">{category}</h3>
-                    <ul className="mt-1 list-disc pl-5 text-sm">
-                      {items.map((item) => (
-                        <li key={item.key}>
-                          <span className="font-medium">{item.label}</span>
-                          {item.description ? <span className="text-muted"> – {item.description}</span> : null}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
+                {view.permissions.length === 0 ? (
+                  <p className="text-sm text-muted">{t('permissions.none')}</p>
+                ) : (
+                  <PermissionChipGroups permissions={view.permissions} uncategorizedLabel={t('permissions.other')} />
+                )}
               </section>
 
               <p className="text-sm text-muted">{t('notice')}</p>
             </>
           )}
         </Card.Content>
-        <Card.Footer className="flex justify-end gap-2">
-          {decided ? (
-            <p role="status" className="text-sm text-muted" data-cy="mcp-oauth-returning">
-              {t('returning')}
-            </p>
-          ) : (
-            <>
-              <Button variant="secondary" isDisabled={!view} onPress={() => decide('deny')} data-cy="mcp-oauth-deny">
-                {t('deny')}
-              </Button>
-              <Button isDisabled={!view} onPress={() => decide('approve')} data-cy="mcp-oauth-approve">
-                {t('approve')}
-              </Button>
-            </>
-          )}
+        <Card.Footer className="flex flex-col items-end gap-2">
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              isDisabled={!view || (decided !== null && decided !== 'deny') || redirecting}
+              isPending={decided === 'deny'}
+              onPress={() => decide('deny')}
+              data-cy="mcp-oauth-deny"
+            >
+              {t('deny')}
+            </Button>
+            <Button
+              isDisabled={!view || (decided !== null && decided !== 'approve') || redirecting}
+              isPending={decided === 'approve'}
+              onPress={() => decide('approve')}
+              data-cy="mcp-oauth-approve"
+            >
+              {t('approve')}
+            </Button>
+          </div>
+          <p role="status" aria-live="polite" className="text-sm text-muted" data-cy="mcp-oauth-returning">
+            {redirecting ? t(decided === 'deny' ? 'returningDenied' : 'returningApproved') : ''}
+          </p>
         </Card.Footer>
       </Card>
     </UnauthorizedLayout>

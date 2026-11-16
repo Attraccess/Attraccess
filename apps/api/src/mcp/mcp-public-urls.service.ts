@@ -18,6 +18,8 @@ export interface McpEndpoints {
   registrationEndpoint: string;
   /** The frontend consent page; the authorization endpoint redirects the browser here. */
   consentUrl: string;
+  /** The frontend page for an authorization request that cannot go back to the client. */
+  errorPageUrl: string;
   /** False on plain-HTTP, non-loopback deployments: API tokens keep working, OAuth does not. */
   oauthEnabled: boolean;
 }
@@ -71,6 +73,7 @@ export class McpPublicUrls implements OnApplicationBootstrap {
       tokenEndpoint: `${origin}${prefix}/mcp/oauth/token`,
       registrationEndpoint: `${origin}${prefix}/mcp/oauth/register`,
       consentUrl: `${frontend}/oauth/authorize`,
+      errorPageUrl: `${frontend}/oauth/error`,
       oauthEnabled,
     };
   }

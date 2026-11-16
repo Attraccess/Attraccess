@@ -17,7 +17,8 @@ export {
   ReaderUiResourceSettings,
 } from './entities/reader-ui-settings.entity';
 export type { ReaderUiAlertKind } from './entities/reader-ui-settings.entity';
-export { AuditLog } from './entities/audit-log.entity';
+export { AuditLog, AUTHENTICATION_METHODS } from './entities/audit-log.entity';
+export type { AuthenticationMethod } from './entities/audit-log.entity';
 export { AuthenticationDetail } from './entities/authenticationDetail.entity';
 export {
   BillingTransactionItem,

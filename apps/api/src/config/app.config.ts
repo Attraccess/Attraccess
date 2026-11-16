@@ -41,7 +41,7 @@ export const AppEnvSchema = z
     ATTRACCESS_FRONTEND_URL: z.string().url().optional(),
     ATTRACCESS_PUBLIC_INTERNET_URL: z.string().url().optional(),
     ATTRACCESS_TRUSTED_ORIGINS: z.string().optional(),
-    /** Optional static MCP OAuth clients (JSON array of { clientId, clientName?, redirectUris }); most clients register themselves. */
+    /** Optional static MCP OAuth clients (JSON array of { client_id, client_name?, redirect_uris }); most clients register themselves. */
     MCP_OAUTH_CLIENTS: z.string().optional(),
     VERSION: z.string().default(resolveAppVersion()),
     COMMIT_SHA: z.string().optional(),

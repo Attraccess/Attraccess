@@ -1,6 +1,8 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { McpOAuthAuthorizePage } from './index';
+import { McpOAuthErrorPage } from './error';
+import { mcpOAuthRoutes } from './routes';
 import en from './en.json';
 import de from './de.json';
 
@@ -38,12 +40,6 @@ vi.mock('../../hooks/useRbacCatalogTranslations', () => ({
   }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useRbacServiceListPermissions: () => ({
-    data: [
-      { key: 'resources.read', label: 'Read', description: '', category: 'resources' },
-      { key: 'users.roles.manage', label: 'Roles', description: '', category: 'users' },
-    ],
-  }),
   useMcpOauthServiceGetMcpOauthRequest: () => state.consent,
   useMcpOauthServiceApproveMcpOauthRequest: (options: (typeof state.options)[string]) => {
     state.options.approve = options;
@@ -59,7 +55,13 @@ const view = {
   redirectUri: 'http://127.0.0.1:8123/cb',
   redirectHost: '127.0.0.1:8123',
   loopbackRedirect: true,
-  permissions: ['resources.read', 'users.roles.manage'],
+  registeredByOperator: false,
+  // Users first: the page orders categories like the rest of the app, not like the API.
+  permissions: [
+    { key: 'users.roles.manage', label: 'Roles', description: 'Manage roles', category: 'users' },
+    { key: 'resources.read', label: 'Read', description: 'Read resources', category: 'resources' },
+    { key: 'plugin.thing', label: 'Plugin thing', description: '', category: '' },
+  ],
   requestedAll: false,
   unavailablePermissions: [] as string[],
   resource: 'http://localhost:3000/api/mcp',
@@ -74,20 +76,28 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it('shows the client, the redirect host and the permissions grouped by category', () => {
+it('shows the client, the redirect host and the permissions grouped by category in the app order', () => {
   render(<McpOAuthAuthorizePage />);
   expect(screen.getByText('title:Claude Code')).toBeTruthy();
-  expect(screen.getByText('loopback.message:127.0.0.1:8123')).toBeTruthy();
-  const groups = screen.getAllByText(/^category /);
-  expect(groups.map((node) => node.textContent)).toEqual(['category resources', 'category users']);
+  expect(screen.getByText(/^loopback.message:127.0.0.1:8123/)).toBeTruthy();
+  const groups = screen.getAllByText(/^category |^permissions.other$/);
+  expect(groups.map((node) => node.textContent)).toEqual(['category resources', 'category users', 'permissions.other']);
   expect(screen.getByText('label resources.read')).toBeTruthy();
-  expect(screen.getByText(/about users.roles.manage/)).toBeTruthy();
+  expect(screen.getByTitle('about users.roles.manage')).toBeTruthy();
 });
 
-it('asks to confirm the address of a client that is not on this device', () => {
-  state.consent = { data: { ...view, loopbackRedirect: false, redirectHost: 'client.example' }, isError: false };
-  render(<McpOAuthAuthorizePage />);
+it('warns about a self-registered client and only notes an operator-registered one', () => {
+  const external = { ...view, loopbackRedirect: false, redirectHost: 'client.example' };
+  state.consent = { data: external, isError: false };
+  const first = render(<McpOAuthAuthorizePage />);
+  expect(screen.getByText('external.message:client.example selfRegistered')).toBeTruthy();
+  expect(first.container.querySelector('[data-cy="mcp-oauth-redirect-notice"]')?.outerHTML).toMatch(/warning/);
+  first.unmount();
+
+  state.consent = { data: { ...external, registeredByOperator: true }, isError: false };
+  const second = render(<McpOAuthAuthorizePage />);
   expect(screen.getByText('external.message:client.example')).toBeTruthy();
+  expect(second.container.querySelector('[data-cy="mcp-oauth-redirect-notice"]')?.outerHTML).not.toMatch(/warning/);
 });
 
 it('explains an all-permissions request and permissions the user does not hold', () => {
@@ -96,8 +106,8 @@ it('explains an all-permissions request and permissions the user does not hold',
     isError: false,
   };
   render(<McpOAuthAuthorizePage />);
-  expect(screen.getByText('permissions.all:2')).toBeTruthy();
-  expect(screen.getByText('unavailable.message:users.roles.manage')).toBeTruthy();
+  expect(screen.getByText('permissions.all:3')).toBeTruthy();
+  expect(screen.getByText('unavailable.message:label users.roles.manage')).toBeTruthy();
 });
 
 it('approves and sends the browser to the client', () => {
@@ -105,17 +115,19 @@ it('approves and sends the browser to the client', () => {
   fireEvent.click(screen.getByText('approve'));
   expect(state.approve).toHaveBeenCalledWith({ requestId: 'mcp_rq_abc' });
   expect(state.deny).not.toHaveBeenCalled();
-  expect(screen.getByText('returning')).toBeTruthy();
-  state.options.approve.onSuccess({ redirectUrl: 'http://127.0.0.1:8123/cb?code=c&state=s' });
+  expect((screen.getByText('deny').closest('button') as HTMLButtonElement).disabled).toBe(true);
+  act(() => state.options.approve.onSuccess({ redirectUrl: 'http://127.0.0.1:8123/cb?code=c&state=s' }));
   expect(state.leave).toHaveBeenCalledWith('http://127.0.0.1:8123/cb?code=c&state=s');
+  expect(screen.getByText('returningApproved')).toBeTruthy();
 });
 
 it('denies and sends the browser to the client with the error redirect', () => {
   render(<McpOAuthAuthorizePage />);
   fireEvent.click(screen.getByText('deny'));
   expect(state.deny).toHaveBeenCalledWith({ requestId: 'mcp_rq_abc' });
-  state.options.deny.onSuccess({ redirectUrl: 'http://127.0.0.1:8123/cb?error=access_denied' });
+  act(() => state.options.deny.onSuccess({ redirectUrl: 'http://127.0.0.1:8123/cb?error=access_denied' }));
   expect(state.leave).toHaveBeenCalledWith('http://127.0.0.1:8123/cb?error=access_denied');
+  expect(screen.getByText('returningDenied')).toBeTruthy();
 });
 
 it('answers only once even when pressed twice', () => {
@@ -139,8 +151,44 @@ it('reports a request that is missing, expired or failed', () => {
   expired.unmount();
 
   state.consent = { data: undefined, isError: true, error: { status: 500 } };
-  render(<McpOAuthAuthorizePage />);
+  const generic = render(<McpOAuthAuthorizePage />);
   expect(screen.getByText('error.generic')).toBeTruthy();
+  generic.unmount();
+
+  state.consent = { data: undefined, isError: true, error: { status: 404, body: { error: 'oauth_disabled' } } };
+  render(<McpOAuthAuthorizePage />);
+  expect(screen.getByText('error.disabled')).toBeTruthy();
+});
+
+it('refuses to show the consent inside a frame', () => {
+  const top = vi.spyOn(window, 'top', 'get').mockReturnValue({} as Window);
+  render(<McpOAuthAuthorizePage />);
+  expect(screen.getByText('error.framed')).toBeTruthy();
+  expect(screen.queryByText('approve')).toBeNull();
+  top.mockRestore();
+});
+
+it('explains an authorization request that cannot go back to the client, showing only known error codes', () => {
+  state.query = new URLSearchParams('error=invalid_client');
+  const known = render(<McpOAuthErrorPage />);
+  expect(screen.getByText('authorizeError.invalid_client')).toBeTruthy();
+  known.unmount();
+
+  state.query = new URLSearchParams('error=invalid_target');
+  const request = render(<McpOAuthErrorPage />);
+  expect(screen.getByText('authorizeError.request:invalid_target')).toBeTruthy();
+  request.unmount();
+
+  state.query = new URLSearchParams('error=Your+account+is+locked');
+  render(<McpOAuthErrorPage />);
+  expect(screen.getByText('authorizeError.request:invalid_request')).toBeTruthy();
+});
+
+it('needs a sign-in for the consent page only', () => {
+  expect(mcpOAuthRoutes.map(({ path, authRequired }) => [path, authRequired])).toEqual([
+    ['/oauth/authorize', true],
+    ['/oauth/error', false],
+  ]);
 });
 
 it('sends the user to the app when the error dialog is closed and the browser keeps the window open', () => {

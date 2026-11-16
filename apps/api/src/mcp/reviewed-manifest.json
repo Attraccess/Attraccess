@@ -30,8 +30,8 @@
     "shape": "6b6797f7"
   },
   "createOneUser": {
-    "decision": "allow",
-    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "decision": "deny",
+    "reason": "Credential flow: public sign-up that sets the new account password.",
     "shape": "2f091df1"
   },
   "findMany": {
@@ -1526,7 +1526,7 @@
   },
   "PluginController_addRegistry": {
     "decision": "deny",
-    "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
+    "reason": "Secret management: stores an npm registry and its access token.",
     "shape": "78526244"
   },
   "PluginController_testRegistry": {
@@ -1536,7 +1536,7 @@
   },
   "PluginController_removeRegistry": {
     "decision": "deny",
-    "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
+    "reason": "Secret management: removes an npm registry and its stored access token.",
     "shape": "db78bcff"
   },
   "PluginController_packageMetadata": {
@@ -1590,28 +1590,28 @@
     "shape": "0ba3a01b"
   },
   "PluginController_installedPackages": {
-    "decision": "deny",
-    "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
     "shape": "290d1dbe"
   },
   "PluginController_updatePolicy": {
-    "decision": "deny",
-    "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
     "shape": "f4d76c00"
   },
   "PluginController_setUpdatePolicy": {
     "decision": "deny",
-    "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
+    "reason": "Host lifecycle: changes automatic plugin updates, which install code and restart the host.",
     "shape": "141e3c2a"
   },
   "PluginController_checkAllInstalledPackages": {
-    "decision": "deny",
-    "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
     "shape": "f031bc54"
   },
   "PluginController_checkInstalledPackage": {
-    "decision": "deny",
-    "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
     "shape": "939cf255"
   },
   "PluginController_updateInstalledPackageSpec": {
@@ -1630,8 +1630,8 @@
     "shape": "f3760cf2"
   },
   "PluginController_installedPackageVersions": {
-    "decision": "deny",
-    "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
     "shape": "aa04fc57"
   },
   "PluginController_replaceInstalledPackage": {
@@ -1952,7 +1952,7 @@
   "getMcpOAuthRequest": {
     "decision": "deny",
     "reason": "MCP OAuth endpoint: the consent decision belongs to the signed-in user in a browser, never to an MCP client.",
-    "shape": "439b09a6"
+    "shape": "81774ff0"
   },
   "approveMcpOAuthRequest": {
     "decision": "deny",

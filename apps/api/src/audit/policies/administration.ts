@@ -1,6 +1,8 @@
 import { createHash } from 'crypto';
 import { EmailTemplateType } from '@attraccess/database-entities';
 import { valid, validRange } from 'semver';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
+import { isAuthenticationMethod } from './projection';
 
 /** URLs may carry credentials, query tokens or private paths: record the origin only. */
 export function safeAuditOrigin(value: string): string {
@@ -38,7 +40,7 @@ export interface AdministrationAuditInput {
   action: string;
   operationId?: string;
   actorId: number;
-  authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
+  authenticationMethod?: AuthenticationMethod;
   apiTokenId?: number;
   subjectType: string;
   subjectId: number;
@@ -323,7 +325,7 @@ export function projectAdministrationAuditEvent(input: AdministrationAuditInput)
       return null;
     const method = input.authenticationMethod ?? 'session';
     if (
-      !['session', 'api-token', 'mcp-oauth'].includes(method) ||
+      !isAuthenticationMethod(method) ||
       (method === 'api-token' && !positive(input.apiTokenId)) ||
       (method !== 'api-token' && input.apiTokenId !== undefined) ||
       (input.outcome !== undefined && !['succeeded', 'failed'].includes(input.outcome))
