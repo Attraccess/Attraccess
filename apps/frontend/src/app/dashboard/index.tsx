@@ -124,10 +124,14 @@ function useDashboardFocus(pinCount: number | undefined) {
     const page = pageRef.current;
     if (index === null || !page) return;
     removedIndex.current = null;
-    const removeButtons = page.querySelectorAll<HTMLElement>(REMOVE_TARGETS);
+    const tiles = page.querySelectorAll<HTMLElement>('[data-cy="dashboard-card"]');
+    const tile = tiles[Math.min(index, tiles.length - 1)];
+    // In edit mode every tile has a remove target; outside it, a tile's link (or an unavailable tile's Remove) stands in.
+    const target =
+      tile?.querySelector<HTMLElement>(REMOVE_TARGETS) ?? tile?.querySelector<HTMLElement>('a[href], button');
     // Outside edit mode there is no "Add widget"; the Edit dashboard toggle is the next stop then.
     const fallback = page.querySelector<HTMLElement>(ADD_TARGETS) ?? page.querySelector<HTMLElement>(EDIT_TOGGLE);
-    (removeButtons[Math.min(index, removeButtons.length - 1)] ?? fallback)?.focus();
+    (target ?? fallback)?.focus();
   }, [pinCount]);
 
   const onPickerClosed = () =>

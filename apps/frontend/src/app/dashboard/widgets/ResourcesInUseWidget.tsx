@@ -31,13 +31,10 @@ function InUseRow({ resource }: Readonly<{ resource: Resource }>) {
     resourceId: resource.id,
     onUpdate: (data) => {
       if (data.eventType && SESSION_EVENTS.has(data.eventType)) {
-        // Every tile showing the resource hears the same event: join a refetch in flight instead of restarting it.
-        const options = { cancelRefetch: false };
-        void queryClient.invalidateQueries({ queryKey: UseResourcesServiceGetAllResourcesInUseKeyFn() }, options);
-        void queryClient.invalidateQueries(
-          { queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId: resource.id }) },
-          options,
-        );
+        void queryClient.invalidateQueries({ queryKey: UseResourcesServiceGetAllResourcesInUseKeyFn() });
+        void queryClient.invalidateQueries({
+          queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId: resource.id }),
+        });
       }
     },
   });

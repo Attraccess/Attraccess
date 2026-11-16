@@ -126,6 +126,7 @@ describe('MessagesWidget', () => {
   it('names who last wrote to the user, not whom the user last replied to', async () => {
     const replied = { ...conversation(1), lastMessage: { ...conversation(1).lastMessage, senderId: 7 } };
     vi.spyOn(MessagingService, 'messagingListConversations').mockResolvedValue([replied, conversation(2)] as never);
+    vi.spyOn(MessagingService, 'messagingGetUnreadCount').mockResolvedValue({ total: 1 } as never);
     renderWidget(<MessagesWidget {...at('small')} />);
 
     expect(await screen.findByText('Latest from user2')).toBeInTheDocument();

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import '@testing-library/jest-dom/vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -334,15 +335,25 @@ describe('widget pins', () => {
     );
   });
 
-  it('keeps focus on the page after removing an unavailable tile outside edit mode', async () => {
+  it('moves focus to the next tile after removing an unavailable one outside edit mode', async () => {
     state.widgets = { ...state.widgets, titleOf: (id) => (id === 'readers' ? 'Readers' : undefined) };
     updatePins().mockResolvedValue([widget('messages')] as never);
     renderDashboard([widget('readers'), widget('messages')]);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Remove Readers widget from dashboard' }));
 
-    // No other Remove button and no "Add widget" outside edit mode: the Edit dashboard toggle takes focus.
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit dashboard' })).toHaveFocus());
+    // Outside edit mode the tile that took its place has no Remove button: its header link takes focus.
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Messages' })).toHaveFocus());
+  });
+
+  it('moves focus to "Add widget" of the empty state after removing the last tile outside edit mode', async () => {
+    state.widgets = { ...state.widgets, titleOf: (id) => (id === 'readers' ? 'Readers' : undefined) };
+    updatePins().mockResolvedValue([] as never);
+    renderDashboard([widget('readers')]);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove Readers widget from dashboard' }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add widget' })).toHaveFocus());
   });
 });
 
@@ -387,6 +398,35 @@ describe('tile sizes', () => {
     expect(save).toHaveBeenCalledWith({
       requestBody: { kind: 'resize', item: { itemType: 'widget', itemId: 'messages' }, size: 'large' },
     });
+  });
+
+  it('keeps a working widget on resize and gives a crashed one another chance at the next size', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    updatePins().mockReturnValue(new Promise(() => undefined) as never);
+    function Fragile({ size }: Readonly<{ size: string }>) {
+      const [term, setTerm] = useState('');
+      if (size === 'small') throw new Error('too small');
+      return <input aria-label="Fragile search" value={term} onChange={(event) => setTerm(event.target.value)} />;
+    }
+    state.widgets = {
+      ...state.widgets,
+      widgets: [{ ...messagesWidget, renderBody: ({ size }) => <Fragile size={size} /> }],
+    };
+    renderDashboard([widget('messages')]);
+    await userEvent.type(await screen.findByRole('textbox', { name: 'Fragile search' }), 'lathe');
+    await userEvent.click(await editToggle('Edit dashboard'));
+
+    const resizeTo = async (size: string) => {
+      await userEvent.click(screen.getByRole('button', { name: 'Change size of Messages widget' }));
+      await userEvent.click(await screen.findByRole('menuitemradio', { name: size }));
+    };
+    await resizeTo('Large');
+    expect(screen.getByRole('textbox', { name: 'Fragile search' })).toHaveValue('lathe');
+
+    await resizeTo('Small');
+    expect(await screen.findByText(/stopped working/)).toBeInTheDocument();
+    await resizeTo('Medium');
+    expect(await screen.findByRole('textbox', { name: 'Fragile search' })).toBeInTheDocument();
   });
 
   it('lists only the sizes an item offers, with the current one selected', async () => {
@@ -442,7 +482,7 @@ describe('header links', () => {
     expect(screen.queryByRole('link', { name: 'Messages' })).toBeNull();
   });
 
-  it('leaves no link on any tile while the dashboard is edited', async () => {
+  it('leaves no header or tile link while the dashboard is edited', async () => {
     const { container } = renderDashboard([widget('messages'), page('/projects'), resource('5', 'Lathe')]);
     await screen.findByText('Session controls');
     const grid = container.querySelector('[data-cy="dashboard-grid"]') as HTMLElement;

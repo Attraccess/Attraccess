@@ -14,15 +14,21 @@ function CrashedWidget() {
   return <StatusAlert status="danger" title={t('crashed')} />;
 }
 
-/** Keeps a throwing widget inside its card, so the rest of the dashboard keeps working. */
-class WidgetBoundary extends Component<
-  PropsWithChildren<{ widgetId: string; pluginName?: string }>,
-  { failed: boolean }
-> {
+type BoundaryProps = PropsWithChildren<{ widgetId: string; pluginName?: string; size: string }>;
+
+/**
+ * Keeps a throwing widget inside its card, so the rest of the dashboard keeps working. A crashed widget gets another
+ * chance at the next size; a working one keeps its state (e.g. a search term) when resized.
+ */
+class WidgetBoundary extends Component<BoundaryProps, { failed: boolean }> {
   state = { failed: false };
 
   static getDerivedStateFromError() {
     return { failed: true };
+  }
+
+  componentDidUpdate(previous: BoundaryProps) {
+    if (this.state.failed && previous.size !== this.props.size) this.setState({ failed: false });
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
@@ -45,8 +51,7 @@ function Rendered({ render }: Readonly<{ render: () => ReactNode }>) {
 
 function WidgetBody({ widget, props }: Readonly<{ widget: DashboardWidget; props: DashboardWidgetRenderProps }>) {
   const body = (
-    // Keyed by size: a widget that crashed at one size gets another chance at the next.
-    <WidgetBoundary key={props.size} widgetId={widget.id} pluginName={widget.plugin?.pluginName}>
+    <WidgetBoundary widgetId={widget.id} pluginName={widget.plugin?.pluginName} size={props.size}>
       <Rendered render={() => widget.renderBody(props)} />
     </WidgetBoundary>
   );
@@ -72,7 +77,7 @@ export function WidgetPinCard({
   const label = t('card.widgetLabel', { title: widget.title });
   // The header extra is the widget's own content too, so it shares the boundary.
   const headerExtra = widget.renderHeaderExtra && (
-    <WidgetBoundary key={size} widgetId={widget.id}>
+    <WidgetBoundary widgetId={widget.id} size={size}>
       <Rendered render={() => widget.renderHeaderExtra?.({ ...props, isEditing })} />
     </WidgetBoundary>
   );
