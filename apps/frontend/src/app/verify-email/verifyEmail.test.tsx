@@ -94,6 +94,14 @@ function renderWithRoute(initialEntry: string, strict = false) {
   return render(strict ? <React.StrictMode>{content}</React.StrictMode> : content);
 }
 
+const VIEWPORT_HEIGHT_CLASS = /(^|:)(min-)?h-(screen|[dsl]vh|\[[^\]]*vh[^\]]*\])$/;
+
+function viewportHeightClasses(container: HTMLElement): string[] {
+  return Array.from(container.querySelectorAll('[class]')).flatMap((el) =>
+    Array.from(el.classList).filter((token) => VIEWPORT_HEIGHT_CLASS.test(token)),
+  );
+}
+
 describe('VerifyEmail', () => {
   beforeEach(() => {
     mutationMode.reactive = false;
@@ -143,6 +151,22 @@ describe('VerifyEmail', () => {
       expect(screen.getByText(en.success.title)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Go to sign in' })).toBeInTheDocument();
     });
+  });
+
+  it('renders the success state without a viewport-height wrapper so the page can scroll', async () => {
+    const { container } = renderWithRoute('/verify-email?email=test%40example.com&token=abc123');
+    act(() => verifyOnSuccess?.());
+
+    await screen.findByRole('button', { name: 'Go to sign in' });
+    expect(viewportHeightClasses(container)).toEqual([]);
+  });
+
+  it('renders the error state without a viewport-height wrapper so the page can scroll', async () => {
+    const { container } = renderWithRoute('/verify-email?email=test%40example.com&token=expired');
+    act(() => verifyOnError?.(new Error('expired')));
+
+    await screen.findByText(en.error.title);
+    expect(viewportHeightClasses(container)).toEqual([]);
   });
 
   it('shows error card and resend form when verification fails', async () => {
