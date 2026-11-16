@@ -41,6 +41,13 @@ public:
     virtual void setRawBinaryCallback(std::function<bool(const uint8_t *, size_t)> callback) { (void)callback; }
     // Called whenever the WebSocket opens (true) or closes (false).
     virtual void setConnectionCallback(std::function<void(bool connected)> callback) { (void)callback; }
+    // Whether the send queue still has more than `reserve` free slots. Bulk senders (BLE proxy) keep that
+    // much room for heartbeats and UI traffic instead of filling the queue until messages are dropped.
+    virtual bool sendQueueHasRoom(size_t reserve) const
+    {
+        (void)reserve;
+        return true;
+    }
 
     // --- Reader identity ------------------------------------------------------------------------
     // An admin asked a token-signed-in reader to pair (READER_START_PAIRING), or the reader has no

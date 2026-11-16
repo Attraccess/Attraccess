@@ -495,6 +495,28 @@ same marks in `ota-update.json`. `HIL_RAM_ITERATIONS` scales the loops (default
 `test_touch_controller_answers` (`test_hardware.py`) checks that the GT911 answers
 its polling (register reads grow, none fail).
 
+### Plugin Bluetooth (opt-in)
+
+`hil/test_ble.py` checks plugin BLE through the reader (ATT-1033, ATT-1036). It is not part of the CI matrix and
+skips unless `HIL_BLE=1`. With it, `run.sh` builds the lab fixture plugin (`ble-fixture-plugin/`, never shipped;
+it only uses `context.ble` and offers REST routes that run step scripts inside one session) into the plugin
+directory of the API it starts. The devices come from the environment:
+
+- `BLE_PERIPHERAL_ADDRESS`: the generic GATT test peripheral (`ble-test-peripheral/`, see its README) in range of
+  the reader, for example a second lab place flashed with it inside its own labgrid session for the duration of the
+  run. It prints its address at boot (`ready address=...`).
+- `SOLO_ADDRESS` and `SOLO_USER_CODE`: a PS Locks SOLO BT in factory `CRYPT_OFF` mode for the real-lock smoke. The
+  code is only ever passed through the environment.
+- `HIL_BLE_LONG=1` adds the 10-minute transfer (at least 256 KiB of MTU-sized writes without response, each
+  acknowledged by a notification).
+
+```sh
+HIL_BLE=1 BLE_PERIPHERAL_ADDRESS=AA:BB:CC:DD:EE:FF apps/attractap-lab/hil/run.sh -k ble
+```
+
+Throughput, notification rates and the internal heap before and after the first BLE init land in `ble-*.json`
+in the artifacts directory.
+
 ### In CI
 
 `.github/workflows/attractap-lab-hil.yml` runs these tests from the release

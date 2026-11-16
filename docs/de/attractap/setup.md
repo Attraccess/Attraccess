@@ -61,7 +61,7 @@ Nach der Kopplung des Lesers muessen Sie festlegen, welche Ressource(n) er steue
 
 Im Tab **Allgemein** des Reader-Editors ist der Schalter **Bluetooth-Nutzung durch Plugins erlauben** standardmäßig aus. Wenn aktiviert, können Plugins mit der Berechtigung `BLE_TRANSPORT` in der Nähe dieses Readers nach Bluetooth-Geräten der von ihnen unterstützten Art suchen und sich mit den für sie eingerichteten Geräten verbinden. Beim Ausschalten werden ihre Bluetooth-Verbindungen über diesen Reader sofort beendet. Plugins können nur die Bluetooth-Profile nutzen, die sie selbst registriert haben; siehe [Bluetooth-Transport für Plugins](plugins/ble-transport.md).
 
-Plugin-Bluetooth braucht die Reader-Firmware **2.2.0 oder neuer**; der Server bietet das Update drahtlos an. Mit älterer Firmware wirkt der Schalter nicht, und Plugins erhalten `READER_UNSUPPORTED`. Ein Reader hält eine Bluetooth-Verbindung zur Zeit: Solange ein Plugin sie nutzt, warten andere (`READER_BUSY`). Kartenanmeldung und der Rest des Readers funktionieren während der Bluetooth-Nutzung weiter.
+Plugin-Bluetooth braucht die Reader-Firmware **2.4.0 oder neuer**; der Server bietet das Update drahtlos an. Mit älterer Firmware wirkt der Schalter nicht, und Plugins erhalten `READER_UNSUPPORTED`. Ein Reader hält eine Bluetooth-Verbindung zur Zeit: Solange ein Plugin sie nutzt, warten andere (`READER_BUSY`). Kartenanmeldung und der Rest des Readers funktionieren während der Bluetooth-Nutzung weiter.
 
 ## Schritt 4: Setup testen
 

@@ -198,6 +198,11 @@ void Websocket::setRawBinaryCallback(std::function<bool(const uint8_t *, size_t)
     this->rawBinaryCallback = callback;
 }
 
+bool Websocket::sendQueueHasRoom(size_t reserve) const
+{
+    return tx_queue && uxQueueSpacesAvailable(tx_queue) > reserve;
+}
+
 void Websocket::setConnectionCallback(std::function<void(bool connected)> callback)
 {
     this->connectionCallback = callback;

@@ -65,7 +65,8 @@ describe('ReaderBleDriver (plugin BLE over the reader websocket)', () => {
   const flush = () => harness.advance(0);
   /** Waits through real I/O (the endpoint lookups run on SQLite) until `condition` holds. */
   const until = async (condition: () => boolean) => {
-    for (let i = 0; i < 500 && !condition(); i++) await new Promise((resolve) => setImmediate(resolve));
+    const deadline = Date.now() + 10_000;
+    while (!condition() && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 5));
     expect(condition()).toBe(true);
   };
 

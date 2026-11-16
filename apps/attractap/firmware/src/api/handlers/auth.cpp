@@ -6,6 +6,7 @@
 #include "../../clock/wall_clock.hpp"
 #include "../../platform.hpp"
 #include "../../display/ui/ui_capabilities.hpp"
+#include "../../ble_proxy/ble_capability.hpp"
 #include "../diagnostics/reset-reason.hpp"
 #ifdef ESP_PLATFORM
 #include "esp_system.h"
@@ -114,8 +115,12 @@ void API::sendFirmwareInfo()
                           uiCaps, sizeof uiCaps);
     // This reader relays card APDUs to the server and holds no card keys (firmware 2.0.0+).
     event["data"]["payload"]["capabilities"]["cardRelay"] = true;
+    // Plugin BLE proxy, protocol v1 (ATT-1033). Builds without it send no `ble`: the API answers READER_UNSUPPORTED.
+    char bleCaps[ble::CAPABILITY_SCRATCH];
+    if (BleProxy::supported())
+        this->bleProxy.fillCapability(event["data"]["payload"]["capabilities"], bleCaps, sizeof bleCaps);
 
-    // The ui block makes this message ~730 B; 256 B would be truncated silently.
+    // The ui and ble blocks make this message ~1.1 KB; a smaller buffer would be truncated silently.
     char json[JSON_OUTBUF_AUTH];
     size_t n = serializeJson(event, json, sizeof(json));
     if (n == 0 || n >= sizeof(json))
@@ -139,6 +144,8 @@ void API::onReaderAuthenticated(JsonObject data)
     this->onServerTime(data["payload"]["serverTime"]);
 
     State::setApiState(true, deviceName, Language::supported(language ? language : "en"));
+    // A new authentication is a new connection for the server: no BLE session carries over.
+    this->bleProxy.linkLost();
     if (language) Settings::saveDefaultLanguage(language);
     ++authenticationCount;
 
