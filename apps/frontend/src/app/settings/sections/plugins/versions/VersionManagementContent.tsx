@@ -7,7 +7,7 @@ import {
   usePluginsServicePluginControllerUpdateInstalledPackagePolicy,
 } from '@attraccess/react-query-client';
 import { Input, ModalBody, ModalFooter, ModalHeader, ModalHeading, TextField } from '@heroui/react';
-import { useEffect, useEffectEvent, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { Select } from '../../../../../components/select/index';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { dependencyError } from '../dependencies/dependencyError';
@@ -56,8 +56,13 @@ export function VersionManagementContent({ plugin, isReplacing, onReplacingChang
   const reportVersionsError = useEffectEvent(() =>
     toast.error({ title: t('error.versions.title'), description: t('error.versions.description') }),
   );
+  // An error cached from an earlier opening is not reported again; only a failure of this opening's load is.
+  const cachedErrorUpdatedAt = useRef(versionsQuery.errorUpdatedAt);
   useEffect(() => {
-    if (versionsQuery.errorUpdatedAt) reportVersionsError();
+    if (versionsQuery.errorUpdatedAt && versionsQuery.errorUpdatedAt !== cachedErrorUpdatedAt.current) {
+      cachedErrorUpdatedAt.current = versionsQuery.errorUpdatedAt;
+      reportVersionsError();
+    }
   }, [versionsQuery.errorUpdatedAt]);
 
   const hasVersionDependencies = Boolean(selectedVersion?.dependencies?.length);

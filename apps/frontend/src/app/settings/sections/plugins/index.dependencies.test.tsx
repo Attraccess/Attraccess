@@ -178,6 +178,43 @@ describe('plugin dependency confirmations', () => {
   });
 });
 describe('plugin version management', () => {
+  it('reports a failed version load once per opening and not again for the cached failure', async () => {
+    hoisted.plugins = [makePlugin()];
+    hoisted.errorToast.mockClear();
+    const installed = { name: 'Cool Plugin', version: '1.2.3', registryId: 'npm', requestedSpec: 'latest' };
+    let versionsResponse: { ok: boolean; data: unknown } = { ok: false, data: null };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: { url?: string } | string) => {
+        const url = typeof input === 'string' ? input : (input.url ?? '');
+        if (url.endsWith('/versions')) return Promise.resolve({ ok: versionsResponse.ok, json: async () => versionsResponse.data });
+        return Promise.resolve({ ok: true, json: async () => (url.endsWith('/installed') ? [installed] : []) });
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithQuery(<PluginsSection />);
+    const open = async () => user.click(await screen.findByRole('button', { name: 'Manage version' }));
+    const close = async () => {
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      await waitFor(() =>
+        expect(screen.queryByRole('heading', { name: 'Manage Cool Plugin version' })).not.toBeInTheDocument(),
+      );
+    };
+
+    await open();
+    await waitFor(() => expect(hoisted.errorToast).toHaveBeenCalledTimes(1));
+    await close();
+    await open();
+    await waitFor(() => expect(hoisted.errorToast).toHaveBeenCalledTimes(2));
+    await close();
+
+    versionsResponse = { ok: true, data: [] };
+    await open();
+    await screen.findByRole('textbox', { name: 'Requested version or channel' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(hoisted.errorToast).toHaveBeenCalledTimes(2);
+  });
+
   it('saves a version policy and requires fresh approvals when switching release candidates', async () => {
     hoisted.plugins = [makePlugin()];
     const installed = {
