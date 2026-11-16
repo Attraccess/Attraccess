@@ -50,6 +50,7 @@ void ReaderWorkflow::testNetworkStatus()
     State::setNetworkQualityState(unmeasured);
 
     auto *origin = lv_screen_active();
+    assert(origin == Display::resourceListScreen.getScreen());
     openFromDrawer();
     assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Network status")));
     // The PIN overlay covers the values until the device PIN is entered.
@@ -180,8 +181,10 @@ void ReaderWorkflow::testNetworkStatus()
     display.touch = {240, 400, true}; pump(); // the backdrop below the drawer closes it
     display.touch.pressed = false; pump();
     assert(!drawerOpen());
+    // Leaving the list unloaded it: the rebuilt list is the origin from here on.
     Display::transitionToScreen(&Display::resourceListScreen);
     pump(100);
+    origin = Display::resourceListScreen.getScreen();
     assert(lv_screen_active() == origin);
 
     // A card tap takes the drawer away, and the network status with it.
