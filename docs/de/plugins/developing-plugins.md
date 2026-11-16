@@ -90,7 +90,7 @@ Widgets in zwei Schritten an.
            href: '/my-plugin/summary', // dorthin führt die Kopfzeile außerhalb des Bearbeitungsmodus
            sizes: ['small', 'medium'], // Standard: ['medium']
            defaultSize: 'medium', // Standard: der erste Eintrag von sizes
-           group: 'Mein Plugin', // Gruppe in der Galerie; Standard: der Anzeigename Ihres Plugins
+           group: 'Mein Plugin', // Gruppe in der Galerie; Standard: die Gruppe Ihres Plugins, benannt nach der ersten Gruppe, die ein Widget nennt, sonst nach dem Manifest-Namen
            keywords: ['Bericht', 'Statistik'], // zusätzliche Suchbegriffe für die Galerie
            render: ({ size, isPreview }) => <SummaryWidget size={size} isPreview={isPreview} />,
          },

@@ -20,6 +20,7 @@ import { ReadersWidget } from './ReadersWidget';
 import { ResourcesInUseWidget } from './ResourcesInUseWidget';
 import { ResourcesWidget } from './ResourcesWidget';
 import { UnverifiedUsersChip, UsersWidget } from './UsersWidget';
+import type { HeaderExtraProps } from './widgetsContext';
 
 export interface BuiltInWidget {
   id: BuiltInWidgetId;
@@ -31,7 +32,7 @@ export interface BuiltInWidget {
   defaultSize: TileSize;
   hasFields?: boolean;
   Body: ComponentType<DashboardWidgetRenderProps>;
-  HeaderExtra?: ComponentType<DashboardWidgetRenderProps>;
+  HeaderExtra?: ComponentType<HeaderExtraProps>;
 }
 
 const ALL_SIZES: TileSize[] = ['small', 'medium', 'large'];

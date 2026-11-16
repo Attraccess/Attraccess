@@ -206,10 +206,9 @@ describe('DashboardPage', () => {
     const card = (await screen.findByRole('heading', { name: 'Lathe' })).closest('[data-cy="dashboard-card"]');
     expect(within(card as HTMLElement).getByText('Status 5')).toBeInTheDocument();
     expect(await within(card as HTMLElement).findByText('Session controls 5')).toBeInTheDocument();
-    expect(within(card as HTMLElement).getByRole('link', { name: 'Open Lathe' })).toHaveAttribute(
-      'href',
-      '/resources/5',
-    );
+    // The header links to the resource; there is no second "Open" link.
+    expect(within(card as HTMLElement).getByRole('link', { name: 'Lathe' })).toHaveAttribute('href', '/resources/5');
+    expect(within(card as HTMLElement).getAllByRole('link')).toHaveLength(1);
   });
 });
 

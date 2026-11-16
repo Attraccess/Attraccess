@@ -2,7 +2,6 @@
   "loadError": "Dieses Widget konnte nicht geladen werden.",
   "crashed": "Dieses Widget funktioniert nicht mehr. Laden Sie die Seite neu, um es erneut zu versuchen.",
   "loading": "Wird geladen…",
-  "search": "Suchen",
   "more": "+{{count}} weitere",
   "groups": {
     "messages": "Nachrichten",
@@ -80,6 +79,7 @@
     "description": "Lesegeräte, die sich seit 24 Stunden nicht verbunden haben",
     "keywords": "Attractap, offline, NFC, Geräte",
     "offlineLabel": "offline",
-    "allConnected": "Alle Lesegeräte verbunden"
+    "allConnected": "Alle Lesegeräte verbunden",
+    "noPaired": "Noch keine gekoppelten Lesegeräte"
   }
 }

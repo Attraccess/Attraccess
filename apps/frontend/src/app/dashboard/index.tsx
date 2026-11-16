@@ -105,11 +105,14 @@ function useEditActions(
   ];
 }
 
+const EDIT_TOGGLE = '[data-cy="dashboard-edit-toggle"]';
 const ADD_TARGETS = '[data-cy="dashboard-add"], [data-cy="dashboard-empty-add"]';
+// The edit controls' remove buttons, and the Remove button an unavailable tile shows in and outside edit mode.
+const REMOVE_TARGETS = '[data-cy="dashboard-card-remove-control"], [data-cy="dashboard-card-remove"]';
 
 /**
  * Keeps keyboard focus on the page when its focused element disappears: after removing a card, on the card that took
- * its place (else the previous one, else "Add widget"); after closing the gallery opened from the empty state,
+ * its place (else the previous one, else "Add widget" or the Edit dashboard toggle); after closing the gallery opened from the empty state,
  * whose button is gone once something was added, on "Add widget".
  */
 function useDashboardFocus(pinCount: number | undefined) {
@@ -121,8 +124,10 @@ function useDashboardFocus(pinCount: number | undefined) {
     const page = pageRef.current;
     if (index === null || !page) return;
     removedIndex.current = null;
-    const removeButtons = page.querySelectorAll<HTMLElement>('[data-cy="dashboard-card-remove-control"]');
-    (removeButtons[Math.min(index, removeButtons.length - 1)] ?? page.querySelector<HTMLElement>(ADD_TARGETS))?.focus();
+    const removeButtons = page.querySelectorAll<HTMLElement>(REMOVE_TARGETS);
+    // Outside edit mode there is no "Add widget"; the Edit dashboard toggle is the next stop then.
+    const fallback = page.querySelector<HTMLElement>(ADD_TARGETS) ?? page.querySelector<HTMLElement>(EDIT_TOGGLE);
+    (removeButtons[Math.min(index, removeButtons.length - 1)] ?? fallback)?.focus();
   }, [pinCount]);
 
   const onPickerClosed = () =>

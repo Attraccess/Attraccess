@@ -31,10 +31,13 @@ function InUseRow({ resource }: Readonly<{ resource: Resource }>) {
     resourceId: resource.id,
     onUpdate: (data) => {
       if (data.eventType && SESSION_EVENTS.has(data.eventType)) {
-        void queryClient.invalidateQueries({ queryKey: UseResourcesServiceGetAllResourcesInUseKeyFn() });
-        void queryClient.invalidateQueries({
-          queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId: resource.id }),
-        });
+        // Every tile showing the resource hears the same event: join a refetch in flight instead of restarting it.
+        const options = { cancelRefetch: false };
+        void queryClient.invalidateQueries({ queryKey: UseResourcesServiceGetAllResourcesInUseKeyFn() }, options);
+        void queryClient.invalidateQueries(
+          { queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId: resource.id }) },
+          options,
+        );
       }
     },
   });
@@ -59,10 +62,11 @@ function InUseRow({ resource }: Readonly<{ resource: Resource }>) {
 }
 
 /** Which resources are busy right now, as far as the user may see their activity. */
-export function ResourcesInUseWidget({ size }: Readonly<DashboardWidgetRenderProps>) {
+export function ResourcesInUseWidget({ size, isPreview }: Readonly<DashboardWidgetRenderProps>) {
   const { t } = useTranslations({ en, de });
+  // The dashboard tile refreshes the shared list; a gallery preview polling too would double the requests.
   const { data, isPending, isError } = useResourcesServiceGetAllResourcesInUse(undefined, {
-    refetchInterval: REFRESH_INTERVAL_MS,
+    refetchInterval: isPreview ? false : REFRESH_INTERVAL_MS,
   });
 
   if (isPending) return <WidgetLoading />;

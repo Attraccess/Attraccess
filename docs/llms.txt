@@ -291,7 +291,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Anmeldung](https://docs.attraccess.org/de/end-user/login.md): Die Anmeldemöglichkeiten bei Attraccess: Passwort, SSO, Zwei-Faktor-Authentifizierung, Registrierung und Passwort zurücksetzen.
 - [Mein Konto](https://docs.attraccess.org/de/end-user/account.md): So verwalten Sie Ihr eigenes Konto: Profil, Sicherheit, RFID-Karten und Konto löschen.
 - [Ressourcen nutzen](https://docs.attraccess.org/de/end-user/using-resources.md): Wie Sie Ressourcen finden, eingewiesen werden, beaufsichtigte Sitzungen starten sowie Nutzungssitzungen starten und beenden.
-- [Dashboard](https://docs.attraccess.org/de/end-user/dashboard.md): Wie Sie Ihr Dashboard aus Widgets, Seitenverknüpfungen und Ressourcen in drei Größen zusammenstellen, anordnen und von dort Sitzungen starten oder beenden.
+- [Dashboard](https://docs.attraccess.org/de/end-user/dashboard.md): Wie Sie Ihr Dashboard aus Widgets, Seitenverknüpfungen und Ressourcen in drei Größen zusammenstellen, bearbeiten, in der Größe ändern und anordnen und von dort Sitzungen starten oder beenden.
 - [Mobile Nutzung (PWA)](https://docs.attraccess.org/de/end-user/mobile-pwa.md): Wie Sie Attraccess als Progressive Web App auf iOS und Android installieren, inklusive Updates und Offline-Unterstützung.
 
 ## Deutsch: FAQ & Hilfe

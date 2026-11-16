@@ -160,7 +160,9 @@ describe('dashboard edit mode', () => {
     await userEvent.keyboard('{Escape}');
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove Projects from dashboard' }));
-    expect(remove).toHaveBeenCalledWith({ requestBody: { kind: 'remove', item: { itemType: 'page', itemId: '/projects' } } });
+    expect(remove).toHaveBeenCalledWith({
+      requestBody: { kind: 'remove', item: { itemType: 'page', itemId: '/projects' } },
+    });
 
     await userEvent.click(done);
     expect(await editToggle('Edit dashboard')).toHaveFocus();
@@ -331,6 +333,17 @@ describe('widget pins', () => {
       expect(screen.getByRole('button', { name: 'Remove Messages widget from dashboard' })).toHaveFocus(),
     );
   });
+
+  it('keeps focus on the page after removing an unavailable tile outside edit mode', async () => {
+    state.widgets = { ...state.widgets, titleOf: (id) => (id === 'readers' ? 'Readers' : undefined) };
+    updatePins().mockResolvedValue([widget('messages')] as never);
+    renderDashboard([widget('readers'), widget('messages')]);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove Readers widget from dashboard' }));
+
+    // No other Remove button and no "Add widget" outside edit mode: the Edit dashboard toggle takes focus.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit dashboard' })).toHaveFocus());
+  });
 });
 
 const tileOf = (container: HTMLElement, title: string) =>
@@ -359,8 +372,9 @@ describe('tile sizes', () => {
     expect(within(tileOf(container, 'Projects')).queryByRole('button', { name: /Change size/ })).toBeNull();
   });
 
-  it('resizes at once and saves the new size', async () => {
-    const save = updatePins().mockResolvedValue([widget('messages', 'large')] as never);
+  it('resizes at once, before the save answers, and saves the new size', async () => {
+    // The save never answers, so the new size can only come from the tile itself.
+    const save = updatePins().mockReturnValue(new Promise(() => undefined) as never);
     const { container } = renderDashboard([widget('messages')]);
     await userEvent.click(await editToggle('Edit dashboard'));
 
@@ -373,6 +387,35 @@ describe('tile sizes', () => {
     expect(save).toHaveBeenCalledWith({
       requestBody: { kind: 'resize', item: { itemType: 'widget', itemId: 'messages' }, size: 'large' },
     });
+  });
+
+  it('lists only the sizes an item offers, with the current one selected', async () => {
+    renderDashboard([widget('users', 'large'), resource('5', 'Lathe')]);
+    await userEvent.click(await editToggle('Edit dashboard'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Change size of Users widget' }));
+    const options = await screen.findAllByRole('menuitemradio');
+    expect(options.map((option) => option.textContent)).toEqual(['Medium', 'Large']);
+    expect(screen.getByRole('menuitemradio', { name: 'Large' })).toHaveAttribute('aria-checked', 'true');
+    await userEvent.keyboard('{Escape}');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Change size of Lathe' }));
+    expect((await screen.findAllByRole('menuitemradio')).map((option) => option.textContent)).toEqual([
+      'Small',
+      'Large',
+    ]);
+  });
+
+  it('keeps focus on the size control when the tile changes to or from small', async () => {
+    updatePins().mockReturnValue(new Promise(() => undefined) as never);
+    const { container } = renderDashboard([widget('messages')]);
+    await userEvent.click(await editToggle('Edit dashboard'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Change size of Messages widget' }));
+    await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Small' }));
+
+    expect(tileOf(container, 'Messages')).toHaveAttribute('data-size', 'small');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Change size of Messages widget' })).toHaveFocus());
   });
 
   it('brings the stored size back and tells the user when the new size cannot be saved', async () => {
@@ -397,5 +440,21 @@ describe('header links', () => {
     await userEvent.click(await editToggle('Edit dashboard'));
 
     expect(screen.queryByRole('link', { name: 'Messages' })).toBeNull();
+  });
+
+  it('leaves no link on any tile while the dashboard is edited', async () => {
+    const { container } = renderDashboard([widget('messages'), page('/projects'), resource('5', 'Lathe')]);
+    await screen.findByText('Session controls');
+    const grid = container.querySelector('[data-cy="dashboard-grid"]') as HTMLElement;
+    // Header links only: the large resource tile has no second "Open" link in its footer.
+    expect(
+      within(grid)
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href')),
+    ).toEqual(['/messages', '/projects', '/resources/5']);
+
+    await userEvent.click(await editToggle('Edit dashboard'));
+
+    expect(within(grid).queryAllByRole('link')).toEqual([]);
   });
 });

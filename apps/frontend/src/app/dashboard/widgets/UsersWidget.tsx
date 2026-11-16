@@ -7,25 +7,33 @@ import { useDebounce, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useUsersServiceFindMany } from '@attraccess/react-query-client';
 import { useAuth } from '../../../hooks/useAuth';
 import { InviteUserModal } from '../../user-management/invite-user-modal/index';
+import type { HeaderExtraProps } from './widgetsContext';
 import { itemsPerSize, WidgetEmpty, WidgetError, WidgetList, WidgetLoading, WidgetSearch } from './widgetParts';
 import de from './de.json';
 import en from './en.json';
 
 const RESULTS_PER_SIZE = { medium: 3, large: 7 };
 
-/** A link to the users who have not verified their email address, shown only while there are any. */
-export function UnverifiedUsersChip() {
+/**
+ * A link to the users who have not verified their email address, shown only while there are any. While the dashboard
+ * is edited it is a plain chip, so pressing it cannot leave the page mid-edit.
+ */
+export function UnverifiedUsersChip({ isEditing }: Readonly<Pick<HeaderExtraProps, 'isEditing'>>) {
   const { t } = useTranslations({ en, de });
   const { data } = useUsersServiceFindMany({ emailVerified: false, limit: 1 });
   const count = data?.total ?? 0;
   if (count === 0) return null;
 
+  const chip = (
+    <Chip size="sm" color="warning">
+      {t('users.unverified', { count })}
+    </Chip>
+  );
+  if (isEditing) return chip;
   return (
     // The same URL the user list writes for its "email verified: no" filter.
     <Link href="/users?emailVerified=false" className="shrink-0 no-underline" data-cy="dashboard-users-unverified">
-      <Chip size="sm" color="warning">
-        {t('users.unverified', { count })}
-      </Chip>
+      {chip}
     </Link>
   );
 }

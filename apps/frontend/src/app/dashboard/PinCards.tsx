@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { Button, Chip, cn, Link, Spinner } from '@heroui/react';
-import { ArrowRightIcon, CircleSlashIcon, Trash2Icon } from 'lucide-react';
+import { CircleSlashIcon, Trash2Icon } from 'lucide-react';
 import { StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   useResourcesServiceGetOneResourceById,
@@ -296,16 +296,6 @@ function LargeResourceContent({
         {otherSession && <SessionTimer startTime={otherSession.startTime} />}
         {renderSession()}
       </div>
-      <footer className="flex justify-end">
-        <Link
-          href={`/resources/${resourceId}`}
-          aria-label={t('card.openResource', { title })}
-          data-cy="dashboard-resource-card-open"
-        >
-          {t('card.open')}
-          <ArrowRightIcon className="w-4 h-4" />
-        </Link>
-      </footer>
     </>
   );
 }

@@ -34,12 +34,21 @@ export function PreviewFrame({ size, children }: Readonly<PropsWithChildren<{ si
 
 export function WidgetPreview({ widget, size }: Readonly<{ widget: DashboardWidget; size: TileSize }>) {
   return (
-    <WidgetPinCard id={`preview:${widget.id}`} widget={widget} size={size} isEditing={false} isPreview onRemove={noop} />
+    <WidgetPinCard
+      id={`preview:${widget.id}`}
+      widget={widget}
+      size={size}
+      isEditing={false}
+      isPreview
+      onRemove={noop}
+    />
   );
 }
 
 export function PagePreview({ page }: Readonly<{ page: PinnablePage }>) {
-  return <PagePinCard id={`preview:${page.path}`} page={page} size="small" isEditing={false} isPreview onRemove={noop} />;
+  return (
+    <PagePinCard id={`preview:${page.path}`} page={page} size="small" isEditing={false} isPreview onRemove={noop} />
+  );
 }
 
 /** A sample resource tile, standing for whichever resource the user chooses. */
@@ -52,7 +61,14 @@ export function ResourcePreview({ size }: Readonly<{ size: TileSize }>) {
   );
 
   return (
-    <PinTile id="preview:resource" title={t('gallery.resource.sampleName')} size={size} isEditing={false} isPreview surface="section">
+    <PinTile
+      id="preview:resource"
+      title={t('gallery.resource.sampleName')}
+      size={size}
+      isEditing={false}
+      isPreview
+      surface="section"
+    >
       {(controls) =>
         size === 'small' ? (
           <div className="flex h-full flex-col items-start justify-between gap-1">
@@ -119,24 +135,25 @@ export function SizeSelector({
 
 /**
  * Add, or "Added" once the item is on the dashboard. "Added" stays focusable (aria-disabled, not disabled), so focus
- * stays on it after adding instead of falling back to the page.
+ * stays on it after adding instead of falling back to the page. Both name the item, so a list of them stays apart.
  */
 export function AddButton({
   label,
+  addedLabel,
   isAdded,
   isDisabled,
   onAdd,
-}: Readonly<{ label: string; isAdded: boolean; isDisabled?: boolean; onAdd: () => void }>) {
+}: Readonly<{ label: string; addedLabel?: string; isAdded: boolean; isDisabled?: boolean; onAdd: () => void }>) {
   const { t } = useTranslations({ en, de });
 
   return (
     <Button
       size="sm"
       variant={isAdded ? 'ghost' : 'secondary'}
-      aria-label={isAdded ? undefined : label}
+      aria-label={isAdded ? addedLabel : label}
       aria-disabled={isAdded || isDisabled || undefined}
       onPress={isAdded || isDisabled ? undefined : onAdd}
-      data-cy="dashboard-gallery-add"
+      data-cy="dashboard-picker-add"
       data-added={isAdded || undefined}
     >
       {isAdded ? <CheckIcon className="w-4 h-4" /> : <PlusIcon className="w-4 h-4" />}

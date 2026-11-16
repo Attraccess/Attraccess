@@ -17,15 +17,20 @@ import en from './en.json';
 const BUILT_IN_IDS = new Set<string>(BUILT_IN_WIDGET_IDS);
 
 const isSize = (value: unknown): value is DashboardWidgetSize => TILE_SIZES.includes(value as DashboardWidgetSize);
+const isText = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
 
 /** A plugin's sizes, default size and gallery group, with the SDK's defaults for what it leaves out. */
 function pluginWidgetLayout(widget: PluginDashboardWidget, manifestName: string, pluginGroup: string) {
-  const declared = Array.isArray(widget.sizes) ? TILE_SIZES.filter((size) => widget.sizes?.includes(size)) : [];
-  const sizes = declared.length ? declared : (['medium'] as DashboardWidgetSize[]);
-  const defaultSize = isSize(widget.defaultSize) && sizes.includes(widget.defaultSize) ? widget.defaultSize : sizes[0];
+  const declared = Array.isArray(widget.sizes) ? widget.sizes.filter(isSize) : [];
+  // Smallest first, the order of the size control; the default is still the first size the plugin lists.
+  const sizes = declared.length
+    ? TILE_SIZES.filter((size) => declared.includes(size))
+    : (['medium'] as DashboardWidgetSize[]);
+  const defaultSize =
+    isSize(widget.defaultSize) && sizes.includes(widget.defaultSize) ? widget.defaultSize : (declared[0] ?? sizes[0]);
   // The plugin's group, unless the widget names another one.
   const group =
-    !widget.group || widget.group === pluginGroup
+    !isText(widget.group) || widget.group === pluginGroup
       ? { id: pluginGalleryGroupId(manifestName), title: pluginGroup }
       : { id: `group:${widget.group}`, title: widget.group };
   return { sizes, defaultSize, group };
@@ -74,8 +79,8 @@ function usePluginWidgets(): DashboardWidget[] {
       }
       // The plugin's group is named by its first widget that names one.
       const pluginGroup =
-        (offered as PluginDashboardWidget[]).find((widget) => typeof widget?.group === 'string' && widget.group)
-          ?.group ?? pluginGroupTitle(manifest.name);
+        (offered as PluginDashboardWidget[]).find((widget) => isText(widget?.group))?.group ??
+        pluginGroupTitle(manifest.name);
       return (offered as PluginDashboardWidget[]).flatMap((widget): DashboardWidget[] => {
         if (typeof widget?.render !== 'function' || !declared.has(widget.id) || seen.has(widget.id)) return [];
         if (BUILT_IN_IDS.has(widget.id)) {
@@ -90,7 +95,7 @@ function usePluginWidgets(): DashboardWidget[] {
             description: widget.description,
             icon: widget.icon ?? <PuzzleIcon className="w-5 h-5" aria-hidden />,
             ...pluginWidgetLayout(widget, manifest.name, pluginGroup),
-            keywords: Array.isArray(widget.keywords) ? widget.keywords : undefined,
+            keywords: Array.isArray(widget.keywords) ? widget.keywords.filter(isText) : undefined,
             href: typeof widget.href === 'string' ? widget.href : undefined,
             hasFields: widget.hasFields,
             renderBody: (props) => widget.render(props),
@@ -123,7 +128,9 @@ function useComputedDashboardWidgets(): DashboardWidgets {
         description: t(`${id}.description`),
         icon: <Icon className="w-5 h-5" aria-hidden />,
         group: { id: group, title: t(`groups.${group}`) },
-        keywords: t(`${id}.keywords`).split(',').map((keyword) => keyword.trim()),
+        keywords: t(`${id}.keywords`)
+          .split(',')
+          .map((keyword) => keyword.trim()),
         href: page,
         sizes,
         defaultSize,

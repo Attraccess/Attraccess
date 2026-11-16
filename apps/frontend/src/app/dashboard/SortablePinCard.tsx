@@ -1,5 +1,14 @@
-import { CSSProperties, forwardRef, PropsWithChildren, ReactNode } from 'react';
-import { Button, Card, cn, Dropdown, DropdownItem, DropdownMenu, DropdownPopover, DropdownTrigger } from '@heroui/react';
+import { CSSProperties, forwardRef, PropsWithChildren, ReactNode, useEffect, useRef } from 'react';
+import {
+  Button,
+  Card,
+  cn,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownPopover,
+  DropdownTrigger,
+} from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -44,17 +53,35 @@ export interface PinTileProps {
   children: (controls: PinEditControls) => ReactNode;
 }
 
+// The tile whose size control takes focus once it shows its new size. A tile changing to or from small rebuilds its
+// header (a resource tile its whole content), so the control the menu would return focus to is gone by then.
+let refocusAfterResize: string | null = null;
+
 function SizeControl({
+  id,
   title,
   size,
   sizes,
   onResize,
-}: Readonly<{ title: string; size: TileSize; sizes: readonly TileSize[]; onResize: (size: TileSize) => void }>) {
+}: Readonly<{
+  id: string;
+  title: string;
+  size: TileSize;
+  sizes: readonly TileSize[];
+  onResize: (size: TileSize) => void;
+}>) {
   const { t } = useTranslations({ en, de });
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (refocusAfterResize !== id) return;
+    refocusAfterResize = null;
+    triggerRef.current?.focus();
+  }, [id, size]);
 
   return (
     <Dropdown>
       <DropdownTrigger
+        ref={triggerRef}
         className={cn(buttonVariants({ variant: 'ghost', size: 'sm', isIconOnly: true }), CONTROL_SIZE)}
         aria-label={t('card.sizeLabel', { title })}
         data-cy="dashboard-card-size-control"
@@ -69,7 +96,9 @@ function SizeControl({
           selectedKeys={[size]}
           onSelectionChange={(keys) => {
             const next = keys === 'all' ? undefined : ([...keys][0] as TileSize | undefined);
-            if (next && next !== size) onResize(next);
+            if (!next || next === size) return;
+            refocusAfterResize = id;
+            onResize(next);
           }}
         >
           {TILE_SIZES.filter((option) => sizes.includes(option)).map((option) => (
@@ -106,7 +135,7 @@ function useSortablePin({ id, title, size, sizes, isEditing, onRemove, onResize 
           </span>
         ),
         sizeControl: onResize && sizes && sizes.length > 1 && (
-          <SizeControl title={title} size={size} sizes={sizes} onResize={onResize} />
+          <SizeControl id={id} title={title} size={size} sizes={sizes} onResize={onResize} />
         ),
         removeButton: onRemove && (
           <Button
@@ -140,7 +169,10 @@ type SurfaceProps = PropsWithChildren<{ surface: 'card' | 'section'; size: TileS
  * The tile itself: it fills its grid cells and never grows past them. Widgets show a fixed amount of content per
  * size, so clipping is only a safety net.
  */
-const TileSurface = forwardRef<HTMLDivElement, SurfaceProps>(function TileSurface({ surface, size, style, children }, ref) {
+const TileSurface = forwardRef<HTMLDivElement, SurfaceProps>(function TileSurface(
+  { surface, size, style, children },
+  ref,
+) {
   const layout = cn(TILE_SPAN_CLASSES[size], 'h-full min-w-0 gap-2 overflow-hidden p-3');
   const dataProps = { 'data-cy': 'dashboard-card', 'data-size': size };
   if (surface === 'section') {

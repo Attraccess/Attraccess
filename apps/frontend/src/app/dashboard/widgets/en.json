@@ -2,7 +2,6 @@
   "loadError": "This widget could not be loaded.",
   "crashed": "This widget stopped working. Reload the page to try again.",
   "loading": "Loading…",
-  "search": "Search",
   "more": "+{{count}} more",
   "groups": {
     "messages": "Messages",
@@ -80,6 +79,7 @@
     "description": "Readers that have not connected for 24 hours",
     "keywords": "attractap, offline, nfc, devices",
     "offlineLabel": "offline",
-    "allConnected": "All readers connected"
+    "allConnected": "All readers connected",
+    "noPaired": "No paired readers yet"
   }
 }

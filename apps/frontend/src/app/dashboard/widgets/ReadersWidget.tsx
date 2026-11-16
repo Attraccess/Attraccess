@@ -32,6 +32,8 @@ export function ReadersWidget({ size }: Readonly<DashboardWidgetRenderProps>) {
 
   if (isPending) return <WidgetLoading />;
   if (isError) return <WidgetError title={t('loadError')} />;
+  // "0/0 offline" in the success colour would claim all is well where nothing is set up yet.
+  if (paired.length === 0) return <WidgetEmpty>{t('readers.noPaired')}</WidgetEmpty>;
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <BigNumber

@@ -1,6 +1,6 @@
 # Dashboard
 
-<!-- llms-description: Wie Sie Ihr Dashboard aus Widgets, Seitenverknüpfungen und Ressourcen in drei Größen zusammenstellen, anordnen und von dort Sitzungen starten oder beenden. -->
+<!-- llms-description: Wie Sie Ihr Dashboard aus Widgets, Seitenverknüpfungen und Ressourcen in drei Größen zusammenstellen, bearbeiten, in der Größe ändern und anordnen und von dort Sitzungen starten oder beenden. -->
 
 Ihr Dashboard sammelt an einem Ort, was Sie am häufigsten nutzen: Widgets mit Live-Inhalten, Verknüpfungen zu Seiten und Ressourcen. Jede Person hat ihr eigenes Dashboard, und es steht Ihnen in jedem Browser und auf jedem Gerät zur Verfügung, auf dem Sie sich anmelden.
 
@@ -13,7 +13,7 @@ Es gibt zwei Wege, etwas auf Ihr Dashboard zu bringen.
 **Widget hinzufügen:** Wählen Sie **Dashboard bearbeiten** in der Kopfzeile des Dashboards und dann **Widget hinzufügen**. Es öffnet sich eine Galerie mit einer Live-Vorschau jedes Widgets, das Sie verwenden dürfen, mit Ihren echten Daten:
 
 - Die Einträge sind gruppiert: **Nachrichten**, **Ressourcen**, **Benutzer**, **Abrechnung**, **Attractap**, **Weitere Seiten** und eine Gruppe pro Plugin.
-- Tippen Sie in **Widgets durchsuchen**, um nach Name, Beschreibung oder Gruppe zu filtern. Gruppen ohne Treffer werden ausgeblendet.
+- Tippen Sie in **Widgets durchsuchen**, um nach Name, Beschreibung, Gruppe oder verwandten Begriffen zu filtern. Gruppen ohne Treffer werden ausgeblendet.
 - Gibt es einen Eintrag in mehreren Größen, wählen Sie die Größe unter **Größe** (**Klein**, **Mittel** oder **Groß**). Die Vorschau ändert sich mit.
 - Wählen Sie **Hinzufügen**, um den Eintrag in der gewählten Größe ans Ende Ihres Dashboards zu setzen. Die Galerie bleibt offen, sodass Sie mehrere Einträge nacheinander hinzufügen können.
 - Einträge, die bereits auf Ihrem Dashboard sind, bleiben in der Galerie und zeigen **Hinzugefügt**.

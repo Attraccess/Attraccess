@@ -123,6 +123,14 @@ describe('MessagesWidget', () => {
     expect(screen.queryByText('Hello 1')).toBeNull();
   });
 
+  it('names who last wrote to the user, not whom the user last replied to', async () => {
+    const replied = { ...conversation(1), lastMessage: { ...conversation(1).lastMessage, senderId: 7 } };
+    vi.spyOn(MessagingService, 'messagingListConversations').mockResolvedValue([replied, conversation(2)] as never);
+    renderWidget(<MessagesWidget {...at('small')} />);
+
+    expect(await screen.findByText('Latest from user2')).toBeInTheDocument();
+  });
+
   it('shows the empty and the error state', async () => {
     const list = vi.spyOn(MessagingService, 'messagingListConversations').mockResolvedValue([] as never);
     const { unmount } = renderWidget(<MessagesWidget {...at('medium')} />);
@@ -361,17 +369,23 @@ describe('UsersWidget', () => {
 
   it('links the unverified users only while there are any', async () => {
     const find = vi.spyOn(UsersService, 'findMany').mockResolvedValue({ data: [], total: 0 } as never);
-    const { container, unmount } = renderWidget(<UnverifiedUsersChip />);
+    const { container, unmount } = renderWidget(<UnverifiedUsersChip isEditing={false} />);
     await waitFor(() => expect(find).toHaveBeenCalledWith({ emailVerified: false, limit: 1 }));
     expect(container).toBeEmptyDOMElement();
     unmount();
 
     find.mockResolvedValue({ data: [{ id: 1 }], total: 4 } as never);
-    renderWidget(<UnverifiedUsersChip />);
+    const { unmount: unmountLink } = renderWidget(<UnverifiedUsersChip isEditing={false} />);
     expect(await screen.findByRole('link', { name: '4 unverified' })).toHaveAttribute(
       'href',
       '/users?emailVerified=false',
     );
+    unmountLink();
+
+    // While editing, the chip is no link that could leave the dashboard.
+    renderWidget(<UnverifiedUsersChip isEditing />);
+    expect(await screen.findByText('4 unverified')).toBeInTheDocument();
+    expect(screen.queryByRole('link')).toBeNull();
   });
 });
 
@@ -437,6 +451,16 @@ describe('ReadersWidget', () => {
   const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
   const offline = (container: HTMLElement) => container.querySelector('[data-cy="dashboard-readers-offline"]');
 
+  it('says so when no reader is paired yet instead of reporting all connected', async () => {
+    vi.spyOn(AttractapService, 'getReaders').mockResolvedValue([
+      { id: 3, name: 'New reader', pairingState: 'unpaired', lastConnection: hoursAgo(90) },
+    ] as never);
+    const { container } = renderWidget(<ReadersWidget {...at('small')} />);
+
+    expect(await screen.findByText('No paired readers yet')).toBeInTheDocument();
+    expect(offline(container)).toBeNull();
+  });
+
   it('counts stale of paired readers like the readers page, in the warning colour', async () => {
     vi.spyOn(AttractapService, 'getReaders').mockResolvedValue([
       { id: 1, name: 'Door', pairingState: 'paired', lastConnection: hoursAgo(1) },
@@ -486,5 +510,20 @@ describe('BUILT_IN_WIDGETS', () => {
 
   it('defaults every widget to one of its own sizes', () => {
     for (const widget of BUILT_IN_WIDGETS) expect(widget.sizes).toContain(widget.defaultSize);
+  });
+
+  it('offers the sizes and default size the requirements set per widget', () => {
+    const layout = Object.fromEntries(
+      BUILT_IN_WIDGETS.map(({ id, sizes, defaultSize }) => [id, { sizes: [...sizes], defaultSize }]),
+    );
+    expect(layout).toEqual({
+      messages: { sizes: ['small', 'medium', 'large'], defaultSize: 'medium' },
+      'my-sessions': { sizes: ['small', 'medium', 'large'], defaultSize: 'medium' },
+      resources: { sizes: ['medium', 'large'], defaultSize: 'medium' },
+      'resources-in-use': { sizes: ['small', 'medium', 'large'], defaultSize: 'medium' },
+      users: { sizes: ['medium', 'large'], defaultSize: 'medium' },
+      'billing-balance': { sizes: ['small', 'medium'], defaultSize: 'small' },
+      readers: { sizes: ['small', 'medium'], defaultSize: 'small' },
+    });
   });
 });

@@ -1113,7 +1113,7 @@ live content and quick actions, which they pick from the "Add widget" gallery. A
            href: '/my-plugin/summary', // the header links here outside edit mode
            sizes: ['small', 'medium'], // default ['medium']
            defaultSize: 'medium', // default: the first entry of sizes
-           group: 'My plugin', // gallery group; default: your plugin's display name
+           group: 'My plugin', // gallery group; default: your plugin's group, titled after the first group a widget names, else the manifest name
            keywords: ['report', 'statistics'], // extra search terms for the gallery
            render: ({ size, isPreview }) => <SummaryWidget size={size} isPreview={isPreview} />,
          },

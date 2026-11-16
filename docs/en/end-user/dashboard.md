@@ -13,7 +13,7 @@ There are two ways to put something on your dashboard.
 **Add widget:** select **Edit dashboard** in the dashboard's header, then **Add widget**. A gallery opens with a live preview of every widget you may use, showing your real data:
 
 - The entries are grouped: **Messages**, **Resources**, **Users**, **Billing**, **Attractap**, **Other pages**, and one group per plugin.
-- Type in **Search widgets** to filter by name, description or group. Groups without a match are hidden.
+- Type in **Search widgets** to filter by name, description, group or related terms. Groups without a match are hidden.
 - Where an entry comes in more than one size, choose it under **Size** (**Small**, **Medium** or **Large**). The preview changes with it.
 - Select **Add** to place the entry at the end of your dashboard in the chosen size. The gallery stays open, so you can add several at once.
 - Entries that are already on your dashboard stay in the gallery and show **Added**.

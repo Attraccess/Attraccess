@@ -206,12 +206,36 @@ describe('DashboardWidgetsProvider', () => {
   });
 
   it('falls back to the first size when the default is not one of them', async () => {
-    installPlugin(() => [{ ...reservations, sizes: ['small', 'medium'], defaultSize: 'large' }], [
-      'reservations-upcoming',
-    ]);
+    installPlugin(
+      () => [{ ...reservations, sizes: ['small', 'medium'], defaultSize: 'large' }],
+      ['reservations-upcoming'],
+    );
     renderProvider();
     await waitFor(() => expect(widgetIds()).toContain('reservations-upcoming'));
     expect(pluginWidget('reservations-upcoming')?.defaultSize).toBe('small');
+  });
+
+  it('defaults to the first size the plugin lists, and drops keywords and groups that are no text', async () => {
+    installPlugin(
+      () => [
+        {
+          ...reservations,
+          sizes: ['large', 'medium'],
+          keywords: ['booking', 1 as never, ''],
+          group: { name: 'x' } as never,
+        },
+      ],
+      ['reservations-upcoming'],
+    );
+    renderProvider();
+    await waitFor(() => expect(widgetIds()).toContain('reservations-upcoming'));
+
+    expect(pluginWidget('reservations-upcoming')).toMatchObject({
+      sizes: ['medium', 'large'],
+      defaultSize: 'large',
+      keywords: ['booking'],
+      group: { id: 'plugin:report', title: 'Report' },
+    });
   });
 
   it('renders plugin widgets with the tile size, also widgets whose render() takes no arguments', async () => {

@@ -45,7 +45,8 @@ function Rendered({ render }: Readonly<{ render: () => ReactNode }>) {
 
 function WidgetBody({ widget, props }: Readonly<{ widget: DashboardWidget; props: DashboardWidgetRenderProps }>) {
   const body = (
-    <WidgetBoundary widgetId={widget.id} pluginName={widget.plugin?.pluginName}>
+    // Keyed by size: a widget that crashed at one size gets another chance at the next.
+    <WidgetBoundary key={props.size} widgetId={widget.id} pluginName={widget.plugin?.pluginName}>
       <Rendered render={() => widget.renderBody(props)} />
     </WidgetBoundary>
   );
@@ -71,8 +72,8 @@ export function WidgetPinCard({
   const label = t('card.widgetLabel', { title: widget.title });
   // The header extra is the widget's own content too, so it shares the boundary.
   const headerExtra = widget.renderHeaderExtra && (
-    <WidgetBoundary widgetId={widget.id}>
-      <Rendered render={() => widget.renderHeaderExtra?.(props)} />
+    <WidgetBoundary key={size} widgetId={widget.id}>
+      <Rendered render={() => widget.renderHeaderExtra?.({ ...props, isEditing })} />
     </WidgetBoundary>
   );
 

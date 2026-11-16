@@ -1,14 +1,5 @@
 import { ReactNode, useState } from 'react';
-import {
-  Button,
-  Label,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-  SearchField,
-  Spinner,
-} from '@heroui/react';
+import { Button, Label, ModalBody, ModalFooter, ModalHeader, ModalHeading, SearchField, Spinner } from '@heroui/react';
 import { EmptyState, StandardModal, useTranslations, useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { DashboardPinItemType, DashboardPinOperationKind, DashboardPinSize } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -35,19 +26,17 @@ function useGalleryEntries() {
   const { pages, isReady: arePagesReady } = usePinnablePages();
 
   const entries: GalleryEntry[] = [
-    ...widgets.map(
-      (widget): GalleryEntry => ({
-        key: pinKey(widgetPin(widget.id)),
-        kind: 'widget',
-        title: widget.title,
-        description: widget.description,
-        groupId: widget.group.id,
-        keywords: widget.keywords,
-        sizes: widget.sizes,
-        defaultSize: widget.defaultSize,
-        item: widgetPin(widget.id),
-      }),
-    ),
+    ...widgets.map((widget): GalleryEntry => ({
+      key: pinKey(widgetPin(widget.id)),
+      kind: 'widget',
+      title: widget.title,
+      description: widget.description,
+      groupId: widget.group.id,
+      keywords: widget.keywords,
+      sizes: widget.sizes,
+      defaultSize: widget.defaultSize,
+      item: widgetPin(widget.id),
+    })),
     {
       key: RESOURCE_ENTRY_KEY,
       kind: 'resource',
@@ -56,17 +45,15 @@ function useGalleryEntries() {
       groupId: 'resources',
       ...RESOURCE_TILE_SIZES,
     },
-    ...pages.map(
-      (page): GalleryEntry => ({
-        key: pinKey(pagePin(page.path)),
-        kind: 'page',
-        title: page.title,
-        description: t('gallery.shortcutDescription'),
-        groupId: page.galleryGroup,
-        ...PAGE_TILE_SIZES,
-        item: pagePin(page.path),
-      }),
-    ),
+    ...pages.map((page): GalleryEntry => ({
+      key: pinKey(pagePin(page.path)),
+      kind: 'page',
+      title: page.title,
+      description: t('gallery.shortcutDescription'),
+      groupId: page.galleryGroup,
+      ...PAGE_TILE_SIZES,
+      item: pagePin(page.path),
+    })),
   ];
 
   return { entries, widgets, pages, isReady: areWidgetsReady && arePagesReady };
@@ -109,6 +96,11 @@ export function WidgetGallery({
   const plugins = usePluginState((state) => state.plugins);
   const { entries, widgets, pages, isReady } = useGalleryEntries();
   const [term, setTerm] = useState('');
+  // The search is not kept: the gallery opens unfiltered every time.
+  const onGalleryOpenChange = (open: boolean) => {
+    if (!open) setTerm('');
+    onOpenChange(open);
+  };
 
   const pinned = new Set(pins.map(pinKey));
   const pinnedResourceIds = new Set(
@@ -136,8 +128,10 @@ export function WidgetGallery({
     if (entry.kind === 'resource') {
       return <ResourceGalleryTile key={entry.key} pinnedResourceIds={pinnedResourceIds} onAdd={add} />;
     }
-    const widget = entry.kind === 'widget' ? widgets.find((candidate) => pinKey(widgetPin(candidate.id)) === entry.key) : undefined;
-    const page = entry.kind === 'page' ? pages.find((candidate) => pinKey(pagePin(candidate.path)) === entry.key) : undefined;
+    const widget =
+      entry.kind === 'widget' ? widgets.find((candidate) => pinKey(widgetPin(candidate.id)) === entry.key) : undefined;
+    const page =
+      entry.kind === 'page' ? pages.find((candidate) => pinKey(pagePin(candidate.path)) === entry.key) : undefined;
     const item = entry.item as DashboardPinItem;
     return (
       <GalleryTile
@@ -154,6 +148,9 @@ export function WidgetGallery({
             label={t(entry.kind === 'widget' ? 'gallery.addWidgetLabel' : 'gallery.addShortcutLabel', {
               title: entry.title,
             })}
+            addedLabel={t(entry.kind === 'widget' ? 'gallery.addedWidgetLabel' : 'gallery.addedShortcutLabel', {
+              title: entry.title,
+            })}
             isAdded={pinned.has(entry.key)}
             onAdd={() => add(item, size)}
           />
@@ -166,7 +163,7 @@ export function WidgetGallery({
   return (
     <StandardModal
       isOpen={isOpen}
-      onOpenChange={onOpenChange}
+      onOpenChange={onGalleryOpenChange}
       size={isDesktop ? 'lg' : 'full'}
       dialogProps={{ className: isDesktop ? 'w-full max-w-[95vw] sm:w-[56rem]' : undefined }}
       data-cy="dashboard-picker"
@@ -174,25 +171,33 @@ export function WidgetGallery({
       {({ close }) => (
         <>
           <ModalHeader>
-            <ModalHeading>{t('gallery.title')}</ModalHeading>
+            {/* Level 2, above the group headings (h3) and the entries (h4). */}
+            <ModalHeading level={2}>{t('gallery.title')}</ModalHeading>
           </ModalHeader>
           <ModalBody className="flex flex-col gap-6">
             <GallerySearch term={term} onChange={setTerm} />
-            {groups.map((group) => (
+            {groups.map((group, index) => (
               <section
                 key={group.id}
                 className="@container flex flex-col gap-3"
-                aria-labelledby={`dashboard-gallery-${group.id}`}
+                // By position: group ids may hold spaces (plugin group titles), which aria-labelledby would split.
+                aria-labelledby={`dashboard-gallery-group-${index}`}
                 data-cy="dashboard-gallery-group"
               >
-                <h3 id={`dashboard-gallery-${group.id}`} className="text-sm font-semibold">
+                <h3 id={`dashboard-gallery-group-${index}`} className="text-sm font-semibold">
                   {group.title}
                 </h3>
                 <ul className="grid grid-cols-1 gap-6 @min-[36rem]:grid-cols-2">{group.entries.map(renderEntry)}</ul>
               </section>
             ))}
             {/* Until the license and plugins have loaded, some entries are still missing. */}
-            {!isReady && <Spinner size="sm" aria-label={t('gallery.loading')} />}
+            {!isReady && (
+              // A spinner's own label is not read out; the status role and hidden text are.
+              <div role="status" className="flex justify-center">
+                <Spinner size="sm" aria-hidden />
+                <span className="sr-only">{t('gallery.loading')}</span>
+              </div>
+            )}
             {isReady && groups.length === 0 && <EmptyState message={t('gallery.noMatch', { term: term.trim() })} />}
           </ModalBody>
           <ModalFooter>

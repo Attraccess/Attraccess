@@ -2,6 +2,9 @@ import { createContext, ReactNode, useContext } from 'react';
 import type { DashboardWidgetRenderProps } from '@attraccess/plugins-frontend-sdk';
 import type { TileSizes } from '../sizes';
 
+/** A widget's header extra may hold links, which must not work while the dashboard is edited. */
+export type HeaderExtraProps = DashboardWidgetRenderProps & { isEditing: boolean };
+
 /** A heading of the "Add widget" gallery. Built-in ids are fixed; plugin groups are `plugin:<manifest name>`. */
 export interface GalleryGroup {
   id: string;
@@ -26,7 +29,7 @@ export interface DashboardWidget extends TileSizes {
    */
   hasFields?: boolean;
   /** Extra content for the card header, such as a count. */
-  renderHeaderExtra?: (props: DashboardWidgetRenderProps) => ReactNode;
+  renderHeaderExtra?: (props: HeaderExtraProps) => ReactNode;
   renderBody: (props: DashboardWidgetRenderProps) => ReactNode;
   /** Set for plugin widgets: the plugin's name for error logs and its manifest name for live updates. */
   plugin?: { pluginName: string; manifestName: string };

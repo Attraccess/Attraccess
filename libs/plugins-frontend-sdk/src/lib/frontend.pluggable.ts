@@ -33,11 +33,6 @@ export interface PluginSidebarGroup {
   icon?: ReactNode;
 }
 
-/**
- * A widget a plugin offers for the user's dashboard. The host renders the card around it (icon, title, the edit
- * controls and an error boundary); `render()` returns only the card body. The `id` must be listed in the plugin
- * manifest's `dashboardWidgets`, and a built-in widget with the same id always wins.
- */
 /** Tile sizes, as on a phone home screen: small is 1×1 grid cells, medium 2×1, large 2×2. */
 export type DashboardWidgetSize = 'small' | 'medium' | 'large';
 
@@ -50,6 +45,11 @@ export interface DashboardWidgetRenderProps {
   isPreview: boolean;
 }
 
+/**
+ * A widget a plugin offers for the user's dashboard. The host renders the card around it (icon, title, the edit
+ * controls and an error boundary); `render()` returns only the card body. The `id` must be listed in the plugin
+ * manifest's `dashboardWidgets`, and a built-in widget with the same id always wins.
+ */
 export interface PluginDashboardWidget {
   /** Stable, lowercase kebab-case id, e.g. `reservations-upcoming`. It is stored in users' dashboards. */
   id: string;
@@ -63,7 +63,10 @@ export interface PluginDashboardWidget {
   sizes?: DashboardWidgetSize[];
   /** The size a new tile gets. Defaults to the first entry of `sizes`. */
   defaultSize?: DashboardWidgetSize;
-  /** The gallery group the widget appears in. Defaults to the plugin's display name. */
+  /**
+   * The gallery group the widget appears in. Without one it joins the plugin's own group, which is titled after the
+   * first group a widget of the plugin names, else after the plugin's manifest name.
+   */
   group?: string;
   /** Extra search terms for the gallery, besides title, description and group. */
   keywords?: string[];

@@ -6,6 +6,7 @@ import {
   useMessagingServiceMessagingGetUnreadCount,
   useMessagingServiceMessagingListConversations,
 } from '@attraccess/react-query-client';
+import { useAuth } from '../../../hooks/useAuth';
 import { BigNumber, itemsPerSize, WidgetEmpty, WidgetError, WidgetList, WidgetLoading } from './widgetParts';
 import de from './de.json';
 import en from './en.json';
@@ -73,11 +74,15 @@ function ConversationRow({ conversation }: Readonly<{ conversation: Conversation
   );
 }
 
-/** Small: the unread count as a big number and who wrote last. */
+/** Small: the unread count as a big number and who last wrote to the user. */
 function UnreadSummary({ conversations }: Readonly<{ conversations: ConversationListItemDto[] }>) {
   const { t } = useTranslations({ en, de });
+  const { user } = useAuth();
   const { data: unread } = useMessagingServiceMessagingGetUnreadCount();
-  const latest = conversations.find((conversation) => conversation.lastMessage)?.otherParticipant?.username;
+  // Skips conversations where the user's own reply is the latest message.
+  const latest = conversations.find(
+    (conversation) => conversation.lastMessage && conversation.lastMessage.senderId !== user?.id,
+  )?.otherParticipant?.username;
 
   return (
     <div className="flex min-w-0 flex-col gap-1">

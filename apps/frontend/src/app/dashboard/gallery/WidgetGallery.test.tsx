@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest';
+import { useState } from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -172,6 +173,41 @@ describe('WidgetGallery', () => {
     expect(screen.getByText('No widgets match "zebra"')).toBeInTheDocument();
   });
 
+  it('opens unfiltered again after closing with a search term', async () => {
+    function Reopenable() {
+      const [isOpen, setIsOpen] = useState(true);
+      return (
+        <>
+          <button onClick={() => setIsOpen(true)}>Reopen</button>
+          <WidgetGallery isOpen={isOpen} onOpenChange={setIsOpen} pins={[]} />
+        </>
+      );
+    }
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <Reopenable />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await userEvent.type(await screen.findByRole('searchbox', { name: 'Search widgets' }), 'zebra');
+    await userEvent.click(document.querySelector('[data-cy="dashboard-picker-close"]') as HTMLElement);
+    await waitFor(() => expect(screen.queryByRole('searchbox')).toBeNull());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Reopen' }));
+    expect(await screen.findByRole('searchbox', { name: 'Search widgets' })).toHaveValue('');
+    expect(groupTitles()).toContain('Messages');
+  });
+
+  it('names each group region after its title, even a title with spaces', async () => {
+    const tools = widgetFixture('tools', 'Tools', { id: 'group:My shop tools', title: 'My shop tools' });
+    state.widgets = { ...state.widgets, widgets: [...state.widgets.widgets, tools] };
+    renderGallery();
+
+    const region = await screen.findByRole('region', { name: 'My shop tools' });
+    expect(within(region).getByRole('button', { name: 'Add Tools widget' })).toBeInTheDocument();
+  });
+
   it('adds an item with the chosen size, keeps the gallery open and focus on the entry', async () => {
     const add = vi
       .spyOn(DashboardService, 'dashboardUpdatePins')
@@ -198,7 +234,7 @@ describe('WidgetGallery', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    const added = within(entryNamed('Balance')).getByRole('button', { name: 'Added' });
+    const added = within(entryNamed('Balance')).getByRole('button', { name: 'Balance widget added' });
     expect(added).toHaveAttribute('aria-disabled', 'true');
     expect(added).toHaveFocus();
     expect(screen.getByRole('heading', { name: 'Add widget' })).toBeInTheDocument();
@@ -208,7 +244,9 @@ describe('WidgetGallery', () => {
     renderGallery([pin(DashboardPinItemType.PAGE, '/settings')]);
     const entry = await waitFor(() => entryNamed('Settings'));
 
-    expect(within(entry).getByRole('button', { name: 'Added' })).toHaveAttribute('aria-disabled', 'true');
+    const added = within(entry).getByRole('button', { name: 'Settings shortcut added' });
+    expect(added).toHaveAttribute('aria-disabled', 'true');
+    expect(added).toHaveTextContent('Added');
     expect(within(entry).queryByRole('group', { name: 'Size' })).toBeNull();
   });
 
@@ -252,7 +290,7 @@ describe('WidgetGallery', () => {
   it('waits for the license and plugins before calling the list complete', async () => {
     state.widgets = { ...state.widgets, isReady: false };
     renderGallery();
-    expect(await screen.findByLabelText('Loading…')).toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent('Loading…');
   });
 
   it('tells the user when an addition could not be saved', async () => {

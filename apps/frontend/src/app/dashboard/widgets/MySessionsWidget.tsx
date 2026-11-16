@@ -55,10 +55,13 @@ function SessionRow({
     resourceId: resource.id,
     onUpdate: (data) => {
       if (!data.eventType || !SESSION_EVENTS.has(data.eventType)) return;
-      void queryClient.invalidateQueries({
-        queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId: resource.id }),
-      });
-      void queryClient.invalidateQueries({ queryKey: mySessionsQueryKey(), exact: true });
+      // Other tiles showing the resource hear the same event: join a refetch in flight instead of restarting it.
+      const options = { cancelRefetch: false };
+      void queryClient.invalidateQueries(
+        { queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId: resource.id }) },
+        options,
+      );
+      void queryClient.invalidateQueries({ queryKey: mySessionsQueryKey(), exact: true }, options);
     },
   });
   const ownSession = activeSession?.usages.find((usage) => usage.userId === user?.id);
