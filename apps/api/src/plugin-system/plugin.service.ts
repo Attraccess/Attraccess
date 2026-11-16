@@ -148,12 +148,15 @@ export class PluginService {
     // One dot-prefixed staging folder per upload inside the plugin folder: no shared parent
     // to leave behind or race on, discovery skips it, and rename() stays on one filesystem.
     await mkdir(PluginService.PLUGIN_PATH, { recursive: true });
-    const tempFolder = await mkdtemp(join(PluginService.PLUGIN_PATH, PluginService.UPLOAD_STAGING_PREFIX));
+    const stagingFolder = await mkdtemp(join(PluginService.PLUGIN_PATH, PluginService.UPLOAD_STAGING_PREFIX));
+    // Extract one level down, like the npm path's `package` folder: the private (0700) mkdtemp
+    // folder itself must never be renamed into place as the plugin folder.
+    const extractFolder = join(stagingFolder, 'contents');
 
     try {
       let extracted: unknown[] = [];
       try {
-        extracted = await decompress(zipFile.buffer, tempFolder);
+        extracted = await decompress(zipFile.buffer, extractFolder);
       } catch (error) {
         PluginService.logger.error(`Failed to extract ${zipFile.originalname}`, error as Error);
       }
@@ -164,7 +167,7 @@ export class PluginService {
       }
 
       // read manifest, tolerating the single wrapper folder that Finder and most GUI zip tools add
-      const sourceFolder = PluginService.findManifestFolder(tempFolder);
+      const sourceFolder = PluginService.findManifestFolder(extractFolder);
       PluginService.logger.debug(`Reading manifest from ${sourceFolder}`);
       const manifestContent = JSON.parse(readFileSync(join(sourceFolder, 'plugin.json'), 'utf8'));
 
@@ -216,7 +219,7 @@ export class PluginService {
       PluginService.logger.debug(`Returning manifest ${manifest}`);
       return manifest;
     } finally {
-      await PluginService.cleanupUploadStaging(tempFolder);
+      await PluginService.cleanupUploadStaging(stagingFolder);
     }
   }
 

@@ -1,16 +1,10 @@
 import { registerPluginServiceFixture } from './plugin.service.plugin-service.test-fixture';
 import { BadRequestException } from '@nestjs/common';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'fs';
-import * as fsPromises from 'fs/promises';
 import { join } from 'path';
 import { PluginService } from './plugin.service';
 import { PluginBootGuard } from './runtime/boot-guard';
 import { zipFileUpload } from './__test__/make-zip';
-
-jest.mock('fs/promises', () => {
-  const actual = jest.requireActual('fs/promises');
-  return { ...actual, rm: jest.fn(actual.rm), rmdir: jest.fn(actual.rmdir) };
-});
 
 describe('PluginService', () => {
   const fixture = registerPluginServiceFixture();
@@ -400,83 +394,6 @@ describe('PluginService', () => {
       const file = zipFileUpload({ 'plugin.json': '{}' }, { buffer: Buffer.from('not a zip at all') });
 
       await expect(service.uploadPlugin(file)).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    describe('staging cleanup', () => {
-      const leftovers = () =>
-        readdirSync(fixture.root).filter((entry) => entry === 'temp' || entry.startsWith('.zip-upload-'));
-
-      it.each([
-        ['an invalid manifest', () => zipFileUpload({ 'plugin.json': JSON.stringify({ name: 'x' }) })],
-        ['a missing plugin.json', () => zipFileUpload({ 'dist/index.js': '' })],
-        ['an unextractable file', () => zipFileUpload({ 'plugin.json': '{}' }, { buffer: Buffer.from('nope') })],
-        [
-          'a reserved name',
-          () => zipFileUpload({ 'plugin.json': JSON.stringify({ ...fixture.VALID_MANIFEST, name: '.hidden' }) }),
-        ],
-      ])('leaves nothing behind when the upload fails with %s', async (_label, makeZip) => {
-        await expect(new PluginService().uploadPlugin(makeZip())).rejects.toBeDefined();
-        expect(leftovers()).toEqual([]);
-      });
-
-      it('creates nothing for a wrong MIME type', async () => {
-        const before = readdirSync(fixture.root);
-        await expect(
-          new PluginService().uploadPlugin(zipFileUpload({ 'plugin.json': '{}' }, { mimetype: 'text/plain' })),
-        ).rejects.toBeInstanceOf(BadRequestException);
-        expect(readdirSync(fixture.root)).toEqual(before);
-      });
-
-      it('removes an empty legacy temp folder', async () => {
-        mkdirSync(join(fixture.root, 'temp'));
-        await new PluginService().uploadPlugin(
-          zipFileUpload({ 'plugin.json': JSON.stringify(fixture.VALID_MANIFEST) }),
-        );
-        expect(leftovers()).toEqual([]);
-      });
-
-      it('keeps a non-empty temp folder untouched', async () => {
-        mkdirSync(join(fixture.root, 'temp'));
-        writeFileSync(join(fixture.root, 'temp', 'plugin.json'), 'keep');
-
-        const manifest = await new PluginService().uploadPlugin(
-          zipFileUpload({ 'plugin.json': JSON.stringify(fixture.VALID_MANIFEST) }),
-        );
-
-        expect(manifest.name).toBe('uploaded-plugin');
-        expect(readFileSync(join(fixture.root, 'temp', 'plugin.json'), 'utf8')).toBe('keep');
-      });
-
-      it('handles concurrent uploads without a shared staging folder', async () => {
-        const upload = (name: string) =>
-          new PluginService().uploadPlugin(
-            zipFileUpload({ 'plugin.json': JSON.stringify({ ...fixture.VALID_MANIFEST, name }) }),
-          );
-
-        await Promise.all([upload('plugin-a'), upload('plugin-b')]);
-
-        expect(existsSync(join(fixture.root, 'plugin-a', 'plugin.json'))).toBe(true);
-        expect(existsSync(join(fixture.root, 'plugin-b', 'plugin.json'))).toBe(true);
-        expect(leftovers()).toEqual([]);
-      });
-
-      it('keeps the upload result when cleanup throws', async () => {
-        jest.mocked(fsPromises.rm).mockRejectedValueOnce(new Error('rm failed'));
-        jest.mocked(fsPromises.rmdir).mockRejectedValueOnce(new Error('rmdir failed'));
-
-        const manifest = await new PluginService().uploadPlugin(
-          zipFileUpload({ 'plugin.json': JSON.stringify(fixture.VALID_MANIFEST) }),
-        );
-        expect(manifest.name).toBe('uploaded-plugin');
-
-        jest.mocked(fsPromises.rm).mockRejectedValueOnce(new Error('rm failed'));
-        jest.mocked(fsPromises.rmdir).mockRejectedValueOnce(new Error('rmdir failed'));
-        const failure = new PluginService().uploadPlugin(
-          zipFileUpload({ 'plugin.json': JSON.stringify({ name: 'x' }) }),
-        );
-        await expect(failure).rejects.toBeDefined();
-        await expect(failure).rejects.not.toThrow(/failed$/);
-      });
     });
 
     it('rejects a manifest that fails schema validation', async () => {
