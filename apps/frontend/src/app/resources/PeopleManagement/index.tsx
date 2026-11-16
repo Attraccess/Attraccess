@@ -16,7 +16,7 @@ import { usePeopleRows } from './usePeopleRows';
 import en from './en.json';
 import de from './de.json';
 
-export function usePeopleManagementState(
+export function PeopleManagement(
   props: Readonly<PeopleManagementProps & Omit<HTMLAttributes<HTMLElement>, 'children'>>,
 ) {
   const { target, canManageIntroducers, canManageIntroductions, hideHeader, className, ...rest } = props;
@@ -102,82 +102,6 @@ export function usePeopleManagementState(
     },
     [openHistory],
   );
-  return {
-    target,
-    canManageIntroducers,
-    canManageIntroductions,
-    hideHeader,
-    className,
-    rest,
-    t,
-    filter,
-    setFilter,
-    addMode,
-    addComment,
-    setAddComment,
-    isAddOpen,
-    closeAdd,
-    setRevokeContext,
-    revokeComment,
-    setRevokeComment,
-    isRevokeOpen,
-    closeRevoke,
-    historyUserId,
-    setHistoryUserId,
-    isHistoryOpen,
-    closeHistory,
-    rows,
-    isLoading,
-    hasError,
-    mutations,
-    filteredRows,
-    handleAddOpen,
-    resetAddState,
-    handleAdd,
-    handleIntroductionToggle,
-    handleRevokeSubmit,
-    handleHistoryOpen,
-  } as const;
-}
-
-export function PeopleManagement(
-  props: Readonly<PeopleManagementProps & Omit<HTMLAttributes<HTMLElement>, 'children'>>,
-) {
-  const {
-    target,
-    canManageIntroducers,
-    canManageIntroductions,
-    hideHeader,
-    className,
-    rest,
-    t,
-    filter,
-    setFilter,
-    addMode,
-    addComment,
-    setAddComment,
-    isAddOpen,
-    closeAdd,
-    setRevokeContext,
-    revokeComment,
-    setRevokeComment,
-    isRevokeOpen,
-    closeRevoke,
-    historyUserId,
-    setHistoryUserId,
-    isHistoryOpen,
-    closeHistory,
-    isLoading,
-    hasError,
-    mutations,
-    filteredRows,
-    handleAddOpen,
-    resetAddState,
-    handleAdd,
-    handleIntroductionToggle,
-    handleRevokeSubmit,
-    handleHistoryOpen,
-  } = usePeopleManagementState(props);
 
   if (hasError) {
     return (
@@ -195,7 +119,6 @@ export function PeopleManagement(
 
   const header = (
     <PeopleHeader
-      t={t}
       targetType={target.type}
       canManageIntroducers={canManageIntroducers}
       canManageIntroductions={canManageIntroductions}
@@ -220,7 +143,6 @@ export function PeopleManagement(
       />
 
       <PeopleTable
-        t={t}
         target={target}
         rows={filteredRows}
         isLoading={isLoading}
@@ -241,7 +163,6 @@ export function PeopleManagement(
   const modals = (
     <>
       <AddPersonDrawer
-        t={t}
         target={target}
         isOpen={isAddOpen}
         mode={addMode}
@@ -256,7 +177,6 @@ export function PeopleManagement(
       />
 
       <IntroductionCommentModal
-        t={t}
         isOpen={isRevokeOpen}
         comment={revokeComment}
         isPending={mutations.isMutating}

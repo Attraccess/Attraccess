@@ -1,12 +1,4 @@
-import {
-  Button,
-  EmptyState,
-  PageHeader,
-  StatusAlert,
-  StatusDialog,
-  TableDataLoadingIndicator,
-} from '@attraccess/plugins-frontend-ui';
-import { Table, TableBody, TableColumn, TableContent, TableHeader, TableScrollContainer } from '@heroui/react';
+import { PageHeader, StatusAlert, StatusDialog, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
 import { PlusIcon, SearchIcon, WifiIcon } from 'lucide-react';
 import { AddDeviceDrawer } from './AddDeviceDrawer';
 import { AdminPasswordDrawer } from '../AdminPasswordDrawer';
@@ -14,25 +6,12 @@ import { DeviceInfoDrawer } from './info/DeviceInfoDrawer';
 import { DiscoverDrawer } from '../DiscoverDrawer';
 import { FirmwareDrawer } from './firmware/FirmwareDrawer';
 import { useShellyTranslations } from '../i18n';
-import { renderDevicesPageDevicesRows } from '../renderDevicesPageDevicesRows';
-import { useDevicesPageState } from '../useDevicesPageState';
-
-export function EmptyDevices({ onAdd }: { onAdd: () => void }) {
-  const { t } = useShellyTranslations();
-  return (
-    <div className="sh:flex sh:flex-col sh:items-center sh:justify-center sh:gap-3 sh:pb-6">
-      <EmptyState message={t('devices.empty')} />
-      <Button variant="secondary" size="sm" onPress={onAdd} data-cy="shelly-add-open-empty">
-        <PlusIcon className="sh:h-4 sh:w-4" /> {t('devices.add')}
-      </Button>
-    </div>
-  );
-}
+import { DevicesTable } from './DevicesTable';
+import { useDevicesPageState } from './useDevicesPageState';
 
 export function DevicesPage() {
+  const { t } = useShellyTranslations();
   const {
-    t,
-    language,
     devices,
     loading,
     pageError,
@@ -91,43 +70,17 @@ export function DevicesPage() {
       {loading ? (
         <TableDataLoadingIndicator />
       ) : (
-        <Table data-cy="shelly-device-table">
-          <TableScrollContainer>
-            <TableContent aria-label={t('devices.table')}>
-              <TableHeader>
-                <TableColumn isRowHeader>{t('devices.device')}</TableColumn>
-                <TableColumn className="sh:hidden sh:sm:table-cell sh:md:hidden sh:lg:table-cell">
-                  {t('devices.address')}
-                </TableColumn>
-                <TableColumn className="sh:hidden sh:lg:table-cell">{t('devices.model')}</TableColumn>
-                <TableColumn className="sh:hidden sh:sm:table-cell">{t('devices.auth')}</TableColumn>
-                <TableColumn className="sh:hidden sh:xl:table-cell">{t('devices.firmware')}</TableColumn>
-                <TableColumn className="sh:text-end">{t('devices.actions')}</TableColumn>
-              </TableHeader>
-              {/* `dependencies` is required: without it react-aria caches the rendered
-                  rows, and the row closure keeps the firmware/busy state it was first
-                  rendered with. */}
-              <TableBody
-                items={devices}
-                dependencies={[firmware, rowBusyId, language]}
-                renderEmptyState={() => <EmptyDevices onAdd={addDrawer.open} />}
-              >
-                {(device) =>
-                  renderDevicesPageDevicesRows(device, {
-                    firmware,
-                    t,
-                    rowBusyId,
-                    setInfoDevice,
-                    setFirmwareDevice,
-                    setAuthDevice,
-                    withRowBusy,
-                    setDeleteTarget,
-                  })
-                }
-              </TableBody>
-            </TableContent>
-          </TableScrollContainer>
-        </Table>
+        <DevicesTable
+          devices={devices}
+          firmware={firmware}
+          rowBusyId={rowBusyId}
+          onAdd={addDrawer.open}
+          setInfoDevice={setInfoDevice}
+          setFirmwareDevice={setFirmwareDevice}
+          setAuthDevice={setAuthDevice}
+          setDeleteTarget={setDeleteTarget}
+          withRowBusy={withRowBusy}
+        />
       )}
 
       <AddDeviceDrawer isOpen={addDrawer.isOpen} onOpenChange={addDrawer.setOpen} onAdded={refresh} />

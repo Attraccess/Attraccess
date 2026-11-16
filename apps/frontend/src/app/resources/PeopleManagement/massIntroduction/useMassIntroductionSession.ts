@@ -27,9 +27,21 @@ export function secondsUntil(timestamp: string): number {
   return Math.max(0, Math.ceil((new Date(timestamp).getTime() - Date.now()) / 1000));
 }
 
-export type MassIntroductionSessionState = ReturnType<typeof useMassIntroductionSession>;
+/** A mass-introduction session as the drawer tabs, the panel content and the footer actions see it. */
+export interface MassIntroductionSessionState {
+  phase: MassIntroductionPhase;
+  session: MassIntroductionSessionDto | null;
+  endReason: MassIntroductionEndState | null;
+  secondsLeft: number;
+  isStarting: boolean;
+  /** Starts a session for the target, optionally on a reader's display. */
+  start: (readerId?: number) => void;
+  cancel: () => void;
+  reset: () => void;
+}
 
-export function useMassIntroductionSession(target: PeopleTarget) {
+/** Shared by IntroductionTabs, MassIntroductionContent and MassIntroductionActions, which all follow the same running session. */
+export function useMassIntroductionSession(target: PeopleTarget): MassIntroductionSessionState {
   const invalidateIntroductions = useInvalidatePeopleIntroductions(target);
   const toast = useToastMessage();
   const { t, tExists } = useTranslations({
@@ -200,5 +212,5 @@ export function useMassIntroductionSession(target: PeopleTarget) {
     start,
     cancel,
     reset,
-  } as const;
+  };
 }

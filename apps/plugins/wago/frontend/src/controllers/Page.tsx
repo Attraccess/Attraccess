@@ -4,7 +4,7 @@ import { PlusIcon, RefreshCwIcon, SettingsIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ClaimControllerModal } from './ClaimControllerModal';
 import { useNavigate } from 'react-router-dom';
-import { ControllersTable } from './Table';
+import { ControllersTable } from './ControllersTable';
 import { CommissioningModal } from '../commissioning/CommissioningModal';
 import { MqttSettingsModal } from './MqttSettingsModal';
 import type { CommissioningSession, WagoController } from '../api/client';

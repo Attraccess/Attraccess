@@ -158,7 +158,8 @@ describe('MonitoringSection', () => {
       onSuccess: (data: { apiKey: string }) => void;
     };
     const remove = vi.mocked(useSettingsServiceDeleteMetricsApiKey).mock.calls.at(-1)?.[0] as { onSuccess: () => void };
-    const toggle = vi.mocked(useSettingsServiceUpdateMetricsSettings).mock.calls[0][0] as {
+    // Calls render in tree order: the threshold save bar (parent) first, then the toggle rows.
+    const toggle = vi.mocked(useSettingsServiceUpdateMetricsSettings).mock.calls[1][0] as {
       onSuccess: () => void;
       onError: () => void;
     };

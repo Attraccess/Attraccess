@@ -30,8 +30,8 @@ export function wireAddress(format: RegisterFormat): number {
   return address;
 }
 
-export /** Validate one logical owner against the selected profile and the shared physical address space. */
-function validateChannelBinding(
+/** Validate one logical owner against the selected profile and the shared physical address space. */
+export function validateChannelBinding(
   channel: {
     capabilities?: unknown;
     measurement?: { unit?: unknown; kind?: unknown; scale?: unknown; offset?: unknown };

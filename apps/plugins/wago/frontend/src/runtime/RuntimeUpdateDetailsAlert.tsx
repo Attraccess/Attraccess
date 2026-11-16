@@ -1,9 +1,11 @@
 import { AlertStatusIcon } from '@attraccess/plugins-frontend-ui';
 import { Alert } from '@heroui/react';
 import runtimeMessages from '../managed-runtime.en.json';
-import { useRuntimeUpdateDetailsState } from './useRuntimeUpdateDetailsState';
-type Props = Pick<ReturnType<typeof useRuntimeUpdateDetailsState>, 'status' | 't'>;
-export function RuntimeUpdateDetailsAlert({ status, t }: Props) {
+import type { RuntimeUpdateStatus } from '../api/client';
+import { useWagoTranslations } from '../i18n';
+
+export function RuntimeUpdateDetailsAlert({ status }: { status: RuntimeUpdateStatus }) {
+  const { t } = useWagoTranslations();
   const alertStatus =
     status.management === 'managed' &&
     status.update?.phase === 'current' &&

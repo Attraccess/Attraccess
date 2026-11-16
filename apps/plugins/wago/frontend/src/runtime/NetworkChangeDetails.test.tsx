@@ -2,7 +2,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { NetworkChangeDetails, NetworkChangeForm } from './NetworkChangeDetails';
+import { NetworkChangeDetails } from './NetworkChangeDetails';
+import { NetworkChangeForm } from './NetworkChangeForm';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import en from '../network-change.en.json';
 import de from '../network-change.de.json';

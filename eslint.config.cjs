@@ -27,6 +27,7 @@ module.exports = [
     // Override or add rules here
     rules: {
       '@nx/workspace-multiline-import-specifiers': 'error',
+      '@nx/workspace-no-export-comment': 'error',
       '@nx/enforce-module-boundaries': [
         'error',
         {
@@ -60,6 +61,44 @@ module.exports = [
       'no-warning-comments': 'off',
       'no-console': 'error',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+    },
+  },
+  {
+    // ATT-1224: frontend props and helpers use explicit types, never a hook's ReturnType.
+    // Tests are excluded: their mocks legitimately use ReturnType<typeof useXQuery>.
+    files: [
+      'apps/frontend/**/*.{ts,tsx}',
+      'apps/plugins/*/frontend/**/*.{ts,tsx}',
+      'libs/plugins-frontend-*/**/*.{ts,tsx}',
+      'apps/companion/renderer/**/*.{ts,tsx}',
+    ],
+    ignores: [
+      '**/*.{test,spec}.{ts,tsx}',
+      '**/*.hoisted.*',
+      '**/tests/**',
+      '**/test-utils/**',
+    ],
+    rules: {
+      '@nx/workspace-no-hook-return-type': 'error',
+    },
+  },
+  {
+    // ATT-1224: plugin dialogs use the shared StandardModal / StatusDialog.
+    files: ['apps/plugins/*/frontend/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@heroui/react',
+              importNames: ['Modal', 'ModalBackdrop', 'ModalContainer', 'ModalDialog'],
+              message:
+                'Use StandardModal or StatusDialog from @attraccess/plugins-frontend-ui instead of the raw HeroUI Modal.',
+            },
+          ],
+        },
+      ],
     },
   },
   {

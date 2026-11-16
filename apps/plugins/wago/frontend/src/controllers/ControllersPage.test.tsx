@@ -15,7 +15,7 @@ vi.mock('../api/queries', () => ({
   }),
   useCommissioningSessionsQuery: () => ({ data: [] }),
 }));
-vi.mock('./Table', () => ({
+vi.mock('./ControllersTable', () => ({
   ControllersTable: ({ onConfigure }: { onConfigure: (id: number) => void }) => (
     <button onClick={() => onConfigure(7)}>Configure fixture controller</button>
   ),

@@ -1,8 +1,13 @@
 import '@testing-library/jest-dom/vitest';
-import { vi } from 'vitest';
-import type { DeleteOptions } from './types';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render } from '@testing-library/react';
+import type { PropsWithChildren, ReactElement } from 'react';
+import { afterEach, beforeEach, vi } from 'vitest';
 
-import { afterEach, beforeEach } from 'vitest';
+interface DeleteOptions {
+  onSuccess?: () => void;
+  onError?: (error: unknown) => void;
+}
 
 const hoisted = vi.hoisted(() => ({
   deleteMutateMock: vi.fn(),
@@ -27,51 +32,103 @@ const hoisted = vi.hoisted(() => ({
   deleteOptions: undefined as DeleteOptions | undefined,
 }));
 
-vi.mock('@attraccess/react-query-client', () => ({
-  usePluginsServicePluginControllerDependencyPlan: () => ({
-    data: hoisted.dependencyPlan,
-    error: hoisted.dependencyPlanError,
-    isFetching: false,
-  }),
-  usePluginsServicePluginControllerRemovalPlan: () => ({ data: hoisted.removalPlan, isFetching: false }),
-  usePluginsServicePluginControllerRemovePackageGraph: () => ({
-    mutateAsync: hoisted.removeGraphMock,
-    isPending: false,
-  }),
-  usePluginsServiceGetPlugins: () => ({ data: hoisted.plugins }),
-  usePluginsServiceGetPluginSystemStatus: () => ({
-    data: hoisted.pluginSystemStatus,
-    refetch: hoisted.statusRefetchMock,
-  }),
-  usePluginsServicePluginControllerCheckAllInstalledPackages: () => ({
-    mutateAsync: hoisted.checkAllInstalledPackagesMock,
-    isPending: false,
-  }),
-  usePluginsServicePluginControllerAddRegistry: () => ({ mutateAsync: hoisted.addRegistryMock, isPending: false }),
-  usePluginsServicePluginControllerTestRegistry: () => ({ mutateAsync: hoisted.testRegistryMock, isPending: false }),
-  usePluginsServicePluginControllerRemoveRegistry: () => ({
-    mutateAsync: hoisted.removeRegistryMock,
-    isPending: false,
-  }),
-  usePluginsServicePluginControllerInstallPackage: () => ({
-    mutateAsync: hoisted.installPackageMock,
-    isPending: false,
-  }),
-  usePluginsServicePluginControllerReplaceInstalledPackage: () => ({
-    mutateAsync: hoisted.replaceInstalledPackageMock,
-    isPending: false,
-  }),
-  usePluginsServicePluginControllerUpdateInstalledPackagePolicy: () => ({
-    mutateAsync: hoisted.updateInstalledPackagePolicyMock,
-    isPending: false,
-  }),
-  usePluginsServiceRetryPlugin: () => ({ mutateAsync: hoisted.retryMutateAsyncMock, isPending: false }),
-  usePluginsServiceDeletePlugin: (options: DeleteOptions) => {
-    hoisted.deleteOptions = options;
-    return { mutate: hoisted.deleteMutateMock, isPending: false };
-  },
-  usePluginsServiceUploadPlugin: () => ({ mutate: vi.fn(), isPending: false }),
-}));
+vi.mock('@attraccess/react-query-client', async () => {
+  const { useQuery } = await vi.importActual<typeof import('@tanstack/react-query')>('@tanstack/react-query');
+  // The generated query hooks are backed by the (stubbed) global fetch, so tests describe the API as HTTP responses.
+  const fetchJson = async (path: string) => {
+    // eslint-disable-next-line no-restricted-syntax -- Test double: hooks are backed by the stubbed global fetch.
+    const response = await fetch(path, { credentials: 'include' });
+    if (!response.ok) throw new Error(`Request failed: ${path}`);
+    return response.json();
+  };
+  const withRegistry = (registryId?: string, separator = '?') =>
+    registryId ? `${separator}registryId=${encodeURIComponent(registryId)}` : '';
+  return {
+    UsePluginsServicePluginControllerInstalledPackagesKeyFn: () => ['installed'],
+    UsePluginsServicePluginControllerListRegistriesKeyFn: () => ['registries'],
+    usePluginsServicePluginControllerInstalledPackages: () =>
+      useQuery({ queryKey: ['installed'], queryFn: () => fetchJson('/api/plugins/installed') }),
+    usePluginsServicePluginControllerListRegistries: (_key: unknown, options: object) =>
+      useQuery({ queryKey: ['registries'], queryFn: () => fetchJson('/api/plugins/registries'), ...options }),
+    usePluginsServicePluginControllerSearchMarketplace: (
+      { query, registryId }: { query: string; registryId?: string },
+      _key: unknown,
+      options: object,
+    ) =>
+      useQuery({
+        queryKey: ['search', query, registryId],
+        queryFn: () =>
+          fetchJson(
+            `/api/plugins/marketplace/search?query=${encodeURIComponent(query)}${withRegistry(registryId, '&')}`,
+          ),
+        ...options,
+      }),
+    usePluginsServicePluginControllerMarketplacePackage: (
+      { packageName, registryId }: { packageName: string; registryId?: string },
+      _key: unknown,
+      options: object,
+    ) =>
+      useQuery({
+        queryKey: ['package', packageName, registryId],
+        queryFn: () =>
+          fetchJson(`/api/plugins/marketplace/${encodeURIComponent(packageName)}${withRegistry(registryId)}`),
+        ...options,
+      }),
+    usePluginsServicePluginControllerInstalledPackageVersions: (
+      { packageName }: { packageName: string },
+      _key: unknown,
+      options: object,
+    ) =>
+      useQuery({
+        queryKey: ['versions', packageName],
+        queryFn: () => fetchJson(`/api/plugins/installed/${encodeURIComponent(packageName)}/versions`),
+        ...options,
+      }),
+    usePluginsServicePluginControllerDependencyPlan: () => ({
+      data: hoisted.dependencyPlan,
+      error: hoisted.dependencyPlanError,
+      isFetching: false,
+    }),
+    usePluginsServicePluginControllerRemovalPlan: () => ({ data: hoisted.removalPlan, isFetching: false }),
+    usePluginsServicePluginControllerRemovePackageGraph: () => ({
+      mutateAsync: hoisted.removeGraphMock,
+      isPending: false,
+    }),
+    usePluginsServiceGetPlugins: () => ({ data: hoisted.plugins }),
+    usePluginsServiceGetPluginSystemStatus: () => ({
+      data: hoisted.pluginSystemStatus,
+      refetch: hoisted.statusRefetchMock,
+    }),
+    usePluginsServicePluginControllerCheckAllInstalledPackages: () => ({
+      mutateAsync: hoisted.checkAllInstalledPackagesMock,
+      isPending: false,
+    }),
+    usePluginsServicePluginControllerAddRegistry: () => ({ mutateAsync: hoisted.addRegistryMock, isPending: false }),
+    usePluginsServicePluginControllerTestRegistry: () => ({ mutateAsync: hoisted.testRegistryMock, isPending: false }),
+    usePluginsServicePluginControllerRemoveRegistry: () => ({
+      mutateAsync: hoisted.removeRegistryMock,
+      isPending: false,
+    }),
+    usePluginsServicePluginControllerInstallPackage: () => ({
+      mutateAsync: hoisted.installPackageMock,
+      isPending: false,
+    }),
+    usePluginsServicePluginControllerReplaceInstalledPackage: () => ({
+      mutateAsync: hoisted.replaceInstalledPackageMock,
+      isPending: false,
+    }),
+    usePluginsServicePluginControllerUpdateInstalledPackagePolicy: () => ({
+      mutateAsync: hoisted.updateInstalledPackagePolicyMock,
+      isPending: false,
+    }),
+    usePluginsServiceRetryPlugin: () => ({ mutateAsync: hoisted.retryMutateAsyncMock, isPending: false }),
+    usePluginsServiceDeletePlugin: (options: DeleteOptions) => {
+      hoisted.deleteOptions = options;
+      return { mutate: hoisted.deleteMutateMock, isPending: false };
+    },
+    usePluginsServiceUploadPlugin: () => ({ mutate: vi.fn(), isPending: false }),
+  };
+});
 
 vi.mock('../../../readerUi/ReaderUiAlerts', () => ({ ReaderUiAlerts: () => null }));
 vi.mock('../../../../components/toastProvider', () => ({
@@ -83,7 +140,18 @@ vi.mock('../../../../components/toastProvider', () => ({
 }));
 
 export { hoisted };
+
+let queryClient = new QueryClient();
+function QueryWrapper({ children }: PropsWithChildren) {
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+}
+/** Renders with a fresh query client per test; rerender keeps the same wrapper. */
+export function renderWithQuery(ui: ReactElement) {
+  return render(ui, { wrapper: QueryWrapper });
+}
+
 export function resetTestFixture() {
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   hoisted.deleteMutateMock.mockReset();
   hoisted.dependencyPlan = undefined;
   hoisted.dependencyPlanError = null;

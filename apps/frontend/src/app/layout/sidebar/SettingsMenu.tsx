@@ -9,50 +9,50 @@ import {
   Description,
 } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
-import { useSidebarState } from './HelpfulLinks';
+import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useAppTheme } from '@attraccess/ui';
+import { useAuth } from '../../../hooks/useAuth';
 import { useInstallApp } from '../../../pwa-install';
-type Props = Pick<
-  ReturnType<typeof useSidebarState>,
-  | 'isCollapsed'
-  | 'user'
-  | 'isSettingsMenuOpen'
-  | 'handleSettingsMenuOpenChange'
-  | 't'
-  | 'setLanguage'
-  | 'language'
-  | 'navigate'
-  | 'cycleTheme'
-  | 'theme'
-  | 'logout'
-  | 'logoutEverywhere'
-  | 'logoutPending'
-  | 'canLogoutEverywhere'
-  | 'logoutUnavailableReason'
-  | 'logoutEverywhereLabel'
-  | 'logoutPendingLabel'
-  | 'logoutProviderNotice'
->;
-export function SettingsMenu({
-  isCollapsed,
-  user,
-  isSettingsMenuOpen,
-  handleSettingsMenuOpenChange,
-  t,
-  setLanguage,
-  language,
-  navigate,
-  cycleTheme,
-  theme,
-  logout,
-  logoutEverywhere,
-  logoutPending,
-  canLogoutEverywhere,
-  logoutUnavailableReason,
-  logoutEverywhereLabel,
-  logoutPendingLabel,
-  logoutProviderNotice,
-}: Props) {
+import de from '../sidebar.de.json';
+import en from '../sidebar.en.json';
+
+interface SettingsMenuProps {
+  isCollapsed: boolean;
+}
+
+export function SettingsMenu({ isCollapsed }: SettingsMenuProps) {
+  const {
+    logout,
+    logoutEverywhere,
+    logoutPending,
+    canLogoutEverywhere,
+    logoutUnavailableReason,
+    logoutEverywhereLabel,
+    logoutPendingLabel,
+    logoutProviderNotice,
+    user,
+  } = useAuth();
+  const { t, language, setLanguage } = useTranslations({ en, de });
   const installApp = useInstallApp();
+  const navigate = useNavigate();
+  const { theme, setTheme } = useAppTheme();
+  const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+  const keepSettingsMenuOpen = useRef(false);
+
+  const cycleTheme = () => {
+    keepSettingsMenuOpen.current = true;
+    setTheme(theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light');
+    window.requestAnimationFrame(() => {
+      keepSettingsMenuOpen.current = false;
+    });
+  };
+
+  const handleSettingsMenuOpenChange = (isOpen: boolean) => {
+    if (!isOpen && keepSettingsMenuOpen.current) return;
+    setIsSettingsMenuOpen(isOpen);
+  };
 
   return (
     <div className={isCollapsed ? 'p-2' : 'p-4'}>

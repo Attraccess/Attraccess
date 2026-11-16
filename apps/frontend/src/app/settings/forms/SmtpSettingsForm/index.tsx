@@ -26,7 +26,7 @@ export type SmtpSettingsFormProps = {
   endpoint: 'first-time-setup' | 'settings';
 };
 
-export function useSmtpSettingsFormState({ variant, endpoint, onNext }: SmtpSettingsFormProps) {
+export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsFormProps) {
   const { t, tExists } = useTranslations({
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
@@ -139,54 +139,6 @@ export function useSmtpSettingsFormState({ variant, endpoint, onNext }: SmtpSett
   ];
 
   const showLoading = variant === 'standalone' && isLoading;
-  return {
-    t,
-    formRef,
-    smtpService,
-    setSmtpService,
-    smtpHost,
-    setSmtpHost,
-    smtpPort,
-    setSmtpPort,
-    smtpSecure,
-    setSmtpSecure,
-    smtpUser,
-    setSmtpUser,
-    smtpFrom,
-    setSmtpFrom,
-    smtpPass,
-    setSmtpPass,
-    isSaving,
-    handleSubmit,
-    smtpServiceOptions,
-    showLoading,
-    variant,
-  } as const;
-}
-
-export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsFormProps) {
-  const {
-    t,
-    formRef,
-    smtpService,
-    setSmtpService,
-    smtpHost,
-    setSmtpHost,
-    smtpPort,
-    setSmtpPort,
-    smtpSecure,
-    setSmtpSecure,
-    smtpUser,
-    setSmtpUser,
-    smtpFrom,
-    setSmtpFrom,
-    smtpPass,
-    setSmtpPass,
-    isSaving,
-    handleSubmit,
-    smtpServiceOptions,
-    showLoading,
-  } = useSmtpSettingsFormState({ variant, endpoint, onNext });
 
   if (showLoading) {
     return (

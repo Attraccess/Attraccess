@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
 import { SIDEBAR_ITEMS, SidebarItem } from '../../layout/sidebar/navigation';
-import { useShowNavItem } from '../../layout/sidebar/HelpfulLinks';
+import { useShowNavItem } from '../../layout/sidebar/useShowNavItem';
 import { useAuth } from '../../../hooks/useAuth';
 
 // The license module the sidebar requires for a path, from the entry itself or its group.

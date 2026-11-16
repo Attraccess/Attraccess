@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AttractapDiagnostics } from './diagnostics/index';
-import { hasPendingCoredump, PENDING_COREDUMP_POLL_WINDOW_MS } from './diagnostics/useDiagnostics';
+import { hasPendingCoredump, PENDING_COREDUMP_POLL_WINDOW_MS } from './diagnostics/pendingCoredump';
 const state = vi.hoisted(() => ({
   reports: [] as unknown[],
   loading: false,

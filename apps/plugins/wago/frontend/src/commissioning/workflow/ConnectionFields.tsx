@@ -1,24 +1,45 @@
 import { Form } from '@heroui/react';
 import { BundledRuntime } from '../artifacts/BundledRuntime';
-import { NameStep } from './Steps';
-import { ConnectionStep } from './Steps';
-import type { CommissioningModel } from '../CommissioningModal';
+import type { CommissioningState } from '../useCommissioningState';
+import { ConnectionStep } from './ConnectionStep';
+import { NameStep } from './NameStep';
 
-export function ConnectionFields({ model }: { model: CommissioningModel }) {
-  const {
-    session,
-    isLoading,
-    activeStep,
-    name,
-    setName,
-    controllerIp,
-    setControllerIp,
-    mqttServerId,
-    setMqttServerId,
-    mqttServersQuery,
-    setArtifactBusy,
-    setSelectedArtifact,
-  } = model;
+type ConnectionFieldsProps = Pick<
+  CommissioningState,
+  | 'session'
+  | 'isLoading'
+  | 'activeStep'
+  | 'name'
+  | 'setName'
+  | 'controllerIp'
+  | 'setControllerIp'
+  | 'mqttServerId'
+  | 'setMqttServerId'
+  | 'selectedMqttServerId'
+  | 'mqttServersQuery'
+  | 'setArtifactBusy'
+  | 'setSelectedArtifact'
+  | 'setStep'
+  | 'createSession'
+>;
+
+export function ConnectionFields({
+  session,
+  isLoading,
+  activeStep,
+  name,
+  setName,
+  controllerIp,
+  setControllerIp,
+  mqttServerId,
+  setMqttServerId,
+  selectedMqttServerId,
+  mqttServersQuery,
+  setArtifactBusy,
+  setSelectedArtifact,
+  setStep,
+  createSession,
+}: ConnectionFieldsProps) {
   return (
     <Form
       id="wago-commissioning-connection"
@@ -26,8 +47,8 @@ export function ConnectionFields({ model }: { model: CommissioningModel }) {
         event.preventDefault();
         if (activeStep === 0 && name.trim()) {
           setArtifactBusy(true);
-          model.setStep(1);
-        } else if (activeStep === 1 && !isLoading) model.createSession();
+          setStep(1);
+        } else if (activeStep === 1 && !isLoading) createSession();
       }}
     >
       {!session && activeStep === 0 && <NameStep name={name} onNameChange={setName} />}
@@ -36,7 +57,7 @@ export function ConnectionFields({ model }: { model: CommissioningModel }) {
           controllerIp={controllerIp}
           mqttServerId={mqttServerId}
           mqttServersQuery={mqttServersQuery}
-          selectedMqttServerId={model.selectedMqttServerId}
+          selectedMqttServerId={selectedMqttServerId}
           onControllerIpChange={setControllerIp}
           onMqttServerIdChange={setMqttServerId}
         />

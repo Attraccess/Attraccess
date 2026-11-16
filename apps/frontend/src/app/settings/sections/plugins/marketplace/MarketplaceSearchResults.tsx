@@ -1,75 +1,43 @@
-import { Button } from '@attraccess/plugins-frontend-ui';
+import type { MarketplacePluginDto } from '@attraccess/react-query-client';
 import { Card, Input, TextField } from '@heroui/react';
 import { cardVariants } from '@heroui/styles';
 import { PluginClassificationBadge } from '../PluginClassificationBadge';
-import { usePluginsSectionState } from '../state/usePluginSettings';
-type Props = Pick<
-  ReturnType<typeof usePluginsSectionState>,
-  | 'marketplaceQuery'
-  | 'marketplaceSearchRequest'
-  | 'setMarketplaceQuery'
-  | 't'
-  | 'selectedRegistryId'
-  | 'setSelectedRegistryId'
-  | 'registries'
-  | 'isLoadingMarketplace'
-  | 'marketplacePlugins'
-  | 'openMarketplacePlugin'
-  | 'registryName'
-  | 'setRegistryName'
-  | 'registryUrl'
-  | 'setRegistryUrl'
-  | 'registryToken'
-  | 'setRegistryToken'
-  | 'addRegistry'
-  | 'isSavingRegistry'
-  | 'testRegistry'
-  | 'testingRegistryId'
-  | 'removeRegistry'
->;
+import type { MarketplaceDetailRequest } from '../types';
+import { usePluginsTranslations } from '../usePluginsTranslations';
+import { RegistryManagement } from './RegistryManagement';
+import { useRegistries } from './useRegistries';
+
+interface Props {
+  query: string;
+  onQueryChange: (query: string) => void;
+  registryId: string;
+  onRegistryIdChange: (registryId: string) => void;
+  plugins: MarketplacePluginDto[];
+  isLoading: boolean;
+  onOpenDetails: (request: MarketplaceDetailRequest) => void;
+}
+
 export function MarketplaceSearchResults({
-  marketplaceQuery,
-  marketplaceSearchRequest,
-  setMarketplaceQuery,
-  t,
-  selectedRegistryId,
-  setSelectedRegistryId,
-  registries,
-  isLoadingMarketplace,
-  marketplacePlugins,
-  openMarketplacePlugin,
-  registryName,
-  setRegistryName,
-  registryUrl,
-  setRegistryUrl,
-  registryToken,
-  setRegistryToken,
-  addRegistry,
-  isSavingRegistry,
-  testRegistry,
-  testingRegistryId,
-  removeRegistry,
+  query,
+  onQueryChange,
+  registryId,
+  onRegistryIdChange,
+  plugins,
+  isLoading,
+  onOpenDetails,
 }: Props) {
+  const { t } = usePluginsTranslations();
+  const { data: registries = [] } = useRegistries();
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2 sm:flex-row">
-        <TextField
-          value={marketplaceQuery}
-          onChange={(value) => {
-            marketplaceSearchRequest.current++;
-            setMarketplaceQuery(value);
-          }}
-          className="w-full"
-        >
+        <TextField value={query} onChange={onQueryChange} className="w-full">
           <Input placeholder={t('marketplace.searchPlaceholder')} aria-label={t('marketplace.search')} />
         </TextField>
         <select
           aria-label={t('marketplace.registry')}
-          value={selectedRegistryId}
-          onChange={(event) => {
-            marketplaceSearchRequest.current++;
-            setSelectedRegistryId(event.target.value);
-          }}
+          value={registryId}
+          onChange={(event) => onRegistryIdChange(event.target.value)}
           className="h-10 rounded-medium border border-divider bg-content1 px-3 text-sm"
         >
           <option value="">{t('marketplace.allRegistries')}</option>
@@ -81,15 +49,13 @@ export function MarketplaceSearchResults({
           ))}
         </select>
       </div>
-      {isLoadingMarketplace ? (
+      {isLoading ? (
         <p role="status" className="text-sm text-muted">
           {t('marketplace.loading')}
         </p>
       ) : null}
       {(['official', 'community'] as const).map((classification) => {
-        const pluginsForClassification = marketplacePlugins.filter(
-          (plugin) => plugin.classification === classification,
-        );
+        const pluginsForClassification = plugins.filter((plugin) => plugin.classification === classification);
         if (pluginsForClassification.length === 0) return null;
         return (
           <div key={classification} className="flex flex-col gap-3">
@@ -100,7 +66,7 @@ export function MarketplaceSearchResults({
                   type="button"
                   key={`${plugin.registry.id}:${plugin.name}`}
                   className={`${cardVariants().base()} h-full cursor-pointer text-left transition-all hover:border-accent hover:shadow-md ${plugin.incompatibilityReason ? 'opacity-75' : ''}`}
-                  onClick={() => void openMarketplacePlugin(plugin)}
+                  onClick={() => onOpenDetails({ name: plugin.name, registryId: plugin.registry.id })}
                 >
                   <Card.Header>
                     <div className="flex w-full items-start justify-between gap-3">
@@ -129,60 +95,12 @@ export function MarketplaceSearchResults({
           </div>
         );
       })}
-      {!isLoadingMarketplace && marketplacePlugins.length === 0 ? (
+      {!isLoading && plugins.length === 0 ? (
         <p role="status" className="text-sm text-muted">
           {t('marketplace.noResults')}
         </p>
       ) : null}
-      <details className="border-t border-divider pt-4">
-        <summary className="cursor-pointer font-medium text-foreground">{t('marketplace.registryManagement')}</summary>
-        <div className="mt-3 flex flex-col gap-3">
-          <div className="grid gap-2 sm:grid-cols-3">
-            <TextField value={registryName} onChange={setRegistryName}>
-              <Input placeholder={t('marketplace.registryName')} aria-label={t('marketplace.registryName')} />
-            </TextField>
-            <TextField value={registryUrl} onChange={setRegistryUrl}>
-              <Input placeholder={t('marketplace.registryUrl')} aria-label={t('marketplace.registryUrl')} />
-            </TextField>
-            <TextField value={registryToken} onChange={setRegistryToken}>
-              <Input
-                type="password"
-                placeholder={t('marketplace.registryToken')}
-                aria-label={t('marketplace.registryToken')}
-              />
-            </TextField>
-          </div>
-          <div>
-            <Button variant="secondary" onPress={() => void addRegistry()} isPending={isSavingRegistry}>
-              {t('marketplace.addRegistry')}
-            </Button>
-          </div>
-          {registries.map((registry) => (
-            <div
-              key={registry.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-medium border border-divider p-3 text-sm"
-            >
-              <span>
-                {registry.name} · {registry.url} ·{' '}
-                {registry.tokenConfigured ? t('marketplace.tokenConfigured') : t('marketplace.noToken')}
-              </span>
-              <span className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onPress={() => void testRegistry(registry.id)}
-                  isPending={testingRegistryId === registry.id}
-                >
-                  {t('marketplace.testRegistry')}
-                </Button>
-                <Button variant="danger-soft" size="sm" onPress={() => void removeRegistry(registry.id)}>
-                  {t('marketplace.removeRegistry')}
-                </Button>
-              </span>
-            </div>
-          ))}
-        </div>
-      </details>
+      <RegistryManagement onRegistryRemoved={(removedId) => registryId === removedId && onRegistryIdChange('')} />
     </div>
   );
 }

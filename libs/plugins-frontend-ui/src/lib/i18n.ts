@@ -104,6 +104,7 @@ interface TranslationState {
   explicitLanguage: Language | undefined;
   setLanguage: (language: Language) => void;
 }
+/** Global language store: the host app and every plugin's useTranslations hook must follow the same active language. */
 export const useTranslationState = create<TranslationState>((set) => ({
   language: 'en',
   explicitLanguage: undefined,

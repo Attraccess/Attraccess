@@ -28,8 +28,8 @@ import { useToastMessage } from '../../../components/toastProvider';
 
 export type FormData = CreateResourceGroupDto | UpdateResourceGroupDto;
 
-export // Define a more specific type for the expected error structure from the API
-interface ApiValidationError {
+// Define a more specific type for the expected error structure from the API
+export interface ApiValidationError {
   errors?: {
     [key: string]: string[];
   };
@@ -43,7 +43,9 @@ export interface Props {
   onUpserted?: (resourceGroup: ResourceGroup) => void;
 }
 
-export function useResourceGroupUpsertModalState(props: Readonly<Props>) {
+// Define a more specific type for the expected error structure from the API
+
+export function ResourceGroupUpsertModal(props: Readonly<Props>) {
   const { isOpen, open, setOpen, close: closeDisclosure } = useOverlayState();
   const { t } = useTranslations({
     en,
@@ -192,42 +194,6 @@ export function useResourceGroupUpsertModalState(props: Readonly<Props>) {
   const getFieldError = (fieldName: keyof FormData) => {
     return apiErrors[fieldName]?.[0];
   };
-  return {
-    isOpen,
-    open,
-    setOpen,
-    closeDisclosure,
-    t,
-    nameInputRef,
-    formData,
-    setFormData,
-    setApiErrors,
-    isEditMode,
-    mutation,
-    handleSubmit,
-    getFieldError,
-    props,
-  };
-}
-
-// Define a more specific type for the expected error structure from the API
-
-export function ResourceGroupUpsertModal(props: Readonly<Props>) {
-  const {
-    isOpen,
-    open,
-    setOpen,
-    closeDisclosure,
-    t,
-    nameInputRef,
-    formData,
-    setFormData,
-    setApiErrors,
-    isEditMode,
-    mutation,
-    handleSubmit,
-    getFieldError,
-  } = useResourceGroupUpsertModalState(props);
 
   return (
     <>

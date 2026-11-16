@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuditEntryDto, AuditMetaDto, AuditSettingsDto } from '@attraccess/react-query-client';
 import { AuditLogSection } from './index';
-import { auditLabel } from './components/AuditLogPanels';
+import { auditLabel } from './components/auditLabel';
 import { humanize } from './audit-log-model';
 import de from './de.json';
 import en from './en.json';

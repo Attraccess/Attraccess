@@ -1,11 +1,12 @@
 import { Tooltip } from '@heroui/react';
 import { HistoryIcon, ShieldCheckIcon, ShieldOffIcon, Trash2Icon } from 'lucide-react';
 import { ResourceIntroducerType, User } from '@attraccess/react-query-client';
-import { Button, TFunction } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PeopleTarget, PersonRow } from './types';
+import en from './en.json';
+import de from './de.json';
 
 interface PeopleRowActionsProps {
-  t: TFunction;
   target: PeopleTarget;
   row: PersonRow;
   canManageIntroducers: boolean;
@@ -22,7 +23,6 @@ interface PeopleRowActionsProps {
 
 export function PeopleRowActions(props: Readonly<PeopleRowActionsProps>) {
   const {
-    t,
     target,
     row,
     canManageIntroducers,
@@ -36,6 +36,7 @@ export function PeopleRowActions(props: Readonly<PeopleRowActionsProps>) {
     onToggleIntroduction,
     onRevokeIntroducer,
   } = props;
+  const { t } = useTranslations({ en, de });
 
   return (
     <div className="flex gap-2 flex-wrap">

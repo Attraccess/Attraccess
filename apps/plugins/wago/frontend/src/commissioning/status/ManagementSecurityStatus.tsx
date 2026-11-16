@@ -1,5 +1,4 @@
-import { AlertStatusIcon } from '@attraccess/plugins-frontend-ui';
-import { Alert, Button, Checkbox, Form, Input, Label, TextField } from '@heroui/react';
+import { Button, Checkbox, Form, Input, Label, TextField } from '@heroui/react';
 import { useEffect, useRef, useState } from 'react';
 import type {
   ManagementException,
@@ -8,6 +7,7 @@ import type {
   SessionCredential,
 } from '../../../../backend/management/model';
 import { useWagoTranslations } from '../../i18n';
+import { ManagementSummary } from './ManagementSummary';
 
 /** Coordinator supplies authenticated API callbacks. Credentials live only in the form/request;
  * this component never caches them, accepts scripts, or makes readiness depend on WBM setup.
@@ -23,66 +23,6 @@ export interface ManagementSecurityStatusProps {
     temporarySsh: SessionCredential;
   }): Promise<ManagementPublicStatus>;
   onRecover(input: { confirm: true; temporarySsh: SessionCredential }): Promise<ManagementPublicStatus>;
-}
-
-export function ManagementSummary({
-  status,
-  recovery,
-}: {
-  status: ManagementPublicStatus | null;
-  recovery: boolean | undefined;
-}) {
-  const { t, tBackendMessage } = useWagoTranslations();
-  return (
-    <>
-      <p role="status">
-        {t(status?.hardened ? 'security.verified' : 'security.notVerified')} ·{' '}
-        {status?.state ? tBackendMessage(status.state) : t('security.inspectionRequired')} ·{' '}
-        {status?.support ? tBackendMessage(status.support) : t('security.qualificationRequired')}
-      </p>
-      <Alert status="warning">
-        <AlertStatusIcon status="warning" />
-        <Alert.Content>
-          <Alert.Description>{t('security.limitations')}</Alert.Description>
-        </Alert.Content>
-      </Alert>
-      {status?.inspection && (
-        <dl>
-          <dt>{t('security.firmware')}</dt>
-          <dd>
-            {tBackendMessage(status.inspection.firmware)} / {tBackendMessage(status.inspection.ssh)} /{' '}
-            {tBackendMessage(status.inspection.serviceControl)}
-          </dd>
-          {status.inspection.ssh === 'dropbear' && (
-            <>
-              <dt>{t('security.peerVersion')}</dt>
-              <dd>{status.inspection.dropbearVersion ?? t('diagnostics.unknown')}</dd>
-            </>
-          )}
-          <dt>{t('security.wbm')}</dt>
-          <dd>{tBackendMessage(status.inspection.wbm)}</dd>
-          <dt>{t('security.otherListeners')}</dt>
-          <dd>{tBackendMessage(status.inspection.otherManagement)}</dd>
-          <dt>{t('security.passwordAccess')}</dt>
-          <dd>
-            {tBackendMessage(status.inspection.passwordAccess)} / {tBackendMessage(status.inspection.defaultAccess)}
-          </dd>
-        </dl>
-      )}
-      <p>{t('security.socketHint')}</p>
-      {status?.keyFingerprint && (
-        <p>
-          {t('security.key')} <code className="wg:break-all">{status.keyFingerprint}</code>
-        </p>
-      )}
-      {status?.failure && (
-        <p role="alert">
-          {t(status.failure === 'rollback_failed' ? 'security.rollbackFailed' : 'security.transitionFailed')}
-        </p>
-      )}
-      {recovery && <p>{t('security.recoveryDescription')}</p>}
-    </>
-  );
 }
 
 export function ManagementSecurityStatus(props: ManagementSecurityStatusProps) {

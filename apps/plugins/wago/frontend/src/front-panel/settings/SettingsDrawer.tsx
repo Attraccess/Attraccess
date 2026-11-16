@@ -4,7 +4,8 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { outputBehavior } from '../../../../channel-behavior';
 import type { ModbusConnection } from '../../../../modbus/model';
-import { Choice, NumericField } from '../../configuration/channels/DigitalChannelEditorFields';
+import { OptionSelect } from '../../configuration/channels/OptionSelect';
+import { NumericField } from '../../configuration/channels/NumericField';
 import { useWagoTranslations } from '../../i18n';
 import type { PanelConfiguration } from '../model';
 import { busConnection, terminalChannel, terminalName, updateBus, updateTerminal, type Terminal } from '../model';
@@ -82,7 +83,7 @@ export function BusSettings({
       }}
     >
       <p className="wg:text-sm wg:text-muted">{t('panel.sharedBus')}</p>
-      <Choice
+      <OptionSelect
         label={t('modbus.baud')}
         value={String(bus.baudRate)}
         onChange={(value) => setBus({ ...bus, baudRate: Number(value) })}
@@ -91,13 +92,13 @@ export function BusSettings({
           label: String(value),
         }))}
       />
-      <Choice
+      <OptionSelect
         label={t('modbus.parity')}
         value={bus.parity}
         onChange={(value) => setBus({ ...bus, parity: value as typeof bus.parity })}
         options={['none', 'even', 'odd'].map((id) => ({ id, label: t(`modbus.options.${id}`) }))}
       />
-      <Choice
+      <OptionSelect
         label={t('modbus.stopBits')}
         value={String(bus.stopBits)}
         onChange={(value) => setBus({ ...bus, stopBits: Number(value) as 1 | 2 })}
@@ -161,7 +162,7 @@ export function TerminalSettings({
         </LabeledSwitch>
       ) : (
         <>
-          <Choice
+          <OptionSelect
             label={t('panel.behavior')}
             value={behavior}
             onChange={setBehavior}
@@ -176,7 +177,7 @@ export function TerminalSettings({
               onChange={setPulseSeconds}
             />
           )}
-          <Choice
+          <OptionSelect
             label={t('panel.disconnect')}
             value={policy}
             onChange={(value) => setPolicy(value as typeof policy)}

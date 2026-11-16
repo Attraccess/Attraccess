@@ -1,10 +1,23 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { getCommissioningVerification, type CommissioningSession } from '../../api/client';
+import {
+  getCommissioningVerification,
+  type CommissioningSession,
+  type CommissioningVerification,
+} from '../../api/client';
 import { useWagoLiveQuery } from '../../api/live-updates';
 
+export interface CommissioningVerificationResult {
+  data: CommissioningVerification | undefined;
+  unavailable: boolean;
+  enrollmentComplete: boolean;
+  runtimeVerified: boolean;
+}
+
 /** Enrollment evidence is independent of configuration and physical qualification. */
-export function useCommissioningVerification(session: Pick<CommissioningSession, 'id' | 'state'>) {
+export function useCommissioningVerification(
+  session: Pick<CommissioningSession, 'id' | 'state'>,
+): CommissioningVerificationResult {
   const enabled = ['awaiting_verification', 'completed'].includes(session.state);
   useWagoLiveQuery(
     ['wago', 'commissioning-verification', session.id],

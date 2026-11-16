@@ -345,7 +345,7 @@ describe('front panel', () => {
     fireEvent.change(await screen.findByRole('textbox', { name: 'Name' }), { target: { value: 'Changed label' } });
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     fireEvent.click(screen.getByRole('button', { name: 'Apply to controller' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Apply configuration?' });
+    const dialog = await screen.findByRole('alertdialog', { name: 'Apply configuration?' });
     expect(within(dialog).getByText(label)).toBeTruthy();
     expect(dialog.textContent).toContain('DO1 · Laser power');
     expect(api.publish).not.toHaveBeenCalled();

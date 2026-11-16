@@ -1,21 +1,24 @@
 import { LabeledSwitch, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
-import type { usePluginsSectionState } from '../state/usePluginSettings';
+import type { InstalledPluginVersionDto } from '@attraccess/react-query-client';
+import { usePluginsTranslations } from '../usePluginsTranslations';
 
-type Props = Pick<
-  ReturnType<typeof usePluginsSectionState>,
-  'selectedVersion' | 't' | 'permissionApproved' | 'setPermissionApproved' | 'majorApproved' | 'setMajorApproved'
->;
+interface Props {
+  selectedVersion: InstalledPluginVersionDto;
+  permissionApproved: boolean;
+  onPermissionApprovedChange: (approved: boolean) => void;
+  majorApproved: boolean;
+  onMajorApprovedChange: (approved: boolean) => void;
+}
 
 export function VersionMetadata({
   selectedVersion,
-  t,
   permissionApproved,
-  setPermissionApproved,
+  onPermissionApprovedChange,
   majorApproved,
-  setMajorApproved,
+  onMajorApprovedChange,
 }: Props) {
+  const { t } = usePluginsTranslations();
   const formatDateTime = useDateTimeFormatter({ showTime: false });
-  if (!selectedVersion) return null;
   return (
     <>
       {selectedVersion.publishedAt ? (
@@ -30,7 +33,7 @@ export function VersionMetadata({
           <input
             type="checkbox"
             checked={permissionApproved}
-            onChange={(event) => setPermissionApproved(event.target.checked)}
+            onChange={(event) => onPermissionApprovedChange(event.target.checked)}
           />
           {t('versionManagement.permissionApproval', {
             permissions: selectedVersion.permissionAdditions.join(', '),
@@ -38,7 +41,7 @@ export function VersionMetadata({
         </label>
       ) : null}
       {selectedVersion.semverImpact === 'major' ? (
-        <LabeledSwitch isSelected={majorApproved} onChange={setMajorApproved}>
+        <LabeledSwitch isSelected={majorApproved} onChange={onMajorApprovedChange}>
           {t('versionManagement.majorApproval')}
         </LabeledSwitch>
       ) : null}

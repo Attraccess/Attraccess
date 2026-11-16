@@ -40,7 +40,7 @@ import { useNow } from '../../../hooks/useNow';
 import de from './de.json';
 import en from './en.json';
 
-export function useAttractapListState() {
+export function AttractapList() {
   const { t } = useTranslations({
     de,
     en,
@@ -136,37 +136,6 @@ export function useAttractapListState() {
     },
     [firmwares],
   );
-  return {
-    t,
-    license,
-    navigate,
-    openedReaderEditor,
-    setOpenedReaderEditor,
-    formatDateTime,
-    staleReaders,
-    activeReaders,
-    firmwareUpdateChip,
-    allReaders,
-    readersToPair,
-    toast,
-  } as const;
-}
-
-export function AttractapList() {
-  const {
-    t,
-    license,
-    navigate,
-    openedReaderEditor,
-    setOpenedReaderEditor,
-    formatDateTime,
-    staleReaders,
-    activeReaders,
-    firmwareUpdateChip,
-    allReaders,
-    readersToPair,
-    toast,
-  } = useAttractapListState();
 
   if (license && !license.modules.includes('attractap')) {
     return null;

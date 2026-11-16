@@ -107,7 +107,9 @@ describe('audit export and filtering', () => {
       subjectTypes: ['resource', 'demo.device'],
       actions: ['resource.updated', 'demo.publication'],
     };
-    expect(pluginDomains(meta)).toEqual([{ id: 'demo', source: 'plugin', labels: { en: 'Demo devices', de: 'Demo-Geräte' } }]);
+    expect(pluginDomains(meta)).toEqual([
+      { id: 'demo', source: 'plugin', labels: { en: 'Demo devices', de: 'Demo-Geräte' } },
+    ]);
     expect(pluginDomains(undefined)).toEqual([]);
     expect(pluginDomainLabel(pluginDomains(meta)[0].labels, 'de')).toBe('Demo-Geräte');
     expect(pluginDomainLabel(pluginDomains(meta)[0].labels, 'en')).toBe('Demo devices');

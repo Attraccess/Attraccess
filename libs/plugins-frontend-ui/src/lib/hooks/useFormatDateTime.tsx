@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { useDateTimeLocale } from './dateTimePreferences';
+import { useDateTimeLocale } from './useDateTimeLocale';
 
 export interface DateTimeOptions {
   showTime?: boolean;

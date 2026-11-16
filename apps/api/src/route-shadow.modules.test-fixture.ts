@@ -3,12 +3,12 @@ import { dirname, resolve } from 'path';
 import { parseControllers } from './route-shadow.controllers.test-fixture';
 import { ControllerInfo, RouteDecl, ShadowReport, shadows } from './route-shadow.paths.test-fixture';
 
-export // ─── Module parsing ───────────────────────────────────────────────────────────
+// ─── Module parsing ───────────────────────────────────────────────────────────
 
 /**
  * Parse a module file's import map (class name → relative path).
  */
-function parseImports(content: string): Map<string, string> {
+export function parseImports(content: string): Map<string, string> {
   const map = new Map<string, string>();
   const re = /import\s*\{([^}]+)\}\s*from\s*['"]([^'"]+)['"]/g;
   let m: RegExpExecArray | null;
@@ -27,11 +27,11 @@ function parseImports(content: string): Map<string, string> {
   }
   return map;
 }
-export /**
+/**
  * Extract controller class names in the order they appear in controllers: [...].
  * Returns an empty array if no controllers array is found.
  */
-function parseControllersArray(content: string): string[] {
+export function parseControllersArray(content: string): string[] {
   // Match `controllers: [` then capture until the matching `]`
   const startIdx = content.search(/\bcontrollers\s*:\s*\[/);
   if (startIdx === -1) return [];
@@ -65,9 +65,9 @@ function parseControllersArray(content: string): string[] {
     )
     .filter((s) => /^[A-Z]\w*$/.test(s));
 }
-export // ─── Shadow detection ─────────────────────────────────────────────────────────
+// ─── Shadow detection ─────────────────────────────────────────────────────────
 
-function detectShadowsInModule(modulePath: string, controllerMap: Map<string, ControllerInfo>): ShadowReport[] {
+export function detectShadowsInModule(modulePath: string, controllerMap: Map<string, ControllerInfo>): ShadowReport[] {
   const content = readFileSync(modulePath, 'utf-8');
   const importMap = parseImports(content);
   const controllerNames = parseControllersArray(content);

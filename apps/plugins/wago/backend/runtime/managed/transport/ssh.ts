@@ -63,8 +63,8 @@ export function managedSshStorageDiagnostics(stderr: string): RuntimeStorageDiag
   return diagnostics;
 }
 
-export /** Bounded process transport; never include subprocess output in errors/logs. */
-async function processOutput(
+/** Bounded process transport; never include subprocess output in errors/logs. */
+export async function processOutput(
   command: string,
   args: string[],
   input: string,

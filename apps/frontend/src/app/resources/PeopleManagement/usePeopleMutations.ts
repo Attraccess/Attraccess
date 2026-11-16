@@ -69,7 +69,8 @@ export function useInvalidatePeopleIntroductions(target: PeopleTarget) {
   );
 }
 
-export function usePeopleMutationsInputs({ target, t }: Params) {
+/** Grant and revoke introducers, maintainers and introductions for a resource or resource group, with toasts. */
+export function usePeopleMutations({ target, t }: Params): PeopleMutations {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   const isResource = target.type === 'resource';
@@ -141,64 +142,45 @@ export function usePeopleMutationsInputs({ target, t }: Params) {
       });
     },
   };
-  return {
-    toast,
-    queryClient,
-    isResource,
-    pendingIntroducer,
-    setPendingIntroducer,
-    pendingIntroductionUserId,
-    setPendingIntroductionUserId,
-    invalidateIntroducers,
-    invalidateIntroductions,
-    grantIntroducerToasts,
-    revokeIntroducerToasts,
-    grantIntroductionToasts,
-    target,
-    t,
-  } as const;
-}
 
-export function usePeopleMutationsRevokeIntroductionToasts(model: ReturnType<typeof usePeopleMutationsInputs>) {
-  const { setPendingIntroducer, isResource, target, setPendingIntroductionUserId } = model;
   const revokeIntroductionToasts = {
     onSuccess: (_data: unknown, variables: { userId: number }) => {
-      model.toast.success({
-        title: model.t('toasts.introductionRevoked.title'),
-        description: model.t('toasts.introductionRevoked.description'),
+      toast.success({
+        title: t('toasts.introductionRevoked.title'),
+        description: t('toasts.introductionRevoked.description'),
       });
-      model.invalidateIntroductions(variables.userId);
+      invalidateIntroductions(variables.userId);
     },
     onError: (err: Error) => {
-      model.toast.error({
-        title: model.t('toasts.introductionRevokeFailed.title'),
-        description: model.t('toasts.introductionRevokeFailed.description', { error: err.message }),
+      toast.error({
+        title: t('toasts.introductionRevokeFailed.title'),
+        description: t('toasts.introductionRevokeFailed.description', { error: err.message }),
       });
     },
   };
 
   const { mutateAsync: grantResourceIntroducerMut, isPending: isGrantingResourceIntroducer } =
-    useAccessControlServiceResourceIntroducersGrant(model.grantIntroducerToasts);
+    useAccessControlServiceResourceIntroducersGrant(grantIntroducerToasts);
   const { mutateAsync: revokeResourceIntroducerMut, isPending: isRevokingResourceIntroducer } =
-    useAccessControlServiceResourceIntroducersRevoke(model.revokeIntroducerToasts);
+    useAccessControlServiceResourceIntroducersRevoke(revokeIntroducerToasts);
   const { mutateAsync: grantResourceIntroductionMut, isPending: isGrantingResourceIntroduction } =
-    useAccessControlServiceResourceIntroductionsGrant(model.grantIntroductionToasts);
+    useAccessControlServiceResourceIntroductionsGrant(grantIntroductionToasts);
   const { mutateAsync: revokeResourceIntroductionMut, isPending: isRevokingResourceIntroduction } =
     useAccessControlServiceResourceIntroductionsRevoke(revokeIntroductionToasts);
 
   const { mutateAsync: grantGroupIntroducerMut, isPending: isGrantingGroupIntroducer } =
-    useAccessControlServiceResourceGroupIntroducersGrant(model.grantIntroducerToasts);
+    useAccessControlServiceResourceGroupIntroducersGrant(grantIntroducerToasts);
   const { mutateAsync: revokeGroupIntroducerMut, isPending: isRevokingGroupIntroducer } =
-    useAccessControlServiceResourceGroupIntroducersRevoke(model.revokeIntroducerToasts);
+    useAccessControlServiceResourceGroupIntroducersRevoke(revokeIntroducerToasts);
   const { mutateAsync: grantGroupIntroductionMut, isPending: isGrantingGroupIntroduction } =
-    useAccessControlServiceResourceGroupIntroductionsGrant(model.grantIntroductionToasts);
+    useAccessControlServiceResourceGroupIntroductionsGrant(grantIntroductionToasts);
   const { mutateAsync: revokeGroupIntroductionMut, isPending: isRevokingGroupIntroduction } =
     useAccessControlServiceResourceGroupIntroductionsRevoke(revokeIntroductionToasts);
 
-  const isGrantingIntroducer = model.isResource ? isGrantingResourceIntroducer : isGrantingGroupIntroducer;
-  const isRevokingIntroducer = model.isResource ? isRevokingResourceIntroducer : isRevokingGroupIntroducer;
-  const isGrantingIntroduction = model.isResource ? isGrantingResourceIntroduction : isGrantingGroupIntroduction;
-  const isRevokingIntroduction = model.isResource ? isRevokingResourceIntroduction : isRevokingGroupIntroduction;
+  const isGrantingIntroducer = isResource ? isGrantingResourceIntroducer : isGrantingGroupIntroducer;
+  const isRevokingIntroducer = isResource ? isRevokingResourceIntroducer : isRevokingGroupIntroducer;
+  const isGrantingIntroduction = isResource ? isGrantingResourceIntroduction : isGrantingGroupIntroduction;
+  const isRevokingIntroduction = isResource ? isRevokingResourceIntroduction : isRevokingGroupIntroduction;
 
   const grantIntroducerRow = useCallback(
     async (userId: number, type: ResourceIntroducerType) => {
@@ -258,45 +240,7 @@ export function usePeopleMutationsRevokeIntroductionToasts(model: ReturnType<typ
     },
     [grantResourceIntroductionMut, grantGroupIntroductionMut, isResource, target.id, setPendingIntroductionUserId],
   );
-  return {
-    ...model,
-    revokeIntroductionToasts,
-    grantResourceIntroducerMut,
-    isGrantingResourceIntroducer,
-    revokeResourceIntroducerMut,
-    isRevokingResourceIntroducer,
-    grantResourceIntroductionMut,
-    isGrantingResourceIntroduction,
-    revokeResourceIntroductionMut,
-    isRevokingResourceIntroduction,
-    grantGroupIntroducerMut,
-    isGrantingGroupIntroducer,
-    revokeGroupIntroducerMut,
-    isRevokingGroupIntroducer,
-    grantGroupIntroductionMut,
-    isGrantingGroupIntroduction,
-    revokeGroupIntroductionMut,
-    isRevokingGroupIntroduction,
-    isGrantingIntroducer,
-    isRevokingIntroducer,
-    isGrantingIntroduction,
-    isRevokingIntroduction,
-    grantIntroducerRow,
-    grantIntroducer,
-    grantMaintainer,
-    revokeIntroducer,
-    grantIntroduction,
-  } as const;
-}
 
-export function usePeopleMutationsOutput(model: ReturnType<typeof usePeopleMutationsRevokeIntroductionToasts>) {
-  const {
-    setPendingIntroductionUserId,
-    isResource,
-    revokeResourceIntroductionMut,
-    target,
-    revokeGroupIntroductionMut,
-  } = model;
   const revokeIntroduction = useCallback(
     async (userId: number, comment?: string) => {
       setPendingIntroductionUserId(userId);
@@ -315,28 +259,17 @@ export function usePeopleMutationsOutput(model: ReturnType<typeof usePeopleMutat
   );
 
   return {
-    grantIntroducer: model.grantIntroducer,
-    grantMaintainer: model.grantMaintainer,
-    revokeIntroducer: model.revokeIntroducer,
-    grantIntroduction: model.grantIntroduction,
+    grantIntroducer,
+    grantMaintainer,
+    revokeIntroducer,
+    grantIntroduction,
     revokeIntroduction,
-    pendingIntroducer: model.pendingIntroducer,
-    pendingIntroductionUserId: model.pendingIntroductionUserId,
-    isGrantingIntroducer: model.isGrantingIntroducer,
-    isRevokingIntroducer: model.isRevokingIntroducer,
-    isGrantingIntroduction: model.isGrantingIntroduction,
-    isRevokingIntroduction: model.isRevokingIntroduction,
-    isMutating:
-      model.isGrantingIntroducer ||
-      model.isRevokingIntroducer ||
-      model.isGrantingIntroduction ||
-      model.isRevokingIntroduction,
+    pendingIntroducer,
+    pendingIntroductionUserId,
+    isGrantingIntroducer,
+    isRevokingIntroducer,
+    isGrantingIntroduction,
+    isRevokingIntroduction,
+    isMutating: isGrantingIntroducer || isRevokingIntroducer || isGrantingIntroduction || isRevokingIntroduction,
   };
-}
-
-export function usePeopleMutations({ target, t }: Params): PeopleMutations {
-  const usePeopleMutationsInputsModel = usePeopleMutationsInputs({ target, t });
-  const usePeopleMutationsRevokeIntroductionToastsModel =
-    usePeopleMutationsRevokeIntroductionToasts(usePeopleMutationsInputsModel);
-  return usePeopleMutationsOutput(usePeopleMutationsRevokeIntroductionToastsModel);
 }

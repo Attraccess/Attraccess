@@ -28,7 +28,7 @@ function nextPollDelay(status: ApiStatusData): number {
   return Math.min(STATUS_POLL_INTERVAL_MS, Math.max(MIN_STATUS_POLL_INTERVAL_MS, rotatesIn + 250));
 }
 
-export function useAttractapSerialConfiguratorApiState({
+export function AttractapSerialConfiguratorApi({
   openDeviceSettings,
   className,
 }: {
@@ -199,70 +199,6 @@ export function useAttractapSerialConfiguratorApiState({
   const handleRefresh = async () => {
     await fetchConfiguration();
   };
-  return {
-    t,
-    isFetchingConfiguration,
-    isUpdatingApi,
-    showManual,
-    setShowManual,
-    status,
-    apiConnectionData,
-    manualHostname,
-    setManualHostname,
-    manualPort,
-    setManualPort,
-    manualUseSSL,
-    setManualUseSSL,
-    apiDataMatchesServer,
-    handleOpenDeviceSettings,
-    pendingCode,
-    approveOpen,
-    setApproveOpen,
-    closeApprove,
-    alertDescription,
-    alertTitle,
-    alertColor,
-    handleApplyCurrentServer,
-    handleManualSubmit,
-    handleRefresh,
-    className,
-  } as const;
-}
-
-export function AttractapSerialConfiguratorApi({
-  openDeviceSettings,
-  className,
-}: {
-  openDeviceSettings: OpenDeviceSettings;
-  className?: string;
-}) {
-  const {
-    t,
-    isFetchingConfiguration,
-    isUpdatingApi,
-    showManual,
-    setShowManual,
-    status,
-    apiConnectionData,
-    manualHostname,
-    setManualHostname,
-    manualPort,
-    setManualPort,
-    manualUseSSL,
-    setManualUseSSL,
-    apiDataMatchesServer,
-    handleOpenDeviceSettings,
-    pendingCode,
-    approveOpen,
-    setApproveOpen,
-    closeApprove,
-    alertDescription,
-    alertTitle,
-    alertColor,
-    handleApplyCurrentServer,
-    handleManualSubmit,
-    handleRefresh,
-  } = useAttractapSerialConfiguratorApiState({ openDeviceSettings, className });
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>

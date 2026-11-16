@@ -29,8 +29,10 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   useMessagingServiceMessagingGetUnreadCount: () => ({ data: { total: 4 } }),
 }));
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ isAuthenticated: true }) }));
-vi.mock('../layout/sidebar/HelpfulLinks', () => ({
+vi.mock('../layout/sidebar/useShowNavItem', () => ({
   useShowNavItem: () => (item: { path: string }) => !state.denied.has(item.path),
+}));
+vi.mock('../layout/sidebar/usePluginSidebarContributions', () => ({
   usePluginSidebarContributions: () => ({ pluginNavItems: state.pluginItems, pluginNavGroups: [] }),
 }));
 

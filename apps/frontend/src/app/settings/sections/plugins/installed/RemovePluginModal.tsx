@@ -1,5 +1,11 @@
 import { Button, LabeledSwitch, StandardModal } from '@attraccess/plugins-frontend-ui';
 import {
+  usePluginsServiceDeletePlugin,
+  usePluginsServiceGetPlugins,
+  usePluginsServicePluginControllerRemovalPlan,
+  usePluginsServicePluginControllerRemovePackageGraph,
+} from '@attraccess/react-query-client';
+import {
   Alert,
   AlertContent,
   AlertDescription,
@@ -9,49 +15,91 @@ import {
   ModalHeader,
   ModalHeading,
 } from '@heroui/react';
-import { dependencyError } from '../dependencies/DependencyPlan';
-import { usePluginsSectionState } from '../state/usePluginSettings';
-type Props = Pick<
-  ReturnType<typeof usePluginsSectionState>,
-  | 'pluginToDelete'
-  | 'setPluginToDelete'
-  | 't'
-  | 'deletingPlugin'
-  | 'deletingNpm'
-  | 'isResolvingRemoval'
-  | 'dependantsToRemove'
-  | 'removeDependantsApproved'
-  | 'setApprovedRemovalPlan'
-  | 'removalApprovalToken'
-  | 'removalPlanError'
-  | 'removeFailure'
-  | 'isDeleting'
-  | 'isRemovingGraph'
-  | 'deleteConfirmedPlugin'
-  | 'removalPlan'
->;
-export function RemovePluginModal({
-  pluginToDelete,
-  setPluginToDelete,
-  t,
-  deletingPlugin,
-  deletingNpm,
-  isResolvingRemoval,
-  dependantsToRemove,
-  removeDependantsApproved,
-  setApprovedRemovalPlan,
-  removalApprovalToken,
-  removalPlanError,
-  removeFailure,
-  isDeleting,
-  isRemovingGraph,
-  deleteConfirmedPlugin,
-  removalPlan,
-}: Props) {
+import { useState } from 'react';
+import { useToastMessage } from '../../../../../components/toastProvider';
+import { dependencyError } from '../dependencies/dependencyError';
+import { usePluginsTranslations } from '../usePluginsTranslations';
+import { useInstalledNpmPlugins } from './useInstalledNpmPlugins';
+
+interface Props {
+  /** The id of the plugin to remove; the dialog is open while this is set. */
+  pluginId: string | null;
+  onClose: () => void;
+}
+
+export function RemovePluginModal({ pluginId, onClose }: Props) {
+  const { t } = usePluginsTranslations();
+  const toast = useToastMessage();
+  const { data: plugins } = usePluginsServiceGetPlugins();
+  const { installedByName } = useInstalledNpmPlugins();
+  const [approvedRemovalPlan, setApprovedRemovalPlan] = useState<string | null>(null);
+  const [removeFailure, setRemoveFailure] = useState<string | null>(null);
+
+  const dismiss = () => {
+    setApprovedRemovalPlan(null);
+    setRemoveFailure(null);
+    onClose();
+  };
+
+  const { mutate: deletePlugin, isPending: isDeleting } = usePluginsServiceDeletePlugin({
+    onSuccess: () => {
+      // The server drops the plugin's bundle from the served asset set, so the running frontend is
+      // holding modules that no longer exist — a reload is the only way back to a consistent app.
+      setTimeout(() => window.location.reload(), 5000);
+      dismiss();
+      toast.success({
+        title: t('success.delete.title'),
+        description: t('success.delete.description'),
+      });
+    },
+    onError: () => {
+      toast.error({ title: t('error.delete.title'), description: t('error.delete.description') });
+    },
+  });
+  const { mutateAsync: removePackageGraph, isPending: isRemovingGraph } =
+    usePluginsServicePluginControllerRemovePackageGraph();
+
+  const deletingPlugin = plugins?.find((plugin) => plugin.id === pluginId);
+  const deletingNpm = Boolean(deletingPlugin && installedByName.has(deletingPlugin.name));
+  const {
+    data: removalPlan,
+    error: removalPlanError,
+    isFetching: isResolvingRemoval,
+  } = usePluginsServicePluginControllerRemovalPlan({ packageName: deletingPlugin?.name ?? '' }, undefined, {
+    enabled: deletingNpm,
+    staleTime: 0,
+    retry: false,
+  });
+  const dependantsToRemove = removalPlan?.filter((plugin) => plugin.name !== deletingPlugin?.name) ?? [];
+  const removalApprovalToken = JSON.stringify(removalPlan?.map(({ name, version }) => ({ name, version })));
+  const removeDependantsApproved = Boolean(removalApprovalToken && approvedRemovalPlan === removalApprovalToken);
+
+  const deleteConfirmedPlugin = async () => {
+    if (!pluginId) return;
+    if (!deletingNpm) {
+      deletePlugin({ pluginId });
+      return;
+    }
+    try {
+      await removePackageGraph({
+        packageName: deletingPlugin.name,
+        requestBody: { approvedDependants: dependantsToRemove.map(({ name }) => name) },
+      });
+      dismiss();
+      toast.success({
+        title: t('success.delete.title'),
+        description: t('success.delete.description'),
+      });
+      setTimeout(() => window.location.reload(), 5000);
+    } catch (error) {
+      setRemoveFailure(dependencyError(error));
+    }
+  };
+
   return (
     <StandardModal
-      isOpen={pluginToDelete !== null}
-      onOpenChange={(open) => !open && setPluginToDelete(null)}
+      isOpen={pluginId !== null}
+      onOpenChange={(open) => !open && dismiss()}
       data-cy="plugins-list-delete-confirmation-modal"
       size="sm"
     >
@@ -104,7 +152,7 @@ export function RemovePluginModal({
               onPress={() => void deleteConfirmedPlugin()}
               isPending={isDeleting || isRemovingGraph}
               isDisabled={
-                Boolean(deletingNpm) &&
+                deletingNpm &&
                 (isResolvingRemoval ||
                   !removalPlan ||
                   Boolean(removalPlanError) ||

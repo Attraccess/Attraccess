@@ -5,6 +5,8 @@ import { SetPasswordForm } from './components/setPasswordForm/index';
 import { ChangeUsernameForm } from './components/changeUsername/index';
 import { ChangeEmailForm } from './components/changeEmail/index';
 import { Chip, Separator, useOverlayState } from '@heroui/react';
+import { EffectivePermissionsSection } from './components/EffectivePermissionsSection';
+import { useSsoProviders } from '../useSsoProviders';
 import {
   AlertTriangleIcon,
   KeyRoundIcon,
@@ -15,16 +17,11 @@ import {
   CreditCardIcon,
 } from 'lucide-react';
 import { FlatSection } from '../../../components/flatSection';
-import { PermissionChipGroups } from '../../../components/permissionList';
 import {
-  useRbacServiceListPermissions,
-  useRbacServiceListRoles,
-  useUsersServiceGetUserRoleAssignments,
   ApiError,
   SSOProvider,
   SSOProviderType,
   User,
-  useAuthenticationServiceGetAllSsoProviders,
   useLicenseServiceGetLicenseInformation,
   useUsersServiceDeleteUser,
   useUsersServiceGetOneUserById,
@@ -39,52 +36,7 @@ import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.d
 import { useAuth } from '../../../hooks/useAuth';
 import { getSsoManagedPermissionKeys, hasConfiguredPermissionMapping } from '@attraccess/shared';
 
-export function EffectivePermissionsSection({
-  userId,
-  t,
-}: {
-  userId: number;
-  t: ReturnType<typeof useTranslations>['t'];
-}) {
-  const { data: allRoles, isLoading: isLoadingRoles } = useRbacServiceListRoles();
-  const { data: allPermissions, isLoading: isLoadingPerms } = useRbacServiceListPermissions();
-  const { data: userRoles, isLoading: isLoadingUserRoles } = useUsersServiceGetUserRoleAssignments({ id: userId });
-
-  const effectivePermKeys = useMemo(() => {
-    if (!allRoles || !userRoles) return new Set<string>();
-    const assignedRoleIds = new Set(userRoles.map((ur) => ur.roleId));
-    const keys = new Set<string>();
-    for (const role of allRoles) {
-      if (!assignedRoleIds.has(role.id)) continue;
-      for (const rp of role.rolePermissions ?? []) {
-        keys.add(rp.permissionKey);
-      }
-    }
-    return keys;
-  }, [allRoles, userRoles]);
-
-  const effectivePermissions = useMemo(
-    () => (allPermissions ?? []).filter((permission) => effectivePermKeys.has(permission.key)),
-    [allPermissions, effectivePermKeys],
-  );
-
-  if (isLoadingRoles || isLoadingPerms || isLoadingUserRoles) {
-    return <p className="text-sm text-default-400">{t('effectivePermissions.loading')}</p>;
-  }
-
-  if (effectivePermKeys.size === 0) {
-    return <p className="text-sm text-default-400">{t('effectivePermissions.empty')}</p>;
-  }
-
-  return (
-    <PermissionChipGroups
-      permissions={effectivePermissions}
-      uncategorizedLabel={t('effectivePermissions.uncategorized')}
-    />
-  );
-}
-
-export function useUserDetailsState({ id, roleIdToAssign }: { id: number; roleIdToAssign?: number }) {
+export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign?: number }) {
   const { t, tExists } = useTranslations({
     en: { ...en, apiErrors: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, apiErrors: API_ERROR_TRANSLATIONS_DE },
@@ -97,9 +49,7 @@ export function useUserDetailsState({ id, roleIdToAssign }: { id: number; roleId
 
   const { data: user } = useUsersServiceGetOneUserById({ id });
   const { data: license } = useLicenseServiceGetLicenseInformation();
-  const { data: ssoProviders } = useAuthenticationServiceGetAllSsoProviders(undefined, {
-    enabled: license?.modules.includes('sso'),
-  });
+  const ssoProviders = useSsoProviders();
 
   const providersById = useMemo(
     () => new Map((ssoProviders ?? []).map((provider: SSOProvider) => [provider.id, provider])),
@@ -198,45 +148,6 @@ export function useUserDetailsState({ id, roleIdToAssign }: { id: number; roleId
       });
     },
   });
-  return {
-    t,
-    navigate,
-    isOpen,
-    open,
-    setOpen,
-    hasPermission,
-    user,
-    license,
-    providersById,
-    ssoDetails,
-    ssoManagedProviders,
-    ssoManagedPermissionKeys,
-    isSelf,
-    deleteUser,
-    isDeleting,
-    id,
-    roleIdToAssign,
-  };
-}
-
-export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign?: number }) {
-  const {
-    t,
-    navigate,
-    isOpen,
-    open,
-    setOpen,
-    hasPermission,
-    user,
-    license,
-    providersById,
-    ssoDetails,
-    ssoManagedProviders,
-    ssoManagedPermissionKeys,
-    isSelf,
-    deleteUser,
-    isDeleting,
-  } = useUserDetailsState({ id, roleIdToAssign });
 
   return (
     <div>
@@ -298,7 +209,7 @@ export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign
             title={t('effectivePermissions.title')}
             data-cy="user-details-effective-permissions-section"
           >
-            <EffectivePermissionsSection userId={id} t={t} />
+            <EffectivePermissionsSection userId={id} />
           </FlatSection>
 
           <FlatSection

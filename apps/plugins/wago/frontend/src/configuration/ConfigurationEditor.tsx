@@ -11,9 +11,15 @@ import { ConfigurationErrors } from './ConfigurationChanges';
 import { ConfigurationSessionContent } from './ConfigurationSessionContent';
 import { ConfigurationSessionForm } from './ConfigurationSessionForm';
 import { ControllerDiagnostics } from '../diagnostics/ControllerDiagnostics';
-import type { ConfigurationEditorMetadata, WagoConfigurationSnapshot } from '../api/client';
+import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
+import type {
+  ConfigurationEditorMetadata,
+  ConfigurationRevisionSnapshot,
+  ConfigurationValidationResult,
+  WagoConfigurationDraft,
+  WagoConfigurationSnapshot,
+} from '../api/client';
 import { useWagoTranslations } from '../i18n';
-import { useConfigurationActions, useConfigurationBaselineQuery, useDraftQuery } from '../api/queries';
 import { useConfigurationSessionState } from './useConfigurationSessionState';
 
 export function ConfigurationToolbar({
@@ -31,8 +37,8 @@ export function ConfigurationToolbar({
 }: {
   snapshot: WagoConfigurationSnapshot;
   dirty: boolean;
-  draft: ReturnType<typeof useDraftQuery>['data'];
-  baseline: ReturnType<typeof useConfigurationBaselineQuery>['data'];
+  draft: WagoConfigurationDraft | null | undefined;
+  baseline: ConfigurationRevisionSnapshot | null | undefined;
   editingDisabled: boolean;
   hasErrors: boolean;
   saving: boolean;
@@ -84,13 +90,13 @@ export function DraftFeedback({
   snapshot,
   metadata,
 }: {
-  draft: ReturnType<typeof useDraftQuery>;
-  baseline: ReturnType<typeof useConfigurationBaselineQuery>;
+  draft: UseQueryResult<WagoConfigurationDraft | null>;
+  baseline: UseQueryResult<ConfigurationRevisionSnapshot | null>;
   draftConflict: boolean;
   reloadSavedDraft: () => void;
   error: string | TranslationMessage | null;
   notice: string | TranslationMessage;
-  validate: ReturnType<typeof useConfigurationActions>['validate'];
+  validate: UseMutationResult<ConfigurationValidationResult, Error, WagoConfigurationSnapshot>;
   snapshot: WagoConfigurationSnapshot;
   metadata: ConfigurationEditorMetadata;
 }) {
@@ -154,7 +160,7 @@ export function LocalDraftReview({
   dirty: boolean;
   hasDraft: boolean;
   disabled: boolean;
-  validate: ReturnType<typeof useConfigurationActions>['validate'];
+  validate: UseMutationResult<ConfigurationValidationResult, Error, WagoConfigurationSnapshot>;
   snapshot: WagoConfigurationSnapshot;
   metadata: ConfigurationEditorMetadata;
   setError: (error: string | null) => void;
@@ -284,23 +290,20 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
       {model.initialized && (
         <>
           <ConfigurationSessionForm
-            {...{
-              saveDraft: model.saveDraft,
-              editingDisabled: model.editingDisabled,
-              t: model.t,
-              section: model.section,
-              focusChannelId: model.focusChannelId,
-              snapshot: model.snapshot,
-              metadata: model.metadata,
-              edit: model.edit,
-              editMetadata: model.editMetadata,
-              setSection: model.setSection,
-              controllerId,
-              setPresetBusy: model.setPresetBusy,
-              setMetadata: model.setMetadata,
-              setFocusChannelId: model.setFocusChannelId,
-              setNotice: model.setNotice,
-            }}
+            saveDraft={model.saveDraft}
+            editingDisabled={model.editingDisabled}
+            section={model.section}
+            focusChannelId={model.focusChannelId}
+            snapshot={model.snapshot}
+            metadata={model.metadata}
+            edit={model.edit}
+            editMetadata={model.editMetadata}
+            setSection={model.setSection}
+            controllerId={controllerId}
+            setPresetBusy={model.setPresetBusy}
+            setMetadata={model.setMetadata}
+            setFocusChannelId={model.setFocusChannelId}
+            setNotice={model.setNotice}
           />
           {model.modbusErrors.length > 0 && (
             <Card>
@@ -329,24 +332,22 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
             />
           </div>
           <ConfigurationSessionContent
-            {...{
-              section: model.section,
-              controllerId,
-              metadata: model.metadata,
-              generation: model.generation,
-              reviewDisabled: model.reviewDisabled,
-              draft: model.draft,
-              setRevisionBusy: model.setRevisionBusy,
-              setInitialized: model.setInitialized,
-              setNotice: model.setNotice,
-              setError: model.setError,
-              loadedDraft: model.loadedDraft,
-              setDraftConflict: model.setDraftConflict,
-              setSnapshot: model.setSnapshot,
-              setMetadata: model.setMetadata,
-              setDirty: model.setDirty,
-              setGeneration: model.setGeneration,
-            }}
+            section={model.section}
+            controllerId={controllerId}
+            metadata={model.metadata}
+            generation={model.generation}
+            reviewDisabled={model.reviewDisabled}
+            draft={model.draft}
+            setRevisionBusy={model.setRevisionBusy}
+            setInitialized={model.setInitialized}
+            setNotice={model.setNotice}
+            setError={model.setError}
+            loadedDraft={model.loadedDraft}
+            setDraftConflict={model.setDraftConflict}
+            setSnapshot={model.setSnapshot}
+            setMetadata={model.setMetadata}
+            setDirty={model.setDirty}
+            setGeneration={model.setGeneration}
           />
         </>
       )}

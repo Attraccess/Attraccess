@@ -1,4 +1,5 @@
-import { Button } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useAppTheme } from '@attraccess/ui';
 import { useParams } from 'react-router-dom';
 import { useCallback, useMemo, useRef } from 'react';
 import type { FlowOwner } from './flowOwner';
@@ -18,12 +19,23 @@ import {
   SaveIcon,
   UploadIcon,
 } from 'lucide-react';
-import { NodeCatalogPanel } from './nodeCatalog';
+import { NodeCatalogHandle, NodeCatalogPanel } from './nodeCatalog';
 import { FlowProvider } from './context/index';
 import { LogViewer } from './logViewer';
 import { VariablesModal } from './variablesModal';
 import { FlowNodeQuerySelection } from './FlowNodeQuerySelection';
-import { useFlowEditor } from './canvas/useFlowEditor';
+import { EdgeWithDeleteButton } from './edgeWithDeleteButton';
+import { useCanvasInteractionMode } from './canvas/useCanvasInteractionMode';
+import { useFlowCanvasData } from './canvas/useFlowCanvasData';
+import { useFlowKeyboardShortcuts } from './canvas/useFlowKeyboardShortcuts';
+import { useFlowLayoutActions } from './canvas/useFlowLayoutActions';
+import { useFlowNodeDrop } from './canvas/useFlowNodeDrop';
+import { useFlowRunFeedback } from './canvas/useFlowRunFeedback';
+import { useFlowContext } from './context/index';
+import de from './de.json';
+import en from './en.json';
+import nodesDeTranslations from './node/de.json';
+import nodesEnTranslations from './node/en.json';
 import { FlowMqttExplorer } from './mqttExplorer';
 import { editorHoldsFlowNodes, useMqttNodeUses } from './mqttExplorer/mqttNodes';
 import { useRememberedOpen } from './mqttExplorer/useRememberedOpen';
@@ -31,10 +43,35 @@ import { useAuth } from '../../../../hooks/useAuth';
 import { MQTT_EXPLORER_PERMISSION } from '../../../mqtt/explorer/permission';
 import { useMqttServiceMqttServersGetAll } from '@attraccess/react-query-client';
 
-// Efficient comparison functions to replace expensive JSON.stringify operations
+const edgeTypes = { 'attraccess-edge': EdgeWithDeleteButton };
 
 function FlowsPageInner() {
-  const model = useFlowEditor();
+  const { owner, nodes, edges, setNodes, onNodesChange, onEdgesChange, onConnect, flowNodeTypes } = useFlowContext();
+  const { resolvedTheme } = useAppTheme();
+  const { t } = useTranslations({ en, de });
+  const { t: tNodeTranslations } = useTranslations({ de: nodesDeTranslations, en: nodesEnTranslations });
+  const mousePosRef = useRef<{ x: number; y: number } | null>(null);
+  const nodeCatalogRef = useRef<NodeCatalogHandle>(null);
+  const {
+    originalFlowData,
+    isFlowError,
+    isFlowLoading,
+    saveFailed,
+    isSaving,
+    flowHasChanged,
+    save,
+    handleExport,
+    handleImportClick,
+  } = useFlowCanvasData();
+  const { layout, addStartNode } = useFlowLayoutActions();
+  const { onDragOver, onDropNode } = useFlowNodeDrop();
+  const { flowIsRunning, confettiEnabled, setConfettiEnabled } = useFlowRunFeedback();
+  const { interactionMode, setInteractionMode, panOnDrag, selectionOnDrag } = useCanvasInteractionMode();
+  useFlowKeyboardShortcuts(mousePosRef);
+  const edgesWithCorrectType = useMemo(
+    () => edges.map((edge) => ({ ...edge, type: edge.type ?? 'attraccess-edge', animated: flowIsRunning })),
+    [edges, flowIsRunning],
+  );
   const { hasPermission } = useAuth();
   const canUseMqttExplorer = hasPermission(MQTT_EXPLORER_PERMISSION);
   const { data: mqttServers } = useMqttServiceMqttServersGetAll(undefined, { enabled: canUseMqttExplorer });
@@ -43,21 +80,21 @@ function FlowsPageInner() {
   // Stable props, so the explorer panel does not re-render on every canvas change (e.g. each drag frame).
   const mqttExplorerToggleRef = useRef<HTMLButtonElement>(null);
   const closeMqttExplorer = useCallback(() => setMqttExplorerOpen(false), [setMqttExplorerOpen]);
-  const mqttNodes = useMqttNodeUses(model.nodes);
+  const mqttNodes = useMqttNodeUses(nodes);
 
   return (
     <div className="h-full w-full flex flex-col">
       <div className="flex flex-row w-full flex-1 min-h-0 rounded-lg overflow-hidden border border-border">
         <NodeCatalogPanel
-          ref={model.nodeCatalogRef}
-          owner={model.owner}
-          onSelect={model.addStartNode}
-          tNodeTranslations={model.tNodeTranslations}
+          ref={nodeCatalogRef}
+          owner={owner}
+          onSelect={addStartNode}
+          tNodeTranslations={tNodeTranslations}
         />
         <div
           className="flex-1 h-full relative"
           onMouseMove={(e) => {
-            model.mousePosRef.current = { x: e.clientX, y: e.clientY };
+            mousePosRef.current = { x: e.clientX, y: e.clientY };
           }}
         >
           <ReactFlow
@@ -69,19 +106,19 @@ function FlowsPageInner() {
               [--xy-controls-button-color:var(--foreground)] [--xy-controls-button-color-hover:var(--foreground)]
               [--xy-controls-button-border-color:var(--border)] [--xy-controls-box-shadow:var(--surface-shadow)]
               [--xy-selection-background-color:var(--accent-soft)] [--xy-selection-border:1px_dotted_var(--accent)]"
-            nodes={model.nodes}
-            edges={model.edgesWithCorrectType}
-            onNodesChange={model.onNodesChange}
-            onEdgesChange={model.onEdgesChange}
-            onConnect={model.onConnect}
-            onDrop={model.onDropNode}
-            onDragOver={model.onDragOver}
-            selectionOnDrag={model.selectionOnDrag}
-            panOnDrag={model.panOnDrag}
+            nodes={nodes}
+            edges={edgesWithCorrectType}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onDrop={onDropNode}
+            onDragOver={onDragOver}
+            selectionOnDrag={selectionOnDrag}
+            panOnDrag={panOnDrag}
             selectionMode={SelectionMode.Partial}
             deleteKeyCode={['Backspace', 'Delete']}
             multiSelectionKeyCode="Shift"
-            colorMode={model.resolvedTheme}
+            colorMode={resolvedTheme}
             fitView
             // ponytail: fixed floor, derive it from the graph bounding box if 0.02 ever bites.
             // React Flow's default minZoom of 0.5 clamps fitView on flows taller than the pane,
@@ -89,72 +126,67 @@ function FlowsPageInner() {
             // nodes - the canvas looks empty even though every node is rendered.
             minZoom={0.02}
             defaultEdgeOptions={{ style: { strokeWidth: 4 } }}
-            nodeTypes={model.flowNodeTypes}
-            edgeTypes={model.edgeTypes}
+            nodeTypes={flowNodeTypes}
+            edgeTypes={edgeTypes}
           >
             <Controls />
-            <FlowNodeQuerySelection key={flowOwnerKey(model.owner)} nodes={model.nodes} setNodes={model.setNodes} />
+            <FlowNodeQuerySelection key={flowOwnerKey(owner)} nodes={nodes} setNodes={setNodes} />
             <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
 
             <Panel position="top-right" className="flex flex-row flex-wrap gap-2">
               <ButtonGroup>
                 <Button
                   isIconOnly
-                  variant={model.interactionMode === 'pan' ? 'primary' : 'ghost'}
-                  onPress={() => model.setInteractionMode('pan')}
-                  aria-label={model.t('actions.modePan')}
-                  aria-pressed={model.interactionMode === 'pan'}
+                  variant={interactionMode === 'pan' ? 'primary' : 'ghost'}
+                  onPress={() => setInteractionMode('pan')}
+                  aria-label={t('actions.modePan')}
+                  aria-pressed={interactionMode === 'pan'}
                 >
                   <HandIcon />
                 </Button>
                 <Button
                   isIconOnly
-                  variant={model.interactionMode === 'select' ? 'primary' : 'ghost'}
-                  onPress={() => model.setInteractionMode('select')}
-                  aria-label={model.t('actions.modeSelect')}
-                  aria-pressed={model.interactionMode === 'select'}
+                  variant={interactionMode === 'select' ? 'primary' : 'ghost'}
+                  onPress={() => setInteractionMode('select')}
+                  aria-label={t('actions.modeSelect')}
+                  aria-pressed={interactionMode === 'select'}
                 >
                   <BoxSelectIcon />
                 </Button>
               </ButtonGroup>
               <Button
                 isIconOnly
-                isPending={model.isSaving}
-                onPress={model.save}
-                isDisabled={!model.flowHasChanged}
-                variant={model.saveFailed ? 'danger-soft' : model.flowHasChanged ? 'primary' : 'secondary'}
+                isPending={isSaving}
+                onPress={save}
+                isDisabled={!flowHasChanged}
+                variant={saveFailed ? 'danger-soft' : flowHasChanged ? 'primary' : 'secondary'}
               >
                 <SaveIcon />
               </Button>
               <Button
                 isIconOnly
-                onPress={model.handleImportClick}
-                aria-label={model.t('actions.import')}
-                isDisabled={model.isFlowLoading}
+                onPress={handleImportClick}
+                aria-label={t('actions.import')}
+                isDisabled={isFlowLoading}
               >
                 <UploadIcon />
               </Button>
-              <Button
-                isIconOnly
-                onPress={model.handleExport}
-                aria-label={model.t('actions.export')}
-                isDisabled={model.isFlowLoading}
-              >
+              <Button isIconOnly onPress={handleExport} aria-label={t('actions.export')} isDisabled={isFlowLoading}>
                 <DownloadIcon />
               </Button>
-              <LogViewer confettiEnabled={model.confettiEnabled} onConfettiEnabledChange={model.setConfettiEnabled}>
+              <LogViewer confettiEnabled={confettiEnabled} onConfettiEnabledChange={setConfettiEnabled}>
                 {(open) => (
-                  <Button isIconOnly onPress={open} aria-label={model.t('actions.logs')}>
+                  <Button isIconOnly onPress={open} aria-label={t('actions.logs')}>
                     <LogsIcon />
                   </Button>
                 )}
               </LogViewer>
 
               {/* Variables are managed through a resource; a global flow has none to open them for. */}
-              {model.owner.kind === 'resource' && (
-                <VariablesModal resourceId={model.owner.resourceId}>
+              {owner.kind === 'resource' && (
+                <VariablesModal resourceId={owner.resourceId}>
                   {(open) => (
-                    <Button isIconOnly onPress={open} aria-label={model.t('actions.variables')}>
+                    <Button isIconOnly onPress={open} aria-label={t('actions.variables')}>
                       <BracesIcon />
                     </Button>
                   )}
@@ -168,7 +200,7 @@ function FlowsPageInner() {
                   // Closed it looks like its neighbours; open it stands out as switched on.
                   variant={mqttExplorerOpen ? 'outline' : undefined}
                   onPress={() => setMqttExplorerOpen(!mqttExplorerOpen)}
-                  aria-label={model.t('actions.mqttExplorer')}
+                  aria-label={t('actions.mqttExplorer')}
                   aria-pressed={mqttExplorerOpen}
                   data-cy="flow-mqtt-explorer-toggle"
                 >
@@ -176,31 +208,31 @@ function FlowsPageInner() {
                 </Button>
               )}
 
-              <Button isIconOnly onPress={model.layout} isDisabled={model.isFlowLoading}>
+              <Button isIconOnly onPress={layout} isDisabled={isFlowLoading}>
                 <LayoutGridIcon />
               </Button>
               <Button
                 isIconOnly
                 variant="primary"
-                onPress={() => model.nodeCatalogRef.current?.open()}
-                aria-label={model.t('actions.addNode')}
+                onPress={() => nodeCatalogRef.current?.open()}
+                aria-label={t('actions.addNode')}
                 className="md:hidden"
-                isDisabled={model.isFlowLoading}
+                isDisabled={isFlowLoading}
               >
                 <PlusIcon />
               </Button>
             </Panel>
           </ReactFlow>
-          {(model.isFlowLoading || (model.isFlowError && !model.originalFlowData)) && (
+          {(isFlowLoading || (isFlowError && !originalFlowData)) && (
             <div
               className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-sm"
-              role={model.isFlowError ? 'alert' : 'status'}
+              role={isFlowError ? 'alert' : 'status'}
               aria-live="polite"
-              aria-label={model.isFlowError ? model.t('loadError') : model.t('loading')}
-              aria-busy={model.isFlowLoading}
+              aria-label={isFlowError ? t('loadError') : t('loading')}
+              aria-busy={isFlowLoading}
             >
-              {model.isFlowError ? (
-                <p className="text-danger text-sm text-center px-4">{model.t('loadError')}</p>
+              {isFlowError ? (
+                <p className="text-danger text-sm text-center px-4">{t('loadError')}</p>
               ) : (
                 <Spinner size="lg" />
               )}
@@ -214,9 +246,9 @@ function FlowsPageInner() {
             mqttNodes={mqttNodes}
             returnFocusRef={mqttExplorerToggleRef}
             nodesReady={editorHoldsFlowNodes({
-              isError: model.isFlowError,
-              loaded: model.originalFlowData,
-              editorNodeCount: model.nodes.length,
+              isError: isFlowError,
+              loaded: originalFlowData,
+              editorNodeCount: nodes.length,
             })}
           />
         )}

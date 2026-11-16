@@ -3,21 +3,32 @@ import { StatusAlert } from '@attraccess/plugins-frontend-ui';
 import { useWagoTranslations } from '../../i18n';
 import { DEFAULT_SSH } from '../model';
 import { canRecover } from '../model';
-import { CredentialFields } from './Steps';
-import type { CommissioningModel } from '../CommissioningModal';
+import type { CommissioningState } from '../useCommissioningState';
+import { CredentialFields } from './CredentialFields';
 
-export function RecoveryFields({ model }: { model: CommissioningModel }) {
+type RecoveryFieldsProps = Pick<
+  CommissioningState,
+  | 'session'
+  | 'isLoading'
+  | 'recoveryUsername'
+  | 'recoveryPassword'
+  | 'setRecoveryUsername'
+  | 'setRecoveryPassword'
+  | 'customRecoverySsh'
+  | 'setCustomRecoverySsh'
+>;
+
+export function RecoveryFields({
+  session,
+  isLoading,
+  recoveryUsername,
+  recoveryPassword,
+  setRecoveryUsername,
+  setRecoveryPassword,
+  customRecoverySsh,
+  setCustomRecoverySsh,
+}: RecoveryFieldsProps) {
   const { t } = useWagoTranslations();
-  const {
-    session,
-    isLoading,
-    recoveryUsername,
-    recoveryPassword,
-    setRecoveryUsername,
-    setRecoveryPassword,
-    customRecoverySsh,
-    setCustomRecoverySsh,
-  } = model;
   return (
     <>
       {session && canRecover(session) && (

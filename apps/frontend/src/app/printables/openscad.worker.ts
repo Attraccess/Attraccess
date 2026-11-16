@@ -37,13 +37,13 @@ export let modulePromise: Promise<WebAssembly.Module> | null = null;
 
 export let assetsPromise: Promise<{ font: Uint8Array; config: string }> | null = null;
 
-export /**
+/**
  * The vendored build is unmodified, so it compiles the 11 MB wasm on every instance and
  * every render needs two instances. Compiling once here and handing the result to each
  * instance via `instantiateWasm` — the one loading hook this build honours — keeps that
  * cost to the first render without patching any GPL-licensed file.
  */
-function load(): Promise<[CreateOpenSCAD, WebAssembly.Module, { font: Uint8Array; config: string }]> {
+export function load(): Promise<[CreateOpenSCAD, WebAssembly.Module, { font: Uint8Array; config: string }]> {
   factoryPromise ??= import(/* @vite-ignore */ `${OPENSCAD_BASE}/openscad.wasm.js`).then(
     (module) => module.default as CreateOpenSCAD,
   );
@@ -61,10 +61,10 @@ function load(): Promise<[CreateOpenSCAD, WebAssembly.Module, { font: Uint8Array
 
 export const FONT_FILE = 'Sansation_Regular.ttf';
 
-export // OpenSCAD is GPL-licensed and deliberately kept at arm's length: it is fetched as an
+// OpenSCAD is GPL-licensed and deliberately kept at arm's length: it is fetched as an
 // unbundled static asset and driven through argv + a virtual filesystem, exactly like the
 // CLI. See apps/frontend/public/openscad/NOTICE.md. Do not import it into the main bundle.
-const OPENSCAD_BASE = '/openscad';
+export const OPENSCAD_BASE = '/openscad';
 
 export const submit = createSerialQueue();
 
@@ -131,12 +131,12 @@ export function renderErrorReason(errors: string[]): string {
   return assertionMessage(errors) ?? NO_OUTPUT_ERROR;
 }
 
-export /**
+/**
  * Renders one part. A fresh instance per call is required: Emscripten tears the runtime
  * down after callMain, so a second call on the same instance throws. Instances stay cheap
  * because `load()` compiles the wasm once and every instance reuses that module.
  */
-async function renderPart(label: string, part: 'body' | 'letters'): Promise<ArrayBuffer> {
+export async function renderPart(label: string, part: 'body' | 'letters'): Promise<ArrayBuffer> {
   const [factory, wasmModule, assets] = await load();
   const errors: string[] = [];
   // Silence stdout: without an explicit `print`, Emscripten's default writes OpenSCAD's

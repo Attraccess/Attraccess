@@ -1,7 +1,7 @@
 // Locale-aware formatting for the RabbitMQ panels. Numbers follow the UI
 // language and dates/times the user's date/time locale preference, through the
 // shared formatters; only the byte/rate unit scaling lives here.
-import { useDateTimeFormatter, useFormatedDuration, useNumberFormatter } from '@attraccess/plugins-frontend-ui';
+import { useDateTimeFormatter, useNumberFormatter } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useMemo } from 'react';
 
 // The one placeholder every panel shows for a value the broker did not report.
@@ -60,10 +60,4 @@ export function useRabbitmqFormatters(): RabbitmqFormatters {
   );
 
   return useMemo(() => ({ number, bytes, rate, dateTime, time }), [number, bytes, rate, dateTime, time]);
-}
-
-// A localized duration (whole minutes) or the missing-value placeholder.
-export function Duration({ ms }: { ms: number | null }) {
-  const formatted = useFormatedDuration(ms == null ? 0 : Math.floor(ms / 60_000));
-  return <>{ms == null ? MISSING_VALUE : formatted}</>;
 }

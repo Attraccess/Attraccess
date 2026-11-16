@@ -59,7 +59,56 @@ export function LoginFormHeader(props: LoginFormProps & { isLocalSignupEnabled: 
   );
 }
 
-export function useLoginFormContentState(props: LoginFormProps & { t: TFunction; tExists: TExists }) {
+export function LoginForm(props: LoginFormProps) {
+  const { data: isLocalSignupEnabled, isLoading } = useUsersServiceIsLocalSignupEnabled();
+
+  const { t, tExists } = useTranslations({
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
+  });
+
+  if (isLoading) {
+    return <Skeleton className="w-full h-10" />;
+  }
+
+  if (isLocalSignupEnabled?.value) {
+    return (
+      <>
+        <LoginFormHeader {...props} isLocalSignupEnabled={isLocalSignupEnabled.value} t={t} />
+        <LoginFormContent {...props} t={t} tExists={tExists} />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <LoginFormHeader {...props} isLocalSignupEnabled={isLocalSignupEnabled?.value ?? false} t={t} />
+      <Accordion variant="default" className="w-full">
+        <AccordionItem className="bg-default-100">
+          <AccordionHeading>
+            <AccordionTrigger>
+              <LogInIcon className="mr-2" />
+              {t('accordion.title')}
+            </AccordionTrigger>
+          </AccordionHeading>
+          <AccordionPanel>
+            <AccordionBody>
+              <LoginFormContent {...props} t={t} tExists={tExists} />
+            </AccordionBody>
+          </AccordionPanel>
+        </AccordionItem>
+      </Accordion>
+    </>
+  );
+}
+
+function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExists }) {
   const { onForgotPassword, t, tExists } = props;
 
   const { mutate: login, isPending, error, reset } = useLogin();
@@ -209,93 +258,10 @@ export function useLoginFormContentState(props: LoginFormProps & { t: TFunction;
 
   const arrowRight = <ArrowRight className="group-hover:translate-x-1 transition-transform" />;
 
-  return {
-    onForgotPassword,
-    t,
-    isPending,
-    formRef,
-    identifier,
-    setIdentifier,
-    passwordValue,
-    setPasswordValue,
-    challengeCredentials,
-    changeCredentials,
-    twoFactorCode,
-    setTwoFactorCode,
-    resendEmail,
-    setResendEmail,
-    resendSuccess,
-    resendError,
-    setResendError,
-    isEmailNotVerified,
-    resendVerification,
-    errorTitle,
-    errorDescription,
-    handleSubmit,
-    arrowRight,
-  } as const;
-}
-export function LoginForm(props: LoginFormProps) {
-  const { data: isLocalSignupEnabled, isLoading } = useUsersServiceIsLocalSignupEnabled();
-
-  const { t, tExists } = useTranslations({
-    en: {
-      ...en,
-      api: API_ERROR_TRANSLATIONS_EN,
-    },
-    de: {
-      ...de,
-      api: API_ERROR_TRANSLATIONS_DE,
-    },
-  });
-
-  if (isLoading) {
-    return <Skeleton className="w-full h-10" />;
-  }
-
-  if (isLocalSignupEnabled?.value) {
-    return (
-      <>
-        <LoginFormHeader {...props} isLocalSignupEnabled={isLocalSignupEnabled.value} t={t} />
-        <LoginFormContent {...props} t={t} tExists={tExists} />
-      </>
-    );
-  }
-
   return (
-    <>
-      <LoginFormHeader {...props} isLocalSignupEnabled={isLocalSignupEnabled?.value ?? false} t={t} />
-      <Accordion variant="default" className="w-full">
-        <AccordionItem className="bg-default-100">
-          <AccordionHeading>
-            <AccordionTrigger>
-              <LogInIcon className="mr-2" />
-              {t('accordion.title')}
-            </AccordionTrigger>
-          </AccordionHeading>
-          <AccordionPanel>
-            <AccordionBody>
-              <LoginFormContent {...props} t={t} tExists={tExists} />
-            </AccordionBody>
-          </AccordionPanel>
-        </AccordionItem>
-      </Accordion>
-    </>
-  );
-}
-
-function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExists }) {
-  const model = useLoginFormContentState(props);
-
-  return (
-    <form ref={model.formRef} className="space-y-6" onSubmit={model.handleSubmit} data-cy="login-form">
-      <TextField
-        value={model.identifier}
-        onChange={model.setIdentifier}
-        isDisabled={model.isPending}
-        isReadOnly={!!model.challengeCredentials}
-      >
-        <Label>{model.t('username')}</Label>
+    <form ref={formRef} className="space-y-6" onSubmit={handleSubmit} data-cy="login-form">
+      <TextField value={identifier} onChange={setIdentifier} isDisabled={isPending} isReadOnly={!!challengeCredentials}>
+        <Label>{t('username')}</Label>
         <Input
           id="username"
           name="username"
@@ -308,81 +274,81 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
       <PasswordInput
         id="password"
         name="password"
-        label={model.t('password')}
-        value={model.passwordValue}
-        onChange={model.setPasswordValue}
+        label={t('password')}
+        value={passwordValue}
+        onChange={setPasswordValue}
         required
-        isDisabled={model.isPending}
-        isReadOnly={!!model.challengeCredentials}
+        isDisabled={isPending}
+        isReadOnly={!!challengeCredentials}
         data-cy="login-form-password-input"
         autoComplete="current-password"
       />
-      {model.challengeCredentials && (
-        <fieldset aria-label={model.t('twoFactorCode')} className="space-y-2">
-          <p>{model.t('twoFactorInstruction')}</p>
+      {challengeCredentials && (
+        <fieldset aria-label={t('twoFactorCode')} className="space-y-2">
+          <p>{t('twoFactorInstruction')}</p>
           <OneTimeCodeInput
-            label={model.t('twoFactorCode')}
+            label={t('twoFactorCode')}
             name="twoFactorCode"
-            value={model.twoFactorCode}
-            onChange={model.setTwoFactorCode}
-            isDisabled={model.isPending}
+            value={twoFactorCode}
+            onChange={setTwoFactorCode}
+            isDisabled={isPending}
             autoFocus
             data-cy="login-form-two-factor-input"
           />
-          <Button variant="secondary" onPress={model.changeCredentials} isDisabled={model.isPending}>
-            {model.t('changeCredentials')}
+          <Button variant="secondary" onPress={changeCredentials} isDisabled={isPending}>
+            {t('changeCredentials')}
           </Button>
         </fieldset>
       )}
       <div className="flex items-center justify-between">
         <Button
           variant="secondary"
-          onPress={model.onForgotPassword}
-          isDisabled={model.isPending}
+          onPress={onForgotPassword}
+          isDisabled={isPending}
           data-cy="login-form-forgot-password-button"
         >
-          {model.t('forgotPassword')}
+          {t('forgotPassword')}
         </Button>
       </div>
       <Button
         variant="primary"
         type="submit"
         className="w-full"
-        isPending={model.isPending}
-        isDisabled={model.isPending || (!!model.challengeCredentials && !/^\d{6}$/.test(model.twoFactorCode))}
+        isPending={isPending}
+        isDisabled={isPending || (!!challengeCredentials && !/^\d{6}$/.test(twoFactorCode))}
         data-cy="login-form-sign-in-button"
       >
-        {model.challengeCredentials ? model.t('verifyCode') : model.t('signInButton')}
-        {model.arrowRight}
+        {challengeCredentials ? t('verifyCode') : t('signInButton')}
+        {arrowRight}
       </Button>
 
-      {model.errorTitle && (
+      {errorTitle && (
         <Alert status="danger" data-cy="login-form-error-alert">
           <AlertContent>
-            <AlertTitle>{model.errorTitle}</AlertTitle>
-            <AlertDescription>{model.errorDescription}</AlertDescription>
+            <AlertTitle>{errorTitle}</AlertTitle>
+            <AlertDescription>{errorDescription}</AlertDescription>
           </AlertContent>
         </Alert>
       )}
 
-      {model.isEmailNotVerified && !model.resendSuccess && (
+      {isEmailNotVerified && !resendSuccess && (
         <div className="space-y-2" data-testid="resend-verification-section">
-          <p className="text-sm text-gray-600 dark:text-gray-400">{model.t('resendVerification.prompt')}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">{t('resendVerification.prompt')}</p>
           <TextField
-            value={model.resendEmail}
+            value={resendEmail}
             onChange={(value) => {
-              model.setResendEmail(value);
-              model.setResendError(null);
+              setResendEmail(value);
+              setResendError(null);
             }}
           >
-            <Label>{model.t('resendVerification.emailLabel')}</Label>
+            <Label>{t('resendVerification.emailLabel')}</Label>
             <Input type="email" data-testid="resend-email-input" />
           </TextField>
-          {model.resendError && (
+          {resendError && (
             <Alert status="danger" data-testid="resend-error-alert">
               <AlertContent>
-                <AlertTitle>{model.resendError.title}</AlertTitle>
-                <AlertDescription>{model.resendError.description}</AlertDescription>
+                <AlertTitle>{resendError.title}</AlertTitle>
+                <AlertDescription>{resendError.description}</AlertDescription>
               </AlertContent>
             </Alert>
           )}
@@ -390,26 +356,26 @@ function LoginFormContent(props: LoginFormProps & { t: TFunction; tExists: TExis
             variant="secondary"
             className="w-full"
             onPress={() => {
-              const trimmed = model.resendEmail.trim();
+              const trimmed = resendEmail.trim();
               if (!isValidEmail(trimmed)) {
                 return;
               }
-              model.resendVerification.mutate({ requestBody: { email: trimmed } });
+              resendVerification.mutate({ requestBody: { email: trimmed } });
             }}
-            isPending={model.resendVerification.isPending}
-            isDisabled={!isValidEmail(model.resendEmail.trim()) || model.resendVerification.isPending}
+            isPending={resendVerification.isPending}
+            isDisabled={!isValidEmail(resendEmail.trim()) || resendVerification.isPending}
             data-testid="resend-verification-button"
           >
-            {model.t('resendVerification.button')}
+            {t('resendVerification.button')}
           </Button>
         </div>
       )}
 
-      {model.resendSuccess && (
+      {resendSuccess && (
         <Alert status="success" data-testid="resend-success-alert">
           <AlertContent>
-            <AlertTitle>{model.t('resendVerification.successTitle')}</AlertTitle>
-            <AlertDescription>{model.t('resendVerification.successMessage')}</AlertDescription>
+            <AlertTitle>{t('resendVerification.successTitle')}</AlertTitle>
+            <AlertDescription>{t('resendVerification.successMessage')}</AlertDescription>
           </AlertContent>
         </Alert>
       )}

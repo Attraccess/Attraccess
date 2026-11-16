@@ -42,7 +42,7 @@ export interface Props {
   role: RoleWithUsageDto | null;
 }
 
-export function useRoleFormDrawerState({ isOpen, onOpenChange, role }: Props) {
+export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
   const { t, tExists } = useTranslations({
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
@@ -136,52 +136,6 @@ export function useRoleFormDrawerState({ isOpen, onOpenChange, role }: Props) {
       updateRole({ id: role.id, requestBody });
     }
   };
-  return {
-    t,
-    permissionLabel,
-    permissionDescription,
-    permissionCategory,
-    isReadOnly,
-    mode,
-    permissions,
-    name,
-    setName,
-    description,
-    setDescription,
-    selectedKeys,
-    permissionsByCategory,
-    nonGrantableKeys,
-    applySelection,
-    close,
-    isSaving,
-    handleSave,
-    isOpen,
-    onOpenChange,
-    role,
-  };
-}
-
-export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
-  const {
-    t,
-    permissionLabel,
-    permissionDescription,
-    permissionCategory,
-    isReadOnly,
-    mode,
-    permissions,
-    name,
-    setName,
-    description,
-    setDescription,
-    selectedKeys,
-    permissionsByCategory,
-    nonGrantableKeys,
-    applySelection,
-    close,
-    isSaving,
-    handleSave,
-  } = useRoleFormDrawerState({ isOpen, onOpenChange, role });
 
   return (
     <StandardDrawer isOpen={isOpen} onOpenChange={onOpenChange}>

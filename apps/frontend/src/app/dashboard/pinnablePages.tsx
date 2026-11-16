@@ -9,7 +9,8 @@ import {
   SidebarItemGroup,
   useSidebarItems,
 } from '../layout/sidebar/navigation';
-import { usePluginSidebarContributions, useShowNavItem } from '../layout/sidebar/HelpfulLinks';
+import { usePluginSidebarContributions } from '../layout/sidebar/usePluginSidebarContributions';
+import { useShowNavItem } from '../layout/sidebar/useShowNavItem';
 import usePluginState from '../plugins/plugin.state';
 import { useAuth } from '../../hooks/useAuth';
 import sidebarDe from '../layout/sidebar.de.json';

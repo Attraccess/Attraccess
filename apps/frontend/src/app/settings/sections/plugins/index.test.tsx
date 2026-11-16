@@ -1,15 +1,15 @@
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 // Register the shared API mocks before loading the component's feature modules.
-import { deferred, hoisted, makePlugin } from './index.test.hoisted';
+import { deferred, hoisted, makePlugin, renderWithQuery } from './index.test.hoisted';
 import { PluginsSection } from './index';
 
 import { describe } from 'vitest';
 describe('PluginsSection', () => {
   it('renders the section heading, install menu and table headers', () => {
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
 
     expect(screen.getByRole('heading', { name: 'Plugins' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Install plugin' })).toBeInTheDocument();
@@ -59,7 +59,7 @@ describe('PluginsSection', () => {
     vi.stubGlobal('fetch', fetchMock);
     hoisted.checkAllInstalledPackagesMock.mockResolvedValue([checked]);
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
 
     await user.click(await screen.findByRole('button', { name: 'Check all now' }));
     expect(await screen.findByText('Plugin updates are available')).toBeInTheDocument();
@@ -108,7 +108,7 @@ describe('PluginsSection', () => {
       },
     ]);
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
 
     await user.click(await screen.findByRole('button', { name: 'Check all now' }));
 
@@ -123,7 +123,7 @@ describe('PluginsSection', () => {
 
   it('renders the official marketplace classification', async () => {
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
     expect(await screen.findByText('Example')).toBeInTheDocument();
@@ -134,7 +134,7 @@ describe('PluginsSection', () => {
 
   it('closes the marketplace with its Cancel button', async () => {
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -148,6 +148,7 @@ describe('PluginsSection', () => {
       'fetch',
       vi.fn((input: { url?: string } | string) => {
         const url = typeof input === 'string' ? input : (input.url ?? '');
+        if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
         if (url.endsWith('/api/plugins/registries'))
           return Promise.resolve({
             ok: true,
@@ -168,13 +169,47 @@ describe('PluginsSection', () => {
         });
       }),
     );
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
     await user.selectOptions(screen.getByLabelText('Registry'), 'private');
     await user.type(screen.getByLabelText('Search plugins'), '@private/plugin');
 
     expect(await screen.findByText('Private plugin')).toBeInTheDocument();
+  });
+
+  it('merges an exact package lookup into the search results without duplicating it', async () => {
+    const user = userEvent.setup();
+    const listed = (name: string) => ({
+      name,
+      version: '1.0.0',
+      displayName: name,
+      permissions: [],
+      registry: { id: 'private', name: 'Private', url: 'https://packages.example.com' },
+      classification: 'community',
+      installable: true,
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: { url?: string } | string) => {
+        const url = typeof input === 'string' ? input : (input.url ?? '');
+        const respond = (data: unknown) => Promise.resolve({ ok: true, json: async () => data });
+        if (url.includes('/api/plugins/installed')) return respond([]);
+        if (url.endsWith('/api/plugins/registries'))
+          return respond([{ id: 'private', name: 'Private', url: 'https://packages.example.com' }]);
+        if (url.includes('/marketplace/search'))
+          return respond({ results: [listed('first'), listed('second')], errors: [] });
+        return respond(listed('first'));
+      }),
+    );
+    renderWithQuery(<PluginsSection />);
+    await openMarketplace(user);
+
+    await user.selectOptions(screen.getByLabelText('Registry'), 'private');
+    await user.type(screen.getByLabelText('Search plugins'), 'first');
+
+    await waitFor(() => expect(screen.getAllByText('second', { selector: 'h3' })).toHaveLength(1));
+    expect(screen.getAllByText('first', { selector: 'h3' })).toHaveLength(1);
   });
 
   it('keeps incompatible marketplace packages visible with their reason', async () => {
@@ -204,7 +239,7 @@ describe('PluginsSection', () => {
       }),
     );
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
     expect(await screen.findByText('Plugin is not compatible with Attraccess 1.0.0')).toBeInTheDocument();
@@ -212,7 +247,7 @@ describe('PluginsSection', () => {
 
   it('requires source and permission acknowledgement before installing', async () => {
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
     await user.click(await screen.findByText('Example'));
@@ -233,12 +268,14 @@ describe('PluginsSection', () => {
     'discards the install acknowledgement when the confirmation is dismissed with the %s',
     async (dismissal) => {
       const user = userEvent.setup();
-      render(<PluginsSection />);
+      renderWithQuery(<PluginsSection />);
       await openMarketplace(user);
       await user.click(await screen.findByText('Example'));
 
       await user.click(screen.getByRole('button', { name: 'Install' }));
-      const dialog = screen.getByRole('heading', { name: 'Install Example?' }).closest('[role="dialog"]') as HTMLElement;
+      const dialog = screen
+        .getByRole('heading', { name: 'Install Example?' })
+        .closest('[role="dialog"]') as HTMLElement;
       await user.click(within(dialog).getByRole('checkbox'));
       expect(within(dialog).getByRole('button', { name: 'Install plugin' })).toBeEnabled();
       if (dismissal === 'Cancel button') await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
@@ -282,7 +319,7 @@ describe('PluginsSection', () => {
       return Promise.resolve({ ok: true });
     });
     vi.stubGlobal('fetch', fetchMock);
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
     await user.selectOptions(screen.getByLabelText('Registry'), 'private');
@@ -309,7 +346,7 @@ describe('PluginsSection', () => {
       body: { message: 'Plugin is not compatible with Attraccess 1.9.0' },
     });
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
     await user.click(await screen.findByText('Example'));
     await user.click(await screen.findByRole('button', { name: 'Install' }));
@@ -342,7 +379,7 @@ describe('PluginsSection', () => {
       }),
     );
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
     await user.click(screen.getByText('Manage registries'));
@@ -369,7 +406,7 @@ describe('PluginsSection', () => {
       }),
     );
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
     await waitFor(() => expect(registryLoads).toBe(1));
@@ -407,7 +444,7 @@ describe('PluginsSection', () => {
       }),
     );
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
     await user.click(screen.getByText('Manage registries'));
@@ -448,7 +485,7 @@ describe('PluginsSection', () => {
       }),
     );
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
     await user.click(screen.getByText('Manage registries'));
@@ -494,7 +531,7 @@ describe('PluginsSection', () => {
       ),
     );
 
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
 
     expect(document.querySelector('[data-cy="plugin-classification-community"]')).toBeInTheDocument();
   });
@@ -502,14 +539,19 @@ describe('PluginsSection', () => {
   it('reports registry search failures alongside partial marketplace results', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({ results: [], errors: ['Could not search Private'] }),
-      }),
+      vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          json: async () =>
+            url.endsWith('/api/plugins/installed') || url.endsWith('/api/plugins/registries')
+              ? []
+              : { results: [], errors: ['Could not search Private'] },
+        }),
+      ),
     );
 
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
     await waitFor(() =>
@@ -545,7 +587,7 @@ describe('PluginsSection', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
     await user.click((await screen.findAllByText('Second'))[1]);
@@ -586,7 +628,7 @@ describe('PluginsSection', () => {
       }),
     );
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
     await user.click(await screen.findByText('Example'));
@@ -637,7 +679,7 @@ describe('PluginsSection', () => {
       }),
     );
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
     await user.type(screen.getByLabelText('Search plugins'), 's');
@@ -680,7 +722,7 @@ describe('PluginsSection', () => {
       }),
     );
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
     await user.click(await screen.findByText('Example'));
@@ -695,7 +737,7 @@ describe('PluginsSection', () => {
   it('shows a plugin load error in a modal', async () => {
     hoisted.plugins = [makePlugin({ status: 'error', error: "Cannot find module '@nestjs/common'" })];
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
 
     expect(screen.getByText('Failed to load')).toBeInTheDocument();
     expect(screen.queryByText("Cannot find module '@nestjs/common'")).not.toBeInTheDocument();
@@ -707,14 +749,14 @@ describe('PluginsSection', () => {
 
   it('warns when plugins are globally disabled', async () => {
     hoisted.pluginSystemStatus = { disabled: true, instanceId: 'original-instance' };
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
 
     expect(await screen.findByText('Plugins are disabled')).toBeInTheDocument();
   });
 
   it('marks a successfully loaded plugin', () => {
     hoisted.plugins = [makePlugin({ status: 'loaded', error: null })];
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
 
     expect(screen.getByText('Loaded')).toBeInTheDocument();
   });
@@ -725,7 +767,7 @@ describe('PluginsSection', () => {
       .mockResolvedValueOnce({ data: { disabled: false, instanceId: 'restarted-instance' } });
     hoisted.plugins = [makePlugin({ status: 'error', error: 'Plugin startup failed' })];
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
 
     await user.click(screen.getByRole('button', { name: 'View load error for Cool Plugin' }));
     await user.click(screen.getByRole('button', { name: 'Retry and restart' }));
@@ -747,7 +789,7 @@ describe('PluginsSection', () => {
       .mockReturnValueOnce(restartStatus.promise);
     hoisted.plugins = [makePlugin({ status: 'error', error: 'Plugin startup failed' })];
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
 
     await user.click(screen.getByRole('button', { name: 'View load error for Cool Plugin' }));
     await user.click(screen.getByRole('button', { name: 'Retry and restart' }));
@@ -763,14 +805,14 @@ describe('PluginsSection', () => {
   });
 
   it('shows the empty state when no plugins are installed', () => {
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
 
     expect(screen.getByText('No entries found')).toBeInTheDocument();
   });
 
   it('renders a row per plugin with name, version, directory and permission chips', () => {
     hoisted.plugins = [makePlugin()];
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
 
     expect(screen.getByText('Cool Plugin')).toBeInTheDocument();
     expect(screen.getByText('1.2.3')).toBeInTheDocument();
@@ -781,7 +823,7 @@ describe('PluginsSection', () => {
 
   it('falls back to a dash for a missing directory and "None requested" for no permissions', () => {
     hoisted.plugins = [makePlugin({ pluginDirectory: '', permissions: [] })];
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
 
     expect(screen.getAllByText('-')).toHaveLength(2);
     expect(screen.getByText('None requested')).toBeInTheDocument();
@@ -789,7 +831,7 @@ describe('PluginsSection', () => {
 
   it('opens the upload drawer when the upload button is pressed', async () => {
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
 
     expect(document.querySelector('[data-cy="upload-plugin-modal"]')).not.toBeInTheDocument();
 
@@ -802,7 +844,7 @@ describe('PluginsSection', () => {
   it('opens the delete confirmation modal when a delete button is pressed', async () => {
     hoisted.plugins = [makePlugin()];
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
 
     await user.click(document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element);
 
@@ -814,7 +856,7 @@ describe('PluginsSection', () => {
   it('calls deletePlugin with the plugin id when deletion is confirmed', async () => {
     hoisted.plugins = [makePlugin()];
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
 
     await user.click(document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element);
     const confirm = await waitFor(() =>
@@ -829,7 +871,7 @@ describe('PluginsSection', () => {
     // The success handler also schedules a full page reload; fake timers keep that out of the test.
     vi.useFakeTimers();
     hoisted.plugins = [makePlugin()];
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
 
     hoisted.deleteOptions?.onSuccess?.();
 
@@ -839,7 +881,7 @@ describe('PluginsSection', () => {
 
   it('shows an error toast when the delete fails', () => {
     hoisted.plugins = [makePlugin()];
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
 
     hoisted.deleteOptions?.onError?.(new Error('boom'));
 
@@ -849,7 +891,7 @@ describe('PluginsSection', () => {
   it('cancels the delete without calling the mutation', async () => {
     hoisted.plugins = [makePlugin()];
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
 
     await user.click(document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element);
     const cancel = await waitFor(() =>
@@ -862,7 +904,7 @@ describe('PluginsSection', () => {
 
   it('renders permission chips scoped to the plugin row', () => {
     hoisted.plugins = [makePlugin({ id: 'p-perms', permissions: ['admin'] })];
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
 
     const container = document.querySelector('[data-cy="plugins-list-permissions-p-perms"]') as HTMLElement;
     expect(container).toBeInTheDocument();

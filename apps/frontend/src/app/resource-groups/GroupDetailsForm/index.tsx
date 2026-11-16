@@ -16,7 +16,11 @@ import en from './translations/en.json';
 import de from './translations/de.json';
 import { useNavigate } from 'react-router-dom';
 
-export function useGroupDetailsFormState(
+export interface GroupDetailsFormProps {
+  groupId: number;
+}
+
+export function GroupDetailsForm(
   props: Readonly<GroupDetailsFormProps & Omit<HTMLAttributes<HTMLDivElement>, 'children'>>,
 ) {
   const { groupId, className, ...rest } = props;
@@ -95,55 +99,6 @@ export function useGroupDetailsFormState(
   }, [deleteGroupMutation, groupId]);
 
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
-  return {
-    className,
-    rest,
-    t,
-    name,
-    setName,
-    description,
-    setDescription,
-    isHidden,
-    setIsHidden,
-    group,
-    isLoading,
-    error,
-    isUpdating,
-    handleSubmit,
-    isDeleting,
-    handleDelete,
-    showDeleteConfirmation,
-    setShowDeleteConfirmation,
-  } as const;
-}
-
-export interface GroupDetailsFormProps {
-  groupId: number;
-}
-
-export function GroupDetailsForm(
-  props: Readonly<GroupDetailsFormProps & Omit<HTMLAttributes<HTMLDivElement>, 'children'>>,
-) {
-  const {
-    className,
-    rest,
-    t,
-    name,
-    setName,
-    description,
-    setDescription,
-    isHidden,
-    setIsHidden,
-    group,
-    isLoading,
-    error,
-    isUpdating,
-    handleSubmit,
-    isDeleting,
-    handleDelete,
-    showDeleteConfirmation,
-    setShowDeleteConfirmation,
-  } = useGroupDetailsFormState(props);
 
   if (isLoading) {
     return (

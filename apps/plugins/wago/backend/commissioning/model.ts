@@ -95,9 +95,9 @@ export class WagoRuntimeUploadError extends Error {
 
 export const VERIFIER_PREFIX = 'encrypted:v1:';
 
-export // The initial supported CC100 commissioning baseline. Operators may pin a more
+// The initial supported CC100 commissioning baseline. Operators may pin a more
 // specific vendor firmware identifier through configuration as it becomes available.
-const configuredFirmwareBaseline = process.env.WAGO_CC100_FIRMWARE_BASELINE?.trim() || '31';
+export const configuredFirmwareBaseline = process.env.WAGO_CC100_FIRMWARE_BASELINE?.trim() || '31';
 
 export const BOOTSTRAP_SSH_OPTIONS = [
   '-F',

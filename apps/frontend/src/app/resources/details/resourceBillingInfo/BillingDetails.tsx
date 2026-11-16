@@ -6,30 +6,29 @@ import {
   NumberFieldIncrementButton,
   NumberFieldInput,
 } from '@heroui/react';
-import { useBillingDetails } from './useBillingDetails';
-type Props = Pick<
-  ReturnType<typeof useBillingDetails>,
-  't' | 'exampleSessionMinutes' | 'setExampleSessionMinutes' | 'setExampleOperatingMinutes' | 'exampleOperatingMinutes'
->;
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import de from './de.json';
+import en from './en.json';
+
+interface BillingDetailsProps {
+  sessionMinutes: number;
+  operatingMinutes: number;
+  onSessionMinutesChange: (minutes: number) => void;
+  onOperatingMinutesChange: (minutes: number) => void;
+}
+
+/** The two number inputs (session and operating duration) of the example cost calculation. */
 export function BillingDetails({
-  t,
-  exampleSessionMinutes,
-  setExampleSessionMinutes,
-  setExampleOperatingMinutes,
-  exampleOperatingMinutes,
-}: Props) {
+  sessionMinutes,
+  operatingMinutes,
+  onSessionMinutesChange,
+  onOperatingMinutesChange,
+}: Readonly<BillingDetailsProps>) {
+  const { t } = useTranslations({ en, de });
   return (
     <dt className="flex flex-col gap-2">
       <span className="font-medium">{t('example.label')}</span>
-      <NumberField
-        value={exampleSessionMinutes}
-        onChange={(value) => {
-          setExampleSessionMinutes(value);
-          setExampleOperatingMinutes((operatingMinutes) => Math.min(operatingMinutes, value));
-        }}
-        minValue={0}
-        defaultValue={10}
-      >
+      <NumberField value={sessionMinutes} onChange={onSessionMinutesChange} minValue={0} defaultValue={10}>
         <Label>{t('example.sessionDuration.label')}</Label>
         <NumberFieldGroup>
           <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
@@ -38,10 +37,10 @@ export function BillingDetails({
         </NumberFieldGroup>
       </NumberField>
       <NumberField
-        value={exampleOperatingMinutes}
-        onChange={(value) => setExampleOperatingMinutes(value)}
+        value={operatingMinutes}
+        onChange={onOperatingMinutesChange}
         minValue={0}
-        maxValue={exampleSessionMinutes}
+        maxValue={sessionMinutes}
         defaultValue={10}
       >
         <Label>{t('example.operatingDuration.label')}</Label>

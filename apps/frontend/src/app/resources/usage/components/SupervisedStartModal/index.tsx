@@ -45,8 +45,8 @@ import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-er
 import en from './translations/en.json';
 import de from './translations/de.json';
 
-export /** The 30s supervisor-approval window, mirrored from the backend. */
-const APPROVAL_TIMEOUT_SECONDS = 30;
+/** The 30s supervisor-approval window, mirrored from the backend. */
+export const APPROVAL_TIMEOUT_SECONDS = 30;
 
 export interface SupervisedStartModalProps {
   isOpen: boolean;
@@ -169,7 +169,7 @@ export function SupervisedStartBody({
   );
 }
 
-export function useSupervisedStartModalState({
+export function SupervisedStartModal({
   isOpen,
   onClose,
   resourceId,
@@ -306,23 +306,6 @@ export function useSupervisedStartModalState({
       handleSelectSupervisor={handleSelectSupervisor}
     />
   );
-  return { t, phase, setPhase, renderBody, isOpen, onClose };
-}
-
-export function SupervisedStartModal({
-  isOpen,
-  onClose,
-  resourceId,
-  requestBody,
-  onApproved,
-}: Readonly<SupervisedStartModalProps>) {
-  const { t, phase, setPhase, renderBody } = useSupervisedStartModalState({
-    isOpen,
-    onClose,
-    resourceId,
-    requestBody,
-    onApproved,
-  });
 
   return (
     <StandardDrawer

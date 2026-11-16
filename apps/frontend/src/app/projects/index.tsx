@@ -64,7 +64,7 @@ export function useInvitationHighlight(hasInvitations: boolean) {
   return { invitationRefs, highlightedInvitationId };
 }
 
-export function useProjectsListPageState() {
+export function ProjectsListPage() {
   const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const page = 1;
   const [includeArchived, setIncludeArchived] = useState(false);
@@ -207,29 +207,6 @@ export function useProjectsListPageState() {
     isLoadingInvitations,
     t,
   ]);
-  return {
-    includeArchived,
-    setIncludeArchived,
-    projects,
-    isLoading,
-    isLoadingInvitations,
-    t,
-    hasInvitations,
-    invitationContent,
-  } as const;
-}
-
-export function ProjectsListPage() {
-  const {
-    includeArchived,
-    setIncludeArchived,
-    projects,
-    isLoading,
-    isLoadingInvitations,
-    t,
-    hasInvitations,
-    invitationContent,
-  } = useProjectsListPageState();
 
   return (
     <div>

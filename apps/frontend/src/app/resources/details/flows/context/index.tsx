@@ -22,121 +22,12 @@ import { FlowContext, type FlowContextType, type LiveLogReceiver } from './flowC
 import nodesDeTranslations from '../node/de.json';
 import nodesEnTranslations from '../node/en.json';
 
-export function useFlowProviderStateOutput(model: ReturnType<typeof useFlowProviderStateInputs>) {
-  const {
-    nodes,
-    edges,
-    setNodes,
-    setEdges,
-    onNodesChange,
-    onEdgesChange,
-    onConnect,
-    updateNodeData,
-    addNode,
-    removeNode,
-    owner,
-    resource,
-    liveLogs,
-    addLiveLogReceiver,
-    removeLiveLogReceiver,
-    flowNodeTypes,
-    validationErrors,
-    setValidationErrors,
-  } = model;
-  const copySelectedNodes = useCallback(async () => {
-    const clipboardData = buildClipboardData(nodes, edges);
-    if (!clipboardData) return;
-    await navigator.clipboard.writeText(JSON.stringify(clipboardData));
-  }, [nodes, edges]);
-
-  const cutSelectedNodes = useCallback(async () => {
-    const clipboardData = buildClipboardData(nodes, edges);
-    if (!clipboardData) return;
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(clipboardData));
-    } catch {
-      return;
-    }
-    const removedIds = new Set(clipboardData.nodes.map((n) => n.id));
-    setNodes((prev) => prev.filter((n) => !removedIds.has(n.id)));
-    setEdges((prev) => prev.filter((e) => !removedIds.has(e.source) && !removedIds.has(e.target)));
-  }, [nodes, edges, setNodes, setEdges]);
-
-  const pasteNodes = useCallback(
-    async (targetFlowPosition?: { x: number; y: number }) => {
-      const text = await navigator.clipboard.readText().catch(() => '');
-      const clipboardData = parseClipboardData(text);
-      if (!clipboardData) return;
-
-      const { nodes: newNodes, edges: newEdges } = buildPastedElements(clipboardData, nanoid, 50, targetFlowPosition);
-      setNodes((prev) => [...prev.map((n) => ({ ...n, selected: false })), ...newNodes]);
-      setEdges((prev) => [...prev, ...newEdges]);
-    },
-    [setNodes, setEdges],
-  );
-
-  const value: FlowContextType = useMemo(
-    () => ({
-      nodes: nodes,
-      edges: edges,
-      onNodesChange: onNodesChange,
-      onEdgesChange: onEdgesChange,
-      onConnect: onConnect,
-      updateNodeData: updateNodeData,
-      addNode: addNode,
-      removeNode: removeNode,
-      setNodes: setNodes,
-      setEdges: setEdges,
-      owner,
-      resourceId: owner.kind === 'resource' ? owner.resourceId : undefined,
-      resourceType: (resource?.type as 'machine' | 'door') ?? 'machine',
-      resourceSeparateUnlockAndUnlatch: Boolean(resource?.separateUnlockAndUnlatch),
-      resourceAllowTakeOver: Boolean(resource?.allowTakeOver),
-      liveLogs: liveLogs ?? [],
-      addLiveLogReceiver: addLiveLogReceiver,
-      removeLiveLogReceiver: removeLiveLogReceiver,
-      flowNodeTypes: flowNodeTypes,
-      copySelectedNodes,
-      cutSelectedNodes,
-      pasteNodes,
-      validationErrors: validationErrors,
-      setValidationErrors: setValidationErrors,
-    }),
-    [
-      nodes,
-      edges,
-      onNodesChange,
-      onEdgesChange,
-      onConnect,
-      updateNodeData,
-      addNode,
-      removeNode,
-      setNodes,
-      setEdges,
-      owner,
-      resource?.type,
-      resource?.separateUnlockAndUnlatch,
-      resource?.allowTakeOver,
-      liveLogs,
-      addLiveLogReceiver,
-      removeLiveLogReceiver,
-      flowNodeTypes,
-      copySelectedNodes,
-      cutSelectedNodes,
-      pasteNodes,
-      validationErrors,
-      setValidationErrors,
-    ],
-  );
-  return { value, children: model.children } as const;
+export interface FlowProviderProps {
+  children: ReactNode;
+  owner: FlowOwner;
 }
 
-export function useFlowProviderState({ children, owner }: FlowProviderProps) {
-  const useFlowProviderStateInputsModel = useFlowProviderStateInputs({ children, owner });
-  return useFlowProviderStateOutput(useFlowProviderStateInputsModel);
-}
-
-export function useFlowProviderStateInputs({ children, owner }: FlowProviderProps) {
+export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [validationErrors, setValidationErrorsState] = useState<Record<string, string>>({});
@@ -242,42 +133,92 @@ export function useFlowProviderStateInputs({ children, owner }: FlowProviderProp
 
     return types;
   }, [nodeSchemas, tNodeTranslations, tNodeExists, validationErrors]);
-  return {
-    nodes,
-    setNodes,
-    edges,
-    setEdges,
-    validationErrors,
-    setValidationErrorsState,
-    resource,
-    tNodeTranslations,
-    tNodeExists,
-    onNodesChange,
-    onEdgesChange,
-    onConnect,
-    updateNodeData,
-    addNode,
-    removeNode,
-    setValidationErrors,
-    liveLogReceivers,
-    publishLiveLog,
-    addLiveLogReceiver,
-    removeLiveLogReceiver,
-    liveLogs,
-    nodeSchemas,
-    flowNodeTypes,
-    children,
-    owner,
-  } as const;
-}
 
-export interface FlowProviderProps {
-  children: ReactNode;
-  owner: FlowOwner;
-}
+  const copySelectedNodes = useCallback(async () => {
+    const clipboardData = buildClipboardData(nodes, edges);
+    if (!clipboardData) return;
+    await navigator.clipboard.writeText(JSON.stringify(clipboardData));
+  }, [nodes, edges]);
 
-export function FlowProvider({ children, owner }: FlowProviderProps) {
-  const { value } = useFlowProviderState({ children, owner });
+  const cutSelectedNodes = useCallback(async () => {
+    const clipboardData = buildClipboardData(nodes, edges);
+    if (!clipboardData) return;
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(clipboardData));
+    } catch {
+      return;
+    }
+    const removedIds = new Set(clipboardData.nodes.map((n) => n.id));
+    setNodes((prev) => prev.filter((n) => !removedIds.has(n.id)));
+    setEdges((prev) => prev.filter((e) => !removedIds.has(e.source) && !removedIds.has(e.target)));
+  }, [nodes, edges, setNodes, setEdges]);
+
+  const pasteNodes = useCallback(
+    async (targetFlowPosition?: { x: number; y: number }) => {
+      const text = await navigator.clipboard.readText().catch(() => '');
+      const clipboardData = parseClipboardData(text);
+      if (!clipboardData) return;
+
+      const { nodes: newNodes, edges: newEdges } = buildPastedElements(clipboardData, nanoid, 50, targetFlowPosition);
+      setNodes((prev) => [...prev.map((n) => ({ ...n, selected: false })), ...newNodes]);
+      setEdges((prev) => [...prev, ...newEdges]);
+    },
+    [setNodes, setEdges],
+  );
+
+  const value: FlowContextType = useMemo(
+    () => ({
+      nodes: nodes,
+      edges: edges,
+      onNodesChange: onNodesChange,
+      onEdgesChange: onEdgesChange,
+      onConnect: onConnect,
+      updateNodeData: updateNodeData,
+      addNode: addNode,
+      removeNode: removeNode,
+      setNodes: setNodes,
+      setEdges: setEdges,
+      owner,
+      resourceId: owner.kind === 'resource' ? owner.resourceId : undefined,
+      resourceType: (resource?.type as 'machine' | 'door') ?? 'machine',
+      resourceSeparateUnlockAndUnlatch: Boolean(resource?.separateUnlockAndUnlatch),
+      resourceAllowTakeOver: Boolean(resource?.allowTakeOver),
+      liveLogs: liveLogs ?? [],
+      addLiveLogReceiver: addLiveLogReceiver,
+      removeLiveLogReceiver: removeLiveLogReceiver,
+      flowNodeTypes: flowNodeTypes,
+      copySelectedNodes,
+      cutSelectedNodes,
+      pasteNodes,
+      validationErrors: validationErrors,
+      setValidationErrors: setValidationErrors,
+    }),
+    [
+      nodes,
+      edges,
+      onNodesChange,
+      onEdgesChange,
+      onConnect,
+      updateNodeData,
+      addNode,
+      removeNode,
+      setNodes,
+      setEdges,
+      owner,
+      resource?.type,
+      resource?.separateUnlockAndUnlatch,
+      resource?.allowTakeOver,
+      liveLogs,
+      addLiveLogReceiver,
+      removeLiveLogReceiver,
+      flowNodeTypes,
+      copySelectedNodes,
+      cutSelectedNodes,
+      pasteNodes,
+      validationErrors,
+      setValidationErrors,
+    ],
+  );
 
   return <FlowContext.Provider value={value}>{children}</FlowContext.Provider>;
 }
