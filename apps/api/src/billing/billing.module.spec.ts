@@ -1,17 +1,14 @@
 import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 import 'reflect-metadata';
 import { Test, TestingModule } from '@nestjs/testing';
-import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
 import { BillingModule } from './billing.module';
 import { BillingController } from './billing.controller';
 import { BillingService } from './charges/billing.service';
-import {
-  BillingTransaction,
-  BillingTransactionItem,
-  ResourceBillingConfiguration,
-  Setting,
-  User,
-} from '@attraccess/database-entities';
+import { BillingPersistenceModule } from '../database/adapters/billing/billing-persistence.module';
+import { BILLING_CONFIGURATION_STORE } from './ports/billing-configuration.port';
+import { BILLING_LEDGER_STORE } from './ports/billing-ledger.port';
+import { UNIT_OF_WORK } from '../database/unit-of-work';
+import { FakeBillingConfigurationStore, FakeBillingLedgerStore, FakeUnitOfWork } from './testing/billing-store.fakes';
 import { SumUpService } from './sumup/sumup.service';
 import { LiveNotificationsService } from './live-notifications/live-notifications.service';
 import { ResourceFlowsExecutorService } from '../resources/flows/execution/resource-flows-executor.service';
@@ -40,14 +37,12 @@ describe('BillingModule', () => {
       expect(providersMeta).toContain(BillingService);
       expect(exportsMeta).toContain(BillingService);
 
-      // Ensure TypeOrmModule.forFeature is registered in imports
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const typeOrmFeature = importsMeta.find((entry: any) => entry?.module === TypeOrmModule);
-      expect(typeOrmFeature).toBeDefined();
+      // The persistence ports come from the adapter module; the feature module itself knows no ORM.
+      expect(importsMeta).toContain(BillingPersistenceModule);
     });
   });
 
-  describe('instantiation with mocked repositories (no real TypeORM)', () => {
+  describe('instantiation with fake ports (no database)', () => {
     let moduleRef: TestingModule;
 
     beforeEach(async () => {
@@ -63,24 +58,9 @@ describe('BillingModule', () => {
           { provide: EventEmitter2, useValue: { emit: jest.fn() } },
           { provide: SumUpService, useValue: {} },
           { provide: EmailService, useValue: { sendResourceUsageBillingSummaryEmail: jest.fn() } },
-          { provide: getRepositoryToken(BillingTransaction), useValue: { findAndCount: jest.fn(), save: jest.fn() } },
-          { provide: getRepositoryToken(User), useValue: { findOneBy: jest.fn() } },
-          {
-            provide: getRepositoryToken(ResourceBillingConfiguration),
-            useValue: { save: jest.fn(), findOneBy: jest.fn(), create: jest.fn() },
-          },
-          {
-            provide: getRepositoryToken(Setting),
-            useValue: { findOneBy: jest.fn(), insert: jest.fn(), update: jest.fn() },
-          },
-          {
-            provide: getRepositoryToken(BillingTransactionItem),
-            useValue: {
-              manager: {
-                transaction: jest.fn(async (cb: (em: unknown) => Promise<unknown>) => cb({})),
-              },
-            },
-          },
+          { provide: BILLING_LEDGER_STORE, useValue: new FakeBillingLedgerStore() },
+          { provide: BILLING_CONFIGURATION_STORE, useValue: new FakeBillingConfigurationStore() },
+          { provide: UNIT_OF_WORK, useValue: new FakeUnitOfWork() },
           {
             provide: ResourceFlowsExecutorService,
             useValue: { runFlow: jest.fn().mockResolvedValue([]) },
@@ -110,9 +90,9 @@ describe('BillingModule', () => {
       expect(moduleRef.get(BillingController)).toBeDefined();
     });
 
-    it('should resolve repository tokens', () => {
-      expect(moduleRef.get(getRepositoryToken(BillingTransaction))).toBeDefined();
-      expect(moduleRef.get(getRepositoryToken(User))).toBeDefined();
+    it('should resolve the billing ports', () => {
+      expect(moduleRef.get(BILLING_LEDGER_STORE)).toBeInstanceOf(FakeBillingLedgerStore);
+      expect(moduleRef.get(BILLING_CONFIGURATION_STORE)).toBeInstanceOf(FakeBillingConfigurationStore);
     });
   });
 });

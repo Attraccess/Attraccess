@@ -1,23 +1,19 @@
-import { BillingTransaction } from '@attraccess/database-entities';
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { BillingTransactionRecord } from '@attraccess/application-models';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { Subject } from 'rxjs';
-import { Repository } from 'typeorm';
+import { BILLING_LEDGER_STORE, BillingLedgerStore } from '../ports/billing-ledger.port';
 
 export const SUMUP_TOPUP_TRANSACTION_PREFIX = 'sumup_topup_transaction';
 
 @Injectable()
 export class LiveNotificationsService {
-  private readonly transactionSubjects: Map<number, Subject<{ data: BillingTransaction }>> = new Map();
+  private readonly transactionSubjects: Map<number, Subject<{ data: BillingTransactionRecord }>> = new Map();
 
-  public constructor(
-    @InjectRepository(BillingTransaction)
-    private readonly billingTransactionRepository: Repository<BillingTransaction>,
-  ) {}
+  public constructor(@Inject(BILLING_LEDGER_STORE) private readonly ledgerStore: BillingLedgerStore) {}
 
-  public getTransactionSubject(userId: number): Subject<{ data: BillingTransaction }> {
+  public getTransactionSubject(userId: number): Subject<{ data: BillingTransactionRecord }> {
     if (!this.transactionSubjects.has(userId)) {
-      this.transactionSubjects.set(userId, new Subject<{ data: BillingTransaction }>());
+      this.transactionSubjects.set(userId, new Subject<{ data: BillingTransactionRecord }>());
     }
     return this.transactionSubjects.get(userId);
   }
@@ -29,13 +25,10 @@ export class LiveNotificationsService {
     }
   }
 
-  public async notifyTransactionUpdate(transactionOrId: BillingTransaction | number): Promise<void> {
+  public async notifyTransactionUpdate(transactionOrId: { id: number } | number): Promise<void> {
     const transactionId = typeof transactionOrId === 'number' ? transactionOrId : transactionOrId.id;
 
-    const transaction = await this.billingTransactionRepository.findOne({
-      where: { id: transactionId },
-      relations: ['items'],
-    });
+    const transaction = await this.ledgerStore.findTransactionWithItems(transactionId);
     if (!transaction) {
       throw new BadRequestException('Transaction not found');
     }

@@ -1,5 +1,6 @@
 import {
   BillingTransaction,
+  BillingTransactionItem,
   Project,
   ProjectInvitation,
   ResourceUsage,
@@ -36,6 +37,9 @@ import { createTransport } from 'nodemailer';
 import { existsSync } from 'node:fs';
 
 import { join } from 'node:path';
+
+/** The user fields a mail is addressed and rendered with. */
+type MailRecipient = Pick<User, 'id' | 'username' | 'email' | 'locale'>;
 
 export const EMAIL_LOGO_CID = 'attraccess-logo';
 
@@ -87,9 +91,9 @@ export class EmailService {
   }
 
   public async sendResourceUsageBillingSummaryEmail(
-    user: User,
-    transaction: BillingTransaction,
-    usage: ResourceUsage,
+    user: MailRecipient & Pick<User, 'creditBalance'>,
+    transaction: Pick<BillingTransaction, 'amount'> & { items?: Omit<BillingTransactionItem, 'billingTransaction'>[] },
+    usage: Pick<ResourceUsage, 'startTime' | 'endTime' | 'billingFactor'> & { resource: Pick<Resource, 'id' | 'name'> },
     currencyMinorUnit: number,
   ) {
     if (!user?.email) {
@@ -512,7 +516,7 @@ export class EmailService {
   }
 
   async sendEmail(
-    user: User,
+    user: MailRecipient,
     templateType: EmailTemplateKey,
     context: Record<string, unknown>,
     manager?: EntityManager,
@@ -536,7 +540,7 @@ export class EmailService {
   }
 
   /** Hands one rendered email to the SMTP transport, with the layout's inline logo attached. */
-  async deliverEmail(user: User, subject: string, html: string, text?: string): Promise<void> {
+  async deliverEmail(user: Pick<User, 'email'>, subject: string, html: string, text?: string): Promise<void> {
     const { transporter, from } = await this.createTransporter();
     await this.externalCallTimer.time('smtp', 'send', () =>
       transporter.sendMail({
@@ -553,7 +557,7 @@ export class EmailService {
     }
   }
 
-  async getBaseContext(user: User) {
+  async getBaseContext(user: MailRecipient) {
     const url = await this.settingsService.getUrl();
     if (!url) {
       throw new Error('Application URL not configured');

@@ -1,111 +1,66 @@
-import { billingTransactionAuditEvent } from '../../audit/policies/billing';
-import { BillingTransaction, User, ResourceBillingConfiguration, Setting } from '@attraccess/database-entities';
-import { BillingTransactionStatus } from '@attraccess/application-models';
-
+import {
+  BillingTransactionDetail,
+  BillingTransactionPage,
+  BillingTransactionRecord,
+  BillingTransactionStatus,
+  ResourceBillingConfigurationRecord,
+} from '@attraccess/application-models';
 import { BadRequestException } from '@nestjs/common';
-
-import { EntityManager, Repository } from 'typeorm';
-
-import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
-
-import { PaginationOptions } from '../../types/request';
-
-import { RefundTransactionDto } from '../dto/refund-transaction.dto';
-
-import { TransactionsDto } from '../dto/transactions.dto';
-
-import { BillingTransactionNotFoundException } from '../errors/billing-transaction-not-found.error';
-
-import { InsufficientBalanceError } from '../errors/insufficient-balance.error';
-
-import { RefundAmountHigherThanTransactionAmountException } from '../errors/refund-amount-higher-than-transaction-amount.error';
-
-import { BillingConfigurationDto } from '../dto/configuration.dto';
-
-import { Currency, SetBillingConfigurationDto } from '../dto/set-configuration.dto';
-
-import { UpdateResourceBillingConfigurationDto } from '../dto/update-resource-billing-configuration.dto';
-
-import { ResourceBillingConfigurationNotFoundException } from '../errors/resource-billing-configuration-not-found.error';
-
-import { ResourceBillingConfigurationChangedEvent } from '../events/resource-billing-configuration-changed.event';
-
 import { EventEmitter2 } from '@nestjs/event-emitter';
-
+import { billingTransactionAuditEvent } from '../../audit/policies/billing';
 import { AuditRecorder } from '../../audit/recorder/audit-event';
-
+import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { MetricsService } from '../../metrics/metrics.service';
-
+import { PaginationOptions } from '../../types/request';
+import { BillingConfigurationDto } from '../dto/configuration.dto';
+import { RefundTransactionDto } from '../dto/refund-transaction.dto';
+import { Currency, SetBillingConfigurationDto } from '../dto/set-configuration.dto';
+import { UpdateResourceBillingConfigurationDto } from '../dto/update-resource-billing-configuration.dto';
+import { BillingTransactionNotFoundException } from '../errors/billing-transaction-not-found.error';
+import { InsufficientBalanceError } from '../errors/insufficient-balance.error';
+import { RefundAmountHigherThanTransactionAmountException } from '../errors/refund-amount-higher-than-transaction-amount.error';
+import { ResourceBillingConfigurationNotFoundException } from '../errors/resource-billing-configuration-not-found.error';
+import { ResourceBillingConfigurationChangedEvent } from '../events/resource-billing-configuration-changed.event';
 import { LiveNotificationsService } from '../live-notifications/live-notifications.service';
+import { BillingConfigurationStore } from '../ports/billing-configuration.port';
+import { BillingLedgerStore, BillingTransactionContext } from '../ports/billing-ledger.port';
 
 /** Balances, transaction history, manual and refund transactions, and the billing configuration. */
 export class BillingLedger {
-  private readonly DEFAULT_RELATIONS = ['initiator', 'resourceUsage', 'resourceUsage.resource', 'refundOf', 'items'];
-
   constructor(
-    private readonly settingRepository: Repository<Setting>,
-    private readonly userRepository: Repository<User>,
-    private readonly billingTransactionRepository: Repository<BillingTransaction>,
+    private readonly ledgerStore: BillingLedgerStore,
+    private readonly configurationStore: BillingConfigurationStore,
     private readonly liveNotificationsService: LiveNotificationsService,
     private readonly auditService: AuditRecorder,
     private readonly metricsService: MetricsService,
-    private readonly resourceBillingConfigurationRepository: Repository<ResourceBillingConfiguration>,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  async getBalance(userId: number, transactionalEntityManager?: EntityManager): Promise<number> {
-    const userRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(User)
-      : this.userRepository;
-
-    const user = await userRepository.findOneBy({ id: userId });
-    if (!user) {
+  async getBalance(userId: number, context?: BillingTransactionContext): Promise<number> {
+    const balance = await this.ledgerStore.getBalance(userId, context);
+    if (balance === null) {
       throw new UserNotFoundException(userId);
     }
 
-    return user.creditBalance;
+    return balance;
   }
 
   async getTransactionIdForUsage(usageId: number, userId: number): Promise<number | null> {
-    const transaction = await this.billingTransactionRepository.findOne({
-      where: { resourceUsageId: usageId, userId },
-      select: ['id'],
-    });
-    return transaction?.id ?? null;
+    return this.ledgerStore.findTransactionIdForUsage(usageId, userId);
   }
 
-  async getHistory(userId: number, options: PaginationOptions): Promise<TransactionsDto> {
+  async getHistory(userId: number, options: PaginationOptions): Promise<BillingTransactionPage> {
     const { page, limit } = options;
-
-    const [transactions, total] = await this.billingTransactionRepository.findAndCount({
-      where: { userId },
-      skip: (page - 1) * limit,
-      take: limit,
-      relations: this.DEFAULT_RELATIONS,
-      order: { createdAt: 'DESC', id: 'DESC' },
-    });
-
-    return {
-      data: transactions,
-      total,
-      page,
-      limit,
-    };
+    const { transactions, total } = await this.ledgerStore.listTransactionsForUser(userId, { page, limit });
+    return { data: transactions, total, page, limit };
   }
 
-  async getTransaction(transactionId: number, userId?: number): Promise<BillingTransaction> {
-    return await this.billingTransactionRepository.findOne({
-      where: { id: transactionId, userId },
-      relations: this.DEFAULT_RELATIONS,
-    });
+  async getTransaction(transactionId: number, userId?: number): Promise<BillingTransactionDetail | null> {
+    return this.ledgerStore.findTransactionDetail(transactionId, userId);
   }
 
-  async getResourceUsageCharge(resourceUsageId: number, userId: number): Promise<BillingTransaction | null> {
-    return this.billingTransactionRepository.findOneBy({
-      resourceUsageId,
-      userId,
-      status: BillingTransactionStatus.Completed,
-    });
+  async getResourceUsageCharge(resourceUsageId: number, userId: number): Promise<BillingTransactionRecord | null> {
+    return this.ledgerStore.findCompletedUsageCharge(resourceUsageId, userId);
   }
 
   async createManualTransaction(
@@ -113,9 +68,9 @@ export class BillingLedger {
     initiatorId: number,
     amount: number,
     failOnInsufficientBalance = true,
-  ): Promise<BillingTransaction> {
-    const user = await this.userRepository.findOneBy({ id: userId });
-    if (!user) {
+  ): Promise<BillingTransactionRecord> {
+    const currentBalance = await this.ledgerStore.getBalance(userId);
+    if (currentBalance === null) {
       throw new UserNotFoundException(userId);
     }
 
@@ -123,15 +78,13 @@ export class BillingLedger {
       throw new BadRequestException('Amount must be an integer (multiply by currency minor unit)');
     }
 
-    const currentBalance = user.creditBalance;
-
     const amountIsNegative = amount < 0;
 
     if (amountIsNegative && failOnInsufficientBalance && currentBalance + amount < 0) {
       throw new InsufficientBalanceError();
     }
 
-    const transaction = await this.billingTransactionRepository.save({
+    const transaction = await this.ledgerStore.insertTransaction({
       userId,
       initiatorId,
       amount,
@@ -157,7 +110,11 @@ export class BillingLedger {
     return transaction;
   }
 
-  public async refundTransaction(executingUserId: number, transactionId: number, data: RefundTransactionDto) {
+  public async refundTransaction(
+    executingUserId: number,
+    transactionId: number,
+    data: RefundTransactionDto,
+  ): Promise<BillingTransactionDetail | null> {
     const transaction = await this.getTransaction(transactionId);
 
     if (!transaction) {
@@ -174,13 +131,13 @@ export class BillingLedger {
 
     const refundAmount = transaction.amount > 0 ? -data.amount : data.amount;
 
-    const refundTransaction = await this.billingTransactionRepository.save({
+    const refundTransaction = await this.ledgerStore.insertTransaction({
       userId: transaction.userId,
       initiatorId: executingUserId,
       amount: refundAmount,
       status: BillingTransactionStatus.Completed,
       refundOfId: transaction.id,
-    } as Partial<BillingTransaction>);
+    });
 
     this.liveNotificationsService.notifyTransactionUpdate(refundTransaction);
     void this.auditService.record(
@@ -202,34 +159,16 @@ export class BillingLedger {
       throw new BadRequestException('Invalid currency');
     }
 
-    const existingCurrency = await this.settingRepository.findOneBy({
-      parent: 'billing',
-      key: 'currency',
-    });
-
-    if (existingCurrency) {
-      await this.settingRepository.update(existingCurrency.id, {
-        value: nextConfigurationData.currency,
-      });
-    } else {
-      await this.settingRepository.insert({
-        parent: 'billing',
-        key: 'currency',
-        value: nextConfigurationData.currency,
-      });
-    }
+    await this.configurationStore.saveCurrency(nextConfigurationData.currency);
 
     return await this.getConfiguration();
   }
 
   public async getConfiguration(): Promise<BillingConfigurationDto> {
-    const currency = await this.settingRepository.findOneBy({
-      parent: 'billing',
-      key: 'currency',
-    });
+    const storedCurrency = await this.configurationStore.getCurrency();
     let currencyValue = Currency.EUR;
-    if (currency) {
-      currencyValue = (currency.value as Currency) ?? Currency.EUR;
+    if (storedCurrency !== null) {
+      currencyValue = (storedCurrency as Currency) ?? Currency.EUR;
     }
 
     let minorUnit: number;
@@ -252,33 +191,24 @@ export class BillingLedger {
 
   public async getResourceBillingConfiguration(
     resourceId: number,
-    transactionManager?: EntityManager,
-  ): Promise<ResourceBillingConfiguration> {
-    const repository = transactionManager
-      ? transactionManager.getRepository(ResourceBillingConfiguration)
-      : this.resourceBillingConfigurationRepository;
-
-    let configuration = await repository.findOneBy({ resourceId });
-    if (!configuration) {
-      configuration = repository.create({
-        resourceId,
-        creditsPerUsage: 0,
-        creditsPerMinute: 0,
-        creditsPerOperatingMinute: 0,
-      });
-      configuration = await repository.save(configuration);
-    }
-    return configuration;
+    context?: BillingTransactionContext,
+  ): Promise<ResourceBillingConfigurationRecord> {
+    return this.configurationStore.getOrCreateResourceConfiguration(resourceId, context);
   }
 
   public async updateResourceBillingConfiguration(
     resourceId: number,
     data: UpdateResourceBillingConfigurationDto,
-  ): Promise<ResourceBillingConfiguration> {
-    const configuration = await this.resourceBillingConfigurationRepository.findOneBy({ resourceId });
+  ): Promise<ResourceBillingConfigurationRecord> {
+    const configuration = await this.configurationStore.findResourceConfiguration(resourceId);
     if (!configuration) {
       throw new ResourceBillingConfigurationNotFoundException(resourceId);
     }
+    const rates = {
+      creditsPerUsage: configuration.creditsPerUsage,
+      creditsPerMinute: configuration.creditsPerMinute,
+      creditsPerOperatingMinute: configuration.creditsPerOperatingMinute,
+    };
 
     if (data.creditsPerMinute === null) {
       data.creditsPerMinute = 0;
@@ -287,7 +217,7 @@ export class BillingLedger {
       if (data.creditsPerMinute < 0) {
         throw new BadRequestException('Credits per minute cannot be negative');
       }
-      configuration.creditsPerMinute = data.creditsPerMinute;
+      rates.creditsPerMinute = data.creditsPerMinute;
     }
 
     if (data.creditsPerOperatingMinute === null) {
@@ -297,7 +227,7 @@ export class BillingLedger {
       if (data.creditsPerOperatingMinute < 0) {
         throw new BadRequestException('Credits per operating minute cannot be negative');
       }
-      configuration.creditsPerOperatingMinute = data.creditsPerOperatingMinute;
+      rates.creditsPerOperatingMinute = data.creditsPerOperatingMinute;
     }
 
     if (data.creditsPerUsage === null) {
@@ -307,7 +237,7 @@ export class BillingLedger {
       if (data.creditsPerUsage < 0) {
         throw new BadRequestException('Credits per usage cannot be negative');
       }
-      configuration.creditsPerUsage = data.creditsPerUsage;
+      rates.creditsPerUsage = data.creditsPerUsage;
     }
 
     if (data.creditsPerUsage !== undefined && data.creditsPerUsage % 1 !== 0) {
@@ -323,7 +253,7 @@ export class BillingLedger {
       );
     }
 
-    const savedConfiguration = await this.resourceBillingConfigurationRepository.save(configuration);
+    const savedConfiguration = await this.configurationStore.saveResourceRates(resourceId, rates);
     this.eventEmitter.emit(
       ResourceBillingConfigurationChangedEvent.EVENT_NAME,
       new ResourceBillingConfigurationChangedEvent(resourceId),

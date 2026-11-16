@@ -271,17 +271,18 @@ describe('audit recorded by the owning services, without the HTTP layer', () => 
 
   it('billing: a manual transaction records the deterministic billing operation', async () => {
     const billing = new BillingService(
-      { save: async (value: object) => ({ ...value, id: 11 }) } as never,
-      { findOneBy: async () => ({ id: 5, creditBalance: 100 }) } as never,
+      {
+        getBalance: async () => 100,
+        insertTransaction: async (value: object) => ({ ...value, id: 11 }),
+      } as never,
       {} as never,
       { notifyTransactionUpdate: jest.fn() } as never,
       {} as never,
       {} as never,
       {} as never,
-      {} as never,
-      {} as never,
       { billingTransactionsTotal: { inc: jest.fn() }, billingTransactionAmount: { observe: jest.fn() } } as never,
       fixture.service,
+      {} as never,
     );
 
     await billing.createManualTransaction(5, 42, 25);

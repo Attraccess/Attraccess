@@ -19,6 +19,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource, EntityManager } from 'typeorm';
 import { BillingService } from '../billing/charges/billing.service';
+import { TransactionContextResolver } from '../database/adapters/transaction-context';
+import { TypeOrmBillingConfigurationStore } from '../database/adapters/billing/typeorm-billing-configuration.store';
+import { TypeOrmBillingLedgerStore } from '../database/adapters/billing/typeorm-billing-ledger.store';
+import { createSqliteUnitOfWork } from '../database/sqlite/sqlite-unit-of-work';
 import * as migrations from '../database/migrations';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { SSOService } from '../users-and-auth/auth/sso/sso.service';
@@ -101,18 +105,27 @@ describe('audit recorded by an owning service inside its transaction', () => {
         startTime: new Date('2026-11-13T09:00:00.000Z'),
         lifecyclePending: true,
       });
+      const unitOfWork = createSqliteUnitOfWork(source);
+      const contexts = new TransactionContextResolver(source, unitOfWork);
       billing = new BillingService(
-        source.getRepository(BillingTransaction),
-        source.getRepository(User),
-        source.getRepository(ResourceBillingConfiguration),
+        new TypeOrmBillingLedgerStore(
+          source.getRepository(BillingTransaction),
+          source.getRepository(User),
+          audit,
+          contexts,
+        ),
+        new TypeOrmBillingConfigurationStore(
+          source.getRepository(Setting),
+          source.getRepository(ResourceBillingConfiguration),
+          contexts,
+        ),
         {} as never,
-        source.getRepository(Setting),
-        source.getRepository(BillingTransactionItem),
         { getNodes: async () => [] } as never,
         {} as never,
         new EventEmitter2(),
         {} as never,
         audit,
+        unitOfWork,
       );
     });
 

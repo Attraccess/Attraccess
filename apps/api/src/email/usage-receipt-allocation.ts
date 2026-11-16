@@ -75,7 +75,7 @@ export function receiptFormatters(locale: string): {
 
 /** Receipt fields for a charge that is a share of a machine used by several people at once. */
 export function describeAllocation(
-  item: BillingTransactionItem,
+  item: Pick<BillingTransactionItem, 'allocation' | 'meterQuantity' | 'durationMs'>,
   secondsFormatter: Intl.NumberFormat,
   minorUnit: number,
   formatRange: SegmentRangeFormatter,

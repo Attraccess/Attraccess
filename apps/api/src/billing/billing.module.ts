@@ -1,12 +1,4 @@
-import {
-  BillingTransaction,
-  ResourceBillingConfiguration,
-  Setting,
-  User,
-  BillingTransactionItem,
-} from '@attraccess/database-entities';
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { BillingController } from './billing.controller';
 import { BillingService } from './charges/billing.service';
 import { SumUpService } from './sumup/sumup.service';
@@ -17,10 +9,11 @@ import { SettingsModule } from '../settings/settings.module';
 import { LicenseModule } from '../license/license.module';
 import { LiveTopicsModule } from '../live-updates/live-topics.module';
 import { BillingLiveTopicsProvider } from './live-notifications/billing-live-topics.provider';
+import { BillingPersistenceModule } from '../database/adapters/billing/billing-persistence.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([BillingTransaction, User, ResourceBillingConfiguration, Setting, BillingTransactionItem]),
+    BillingPersistenceModule,
     ResourceFlowsModule,
     EmailModule,
     SettingsModule,
