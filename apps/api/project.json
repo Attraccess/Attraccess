@@ -238,7 +238,7 @@
     "build-migration-datasource": {
       "executor": "@nx/webpack:webpack",
       "cache": true,
-      "inputs": ["typeorm", "{projectRoot}/src/config/storage-path.ts"],
+      "inputs": ["typeorm", "{projectRoot}/src/config/storage-path.ts", "{projectRoot}/migration-tracks.cjs", { "env": "DATABASE_TYPE" }],
       "outputs": ["{options.outputPath}"],
       "options": {
         "outputPath": "dist/apps/migrations",

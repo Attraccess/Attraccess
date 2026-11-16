@@ -1,9 +1,9 @@
+import { sqliteProvider } from './lib/database-provider.mjs';
+
 /** Validate direct seed/import writes before committing; never repair them implicitly. */
-export async function assertUsageIntegrity(db) {
-  const all = (sql) =>
-    new Promise((resolve, reject) => db.all(sql, (error, rows) => (error ? reject(error) : resolve(rows))));
-  const tables = await all("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'resource_usage'");
-  if (tables.length === 0) return;
+export async function assertUsageIntegrity(db, provider = sqliteProvider) {
+  const all = (sql) => provider.all(db, sql);
+  if (!(await provider.hasTable(db, 'resource_usage'))) return;
   const invalid = await all(`SELECT id FROM resource_usage
     WHERE endTime IS NULL AND isFinalized = 0 AND lifecyclePending = 0`);
   const duplicate = await all(`SELECT resourceId FROM resource_usage

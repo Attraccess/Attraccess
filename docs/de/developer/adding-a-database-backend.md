@@ -17,9 +17,12 @@ dass es funktioniert.
    Nutzungsdauer-Ausdruck, den SQLite mit `julianday` berechnet), Indizes, Teilindizes, Constraints und Trigger oder
    Entsprechungen für Guthabenpflege und Nutzungsintegrität.
 4. **Migrationsspur anlegen.** SQLite-Migrationen laufen nicht auf einer anderen Engine. Eine neue geordnete Spur
-   (`MigrationTrack`) mit eigener Migrationstabelle anlegen. Veröffentlichte SQLite-Migrationen werden nie geändert.
-5. **Seeds und Werkzeuge anbinden**: Dev-Seed, `scripts/setup-dev-dependencies.sh` samt Worktree-Bootstrap,
-   Migrations-Nx-Targets und Test-Datenbankfabriken nutzen das gewählte Backend.
+   (`MigrationTrack`) mit eigener Migrationstabelle anlegen und ihr Verzeichnis in `apps/api/migration-tracks.cjs`
+   eintragen, das die Spur für den Migrations-Build nach `DATABASE_TYPE` wählt. Veröffentlichte SQLite-Migrationen
+   werden nie geändert.
+5. **Seeds und Werkzeuge anbinden**: einen Provider in `apps/api/scripts/lib/database-provider.mjs` ergänzen (Dev-Seed,
+   `reencrypt-card-keys`), `scripts/check-database-type.sh` und die Migrations-Nx-Targets weiter nach `DATABASE_TYPE`
+   wählen lassen und `apps/api/src/test-utils/test-database.ts` die neue Engine öffnen lassen.
 6. **Persistenz-Ports liefern.** Für jeden Bereich auf der Baseline einen anwendungseigenen Port und einen Adapter
    einführen, dann `scripts/persistence-boundaries.baseline.json` senken. Adapter teilen TypeORM-Code bei gleichem
    Verhalten und isolieren echte Unterschiede.
@@ -47,8 +50,15 @@ Ein Transfer oder Restore muss, egal mit welchem Werkzeug, erhalten:
 - **Abgeleitete Daten:** Guthaben und Nutzungsinvarianten werden nach dem Import mit den Integritätsprüfungen der Engine
   kontrolliert; Trigger oder Entsprechungen dürfen beim Import nicht doppelt wirken.
 
-SQLite-Conformance für diesen Vertrag: Neuinstallation, Upgrade aus älteren Migrationsständen und der unveränderte
-Tabellenname der Migrationsspur sind getestet; der Engine-übergreifende Transferbefehl selbst gehört nicht zu dieser Arbeit.
+SQLite-Conformance für diesen Vertrag: Neuinstallation, Upgrade aus älteren Migrationsständen mit Daten und der
+unveränderte Tabellenname der Migrationsspur sind getestet (`apps/api/src/e2e/migrations`). Der Vertrag selbst ist ein
+neutraler Snapshot (`database/transfer-snapshot.ts`: Tabellen, gespeicherte Spalten in neutralen Arten, Zeitpunkte als
+ISO-8601 UTC, Ganzzahlen über 2^53 und Dezimaltext exakt, Sequenzen, Kern- und Plugin-Migrationsstand), den ein Backend
+über `DatabaseBackend.transfer` exportiert und importiert. `describeTransferConformance` (`database/conformance`,
+ausgeführt von `api:test-conformance`) prüft ihn je Backend: stabile IDs und Beziehungen, Zeitpunkte, exakte Geld- und
+Zählerwerte, Plugin-Tabellen und Plugin-Migrationsstand, Kern-Migrationsstand, nicht doppelt angewendete abgeleitete
+Guthaben und einen atomaren Restore, der einen Snapshot für einen anderen Migrationsstand ablehnt. Ein Backend ergänzt
+eine `TransferBackendFixture`. Der Engine-übergreifende Transferbefehl selbst gehört nicht zu dieser Arbeit.
 
 ## Verbleibende ATT-584-Lieferungen
 

@@ -1,9 +1,18 @@
 const { NxAppWebpackPlugin } = require('@nx/webpack/app-plugin');
 const { join } = require('path');
 const glob = require('glob');
+const { existsSync, readFileSync } = require('fs');
+const { parseEnv } = require('util');
+const { resolveMigrationTrack } = require('./migration-tracks.cjs');
 
-// Get all migration files
-const migrationFiles = glob.sync('apps/api/src/database/migrations/**/*.ts');
+// The typeorm CLI reads DATABASE_TYPE from the environment or the root .env; the build selects the track the same way.
+const dotenvPath = join(__dirname, '../../.env');
+const dotenvValues = existsSync(dotenvPath) ? parseEnv(readFileSync(dotenvPath, 'utf8')) : {};
+// An unsupported DATABASE_TYPE fails here, before webpack compiles anything.
+const track = resolveMigrationTrack({ ...dotenvValues, ...process.env });
+
+// Get all migration files of the selected backend's track
+const migrationFiles = glob.sync(`${track.directory}/**/*.ts`);
 const migrationEntries = migrationFiles.reduce((acc, file) => {
   const key = './' + file.replace('apps/api/src/database/', '');
   acc[key] = file;
@@ -14,8 +23,8 @@ module.exports = {
   output: {
     path: join(__dirname, '../../dist/apps/migrations'),
     library: {
-      type: 'commonjs2'
-    }
+      type: 'commonjs2',
+    },
   },
   plugins: [
     new NxAppWebpackPlugin({
@@ -29,15 +38,15 @@ module.exports = {
       outputHashing: 'none',
       generatePackageJson: true,
       deleteOutputPath: true,
-    })
+    }),
   ],
   externals: {
     typeorm: 'commonjs typeorm',
     tslib: 'commonjs tslib',
-    zod: 'commonjs zod'
+    zod: 'commonjs zod',
   },
   entry: {
     main: './apps/api/src/database/datasource.ts',
-    ...migrationEntries
-  }
+    ...migrationEntries,
+  },
 };

@@ -5,41 +5,22 @@
 import { existsSync, realpathSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import sqlite3pkg from 'sqlite3';
 import { assertUsageIntegrity } from './usage-integrity.mjs';
 import bcrypt from 'bcrypt';
 import { loadEnvFile } from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { resolveDatabasePath, resolveStorageRoot } from '../src/config/storage-path.ts';
+import { resolveStorageRoot } from '../src/config/storage-path.ts';
+import { resolveDatabaseProvider, sqliteProvider } from './lib/database-provider.mjs';
 
-export function run(db, sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function callback(error) {
-      if (error) reject(error);
-      else resolve(this);
-    });
-  });
-}
+// The provider main() selects through DATABASE_TYPE; the helpers below delegate to it.
+let provider = sqliteProvider;
 
-export function get(db, sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (error, row) => (error ? reject(error) : resolve(row)));
-  });
-}
-
-export function all(db, sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (error, rows) => (error ? reject(error) : resolve(rows)));
-  });
-}
-
-export async function hasTable(db, table) {
-  return Boolean(await get(db, "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", [table]));
-}
-
-export async function getColumns(db, table) {
-  return (await all(db, `PRAGMA table_info("${table}")`)).map((row) => row.name);
-}
+// Statement helpers come from the selected database provider (scripts/lib/database-provider.mjs).
+export const run = (db, sql, params = []) => provider.run(db, sql, params);
+export const get = (db, sql, params = []) => provider.get(db, sql, params);
+export const all = (db, sql, params = []) => provider.all(db, sql, params);
+export const hasTable = (db, table) => provider.hasTable(db, table);
+export const getColumns = (db, table) => provider.columns(db, table);
 
 export async function upsertAdmin(db, { username, email, password }) {
   const userColumns = await getColumns(db, 'user');
@@ -249,8 +230,6 @@ export async function applyRoles(db, entries) {
   }
 }
 
-const sqlite3 = sqlite3pkg.verbose();
-
 function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i++) {
@@ -275,10 +254,12 @@ export async function main(
   repoRoot = path.resolve(repoRoot);
   const envFile = path.join(repoRoot, '.env');
   if (existsSync(envFile)) loadEnvFile(envFile);
+  // Selecting the provider validates DATABASE_TYPE before any path is resolved or database opened.
+  provider = resolveDatabaseProvider(process.env);
   const args = parseArgs(argv);
   const storageDir = resolveStorageRoot(process.env, repoRoot);
   const requestedPath = args.db || process.env.SEED_DB_PATH;
-  const dbPath = requestedPath ? path.resolve(requestedPath) : resolveDatabasePath(process.env, repoRoot);
+  const dbPath = requestedPath ? path.resolve(requestedPath) : provider.defaultLocation(process.env, repoRoot);
   const isLocal = within(repoRoot, storageDir) && within(storageDir, dbPath);
   if (!isLocal && !args['allow-external-db']) {
     throw new Error(
@@ -295,12 +276,14 @@ export async function main(
   }
 
   const username = String(args.username || 'admin').toLowerCase();
-  const email = String(args.email || 'admin@local').trim().toLowerCase();
+  const email = String(args.email || 'admin@local')
+    .trim()
+    .toLowerCase();
   const password = String(args.password || 'password');
   const fixture = args.fixture ? loadFixture(path.resolve(String(args.fixture))) : null;
-  const db = new sqlite3.Database(dbPath);
+  const db = await provider.open(dbPath);
   try {
-    await run(db, 'BEGIN');
+    await provider.begin(db);
     const rbacTables = ['role', 'permission', 'role_permission', 'user_role'];
     if (!(await Promise.all(rbacTables.map((table) => hasTable(db, table)))).every(Boolean)) {
       throw new Error('RBAC tables are missing - start the API with the latest migrations before seeding');
@@ -313,7 +296,7 @@ export async function main(
     }
     if (fixture) await applyFixture(db, fixture);
     await assertUsageIntegrity(db);
-    await run(db, 'COMMIT');
+    await provider.commit(db);
     console.log(`Seeded local admin user id=${userId}`);
     console.log(`  username: ${username}`);
     console.log('  password: supplied via command arguments or the documented development default');
@@ -321,10 +304,10 @@ export async function main(
     if (args.demo) console.log('  demo fixture: applied');
     if (fixture) console.log(`  fixture: applied from ${args.fixture}`);
   } catch (error) {
-    await run(db, 'ROLLBACK');
+    await provider.rollback(db);
     throw error;
   } finally {
-    db.close();
+    await provider.close(db);
   }
 }
 

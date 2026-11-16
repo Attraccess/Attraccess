@@ -28,7 +28,6 @@ import {
   Session,
   User,
   UserRole,
-  entities,
 } from '@attraccess/database-entities';
 import { SSOProviderType } from '@attraccess/application-models';
 import type { ConfigService } from '@nestjs/config';
@@ -37,8 +36,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { promises as fs } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import type { Repository } from 'typeorm';
-import { DataSource } from 'typeorm';
+import type { DataSource, Repository } from 'typeorm';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import type { AppConfigType } from '../../../config/app.config';
 import type { EmailService } from '../../../email/email.service';
 import { TokenHashService } from '../../../encryption/token-hash.service';
@@ -118,13 +117,7 @@ beforeAll(async () => {
   const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'att-sso-saml-e2e-'));
   process.env.AUTH_SESSION_SECRET = 'sso-saml-e2e-test-secret-must-be-long';
 
-  dataSource = new DataSource({
-    type: 'sqlite',
-    database: path.join(tmpRoot, 'attraccess.sqlite'),
-    entities: Object.values(entities),
-    synchronize: true,
-  });
-  await dataSource.initialize();
+  dataSource = await createTestDataSource({ location: path.join(tmpRoot, 'attraccess.sqlite'), synchronize: true });
 
   // ── Build real services backed by SQLite ────────────────────────────────────
   userRepo = dataSource.getRepository(User);
@@ -209,7 +202,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (dataSource?.isInitialized) {
-    await dataSource.destroy();
+    await closeTestDataSource(dataSource);
   }
 });
 export function registerSsoSamlStrategyValidateIntegrationE2eFixture() {

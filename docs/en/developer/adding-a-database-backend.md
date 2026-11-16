@@ -16,9 +16,11 @@ contract has to change. PostgreSQL (ATT-584) is the first intended target; nothi
    duration expression that SQLite computes with `julianday`), indexes, partial indexes, constraints and triggers or
    their equivalent for balance maintenance and usage integrity.
 4. **Add a migration track.** Do not run SQLite migrations on another engine. Create a new ordered track
-   (`MigrationTrack`) with its own migrations table. Released SQLite migrations are never changed.
-5. **Wire seeding and tooling** to the selected backend: the dev seed, `scripts/setup-dev-dependencies.sh` and its
-   worktree bootstrap, the migration Nx targets and the test database factories.
+   (`MigrationTrack`) with its own migrations table and register its directory in `apps/api/migration-tracks.cjs`, which
+   selects the track for the migration build by `DATABASE_TYPE`. Released SQLite migrations are never changed.
+5. **Wire seeding and tooling** to the selected backend: add a provider to `apps/api/scripts/lib/database-provider.mjs`
+   (dev seed, `reencrypt-card-keys`), keep `scripts/check-database-type.sh` and the migration Nx targets selecting by
+   `DATABASE_TYPE`, and let `apps/api/src/test-utils/test-database.ts` open the new engine.
 6. **Provide persistence ports.** For each feature area still on the baseline, introduce an application-owned port and an
    adapter, then lower `scripts/persistence-boundaries.baseline.json`. Adapters share TypeORM code where behaviour is
    identical and isolate real differences.
@@ -46,8 +48,15 @@ A transfer or restore, whatever its tooling, must preserve:
 - **Derived data:** balances and usage invariants are checked after import by running the engine's integrity checks;
   triggers or equivalent must not double-apply during import.
 
-SQLite conformance for this contract: a fresh install, an upgrade from older migration states and the migration track's
-unchanged table name are tested; the cross-engine transfer command itself is not part of this work.
+SQLite conformance for this contract: a fresh install, an upgrade from older migration states with data and the
+migration track's unchanged table name are tested (`apps/api/src/e2e/migrations`). The contract itself is a neutral
+snapshot (`database/transfer-snapshot.ts`: tables, stored columns in neutral kinds, instants as ISO-8601 UTC, integers
+beyond 2^53 and decimal text exactly, sequences, core and plugin migration state) that a backend exports and imports
+through `DatabaseBackend.transfer`. `describeTransferConformance` (`database/conformance`, run by `api:test-conformance`)
+checks it per backend: stable ids and relationships, instants, exact monetary and meter values, plugin tables and
+plugin migration state, core migration state, derived balances not applied twice, and an atomic restore that refuses a
+snapshot written for another migration state. A backend adds a `TransferBackendFixture`. The cross-engine transfer
+command itself is not part of this work.
 
 ## Remaining ATT-584 deliverables
 

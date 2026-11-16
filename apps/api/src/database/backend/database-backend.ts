@@ -1,5 +1,6 @@
 import type { DataSource, DataSourceOptions } from 'typeorm';
 import type { PersistenceErrorClassifier } from '../persistence-errors';
+import type { DatabaseTransfer } from '../transfer-snapshot';
 
 /** Backends the application can run on. A new backend is added here, in resolveDatabaseBackend and in its adapter. */
 export const SUPPORTED_DATABASE_TYPES = ['sqlite'] as const;
@@ -13,6 +14,8 @@ export const DEFAULT_DATABASE_TYPE: DatabaseType = 'sqlite';
 export interface MigrationTrack {
   readonly name: string;
   readonly tableName: string;
+  /** Repository path of the track's migration files; apps/api/migration-tracks.cjs selects the same one for the build. */
+  readonly directory: string;
   /** The migration index module exports classes plus a few helper constants; TypeORM ignores the non-classes. */
   readonly migrations: readonly unknown[];
 }
@@ -33,6 +36,8 @@ export interface DatabaseBackend {
   /** Opens a connection with the engine's connection rules (busy handling, flow ownership, PRAGMAs). */
   createDataSource(options: DataSourceOptions): DataSource;
   readonly errors: PersistenceErrorClassifier;
+  /** Neutral export and import of the whole database for backup, restore and engine transfer. */
+  readonly transfer: DatabaseTransfer;
   /** Releases connections the backend opened beside the given application DataSource. */
   shutdown(source: DataSource): Promise<void>;
 }

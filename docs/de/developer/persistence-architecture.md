@@ -94,3 +94,43 @@ Maßgeblich ist die aktuelle Liste in `scripts/persistence-boundaries.baseline.j
 HTTP- und WebSocket-Antworten behalten ihre Form. Gibt ein Service keine ORM-Entities mehr zurück, mappt er explizit
 auf ein DTO. Swagger und AsyncAPI werden mit `api:export-swagger` und `api:export-asyncapi` erzeugt und verglichen;
 generierte Clients werden nicht eingecheckt.
+
+### Vertrag zweier Commits vergleichen
+
+`node scripts/compare-api-contracts.mjs <base.json> <head.json>` vergleicht zwei erzeugte `swagger.json`- oder
+`asyncapi.json`-Dateien und zeigt nur, was ein Client bemerken könnte: Pfade und Methoden, Parameter, Request- und
+Response-Bodies, Schemas, Properties, Pflichtfelder, Enum-Werte, Typen und `$ref`s. Beschreibungen, Beispiele, Titel,
+Tags, Server, Dokumentversion und Schlüsselreihenfolge werden ignoriert. Jeder Unterschied ist `breaking` (etwas
+entfernt oder strenger), `changed` (Review wert) oder `added`; `--json` gibt die Daten aus und `--fail-on-breaking`
+setzt den Exit-Status auf 1, wenn etwas bricht.
+
+Beide Dateien auf den zu vergleichenden Commits erzeugen und außerhalb des Repositorys ablegen (erzeugte Verträge
+werden nie eingecheckt):
+
+```bash
+pnpm nx run api:export-swagger     # dist/apps/api-swagger/swagger.json
+pnpm nx run api:export-asyncapi    # dist/apps/api/asyncapi.json
+node scripts/compare-api-contracts.mjs /tmp/base/swagger.json dist/apps/api-swagger/swagger.json
+```
+
+Ein leerer Bericht heißt: Das Refactoring hat den HTTP- und WebSocket-Vertrag nicht verändert.
+
+### Werkzeuge folgen dem gewählten Backend
+
+Alles, was eine Datenbank öffnet, läuft über `DATABASE_TYPE`; ein nicht unterstützter Wert stoppt es, bevor etwas
+angelegt oder geändert wird:
+
+- Die Migrations-Datasource (`database/datasource.ts`) nutzt die Migrationsspur des Backends.
+  `apps/api/migration-tracks.cjs` ordnet jedem Datenbanktyp sein Spurverzeichnis für den Migrations-Build
+  (`api:build-migration-datasource`) zu, sodass `api:migrations-run`, `api:migration-generate` und
+  `api:migration-revert` die Spur des gewählten Backends bauen und ausführen. Ein zweites Backend trägt dort sein
+  Verzeichnis und seinen `MigrationTrack` ein.
+- Der Dev-Seed (`api:seed-dev`) und `reencrypt-card-keys` nutzen einen Datenbank-Provider
+  (`apps/api/scripts/lib/database-provider.mjs`). `scripts/setup-dev-dependencies.sh`, `scripts/setup-workspace.sh` und
+  `scripts/create-worktree.sh` prüfen zuerst `DATABASE_TYPE` (`scripts/check-database-type.sh`).
+- Tests öffnen Datenbanken über `apps/api/src/test-utils/test-database.ts`, das die Verbindungsfabrik des Backends nutzt.
+
+Die Lebenszyklus-Tests mit echter Datenbank liegen in `apps/api/src/e2e/migrations/migration-lifecycle.e2e.spec.ts`
+(Neuinstallation, Upgrade aus vier älteren Release-Ständen mit Daten, Fehlerwiederherstellung, Seeding). Der Export-,
+Import- und Backup-Vertrag wird von `database/conformance/transfer.conformance.test-fixture.ts` über
+`api:test-conformance` getestet.
