@@ -1,8 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 /** Chunked coredump upload (ATT-1144): a report can wait for its dump. */
-export class AttractapCrashReportCoredumpUpload1793200000000 implements MigrationInterface {
-  name = 'AttractapCrashReportCoredumpUpload1793200000000';
+export class AttractapCrashReportCoredumpUpload1793300000000 implements MigrationInterface {
+  name = 'AttractapCrashReportCoredumpUpload1793300000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`ALTER TABLE "attractap_crash_report" ADD COLUMN "coredumpStatus" text`);

@@ -1,10 +1,10 @@
 import { DataSource, QueryRunner } from 'typeorm';
-import { AttractapCrashReportCoredumpUpload1793200000000 } from './1793200000000-attractap-crash-report-coredump-upload';
+import { AttractapCrashReportCoredumpUpload1793300000000 } from './1793300000000-attractap-crash-report-coredump-upload';
 
 describe('Attractap crash report coredump upload migration', () => {
   let source: DataSource;
   let runner: QueryRunner;
-  const migration = new AttractapCrashReportCoredumpUpload1793200000000();
+  const migration = new AttractapCrashReportCoredumpUpload1793300000000();
 
   const columns = async (): Promise<string[]> =>
     (await runner.query(`PRAGMA table_info("attractap_crash_report")`)).map((column: { name: string }) => column.name);

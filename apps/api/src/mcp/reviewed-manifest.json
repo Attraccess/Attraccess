@@ -1697,7 +1697,7 @@
   "getReaderCrashReports": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "ddb23c45"
+    "shape": "d354ff2d"
   },
   "getReaderCrashReportCoredump": {
     "decision": "deny",
