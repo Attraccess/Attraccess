@@ -1,6 +1,7 @@
 import { registerSsoControllerFixture } from './sso.controller.sso-controller.test-fixture';
 import * as discovery from './providers/discovery-client';
-import { AuthenticationDetail, SSOProvider } from '@attraccess/database-entities';
+import type { SsoProviderRecord } from '@attraccess/application-models';
+import { toSsoProviderResponse } from './dto/sso-provider-response.dto';
 import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
 import { CreateSSOProviderDto } from './dto/create-sso-provider.dto';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
@@ -24,15 +25,51 @@ describe('SsoController', () => {
   describe('getProviders', () => {
     it('should return an array of providers', async () => {
       const result = await fixture.controller.getAll();
-      expect(result).toEqual([fixture.mockSSOProvider]);
+      expect(result).toEqual([toSsoProviderResponse(fixture.mockSSOProvider)]);
       expect(fixture.ssoService.getAllProviders).toHaveBeenCalled();
+    });
+  });
+
+  describe('provider responses', () => {
+    it('never carry the client secret, the provisioning secret or the encrypted signing key', async () => {
+      const samlProvider = {
+        ...fixture.mockSSOProvider,
+        oidcConfiguration: fixture.mockSSOProvider.oidcConfiguration,
+        samlConfiguration: {
+          id: 5,
+          ssoProviderId: 1,
+          entryPoint: 'https://idp/sso',
+          issuer: 'sp',
+          certificate: 'CERT',
+          signRequest: false,
+          wantAssertionsSigned: false,
+          wantAuthnResponseSigned: true,
+          forceAuthn: false,
+          provisioningSecret: 'provisioning-secret',
+          spSigningKeyEncrypted: 'encrypted-signing-key',
+          spSigningKeyEncryptionKeyId: 'default',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      } as SsoProviderRecord;
+      jest.spyOn(fixture.ssoService, 'getAllProviders').mockResolvedValueOnce([samlProvider]);
+
+      const [provider] = await fixture.controller.getAll();
+      const json = JSON.stringify(provider);
+
+      expect(json).not.toMatch(/test-client-secret|provisioning-secret|encrypted-signing-key/);
+      expect(provider.oidcConfiguration).not.toHaveProperty('clientSecret');
+      expect(provider.samlConfiguration).toMatchObject({
+        entryPoint: 'https://idp/sso',
+        spSigningKeyEncryptionKeyId: 'default',
+      });
     });
   });
 
   describe('getProviderById', () => {
     it('should return a single provider', async () => {
       const result = await fixture.controller.getOneById('1');
-      expect(result).toEqual(fixture.mockSSOProvider);
+      expect(result).toEqual(toSsoProviderResponse(fixture.mockSSOProvider));
       expect(fixture.ssoService.getProviderById).toHaveBeenCalledWith(1);
     });
 
@@ -61,7 +98,7 @@ describe('SsoController', () => {
 
       const result = await fixture.controller.createOne(createDto, { user: { id: 1 } } as AuthenticatedRequest);
 
-      expect(result).toEqual(fixture.mockSSOProvider);
+      expect(result).toEqual(toSsoProviderResponse(fixture.mockSSOProvider));
       expect(fixture.ssoService.createProvider).toHaveBeenCalledWith(createDto, ACTOR);
     });
   });
@@ -76,14 +113,14 @@ describe('SsoController', () => {
       jest.spyOn(fixture.ssoService, 'getProviderById').mockResolvedValueOnce({
         ...fixture.mockSSOProvider,
         oidcConfiguration: { ...fixture.mockSSOProvider.oidcConfiguration, roleMappings: {} },
-      } as SSOProvider);
+      } as SsoProviderRecord);
 
       const mockReq = {
         user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) },
       } as unknown as AuthenticatedRequest;
       const result = await fixture.controller.updateOne('1', updateDto, mockReq);
 
-      expect(result).toEqual(fixture.mockSSOProvider);
+      expect(result).toEqual(toSsoProviderResponse(fixture.mockSSOProvider));
       expect(fixture.ssoService.updateProvider).toHaveBeenCalledWith(1, updateDto, ACTOR);
     });
 
@@ -131,7 +168,7 @@ describe('SsoController', () => {
       const rotated = {
         ...provider,
         oidcConfiguration: { ...provider.oidcConfiguration, clientSecret: 'replacement' },
-      } as SSOProvider;
+      } as SsoProviderRecord;
       expect(ssoProviderAuditEvent('updated', actor, rotated, provider)).toMatchObject({
         action: 'sso.provider.updated',
         details: expect.objectContaining({ changes: JSON.stringify({ changed: [], rotated: ['clientSecret'] }) }),
@@ -141,7 +178,7 @@ describe('SsoController', () => {
 
     it('does not report rotation when a SAML form resubmits its unchanged certificate', () => {
       const provider = fixture.mockSamlProvider;
-      const resubmitted = { ...provider, samlConfiguration: { ...provider.samlConfiguration } } as SSOProvider;
+      const resubmitted = { ...provider, samlConfiguration: { ...provider.samlConfiguration } } as SsoProviderRecord;
       expect(ssoProviderAuditEvent('updated', actor, resubmitted, provider)).toBeNull();
     });
 
@@ -153,7 +190,7 @@ describe('SsoController', () => {
           authorizationURL: 'https://test-issuer.com/auth?tenant=one',
           roleMappings: { 'user-manager': ['admins'] },
         },
-      } as SSOProvider;
+      } as SsoProviderRecord;
       const after = {
         ...before,
         oidcConfiguration: {
@@ -161,7 +198,7 @@ describe('SsoController', () => {
           authorizationURL: 'https://test-issuer.com/auth?tenant=two',
           roleMappings: { 'billing-manager': ['billing'] },
         },
-      } as SSOProvider;
+      } as SsoProviderRecord;
 
       expect(ssoProviderAuditEvent('updated', actor, after, before)?.details).toMatchObject({
         changes: JSON.stringify({
@@ -176,7 +213,7 @@ describe('SsoController', () => {
       const after = {
         ...before,
         samlConfiguration: { ...before.samlConfiguration, certificate: 'REPLACEMENT' },
-      } as SSOProvider;
+      } as SsoProviderRecord;
 
       const event = ssoProviderAuditEvent('updated', actor, after, before);
       expect(event?.details).toMatchObject({
@@ -204,12 +241,12 @@ describe('SsoController', () => {
         {
           id: 10,
           type: AuthenticationType.LOCAL_PASSWORD,
-        } as AuthenticationDetail,
+        } as Record<string, unknown>,
       ],
     };
 
     function setupLinkMocks({
-      existingSSODetail = null as AuthenticationDetail | null,
+      existingSSODetail = null as Record<string, unknown> | null,
       passwordOk = true,
       ssoSubjectExistsForOtherUser = false,
       hasLocalPassword = true,
@@ -276,14 +313,14 @@ describe('SsoController', () => {
     });
 
     describe('re-linking (same provider, changed subject)', () => {
-      const existingSSODetailSameProvider: AuthenticationDetail = {
+      const existingSSODetailSameProvider: Record<string, unknown> = {
         id: 20,
         userId: 42,
         type: AuthenticationType.SSO,
         providerType: SSOProviderType.OIDC,
         providerId: 1,
         ssoSubject: 'old-sub-from-test-idp',
-      } as AuthenticationDetail;
+      } as Record<string, unknown>;
 
       it('updates ssoSubject when re-linking to the same provider', async () => {
         const { authService } = setupLinkMocks({ existingSSODetail: existingSSODetailSameProvider });
@@ -342,14 +379,14 @@ describe('SsoController', () => {
     });
 
     describe('cross-provider rejection', () => {
-      const existingSSODetailDifferentProvider: AuthenticationDetail = {
+      const existingSSODetailDifferentProvider: Record<string, unknown> = {
         id: 30,
         userId: 42,
         type: AuthenticationType.SSO,
         providerType: SSOProviderType.SAML,
         providerId: 2,
         ssoSubject: 'saml-sub-456',
-      } as AuthenticationDetail;
+      } as Record<string, unknown>;
 
       it('rejects linking when user is already linked to a different provider', async () => {
         const { authService } = setupLinkMocks({ existingSSODetail: existingSSODetailDifferentProvider });

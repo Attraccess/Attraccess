@@ -1,18 +1,6 @@
-import { SsoSessionContext } from '@attraccess/application-models';
+import type { SsoSessionContext, SsoSessionSelector } from '@attraccess/application-models';
 
-export type SsoSessionSelector =
-  | { protocol: 'OIDC'; providerId: number; issuer: string; subject?: string; sid?: string; issuedBefore?: number }
-  | {
-      protocol: 'SAML';
-      providerId: number;
-      issuer?: string;
-      nameID: string;
-      nameIDFormat?: string;
-      nameQualifier?: string;
-      spNameQualifier?: string;
-      sessionIndexes?: string[];
-      issuedBefore?: number;
-    };
+export type { SsoSessionSelector };
 
 type OidcContext = Extract<SsoSessionContext, { protocol: 'OIDC' }>;
 type SamlContext = Extract<SsoSessionContext, { protocol: 'SAML' }>;

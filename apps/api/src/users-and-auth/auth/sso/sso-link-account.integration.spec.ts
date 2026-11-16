@@ -1,7 +1,7 @@
 import { AUDIT_RECORDER } from '../../../audit/recorder/audit-event';
-import { Setting, User } from '@attraccess/database-entities';
 import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { ACCOUNT_LOCKOUT_STORE } from '../../rate-limiting/account-lockout.port';
+import { SSO_LINK_SECRET_STORE } from './link-token-secret.port';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ModuleRef } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
@@ -66,7 +66,11 @@ describe('POST /auth/sso/link-account (HTTP integration)', () => {
   let store: ReturnType<typeof memoryStore>;
   const instances: NestExpressApplication[] = [];
 
-  const userRepository = { update: jest.fn().mockResolvedValue(undefined) };
+  const lockoutStore = {
+    recordFailureStreak: jest.fn().mockResolvedValue(undefined),
+    lockAccount: jest.fn().mockResolvedValue(undefined),
+    clearLockout: jest.fn().mockResolvedValue(undefined),
+  };
   const makeUser = (id: number, email: string) => ({
     id,
     email,
@@ -100,7 +104,7 @@ describe('POST /auth/sso/link-account (HTTP integration)', () => {
     };
     audit = { log: jest.fn() };
 
-    userRepository.update.mockClear();
+    lockoutStore.lockAccount.mockClear();
     store = memoryStore();
     app = await startInstance(store);
     tokens = app.get(SSOLinkTokenService);
@@ -142,10 +146,10 @@ describe('POST /auth/sso/link-account (HTTP integration)', () => {
           },
         },
         {
-          provide: getRepositoryToken(Setting),
-          useValue: { findOneBy: async () => ({ value: 'link-secret' }), insert: jest.fn(), update: jest.fn() },
+          provide: SSO_LINK_SECRET_STORE,
+          useValue: { read: async () => 'link-secret', replace: jest.fn(), createIfAbsent: jest.fn() },
         },
-        { provide: getRepositoryToken(User), useValue: userRepository },
+        { provide: ACCOUNT_LOCKOUT_STORE, useValue: lockoutStore },
       ],
     }).compile();
 
@@ -241,13 +245,10 @@ describe('POST /auth/sso/link-account (HTTP integration)', () => {
       expect((await post(await issue(), 'wrong')).status).toBe(401);
     }
 
-    await expect(bruteForce.assertAccountAllowed({ id: 1, lockedUntil: null } as User)).rejects.toBeInstanceOf(
+    await expect(bruteForce.assertAccountAllowed({ id: 1, lockedUntil: null })).rejects.toBeInstanceOf(
       AccountLockedException,
     );
-    expect(userRepository.update).toHaveBeenCalledWith(
-      { id: 1 },
-      expect.objectContaining({ lockedUntil: expect.any(Date) }),
-    );
+    expect(lockoutStore.lockAccount).toHaveBeenCalledWith(1, expect.any(Date));
   });
 
   it('clears the IP and account counters after a successful link', async () => {

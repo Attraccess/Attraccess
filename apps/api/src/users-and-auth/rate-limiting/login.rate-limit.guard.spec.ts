@@ -1,7 +1,6 @@
 import { LoginRateLimitGuard, resolveIp } from './login.rate-limit.guard';
 import { Request, Response } from 'express';
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { User } from '@attraccess/database-entities';
 import { BruteForceProtectionService } from './brute-force.service';
 import { SettingsService } from '../../settings/settings.service';
 import { UsersService } from '../users/users.service';
@@ -10,9 +9,9 @@ import { AccountLockedException } from './exceptions';
 
 describe('concurrent account login attempts', () => {
   it('admits only the remaining guess across email/username and different IPs', async () => {
-    const user = { id: 7, lockedUntil: null } as User;
+    const user = { id: 7, lockedUntil: null };
     const bruteForce = new BruteForceProtectionService(
-      { update: jest.fn().mockResolvedValue(undefined) } as never,
+      { recordFailureStreak: jest.fn(), lockAccount: jest.fn(), clearLockout: jest.fn() },
       {
         getRateLimitPolicy: async () => ({
           maxAttempts: 3,

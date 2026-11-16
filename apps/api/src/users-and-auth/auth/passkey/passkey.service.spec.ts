@@ -2,9 +2,9 @@ import { AuthAuditLogger } from '../../rate-limiting/auth-audit.logger';
 import { BruteForceProtectionService } from '../../rate-limiting/brute-force.service';
 import { AUDIT_RECORDER } from '../../../audit/recorder/audit-event';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { Passkey, PasskeyChallenge, User } from '@attraccess/database-entities';
+import type { AuthenticatedSessionUser, PasskeyChallengeRecord, PasskeyRecord } from '@attraccess/application-models';
+import { PASSKEY_STORE, type PasskeyStore } from './passkey.port';
 import { PasskeyService } from './passkey.service';
 import { SettingsService } from '../../../settings/settings.service';
 import { UserEmailNotVerifiedException } from '../errors/userEmailNotVerified.exception';
@@ -24,9 +24,7 @@ function clientDataFor(challenge: string): string {
 describe('PasskeyService', () => {
   let service: PasskeyService;
   const origin = { actor: { id: 42, authenticationMethod: 'session' as const } };
-  let passkeyRepo: Record<string, jest.Mock>;
-  let challengeRepo: Record<string, jest.Mock>;
-  let userRepo: Record<string, jest.Mock>;
+  let store: jest.Mocked<PasskeyStore>;
   let getUrl: jest.Mock;
   let bruteForce: Record<string, jest.Mock>;
   let authAuditLog: jest.Mock;
@@ -38,24 +36,20 @@ describe('PasskeyService', () => {
     publicKey: Buffer.from([1, 2, 3]).toString('base64url'),
     counter: 3,
     transports: 'internal,hybrid',
-  } as Passkey;
+  } as PasskeyRecord;
+  const verifiedUser = { id: 42, username: 'maker', isEmailVerified: true } as AuthenticatedSessionUser;
 
   beforeEach(async () => {
-    passkeyRepo = {
-      find: jest.fn().mockResolvedValue([]),
-      findOneBy: jest.fn().mockResolvedValue(storedPasskey),
-      delete: jest.fn().mockResolvedValue({ affected: 1 }),
-      update: jest.fn().mockResolvedValue({ affected: 1 }),
-      create: jest.fn((v) => v),
-      save: jest.fn((v) => Promise.resolve(v)),
-    };
-    challengeRepo = {
-      insert: jest.fn().mockResolvedValue(undefined),
-      delete: jest.fn().mockResolvedValue({ affected: 1 }),
-      findOneBy: jest.fn().mockResolvedValue(null),
-    };
-    userRepo = {
-      findOneBy: jest.fn().mockResolvedValue({ id: 42, username: 'maker', isEmailVerified: true } as User),
+    store = {
+      listForUser: jest.fn().mockResolvedValue([]),
+      findByCredentialId: jest.fn().mockResolvedValue(storedPasskey),
+      register: jest.fn(),
+      renameOwned: jest.fn(),
+      deleteOwned: jest.fn().mockResolvedValue(true),
+      recordUse: jest.fn().mockResolvedValue(undefined),
+      findSignInUser: jest.fn().mockResolvedValue(verifiedUser),
+      issueChallenge: jest.fn().mockResolvedValue(undefined),
+      consumeChallenge: jest.fn().mockResolvedValue(null),
     };
     getUrl = jest.fn().mockResolvedValue('https://make.example.com');
     bruteForce = {
@@ -71,9 +65,7 @@ describe('PasskeyService', () => {
         { provide: BruteForceProtectionService, useValue: bruteForce },
         { provide: AuthAuditLogger, useValue: { log: authAuditLog } },
         PasskeyService,
-        { provide: getRepositoryToken(Passkey), useValue: passkeyRepo },
-        { provide: getRepositoryToken(PasskeyChallenge), useValue: challengeRepo },
-        { provide: getRepositoryToken(User), useValue: userRepo },
+        { provide: PASSKEY_STORE, useValue: store },
         { provide: SettingsService, useValue: { getUrl } },
       ],
     }).compile();
@@ -121,8 +113,8 @@ describe('PasskeyService', () => {
   describe('verifyAuthentication', () => {
     const response = { id: 'cred-1', response: { clientDataJSON: clientDataFor('auth-challenge') } };
 
-    function issueChallenge(overrides: Partial<PasskeyChallenge> = {}) {
-      challengeRepo.findOneBy.mockResolvedValue({
+    function issueChallenge(overrides: Partial<PasskeyChallengeRecord> = {}) {
+      store.consumeChallenge.mockResolvedValue({
         challenge: 'auth-challenge',
         userId: null,
         expiresAt: new Date(Date.now() + 60_000),
@@ -136,7 +128,7 @@ describe('PasskeyService', () => {
       const user = await service.verifyAuthentication(response as never);
 
       expect(user.id).toBe(42);
-      expect(passkeyRepo.update).toHaveBeenCalledWith(7, expect.objectContaining({ counter: 4, backedUp: true }));
+      expect(store.recordUse).toHaveBeenCalledWith(7, expect.objectContaining({ counter: 4, backedUp: true }));
     });
 
     it('burns the challenge so an assertion cannot be replayed', async () => {
@@ -144,11 +136,11 @@ describe('PasskeyService', () => {
 
       await service.verifyAuthentication(response as never);
 
-      expect(challengeRepo.delete).toHaveBeenCalledWith({ challenge: 'auth-challenge' });
+      expect(store.consumeChallenge).toHaveBeenCalledWith('auth-challenge');
     });
 
     it('rejects an unknown challenge', async () => {
-      challengeRepo.findOneBy.mockResolvedValue(null);
+      store.consumeChallenge.mockResolvedValue(null);
 
       await expect(service.verifyAuthentication(response as never)).rejects.toThrow(BadRequestException);
     });
@@ -167,7 +159,7 @@ describe('PasskeyService', () => {
 
     it('rejects a credential that is not registered', async () => {
       issueChallenge();
-      passkeyRepo.findOneBy.mockResolvedValue(null);
+      store.findByCredentialId.mockResolvedValue(null);
 
       await expect(service.verifyAuthentication(response as never)).rejects.toThrow(UnauthorizedException);
     });
@@ -181,7 +173,7 @@ describe('PasskeyService', () => {
 
     it('refuses a user whose email is not verified, so a passkey cannot skip re-verification', async () => {
       issueChallenge();
-      userRepo.findOneBy.mockResolvedValue({ id: 42, username: 'maker', isEmailVerified: false } as User);
+      store.findSignInUser.mockResolvedValue({ ...verifiedUser, isEmailVerified: false });
 
       await expect(service.verifyAuthentication(response as never)).rejects.toThrow(UserEmailNotVerifiedException);
     });
@@ -226,7 +218,7 @@ describe('PasskeyService', () => {
     });
 
     it('counts and logs a verified passkey as a successful login for its user', async () => {
-      const user = { id: 42, username: 'maker', isEmailVerified: true } as User;
+      const user = verifiedUser;
       jest.spyOn(service, 'verifyAuthentication').mockResolvedValue(user);
 
       await expect(service.signIn(response as never, 'https://make.example.com', ip)).resolves.toBe(user);
@@ -249,11 +241,11 @@ describe('PasskeyService', () => {
     it('only deletes passkeys owned by the user', async () => {
       await service.delete(42, 7, origin);
 
-      expect(passkeyRepo.delete).toHaveBeenCalledWith({ id: 7, userId: 42 });
+      expect(store.deleteOwned).toHaveBeenCalledWith(42, 7);
     });
 
     it('throws when the passkey belongs to somebody else', async () => {
-      passkeyRepo.delete.mockResolvedValue({ affected: 0 });
+      store.deleteOwned.mockResolvedValue(false);
 
       await expect(service.delete(1, 7, origin)).rejects.toThrow(NotFoundException);
     });

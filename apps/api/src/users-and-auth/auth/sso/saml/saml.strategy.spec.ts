@@ -4,7 +4,7 @@ import {
   type SamlProfile,
 } from './saml.strategy.ssosaml-strategy.test-fixture';
 import { ModuleRef } from '@nestjs/core';
-import { SSOProvider } from '@attraccess/database-entities';
+import type { SsoProviderRecord } from '@attraccess/application-models';
 import { SSOProviderType } from '@attraccess/application-models';
 import { SSOSamlStrategy } from './saml.strategy';
 import { EncryptionService } from './../../../../encryption/encryption.service';
@@ -239,7 +239,7 @@ describe('SSOSamlStrategy', () => {
         emailAttributeKeys: ['email'],
         roleMappings: { 'user-manager': ['admins'] },
       },
-    } as unknown as SSOProvider;
+    } as unknown as SsoProviderRecord;
     const moduleRef = buildSamlModuleRef({
       users: usersService,
       rbac: rbacService,
@@ -296,7 +296,7 @@ describe('SSOSamlStrategy', () => {
         emailAttributeKeys: ['email'],
         roleMappings: { 'user-manager': ['admins'] },
       },
-    } as unknown as SSOProvider;
+    } as unknown as SsoProviderRecord;
     const moduleRef = buildSamlModuleRef({
       users: usersService,
       rbac: { syncSsoRoles: jest.fn().mockRejectedValue(new Error('role write failed')) },

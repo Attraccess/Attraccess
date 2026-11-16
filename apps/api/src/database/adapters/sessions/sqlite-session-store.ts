@@ -1,11 +1,20 @@
-import { runSerializedTransaction } from '../../../database/sqlite/run-serialized-transaction';
 import { Repository, LessThan, MoreThan } from 'typeorm';
-import { Session, User } from '@attraccess/database-entities';
-import { SsoSessionContext } from '@attraccess/application-models';
+import { Session } from '@attraccess/database-entities';
+import type {
+  AuthenticatedSession,
+  AuthenticatedSessionUser,
+  LogoutSession,
+  SessionMetadata,
+  SessionStats,
+  SsoLogoutReceipt,
+  SsoSessionContext,
+  SsoSessionSelector,
+  UserSessionSummary,
+} from '@attraccess/application-models';
 import { TokenHashService } from '../../../encryption/token-hash.service';
-import { SessionStore, SessionMetadata, LogoutSession, AuthenticatedSession } from './session-store';
-
-import { matchesSsoSession, SsoSessionSelector } from './sso-session-selector';
+import { SessionStore } from '../../../users-and-auth/auth/session-store/session-store';
+import { matchesSsoSession } from '../../../users-and-auth/auth/session-store/sso-session-selector';
+import { runSerializedTransaction } from '../../sqlite/run-serialized-transaction';
 
 const LAST_ACCESSED_THROTTLE_MS = 60_000;
 
@@ -40,7 +49,7 @@ export class SqliteSessionStore implements SessionStore {
     await this.sessionRepository.save(session);
   }
 
-  async validateSession(token: string): Promise<User | null> {
+  async validateSession(token: string): Promise<AuthenticatedSessionUser | null> {
     return (await this.authenticateSession(token))?.user ?? null;
   }
 
@@ -143,7 +152,7 @@ export class SqliteSessionStore implements SessionStore {
 
   async revokeSsoSessionsOnce(
     selector: SsoSessionSelector,
-    receipt: { key: string; expiresAt: number; requireMatch?: boolean },
+    receipt: SsoLogoutReceipt,
   ): Promise<{ fresh: boolean; count: number }> {
     return runSerializedTransaction(this.sessionRepository.manager, async (manager) => {
       const store = new SqliteSessionStore(manager.getRepository(Session), this.tokenHashService);
@@ -216,14 +225,22 @@ export class SqliteSessionStore implements SessionStore {
     return { remainingActive };
   }
 
-  async getUserSessions(userId: number): Promise<Session[]> {
-    return this.sessionRepository.find({
+  async getUserSessions(userId: number): Promise<UserSessionSummary[]> {
+    const sessions = await this.sessionRepository.find({
       where: { userId, expiresAt: MoreThan(new Date()) },
       order: { lastAccessedAt: 'DESC' },
     });
+    return sessions.map((session) => ({
+      userId: session.userId,
+      userAgent: session.userAgent,
+      ipAddress: session.ipAddress,
+      expiresAt: session.expiresAt,
+      createdAt: session.createdAt,
+      lastAccessedAt: session.lastAccessedAt,
+    }));
   }
 
-  async getStats(): Promise<{ totalActiveSessions: number; expiredSessions: number }> {
+  async getStats(): Promise<SessionStats> {
     const now = new Date();
     const [totalActiveSessions, expiredSessions] = await Promise.all([
       this.sessionRepository.count({ where: { expiresAt: MoreThan(now) } }),

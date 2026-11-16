@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { Session, User, entities } from '@attraccess/database-entities';
 import { SsoSessionContext } from '@attraccess/application-models';
 import { GenericContainer, StartedTestContainer } from 'testcontainers';
@@ -25,7 +25,7 @@ import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { Response } from 'express';
 import { MetricsService } from '../../../metrics/metrics.service';
 import { CronTimer } from '../../../metrics/instrumentation/cron/cron.helper';
-import { SqliteSessionStore } from './sqlite.session-store';
+import { SqliteSessionStore } from '../../../database/adapters/sessions/sqlite-session-store';
 import { ValkeySessionStore } from './valkey.session-store';
 import { TokenHashService } from '../../../encryption/token-hash.service';
 import { SSOService } from '../sso/sso.service';
@@ -81,8 +81,9 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
         container = await new GenericContainer('valkey/valkey:8-alpine').withExposedPorts(6379).start();
         client = new Redis(container.getMappedPort(6379), container.getHost());
         const users = {
-          findOne: async () => ({ id: 7, username: 'fixture', email: 'fixture@example.com', isEmailVerified: true }),
-        } as unknown as Repository<User>;
+          findSessionUser: async () =>
+            ({ id: 7, username: 'fixture', email: 'fixture@example.com', isEmailVerified: true }) as never,
+        };
         store = new ValkeySessionStore(client, users, hash);
       }
     });

@@ -1,9 +1,8 @@
 import { UnauthorizedException } from '@nestjs/common';
-import { InsertResult, Repository } from 'typeorm';
-import { Setting } from '@attraccess/database-entities';
 import { SSOProviderType } from '@attraccess/application-models';
 import { MAX_LINK_TOKEN_PASSWORD_ATTEMPTS, SSOLinkTokenService } from './link-token.service';
 import { SessionStore } from '../session-store/session-store';
+import type { SsoLinkSecretStore } from './link-token-secret.port';
 import { EncryptionService } from '../../../encryption/encryption.service';
 
 describe('SSOLinkTokenService', () => {
@@ -15,7 +14,7 @@ describe('SSOLinkTokenService', () => {
   };
   const fixedNow = 1_700_000_000_000;
 
-  let repository: jest.Mocked<Pick<Repository<Setting>, 'findOneBy' | 'insert' | 'update'>>;
+  let repository: jest.Mocked<SsoLinkSecretStore>;
   let encryptionService: Pick<EncryptionService, 'isEncrypted' | 'encrypt' | 'decryptIfEncrypted'>;
 
   let sessionStore: jest.Mocked<
@@ -29,9 +28,9 @@ describe('SSOLinkTokenService', () => {
       incrementEphemeralCounter: jest.fn().mockResolvedValue(1),
     };
     repository = {
-      findOneBy: jest.fn(),
-      insert: jest.fn(),
-      update: jest.fn(),
+      read: jest.fn(),
+      replace: jest.fn(),
+      createIfAbsent: jest.fn(),
     };
     const isEncrypted = (value: string | null | undefined): value is string =>
       typeof value === 'string' && value.startsWith('enc:');
@@ -50,22 +49,18 @@ describe('SSOLinkTokenService', () => {
   });
 
   it('creates a new secret when missing and issues/verifies tokens', async () => {
-    repository.findOneBy.mockResolvedValue(null);
-    repository.insert.mockResolvedValue({ identifiers: [], generatedMaps: [], raw: [] } as InsertResult);
+    repository.read.mockResolvedValue(null);
+    repository.createIfAbsent.mockResolvedValue(true);
 
     const service = new SSOLinkTokenService(
-      repository as unknown as Repository<Setting>,
+      repository,
       encryptionService as EncryptionService,
       sessionStore as unknown as SessionStore,
     );
 
     const token = await service.issue(basePayload);
 
-    expect(repository.insert).toHaveBeenCalledWith({
-      parent: 'auth',
-      key: 'sso_link_token_secret',
-      value: expect.any(String),
-    });
+    expect(repository.createIfAbsent).toHaveBeenCalledWith(expect.stringMatching(/^enc:/));
 
     const payload = await service.verify(token);
     expect(payload.email).toBe(basePayload.email);
@@ -73,17 +68,17 @@ describe('SSOLinkTokenService', () => {
   });
 
   it('reuses existing secret without inserting a new one', async () => {
-    repository.findOneBy.mockResolvedValue({ value: 'existing-secret' } as Setting);
+    repository.read.mockResolvedValue('existing-secret');
 
     const service = new SSOLinkTokenService(
-      repository as unknown as Repository<Setting>,
+      repository,
       encryptionService as EncryptionService,
       sessionStore as unknown as SessionStore,
     );
 
     const token = await service.issue(basePayload);
 
-    expect(repository.insert).not.toHaveBeenCalled();
+    expect(repository.createIfAbsent).not.toHaveBeenCalled();
     await expect(service.verify(token)).resolves.toMatchObject({
       email: basePayload.email,
     });
@@ -100,12 +95,12 @@ describe('SSOLinkTokenService', () => {
       .mockReturnValueOnce(t1) // second issue: iat
       .mockReturnValueOnce(t1); // getSecret: force refresh
 
-    repository.findOneBy
-      .mockResolvedValueOnce({ value: 'old-secret' } as Setting) // initial fetch
-      .mockResolvedValueOnce({ value: 'rotated-secret' } as Setting); // refresh fetch
+    repository.read
+      .mockResolvedValueOnce('old-secret') // initial fetch
+      .mockResolvedValueOnce('rotated-secret'); // refresh fetch
 
     const service = new SSOLinkTokenService(
-      repository as unknown as Repository<Setting>,
+      repository,
       encryptionService as EncryptionService,
       sessionStore as unknown as SessionStore,
     );
@@ -113,36 +108,36 @@ describe('SSOLinkTokenService', () => {
     await service.issue(basePayload); // warm cache with old-secret
     await service.issue(basePayload); // should refresh and use rotated-secret
 
-    expect(repository.findOneBy).toHaveBeenCalledTimes(2);
+    expect(repository.read).toHaveBeenCalledTimes(2);
     const cachedSecret = Reflect.get(service as object, 'cachedSecret') as string | null;
     expect(cachedSecret).toBe('rotated-secret');
   });
 
   it('recovers when insert races and secret appears afterwards', async () => {
-    repository.findOneBy
+    repository.read
       .mockResolvedValueOnce(null) // initial fetch
-      .mockResolvedValueOnce({ value: 'post-race-secret' } as Setting); // after insert failure
-    repository.insert.mockRejectedValue(new Error('duplicate'));
+      .mockResolvedValueOnce('post-race-secret'); // after insert failure
+    repository.createIfAbsent.mockResolvedValue(false);
 
     const service = new SSOLinkTokenService(
-      repository as unknown as Repository<Setting>,
+      repository,
       encryptionService as EncryptionService,
       sessionStore as unknown as SessionStore,
     );
 
     const token = await service.issue(basePayload);
 
-    expect(repository.insert).toHaveBeenCalled();
-    expect(repository.findOneBy).toHaveBeenCalledTimes(2);
+    expect(repository.createIfAbsent).toHaveBeenCalled();
+    expect(repository.read).toHaveBeenCalledTimes(2);
     await expect(service.verify(token)).resolves.toMatchObject({ providerId: basePayload.providerId });
   });
 
   it('throws when secret cannot be created or retrieved', async () => {
-    repository.findOneBy.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
-    repository.insert.mockRejectedValue(new Error('write failure'));
+    repository.read.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    repository.createIfAbsent.mockRejectedValue(new Error('write failure'));
 
     const service = new SSOLinkTokenService(
-      repository as unknown as Repository<Setting>,
+      repository,
       encryptionService as EncryptionService,
       sessionStore as unknown as SessionStore,
     );
@@ -151,9 +146,9 @@ describe('SSOLinkTokenService', () => {
   });
 
   it('rejects expired tokens', async () => {
-    repository.findOneBy.mockResolvedValue({ value: 'expire-secret' } as Setting);
+    repository.read.mockResolvedValue('expire-secret');
     const service = new SSOLinkTokenService(
-      repository as unknown as Repository<Setting>,
+      repository,
       encryptionService as EncryptionService,
       sessionStore as unknown as SessionStore,
     );
@@ -171,9 +166,9 @@ describe('SSOLinkTokenService', () => {
 
   describe('single-use state', () => {
     async function issued() {
-      repository.findOneBy.mockResolvedValue({ value: 'secret' } as Setting);
+      repository.read.mockResolvedValue('secret');
       const service = new SSOLinkTokenService(
-        repository as unknown as Repository<Setting>,
+        repository,
         encryptionService as EncryptionService,
         sessionStore as unknown as SessionStore,
       );

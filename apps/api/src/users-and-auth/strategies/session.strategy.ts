@@ -10,7 +10,7 @@ import { ApiTokenService } from '../auth/api-token/api-token.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
 import { SessionPermissionSync } from '../auth/sso/session-permission-sync';
 import { resolveIp } from '../rate-limiting/login.rate-limit.guard';
-import { User } from '@attraccess/database-entities';
+import type { AuthenticatedSessionUser } from '@attraccess/application-models';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { databaseBusyException, isDatabaseBusyError } from '../../database/persistence-errors';
 import { isValkeyUnavailableError, valkeyUnavailableException } from '../../valkey/valkey-unavailable';
@@ -39,7 +39,7 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     super();
   }
 
-  async validate(req: Request & { authSession?: LogoutSession }): Promise<User> {
+  async validate(req: Request & { authSession?: LogoutSession }): Promise<AuthenticatedSessionUser> {
     try {
       return await this.resolveUser(req);
     } catch (error) {
@@ -52,7 +52,7 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     }
   }
 
-  private async resolveUser(req: Request & { authSession?: LogoutSession }): Promise<User> {
+  private async resolveUser(req: Request & { authSession?: LogoutSession }): Promise<AuthenticatedSessionUser> {
     const { token, fromAuthorizationHeader } = this.extractTokenFromRequest(req);
 
     if (!token) {
@@ -102,21 +102,23 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
       throw new UnauthorizedException('Session was ended by the identity provider');
     }
 
+    // The stored account becomes the plugin SDK's authenticated principal (same object, more fields attached)
+    const principal = user as unknown as AuthenticatedUser;
     // Attach effectivePermissions before 2FA check so isPrivilegedUser() can use them
-    (user as AuthenticatedUser).effectivePermissions = new SerializablePermissionSet(
+    principal.effectivePermissions = new SerializablePermissionSet(
       await this.rbacService.getEffectivePermissions(user.id),
     );
-    (user as AuthenticatedUser).authenticationMethod = 'session';
+    principal.authenticationMethod = 'session';
 
     if (!this.isTwoFactorSetupAllowedPath(req)) {
-      const status = await this.twoFactorService.getStatus(user);
+      const status = await this.twoFactorService.getStatus(principal);
       if (status.required && !status.enabled) {
         this.logger.debug(`Blocked request for user ${user.id} due to missing 2FA setup`);
         throw new ForbiddenException('TwoFactorSetupRequired');
       }
     }
 
-    return user;
+    return principal;
   }
 
   /**

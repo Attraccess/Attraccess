@@ -21,6 +21,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { BillingService } from '../billing/charges/billing.service';
 import * as migrations from '../database/migrations';
 import { SettingsStoreService } from '../settings/settings-store.service';
+import { TypeOrmSsoProviderStore } from '../database/adapters/sso/typeorm-sso-provider-store';
 import { SSOService } from '../users-and-auth/auth/sso/sso.service';
 import { AuditService } from './audit.service';
 import { createTestAuditMetrics, droppedRecords } from './audit.test-fixture';
@@ -186,9 +187,7 @@ describe('audit recorded by an owning service inside its transaction', () => {
 
     beforeEach(() => {
       sso = new SSOService(
-        source.getRepository(SSOProvider),
-        source.getRepository(SSOProviderOIDCConfiguration),
-        source.getRepository(SSOProviderSAMLConfiguration),
+        new TypeOrmSsoProviderStore(source, audit),
         { verifyLicense: async () => undefined } as never,
         {
           encrypt: (value: string) => `enc:${value}`,

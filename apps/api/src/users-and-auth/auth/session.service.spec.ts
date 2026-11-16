@@ -8,7 +8,7 @@ jest.mock('crypto', () => ({
 import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { SessionService, SessionMetadata } from './session.service';
-import { User } from '@attraccess/database-entities';
+import type { AuthenticatedSessionUser, UserSessionSummary } from '@attraccess/application-models';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
@@ -19,11 +19,11 @@ describe('SessionService', () => {
   let store: jest.Mocked<SessionStore>;
   let metrics: { authActiveSessions: { inc: jest.Mock; dec: jest.Mock; set: jest.Mock } };
 
-  const mockUser: User = {
+  const mockUser: AuthenticatedSessionUser = {
     id: 1,
     username: 'testuser',
     email: 'test@example.com',
-  } as User;
+  } as AuthenticatedSessionUser;
 
   function makeStore(): jest.Mocked<SessionStore> {
     return {
@@ -247,7 +247,7 @@ describe('SessionService', () => {
 
   describe('getUserSessions', () => {
     it('should delegate to store', async () => {
-      const sessions = [{ id: 1 }, { id: 2 }] as unknown as import('@attraccess/database-entities').Session[];
+      const sessions = [{ id: 1 }, { id: 2 }] as unknown as UserSessionSummary[];
       store.getUserSessions.mockResolvedValue(sessions);
       const result = await service.getUserSessions(1);
       expect(result).toBe(sessions);

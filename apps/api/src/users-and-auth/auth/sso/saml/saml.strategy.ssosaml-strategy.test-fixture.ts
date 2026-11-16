@@ -1,5 +1,5 @@
 import { withSignInProvisioning } from '../oidc/oidc.strategy.ssooidcstrategy-claim-path-resolution.test-fixture';
-import { SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
+import type { SsoSamlConfigurationRecord } from '@attraccess/application-models';
 import { ModuleRef } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { MetricsService } from '../../../../metrics/metrics.service';
@@ -50,7 +50,7 @@ export function registerSsosamlStrategyFixture() {
       forceAuthn: false,
       emailAttributeKeys: [emailKey],
       ssoProviderId: providerId,
-    } as SSOProviderSAMLConfiguration;
+    } as SsoSamlConfigurationRecord;
 
     return {
       ssoSamlOptions: {

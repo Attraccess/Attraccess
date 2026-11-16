@@ -1,6 +1,5 @@
 import type { Redis } from 'ioredis';
-import type { Repository } from 'typeorm';
-import type { User } from '@attraccess/database-entities';
+import type { AuthenticatedSessionUser } from '@attraccess/application-models';
 import type { TokenHashService } from '../../../encryption/token-hash.service';
 import { ValkeySessionStore } from './valkey.session-store';
 const now = new Date('2026-09-22T10:00:00Z');
@@ -22,13 +21,9 @@ describe('ValkeySessionStore', () => {
     expire: jest.fn(),
     scan: jest.fn(),
   };
-  const users = { findOne: jest.fn() },
+  const users = { findSessionUser: jest.fn() },
     hash = { hashToken: jest.fn((token: string) => `hashed-${token}`) };
-  const store = new ValkeySessionStore(
-    client as unknown as Redis,
-    users as unknown as Repository<User>,
-    hash as unknown as TokenHashService,
-  );
+  const store = new ValkeySessionStore(client as unknown as Redis, users, hash as unknown as TokenHashService);
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers().setSystemTime(now);
@@ -42,7 +37,11 @@ describe('ValkeySessionStore', () => {
       .mockResolvedValueOnce(active)
       .mockResolvedValueOnce({ ...active, expiresAt: '2026-09-22T12:00:00Z', userAgent: '', ipAddress: '' });
     const sessions = await store.getUserSessions(7);
-    expect(sessions.map(({ token }) => token)).toEqual(['newer', 'older']);
+    expect(sessions.map(({ expiresAt }) => expiresAt.toISOString())).toEqual([
+      '2026-09-22T12:00:00.000Z',
+      '2026-09-22T11:00:00.000Z',
+    ]);
+    expect(sessions[0]).not.toHaveProperty('token');
     expect(sessions[0]).toMatchObject({ userId: 7, userAgent: null, ipAddress: null });
     expect(sessions[1]).toMatchObject({
       userAgent: 'fixture',
@@ -64,10 +63,10 @@ describe('ValkeySessionStore', () => {
     expect(await store.validateSession('missing')).toBeNull();
     expect(await store.validateSession('expired')).toBeNull();
     expect(client.del).toHaveBeenCalledWith('session:hashed-expired');
-    users.findOne.mockResolvedValue({ id: 7 });
+    users.findSessionUser.mockResolvedValue({ id: 7 } as AuthenticatedSessionUser);
     expect(await store.validateSession('live')).toEqual({ id: 7 });
     expect(client.expire).toHaveBeenCalledWith('session:hashed-live', 3600);
-    expect(users.findOne).toHaveBeenCalledWith({ where: { id: 7 } });
+    expect(users.findSessionUser).toHaveBeenCalledWith(7);
   });
   it('delegates rotation to one atomic store operation', async () => {
     client.eval.mockResolvedValueOnce(1).mockResolvedValueOnce(0);

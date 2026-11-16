@@ -1,5 +1,5 @@
 import { Profile } from 'passport-openidconnect';
-import { User } from '@attraccess/database-entities';
+import type { AuthenticatedSessionUser } from '@attraccess/application-models';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
 import { registerSsooidcstrategyClaimPathResolutionFixture } from './oidc.strategy.ssooidcstrategy-claim-path-resolution.test-fixture';
@@ -9,12 +9,12 @@ describe('SSOOIDCStrategy - email_verified', () => {
   const profile = (json: Record<string, unknown> = {}) =>
     ({ id: 'subject', emails: [{ value: 'user@example.com' }], _json: json }) as unknown as Profile;
 
-  const setup = (existingByEmail: User | null = null, boundUserId: number | null = null) => {
+  const setup = (existingByEmail: AuthenticatedSessionUser | null = null, boundUserId: number | null = null) => {
     const users = {
       findOne: jest.fn(async (query: Record<string, unknown>) =>
-        'email' in query ? existingByEmail : ({ id: query.id } as User),
+        'email' in query ? existingByEmail : ({ id: query.id } as AuthenticatedSessionUser),
       ),
-      createOne: jest.fn(async () => ({ id: 50 }) as User),
+      createOne: jest.fn(async () => ({ id: 50 }) as AuthenticatedSessionUser),
       buildUsernameFromSSOClaim: jest.fn((value: string) => value),
     };
     const auth = { findUserIdBySSO: jest.fn().mockResolvedValue(boundUserId), addAuthenticationDetails: jest.fn() };
@@ -45,7 +45,7 @@ describe('SSOOIDCStrategy - email_verified', () => {
   });
 
   it.each([false, 'false'])('rejects with SSO_EMAIL_NOT_VERIFIED instead of linking (%p)', async (value) => {
-    const { users, auth, metrics, strategy } = setup({ id: 9 } as User);
+    const { users, auth, metrics, strategy } = setup({ id: 9 } as AuthenticatedSessionUser);
     const error = await strategy
       .validateProfile('issuer', profile({ email_verified: value }))
       .catch((caught: unknown) => caught);
@@ -57,7 +57,7 @@ describe('SSOOIDCStrategy - email_verified', () => {
   });
 
   it('reads email_verified from the id token claims too', async () => {
-    const { strategy } = setup({ id: 9 } as User);
+    const { strategy } = setup({ id: 9 } as AuthenticatedSessionUser);
     await expect(strategy.validateProfile('issuer', profile(), undefined, { email_verified: false })).rejects.toThrow(
       'SSO_EMAIL_NOT_VERIFIED',
     );
@@ -71,7 +71,7 @@ describe('SSOOIDCStrategy - email_verified', () => {
       expect.objectContaining({ isEmailVerified: false }),
       expect.anything(),
     );
-    const taken = setup({ id: 9 } as User);
+    const taken = setup({ id: 9 } as AuthenticatedSessionUser);
     await expect(
       taken.strategy.validateProfile('issuer', bare, undefined, undefined, { email_verified: value }),
     ).rejects.toThrow('SSO_EMAIL_NOT_VERIFIED');
@@ -80,7 +80,7 @@ describe('SSOOIDCStrategy - email_verified', () => {
   it.each([true, 'true', undefined, 'maybe'])(
     'keeps linking and trusting behaviour when email_verified is %p',
     async (value) => {
-      const linking = setup({ id: 9 } as User);
+      const linking = setup({ id: 9 } as AuthenticatedSessionUser);
       await expect(
         linking.strategy.validateProfile('issuer', profile({ email_verified: value })),
       ).rejects.toBeInstanceOf(AccountLinkingRequiredException);

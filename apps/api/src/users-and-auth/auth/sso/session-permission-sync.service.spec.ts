@@ -1,6 +1,6 @@
 import { AuditRecorder } from '../../../audit/recorder/audit-event';
 import { Logger } from '@nestjs/common';
-import { SSOProvider } from '@attraccess/database-entities';
+import type { SsoProviderRecord } from '@attraccess/application-models';
 import { SSOProviderType, SsoSessionContext } from '@attraccess/application-models';
 import { SsoSessionPermissionSyncService } from './session-permission-sync.service';
 import { SessionPermissionResyncer, SessionRejectedError } from './session-permission-sync';
@@ -11,7 +11,7 @@ import { LogoutSession } from '../session-store/session-store';
 const now = new Date('2026-10-27T12:00:00Z').getTime();
 const HOUR = 3600_000;
 
-const provider = { id: 4, name: 'Keycloak', type: SSOProviderType.OIDC } as unknown as SSOProvider;
+const provider = { id: 4, name: 'Keycloak', type: SSOProviderType.OIDC } as unknown as SsoProviderRecord;
 
 const context = (lastSsoSyncAt = now - 2 * HOUR): SsoSessionContext => ({
   protocol: 'OIDC',
