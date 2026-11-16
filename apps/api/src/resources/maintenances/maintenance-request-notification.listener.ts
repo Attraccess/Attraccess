@@ -1,10 +1,8 @@
 // Emails maintainers and admins when a user requests maintenance for a resource
 // FEATURE: Manual maintenance mode for resources
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
-import { Resource, ResourceIntroducer, ResourceMaintenanceRequest, User } from '@attraccess/database-entities';
+import type { ResourceNotificationRecipient } from '@attraccess/application-models';
 import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
@@ -12,22 +10,23 @@ import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import { createTranslator } from '../../i18n/translate';
 import * as en from './maintenance-request-notification.en.json';
 import * as de from './maintenance-request-notification.de.json';
+import { MAINTENANCE_NOTIFICATION_STORE, type MaintenanceNotificationStore } from './maintenance-request-store.port';
 
 const t = createTranslator({ en, de });
+
+type DispatchRecipient = Parameters<NotificationDispatchService['dispatch']>[0]['recipients'][number];
+
+/** The dispatcher reads the id, the address and the locale of a recipient, which the recipient model carries. */
+const asDispatchRecipient = (recipient: ResourceNotificationRecipient): DispatchRecipient =>
+  recipient as unknown as DispatchRecipient;
 
 @Injectable()
 export class MaintenanceRequestNotificationListener {
   private readonly logger = new Logger(MaintenanceRequestNotificationListener.name);
 
   constructor(
-    @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(ResourceIntroducer)
-    private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
-    @InjectRepository(ResourceMaintenanceRequest)
-    private readonly requestRepository: Repository<ResourceMaintenanceRequest>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    @Inject(MAINTENANCE_NOTIFICATION_STORE)
+    private readonly store: MaintenanceNotificationStore,
     private readonly notifications: NotificationDispatchService,
     private readonly rbacService: RbacService,
   ) {}
@@ -35,18 +34,12 @@ export class MaintenanceRequestNotificationListener {
   @OnEvent(ResourceMaintenanceRequestCreatedEvent.EVENT_NAME)
   async handleRequestCreated(event: ResourceMaintenanceRequestCreatedEvent): Promise<void> {
     try {
-      const request = await this.requestRepository.findOne({
-        where: { id: event.requestId },
-        relations: ['createdByUser'],
-      });
+      const request = await this.store.findRequest(event.requestId);
       if (!request) {
         return;
       }
 
-      const resource = await this.resourceRepository.findOne({
-        where: { id: event.resourceId },
-        relations: ['groups'],
-      });
+      const resource = await this.store.findResource(event.resourceId);
       if (!resource) {
         this.logger.warn(`Maintenance request for missing resource ${event.resourceId}; skipping notifications`);
         return;
@@ -57,11 +50,11 @@ export class MaintenanceRequestNotificationListener {
         return;
       }
 
-      const requestedByUsername = request.createdByUser?.username;
+      const requestedByUsername = request.createdByUsername ?? undefined;
 
       await this.notifications.dispatch({
         category: NotificationCategory.MAINTENANCE_REQUESTS,
-        recipients,
+        recipients: recipients.map(asDispatchRecipient),
         title: (recipient) => t(recipient.locale, 'title', { resourceName: resource.name }),
         body: (recipient) => {
           const requestedBy = requestedByUsername ?? t(recipient.locale, 'fallbackUser');
@@ -86,30 +79,23 @@ export class MaintenanceRequestNotificationListener {
     }
   }
 
-  private async collectRecipients(resource: Resource): Promise<User[]> {
-    const groupIds = (resource.groups ?? []).map((group) => group.id);
-
+  private async collectRecipients(resource: {
+    id: number;
+    groupIds: number[];
+  }): Promise<ResourceNotificationRecipient[]> {
     const adminIds = await this.rbacService.getUserIdsWithPermission('resources.maintenance.manage');
-    const admins = adminIds.length > 0 ? await this.userRepository.findBy({ id: In(adminIds) }) : [];
+    const admins = adminIds.length > 0 ? await this.store.findUsersByIds(adminIds) : [];
+    const introducerUsers = await this.store.findIntroducerUsers(resource.id, resource.groupIds);
 
-    const introducerWhere: Array<Record<string, unknown>> = [{ resourceId: resource.id }];
-    if (groupIds.length > 0) {
-      introducerWhere.push({ resourceGroupId: In(groupIds) });
-    }
-    const introducerRows = await this.resourceIntroducerRepository.find({
-      where: introducerWhere,
-      relations: ['user'],
-    });
-
-    const byId = new Map<number, User>();
+    const byId = new Map<number, ResourceNotificationRecipient>();
     for (const admin of admins) {
       if (admin.email) {
         byId.set(admin.id, admin);
       }
     }
-    for (const row of introducerRows) {
-      if (row.user?.email && !byId.has(row.user.id)) {
-        byId.set(row.user.id, row.user);
+    for (const user of introducerUsers) {
+      if (user.email && !byId.has(user.id)) {
+        byId.set(user.id, user);
       }
     }
 

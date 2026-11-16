@@ -1,4 +1,5 @@
-import { ResourceMaintenance } from '@attraccess/database-entities';
+import { ResourceMaintenance } from './dtos/maintenance-records.dto';
+import { toMaintenanceDto } from './dtos/maintenance-records.mapper';
 
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
@@ -127,7 +128,8 @@ export class ResourceMaintenanceController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Query() query: ListMaintenancesDto,
   ): Promise<PaginatedMaintenanceResponse> {
-    return await this.maintenanceService.findMaintenances(resourceId, query);
+    const page = await this.maintenanceService.findMaintenances(resourceId, query);
+    return { ...page, data: page.data.map(toMaintenanceDto) };
   }
 
   @Get(':maintenanceId')
@@ -169,7 +171,7 @@ export class ResourceMaintenanceController {
       throw new NotFoundException('Maintenance not found');
     }
 
-    return maintenance;
+    return toMaintenanceDto(maintenance);
   }
 
   @Post()
@@ -210,7 +212,7 @@ export class ResourceMaintenanceController {
     @Body() dto: CreateMaintenanceDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<ResourceMaintenance> {
-    return await this.maintenanceService.createMaintenance(resourceId, dto, request.user?.id);
+    return toMaintenanceDto(await this.maintenanceService.createMaintenance(resourceId, dto, request.user?.id));
   }
 
   @Post(':maintenanceId/finish')
@@ -264,9 +266,11 @@ export class ResourceMaintenanceController {
       throw new NotFoundException('Maintenance not found');
     }
 
-    return await this.maintenanceService.finishMaintenance(maintenanceId, {
-      userId: request.user?.id,
-      notes: dto?.notes,
-    });
+    return toMaintenanceDto(
+      await this.maintenanceService.finishMaintenance(maintenanceId, {
+        userId: request.user?.id,
+        notes: dto?.notes,
+      }),
+    );
   }
 }

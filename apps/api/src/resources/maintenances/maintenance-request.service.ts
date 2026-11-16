@@ -1,24 +1,17 @@
-import { Injectable, Logger, BadRequestException, NotFoundException, Inject } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Resource, ResourceMaintenanceRequest, User } from '@attraccess/database-entities';
-import { MaintenanceRequestStatus } from '@attraccess/application-models';
+import { Injectable, BadRequestException, NotFoundException, Inject } from '@nestjs/common';
+import { MaintenanceRequestStatus, type ResourceMaintenanceRequestRecord } from '@attraccess/application-models';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
 import { ListMaintenanceRequestsDto } from './dtos/list-maintenance-requests.dto';
-import { PaginatedMaintenanceRequestResponse } from './dtos/paginated-maintenance-request-response.dto';
 import { ResolveMaintenanceRequestAction } from './dtos/resolve-maintenance-request.dto';
+import { MAINTENANCE_REQUEST_STORE, type MaintenanceRequestStore } from './maintenance-request-store.port';
 
 @Injectable()
 export class MaintenanceRequestService {
-  private readonly logger = new Logger(MaintenanceRequestService.name);
-
   constructor(
-    @InjectRepository(ResourceMaintenanceRequest)
-    private readonly requestRepository: Repository<ResourceMaintenanceRequest>,
-    @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
+    @Inject(MAINTENANCE_REQUEST_STORE)
+    private readonly store: MaintenanceRequestStore,
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
     private readonly maintenanceService: ResourceMaintenanceService,
@@ -27,20 +20,12 @@ export class MaintenanceRequestService {
   /**
    * Create a maintenance request for a resource (any authenticated user reporting a broken machine).
    */
-  async createRequest(resourceId: number, userId: number, reason: string): Promise<ResourceMaintenanceRequest> {
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
-    if (!resource) {
+  async createRequest(resourceId: number, userId: number, reason: string): Promise<ResourceMaintenanceRequestRecord> {
+    if (!(await this.store.resourceExists(resourceId))) {
       throw new NotFoundException(`Resource with ID ${resourceId} not found`);
     }
 
-    const request = this.requestRepository.create({
-      resource,
-      reason,
-      status: MaintenanceRequestStatus.OPEN,
-      createdByUser: { id: userId } as User,
-    });
-
-    const saved = await this.requestRepository.save(request);
+    const saved = await this.store.create(resourceId, userId, reason);
     this.eventEmitter.emit(
       ResourceMaintenanceRequestCreatedEvent.EVENT_NAME,
       new ResourceMaintenanceRequestCreatedEvent(resourceId, saved.id),
@@ -54,22 +39,15 @@ export class MaintenanceRequestService {
   async listRequests(
     resourceId: number,
     options: ListMaintenanceRequestsDto = {},
-  ): Promise<PaginatedMaintenanceRequestResponse> {
+  ): Promise<{ data: ResourceMaintenanceRequestRecord[]; total: number; page: number; limit: number }> {
     const { page = 1, limit = 10, status = MaintenanceRequestStatus.OPEN } = options;
     const skip = (page - 1) * limit;
 
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
-    if (!resource) {
+    if (!(await this.store.resourceExists(resourceId))) {
       throw new NotFoundException(`Resource with ID ${resourceId} not found`);
     }
 
-    const [data, total] = await this.requestRepository.findAndCount({
-      where: { resourceId, status },
-      relations: ['createdByUser', 'resolvedByUser', 'resultingMaintenance'],
-      order: { createdAt: 'DESC' },
-      skip,
-      take: limit,
-    });
+    const { data, total } = await this.store.page(resourceId, status, skip, limit);
 
     return { data, total, page, limit };
   }
@@ -77,11 +55,8 @@ export class MaintenanceRequestService {
   /**
    * Get a single request by ID with audit relations.
    */
-  async getRequestById(requestId: number): Promise<ResourceMaintenanceRequest> {
-    const request = await this.requestRepository.findOne({
-      where: { id: requestId },
-      relations: ['createdByUser', 'resolvedByUser', 'resultingMaintenance'],
-    });
+  async getRequestById(requestId: number): Promise<ResourceMaintenanceRequestRecord> {
+    const request = await this.store.findById(requestId);
     if (!request) {
       throw new NotFoundException(`Maintenance request with ID ${requestId} not found`);
     }
@@ -98,7 +73,7 @@ export class MaintenanceRequestService {
     userId: number,
     action: ResolveMaintenanceRequestAction,
     reasonOverride?: string,
-  ): Promise<ResourceMaintenanceRequest> {
+  ): Promise<ResourceMaintenanceRequestRecord> {
     const request = await this.getRequestById(requestId);
 
     if (request.resourceId !== resourceId) {
@@ -109,22 +84,20 @@ export class MaintenanceRequestService {
       throw new BadRequestException('Maintenance request is already resolved');
     }
 
-    if (action === ResolveMaintenanceRequestAction.CONVERT) {
-      const maintenance = await this.maintenanceService.createMaintenance(
-        resourceId,
-        { startTime: new Date().toISOString(), reason: reasonOverride ?? request.reason },
-        userId,
-      );
-      request.resultingMaintenance = maintenance;
-    }
+    const converting = action === ResolveMaintenanceRequestAction.CONVERT;
+    const maintenance = converting
+      ? await this.maintenanceService.createMaintenance(
+          resourceId,
+          { startTime: new Date().toISOString(), reason: reasonOverride ?? request.reason },
+          userId,
+        )
+      : undefined;
 
-    request.status =
-      action === ResolveMaintenanceRequestAction.CONVERT
-        ? MaintenanceRequestStatus.RESOLVED
-        : MaintenanceRequestStatus.DISMISSED;
-    request.resolvedByUser = { id: userId } as User;
-    request.resolvedAt = new Date();
-
-    return await this.requestRepository.save(request);
+    return await this.store.resolve(requestId, {
+      status: converting ? MaintenanceRequestStatus.RESOLVED : MaintenanceRequestStatus.DISMISSED,
+      resolvedByUserId: userId,
+      resolvedAt: new Date(),
+      resultingMaintenanceId: maintenance?.id,
+    });
   }
 }

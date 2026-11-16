@@ -1,45 +1,38 @@
 import { registerMaintenanceServiceFixture } from './maintenance.service.maintenance-service.test-fixture';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
-import { Resource } from '@attraccess/database-entities';
 
 describe('MaintenanceService', () => {
   const fixture = registerMaintenanceServiceFixture();
 
   it('creates scheduled maintenance with deferred notifications in a transaction', async () => {
-    jest.spyOn(fixture.resourceRepository, 'findOne').mockResolvedValue(fixture.mockResource);
-    jest.spyOn(fixture.maintenanceRepository, 'create').mockReturnValue(fixture.mockMaintenance);
-    jest.spyOn(fixture.maintenanceRepository, 'save').mockResolvedValue(fixture.mockMaintenance);
-    const manager = {
-      getRepository: (entity: unknown) =>
-        entity === Resource ? fixture.resourceRepository : fixture.maintenanceRepository,
-    };
+    const context = {};
     const emit = jest.spyOn(fixture.service, 'emitScheduledMaintenanceCreated');
-    expect(await fixture.service.createMaintenanceFromSchedule(1, 8, 'Due', manager as never, false)).toBe(
+    expect(await fixture.service.createMaintenanceFromSchedule(1, 8, 'Due', context, false)).toBe(
       fixture.mockMaintenance,
     );
-    expect(fixture.maintenanceRepository.create).toHaveBeenCalledWith(
-      expect.objectContaining({ maintenanceSchedule: { id: 8 }, endTime: null, reason: 'Due' }),
+    expect(fixture.store.createFromSchedule).toHaveBeenCalledWith(
+      { resourceId: 1, scheduleId: 8, reason: 'Due', startTime: expect.any(Date) },
+      context,
     );
     expect(emit).not.toHaveBeenCalled();
     await fixture.service.createMaintenanceFromSchedule(1, 8, 'Due');
     expect(emit).toHaveBeenCalledWith(1, 1);
-    jest.spyOn(fixture.resourceRepository, 'findOne').mockResolvedValue(null);
+    fixture.store.createFromSchedule.mockResolvedValue(null);
     await expect(fixture.service.createMaintenanceFromSchedule(99, 8, 'Due')).rejects.toThrow('not found');
   });
 
   it('checks active maintenance by resource or schedule through the supplied transaction', async () => {
-    const query = {
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      getOne: jest.fn().mockResolvedValue(fixture.mockMaintenance),
-    };
-    jest.spyOn(fixture.maintenanceRepository, 'createQueryBuilder').mockReturnValue(query as never);
+    fixture.store.hasActive.mockResolvedValue(true);
     expect(await fixture.service.hasActiveMaintenance(1)).toBe(true);
-    expect(query.where).toHaveBeenCalledWith('maintenance.resourceId = :resourceId', { resourceId: 1 });
-    query.getOne.mockResolvedValue(null);
-    const manager = { getRepository: () => fixture.maintenanceRepository };
-    expect(await fixture.service.hasActiveMaintenance({ resourceId: 1, scheduleId: 8 }, manager as never)).toBe(false);
-    expect(query.andWhere).toHaveBeenCalledWith('maintenance.maintenanceScheduleId = :scheduleId', { scheduleId: 8 });
+    expect(fixture.store.hasActive).toHaveBeenLastCalledWith({ resourceId: 1 }, expect.any(Date), undefined);
+    fixture.store.hasActive.mockResolvedValue(false);
+    const context = {};
+    expect(await fixture.service.hasActiveMaintenance({ resourceId: 1, scheduleId: 8 }, context)).toBe(false);
+    expect(fixture.store.hasActive).toHaveBeenLastCalledWith(
+      { resourceId: 1, scheduleId: 8 },
+      expect.any(Date),
+      context,
+    );
   });
 
   it('should be defined', () => {
@@ -48,38 +41,36 @@ describe('MaintenanceService', () => {
 
   describe('maintenance listing', () => {
     it.each([
-      [true, false, false, 'maintenance.startTime > :now'],
-      [false, true, false, 'maintenance.endTime IS NULL'],
-      [false, false, true, 'maintenance.endTime < :now'],
-      [true, true, true, null],
+      [true, false, false],
+      [false, true, false],
+      [false, false, true],
+      [true, true, true],
     ])(
-      'filters upcoming=%s active=%s past=%s before pagination',
-      async (includeUpcoming, includeActive, includePast, condition) => {
-        jest.spyOn(fixture.resourceRepository, 'findOne').mockResolvedValue(fixture.mockResource);
-        const query = fixture.maintenanceRepository.createQueryBuilder();
-        jest.spyOn(fixture.maintenanceRepository, 'createQueryBuilder').mockReturnValue(query);
-        jest.spyOn(query, 'getCount').mockResolvedValue(11);
-        jest.spyOn(query, 'getMany').mockResolvedValue([fixture.mockMaintenance]);
+      'hands upcoming=%s active=%s past=%s and the page window to the store',
+      async (includeUpcoming, includeActive, includePast) => {
+        fixture.store.page.mockResolvedValue({ data: [fixture.mockMaintenance], total: 11 });
         expect(
           await fixture.service.findMaintenances(1, { page: 2, limit: 5, includeUpcoming, includeActive, includePast }),
         ).toEqual({ data: [fixture.mockMaintenance], total: 11, page: 2, limit: 5 });
-        expect(query.where).toHaveBeenCalledWith('maintenance.resourceId = :resourceId', { resourceId: 1 });
-        if (condition)
-          expect(query.andWhere).toHaveBeenCalledWith(expect.stringContaining(condition), { now: expect.any(Date) });
-        else expect(query.andWhere).not.toHaveBeenCalled();
-        expect(query.skip).toHaveBeenCalledWith(5);
-        expect(query.take).toHaveBeenCalledWith(5);
-        expect(query.leftJoinAndSelect).toHaveBeenCalledWith('maintenance.completedByUser', 'completedByUser');
+        expect(fixture.store.page).toHaveBeenCalledWith(1, {
+          includeUpcoming,
+          includeActive,
+          includePast,
+          now: expect.any(Date),
+          skip: 5,
+          take: 5,
+        });
       },
     );
 
     it('rejects missing resources and an empty filter selection', async () => {
-      jest.spyOn(fixture.resourceRepository, 'findOne').mockResolvedValue(null);
+      fixture.store.resourceExists.mockResolvedValue(false);
       await expect(fixture.service.findMaintenances(99)).rejects.toBeInstanceOf(NotFoundException);
-      jest.spyOn(fixture.resourceRepository, 'findOne').mockResolvedValue(fixture.mockResource);
+      fixture.store.resourceExists.mockResolvedValue(true);
       await expect(
         fixture.service.findMaintenances(1, { includeUpcoming: false, includeActive: false, includePast: false }),
       ).rejects.toBeInstanceOf(BadRequestException);
+      expect(fixture.store.page).not.toHaveBeenCalled();
     });
   });
 
@@ -89,52 +80,48 @@ describe('MaintenanceService', () => {
         typeof fixture.service.canManageMaintenance
       >[0];
       expect(await fixture.service.canManageMaintenance(user, 1)).toBe(true);
-      expect(fixture.resourceIntroducerRepository.findOne).not.toHaveBeenCalled();
-      jest.spyOn(fixture.resourceIntroducerRepository, 'findOne').mockResolvedValue({ id: 2 });
+      expect(fixture.store.lookupMaintenanceAccess).not.toHaveBeenCalled();
+      fixture.store.lookupMaintenanceAccess.mockResolvedValue('direct');
       expect(await fixture.service.canManageMaintenance({ ...user, effectivePermissions: new Set() }, 1)).toBe(true);
-      expect(fixture.resourceRepository.findOne).not.toHaveBeenCalled();
     });
 
-    it('checks resource group introductions and denies missing or failed lookups', async () => {
+    it('accepts group introductions and denies missing or failed lookups', async () => {
       const user = { id: 7 } as Parameters<typeof fixture.service.canManageMaintenance>[0];
-      jest
-        .spyOn(fixture.resourceIntroducerRepository, 'findOne')
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({ id: 4 });
-      jest
-        .spyOn(fixture.resourceRepository, 'findOne')
-        .mockResolvedValue({ ...fixture.mockResource, groups: [{ id: 3 }] });
+      fixture.store.lookupMaintenanceAccess.mockResolvedValue('group');
       expect(await fixture.service.canManageMaintenance(user, 1)).toBe(true);
-      expect(fixture.resourceIntroducerRepository.findOne).toHaveBeenLastCalledWith({
-        where: { user: { id: 7 }, resourceGroup: { id: expect.objectContaining({ _value: [3] }) } },
-      });
-      jest.spyOn(fixture.resourceIntroducerRepository, 'findOne').mockResolvedValue(null);
+      expect(fixture.store.lookupMaintenanceAccess).toHaveBeenLastCalledWith(7, 1, undefined);
+      fixture.store.lookupMaintenanceAccess.mockResolvedValue('none');
       expect(await fixture.service.canManageMaintenance(user, 1)).toBe(false);
-      jest.spyOn(fixture.resourceRepository, 'findOne').mockResolvedValue(null);
+      fixture.store.lookupMaintenanceAccess.mockResolvedValue('resource-missing');
       expect(await fixture.service.canManageMaintenance(user, 1)).toBe(false);
-      jest.spyOn(fixture.resourceIntroducerRepository, 'findOne').mockRejectedValue(new Error('Database unavailable'));
+      fixture.store.lookupMaintenanceAccess.mockRejectedValue(new Error('Database unavailable'));
       expect(await fixture.service.canManageMaintenance(user, 1)).toBe(false);
     });
   });
 
   describe('createMaintenance', () => {
-    it('should create a maintenance successfully', async () => {
+    it('should create a maintenance successfully and announce it', async () => {
       const futureDate = new Date();
       futureDate.setDate(futureDate.getDate() + 1); // Tomorrow
 
-      const dto = {
-        startTime: futureDate.toISOString(),
-        reason: 'Test maintenance',
-      };
-
-      jest.spyOn(fixture.resourceRepository, 'findOne').mockResolvedValue(fixture.mockResource);
-      jest.spyOn(fixture.maintenanceRepository, 'create').mockReturnValue(fixture.mockMaintenance);
-      jest.spyOn(fixture.maintenanceRepository, 'save').mockResolvedValue(fixture.mockMaintenance);
-
-      const result = await fixture.service.createMaintenance(1, dto);
+      const result = await fixture.service.createMaintenance(
+        1,
+        { startTime: futureDate.toISOString(), reason: 'Test' },
+        5,
+      );
 
       expect(result).toEqual(fixture.mockMaintenance);
-      expect(fixture.resourceRepository.findOne).toHaveBeenCalledWith({ where: { id: 1 } });
+      expect(fixture.store.createManual).toHaveBeenCalledWith({
+        resourceId: 1,
+        startTime: futureDate,
+        endTime: null,
+        reason: 'Test',
+        createdByUserId: 5,
+      });
+      expect(fixture.eventEmitter.emit).toHaveBeenCalledWith(
+        'resource.maintenance.changed',
+        expect.objectContaining({ resourceId: 1, maintenanceId: 1, action: 'created' }),
+      );
     });
 
     it('should throw error if resource not found', async () => {
@@ -142,10 +129,18 @@ describe('MaintenanceService', () => {
         startTime: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
       };
 
-      jest.spyOn(fixture.resourceRepository, 'findOne').mockResolvedValue(null);
+      fixture.store.resourceExists.mockResolvedValue(false);
 
       await expect(fixture.service.createMaintenance(999, dto)).rejects.toThrow(
         new NotFoundException('Resource with ID 999 not found'),
+      );
+      expect(fixture.store.createManual).not.toHaveBeenCalled();
+    });
+
+    it('rejects an end time that is not after the start time', async () => {
+      const startTime = new Date(Date.now() + 86400000).toISOString();
+      await expect(fixture.service.createMaintenance(1, { startTime, endTime: startTime })).rejects.toThrow(
+        new BadRequestException('End time must be after start time'),
       );
     });
 
@@ -155,33 +150,30 @@ describe('MaintenanceService', () => {
         reason: 'Test maintenance with past start time',
       };
 
-      jest.spyOn(fixture.resourceRepository, 'findOne').mockResolvedValue(fixture.mockResource);
-      jest.spyOn(fixture.maintenanceRepository, 'create').mockReturnValue(fixture.mockMaintenance);
-      jest.spyOn(fixture.maintenanceRepository, 'save').mockResolvedValue(fixture.mockMaintenance);
-
       const result = await fixture.service.createMaintenance(1, dto);
 
       expect(result).toEqual(fixture.mockMaintenance);
-      expect(fixture.resourceRepository.findOne).toHaveBeenCalledWith({ where: { id: 1 } });
     });
   });
 
   describe('finishMaintenance', () => {
     it('should finish a maintenance successfully', async () => {
-      const maintenance = { ...fixture.mockMaintenance, endTime: null };
-      const finishedMaintenance = { ...maintenance, endTime: new Date() };
+      const finished = { ...fixture.mockMaintenance, endTime: new Date() };
+      fixture.store.findById.mockResolvedValue(fixture.mockMaintenance);
+      fixture.store.markFinished.mockResolvedValue(finished);
 
-      jest.spyOn(fixture.maintenanceRepository, 'findOne').mockResolvedValue(maintenance);
-      jest.spyOn(fixture.maintenanceRepository, 'save').mockResolvedValue(finishedMaintenance);
-
-      const result = await fixture.service.finishMaintenance(1);
+      const result = await fixture.service.finishMaintenance(1, { userId: 5 });
 
       expect(result.endTime).toBeDefined();
-      expect(fixture.maintenanceRepository.save).toHaveBeenCalled();
+      expect(fixture.store.markFinished).toHaveBeenCalledWith(1, expect.any(Date), 5);
+      expect(fixture.eventEmitter.emit).toHaveBeenCalledWith(
+        'resource.maintenance.changed',
+        expect.objectContaining({ action: 'finished' }),
+      );
     });
 
     it('should throw error if maintenance not found', async () => {
-      jest.spyOn(fixture.maintenanceRepository, 'findOne').mockResolvedValue(null);
+      fixture.store.findById.mockResolvedValue(null);
 
       await expect(fixture.service.finishMaintenance(999)).rejects.toThrow(
         new NotFoundException('Maintenance with ID 999 not found'),
@@ -189,13 +181,12 @@ describe('MaintenanceService', () => {
     });
 
     it('should throw error if maintenance already finished', async () => {
-      const finishedMaintenance = { ...fixture.mockMaintenance, endTime: new Date() };
-
-      jest.spyOn(fixture.maintenanceRepository, 'findOne').mockResolvedValue(finishedMaintenance);
+      fixture.store.findById.mockResolvedValue({ ...fixture.mockMaintenance, endTime: new Date() });
 
       await expect(fixture.service.finishMaintenance(1)).rejects.toThrow(
         new BadRequestException('Maintenance is already finished'),
       );
+      expect(fixture.store.markFinished).not.toHaveBeenCalled();
     });
   });
 
@@ -208,31 +199,24 @@ describe('MaintenanceService', () => {
           new Set(['resources.maintenance.manage']),
         ),
       ).resolves.toEqual(new Set([10, 20]));
-      expect(fixture.resourceIntroducerRepository.createQueryBuilder).not.toHaveBeenCalled();
+      expect(fixture.store.introducerManagedResourceIds).not.toHaveBeenCalled();
     });
 
-    it('batches direct and group maintenance roles for a resource list', async () => {
-      const query = {
-        leftJoin: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        addSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getRawMany: jest.fn().mockResolvedValue([
-          { resourceId: 10, groupResourceId: null },
-          { resourceId: null, groupResourceId: 20 },
-        ]),
-      };
-      jest.spyOn(fixture.resourceIntroducerRepository, 'createQueryBuilder').mockReturnValue(query as never);
+    it('asks the store once for the direct and group maintenance roles of a resource list', async () => {
+      fixture.store.introducerManagedResourceIds.mockResolvedValue(new Set([10, 20]));
 
       await expect(fixture.service.getMaintenanceManagedResourceIds({ id: 7 } as never, [10, 20, 30])).resolves.toEqual(
         new Set([10, 20]),
       );
 
-      expect(fixture.resourceIntroducerRepository.createQueryBuilder).toHaveBeenCalledTimes(1);
-      expect(query.andWhere).toHaveBeenCalledWith(
-        '(resource.id IN (:...resourceIds) OR groupResource.id IN (:...resourceIds))',
-        { resourceIds: [10, 20, 30] },
+      expect(fixture.store.introducerManagedResourceIds).toHaveBeenCalledTimes(1);
+      expect(fixture.store.introducerManagedResourceIds).toHaveBeenCalledWith(7, [10, 20, 30], undefined);
+    });
+
+    it('manages nothing when the role lookup fails', async () => {
+      fixture.store.introducerManagedResourceIds.mockRejectedValue(new Error('Database unavailable'));
+      await expect(fixture.service.getMaintenanceManagedResourceIds({ id: 7 } as never, [10])).resolves.toEqual(
+        new Set(),
       );
     });
   });
