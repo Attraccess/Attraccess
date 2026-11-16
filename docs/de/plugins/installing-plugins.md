@@ -62,7 +62,7 @@ Plugins koennen ein- oder ausgeschaltet werden, ohne sie zu entfernen:
 
 ## Lizenz fehlt
 
-Einige Plugins brauchen ein bezahltes Lizenzmodul. Das Plugin **WAGO** braucht zum Beispiel das Modul `wago`. Der
+Einige Plugins brauchen ein bezahltes Lizenzmodul. Das Plugin **WAGO** braucht das Modul `wago`, das Plugin **Reservierungen** das Modul `reservations`. Der
 Schluessel fuer gemeinnuetzige Nutzung enthaelt es nicht.
 
 Deckt die Lizenz ein Plugin nicht ab, zeigt **Einstellungen > Plugins** es mit dem Status **Lizenz fehlt** und nennt, was

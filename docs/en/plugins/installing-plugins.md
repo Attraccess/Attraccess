@@ -62,7 +62,7 @@ Plugins can be toggled on or off without removing them:
 
 ## License missing
 
-Some plugins need a paid license module. The **WAGO** plugin, for example, needs the `wago` module. The key for
+Some plugins need a paid license module. The **WAGO** plugin needs the `wago` module and the **Reservations** plugin needs the `reservations` module. The key for
 non-profit use does not include it.
 
 If the license does not cover a plugin, **Settings > Plugins** shows it with the status **License missing** and names

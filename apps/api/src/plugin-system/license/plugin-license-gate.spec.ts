@@ -51,6 +51,40 @@ describe('plugin license gate', () => {
   const nonProfit = { valid: true, modules: ['attractap', 'sso', 'billing', 'maintenance'] };
   const wagoLicense = { valid: true, modules: ['attractap', 'wago'] };
 
+  describe('paid plugins (wago, reservations)', () => {
+    const readJson = (path: string) => JSON.parse(readFileSync(join(__dirname, '../../../../plugins', path), 'utf8'));
+
+    it.each(['wago', 'reservations'])('the shipped %s plugin declares its own paid module', (name) => {
+      const manifest = readJson(`${name}/plugin.json`);
+      const pkg = readJson(`${name}/package.json`);
+      expect(manifest.license).toEqual({ required: true, modules: [name] });
+      expect(pkg.attraccess.license).toEqual(manifest.license);
+      expect(pkg.license).toBe('SEE LICENSE IN LICENSE.md');
+      expect(manifest.attraccessVersion.min).toBe('1.11.0-beta.1');
+      expect(pkg.attraccess.host).toBe('^1.11.0-beta.1');
+      expect(readFileSync(join(__dirname, '../../../../plugins', name, 'LICENSE.md'), 'utf8')).toContain(`\`${name}\``);
+    });
+
+    it.each([
+      ['reservations', ['reservations'], ['reservations']],
+      ['wago', ['wago'], ['wago']],
+      ['both', ['wago', 'reservations'], ['reservations', 'wago']],
+      ['the non-profit key', ['attractap', 'sso', 'billing', 'maintenance'], []],
+    ])('a license with %s loads exactly the matching paid plugins', (_label, modules, expected) => {
+      fixture('wago', { required: true, modules: ['wago'] });
+      fixture('reservations', { required: true, modules: ['reservations'] });
+      PluginService.setLicenseSnapshot({ valid: true, modules });
+      PluginModule.forRoot();
+      expect(loaded().sort()).toEqual(expected);
+      if (!expected.includes('reservations')) {
+        expect(status('reservations')).toMatchObject({
+          status: 'license_missing',
+          error: 'Requires license module: reservations',
+        });
+      }
+    });
+  });
+
   it('loads a module plugin with the module and keeps ungated plugins loading', () => {
     fixture('wago', { required: true, modules: ['wago'] });
     fixture('plain', undefined);

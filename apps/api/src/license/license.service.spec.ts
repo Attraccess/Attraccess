@@ -224,6 +224,7 @@ describe('LicenseService', () => {
     const data = await service.getLicenseData();
 
     expect(data.modules).not.toContain('wago');
+    expect(data.modules).not.toContain('reservations');
     await expect(service.verifyLicense({ modules: ['wago'] })).rejects.toThrow(
       'Trying to use module(s) that are not included in the license: wago',
     );

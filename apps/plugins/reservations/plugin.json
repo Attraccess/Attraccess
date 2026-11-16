@@ -17,7 +17,7 @@
     }
   },
   "attraccessVersion": {
-    "min": "1.11.0-0"
+    "min": "1.11.0-beta.1"
   },
   "permissions": [
     "DATABASE_ACCESS",
@@ -28,5 +28,9 @@
     "READ_SETTINGS",
     "SEND_NOTIFICATIONS",
     "READER_UI"
-  ]
+  ],
+  "license": {
+    "required": true,
+    "modules": ["reservations"]
+  }
 }

@@ -1,14 +1,32 @@
-# Lizenz von @attraccess/plugin-reservations
+# Kommerzielle Lizenz – Attraccess Plugin „Reservierungen“
 
 Copyright (c) 2025 Jan Jaap (Github: JappyJan, E-Mail: mail@janjaap.de)
 Project: Attraccess
 
-Dieses Plugin hat keine eigene Lizenz. Es steht unter der Lizenz des Attraccess-Kerns, der **Prosperity Public License 3.0 – Modified Version**. Der vollständige Text steht in der Datei [LICENSE.md im Repository-Stamm](https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md).
+## 1. Geltungsbereich
 
-Kurz zusammengefasst (maßgeblich ist allein der Text der Kernlizenz):
+Diese Lizenz gilt für das Plugin `@attraccess/plugin-reservations` (Ordner `apps/plugins/reservations`). Sie ersetzt für dieses Plugin die Lizenz des Attraccess-Kerns (Prosperity Public License 3.0 – Modified Version). Die Lizenz des Kerns erlaubt die kostenlose nicht-kommerzielle Nutzung; **diese Erlaubnis erstreckt sich nicht auf dieses Plugin.**
 
-- Kostenlos für Privatpersonen und gemeinnützige Organisationen, für nicht-kommerzielle Zwecke.
-- Kommerzielle Nutzer dürfen 30 Tage kostenlos evaluieren, danach ist eine kommerzielle Lizenz erforderlich.
-- Forks und abgeleitete Werke nur unter exakt denselben Lizenzbedingungen.
+## 2. Nur kommerziell
 
-Für kommerzielle Lizenzen: [contact@attraccess.org](mailto:contact@attraccess.org)
+- Die Nutzung dieses Plugins ist **ausschließlich gegen Bezahlung** erlaubt.
+- Voraussetzung ist eine bezahlte Attraccess-Lizenz mit dem Lizenzmodul **`reservations`**.
+- Es gibt **keine kostenlose und keine gemeinnützige Nutzung**. Der Lizenzschlüssel für gemeinnützige Nutzung schaltet dieses Plugin nicht frei.
+- Es gibt keine kostenlose Testphase.
+
+## 3. Technische Durchsetzung
+
+Attraccess lädt dieses Plugin nur, wenn die installierte Lizenz das Modul `reservations` enthält. Das Umgehen oder Entfernen dieser Prüfung ist keine erlaubte Nutzung und ändert nichts an den Lizenzpflichten.
+
+## 4. Weitergabe und Änderung
+
+Ohne ausdrückliche schriftliche Genehmigung des Autors ist es nicht gestattet, dieses Plugin zu verbreiten, zu verkaufen, unterzulizenzieren, zu verändern oder abgeleitete Werke weiterzugeben. Das Betrachten des Quelltexts ist erlaubt.
+
+## 5. Keine Garantie
+
+DIE SOFTWARE WIRD OHNE JEGLICHE GARANTIE ZUR VERFÜGUNG GESTELLT. DER AUTOR ÜBERNIMMT KEINE HAFTUNG FÜR DIREKTE ODER INDIREKTE SCHÄDEN ODER FOLGEKOSTEN. DIES GILT INSBESONDERE FÜR DIE DURCHSETZUNG VON RESERVIERUNGEN: DAS PLUGIN IST KEINE SICHERHEITS- ODER ZUGANGSKONTROLLFUNKTION UND GARANTIERT NICHT, DASS EINE RESSOURCE NUR VON BERECHTIGTEN GESTARTET WIRD.
+
+---
+
+**Lizenzen erwerben:**  
+Bitte kontaktiere [contact@attraccess.org](mailto:contact@attraccess.org).
