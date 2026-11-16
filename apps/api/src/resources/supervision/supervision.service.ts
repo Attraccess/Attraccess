@@ -34,6 +34,7 @@ import { StartUsageSessionDto } from '../usage/dtos/startUsageSession.dto';
 import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto';
 
 import { PendingSupervisionRequest, ReaderSupervisionCallbacks, ReaderSupervisionArmer } from './supervision.types';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 export type {
   PendingSupervisionRequest,
   ReaderSupervisionCallbacks,
@@ -128,7 +129,7 @@ export class SupervisionService {
   public async approve(
     requestId: string,
     supervisor: User,
-    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' | null = 'session',
+    authenticationMethod: AuthenticationMethod | null = 'session',
     apiTokenId?: number,
   ): Promise<ResourceUsage> {
     const request = this.getPendingForSupervisorOrThrow(requestId, supervisor, { allowAnyAuthorized: true });
@@ -185,7 +186,7 @@ export class SupervisionService {
   public reject(
     requestId: string,
     supervisor: User,
-    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): SupervisionDecisionResponseDto {
     const request = this.getPendingForSupervisorOrThrow(requestId, supervisor);

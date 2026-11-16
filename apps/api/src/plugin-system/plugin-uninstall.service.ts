@@ -8,6 +8,8 @@ import { join } from 'path';
 
 import { PluginMigrationService } from './plugin-migration.service';
 
+import { PluginBleService } from './ble/plugin-ble.service';
+
 import { PluginService } from './plugin.service';
 
 /**
@@ -18,7 +20,10 @@ import { PluginService } from './plugin.service';
 export class PluginUninstallService {
   private static readonly logger = new Logger('PluginService');
 
-  constructor(private readonly pluginService: PluginService) {}
+  constructor(
+    private readonly pluginService: PluginService,
+    private readonly ble: PluginBleService,
+  ) {}
 
   async deletePlugin(pluginId: string, deferRestart = false) {
     const plugin = PluginService.getPlugins().find((plugin) => plugin.id === pluginId);
@@ -51,12 +56,22 @@ export class PluginUninstallService {
       }
     }
 
+    // The plugin's BLE endpoints reference a plugin that is going away. A failure is logged, never blocking.
+    try {
+      await this.ble.deleteAllForPlugin(plugin.id);
+    } catch (error) {
+      PluginUninstallService.logger.error(`Failed to delete BLE endpoints of plugin ${plugin.name}`, error as Error);
+    }
+
     // delete folder
     await rm(pluginFolder, { recursive: true });
     try {
       PluginService.clearPluginQuarantine(plugin.pluginDirectory);
     } catch (error) {
-      PluginUninstallService.logger.error(`Failed to clear quarantine for deleted plugin ${plugin.name}`, error as Error);
+      PluginUninstallService.logger.error(
+        `Failed to clear quarantine for deleted plugin ${plugin.name}`,
+        error as Error,
+      );
     }
 
     // restart app

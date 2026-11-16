@@ -10,6 +10,8 @@ export const AUTHORIZATION_CODE_TTL_MS = 2 * 60 * 1000;
 export const ACCESS_TOKEN_TTL_MS = 15 * 60 * 1000;
 /** Absolute lifetime of a grant, and so of its refresh tokens. */
 export const GRANT_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
+/** Longest `state` the authorization endpoint stores and echoes back. */
+export const MAX_STATE_LENGTH = 1024;
 
 const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
 
@@ -48,8 +50,6 @@ export function isLoopbackRedirectUri(value: string): boolean {
     return false;
   }
 }
-
-export const hashSecret = (value: string): string => createHash('sha256').update(value).digest('hex');
 
 export const randomSecret = (prefix: string): string => `${prefix}${randomBytes(32).toString('base64url')}`;
 

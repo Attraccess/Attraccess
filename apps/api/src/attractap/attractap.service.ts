@@ -44,6 +44,7 @@ import { createTranslator } from '../i18n/translate';
 import * as de from './rfid-card-notification.de.json';
 
 import * as en from './rfid-card-notification.en.json';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 export const t = createTranslator({ en, de });
 
@@ -274,6 +275,7 @@ export class AttractapService {
       connectedResourceIds?: number[];
       firmware?: AttractapFirmwareVersion;
       ledBrightness?: number;
+      allowPluginBle?: boolean;
     },
     emitEvent = true,
   ): Promise<Attractap> {
@@ -289,6 +291,10 @@ export class AttractapService {
 
     if (updateData.ledBrightness !== undefined) {
       reader.ledBrightness = updateData.ledBrightness;
+    }
+
+    if (updateData.allowPluginBle !== undefined) {
+      reader.allowPluginBle = updateData.allowPluginBle;
     }
 
     if (updateData.firmware) {
@@ -345,7 +351,7 @@ export class AttractapService {
 
   public async recordReaderDeregistration(
     readerId: number,
-    principal: { userId: number; authenticationMethod: 'session' | 'api-token' | 'mcp-oauth'; apiTokenId?: number },
+    principal: { userId: number; authenticationMethod: AuthenticationMethod; apiTokenId?: number },
   ): Promise<void> {
     await this.audit.record({
       domain: 'attractap',

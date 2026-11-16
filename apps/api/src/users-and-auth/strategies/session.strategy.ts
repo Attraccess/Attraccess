@@ -13,7 +13,7 @@ import { resolveIp } from '../rate-limiting/login.rate-limit.guard';
 import { User } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { isValkeyUnavailableError, valkeyUnavailableException } from '../../valkey/valkey-unavailable';
-import { getMcpDelegation, McpDelegation } from '../../mcp/mcp-delegation';
+import { getMcpDelegation, McpDelegation } from './mcp-delegation';
 
 const TWO_FACTOR_SETUP_ALLOWED_PREFIXES = ['/auth/two-factor', '/auth/session', '/users/me'];
 

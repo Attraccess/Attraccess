@@ -34,9 +34,6 @@ jobs:
     uses: ./.github/workflows/attractap-firmware.yml
     secrets: inherit
 
-  build-attractap-desktop:
-    uses: ./.github/workflows/build-attractap-desktop.yml
-
   test:
     runs-on: ubuntu-latest
     steps:
@@ -51,7 +48,7 @@ jobs:
         run: pnpm --dir examples/plugin-hello-world run pack-test
 
   balena:
-    needs: [build-companion, build-attractap-firmware, build-attractap-desktop, test]
+    needs: [build-companion, build-attractap-firmware, test]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

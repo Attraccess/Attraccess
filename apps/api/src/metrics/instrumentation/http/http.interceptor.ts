@@ -6,6 +6,7 @@ import { Request, Response } from 'express';
 import { HTTP_METRICS } from '../../definitions/tokens';
 import { HttpMetrics } from '../../definitions/http.metrics';
 import { MetricsToggleService } from '../../settings/metrics-toggle.service';
+import { AUTHENTICATION_METHODS, type AuthenticationMethod } from '@attraccess/database-entities';
 
 @Injectable()
 export class HttpMetricsInterceptor implements NestInterceptor {
@@ -52,7 +53,9 @@ export class HttpMetricsInterceptor implements NestInterceptor {
   }
 }
 
-function authenticationMethod(request: Request): 'api-token' | 'session' | 'anonymous' {
-  const method = (request.user as { authenticationMethod?: string } | undefined)?.authenticationMethod;
-  return method === 'api-token' || method === 'session' ? method : 'anonymous';
+function authenticationMethod(request: Request): AuthenticationMethod | 'anonymous' {
+  const method = (request.user as { authenticationMethod?: unknown } | undefined)?.authenticationMethod;
+  return (AUTHENTICATION_METHODS as readonly unknown[]).includes(method)
+    ? (method as AuthenticationMethod)
+    : 'anonymous';
 }

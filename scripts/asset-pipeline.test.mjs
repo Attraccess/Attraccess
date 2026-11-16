@@ -91,7 +91,8 @@ const action = (name) => parse(fs.readFileSync(`.github/actions/${name}/action.y
 test('every main pipeline tests all deliverables and bundles artifacts built in the same run', () => {
   for (const name of ['pull-requests', 'docker-nightly-latest', 'release']) {
     const { jobs } = workflow(name);
-    for (const deliverable of ['build-companion', 'build-attractap-firmware', 'build-attractap-desktop']) {
+    assert.equal(jobs['build-attractap-desktop'], undefined, `${name}: the desktop simulator is dev-only`);
+    for (const deliverable of ['build-companion', 'build-attractap-firmware']) {
       assert.ok(jobs[deliverable].uses, `${name}: ${deliverable} must always run`);
       assert.equal(jobs[deliverable].if, undefined);
       const consumer = name === 'docker-nightly-latest' ? jobs['publish-gate'] : jobs.containerize;
@@ -217,7 +218,8 @@ test('manual builds use the dispatch ref without accepting a separate checkout r
     const checkout = jobs[job].steps.find((step) => step.uses === 'actions/checkout@v7');
     assert.equal(checkout.with?.ref, undefined);
   }
-  for (const job of ['build-companion', 'build-attractap-firmware', 'build-attractap-desktop']) {
+  assert.equal(jobs['build-attractap-desktop'], undefined);
+  for (const job of ['build-companion', 'build-attractap-firmware']) {
     assert.equal(jobs[job].with?.ref, undefined);
     assert.ok(jobs.balena.needs.includes(job));
   }

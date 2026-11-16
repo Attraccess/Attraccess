@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import {
-  hashSecret,
   isAllowedRedirectUri,
   isLoopbackRedirectUri,
   isSecureOrLoopbackOrigin,
@@ -55,8 +54,7 @@ describe('MCP OAuth rules', () => {
     expect(parseScope(undefined)).toEqual([]);
   });
 
-  it('hashes secrets and generates unguessable prefixed ones', () => {
-    expect(hashSecret('x')).toMatch(/^[0-9a-f]{64}$/);
+  it('generates unguessable prefixed secrets', () => {
     const first = randomSecret('mcp_at_');
     expect(first).toMatch(/^mcp_at_[A-Za-z0-9_-]{43}$/);
     expect(randomSecret('mcp_at_')).not.toBe(first);

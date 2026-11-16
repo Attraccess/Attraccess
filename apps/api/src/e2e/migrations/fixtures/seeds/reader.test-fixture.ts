@@ -4,6 +4,7 @@ import {
   AttractapCrashReport,
   AttractapCredentialEvent,
   AttractapInstallation,
+  PluginBleEndpointEntity,
   ReaderUiAlert,
   ReaderUiPluginSettings,
   ReaderUiReaderSettings,
@@ -87,6 +88,15 @@ export async function migrationReaderSeeds(dataSource: DataSource, seedTag: stri
     serverCertificatePem: 'seed-server-certificate',
     serverPrivateKeyEncrypted: 'seed-server-key',
     serverCertificateNotAfter: new Date('2030-01-01T00:00:00Z'),
+  }));
+
+  await ensureEntity(dataSource.getRepository(PluginBleEndpointEntity), () => ({
+    pluginId: `seed-plugin-${seedTag}`,
+    readerId: attractap.id,
+    address: 'AA:BB:CC:DD:EE:FF',
+    addressType: 'public' as const,
+    profileId: 'seed-profile',
+    label: null,
   }));
 
   await ensureEntity(billingConfigRepo, () => ({

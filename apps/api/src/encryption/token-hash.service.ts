@@ -46,4 +46,12 @@ export class TokenHashService {
     }
     return createHmac('sha256', this.getHashKey('api')).update(token, 'utf8').digest('base64url');
   }
+
+  /** MCP OAuth tokens, authorization codes and authorization request ids. */
+  hashMcpToken(token: string): string {
+    if (typeof token !== 'string' || token.length === 0) {
+      throw new TypeError('hashMcpToken: token must be a non-empty string');
+    }
+    return createHmac('sha256', this.getHashKey('mcp')).update(token, 'utf8').digest('base64url');
+  }
 }

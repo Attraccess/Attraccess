@@ -87,6 +87,10 @@ import { ResourceFlowsExecutorService } from '../resources/flows/execution/resou
 
 import { createPluginAuditContext } from './runtime/audit-context';
 
+import { createPluginBleContext } from './ble/plugin-ble-context';
+
+import { PluginBleService } from './ble/plugin-ble.service';
+
 import { preparePluginNotifications } from './runtime/plugin-notifications';
 import {
   PLUGIN_START_BLOCKED_CHANGED_EVENT,
@@ -148,6 +152,7 @@ export class PluginModule {
           PluginClassificationService,
           PluginLiveUpdatesService,
           PluginSystemEventsBridge,
+          PluginBleService,
         ],
         exports: [PluginEventsService],
         controllers: [PluginController],
@@ -226,6 +231,7 @@ export class PluginModule {
         PluginClassificationService,
         PluginLiveUpdatesService,
         PluginSystemEventsBridge,
+        PluginBleService,
         ReaderUiWiring,
       ],
       exports: [PluginEventsService],
@@ -332,6 +338,8 @@ export class PluginModule {
               getImplementationClass().pluginLiveUpdates().clearPlugin(manifest.id);
               unregisterReaderUi(manifest.name);
               categories.unregister();
+              // Closes this plugin's BLE sessions with `shutdown`; a plugin that never got host refs has none.
+              return getImplementationClass().closePluginBleSessions(manifest.id);
             },
           }),
         },
@@ -397,6 +405,9 @@ export class PluginModule {
       ),
       manifest: PluginService.toManifestInfo(manifest),
       readerUi: { invalidate: (scope) => invalidateReaderUi(manifest.name, scope) },
+      ble: createPluginBleContext({ id: manifest.id, logger: new Logger(`Plugin:${manifest.name}`) }, () =>
+        getImplementationClass().hostRefs().get(PluginBleService),
+      ),
       startBlocked: {
         invalidate: ({ resourceId }) => {
           if (!Number.isInteger(resourceId)) return;
@@ -546,6 +557,18 @@ export class PluginModule {
     return getImplementationClass()
       .requireRef(getImplementationClass().moduleRef, 'ModuleRef')
       .get(PluginLiveUpdatesService, { strict: false });
+  }
+
+  protected static async closePluginBleSessions(pluginId: string): Promise<void> {
+    const ref = getImplementationClass().moduleRef;
+    if (!ref) return;
+    try {
+      await ref.get(PluginBleService, { strict: false }).closePluginSessions(pluginId, 'shutdown');
+    } catch (error) {
+      getImplementationClass().logger.warn(
+        `Closing BLE sessions of plugin ${pluginId} failed: ${(error as Error).message}`,
+      );
+    }
   }
 
   protected static pluginMqtt(): PluginMqttService {

@@ -1,7 +1,8 @@
 name: Build Attractap Desktop for macOS
 
+# Dev-only tool, not part of any production bundle: no pipeline runs this.
+# Start it by hand (Actions → Run workflow) when you need fresh DMGs.
 on:
-  workflow_call:
   workflow_dispatch:
 
 permissions:

@@ -18,6 +18,7 @@ import { EmailService } from '../../email/email.service';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 
 import { ProjectAccessService } from '../project-access.service';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 /** Audit details of an invitation. */
 export function invitationDetails(invitation: ProjectInvitation): Record<string, string | number> {
@@ -52,7 +53,7 @@ export class ProjectInvitations {
   public async acceptInvitation(
     userId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitation> {
     return await this.respondToInvitation(
@@ -67,7 +68,7 @@ export class ProjectInvitations {
   public async declineInvitation(
     userId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitation> {
     return await this.respondToInvitation(
@@ -83,7 +84,7 @@ export class ProjectInvitations {
     userId: number,
     invitationId: number,
     status: ProjectInvitationStatus,
-    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth',
+    authenticationMethod: AuthenticationMethod,
     apiTokenId?: number,
   ): Promise<ProjectInvitation> {
     const invitation = await this.getInvitationWithRelations(invitationId);
@@ -182,7 +183,7 @@ export class ProjectInvitations {
     projectId: number,
     invitedUserId: number,
     role: ProjectMemberRole = ProjectMemberRole.VIEWER,
-    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitation> {
     const project = await this.projectAccessService.ensureOwner(ownerId, projectId);
@@ -241,7 +242,7 @@ export class ProjectInvitations {
     ownerId: number,
     projectId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitation> {
     await this.projectAccessService.ensureOwner(ownerId, projectId);
@@ -273,7 +274,7 @@ export class ProjectInvitations {
     ownerId: number,
     projectId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitation> {
     await this.projectAccessService.ensureOwner(ownerId, projectId);

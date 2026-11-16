@@ -1,0 +1,15 @@
+{
+  "intro": "Attraccess ist ein MCP-Server. KI-Clients, die das Model Context Protocol (MCP) unterstützen, können damit für dich Dinge in Attraccess nachschlagen und ändern, nie mit mehr Berechtigungen, als du selbst hast.",
+  "urlLabel": "Server-URL",
+  "copy": "Server-URL kopieren",
+  "copied": "Server-URL kopiert",
+  "copyFailed": "Die Server-URL konnte nicht kopiert werden",
+  "signIn": {
+    "title": "Anmeldung",
+    "oauth": "OAuth: Trage die Server-URL in deinem KI-Client ein. Er öffnet Attraccess im Browser, wo du dich anmeldest und festlegst, was der Client darf.",
+    "apiToken": "API-Token: Erstelle unter API-Tokens ein Token und stelle deinen Client so ein, dass er es im Header Authorization: Bearer <token> sendet. Der Client erhält nur die Berechtigungen des Tokens.",
+    "oauthUnavailable": "Die Anmeldung per OAuth ist nicht verfügbar, weil Attraccess hier nicht über HTTPS erreichbar ist. Verwende ein API-Token."
+  },
+  "docs": "So verbindest du einen KI-Client",
+  "docsUrl": "https://docs.attraccess.org/#/de/developer/mcp"
+}

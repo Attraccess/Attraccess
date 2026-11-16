@@ -60,6 +60,11 @@ const EXACT: Record<string, string> = {
   createSecureBootKeys: 'Secret management: generates secure-boot key material.',
   restoreSecureBootKeys: 'Secret management: restores secure-boot key material from a backup.',
   checkRecoveryKey: 'Secret management: checks a secure-boot recovery key.',
+  createOneUser: 'Credential flow: public sign-up that sets the new account password.',
+  PluginController_addRegistry: 'Secret management: stores an npm registry and its access token.',
+  PluginController_removeRegistry: 'Secret management: removes an npm registry and its stored access token.',
+  PluginController_setUpdatePolicy:
+    'Host lifecycle: changes automatic plugin updates, which install code and restart the host.',
 };
 
 const PATTERNS: Array<[RegExp, string]> = [
@@ -84,7 +89,7 @@ const PATTERNS: Array<[RegExp, string]> = [
   ],
   [/ApiToken/, 'API-token management: a token must never mint or change tokens.'],
   [
-    /^PluginController_(add|remove|install|update|replace|check|setUpdate)|^(uploadPlugin|retryPlugin|deletePlugin)$/,
+    /^PluginController_(removePackageGraph|installPackage|installPackageSpec|removeInstalledPackage|updateInstalledPackage\w*|replaceInstalledPackage)$|^(uploadPlugin|retryPlugin|deletePlugin)$/,
     'Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.',
   ],
 ];

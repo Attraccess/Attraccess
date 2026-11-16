@@ -3,15 +3,18 @@ import { lastValueFrom, of } from 'rxjs';
 import { ApiTokenRequestRateLimitInterceptor } from './api-token-request-rate-limit.interceptor';
 
 describe('API token request rate limit interceptor', () => {
+  const noSkip = { getAllAndOverride: () => undefined };
   const setup = (user?: object, requestDetails: object = {}, type = 'http') => {
     const rateLimit = { assertWithinLimit: jest.fn().mockResolvedValue(undefined) };
     const audit = { log: jest.fn() };
     const next = { handle: jest.fn(() => of('response')) };
     const context = {
       getType: () => type,
+      getHandler: () => undefined,
+      getClass: () => undefined,
       switchToHttp: () => ({ getRequest: () => ({ user, ...requestDetails }) }),
     } as unknown as ExecutionContext;
-    const interceptor = new ApiTokenRequestRateLimitInterceptor(rateLimit as never, audit as never);
+    const interceptor = new ApiTokenRequestRateLimitInterceptor(rateLimit as never, audit as never, noSkip as never);
     return { rateLimit, audit, next, context, interceptor };
   };
   it.each([undefined, { authenticationMethod: 'session' }, { authenticationMethod: 'api-token' }])(
@@ -53,5 +56,26 @@ describe('API token request rate limit interceptor', () => {
     expect(audit.log).toHaveBeenCalledWith(
       expect.objectContaining({ ip, userId: 3, apiTokenId: 7, outcome: 'rate_limited' }),
     );
+  });
+  it.each([
+    [true, 0],
+    [false, 1],
+  ])('leaves the charge to the forwarded requests when the route says so (%s)', async (forwarded, charges) => {
+    const rateLimit = { assertWithinLimit: jest.fn() };
+    const next = { handle: jest.fn(() => of('response')) };
+    const reflector = { getAllAndOverride: jest.fn().mockReturnValue(() => forwarded) };
+    const context = {
+      getType: () => 'http',
+      getHandler: () => undefined,
+      getClass: () => undefined,
+      switchToHttp: () => ({ getRequest: () => ({ user: { authenticationMethod: 'api-token', apiTokenId: 7 } }) }),
+    } as unknown as ExecutionContext;
+    const interceptor = new ApiTokenRequestRateLimitInterceptor(
+      rateLimit as never,
+      { log: jest.fn() } as never,
+      reflector as never,
+    );
+    expect(await lastValueFrom(await interceptor.intercept(context, next))).toBe('response');
+    expect(rateLimit.assertWithinLimit).toHaveBeenCalledTimes(charges);
   });
 });

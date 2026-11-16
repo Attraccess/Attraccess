@@ -7,6 +7,7 @@ import {
   ListToolsRequestSchema,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
+import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv-provider.js';
 import { buildRestRequest, McpArgumentError, RestRequest } from './mcp-rest-bridge';
 import type { McpTool } from './openapi-tools';
 
@@ -14,6 +15,9 @@ export interface McpToolSource {
   list(): McpTool[];
   get(name: string): McpTool | undefined;
 }
+
+// Building an Ajv instance costs far more than the rest of a server; one is enough for every request.
+const jsonSchemaValidator = new AjvJsonSchemaValidator();
 
 /** A fresh server per HTTP request (stateless Streamable HTTP): `tools` capability only. */
 export function createMcpServer(
@@ -25,6 +29,7 @@ export function createMcpServer(
     { name: 'attraccess', version },
     {
       capabilities: { tools: {} },
+      jsonSchemaValidator,
       instructions:
         'Attraccess machine and access management. Each tool is one REST operation and fails exactly as the REST ' +
         'API would for your credentials; permission errors are reported as tool errors.',

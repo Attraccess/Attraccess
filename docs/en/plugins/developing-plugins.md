@@ -200,6 +200,7 @@ export default plugin;
 | `context.startBlocked.invalidate({ resourceId })`         | Tell open resource pages that your `startBlockedQuery` answer changed. See [Start-blocked state](#start-blocked-state).                                           | `ACCESS_HOOKS`           |
 | `context.resourceAccess`                                  | Read-only authorization, maintenance and session queries. See [Resource access](#resource-access-queries).                                                        | `ACCESS_RESOURCES`       |
 | `context.runSerialized(fn)`                               | Run database work in one serialized transaction. See [Serialized transactions](#serialized-transactions).                                                         | `DATABASE_ACCESS`        |
+| `context.ble`                                             | Bluetooth transport through Attractap readers: profiles, endpoints, sessions. See [Bluetooth Transport for Plugins](plugins/ble-transport.md).                    | `BLE_TRANSPORT`          |
 
 > [!IMPORTANT]
 > Resolve services and repositories through `context`, never by re-initialising
@@ -227,6 +228,7 @@ naming the missing permission.
 | `READER_UI`              | `context.readerUi.invalidate(...)` and the `readerUi` provider — show widgets on Attractap reader screens. See [Reader UI](#reader-ui-and-start-hooks).                                                                                                                 |
 | `ACCESS_HOOKS`           | The `preStartHook`, `sessionEndHook`, `startBlockedQuery` and `startCapacityHook` — ask for a confirmation or block a session start, and show a blocked start in the UI. `startCapacityHook` also needs `DATABASE_ACCESS`. See [Reader UI](#reader-ui-and-start-hooks). |
 | `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` — send in-app, push and email notifications under categories the plugin declares, and declare editable email templates. See [Notifications](#notifications).                                                                      |
+| `BLE_TRANSPORT`          | `context.ble` — use the Bluetooth radio of Attractap readers an administrator opened for plugins, limited to the BLE profiles your plugin registers. See [Bluetooth Transport for Plugins](plugins/ble-transport.md).                                                   |
 
 ### MQTT subscriptions
 

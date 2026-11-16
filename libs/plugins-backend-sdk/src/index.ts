@@ -11,6 +11,9 @@ export * from './lib/semver';
 export * from './lib/reader-ui';
 export * from './lib/plugin-notifications';
 export * from './lib/plugin-resource-access';
+export * from './lib/plugin-ble';
+export * from './lib/plugin-ble-validation';
+export * from './lib/plugin-ble-fake';
 
 export * from './lib/auth-decorator';
 export * from '@attraccess/database-entities';

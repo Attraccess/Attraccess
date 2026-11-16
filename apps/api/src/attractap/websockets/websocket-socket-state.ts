@@ -1,6 +1,7 @@
 import { Attractap, ResourceFormAction } from '@attraccess/database-entities';
 import type { CardConversation } from './card-conversation.service';
 import type { CardSessionState, UiSlotsState, UiStepState } from './handlers/ui/ui-socket-state';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 export interface AttractapMessageBaseData<TPayload = unknown> {
   auth?: {
@@ -273,7 +274,7 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       userId: number;
       auditPrincipal: {
         userId: number;
-        authenticationMethod: 'session' | 'api-token' | 'mcp-oauth';
+        authenticationMethod: AuthenticationMethod;
         apiTokenId?: number;
       };
       /** When the enrollment was armed (ms since epoch); a card arriving much later is refused. */
@@ -284,7 +285,7 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       cardId: number;
       auditPrincipal: {
         userId: number;
-        authenticationMethod: 'session' | 'api-token' | 'mcp-oauth';
+        authenticationMethod: AuthenticationMethod;
         apiTokenId?: number;
       };
       /** When the reset was armed (ms since epoch); a card arriving much later is refused. */

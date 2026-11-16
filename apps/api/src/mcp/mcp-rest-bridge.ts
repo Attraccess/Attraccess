@@ -3,7 +3,7 @@ import type { McpTool } from './openapi-tools';
 
 export type RestRequest = { method: string; url: string; body?: unknown };
 
-const MAX_RESULT_CHARS = 1_000_000;
+export const MAX_RESULT_CHARS = 1_000_000;
 
 /** Why a tool call cannot be turned into a REST request. Reported to the model as a tool error. */
 export class McpArgumentError extends Error {}

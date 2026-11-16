@@ -1,20 +1,20 @@
 {
   "title": "Allow {{client}} to use Attraccess?",
   "intro": "This app asks to act on your behalf through the Attraccess MCP interface. It can only do what is listed below, and only what you are allowed to do yourself.",
-  "client": "App",
-  "returnTo": "After your decision you are sent back to",
   "loopback": {
     "title": "App on this device",
     "message": "The app returns to {{host}}, which is this device. Only continue if you started it yourself."
   },
   "external": {
     "title": "Check the address",
-    "message": "The app returns to {{host}}. Only continue if you recognise and trust it."
+    "message": "The app returns to {{host}}. Only continue if you recognize and trust it."
   },
+  "selfRegistered": "The app registered itself, so Attraccess cannot confirm its name.",
   "permissions": {
     "title": "Requested permissions",
     "all": "The app did not name specific permissions, so it asks for everything you can do today ({{count}} permissions).",
-    "none": "You currently hold no permissions that the app could use."
+    "none": "You currently hold no permissions that the app could use.",
+    "other": "Other"
   },
   "unavailable": {
     "title": "Not allowed for your account",
@@ -22,14 +22,22 @@
   },
   "approve": "Allow",
   "deny": "Deny",
-  "returning": "Returning to the app…",
-  "notice": "Access lasts up to 7 days, and you lose nothing by denying it. If a permission is taken from you in Attraccess, the app loses it too.",
+  "returningApproved": "Access allowed. Returning to the app… If nothing happens, you can close this tab.",
+  "returningDenied": "Access denied. Returning to the app… If nothing happens, you can close this tab.",
+  "notice": "Access lasts up to 7 days. Denying has no effect on your account. If a permission is taken from you in Attraccess, the app loses it too.",
   "error": {
     "title": "This request cannot be answered",
     "expired": "The authorization request has expired or was already answered. Start the connection again from your app.",
     "generic": "Something went wrong. Start the connection again from your app.",
     "missing": "The link is incomplete. Start the connection again from your app.",
     "disabled": "MCP sign-in is not available on this server. Use an API token instead.",
+    "framed": "For your safety, this page cannot be shown inside another page. Open the link in its own browser tab.",
     "close": "Close"
+  },
+  "authorizeError": {
+    "title": "The app cannot connect",
+    "invalid_client": "This app is not registered with Attraccess. Start the connection again from your app.",
+    "invalid_redirect_uri": "The app asked to return to an address it did not register. Start the connection again from your app.",
+    "request": "The app sent an invalid sign-in request ({{code}}). Start the connection again from your app or contact its developer."
   }
 }
