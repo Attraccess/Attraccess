@@ -28,3 +28,4 @@ export * from './lib/usage-duration-unit';
 export * from './lib/user-role';
 export * from './lib/resource-actor-user';
 export * from './lib/resource-maintenance-records';
+export * from './lib/resource-health-records';

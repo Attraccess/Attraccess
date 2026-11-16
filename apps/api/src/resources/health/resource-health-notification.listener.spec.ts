@@ -1,6 +1,4 @@
-import { type Resource, type ResourceIntroducer, type User } from '@attraccess/database-entities';
 import { ResourceHealthStatus } from '@attraccess/application-models';
-import { Repository } from 'typeorm';
 import { ResourceHealthNotificationListener } from './resource-health-notification.listener';
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
 import {
@@ -8,31 +6,28 @@ import {
   type NotificationDispatchRequest,
 } from '../../notifications/notification-dispatch.service';
 import { RbacService } from '../../users-and-auth/rbac/rbac.service';
-const resource = { id: 3, name: 'Laser', groups: [{ id: 4 }] };
+const resource = { id: 3, name: 'Laser', groupIds: [4] };
+type User = { locale: string };
 const admin = { id: 1, email: 'admin@example.test', locale: 'en' };
 const introducer = { id: 2, email: 'instructor@example.test', locale: 'de' };
 describe('Resource health notifications', () => {
-  const resources = { findOne: jest.fn() },
-    introducers = { find: jest.fn() },
-    users = { findBy: jest.fn() };
+  const store = { findResource: jest.fn(), findUsersByIds: jest.fn(), findIntroducerUsers: jest.fn() };
   const notifications = {
     dispatch: jest.fn<Promise<void>, [NotificationDispatchRequest]>(),
     sendEmailTemplate: jest.fn(),
   };
   const rbac = { getUserIdsWithPermission: jest.fn() };
   const listener = new ResourceHealthNotificationListener(
-    resources as unknown as Repository<Resource>,
-    introducers as unknown as Repository<ResourceIntroducer>,
-    users as unknown as Repository<User>,
+    store as never,
     notifications as unknown as NotificationDispatchService,
     rbac as unknown as RbacService,
   );
   beforeEach(() => {
     jest.resetAllMocks();
-    resources.findOne.mockResolvedValue(resource);
+    store.findResource.mockResolvedValue(resource);
     rbac.getUserIdsWithPermission.mockResolvedValue([1, 9]);
-    users.findBy.mockResolvedValue([admin, { id: 9, email: null }]);
-    introducers.find.mockResolvedValue([{ user: admin }, { user: introducer }, { user: null }]);
+    store.findUsersByIds.mockResolvedValue([admin, { id: 9, email: null }]);
+    store.findIntroducerUsers.mockResolvedValue([admin, introducer]);
   });
   it('deduplicates maintainers and group introducers and renders localized warning emails', async () => {
     const event = new ResourceHealthChangedEvent(
@@ -58,27 +53,24 @@ describe('Resource health notifications', () => {
         identifier: 'temperature',
       },
     });
-    expect(introducers.find).toHaveBeenCalledWith({
-      where: [{ resourceId: 3 }, { resourceGroupId: expect.objectContaining({ _value: [4] }) }],
-      relations: ['user'],
-    });
+    expect(store.findIntroducerUsers).toHaveBeenCalledWith(3, [4]);
   });
   it('suppresses an initial healthy report and handles missing resources or empty recipient sets', async () => {
     await listener.handleHealthChanged(
       new ResourceHealthChangedEvent(3, 'temperature', ResourceHealthStatus.HEALTHY, null, null),
     );
-    expect(resources.findOne).not.toHaveBeenCalled();
+    expect(store.findResource).not.toHaveBeenCalled();
     const event = new ResourceHealthChangedEvent(3, 'temperature', ResourceHealthStatus.UNHEALTHY, null, null);
-    resources.findOne.mockResolvedValueOnce(null);
+    store.findResource.mockResolvedValueOnce(null);
     await listener.handleHealthChanged(event);
     rbac.getUserIdsWithPermission.mockResolvedValue([]);
-    introducers.find.mockResolvedValue([]);
+    store.findIntroducerUsers.mockResolvedValue([]);
     await listener.handleHealthChanged(event);
     expect(notifications.dispatch).not.toHaveBeenCalled();
-    expect(users.findBy).not.toHaveBeenCalled();
+    expect(store.findUsersByIds).not.toHaveBeenCalled();
   });
   it('renders recovered status without an explicit reason and contains notification failures', async () => {
-    resources.findOne.mockResolvedValue({ ...resource, groups: [] });
+    store.findResource.mockResolvedValue({ ...resource, groupIds: [] });
     await listener.handleHealthChanged(
       new ResourceHealthChangedEvent(
         3,

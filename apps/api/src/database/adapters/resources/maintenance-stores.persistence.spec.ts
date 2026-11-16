@@ -22,6 +22,7 @@ import {
   TypeOrmMaintenanceRequestStore,
 } from './maintenance-request-store.adapter';
 import { TypeOrmMaintenanceScheduleStore } from './maintenance-schedule-store.adapter';
+import { TypeOrmResourceRecipientStore } from './resource-recipient-store.adapter';
 
 describe('maintenance stores on real SQLite', () => {
   let source: DataSource;
@@ -46,7 +47,7 @@ describe('maintenance stores on real SQLite', () => {
     audit = { record: jest.fn().mockResolvedValue(undefined) };
     maintenance = new TypeOrmResourceMaintenanceStore(source);
     requests = new TypeOrmMaintenanceRequestStore(source);
-    notifications = new TypeOrmMaintenanceNotificationStore(source);
+    notifications = new TypeOrmMaintenanceNotificationStore(source, new TypeOrmResourceRecipientStore(source));
     schedules = new TypeOrmMaintenanceScheduleStore(source, audit as never);
     resourceId = (
       await source

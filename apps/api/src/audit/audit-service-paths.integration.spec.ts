@@ -129,11 +129,10 @@ describe('audit recorded by the owning services, without the HTTP layer', () => 
     }));
     const health = new ResourceHealthService(
       {
-        findOne: async ({ where }: { where: { id: number; resourceId: number } }) =>
-          entries.find((entry) => entry.id === where.id && entry.resourceId === where.resourceId) ?? null,
-        remove: async (entry: object) => entry,
+        findEntry: async (resourceId: number, entryId: number) =>
+          entries.find((entry) => entry.id === entryId && entry.resourceId === resourceId) ?? null,
+        removeEntry: async () => undefined,
       } as never,
-      {} as never,
       { emit: jest.fn() } as never,
       fixture.service,
     );

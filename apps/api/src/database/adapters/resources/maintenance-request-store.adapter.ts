@@ -1,25 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, In } from 'typeorm';
-import {
-  Resource,
-  ResourceIntroducer,
-  ResourceMaintenance,
-  ResourceMaintenanceRequest,
-  User,
-} from '@attraccess/database-entities';
-import {
-  MaintenanceRequestStatus,
-  type ResourceMaintenanceRequestRecord,
-  type ResourceNotificationRecipient,
-} from '@attraccess/application-models';
+import { DataSource } from 'typeorm';
+import { Resource, ResourceMaintenance, ResourceMaintenanceRequest, User } from '@attraccess/database-entities';
+import { MaintenanceRequestStatus, type ResourceMaintenanceRequestRecord } from '@attraccess/application-models';
 import type {
   MaintenanceNotificationStore,
   MaintenanceRequestResolution,
   MaintenanceRequestStore,
   RequestForNotification,
 } from '../../../resources/maintenances/maintenance-request-store.port';
-import { toMaintenanceRequestRecord, toNotificationRecipient } from './maintenance-mappers';
+import { toMaintenanceRequestRecord } from './maintenance-mappers';
+import { TypeOrmResourceRecipientStore } from './resource-recipient-store.adapter';
 
 const REQUEST_RELATIONS = ['createdByUser', 'resolvedByUser', 'resultingMaintenance'];
 
@@ -93,7 +84,10 @@ export class TypeOrmMaintenanceRequestStore implements MaintenanceRequestStore {
 
 @Injectable()
 export class TypeOrmMaintenanceNotificationStore implements MaintenanceNotificationStore {
-  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly recipients: TypeOrmResourceRecipientStore,
+  ) {}
 
   async findRequest(requestId: number): Promise<RequestForNotification | null> {
     const request = await this.dataSource
@@ -107,23 +101,15 @@ export class TypeOrmMaintenanceNotificationStore implements MaintenanceNotificat
     };
   }
 
-  async findResource(resourceId: number): Promise<{ id: number; name: string; groupIds: number[] } | null> {
-    const resource = await this.dataSource
-      .getRepository(Resource)
-      .findOne({ where: { id: resourceId }, relations: ['groups'] });
-    if (!resource) return null;
-    return { id: resource.id, name: resource.name, groupIds: (resource.groups ?? []).map((group) => group.id) };
+  findResource(resourceId: number) {
+    return this.recipients.findResource(resourceId);
   }
 
-  async findUsersByIds(userIds: number[]): Promise<ResourceNotificationRecipient[]> {
-    const users = await this.dataSource.getRepository(User).findBy({ id: In(userIds) });
-    return users.map(toNotificationRecipient);
+  findUsersByIds(userIds: number[]) {
+    return this.recipients.findUsersByIds(userIds);
   }
 
-  async findIntroducerUsers(resourceId: number, groupIds: number[]): Promise<ResourceNotificationRecipient[]> {
-    const where: Array<Record<string, unknown>> = [{ resourceId }];
-    if (groupIds.length > 0) where.push({ resourceGroupId: In(groupIds) });
-    const rows = await this.dataSource.getRepository(ResourceIntroducer).find({ where, relations: ['user'] });
-    return rows.filter((row) => row.user).map((row) => toNotificationRecipient(row.user));
+  findIntroducerUsers(resourceId: number, groupIds: number[]) {
+    return this.recipients.findIntroducerUsers(resourceId, groupIds);
   }
 }

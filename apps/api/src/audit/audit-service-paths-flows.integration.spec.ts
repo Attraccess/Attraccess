@@ -1,4 +1,5 @@
-import { AuditLog, ResourceFlowNode, ResourceHealthState } from '@attraccess/database-entities';
+import { AuditLog, ResourceFlowNode } from '@attraccess/database-entities';
+import type { ResourceHealthRecord } from '@attraccess/application-models';
 import { ResourceFlowNodeType, ResourceType } from '@attraccess/application-models';
 import {
   AuthenticatedRequest,
@@ -75,19 +76,23 @@ describe('audit recorded through flows, MQTT and the plugin context', () => {
 
   /** The real health service over an in-memory state table. */
   function healthService(audit: AuditRecorder): ResourceHealthService {
-    const states: ResourceHealthState[] = [];
+    const states: ResourceHealthRecord[] = [];
     return new ResourceHealthService(
       {
-        findOne: async ({ where }: { where: Partial<ResourceHealthState> }) =>
-          states.find((state) => state.resourceId === where.resourceId && state.identifier === where.identifier) ??
-          null,
-        create: (value: Partial<ResourceHealthState>) => ({ ...value }),
-        save: async (value: ResourceHealthState) => {
-          if (!states.includes(value)) states.push(Object.assign(value, { id: states.length + 1 }));
-          return value;
+        upsertReport: async (report: Omit<ResourceHealthRecord, 'id'>) => {
+          const existing = states.find(
+            (state) => state.resourceId === report.resourceId && state.identifier === report.identifier,
+          );
+          if (existing) {
+            const previousStatus = existing.status;
+            Object.assign(existing, report);
+            return { record: existing, previousStatus };
+          }
+          const record = { id: states.length + 1, ...report };
+          states.push(record);
+          return { record, previousStatus: null };
         },
       } as never,
-      {} as never,
       new EventEmitter2(),
       audit,
     );

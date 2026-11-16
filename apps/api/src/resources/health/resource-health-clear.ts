@@ -7,7 +7,7 @@ import { AuditActor, SYSTEM_AUDIT_ACTOR } from '../../audit/recorder/audit-event
 import type { ResourceHealthService } from './resource-health.service';
 
 interface ResourceHealthServiceResourceHealthClearContext {
-  healthRepository: ResourceHealthService['healthRepository'];
+  store: ResourceHealthService['store'];
   audit: ResourceHealthService['audit'];
   logger: ResourceHealthService['logger'];
   eventEmitter: ResourceHealthService['eventEmitter'];
@@ -18,14 +18,12 @@ export async function clearEntry(
   entryId: number,
   auditOrigin: AuditActor = SYSTEM_AUDIT_ACTOR,
 ): Promise<void> {
-  const entry = await context.healthRepository.findOne({
-    where: { id: entryId, resourceId },
-  });
+  const entry = await context.store.findEntry(resourceId, entryId);
   if (!entry) {
     throw new NotFoundException(`Health entry ${entryId} not found for resource ${resourceId}`);
   }
 
-  await context.healthRepository.remove(entry);
+  await context.store.removeEntry(entry.id);
 
   if (entry.status === ResourceHealthStatus.UNHEALTHY) {
     await context.audit.record({

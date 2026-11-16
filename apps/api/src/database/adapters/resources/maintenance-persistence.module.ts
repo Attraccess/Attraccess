@@ -23,6 +23,7 @@ import {
   TypeOrmMaintenanceNotificationStore,
   TypeOrmMaintenanceRequestStore,
 } from './maintenance-request-store.adapter';
+import { TypeOrmResourceRecipientStore } from './resource-recipient-store.adapter';
 import { TypeOrmMaintenanceScheduleStore } from './maintenance-schedule-store.adapter';
 
 /**
@@ -45,6 +46,7 @@ import { TypeOrmMaintenanceScheduleStore } from './maintenance-schedule-store.ad
     ]),
   ],
   providers: [
+    TypeOrmResourceRecipientStore,
     { provide: RESOURCE_MAINTENANCE_STORE, useClass: TypeOrmResourceMaintenanceStore },
     { provide: MAINTENANCE_REQUEST_STORE, useClass: TypeOrmMaintenanceRequestStore },
     { provide: MAINTENANCE_NOTIFICATION_STORE, useClass: TypeOrmMaintenanceNotificationStore },
