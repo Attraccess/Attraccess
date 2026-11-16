@@ -22,7 +22,10 @@ import { SettingsService } from '../../settings/settings.service';
 class FakeController {
   @Post('register')
   @AuthRateLimit('register')
-  register(@Body() body: { fail?: boolean; smtpDown?: boolean }) {
+  register(@Body() body: { fail?: boolean; smtpDown?: boolean; dbBusy?: boolean }) {
+    if (body?.dbBusy) {
+      throw Object.assign(new Error('SQLITE_BUSY: waited 5000 ms'), { code: 'SQLITE_BUSY' });
+    }
     if (body?.smtpDown) {
       throw new ServiceUnavailableException('EmailSendFailed');
     }
@@ -133,6 +136,19 @@ describe('AuthRateLimitInterceptor (HTTP integration)', () => {
         statusCode: 503,
         message: 'EmailSendFailed',
       });
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'register', outcome: 'dependency_failure' }),
+      );
+    });
+
+    it('does not count a busy database toward the lockout', async () => {
+      for (let i = 0; i < policy.maxAttempts; i += 1) {
+        const res = await request(app.getHttpServer()).post('/register').send({ dbBusy: true });
+        expect(res.status).toBe(500);
+      }
+
+      const after = await request(app.getHttpServer()).post('/register').send({});
+      expect(after.status).toBe(201);
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'register', outcome: 'dependency_failure' }),
       );

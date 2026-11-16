@@ -67,6 +67,41 @@ describe('concurrent account login attempts', () => {
   });
 });
 
+describe('login with a busy database', () => {
+  it('neither counts the attempt toward a lockout nor audits it as invalid credentials', async () => {
+    const recordFailure = jest.fn();
+    const bruteForce = {
+      assertIpAllowed: jest.fn().mockResolvedValue(undefined),
+      assertAccountAllowed: jest.fn().mockResolvedValue(undefined),
+      runAccountAttempt: (_userId: number | null, attempt: () => Promise<boolean>) => attempt(),
+      recordFailure,
+    } as unknown as BruteForceProtectionService;
+    const log = jest.fn().mockResolvedValue(undefined);
+    const guard = new LoginRateLimitGuard(
+      bruteForce,
+      { findByLoginIdentifier: jest.fn().mockResolvedValue({ id: 7, lockedUntil: null }) } as unknown as UsersService,
+      { log } as unknown as AuthAuditLogger,
+    );
+    const busy = Object.assign(new Error('SQLITE_BUSY: waited 5000 ms'), { code: 'SQLITE_BUSY' });
+    const authenticate = jest
+      .spyOn(Object.getPrototypeOf(LoginRateLimitGuard.prototype), 'canActivate')
+      .mockRejectedValue(busy);
+    const context = {
+      switchToHttp: () => ({
+        getRequest: () => ({ ip: '203.0.113.1', body: { username: 'alice' } }) as Request,
+        getResponse: () => ({ setHeader: jest.fn() }) as unknown as Response,
+      }),
+    } as ExecutionContext;
+    try {
+      await expect(guard.canActivate(context)).rejects.toBe(busy);
+      expect(recordFailure).not.toHaveBeenCalled();
+      expect(log).toHaveBeenCalledWith(expect.objectContaining({ type: 'login', outcome: 'dependency_failure' }));
+    } finally {
+      authenticate.mockRestore();
+    }
+  });
+});
+
 describe('resolveIp', () => {
   const createRequest = (overrides?: Partial<Request>): Request =>
     ({
