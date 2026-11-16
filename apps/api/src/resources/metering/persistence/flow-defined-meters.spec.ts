@@ -19,7 +19,7 @@ import { MeteringReadyExecutor, MeteringReport, MeteringReportExecutor } from '.
 
 import { MeterFlowConversions1790300000000 } from '../../../database/migrations/1790300000000-meter-flow-conversions';
 
-import { closeResourceTransactionConnection } from '../../../database/run-serialized-transaction';
+import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
 
 import { inheritTestScope } from '../../../test-utils/inherit-test-scope';
 

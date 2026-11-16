@@ -8,7 +8,7 @@ import { ResourceOperatingIntervalService } from './resource-operating-interval.
 import { OperatingMetricsRecorder } from '../../metrics/instrumentation/operating/operating.helper';
 import { ResourceOperatingInterval1783500000000 } from '../../database/migrations/1783500000000-resource-operating-interval';
 import { OperatingTransitionProvenance1784300000000 } from '../../database/migrations/1784300000000-operating-transition-provenance';
-import { closeResourceTransactionConnection } from '../../database/run-serialized-transaction';
+import { closeResourceTransactionConnection } from '../../database/sqlite/run-serialized-transaction';
 import { ResourceOperatingStateChangedEvent } from './events/resource-operating-state-changed.event';
 
 const IntervalSchema = new EntitySchema<ResourceOperatingInterval>({

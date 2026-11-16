@@ -1,7 +1,7 @@
 import { billingTransactionAuditEvent } from './policies/billing';
 import { Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { closeResourceTransactionConnection, runSerializedTransaction } from '../database/run-serialized-transaction';
+import { closeResourceTransactionConnection, runSerializedTransaction } from '../database/sqlite/run-serialized-transaction';
 import { AuditTransactionAbortedError } from './persistence/audit-storage';
 import { droppedRecords, setupAuditDatabase } from './audit.test-fixture';
 

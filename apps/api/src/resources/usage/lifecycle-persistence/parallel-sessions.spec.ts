@@ -8,7 +8,7 @@ import {
 import { NoUsageSessionError } from '../../flows/errors/no-usage-session.error';
 import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { rm } from 'node:fs/promises';
-import { closeResourceTransactionConnection } from '../../../database/run-serialized-transaction';
+import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
 import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../../exceptions/resource.maintenance.inUse.exception';
 import { ResourceUnhealthyException } from '../../../exceptions/resource.unhealthy.exception';
 import { FlowExecutionError } from '../../flows/errors/flow-execution.error';

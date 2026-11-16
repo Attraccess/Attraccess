@@ -14,7 +14,7 @@ import Handlebars from 'handlebars';
 
 import { rm } from 'node:fs/promises';
 
-import { closeResourceTransactionConnection } from '../../../database/run-serialized-transaction';
+import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
 
 import { readDefaultTemplateBody, SHIPPED_TRANSLATIONS } from '../../../email-template/email-defaults';
 

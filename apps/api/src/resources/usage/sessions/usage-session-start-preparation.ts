@@ -22,7 +22,7 @@ import { hookPrincipal } from '../pre-start/hook-principal';
 
 import { StartBlockedException } from '../pre-start/start-confirmation.errors';
 
-import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
+import { runSerializedTransaction } from '../../../database/sqlite/run-serialized-transaction';
 
 import { BillingService } from '../../../billing/charges/billing.service';
 

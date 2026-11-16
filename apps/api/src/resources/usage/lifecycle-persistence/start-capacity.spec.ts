@@ -3,7 +3,7 @@ import { ResourceUsageAction } from '@attraccess/application-models';
 import type { StartCapacityContext, StartCapacityHook } from '@attraccess/plugins-backend-sdk';
 import { ConflictException } from '@nestjs/common';
 import { rm } from 'node:fs/promises';
-import { closeResourceTransactionConnection } from '../../../database/run-serialized-transaction';
+import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
 import { ReaderUiHooksService } from '../../../plugin-system/reader-ui/reader-ui-hooks.service';
 import { AlreadyHasActiveSessionError } from '../errors/already-has-active-session.error';
 import { ResourceFullError } from '../errors/resource-full.error';

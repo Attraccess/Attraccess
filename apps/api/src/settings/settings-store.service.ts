@@ -129,7 +129,7 @@ export class SettingsStoreService {
 
   /**
    * Single-statement writes hold the SQLite write lock as briefly as possible. They predate the main connection's
-   * IMMEDIATE transactions (database/sqlite-connection.ts): a deferred read-then-write transaction failed with
+   * IMMEDIATE transactions (database/sqlite/sqlite-connection.ts): a deferred read-then-write transaction failed with
    * SQLITE_BUSY at once when another connection held the write lock.
    */
   private async upsertSetting(parent: string, key: string, value: string): Promise<void> {

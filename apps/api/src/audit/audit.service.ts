@@ -14,10 +14,10 @@ import {
   AuditStorage,
   AuditStorageState,
   hasPasswordPolicyOverflow,
-  sqliteErrorCode,
 } from './persistence/audit-storage';
 
-import { SQLITE_BUSY_TIMEOUT_MS } from '../database/sqlite-connection';
+import { persistenceErrorCode } from '../database/persistence-errors';
+import { SQLITE_BUSY_TIMEOUT_MS } from '../database/sqlite/sqlite-connection';
 
 import { getRegisteredPluginAuditDomains } from '../plugin-system/audit/audit-registry';
 
@@ -85,7 +85,7 @@ export class AuditService implements AuditRecorder, OnModuleInit, OnModuleDestro
       // Only the SQLite code or error name: the driver message may contain the database path.
       this.logger.error(
         `Audit storage initialization failed: ${
-          sqliteErrorCode(error) ?? (error instanceof Error ? error.name : 'unknown error')
+          persistenceErrorCode(error) ?? (error instanceof Error ? error.name : 'unknown error')
         }`,
       );
       if (storage.isInitialized) await storage.destroy().catch(() => undefined);

@@ -16,7 +16,7 @@ import { auditDomainLabel, AuditRow, projectAuditRow } from '../recorder/audit-r
 
 import { DataSource, EntityManager } from 'typeorm';
 
-import { sqliteErrorCode } from '../../database/sqlite-errors';
+import { sqliteErrorCode } from '../../database/sqlite/sqlite-errors';
 
 import { AuditDropReason, AuditMetrics } from '../../metrics/definitions/audit.metrics';
 

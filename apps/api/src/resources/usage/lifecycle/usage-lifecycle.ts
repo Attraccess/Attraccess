@@ -19,7 +19,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { EntityManager, In, IsNull, Repository } from 'typeorm';
 
-import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
+import { runSerializedTransaction } from '../../../database/sqlite/run-serialized-transaction';
 
 import { ResourceUsageLifecycleAbortedEvent } from '../events/resource-usage.events';
 

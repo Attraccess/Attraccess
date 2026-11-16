@@ -3,7 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Attractap, AttractapCredentialEvent } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
-import { runSerializedTransaction } from '../../database/run-serialized-transaction';
+import { runSerializedTransaction } from '../../database/sqlite/run-serialized-transaction';
 import { ReaderDeletedEvent } from '../events';
 
 export interface ActiveCredential {

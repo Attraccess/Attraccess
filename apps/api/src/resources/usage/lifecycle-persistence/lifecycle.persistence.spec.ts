@@ -15,7 +15,7 @@ import { dataSourceConfig } from '../../../database/datasource';
 import { ResourceUsageIntegrity1790100000000 } from '../../../database/migrations/1790100000000-resource-usage-integrity';
 import { ParallelMachineSessions1792000000000 } from '../../../database/migrations/1792000000000-parallel-machine-sessions';
 import { recoverOrphanedUsages } from '../../../database/resource-usage-integrity';
-import { closeResourceTransactionConnection } from '../../../database/run-serialized-transaction';
+import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
 import { ResourceInUseError } from '../errors/resource-in-use.error';
 import { resetTestFixture } from './fixtures/setup.test-fixture';
 import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from './fixtures/state.test-fixture';

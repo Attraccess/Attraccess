@@ -20,7 +20,7 @@ import { LiveNotificationsService } from '../../billing/live-notifications/live-
 
 import { meterCharge, meterDiscount, formatMeterValue } from './quantity';
 
-import { runSerializedTransaction } from '../../database/run-serialized-transaction';
+import { runSerializedTransaction } from '../../database/sqlite/run-serialized-transaction';
 
 import { clearPendingShareMarkers, findUsageSegments, sessionShare } from './segment-charges';
 

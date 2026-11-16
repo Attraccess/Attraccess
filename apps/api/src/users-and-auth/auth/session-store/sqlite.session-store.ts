@@ -1,4 +1,4 @@
-import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
+import { runSerializedTransaction } from '../../../database/sqlite/run-serialized-transaction';
 import { Repository, LessThan, MoreThan } from 'typeorm';
 import { Session, User } from '@attraccess/database-entities';
 import { SsoSessionContext } from '@attraccess/application-models';

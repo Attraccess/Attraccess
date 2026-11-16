@@ -12,7 +12,7 @@ import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 import { resolveTriggeringUsage, triggeringUsageId } from './triggering-usage';
 import { requireRunMachineId } from './flow.utils';
-import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
+import { runSerializedTransaction } from '../../../database/sqlite/run-serialized-transaction';
 
 export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
   private readonly logger = new Logger(BillingSetAdditionalItemsExecutor.name);

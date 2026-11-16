@@ -1,6 +1,6 @@
 import type { EntityManager } from 'typeorm';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { runSerializedTransaction } from '../../database/run-serialized-transaction';
+import { runSerializedTransaction } from '../../database/sqlite/run-serialized-transaction';
 
 /** Marks the async context of a running plugin `runSerialized` callback; `active` drops once it settled. */
 const runningCallback = new AsyncLocalStorage<{ active: boolean }>();

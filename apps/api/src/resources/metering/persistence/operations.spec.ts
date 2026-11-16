@@ -7,7 +7,7 @@ import {
 
 import { rm } from 'node:fs/promises';
 
-import { closeResourceTransactionConnection } from '../../../database/run-serialized-transaction';
+import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
 
 import { inheritTestScope } from '../../../test-utils/inherit-test-scope';
 

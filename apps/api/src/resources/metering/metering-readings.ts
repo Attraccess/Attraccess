@@ -12,7 +12,7 @@ import { ResourceMeteringSessionStatus } from '@attraccess/application-models';
 
 import type { MeteringReport } from '../flows/node-executors/node-executor.interface';
 
-import { runSerializedTransaction } from '../../database/run-serialized-transaction';
+import { runSerializedTransaction } from '../../database/sqlite/run-serialized-transaction';
 
 import { requireMeter } from './metering-catalog';
 

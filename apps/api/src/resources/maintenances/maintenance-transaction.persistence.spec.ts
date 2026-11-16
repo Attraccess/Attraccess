@@ -8,7 +8,7 @@ import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-eval
 import {
   closeResourceTransactionConnection,
   runSerializedTransaction,
-} from '../../database/run-serialized-transaction';
+} from '../../database/sqlite/run-serialized-transaction';
 import { MaintenanceResourceEvaluation } from './evaluation/resource-evaluation';
 
 const deferred = () => {

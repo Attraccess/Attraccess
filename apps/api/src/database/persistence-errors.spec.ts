@@ -1,0 +1,28 @@
+import {
+  classifyPersistenceError,
+  isDatabaseBusyError,
+  isUniqueViolation,
+  persistenceErrorCode,
+  registerPersistenceErrorClassifier,
+} from './persistence-errors';
+import { sqliteErrorClassifier } from './sqlite/sqlite-errors';
+
+describe('persistence error categories', () => {
+  beforeAll(() => registerPersistenceErrorClassifier(sqliteErrorClassifier));
+
+  it('maps SQLite codes on the error and on the driver error to neutral categories', () => {
+    expect(classifyPersistenceError(Object.assign(new Error('x'), { code: 'SQLITE_BUSY' }))).toBe('busy');
+    expect(isDatabaseBusyError({ driverError: { code: 'SQLITE_BUSY' } })).toBe(true);
+    expect(isUniqueViolation({ driverError: { code: 'SQLITE_CONSTRAINT_UNIQUE' } })).toBe(true);
+    expect(classifyPersistenceError({ code: 'SQLITE_CONSTRAINT_PRIMARYKEY' })).toBe('unique-violation');
+    expect(classifyPersistenceError({ code: 'SQLITE_CONSTRAINT_FOREIGNKEY' })).toBe('foreign-key-violation');
+    expect(classifyPersistenceError({ code: 'SQLITE_BUSY_SNAPSHOT' })).toBe('conflict');
+  });
+
+  it('does not treat unrelated errors as database errors and exposes only a safe code', () => {
+    expect(classifyPersistenceError(new Error('SQLITE_BUSY in the message only'))).toBeUndefined();
+    expect(isDatabaseBusyError(undefined)).toBe(false);
+    expect(persistenceErrorCode({ code: 'SQLITE_BUSY', message: 'secret parameter' })).toBe('SQLITE_BUSY');
+    expect(persistenceErrorCode(new Error('nothing'))).toBeUndefined();
+  });
+});

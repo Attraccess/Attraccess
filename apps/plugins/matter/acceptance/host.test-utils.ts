@@ -22,8 +22,8 @@ import {
 } from '../../../api/src/plugin-system/audit/audit-registry';
 import { createPluginAuditContext } from '../../../api/src/plugin-system/runtime/audit-context';
 import { createPluginRunSerialized } from '../../../api/src/plugin-system/runtime/plugin-serialized';
-import { closeResourceTransactionConnection } from '../../../api/src/database/run-serialized-transaction';
-import { createDataSource } from '../../../api/src/database/sqlite-connection';
+import { closeResourceTransactionConnection } from '../../../api/src/database/sqlite/run-serialized-transaction';
+import { createDataSource } from '../../../api/src/database/sqlite/sqlite-connection';
 import { SettingsStoreService } from '../../../api/src/settings/settings-store.service';
 import { Setting } from '@attraccess/database-entities';
 import * as sourceMigrations from '../backend/migrations';

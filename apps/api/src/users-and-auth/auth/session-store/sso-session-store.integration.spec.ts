@@ -2,7 +2,7 @@ import { AuditRecorder } from '../../../audit/recorder/audit-event';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { closeResourceTransactionConnection } from '../../../database/run-serialized-transaction';
+import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
 import { DataSource, Repository } from 'typeorm';
 import { Session, User, entities } from '@attraccess/database-entities';
 import { SsoSessionContext } from '@attraccess/application-models';

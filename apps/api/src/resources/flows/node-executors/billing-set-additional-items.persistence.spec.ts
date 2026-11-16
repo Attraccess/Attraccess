@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import {
   closeResourceTransactionConnection,
   runSerializedTransaction,
-} from '../../../database/run-serialized-transaction';
+} from '../../../database/sqlite/run-serialized-transaction';
 import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { BillingSetAdditionalItemsExecutor } from './billing-set-additional-items.executor';

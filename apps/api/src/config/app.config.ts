@@ -4,6 +4,7 @@ import { READER_UI_TIMING } from '@attraccess/plugins-backend-sdk';
 import { logDestinationsSchema, logLevelsSchema } from '../logging/logging.config';
 import { join } from 'path';
 import { DEFAULT_STORAGE_ROOT } from './storage.config';
+import { DEFAULT_DATABASE_TYPE, SUPPORTED_DATABASE_TYPES } from '../database/backend/database-backend';
 
 const PLACEHOLDER_VERSIONS = new Set(['', '0.0.0', 'undefined', 'null']);
 export const DEFAULT_PLUGIN_DIR = join(DEFAULT_STORAGE_ROOT, 'plugins');
@@ -33,6 +34,8 @@ export const AppEnvSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     PORT: z.coerce.number().default(3000),
+    /** Database engine. Only `sqlite` is supported; validated before any connection (see database/backend). */
+    DATABASE_TYPE: z.enum(SUPPORTED_DATABASE_TYPES).default(DEFAULT_DATABASE_TYPE),
     LOG_LEVELS: logLevelsSchema,
     LOG_DESTINATIONS: logDestinationsSchema,
     LOG_FILE_PATH: z.string().optional(),

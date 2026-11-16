@@ -20,7 +20,7 @@ import { mkdirSync } from 'fs';
 
 import { dataSourceConfig } from '../database/datasource';
 
-import { createDataSource, SQLITE_BUSY_TIMEOUT_MS } from '../database/sqlite-connection';
+import { createDataSource, SQLITE_BUSY_TIMEOUT_MS } from '../database/sqlite/sqlite-connection';
 
 function getImplementationClass(): typeof PluginMigrationService {
   return require('./plugin-migration.service').PluginMigrationService;

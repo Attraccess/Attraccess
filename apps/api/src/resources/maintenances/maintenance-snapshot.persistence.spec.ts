@@ -18,7 +18,7 @@ import { MaintenanceSnapshotReader, captureDurationState } from './evaluation/sn
 import {
   closeResourceTransactionConnection,
   runSerializedTransaction,
-} from '../../database/run-serialized-transaction';
+} from '../../database/sqlite/run-serialized-transaction';
 import { MaintenanceResourceEvaluation } from './evaluation/resource-evaluation';
 
 const UsageSchema = new EntitySchema<ResourceUsage>({

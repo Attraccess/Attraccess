@@ -5,7 +5,7 @@ import { EntityManager, QueryFailedError, Repository } from 'typeorm';
 import { OperatingMetricsRecorder } from '../../metrics/instrumentation/operating/operating.helper';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceOperatingStateChangedEvent } from './events/resource-operating-state-changed.event';
-import { runSerializedTransaction } from '../../database/run-serialized-transaction';
+import { runSerializedTransaction } from '../../database/sqlite/run-serialized-transaction';
 
 export type ResourceOperatingState = 'operating' | 'idle';
 

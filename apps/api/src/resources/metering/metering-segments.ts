@@ -12,7 +12,7 @@ import {
 } from '@attraccess/database-entities';
 import { ResourceFlowNodeType, ResourceMeteringSessionStatus } from '@attraccess/application-models';
 
-import { runSerializedTransaction } from '../../database/run-serialized-transaction';
+import { runSerializedTransaction } from '../../database/sqlite/run-serialized-transaction';
 import { MeteringOperationError } from './metering-readings';
 import { findActiveUsages } from '../usage/sessions/active-usage';
 import type { meterDefinitionFromFlow } from './metering-definition';

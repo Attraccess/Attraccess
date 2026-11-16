@@ -1,7 +1,7 @@
 import { Resource, ResourceUsage, ResourceUsageLifecycleAttempt, User } from '@attraccess/database-entities';
 import { ResourceFlowNodeType, SupervisionMode } from '@attraccess/application-models';
 import { rm } from 'node:fs/promises';
-import { closeResourceTransactionConnection } from '../../../database/run-serialized-transaction';
+import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
 import { EndUsageSessionExecutor } from '../../flows/node-executors/end-usage-session.executor';
 import { NodeExecutionContext } from '../../flows/node-executors/node-executor.interface';
 import { MachineBusyError } from '../errors/machine-busy.error';

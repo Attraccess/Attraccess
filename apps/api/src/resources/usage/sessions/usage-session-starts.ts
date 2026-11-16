@@ -11,7 +11,7 @@ import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../../../audit/record
 
 import { BillingService } from '../../../billing/charges/billing.service';
 
-import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
+import { runSerializedTransaction } from '../../../database/sqlite/run-serialized-transaction';
 
 import { FinalCollection } from '../../metering/resource-metering.service';
 

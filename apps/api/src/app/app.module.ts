@@ -6,7 +6,7 @@ import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSourceOptions } from 'typeorm';
 import { dataSourceConfig } from '../database/datasource';
-import { createDataSource } from '../database/sqlite-connection';
+import { createDataSource } from '../database/sqlite/sqlite-connection';
 import { ResourcesModule } from '../resources/resources.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import storageConfigObject, { StorageConfigType } from '../config/storage.config';

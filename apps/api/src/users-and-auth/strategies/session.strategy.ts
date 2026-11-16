@@ -12,7 +12,7 @@ import { SessionPermissionSync } from '../auth/sso/session-permission-sync';
 import { resolveIp } from '../rate-limiting/login.rate-limit.guard';
 import { User } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
-import { databaseBusyException, isSqliteBusyError } from '../../database/sqlite-errors';
+import { databaseBusyException, isDatabaseBusyError } from '../../database/persistence-errors';
 import { isValkeyUnavailableError, valkeyUnavailableException } from '../../valkey/valkey-unavailable';
 
 const TWO_FACTOR_SETUP_ALLOWED_PREFIXES = ['/auth/two-factor', '/auth/session', '/users/me'];
@@ -47,7 +47,7 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
       if (isValkeyUnavailableError(error)) throw valkeyUnavailableException(error as Error);
       // Neither is a busy database (a request that waited too long for another request's transaction): answering 401
       // would make clients drop a valid session.
-      if (isSqliteBusyError(error)) throw databaseBusyException();
+      if (isDatabaseBusyError(error)) throw databaseBusyException();
       throw error;
     }
   }

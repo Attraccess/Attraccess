@@ -1,7 +1,7 @@
 import { AuditLog, Resource, Setting, User } from '@attraccess/database-entities';
 import { ResourceType, SupervisionMode } from '@attraccess/application-models';
 import { rm } from 'node:fs/promises';
-import { closeResourceTransactionConnection } from '../database/run-serialized-transaction';
+import { closeResourceTransactionConnection } from '../database/sqlite/run-serialized-transaction';
 import { AuditMetrics } from '../metrics/definitions/audit.metrics';
 import { resetTestFixture } from '../resources/usage/lifecycle-persistence/fixtures/setup.test-fixture';
 import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../resources/usage/lifecycle-persistence/fixtures/state.test-fixture';

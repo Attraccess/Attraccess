@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
-import { closeResourceTransactionConnection } from '../../database/run-serialized-transaction';
+import { closeResourceTransactionConnection } from '../../database/sqlite/run-serialized-transaction';
 import { createPluginRunSerialized } from './plugin-serialized';
 
 describe('plugin runSerialized', () => {
