@@ -15,10 +15,11 @@ function InstallBanner({ t }: { t: Translate }) {
   const dismissBanner = useInstallPromptStore((state) => state.dismissBanner);
   if (!mode || isBannerDismissed) return null;
 
+  // From md up the sidebar (z-50) is part of the page, so the card moves right of it instead of hiding behind it.
   return (
     <section
       aria-label={t('banner.label')}
-      className="fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-30 sm:right-auto sm:max-w-sm"
+      className="fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-30 sm:right-auto sm:max-w-sm md:[:root:has([data-sidebar=expanded])_&]:left-68 md:[:root:has([data-sidebar=collapsed])_&]:left-20"
       data-cy="install-app-banner"
     >
       <Alert status="accent" className="shadow-overlay">

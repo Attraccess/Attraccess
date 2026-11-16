@@ -432,3 +432,15 @@ describe('account logout actions', () => {
     expect(screen.getByRole('menuitem', { name: /Logout everywhere/ })).toHaveAttribute('aria-disabled', 'true');
   });
 });
+
+describe('sidebar width marker', () => {
+  // The install card reads it to sit right of the sidebar instead of behind it (ATT-1150).
+  it.each([
+    [false, 'expanded'],
+    [true, 'collapsed'],
+  ])('marks the sidebar collapsed=%s as %s', (collapsed, marker) => {
+    const { container } = renderSidebar(collapsed);
+
+    expect(container.querySelector('aside')).toHaveAttribute('data-sidebar', marker);
+  });
+});
