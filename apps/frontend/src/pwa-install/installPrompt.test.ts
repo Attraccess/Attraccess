@@ -34,6 +34,7 @@ beforeEach(() => {
 
 afterEach(() => {
   unregister();
+  delete window.__attraccessInstallPrompt;
   vi.restoreAllMocks();
   localStorage.clear();
 });
@@ -44,6 +45,15 @@ describe('registerInstallPrompt', () => {
     window.dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(true);
+    expect(useInstallPromptStore.getState().deferredPrompt).toBe(event);
+  });
+
+  it('takes over an event that index.html caught before the app started', () => {
+    unregister();
+    const event = installPromptEvent();
+    window.__attraccessInstallPrompt = event;
+    unregister = registerInstallPrompt();
+
     expect(useInstallPromptStore.getState().deferredPrompt).toBe(event);
   });
 

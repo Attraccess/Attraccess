@@ -6,6 +6,13 @@ export interface BeforeInstallPromptEvent extends Event {
   readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 }
 
+declare global {
+  interface Window {
+    /** Set by the inline script in index.html when the event fires before registerInstallPrompt() runs. */
+    __attraccessInstallPrompt?: BeforeInstallPromptEvent | null;
+  }
+}
+
 const BANNER_DISMISSED_KEY = 'pwa-install-banner-dismissed-at';
 // After "Not now" the banner stays away this long; the on-demand action stays available.
 const BANNER_SNOOZE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -48,6 +55,9 @@ export const useInstallPromptStore = create<InstallPromptState>((set) => ({
  * Returns a cleanup for tests.
  */
 export function registerInstallPrompt(target: Window = window): () => void {
+  const earlyEvent = target.__attraccessInstallPrompt;
+  if (earlyEvent) useInstallPromptStore.setState({ deferredPrompt: earlyEvent });
+
   const onBeforeInstallPrompt = (event: Event) => {
     // Stops Chrome's own mini-infobar / install pop-up; Attraccess offers the prompt on demand instead.
     event.preventDefault();
