@@ -1,10 +1,5 @@
-import {
-  BillingTransaction,
-  entities,
-  ResourceUsage,
-  ResourceUsageAction,
-  Setting,
-} from '@attraccess/database-entities';
+import { BillingTransaction, entities, ResourceUsage, Setting } from '@attraccess/database-entities';
+import { ResourceUsageAction } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
 import { ProjectAccessService } from './project-access.service';
 import { ProjectUsageService } from './project-usage.service';

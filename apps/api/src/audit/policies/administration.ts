@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { EmailTemplateType } from '@attraccess/database-entities';
+import { EmailTemplateType } from '@attraccess/application-models';
 import { valid, validRange } from 'semver';
 
 /** URLs may carry credentials, query tokens or private paths: record the origin only. */

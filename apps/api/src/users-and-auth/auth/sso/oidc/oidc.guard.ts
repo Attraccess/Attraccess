@@ -10,7 +10,7 @@ import { SettingsService } from '../../../../settings/settings.service';
 import { SSOOIDCStrategy, SSO_OIDC_CALLBACK_URL_REQUEST_KEY, SSO_OIDC_STATE_REQUEST_KEY } from './oidc.strategy';
 import { ModuleRef } from '@nestjs/core';
 import { SSOService } from '../sso.service';
-import { SSOProviderType } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import {
   InvalidSSOProviderIdException,
   InvalidSSOProviderTypeException,
@@ -32,7 +32,7 @@ export class SSOOIDCGuard implements CanActivate {
     private licenseService: LicenseService,
     private stateStore: OidcCookieStateStore,
     private metricsService: MetricsService,
-  ) { }
+  ) {}
 
   async canActivate(context: ExecutionContext) {
     this.logger.debug('OIDC Guard activation attempted');
@@ -106,7 +106,7 @@ export class SSOOIDCGuard implements CanActivate {
     this.logger.debug(`Callback URL (fixed): ${callbackURL}`);
 
     this.logger.debug(
-      `Initializing SSOOIDC strategy for ${routeAction} with provider id: ${providerId} and callbackURL: ${callbackURL}`
+      `Initializing SSOOIDC strategy for ${routeAction} with provider id: ${providerId} and callbackURL: ${callbackURL}`,
     );
     // Create a new strategy instance with the real provider config.
     // This registers with passport under the 'sso-oidc' name, replacing the

@@ -13,7 +13,8 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { Message, MessageReferenceType } from '@attraccess/database-entities';
+import { Message } from '@attraccess/database-entities';
+import { MessageReferenceType } from '@attraccess/application-models';
 import { Observable } from 'rxjs';
 import { MessagingService } from './messaging.service';
 import { MessagingLiveService } from './messaging-live.service';

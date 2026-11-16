@@ -1,4 +1,4 @@
-import { AuthenticationType } from '@attraccess/database-entities';
+import { AuthenticationType } from '@attraccess/application-models';
 
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 

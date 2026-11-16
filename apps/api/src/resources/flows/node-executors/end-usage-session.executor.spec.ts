@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 import { EndUsageSessionExecutor } from './end-usage-session.executor';
 import { NodeExecutionContext } from './node-executor.interface';

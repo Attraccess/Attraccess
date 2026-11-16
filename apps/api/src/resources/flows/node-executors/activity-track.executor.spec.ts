@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
-import { Resource, ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
+import { Resource, ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import { ActivityTrackExecutor } from './activity-track.executor';
 
 function createNode(partial: Partial<ResourceFlowNode>): ResourceFlowNode {

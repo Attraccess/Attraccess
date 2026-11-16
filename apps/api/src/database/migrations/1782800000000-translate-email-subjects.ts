@@ -1,5 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
-import { EmailTemplateType } from '@attraccess/database-entities';
+import { EmailTemplateType } from '@attraccess/application-models';
 import { EMAIL_TEMPLATE_DEFAULTS, SHIPPED_TRANSLATIONS } from '../../email-template/email-defaults';
 
 // Subjects became translatable via {{t "subject" …}} helpers. This rewrites existing

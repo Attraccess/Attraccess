@@ -1,4 +1,5 @@
-import { Attractap, entities, Resource, ResourceType } from '@attraccess/database-entities';
+import { Attractap, entities, Resource } from '@attraccess/database-entities';
+import { ResourceType } from '@attraccess/application-models';
 import { DataSource, Table } from 'typeorm';
 import { AttractapService } from './attractap.service';
 

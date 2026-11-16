@@ -1,6 +1,7 @@
 import { InjectRepository } from '@nestjs/typeorm';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/database-entities';
+import { ResourceIntroducer, User } from '@attraccess/database-entities';
+import { ResourceIntroducerType } from '@attraccess/application-models';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceGroupIntroducerChangedEvent } from './events/resource-group-introducer-changed.event';

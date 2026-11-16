@@ -1,4 +1,5 @@
-import { ResourceHealthStatus, type Resource, type ResourceIntroducer, type User } from '@attraccess/database-entities';
+import { type Resource, type ResourceIntroducer, type User } from '@attraccess/database-entities';
+import { ResourceHealthStatus } from '@attraccess/application-models';
 import { Repository } from 'typeorm';
 import { ResourceHealthNotificationListener } from './resource-health-notification.listener';
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';

@@ -1,4 +1,5 @@
-import { Session, User, SsoSessionContext } from '@attraccess/database-entities';
+import { Session, User } from '@attraccess/database-entities';
+import { SsoSessionContext } from '@attraccess/application-models';
 
 import { SsoSessionSelector } from './sso-session-selector';
 

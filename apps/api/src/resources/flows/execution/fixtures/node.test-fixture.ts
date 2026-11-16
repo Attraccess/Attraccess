@@ -1,4 +1,5 @@
-import { ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 
 export // Helper to create a node
 function createNode(partial: Partial<ResourceFlowNode>): ResourceFlowNode {

@@ -1,13 +1,11 @@
 import { Logger } from '@nestjs/common';
 import {
   ResourceFlowNode,
-  ResourceFlowNodeType,
   ResourceUsage,
   ResourceHealthHeartbeatNodeDataSchema,
-  ResourceHealthSource,
-  ResourceHealthStatus,
   InputResourceActivityNoActivityNodeDataSchema,
 } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceHealthSource, ResourceHealthStatus } from '@attraccess/application-models';
 import { IsNull, Repository } from 'typeorm';
 import { ResourceHealthService } from '../../health/resource-health.service';
 import { CronTimer } from '../../../metrics/instrumentation/cron/cron.helper';

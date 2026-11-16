@@ -1,5 +1,6 @@
 import { createMock } from '@golevelup/ts-jest';
-import { entities, Role, User, UserRole, UserRoleSource } from '@attraccess/database-entities';
+import { entities, Role, User, UserRole } from '@attraccess/database-entities';
+import { UserRoleSource } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
 import * as migrations from '../../database/migrations';
 import { createDataSource } from '../../database/sqlite-connection';

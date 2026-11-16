@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import { SetPayloadExecutor } from './set-payload.executor';
 import { NodeExecutionContext } from './node-executor.interface';
 
@@ -58,10 +59,7 @@ describe('SetPayloadExecutor', () => {
   });
 
   it('calls compileTemplate once per entry and applies each result', async () => {
-    const compileTemplate = jest
-      .fn()
-      .mockReturnValueOnce('first')
-      .mockReturnValueOnce('second');
+    const compileTemplate = jest.fn().mockReturnValueOnce('first').mockReturnValueOnce('second');
     const ctx = makeCtx({ compileTemplate });
     const node = makeNode({
       entries: [

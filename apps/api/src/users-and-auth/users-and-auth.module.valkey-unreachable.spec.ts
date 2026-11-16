@@ -1,4 +1,5 @@
-import { AuthenticationType, entities, User } from '@attraccess/database-entities';
+import { entities, User } from '@attraccess/database-entities';
+import { AuthenticationType } from '@attraccess/application-models';
 import { Logger } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';

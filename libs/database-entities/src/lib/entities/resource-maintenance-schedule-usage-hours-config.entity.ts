@@ -1,13 +1,7 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  OneToOne,
-  JoinColumn,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { ResourceMaintenanceSchedule } from './resource-maintenance-schedule.entity';
-import { UsageDurationUnit } from '../types/usageDurationUnit.enum';
+import { UsageDurationUnit } from '@attraccess/application-models';
 
 /**
  * Config for USAGE_HOURS trigger. Baseline is always the end of the last maintenance

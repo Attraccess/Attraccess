@@ -1,4 +1,5 @@
-import { ResourceHealthStatus, ResourceMaintenance } from '@attraccess/database-entities';
+import { ResourceMaintenance } from '@attraccess/database-entities';
+import { ResourceHealthStatus } from '@attraccess/application-models';
 import { SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';

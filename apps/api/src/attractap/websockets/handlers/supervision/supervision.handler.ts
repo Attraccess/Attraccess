@@ -1,4 +1,5 @@
-import { Resource, SupervisionMode, User } from '@attraccess/database-entities';
+import { Resource, User } from '@attraccess/database-entities';
+import { SupervisionMode } from '@attraccess/application-models';
 
 import {
   Inject,

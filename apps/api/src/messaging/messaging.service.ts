@@ -1,11 +1,5 @@
-import {
-  Conversation,
-  ConversationParticipant,
-  Message,
-  Resource,
-  User,
-  MessageReferenceType,
-} from '@attraccess/database-entities';
+import { Conversation, ConversationParticipant, Message, Resource, User } from '@attraccess/database-entities';
+import { MessageReferenceType } from '@attraccess/application-models';
 
 import { ForbiddenException, Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 

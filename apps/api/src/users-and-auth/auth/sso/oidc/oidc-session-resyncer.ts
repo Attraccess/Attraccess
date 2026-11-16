@@ -1,10 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import {
-  SSOProvider,
-  SSOProviderOIDCConfiguration,
-  SSOProviderType,
-  SsoSessionContext,
-} from '@attraccess/database-entities';
+import { SSOProvider, SSOProviderOIDCConfiguration } from '@attraccess/database-entities';
+import { SSOProviderType, SsoSessionContext } from '@attraccess/application-models';
 import axios from 'axios';
 import { EncryptionService } from '../../../../encryption/encryption.service';
 import { RbacService } from '../../../rbac/rbac.service';

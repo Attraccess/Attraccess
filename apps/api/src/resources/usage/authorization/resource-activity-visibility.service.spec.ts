@@ -1,4 +1,5 @@
-import { Resource, ResourceUsage, SupervisionMode } from '@attraccess/database-entities';
+import { Resource, ResourceUsage } from '@attraccess/database-entities';
+import { SupervisionMode } from '@attraccess/application-models';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { Subject } from 'rxjs';
 import { ResourceActivityVisibility } from '../../../settings/constants';

@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import { ResourceHealthService } from '../../health/resource-health.service';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { HealthSetExecutor } from './health-set.executor';
@@ -177,7 +178,11 @@ describe('HealthSetExecutor', () => {
   });
 
   it('throws FlowExecutionError when node.data is missing entirely (status required)', async () => {
-    const node = { id: 'n', type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET, resourceId: 1 } as unknown as ResourceFlowNode;
+    const node = {
+      id: 'n',
+      type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
+      resourceId: 1,
+    } as unknown as ResourceFlowNode;
 
     await expect(executor.execute(node, {}, ctx)).rejects.toBeInstanceOf(FlowExecutionError);
     expect(resourceHealthService.reportHealth).not.toHaveBeenCalled();

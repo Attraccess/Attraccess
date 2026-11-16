@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode, ResourceFlowVariableScope } from '@attraccess/database-entities';
+import { ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowVariableScope } from '@attraccess/application-models';
 import { SetVariablesExecutor } from './set-variables.executor';
 import { ResourceFlowVariablesService } from '../variables/resource-flow-variables.service';
 import { NodeExecutionContext } from './node-executor.interface';

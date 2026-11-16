@@ -1,10 +1,6 @@
 import { registerSsoServiceFixture } from './sso.service.sso-service.test-fixture';
-import {
-  SSOProvider,
-  SSOProviderOIDCConfiguration,
-  SSOProviderType,
-  SSOProviderSAMLConfiguration,
-} from '@attraccess/database-entities';
+import { SSOProvider, SSOProviderOIDCConfiguration, SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { CreateSAMLConfigurationDto } from './dto/create-sso-provider.dto';
 import { ssoAuditSnapshot } from './audit/provider-audit';

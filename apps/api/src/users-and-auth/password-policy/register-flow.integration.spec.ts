@@ -3,12 +3,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
   AuthenticationDetail,
-  AuthenticationType,
   PasswordHistory,
   PasswordPolicy,
   PasswordPolicyOverride,
   Setting,
 } from '@attraccess/database-entities';
+import { AuthenticationType } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
 import { UserRegistrationService } from '../users/user-registration.service';
 import { SignupDomainService } from '../users/signup-domain.service';

@@ -1,4 +1,5 @@
-import { Resource, ResourceFlowEdge, ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
+import { Resource, ResourceFlowEdge, ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 

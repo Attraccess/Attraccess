@@ -1,12 +1,5 @@
-import {
-  Project,
-  Resource,
-  ResourceFlowNodeType,
-  ResourceType,
-  ResourceUsage,
-  ResourceUsageAction,
-  User,
-} from '@attraccess/database-entities';
+import { Project, Resource, ResourceUsage, User } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceType, ResourceUsageAction } from '@attraccess/application-models';
 
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 

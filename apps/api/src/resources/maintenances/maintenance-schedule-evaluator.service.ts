@@ -5,8 +5,8 @@ import {
   ResourceMaintenance,
   ResourceMaintenanceSchedule,
   ResourceUsage,
-  ResourceMaintenanceScheduleTriggerType,
 } from '@attraccess/database-entities';
+import { ResourceMaintenanceScheduleTriggerType } from '@attraccess/application-models';
 
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 

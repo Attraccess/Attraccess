@@ -1,5 +1,5 @@
 import { registerPasswordPolicyServiceFixture } from './password-policy.service.password-policy-service.test-fixture';
-import { PasswordPolicyRole, AuthenticationType } from '@attraccess/database-entities';
+import { AuthenticationType, PasswordPolicyRole } from '@attraccess/application-models';
 import * as bcrypt from 'bcrypt';
 import { DEFAULT_PASSWORD_POLICY } from '@attraccess/shared';
 

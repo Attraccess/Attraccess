@@ -1,5 +1,6 @@
 import { registerResourceIntroducersServiceFixture } from './resourceIntroducers.service.resource-introducers-service.test-fixture';
-import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/database-entities';
+import { ResourceIntroducer, User } from '@attraccess/database-entities';
+import { ResourceIntroducerType } from '@attraccess/application-models';
 import { NotificationCategory } from './../../notifications/notification-types';
 
 describe('ResourceIntroducersService', () => {

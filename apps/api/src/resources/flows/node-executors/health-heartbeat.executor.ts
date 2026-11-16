@@ -1,10 +1,6 @@
 import { Logger } from '@nestjs/common';
-import {
-  ResourceFlowNode,
-  ResourceHealthHeartbeatNodeDataSchema,
-  ResourceHealthSource,
-  ResourceHealthStatus,
-} from '@attraccess/database-entities';
+import { ResourceFlowNode, ResourceHealthHeartbeatNodeDataSchema } from '@attraccess/database-entities';
+import { ResourceHealthSource, ResourceHealthStatus } from '@attraccess/application-models';
 import { ResourceHealthService } from '../../health/resource-health.service';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 import { globalHeartbeatKey, heartbeatKey, requireRunResourceId } from './flow.utils';

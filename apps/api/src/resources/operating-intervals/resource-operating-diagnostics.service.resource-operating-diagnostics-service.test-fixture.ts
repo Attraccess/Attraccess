@@ -1,4 +1,5 @@
-import { ResourceFlowNode, ResourceOperatingInterval, ResourceType } from '@attraccess/database-entities';
+import { ResourceFlowNode, ResourceOperatingInterval } from '@attraccess/database-entities';
+import { ResourceType } from '@attraccess/application-models';
 import { Repository } from 'typeorm';
 import { OperatingMetricsRecorder } from '../../metrics/instrumentation/operating/operating.helper';
 import {

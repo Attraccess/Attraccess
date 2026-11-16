@@ -1,4 +1,5 @@
-import type { SSOProvider, SsoSessionContext } from '@attraccess/database-entities';
+import type { SSOProvider } from '@attraccess/database-entities';
+import type { SsoSessionContext } from '@attraccess/application-models';
 import { LogoutSession } from '../session-store/session-store';
 
 /** `skipped` means no IdP call was made; every other outcome is one logged re-sync attempt. */

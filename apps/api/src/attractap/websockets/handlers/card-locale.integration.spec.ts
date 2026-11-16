@@ -1,4 +1,5 @@
-import { entities, NFCCard, Resource, ResourceType, User } from '@attraccess/database-entities';
+import { entities, NFCCard, Resource, User } from '@attraccess/database-entities';
+import { ResourceType } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
 import * as migrations from '../../../database/migrations';
 import { UserProfileController } from '../../../users-and-auth/users/user-profile.controller';

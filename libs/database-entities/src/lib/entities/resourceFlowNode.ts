@@ -12,9 +12,8 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
 import { Flow } from './flow.entity';
-import { ResourceFlowNodeType } from './resource-flow-node/node-type';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 
-export { ResourceFlowNodeType } from './resource-flow-node/node-type';
 export {
   ExternalEffectFailureBehaviorSchema,
   ExternalEffectPolicySchema,

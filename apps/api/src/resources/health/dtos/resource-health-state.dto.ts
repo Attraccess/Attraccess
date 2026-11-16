@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ResourceHealthSource, ResourceHealthStatus } from '@attraccess/database-entities';
+import { ResourceHealthSource, ResourceHealthStatus } from '@attraccess/application-models';
 
 export class ResourceHealthStateDto {
   @ApiProperty({ description: 'The health record id', example: 1 })

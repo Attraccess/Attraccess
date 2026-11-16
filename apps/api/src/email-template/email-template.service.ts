@@ -7,7 +7,8 @@ import {
   OnApplicationBootstrap,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EmailTemplate, EmailTemplateTranslation, EmailTemplateType } from '@attraccess/database-entities';
+import { EmailTemplate, EmailTemplateTranslation } from '@attraccess/database-entities';
+import { EmailTemplateType } from '@attraccess/application-models';
 import { EntityManager, Repository } from 'typeorm';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
 import { MjmlService } from './mjml.service';

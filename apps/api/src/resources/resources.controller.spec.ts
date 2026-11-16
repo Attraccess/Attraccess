@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResourcesController } from './resources.controller';
 import { ResourcesService } from './resources.service';
-import { Resource, DocumentationType, ResourceType } from '@attraccess/database-entities';
+import { Resource } from '@attraccess/database-entities';
+import { DocumentationType, ResourceType } from '@attraccess/application-models';
 import { createMockResource } from '../test-utils/resource.fixtures';
 import { CreateResourceDto } from './dtos/createResource.dto';
 import { UpdateResourceDto } from './dtos/updateResource.dto';

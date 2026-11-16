@@ -38,7 +38,8 @@ import { MetricsService } from '../../../metrics/metrics.service';
 
 import { SettingsService } from '../../../settings/settings.service';
 
-import { SSOProvider, SSOProviderType } from '@attraccess/database-entities';
+import { SSOProvider } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 
 import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 

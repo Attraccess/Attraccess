@@ -1,5 +1,6 @@
 import { billingTransactionAuditEvent } from '../../audit/policies/billing';
-import { BillingTransaction, Setting, BillingTransactionStatus } from '@attraccess/database-entities';
+import { BillingTransaction, Setting } from '@attraccess/database-entities';
+import { BillingTransactionStatus } from '@attraccess/application-models';
 
 import { BadRequestException, Injectable, Logger, Inject } from '@nestjs/common';
 

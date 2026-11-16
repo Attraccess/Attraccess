@@ -1,13 +1,8 @@
 import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import {
-  DocumentationType,
-  Resource,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  ResourceType,
-} from '@attraccess/database-entities';
+import { Resource, ResourceFlowEdge, ResourceFlowNode } from '@attraccess/database-entities';
+import { DocumentationType, ResourceType } from '@attraccess/application-models';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 

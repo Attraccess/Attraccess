@@ -1,10 +1,5 @@
-import {
-  AuditLog,
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-  ResourceHealthState,
-  ResourceType,
-} from '@attraccess/database-entities';
+import { AuditLog, ResourceFlowNode, ResourceHealthState } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceType } from '@attraccess/application-models';
 import {
   AuthenticatedRequest,
   PLUGIN_AUDIT_HOST_PROVIDER,

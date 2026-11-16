@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { Project, ProjectMember, ProjectMemberRole } from '@attraccess/database-entities';
+import { Project, ProjectMember } from '@attraccess/database-entities';
+import { ProjectMemberRole } from '@attraccess/application-models';
 import { ProjectAccessInfoDto, ProjectWithAccessDto } from './dto/project-access.dto';
 
 @Injectable()
@@ -106,4 +107,3 @@ export class ProjectAccessService {
     return membership.role === ProjectMemberRole.VIEWER ? false : false;
   }
 }
-

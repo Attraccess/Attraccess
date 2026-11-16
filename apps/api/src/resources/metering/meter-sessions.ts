@@ -1,10 +1,6 @@
 import { EntityManager, In } from 'typeorm';
-import {
-  Resource,
-  ResourceMeteringSession,
-  ResourceMeteringSessionStatus,
-  ResourceUsage,
-} from '@attraccess/database-entities';
+import { Resource, ResourceMeteringSession, ResourceUsage } from '@attraccess/database-entities';
+import { ResourceMeteringSessionStatus } from '@attraccess/application-models';
 import { findActiveUsages, getSessionCapacity } from '../usage/sessions/active-usage';
 
 /** Effective parallel session limit for metering. Doors and unknown resources behave like a limit of 1. */

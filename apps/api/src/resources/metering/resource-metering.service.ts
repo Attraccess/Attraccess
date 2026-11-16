@@ -10,13 +10,12 @@ import {
   ResourceFlowNode,
   ResourceMeteringOperation,
   ResourceMeteringSession,
-  ResourceFlowNodeType,
   ResourceMeteringOperationKind,
-  ResourceMeteringSessionStatus,
   ResourceMeterAllocation,
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
 } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceMeteringSessionStatus } from '@attraccess/application-models';
 
 import { ResourceFlowsExecutorService } from '../flows/execution/resource-flows-executor.service';
 

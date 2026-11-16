@@ -1,4 +1,5 @@
-import { EmailTemplate, EmailTemplateTranslation, EmailTemplateType } from '@attraccess/database-entities';
+import { EmailTemplate, EmailTemplateTranslation } from '@attraccess/database-entities';
+import { EmailTemplateType } from '@attraccess/application-models';
 import type { PluginEmailTemplate } from '@attraccess/plugins-backend-sdk';
 import { DataSource } from 'typeorm';
 import { EmailTemplateService } from './email-template.service';

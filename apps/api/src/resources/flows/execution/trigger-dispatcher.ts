@@ -1,11 +1,11 @@
 import { Logger } from '@nestjs/common';
 import {
   ResourceFlowNode,
-  ResourceFlowNodeType,
   MqttMessageReceivedNodeDataSchema,
   MqttWaitForMessageNodeDataSchema,
   CompanionUsbDeviceNodeDataSchema,
 } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import { Repository } from 'typeorm';
 import z from 'zod';
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';

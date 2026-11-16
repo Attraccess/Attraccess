@@ -1,12 +1,6 @@
 import { Logger } from '@nestjs/common';
-import {
-  entities,
-  Flow,
-  Resource,
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-  ResourceType,
-} from '@attraccess/database-entities';
+import { entities, Flow, Resource, ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceType } from '@attraccess/application-models';
 import { DataSource, Repository } from 'typeorm';
 import {
   enabledGlobalNodesWhere,

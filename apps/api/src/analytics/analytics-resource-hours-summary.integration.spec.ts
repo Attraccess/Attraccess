@@ -4,9 +4,9 @@ import {
   Resource,
   ResourceOperatingInterval,
   ResourceUsage,
-  ResourceUsageAction,
   ResourceUsageLifecycleAttempt,
 } from '@attraccess/database-entities';
+import { ResourceUsageAction } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
 import { ResourceOperatingAttributionService } from '../resources/operating-intervals/resource-operating-attribution.service';
 import { AnalyticsService } from './analytics.service';

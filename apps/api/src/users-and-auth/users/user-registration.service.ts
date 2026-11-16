@@ -1,4 +1,5 @@
-import { AuthenticationType, User } from '@attraccess/database-entities';
+import { User } from '@attraccess/database-entities';
+import { AuthenticationType } from '@attraccess/application-models';
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
 

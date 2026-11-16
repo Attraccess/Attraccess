@@ -1,9 +1,5 @@
-import {
-  ResourceFlowNodeType,
-  ResourceUsage,
-  ResourceUsageLifecycleAttempt,
-  User,
-} from '@attraccess/database-entities';
+import { ResourceUsage, ResourceUsageLifecycleAttempt, User } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 
 import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 

@@ -17,7 +17,8 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { PasswordPolicyOverride, PasswordPolicyRole } from '@attraccess/database-entities';
+import { PasswordPolicyOverride } from '@attraccess/database-entities';
+import { PasswordPolicyRole } from '@attraccess/application-models';
 import { PasswordPolicyConfig } from '@attraccess/shared';
 import { AuditContext, PasswordPolicyService, POLICY_FIELDS } from './password-policy.service';
 import {

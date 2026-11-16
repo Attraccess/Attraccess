@@ -1,13 +1,6 @@
 import { readerTimeZoneStub } from '../../attractap/websockets/reader-time-zone.test-fixture';
-import {
-  entities,
-  ResourceType,
-  Resource,
-  ResourceGroup,
-  ResourceIntroducer,
-  ResourceIntroducerType,
-  User,
-} from '@attraccess/database-entities';
+import { entities, Resource, ResourceGroup, ResourceIntroducer, User } from '@attraccess/database-entities';
+import { ResourceIntroducerType, ResourceType } from '@attraccess/application-models';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import * as migrations from '../../database/migrations';

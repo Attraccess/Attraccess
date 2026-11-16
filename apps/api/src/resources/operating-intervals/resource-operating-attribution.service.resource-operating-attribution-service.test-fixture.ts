@@ -1,9 +1,5 @@
-import {
-  ResourceOperatingInterval,
-  ResourceUsage,
-  ResourceUsageAction,
-  ResourceUsageLifecycleAttempt,
-} from '@attraccess/database-entities';
+import { ResourceOperatingInterval, ResourceUsage, ResourceUsageLifecycleAttempt } from '@attraccess/database-entities';
+import { ResourceUsageAction } from '@attraccess/application-models';
 import { Repository } from 'typeorm';
 import { ResourceOperatingAttributionService } from './resource-operating-attribution.service';
 

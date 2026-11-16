@@ -1,11 +1,6 @@
 import { billingTransactionAuditEvent } from '../../audit/policies/billing';
-import {
-  BillingTransaction,
-  BillingTransactionStatus,
-  User,
-  ResourceBillingConfiguration,
-  Setting,
-} from '@attraccess/database-entities';
+import { BillingTransaction, User, ResourceBillingConfiguration, Setting } from '@attraccess/database-entities';
+import { BillingTransactionStatus } from '@attraccess/application-models';
 
 import { BadRequestException } from '@nestjs/common';
 

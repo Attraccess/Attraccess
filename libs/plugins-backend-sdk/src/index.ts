@@ -13,6 +13,7 @@ export * from './lib/plugin-notifications';
 export * from './lib/plugin-resource-access';
 
 export * from './lib/auth-decorator';
+export * from '@attraccess/application-models';
 export * from '@attraccess/database-entities';
 export * as entities from '@attraccess/database-entities';
 export * from './lib/auth.types';

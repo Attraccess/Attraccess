@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
-import { SSOProviderOIDCConfiguration, SSOProviderType } from '@attraccess/database-entities';
+import { SSOProviderOIDCConfiguration } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { toPath } from 'lodash-es';
 import { DEFAULT_OIDC_ROLE_CLAIM_PATHS } from '@attraccess/shared';
 import type { RbacService } from '../../../rbac/rbac.service';

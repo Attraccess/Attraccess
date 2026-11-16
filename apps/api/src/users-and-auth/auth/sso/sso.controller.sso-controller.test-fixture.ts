@@ -1,5 +1,6 @@
 import { AUDIT_RECORDER } from '../../../audit/recorder/audit-event';
-import { SSOProvider, SSOProviderType } from '@attraccess/database-entities';
+import { SSOProvider } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { ModuleRef } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';

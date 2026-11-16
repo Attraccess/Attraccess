@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsEnum, IsInt, IsOptional, Min } from 'class-validator';
-import { MaintenanceRequestStatus } from '@attraccess/database-entities';
+import { MaintenanceRequestStatus } from '@attraccess/application-models';
 
 export class ListMaintenanceRequestsDto {
   @ApiProperty({ description: 'Page number for pagination', required: false, example: 1 })

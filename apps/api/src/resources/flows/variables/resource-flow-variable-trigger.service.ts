@@ -2,12 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
-import {
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-  ResourceFlowVariableScope,
-  VariableChangedNodeDataSchema,
-} from '@attraccess/database-entities';
+import { ResourceFlowNode, VariableChangedNodeDataSchema } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceFlowVariableScope } from '@attraccess/application-models';
 import { ResourceFlowVariableChangedEvent } from '../events/flow-variable-changed.event';
 import { ResourceFlowsExecutorService } from '../execution/resource-flows-executor.service';
 import { enabledGlobalNodesWhere, isGlobalFlowNode } from '../execution/flow-node-queries';

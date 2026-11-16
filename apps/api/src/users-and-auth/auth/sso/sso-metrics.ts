@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { SSOProviderType } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { MetricsService } from '../../../metrics/metrics.service';
 
 export type SSOLoginFailureReason = 'guard_rejected' | 'invalid_assertion' | 'linking_failed' | 'provider_error';
@@ -39,7 +39,9 @@ export function recordSsoLoginFailure(
       reason,
     });
   } catch (error) {
-    logger?.warn(`Failed to record SSO login failure metric: ${error instanceof Error ? error.message : String(error)}`);
+    logger?.warn(
+      `Failed to record SSO login failure metric: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -59,9 +61,10 @@ export function classifySsoFailureReason(error: unknown): SSOLoginFailureReason 
     return 'linking_failed';
   }
 
-  const status = typeof error === 'object' && error !== null && 'getStatus' in error
-    ? (error as { getStatus?: () => number }).getStatus?.()
-    : undefined;
+  const status =
+    typeof error === 'object' && error !== null && 'getStatus' in error
+      ? (error as { getStatus?: () => number }).getStatus?.()
+      : undefined;
   if (status === 400 || status === 401) {
     return 'invalid_assertion';
   }

@@ -1,4 +1,5 @@
-import { Form, FormField, FormSubmission, Resource, ResourceFormAction } from '@attraccess/database-entities';
+import { Form, FormField, FormSubmission, Resource } from '@attraccess/database-entities';
+import { ResourceFormAction } from '@attraccess/application-models';
 
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 

@@ -2,10 +2,10 @@ import { Logger } from '@nestjs/common';
 import {
   BillingTransaction,
   BillingTransactionItem,
-  BillingTransactionStatus,
   ResourceFlowNode,
   ResourceUsage,
 } from '@attraccess/database-entities';
+import { BillingTransactionStatus } from '@attraccess/application-models';
 import { DataSource, EntitySchema } from 'typeorm';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';

@@ -1,5 +1,6 @@
 import { registerUserRegistrationServiceFixture } from './user-registration.service.user-registration-service.test-fixture';
-import { AuthenticationDetail, AuthenticationType, User } from '@attraccess/database-entities';
+import { AuthenticationDetail, User } from '@attraccess/database-entities';
+import { AuthenticationType } from '@attraccess/application-models';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { CreateUserDto } from './dtos/createUser.dto';
 import { EntityManager } from 'typeorm';

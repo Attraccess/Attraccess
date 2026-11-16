@@ -14,7 +14,12 @@ import {
   ManyToOne,
 } from 'typeorm';
 
-import { DocumentationType } from '../types/documentationType.enum';
+import {
+  AutoIntroductionTarget,
+  DocumentationType,
+  ResourceType,
+  SupervisionMode,
+} from '@attraccess/application-models';
 
 import { Attractap } from './attractap.entity';
 
@@ -27,8 +32,6 @@ import { ResourceMaintenanceSchedule } from './resource-maintenance-schedule.ent
 import { ResourceOperatingInterval } from './resource-operating-interval.entity';
 
 import { ResourceMaintenance } from './resource.maintenance';
-
-import { ResourceType } from './resource.type';
 
 import { ResourceFlowEdge } from './resourceFlowEdge';
 
@@ -43,8 +46,6 @@ import { ResourceIntroducer } from './resourceIntroducer.entity';
 import { ResourceIntroduction } from './resourceIntroduction.entity';
 
 import { ResourceUsage } from './resourceUsage.entity';
-
-import { AutoIntroductionTarget, SupervisionMode } from './resource.supervision';
 
 @Entity()
 export class Resource {

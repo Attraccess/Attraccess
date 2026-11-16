@@ -6,11 +6,11 @@ import {
   Permission,
   ResourceUsage,
   Role,
-  SSOProviderType,
   Session,
   User,
   UserRole,
 } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import type { ConfigService } from '@nestjs/config';
 import type { ModuleRef } from '@nestjs/core';
 import { DataSource } from 'typeorm';

@@ -1,6 +1,7 @@
 import { AuditRecorder } from '../../../audit/recorder/audit-event';
 import { Logger } from '@nestjs/common';
-import { SSOProvider, SSOProviderType, SsoSessionContext } from '@attraccess/database-entities';
+import { SSOProvider } from '@attraccess/database-entities';
+import { SSOProviderType, SsoSessionContext } from '@attraccess/application-models';
 import { SsoSessionPermissionSyncService } from './session-permission-sync.service';
 import { SessionPermissionResyncer, SessionRejectedError } from './session-permission-sync';
 import { SessionService } from '../session.service';

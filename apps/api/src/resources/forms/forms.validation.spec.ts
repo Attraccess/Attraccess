@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { FormFieldType } from '@attraccess/database-entities';
+import { FormFieldType } from '@attraccess/application-models';
 import { parseFieldOptions, parseFieldValue } from './forms.validation';
 
 describe('forms.validation', () => {

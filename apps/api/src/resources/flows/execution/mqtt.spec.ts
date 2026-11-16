@@ -1,11 +1,5 @@
-import {
-  BillingTransactionItem,
-  Resource,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-  ResourceType,
-} from '@attraccess/database-entities';
+import { BillingTransactionItem, Resource, ResourceFlowEdge, ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceType } from '@attraccess/application-models';
 
 import { Logger } from '@nestjs/common';
 

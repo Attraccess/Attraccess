@@ -2,11 +2,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource, EntityManager } from 'typeorm';
-import {
-  ResourceMaintenanceSchedule,
-  ResourceMaintenanceScheduleTriggerType,
-  UsageDurationUnit,
-} from '@attraccess/database-entities';
+import { ResourceMaintenanceSchedule } from '@attraccess/database-entities';
+import { ResourceMaintenanceScheduleTriggerType, UsageDurationUnit } from '@attraccess/application-models';
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 import {
   closeResourceTransactionConnection,

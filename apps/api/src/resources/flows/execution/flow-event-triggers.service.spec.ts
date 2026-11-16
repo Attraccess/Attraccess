@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNodeType, ResourceHealthStatus } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceHealthStatus } from '@attraccess/application-models';
 import { ResourceHealthChangedEvent } from '../../health/events/resource-health-changed.event';
 import { ResourceMaintenanceChangedEvent } from '../../maintenances/events/resource-maintenance-changed.event';
 import { ResourceMaintenanceRequestCreatedEvent } from '../../maintenances/events/maintenance-request-created.event';

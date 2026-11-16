@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ResourceUsageAction } from '@attraccess/database-entities';
+import { ResourceUsageAction } from '@attraccess/application-models';
 import { READER_UI_SLOTS } from '@attraccess/plugins-backend-sdk';
 import { CardSessionService } from './card-session.service';
 import { AttractapUiHandler } from './ui.handler';

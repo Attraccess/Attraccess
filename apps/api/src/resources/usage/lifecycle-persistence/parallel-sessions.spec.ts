@@ -1,13 +1,10 @@
+import { Resource, ResourceUsage, ResourceUsageLifecycleAttempt, User } from '@attraccess/database-entities';
 import {
-  Resource,
   ResourceFlowNodeType,
   ResourceType,
-  ResourceUsage,
   ResourceUsageAction,
-  ResourceUsageLifecycleAttempt,
   SupervisionMode,
-  User,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 import { NoUsageSessionError } from '../../flows/errors/no-usage-session.error';
 import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { rm } from 'node:fs/promises';

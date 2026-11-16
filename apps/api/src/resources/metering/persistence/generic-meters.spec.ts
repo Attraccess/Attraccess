@@ -1,15 +1,14 @@
 import {
   BillingTransaction,
-  EmailTemplateType,
   ResourceFlowEdge,
   ResourceFlowNode,
   ResourceMeter,
   ResourceMeteringOperation,
   ResourceMeteringSession,
-  ResourceMeteringSessionStatus,
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
 } from '@attraccess/database-entities';
+import { EmailTemplateType, ResourceMeteringSessionStatus } from '@attraccess/application-models';
 
 import Handlebars from 'handlebars';
 

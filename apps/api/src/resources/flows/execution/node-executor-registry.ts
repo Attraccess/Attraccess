@@ -1,4 +1,5 @@
-import { BillingTransactionItem, ResourceFlowNodeType } from '@attraccess/database-entities';
+import { BillingTransactionItem } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';

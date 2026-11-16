@@ -1,4 +1,5 @@
-import { AuditLog, ResourceHealthStatus, SSOProviderType } from '@attraccess/database-entities';
+import { AuditLog } from '@attraccess/database-entities';
+import { ResourceHealthStatus, SSOProviderType } from '@attraccess/application-models';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { WebSocket } from 'ws';

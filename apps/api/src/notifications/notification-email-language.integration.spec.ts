@@ -1,14 +1,8 @@
 import { createMock } from '@golevelup/ts-jest';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import {
-  EmailTemplate,
-  EmailTemplateType,
-  Resource,
-  ResourceIntroducer,
-  ResourceUsage,
-  User,
-} from '@attraccess/database-entities';
+import { EmailTemplate, Resource, ResourceIntroducer, ResourceUsage, User } from '@attraccess/database-entities';
+import { EmailTemplateType } from '@attraccess/application-models';
 import { Repository } from 'typeorm';
 import { createTransport } from 'nodemailer';
 import { EmailService } from '../email/email.service';

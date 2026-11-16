@@ -1,5 +1,5 @@
 import { registerSsoOidcIntegrationE2eWithTestcontainersFixture } from './oidc.test-fixture';
-import { UserRoleSource } from '@attraccess/database-entities';
+import { UserRoleSource } from '@attraccess/application-models';
 import { SSOOIDCStrategy } from '../../../users-and-auth/auth/sso/oidc/oidc.strategy';
 
 describe('SSO OIDC integration (e2e with testcontainers)', () => {

@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { SSOProvider, SSOProviderType, SsoSessionContext } from '@attraccess/database-entities';
+import { SSOProvider } from '@attraccess/database-entities';
+import { SSOProviderType, SsoSessionContext } from '@attraccess/application-models';
 import { OidcSessionResyncer } from './oidc-session-resyncer';
 import { SessionRejectedError } from '../session-permission-sync';
 import { SSOService } from '../sso.service';

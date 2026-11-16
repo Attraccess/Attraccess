@@ -1,5 +1,6 @@
 import { getSupportedDeviceLanguage } from '@attraccess/shared';
-import { Resource, SupervisionMode } from '@attraccess/database-entities';
+import { Resource } from '@attraccess/database-entities';
+import { SupervisionMode } from '@attraccess/application-models';
 
 import { SettingsService } from '../../../../settings/settings.service';
 import {

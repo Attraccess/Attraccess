@@ -3,11 +3,11 @@
 import {
   BillingTransaction,
   BillingTransactionItem,
-  EmailTemplateType,
   Resource,
   ResourceUsage,
   User,
 } from '@attraccess/database-entities';
+import { EmailTemplateType } from '@attraccess/application-models';
 import { EmailTemplateService } from './../email-template/email-template.service';
 import { EmailService } from './email.service';
 import { inheritTestScope } from './../test-utils/inherit-test-scope';

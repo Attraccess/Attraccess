@@ -1,4 +1,5 @@
-import { SSOProvider, SSOProviderType } from '@attraccess/database-entities';
+import { SSOProvider } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { AuditActor, AuditEvent, AuditRecorder } from '../../../../audit/recorder/audit-event';

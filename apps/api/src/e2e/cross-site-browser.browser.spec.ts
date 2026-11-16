@@ -4,7 +4,8 @@ import type { AddressInfo } from 'node:net';
 import { Browser, BrowserContext, Page, Response, chromium } from 'playwright';
 import { DataSource } from 'typeorm';
 import WebSocket from 'ws';
-import { Resource, ResourceType, User } from '@attraccess/database-entities';
+import { Resource, User } from '@attraccess/database-entities';
+import { ResourceType } from '@attraccess/application-models';
 import { bootstrap } from '../main.bootstrap';
 import { AUTH_COOKIE_NAME } from '../common/services/cookie-config.service';
 import { SessionService } from '../users-and-auth/auth/session.service';
@@ -39,7 +40,9 @@ describe('sibling website against a real API in headless Chromium', () => {
 
   beforeAll(async () => {
     // One plain page server answers for the sibling and the portal hostnames.
-    pages = createServer((_req, res) => res.setHeader('content-type', 'text/html').end('<!doctype html><title>x</title>'));
+    pages = createServer((_req, res) =>
+      res.setHeader('content-type', 'text/html').end('<!doctype html><title>x</title>'),
+    );
     await new Promise<void>((resolve) => pages.listen(0, '127.0.0.1', resolve));
     const pagesPort = (pages.address() as AddressInfo).port;
     siblingUrl = `http://${SIBLING_HOST}:${pagesPort}`;

@@ -1,4 +1,5 @@
-import { ResourceType, ResourceUsage, ResourceUsageAction, User } from '@attraccess/database-entities';
+import { ResourceUsage, User } from '@attraccess/database-entities';
+import { ResourceType, ResourceUsageAction } from '@attraccess/application-models';
 
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 

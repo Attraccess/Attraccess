@@ -2,12 +2,12 @@ import {
   Resource,
   ResourceFlowEdge,
   ResourceFlowNode,
-  ResourceFlowNodeType,
   getNodeDataSchema,
   ResourceMeter,
   Flow,
   FlowScope,
 } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 

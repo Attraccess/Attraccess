@@ -1,10 +1,10 @@
+import { ResourceFlowNode } from '@attraccess/database-entities';
 import {
-  ResourceFlowNode,
   ResourceFlowNodeType,
   ResourceHealthSource,
   ResourceHealthStatus,
   ResourceType,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 import { registerPluginFlowNodes } from '../../../plugin-system/flows/node-registry';
 import { ResourceHealthChangedEvent } from '../../health/events/resource-health-changed.event';
 import { registerResourceHealthServiceFixture } from '../../health/resource-health.service.resource-health-service.test-fixture';

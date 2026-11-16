@@ -1,11 +1,7 @@
 import { InjectRepository } from '@nestjs/typeorm';
 
-import {
-  IntroductionHistoryAction,
-  ResourceIntroduction,
-  ResourceIntroductionHistoryItem,
-  User,
-} from '@attraccess/database-entities';
+import { ResourceIntroduction, ResourceIntroductionHistoryItem, User } from '@attraccess/database-entities';
+import { IntroductionHistoryAction } from '@attraccess/application-models';
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
 

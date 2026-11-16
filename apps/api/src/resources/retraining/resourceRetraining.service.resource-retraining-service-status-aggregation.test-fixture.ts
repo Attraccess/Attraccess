@@ -1,5 +1,5 @@
 import { ResourceRetrainingService } from './resourceRetraining.service';
-import { IntroductionHistoryAction } from '@attraccess/database-entities';
+import { IntroductionHistoryAction } from '@attraccess/application-models';
 
 export function registerResourceRetrainingServiceStatusAggregationFixture() {
   const trainedAt = new Date('2020-01-01T00:00:00Z');

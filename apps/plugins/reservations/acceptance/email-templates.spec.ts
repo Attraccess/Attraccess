@@ -1,4 +1,5 @@
-import { EmailTemplate, EmailTemplateTranslation, EmailTemplateType } from '@attraccess/database-entities';
+import { EmailTemplate, EmailTemplateTranslation } from '@attraccess/database-entities';
+import { EmailTemplateType } from '@attraccess/application-models';
 import { BadRequestException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';

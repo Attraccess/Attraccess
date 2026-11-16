@@ -5,12 +5,8 @@ import {
   ResourceOperatingAttributionSummary,
 } from './resource-operating-attribution.service';
 import { ResourceMaintenanceService } from '../maintenances/maintenance.service';
-import {
-  ResourceOperatingInterval,
-  ResourceUsage,
-  ResourceUsageAction,
-  ResourceUsageLifecycleAttempt,
-} from '@attraccess/database-entities';
+import { ResourceOperatingInterval, ResourceUsage, ResourceUsageLifecycleAttempt } from '@attraccess/database-entities';
+import { ResourceUsageAction } from '@attraccess/application-models';
 import { IsNull, LessThan, MoreThan, Repository } from 'typeorm';
 
 describe('ResourceOperatingAttributionController', () => {

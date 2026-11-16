@@ -1,5 +1,6 @@
 import { registerResourceOperatingAttributionServiceFixture } from './resource-operating-attribution.service.resource-operating-attribution-service.test-fixture';
-import { ResourceOperatingInterval, ResourceUsage, ResourceUsageAction } from '@attraccess/database-entities';
+import { ResourceOperatingInterval, ResourceUsage } from '@attraccess/database-entities';
+import { ResourceUsageAction } from '@attraccess/application-models';
 import { MoreThan } from 'typeorm';
 
 describe('ResourceOperatingAttributionService', () => {

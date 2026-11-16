@@ -1,4 +1,5 @@
-import { ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import { EntityManager } from 'typeorm';
 import { ResourceOperatingIntervalService } from '../../operating-intervals/resource-operating-interval.service';
 import { ExternalEffectFailureError } from '../errors/external-effect-failure.error';

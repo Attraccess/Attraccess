@@ -1,4 +1,5 @@
-import { DocumentationType, Resource, ResourceType, SupervisionMode } from '@attraccess/database-entities';
+import { Resource } from '@attraccess/database-entities';
+import { DocumentationType, ResourceType, SupervisionMode } from '@attraccess/application-models';
 
 export function createMockResource(overrides: Partial<Resource> = {}): Resource {
   const now = new Date();

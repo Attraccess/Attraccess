@@ -1,12 +1,6 @@
 import { FindOperator, Repository } from 'typeorm';
-import {
-  Resource,
-  ResourceHealthStatus,
-  ResourceType,
-  ResourceUsage,
-  ResourceUsageAction,
-  User,
-} from '@attraccess/database-entities';
+import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
+import { ResourceHealthStatus, ResourceType, ResourceUsageAction } from '@attraccess/application-models';
 import { ResourceEventsService } from './resource-events.service';
 import {
   ResourceSessionStartedEvent,

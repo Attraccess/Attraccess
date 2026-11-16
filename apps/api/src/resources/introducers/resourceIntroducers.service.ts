@@ -1,4 +1,5 @@
-import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/database-entities';
+import { ResourceIntroducer, User } from '@attraccess/database-entities';
+import { ResourceIntroducerType } from '@attraccess/application-models';
 
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 

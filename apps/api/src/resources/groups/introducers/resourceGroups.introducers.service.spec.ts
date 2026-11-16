@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ResourceIntroducer, ResourceIntroducerType } from '@attraccess/database-entities';
+import { ResourceIntroducer } from '@attraccess/database-entities';
+import { ResourceIntroducerType } from '@attraccess/application-models';
 import { ResourceGroupsIntroducersService } from './resourceGroups.introducers.service';
 import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../../notifications/notification-types';

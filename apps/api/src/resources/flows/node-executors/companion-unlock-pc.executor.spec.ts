@@ -1,4 +1,5 @@
-import { ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import { CompanionGatewayService } from '../../../companion/companion-gateway.service';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { CompanionUnlockPcExecutor } from './companion-unlock-pc.executor';

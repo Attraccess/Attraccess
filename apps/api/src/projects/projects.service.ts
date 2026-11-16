@@ -1,11 +1,5 @@
-import {
-  Project,
-  ProjectInvitation,
-  ProjectMember,
-  ProjectMemberRole,
-  ResourceUsage,
-  User,
-} from '@attraccess/database-entities';
+import { Project, ProjectInvitation, ProjectMember, ResourceUsage, User } from '@attraccess/database-entities';
+import { ProjectMemberRole } from '@attraccess/application-models';
 
 import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 

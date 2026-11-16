@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
-import { AuthenticationType, SSOProviderType, User } from '@attraccess/database-entities';
+import { User } from '@attraccess/database-entities';
+import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
 import { UsersService } from '../../../users/users.service';
 import { AuthService } from '../../auth.service';
 import { AccountLinkingRequiredException } from '../oidc/exceptions/account-linking-required.exception';

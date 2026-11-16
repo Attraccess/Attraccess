@@ -1,5 +1,6 @@
 import { registerAuthServiceFixture } from './auth.service.auth-service.test-fixture';
-import { User, AuthenticationDetail, AuthenticationType, SSOProviderType } from '@attraccess/database-entities';
+import { User, AuthenticationDetail } from '@attraccess/database-entities';
+import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
 import * as bcrypt from 'bcrypt';
 import { UpdateResult } from 'typeorm';
 

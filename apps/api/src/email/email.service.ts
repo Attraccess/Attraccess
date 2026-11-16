@@ -1,14 +1,13 @@
 import {
   BillingTransaction,
-  EmailTemplateType,
   Project,
   ProjectInvitation,
   ResourceUsage,
   User,
   Resource,
-  ResourceHealthStatus,
   EmailTemplate,
 } from '@attraccess/database-entities';
+import { EmailTemplateType, ResourceHealthStatus } from '@attraccess/application-models';
 
 import { formatCredits, toExactCredits, getSupportedDeviceLanguage } from '@attraccess/shared';
 

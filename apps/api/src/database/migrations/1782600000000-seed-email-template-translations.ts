@@ -1,6 +1,10 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
-import { EmailTemplateType } from '@attraccess/database-entities';
-import { EMAIL_TEMPLATE_DEFAULTS, readDefaultTemplateBody, SHIPPED_TRANSLATIONS } from '../../email-template/email-defaults';
+import { EmailTemplateType } from '@attraccess/application-models';
+import {
+  EMAIL_TEMPLATE_DEFAULTS,
+  readDefaultTemplateBody,
+  SHIPPED_TRANSLATIONS,
+} from '../../email-template/email-defaults';
 
 export class SeedEmailTemplateTranslations1782600000000 implements MigrationInterface {
   name = 'SeedEmailTemplateTranslations1782600000000';

@@ -3,14 +3,8 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import {
-  Conversation,
-  ConversationParticipant,
-  Message,
-  MessageReferenceType,
-  Resource,
-  User,
-} from '@attraccess/database-entities';
+import { Conversation, ConversationParticipant, Message, Resource, User } from '@attraccess/database-entities';
+import { MessageReferenceType } from '@attraccess/application-models';
 import { MessagingService } from './messaging.service';
 import { MessagingLiveService } from './messaging-live.service';
 import { MessageCreatedEvent } from './events/message-created.event';

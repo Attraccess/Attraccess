@@ -1,5 +1,6 @@
 import { Repository } from 'typeorm';
-import { Session, User, SsoSessionContext } from '@attraccess/database-entities';
+import { Session, User } from '@attraccess/database-entities';
+import { SsoSessionContext } from '@attraccess/application-models';
 import type { Redis } from 'ioredis';
 import { TokenHashService } from '../../../encryption/token-hash.service';
 import { SessionStore, SessionMetadata, LogoutSession, AuthenticatedSession } from './session-store';

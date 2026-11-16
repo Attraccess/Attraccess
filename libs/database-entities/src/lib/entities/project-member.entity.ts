@@ -1,11 +1,8 @@
+import { ProjectMemberRole } from '@attraccess/application-models';
 import { ApiProperty } from '@nestjs/swagger';
 import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, Unique } from 'typeorm';
 import { Project } from './project';
 import { User } from './user.entity';
-
-export enum ProjectMemberRole {
-  VIEWER = 'viewer',
-}
 
 @Entity('project_members')
 @Unique(['projectId', 'userId'])

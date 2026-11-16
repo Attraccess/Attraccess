@@ -1,4 +1,5 @@
-import { Attractap, ResourceFormAction } from '@attraccess/database-entities';
+import { Attractap } from '@attraccess/database-entities';
+import { ResourceFormAction } from '@attraccess/application-models';
 import type { CardConversation } from './card-conversation.service';
 import type { CardSessionState, UiSlotsState, UiStepState } from './handlers/ui/ui-socket-state';
 

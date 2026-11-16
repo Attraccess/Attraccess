@@ -5,15 +5,14 @@ import { Repository, In, EntityManager, MoreThan, Not } from 'typeorm';
 
 import {
   ResourceMeteringSession,
-  ResourceMeteringSessionStatus,
   BillingTransaction,
   BillingItemAllocation,
   BillingTransactionItem,
-  BillingTransactionStatus,
   ResourceMeteringOperation,
   ResourceMeteringSegment,
   ResourceUsage,
 } from '@attraccess/database-entities';
+import { BillingTransactionStatus, ResourceMeteringSessionStatus } from '@attraccess/application-models';
 
 import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 

@@ -1,12 +1,8 @@
 import { Injectable, Logger, BadRequestException, NotFoundException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-  MaintenanceRequestStatus,
-  Resource,
-  ResourceMaintenanceRequest,
-  User,
-} from '@attraccess/database-entities';
+import { Resource, ResourceMaintenanceRequest, User } from '@attraccess/database-entities';
+import { MaintenanceRequestStatus } from '@attraccess/application-models';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';

@@ -1,5 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
-import { ResourceUsage, SupervisionMode } from '@attraccess/database-entities';
+import { ResourceUsage } from '@attraccess/database-entities';
+import { SupervisionMode } from '@attraccess/application-models';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { ResourceActivityVisibility } from '../../../settings/constants';
 import { ResourceActivityVisibilityService } from '../authorization/resource-activity-visibility.service';

@@ -5,12 +5,10 @@ import {
   Resource,
   ResourceFlowEdge,
   ResourceFlowNode,
-  ResourceFlowNodeType,
   ResourceFlowVariable,
-  ResourceFlowVariableScope,
-  ResourceType,
   Setting,
 } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceFlowVariableScope, ResourceType } from '@attraccess/application-models';
 import { BadRequestException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { mkdtemp, rm } from 'node:fs/promises';

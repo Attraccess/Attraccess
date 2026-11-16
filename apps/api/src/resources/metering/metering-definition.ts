@@ -3,8 +3,8 @@ import {
   MeteringStartNodeDataSchema,
   ResourceFlowEdge,
   ResourceFlowNode,
-  ResourceFlowNodeType,
 } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 
 export type MeterProblem =
   | 'start-trigger-missing'

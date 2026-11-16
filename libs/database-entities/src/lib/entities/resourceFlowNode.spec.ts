@@ -1,4 +1,5 @@
-import { getExternalEffectFailureBehavior, getNodeDataSchema, ResourceFlowNodeType as Type } from './resourceFlowNode';
+import { getExternalEffectFailureBehavior, getNodeDataSchema } from './resourceFlowNode';
+import { ResourceFlowNodeType as Type } from '@attraccess/application-models';
 
 describe('resource flow node schemas', () => {
   it.each(Object.values(Type))('provides a usable schema for %s', (type) => {

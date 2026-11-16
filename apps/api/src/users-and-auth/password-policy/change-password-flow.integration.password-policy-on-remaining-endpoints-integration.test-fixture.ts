@@ -1,12 +1,12 @@
 import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import {
   AuthenticationDetail,
-  AuthenticationType,
   PasswordHistory,
   PasswordPolicy,
   PasswordPolicyOverride,
   Setting,
 } from '@attraccess/database-entities';
+import { AuthenticationType } from '@attraccess/application-models';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';

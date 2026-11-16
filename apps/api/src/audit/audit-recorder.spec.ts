@@ -1,4 +1,5 @@
-import { AuditLog, SSOProviderType } from '@attraccess/database-entities';
+import { AuditLog } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { Logger } from '@nestjs/common';
 import { ssoProviderAuditEvent } from '../users-and-auth/auth/sso/audit/provider-audit';
 import { randomUUID } from 'node:crypto';

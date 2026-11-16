@@ -1,4 +1,5 @@
-import { Resource, ResourceHealthStatus, User } from '@attraccess/database-entities';
+import { Resource, User } from '@attraccess/database-entities';
+import { ResourceHealthStatus } from '@attraccess/application-models';
 
 export enum SystemEvent {
   RESOURCE_USAGE_STARTED = 'RESOURCE_USAGE_STARTED',

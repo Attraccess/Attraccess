@@ -6,10 +6,10 @@ import {
   Resource,
   ResourceOperatingInterval,
   ResourceUsage,
-  ResourceUsageAction,
   ResourceUsageLifecycleAttempt,
   User,
 } from '@attraccess/database-entities';
+import { ResourceUsageAction } from '@attraccess/application-models';
 import { EntitySchema } from 'typeorm';
 export // Real repositories and relations for the lifecycle boundary; peripheral domain tables are omitted.
 const schemas = [

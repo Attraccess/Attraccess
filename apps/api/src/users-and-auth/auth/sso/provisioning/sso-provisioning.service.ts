@@ -1,4 +1,5 @@
-import { AuthenticationType, SSOProvider, SSOProviderType, User } from '@attraccess/database-entities';
+import { SSOProvider, User } from '@attraccess/database-entities';
+import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
 
 import { BadRequestException, Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 

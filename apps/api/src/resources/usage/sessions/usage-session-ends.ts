@@ -1,12 +1,5 @@
-import {
-  FormSubmission,
-  ResourceFlowNodeType,
-  ResourceFormAction,
-  ResourceType,
-  ResourceUsage,
-  ResourceUsageLifecycleAttempt,
-  User,
-} from '@attraccess/database-entities';
+import { FormSubmission, ResourceUsage, ResourceUsageLifecycleAttempt, User } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceFormAction, ResourceType } from '@attraccess/application-models';
 
 import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 

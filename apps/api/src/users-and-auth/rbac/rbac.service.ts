@@ -1,4 +1,5 @@
-import { Permission, Role, RolePermission, User, UserRole, UserRoleSource } from '@attraccess/database-entities';
+import { Permission, Role, RolePermission, User, UserRole } from '@attraccess/database-entities';
+import { UserRoleSource } from '@attraccess/application-models';
 import {
   Inject,
   Injectable,

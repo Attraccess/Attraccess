@@ -1,4 +1,5 @@
-import { Resource, ResourceType, User } from '@attraccess/database-entities';
+import { Resource, User } from '@attraccess/database-entities';
+import { ResourceType } from '@attraccess/application-models';
 import { inheritTestScope } from '../../../../test-utils/inherit-test-scope';
 import type { ResourceUsageServiceTestScope } from '../resource-usage.service.spec';
 

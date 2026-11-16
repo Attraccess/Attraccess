@@ -2,15 +2,14 @@ import {
   BillingTransaction,
   BillingTransactionItem,
   FormSubmission,
-  ResourceFlowNodeType,
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
   LifecycleBillingItem,
   Resource,
-  ResourceUsageAction,
   User,
   Project,
 } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceUsageAction } from '@attraccess/application-models';
 
 import { ConflictException, Injectable, Logger, Optional } from '@nestjs/common';
 

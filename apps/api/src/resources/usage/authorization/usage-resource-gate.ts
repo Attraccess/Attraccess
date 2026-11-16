@@ -1,4 +1,5 @@
-import { Resource, ResourceUsage, User, SupervisionMode } from '@attraccess/database-entities';
+import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
+import { SupervisionMode } from '@attraccess/application-models';
 
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 

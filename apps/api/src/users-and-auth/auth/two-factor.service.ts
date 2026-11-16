@@ -1,4 +1,5 @@
-import { AuthenticationDetail, AuthenticationType, Setting, User } from '@attraccess/database-entities';
+import { AuthenticationDetail, Setting, User } from '@attraccess/database-entities';
+import { AuthenticationType } from '@attraccess/application-models';
 
 import { Inject, Injectable, Logger, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { identityAuditEvent } from '../../audit/policies/identity';

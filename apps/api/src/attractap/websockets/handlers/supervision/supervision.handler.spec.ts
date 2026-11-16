@@ -2,7 +2,7 @@ import { registerAttractapSupervisionHandlerFixture } from './handler.test-fixtu
 import type { SocketState } from './handler.test-fixture';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
-import { SupervisionMode } from '@attraccess/database-entities';
+import { SupervisionMode } from '@attraccess/application-models';
 
 describe('AttractapSupervisionHandler', () => {
   const fixture = registerAttractapSupervisionHandlerFixture();

@@ -1,13 +1,9 @@
+import { ResourceIntroducerType } from '@attraccess/application-models';
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
 import { User } from './user.entity';
 import { ResourceGroup } from './resourceGroup.entity';
-
-export enum ResourceIntroducerType {
-  INTRODUCER = 'introducer',
-  MAINTAINER = 'maintainer',
-}
 
 @Entity()
 export class ResourceIntroducer {

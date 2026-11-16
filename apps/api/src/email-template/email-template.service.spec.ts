@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { EmailTemplateService } from './email-template.service';
-import { EmailTemplateType, EmailTemplateTranslation } from '@attraccess/database-entities';
+import { EmailTemplateTranslation } from '@attraccess/database-entities';
+import { EmailTemplateType } from '@attraccess/application-models';
 import { MjmlService } from './mjml.service';
 import { readDefaultTemplateBody } from './email-defaults';
 

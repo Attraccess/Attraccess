@@ -10,12 +10,12 @@ import {
   ResourceMeteringSession,
   ResourceOperatingInterval,
   ResourceUsage,
-  ResourceUsageAction,
   ResourceUsageLifecycleAttempt,
   User,
   FormSubmission,
   Project,
 } from '@attraccess/database-entities';
+import { ResourceUsageAction } from '@attraccess/application-models';
 import { EntitySchema } from 'typeorm';
 export const schemas = [
   new EntitySchema<ResourceMeter>({

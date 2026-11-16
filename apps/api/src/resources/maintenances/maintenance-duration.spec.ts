@@ -2,13 +2,15 @@ import { DataSource, EntitySchema } from 'typeorm';
 import {
   ResourceOperatingInterval,
   ResourceUsage,
-  ResourceUsageAction,
   ResourceUsageLifecycleAttempt,
   ResourceMaintenanceSchedule,
+} from '@attraccess/database-entities';
+import {
   ResourceMaintenanceScheduleDurationBasis,
   ResourceMaintenanceScheduleTriggerType,
+  ResourceUsageAction,
   UsageDurationUnit,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 import { ResourceOperatingAttributionService } from '../operating-intervals/resource-operating-attribution.service';
 import { MaintenanceResourceEvaluation } from './evaluation/resource-evaluation';

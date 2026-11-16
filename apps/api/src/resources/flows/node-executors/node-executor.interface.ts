@@ -1,5 +1,6 @@
 import { EntityManager } from 'typeorm';
-import { ResourceFlowNode, ResourceType } from '@attraccess/database-entities';
+import { ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceType } from '@attraccess/application-models';
 
 export interface NodeProcessingResult {
   payload: object;

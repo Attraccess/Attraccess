@@ -6,10 +6,10 @@ import {
   ResourceFlowNode,
   ResourceFlowEdge,
   ResourceMeteringSession,
-  ResourceMeteringSessionStatus,
   ResourceMeterAllocation,
   ResourceUsage,
 } from '@attraccess/database-entities';
+import { ResourceMeteringSessionStatus } from '@attraccess/application-models';
 import { meterDefinitionFromFlow } from './metering-definition';
 import { meterCharge, formatMeterValue } from './quantity';
 import { findActiveMeterSessions, getMeteringSessionLimit } from './meter-sessions';

@@ -1,11 +1,5 @@
-import {
-  Project,
-  ProjectInvitation,
-  ProjectInvitationStatus,
-  ProjectMember,
-  ProjectMemberRole,
-  User,
-} from '@attraccess/database-entities';
+import { Project, ProjectInvitation, ProjectMember, User } from '@attraccess/database-entities';
+import { ProjectInvitationStatus, ProjectMemberRole } from '@attraccess/application-models';
 
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 

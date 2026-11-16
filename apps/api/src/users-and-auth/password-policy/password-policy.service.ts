@@ -3,11 +3,9 @@ import {
   PasswordHistory,
   PasswordPolicy,
   PasswordPolicyOverride,
-  PASSWORD_POLICY_SINGLETON_ID,
-  PasswordPolicyRole,
-  AuthenticationType,
   User,
 } from '@attraccess/database-entities';
+import { AuthenticationType, PASSWORD_POLICY_SINGLETON_ID, PasswordPolicyRole } from '@attraccess/application-models';
 
 import {
   Inject,

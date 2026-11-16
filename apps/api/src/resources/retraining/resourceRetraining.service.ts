@@ -4,8 +4,8 @@ import {
   ResourceIntroduction,
   ResourceIntroductionHistoryItem,
   ResourceUsage,
-  IntroductionHistoryAction,
 } from '@attraccess/database-entities';
+import { IntroductionHistoryAction } from '@attraccess/application-models';
 
 import { Injectable, Logger, Inject } from '@nestjs/common';
 

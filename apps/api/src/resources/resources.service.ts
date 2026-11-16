@@ -1,4 +1,5 @@
-import { Resource, ResourceFlowEdge, ResourceFlowNode, SupervisionMode } from '@attraccess/database-entities';
+import { Resource, ResourceFlowEdge, ResourceFlowNode } from '@attraccess/database-entities';
+import { SupervisionMode } from '@attraccess/application-models';
 
 import { Inject, Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 

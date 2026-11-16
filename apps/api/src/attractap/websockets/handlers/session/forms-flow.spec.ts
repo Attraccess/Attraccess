@@ -1,14 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import {
-  Form,
-  FormField,
-  FormFieldType,
-  FormSubmission,
-  Resource,
-  ResourceFormAction,
-} from '@attraccess/database-entities';
+import { Form, FormField, FormSubmission, Resource } from '@attraccess/database-entities';
+import { FormFieldType, ResourceFormAction } from '@attraccess/application-models';
 import { ResourceFormsService } from '../../../../resources/forms/forms.service';
 import { AttractapFormsHandler } from '../forms/forms.handler';
 import { ReaderStartGate } from './reader-start-gate.service';

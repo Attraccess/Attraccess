@@ -1,4 +1,5 @@
-import { ResourceFlowNode, ResourceType } from '@attraccess/database-entities';
+import { ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceType } from '@attraccess/application-models';
 import { FindOptionsWhere, IsNull } from 'typeorm';
 import { getCoreNodeResourceType } from '../schemas/core-node-schemas';
 

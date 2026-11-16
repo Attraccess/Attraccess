@@ -1,5 +1,6 @@
 import { registerSsoControllerFixture } from './sso.controller.sso-controller.test-fixture';
-import { SSOProviderType, AuthenticationDetail, AuthenticationType } from '@attraccess/database-entities';
+import { AuthenticationDetail } from '@attraccess/database-entities';
+import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
 import { UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './../auth.service';
 import { UsersService } from './../../users/users.service';

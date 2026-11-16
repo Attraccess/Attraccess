@@ -1,3 +1,4 @@
+import { ResourceMeteringSessionStatus } from '@attraccess/application-models';
 import {
   Column,
   CreateDateColumn,
@@ -11,19 +12,6 @@ import {
 import { ResourceMeter } from './resource-meter.entity';
 import { Resource } from './resource.entity';
 import { ResourceUsage } from './resourceUsage.entity';
-
-export enum ResourceMeteringSessionStatus {
-  /** Metering is initialized; the usage is running (or being started). */
-  Active = 'active',
-  /** The final total was collected and the meter charge is part of the usage bill. */
-  Settled = 'settled',
-  /** The usage ended but no valid final total is available yet; retryable. */
-  Pending = 'pending',
-  /** The final total can no longer be obtained (or was rejected); needs an operator decision. */
-  Failed = 'failed',
-  /** An operator decided not to charge meter for this usage. */
-  Waived = 'waived',
-}
 
 /** `boundary` is a reading at a session start or stop of a shared meter: it closes a time segment without resetting the meter. */
 export type ResourceMeteringOperationKind = 'start' | 'interim' | 'final' | 'boundary';

@@ -4,7 +4,8 @@ import {
   type SamlProfile,
 } from './saml.strategy.ssosaml-strategy.test-fixture';
 import { ModuleRef } from '@nestjs/core';
-import { SSOProvider, SSOProviderType } from '@attraccess/database-entities';
+import { SSOProvider } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { SSOSamlStrategy } from './saml.strategy';
 import { EncryptionService } from './../../../../encryption/encryption.service';
 import { PassportSamlConfig } from '@node-saml/passport-saml';

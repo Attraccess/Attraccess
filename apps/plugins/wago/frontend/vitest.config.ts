@@ -14,6 +14,9 @@ export default defineConfig({
       '@attraccess/plugins-frontend-sdk': fileURLToPath(
         new URL('../../../../libs/plugins-frontend-sdk/src/index.ts', import.meta.url),
       ),
+      '@attraccess/application-models': fileURLToPath(
+        new URL('../../../../libs/application-models/src/index.ts', import.meta.url),
+      ),
       '@attraccess/database-entities': fileURLToPath(
         new URL('../../../../libs/database-entities/src/index.ts', import.meta.url),
       ),

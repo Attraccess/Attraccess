@@ -2,11 +2,8 @@ import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import {
-  IntroductionHistoryAction,
-  ResourceIntroduction,
-  ResourceIntroductionHistoryItem,
-} from '@attraccess/database-entities';
+import { ResourceIntroduction, ResourceIntroductionHistoryItem } from '@attraccess/database-entities';
+import { IntroductionHistoryAction } from '@attraccess/application-models';
 import { ResourceIntroductionsService } from './resouceIntroductions.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';

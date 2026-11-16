@@ -1,9 +1,5 @@
-import {
-  IfNodeDataSchema,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-} from '@attraccess/database-entities';
+import { IfNodeDataSchema, ResourceFlowEdge, ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import { getPluginFlowNode } from '../../plugin-system/flows/node-registry';
 import { coreNodeHasExternalEffect } from './schemas/core-node-schemas';
 

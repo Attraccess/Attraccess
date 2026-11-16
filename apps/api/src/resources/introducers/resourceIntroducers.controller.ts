@@ -12,7 +12,8 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ResourceIntroducersService } from './resourceIntroducers.service';
-import { ResourceIntroducer, ResourceIntroducerType } from '@attraccess/database-entities';
+import { ResourceIntroducer } from '@attraccess/database-entities';
+import { ResourceIntroducerType } from '@attraccess/application-models';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { IsResourceIntroducerResponseDto } from './dtos/isIntroducer.response.dto';
 import { GrantIntroducerDto } from './dtos/grantIntroducer.dto';

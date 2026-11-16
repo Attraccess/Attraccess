@@ -4,12 +4,11 @@ import { join } from 'node:path';
 import { DataSource, EntityManager, EntitySchema } from 'typeorm';
 import {
   ResourceMaintenanceSchedule,
-  ResourceMaintenanceScheduleTriggerType,
   ResourceOperatingInterval,
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
-  UsageDurationUnit,
 } from '@attraccess/database-entities';
+import { ResourceMaintenanceScheduleTriggerType, UsageDurationUnit } from '@attraccess/application-models';
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 import {
   ResourceDurationWindow,

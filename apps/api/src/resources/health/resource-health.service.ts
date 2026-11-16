@@ -1,11 +1,7 @@
 // Manages resource health state tracking with mutable status and source lifecycle tracking
 // FEATURE: Resource health monitoring system for subsystem-level status tracking
-import {
-  Resource,
-  ResourceHealthState,
-  ResourceHealthStatus,
-  ResourceHealthSource,
-} from '@attraccess/database-entities';
+import { Resource, ResourceHealthState } from '@attraccess/database-entities';
+import { ResourceHealthSource, ResourceHealthStatus } from '@attraccess/application-models';
 
 import { Injectable, Logger, NotFoundException, Inject } from '@nestjs/common';
 

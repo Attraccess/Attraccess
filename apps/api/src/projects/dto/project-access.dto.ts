@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Project, ProjectMemberRole } from '@attraccess/database-entities';
+import { Project } from '@attraccess/database-entities';
+import { ProjectMemberRole } from '@attraccess/application-models';
 
 export class ProjectAccessInfoDto {
   @ApiProperty({ description: 'Whether the authenticated user owns the project' })

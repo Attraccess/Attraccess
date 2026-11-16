@@ -1,5 +1,6 @@
 import { getSupportedDeviceLanguage } from '@attraccess/shared';
-import { AuthenticationType, SSOProviderType, User } from '@attraccess/database-entities';
+import { User } from '@attraccess/database-entities';
+import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
 
 import {
   EntityManager,

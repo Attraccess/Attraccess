@@ -1,25 +1,27 @@
 import {
   BillingTransaction,
   BillingTransactionItem,
-  BillingTransactionStatus,
   Flow,
   Project,
   Resource,
   ResourceFlowEdge,
   ResourceFlowNode,
-  ResourceFlowNodeType,
   ResourceFlowVariable,
-  ResourceFlowVariableScope,
   ResourceMeteringOperation,
   ResourceMeteringSegment,
   ResourceMeteringSession,
   ResourceMeter,
-  ResourceMeteringSessionStatus,
   ResourceUsage,
-  ResourceUsageAction,
   ResourceUsageLifecycleAttempt,
   User,
 } from '@attraccess/database-entities';
+import {
+  BillingTransactionStatus,
+  ResourceFlowNodeType,
+  ResourceFlowVariableScope,
+  ResourceMeteringSessionStatus,
+  ResourceUsageAction,
+} from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
 import { ensureEntity } from '../seed-storage.test-fixture';
 export async function migrationFlowUsageSeeds(

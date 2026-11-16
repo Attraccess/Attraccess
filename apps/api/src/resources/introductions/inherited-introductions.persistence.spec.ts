@@ -5,8 +5,8 @@ import {
   Resource,
   User,
   ResourceIntroductionHistoryItem,
-  IntroductionHistoryAction,
 } from '@attraccess/database-entities';
+import { IntroductionHistoryAction } from '@attraccess/application-models';
 import { ResourceIntroductionsService } from './resouceIntroductions.service';
 import { ResourceGroupsIntroductionsService } from '../groups/introductions/resourceGroups.introductions.service';
 import { ResourceRetrainingService } from '../retraining/resourceRetraining.service';

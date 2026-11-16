@@ -1,10 +1,10 @@
+import { ResourceUsage } from '@attraccess/database-entities';
 import {
   ResourceFlowNodeType,
-  ResourceUsage,
   ResourceHealthStatus,
   ResourceIntroducerType,
   SupervisionMode,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
 import { getSessionCapacity } from '../../../../resources/usage/sessions/active-usage';
 import type { ResourceListService } from './resource-list.service';

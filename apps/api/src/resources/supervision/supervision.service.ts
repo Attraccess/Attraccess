@@ -17,7 +17,8 @@ import { ResourceIntroducersService } from '../introducers/resourceIntroducers.s
 import { ResourceUsageService } from '../usage/sessions/resource-usage.service';
 
 import { SupervisionLiveService } from './supervision-live.service';
-import { ResourceUsage, User, ResourceIntroducerType } from '@attraccess/database-entities';
+import { ResourceUsage, User } from '@attraccess/database-entities';
+import { ResourceIntroducerType } from '@attraccess/application-models';
 
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
 

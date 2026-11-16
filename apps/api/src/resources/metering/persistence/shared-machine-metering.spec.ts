@@ -6,10 +6,10 @@ import {
   ResourceMeter,
   ResourceMeteringSegment,
   ResourceMeteringSession,
-  ResourceMeteringSessionStatus,
   ResourceUsage,
   User,
 } from '@attraccess/database-entities';
+import { ResourceMeteringSessionStatus } from '@attraccess/application-models';
 
 import { rm } from 'node:fs/promises';
 

@@ -5,16 +5,14 @@ import {
   entities,
   Resource,
   ResourceBillingConfiguration,
-  ResourceType,
   ResourceUsage,
-  ResourceUsageAction,
   Setting,
   SSOProvider,
   SSOProviderOIDCConfiguration,
   SSOProviderSAMLConfiguration,
-  SSOProviderType,
   User,
 } from '@attraccess/database-entities';
+import { ResourceType, ResourceUsageAction, SSOProviderType } from '@attraccess/application-models';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

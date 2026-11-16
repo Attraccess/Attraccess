@@ -1,13 +1,6 @@
 import type { AuditActor } from '../../audit/recorder/audit-event';
-import {
-  entities,
-  Flow,
-  Resource,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-  ResourceType,
-} from '@attraccess/database-entities';
+import { entities, Flow, Resource, ResourceFlowEdge, ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceType } from '@attraccess/application-models';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { ResourceFlowSaveDto } from './dto/index';

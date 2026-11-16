@@ -1,4 +1,5 @@
-import { ResourceMaintenance, ResourceUsage, SupervisionMode, User } from '@attraccess/database-entities';
+import { ResourceMaintenance, ResourceUsage, User } from '@attraccess/database-entities';
+import { SupervisionMode } from '@attraccess/application-models';
 import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
 import { createResourceUsageServiceFixture } from '../../resources/usage/sessions/fixtures/service.test-fixture';
 import { resetTestFixture } from '../../resources/usage/sessions/fixtures/setup.test-fixture';

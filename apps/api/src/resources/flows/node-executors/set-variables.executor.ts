@@ -1,4 +1,5 @@
-import { ResourceFlowNode, SetVariablesNodeDataSchema, ResourceFlowVariableScope } from '@attraccess/database-entities';
+import { ResourceFlowNode, SetVariablesNodeDataSchema } from '@attraccess/database-entities';
+import { ResourceFlowVariableScope } from '@attraccess/application-models';
 import { ResourceFlowVariablesService } from '../variables/resource-flow-variables.service';
 import { runResourceId, requireRunResourceId } from './flow.utils';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';

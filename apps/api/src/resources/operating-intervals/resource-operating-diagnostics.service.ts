@@ -1,13 +1,8 @@
 // Diagnostics over the authoritative machine operating timeline (ATT-1024).
 // All views are derived directly from `resource_operating_interval` rows; there are no persisted
 // aggregates yet, so verification recomputes derived durations from the timeline and compares.
-import {
-  Resource,
-  ResourceFlowNode,
-  ResourceOperatingInterval,
-  ResourceFlowNodeType,
-  ResourceType,
-} from '@attraccess/database-entities';
+import { Resource, ResourceFlowNode, ResourceOperatingInterval } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceType } from '@attraccess/application-models';
 
 import { Injectable } from '@nestjs/common';
 

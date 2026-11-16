@@ -1,10 +1,9 @@
 import {
   ResourceFlowNode,
   ResourceHealthSetNodeDataSchema,
-  ResourceHealthSource,
-  ResourceHealthStatus,
   HealthStateOptionEnum,
 } from '@attraccess/database-entities';
+import { ResourceHealthSource, ResourceHealthStatus } from '@attraccess/application-models';
 import { get } from 'lodash-es';
 import { ResourceHealthService } from '../../health/resource-health.service';
 import { FlowExecutionError } from '../errors/flow-execution.error';

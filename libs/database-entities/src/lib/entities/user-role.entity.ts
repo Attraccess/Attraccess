@@ -1,3 +1,4 @@
+import { UserRoleSource } from '@attraccess/application-models';
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -10,11 +11,6 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { Role } from './role.entity';
-
-export enum UserRoleSource {
-  MANUAL = 'manual',
-  SSO = 'sso',
-}
 
 @Entity('user_role')
 export class UserRole {

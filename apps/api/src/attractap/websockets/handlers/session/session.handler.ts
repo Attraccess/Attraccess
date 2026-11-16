@@ -38,7 +38,7 @@ import { ResourceListService } from '../resource-list/resource-list.service';
 
 import { formatCredits, dbCurrencyToUserCurrency } from '@attraccess/shared';
 
-import { ResourceFormAction } from '@attraccess/database-entities';
+import { ResourceFormAction } from '@attraccess/application-models';
 
 import { InsufficientBalanceError } from '../../../../billing/errors/insufficient-balance.error';
 

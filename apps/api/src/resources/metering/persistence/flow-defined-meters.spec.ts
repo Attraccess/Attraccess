@@ -1,14 +1,13 @@
 import {
-  BillingTransactionStatus,
   ResourceFlowEdge,
   ResourceFlowNode,
   ResourceMeter,
   ResourceMeteringOperation,
   ResourceMeteringSession,
-  ResourceMeteringSessionStatus,
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
 } from '@attraccess/database-entities';
+import { BillingTransactionStatus, ResourceMeteringSessionStatus } from '@attraccess/application-models';
 
 import { BadRequestException } from '@nestjs/common';
 

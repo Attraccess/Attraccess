@@ -6,7 +6,7 @@ import { getRedirectToFromRequest } from './oidc-cookie-state-store';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { recordSsoLoginFailure } from '../sso-metrics';
 import { ApprovedOriginsService } from '../../../../common/security/approved-origins.service';
-import { SSOProviderType } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { SettingsService } from '../../../../settings/settings.service';
 
 @Catch(AccountLinkingRequiredException)

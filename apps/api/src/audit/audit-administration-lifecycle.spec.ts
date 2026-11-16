@@ -1,4 +1,5 @@
-import { EmailTemplateType, MqttServer } from '@attraccess/database-entities';
+import { MqttServer } from '@attraccess/database-entities';
+import { EmailTemplateType } from '@attraccess/application-models';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { EmailLayoutController } from '../email-layout/email-layout.controller';
 import { EmailLayoutService } from '../email-layout/email-layout.service';

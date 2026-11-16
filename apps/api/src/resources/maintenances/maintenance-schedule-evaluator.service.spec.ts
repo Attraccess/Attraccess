@@ -1,11 +1,10 @@
 import { registerMaintenanceScheduleEvaluatorServiceFixture } from './maintenance-schedule-evaluator.service.maintenance-schedule-evaluator-service.test-fixture';
 
+import { Resource, ResourceMaintenanceSchedule } from '@attraccess/database-entities';
 import {
-  Resource,
-  ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleDurationBasis,
   ResourceMaintenanceScheduleTriggerType,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 import { formatDbDate } from './maintenance-schedule-evaluator.service';
 import { MaintenanceResourceEvaluation } from './evaluation/resource-evaluation';
 

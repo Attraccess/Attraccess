@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import { MqttWaitForMessageExecutor } from './mqtt-wait-for-message.executor';
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
 import { MqttMessageEvent } from '../../../mqtt/mqtt-message.event';
@@ -27,10 +28,7 @@ describe('MqttWaitForMessageExecutor', () => {
 
     mqttClientService = { subscribe: jest.fn().mockResolvedValue(undefined) };
     eventEmitter = new EventEmitter2();
-    executor = new MqttWaitForMessageExecutor(
-      mqttClientService as unknown as MqttClientService,
-      eventEmitter,
-    );
+    executor = new MqttWaitForMessageExecutor(mqttClientService as unknown as MqttClientService, eventEmitter);
   });
 
   afterEach(() => {
@@ -49,10 +47,7 @@ describe('MqttWaitForMessageExecutor', () => {
 
     expect(mqttClientService.subscribe).toHaveBeenCalledWith(7, 'sensors/+/temp', 1);
 
-    eventEmitter.emit(
-      MqttMessageEvent.EVENT_NAME,
-      new MqttMessageEvent(7, 'sensors/kitchen/temp', { value: 21 }),
-    );
+    eventEmitter.emit(MqttMessageEvent.EVENT_NAME, new MqttMessageEvent(7, 'sensors/kitchen/temp', { value: 21 }));
 
     await expect(promise).resolves.toEqual({
       payload: { topic: 'sensors/kitchen/temp', payload: { value: 21 } },
@@ -97,9 +92,7 @@ describe('MqttWaitForMessageExecutor', () => {
     const node = makeNode({ serverId: 7, topic: 'a/b', timeoutSeconds: 5, subscribeQos: 0 });
 
     const promise = executor.execute(node);
-    const assertion = expect(promise).rejects.toThrow(
-      "Timeout waiting for MQTT message on topic 'a/b' (server 7)",
-    );
+    const assertion = expect(promise).rejects.toThrow("Timeout waiting for MQTT message on topic 'a/b' (server 7)");
 
     // let subscribe() + listener registration settle before advancing timers
     await Promise.resolve();

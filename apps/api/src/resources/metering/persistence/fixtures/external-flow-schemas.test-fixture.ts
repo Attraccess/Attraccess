@@ -6,16 +6,15 @@ import {
   Resource,
   ResourceFlowEdge,
   ResourceFlowNode,
-  ResourceFlowNodeType,
   ResourceMeteringOperation,
   ResourceMeteringSegment,
   ResourceMeteringSession,
   ResourceOperatingInterval,
   ResourceUsage,
-  ResourceUsageAction,
   ResourceUsageLifecycleAttempt,
   User,
 } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceUsageAction } from '@attraccess/application-models';
 import { EntitySchema } from 'typeorm';
 export const T = ResourceFlowNodeType;
 export const schemas = [

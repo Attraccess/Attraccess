@@ -1,6 +1,7 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { InsertResult, Repository } from 'typeorm';
-import { SSOProviderType, Setting } from '@attraccess/database-entities';
+import { Setting } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { MAX_LINK_TOKEN_PASSWORD_ATTEMPTS, SSOLinkTokenService } from './link-token.service';
 import { SessionStore } from '../session-store/session-store';
 import { EncryptionService } from '../../../encryption/encryption.service';

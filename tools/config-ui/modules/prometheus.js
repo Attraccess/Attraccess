@@ -17,7 +17,7 @@ const PRIVATE_FILE_MODE = 0o600;
 const SHARED_FILE_MODE = 0o644;
 
 function log(message) {
-  // eslint-disable-next-line no-console -- Standalone container logs go to stdout.
+   
   console.log(`[prometheus] ${message}`);
 }
 

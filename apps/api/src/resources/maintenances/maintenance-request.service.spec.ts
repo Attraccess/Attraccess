@@ -7,7 +7,8 @@ import { MaintenanceRequestService } from './maintenance-request.service';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
 import { ResolveMaintenanceRequestAction } from './dtos/resolve-maintenance-request.dto';
-import { MaintenanceRequestStatus, Resource, ResourceMaintenanceRequest } from '@attraccess/database-entities';
+import { Resource, ResourceMaintenanceRequest } from '@attraccess/database-entities';
+import { MaintenanceRequestStatus } from '@attraccess/application-models';
 
 const mockResource = { id: 1, name: 'Test Resource' };
 

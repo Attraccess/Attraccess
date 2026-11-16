@@ -1,4 +1,5 @@
-import { AuditLog, Resource, ResourceType, Setting, SupervisionMode, User } from '@attraccess/database-entities';
+import { AuditLog, Resource, Setting, User } from '@attraccess/database-entities';
+import { ResourceType, SupervisionMode } from '@attraccess/application-models';
 import { rm } from 'node:fs/promises';
 import { closeResourceTransactionConnection } from '../database/run-serialized-transaction';
 import { AuditMetrics } from '../metrics/definitions/audit.metrics';

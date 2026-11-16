@@ -1,4 +1,5 @@
-import { BillingTransaction, BillingTransactionStatus, Resource, ResourceUsage } from '@attraccess/database-entities';
+import { BillingTransaction, Resource, ResourceUsage } from '@attraccess/database-entities';
+import { BillingTransactionStatus } from '@attraccess/application-models';
 import { DataSource, EntitySchema } from 'typeorm';
 
 import { getProjectUsageStats } from './project-usage-statistics';

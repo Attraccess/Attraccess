@@ -1,4 +1,5 @@
-import { Resource, ResourceUsage, ResourceUsageAction, User } from '@attraccess/database-entities';
+import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
+import { ResourceUsageAction } from '@attraccess/application-models';
 
 import { SystemEvent } from '@attraccess/plugins-backend-sdk';
 

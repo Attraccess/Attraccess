@@ -1,11 +1,5 @@
-import {
-  Resource,
-  ResourceFlowNodeType,
-  ResourceUsage,
-  ResourceUsageLifecycleAttempt,
-  SupervisionMode,
-  User,
-} from '@attraccess/database-entities';
+import { Resource, ResourceUsage, ResourceUsageLifecycleAttempt, User } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, SupervisionMode } from '@attraccess/application-models';
 import { rm } from 'node:fs/promises';
 import { closeResourceTransactionConnection } from '../../../database/run-serialized-transaction';
 import { EndUsageSessionExecutor } from '../../flows/node-executors/end-usage-session.executor';

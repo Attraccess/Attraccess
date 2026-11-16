@@ -2,7 +2,8 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { QueryFailedError } from 'typeorm';
-import { CsvExportTemplate, CsvExportTemplateColumnType, CsvExportType } from '@attraccess/database-entities';
+import { CsvExportTemplate } from '@attraccess/database-entities';
+import { CsvExportTemplateColumnType, CsvExportType } from '@attraccess/application-models';
 import { CsvExportTemplatesService } from './csv-export-templates.service';
 
 describe('CsvExportTemplatesService', () => {

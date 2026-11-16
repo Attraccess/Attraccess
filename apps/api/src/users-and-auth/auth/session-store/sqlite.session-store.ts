@@ -1,6 +1,7 @@
 import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
 import { Repository, LessThan, MoreThan } from 'typeorm';
-import { Session, User, SsoSessionContext } from '@attraccess/database-entities';
+import { Session, User } from '@attraccess/database-entities';
+import { SsoSessionContext } from '@attraccess/application-models';
 import { TokenHashService } from '../../../encryption/token-hash.service';
 import { SessionStore, SessionMetadata, LogoutSession, AuthenticatedSession } from './session-store';
 

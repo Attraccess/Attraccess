@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ResourceIntroducerType } from '@attraccess/database-entities';
+import { ResourceIntroducerType } from '@attraccess/application-models';
 
 /** Public-to-readers view of an introducer: who to ask for help, nothing else (no email). */
 export class ResourceIntroducerNameDto {

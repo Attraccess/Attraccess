@@ -1,4 +1,5 @@
-import { ResourceMeteringSession, ResourceMeteringSessionStatus, ResourceUsage } from '@attraccess/database-entities';
+import { ResourceMeteringSession, ResourceUsage } from '@attraccess/database-entities';
+import { ResourceMeteringSessionStatus } from '@attraccess/application-models';
 import { inheritTestScope } from '../../../../test-utils/inherit-test-scope';
 import type { FlowDefinedMeteringTestScope } from '../flow-defined-meters.spec';
 

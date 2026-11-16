@@ -1,13 +1,13 @@
 import {
   BillingTransaction,
   BillingTransactionItem,
-  BillingTransactionStatus,
   Resource,
   ResourceBillingConfiguration,
   ResourceUsage,
   Setting,
   User,
 } from '@attraccess/database-entities';
+import { BillingTransactionStatus } from '@attraccess/application-models';
 
 import { BadRequestException } from '@nestjs/common';
 

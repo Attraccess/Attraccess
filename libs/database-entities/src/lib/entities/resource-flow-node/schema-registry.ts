@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ResourceFlowNodeType } from './node-type';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import { ExternalEffectFailureBehavior } from './external-effect-policy';
 import { HttpRequestNodeDataSchema } from './http-schema';
 import {

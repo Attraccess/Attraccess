@@ -1,5 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
-import { EmailTemplateType } from '@attraccess/database-entities';
+import { EmailTemplateType } from '@attraccess/application-models';
 import { refreshDefaultEmailTemplate } from '../migration-helpers/refresh-default-email-template';
 
 // Stock energy receipt and first generic-meter receipt, trimmed with LF line endings.

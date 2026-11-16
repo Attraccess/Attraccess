@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import { WaitExecutor } from './wait.executor';
 
 describe('WaitExecutor', () => {
@@ -11,7 +12,7 @@ describe('WaitExecutor', () => {
       type: ResourceFlowNodeType.PROCESSING_WAIT,
       resourceId: 1,
       data,
-    } as unknown as ResourceFlowNode);
+    }) as unknown as ResourceFlowNode;
 
   beforeEach(() => {
     jest.useFakeTimers();

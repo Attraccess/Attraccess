@@ -4,12 +4,11 @@ import { billingTransactionAuditEvent } from '../../audit/policies/billing';
 import {
   BillingTransaction,
   BillingTransactionItem,
-  BillingTransactionStatus,
   ResourceBillingConfiguration,
   ResourceUsage,
-  ResourceUsageAction,
   User,
 } from '@attraccess/database-entities';
+import { BillingTransactionStatus, ResourceUsageAction } from '@attraccess/application-models';
 
 import { BadRequestException } from '@nestjs/common';
 

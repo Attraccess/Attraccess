@@ -6,7 +6,6 @@ import {
   Conversation,
   ConversationParticipant,
   EmailTemplate,
-  EmailTemplateType,
   Message,
   NFCCard,
   NFCCardPendingChange,
@@ -15,14 +14,13 @@ import {
   PasskeyChallenge,
   PasswordHistory,
   PasswordPolicyOverride,
-  PasswordPolicyRole,
   Permission,
   PushSubscription,
   Role,
   User,
   UserRole,
-  UserRoleSource,
 } from '@attraccess/database-entities';
+import { EmailTemplateType, PasswordPolicyRole, UserRoleSource } from '@attraccess/application-models';
 import { ensureEntity } from '../seed-storage.test-fixture';
 export async function migrationIdentityNotificationSeeds(dataSource: DataSource, seedTag: string, primaryUser: User) {
   const nfcCardRepo = dataSource.getRepository(NFCCard);

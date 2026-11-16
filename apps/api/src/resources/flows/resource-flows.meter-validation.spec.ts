@@ -1,12 +1,6 @@
 import { createMock } from '@golevelup/ts-jest';
-import {
-  Resource,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-  ResourceMeter,
-  Flow,
-} from '@attraccess/database-entities';
+import { Resource, ResourceFlowEdge, ResourceFlowNode, ResourceMeter, Flow } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EntityManager, Repository } from 'typeorm';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';

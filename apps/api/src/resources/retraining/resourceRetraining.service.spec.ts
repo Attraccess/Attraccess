@@ -1,7 +1,7 @@
 import { registerResourceRetrainingServiceEvaluateFixture } from './resourceRetraining.service.resource-retraining-service-evaluate.test-fixture';
 import { registerResourceRetrainingServiceStatusAggregationFixture } from './resourceRetraining.service.resource-retraining-service-status-aggregation.test-fixture';
 import { ResourceRetrainingService } from './resourceRetraining.service';
-import { IntroductionHistoryAction } from '@attraccess/database-entities';
+import { IntroductionHistoryAction } from '@attraccess/application-models';
 
 describe('ResourceRetrainingService.evaluate', () => {
   const fixture = registerResourceRetrainingServiceEvaluateFixture();

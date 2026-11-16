@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { Resource, ResourceType, SupervisionMode, User } from '@attraccess/database-entities';
+import { Resource, User } from '@attraccess/database-entities';
+import { ResourceType, SupervisionMode } from '@attraccess/application-models';
 import { AlreadyHasActiveSessionError } from '../errors/already-has-active-session.error';
 import { ResourceInUseError } from '../errors/resource-in-use.error';
 import { resetTestFixture } from './fixtures/setup.test-fixture';

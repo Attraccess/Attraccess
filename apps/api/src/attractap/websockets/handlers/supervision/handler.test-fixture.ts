@@ -1,4 +1,5 @@
-import { SupervisionMode, User } from '@attraccess/database-entities';
+import { User } from '@attraccess/database-entities';
+import { SupervisionMode } from '@attraccess/application-models';
 import { AuthenticatedWebSocket } from '../../websocket.types';
 import { AttractapSupervisionHandler } from './supervision.handler';
 

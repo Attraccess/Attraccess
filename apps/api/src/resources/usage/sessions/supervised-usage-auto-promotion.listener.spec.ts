@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { In, IsNull, Not } from 'typeorm';
-import { AutoIntroductionTarget, Resource, ResourceUsage } from '@attraccess/database-entities';
+import { Resource, ResourceUsage } from '@attraccess/database-entities';
+import { AutoIntroductionTarget } from '@attraccess/application-models';
 import { SupervisedUsageAutoPromotionListener } from './supervised-usage-auto-promotion.listener';
 import { ResourceSupervisedUsageEndedEvent } from '../events/resource-usage.events';
 import { ResourceIntroductionsService } from '../../introductions/resouceIntroductions.service';

@@ -1,5 +1,6 @@
 import { UnauthorizedException } from '@nestjs/common';
-import { AuthenticationType, SSOProviderType, User } from '@attraccess/database-entities';
+import { User } from '@attraccess/database-entities';
+import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
 import { UsersService } from '../../../users/users.service';
 import { AuthService } from '../../auth.service';

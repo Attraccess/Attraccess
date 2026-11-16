@@ -1,12 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { EntityManager, Repository } from 'typeorm';
-import {
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-  BillingTransaction,
-  BillingTransactionItem,
-  BillingTransactionStatus,
-} from '@attraccess/database-entities';
+import { ResourceFlowNode, BillingTransaction, BillingTransactionItem } from '@attraccess/database-entities';
+import { BillingTransactionStatus, ResourceFlowNodeType } from '@attraccess/application-models';
 import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { BillingSetAdditionalItemsExecutor } from './billing-set-additional-items.executor';

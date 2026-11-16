@@ -2,14 +2,13 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   BillingTransaction,
   BillingTransactionItem,
-  BillingTransactionStatus,
   FormSubmission,
   ResourceOperatingInterval,
   ResourceUsage,
-  ResourceUsageAction,
   ResourceUsageLifecycleAttempt,
   User,
 } from '@attraccess/database-entities';
+import { BillingTransactionStatus, ResourceUsageAction } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
 import { ResourceUsageService } from '../../sessions/resource-usage.service';
 import { ResourceOperatingIntervalService } from '../../../operating-intervals/resource-operating-interval.service';

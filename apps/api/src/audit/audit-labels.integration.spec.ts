@@ -1,4 +1,5 @@
-import { AuditLog, entities, Resource, ResourceType, Setting, User } from '@attraccess/database-entities';
+import { AuditLog, entities, Resource, Setting, User } from '@attraccess/database-entities';
+import { ResourceType } from '@attraccess/application-models';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

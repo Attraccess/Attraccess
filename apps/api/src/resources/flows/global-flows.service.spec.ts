@@ -1,5 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { ResourceFlowEdge, ResourceFlowNode, ResourceFlowNodeType, Flow } from '@attraccess/database-entities';
+import { ResourceFlowEdge, ResourceFlowNode, Flow } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import { GlobalFlowsService } from './global-flows.service';
 import { ResourceFlowsService } from './resource-flows.service';
 import { getCoreNodeFlowScopes } from './schemas/core-node-schemas';

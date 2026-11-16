@@ -1,11 +1,7 @@
 import { Logger } from '@nestjs/common';
 
-import {
-  ResourceFlowNode,
-  ResourceFlowEdge,
-  ResourceFlowNodeType,
-  getExternalEffectFailureBehavior,
-} from '@attraccess/database-entities';
+import { ResourceFlowNode, ResourceFlowEdge, getExternalEffectFailureBehavior } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 
 import { Repository, EntityManager, FindOperator, IsNull } from 'typeorm';
 

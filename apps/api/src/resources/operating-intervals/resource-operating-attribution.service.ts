@@ -1,9 +1,5 @@
-import {
-  ResourceOperatingInterval,
-  ResourceUsage,
-  ResourceUsageLifecycleAttempt,
-  ResourceUsageAction,
-} from '@attraccess/database-entities';
+import { ResourceOperatingInterval, ResourceUsage, ResourceUsageLifecycleAttempt } from '@attraccess/database-entities';
+import { ResourceUsageAction } from '@attraccess/application-models';
 
 import { Injectable } from '@nestjs/common';
 

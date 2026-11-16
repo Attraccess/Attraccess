@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import { getPluginFlowNode } from '../../../plugin-system/flows/node-registry';
 import { FlowExecutionEngine } from './flow-execution-engine';
 import { FlowExecutionContext } from './flow-execution-context';

@@ -1,12 +1,7 @@
 import { createMock } from '@golevelup/ts-jest';
 import type { PluginFlowTriggerNodeDefinition } from '@attraccess/plugins-backend-sdk';
-import {
-  Flow,
-  Resource,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-} from '@attraccess/database-entities';
+import { Flow, Resource, ResourceFlowEdge, ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import { BadRequestException } from '@nestjs/common';
 import { EntityManager, In, Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';

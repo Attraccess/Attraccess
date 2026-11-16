@@ -1,7 +1,8 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ResourceFlowNode, ResourceFlowNodeType, ResourceFlowVariableScope } from '@attraccess/database-entities';
+import { ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceFlowVariableScope } from '@attraccess/application-models';
 import { ResourceFlowVariableChangedEvent } from '../events/flow-variable-changed.event';
 import { ResourceFlowVariableTriggerService } from './resource-flow-variable-trigger.service';
 import { ResourceFlowsExecutorService } from '../execution/resource-flows-executor.service';

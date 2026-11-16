@@ -5,10 +5,10 @@ import {
   ResourceMeteringOperation,
   ResourceMeteringSegment,
   ResourceMeteringSession,
-  ResourceMeteringSessionStatus,
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
 } from '@attraccess/database-entities';
+import { ResourceMeteringSessionStatus } from '@attraccess/application-models';
 
 import type { MeteringReport } from '../flows/node-executors/node-executor.interface';
 

@@ -1,2 +1,2 @@
-import { ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 export const T = ResourceFlowNodeType;

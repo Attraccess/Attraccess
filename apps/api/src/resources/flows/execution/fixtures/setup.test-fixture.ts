@@ -2,13 +2,8 @@ import { ResourceFlowsExecutorService } from '../resource-flows-executor.service
 import { FlowLogRecorderService } from '../../logs/flow-log-recorder.service';
 import { Logger } from '@nestjs/common';
 import { FindOperator, Repository, SelectQueryBuilder } from 'typeorm';
-import {
-  Resource,
-  ResourceFlowNode,
-  ResourceFlowEdge,
-  BillingTransactionItem,
-  ResourceType,
-} from '@attraccess/database-entities';
+import { Resource, ResourceFlowNode, ResourceFlowEdge, BillingTransactionItem } from '@attraccess/database-entities';
+import { ResourceType } from '@attraccess/application-models';
 import { MqttClientService } from '../../../../mqtt/mqtt-client.service';
 import { ResourceUsageService } from '../../../usage/sessions/resource-usage.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';

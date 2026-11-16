@@ -1,12 +1,6 @@
 import { DateTimePreferences, getSupportedDeviceLanguage, validateDateTimeLocale } from '@attraccess/shared';
-import {
-  AuthenticationDetail,
-  ResourceUsage,
-  Session,
-  SSOProviderType,
-  User,
-  Role,
-} from '@attraccess/database-entities';
+import { AuthenticationDetail, ResourceUsage, Session, User, Role } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 
 import { BadRequestException, Injectable, Logger, ForbiddenException } from '@nestjs/common';
 

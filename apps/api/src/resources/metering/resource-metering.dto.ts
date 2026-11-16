@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ResourceMeteringSessionStatus } from '@attraccess/database-entities';
+import { ResourceMeteringSessionStatus } from '@attraccess/application-models';
 import { IsIn, IsInt, IsNotEmpty, IsString, Max, MaxLength, Min } from 'class-validator';
 import { Transform } from 'class-transformer';
 
@@ -54,7 +54,10 @@ class MeterSessionDto {
   @ApiProperty({ type: String, nullable: true }) source!: string | null;
   @ApiProperty({ required: false, description: 'The session shares this meter with others: the values are its share' })
   shared?: boolean;
-  @ApiProperty({ required: false, description: 'The share includes the open segment, which changes until the next reading' })
+  @ApiProperty({
+    required: false,
+    description: 'The share includes the open segment, which changes until the next reading',
+  })
   provisional?: boolean;
   @ApiProperty({ type: Number, nullable: true, required: false, description: 'Sessions in the open segment' })
   participants?: number | null;

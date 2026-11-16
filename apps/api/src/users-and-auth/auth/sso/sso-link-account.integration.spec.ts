@@ -1,5 +1,6 @@
 import { AUDIT_RECORDER } from '../../../audit/recorder/audit-event';
-import { AuthenticationType, Setting, SSOProviderType, User } from '@attraccess/database-entities';
+import { Setting, User } from '@attraccess/database-entities';
+import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ModuleRef } from '@nestjs/core';

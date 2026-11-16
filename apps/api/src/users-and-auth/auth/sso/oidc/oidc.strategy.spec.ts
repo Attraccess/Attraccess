@@ -2,13 +2,8 @@ import { ModuleRef } from '@nestjs/core';
 import { OidcCookieStateStore } from './oidc-cookie-state-store';
 import { registerSsooidcstrategyClaimPathResolutionFixture } from './oidc.strategy.ssooidcstrategy-claim-path-resolution.test-fixture';
 import { Profile, Strategy } from 'passport-openidconnect';
-import {
-  SSOProvider,
-  SSOProviderType,
-  SSOProviderOIDCConfiguration,
-  User,
-  AuthenticationType,
-} from '@attraccess/database-entities';
+import { SSOProvider, SSOProviderOIDCConfiguration, User } from '@attraccess/database-entities';
+import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
 import { SSOOIDCStrategy, SSO_OIDC_CALLBACK_URL_REQUEST_KEY } from './oidc.strategy';
 
 describe('SSOOIDCStrategy - claim path resolution', () => {

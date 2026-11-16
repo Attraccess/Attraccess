@@ -1,13 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import {
-  Form,
-  FormField,
-  FormFieldType,
-  FormSubmission,
-  Resource,
-  ResourceFormAction,
-} from '@attraccess/database-entities';
+import { Form, FormField, FormSubmission, Resource } from '@attraccess/database-entities';
+import { FormFieldType, ResourceFormAction } from '@attraccess/application-models';
 import { ResourceFormsService } from './forms.service';
 import { EntityManager } from 'typeorm';
 

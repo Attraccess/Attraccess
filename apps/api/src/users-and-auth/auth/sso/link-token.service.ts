@@ -2,7 +2,8 @@ import { BadRequestException, Inject, Injectable, Logger, UnauthorizedException 
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { SSOProviderType, Setting } from '@attraccess/database-entities';
+import { Setting } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { EncryptionService } from '../../../encryption/encryption.service';
 import { SESSION_STORE, SessionStore } from '../session-store/session-store';
 

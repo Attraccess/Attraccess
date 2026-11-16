@@ -5,8 +5,8 @@ import {
   BillingTransaction,
   BillingTransactionItem,
   BillingTransactionItemCreateSchema,
-  BillingTransactionStatus,
 } from '@attraccess/database-entities';
+import { BillingTransactionStatus } from '@attraccess/application-models';
 import type { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';

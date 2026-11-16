@@ -1,5 +1,6 @@
 import { SsoSessionRequest } from '../sso-session-request';
-import { SSOProviderType, User, SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
+import { User, SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { DEFAULT_SAML_ROLE_ATTRIBUTE_KEYS } from '@attraccess/shared';
 
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';

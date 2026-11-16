@@ -4,8 +4,8 @@ import {
   PasswordHistory,
   PasswordPolicy,
   PasswordPolicyOverride,
-  PasswordPolicyRole,
 } from '@attraccess/database-entities';
+import { PasswordPolicyRole } from '@attraccess/application-models';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';

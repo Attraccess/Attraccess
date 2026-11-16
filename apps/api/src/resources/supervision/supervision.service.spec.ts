@@ -8,7 +8,8 @@ import {
 } from '@nestjs/common';
 import { SupervisionService } from './supervision.service';
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
-import { User, ResourceIntroducerType } from '@attraccess/database-entities';
+import { User } from '@attraccess/database-entities';
+import { ResourceIntroducerType } from '@attraccess/application-models';
 import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto';
 
 describe('SupervisionService', () => {

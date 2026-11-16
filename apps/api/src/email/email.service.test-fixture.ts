@@ -1,4 +1,5 @@
-import { EmailTemplateType, User } from '@attraccess/database-entities';
+import { User } from '@attraccess/database-entities';
+import { EmailTemplateType } from '@attraccess/application-models';
 import { createTransport } from 'nodemailer';
 import { Repository } from 'typeorm';
 import { EmailLayoutService } from './../email-layout/email-layout.service';

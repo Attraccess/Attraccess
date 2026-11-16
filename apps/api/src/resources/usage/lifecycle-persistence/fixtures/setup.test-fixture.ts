@@ -2,16 +2,14 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Logger } from '@nestjs/common';
 import {
   BillingTransaction,
-  BillingTransactionStatus,
   Form,
   Resource,
   ResourceOperatingInterval,
-  ResourceType,
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
-  SupervisionMode,
   User,
 } from '@attraccess/database-entities';
+import { BillingTransactionStatus, ResourceType, SupervisionMode } from '@attraccess/application-models';
 import { DataSource, EntityManager } from 'typeorm';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

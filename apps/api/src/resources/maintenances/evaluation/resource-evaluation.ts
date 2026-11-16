@@ -3,13 +3,15 @@ import { MaintenanceSnapshotReader, captureDurationState } from './snapshot-read
 import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
 import {
   ResourceMaintenanceSchedule,
-  ResourceMaintenanceScheduleTriggerType,
-  UsageDurationUnit,
-  ResourceMaintenanceScheduleDurationBasis,
   Resource,
   ResourceMaintenance,
   ResourceUsage,
 } from '@attraccess/database-entities';
+import {
+  ResourceMaintenanceScheduleDurationBasis,
+  ResourceMaintenanceScheduleTriggerType,
+  UsageDurationUnit,
+} from '@attraccess/application-models';
 
 import { EntityManager, Repository } from 'typeorm';
 

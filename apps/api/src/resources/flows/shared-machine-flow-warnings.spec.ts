@@ -1,4 +1,5 @@
-import { ResourceFlowEdge, ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowEdge, ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import type { PluginFlowNodeDefinition } from '@attraccess/plugins-backend-sdk';
 import { registerPluginFlowNodes } from '../../plugin-system/flows/node-registry';
 import { findFlowsWithoutSessionCountCheck } from './shared-machine-flow-warnings';

@@ -4,12 +4,14 @@ import {
   ResourceMaintenanceScheduleTimeIntervalConfig,
   ResourceMaintenanceScheduleUsageCountConfig,
   ResourceMaintenanceScheduleUsageHoursConfig,
-  ResourceMaintenanceScheduleTriggerType,
-  UsageDurationUnit,
   ResourceMaintenance,
-  ResourceMaintenanceScheduleDurationBasis,
-  ResourceType,
 } from '@attraccess/database-entities';
+import {
+  ResourceMaintenanceScheduleDurationBasis,
+  ResourceMaintenanceScheduleTriggerType,
+  ResourceType,
+  UsageDurationUnit,
+} from '@attraccess/application-models';
 
 import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 

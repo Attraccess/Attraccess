@@ -1,11 +1,5 @@
-import {
-  Resource,
-  ResourceUsage,
-  ResourceType,
-  ResourceUsageAction,
-  User,
-  SupervisionMode,
-} from '@attraccess/database-entities';
+import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
+import { ResourceType, ResourceUsageAction, SupervisionMode } from '@attraccess/application-models';
 import { SelectQueryBuilder } from 'typeorm';
 import { inheritTestScope } from '../../../../test-utils/inherit-test-scope';
 import type { ResourceUsageServiceTestScope } from '../resource-usage.service.spec';

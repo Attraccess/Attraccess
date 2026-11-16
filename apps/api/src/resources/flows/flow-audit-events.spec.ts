@@ -1,4 +1,4 @@
-import { ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import { auditActorOf } from '../../audit/recorder/audit-event';
 import { projectAuditRow } from '../../audit/recorder/audit-row';
 import { openFlowCanvasDatabase, startToHttpCanvas, testActor } from './flow-canvas-database.test-fixture';

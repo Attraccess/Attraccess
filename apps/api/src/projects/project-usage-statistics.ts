@@ -1,4 +1,5 @@
-import { BillingTransactionStatus, ResourceUsage } from '@attraccess/database-entities';
+import { ResourceUsage } from '@attraccess/database-entities';
+import { BillingTransactionStatus } from '@attraccess/application-models';
 import { ProjectUsageStatsQueryDto } from './dto/project-usage-stats-query.dto';
 import { ProjectUsageStatsDto } from './dto/project-usage-stats.dto';
 import type { ProjectUsageService } from './project-usage.service';

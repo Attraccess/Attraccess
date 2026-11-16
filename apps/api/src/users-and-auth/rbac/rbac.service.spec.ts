@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { registerRbacServiceFixture } from './rbac.service.rbac-service.test-fixture';
-import { Role, UserRoleSource, RolePermission, UserRole } from '@attraccess/database-entities';
+import { Role, RolePermission, UserRole } from '@attraccess/database-entities';
+import { UserRoleSource } from '@attraccess/application-models';
 import { ForbiddenException, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { UserNotFoundException } from './../../exceptions/user.notFound.exception';
 import { UserPermissionsChangedEvent } from './events/user-permissions-changed.event';

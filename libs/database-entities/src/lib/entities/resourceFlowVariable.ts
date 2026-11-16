@@ -1,3 +1,4 @@
+import { ResourceFlowVariableScope } from '@attraccess/application-models';
 import {
   Column,
   CreateDateColumn,
@@ -11,11 +12,6 @@ import {
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
-
-export enum ResourceFlowVariableScope {
-  RESOURCE = 'resource',
-  GLOBAL = 'global',
-}
 
 export type ResourceFlowVariableValueType = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null';
 

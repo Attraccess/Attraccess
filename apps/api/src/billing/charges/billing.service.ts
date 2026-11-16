@@ -2,14 +2,13 @@ import { billingTransactionAuditEvent } from '../../audit/policies/billing';
 import {
   BillingTransaction,
   BillingTransactionItem,
-  BillingTransactionStatus,
   ResourceBillingConfiguration,
-  ResourceFlowNodeType,
   ResourceUsage,
   Setting,
   User,
   ResourceMeter,
 } from '@attraccess/database-entities';
+import { BillingTransactionStatus, ResourceFlowNodeType } from '@attraccess/application-models';
 
 import { Inject, Injectable, Logger, BadRequestException } from '@nestjs/common';
 

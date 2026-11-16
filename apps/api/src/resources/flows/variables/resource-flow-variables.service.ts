@@ -2,11 +2,8 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { In, IsNull, Repository } from 'typeorm';
-import {
-  ResourceFlowVariable,
-  ResourceFlowVariableScope,
-  ResourceFlowVariableValueType,
-} from '@attraccess/database-entities';
+import { ResourceFlowVariable, ResourceFlowVariableValueType } from '@attraccess/database-entities';
+import { ResourceFlowVariableScope } from '@attraccess/application-models';
 import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../../../audit/recorder/audit-event';
 import { fitAuditTexts } from '../../../audit/policies/projection';
 import { REDACTED, isSecretKey, redactFlowData } from '../flow-audit';

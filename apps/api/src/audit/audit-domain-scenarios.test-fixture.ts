@@ -1,5 +1,6 @@
 import { billingTransactionAuditEvent } from './policies/billing';
-import { AuditLog, SSOProviderType } from '@attraccess/database-entities';
+import { AuditLog } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { randomUUID } from 'node:crypto';
 import { ssoAuditSnapshot } from '../users-and-auth/auth/sso/audit/provider-audit';
 import { AuditService } from './audit.service';

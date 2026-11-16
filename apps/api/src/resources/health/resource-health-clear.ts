@@ -1,7 +1,7 @@
 // Manages resource health state tracking with mutable status and source lifecycle tracking
 // FEATURE: Resource health monitoring system for subsystem-level status tracking
 import { NotFoundException } from '@nestjs/common';
-import { ResourceHealthStatus } from '@attraccess/database-entities';
+import { ResourceHealthStatus } from '@attraccess/application-models';
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
 import { AuditActor, SYSTEM_AUDIT_ACTOR } from '../../audit/recorder/audit-event';
 import type { ResourceHealthService } from './resource-health.service';

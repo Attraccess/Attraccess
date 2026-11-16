@@ -1,5 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
-import { SSOProvider, SSOProviderType } from '@attraccess/database-entities';
+import { SSOProvider } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { CreateSSOProviderDto } from './dto/create-sso-provider.dto';
 import { UpdateSSOProviderDto } from './dto/update-sso-provider.dto';

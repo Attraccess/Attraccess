@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { SSOProvider, SsoSessionContext } from '@attraccess/database-entities';
+import { SSOProvider } from '@attraccess/database-entities';
+import { SsoSessionContext } from '@attraccess/application-models';
 import { MetricsService } from '../../../metrics/metrics.service';
 import { AUDIT_RECORDER, AuditRecorder } from '../../../audit/recorder/audit-event';
 import { SessionService } from '../session.service';

@@ -1,4 +1,4 @@
-import { ResourceFlowNodeType as Type, ResourceType } from '@attraccess/database-entities';
+import { ResourceFlowNodeType as Type, ResourceType } from '@attraccess/application-models';
 import { getCoreNodeSchemas } from './schemas/core-node-schemas';
 
 describe('core flow node catalog', () => {

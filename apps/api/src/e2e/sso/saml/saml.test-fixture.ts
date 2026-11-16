@@ -25,12 +25,12 @@ import {
   ResourceUsage,
   Role,
   RolePermission,
-  SSOProviderType,
   Session,
   User,
   UserRole,
   entities,
 } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import type { ConfigService } from '@nestjs/config';
 import type { ModuleRef } from '@nestjs/core';
 import { EventEmitter2 } from '@nestjs/event-emitter';

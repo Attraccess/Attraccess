@@ -9,12 +9,11 @@ import {
   ResourceFlowEdge,
   Resource,
   BillingTransactionItem,
-  ResourceFlowNodeType,
   CompanionForegroundAppNodeDataSchema,
   CompanionIdleActiveNodeDataSchema,
   ResourceUsage,
-  ResourceUsageAction,
 } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceUsageAction } from '@attraccess/application-models';
 
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 

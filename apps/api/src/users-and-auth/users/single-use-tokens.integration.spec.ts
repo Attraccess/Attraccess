@@ -2,13 +2,13 @@ import { createMock } from '@golevelup/ts-jest';
 import { ForbiddenException } from '@nestjs/common';
 import {
   AuthenticationDetail,
-  AuthenticationType,
   entities,
   PasswordHistory,
   PasswordPolicy,
   PasswordPolicyOverride,
   User,
 } from '@attraccess/database-entities';
+import { AuthenticationType } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
 import * as migrations from '../../database/migrations';
 import { EmailService } from '../../email/email.service';

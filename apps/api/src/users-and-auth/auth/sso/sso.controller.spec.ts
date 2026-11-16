@@ -1,6 +1,7 @@
 import { registerSsoControllerFixture } from './sso.controller.sso-controller.test-fixture';
 import * as discovery from './providers/discovery-client';
-import { SSOProviderType, AuthenticationDetail, AuthenticationType, SSOProvider } from '@attraccess/database-entities';
+import { AuthenticationDetail, SSOProvider } from '@attraccess/database-entities';
+import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
 import { CreateSSOProviderDto } from './dto/create-sso-provider.dto';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { NotFoundException, BadRequestException, UnauthorizedException, ForbiddenException } from '@nestjs/common';

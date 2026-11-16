@@ -3,15 +3,17 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
   Resource,
-  ResourceType,
   ResourceMaintenance,
   ResourceMaintenanceSchedule,
-  ResourceMaintenanceScheduleDurationBasis,
-  ResourceMaintenanceScheduleTriggerType,
   ResourceMaintenanceScheduleTimeIntervalConfig,
   ResourceMaintenanceScheduleUsageCountConfig,
   ResourceMaintenanceScheduleUsageHoursConfig,
 } from '@attraccess/database-entities';
+import {
+  ResourceMaintenanceScheduleDurationBasis,
+  ResourceMaintenanceScheduleTriggerType,
+  ResourceType,
+} from '@attraccess/application-models';
 import { MaintenanceScheduleService } from './maintenance-schedule.service';
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 

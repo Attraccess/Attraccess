@@ -1,6 +1,7 @@
 import { registerResourceHealthServiceFixture } from './resource-health.service.resource-health-service.test-fixture';
 import { NotFoundException } from '@nestjs/common';
-import { ResourceHealthSource, ResourceHealthStatus, ResourceHealthState } from '@attraccess/database-entities';
+import { ResourceHealthState } from '@attraccess/database-entities';
+import { ResourceHealthSource, ResourceHealthStatus } from '@attraccess/application-models';
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
 
 describe('ResourceHealthService', () => {

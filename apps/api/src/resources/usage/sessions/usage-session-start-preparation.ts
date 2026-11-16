@@ -1,14 +1,11 @@
 import {
   FormSubmission,
-  ResourceFormAction,
-  ResourceType,
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
   User,
   ResourceMeter,
-  ResourceUsageAction,
-  SupervisionMode,
 } from '@attraccess/database-entities';
+import { ResourceFormAction, ResourceType, ResourceUsageAction, SupervisionMode } from '@attraccess/application-models';
 
 import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
 

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { registerAttractapFormsHandlerFixture } from './handler.test-fixture';
-import { ResourceFormAction } from '@attraccess/database-entities';
+import { ResourceFormAction } from '@attraccess/application-models';
 import { AttractapEvent, AttractapEventType } from '../../websocket.types';
 
 describe('AttractapFormsHandler', () => {

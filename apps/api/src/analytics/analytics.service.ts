@@ -1,13 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DateRangeValue } from './dtos/dateRangeValue';
 import { toBillingTransactionExportRow, toResourceUsageExportRow } from './dtos/analyticsExportRows.dto';
-import {
-  BillingTransaction,
-  Resource,
-  ResourceOperatingInterval,
-  ResourceUsage,
-  ResourceUsageAction,
-} from '@attraccess/database-entities';
+import { BillingTransaction, Resource, ResourceOperatingInterval, ResourceUsage } from '@attraccess/database-entities';
+import { ResourceUsageAction } from '@attraccess/application-models';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Brackets, FindManyOptions, In, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
 import { ResourceHoursSummaryRowDto } from './dtos/resourceHoursSummary.dto';

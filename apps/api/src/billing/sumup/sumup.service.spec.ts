@@ -3,7 +3,8 @@ import { registerSumUpServiceFixture } from './service.test-fixture';
 import { SumupTransactionEventType } from '../dto/sumup/sumup-transaction-callback.dto';
 import { BadRequestException } from '@nestjs/common';
 import { SUMUP_TOPUP_TRANSACTION_PREFIX } from './sumup.service';
-import { BillingTransactionStatus, BillingTransaction } from '@attraccess/database-entities';
+import { BillingTransaction } from '@attraccess/database-entities';
+import { BillingTransactionStatus } from '@attraccess/application-models';
 
 describe('SumUpService', () => {
   const fixture = registerSumUpServiceFixture();

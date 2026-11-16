@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ResourceFlowsExecutorService } from './resource-flows-executor.service';
 import { ResourceSessionStartedEvent } from '../../usage/events/resource-usage.events';
-import { ResourceUsageAction, ResourceUsage, Resource, ResourceType } from '@attraccess/database-entities';
+import { ResourceUsage, Resource } from '@attraccess/database-entities';
+import { ResourceType, ResourceUsageAction } from '@attraccess/application-models';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 
 describe('ResourceFlowsExecutorService – handleResourceSessionStartedEvent', () => {

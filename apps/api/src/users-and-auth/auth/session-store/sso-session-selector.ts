@@ -1,4 +1,4 @@
-import { SsoSessionContext } from '@attraccess/database-entities';
+import { SsoSessionContext } from '@attraccess/application-models';
 
 export type SsoSessionSelector =
   | { protocol: 'OIDC'; providerId: number; issuer: string; subject?: string; sid?: string; issuedBefore?: number }

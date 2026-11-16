@@ -3,7 +3,8 @@ import { PassportStrategy } from '@nestjs/passport';
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Request } from 'express';
 import { AuthService } from '../auth/auth.service';
-import { AuthenticationType, User } from '@attraccess/database-entities';
+import { User } from '@attraccess/database-entities';
+import { AuthenticationType } from '@attraccess/application-models';
 import { TwoFactorService } from '../auth/two-factor.service';
 
 class UnknownUserOrPasswordException extends UnauthorizedException {

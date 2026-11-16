@@ -1,6 +1,6 @@
 import { registerPasswordPolicyOnRemainingEndpointsIntegrationFixture } from './change-password-flow.integration.password-policy-on-remaining-endpoints-integration.test-fixture';
 import { PasswordPolicyViolationException } from './password-policy.errors';
-import { AuthenticationType } from '@attraccess/database-entities';
+import { AuthenticationType } from '@attraccess/application-models';
 import * as bcrypt from 'bcrypt';
 
 describe('Password policy on remaining endpoints (integration)', () => {

@@ -1,10 +1,5 @@
-import {
-  BillingTransaction,
-  BillingTransactionItem,
-  EmailTemplateType,
-  Resource,
-  ResourceUsage,
-} from '@attraccess/database-entities';
+import { BillingTransaction, BillingTransactionItem, Resource, ResourceUsage } from '@attraccess/database-entities';
+import { EmailTemplateType } from '@attraccess/application-models';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {

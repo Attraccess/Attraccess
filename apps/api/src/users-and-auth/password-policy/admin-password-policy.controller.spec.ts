@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { PasswordPolicyRole } from '@attraccess/database-entities';
+import { PasswordPolicyRole } from '@attraccess/application-models';
 import { DEFAULT_PASSWORD_POLICY } from '@attraccess/shared';
 import { AdminPasswordPolicyController } from './admin-password-policy.controller';
 

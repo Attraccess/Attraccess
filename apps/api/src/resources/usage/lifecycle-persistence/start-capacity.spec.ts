@@ -1,10 +1,5 @@
-import {
-  Resource,
-  ResourceUsage,
-  ResourceUsageAction,
-  ResourceUsageLifecycleAttempt,
-  User,
-} from '@attraccess/database-entities';
+import { Resource, ResourceUsage, ResourceUsageLifecycleAttempt, User } from '@attraccess/database-entities';
+import { ResourceUsageAction } from '@attraccess/application-models';
 import type { StartCapacityContext, StartCapacityHook } from '@attraccess/plugins-backend-sdk';
 import { ConflictException } from '@nestjs/common';
 import { rm } from 'node:fs/promises';
