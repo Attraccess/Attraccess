@@ -1,15 +1,9 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  ManyToOne,
-  JoinColumn,
-  Index,
-  CreateDateColumn,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index, CreateDateColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
 import { Attractap } from './attractap.entity';
+
+export type CoredumpStatus = 'awaiting' | 'stored';
 
 @Entity('attractap_crash_report')
 @Index(['attractapId', 'createdAt'])
@@ -94,6 +88,29 @@ export class AttractapCrashReport {
     nullable: true,
   })
   coredumpSize!: number | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description:
+      'Upload state of the coredump: awaiting while a chunked upload is owed (or never arrived), stored once the whole dump was verified and saved. Null for reports without a dump.',
+    example: 'stored',
+    enum: ['awaiting', 'stored'],
+    nullable: true,
+  })
+  coredumpStatus!: CoredumpStatus | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'Size in bytes of the coredump the reader announced for a chunked upload',
+    example: 43776,
+    nullable: true,
+  })
+  coredumpExpectedSize!: number | null;
+
+  /** zlib CRC-32 the reader announced; a restarted upload must declare the same dump. */
+  @Column({ type: 'integer', nullable: true })
+  @Exclude()
+  coredumpExpectedCrc32!: number | null;
 
   @Column({ type: 'blob', nullable: true, select: false })
   @Exclude()

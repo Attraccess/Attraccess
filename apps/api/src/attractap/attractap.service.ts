@@ -83,11 +83,20 @@ export class AttractapService {
 
   protected readonly logger = new Logger(AttractapService.name);
 
-  public async createCrashReport(readerId: number, payload: ReaderCrashReportPayload): Promise<AttractapCrashReport> {
+  /**
+   * Stores a crash report. A legacy reader sends its dump inline; a newer one announces `expectedCoredump`
+   * and uploads it in chunks afterwards (ATT-1144), so the report waits for it (`coredumpStatus: awaiting`).
+   */
+  public async createCrashReport(
+    readerId: number,
+    payload: ReaderCrashReportPayload,
+    expectedCoredump: { size: number; crc32: number } | null = null,
+  ): Promise<AttractapCrashReport> {
     const coredump =
       typeof payload.coredumpBase64 === 'string' && payload.coredumpBase64.length > 0
         ? Buffer.from(payload.coredumpBase64, 'base64')
         : null;
+    const awaiting = !coredump && expectedCoredump !== null;
 
     const report = await this.crashReportRepository.save({
       attractapId: readerId,
@@ -101,6 +110,9 @@ export class AttractapService {
       firmwareVersion: payload.firmwareVersion ?? null,
       coredumpSize: coredump ? coredump.length : null,
       coredump,
+      coredumpStatus: coredump ? 'stored' : awaiting ? 'awaiting' : null,
+      coredumpExpectedSize: awaiting ? expectedCoredump.size : null,
+      coredumpExpectedCrc32: awaiting ? expectedCoredump.crc32 : null,
       symbolicationStatus: coredump ? 'pending' : null,
     });
 
@@ -110,6 +122,28 @@ export class AttractapService {
 
     report.coredump = null;
     return report;
+  }
+
+  /** The report a reader uploads a coredump to; null unless that reader owns it. */
+  public async findCrashReportOfReader(reportId: number, readerId: number): Promise<AttractapCrashReport | null> {
+    return this.crashReportRepository.findOne({ where: { id: reportId, attractapId: readerId } });
+  }
+
+  /**
+   * Saves a verified chunked upload to its waiting report and symbolicates it like an inline dump.
+   * False when the report no longer waits for a dump (already stored, or deleted meanwhile).
+   */
+  public async storeUploadedCoredump(report: AttractapCrashReport, coredump: Buffer): Promise<boolean> {
+    const result = await this.crashReportRepository.update(
+      { id: report.id, attractapId: report.attractapId, coredumpStatus: 'awaiting' },
+      { coredump, coredumpSize: coredump.length, coredumpStatus: 'stored', symbolicationStatus: 'pending' },
+    );
+    if (!result.affected) return false;
+    report.coredumpSize = coredump.length;
+    report.coredumpStatus = 'stored';
+    report.symbolicationStatus = 'pending';
+    await this.symbolicateCrashReport(report, report.attractapId, coredump);
+    return true;
   }
 
   protected async symbolicateCrashReport(
@@ -193,6 +227,8 @@ export class AttractapService {
       firmwareMatchesCurrentReader,
       firmwareMatchesLatestServer,
       coredumpSize: report.coredumpSize,
+      coredumpStatus: report.coredumpStatus ?? null,
+      coredumpExpectedSize: report.coredumpExpectedSize ?? null,
       coredumpBuildId: report.coredumpBuildId,
       coredumpBuildIdKnown: report.coredumpBuildId
         ? this.firmwareService.hasSymbolForBuildId(report.coredumpBuildId)

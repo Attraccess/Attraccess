@@ -286,6 +286,58 @@ describe('AttractapService reader maintenance and crash reports', () => {
     });
     expect(reports.update).toHaveBeenCalledWith(7, expect.objectContaining({ coredumpBuildId: 'build' }));
   });
+  it('marks a report as awaiting the announced chunked coredump', async () => {
+    const { service, reports, symbolication } = setup();
+    const report = await service.createCrashReport(4, { resetReason: 'PANIC', coredumpSize: 43776 } as never, {
+      size: 43776,
+      crc32: 0xdeadbeef,
+    });
+    expect(report).toMatchObject({
+      coredumpStatus: 'awaiting',
+      coredumpExpectedSize: 43776,
+      coredumpExpectedCrc32: 0xdeadbeef,
+      coredumpSize: null,
+      symbolicationStatus: null,
+    });
+    expect(reports.save).toHaveBeenCalledWith(expect.objectContaining({ coredump: null }));
+    expect(symbolication.symbolicate).not.toHaveBeenCalled();
+  });
+  it('keeps an inline coredump stored even when a size is announced as well', async () => {
+    const { service } = setup();
+    const report = await service.createCrashReport(
+      4,
+      { resetReason: 'PANIC', coredumpBase64: Buffer.from('dump').toString('base64') } as never,
+      { size: 4, crc32: 1 },
+    );
+    expect(report).toMatchObject({ coredumpStatus: 'stored', coredumpSize: 4, coredumpExpectedSize: null });
+  });
+  it('stores a verified chunked coredump only on a report that awaits one, then symbolicates it', async () => {
+    const { service, reports, symbolication } = setup();
+    const dump = Buffer.alloc(43776, 7);
+    reports.update.mockResolvedValueOnce({ affected: 1 });
+    const report = { id: 7, attractapId: 4, coredumpStatus: 'awaiting' } as never;
+    expect(await service.storeUploadedCoredump(report, dump)).toBe(true);
+    expect(reports.update).toHaveBeenNthCalledWith(
+      1,
+      { id: 7, attractapId: 4, coredumpStatus: 'awaiting' },
+      { coredump: dump, coredumpSize: 43776, coredumpStatus: 'stored', symbolicationStatus: 'pending' },
+    );
+    expect(symbolication.symbolicate).toHaveBeenCalledWith(dump, { variant: 'standard' });
+    expect(report).toMatchObject({ coredumpStatus: 'stored', coredumpSize: 43776, symbolicationStatus: 'completed' });
+
+    reports.update.mockResolvedValueOnce({ affected: 0 });
+    symbolication.symbolicate.mockClear();
+    expect(await service.storeUploadedCoredump({ id: 8, attractapId: 4 } as never, dump)).toBe(false);
+    expect(symbolication.symbolicate).not.toHaveBeenCalled();
+  });
+  it('finds a crash report only for the reader that owns it', async () => {
+    const { service, reports } = setup();
+    Object.assign(reports, { findOne: jest.fn().mockResolvedValue(null) });
+    expect(await service.findCrashReportOfReader(7, 5)).toBeNull();
+    expect((reports as unknown as { findOne: jest.Mock }).findOne).toHaveBeenCalledWith({
+      where: { id: 7, attractapId: 5 },
+    });
+  });
   it('looks up installed and server firmware while listing crash reports', async () => {
     const { service, firmware, readers } = setup();
     expect(await service.getCrashReportsForReader(4)).toEqual([]);

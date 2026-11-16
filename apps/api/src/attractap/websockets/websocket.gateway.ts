@@ -50,7 +50,7 @@ import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 /**
  * The only events a reader that is not paired may send: signing in again, the firmware update, its crash
- * report and the end of its login. Everything else runs no handler; the reader is asked to start pairing
+ * report (with its coredump upload) and the end of its login. Everything else runs no handler; the reader is asked to start pairing
  * (see promptPairing for how often).
  */
 const ALLOWED_WHILE_PAIRING_REQUIRED = new Set<AttractapEventType>([
@@ -59,14 +59,21 @@ const ALLOWED_WHILE_PAIRING_REQUIRED = new Set<AttractapEventType>([
   AttractapEventType.READER_FIRMWARE_INFO,
   AttractapEventType.FIRMWARE_REQUEST_CHUNK,
   AttractapEventType.READER_CRASH_REPORT,
+  AttractapEventType.READER_COREDUMP_BEGIN,
+  AttractapEventType.READER_COREDUMP_CHUNK,
+  AttractapEventType.READER_COREDUMP_COMPLETE,
   AttractapEventType.READER_SESSION_ENDED,
 ]);
 
-/** Card relay events: a card conversation must not wait for the reader's lastConnection update. */
+/**
+ * Card relay events: a card conversation must not wait for the reader's lastConnection update. Coredump
+ * chunks arrive dozens per upload; the BEGIN and COMPLETE around them record the activity.
+ */
 const SKIPS_ACTIVITY_WRITE = new Set<AttractapEventType>([
   AttractapEventType.CARD_DETECTED,
   AttractapEventType.CARD_APDU_RESPONSE,
   AttractapEventType.CARD_REMOVED,
+  AttractapEventType.READER_COREDUMP_CHUNK,
 ]);
 
 @WebSocketGateway({
@@ -571,6 +578,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     // Open reader UI steps, timers and the OTA file descriptor.
     cleanupSocketState(socket, { uiHandler: this.uiHandler });
+    // A partial coredump upload is restarted by the reader after it reconnects.
+    this.crashReportHandler.discardCoredumpUpload(socket.id);
     this.websocketService.sockets.delete(socket.id);
     this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
   }

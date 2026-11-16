@@ -130,3 +130,38 @@ it('reports download failures without claiming success', async () => {
   fireEvent.click(screen.getByRole('button', { name: /downloadCoredump/ }));
   await waitFor(() => expect(state.toast).toHaveBeenCalledWith({ title: 'downloadFailed', description: 'HTTP 503' }));
 });
+it('tells a coredump that is still being uploaded and a recovered one apart from reports without a dump', () => {
+  state.reports = [
+    {
+      id: 11,
+      createdAt: report.createdAt,
+      resetReason: 'PANIC',
+      coredumpStatus: 'awaiting',
+      coredumpExpectedSize: 43776,
+      coredumpSize: null,
+    },
+    {
+      id: 12,
+      createdAt: report.createdAt,
+      resetReason: 'UNKNOWN',
+      rebootReason: 'COREDUMP_ORPHAN',
+      coredumpSize: 4096,
+    },
+    { id: 13, createdAt: report.createdAt, resetReason: 'POWERON', coredumpStatus: null, coredumpSize: null },
+  ];
+  const { container } = render(<AttractapDiagnostics readerId={7} />);
+  const reports = container.querySelectorAll('[data-cy="attractap-diagnostics-report"]');
+  expect(reports[0].querySelector('[data-cy="attractap-diagnostics-coredump-pending"]')?.textContent).toBe(
+    'coredumpPending',
+  );
+  expect(reports[0].querySelector('[data-cy="attractap-diagnostics-coredump-pending-hint"]')).toBeTruthy();
+  expect(reports[0].textContent).not.toContain('noCoredump');
+  expect(reports[1].querySelector('[data-cy="attractap-diagnostics-orphan-coredump"]')?.textContent).toBe(
+    'orphanCoredump',
+  );
+  expect(reports[1].querySelector('[data-cy="attractap-diagnostics-reboot-reason"]')).toBeNull();
+  expect(reports[1].querySelector('[data-cy="attractap-diagnostics-orphan-hint"]')).toBeTruthy();
+  expect(reports[1].querySelector('[data-cy="attractap-diagnostics-download-coredump"]')).toBeTruthy();
+  expect(reports[2].textContent).toContain('noCoredump');
+  expect(reports[2].querySelector('[data-cy="attractap-diagnostics-coredump-pending"]')).toBeNull();
+});

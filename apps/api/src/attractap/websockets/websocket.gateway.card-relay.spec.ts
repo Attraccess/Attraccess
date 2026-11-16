@@ -541,6 +541,9 @@ describe('AttractapGateway card relay rules', () => {
       AttractapEventType.READER_FIRMWARE_INFO,
       AttractapEventType.FIRMWARE_REQUEST_CHUNK,
       AttractapEventType.READER_CRASH_REPORT,
+      AttractapEventType.READER_COREDUMP_BEGIN,
+      AttractapEventType.READER_COREDUMP_CHUNK,
+      AttractapEventType.READER_COREDUMP_COMPLETE,
       AttractapEventType.READER_SESSION_ENDED,
     ]);
     const gatedEvents = () =>
