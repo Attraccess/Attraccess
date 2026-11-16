@@ -1,8 +1,11 @@
-import { LabeledSwitch } from '@attraccess/plugins-frontend-ui';
+import { LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { EditorTabProps } from './props';
+import en from '../resourceEditModal.en.json';
+import de from '../resourceEditModal.de.json';
 
 export function DoorTab(props: EditorTabProps) {
-  const { t, formData, setField } = props;
+  const { formData, setField } = props;
+  const { t } = useTranslations({ en, de });
   return (
     <div className="flex flex-col gap-2">
       <LabeledSwitch

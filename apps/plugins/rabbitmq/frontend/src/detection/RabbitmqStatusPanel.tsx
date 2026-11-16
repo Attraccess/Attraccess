@@ -10,7 +10,7 @@ import { CheckCircle2Icon, RabbitIcon, RefreshCwIcon, XCircleIcon } from 'lucide
 import type { ReactNode } from 'react';
 import { useDetection } from './detection';
 import { useRabbitmqTranslations } from '../i18n';
-import { MISSING_VALUE } from '../format';
+import { MISSING_VALUE } from '../useRabbitmqFormatters';
 
 function StatusRow({ ok, label, value }: { ok: boolean; label: string; value: ReactNode }) {
   return (

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { type ReactNode, useCallback, useMemo } from 'react';
 import { useDateTimeLocale } from './useDateTimeLocale';
 
 export interface DateTimeOptions {
@@ -35,7 +35,7 @@ export function useDateTimeFormatter(options?: DateTimeOptions) {
   }, [showDate, showTime, showSeconds, locale]);
 
   return useCallback(
-    (date?: Date | string | number | null, fallback?: string | React.ReactNode) => {
+    (date?: Date | string | number | null, fallback?: string | ReactNode) => {
       if (date === null || date === undefined) {
         return fallback ?? '-';
       }
@@ -49,10 +49,4 @@ export function useDateTimeFormatter(options?: DateTimeOptions) {
     },
     [formatter],
   );
-}
-
-export function useFormatDateTime(date?: Date | string | number | null, options?: DateTimeOptions) {
-  const formatter = useDateTimeFormatter(options);
-
-  return formatter(date);
 }

@@ -19,6 +19,8 @@ import { AlertStatusIcon, LabeledSwitch, useTranslations } from '@attraccess/plu
 import nodeTranslationsDe from '../../details/flows/node/de.json';
 import nodeTranslationsEn from '../../details/flows/node/en.json';
 import { EditorTabProps } from './props';
+import en from '../resourceEditModal.en.json';
+import de from '../resourceEditModal.de.json';
 
 const MIN_PARALLEL_SESSIONS = 1;
 const MAX_PARALLEL_SESSIONS = 1000;
@@ -43,7 +45,8 @@ function useFlowNodeTitle(resourceId: number | undefined, enabled: boolean) {
 }
 
 export function MachineTab(props: EditorTabProps) {
-  const { t, formData, setField, resource } = props;
+  const { formData, setField, resource } = props;
+  const { t } = useTranslations({ en, de });
 
   const maxParallelSessions = formData.maxParallelSessions ?? 1;
   // Lets the field be emptied while typing; the stored value is always a valid number

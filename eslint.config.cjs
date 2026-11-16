@@ -1,4 +1,5 @@
 const nx = require('@nx/eslint-plugin');
+const noHookReturnTypeConfig = require('./tools/eslint-rules/no-hook-return-type.config.cjs');
 
 module.exports = [
   // {
@@ -63,25 +64,14 @@ module.exports = [
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     },
   },
-  {
-    // ATT-1224: frontend props and helpers use explicit types, never a hook's ReturnType.
-    // Tests are excluded: their mocks legitimately use ReturnType<typeof useXQuery>.
-    files: [
-      'apps/frontend/**/*.{ts,tsx}',
-      'apps/plugins/*/frontend/**/*.{ts,tsx}',
-      'libs/plugins-frontend-*/**/*.{ts,tsx}',
-      'apps/companion/renderer/**/*.{ts,tsx}',
-    ],
-    ignores: [
-      '**/*.{test,spec}.{ts,tsx}',
-      '**/*.hoisted.*',
-      '**/tests/**',
-      '**/test-utils/**',
-    ],
-    rules: {
-      '@nx/workspace-no-hook-return-type': 'error',
-    },
-  },
+  // ATT-1224: no hook ReturnType in frontend source. For lint targets that run from the workspace root (plugins,
+  // companion); frontend and the plugin UI libs lint from their own folder and add the block themselves.
+  noHookReturnTypeConfig([
+    'apps/frontend/**/*.{ts,tsx}',
+    'apps/plugins/*/frontend/**/*.{ts,tsx}',
+    'libs/plugins-frontend-*/**/*.{ts,tsx}',
+    'apps/companion/renderer/**/*.{ts,tsx}',
+  ]),
   {
     // ATT-1224: plugin dialogs use the shared StandardModal / StatusDialog.
     files: ['apps/plugins/*/frontend/**/*.{ts,tsx}'],
@@ -129,3 +119,6 @@ module.exports = [
       ]
     : []),
 ];
+
+// Shared with project configs that lint from their own folder (see no-hook-return-type.config.cjs).
+module.exports.noHookReturnTypeConfig = noHookReturnTypeConfig;

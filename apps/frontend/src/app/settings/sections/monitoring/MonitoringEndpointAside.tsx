@@ -2,13 +2,16 @@ import { InputGroup, Label, TextField, Tooltip, TooltipContent } from '@heroui/r
 import { ClipboardCopyIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useCopyToClipboard } from './useCopyToClipboard';
+import { useCopyToClipboard } from '../../../../hooks/useCopyToClipboard';
 import en from './en.json';
 import de from './de.json';
 
 export function MonitoringEndpointAside() {
   const { t } = useTranslations({ en, de });
-  const copyToClipboard = useCopyToClipboard();
+  const copyToClipboard = useCopyToClipboard({
+    title: t('copyFailed.title'),
+    description: t('copyFailed.description'),
+  });
   const metricsEndpointUrl = useMemo(() => `${window.location.origin}/api/metrics`, []);
   const prometheusSnippet = useMemo(
     () => `scrape_configs:
@@ -33,7 +36,10 @@ export function MonitoringEndpointAside() {
                 isIconOnly
                 aria-label={t('copyButton')}
                 onPress={() =>
-                  copyToClipboard(metricsEndpointUrl, t('endpointCopied.title'), t('endpointCopied.description'))
+                  copyToClipboard(metricsEndpointUrl, {
+                    title: t('endpointCopied.title'),
+                    description: t('endpointCopied.description'),
+                  })
                 }
               >
                 <ClipboardCopyIcon size={16} />

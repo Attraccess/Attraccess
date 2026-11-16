@@ -2,12 +2,16 @@ import { Spinner } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   usePasswordPolicyAdminServiceGetAdminPasswordPolicy,
+  usePasswordPolicyAdminServiceListPasswordPolicyOverrides,
   useSettingsServiceGetAuthRateLimitSettings,
+  useTwoFactorAuthenticationServiceGetTwoFactorPolicy,
+  useUsersServiceGetLocalSignupDomainWhitelist,
 } from '@attraccess/react-query-client';
 import { SettingsSection } from '../../components/SettingsSection';
 import { PasswordPolicySettings } from './components/PasswordPolicySettings';
 import { RateLimitSettings } from './components/RateLimitSettings';
 import { SecuritySaveBar } from './components/SecuritySaveBar';
+import { SignupDomainsRow } from './components/SignupDomainsRow';
 import { SubHeading } from './components/SubHeading';
 import { TwoFactorSettings } from './components/TwoFactorSettings';
 import { PasswordPreview } from './PasswordPreview';
@@ -26,8 +30,15 @@ import de from './de.json';
 export function SecuritySection() {
   const { t } = useTranslations({ en, de });
   const drafts = useSecurityDrafts();
+  // Every query of the section starts here, above the early return, so all five go out in one
+  // parallel round and the rows below get their data as props. Subscribing in the rows instead
+  // delayed 2FA, the whitelist and the overrides until the gate opened, and refetched the policy
+  // and the rate limit a second time on mount (the shared client has no `staleTime`).
   const { data: policy, isLoading: isPolicyLoading } = usePasswordPolicyAdminServiceGetAdminPasswordPolicy();
-  const { isLoading: isRateLimitLoading } = useSettingsServiceGetAuthRateLimitSettings();
+  const { data: rateLimit, isLoading: isRateLimitLoading } = useSettingsServiceGetAuthRateLimitSettings();
+  const { data: twoFactor } = useTwoFactorAuthenticationServiceGetTwoFactorPolicy();
+  const { data: savedDomains, isLoading: isDomainsLoading } = useUsersServiceGetLocalSignupDomainWhitelist();
+  const { data: overrides = [] } = usePasswordPolicyAdminServiceListPasswordPolicyOverrides();
 
   // Loading only. Folding `!policy || !rateLimit` in here conflated "not arrived yet" with "arrived
   // empty": on error `isLoading` goes false while the data stays undefined, so the spinner became
@@ -51,23 +62,40 @@ export function SecuritySection() {
       <SubHeading title={t('access.heading')} description={t('access.description')} />
 
       <TwoFactorSettings
+        savedPolicy={twoFactor?.policy}
         twoFactorDraft={drafts.twoFactorDraft}
         setTwoFactorDraft={drafts.setTwoFactorDraft}
-        domainsDraft={drafts.domainsDraft}
-        setDomainsDraft={drafts.setDomainsDraft}
-        domainToAdd={drafts.domainToAdd}
-        setDomainToAdd={drafts.setDomainToAdd}
-      />
+      >
+        <SignupDomainsRow
+          savedDomains={savedDomains}
+          isDomainsLoading={isDomainsLoading}
+          domainsDraft={drafts.domainsDraft}
+          setDomainsDraft={drafts.setDomainsDraft}
+          domainToAdd={drafts.domainToAdd}
+          setDomainToAdd={drafts.setDomainToAdd}
+        />
+      </TwoFactorSettings>
 
       <SubHeading title={t('rateLimit.heading')} description={t('rateLimit.description')} />
 
-      <RateLimitSettings rateDraft={drafts.rateDraft} setRateDraft={drafts.setRateDraft} />
+      <RateLimitSettings rateLimit={rateLimit} rateDraft={drafts.rateDraft} setRateDraft={drafts.setRateDraft} />
 
       <SubHeading title={t('policy.heading')} description={t('policy.description')} />
 
-      <PasswordPolicySettings policyDraft={drafts.policyDraft} setPolicyDraft={drafts.setPolicyDraft} />
+      <PasswordPolicySettings
+        policy={policy}
+        overrides={overrides}
+        policyDraft={drafts.policyDraft}
+        setPolicyDraft={drafts.setPolicyDraft}
+      />
 
-      <SecuritySaveBar drafts={drafts} />
+      <SecuritySaveBar
+        drafts={drafts}
+        policy={policy}
+        rateLimit={rateLimit}
+        twoFactorPolicy={twoFactor?.policy}
+        savedDomains={savedDomains}
+      />
     </SettingsSection>
   );
 }

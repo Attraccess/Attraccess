@@ -14,7 +14,7 @@ import {
   TooltipTrigger,
 } from '@heroui/react';
 import { useNavigate } from 'react-router-dom';
-import { RoleWithUsageDto, useRbacServiceListPermissions } from '@attraccess/react-query-client';
+import { Permission, RoleWithUsageDto } from '@attraccess/react-query-client';
 import { Button, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useRbacCatalogTranslations } from '../../../../hooks/useRbacCatalogTranslations';
 import en from './en.json';
@@ -22,15 +22,16 @@ import de from './de.json';
 
 interface RolesSectionTableProps {
   roles: RoleWithUsageDto[];
+  /** The permission catalog, loaded by the section in parallel with the roles; `undefined` until it arrives. */
+  permissions: Permission[] | undefined;
   onEdit: (role: RoleWithUsageDto) => void;
   onDelete: (role: RoleWithUsageDto) => void;
 }
 
-export function RolesSectionTable({ roles, onEdit, onDelete }: RolesSectionTableProps) {
+export function RolesSectionTable({ roles, permissions, onEdit, onDelete }: RolesSectionTableProps) {
   const { t } = useTranslations({ en, de });
   const { permissionLabel, roleName, roleDescription } = useRbacCatalogTranslations();
   const navigate = useNavigate();
-  const { data: permissions } = useRbacServiceListPermissions();
   return (
     <Table>
       <TableScrollContainer>

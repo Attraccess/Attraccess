@@ -1,5 +1,8 @@
 import { TextField, Label, Input, FieldError } from '@heroui/react';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { EditorTabProps } from './props';
+import en from '../resourceEditModal.en.json';
+import de from '../resourceEditModal.de.json';
 import { ImageUpload } from '../../../../components/imageUpload';
 import { filenameToUrl } from '../../../../api';
 
@@ -8,7 +11,8 @@ interface Props {
 }
 
 export function SharedDataTab(props: EditorTabProps & Props) {
-  const { t, formData, setField, onImageSelected, resource } = props;
+  const { formData, setField, onImageSelected, resource } = props;
+  const { t } = useTranslations({ en, de });
   return (
     <div className="flex flex-col gap-3 w-full">
       <TextField

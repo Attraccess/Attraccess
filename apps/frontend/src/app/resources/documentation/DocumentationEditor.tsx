@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Spinner } from '@heroui/react';
 import { ArrowLeft } from 'lucide-react';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
@@ -7,6 +7,7 @@ import { Button, PageHeader, useTranslations } from '@attraccess/plugins-fronten
 import en from './documentationEditor.en.json';
 import de from './documentationEditor.de.json';
 import { DocumentationEditorForm } from './DocumentationEditorForm';
+import { DocumentationDraft, documentationContentOf, documentationDraftOf } from './documentationDraft';
 
 function DocumentationEditorComponent() {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +21,15 @@ function DocumentationEditorComponent() {
     error: resourceError,
     refetch: refetchResource,
   } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  // The draft lives here, above the loading and error views, so a failed background refetch (error
+  // view) and the Retry after it (loading) do not throw away what the operator typed. It follows the
+  // server only when the resource itself changes.
+  const [draft, setDraft] = useState<DocumentationDraft>(() => documentationDraftOf(resource));
+  useEffect(() => {
+    if (resource) {
+      setDraft((current) => ({ ...current, ...documentationContentOf(resource) }));
+    }
+  }, [resource]);
 
   if (isLoadingResource) {
     return (
@@ -76,7 +86,7 @@ function DocumentationEditorComponent() {
     );
   }
 
-  return <DocumentationEditorForm resource={resource} resourceId={resourceId} />;
+  return <DocumentationEditorForm resource={resource} resourceId={resourceId} draft={draft} onDraftChange={setDraft} />;
 }
 
 export const DocumentationEditor = memo(DocumentationEditorComponent);

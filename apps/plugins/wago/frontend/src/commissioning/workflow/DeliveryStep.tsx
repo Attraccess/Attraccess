@@ -1,28 +1,20 @@
 import { StatusAlert } from '@attraccess/plugins-frontend-ui';
 import type { CommissioningSession } from '../../api/client';
 import { useWagoTranslations } from '../../i18n';
-import { canInstall } from '../model';
+import { canInstall, sshCredentials, type SshCredentials } from '../model';
 import { CommissioningStatusPanel } from '../status/CommissioningStatusPanel';
 import { CredentialFields } from './CredentialFields';
 
 export function DeliveryStep({
   isDelivering,
   session,
-  sshUsername,
-  sshPassword,
-  onSshUsernameChange,
-  onSshPasswordChange,
-  customSsh,
-  onCustomSshChange,
+  credentials,
+  onCredentialsChange,
 }: {
   isDelivering: boolean;
   session: CommissioningSession;
-  sshUsername: string;
-  sshPassword: string;
-  onSshUsernameChange: (value: string) => void;
-  onSshPasswordChange: (value: string) => void;
-  customSsh: boolean;
-  onCustomSshChange: (value: boolean) => void;
+  credentials: SshCredentials;
+  onCredentialsChange: (update: (current: SshCredentials) => SshCredentials) => void;
 }) {
   const { t } = useWagoTranslations();
   return (
@@ -35,12 +27,12 @@ export function DeliveryStep({
           </StatusAlert>
           <CredentialFields
             isDisabled={isDelivering}
-            username={sshUsername}
-            password={sshPassword}
-            onUsernameChange={onSshUsernameChange}
-            onPasswordChange={onSshPasswordChange}
-            custom={customSsh}
-            onCustomChange={onCustomSshChange}
+            username={credentials.username}
+            password={credentials.password}
+            onUsernameChange={(username) => onCredentialsChange((current) => ({ ...current, username }))}
+            onPasswordChange={(password) => onCredentialsChange((current) => ({ ...current, password }))}
+            custom={credentials.custom}
+            onCustomChange={(custom) => onCredentialsChange(() => sshCredentials(custom))}
           />
         </>
       )}

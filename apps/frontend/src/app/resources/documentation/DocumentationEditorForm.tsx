@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Dispatch, SetStateAction, useCallback } from 'react';
 import {
   FieldError,
   Form,
@@ -28,26 +28,33 @@ import { useToastMessage } from '../../../components/toastProvider';
 import en from './documentationEditor.en.json';
 import de from './documentationEditor.de.json';
 import { useQueryClient } from '@tanstack/react-query';
+import { DocumentationDraft } from './documentationDraft';
 
 /** The documentation form (type, markdown or URL) of one loaded resource. */
 interface DocumentationEditorFormProps {
   resource: Resource;
   resourceId: number;
+  /**
+   * Held by DocumentationEditor, above its loading and error views: a background refetch that fails
+   * replaces this form with the error view, and the operator's edit must still be here after Retry.
+   */
+  draft: DocumentationDraft;
+  onDraftChange: Dispatch<SetStateAction<DocumentationDraft>>;
 }
 
-export function DocumentationEditorForm({ resource, resourceId }: Readonly<DocumentationEditorFormProps>) {
+export function DocumentationEditorForm({
+  resource,
+  resourceId,
+  draft,
+  onDraftChange,
+}: Readonly<DocumentationEditorFormProps>) {
   const navigate = useNavigate();
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
   const { t } = useTranslations({ en, de });
 
-  const [documentationType, setDocumentationType] = useState<DocumentationType | ''>(
-    (resource.documentationType as DocumentationType | null) || '',
-  );
-  const [markdownContent, setMarkdownContent] = useState(resource.documentationMarkdown || '');
-  const [urlContent, setUrlContent] = useState(resource.documentationUrl || '');
-  const [selectedTab, setSelectedTab] = useState<'edit' | 'preview'>('edit');
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const { documentationType, markdownContent, urlContent, selectedTab, validationErrors } = draft;
+  const update = (patch: Partial<DocumentationDraft>) => onDraftChange((current) => ({ ...current, ...patch }));
 
   const resourceQueryKey = UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId });
 
@@ -71,16 +78,6 @@ export function DocumentationEditorForm({ resource, resourceId }: Readonly<Docum
     },
   });
 
-  useEffect(() => {
-    if (resource.documentationType) {
-      setDocumentationType(resource.documentationType as DocumentationType);
-    } else {
-      setDocumentationType('');
-    }
-    setMarkdownContent(resource.documentationMarkdown || '');
-    setUrlContent(resource.documentationUrl || '');
-  }, [resource]);
-
   const validateForm = useCallback(() => {
     const errors: Record<string, string> = {};
 
@@ -100,9 +97,9 @@ export function DocumentationEditorForm({ resource, resourceId }: Readonly<Docum
       errors.markdown = t('validation.markdownRequired');
     }
 
-    setValidationErrors(errors);
+    onDraftChange((current) => ({ ...current, validationErrors: errors }));
     return Object.keys(errors).length === 0;
-  }, [documentationType, markdownContent, urlContent, t]);
+  }, [documentationType, markdownContent, urlContent, t, onDraftChange]);
 
   const handleSave = useCallback(() => {
     if (!validateForm()) {
@@ -152,7 +149,7 @@ export function DocumentationEditorForm({ resource, resourceId }: Readonly<Docum
           <RadioGroup
             orientation="horizontal"
             value={documentationType}
-            onChange={setDocumentationType as (value: string) => void}
+            onChange={(value) => update({ documentationType: value as DocumentationType })}
             isDisabled={updateResource.isPending}
             data-cy="documentation-editor-type-radiogroup"
           >
@@ -181,7 +178,7 @@ export function DocumentationEditorForm({ resource, resourceId }: Readonly<Docum
             <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('sections.content')}</h3>
             <Tabs
               selectedKey={selectedTab}
-              onSelectionChange={(k) => setSelectedTab(k as 'edit' | 'preview')}
+              onSelectionChange={(k) => update({ selectedTab: k as 'edit' | 'preview' })}
               className="w-full"
               data-cy="documentation-editor-markdown-tabs"
             >
@@ -200,7 +197,7 @@ export function DocumentationEditorForm({ resource, resourceId }: Readonly<Docum
               <TabPanel id="edit" className="pt-4">
                 <TextField
                   value={markdownContent}
-                  onChange={setMarkdownContent}
+                  onChange={(value) => update({ markdownContent: value })}
                   isInvalid={!!validationErrors.markdown}
                   isDisabled={updateResource.isPending}
                   className="w-full"
@@ -234,7 +231,7 @@ export function DocumentationEditorForm({ resource, resourceId }: Readonly<Docum
             <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('sections.content')}</h3>
             <TextField
               value={urlContent}
-              onChange={setUrlContent}
+              onChange={(value) => update({ urlContent: value })}
               isInvalid={!!validationErrors.url}
               isDisabled={updateResource.isPending}
               className="w-full"

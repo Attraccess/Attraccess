@@ -3,10 +3,11 @@ import type { MarketplacePluginDto } from '@attraccess/react-query-client';
 import { ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { useEffect, useEffectEvent, useState } from 'react';
 import { useToastMessage } from '../../../../../components/toastProvider';
-import type { MarketplaceDetailRequest } from '../types';
+import type { MarketplaceDetailRequest, RegistryForm } from '../types';
 import { usePluginsTranslations } from '../usePluginsTranslations';
 import { MarketplacePluginDetails } from './MarketplacePluginDetails';
 import { MarketplaceSearchResults } from './MarketplaceSearchResults';
+import { RegistryManagement } from './RegistryManagement';
 import { useMarketplaceSearch } from './useMarketplaceSearch';
 import { useRegistries } from './useRegistries';
 
@@ -36,6 +37,13 @@ export function MarketplaceBrowser({
   const toast = useToastMessage();
   const [query, setQuery] = useState('');
   const [registryId, setRegistryId] = useState('');
+  const [registryForm, setRegistryForm] = useState<RegistryForm>({
+    name: '',
+    url: '',
+    token: '',
+    isSaving: false,
+    test: null,
+  });
   const { plugins, isLoading } = useMarketplaceSearch({ isOpen, query, registryId });
 
   const { errorUpdatedAt: registriesErrorUpdatedAt } = useRegistries();
@@ -74,15 +82,22 @@ export function MarketplaceBrowser({
                 onManageVersion={() => onManageVersion(plugin)}
               />
             ) : (
-              <MarketplaceSearchResults
-                query={query}
-                onQueryChange={setQuery}
-                registryId={registryId}
-                onRegistryIdChange={setRegistryId}
-                plugins={plugins}
-                isLoading={isLoading || isLoadingDetail}
-                onOpenDetails={onOpenDetails}
-              />
+              <div className="flex flex-col gap-4">
+                <MarketplaceSearchResults
+                  query={query}
+                  onQueryChange={setQuery}
+                  registryId={registryId}
+                  onRegistryIdChange={setRegistryId}
+                  plugins={plugins}
+                  isLoading={isLoading || isLoadingDetail}
+                  onOpenDetails={onOpenDetails}
+                />
+                <RegistryManagement
+                  form={registryForm}
+                  onFormChange={setRegistryForm}
+                  onRegistryRemoved={(removedId) => setRegistryId((current) => (current === removedId ? '' : current))}
+                />
+              </div>
             )}
           </ModalBody>
           <ModalFooter>

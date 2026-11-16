@@ -34,9 +34,9 @@ export function VersionManagementContent({ plugin, isReplacing, onReplacingChang
   const { installedByName, mergeInstalled } = useInstalledNpmPlugins();
   const installed = installedByName.get(plugin.name);
   const { mutateAsync: replaceInstalledPlugin } =
-    usePluginsServicePluginControllerReplaceInstalledPackage<InstalledNpmPluginDto>();
+    usePluginsServicePluginControllerReplaceInstalledPackage();
   const { mutateAsync: updateInstalledPluginPolicy } =
-    usePluginsServicePluginControllerUpdateInstalledPackagePolicy<InstalledNpmPluginDto>();
+    usePluginsServicePluginControllerUpdateInstalledPackagePolicy();
 
   const [requestedSpec, setRequestedSpec] = useState(installed?.requestedSpec ?? plugin.version);
   const [updateOverride, setUpdateOverride] = useState<InstalledNpmPluginDto['updateOverride']>(

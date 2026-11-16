@@ -42,12 +42,6 @@ export const toStorable = (editedDoc: string, head: string) =>
     // a literal '<mjml>' match would silently drop the head for such layouts.
     .replace(/<mjml([^>]*)>/, (_match, attrs) => `<mjml${attrs}>${head}`);
 
-// The stored layout is a full <mjml> document with a raw {{content}} token in
-// mj-body. GrapesJS would drop that bare text node, so for editing we swap it
-// for a locked, visibly-marked section and swap back on save. The mj-head is
-// split off too (GrapesJS has no mj-attributes component) and carried through
-// verbatim; MjmlVisualEditor injects it into the canvas so styles still render.
-
 export function EmailLayoutPage() {
   const navigate = useNavigate();
   const basePath = '/settings/email';

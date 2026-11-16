@@ -1,13 +1,12 @@
 import { Button, Spinner, Tabs } from '@heroui/react';
 import { ChevronLeftIcon, ChevronRightIcon, HistoryIcon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { AuditEntryDto } from '@attraccess/react-query-client';
 import { AuditLogFilterState } from '../useAuditLogFilterState';
 import { useAuditLogActivity } from '../useAuditLogActivity';
 import { AuditEntriesTable } from './AuditEntriesTable';
 import { AuditLogFilters } from './AuditLogFilters';
 import { MobileEntries } from './MobileEntries';
-import { Notice } from './Notice';
 import en from '../en.json';
 import de from '../de.json';
 
@@ -25,7 +24,7 @@ export function AuditLogActivityPanel({ filterState, exportError, onInspect }: A
   return (
     <Tabs.Panel id="activity" className="space-y-5 pt-5">
       <AuditLogFilters filterState={filterState} isRefreshing={activity.isFetching} />
-      {exportError && <Notice title={t('exportError')} />}
+      {exportError && <StatusAlert status="danger" title={t('exportError')} />}
       {activity.isPending ? (
         <div className="flex items-center justify-center gap-3 py-16">
           <Spinner size="sm" />
@@ -33,7 +32,7 @@ export function AuditLogActivityPanel({ filterState, exportError, onInspect }: A
         </div>
       ) : activity.isError ? (
         <div className="space-y-3">
-          <Notice title={t('loadError')} />
+          <StatusAlert status="danger" title={t('loadError')} />
           <Button variant="secondary" onPress={() => void activity.refetch()}>
             {t('retry')}
           </Button>

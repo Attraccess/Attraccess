@@ -9,23 +9,19 @@ import {
   useAccessControlServiceResourceIntroductionsGrant,
   useAccessControlServiceResourceIntroductionsRevoke,
   ResourceIntroducerType,
-  useAccessControlServiceResourceIntroductionsGetPeopleKey,
-  UseAccessControlServiceResourceIntroductionsGetPeopleKeyFn,
   UseAccessControlServiceResourceGroupIntroducersGetManyKeyFn,
-  UseAccessControlServiceResourceGroupIntroductionsGetHistoryKeyFn,
-  UseAccessControlServiceResourceGroupIntroductionsGetManyKeyFn,
   UseAccessControlServiceResourceIntroducersGetManyKeyFn,
-  UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn,
-  UseAccessControlServiceResourceIntroductionsGetManyKeyFn,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastMessage } from '../../../components/toastProvider';
-import { TFunction } from '@attraccess/plugins-frontend-ui';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PeopleTarget } from './types';
+import { useInvalidatePeopleIntroductions } from './useInvalidatePeopleIntroductions';
+import en from './en.json';
+import de from './de.json';
 
 export interface Params {
   target: PeopleTarget;
-  t: TFunction;
 }
 
 export interface PeopleMutations {
@@ -43,34 +39,9 @@ export interface PeopleMutations {
   isMutating: boolean;
 }
 
-/** Refreshes the people table (and one user's history) after introductions changed for the target. */
-export function useInvalidatePeopleIntroductions(target: PeopleTarget) {
-  const queryClient = useQueryClient();
-  const isResource = target.type === 'resource';
-  return useCallback(
-    (userId?: number) => {
-      const listKey = isResource
-        ? UseAccessControlServiceResourceIntroductionsGetManyKeyFn({ resourceId: target.id })
-        : UseAccessControlServiceResourceGroupIntroductionsGetManyKeyFn({ groupId: target.id });
-      queryClient.invalidateQueries({ queryKey: listKey });
-      queryClient.invalidateQueries({
-        queryKey: isResource
-          ? UseAccessControlServiceResourceIntroductionsGetPeopleKeyFn({ resourceId: target.id })
-          : [useAccessControlServiceResourceIntroductionsGetPeopleKey],
-      });
-      if (userId !== undefined) {
-        const historyKey = isResource
-          ? UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn({ resourceId: target.id, userId })
-          : UseAccessControlServiceResourceGroupIntroductionsGetHistoryKeyFn({ groupId: target.id, userId });
-        queryClient.invalidateQueries({ queryKey: historyKey });
-      }
-    },
-    [queryClient, target.id, isResource],
-  );
-}
-
 /** Grant and revoke introducers, maintainers and introductions for a resource or resource group, with toasts. */
-export function usePeopleMutations({ target, t }: Params): PeopleMutations {
+export function usePeopleMutations({ target }: Params): PeopleMutations {
+  const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   const isResource = target.type === 'resource';

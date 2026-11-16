@@ -1,6 +1,10 @@
 import { PlusIcon } from 'lucide-react';
 import { useState } from 'react';
-import { RoleWithUsageDto, useRbacServiceListRoles } from '@attraccess/react-query-client';
+import {
+  RoleWithUsageDto,
+  useRbacServiceListPermissions,
+  useRbacServiceListRoles,
+} from '@attraccess/react-query-client';
 import { Button, TableDataLoadingIndicator, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { SettingsSection } from '../../components/SettingsSection';
 import { RoleFormDrawer } from '../../../roles/role-form-drawer/index';
@@ -18,6 +22,8 @@ import de from './de.json';
 export function RolesSection() {
   const { t } = useTranslations({ en, de });
   const { data: roles, isLoading } = useRbacServiceListRoles();
+  // Requested alongside the roles, not from the table once they have loaded.
+  const { data: permissions } = useRbacServiceListPermissions();
   const [formRole, setFormRole] = useState<RoleWithUsageDto | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<RoleWithUsageDto | null>(null);
@@ -40,7 +46,12 @@ export function RolesSection() {
         {isLoading ? (
           <TableDataLoadingIndicator />
         ) : (
-          <RolesSectionTable roles={roles ?? []} onEdit={openForm} onDelete={setRoleToDelete} />
+          <RolesSectionTable
+            roles={roles ?? []}
+            permissions={permissions}
+            onEdit={openForm}
+            onDelete={setRoleToDelete}
+          />
         )}
       </div>
 

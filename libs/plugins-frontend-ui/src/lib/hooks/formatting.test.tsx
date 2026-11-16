@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { useDateTimeFormatter } from './useFormatDateTime';
+import { useDateTimeFormatter } from './useDateTimeFormatter';
 import { useFormatedDuration } from './useFormatedDuration';
 import { useDateTimePreferences } from './useDateTimePreferences';
 import { useTranslationState } from '../i18n';

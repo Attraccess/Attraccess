@@ -1,6 +1,5 @@
 import { Button } from '@attraccess/plugins-frontend-ui';
 import {
-  type PluginRegistryDto,
   UsePluginsServicePluginControllerListRegistriesKeyFn,
   usePluginsServicePluginControllerAddRegistry,
   usePluginsServicePluginControllerRemoveRegistry,
@@ -8,29 +7,26 @@ import {
 } from '@attraccess/react-query-client';
 import { Input, TextField } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { useToastMessage } from '../../../../../components/toastProvider';
+import type { RegistryForm } from '../types';
 import { usePluginsTranslations } from '../usePluginsTranslations';
 import { useRegistries } from './useRegistries';
 
 interface Props {
+  form: RegistryForm;
+  onFormChange: Dispatch<SetStateAction<RegistryForm>>;
   onRegistryRemoved: (registryId: string) => void;
 }
 
-export function RegistryManagement({ onRegistryRemoved }: Props) {
+export function RegistryManagement({ form, onFormChange, onRegistryRemoved }: Props) {
   const { t } = usePluginsTranslations();
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   const { data: registries = [], refetch: refetchRegistries } = useRegistries();
-  const { mutateAsync: addPluginRegistry } = usePluginsServicePluginControllerAddRegistry<PluginRegistryDto>();
+  const { mutateAsync: addPluginRegistry } = usePluginsServicePluginControllerAddRegistry();
   const { mutateAsync: testPluginRegistry } = usePluginsServicePluginControllerTestRegistry();
   const { mutateAsync: removePluginRegistry } = usePluginsServicePluginControllerRemoveRegistry();
-  const [registryName, setRegistryName] = useState('');
-  const [registryUrl, setRegistryUrl] = useState('');
-  const [registryToken, setRegistryToken] = useState('');
-  const [isSavingRegistry, setIsSavingRegistry] = useState(false);
-  const [testingRegistryId, setTestingRegistryId] = useState<string | null>(null);
-  const latestRegistryTest = useRef<symbol | null>(null);
 
   // A load that is still in flight predates the change, so it is cancelled and its late response ignored.
   const reloadRegistries = async () => {
@@ -39,37 +35,31 @@ export function RegistryManagement({ onRegistryRemoved }: Props) {
   };
 
   const addRegistry = async () => {
-    setIsSavingRegistry(true);
+    onFormChange((current) => ({ ...current, isSaving: true }));
     try {
       await addPluginRegistry({
-        requestBody: { name: registryName, url: registryUrl, token: registryToken || undefined },
+        requestBody: { name: form.name, url: form.url, token: form.token || undefined },
       });
-      setRegistryName('');
-      setRegistryUrl('');
-      setRegistryToken('');
+      onFormChange((current) => ({ ...current, name: '', url: '', token: '' }));
       await reloadRegistries();
       toast.success({ title: t('marketplace.registryAdded') });
     } catch {
       toast.error({ title: t('marketplace.registrySaveError') });
     } finally {
-      setIsSavingRegistry(false);
+      onFormChange((current) => ({ ...current, isSaving: false }));
     }
   };
 
   const testRegistry = async (registryId: string) => {
     const request = Symbol(registryId);
-    latestRegistryTest.current = request;
-    setTestingRegistryId(registryId);
+    onFormChange((current) => ({ ...current, test: { registryId, request } }));
     try {
       await testPluginRegistry({ registryId });
       toast.success({ title: t('marketplace.registryTestSuccess') });
     } catch {
       toast.error({ title: t('marketplace.registryTestError') });
     } finally {
-      if (latestRegistryTest.current === request) {
-        latestRegistryTest.current = null;
-        setTestingRegistryId(null);
-      }
+      onFormChange((current) => (current.test?.request === request ? { ...current, test: null } : current));
     }
   };
 
@@ -88,13 +78,13 @@ export function RegistryManagement({ onRegistryRemoved }: Props) {
       <summary className="cursor-pointer font-medium text-foreground">{t('marketplace.registryManagement')}</summary>
       <div className="mt-3 flex flex-col gap-3">
         <div className="grid gap-2 sm:grid-cols-3">
-          <TextField value={registryName} onChange={setRegistryName}>
+          <TextField value={form.name} onChange={(name) => onFormChange((current) => ({ ...current, name }))}>
             <Input placeholder={t('marketplace.registryName')} aria-label={t('marketplace.registryName')} />
           </TextField>
-          <TextField value={registryUrl} onChange={setRegistryUrl}>
+          <TextField value={form.url} onChange={(url) => onFormChange((current) => ({ ...current, url }))}>
             <Input placeholder={t('marketplace.registryUrl')} aria-label={t('marketplace.registryUrl')} />
           </TextField>
-          <TextField value={registryToken} onChange={setRegistryToken}>
+          <TextField value={form.token} onChange={(token) => onFormChange((current) => ({ ...current, token }))}>
             <Input
               type="password"
               placeholder={t('marketplace.registryToken')}
@@ -103,7 +93,7 @@ export function RegistryManagement({ onRegistryRemoved }: Props) {
           </TextField>
         </div>
         <div>
-          <Button variant="secondary" onPress={() => void addRegistry()} isPending={isSavingRegistry}>
+          <Button variant="secondary" onPress={() => void addRegistry()} isPending={form.isSaving}>
             {t('marketplace.addRegistry')}
           </Button>
         </div>
@@ -121,7 +111,7 @@ export function RegistryManagement({ onRegistryRemoved }: Props) {
                 variant="secondary"
                 size="sm"
                 onPress={() => void testRegistry(registry.id)}
-                isPending={testingRegistryId === registry.id}
+                isPending={form.test?.registryId === registry.id}
               >
                 {t('marketplace.testRegistry')}
               </Button>

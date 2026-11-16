@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ControllersPage } from './Page';
+import { ControllersPage } from './ControllersPage';
 
 const state = vi.hoisted(() => ({ navigate: vi.fn(), refetch: vi.fn(), pending: false, error: null as Error | null }));
 vi.mock('react-router-dom', () => ({ useNavigate: () => state.navigate }));

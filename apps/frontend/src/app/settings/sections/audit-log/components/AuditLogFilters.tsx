@@ -1,15 +1,13 @@
-import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, Input, Label, TextField } from '@heroui/react';
 import { FilterIcon, RefreshCwIcon, SearchIcon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { LocaleDateField } from '../../../../../components/localeDateField';
 import { coreAuditDomains, filterRequest, pluginDomains } from '../audit-log-model';
 import { AuditLogFilterState } from '../useAuditLogFilterState';
 import { useAuditDomainLabel } from '../useAuditDomainLabel';
 import { useAuditLogMeta } from '../useAuditLogMeta';
 import { AuditSelect } from './AuditSelect';
-import { Notice } from './Notice';
 import en from '../en.json';
 import de from '../de.json';
 
@@ -33,11 +31,15 @@ export function AuditLogFilters({ filterState, isRefreshing }: AuditLogFiltersPr
     activeFilterCount,
     clearFilters,
     setCursors,
+    filtersOpen,
+    setFiltersOpen,
+    advanced,
+    setAdvanced,
+    fromDateValid,
+    setFromDateValid,
+    toDateValid,
+    setToDateValid,
   } = filterState;
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [advanced, setAdvanced] = useState(false);
-  const [fromDateValid, setFromDateValid] = useState(true);
-  const [toDateValid, setToDateValid] = useState(true);
   const applyFilters = () => {
     if (!fromDateValid || !toDateValid) return;
     const result = filterRequest(filters, meta.data?.subjectTypes);
@@ -46,7 +48,6 @@ export function AuditLogFilters({ filterState, isRefreshing }: AuditLogFiltersPr
       return;
     }
     filterState.applyFilters();
-    setFiltersOpen(false);
   };
   return (
     <>
@@ -128,7 +129,7 @@ export function AuditLogFilters({ filterState, isRefreshing }: AuditLogFiltersPr
             />
           </div>
         )}
-        {filterError && <Notice title={filterError} />}
+        {filterError && <StatusAlert status="danger" title={filterError} />}
         <div className="flex flex-wrap gap-2">
           <Button type="submit" variant="primary" isDisabled={!fromDateValid || !toDateValid}>
             <SearchIcon size={16} />

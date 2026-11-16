@@ -1,8 +1,8 @@
 import { AuditEntryDto } from '@attraccess/react-query-client';
 import { auditLabel } from './auditLabel';
-import { Translate } from './Translate';
+import { TFunction } from '@attraccess/plugins-frontend-ui';
 
-export function target(entry: AuditEntryDto, t: Translate) {
+export function target(entry: AuditEntryDto, t: TFunction) {
   if (entry.subjectType === 'setting' && typeof entry.details.settingKey === 'string')
     return auditLabel('settingNames', entry.details.settingKey, t);
   return (

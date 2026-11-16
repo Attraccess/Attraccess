@@ -9,7 +9,15 @@ interface DeleteOptions {
   onError?: (error: unknown) => void;
 }
 
+/** What the fake API answers for a GET: a failed request has `ok: false`. */
+interface ApiResponse {
+  ok: boolean;
+  json?: () => Promise<unknown>;
+}
+
 const hoisted = vi.hoisted(() => ({
+  /** The fake API behind the mocked query hooks: answers a GET request path. */
+  apiMock: vi.fn<(path: string) => Promise<ApiResponse>>(),
   deleteMutateMock: vi.fn(),
   dependencyPlan: undefined as unknown,
   dependencyPlanError: null as unknown,
@@ -34,11 +42,10 @@ const hoisted = vi.hoisted(() => ({
 
 vi.mock('@attraccess/react-query-client', async () => {
   const { useQuery } = await vi.importActual<typeof import('@tanstack/react-query')>('@tanstack/react-query');
-  // The generated query hooks are backed by the (stubbed) global fetch, so tests describe the API as HTTP responses.
+  // The generated query hooks read from the fake API, so tests describe the API as HTTP-like responses per path.
   const fetchJson = async (path: string) => {
-    // eslint-disable-next-line no-restricted-syntax -- Test double: hooks are backed by the stubbed global fetch.
-    const response = await fetch(path, { credentials: 'include' });
-    if (!response.ok) throw new Error(`Request failed: ${path}`);
+    const response = await hoisted.apiMock(path);
+    if (!response.ok || !response.json) throw new Error(`Request failed: ${path}`);
     return response.json();
   };
   const withRegistry = (registryId?: string, separator = '?') =>
@@ -46,8 +53,8 @@ vi.mock('@attraccess/react-query-client', async () => {
   return {
     UsePluginsServicePluginControllerInstalledPackagesKeyFn: () => ['installed'],
     UsePluginsServicePluginControllerListRegistriesKeyFn: () => ['registries'],
-    usePluginsServicePluginControllerInstalledPackages: () =>
-      useQuery({ queryKey: ['installed'], queryFn: () => fetchJson('/api/plugins/installed') }),
+    usePluginsServicePluginControllerInstalledPackages: (_key: unknown, options: object) =>
+      useQuery({ queryKey: ['installed'], queryFn: () => fetchJson('/api/plugins/installed'), ...options }),
     usePluginsServicePluginControllerListRegistries: (_key: unknown, options: object) =>
       useQuery({ queryKey: ['registries'], queryFn: () => fetchJson('/api/plugins/registries'), ...options }),
     usePluginsServicePluginControllerSearchMarketplace: (
@@ -181,39 +188,36 @@ export function resetTestFixture() {
   hoisted.installPackageMock.mockResolvedValue({});
   hoisted.replaceInstalledPackageMock.mockResolvedValue({});
   hoisted.updateInstalledPackagePolicyMock.mockResolvedValue({});
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((input: { url?: string } | string) => {
-      const url = typeof input === 'string' ? input : (input.url ?? '');
-      const plugin = {
-        name: '@attraccess/plugin-example',
-        version: '1.0.0',
-        displayName: 'Example',
-        description: 'Official integration',
-        permissions: [],
-        hostRange: '^1.0.0',
-        sdkCompatibility: { backend: '^1.0.0', frontend: null },
-        repository: null,
-        homepage: null,
-        license: 'MIT',
-        publisher: 'attraccess',
-        deprecated: false,
-        registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
-        classification: 'official' as const,
-        classificationReason: 'Published by Attraccess on npm',
-        installable: true,
-        incompatibilityReason: null,
-        integrity: 'sha512-test',
-        provenance: null,
-      };
-      if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
-      if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
-      return Promise.resolve({
-        ok: true,
-        json: async () => (url.includes('/marketplace/search') ? { results: [plugin], errors: [] } : plugin),
-      });
-    }),
-  );
+  hoisted.apiMock.mockReset();
+  hoisted.apiMock.mockImplementation((url) => {
+    const plugin = {
+      name: '@attraccess/plugin-example',
+      version: '1.0.0',
+      displayName: 'Example',
+      description: 'Official integration',
+      permissions: [],
+      hostRange: '^1.0.0',
+      sdkCompatibility: { backend: '^1.0.0', frontend: null },
+      repository: null,
+      homepage: null,
+      license: 'MIT',
+      publisher: 'attraccess',
+      deprecated: false,
+      registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
+      classification: 'official' as const,
+      classificationReason: 'Published by Attraccess on npm',
+      installable: true,
+      incompatibilityReason: null,
+      integrity: 'sha512-test',
+      provenance: null,
+    };
+    if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+    if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+    return Promise.resolve({
+      ok: true,
+      json: async () => (url.includes('/marketplace/search') ? { results: [plugin], errors: [] } : plugin),
+    });
+  });
 }
 export function deferred<T>() {
   let resolve: (value: T) => void;

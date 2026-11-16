@@ -2,31 +2,29 @@ import { AlertStatusIcon, Button } from '@attraccess/plugins-frontend-ui';
 import { Alert } from '@heroui/react';
 import { useEffect, useState } from 'react';
 import { useWagoTranslations } from '../../i18n';
-import type { CommissioningState } from '../useCommissioningState';
-
-type CommissioningLiveStatusProps = Pick<
-  CommissioningState,
-  'session' | 'sessionsQuery' | 'deliverPending' | 'recoverPending'
->;
+import type { CommissioningSession } from '../../api/client';
+import { useCommissioningSessionsQuery } from '../../api/queries';
 
 export function CommissioningLiveStatus({
   session,
-  sessionsQuery: query,
-  deliverPending,
-  recoverPending,
-}: CommissioningLiveStatusProps) {
+  isOperationPending,
+}: {
+  session: CommissioningSession;
+  /** An installation or cleanup request is still running in this browser. */
+  isOperationPending: boolean;
+}) {
   const { t } = useWagoTranslations();
+  const query = useCommissioningSessionsQuery();
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
-  if (!session) return null;
   const checkedAt = query.dataUpdatedAt || Date.parse(session.updatedAt);
   const checkedSeconds = Math.max(0, Math.floor((now - checkedAt) / 1000));
   const stale = !Number.isFinite(checkedAt) || checkedSeconds > 15;
   const phaseSeconds = Math.max(0, Math.floor((now - Date.parse(session.updatedAt)) / 1000));
-  const active = session.state === 'delivering' || deliverPending || recoverPending;
+  const active = session.state === 'delivering' || isOperationPending;
   const remaining = session.operationDeadlineAt
     ? Math.ceil((Date.parse(session.operationDeadlineAt) - now) / 1000)
     : null;

@@ -1,10 +1,10 @@
+import { ReactNode } from 'react';
 import { Alert, AlertContent, AlertDescription } from '@heroui/react';
-import { TwoFactorPolicy, useTwoFactorAuthenticationServiceGetTwoFactorPolicy } from '@attraccess/react-query-client';
+import { TwoFactorPolicy } from '@attraccess/react-query-client';
 import { AlertStatusIcon, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { SettingsRow } from '../../../components/SettingsRow';
 import { Select } from '../../../../../components/select/index';
 import { SecurityDrafts } from '../useSecurityDrafts';
-import { SignupDomainsRow } from './SignupDomainsRow';
 import en from '../en.json';
 import de from '../de.json';
 
@@ -14,22 +14,22 @@ const TWO_FACTOR_OPTIONS = [
   { value: TwoFactorPolicy.REQUIRED_FOR_ALL, key: 'all' },
 ];
 
-type TwoFactorSettingsProps = Pick<
-  SecurityDrafts,
-  'twoFactorDraft' | 'setTwoFactorDraft' | 'domainsDraft' | 'setDomainsDraft' | 'domainToAdd' | 'setDomainToAdd'
->;
+interface TwoFactorSettingsProps extends Pick<SecurityDrafts, 'twoFactorDraft' | 'setTwoFactorDraft'> {
+  /** The stored requirement; the section loads it. */
+  savedPolicy: TwoFactorPolicy | undefined;
+  /** Rows rendered below the requirement, inside the same column (the signup domain whitelist). */
+  children?: ReactNode;
+}
 
+/** The two-factor requirement row; `children` render below it, inside the same column. */
 export function TwoFactorSettings({
+  savedPolicy,
   twoFactorDraft,
   setTwoFactorDraft,
-  domainsDraft,
-  setDomainsDraft,
-  domainToAdd,
-  setDomainToAdd,
+  children,
 }: TwoFactorSettingsProps) {
   const { t } = useTranslations({ en, de });
-  const { data: twoFactor } = useTwoFactorAuthenticationServiceGetTwoFactorPolicy();
-  const twoFactorValue = twoFactorDraft ?? twoFactor?.policy;
+  const twoFactorValue = twoFactorDraft ?? savedPolicy;
   return (
     <div className="flex flex-col">
       <SettingsRow stacked label={t('twoFactor.label')} hint={t('twoFactor.hint')}>
@@ -62,12 +62,7 @@ export function TwoFactorSettings({
         </div>
       </SettingsRow>
 
-      <SignupDomainsRow
-        domainsDraft={domainsDraft}
-        setDomainsDraft={setDomainsDraft}
-        domainToAdd={domainToAdd}
-        setDomainToAdd={setDomainToAdd}
-      />
+      {children}
     </div>
   );
 }

@@ -5,29 +5,35 @@ import {
   NumberFieldIncrementButton,
   NumberFieldInput,
 } from '@heroui/react';
-import { LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { usePasswordPolicyAdminServiceGetAdminPasswordPolicy } from '@attraccess/react-query-client';
+import { LabeledSwitch, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { PasswordPolicyDto, PasswordPolicyOverrideDto } from '@attraccess/react-query-client';
 import { SettingsRow } from '../../../components/SettingsRow';
 import { POLICY_BOOL_FIELDS, POLICY_NUMBER_FIELDS } from '../policy-fields';
 import { policyValue } from '../policyValue';
 import { SecurityDrafts } from '../useSecurityDrafts';
-import { LoadFailedAlert } from './LoadFailedAlert';
 import { PasswordPolicyOverrides } from './PasswordPolicyOverrides';
 import en from '../en.json';
 import de from '../de.json';
 
+interface PasswordPolicySettingsProps extends Pick<SecurityDrafts, 'policyDraft' | 'setPolicyDraft'> {
+  /** The stored policy; `undefined` once settled means the request failed. */
+  policy: PasswordPolicyDto | undefined;
+  overrides: PasswordPolicyOverrideDto[];
+}
+
 export function PasswordPolicySettings({
+  policy,
+  overrides,
   policyDraft,
   setPolicyDraft,
-}: Pick<SecurityDrafts, 'policyDraft' | 'setPolicyDraft'>) {
+}: PasswordPolicySettingsProps) {
   const { t } = useTranslations({ en, de });
-  const { data: policy } = usePasswordPolicyAdminServiceGetAdminPasswordPolicy();
 
   return (
     <div className="flex flex-col">
       {!policy ? (
         <div data-testid="policy-load-failed">
-          <LoadFailedAlert message={t('policy.loadFailed')} />
+          <StatusAlert status="danger">{t('policy.loadFailed')}</StatusAlert>
         </div>
       ) : (
         <>
@@ -69,7 +75,7 @@ export function PasswordPolicySettings({
             </SettingsRow>
           ))}
 
-          <PasswordPolicyOverrides />
+          <PasswordPolicyOverrides policy={policy} overrides={overrides} />
         </>
       )}
     </div>

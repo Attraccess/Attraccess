@@ -7,7 +7,7 @@ import { useAuth } from '../../hooks/useAuth';
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { MqttServerList } from './servers/MqttServerList';
-import { CreateMqttServerForm } from './servers/CreateMqttServerPage';
+import { CreateMqttServerForm } from './servers/CreateMqttServerForm';
 
 export function MqttServersPage() {
   const { hasPermission } = useAuth();

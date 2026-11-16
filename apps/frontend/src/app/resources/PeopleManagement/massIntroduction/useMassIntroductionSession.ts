@@ -16,7 +16,7 @@ import { useLiveUpdates } from '../../../../utils/live-updates';
 import { useToastMessage } from '../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
-import { useInvalidatePeopleIntroductions } from '../usePeopleMutations';
+import { useInvalidatePeopleIntroductions } from '../useInvalidatePeopleIntroductions';
 import { PeopleTarget } from '../types';
 
 export type MassIntroductionPhase = 'setup' | 'active' | 'ended';

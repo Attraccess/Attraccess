@@ -16,7 +16,7 @@ import {
 import { BarChart3Icon, RefreshCwIcon, TriangleAlertIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Duration } from '../Duration';
-import { MISSING_VALUE, useRabbitmqFormatters } from '../format';
+import { MISSING_VALUE, useRabbitmqFormatters } from '../useRabbitmqFormatters';
 import { useRabbitmqTranslations } from '../i18n';
 import { usePolledResource } from '../usePolledResource';
 import { fetchStats, type RabbitmqNode } from './stats-api';

@@ -1,7 +1,7 @@
 import { Card, Label, NumberField, NumberFieldGroup, NumberFieldInput, Spinner, Tabs } from '@heroui/react';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { LabeledSwitch, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   AuditSettingsDto,
   UseAuditServiceAuditControllerListKeyFn,
@@ -13,7 +13,6 @@ import { SettingsSaveBar } from '../../../components/SettingsSaveBar';
 import { coreAuditDomains, pluginDomains, toggleDomain, togglePluginDomain } from '../audit-log-model';
 import { useAuditDomainLabel } from '../useAuditDomainLabel';
 import { useAuditLogMeta } from '../useAuditLogMeta';
-import { Notice } from './Notice';
 import en from '../en.json';
 import de from '../de.json';
 
@@ -47,7 +46,7 @@ export function AuditSettingsPanel() {
       {settings.isPending ? (
         <Spinner />
       ) : settings.isError ? (
-        <Notice title={t('settingsError')} />
+        <StatusAlert status="danger" title={t('settingsError')} />
       ) : (
         currentSettings && (
           <>
@@ -121,8 +120,8 @@ export function AuditSettingsPanel() {
               </NumberFieldGroup>
             </NumberField>
             <p className="text-sm text-muted">{t('retentionHint')}</p>
-            {saveSettings.isError && <Notice title={t('saveError')} />}
-            {saved && <Notice status="success" title={t('saved')} />}
+            {saveSettings.isError && <StatusAlert status="danger" title={t('saveError')} />}
+            {saved && <StatusAlert status="success" title={t('saved')} />}
             <SettingsSaveBar
               isDirty={dirty}
               isSaving={saveSettings.isPending}

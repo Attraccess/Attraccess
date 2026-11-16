@@ -2,22 +2,21 @@ import { Link } from 'react-router-dom';
 import { Chip } from '@heroui/react';
 import { CheckIcon, ChevronRightIcon, XIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useSettingsServiceGetSystemSettings } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
 
-export function EmailStatusAside() {
+/** Whether a password is stored, and links to the template and layout editors. */
+export function EmailStatusAside({ passConfigured }: { passConfigured: boolean | undefined }) {
   const { t } = useTranslations({ en, de });
-  const { data: settings } = useSettingsServiceGetSystemSettings();
   return (
     <>
       <div className="flex flex-col gap-2">
         <h3 className="text-sm font-semibold text-foreground">{t('aside.statusTitle')}</h3>
         <div>
-          <Chip color={settings?.smtp.passConfigured ? 'success' : 'warning'} variant="soft">
+          <Chip color={passConfigured ? 'success' : 'warning'} variant="soft">
             <span className="flex items-center gap-1">
-              {settings?.smtp.passConfigured ? <CheckIcon size={14} /> : <XIcon size={14} />}
-              {settings?.smtp.passConfigured ? t('passwordStatus.configured') : t('passwordStatus.missing')}
+              {passConfigured ? <CheckIcon size={14} /> : <XIcon size={14} />}
+              {passConfigured ? t('passwordStatus.configured') : t('passwordStatus.missing')}
             </span>
           </Chip>
         </div>

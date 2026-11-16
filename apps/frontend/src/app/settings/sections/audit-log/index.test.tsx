@@ -348,6 +348,18 @@ describe('audit admin workflows', () => {
     );
   });
 
+  it('keeps the expanded filters after switching to the settings tab and back', async () => {
+    // The Activity panel unmounts on a tab switch, so the disclosure state has to live above the tabs.
+    mount();
+    await screen.findByRole('button', { name: 'View event #52' });
+    await userEvent.click(screen.getByRole('button', { name: 'More filters' }));
+    expect(screen.getByLabelText('Actor ID')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Logging settings' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Activity' }));
+    expect(await screen.findByLabelText('Actor ID')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fewer filters' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
   it('clears partially typed dates when resetting all filters', async () => {
     const user = userEvent.setup();
     mount();

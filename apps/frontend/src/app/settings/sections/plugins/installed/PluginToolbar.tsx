@@ -1,5 +1,4 @@
 import { Button } from '@attraccess/plugins-frontend-ui';
-import type { InstalledNpmPluginDto } from '@attraccess/react-query-client';
 import { usePluginsServicePluginControllerCheckAllInstalledPackages } from '@attraccess/react-query-client';
 import { Dropdown, DropdownItem, DropdownMenu, DropdownPopover, DropdownTrigger } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
@@ -18,7 +17,7 @@ export function PluginToolbar({ onOpenMarketplace, onOpenUpload }: Props) {
   const toast = useToastMessage();
   const { installed, mergeInstalled } = useInstalledNpmPlugins();
   const { mutateAsync: checkAllInstalledPackages, isPending: isCheckingForUpdates } =
-    usePluginsServicePluginControllerCheckAllInstalledPackages<InstalledNpmPluginDto[]>();
+    usePluginsServicePluginControllerCheckAllInstalledPackages();
 
   const checkForUpdates = async () => {
     try {

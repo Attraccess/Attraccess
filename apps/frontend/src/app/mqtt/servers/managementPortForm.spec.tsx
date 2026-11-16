@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CreateMqttServerForm } from './CreateMqttServerPage';
+import { CreateMqttServerForm } from './CreateMqttServerForm';
 import { EditMqttServerPage } from './EditMqttServerPage';
 
 const mocks = vi.hoisted(() => ({

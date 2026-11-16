@@ -10,7 +10,7 @@ import {
 } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { formatDurationMs, toExactCredits } from '@attraccess/shared';
-import { BillingTransaction, useBillingServiceGetBillingConfiguration } from '@attraccess/react-query-client';
+import { BillingTransaction } from '@attraccess/react-query-client';
 import { useMemo } from 'react';
 import {
   AllocationBreakdown,
@@ -22,12 +22,17 @@ import { useCreditsFormatter } from '../../../../../hooks/useCreditsFormatter';
 import de from './de.json';
 import en from './en.json';
 
+interface TransactionItemsTableProps {
+  transaction: BillingTransaction;
+  /** The billing currency's minor unit, from the configuration the details modal already loaded. */
+  minorUnit: number;
+}
+
 /** The line items of a transaction with totals and the allocation breakdown of shared meters. */
-export function TransactionItemsTable({ transaction }: Readonly<{ transaction: BillingTransaction }>) {
+export function TransactionItemsTable({ transaction, minorUnit }: Readonly<TransactionItemsTableProps>) {
   const { t, tExists } = useTranslations({ en, de });
-  const { data: configuration } = useBillingServiceGetBillingConfiguration();
   const formatMeterValue = useMeterValueFormatter();
-  const formatCredits = useCreditsFormatter(configuration?.minorUnit ?? 2);
+  const formatCredits = useCreditsFormatter(minorUnit);
 
   const totalItemsAmount = useMemo(() => {
     if (!transaction.items) return BigInt(0);

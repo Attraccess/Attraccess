@@ -9,7 +9,7 @@ import { TestWrapper } from '../../test-utils/wrappers';
 const state = vi.hoisted(() => ({ update: vi.fn(), owner: undefined as unknown }));
 
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: () => true }) }));
-vi.mock('../resources/details/flows/index', () => ({
+vi.mock('../resources/details/flows/FlowEditor', () => ({
   FlowEditor: ({ owner }: { owner: unknown }) => {
     state.owner = owner;
     return <div>editor</div>;

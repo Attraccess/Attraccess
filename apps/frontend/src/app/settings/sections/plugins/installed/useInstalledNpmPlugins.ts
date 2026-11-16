@@ -6,10 +6,20 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
-/** The npm-installed plugins by name, plus a way to merge fresher records (update checks, policy saves) into the cache. */
+/**
+ * The npm-installed plugins by name, plus a way to merge fresher records (update checks, policy saves) into the cache.
+ * The list is loaded once and a failed load reads as no installed packages: it only changes through this section,
+ * which merges the records it gets back or reloads the page after an install, replacement or removal.
+ */
 export function useInstalledNpmPlugins() {
   const queryClient = useQueryClient();
-  const { data } = usePluginsServicePluginControllerInstalledPackages();
+  const { data } = usePluginsServicePluginControllerInstalledPackages(undefined, {
+    staleTime: Infinity,
+    retryOnMount: false,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
   const installed = useMemo(() => data ?? [], [data]);
   const installedByName = useMemo(
     () => new Map(installed.map((plugin) => [plugin.name, plugin] as const)),

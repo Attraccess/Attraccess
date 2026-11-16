@@ -9,28 +9,39 @@ import {
   useOverlayState,
 } from '@heroui/react';
 import { ClipboardCopyIcon, KeyIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
-import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertStatusIcon, Button, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   useSettingsServiceDeleteMetricsApiKey,
   useSettingsServiceGenerateMetricsApiKey,
-  useSettingsServiceGetMetricsSettings,
   UseSettingsServiceGetMetricsSettingsKeyFn,
 } from '@attraccess/react-query-client';
 import { SettingsRow } from '../../components/SettingsRow';
 import { useToastMessage } from '../../../../components/toastProvider';
-import { useCopyToClipboard } from './useCopyToClipboard';
+import { useCopyToClipboard } from '../../../../hooks/useCopyToClipboard';
 import en from './en.json';
 import de from './de.json';
 
-export function MonitoringApiKeyRow() {
+interface MonitoringApiKeyRowProps {
+  /** From the metrics settings the section loads; `undefined` while they are unknown. */
+  apiKeyConfigured: boolean | undefined;
+  /**
+   * The key just generated, shown once. Held by the section, above its loading gate: Generate
+   * invalidates the settings, and when they had failed to load that refetch shows the spinner and
+   * unmounts this row — the key must still be there afterwards, it cannot be shown again.
+   */
+  generatedKey: string | null;
+  setGeneratedKey: (key: string | null) => void;
+}
+
+export function MonitoringApiKeyRow({ apiKeyConfigured, generatedKey, setGeneratedKey }: MonitoringApiKeyRowProps) {
   const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
-  const copyToClipboard = useCopyToClipboard();
-  const { data: metricsSettings } = useSettingsServiceGetMetricsSettings();
-  const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+  const copyToClipboard = useCopyToClipboard({
+    title: t('copyFailed.title'),
+    description: t('copyFailed.description'),
+  });
   const rerollModal = useOverlayState();
   const removeModal = useOverlayState();
 
@@ -74,7 +85,12 @@ export function MonitoringApiKeyRow() {
                       variant="ghost"
                       isIconOnly
                       aria-label={t('copyButton')}
-                      onPress={() => copyToClipboard(generatedKey, t('copied.title'), t('copied.description'))}
+                      onPress={() =>
+                        copyToClipboard(generatedKey, {
+                          title: t('copied.title'),
+                          description: t('copied.description'),
+                        })
+                      }
                     >
                       <ClipboardCopyIcon size={16} />
                     </Button>
@@ -93,12 +109,12 @@ export function MonitoringApiKeyRow() {
               variant="primary"
               size="sm"
               isPending={isGenerating}
-              onPress={() => (metricsSettings?.apiKeyConfigured ? rerollModal.open() : generateApiKey())}
+              onPress={() => (apiKeyConfigured ? rerollModal.open() : generateApiKey())}
             >
-              {metricsSettings?.apiKeyConfigured ? <RefreshCwIcon size={16} /> : <KeyIcon size={16} />}
-              {metricsSettings?.apiKeyConfigured ? t('rerollButton') : t('generateButton')}
+              {apiKeyConfigured ? <RefreshCwIcon size={16} /> : <KeyIcon size={16} />}
+              {apiKeyConfigured ? t('rerollButton') : t('generateButton')}
             </Button>
-            {metricsSettings?.apiKeyConfigured && (
+            {apiKeyConfigured && (
               <Button variant="danger-soft" size="sm" onPress={removeModal.open}>
                 <Trash2Icon size={16} />
                 {t('removeButton')}

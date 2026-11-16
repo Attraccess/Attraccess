@@ -36,7 +36,7 @@ export function PeopleManagement(
 
   const { rows, isLoading, hasError } = usePeopleRows({ target });
 
-  const mutations = usePeopleMutations({ target, t });
+  const mutations = usePeopleMutations({ target });
 
   const filteredRows = useMemo(() => {
     if (filter === 'introducers') return rows.filter((r) => r.isIntroducer);

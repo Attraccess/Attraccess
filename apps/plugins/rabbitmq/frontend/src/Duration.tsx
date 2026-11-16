@@ -1,5 +1,5 @@
 import { useFormatedDuration } from '@attraccess/plugins-frontend-ui';
-import { MISSING_VALUE } from './format';
+import { MISSING_VALUE } from './useRabbitmqFormatters';
 
 // A localized duration (whole minutes) or the missing-value placeholder.
 export function Duration({ ms }: { ms: number | null }) {

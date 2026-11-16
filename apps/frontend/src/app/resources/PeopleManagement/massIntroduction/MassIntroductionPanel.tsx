@@ -16,7 +16,7 @@ import {
   ProgressBarTrack,
 } from '@heroui/react';
 import { QRCode } from 'react-qrcode-logo';
-import { AttraccessUser, Button, LabeledSwitch, TFunction } from '@attraccess/plugins-frontend-ui';
+import { AttraccessUser, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   MassIntroductionParticipantDto,
   MassIntroductionReaderDto,
@@ -29,6 +29,8 @@ import { AttractapSelect } from '../../../attractap/AttractapSelect';
 import { massIntroductionUrl } from '../../../mass-introduction/MassIntroductionRedeemModal';
 import { PeopleTarget } from '../types';
 import { MassIntroductionEndState, MassIntroductionSessionState, secondsUntil } from './useMassIntroductionSession';
+import en from './en.json';
+import de from './de.json';
 
 // The scan screen needs a display, and firmware 2.0.0 or later (card relay) or the server refuses the reader.
 const REQUIRED_READER_CAPABILITIES = { cardEnrollment: true, cardRelay: true };
@@ -47,7 +49,6 @@ function formatCountdown(seconds: number): string {
 }
 
 interface MassIntroductionContentProps {
-  t: TFunction;
   target: PeopleTarget;
   state: MassIntroductionSessionState;
   setup: MassIntroductionSetup;
@@ -55,87 +56,40 @@ interface MassIntroductionContentProps {
 }
 
 export function MassIntroductionContent(props: Readonly<MassIntroductionContentProps>) {
-  const { t, target, state, setup, onSetupChange } = props;
+  const { target, state, setup, onSetupChange } = props;
+  const { t } = useTranslations({ en, de });
   const { phase, session, endReason } = state;
 
   if (phase === 'setup') {
-    return <SetupStep t={t} target={target} setup={setup} onSetupChange={onSetupChange} />;
+    return <SetupStep target={target} setup={setup} onSetupChange={onSetupChange} />;
   }
 
   if (phase === 'active' && session) {
     return (
       <div className="flex flex-col gap-4">
         <Description>{t('subtitle.active', { name: session.target.name })}</Description>
-        <ActiveSession t={t} session={session} secondsLeft={state.secondsLeft} />
-        <Participants t={t} participants={session.participants} />
+        <ActiveSession session={session} secondsLeft={state.secondsLeft} />
+        <Participants participants={session.participants} />
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <EndedNotice t={t} reason={endReason ?? 'unknown'} />
-      {session && <Participants t={t} participants={session.participants} />}
+      <EndedNotice reason={endReason ?? 'unknown'} />
+      {session && <Participants participants={session.participants} />}
     </div>
   );
 }
 
-interface MassIntroductionActionsProps {
-  t: TFunction;
-  state: MassIntroductionSessionState;
-  setup: MassIntroductionSetup;
-  /** Closes the drawer; a running session is ended by unmounting. */
-  onClose: () => void;
-}
-
-export function MassIntroductionActions({ t, state, setup, onClose }: Readonly<MassIntroductionActionsProps>) {
-  if (state.phase === 'setup') {
-    return (
-      <>
-        <Button variant="ghost" onPress={onClose} data-cy="mass-introduction-cancel">
-          {t('setup.cancel')}
-        </Button>
-        <Button
-          variant="primary"
-          onPress={() => state.start(setup.useReader && setup.readerId !== null ? setup.readerId : undefined)}
-          isPending={state.isStarting}
-          isDisabled={setup.useReader && setup.readerId === null}
-          data-cy="mass-introduction-start"
-        >
-          {t('setup.start')}
-        </Button>
-      </>
-    );
-  }
-
-  if (state.phase === 'active') {
-    return (
-      <Button variant="danger" onPress={state.cancel} data-cy="mass-introduction-end">
-        {t('active.end')}
-      </Button>
-    );
-  }
-
-  return (
-    <>
-      <Button variant="ghost" onPress={state.reset} data-cy="mass-introduction-restart">
-        {t('ended.restart')}
-      </Button>
-      <Button variant="primary" onPress={onClose} data-cy="mass-introduction-close">
-        {t('ended.close')}
-      </Button>
-    </>
-  );
-}
-
 interface SetupStepProps {
-  t: TFunction;
   target: PeopleTarget;
   setup: MassIntroductionSetup;
   onSetupChange: (setup: MassIntroductionSetup) => void;
 }
 
-function SetupStep({ t, target, setup, onSetupChange }: Readonly<SetupStepProps>) {
+function SetupStep({ target, setup, onSetupChange }: Readonly<SetupStepProps>) {
+  const { t } = useTranslations({ en, de });
   // Only readers linked to the resource (or a resource of the group) may show the scan screen.
   const isResource = target.type === 'resource';
   const resourceReaders = useAttractapServiceGetResourceAttractaps({ resourceId: target.id }, undefined, {
@@ -174,12 +128,12 @@ function SetupStep({ t, target, setup, onSetupChange }: Readonly<SetupStepProps>
 }
 
 interface ActiveSessionProps {
-  t: TFunction;
   session: MassIntroductionSessionDto;
   secondsLeft: number;
 }
 
-function ActiveSession({ t, session, secondsLeft }: Readonly<ActiveSessionProps>) {
+function ActiveSession({ session, secondsLeft }: Readonly<ActiveSessionProps>) {
+  const { t } = useTranslations({ en, de });
   const url = useMemo(() => massIntroductionUrl(session), [session]);
   const totalSeconds = Math.max(
     1,
@@ -191,7 +145,7 @@ function ActiveSession({ t, session, secondsLeft }: Readonly<ActiveSessionProps>
       <figure className="flex flex-col items-center gap-2" aria-label={t('active.qrLabel')}>
         <QRCode value={url} size={256} qrStyle="fluid" quietZone={8} />
         <Description className="text-center">{t('active.scanHint')}</Description>
-        <JoinCode t={t} code={session.code} refreshAt={session.codeRefreshAt} />
+        <JoinCode code={session.code} refreshAt={session.codeRefreshAt} />
         <Description className="text-center">{t('active.rotationHint')}</Description>
       </figure>
 
@@ -210,13 +164,14 @@ function ActiveSession({ t, session, secondsLeft }: Readonly<ActiveSessionProps>
         </ProgressBarTrack>
       </ProgressBar>
 
-      {session.reader && <ReaderStatus t={t} reader={session.reader} />}
+      {session.reader && <ReaderStatus reader={session.reader} />}
     </>
   );
 }
 
 /** Rerenders every second with the session countdown, so the "changes in" hint stays current. */
-function JoinCode({ t, code, refreshAt }: Readonly<{ t: TFunction; code: string; refreshAt: string }>) {
+function JoinCode({ code, refreshAt }: Readonly<{ code: string; refreshAt: string }>) {
+  const { t } = useTranslations({ en, de });
   return (
     <div className="flex flex-col items-center" data-cy="mass-introduction-code">
       <Label>{t('active.codeLabel')}</Label>
@@ -233,7 +188,8 @@ function JoinCode({ t, code, refreshAt }: Readonly<{ t: TFunction; code: string;
   );
 }
 
-function ReaderStatus({ t, reader }: Readonly<{ t: TFunction; reader: MassIntroductionReaderDto }>) {
+function ReaderStatus({ reader }: Readonly<{ reader: MassIntroductionReaderDto }>) {
+  const { t } = useTranslations({ en, de });
   const isActive = reader.state === MassIntroductionReaderState.ACTIVE;
   return (
     <Alert status={isActive ? 'success' : 'warning'} data-cy="mass-introduction-reader-status">
@@ -244,7 +200,8 @@ function ReaderStatus({ t, reader }: Readonly<{ t: TFunction; reader: MassIntrod
   );
 }
 
-function EndedNotice({ t, reason }: Readonly<{ t: TFunction; reason: MassIntroductionEndState }>) {
+function EndedNotice({ reason }: Readonly<{ reason: MassIntroductionEndState }>) {
+  const { t } = useTranslations({ en, de });
   return (
     <Alert status={reason === 'revoked' ? 'danger' : 'default'} data-cy="mass-introduction-ended">
       <AlertContent>
@@ -255,7 +212,8 @@ function EndedNotice({ t, reason }: Readonly<{ t: TFunction; reason: MassIntrodu
   );
 }
 
-function Participants({ t, participants }: Readonly<{ t: TFunction; participants: MassIntroductionParticipantDto[] }>) {
+function Participants({ participants }: Readonly<{ participants: MassIntroductionParticipantDto[] }>) {
+  const { t } = useTranslations({ en, de });
   // Newest first, so the introducer sees who just joined without scrolling.
   const sorted = useMemo(
     () => [...participants].sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime()),

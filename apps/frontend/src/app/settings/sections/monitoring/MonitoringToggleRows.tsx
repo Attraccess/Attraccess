@@ -4,7 +4,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   MetricsTogglesDto,
-  useSettingsServiceGetMetricsSettings,
   UseSettingsServiceGetMetricsSettingsKeyFn,
   useSettingsServiceUpdateMetricsSettings,
 } from '@attraccess/react-query-client';
@@ -15,11 +14,11 @@ import de from './de.json';
 
 const TOGGLE_ORDER: Array<keyof MetricsTogglesDto> = ['http', 'ws', 'cron', 'db', 'external', 'sse', 'flow'];
 
-export function MonitoringToggleRows() {
+/** One switch per instrumented subsystem; `toggles` come from the metrics settings the section loads. */
+export function MonitoringToggleRows({ toggles }: { toggles: MetricsTogglesDto | undefined }) {
   const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
-  const { data: metricsSettings } = useSettingsServiceGetMetricsSettings();
   const [pendingToggle, setPendingToggle] = useState<keyof MetricsTogglesDto | null>(null);
 
   const { mutate: updateToggle, isPending: isUpdatingToggles } = useSettingsServiceUpdateMetricsSettings({
@@ -34,7 +33,7 @@ export function MonitoringToggleRows() {
     },
   });
 
-  if (!metricsSettings?.toggles) return null;
+  if (!toggles) return null;
 
   return (
     <>
@@ -59,7 +58,7 @@ export function MonitoringToggleRows() {
           <LabeledSwitch
             data-testid={`metrics-toggle-${subsystem}`}
             aria-label={t(`toggles.${subsystem}.label`)}
-            isSelected={metricsSettings.toggles[subsystem]}
+            isSelected={toggles[subsystem]}
             isDisabled={isUpdatingToggles && pendingToggle !== null}
             onChange={(value) => {
               setPendingToggle(subsystem);

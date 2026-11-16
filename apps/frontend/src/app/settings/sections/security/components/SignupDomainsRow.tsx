@@ -1,25 +1,29 @@
 import { Alert, AlertContent, AlertDescription, Input, Spinner, TextField } from '@heroui/react';
 import { PlusIcon, Trash2Icon } from 'lucide-react';
 import { AlertStatusIcon, Button, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useUsersServiceGetLocalSignupDomainWhitelist } from '@attraccess/react-query-client';
 import { SettingsRow } from '../../../components/SettingsRow';
 import { SecurityDrafts } from '../useSecurityDrafts';
 import en from '../en.json';
 import de from '../de.json';
 
-type SignupDomainsRowProps = Pick<
+interface SignupDomainsRowProps extends Pick<
   SecurityDrafts,
   'domainsDraft' | 'setDomainsDraft' | 'domainToAdd' | 'setDomainToAdd'
->;
+> {
+  /** The stored whitelist; the section loads it. */
+  savedDomains: string[] | undefined;
+  isDomainsLoading: boolean;
+}
 
 export function SignupDomainsRow({
+  savedDomains,
+  isDomainsLoading,
   domainsDraft,
   setDomainsDraft,
   domainToAdd,
   setDomainToAdd,
 }: SignupDomainsRowProps) {
   const { t } = useTranslations({ en, de });
-  const { data: savedDomains, isLoading: isDomainsLoading } = useUsersServiceGetLocalSignupDomainWhitelist();
   // `savedDomains === undefined` means the whitelist has not arrived — loading, or the request
   // failed. It must not read as an empty list: PUT is a full replace, so staging one addition off
   // an empty fallback and saving would delete every domain the instance actually has. The row shows

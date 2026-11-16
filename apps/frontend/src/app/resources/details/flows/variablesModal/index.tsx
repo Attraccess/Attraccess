@@ -178,7 +178,6 @@ export function VariablesModal(props: Props) {
               isSaving={upsert.isPending}
               onCancel={() => setEditor({ open: false })}
               onSubmit={handleSubmit}
-              t={t}
             />
           ) : (
             <div className="flex flex-col gap-3">

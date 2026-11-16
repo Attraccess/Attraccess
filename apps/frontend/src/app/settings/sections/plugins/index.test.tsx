@@ -42,8 +42,7 @@ describe('PluginsSection', () => {
         error: null,
       },
     };
-    const fetchMock = vi.fn((input: { url?: string } | string, _init?: RequestInit) => {
-      const url = typeof input === 'string' ? input : (input.url ?? '');
+    hoisted.apiMock.mockImplementation((url: string) => {
       if (url.endsWith('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [installed] });
       if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
       if (url.endsWith('/api/plugins/installed/Cool%20Plugin/versions'))
@@ -56,7 +55,6 @@ describe('PluginsSection', () => {
         });
       return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
     });
-    vi.stubGlobal('fetch', fetchMock);
     hoisted.checkAllInstalledPackagesMock.mockResolvedValue([checked]);
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
@@ -87,15 +85,11 @@ describe('PluginsSection', () => {
       requestedSpec: 'latest',
       updateOverride: 'inherit',
     };
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((input: { url?: string } | string) => {
-        const url = typeof input === 'string' ? input : (input.url ?? '');
-        if (url.endsWith('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [installed] });
-        if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
-        return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
-      }),
-    );
+    hoisted.apiMock.mockImplementation((url: string) => {
+      if (url.endsWith('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [installed] });
+      if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+      return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
+    });
     hoisted.checkAllInstalledPackagesMock.mockResolvedValue([
       {
         ...installed,
@@ -144,31 +138,27 @@ describe('PluginsSection', () => {
 
   it('uses exact package lookup when a selected registry cannot be searched', async () => {
     const user = userEvent.setup();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((input: { url?: string } | string) => {
-        const url = typeof input === 'string' ? input : (input.url ?? '');
-        if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
-        if (url.endsWith('/api/plugins/registries'))
-          return Promise.resolve({
-            ok: true,
-            json: async () => [{ id: 'private', name: 'Private', url: 'https://packages.example.com' }],
-          });
-        if (url.includes('/marketplace/search')) return Promise.resolve({ ok: false });
+    hoisted.apiMock.mockImplementation((url: string) => {
+      if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+      if (url.endsWith('/api/plugins/registries'))
         return Promise.resolve({
           ok: true,
-          json: async () => ({
-            name: '@private/plugin',
-            version: '1.0.0',
-            displayName: 'Private plugin',
-            permissions: [],
-            registry: { id: 'private', name: 'Private', url: 'https://packages.example.com' },
-            classification: 'community',
-            installable: true,
-          }),
+          json: async () => [{ id: 'private', name: 'Private', url: 'https://packages.example.com' }],
         });
-      }),
-    );
+      if (url.includes('/marketplace/search')) return Promise.resolve({ ok: false });
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          name: '@private/plugin',
+          version: '1.0.0',
+          displayName: 'Private plugin',
+          permissions: [],
+          registry: { id: 'private', name: 'Private', url: 'https://packages.example.com' },
+          classification: 'community',
+          installable: true,
+        }),
+      });
+    });
     renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
@@ -178,7 +168,10 @@ describe('PluginsSection', () => {
     expect(await screen.findByText('Private plugin')).toBeInTheDocument();
   });
 
-  it('merges an exact package lookup into the search results without duplicating it', async () => {
+  it.each([
+    ['adds an exact package lookup to the search results', ['second']],
+    ['does not duplicate an exact package lookup the search already found', ['first', 'second']],
+  ])('%s', async (_case, searchResults) => {
     const user = userEvent.setup();
     const listed = (name: string) => ({
       name,
@@ -189,55 +182,50 @@ describe('PluginsSection', () => {
       classification: 'community',
       installable: true,
     });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((input: { url?: string } | string) => {
-        const url = typeof input === 'string' ? input : (input.url ?? '');
-        const respond = (data: unknown) => Promise.resolve({ ok: true, json: async () => data });
-        if (url.includes('/api/plugins/installed')) return respond([]);
-        if (url.endsWith('/api/plugins/registries'))
-          return respond([{ id: 'private', name: 'Private', url: 'https://packages.example.com' }]);
-        if (url.includes('/marketplace/search'))
-          return respond({ results: [listed('first'), listed('second')], errors: [] });
-        return respond(listed('first'));
-      }),
-    );
+    hoisted.apiMock.mockImplementation((url: string) => {
+      const respond = (data: unknown) => Promise.resolve({ ok: true, json: async () => data });
+      if (url.includes('/api/plugins/installed')) return respond([]);
+      if (url.endsWith('/api/plugins/registries'))
+        return respond([{ id: 'private', name: 'Private', url: 'https://packages.example.com' }]);
+      if (url.includes('/marketplace/search')) return respond({ results: searchResults.map(listed), errors: [] });
+      return respond(listed('first'));
+    });
     renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
     await user.selectOptions(screen.getByLabelText('Registry'), 'private');
     await user.type(screen.getByLabelText('Search plugins'), 'first');
 
-    await waitFor(() => expect(screen.getAllByText('second', { selector: 'h3' })).toHaveLength(1));
+    await waitFor(() =>
+      expect(hoisted.apiMock).toHaveBeenCalledWith('/api/plugins/marketplace/first?registryId=private'),
+    );
+    await waitFor(() => expect(screen.queryByText('Searching plugins...')).not.toBeInTheDocument());
     expect(screen.getAllByText('first', { selector: 'h3' })).toHaveLength(1);
+    expect(screen.getAllByText('second', { selector: 'h3' })).toHaveLength(1);
   });
 
   it('keeps incompatible marketplace packages visible with their reason', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((input: { url?: string } | string) => {
-        const url = typeof input === 'string' ? input : (input.url ?? '');
-        if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
-        if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({
-            results: [
-              {
-                name: '@example/incompatible',
-                version: '1.0.0',
-                displayName: 'Incompatible Plugin',
-                registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
-                classification: 'community',
-                installable: false,
-                incompatibilityReason: 'Plugin is not compatible with Attraccess 1.0.0',
-              },
-            ],
-            errors: [],
-          }),
-        });
-      }),
-    );
+    hoisted.apiMock.mockImplementation((url: string) => {
+      if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+      if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          results: [
+            {
+              name: '@example/incompatible',
+              version: '1.0.0',
+              displayName: 'Incompatible Plugin',
+              registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
+              classification: 'community',
+              installable: false,
+              incompatibilityReason: 'Plugin is not compatible with Attraccess 1.0.0',
+            },
+          ],
+          errors: [],
+        }),
+      });
+    });
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
@@ -294,8 +282,7 @@ describe('PluginsSection', () => {
 
   it('installs an exact private package version from its selected registry', async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.fn((input: { url?: string } | string) => {
-      const url = typeof input === 'string' ? input : (input.url ?? '');
+    hoisted.apiMock.mockImplementation((url: string) => {
       if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
       if (url.endsWith('/api/plugins/registries'))
         return Promise.resolve({
@@ -318,7 +305,6 @@ describe('PluginsSection', () => {
         });
       return Promise.resolve({ ok: true });
     });
-    vi.stubGlobal('fetch', fetchMock);
     renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
@@ -363,21 +349,17 @@ describe('PluginsSection', () => {
   });
 
   it('shows only the configured state for registry tokens', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((input: { url?: string } | string) => {
-        const url = typeof input === 'string' ? input : (input.url ?? '');
-        if (url.endsWith('/api/plugins/registries'))
-          return Promise.resolve({
-            ok: true,
-            json: async () => [
-              { id: 'private', name: 'Private', url: 'https://packages.example.test/npm', tokenConfigured: true },
-            ],
-          });
-        if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
-        return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
-      }),
-    );
+    hoisted.apiMock.mockImplementation((url: string) => {
+      if (url.endsWith('/api/plugins/registries'))
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { id: 'private', name: 'Private', url: 'https://packages.example.test/npm', tokenConfigured: true },
+          ],
+        });
+      if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+      return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
+    });
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
@@ -391,20 +373,14 @@ describe('PluginsSection', () => {
     const initial = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
     const refreshed = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
     let registryLoads = 0;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((input: { url?: string } | string, init?: { method?: string }) => {
-        const request: { url?: string; method?: string } =
-          typeof input === 'string' ? { url: input, method: init?.method } : input;
-        if (request.url?.endsWith('/api/plugins/registries')) {
-          if (request.method === 'POST') return Promise.resolve({ ok: true });
-          registryLoads += 1;
-          return registryLoads === 1 ? initial.promise : refreshed.promise;
-        }
-        if (request.url?.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
-        return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
-      }),
-    );
+    hoisted.apiMock.mockImplementation((url: string) => {
+      if (url.endsWith('/api/plugins/registries')) {
+        registryLoads += 1;
+        return registryLoads === 1 ? initial.promise : refreshed.promise;
+      }
+      if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+      return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
+    });
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
@@ -429,20 +405,14 @@ describe('PluginsSection', () => {
 
   it('does not report a registry add as successful when its refresh fails', async () => {
     let registryLoads = 0;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((input: { url?: string } | string, init?: { method?: string }) => {
-        const request: { url?: string; method?: string } =
-          typeof input === 'string' ? { url: input, method: init?.method } : input;
-        if (request.url?.endsWith('/api/plugins/registries')) {
-          if (request.method === 'POST') return Promise.resolve({ ok: true });
-          registryLoads += 1;
-          return Promise.resolve(registryLoads === 1 ? { ok: true, json: async () => [] } : { ok: false });
-        }
-        if (request.url?.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
-        return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
-      }),
-    );
+    hoisted.apiMock.mockImplementation((url: string) => {
+      if (url.endsWith('/api/plugins/registries')) {
+        registryLoads += 1;
+        return Promise.resolve(registryLoads === 1 ? { ok: true, json: async () => [] } : { ok: false });
+      }
+      if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+      return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
+    });
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
@@ -468,22 +438,18 @@ describe('PluginsSection', () => {
       }
       return secondTest.promise;
     });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((input: { url?: string } | string, init?: { method?: string }) => {
-        const request = typeof input === 'string' ? { url: input, method: init?.method } : input;
-        if (request.url?.endsWith('/api/plugins/registries'))
-          return Promise.resolve({
-            ok: true,
-            json: async () => [
-              { id: 'first', name: 'First', url: 'https://first.example.test', tokenConfigured: false },
-              { id: 'second', name: 'Second', url: 'https://second.example.test', tokenConfigured: false },
-            ],
-          });
-        if (request.url?.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
-        return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
-      }),
-    );
+    hoisted.apiMock.mockImplementation((url: string) => {
+      if (url.endsWith('/api/plugins/registries'))
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { id: 'first', name: 'First', url: 'https://first.example.test', tokenConfigured: false },
+            { id: 'second', name: 'Second', url: 'https://second.example.test', tokenConfigured: false },
+          ],
+        });
+      if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+      return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
+    });
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
@@ -520,15 +486,8 @@ describe('PluginsSection', () => {
       ],
     };
     const marketplaceResponse = { ok: true, json: async () => ({ results: [], errors: [] }) };
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((input: { url?: string } | string) =>
-        Promise.resolve(
-          (typeof input === 'string' ? input : input.url)?.includes('/api/plugins/installed')
-            ? installedResponse
-            : marketplaceResponse,
-        ),
-      ),
+    hoisted.apiMock.mockImplementation((url: string) =>
+      Promise.resolve(url.includes('/api/plugins/installed') ? installedResponse : marketplaceResponse),
     );
 
     renderWithQuery(<PluginsSection />);
@@ -537,17 +496,14 @@ describe('PluginsSection', () => {
   });
 
   it('reports registry search failures alongside partial marketplace results', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) =>
-        Promise.resolve({
-          ok: true,
-          json: async () =>
-            url.endsWith('/api/plugins/installed') || url.endsWith('/api/plugins/registries')
-              ? []
-              : { results: [], errors: ['Could not search Private'] },
-        }),
-      ),
+    hoisted.apiMock.mockImplementation((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: async () =>
+          url.endsWith('/api/plugins/installed') || url.endsWith('/api/plugins/registries')
+            ? []
+            : { results: [], errors: ['Could not search Private'] },
+      }),
     );
 
     const user = userEvent.setup();
@@ -574,8 +530,7 @@ describe('PluginsSection', () => {
       installable: true,
       incompatibilityReason: null,
     });
-    const fetchMock = vi.fn((input: { url?: string } | string) => {
-      const url = typeof input === 'string' ? input : (input.url ?? '');
+    hoisted.apiMock.mockImplementation((url: string) => {
       if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
       if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
       if (url.includes('/marketplace/search'))
@@ -585,7 +540,6 @@ describe('PluginsSection', () => {
         });
       return Promise.resolve({ ok: true, json: async () => plugin('Second') });
     });
-    vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
@@ -598,35 +552,31 @@ describe('PluginsSection', () => {
 
   it('discards detail responses that arrive after closing the marketplace', async () => {
     const detail = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((input: { url?: string } | string) => {
-        const url = typeof input === 'string' ? input : (input.url ?? '');
-        if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
-        if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
-        if (url.includes('/marketplace/search'))
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({
-              results: [
-                {
-                  name: '@attraccess/plugin-example',
-                  version: '1.0.0',
-                  displayName: 'Example',
-                  permissions: [],
-                  registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
-                  classification: 'official',
-                  classificationReason: 'Published by Attraccess on npm',
-                  installable: true,
-                  incompatibilityReason: null,
-                },
-              ],
-              errors: [],
-            }),
-          });
-        return detail.promise;
-      }),
-    );
+    hoisted.apiMock.mockImplementation((url: string) => {
+      if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+      if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+      if (url.includes('/marketplace/search'))
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            results: [
+              {
+                name: '@attraccess/plugin-example',
+                version: '1.0.0',
+                displayName: 'Example',
+                permissions: [],
+                registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
+                classification: 'official',
+                classificationReason: 'Published by Attraccess on npm',
+                installable: true,
+                incompatibilityReason: null,
+              },
+            ],
+            errors: [],
+          }),
+        });
+      return detail.promise;
+    });
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
@@ -667,17 +617,13 @@ describe('PluginsSection', () => {
       installable: true,
       incompatibilityReason: null,
     };
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((input: { url?: string } | string) => {
-        const url = typeof input === 'string' ? input : (input.url ?? '');
-        if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
-        if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
-        if (url.includes('/marketplace/search'))
-          return Promise.resolve({ ok: true, json: async () => ({ results: [plugin], errors: [] }) });
-        return detail.promise;
-      }),
-    );
+    hoisted.apiMock.mockImplementation((url: string) => {
+      if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+      if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+      if (url.includes('/marketplace/search'))
+        return Promise.resolve({ ok: true, json: async () => ({ results: [plugin], errors: [] }) });
+      return detail.promise;
+    });
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
@@ -706,21 +652,17 @@ describe('PluginsSection', () => {
       incompatibilityReason: null,
     };
     let searches = 0;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((input: { url?: string } | string) => {
-        const url = typeof input === 'string' ? input : (input.url ?? '');
-        if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
-        if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
-        if (url.includes('/marketplace/search')) {
-          searches += 1;
-          return searches === 1
-            ? Promise.resolve({ ok: true, json: async () => ({ results: [plugin], errors: [] }) })
-            : refreshedSearch.promise;
-        }
-        return detail.promise;
-      }),
-    );
+    hoisted.apiMock.mockImplementation((url: string) => {
+      if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+      if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+      if (url.includes('/marketplace/search')) {
+        searches += 1;
+        return searches === 1
+          ? Promise.resolve({ ok: true, json: async () => ({ results: [plugin], errors: [] }) })
+          : refreshedSearch.promise;
+      }
+      return detail.promise;
+    });
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
     await openMarketplace(user);

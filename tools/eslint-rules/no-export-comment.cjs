@@ -19,6 +19,8 @@ module.exports = {
     return {
       ExportNamedDeclaration: check,
       ExportDefaultDeclaration: check,
+      ExportAllDeclaration: check,
+      TSExportAssignment: check,
     };
   },
 };

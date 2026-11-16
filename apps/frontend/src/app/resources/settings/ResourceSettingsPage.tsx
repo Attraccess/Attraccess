@@ -137,7 +137,7 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
       </Button>
     </div>
   );
-  const editorProps = { t: t, formData: formData, setField: setField, resource: resource };
+  const editorProps = { formData, setField, resource };
   const groups: SettingsDirectoryGroup[] = [
     {
       key: 'general',
@@ -195,11 +195,7 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
           icon: <Settings2Icon size={19} />,
           content: (
             <>
-              <ResourceMetadataEditor
-                t={t}
-                value={formData.metadata}
-                onChange={(value) => setField('metadata', value)}
-              />
+              <ResourceMetadataEditor value={formData.metadata} onChange={(value) => setField('metadata', value)} />
               {saveButton}
             </>
           ),

@@ -1,5 +1,5 @@
 import { StatusAlert, StatusDialog, type TranslationMessage } from '@attraccess/plugins-frontend-ui';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRabbitmqTranslations } from '../i18n';
 import { errorTitle } from './errorTitle';
 import { deleteUser, type RabbitmqUser } from './users-api';
@@ -17,13 +17,16 @@ export function RabbitmqUserDeleteDialog({ mqttServerId, user, onClose, onDelete
   const { t, tMessage } = useRabbitmqTranslations();
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | TranslationMessage | null>(null);
+  const [confirmingName, setConfirmingName] = useState<string | null>(null);
 
-  // A fresh confirmation never shows the previous attempt's error.
-  useEffect(() => {
-    if (user) {
+  // A fresh confirmation never shows the previous attempt's error, not even for one render.
+  const userName = user?.name ?? null;
+  if (userName !== confirmingName) {
+    setConfirmingName(userName);
+    if (userName !== null) {
       setDeleteError(null);
     }
-  }, [user]);
+  }
 
   const confirmDelete = async () => {
     if (!user) {

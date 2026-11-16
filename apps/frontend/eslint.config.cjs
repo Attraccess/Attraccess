@@ -60,4 +60,6 @@ module.exports = [
       'no-restricted-globals': 'off',
     },
   },
+  // ATT-1224: this project lints from its own folder, where the root config's workspace-relative globs never match.
+  baseConfig.noHookReturnTypeConfig(['src/**/*.{ts,tsx}']),
 ];

@@ -1,6 +1,6 @@
 import { Input, ModalBody, ModalFooter, ModalHeader, ModalHeading, TextField } from '@heroui/react';
 import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import de from './de.json';
 import en from './en.json';
 import { LOCALE_PATTERN } from './translationLocales';
@@ -15,10 +15,14 @@ interface CustomLocaleModalProps {
 export function CustomLocaleModal({ isOpen, onOpenChange, onAdd }: Readonly<CustomLocaleModalProps>) {
   const { t } = useTranslations({ en, de });
   const [customLocale, setCustomLocale] = useState('');
+  const [wasOpen, setWasOpen] = useState(isOpen);
 
-  useEffect(() => {
+  // Reset on the open transition during render, not in an effect: an effect runs after the first
+  // open frame has painted, which would show the previous entry for that frame.
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
     if (isOpen) setCustomLocale('');
-  }, [isOpen]);
+  }
 
   return (
     <StandardModal isOpen={isOpen} onOpenChange={onOpenChange} size="sm">

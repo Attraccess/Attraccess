@@ -2,19 +2,17 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
+  AuthRateLimitSettingsDto,
   PasswordPolicyDto,
+  TwoFactorPolicy,
   UpdatePasswordPolicyDto,
   UsePasswordPolicyAdminServiceGetAdminPasswordPolicyKeyFn,
   UseSettingsServiceGetAuthRateLimitSettingsKeyFn,
   UseTwoFactorAuthenticationServiceGetTwoFactorPolicyKeyFn,
   UseUsersServiceGetLocalSignupDomainWhitelistKeyFn,
-  usePasswordPolicyAdminServiceGetAdminPasswordPolicy,
   usePasswordPolicyAdminServiceUpdateAdminPasswordPolicy,
-  useSettingsServiceGetAuthRateLimitSettings,
   useSettingsServiceUpdateAuthRateLimitSettings,
-  useTwoFactorAuthenticationServiceGetTwoFactorPolicy,
   useTwoFactorAuthenticationServiceSetTwoFactorPolicy,
-  useUsersServiceGetLocalSignupDomainWhitelist,
   useUsersServiceSetLocalSignupDomainWhitelist,
 } from '@attraccess/react-query-client';
 import { SettingsSaveBar } from '../../../components/SettingsSaveBar';
@@ -32,22 +30,26 @@ function domainsHaveChanged(saved: string[] | undefined, draft: string[] | undef
   return draft.length !== saved.length || draft.some((domain, index) => domain !== saved[index]);
 }
 
+/** The stored values of the four groups, loaded by the section; each is `undefined` until (or unless) it arrives. */
+interface SecuritySaveBarProps {
+  drafts: SecurityDrafts;
+  policy: PasswordPolicyDto | undefined;
+  rateLimit: AuthRateLimitSettingsDto | undefined;
+  twoFactorPolicy: TwoFactorPolicy | undefined;
+  savedDomains: string[] | undefined;
+}
+
 /**
  * Four backends stand behind this one bar, so Save fires only the mutations whose group is actually
  * dirty. The password policy keeps a confirmation step in front of it — it is the one group here
  * that can make every existing password invalid at once.
  */
-export function SecuritySaveBar({ drafts }: { drafts: SecurityDrafts }) {
+export function SecuritySaveBar({ drafts, policy, rateLimit, twoFactorPolicy, savedDomains }: SecuritySaveBarProps) {
   const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   const { policyDraft, setPolicyDraft, rateDraft, setRateDraft, twoFactorDraft, domainsDraft } = drafts;
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-
-  const { data: policy } = usePasswordPolicyAdminServiceGetAdminPasswordPolicy();
-  const { data: rateLimit } = useSettingsServiceGetAuthRateLimitSettings();
-  const { data: twoFactor } = useTwoFactorAuthenticationServiceGetTwoFactorPolicy();
-  const { data: savedDomains } = useUsersServiceGetLocalSignupDomainWhitelist();
 
   const {
     value: rateValue,
@@ -55,7 +57,7 @@ export function SecuritySaveBar({ drafts }: { drafts: SecurityDrafts }) {
     isDirty: isRateDirty,
     isSavable: isRateSavable,
   } = getRateLimitDraft(rateLimit, rateDraft);
-  const twoFactorValue = twoFactorDraft ?? twoFactor?.policy;
+  const twoFactorValue = twoFactorDraft ?? twoFactorPolicy;
 
   const policyDiff = policy
     ? POLICY_FIELD_KEYS.filter((key) => policyDraft[key] !== undefined && policyDraft[key] !== policy[key]).map(
@@ -124,7 +126,7 @@ export function SecuritySaveBar({ drafts }: { drafts: SecurityDrafts }) {
     Number.isInteger(policyValue(policy, policyDraft, key) as number),
   );
   const isPolicyDirty = policyDiff.length > 0 || (!isPolicySavable && Object.keys(policyDraft).length > 0);
-  const isTwoFactorDirty = twoFactorValue !== undefined && twoFactorValue !== twoFactor?.policy;
+  const isTwoFactorDirty = twoFactorValue !== undefined && twoFactorValue !== twoFactorPolicy;
   const isDomainsDirty = domainsHaveChanged(savedDomains, domainsDraft);
 
   const isDirty = isRateDirty || isPolicyDirty || isTwoFactorDirty || isDomainsDirty;

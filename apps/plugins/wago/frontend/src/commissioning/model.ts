@@ -17,6 +17,17 @@ export function sessionStep(session: CommissioningSession | null): number {
 
 export const DEFAULT_SSH = { username: 'root', password: 'wago' };
 
+export interface SshCredentials {
+  username: string;
+  password: string;
+  custom: boolean;
+}
+
+/** Custom credentials start empty; switching back restores the factory login. */
+export function sshCredentials(custom: boolean): SshCredentials {
+  return custom ? { username: '', password: '', custom } : { ...DEFAULT_SSH, custom };
+}
+
 export function canInstall(session: CommissioningSession) {
   return (
     !session.runtimeRecoveryAvailable &&

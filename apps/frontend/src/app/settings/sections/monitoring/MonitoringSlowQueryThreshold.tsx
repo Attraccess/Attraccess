@@ -5,11 +5,10 @@ import {
   NumberFieldIncrementButton,
   NumberFieldInput,
 } from '@heroui/react';
-import { ReactNode, useState } from 'react';
+import { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  useSettingsServiceGetMetricsSettings,
   UseSettingsServiceGetMetricsSettingsKeyFn,
   useSettingsServiceUpdateMetricsSettings,
 } from '@attraccess/react-query-client';
@@ -19,19 +18,30 @@ import { useToastMessage } from '../../../../components/toastProvider';
 import en from './en.json';
 import de from './de.json';
 
+interface MonitoringSlowQueryThresholdProps {
+  /** The stored threshold, from the metrics settings the section loads. */
+  savedThreshold: number | undefined;
+  /**
+   * `undefined` means "untouched in this session"; the displayed value then falls back to the
+   * server's. Held by the section, above its loading gate, so a refetch after a failed load (which
+   * shows the spinner and unmounts this row) does not drop the edit.
+   */
+  thresholdDraft: number | undefined;
+  setThresholdDraft: (value: number | undefined) => void;
+  children?: ReactNode;
+}
+
 /** The slow-query threshold row and its save bar; `children` render above the row, inside the same column. */
-export function MonitoringSlowQueryThreshold({ children }: { children?: ReactNode }) {
+export function MonitoringSlowQueryThreshold({
+  savedThreshold,
+  thresholdDraft,
+  setThresholdDraft,
+  children,
+}: MonitoringSlowQueryThresholdProps) {
   const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
-  const { data: metricsSettings } = useSettingsServiceGetMetricsSettings();
-  // `undefined` means "untouched in this session"; the displayed value then falls back to the
-  // server's. Seeding this from an effect instead left the NumberField without a value for the
-  // first commit after loading finished, painting the field empty for a frame, and let a background
-  // refetch clobber edits the operator had not saved yet.
-  const [thresholdDraft, setThresholdDraft] = useState<number | undefined>(undefined);
 
-  const savedThreshold = metricsSettings?.slowQueryThresholdSeconds;
   // NaN is React Aria's representation of an empty NumberField, so it keeps the field controlled
   // even when there is nothing to show.
   const threshold = thresholdDraft ?? savedThreshold ?? NaN;

@@ -16,3 +16,16 @@ export interface MarketplaceDetailRequest {
   name: string;
   registryId: string;
 }
+
+/**
+ * The registry form and its pending requests. It lives with the marketplace browser so that it survives showing a
+ * package's details and closing the marketplace, which unmount the registry management.
+ */
+export interface RegistryForm {
+  name: string;
+  url: string;
+  token: string;
+  isSaving: boolean;
+  /** The latest registry test still running; an earlier test settling does not end it. */
+  test: { registryId: string; request: symbol } | null;
+}

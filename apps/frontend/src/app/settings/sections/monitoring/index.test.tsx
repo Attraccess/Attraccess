@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 import {
   useSettingsServiceDeleteMetricsApiKey,
   useSettingsServiceGenerateMetricsApiKey,
@@ -35,6 +35,25 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('../../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success, error }),
 }));
+
+interface UpdateMutationOptions {
+  onSuccess: (data?: unknown) => void;
+  onError: () => void;
+}
+
+/**
+ * Two components use the update mutation (threshold and toggles). Every call gets its own `mutate`,
+ * so a test picks the options of the one an interaction actually fired, not by render order.
+ */
+function trackUpdateMutations() {
+  const mutations: Array<{ options: UpdateMutationOptions; mutate: Mock }> = [];
+  vi.mocked(useSettingsServiceUpdateMetricsSettings).mockImplementation((options) => {
+    const mutate = vi.fn();
+    mutations.push({ options: options as UpdateMutationOptions, mutate });
+    return { mutate, isPending: false } as unknown as ReturnType<typeof useSettingsServiceUpdateMetricsSettings>;
+  });
+  return mutations;
+}
 
 const TOGGLES = { http: true, ws: false, cron: true, db: false, external: true, sse: false, flow: true };
 
@@ -117,15 +136,7 @@ describe('MonitoringSection', () => {
     // released once the value is committed. Held past the save, the field ignores the server for
     // the lifetime of the mount: someone else changing the threshold then shows up as an "unsaved
     // changes" bar the operator never caused, holding a stale value, whose Save reverts them.
-    let onSuccess: ((data: unknown) => void) | undefined;
-    vi.mocked(useSettingsServiceUpdateMetricsSettings).mockImplementation(
-      (options?: { onSuccess?: (data: unknown) => void }) => {
-        onSuccess = options?.onSuccess;
-        return { mutate: vi.fn(), isPending: false } as unknown as ReturnType<
-          typeof useSettingsServiceUpdateMetricsSettings
-        >;
-      },
-    );
+    const updateMutations = trackUpdateMutations();
 
     const { container, rerender } = render(<MonitoringSection />);
 
@@ -134,10 +145,13 @@ describe('MonitoringSection', () => {
     await userEvent.type(input, '2');
     await userEvent.tab();
     expect(container.querySelector('[data-slot="settings-save-bar"]')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
+    const thresholdMutation = updateMutations.find(({ mutate }) => mutate.mock.calls.length > 0);
+    expect(thresholdMutation?.mutate).toHaveBeenCalledWith({ requestBody: { slowQueryThresholdSeconds: 2 } });
 
     // The PATCH resolves with the authoritative post-write state.
     const afterSave = { apiKeyConfigured: true, toggles: TOGGLES, slowQueryThresholdSeconds: 2 };
-    await act(async () => onSuccess?.(afterSave));
+    await act(async () => thresholdMutation?.options.onSuccess(afterSave));
 
     expect(setQueryData).toHaveBeenCalledWith(['metrics'], afterSave);
     expect(container.querySelector('[data-slot="settings-save-bar"]')).toBeNull();
@@ -153,16 +167,16 @@ describe('MonitoringSection', () => {
     expect(container.querySelector('[data-slot="settings-save-bar"]')).toBeNull();
   });
   it('shows generated keys and refreshes settings after generation, removal and toggle updates', async () => {
+    const updateMutations = trackUpdateMutations();
     render(<MonitoringSection />);
     const generate = vi.mocked(useSettingsServiceGenerateMetricsApiKey).mock.calls.at(-1)?.[0] as {
       onSuccess: (data: { apiKey: string }) => void;
     };
     const remove = vi.mocked(useSettingsServiceDeleteMetricsApiKey).mock.calls.at(-1)?.[0] as { onSuccess: () => void };
-    // Calls render in tree order: the threshold save bar (parent) first, then the toggle rows.
-    const toggle = vi.mocked(useSettingsServiceUpdateMetricsSettings).mock.calls[1][0] as {
-      onSuccess: () => void;
-      onError: () => void;
-    };
+    await userEvent.click(screen.getByRole('switch', { name: 'toggles.ws.label' }));
+    const toggleMutation = updateMutations.find(({ mutate }) => mutate.mock.calls.length > 0);
+    expect(toggleMutation?.mutate).toHaveBeenCalledWith({ requestBody: { toggles: { ws: true } } });
+    const toggle = toggleMutation?.options as UpdateMutationOptions;
     act(() => generate.onSuccess({ apiKey: 'generated-secret' }));
     expect(screen.getByDisplayValue('generated-secret')).toBeInTheDocument();
     expect(success).toHaveBeenLastCalledWith({ title: 'keyGenerated.title', description: 'keyGenerated.description' });
@@ -174,5 +188,65 @@ describe('MonitoringSection', () => {
     expect(success).toHaveBeenLastCalledWith({ title: 'toggles.savedTitle', description: 'toggles.savedDescription' });
     act(() => toggle.onError());
     expect(error).toHaveBeenLastCalledWith({ title: 'toggles.errorTitle', description: 'toggles.errorDescription' });
+  });
+
+  it('reads the metrics settings once, in the section, so the rows do not refetch them on mount', () => {
+    render(<MonitoringSection />);
+
+    expect(useSettingsServiceGetMetricsSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a freshly generated key when the refetch after Generate passes through loading', () => {
+    // Settings that failed to load have no data, so the invalidation in Generate's onSuccess sends
+    // the query back to loading: the spinner replaces the rows. The key is shown only once and
+    // must still be there when they return.
+    vi.mocked(useSettingsServiceGetMetricsSettings).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    } as ReturnType<typeof useSettingsServiceGetMetricsSettings>);
+    const { rerender } = render(<MonitoringSection />);
+    const generate = vi.mocked(useSettingsServiceGenerateMetricsApiKey).mock.calls.at(-1)?.[0] as {
+      onSuccess: (data: { apiKey: string }) => void;
+    };
+    act(() => generate.onSuccess({ apiKey: 'one-time-secret' }));
+    expect(screen.getByDisplayValue('one-time-secret')).toBeInTheDocument();
+
+    vi.mocked(useSettingsServiceGetMetricsSettings).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    } as ReturnType<typeof useSettingsServiceGetMetricsSettings>);
+    rerender(<MonitoringSection />);
+    expect(screen.queryByDisplayValue('one-time-secret')).toBeNull();
+
+    vi.mocked(useSettingsServiceGetMetricsSettings).mockReturnValue({
+      data: { apiKeyConfigured: true, toggles: TOGGLES, slowQueryThresholdSeconds: 1 },
+      isLoading: false,
+    } as ReturnType<typeof useSettingsServiceGetMetricsSettings>);
+    rerender(<MonitoringSection />);
+
+    expect(screen.getByDisplayValue('one-time-secret')).toBeInTheDocument();
+  });
+
+  it('keeps an unsaved threshold through a refetch that passes through loading', async () => {
+    vi.mocked(useSettingsServiceGetMetricsSettings).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    } as ReturnType<typeof useSettingsServiceGetMetricsSettings>);
+    const { rerender } = render(<MonitoringSection />);
+    await userEvent.type(screen.getByLabelText('slowQueryThreshold.label'), '3');
+    await userEvent.tab();
+
+    vi.mocked(useSettingsServiceGetMetricsSettings).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    } as ReturnType<typeof useSettingsServiceGetMetricsSettings>);
+    rerender(<MonitoringSection />);
+    vi.mocked(useSettingsServiceGetMetricsSettings).mockReturnValue({
+      data: { apiKeyConfigured: true, toggles: TOGGLES, slowQueryThresholdSeconds: 1 },
+      isLoading: false,
+    } as ReturnType<typeof useSettingsServiceGetMetricsSettings>);
+    rerender(<MonitoringSection />);
+
+    expect(screen.getByLabelText('slowQueryThreshold.label')).toHaveValue('3');
   });
 });

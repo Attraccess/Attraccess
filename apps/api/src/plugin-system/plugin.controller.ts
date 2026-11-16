@@ -77,6 +77,7 @@ export class PluginController {
   }
 
   @Post('registries')
+  @ApiResponse({ status: 201, type: PluginRegistryDto })
   @Auth('system.plugins.manage')
   addRegistry(@Body() body: AddPluginRegistryDto, @Req() req: AuthenticatedRequest) {
     return this.pluginAdministration.addRegistry(body, auditActorOf(req.user));
@@ -217,6 +218,7 @@ export class PluginController {
   }
 
   @Post('installed/check')
+  @ApiResponse({ status: 201, type: InstalledNpmPluginDto, isArray: true })
   @Auth('system.plugins.manage')
   checkAllInstalledPackages(@Req() req: AuthenticatedRequest) {
     return this.pluginAdministration.checkAllInstalled(auditActorOf(req.user));
@@ -249,6 +251,7 @@ export class PluginController {
   }
 
   @Post('installed/:packageName/update-policy')
+  @ApiResponse({ status: 201, type: InstalledNpmPluginDto })
   @Auth('system.plugins.manage')
   updateInstalledPackagePolicy(
     @Param('packageName') packageName: string,
@@ -271,6 +274,7 @@ export class PluginController {
   }
 
   @Post('installed/:packageName/versions/:version')
+  @ApiResponse({ status: 201, type: InstalledNpmPluginDto })
   @Auth('system.plugins.manage')
   replaceInstalledPackage(
     @Param('packageName') packageName: string,

@@ -1,4 +1,4 @@
-import { LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { LabeledSwitch, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   NumberField,
   NumberFieldDecrementButton,
@@ -6,17 +6,20 @@ import {
   NumberFieldIncrementButton,
   NumberFieldInput,
 } from '@heroui/react';
-import { useSettingsServiceGetAuthRateLimitSettings } from '@attraccess/react-query-client';
+import { AuthRateLimitSettingsDto } from '@attraccess/react-query-client';
 import { SettingsRow } from '../../../components/SettingsRow';
 import { getRateLimitDraft, RATE_LIMIT_NUMBERS } from '../getRateLimitDraft';
 import { SecurityDrafts } from '../useSecurityDrafts';
-import { LoadFailedAlert } from './LoadFailedAlert';
 import en from '../en.json';
 import de from '../de.json';
 
-export function RateLimitSettings({ rateDraft, setRateDraft }: Pick<SecurityDrafts, 'rateDraft' | 'setRateDraft'>) {
+interface RateLimitSettingsProps extends Pick<SecurityDrafts, 'rateDraft' | 'setRateDraft'> {
+  /** The stored throttling settings; `undefined` once settled means the request failed. */
+  rateLimit: AuthRateLimitSettingsDto | undefined;
+}
+
+export function RateLimitSettings({ rateLimit, rateDraft, setRateDraft }: RateLimitSettingsProps) {
   const { t } = useTranslations({ en, de });
-  const { data: rateLimit } = useSettingsServiceGetAuthRateLimitSettings();
   const { value: rateValue, exponentialBackoff } = getRateLimitDraft(rateLimit, rateDraft);
   return (
     <div className="flex flex-col">
@@ -24,7 +27,7 @@ export function RateLimitSettings({ rateDraft, setRateDraft }: Pick<SecurityDraf
         // Settled with nothing usable. The other three groups are separate queries and stay
         // editable — only throttling is unreachable.
         <div data-testid="rate-limit-load-failed">
-          <LoadFailedAlert message={t('rateLimit.loadFailed')} />
+          <StatusAlert status="danger">{t('rateLimit.loadFailed')}</StatusAlert>
         </div>
       ) : (
         <>

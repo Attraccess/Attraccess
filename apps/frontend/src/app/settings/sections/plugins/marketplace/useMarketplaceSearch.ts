@@ -32,6 +32,7 @@ export function useMarketplaceSearch({ isOpen, query, registryId }: Params) {
   }, [isOpen, query, registryId]);
 
   const exactName = settled.query.trim();
+  // The explicit response type is needed: `keepPreviousData` is generic, so it would otherwise infer `unknown`.
   const search = usePluginsServicePluginControllerSearchMarketplace<MarketplaceSearchResponseDto>(
     { query: settled.query, registryId: settled.registryId || undefined },
     undefined,
@@ -61,10 +62,14 @@ export function useMarketplaceSearch({ isOpen, query, registryId }: Params) {
     else if (errors.length > 0) toast.error({ title: t('marketplace.loadError'), description: errors.join(', ') });
   });
 
+  // While a newer query waits for its debounce, a still-running search for the previous one is outdated: its outcome
+  // is not reported.
+  const isCurrent = settled.query === query && settled.registryId === registryId;
   const isSettled = !search.isFetching && !direct.isFetching && (search.isSuccess || search.isError);
-  const outcome = isSettled
-    ? [search.dataUpdatedAt, search.errorUpdatedAt, direct.dataUpdatedAt, direct.errorUpdatedAt].join(':')
-    : null;
+  const outcome =
+    isCurrent && isSettled
+      ? [search.dataUpdatedAt, search.errorUpdatedAt, direct.dataUpdatedAt, direct.errorUpdatedAt].join(':')
+      : null;
   useEffect(() => {
     if (outcome) reportOutcome();
   }, [outcome]);

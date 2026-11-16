@@ -2,7 +2,7 @@ import { act, cleanup, render, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { useDateTimePreferences, useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { Duration } from './Duration';
-import { MISSING_VALUE, scaleBytes, useRabbitmqFormatters } from './format';
+import { MISSING_VALUE, scaleBytes, useRabbitmqFormatters } from './useRabbitmqFormatters';
 
 afterEach(() => {
   cleanup();

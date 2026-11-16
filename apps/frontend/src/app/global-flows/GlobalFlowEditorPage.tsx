@@ -12,7 +12,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../hooks/useAuth';
 import { useToastMessage } from '../../components/toastProvider';
-import { FlowEditor } from '../resources/details/flows/index';
+import { FlowEditor } from '../resources/details/flows/FlowEditor';
 import { GlobalFlowDetailsModal } from './GlobalFlowDetailsModal';
 import { useGlobalFlowsTranslations } from './useGlobalFlowsTranslations';
 

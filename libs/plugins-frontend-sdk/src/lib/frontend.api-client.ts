@@ -5,7 +5,7 @@
 // wrapper, once, so plugins only describe what differs (path, method, body).
 //
 // The base URL comes from the host: it publishes it on `window` (see
-// apps/frontend/src/app/plugins/plugin-provider.tsx) before it loads any plugin
+// apps/frontend/src/app/plugins/usePluginRuntimeBootstrap.ts) before it loads any plugin
 // bundle. Plugins get their own copy of this SDK — module federation only
 // shares react & friends — so a window global, not a module singleton, is what
 // crosses the bundle boundary.

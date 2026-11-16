@@ -11,11 +11,7 @@ import {
 } from '@heroui/react';
 import { useMemo, useState } from 'react';
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  PasswordPolicyRole,
-  usePasswordPolicyAdminServiceGetAdminPasswordPolicy,
-  usePasswordPolicyAdminServiceListPasswordPolicyOverrides,
-} from '@attraccess/react-query-client';
+import { PasswordPolicyDto, PasswordPolicyOverrideDto, PasswordPolicyRole } from '@attraccess/react-query-client';
 import { SettingsRow } from '../../../components/SettingsRow';
 import { POLICY_FIELD_KEYS } from '../policy-fields';
 import { RoleOverridesModal } from '../RoleOverridesModal';
@@ -24,10 +20,15 @@ import de from '../de.json';
 
 const OVERRIDE_ROLES: PasswordPolicyRole[] = [PasswordPolicyRole.ADMIN];
 
-export function PasswordPolicyOverrides() {
+interface PasswordPolicyOverridesProps {
+  /** The stored global policy; the section loads it. */
+  policy: PasswordPolicyDto;
+  /** The stored per-role overrides; the section loads them. */
+  overrides: PasswordPolicyOverrideDto[];
+}
+
+export function PasswordPolicyOverrides({ policy, overrides }: PasswordPolicyOverridesProps) {
   const { t } = useTranslations({ en, de });
-  const { data: policy } = usePasswordPolicyAdminServiceGetAdminPasswordPolicy();
-  const { data: overrides = [] } = usePasswordPolicyAdminServiceListPasswordPolicyOverrides();
   const [editingRole, setEditingRole] = useState<PasswordPolicyRole | null>(null);
   const overridesByRole = useMemo(() => new Map(overrides.map((row) => [row.role, row])), [overrides]);
 
@@ -87,14 +88,12 @@ export function PasswordPolicyOverrides() {
           resolves server-side against what is *stored* — so seeding an override from an unsaved edit
           would pin it to a value that never existed on the instance (and could then be Discarded),
           while the "inherit: N" hint would name a number no role would actually get. */}
-      {policy && (
-        <RoleOverridesModal
-          role={editingRole}
-          existing={editingRole ? overridesByRole.get(editingRole) : undefined}
-          globalPolicy={policy}
-          onClose={() => setEditingRole(null)}
-        />
-      )}
+      <RoleOverridesModal
+        role={editingRole}
+        existing={editingRole ? overridesByRole.get(editingRole) : undefined}
+        globalPolicy={policy}
+        onClose={() => setEditingRole(null)}
+      />
     </>
   );
 }

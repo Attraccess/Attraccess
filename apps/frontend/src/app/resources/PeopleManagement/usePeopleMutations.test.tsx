@@ -43,6 +43,10 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
     UseAccessControlServiceResourceIntroductionsGetPeopleKeyFn: (params: unknown) => ['resourceIntroductions', params],
   };
 });
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
+}));
 vi.mock('../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: state.success, error: state.error }),
 }));
@@ -59,7 +63,7 @@ afterEach(() => {
 });
 function setup(type: 'resource' | 'group') {
   const invalidate = vi.spyOn(client, 'invalidateQueries').mockResolvedValue();
-  const hook = renderHook(() => usePeopleMutations({ target: { type, id: 7 }, t: (key) => key }), {
+  const hook = renderHook(() => usePeopleMutations({ target: { type, id: 7 } }), {
     wrapper: ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={client}>{children}</QueryClientProvider>
     ),

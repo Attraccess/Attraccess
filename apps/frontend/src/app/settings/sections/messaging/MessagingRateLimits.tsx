@@ -13,7 +13,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { AlertStatusIcon, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   MessagingRateLimitSettingsDto,
-  useSettingsServiceGetMessagingRateLimitSettings,
   UseSettingsServiceGetMessagingRateLimitSettingsKeyFn,
   useSettingsServiceUpdateMessagingRateLimitSettings,
 } from '@attraccess/react-query-client';
@@ -27,13 +26,18 @@ type LimitKey = keyof MessagingRateLimitSettingsDto;
 
 const LIMIT_KEYS: LimitKey[] = ['sendMaxPerWindow', 'sendWindowSeconds', 'contactMaxPerWindow', 'contactWindowSeconds'];
 
+interface MessagingRateLimitsProps {
+  /** The stored limits, loaded by the section; `undefined` once settled means the request failed. */
+  limits: MessagingRateLimitSettingsDto | undefined;
+  children?: ReactNode;
+}
+
 /** The four rate limits and their save bar; `children` render below the limit rows, inside the same column. */
-export function MessagingRateLimits({ children }: { children?: ReactNode }) {
+export function MessagingRateLimits({ limits, children }: MessagingRateLimitsProps) {
   const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { data: limits } = useSettingsServiceGetMessagingRateLimitSettings();
   // Derived draft: an untouched field falls back to the server's value, so a background refetch
   // cannot overwrite an unsaved edit (ATT-868).
   const [draft, setDraft] = useState<Partial<Record<LimitKey, number>>>({});

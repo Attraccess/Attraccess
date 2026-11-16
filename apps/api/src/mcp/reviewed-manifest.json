@@ -1527,7 +1527,7 @@
   "PluginController_addRegistry": {
     "decision": "deny",
     "reason": "Secret management: stores an npm registry and its access token.",
-    "shape": "78526244"
+    "shape": "0979ba5d"
   },
   "PluginController_testRegistry": {
     "decision": "allow",
@@ -1607,7 +1607,7 @@
   "PluginController_checkAllInstalledPackages": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "f031bc54"
+    "shape": "9836a353"
   },
   "PluginController_checkInstalledPackage": {
     "decision": "allow",
@@ -1627,7 +1627,7 @@
   "PluginController_updateInstalledPackagePolicy": {
     "decision": "deny",
     "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
-    "shape": "f3760cf2"
+    "shape": "649455ec"
   },
   "PluginController_installedPackageVersions": {
     "decision": "allow",
@@ -1637,7 +1637,7 @@
   "PluginController_replaceInstalledPackage": {
     "decision": "deny",
     "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
-    "shape": "ebbd4fcd"
+    "shape": "b6702017"
   },
   "getPlugins": {
     "decision": "allow",

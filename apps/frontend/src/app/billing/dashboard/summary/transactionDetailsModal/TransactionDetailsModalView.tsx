@@ -72,7 +72,8 @@ export function TransactionDetailsModalView({
     if (!isOpen) setUsageOpen(false);
   }, [isOpen]);
 
-  const formatCredits = useCreditsFormatter(configuration?.minorUnit ?? 2);
+  const minorUnit = configuration?.minorUnit ?? 2;
+  const formatCredits = useCreditsFormatter(minorUnit);
 
   const statusColor = (status: BillingTransaction['status']) => {
     switch (status) {
@@ -198,7 +199,7 @@ export function TransactionDetailsModalView({
 
                   <Separator />
 
-                  <TransactionItemsTable transaction={transaction} />
+                  <TransactionItemsTable transaction={transaction} minorUnit={minorUnit} />
                 </div>
               )}
             </ModalBody>

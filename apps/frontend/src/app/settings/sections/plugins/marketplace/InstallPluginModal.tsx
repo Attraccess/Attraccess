@@ -32,6 +32,8 @@ export function InstallPluginModal({ plugin, onClose }: Props) {
     hasDependencies
       ? { packageName: plugin.name, spec: plugin.version ?? undefined, registryId: plugin.registry.id }
       : undefined,
+    // The package details behind this dialog already resolved the plan.
+    { reuseResolvedPlan: true },
   );
   const approvalToken = hasDependencies
     ? dependencyPlan?.token

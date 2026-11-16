@@ -4,7 +4,6 @@ import { cardVariants } from '@heroui/styles';
 import { PluginClassificationBadge } from '../PluginClassificationBadge';
 import type { MarketplaceDetailRequest } from '../types';
 import { usePluginsTranslations } from '../usePluginsTranslations';
-import { RegistryManagement } from './RegistryManagement';
 import { useRegistries } from './useRegistries';
 
 interface Props {
@@ -100,7 +99,6 @@ export function MarketplaceSearchResults({
           {t('marketplace.noResults')}
         </p>
       ) : null}
-      <RegistryManagement onRegistryRemoved={(removedId) => registryId === removedId && onRegistryIdChange('')} />
     </div>
   );
 }

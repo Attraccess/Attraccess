@@ -1,12 +1,11 @@
 import { FieldError, Form, Input, TextField } from '@heroui/react';
-import { useState } from 'react';
+import { Dispatch, SetStateAction } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { LabeledSwitch, PasswordInput, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
   SmtpServiceType,
   SystemSettingsDto,
-  useSettingsServiceGetSystemSettings,
   UseSettingsServiceGetSystemSettingsKeyFn,
   useSettingsServiceUpdateSystemSettings,
 } from '@attraccess/react-query-client';
@@ -25,6 +24,12 @@ const OUTLOOK_HOST = 'smtp.office365.com';
 const OUTLOOK_PORT = '587';
 
 type Field = 'service' | 'host' | 'port' | 'secure' | 'user' | 'from' | 'pass';
+
+/**
+ * Derived draft, matching Monitoring and General: an untouched field falls back to the server, so a
+ * background refetch can never overwrite an edit the operator has not saved (ATT-868).
+ */
+export type SmtpDraft = Partial<Record<Field, string | boolean>>;
 
 function getSavedSmtpFields(settings: SystemSettingsDto | undefined) {
   const savedService =
@@ -57,19 +62,33 @@ function validateSmtpFields(host: string, port: string, from: string, t: (key: s
   return { hostError, portNumber, portError, fromError, hasError };
 }
 
-export function EmailSmtpForm() {
+interface EmailSmtpFormProps {
+  /** The stored settings, loaded by the section; `undefined` once settled means the request failed. */
+  settings: SystemSettingsDto | undefined;
+  /**
+   * The draft and the "show validation" flag are held by the section, above its loading gate: a
+   * refetch of settings that failed to load goes back to loading and unmounts this form, and what the
+   * operator typed must survive that.
+   */
+  draft: SmtpDraft;
+  setDraft: Dispatch<SetStateAction<SmtpDraft>>;
+  hasAttemptedSave: boolean;
+  setHasAttemptedSave: (attempted: boolean) => void;
+}
+
+export function EmailSmtpForm({
+  settings,
+  draft,
+  setDraft,
+  hasAttemptedSave,
+  setHasAttemptedSave,
+}: EmailSmtpFormProps) {
   const { t, tExists } = useTranslations({
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
   });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
-
-  const { data: settings } = useSettingsServiceGetSystemSettings();
-  // Derived draft, matching Monitoring and General: an untouched field falls back to the server, so
-  // a background refetch can never overwrite an edit the operator has not saved (ATT-868).
-  const [draft, setDraft] = useState<Partial<Record<Field, string | boolean>>>({});
-  const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
 
   const {
     service: savedService,
