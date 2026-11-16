@@ -1534,7 +1534,7 @@ so they share the workspace toolchain, caching and CI.
   SDK libraries, other Nx inputs) changed since then. A plugin that was never published, or has no recorded commit,
   is always published. Changes merged in a failed run are therefore picked up by the next green one, and an older
   run finishing late never moves a tag backwards.
-  - **Nightly** (main, after all build, test and hardware gates pass) publishes the `package.json` version
+  - **Nightly** (main, once a night after all build, test and hardware gates pass) publishes the `package.json` version
     without its prerelease suffix plus `-nightly.<run>.<attempt>` (e.g. `0.2.0-nightly.1180.1`) under `next`, in
     the same gated outcome as the `nightly-<sha>` image.
   - **Release** publishes the `package.json` version without its prerelease suffix (`0.2.0-alpha.0` becomes

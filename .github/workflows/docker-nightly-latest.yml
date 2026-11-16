@@ -1,8 +1,12 @@
 name: Docker Nightly Latest (Main Branch)
 
+# Once a night instead of on every push: one full run needs both lab readers for
+# about an hour, and merges come faster than that. Pushes to main keep the Nx
+# cache warm through main-nx-cache.yml. Run it by hand (on main) to publish sooner.
 on:
-  push:
-    branches: [main]
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
 
 env:
   GHCR_IMAGE_NAME: ${{ vars.GHCR_IMAGE_NAME }}
@@ -11,7 +15,7 @@ env:
   # Nx remote cache — main is the only branch that writes it. Falls back to the
   # read-only token if RW is missing, so a rotation gap degrades to reads.
   NX_SELF_HOSTED_REMOTE_CACHE_SERVER: ${{ secrets.NX_CACHE_TOKEN_RO && vars.NX_CACHE_URL || '' }}
-  NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ${{ secrets.NX_CACHE_TOKEN_RW || secrets.NX_CACHE_TOKEN_RO }}
+  NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ${{ github.ref == 'refs/heads/main' && (secrets.NX_CACHE_TOKEN_RW || secrets.NX_CACHE_TOKEN_RO) || secrets.NX_CACHE_TOKEN_RO }}
 
 permissions:
   contents: read
@@ -19,6 +23,36 @@ permissions:
   packages: write
 
 jobs:
+  # Decides whether this run tests on the readers and publishes. A scheduled run
+  # on a commit that already passed has nothing new, so it leaves the readers
+  # free; a commit whose last run failed is tried again. Manual runs always go.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+    steps:
+      - name: Compare with the last green nightly
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::The nightly publishes from main only; dispatch it on main"
+            exit 1
+          fi
+          changed=true
+          if [ "$GITHUB_EVENT_NAME" = schedule ]; then
+            last="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow docker-nightly-latest.yml \
+              --branch main --status success --limit 1 --json headSha --jq '.[0].headSha // ""')"
+            if [ "$last" = "$GITHUB_SHA" ]; then
+              changed=false
+              echo "::notice::$GITHUB_SHA already passed a nightly; skipping the lab readers and publishing"
+            fi
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -99,9 +133,10 @@ jobs:
 
   # The single publish gate: plugins and the server image publish from the same outcome.
   # A failed or cancelled job blocks; a skipped one (HIL variable off) does not.
+  # Nothing publishes when `changes` found the commit already published.
   publish-gate:
-    needs: [lint, typecheck, test, build, plugins, build-companion, build-attractap-firmware, attractap-lab-hil]
-    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    needs: [changes, lint, typecheck, test, build, plugins, build-companion, build-attractap-firmware, attractap-lab-hil]
+    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - run: echo "All build, test and HIL jobs passed or were skipped"
@@ -136,6 +171,8 @@ jobs:
     # Real reader firmware against the NFC card emulator in the Attractap lab;
     # skipped unless vars.ATTRACTAP_LAB_HIL_ENABLED is 'true'. Publishing jobs
     # need it: a failed or cancelled run blocks them, a skipped one does not.
+    needs: [changes]
+    if: needs.changes.outputs.changed == 'true'
     uses: ./.github/workflows/attractap-lab-hil.yml
     secrets: inherit
 

@@ -4,7 +4,7 @@ name: Attractap lab hardware tests
 # reader firmware and the NFC card emulator in the Attractap lab, on every
 # reader type at once: one job per firmware variant, in place <variant>-1, plus
 # (ATTRACTAP_LAB_HIL_SECURE_ENABLED) one on the Secure Boot lab reader.
-# Called from the release and main-branch (nightly) workflows; skipped unless
+# Called from the release and the scheduled nightly workflows; skipped unless
 # the ATTRACTAP_LAB_HIL_ENABLED variable is "true".
 #
 # Repository variables (the job's `if:` cannot read environment variables):
