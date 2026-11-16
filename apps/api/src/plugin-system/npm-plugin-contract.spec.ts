@@ -1,5 +1,8 @@
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 import { parseNpmPluginPackage } from './npm/contract-validation';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { PluginManifestSchema } from './runtime/manifest-schema';
 
 const validPackage = {
   name: '@attraccess/plugin-example',
@@ -43,6 +46,15 @@ describe('parseNpmPluginPackage', () => {
     );
     expect(manifest.license).toEqual(license);
     expect(parseNpmPluginPackage(validPackage, '1.9.0').manifest.license).toBeUndefined();
+  });
+
+  it('keeps the paid wago module required in both Wago manifests', () => {
+    // Without this block the host would load Wago for every license, including the non-profit key.
+    const read = (file: string) => JSON.parse(readFileSync(join(__dirname, '../../../plugins/wago', file), 'utf8'));
+    const pkg = read('package.json');
+    const expected = { required: true, modules: ['wago'] };
+    expect(PluginManifestSchema.parse(read('plugin.json')).license).toEqual(expected);
+    expect(parseNpmPluginPackage(pkg, pkg.attraccess.host.replace(/^\^/, '')).manifest.license).toEqual(expected);
   });
 
   it('rejects an invalid license requirement', () => {

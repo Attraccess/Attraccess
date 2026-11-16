@@ -3,7 +3,7 @@ export {
   LoadedPluginManifest,
   PluginAttraccessVersion,
   PluginDependencyInfo,
-  PluginLicenseRequirement,
+  PluginManifestLicense,
   PluginManifest,
 } from './runtime/manifest';
 export { PluginManifestSchema } from './runtime/manifest-schema';

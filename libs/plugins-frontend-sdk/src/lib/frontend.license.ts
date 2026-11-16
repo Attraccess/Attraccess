@@ -7,7 +7,10 @@ export interface PluginLicenseData {
   valid: boolean;
   /** Why the license is not valid. */
   reason?: string;
-  /** Modules the license grants. The non-profit key grants core modules only, never plugin modules. */
+  /**
+   * Modules of the license. They count only while `valid` is true (an expired license still lists them), so prefer
+   * `hasModule`. The non-profit key grants core modules only, never plugin modules.
+   */
   modules: string[];
   /** Usage limits by name. Unlimited values arrive as `null` in JSON. */
   usageLimits: Record<string, number | null>;
@@ -15,12 +18,29 @@ export interface PluginLicenseData {
   isNonProfit: boolean;
 }
 
+/** How long components share one answer; the server verifies the key on every request. */
+const LICENSE_CACHE_MS = 30_000;
+
+let shared: { promise: Promise<PluginLicenseData>; at: number } | null = null;
+
 /**
  * Fetches the current license of the installation. Needs a logged-in user. Rejects with a `PluginApiError` on
  * failure (for example when the user is signed out) or when the license service cannot check it.
  */
 export function fetchPluginLicense(): Promise<PluginLicenseData> {
   return createPluginApiClient().request<PluginLicenseData>('/api/license-data');
+}
+
+/** One request for every mounted hook: reuses an answer younger than {@link LICENSE_CACHE_MS}; `fresh` skips it. */
+function loadSharedLicense(fresh: boolean): Promise<PluginLicenseData> {
+  if (!fresh && shared && Date.now() - shared.at < LICENSE_CACHE_MS) return shared.promise;
+  const entry = { promise: fetchPluginLicense(), at: Date.now() };
+  shared = entry;
+  // A failure is not reused: the next caller asks again.
+  entry.promise.catch(() => {
+    if (shared === entry) shared = null;
+  });
+  return entry.promise;
 }
 
 export interface UsePluginLicenseResult {
@@ -43,10 +63,10 @@ export function usePluginLicense(): UsePluginLicenseResult {
   const [error, setError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const load = useCallback(async (isCurrent: () => boolean) => {
+  const load = useCallback(async (isCurrent: () => boolean, fresh: boolean) => {
     setIsLoading(true);
     try {
-      const data = await fetchPluginLicense();
+      const data = await loadSharedLicense(fresh);
       if (!isCurrent()) return;
       setLicense(data);
       setError(null);
@@ -61,7 +81,7 @@ export function usePluginLicense(): UsePluginLicenseResult {
 
   useEffect(() => {
     let current = true;
-    void load(() => current);
+    void load(() => current, false);
     return () => {
       current = false;
     };
@@ -72,6 +92,6 @@ export function usePluginLicense(): UsePluginLicenseResult {
     isLoading,
     error,
     hasModule: (module) => Boolean(license?.valid && license.modules.includes(module)),
-    refetch: () => load(() => true),
+    refetch: () => load(() => true, true),
   };
 }

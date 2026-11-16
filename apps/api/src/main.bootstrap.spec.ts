@@ -264,7 +264,11 @@ describe('API bootstrap ordering and configuration', () => {
     expect(migrationOrder).toBeLessThan(jest.mocked(NestFactory.create).mock.invocationCallOrder[0]);
     // The license decides which plugins load, so it is known before migrations and before AppModule is imported.
     expect(PluginService.setLicenseSnapshot).toHaveBeenCalledWith({ valid: true, modules: ['wago'] });
-    expect(jest.mocked(PluginService.setLicenseSnapshot).mock.invocationCallOrder[0]).toBeLessThan(migrationOrder);
+    const snapshotOrder = jest.mocked(PluginService.setLicenseSnapshot).mock.invocationCallOrder[0];
+    expect(snapshotOrder).toBeLessThan(migrationOrder);
+    // configure() resets the snapshot, and the boot guard must not record plugins the license keeps out.
+    expect(jest.mocked(PluginService.configure).mock.invocationCallOrder[0]).toBeLessThan(snapshotOrder);
+    expect(snapshotOrder).toBeLessThan(jest.mocked(PluginService.beginBootGuard).mock.invocationCallOrder[0]);
     expect(early.close).toHaveBeenCalled();
     expect(initializeProcessLogging).toHaveBeenCalledTimes(1);
     expect(early.useLogger).toHaveBeenCalledWith(jest.mocked(initializeProcessLogging).mock.results[0].value);
@@ -284,6 +288,7 @@ describe('API bootstrap ordering and configuration', () => {
     const result = await bootstrap();
     expect(result.shouldGuardPluginLifecycle).toBe(false);
     expect(PluginService.beginBootGuard).not.toHaveBeenCalled();
+    expect(PluginService.setLicenseSnapshot).not.toHaveBeenCalled();
     expect(PluginMigrationService.runPendingUpMigrationsForAllPlugins).not.toHaveBeenCalled();
     expect(datasource.initialize).not.toHaveBeenCalled();
     expect(datasource.runMigrations).not.toHaveBeenCalled();

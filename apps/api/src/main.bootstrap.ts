@@ -289,15 +289,17 @@ export async function bootstrap() {
   if (earlyConfig.PLUGIN_DIR) await NpmPluginService.recoverBackups();
   bootstrapLogger.log('PluginSystem configured.');
 
-  // Record active plugins before migrations or module loading execute plugin code.
   const shouldGuardPluginLifecycle = !earlyConfig.DISABLE_PLUGINS && Boolean(earlyConfig.PLUGIN_DIR);
-  if (shouldGuardPluginLifecycle) PluginService.beginBootGuard();
 
   // Decide which license-gated plugins may load. PluginModule.forRoot() is synchronous, so the license is read here,
-  // before AppModule is imported. A failure never aborts boot: gated plugins then count as unlicensed.
-  if (!earlyConfig.DISABLE_PLUGINS && earlyConfig.PLUGIN_DIR) {
+  // before AppModule is imported. A failure never aborts boot: gated plugins then count as unlicensed. It runs before
+  // the boot guard, so plugins the license keeps out are never recorded as active (and never quarantined).
+  if (shouldGuardPluginLifecycle) {
     PluginService.setLicenseSnapshot(await evaluateStartupLicense(earlyConfig, bootstrapLogger));
   }
+
+  // Record active plugins before migrations or module loading execute plugin code.
+  if (shouldGuardPluginLifecycle) PluginService.beginBootGuard();
 
   // Run plugin-shipped up-migrations BEFORE AppModule is imported, so every
   // plugin's tables exist before any plugin code (its onModuleInit) runs. This

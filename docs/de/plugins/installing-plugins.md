@@ -66,14 +66,16 @@ Einige Plugins brauchen ein bezahltes Lizenzmodul. Das Plugin **WAGO** braucht z
 Schluessel fuer gemeinnuetzige Nutzung enthaelt es nicht.
 
 Deckt die Lizenz ein Plugin nicht ab, zeigt **Einstellungen > Plugins** es mit dem Status **Lizenz fehlt** und nennt, was
-es braucht, zum Beispiel "Benoetigt das Lizenzmodul: wago". Das Plugin wird nicht geladen: Es hat keine Menueeintraege,
-Seiten, Flow-Knoten oder Hintergrundaktivitaet, und Attraccess zeigt dafuer keine Fehlermeldung.
+es braucht, zum Beispiel "Benötigt das Lizenzmodul: wago". Das Plugin wird nicht geladen: Es hat keine Menueeintraege,
+Seiten, Flow-Knoten oder Hintergrundaktivitaet, und Attraccess zeigt dafuer keine Fehlermeldung. Ein Plugin, das es als
+Abhaengigkeit braucht, wird ebenfalls nicht geladen und zeigt den ueblichen Abhaengigkeitsfehler.
 
 Speichern Sie unter **Einstellungen > Allgemein** einen gueltigen Lizenzschluessel, der aendert, welche Plugins geladen
-werden duerfen, startet Attraccess automatisch neu und das Plugin wird geladen (oder nicht mehr geladen). Betrifft die
-Aenderung kein Plugin, gibt es keinen Neustart. Ein ungueltiger, abgelaufener oder nicht pruefbarer Schluessel loest nie
+werden duerfen, startet Attraccess automatisch neu und das Plugin wird geladen (oder nicht mehr geladen). Das Entfernen
+des Schluessels wirkt genauso. Betrifft die Aenderung kein Plugin, gibt es keinen Neustart. Ein ungueltiger, abgelaufener oder nicht pruefbarer Schluessel loest nie
 einen Neustart aus, weil Attraccess damit nicht starten wuerde: Korrigieren Sie zuerst den Schluessel. Eine Lizenz, die
-waehrend des Betriebs ablaeuft, wirkt ab dem naechsten Start.
+waehrend des Betriebs ablaeuft, wirkt ab dem naechsten Start. Zeigt ein Plugin trotz gueltiger Lizenz **Lizenz fehlt**,
+konnte die Lizenz beim Start nicht geprueft werden: Starten Sie Attraccess neu.
 
 ## Plugin entfernen
 

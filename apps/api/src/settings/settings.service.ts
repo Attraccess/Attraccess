@@ -193,11 +193,18 @@ export class SettingsService {
   }
 
   async updateSystemSettings(update: UpdateSystemSettingsDto): Promise<SystemSettingsDto> {
-    if (update.app) {
-      await this.updateAppSettings(update.app);
-    }
-    if (update.smtp) {
-      await this.updateSmtpSettings(update.smtp);
+    let licenseKeyStored = false;
+    try {
+      if (update.app) {
+        await this.updateAppSettings(update.app);
+        licenseKeyStored = Object.prototype.hasOwnProperty.call(update.app, 'licenseKey');
+      }
+      if (update.smtp) {
+        await this.updateSmtpSettings(update.smtp);
+      }
+    } finally {
+      // Only after every setting of this request is stored (or failed): the event may restart the server.
+      if (licenseKeyStored) this.eventEmitter?.emit(LICENSE_KEY_CHANGED_EVENT);
     }
     return this.getSystemSettings();
   }
@@ -232,7 +239,6 @@ export class SettingsService {
     }
     if (Object.prototype.hasOwnProperty.call(update, 'licenseKey')) {
       await this.settingsStore.setSecretSetting(APP_PARENT, APP_KEYS.licenseKey, update.licenseKey ?? null);
-      this.eventEmitter?.emit(LICENSE_KEY_CHANGED_EVENT);
     }
     if (update.defaultLanguage !== undefined) {
       await this.settingsStore.setPlainSetting(APP_PARENT, APP_KEYS.defaultLanguage, update.defaultLanguage);

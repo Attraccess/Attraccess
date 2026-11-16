@@ -238,7 +238,9 @@ describe('PluginsSection', () => {
       await user.click(await screen.findByText('Example'));
 
       await user.click(screen.getByRole('button', { name: 'Install' }));
-      const dialog = screen.getByRole('heading', { name: 'Install Example?' }).closest('[role="dialog"]') as HTMLElement;
+      const dialog = screen
+        .getByRole('heading', { name: 'Install Example?' })
+        .closest('[role="dialog"]') as HTMLElement;
       await user.click(within(dialog).getByRole('checkbox'));
       expect(within(dialog).getByRole('button', { name: 'Install plugin' })).toBeEnabled();
       if (dismissal === 'Cancel button') await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
@@ -703,6 +705,36 @@ describe('PluginsSection', () => {
 
     expect(await screen.findByRole('heading', { name: 'Cool Plugin failed to load' })).toBeInTheDocument();
     expect(screen.getByText("Cannot find module '@nestjs/common'")).toBeInTheDocument();
+  });
+
+  it('shows a missing license as a warning with only the missing modules and no load-error action', () => {
+    hoisted.plugins = [
+      makePlugin({
+        status: 'license_missing',
+        error: 'Requires license module: other',
+        license: { required: true, modules: ['wago', 'other'] },
+        missingLicenseModules: ['other'],
+      }),
+    ];
+    render(<PluginsSection />);
+
+    expect(screen.getByText('License missing')).toBeInTheDocument();
+    expect(screen.getByText('Requires license module: other')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'View load error for Cool Plugin' })).not.toBeInTheDocument();
+  });
+
+  it('names a valid license when a plugin needs no specific module', () => {
+    hoisted.plugins = [
+      makePlugin({
+        status: 'license_missing',
+        error: 'Requires a valid Attraccess license',
+        license: { required: true },
+        missingLicenseModules: [],
+      }),
+    ];
+    render(<PluginsSection />);
+
+    expect(screen.getByText('Requires a valid Attraccess license')).toBeInTheDocument();
   });
 
   it('warns when plugins are globally disabled', async () => {

@@ -5,7 +5,7 @@
   "inputs": {
     "licenseKey": {
       "label": "Lizenzschlüssel",
-      "description": "Füge deinen kommerziellen Lizenzschlüssel ein oder nutze die Community-Schaltfläche oben."
+      "description": "Füge deinen kommerziellen Lizenzschlüssel ein oder nutze die Community-Schaltfläche oben. Ändert der Schlüssel, welche Plugins geladen werden dürfen, startet der Server automatisch neu."
     }
   },
   "actions": {

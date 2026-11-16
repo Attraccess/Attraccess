@@ -16,9 +16,18 @@ export function createPluginLicenseContext(getService: () => LicenseSource): Plu
   const getLicense = async (): Promise<PluginLicenseInfo> => {
     try {
       const data = await getService().getLicenseData();
+      // An invalid (for example expired) Licenso license still carries its payload; it grants nothing.
+      if (!data.valid) {
+        return {
+          valid: false,
+          reason: data.reason ?? 'LICENSE_INVALID',
+          modules: [],
+          usageLimits: {},
+          isNonProfit: data.isNonProfit,
+        };
+      }
       return {
-        valid: data.valid,
-        ...(data.reason ? { reason: data.reason } : {}),
+        valid: true,
         modules: [...data.modules],
         usageLimits: { ...data.usageLimits },
         isNonProfit: data.isNonProfit,

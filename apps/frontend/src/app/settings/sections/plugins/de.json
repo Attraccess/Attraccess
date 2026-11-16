@@ -111,7 +111,7 @@
       "many": "Benötigt die Lizenzmodule: {{modules}}"
     },
     "licenseMissingRequired": "Benötigt eine gültige Attraccess-Lizenz",
-    "licenseMissingTooltip": "Nicht geladen: Die Lizenz deckt dieses Plugin nicht ab. Nach dem Speichern eines passenden Lizenzschlüssels startet der Server neu und lädt es.",
+    "licenseMissingTooltip": "Nicht geladen: Beim Start deckte die Lizenz dieses Plugin nicht ab oder konnte nicht geprüft werden. Nach dem Speichern eines passenden Lizenzschlüssels startet der Server neu und lädt es.",
     "unknown": "Nur Frontend",
     "errorTooltip": "Serverfehler beim Laden anzeigen",
     "viewError": "Ladefehler für {{pluginName}} anzeigen",

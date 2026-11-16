@@ -10,7 +10,7 @@
     },
     "licenseKey": {
       "label": "Lizenzschlüssel",
-      "description": "Füge einen neuen Lizenzschlüssel zum Aktualisieren ein. Ändert er, welche Plugins geladen werden dürfen (z. B. Wago), startet der Server automatisch neu."
+      "description": "Füge einen neuen Lizenzschlüssel zum Aktualisieren ein. Ändert ein gültiger neuer Schlüssel, welche Plugins geladen werden dürfen (z. B. WAGO), startet der Server automatisch neu."
     },
     "defaultLanguage": {
       "label": "Standardsprache des Systems"

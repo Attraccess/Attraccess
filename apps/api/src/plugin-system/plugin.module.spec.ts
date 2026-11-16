@@ -6,6 +6,7 @@ import { ModuleRef } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { User } from '@attraccess/database-entities';
 import { PLUGIN_AUDIT_HOST_PROVIDER, PluginPermission, PluginPermissionError } from '@attraccess/plugins-backend-sdk';
+import { LicenseService } from '../license/license.service';
 import { PluginModule } from './plugin.module';
 import { resolveAppVersion } from '../config/app.config';
 import { PluginLiveUpdatesService } from './plugin-live-updates.service';
@@ -416,6 +417,27 @@ describe('PluginModule', () => {
         }
       ).createPluginContext(fixture.manifest({ permissions: [] }));
       expect(() => context.runSerialized(async () => 1)).toThrow(PluginPermissionError);
+    });
+  });
+
+  describe('license', () => {
+    it('reaches the plugin without a permission and asks the host license service', async () => {
+      const getLicenseData = jest.fn(async () => ({
+        valid: true,
+        modules: ['wago'],
+        usageLimits: {},
+        isNonProfit: false,
+      }));
+      const get = jest.fn((token: unknown) => (token === LicenseService ? { getLicenseData } : { token }));
+      new PluginModule({} as DataSource, new EventEmitter2(), { get } as unknown as ModuleRef);
+      const context = (
+        PluginModule as unknown as {
+          createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
+        }
+      ).createPluginContext(fixture.manifest({ permissions: [] }));
+
+      await expect(context.license?.hasModule('wago')).resolves.toBe(true);
+      expect(getLicenseData).toHaveBeenCalled();
     });
   });
 

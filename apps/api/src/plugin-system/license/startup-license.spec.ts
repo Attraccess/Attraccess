@@ -76,9 +76,50 @@ describe('evaluateStartupLicense', () => {
     expect(verifyLicense).not.toHaveBeenCalled();
   });
 
-  it('returns null without creating a database on a fresh install', async () => {
-    await expect(evaluateStartupLicense(appConfig, logger)).resolves.toBeNull();
-    expect(require('fs').existsSync(mockDatabase.file)).toBe(false);
+  describe('on a fresh install (no database yet)', () => {
+    const env = { ...process.env };
+    afterEach(() => {
+      process.env = { ...env };
+    });
+
+    it('reports no license without creating a database when LICENSE_KEY is not set', async () => {
+      delete process.env.LICENSE_KEY;
+      await expect(evaluateStartupLicense(appConfig, logger)).resolves.toEqual({ valid: false, modules: [] });
+      expect(require('fs').existsSync(mockDatabase.file)).toBe(false);
+    });
+
+    it('uses LICENSE_KEY from the environment, which the seed migration stores later', async () => {
+      process.env.LICENSE_KEY = '  licenso-key  ';
+      process.env.ATTRACCESS_URL = 'https://attraccess.example';
+      (verifyLicense as jest.Mock).mockResolvedValue({
+        valid: true,
+        payload: { cfg: { modules: { wago: true }, usageLimits: {} } },
+      });
+      await expect(evaluateStartupLicense(appConfig, logger)).resolves.toEqual({ valid: true, modules: ['wago'] });
+      expect(verifyLicense).toHaveBeenCalledWith('licenso-key', 'public', 'attraccess.example');
+      expect(require('fs').existsSync(mockDatabase.file)).toBe(false);
+    });
+  });
+
+  it('reports no modules for an invalid (for example expired) key', async () => {
+    await seed('licenso-key');
+    (verifyLicense as jest.Mock).mockResolvedValue({
+      valid: false,
+      reason: 'Expired',
+      payload: { cfg: { modules: { wago: true }, usageLimits: {} } },
+    });
+    await expect(evaluateStartupLicense(appConfig, logger)).resolves.toEqual({ valid: false, modules: [] });
+  });
+
+  it('gives up after the timeout and still closes the connection', async () => {
+    await seed('licenso-key');
+    let finish: (value: unknown) => void = () => undefined;
+    (verifyLicense as jest.Mock).mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    const destroy = jest.spyOn(DataSource.prototype, 'destroy');
+    await expect(evaluateStartupLicense(appConfig, logger, 20)).resolves.toBeNull();
+    finish({ valid: true, payload: { cfg: { modules: { wago: true } } } });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(destroy).toHaveBeenCalled();
   });
 
   it('reports an invalid license when no license key is stored', async () => {

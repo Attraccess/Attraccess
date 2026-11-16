@@ -10,7 +10,7 @@
     },
     "licenseKey": {
       "label": "License Key",
-      "description": "Paste a new license key to update. If it changes which plugins may load (for example Wago), the server restarts automatically."
+      "description": "Paste a new license key to update. If a valid new key changes which plugins may load (for example WAGO), the server restarts automatically."
     },
     "defaultLanguage": {
       "label": "Default system language"

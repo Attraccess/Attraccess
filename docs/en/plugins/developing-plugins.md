@@ -108,9 +108,10 @@ Updates and downgrades must satisfy both the target version's dependencies and i
 A plugin can require an Attraccess license. The host enforces the requirement with the same license logic as core
 features (a valid key, optionally with named modules), so a plugin never re-implements a license check.
 
-Plugins are not automatically part of the non-profit license. A plugin without its own license terms takes over the
-core license (see the `LICENSE.md` of the repository). A plugin that needs a paid module ships its own `LICENSE.md`
-and declares the module as below. The non-profit key grants the core modules only and **never a plugin module**.
+A plugin without its own license terms is under the core license (see the `LICENSE.md` of the repository), including
+its free use by private individuals and non-profit organizations. A plugin with its own commercial license is not
+covered by that non-profit permission: it ships its own `LICENSE.md` and declares its paid module as below. The
+non-profit key grants the core modules only and **never a plugin module**.
 
 ### Declaring a requirement
 
@@ -129,8 +130,9 @@ Add an optional `license` block. In a ZIP plugin it belongs in `plugin.json`; in
 Anything declared here is a hard requirement. The host evaluates the license **once at startup**, before it loads any
 plugin. If the requirement is not met, the plugin is not loaded at all: no backend, migrations, flow nodes, audit
 domains, reader UI, hooks or frontend. Settings > Plugins shows it as **License missing**, with the missing modules.
-If the license cannot be determined (no key, the license server is unreachable), a gated plugin counts as unlicensed.
-A plugin that has a required dependency on an unlicensed plugin does not load either.
+If the license cannot be determined (no key, a key that does not verify, unreadable settings), a gated plugin counts as
+unlicensed. On a fresh install, the host uses the `LICENSE_KEY` environment variable. A plugin that has a required
+dependency on an unlicensed plugin does not load either; it shows the usual dependency error.
 
 Not loading for license reasons is not a failure: the plugin is not quarantined, and it loads after the next restart
 once the license covers it. An invalid `license` block (wrong types, unknown keys) is a manifest error: the plugin does
@@ -139,10 +141,10 @@ npm plugins, set `attraccess.host` to the first version that enforces it; the ho
 plugin's `attraccessVersion` is not compared with the host version, so an old host loads a ZIP plugin without the
 gate.
 
-When an administrator saves a different, valid license key, the host checks the plugins again. It restarts
-automatically exactly when that changes whether at least one gated plugin loads. An invalid, expired or unverifiable
-key never restarts, because the host refuses to start with it. There is no periodic re-check: an expired license is
-noticed at the next startup.
+When an administrator saves a different, valid license key or removes the key, the host checks the plugins again. It
+restarts automatically exactly when that changes whether at least one gated plugin loads. An invalid, expired or
+unverifiable key never restarts, because the host refuses to start with it. There is no periodic re-check: an expired
+license is noticed at the next startup.
 
 ### Deciding at runtime
 
@@ -158,25 +160,30 @@ plugin.
 | `license.hasModule(module)`     | `true` only if the license is valid and grants the module. `false` when it cannot be determined.                                      |
 | `license.verify(requirements?)` | Resolves if the license is valid and satisfies `{ modules?, usageLimits? }`, otherwise throws a `PluginLicenseError` with a `reason`. |
 
-Every call checks the license anew, so a plugin sees a changed key without a restart.
+Every call checks the license anew (a local signature check, no network request), so a plugin sees a changed key
+without a restart. An invalid license reports no modules and no usage limits. In hot paths, such as per message or per
+reader event, check once per operation rather than per item.
 
 ```ts
 import { PluginLicenseError } from '@attraccess/plugins-backend-sdk';
 
-// Offer the export only with the `reports` module.
+// Offer the export only with the `reports` module. `false` on hosts without `context.license`.
 if (!(await context.license?.hasModule('reports'))) throw new ForbiddenException('Requires the reports module');
 
-// Or fail with the host's reason:
+// Or fail with the host's reason. Check for `context.license` first: on an older host, `?.verify` would do nothing.
+if (!context.license) throw new ForbiddenException('This host cannot check the license');
 try {
-  await context.license?.verify({ modules: ['reports'], usageLimits: { users: userCount } });
+  await context.license.verify({ modules: ['reports'], usageLimits: { users: userCount } });
 } catch (error) {
-  if (error instanceof PluginLicenseError) context.logger.warn(error.reason);
+  if (error instanceof PluginLicenseError) throw new ForbiddenException(error.reason);
+  throw error;
 }
 ```
 
 **Frontend:** `usePluginLicense()` from `@attraccess/plugins-frontend-sdk` reads `GET /api/license-data` (for a signed-in
 user). It returns `{ license, isLoading, error, hasModule(module), refetch() }`; `hasModule` is `false` while loading or
-when the license is unknown. `fetchPluginLicense()` does the same request without React.
+when the license is unknown. Mounted hooks share one request for 30 seconds; `refetch()` asks again.
+`fetchPluginLicense()` does the same request without React.
 
 ```tsx
 import { usePluginLicense } from '@attraccess/plugins-frontend-sdk';

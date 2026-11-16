@@ -67,12 +67,15 @@ non-profit use does not include it.
 
 If the license does not cover a plugin, **Settings > Plugins** shows it with the status **License missing** and names
 what it needs, for example "Requires license module: wago". The plugin is not loaded: it has no menu entries, pages,
-flow nodes or background activity, and Attraccess shows no error message for it.
+flow nodes or background activity, and Attraccess shows no error message for it. A plugin that requires it as a
+dependency does not load either and shows the usual dependency error.
 
 When you save a valid license key in **Settings > General** that changes which plugins may load, Attraccess restarts
-automatically and the plugin loads (or stops loading). If the change affects no plugin, there is no restart. A key that
+automatically and the plugin loads (or stops loading). Removing the key works the same way. If the change affects no
+plugin, there is no restart. A key that
 is invalid, expired or cannot be verified never triggers a restart, because Attraccess would refuse to start with it:
-correct the key first. A license that expires while Attraccess runs takes effect at the next start.
+correct the key first. A license that expires while Attraccess runs takes effect at the next start. If a valid license
+shows **License missing**, the license could not be checked at startup: restart Attraccess.
 
 ## Removing a Plugin
 

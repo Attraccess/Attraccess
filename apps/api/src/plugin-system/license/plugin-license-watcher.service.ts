@@ -28,10 +28,11 @@ export class PluginLicenseWatcher {
     let snapshot: PluginLicenseSnapshot;
     try {
       const data = await this.moduleRef.get(LicenseService, { strict: false }).getLicenseData();
-      snapshot = { valid: data.valid, modules: data.modules };
-      if (!data.valid) {
-        // AppModule.onModuleInit aborts startup for a stored key that does not verify. Restarting into that would take
-        // the API down, so keep running and let the admin correct the key; the next startup applies it.
+      snapshot = { valid: data.valid, modules: data.valid ? data.modules : [] };
+      // AppModule.onModuleInit aborts startup for a stored key that does not verify. Restarting into that would take
+      // the API down, so keep running and let the admin correct the key; the next startup applies it. A removed key
+      // is different: startup skips the check, so a restart is safe and unloads the plugins that need a license.
+      if (!data.valid && data.reason !== 'LICENSE_KEY_NOT_CONFIGURED') {
         this.logger.warn(`The new license key is not valid (${data.reason ?? 'unknown reason'}); not restarting.`);
         return;
       }

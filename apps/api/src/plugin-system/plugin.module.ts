@@ -172,10 +172,9 @@ export class PluginModule {
     const active = new Set<string>();
     for (const manifest of ordered) {
       // Not a failure: no quarantine, no boot-guard entry. The plugin loads after a restart once it is licensed.
-      if (PluginService.getLicenseMissingReason(manifest)) {
-        getImplementationClass().logger.log(
-          `Plugin ${manifest.name} is not loaded: ${PluginService.getLicenseMissingReason(manifest)}`,
-        );
+      const licenseMissing = PluginService.getLicenseMissingReason(manifest);
+      if (licenseMissing) {
+        getImplementationClass().logger.log(`Plugin ${manifest.name} is not loaded: ${licenseMissing}`);
         continue;
       }
       if (

@@ -5,7 +5,7 @@
   "inputs": {
     "licenseKey": {
       "label": "License Key",
-      "description": "Paste your commercial license key, or use the community button above."
+      "description": "Paste your commercial license key, or use the community button above. If the key changes which plugins may load, the server restarts automatically."
     }
   },
   "actions": {

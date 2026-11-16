@@ -211,6 +211,8 @@ describe('PluginService', () => {
 
       PluginService.beginBootGuard();
       PluginService.configure({ PLUGIN_DIR: fixture.root, RESTART_BY_EXIT: true });
+      // The startup license check discovers plugins before the boot guard runs.
+      PluginService.getPlugins();
       PluginService.beginBootGuard();
 
       const [plugin] = PluginService.getPlugins();

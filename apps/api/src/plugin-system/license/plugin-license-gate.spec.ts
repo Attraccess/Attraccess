@@ -105,6 +105,37 @@ describe('plugin license gate', () => {
     });
   });
 
+  it('reports only the modules the license lacks', () => {
+    fixture('multi', { modules: ['wago', 'other'] });
+    PluginService.setLicenseSnapshot(wagoLicense);
+    PluginModule.forRoot();
+    expect(status('multi')).toMatchObject({
+      status: 'license_missing',
+      error: 'Requires license module: other',
+      missingLicenseModules: ['other'],
+    });
+  });
+
+  it('does not record license_missing plugins in the boot guard, so an incomplete startup cannot quarantine them', () => {
+    fixture('wago', { modules: ['wago'] });
+    fixture('wago-addon', undefined, ['wago']);
+    fixture('plain', undefined);
+    PluginService.setLicenseSnapshot(nonProfit);
+    PluginService.beginBootGuard();
+    try {
+      const guarded = JSON.parse(readFileSync(join(root, '.plugin-boot-guard.json'), 'utf8'));
+      expect(guarded).toEqual(['plain']);
+
+      // The next startup after a crash quarantines only what the guard recorded.
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      PluginService.setLicenseSnapshot(wagoLicense);
+      PluginService.beginBootGuard();
+      expect(PluginService.isPluginQuarantined(status('wago') as never)).toBe(false);
+    } finally {
+      PluginService.clearBootGuard();
+    }
+  });
+
   it('does not load dependants of a license_missing plugin and uses the dependency message', () => {
     fixture('wago', { modules: ['wago'] });
     fixture('addon', undefined, ['wago']);
@@ -117,9 +148,10 @@ describe('plugin license gate', () => {
     });
   });
 
-  it('runs no migrations for license_missing plugins or their dependants', async () => {
+  it('runs no migrations for license_missing plugins or their (transitive) dependants', async () => {
     fixture('wago', { modules: ['wago'] }, [], true);
     fixture('addon', undefined, ['wago'], true);
+    fixture('addon-extra', undefined, ['addon'], true);
     fixture('plain', undefined, [], true);
     const migrated: string[] = [];
     jest.spyOn(PluginMigrationService, 'runUpMigrations').mockImplementation(async (manifest) => {
@@ -130,7 +162,9 @@ describe('plugin license gate', () => {
     await PluginMigrationService.runPendingUpMigrationsForAllPlugins();
     expect(migrated).toEqual(['plain']);
     PluginModule.forRoot();
+    expect(loaded()).toEqual(['plain']);
     expect(status('addon')?.error).toContain('Required plugin wago failed to load');
+    expect(status('addon-extra')?.error).toContain('Required plugin addon failed to load');
   });
 
   it('does not load a plugin with an invalid license block', () => {
@@ -212,6 +246,30 @@ describe('plugin license gate', () => {
       PluginService.setLicenseSnapshot(wagoLicense);
       const { watcher, pluginService } = make(
         jest.fn().mockResolvedValue({ valid: false, reason: 'Expired', modules: [], usageLimits: {} }),
+      );
+      await watcher.onLicenseKeyChanged();
+      expect(pluginService.requestRestart).not.toHaveBeenCalled();
+    });
+
+    it('restarts when the key is removed while a gated plugin is loaded', async () => {
+      PluginService.setLicenseSnapshot(wagoLicense);
+      const { watcher, pluginService } = make(
+        jest.fn().mockResolvedValue({
+          valid: false,
+          reason: 'LICENSE_KEY_NOT_CONFIGURED',
+          modules: [],
+          usageLimits: {},
+          isNonProfit: false,
+        }),
+      );
+      await watcher.onLicenseKeyChanged();
+      expect(pluginService.requestRestart).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not restart when the key is removed and no gated plugin was loaded', async () => {
+      PluginService.setLicenseSnapshot(null);
+      const { watcher, pluginService } = make(
+        jest.fn().mockResolvedValue({ valid: false, reason: 'LICENSE_KEY_NOT_CONFIGURED', modules: [] }),
       );
       await watcher.onLicenseKeyChanged();
       expect(pluginService.requestRestart).not.toHaveBeenCalled();

@@ -111,7 +111,7 @@ export class PluginDependencyInfo {
   required: boolean;
 }
 
-export class PluginLicenseRequirement implements PluginLicenseDeclaration {
+export class PluginManifestLicense implements PluginLicenseDeclaration {
   @ApiProperty({
     description:
       'The plugin needs a valid Attraccess license (the non-profit key counts), but no specific module. Implied by a non-empty modules list.',
@@ -166,10 +166,10 @@ export class PluginManifest {
 
   @ApiProperty({
     description: 'License requirements the host enforces before it loads the plugin.',
-    type: PluginLicenseRequirement,
+    type: PluginManifestLicense,
     required: false,
   })
-  license?: PluginLicenseRequirement;
+  license?: PluginManifestLicense;
 }
 
 // inheritance: data shape; a loaded manifest is the declared manifest plus runtime fields.
@@ -202,4 +202,13 @@ export class LoadedPluginManifest extends PluginManifest {
     example: "Cannot find module '@nestjs/common'",
   })
   error: string | null;
+
+  @ApiProperty({
+    description:
+      'For status "license_missing": the declared license modules the license does not grant. Empty when the plugin only needs a valid license.',
+    type: [String],
+    required: false,
+    example: ['wago'],
+  })
+  missingLicenseModules?: string[];
 }

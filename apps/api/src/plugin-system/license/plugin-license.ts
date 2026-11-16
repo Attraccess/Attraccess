@@ -20,23 +20,37 @@ export function isLicenseGated(license: PluginLicenseDeclaration | undefined): b
   return Boolean(license?.required || license?.modules?.length);
 }
 
+/** How the license falls short of a plugin's declaration: the modules it lacks (empty when only `required` fails). */
+export type PluginLicenseShortfall = { missingModules: string[]; message: string };
+
 /**
- * Returns why the license does not satisfy the declaration, or null when it does (or nothing is declared).
- * An unknown license counts as not satisfied.
+ * Returns how the license fails the declaration, or null when it satisfies it (or nothing is declared). An unknown
+ * license counts as not satisfied.
  */
-export function missingLicenseReason(
+export function licenseShortfall(
   license: PluginLicenseDeclaration | undefined,
   snapshot: PluginLicenseSnapshot,
-): string | null {
+): PluginLicenseShortfall | null {
   if (!isLicenseGated(license)) return null;
 
   const modules = license?.modules ?? [];
   if (modules.length > 0) {
     const missing = snapshot?.valid ? modules.filter((module) => !snapshot.modules.includes(module)) : modules;
     return missing.length > 0
-      ? `Requires license ${missing.length === 1 ? 'module' : 'modules'}: ${missing.join(', ')}`
+      ? {
+          missingModules: missing,
+          message: `Requires license ${missing.length === 1 ? 'module' : 'modules'}: ${missing.join(', ')}`,
+        }
       : null;
   }
 
-  return snapshot?.valid ? null : 'Requires a valid Attraccess license';
+  return snapshot?.valid ? null : { missingModules: [], message: 'Requires a valid Attraccess license' };
+}
+
+/** Returns why the license does not satisfy the declaration, or null when it does (or nothing is declared). */
+export function missingLicenseReason(
+  license: PluginLicenseDeclaration | undefined,
+  snapshot: PluginLicenseSnapshot,
+): string | null {
+  return licenseShortfall(license, snapshot)?.message ?? null;
 }

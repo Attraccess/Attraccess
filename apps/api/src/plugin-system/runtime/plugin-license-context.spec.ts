@@ -29,7 +29,13 @@ describe('createPluginLicenseContext', () => {
       getLicenseData: jest.fn().mockResolvedValue({ ...data, valid: false, reason: 'EXPIRED' }),
     });
     await expect(context.hasModule('wago')).resolves.toBe(false);
-    await expect(context.getLicense()).resolves.toMatchObject({ valid: false, reason: 'EXPIRED' });
+    await expect(context.getLicense()).resolves.toEqual({
+      valid: false,
+      reason: 'EXPIRED',
+      modules: [],
+      usageLimits: {},
+      isNonProfit: false,
+    });
   });
 
   it('reports an undeterminable license instead of throwing', async () => {

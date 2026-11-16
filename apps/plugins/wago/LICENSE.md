@@ -1,4 +1,4 @@
-# Kommerzielle Lizenz – Attraccess Plugin „Wago“
+# Kommerzielle Lizenz – Attraccess Plugin „WAGO“
 
 Copyright (c) 2025 Jan Jaap (Github: JappyJan, E-Mail: mail@janjaap.de)
 Project: Attraccess

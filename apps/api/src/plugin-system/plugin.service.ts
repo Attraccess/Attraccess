@@ -25,8 +25,10 @@ import { PluginSandboxService } from './plugin-sandbox.service';
 import { INTERNAL_PLUGIN_DIRECTORIES } from './runtime/boot-guard';
 
 import {
+  licenseShortfall,
   missingLicenseReason,
   PluginLicenseDeclarationSchema,
+  type PluginLicenseShortfall,
   type PluginLicenseSnapshot,
 } from './license/plugin-license';
 
@@ -55,11 +57,42 @@ export class PluginService {
 
   protected static readonly pluginUploadLocks = new Map<string, Promise<void>>();
 
-  /** Marks active plugins only while Nest is running their lifecycle hooks. */
+  /**
+   * Marks active plugins only while Nest is running their lifecycle hooks. Plugins the startup license keeps out (and
+   * plugins that require them) never run, so they are not marked: an incomplete startup must not quarantine them.
+   */
   public static beginBootGuard(): void {
-    return PluginBootGuard.beginBootGuard(getImplementationClass().PLUGIN_PATH, () =>
-      getImplementationClass().getPlugins(),
+    // The startup license check may already have discovered the plugins. Discover again once the previous startup's
+    // plugins are quarantined, so discovery reports them as failed with their quarantine message.
+    getImplementationClass().plugins = null;
+    return PluginBootGuard.beginBootGuard(getImplementationClass().PLUGIN_PATH, () => {
+      const blocked = getImplementationClass().licenseBlockedPluginNames();
+      return getImplementationClass()
+        .getPlugins()
+        .filter((manifest) => !blocked.has(manifest.name));
+    });
+  }
+
+  /** Plugins the startup license keeps out, plus every plugin that requires one of them (transitively). */
+  public static licenseBlockedPluginNames(): Set<string> {
+    const plugins = getImplementationClass().getPlugins();
+    const blocked = new Set(
+      plugins
+        .filter((manifest) => getImplementationClass().getLicenseMissingReason(manifest))
+        .map((manifest) => manifest.name),
     );
+    let grew = blocked.size > 0;
+    while (grew) {
+      grew = false;
+      for (const manifest of plugins) {
+        if (blocked.has(manifest.name)) continue;
+        if (manifest.dependencies?.some((dependency) => dependency.required && blocked.has(dependency.name))) {
+          blocked.add(manifest.name);
+          grew = true;
+        }
+      }
+    }
+    return blocked;
   }
 
   /**
@@ -122,10 +155,15 @@ export class PluginService {
     getImplementationClass().licenseGate = { snapshot };
   }
 
+  /** How the startup license fails the plugin's `license` block; null when it satisfies it or none is declared. */
+  public static getLicenseShortfall(manifest: Pick<LoadedPluginManifest, 'license'>): PluginLicenseShortfall | null {
+    const gate = getImplementationClass().licenseGate;
+    return gate ? licenseShortfall(manifest.license, gate.snapshot) : null;
+  }
+
   /** Why the startup license does not satisfy the plugin's `license` block; null when it does or none is declared. */
   public static getLicenseMissingReason(manifest: Pick<LoadedPluginManifest, 'license'>): string | null {
-    const gate = getImplementationClass().licenseGate;
-    return gate ? missingLicenseReason(manifest.license, gate.snapshot) : null;
+    return getImplementationClass().getLicenseShortfall(manifest)?.message ?? null;
   }
 
   /**
@@ -348,9 +386,14 @@ export class PluginService {
       .getPlugins()
       .map((manifest) => {
         const key = `${manifest.name}@${manifest.version}`;
-        const licenseMissing = getImplementationClass().getLicenseMissingReason(manifest);
-        if (licenseMissing) {
-          return { ...manifest, status: 'license_missing' as const, error: licenseMissing };
+        const shortfall = getImplementationClass().getLicenseShortfall(manifest);
+        if (shortfall) {
+          return {
+            ...manifest,
+            status: 'license_missing' as const,
+            error: shortfall.message,
+            missingLicenseModules: shortfall.missingModules,
+          };
         }
 
         const error = getImplementationClass().pluginLoadErrors.get(key);
