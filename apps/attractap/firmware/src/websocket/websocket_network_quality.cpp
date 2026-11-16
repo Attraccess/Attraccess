@@ -17,8 +17,12 @@
 void Websocket::publishNetworkQuality()
 {
     uint32_t nowMs = millis();
-    bool hasInboundMessage = this->lastInboundFrameTime != 0;
-    uint32_t inboundAgeMs = hasInboundMessage ? nowMs - this->lastInboundFrameTime : 0;
+    // The websocket task writes lastInboundFrameTime unlocked, possibly after nowMs was taken: read it
+    // once and clamp, so a frame that just arrived reads as age 0 instead of wrapping around.
+    uint32_t lastInboundFrameTime = this->lastInboundFrameTime;
+    bool hasInboundMessage = lastInboundFrameTime != 0;
+    int32_t inboundDeltaMs = (int32_t)(nowMs - lastInboundFrameTime);
+    uint32_t inboundAgeMs = hasInboundMessage && inboundDeltaMs > 0 ? (uint32_t)inboundDeltaMs : 0;
     uint8_t txDepth = this->tx_queue ? (uint8_t)uxQueueMessagesWaiting(this->tx_queue) : 0;
     uint8_t reconnects = 0;
     uint8_t queueFull = 0;
@@ -33,6 +37,7 @@ void Websocket::publishNetworkQuality()
     uint32_t averagePongRttMs = 0;
     int32_t pongRttTrendMs = 0;
     bool hasPongRttSample = false;
+    bool hasRecentPongRttSample = false;
     if (this->network_quality_mutex)
     {
         xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
@@ -49,6 +54,7 @@ void Websocket::publishNetworkQuality()
         averagePongRttMs = averageRecentPongRtt(nowMs);
         pongRttTrendMs = recentPongRttTrend(nowMs);
         hasPongRttSample = this->hasPongRttSample;
+        hasRecentPongRttSample = countRecentNetworkQualityEvents(this->pongRttSampleTimes, QUALITY_EVENT_SLOTS, nowMs) > 0;
         xSemaphoreGive(this->network_quality_mutex);
     }
 
@@ -88,6 +94,7 @@ void Websocket::publishNetworkQuality()
     state.averagePongRttMs = averagePongRttMs;
     state.pongRttTrendMs = pongRttTrendMs;
     state.hasPongRttSample = hasPongRttSample;
+    state.hasRecentPongRttSample = hasRecentPongRttSample;
     state.pongTimeoutsLastMinute = pongTimeouts;
     state.pongProbeLossPercentLastMinute = pongProbeLossPercent;
     state.hasCompletedPongProbe = completedPongProbes > 0;

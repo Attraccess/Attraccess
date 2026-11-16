@@ -100,7 +100,8 @@ void NetworkStatusScreen::init()
    lv_obj_set_width(rows, lv_pct(100));
    lv_obj_set_flex_grow(rows, 1);
    lv_obj_set_flex_flow(rows, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_style_pad_row(rows, 8, LV_PART_MAIN);
+   // Tight enough that all rows fit on the 480 px screen without scrolling.
+   lv_obj_set_style_pad_row(rows, 6, LV_PART_MAIN);
    lv_obj_set_scroll_dir(rows, LV_DIR_VER);
 
    for (size_t row = 0; row < RowCount; ++row)
@@ -166,6 +167,7 @@ bool NetworkStatusScreen::onPinConfirmed(const std::string &pin)
    }
    this->locked = false;
    lv_obj_add_flag(this->pinLockOverlay, LV_OBJ_FLAG_HIDDEN);
+   this->refresh();
    return true;
 }
 
@@ -212,8 +214,8 @@ void NetworkStatusScreen::refresh()
        quality,
        availableOr(state.hasInboundMessage, milliseconds(state.lastInboundAgeMs)),
        availableOr(state.hasPongRttSample, milliseconds(state.lastPongRttMs)),
-       availableOr(state.hasPongRttSample, milliseconds(state.averagePongRttMs)),
-       availableOr(state.hasPongRttSample, signedMilliseconds(state.pongRttTrendMs)),
+       availableOr(state.hasRecentPongRttSample, milliseconds(state.averagePongRttMs)),
+       availableOr(state.hasRecentPongRttSample, signedMilliseconds(state.pongRttTrendMs)),
        number(state.reconnectsLastMinute),
        number(state.txQueueDepth),
        number(state.txQueueFullEventsLastMinute),
@@ -232,6 +234,11 @@ void NetworkStatusScreen::refresh()
 
 void NetworkStatusScreen::loop()
 {
+   // Behind the PIN overlay the values are hidden; redrawing them would only repaint the keypad.
+   if (this->locked)
+   {
+      return;
+   }
    if (millis() - this->lastRefreshMs >= REFRESH_INTERVAL_MS)
    {
       this->refresh();

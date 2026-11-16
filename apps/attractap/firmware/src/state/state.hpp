@@ -44,6 +44,8 @@ public:
         uint32_t averagePongRttMs = 0;
         int32_t pongRttTrendMs = 0;
         bool hasPongRttSample = false;
+        // Average and trend cover only the last minute; without a sample in it they are 0, not measured.
+        bool hasRecentPongRttSample = false;
         uint8_t pongTimeoutsLastMinute = 0;
         uint8_t pongProbeLossPercentLastMinute = 0;
         bool hasCompletedPongProbe = false;

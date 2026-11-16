@@ -96,6 +96,7 @@ void testGallery(SdlDisplay &display, const std::filesystem::path &screenshots)
         quality.averagePongRttMs = 31;
         quality.pongRttTrendMs = -7;
         quality.hasPongRttSample = true;
+        quality.hasRecentPongRttSample = true;
         quality.hasCompletedPongProbe = true;
         State::setNetworkQualityState(quality);
         auto &networkStatus = Display::networkStatusScreen;
@@ -113,7 +114,7 @@ void testGallery(SdlDisplay &display, const std::filesystem::path &screenshots)
         quality.pongTimeoutsLastMinute = 3;
         quality.pongProbeLossPercentLastMinute = 50;
         State::setNetworkQualityState(quality);
-        SDL_Delay(1000);
+        hostAdvanceMillis(1000);
         shot("network-status-degraded");
         assert(findLabel(networkStatus.getScreen(), german ? "Eingeschränkt" : "Degraded"));
         auto *lastRow = lv_obj_get_parent(findLabel(networkStatus.getScreen(), german ? "Verpasste Heartbeats (1 Min.)" : "Missed heartbeats (1 min)"));

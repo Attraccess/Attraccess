@@ -154,7 +154,7 @@ void Display::initDrawer()
                              Display::onOpenSettingsCallback();
                      });
 
-    makeDrawerButton(row, LV_SYMBOL_WIFI, FirmwareI18n::Message::NetworkStatusShort, DisplayTheme::primary(),
+    Display::drawerNetworkButton = makeDrawerButton(row, LV_SYMBOL_WIFI, FirmwareI18n::Message::NetworkStatusShort, DisplayTheme::primary(),
                      [](lv_event_t *e)
                      {
                          if (lv_event_get_code(e) != LV_EVENT_CLICKED || !Display::isDrawerAvailable())
@@ -200,6 +200,11 @@ void Display::openDrawer()
 
     Display::drawerOpen = true;
     Display::logger.info("Maintenance drawer opened (top-edge pull-down)");
+    // The connection settings stop the connection, so the network status would only show frozen values.
+    if (Display::isActive(&Display::connectionConfigurationScreen))
+        lv_obj_add_flag(Display::drawerNetworkButton, LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_remove_flag(Display::drawerNetworkButton, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(Display::drawerBackdrop, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(Display::drawerPanel, LV_OBJ_FLAG_HIDDEN);
 
@@ -247,7 +252,8 @@ void Display::requestReboot()
 
 void Display::showNetworkStatus()
 {
-    if (!Display::isDrawerAvailable() || Display::transientActive())
+    if (!Display::isDrawerAvailable() || Display::transientActive() ||
+        Display::isActive(&Display::connectionConfigurationScreen))
         return;
     Display::networkStatusScreen.setOnCloseCallback([] { Display::returnFromTransient(); });
     Display::networkStatusScreen.lock();
@@ -258,7 +264,7 @@ void Display::handleGestureSample(int16_t x, int16_t y, bool pressed)
 {
     (void)x;
 
-    // No drawer over a full-screen flow (status, confirmation, top-up, forms, project picker):
+    // No drawer over a full-screen flow (status, confirmation, top-up, forms, project picker, network status):
     // its reboot question would park that flow's origin while the application still waits on it.
     if (Display::transientActive())
     {

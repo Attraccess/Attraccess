@@ -1,7 +1,7 @@
 #include "display.hpp"
 
 // Transient full-screen layouts (status, confirm, top-up, forms, project
-// picker). They are ordinary routed screens that park the screen under them.
+// picker, network status). They are ordinary routed screens that park the screen under them.
 
 bool Display::isActive(const IScreen *screen)
 {

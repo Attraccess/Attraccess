@@ -90,6 +90,7 @@ std::function<void(int16_t, int16_t)> Display::touchCallback = nullptr;
 lv_obj_t *Display::drawerBackdrop = nullptr;
 lv_obj_t *Display::drawerGrabber = nullptr;
 lv_obj_t *Display::drawerPanel = nullptr;
+lv_obj_t *Display::drawerNetworkButton = nullptr;
 bool Display::drawerOpen = false;
 bool Display::rebootConfirmShown = false;
 std::function<void()> Display::onOpenSettingsCallback = nullptr;

@@ -207,6 +207,7 @@ private:
     static lv_obj_t *drawerBackdrop;
     static lv_obj_t *drawerGrabber;
     static lv_obj_t *drawerPanel;
+    static lv_obj_t *drawerNetworkButton;
     static bool drawerOpen;
     static bool rebootConfirmShown;
     static std::function<void()> onOpenSettingsCallback;

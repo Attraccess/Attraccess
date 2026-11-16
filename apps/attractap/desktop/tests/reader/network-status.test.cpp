@@ -77,6 +77,7 @@ void ReaderWorkflow::testNetworkStatus()
     degraded.averagePongRttMs = 1870;
     degraded.pongRttTrendMs = 12;
     degraded.hasPongRttSample = true;
+    degraded.hasRecentPongRttSample = true;
     degraded.reconnectsLastMinute = 2;
     degraded.txQueueDepth = 3;
     degraded.txQueueFullEventsLastMinute = 1;
@@ -87,7 +88,11 @@ void ReaderWorkflow::testNetworkStatus()
     degraded.hasCompletedPongProbe = true;
     degraded.missedHeartbeatsLastMinute = 7;
     State::setNetworkQualityState(degraded);
-    pump(1100);
+    // The PIN refreshed the values: the next refresh waits for the full second.
+    pump();
+    assert(row("Connection quality") == "Offline");
+    hostAdvanceMillis(1000);
+    pump();
     assert(row("Connection quality") == "Degraded");
     assert(row("Time since last message") == "1450 ms");
     assert(row("Latest ping") == "2140 ms" && row("Average ping") == "1870 ms");
@@ -117,7 +122,8 @@ void ReaderWorkflow::testNetworkStatus()
     good.pongProbeLossPercentLastMinute = good.missedHeartbeatsLastMinute = 0;
     good.hasInboundMessage = false;
     State::setNetworkQualityState(good);
-    pump(1100);
+    hostAdvanceMillis(1000);
+    pump();
     assert(row("Verbindungsqualität") == "Gut");
     assert(row("Letzter Ping") == "24 ms" && row("Ping-Trend") == "-7 ms");
     assert(row("Zeit seit letzter Nachricht") == "Nicht verfügbar");
@@ -126,9 +132,66 @@ void ReaderWorkflow::testNetworkStatus()
     assert(row("Connection quality") == "Good" && row("Ping loss (1 min)") == "0%");
     display.capture(output, "net-status-good-english");
 
+    // Each flag gates only its own rows. Pings answered earlier but none in the last minute: the
+    // latest ping stays, average and trend have nothing to show.
+    State::NetworkQualityState stale = good;
+    stale.hasInboundMessage = true;
+    stale.hasRecentPongRttSample = false;
+    stale.hasCompletedPongProbe = false;
+    State::setNetworkQualityState(stale);
+    hostAdvanceMillis(1000);
+    pump();
+    assert(row("Latest ping") == "24 ms" && row("Time since last message") == "1450 ms");
+    assert(row("Average ping") == "Not available" && row("Ping trend") == "Not available");
+    assert(row("Ping loss (1 min)") == "Not available");
+    State::NetworkQualityState flat = good;
+    flat.pongRttTrendMs = 0;
+    flat.hasPongRttSample = false;
+    State::setNetworkQualityState(flat);
+    hostAdvanceMillis(1000);
+    pump();
+    assert(row("Ping trend") == "0 ms" && row("Latest ping") == "Not available");
+    assert(row("Ping loss (1 min)") == "0%");
+
     // Back returns to the screen it was opened on.
     click(LV_SYMBOL_LEFT);
     pump(100);
+    assert(lv_screen_active() == origin);
+
+    // A wrong PIN keeps the values hidden behind the brute-force delay; Cancel closes the screen.
+    openFromDrawer();
+    const std::string wrongPin = Settings::getDeviceConfig().passCode == "1111" ? "2222" : "1111";
+    const uint32_t beforeWrongPin = millis();
+    enterPin(wrongPin);
+    assert(millis() - beforeWrongPin >= 5000);
+    assert(Display::isActive(&Display::networkStatusScreen));
+    assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Unlock with PIN")));
+    lv_obj_send_event(findAll(&lv_keyboard_class).front(), LV_EVENT_CANCEL, nullptr);
+    pump(100);
+    assert(lv_screen_active() == origin);
+
+    // The connection settings stop the connection, so their drawer offers no network status.
+    Display::transitionToScreen(&Display::connectionConfigurationScreen);
+    pump(100);
+    openDrawer();
+    assert(drawerOpen());
+    const char *networkLabel = FirmwareI18n::messageText(FirmwareI18n::Message::NetworkStatusShort, State::getActiveLanguage());
+    assert(!lv_obj_is_visible(requireLabel(lv_layer_top(), networkLabel)));
+    display.touch = {240, 400, true}; pump(); // the backdrop below the drawer closes it
+    display.touch.pressed = false; pump();
+    assert(!drawerOpen());
+    Display::transitionToScreen(&Display::resourceListScreen);
+    pump(100);
+    assert(lv_screen_active() == origin);
+
+    // A card tap takes the drawer away, and the network status with it.
+    openFromDrawer();
+    enterPin(Settings::getDeviceConfig().passCode);
+    tapCard();
+    assert(!Display::isActive(&Display::networkStatusScreen));
+    server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_REMOVED"})"); pump();
+    clearStatus();
+    nfc.setPresent(0, false); pump();
     assert(lv_screen_active() == origin);
 
     // Reopening asks for the PIN again. A dropped connection keeps the screen up, so the drop can
@@ -138,7 +201,8 @@ void ReaderWorkflow::testNetworkStatus()
     enterPin(Settings::getDeviceConfig().passCode);
     State::setWebsocketState(false, "reader.test", 80, false);
     setQuality(State::NETWORK_QUALITY_OFFLINE);
-    pump(1100);
+    hostAdvanceMillis(1000);
+    pump();
     assert(Display::isActive(&Display::networkStatusScreen));
     assert(row("Connection quality") == "Offline");
     click(LV_SYMBOL_LEFT);

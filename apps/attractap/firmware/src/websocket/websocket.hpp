@@ -51,6 +51,7 @@ public:
 
 private:
     friend struct WebsocketPongProbeTest;
+    friend struct WebsocketNetworkQualityTest;
     std::function<void(const char *, size_t)> messageCallbackRaw;
     std::function<void(esp_websocket_event_data_t)> binaryDataCallback;
     std::function<bool(const uint8_t *, size_t)> rawBinaryCallback;
