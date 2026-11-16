@@ -12,6 +12,13 @@ const CounterEntity = new EntitySchema<Counter>({
   columns: { id: { type: Number, primary: true }, value: { type: Number } },
 });
 
+type Note = { id?: number; text: string | null };
+const NoteEntity = new EntitySchema<Note>({
+  name: 'Note',
+  tableName: 'note',
+  columns: { id: { type: Number, primary: true, generated: 'increment' }, text: { type: String, nullable: false } },
+});
+
 const defer = <T = void>() => {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((done) => (resolve = done));
@@ -27,13 +34,19 @@ describe('main SQLite connection transaction isolation', () => {
     createDataSource({
       type: 'sqlite',
       database: join(directory, 'test.sqlite'),
-      entities: [CounterEntity],
+      entities: [CounterEntity, NoteEntity],
       ...(busyTimeout ? { busyTimeout } : {}),
     }).initialize();
   const values = () => source.query('SELECT id, value FROM counter ORDER BY id');
-  const runnerState = () => {
+  // isTransactionActive reads false for every flow but the owner, so also check that a fresh flow is not kept waiting.
+  const runnerState = async () => {
     const runner = source.createQueryRunner();
-    return [runner.isTransactionActive, (runner as unknown as { transactionDepth: number }).transactionDepth];
+    const read = source.query('SELECT 1');
+    let timer: NodeJS.Timeout | undefined;
+    const waited = new Promise<boolean>((resolve) => (timer = setTimeout(resolve, 1000, false)));
+    const free = await Promise.race([read.then(() => true), waited]).finally(() => clearTimeout(timer));
+    read.catch(() => undefined);
+    return [runner.isTransactionActive, (runner as unknown as { transactionDepth: number }).transactionDepth, free];
   };
 
   beforeEach(async () => {
@@ -41,6 +54,7 @@ describe('main SQLite connection transaction isolation', () => {
     source = await open();
     await source.query('CREATE TABLE counter (id INTEGER PRIMARY KEY, value INTEGER NOT NULL)');
     await source.query('INSERT INTO counter VALUES (1, 0), (2, 0), (3, 0)');
+    await source.query('CREATE TABLE note (id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL)');
   });
 
   afterEach(async () => {
@@ -72,10 +86,10 @@ describe('main SQLite connection transaction isolation', () => {
       { id: 2, value: 20 },
       { id: 3, value: 0 },
     ]);
-    expect(runnerState()).toEqual([false, 0]);
+    expect(await runnerState()).toEqual([false, 0, true]);
   });
 
-  it('does not commit another flow’s partly failed write with the open transaction', async () => {
+  it('does not commit another flow’s partly failed save() with the open transaction', async () => {
     const opened = defer();
     const finish = defer();
     const a = source.transaction(async (manager) => {
@@ -84,63 +98,74 @@ describe('main SQLite connection transaction isolation', () => {
       await finish.promise;
     });
     await opened.promise;
-    // The second row violates the primary key: the whole save must roll back, not leave row 2 in A's commit.
-    const c = source.getRepository(CounterEntity).insert([
-      { id: 2, value: 20 },
-      { id: 3, value: 30 },
-      { id: 3, value: 31 },
-    ]);
+    // Generated ids: save() decides about its own transaction before its first statement, while A is open. The second
+    // note violates NOT NULL, so the first must roll back with it instead of autocommitting or joining A.
+    const c = source.getRepository(NoteEntity).save([{ text: 'kept only with the second' }, { text: null }]);
     const cOutcome = expect(c).rejects.toThrow();
-    await pause(50);
     finish.resolve();
     await a;
     await cOutcome;
 
-    expect(await values()).toEqual([
-      { id: 1, value: 10 },
-      { id: 2, value: 0 },
-      { id: 3, value: 0 },
-    ]);
+    expect(await source.query('SELECT * FROM note')).toEqual([]);
+    expect((await values())[0]).toEqual({ id: 1, value: 10 });
   });
 
-  it.each([
-    ['A throws', true],
-    ['B throws', false],
-  ])('keeps the other flow’s data when %s', async (_name, aFails) => {
+  it('keeps the other flow’s data when A throws', async () => {
     const aOpened = defer();
     const release = defer();
     const a = source.transaction(async (manager) => {
       await manager.update(CounterEntity, { id: 1 }, { value: 1 });
       aOpened.resolve();
       await release.promise;
-      if (aFails) throw new Error('A fails');
+      throw new Error('A fails');
     });
-    const aOutcome = aFails ? expect(a).rejects.toThrow('A fails') : a;
+    const aOutcome = expect(a).rejects.toThrow('A fails');
     await aOpened.promise;
-    const b = source.transaction(async (manager) => {
-      await manager.update(CounterEntity, { id: 2 }, { value: 2 });
-      if (!aFails) throw new Error('B fails');
-    });
-    const bOutcome = aFails ? b : expect(b).rejects.toThrow('B fails');
+    const b = source.transaction((manager) => manager.update(CounterEntity, { id: 2 }, { value: 2 }));
     await pause(50);
     // B has not started inside A's transaction: A's end decides only A's data.
     release.resolve();
-    await Promise.all([aOutcome, bOutcome]);
+    await Promise.all([aOutcome, b]);
 
-    expect(await values()).toEqual(
-      aFails
-        ? [
-            { id: 1, value: 0 },
-            { id: 2, value: 2 },
-            { id: 3, value: 0 },
-          ]
-        : [
-            { id: 1, value: 1 },
-            { id: 2, value: 0 },
-            { id: 3, value: 0 },
-          ],
-    );
-    expect(runnerState()).toEqual([false, 0]);
+    expect(await values()).toEqual([
+      { id: 1, value: 0 },
+      { id: 2, value: 2 },
+      { id: 3, value: 0 },
+    ]);
+    expect(await runnerState()).toEqual([false, 0, true]);
+  });
+
+  it('keeps the committed flow’s data when a later flow’s transaction fails after it', async () => {
+    const aOpened = defer();
+    const releaseA = defer();
+    const bWrote = defer();
+    const releaseB = defer();
+    const a = source.transaction(async (manager) => {
+      await manager.update(CounterEntity, { id: 1 }, { value: 1 });
+      aOpened.resolve();
+      await releaseA.promise;
+    });
+    await aOpened.promise;
+    const b = source.transaction(async (manager) => {
+      await manager.update(CounterEntity, { id: 2 }, { value: 2 });
+      bWrote.resolve();
+      await releaseB.promise;
+      throw new Error('B fails');
+    });
+    const bOutcome = expect(b).rejects.toThrow('B fails');
+    // Nested in A (the old behaviour), B would write now and A's commit would keep B's write.
+    await Promise.race([bWrote.promise, pause(50)]);
+    releaseA.resolve();
+    await a;
+    releaseB.resolve();
+    await bOutcome;
+
+    expect(await values()).toEqual([
+      { id: 1, value: 1 },
+      { id: 2, value: 0 },
+      { id: 3, value: 0 },
+    ]);
+    expect(await runnerState()).toEqual([false, 0, true]);
   });
 
   it('runs 16 concurrent read-modify-write transactions without lost updates, repeatedly', async () => {
@@ -155,7 +180,7 @@ describe('main SQLite connection transaction isolation', () => {
       );
       expect(await source.query('SELECT value FROM counter WHERE id = 1')).toEqual([{ value: round * 16 }]);
     }
-    expect(runnerState()).toEqual([false, 0]);
+    expect(await runnerState()).toEqual([false, 0, true]);
   });
 
   it('keeps savepoints for the owner’s nested transactions and saves', async () => {
@@ -188,7 +213,6 @@ describe('main SQLite connection transaction isolation', () => {
   });
 
   it('lets the owner use the root DataSource and repositories inside its transaction without waiting', async () => {
-    const started = Date.now();
     await expect(
       source.transaction(async () => {
         await source.query('UPDATE counter SET value = 5 WHERE id = 1');
@@ -198,8 +222,7 @@ describe('main SQLite connection transaction isolation', () => {
       }),
     ).rejects.toThrow('Roll everything back');
 
-    expect(Date.now() - started).toBeLessThan(2000);
-    // They ran inside the transaction, so they rolled back with it.
+    // A self-wait would have failed them with SQLITE_BUSY. They ran inside the transaction, so they rolled back with it.
     expect(await values()).toEqual([
       { id: 1, value: 0 },
       { id: 2, value: 0 },
@@ -255,15 +278,19 @@ describe('main SQLite connection transaction isolation', () => {
 
     await source.transaction(async (manager) => {
       await manager.update(CounterEntity, { id: 1 }, { value: 4 });
+      const started = Date.now();
       go.resolve();
       const error = (await outsideFailure) as { code?: string; message?: string };
+      // Rejected after the busy timeout, not at once and not much later.
+      expect(Date.now() - started).toBeGreaterThanOrEqual(140);
+      expect(Date.now() - started).toBeLessThan(2000);
       expect(error.code).toBe('SQLITE_BUSY');
       expect(error.message).toContain("another flow's transaction");
       await manager.update(CounterEntity, { id: 1 }, { value: 5 });
     });
 
     expect((await values())[0]).toEqual({ id: 1, value: 5 });
-    expect(runnerState()).toEqual([false, 0]);
+    expect(await runnerState()).toEqual([false, 0, true]);
     await source.getRepository(CounterEntity).save({ id: 2, value: 9 });
   });
 
@@ -292,7 +319,7 @@ describe('main SQLite connection transaction isolation', () => {
       { id: 2, value: 0 },
       { id: 3, value: 0 },
     ]);
-    expect(runnerState()).toEqual([false, 0]);
+    expect(await runnerState()).toEqual([false, 0, true]);
     await source.getRepository(CounterEntity).save({ id: 2, value: 8 });
   });
 
@@ -315,7 +342,7 @@ describe('main SQLite connection transaction isolation', () => {
       });
       setTimeout(release, 5);
       await Promise.all([holder, save, write]);
-      expect(runnerState()).toEqual([false, 0]);
+      expect(await runnerState()).toEqual([false, 0, true]);
     }
     expect(await values()).toEqual([
       { id: 1, value: 40 },
