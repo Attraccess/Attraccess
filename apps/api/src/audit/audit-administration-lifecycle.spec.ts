@@ -290,6 +290,34 @@ describe('administration lifecycle hooks', () => {
     }
   });
 
+  it('still records ZIP deletion and retry when a manifest name or version cannot be stored as audit text', async () => {
+    const audit = recorder();
+    const manifest = {
+      id: 'zip-plugin',
+      name: 'Example',
+      version: `1.0.0-${'v'.repeat(300)}`,
+      pluginDirectory: 'example',
+    };
+    const service = { deletePlugin: jest.fn().mockResolvedValue(undefined), requestRestart: jest.fn() };
+    const npm = { findInstalledByPluginId: jest.fn(), listInstalled: jest.fn().mockReturnValue([]) };
+    const controller = pluginController(service, npm, audit);
+    const get = jest.spyOn(PluginService, 'getManifestById').mockReturnValue(manifest as never);
+    const quarantined = jest.spyOn(PluginService, 'isPluginQuarantined').mockReturnValue(true);
+    const clear = jest.spyOn(PluginService, 'clearPluginQuarantine').mockImplementation(() => undefined);
+    try {
+      await controller.deletePlugin('zip-plugin', req);
+      await controller.retryPlugin('zip-plugin', req);
+      const [deleted, retried] = recorded(audit);
+      for (const event of [deleted, retried]) {
+        expect(event.details).toEqual({ pluginId: 'zip-plugin', pluginName: 'Example', restartRequested: 1 });
+      }
+    } finally {
+      get.mockRestore();
+      quarantined.mockRestore();
+      clear.mockRestore();
+    }
+  });
+
   it('records registry lifecycle, package configuration and removal using safe identifiers', async () => {
     const audit = recorder();
     const npm = {
