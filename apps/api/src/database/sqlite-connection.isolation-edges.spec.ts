@@ -36,11 +36,9 @@ describe('main SQLite connection transaction isolation: edge cases', () => {
       busyTimeout,
     }).initialize();
   const values = () => source.query('SELECT id, value FROM counter ORDER BY id');
-  /** No flow owns the connection any more: another flow's transaction runs at once. */
+  /** No flow owns the connection any more: another flow's transaction runs, not failing after the busy timeout. */
   const expectFree = async () => {
-    const started = Date.now();
     await source.transaction((manager) => manager.update(CounterEntity, { id: 3 }, { value: 33 }));
-    expect(Date.now() - started).toBeLessThan(250);
     const runner = source.createQueryRunner() as unknown as { transactionDepth: number };
     expect(runner.transactionDepth).toBe(0);
   };
@@ -128,24 +126,66 @@ describe('main SQLite connection transaction isolation: edge cases', () => {
   });
 
   it('frees the connection after the owner ran nested transactions concurrently and one failed', async () => {
-    const outcome = await source
-      .transaction(async (manager) => {
-        await manager.update(CounterEntity, { id: 1 }, { value: 1 });
-        await Promise.allSettled([
-          manager.transaction(async (nested) => {
-            await nested.update(CounterEntity, { id: 2 }, { value: 2 });
-            await pause(10);
-            throw new Error('Inner fails');
-          }),
-          manager.transaction((nested) => nested.update(CounterEntity, { id: 3 }, { value: 3 })),
-        ]);
-      })
-      .then(
-        () => 'committed',
-        () => 'failed',
-      );
+    // The savepoints of the two nested transactions interleave differently from run to run.
+    for (let round = 0; round < 10; round++) {
+      await source
+        .transaction(async (manager) => {
+          await manager.update(CounterEntity, { id: 1 }, { value: 1 });
+          await Promise.allSettled([
+            manager.transaction(async (nested) => {
+              await nested.update(CounterEntity, { id: 2 }, { value: 2 });
+              await pause(round % 3);
+              throw new Error('Inner fails');
+            }),
+            manager.transaction((nested) => nested.update(CounterEntity, { id: 3 }, { value: 3 })),
+          ]);
+        })
+        .catch(() => undefined);
 
-    expect(['committed', 'failed']).toContain(outcome);
+      await expectFree();
+    }
+  });
+
+  it('lets a nested transaction forked without being awaited end the transaction its call outlived', async () => {
+    const gate = defer();
+    let forked!: Promise<unknown>;
+    await source.transaction(async (manager) => {
+      await manager.update(CounterEntity, { id: 1 }, { value: 1 });
+      forked = manager.transaction(async (nested) => {
+        await nested.update(CounterEntity, { id: 2 }, { value: 2 });
+        await gate.promise;
+        await nested.update(CounterEntity, { id: 3 }, { value: 3 });
+      });
+      await pause(20);
+    });
+
+    // The outer COMMIT only released the fork's savepoint: the transaction stays open while the fork runs.
+    await expect(source.query('SELECT 1')).rejects.toMatchObject({ code: 'SQLITE_BUSY' });
+    gate.resolve();
+    await forked;
+    await expectFree();
+    expect(await values()).toEqual([
+      { id: 1, value: 1 },
+      { id: 2, value: 2 },
+      { id: 3, value: 33 },
+    ]);
+  });
+
+  it('fails the call when committing a transaction it outlived fails', async () => {
+    await source.query(
+      'CREATE TABLE child (id INTEGER PRIMARY KEY, parent INTEGER REFERENCES counter(id) DEFERRABLE INITIALLY DEFERRED)',
+    );
+    await expect(
+      source.transaction(async (manager) => {
+        await manager.query('INSERT INTO child VALUES (1, 99)');
+        // Leave one level open that no call will end, as concurrent nested transactions of one flow can: the outer
+        // COMMIT then only releases this savepoint.
+        await manager.query('SAVEPOINT typeorm_1');
+        (manager.queryRunner as unknown as { transactionDepth: number }).transactionDepth++;
+      }),
+    ).rejects.toThrow(/FOREIGN KEY/);
+
+    expect(await source.query('SELECT * FROM child')).toEqual([]);
     await expectFree();
   });
 

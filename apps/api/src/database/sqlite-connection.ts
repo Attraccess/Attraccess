@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { Logger } from '@nestjs/common';
 import { DataSource, DataSourceOptions, QueryRunner, TransactionNotStartedError } from 'typeorm';
 
 /** How long every connection to the SQLite file waits for another connection's write lock before SQLITE_BUSY. */
@@ -10,6 +11,8 @@ type RunnerInternals = QueryRunner & { transactionDepth: number; isTransactionAc
 const guardedRunners = new WeakSet<QueryRunner>();
 
 const noTransaction = () => false;
+
+const logger = new Logger('SqliteConnection');
 
 /** The EntityManager methods that start transactions on the runner themselves (TypeORM 0.3.x EntityPersistExecutor). */
 const MANAGER_ENTRY_POINTS = ['transaction', 'save', 'remove', 'softRemove', 'recover'];
@@ -43,8 +46,12 @@ export function createDataSource(options: DataSourceOptions): DataSource {
   return source;
 }
 
-/** One async flow: the identity of whoever started a transaction. Compared by reference. */
-type Flow = object;
+/**
+ * One async flow: the identity of whoever started a transaction, compared by reference. `nested` counts its nested
+ * entry-point calls still running; `outlived` holds how its outermost call ended while they still ran.
+ */
+type Flow = { nested: number; outlived?: boolean };
+const newFlow = (): Flow => ({ nested: 0 });
 
 /** Per DataSource: which flow owns the connection's open transaction, and the queue of flows waiting for it. */
 type Isolation = ReturnType<typeof createIsolation>;
@@ -82,6 +89,9 @@ function createIsolation(busyTimeout: number) {
       return owner;
     },
     isForeign: (flow: Flow | undefined) => owner !== undefined && owner !== flow,
+    get ticket() {
+      return ticket;
+    },
     /** Returns the claim's ticket. */
     claim(flow: Flow) {
       owner = flow;
@@ -111,6 +121,11 @@ function createIsolation(busyTimeout: number) {
         waiter.wake(true);
       }
     },
+    /**
+     * Ends a transaction that outlived the outermost entry-point call of its flow, once no nested call of the flow
+     * runs any more (set by the guarded runner). It commits after the call succeeded and rolls back after it failed.
+     */
+    endOutlived: async (flow: Flow, succeeded: boolean): Promise<void> => void [flow, succeeded],
     /** A statement let through at a release has finished. */
     endPass() {
       if (--passes === 0) drain();
@@ -149,10 +164,38 @@ function enterFlows(target: object, isolation: Isolation, names: string[]) {
     const original = (...args: unknown[]) => Object.getPrototypeOf(target)[name].apply(target, args);
     methods[name] = (...args) => {
       const current = isolation.flows.getStore();
-      const flow = current !== undefined && current === isolation.owner ? current : {};
-      return isolation.flows.run(flow, () => original(...args));
+      if (current !== undefined && current === isolation.owner)
+        return nestedCall(isolation, current, () => original(...args));
+      const flow = newFlow();
+      return isolation.flows.run(flow, async () => {
+        let result: unknown;
+        try {
+          result = await original(...args);
+        } catch (error) {
+          await isolation.endOutlived(flow, false);
+          throw error;
+        }
+        await isolation.endOutlived(flow, true);
+        return result;
+      });
     };
   }
+}
+
+/** A call inside the owner's transaction. The last nested call to end finishes a transaction its flow outlived. */
+function nestedCall(isolation: Isolation, flow: Flow, call: () => unknown) {
+  flow.nested++;
+  return isolation.flows.run(flow, async () => {
+    try {
+      return await call();
+    } finally {
+      if (--flow.nested === 0 && flow.outlived !== undefined) {
+        await isolation
+          .endOutlived(flow, flow.outlived)
+          .catch((error: Error) => logger.error(`Ending a transaction that outlived its call failed`, error.stack));
+      }
+    }
+  });
 }
 
 /**
@@ -172,7 +215,10 @@ function enterFlows(target: object, isolation: Isolation, names: string[]) {
  *   (commit throws TransactionNotStartedError, rollback does nothing). Nested transactions and statements of the
  *   owner's flow, also through the root manager, run inside it as savepoints, as before. TypeORM's savepoints form one
  *   stack, so nested transactions of one flow must not run concurrently (Promise.all): which writes survive is then
- *   undefined, though the connection is freed when the outer transaction ends.
+ *   undefined. If such a mix-up leaves the transaction open after the call that began the flow (transaction(), save(),
+ *   ...) and all its nested calls returned, the guard commits it (the call succeeded; a failed COMMIT fails the call)
+ *   or rolls it back (it failed), logs a warning and frees the connection. A nested transaction forked without being
+ *   awaited keeps the transaction open until it ends, and other flows wait for it.
  * - A flow is created by the entry points on the DataSource and on every EntityManager it creates (transaction, save,
  *   remove, softRemove, recover, migrations, synchronize). Code without such a context is a flow of its own per call,
  *   never the owner's. Work forked inside the owner's transaction without being awaited (a timer, an event listener,
@@ -255,7 +301,7 @@ function guardSharedRunner(runner: QueryRunner, isolation: Isolation): QueryRunn
     // Let through at a release: runs on its own even if the next owner was already chosen (its BEGIN waits for it).
     let passed = false;
     for (;;) {
-      if (!passed && isForeign(flow)) passed = await isolation.wait(flow ?? {}, false);
+      if (!passed && isForeign(flow)) passed = await isolation.wait(flow ?? newFlow(), false);
       else if (exclusive) await exclusive.catch(() => undefined);
       else break;
     }
@@ -285,7 +331,7 @@ function guardSharedRunner(runner: QueryRunner, isolation: Isolation): QueryRunn
   };
   runner.startTransaction = async (isolationLevel) => {
     let flow = flows.getStore();
-    if (flow === undefined) flows.enterWith((flow = {}));
+    if (flow === undefined) flows.enterWith((flow = newFlow()));
     // Waking from the queue makes this flow the owner. A gate can hand ownership to a queued flow meanwhile: check again.
     for (;;) {
       if (isForeign(flow)) await isolation.wait(flow, true);
@@ -323,14 +369,14 @@ function guardSharedRunner(runner: QueryRunner, isolation: Isolation): QueryRunn
         return await end();
       } finally {
         // A failed savepoint rollback can reset the runner (rollbackOrReset): then nothing is left to own.
-        if (depth > 1 && internals.transactionDepth === 0) isolation.release();
+        if (depth > 1 && internals.transactionDepth === 0 && isolation.owner === flows.getStore()) isolation.release();
       }
     }
     return gated(
       (gate) => (ending = gate),
       end,
       () => {
-        if (internals.transactionDepth === 0) isolation.release();
+        if (internals.transactionDepth === 0 && isolation.owner === flows.getStore()) isolation.release();
       },
     );
   };
@@ -354,8 +400,11 @@ function guardSharedRunner(runner: QueryRunner, isolation: Isolation): QueryRunn
     } catch (error) {
       if (depth > 0 && internals.transactionDepth === depth) {
         if (depth > 1 && (await transactionLive())) {
-          await query(`ROLLBACK TO SAVEPOINT typeorm_${depth - 1}`).catch(() => undefined);
-          internals.transactionDepth = depth - 1;
+          // Read the depth again: concurrent nested transactions of the flow may have failed alike meanwhile.
+          if (internals.transactionDepth > 1) {
+            const level = internals.transactionDepth--;
+            await query(`ROLLBACK TO SAVEPOINT typeorm_${level - 1}`).catch(() => undefined);
+          }
         } else {
           await query('ROLLBACK').catch(() => undefined);
           internals.transactionDepth = 0;
@@ -390,6 +439,44 @@ function guardSharedRunner(runner: QueryRunner, isolation: Isolation): QueryRunn
     if (isForeign(flows.getStore())) return;
     if (!active || internals.transactionDepth > 0) return endTransaction(rollbackOrReset);
     if (!starting) active = false;
+  };
+  // Every entry point ends the transaction it began before it returns. If TypeORM's depth went wrong (nested
+  // transactions of one flow ran concurrently), the outermost end only released a savepoint and the flow would own the
+  // connection forever. End the transaction for it, once no nested call of the flow runs: a nested transaction still
+  // running (forked without being awaited) ends the transaction itself, as TypeORM's depth counts it in.
+  isolation.endOutlived = async (flow, succeeded) => {
+    if (flow.nested > 0) {
+      flow.outlived = succeeded;
+      return;
+    }
+    flow.outlived = undefined;
+    if (isolation.owner !== flow || starting || ending) return;
+    const claimed = isolation.ticket;
+    const depth = internals.transactionDepth;
+    let failure: unknown;
+    await gated(
+      (gate) => (ending = gate),
+      async () => {
+        internals.transactionDepth = 0;
+        active = false;
+        if (depth === 0) return;
+        logger.warn(
+          `A transaction outlived the call that began it (nested transactions of one flow ran concurrently); ` +
+            `${succeeded ? 'committing' : 'rolling back'} it`,
+        );
+        if (succeeded) {
+          try {
+            return void (await query('COMMIT'));
+          } catch (error) {
+            failure = error;
+          }
+        }
+        await query('ROLLBACK').catch(noTransaction);
+      },
+      () => isolation.release(claimed),
+    );
+    // Like a failed outermost COMMIT: the call that seemed to succeed fails, its changes are rolled back.
+    if (failure) throw failure;
   };
   return runner;
 }
