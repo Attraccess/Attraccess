@@ -30,6 +30,14 @@ export class PluginMainFrontend {
     type: [String],
   })
   dashboardPaths?: string[];
+  @ApiProperty({
+    description:
+      'Ids of the dashboard widgets the plugin contributes through getDashboardWidgets(). Lowercase kebab-case; a built-in widget id always wins over a clashing plugin id.',
+    example: ['hello-world'],
+    required: false,
+    type: [String],
+  })
+  dashboardWidgets?: string[];
 }
 
 export class PluginMainBackend {

@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useResourcesServiceGetAllResourcesKey } from '@attraccess/react-query-client';
 import { ResourceOverview } from './index';
@@ -62,10 +63,15 @@ vi.mock('./noResourcesFound', () => ({
   ),
 }));
 
-function renderOverview(client = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
+function renderOverview(
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+  path = '/resources',
+) {
   return render(
     <QueryClientProvider client={client}>
-      <ResourceOverview />
+      <MemoryRouter initialEntries={[path]}>
+        <ResourceOverview />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -100,6 +106,12 @@ describe('ResourceOverview empty-state selection', () => {
     expect(await screen.findByRole('button', { name: 'First resource' })).toBeInTheDocument();
     expect(state.getExistence).toHaveBeenCalledTimes(1);
     expect(state.getResources.mock.calls.every(([params]) => params.onlyWithPermissions === true)).toBe(true);
+  });
+
+  it('starts with the search from ?q=, as the dashboard resource search links it', async () => {
+    renderOverview(undefined, '/resources?q=Laser');
+    await waitFor(() => expect(state.getResources).toHaveBeenCalled());
+    expect(state.getResources.mock.calls.every(([params]) => params.search === 'Laser')).toBe(true);
   });
 
   it.each(['getter', 'methods'])(

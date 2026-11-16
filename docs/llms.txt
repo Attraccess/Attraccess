@@ -145,7 +145,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Logging In](https://docs.attraccess.org/en/end-user/login.md): The ways to log in to Attraccess: password, SSO, two-factor authentication, registration and password reset.
 - [My Account](https://docs.attraccess.org/en/end-user/account.md): How to manage your own account: profile, security, RFID cards and account deletion.
 - [Using Resources](https://docs.attraccess.org/en/end-user/using-resources.md): How to find resources, get introduced, start supervised sessions and start and end usage sessions.
-- [Dashboard](https://docs.attraccess.org/en/end-user/dashboard.md): How to pin pages and resources to your personal dashboard, reorder them, and start sessions from it.
+- [Dashboard](https://docs.attraccess.org/en/end-user/dashboard.md): How to build your personal dashboard from widgets, pages and resources, edit and reorder it, and start or stop sessions from it.
 - [Mobile Usage (PWA)](https://docs.attraccess.org/en/end-user/mobile-pwa.md): How to install Attraccess as a Progressive Web App on iOS and Android, with updates and offline support.
 
 ## English: FAQ & Help
@@ -291,7 +291,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Anmeldung](https://docs.attraccess.org/de/end-user/login.md): Die Anmeldemöglichkeiten bei Attraccess: Passwort, SSO, Zwei-Faktor-Authentifizierung, Registrierung und Passwort zurücksetzen.
 - [Mein Konto](https://docs.attraccess.org/de/end-user/account.md): So verwalten Sie Ihr eigenes Konto: Profil, Sicherheit, RFID-Karten und Konto löschen.
 - [Ressourcen nutzen](https://docs.attraccess.org/de/end-user/using-resources.md): Wie Sie Ressourcen finden, eingewiesen werden, beaufsichtigte Sitzungen starten sowie Nutzungssitzungen starten und beenden.
-- [Dashboard](https://docs.attraccess.org/de/end-user/dashboard.md): Wie Sie Seiten und Ressourcen an Ihr persönliches Dashboard anheften, sie neu anordnen und von dort Sitzungen starten.
+- [Dashboard](https://docs.attraccess.org/de/end-user/dashboard.md): Wie Sie Ihr persönliches Dashboard aus Widgets, Seiten und Ressourcen zusammenstellen, bearbeiten und neu anordnen und von dort Sitzungen starten oder beenden.
 - [Mobile Nutzung (PWA)](https://docs.attraccess.org/de/end-user/mobile-pwa.md): Wie Sie Attraccess als Progressive Web App auf iOS und Android installieren, inklusive Updates und Offline-Unterstützung.
 
 ## Deutsch: FAQ & Hilfe

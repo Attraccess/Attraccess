@@ -3,7 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import * as semver from 'semver';
 import { z } from 'zod';
 import { PluginDependenciesSchema } from '../runtime/dependencies';
-import { dashboardPathsSchema } from '../runtime/manifest-schema';
+import { dashboardPathsSchema, dashboardWidgetsSchema } from '../runtime/manifest-schema';
 import { PluginManifest, PluginManifestSchema } from '../plugin.manifest';
 
 const entryPath = z
@@ -34,6 +34,7 @@ const packageSchema = z
       migrations: entryPath.optional(),
       styles: entryPath.optional(),
       dashboardPaths: dashboardPathsSchema.optional(),
+      dashboardWidgets: dashboardWidgetsSchema.optional(),
       permissions: z.array(z.nativeEnum(PluginPermission)).default([]),
       sdk: z
         .object({
@@ -90,6 +91,7 @@ export function parseNpmPluginPackage(
               ? { styles: styleForFrontend(pkg.attraccess.frontend, pkg.attraccess.styles) }
               : {}),
             ...(pkg.attraccess.dashboardPaths ? { dashboardPaths: pkg.attraccess.dashboardPaths } : {}),
+            ...(pkg.attraccess.dashboardWidgets ? { dashboardWidgets: pkg.attraccess.dashboardWidgets } : {}),
           },
         }
       : {}),

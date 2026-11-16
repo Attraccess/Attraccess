@@ -24,6 +24,8 @@ import {
 } from './pins';
 import { usePinnablePages } from './pinnablePagesContext';
 import { PagePinCard, PendingPinCard, ResourcePinCard, UnavailablePinCard } from './PinCards';
+import { WidgetPinCard } from './WidgetPinCard';
+import { useDashboardWidgets } from './widgets/widgetsContext';
 import de from './de.json';
 import en from './en.json';
 
@@ -86,17 +88,25 @@ export function useDragAccessibility(
   };
 }
 
-/** The pinned cards in the user's order. Dragging a card saves the new order at once. */
-export function DashboardGrid({ pins }: Readonly<{ pins: DashboardPin[] }>) {
+/**
+ * The pinned cards in the user's order. Outside edit mode they are a read-only view: no edit controls, and no sensor
+ * that could pick a card up. In edit mode dragging a card saves the new order at once.
+ */
+export function DashboardGrid({ pins, isEditing }: Readonly<{ pins: DashboardPin[]; isEditing: boolean }>) {
   const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
   const { mutate } = useUpdateDashboardPins();
   const reorder = usePinReorder(pins);
   const { pages, titleOf, isReady } = usePinnablePages();
+  const widgets = useDashboardWidgets();
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 6 } });
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } });
+  const keyboardSensor = useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates });
+  // Always three entries: useSensors memoizes on them, and a changing count would keep the first answer.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    isEditing ? pointerSensor : null,
+    isEditing ? touchSensor : null,
+    isEditing ? keyboardSensor : null,
   );
 
   const remove = (pin: DashboardPin) =>
@@ -105,10 +115,11 @@ export function DashboardGrid({ pins }: Readonly<{ pins: DashboardPin[] }>) {
       { onError: () => toast.error({ title: t('pin.saveError') }) },
     );
 
-  const pinTitle = (pin: DashboardPin) =>
-    pin.itemType === DashboardPinItemType.RESOURCE
-      ? (pin.resourceName ?? pin.itemId)
-      : (pages.find((page) => page.path === pin.itemId)?.title ?? titleOf(pin.itemId) ?? pin.itemId);
+  const pinTitle = (pin: DashboardPin) => {
+    if (pin.itemType === DashboardPinItemType.RESOURCE) return pin.resourceName ?? pin.itemId;
+    if (pin.itemType === DashboardPinItemType.WIDGET) return widgets.titleOf(pin.itemId) ?? pin.itemId;
+    return pages.find((page) => page.path === pin.itemId)?.title ?? titleOf(pin.itemId) ?? pin.itemId;
+  };
   const accessibility = useDragAccessibility((id) => {
     const pin = pins.find((candidate) => pinKey(candidate) === id);
     return pin ? pinTitle(pin) : String(id);
@@ -120,14 +131,19 @@ export function DashboardGrid({ pins }: Readonly<{ pins: DashboardPin[] }>) {
 
   const renderCard = (pin: DashboardPin) => {
     const id = pinKey(pin);
-    if (pin.itemType === DashboardPinItemType.RESOURCE) {
-      return <ResourcePinCard key={id} id={id} pin={pin} onUnpin={() => remove(pin)} />;
-    }
-    const page = pages.find((candidate) => candidate.path === pin.itemId);
-    if (page) return <PagePinCard key={id} id={id} page={page} onUnpin={() => remove(pin)} />;
-    const title = titleOf(pin.itemId) ?? pin.itemId;
-    if (!isReady) return <PendingPinCard key={id} id={id} title={title} />;
-    return <UnavailablePinCard key={id} id={id} title={title} onUnpin={() => remove(pin)} />;
+    const props = { id, isEditing, onRemove: () => remove(pin) };
+    if (pin.itemType === DashboardPinItemType.RESOURCE) return <ResourcePinCard key={id} {...props} pin={pin} />;
+
+    const isWidget = pin.itemType === DashboardPinItemType.WIDGET;
+    const widget = isWidget ? widgets.widgets.find((candidate) => candidate.id === pin.itemId) : undefined;
+    if (widget) return <WidgetPinCard key={id} {...props} widget={widget} />;
+    const page = isWidget ? undefined : pages.find((candidate) => candidate.path === pin.itemId);
+    if (page) return <PagePinCard key={id} {...props} page={page} />;
+
+    const title = pinTitle(pin);
+    if (!(isWidget ? widgets.isReady : isReady)) return <PendingPinCard key={id} {...props} title={title} />;
+    const description = t(isWidget ? 'card.unavailableWidgetDescription' : 'card.unavailableDescription');
+    return <UnavailablePinCard key={id} {...props} title={title} description={description} />;
   };
 
   return (

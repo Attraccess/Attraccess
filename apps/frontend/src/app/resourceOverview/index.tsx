@@ -7,6 +7,7 @@ import {
 import { Toolbar } from './toolbar/toolbar';
 import { ResourceGroupCard } from './resourceGroupCard';
 import { useCallback, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useDebounce } from '@attraccess/plugins-frontend-ui';
 import { NoResourcesFound } from './noResourcesFound';
 import { ActiveUsageSessionsBanner } from './activeUsageSessionsBanner';
@@ -42,15 +43,17 @@ export function ResourceOverview() {
   const [createOpen, setCreateOpen] = useState(false);
   const { data: groups } = useResourcesServiceResourceGroupsGetMany();
 
-  const [searchValue, setSearchValue] = useState('');
-  const [filterByOnlyInUseByMe, setFilterByOnlyInUseByMeState] = useState(
-    () => getValueFromLocalStorage(PersistedFilterProps.onlyInUseByMe, false),
+  // The dashboard's resource search opens this page with `?q=`.
+  const [searchParams] = useSearchParams();
+  const [searchValue, setSearchValue] = useState(() => searchParams.get('q') ?? '');
+  const [filterByOnlyInUseByMe, setFilterByOnlyInUseByMeState] = useState(() =>
+    getValueFromLocalStorage(PersistedFilterProps.onlyInUseByMe, false),
   );
-  const [filterByOnlyWithPermissions, setFilterByOnlyWithPermissionsState] = useState(
-    () => getValueFromLocalStorage(PersistedFilterProps.onlyWithPermissions, true),
+  const [filterByOnlyWithPermissions, setFilterByOnlyWithPermissionsState] = useState(() =>
+    getValueFromLocalStorage(PersistedFilterProps.onlyWithPermissions, true),
   );
-  const [filterByHideEmptyResourceGroups, setFilterByHideEmptyResourceGroupsState] = useState(
-    () => getValueFromLocalStorage(PersistedFilterProps.hideEmptyResourceGroups, true),
+  const [filterByHideEmptyResourceGroups, setFilterByHideEmptyResourceGroupsState] = useState(() =>
+    getValueFromLocalStorage(PersistedFilterProps.hideEmptyResourceGroups, true),
   );
 
   const debouncedSearchValue = useDebounce(searchValue, 250);

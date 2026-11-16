@@ -1,7 +1,14 @@
 {
   "title": "Reservierungen",
-  "sidebar": { "my": "Meine Reservierungen", "manage": "Reservierungen verwalten" },
-  "slots": { "settings": "Reservierungen", "admin": "Reservierungen", "account": "Kalender-Feeds (iCal)" },
+  "sidebar": {
+    "my": "Meine Reservierungen",
+    "manage": "Reservierungen verwalten"
+  },
+  "slots": {
+    "settings": "Reservierungen",
+    "admin": "Reservierungen",
+    "account": "Kalender-Feeds (iCal)"
+  },
   "common": {
     "cancel": "Abbrechen",
     "close": "Schließen",
@@ -311,8 +318,14 @@
       "ownOnly": "Nur meine eigenen Buchungen",
       "introduced": "Ressourcen, in die ich eingewiesen bin",
       "maintained": "Ressourcen, die ich betreue",
-      "groups": { "one": "{{count}} Gruppe", "many": "{{count}} Gruppen" },
-      "resources": { "one": "{{count}} Ressource", "many": "{{count}} Ressourcen" }
+      "groups": {
+        "one": "{{count}} Gruppe",
+        "many": "{{count}} Gruppen"
+      },
+      "resources": {
+        "one": "{{count}} Ressource",
+        "many": "{{count}} Ressourcen"
+      }
     },
     "form": {
       "createTitle": "Neuer Kalender-Feed",
@@ -348,5 +361,14 @@
       "body": "Der Link funktioniert dauerhaft nicht mehr. Das lässt sich nicht rückgängig machen.",
       "confirm": "Widerrufen"
     }
+  },
+  "dashboard": {
+    "title": "Anstehende Reservierungen",
+    "description": "Ihre nächsten Buchungen",
+    "empty": "Keine anstehenden Reservierungen.",
+    "unknownResource": "Unbekannte Ressource",
+    "mine": "Meine Reservierungen",
+    "manage": "Verwalten",
+    "loadError": "Ihre Reservierungen konnten nicht geladen werden."
   }
 }

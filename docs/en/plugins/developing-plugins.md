@@ -79,7 +79,8 @@ keyword and an `attraccess` object:
 | `version`                                    | yes          | Your plugin's semantic version.                                                                        |
 | `attraccess.backend` / `attraccess.frontend` | at least one | Relative package entry point.                                                                          |
 | `attraccess.styles`                          | no           | Stylesheet alongside the frontend entry point.                                                         |
-| `attraccess.dashboardPaths`                  | no           | Sidebar paths users may pin to their dashboard. See [Dashboard pins](#dashboard-pins).                |
+| `attraccess.dashboardPaths`                  | no           | Sidebar paths users may pin to their dashboard. See [Dashboard pins](#dashboard-pins).                 |
+| `attraccess.dashboardWidgets`                | no           | Ids of the dashboard widgets the plugin offers. See [Dashboard widgets](#dashboard-widgets).           |
 | `attraccess.migrations`                      | no           | Module exporting TypeORM migration classes. See [Database Migrations](plugins/database-migrations.md). |
 | `attraccess.host`                            | yes          | Compatible Attraccess host semver range.                                                               |
 | `attraccess.permissions`                     | no           | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`.      |
@@ -1078,6 +1079,70 @@ sidebar entry's label and icon, and its route permissions decide whether the
 user may open it. When a user loses access, or your plugin is disabled or no
 longer lists the path, the card is shown as no longer accessible until the
 user removes it.
+
+### Dashboard widgets
+
+Besides pinned pages, users can add **widgets** to their dashboard: cards with
+live content and quick actions. A plugin offers widgets in two steps.
+
+1. List the widget ids in `attraccess.dashboardWidgets` in `package.json` (or
+   `main.frontend.dashboardWidgets` in `plugin.json`). Ids are lowercase
+   kebab-case, at most 64 characters, and are stored in users' dashboards, so
+   never rename one:
+
+   ```json
+   "dashboardWidgets": ["my-plugin-summary"]
+   ```
+
+2. Return the widgets the current user may use from `getDashboardWidgets()`:
+
+   ```tsx
+   import type { AttraccessFrontendPlugin, PluginDashboardWidget } from '@attraccess/plugins-frontend-sdk';
+
+   export default class MyPlugin implements AttraccessFrontendPlugin {
+     private readonly widgetListeners = new Set<() => void>();
+
+     getDashboardWidgets(): PluginDashboardWidget[] {
+       return [
+         {
+           id: 'my-plugin-summary',
+           title: 'Summary', // translate it: the host asks again when the language changes
+           description: 'What happened today', // one line in the "Add to dashboard" list
+           icon: <ChartIcon />,
+           render: () => <SummaryWidget />,
+         },
+       ];
+     }
+
+     // Optional: call the listeners when the answer of getDashboardWidgets() changes,
+     // for example after an async permission check.
+     onDashboardWidgetsChange(listener: () => void): () => void {
+       this.widgetListeners.add(listener);
+       return () => this.widgetListeners.delete(listener);
+     }
+     // ...
+   }
+   ```
+
+The host renders the card: its header with your icon and title, the edit
+controls and an error boundary. `render()` returns only the body. A body that
+throws shows an error inside its card; the rest of the dashboard keeps
+working. Set `hasFields: true` when the body holds form fields: the host then
+renders the widget on an outlined section instead of a card surface, where
+fields would disappear.
+
+A widget is offered only while your plugin is active, lists its id in the
+manifest and returns it from `getDashboardWidgets()`. The API refuses to add
+ids that no active plugin lists. A built-in widget id always wins over yours
+(the host ignores yours and logs a warning). Return only what the current user
+may use, and gate every link and action in the body by the same rule as its
+target. The host asks again when the user or the language changes and after
+`onDashboardWidgetsChange` fires. When a user loses access, or your plugin is
+disabled or stops returning the widget, the card shows as no longer accessible
+until the user removes it.
+
+The Reservations plugin's `reservations-upcoming` widget
+(`apps/plugins/reservations/frontend/src/dashboard/`) is a complete example.
 
 ### Slots (embedded extension points)
 

@@ -13,6 +13,7 @@ export type DashboardPinItem = DashboardPinItemDto;
 
 export const pinKey = (item: DashboardPinItem) => `${item.itemType}:${item.itemId}`;
 export const pagePin = (path: string): DashboardPinItem => ({ itemType: DashboardPinItemType.PAGE, itemId: path });
+export const widgetPin = (id: string): DashboardPinItem => ({ itemType: DashboardPinItemType.WIDGET, itemId: id });
 
 /** The user's pins, shared by the dashboard, the landing page and every pin toggle through one query. */
 export function useDashboardPins() {

@@ -52,6 +52,76 @@ Route entscheiden, ob der Benutzer sie öffnen darf. Verliert ein Benutzer den
 Zugriff oder ist Ihr Plugin deaktiviert bzw. listet den Pfad nicht mehr, wird
 die Karte als nicht mehr zugänglich angezeigt, bis der Benutzer sie entfernt.
 
+### Dashboard-Widgets
+
+Neben angehefteten Seiten können Benutzer **Widgets** zu ihrem Dashboard
+hinzufügen: Karten mit Live-Inhalten und Schnellaktionen. Ein Plugin bietet
+Widgets in zwei Schritten an.
+
+1. Listen Sie die Widget-IDs in `attraccess.dashboardWidgets` in
+   `package.json` (bzw. `main.frontend.dashboardWidgets` in `plugin.json`) auf.
+   IDs bestehen aus Kleinbuchstaben, Ziffern und Bindestrichen (kebab-case),
+   sind höchstens 64 Zeichen lang und werden in den Dashboards der Benutzer
+   gespeichert; benennen Sie also nie eine um:
+
+   ```json
+   "dashboardWidgets": ["my-plugin-summary"]
+   ```
+
+2. Geben Sie aus `getDashboardWidgets()` die Widgets zurück, die der aktuelle
+   Benutzer verwenden darf:
+
+   ```tsx
+   import type { AttraccessFrontendPlugin, PluginDashboardWidget } from '@attraccess/plugins-frontend-sdk';
+
+   export default class MyPlugin implements AttraccessFrontendPlugin {
+     private readonly widgetListeners = new Set<() => void>();
+
+     getDashboardWidgets(): PluginDashboardWidget[] {
+       return [
+         {
+           id: 'my-plugin-summary',
+           title: 'Zusammenfassung', // übersetzen: der Host fragt bei einem Sprachwechsel erneut
+           description: 'Was heute passiert ist', // eine Zeile in der Liste „Zum Dashboard hinzufügen“
+           icon: <ChartIcon />,
+           render: () => <SummaryWidget />,
+         },
+       ];
+     }
+
+     // Optional: Rufen Sie die Listener auf, wenn sich die Antwort von getDashboardWidgets() ändert,
+     // zum Beispiel nach einer asynchronen Berechtigungsprüfung.
+     onDashboardWidgetsChange(listener: () => void): () => void {
+       this.widgetListeners.add(listener);
+       return () => this.widgetListeners.delete(listener);
+     }
+     // ...
+   }
+   ```
+
+Der Host rendert die Karte: die Kopfzeile mit Ihrem Symbol und Titel, die
+Bearbeitungselemente und eine Error Boundary. `render()` liefert nur den
+Inhalt. Wirft der Inhalt einen Fehler, zeigt seine Karte eine Fehlermeldung;
+der Rest des Dashboards funktioniert weiter. Setzen Sie `hasFields: true`, wenn
+der Inhalt Formularfelder enthält: Der Host rendert das Widget dann auf einem
+umrandeten Abschnitt statt auf einer Kartenfläche, auf der Felder verschwinden
+würden.
+
+Ein Widget wird nur angeboten, solange Ihr Plugin aktiv ist, seine ID im
+Manifest auflistet und es aus `getDashboardWidgets()` zurückgibt. Die API lehnt
+IDs ab, die kein aktives Plugin auflistet. Eine eingebaute Widget-ID hat immer
+Vorrang vor Ihrer (der Host ignoriert Ihre und protokolliert eine Warnung).
+Geben Sie nur zurück, was der aktuelle Benutzer verwenden darf, und prüfen Sie
+jeden Link und jede Aktion im Inhalt nach derselben Regel wie ihr Ziel. Der
+Host fragt erneut, wenn sich Benutzer oder Sprache ändern und nachdem
+`onDashboardWidgetsChange` ausgelöst wurde. Verliert ein Benutzer den Zugriff
+oder ist Ihr Plugin deaktiviert bzw. gibt das Widget nicht mehr zurück, wird
+die Karte als nicht mehr zugänglich angezeigt, bis der Benutzer sie entfernt.
+
+Das Widget `reservations-upcoming` des Reservierungs-Plugins
+(`apps/plugins/reservations/frontend/src/dashboard/`) ist ein vollständiges
+Beispiel.
+
 ### Slots (eingebettete Erweiterungspunkte)
 
 Neben eigenen Routen kann ein Frontend-Plugin über `getSlotContributions()` UI **in** Host-Seiten einbetten. Jeder

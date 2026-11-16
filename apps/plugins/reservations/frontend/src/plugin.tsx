@@ -1,10 +1,11 @@
 // Reservations plugin — frontend half.
 //
 // Slots: resource.overview (bookings card), resource.settings, admin.settings, user.account.
+// Dashboard widget: reservations-upcoming (the user's next bookings).
 // Routes: /reservations (my bookings), /reservations/manage, /reservations/:id (mail deep link).
 import './styles.css';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
-import { CalendarCheckIcon, CalendarClockIcon } from 'lucide-react';
+import { CalendarCheckIcon, CalendarClockIcon, CalendarDaysIcon } from 'lucide-react';
 import {
   ADMIN_SETTINGS_SLOT,
   RESOURCE_OVERVIEW_SLOT,
@@ -12,6 +13,7 @@ import {
   USER_ACCOUNT_SLOT,
   type AttraccessFrontendPlugin,
   type AttraccessFrontendPluginAuthData,
+  type PluginDashboardWidget,
   type PluginSidebarItem,
   type PluginSlotContribution,
   type ResourceSlotContext,
@@ -19,6 +21,7 @@ import {
 } from '@attraccess/plugins-frontend-sdk';
 import type { PluginStore } from 'react-pluggable';
 import { getManageAccess, resetManageAccess } from './api';
+import { UpcomingReservationsWidget } from './dashboard/UpcomingReservationsWidget';
 import de from './de.json';
 import en from './en.json';
 import { IcalFeeds } from './ical/IcalFeeds';
@@ -123,6 +126,19 @@ export default class ReservationsPlugin implements AttraccessFrontendPlugin {
       });
     }
     return items;
+  }
+
+  getDashboardWidgets(): PluginDashboardWidget[] {
+    const text = labels().dashboard;
+    return [
+      {
+        id: 'reservations-upcoming',
+        title: text.title,
+        description: text.description,
+        icon: <CalendarDaysIcon className="rv:w-5 rv:h-5" />,
+        render: () => <UpcomingReservationsWidget />,
+      },
+    ];
   }
 
   getSlotContributions(): PluginSlotContribution[] {

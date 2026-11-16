@@ -33,6 +33,26 @@ export interface PluginSidebarGroup {
   icon?: ReactNode;
 }
 
+/**
+ * A widget a plugin offers for the user's dashboard. The host renders the card around it (icon, title, the edit
+ * controls and an error boundary); `render()` returns only the card body. The `id` must be listed in the plugin
+ * manifest's `dashboardWidgets`, and a built-in widget with the same id always wins.
+ */
+export interface PluginDashboardWidget {
+  /** Stable, lowercase kebab-case id, e.g. `reservations-upcoming`. It is stored in users' dashboards. */
+  id: string;
+  title: string;
+  /** One line shown in the "Add to dashboard" picker. */
+  description: string;
+  icon?: ReactNode;
+  /**
+   * Set when the body holds form fields. Fields disappear on a card surface, so the host then renders the widget on
+   * an outlined section instead.
+   */
+  hasFields?: boolean;
+  render(): ReactNode;
+}
+
 export const getPluginFunctionName = (pluginName: string, func: FRONTEND_FUNCTION) => {
   return `${pluginName}.${func}`;
 };
@@ -59,4 +79,10 @@ export interface AttraccessFrontendPlugin extends IPlugin {
   // Optional. Return the contributions this plugin renders into host slots
   // (generic embedded extension points). See frontend.slots.ts.
   getSlotContributions?(): PluginSlotContribution[];
+  // Optional. Return the dashboard widgets the current user may use. Only ids listed in the manifest's
+  // `dashboardWidgets` are offered; a widget a user pinned and no longer gets shows as "no longer accessible".
+  getDashboardWidgets?(): PluginDashboardWidget[];
+  // Optional. Subscribe to changes of this plugin's dashboard widgets (e.g. after an async permission check);
+  // the host then calls getDashboardWidgets() again. Returns the unsubscribe function.
+  onDashboardWidgetsChange?(listener: () => void): () => void;
 }

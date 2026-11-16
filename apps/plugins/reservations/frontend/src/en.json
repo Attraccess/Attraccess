@@ -1,7 +1,14 @@
 {
   "title": "Reservations",
-  "sidebar": { "my": "My reservations", "manage": "Manage reservations" },
-  "slots": { "settings": "Reservations", "admin": "Reservations", "account": "Calendar feeds (iCal)" },
+  "sidebar": {
+    "my": "My reservations",
+    "manage": "Manage reservations"
+  },
+  "slots": {
+    "settings": "Reservations",
+    "admin": "Reservations",
+    "account": "Calendar feeds (iCal)"
+  },
   "common": {
     "cancel": "Cancel",
     "close": "Close",
@@ -268,7 +275,10 @@
         "one": "{{count}} upcoming booking exists. Disabling reservations cancels it and notifies the holder.",
         "many": "{{count}} upcoming bookings exist. Disabling reservations cancels them and notifies the holders."
       },
-      "confirm": { "one": "Disable and cancel {{count}} booking", "many": "Disable and cancel {{count}} bookings" }
+      "confirm": {
+        "one": "Disable and cancel {{count}} booking",
+        "many": "Disable and cancel {{count}} bookings"
+      }
     },
     "saved": {
       "title": "Settings saved",
@@ -308,8 +318,14 @@
       "ownOnly": "Only my own bookings",
       "introduced": "Resources I am introduced to",
       "maintained": "Resources I maintain",
-      "groups": { "one": "{{count}} group", "many": "{{count}} groups" },
-      "resources": { "one": "{{count}} resource", "many": "{{count}} resources" }
+      "groups": {
+        "one": "{{count}} group",
+        "many": "{{count}} groups"
+      },
+      "resources": {
+        "one": "{{count}} resource",
+        "many": "{{count}} resources"
+      }
     },
     "form": {
       "createTitle": "New calendar feed",
@@ -345,5 +361,14 @@
       "body": "The link stops working for good. This cannot be undone.",
       "confirm": "Revoke"
     }
+  },
+  "dashboard": {
+    "title": "Upcoming reservations",
+    "description": "Your next bookings",
+    "empty": "No upcoming reservations.",
+    "unknownResource": "Unknown resource",
+    "mine": "My reservations",
+    "manage": "Manage",
+    "loadError": "Your reservations could not be loaded."
   }
 }

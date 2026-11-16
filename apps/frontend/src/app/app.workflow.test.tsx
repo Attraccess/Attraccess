@@ -63,6 +63,9 @@ vi.mock('./kiosk/KioskGuard', () => ({ KioskGuard: () => null }));
 vi.mock('./dashboard/pinnablePages', () => ({
   PinnablePagesProvider: ({ children }: PropsWithChildren) => children,
 }));
+vi.mock('./dashboard/widgets/DashboardWidgetsProvider', () => ({
+  DashboardWidgetsProvider: ({ children }: PropsWithChildren) => children,
+}));
 vi.mock('./dashboard/DashboardPinToggle', () => ({ DashboardPinHeaderAccessory: () => null }));
 vi.mock('./not-found', () => ({ NotFound: () => <p>Not found</p> }));
 vi.mock('react-simple-pull-to-refresh', () => ({

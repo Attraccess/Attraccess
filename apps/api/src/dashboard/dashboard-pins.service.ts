@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DashboardPin, Resource, User } from '@attraccess/database-entities';
 import { EntityManager, In, Repository } from 'typeorm';
 import { runSerializedTransaction } from '../database/run-serialized-transaction';
-import { isPinnablePagePath } from './dashboard-page-paths';
+import { isPinnablePagePath, isPinnableWidgetId } from './dashboard-items';
 import { DashboardPinDto, DashboardPinItemDto, UpdateDashboardPinsDto } from './dtos/dashboard-pin.dto';
 
 export const MAX_DASHBOARD_PINS = 200;
@@ -60,7 +60,7 @@ export class DashboardPinsService {
   }
 
   public async updatePins(userId: number, operation: UpdateDashboardPinsDto): Promise<DashboardPinDto[]> {
-    // Only additions are checked: a pin that lost its page must stay removable and movable.
+    // Only additions are checked: a pin that lost its page or widget must stay removable and movable.
     if (operation.kind === 'add') {
       await this.assertPinnable(operation.item);
     }
@@ -88,6 +88,9 @@ export class DashboardPinsService {
   private async assertPinnable(item: DashboardPinItemDto): Promise<void> {
     if (item.itemType === 'page' && !isPinnablePagePath(item.itemId)) {
       throw new BadRequestException(`The page "${item.itemId}" cannot be pinned`);
+    }
+    if (item.itemType === 'widget' && !isPinnableWidgetId(item.itemId)) {
+      throw new BadRequestException(`The widget "${item.itemId}" cannot be pinned`);
     }
     if (
       item.itemType === 'resource' &&

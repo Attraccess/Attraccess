@@ -107,10 +107,13 @@ describe('DashboardLanding', () => {
     updatePins().mockResolvedValue([] as never);
     renderAt('/', <DashboardLanding />);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Remove Projects from dashboard' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit dashboard' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Projects from dashboard' }));
 
     expect(await screen.findByRole('heading', { name: 'Nothing pinned yet' })).toBeInTheDocument();
     expect(screen.queryByRole('status', { name: 'Current URL' })).toBeNull();
+    // Still editing, with the empty state's way to add something.
+    expect(screen.getByRole('button', { name: 'Done' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('shows the dashboard to a user with pins', async () => {
@@ -210,7 +213,9 @@ describe('DashboardPage', () => {
 });
 
 it('tells the user when a pinned resource cannot be loaded', async () => {
-  getPins().mockResolvedValue([{ itemType: DashboardPinItemType.RESOURCE, itemId: '5', resourceName: 'Lathe' }] as never);
+  getPins().mockResolvedValue([
+    { itemType: DashboardPinItemType.RESOURCE, itemId: '5', resourceName: 'Lathe' },
+  ] as never);
   vi.spyOn(ResourcesService, 'getOneResourceById').mockRejectedValue(new Error('gone') as never);
   vi.spyOn(ResourcesService, 'resourceUsageGetActiveSession').mockResolvedValue({ usage: null } as never);
   renderAt('/dashboard', <DashboardPage />);
@@ -396,7 +401,11 @@ describe('useDragAccessibility', () => {
     const titles: Record<string, string> = { 'page:/projects': 'Projects', 'resource:1': 'Lathe' };
     const { result } = renderHook(() => useDragAccessibility((id) => titles[String(id)]));
     const { announcements, screenReaderInstructions } = result.current;
-    const card = (id: string) => ({ id, data: { current: undefined }, rect: { current: { initial: null, translated: null } } });
+    const card = (id: string) => ({
+      id,
+      data: { current: undefined },
+      rect: { current: { initial: null, translated: null } },
+    });
     const active = card('page:/projects');
     const over = { ...card('resource:1'), disabled: false };
 

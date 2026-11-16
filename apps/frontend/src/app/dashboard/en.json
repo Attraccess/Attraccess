@@ -1,14 +1,14 @@
 {
   "title": "Dashboard",
-  "subtitle": "Your pinned pages and resources",
+  "subtitle": "Your widgets, pinned pages and resources",
   "empty": {
     "title": "Nothing pinned yet",
-    "description": "Open a page or a resource and select the star in its header to pin it here. Once you pin something, the dashboard also becomes your start page.",
+    "description": "Add widgets and pages with \"Add to dashboard\", or open a page or a resource and select the star in its header. Once something is on it, the dashboard also becomes your start page.",
     "browseResources": "Browse resources"
   },
   "loadError": {
     "title": "Could not load your dashboard",
-    "description": "Your pinned pages and resources could not be loaded. Check your connection and try again.",
+    "description": "Your dashboard could not be loaded. Check your connection and try again.",
     "retry": "Retry"
   },
   "pin": {
@@ -25,7 +25,8 @@
     "unavailableDescription": "You can no longer open this page. Its permission may have been removed or its plugin is not available.",
     "remove": "Remove from dashboard",
     "removeLabel": "Remove {{title}} from dashboard",
-    "resourceLoadError": "This resource could not be loaded."
+    "resourceLoadError": "This resource could not be loaded.",
+    "unavailableWidgetDescription": "You can no longer use this widget. Its permission or license may have been removed or its plugin is not available."
   },
   "drag": {
     "instructions": "To pick up a card, press space or enter. Use the arrow keys to move it. Press space or enter again to drop it in its new place, or press escape to cancel.",
@@ -36,5 +37,20 @@
     "endOutside": "{{title}} was dropped.",
     "cancel": "Moving {{title}} was cancelled."
   },
-  "reorderError": "The new order could not be saved. Your dashboard shows the saved order again."
+  "reorderError": "The new order could not be saved. Your dashboard shows the saved order again.",
+  "edit": {
+    "start": "Edit dashboard",
+    "done": "Done",
+    "add": "Add to dashboard",
+    "hint": "Drag a card by its handle to move it, or remove it with the button in its corner. Changes are saved right away."
+  },
+  "picker": {
+    "title": "Add to dashboard",
+    "widgets": "Widgets",
+    "pages": "Pages",
+    "add": "Add",
+    "addLabel": "Add {{title}} to dashboard",
+    "allAdded": "Everything is already on your dashboard.",
+    "close": "Close"
+  }
 }

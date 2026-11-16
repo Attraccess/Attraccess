@@ -179,7 +179,7 @@ export const useSidebarEndItems = () => {
 export const SIDEBAR_ITEMS: (SidebarItem | SidebarItemGroup)[] = [
   {
     // The user's own pinned pages and resources. Every other internal entry here and in
-    // buildSidebarEndItems can be pinned; the API keeps that list in dashboard-page-paths.ts.
+    // buildSidebarEndItems can be pinned; the API keeps that list in dashboard-items.ts.
     translationKey: 'dashboard',
     path: '/dashboard',
     icon: LayoutDashboardIcon,

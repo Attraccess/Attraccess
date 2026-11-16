@@ -1,14 +1,14 @@
 {
   "title": "Dashboard",
-  "subtitle": "Ihre angehefteten Seiten und Ressourcen",
+  "subtitle": "Ihre Widgets, angehefteten Seiten und Ressourcen",
   "empty": {
     "title": "Noch nichts angeheftet",
-    "description": "Öffnen Sie eine Seite oder eine Ressource und wählen Sie den Stern in ihrer Kopfzeile, um sie hier anzuheften. Sobald Sie etwas angeheftet haben, wird das Dashboard auch Ihre Startseite.",
+    "description": "Fügen Sie Widgets und Seiten über „Zum Dashboard hinzufügen“ hinzu, oder öffnen Sie eine Seite oder Ressource und wählen Sie den Stern in ihrer Kopfzeile. Sobald etwas darauf ist, wird das Dashboard auch Ihre Startseite.",
     "browseResources": "Ressourcen durchsuchen"
   },
   "loadError": {
     "title": "Ihr Dashboard konnte nicht geladen werden",
-    "description": "Ihre angehefteten Seiten und Ressourcen konnten nicht geladen werden. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+    "description": "Ihr Dashboard konnte nicht geladen werden. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
     "retry": "Erneut versuchen"
   },
   "pin": {
@@ -25,7 +25,8 @@
     "unavailableDescription": "Sie können diese Seite nicht mehr öffnen. Möglicherweise wurde die Berechtigung entzogen oder das Plugin ist nicht verfügbar.",
     "remove": "Vom Dashboard entfernen",
     "removeLabel": "{{title}} vom Dashboard entfernen",
-    "resourceLoadError": "Diese Ressource konnte nicht geladen werden."
+    "resourceLoadError": "Diese Ressource konnte nicht geladen werden.",
+    "unavailableWidgetDescription": "Sie können dieses Widget nicht mehr verwenden. Möglicherweise wurde die Berechtigung oder Lizenz entfernt, oder sein Plugin ist nicht verfügbar."
   },
   "drag": {
     "instructions": "Um eine Karte aufzunehmen, drücken Sie die Leertaste oder Enter. Verschieben Sie sie mit den Pfeiltasten. Drücken Sie erneut die Leertaste oder Enter, um sie an der neuen Stelle abzulegen, oder Escape, um abzubrechen.",
@@ -36,5 +37,20 @@
     "endOutside": "{{title}} wurde abgelegt.",
     "cancel": "Verschieben von {{title}} wurde abgebrochen."
   },
-  "reorderError": "Die neue Reihenfolge konnte nicht gespeichert werden. Ihr Dashboard zeigt wieder die gespeicherte Reihenfolge."
+  "reorderError": "Die neue Reihenfolge konnte nicht gespeichert werden. Ihr Dashboard zeigt wieder die gespeicherte Reihenfolge.",
+  "edit": {
+    "start": "Dashboard bearbeiten",
+    "done": "Fertig",
+    "add": "Zum Dashboard hinzufügen",
+    "hint": "Ziehen Sie eine Karte an ihrem Griff, um sie zu verschieben, oder entfernen Sie sie mit der Schaltfläche in ihrer Ecke. Änderungen werden sofort gespeichert."
+  },
+  "picker": {
+    "title": "Zum Dashboard hinzufügen",
+    "widgets": "Widgets",
+    "pages": "Seiten",
+    "add": "Hinzufügen",
+    "addLabel": "{{title}} zum Dashboard hinzufügen",
+    "allAdded": "Alles ist bereits auf Ihrem Dashboard.",
+    "close": "Schließen"
+  }
 }

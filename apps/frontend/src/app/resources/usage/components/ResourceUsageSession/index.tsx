@@ -22,6 +22,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLiveUpdates } from '../../../../../utils/live-updates';
+import { mySessionsQueryKey } from '../../../../resourceOverview/activeUsageSessionsBanner/mySessionsQuery';
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { MaintenanceInProgressDisplay } from './maintenance';
@@ -65,6 +66,8 @@ export function ResourceUsageSession({
     // Only this resource: the dashboard renders one of these per pinned resource.
     queryClient.invalidateQueries({ queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId }) });
     queryClient.invalidateQueries({ queryKey: UseResourcesServiceResourceUsageCanControlKeyFn({ resourceId }) });
+    // The dashboard's "My sessions" list; refetched only while it is shown.
+    queryClient.invalidateQueries({ queryKey: mySessionsQueryKey(), exact: true });
     invalidateStartBlocked();
   }, [queryClient, resourceId, invalidateStartBlocked]);
 

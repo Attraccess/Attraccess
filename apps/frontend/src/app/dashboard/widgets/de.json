@@ -1,0 +1,61 @@
+{
+  "loadError": "Dieses Widget konnte nicht geladen werden.",
+  "crashed": "Dieses Widget funktioniert nicht mehr. Laden Sie die Seite neu, um es erneut zu versuchen.",
+  "search": "Suchen",
+  "messages": {
+    "title": "Nachrichten",
+    "description": "Ihre neuesten Unterhaltungen und ungelesenen Nachrichten",
+    "unread": "{{count}} ungelesen",
+    "empty": "Noch keine Unterhaltungen.",
+    "unknownUser": "Unbekannter Benutzer",
+    "noMessages": "Noch keine Nachrichten",
+    "online": "Online",
+    "openInbox": "Posteingang öffnen"
+  },
+  "resources": {
+    "title": "Ressourcen",
+    "description": "Ressourcen suchen und zur Ressourcenverwaltung springen",
+    "searchLabel": "Ressourcen suchen",
+    "all": "Alle Ressourcen",
+    "create": "Ressource erstellen",
+    "flows": "Flows",
+    "mqtt": "MQTT-Server",
+    "readers": "Lesegeräte",
+    "reports": "Nutzungsberichte"
+  },
+  "users": {
+    "title": "Benutzer",
+    "description": "Benutzer suchen und Einladungen verwalten",
+    "searchLabel": "Benutzer suchen",
+    "all": "Alle Benutzer",
+    "invite": "Benutzer einladen",
+    "unverified": "Unbestätigte E-Mail-Adressen",
+    "roles": "Rollen"
+  },
+  "my-sessions": {
+    "title": "Meine Sitzungen",
+    "description": "Ihre laufenden Sitzungen, jeweils mit einer Schaltfläche zum Beenden",
+    "empty": "Keine Sitzung läuft.",
+    "browse": "Ressourcen durchsuchen",
+    "stop": "Beenden",
+    "stopLabel": "Ihre Sitzung an {{name}} beenden",
+    "confirmTitle": "Sitzung beenden?",
+    "confirmDescription": "Ihre Sitzung an {{name}} endet jetzt.",
+    "stopped": "Ihre Sitzung an {{name}} wurde beendet."
+  },
+  "billing-balance": {
+    "title": "Guthaben",
+    "description": "Ihr Guthaben",
+    "balance": "{{balance}} {{currency}}",
+    "topUp": "Aufladen",
+    "transactions": "Transaktionen"
+  },
+  "readers": {
+    "title": "Lesegeräte",
+    "description": "Gekoppelte Lesegeräte und solche, die sich länger nicht verbunden haben",
+    "paired": "Gekoppelt",
+    "stale": "Seit 24 h nicht verbunden",
+    "allConnected": "Alle Lesegeräte waren in den letzten 24 Stunden verbunden.",
+    "all": "Alle Lesegeräte"
+  }
+}

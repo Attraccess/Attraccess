@@ -11,6 +11,14 @@ export const dashboardPathsSchema = z.array(
   }),
 );
 
+/** Dashboard widget ids a plugin contributes through getDashboardWidgets(): lowercase kebab-case, at most 64 characters. */
+export const dashboardWidgetsSchema = z.array(
+  z
+    .string()
+    .max(64)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, { message: 'must be a lowercase kebab-case widget id' }),
+);
+
 export const mainSchema = z.object({
   directory: z.string(),
   entryPoint: z.string(),
@@ -21,7 +29,11 @@ export const PluginManifestSchema = z.object({
   name: z.string(),
   main: z.object({
     frontend: mainSchema
-      .extend({ styles: z.string().optional(), dashboardPaths: dashboardPathsSchema.optional() })
+      .extend({
+        styles: z.string().optional(),
+        dashboardPaths: dashboardPathsSchema.optional(),
+        dashboardWidgets: dashboardWidgetsSchema.optional(),
+      })
       .optional(),
     backend: mainSchema.optional(),
     migrations: mainSchema.optional(),

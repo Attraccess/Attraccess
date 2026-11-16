@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { Button, Card, Chip, Link, Spinner } from '@heroui/react';
-import { ArrowRightIcon, CircleSlashIcon, StarOffIcon, Trash2Icon } from 'lucide-react';
+import { ArrowRightIcon, CircleSlashIcon, Trash2Icon } from 'lucide-react';
 import { StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   useResourcesServiceGetOneResourceById,
@@ -12,45 +12,37 @@ import { ResourceUsageSession } from '../resources/usage/components/ResourceUsag
 import { SessionTimer } from '../resources/usage/components/SessionTimer';
 import { DashboardPin } from './pins';
 import { PinnablePage } from './pinnablePagesContext';
-import { SortablePinCard, SortablePinSection } from './SortablePinCard';
+import { PinEditControls, SortablePinCard, SortablePinSection } from './SortablePinCard';
 import de from './de.json';
 import en from './en.json';
 
-interface PinCardProps {
+export interface PinCardProps {
   id: string;
-  onUnpin: () => void;
+  isEditing: boolean;
+  onRemove: () => void;
 }
 
-function CardHeading({
-  dragHandle,
+export function CardHeading({
+  controls,
   title,
   children,
-}: Readonly<{ dragHandle: ReactNode; title: ReactNode; children?: ReactNode }>) {
+}: Readonly<{ controls: PinEditControls; title: ReactNode; children?: ReactNode }>) {
   return (
     <Card.Header className="flex flex-row items-center gap-3">
-      {dragHandle}
+      {controls.dragHandle}
       <div className="flex min-w-0 flex-1 items-center gap-3">{title}</div>
       {children}
+      {controls.removeButton}
     </Card.Header>
   );
 }
 
-function UnpinButton({ label, onUnpin }: Readonly<{ label: string; onUnpin: () => void }>) {
+export function PagePinCard({ id, page, isEditing, onRemove }: Readonly<PinCardProps & { page: PinnablePage }>) {
   return (
-    <Button isIconOnly size="sm" variant="ghost" aria-label={label} onPress={onUnpin} data-cy="dashboard-card-unpin">
-      <StarOffIcon className="w-4 h-4" />
-    </Button>
-  );
-}
-
-export function PagePinCard({ id, page, onUnpin }: Readonly<PinCardProps & { page: PinnablePage }>) {
-  const { t } = useTranslations({ en, de });
-
-  return (
-    <SortablePinCard id={id} dragLabel={t('card.dragHandle', { title: page.title })}>
-      {(dragHandle) => (
+    <SortablePinCard id={id} title={page.title} isEditing={isEditing} onRemove={onRemove}>
+      {(controls) => (
         <CardHeading
-          dragHandle={dragHandle}
+          controls={controls}
           title={
             <Link
               href={page.path}
@@ -68,23 +60,31 @@ export function PagePinCard({ id, page, onUnpin }: Readonly<PinCardProps & { pag
               {page.badgeCount > 99 ? '99+' : page.badgeCount}
             </Chip>
           )}
-          <UnpinButton label={t('card.unpin', { title: page.title })} onUnpin={onUnpin} />
         </CardHeading>
       )}
     </SortablePinCard>
   );
 }
 
-/** A page pin the user cannot open now. It stays stored, so restoring access brings the card back. */
-export function UnavailablePinCard({ id, title, onUnpin }: Readonly<PinCardProps & { title: string }>) {
+/**
+ * A page or widget pin the user cannot use now. It stays stored, so restoring access brings the card back. Its Remove
+ * button is its content, not an edit control, so it shows outside edit mode too.
+ */
+export function UnavailablePinCard({
+  id,
+  title,
+  description,
+  isEditing,
+  onRemove,
+}: Readonly<PinCardProps & { title: string; description: string }>) {
   const { t } = useTranslations({ en, de });
 
   return (
-    <SortablePinCard id={id} dragLabel={t('card.dragHandle', { title })}>
-      {(dragHandle) => (
+    <SortablePinCard id={id} title={title} isEditing={isEditing}>
+      {(controls) => (
         <>
           <CardHeading
-            dragHandle={dragHandle}
+            controls={controls}
             title={
               <>
                 <CircleSlashIcon className="w-5 h-5 shrink-0 text-muted" aria-hidden />
@@ -96,13 +96,13 @@ export function UnavailablePinCard({ id, title, onUnpin }: Readonly<PinCardProps
             <Chip size="sm" color="warning">
               {t('card.unavailable')}
             </Chip>
-            <Card.Description>{t('card.unavailableDescription')}</Card.Description>
+            <Card.Description>{description}</Card.Description>
           </Card.Content>
           <Card.Footer>
             <Button
               size="sm"
               variant="secondary"
-              onPress={onUnpin}
+              onPress={onRemove}
               aria-label={t('card.removeLabel', { title })}
               data-cy="dashboard-card-remove"
             >
@@ -116,14 +116,12 @@ export function UnavailablePinCard({ id, title, onUnpin }: Readonly<PinCardProps
   );
 }
 
-/** A page pin whose page is not known yet because the plugins are still loading. */
-export function PendingPinCard({ id, title }: Readonly<{ id: string; title: string }>) {
-  const { t } = useTranslations({ en, de });
-
+/** A page or widget pin that is not known yet because the license or the plugins are still loading. */
+export function PendingPinCard({ id, title, isEditing, onRemove }: Readonly<PinCardProps & { title: string }>) {
   return (
-    <SortablePinCard id={id} dragLabel={t('card.dragHandle', { title })}>
-      {(dragHandle) => (
-        <CardHeading dragHandle={dragHandle} title={<Card.Title className="truncate text-muted">{title}</Card.Title>}>
+    <SortablePinCard id={id} title={title} isEditing={isEditing} onRemove={onRemove}>
+      {(controls) => (
+        <CardHeading controls={controls} title={<Card.Title className="truncate text-muted">{title}</Card.Title>}>
           <Spinner size="sm" />
         </CardHeading>
       )}
@@ -132,7 +130,7 @@ export function PendingPinCard({ id, title }: Readonly<{ id: string; title: stri
 }
 
 /** A resource with its status, a live timer and the same session controls as its detail page. */
-export function ResourcePinCard({ id, pin, onUnpin }: Readonly<PinCardProps & { pin: DashboardPin }>) {
+export function ResourcePinCard({ id, pin, isEditing, onRemove }: Readonly<PinCardProps & { pin: DashboardPin }>) {
   const { t } = useTranslations({ en, de });
   const { user } = useAuth();
   const resourceId = Number(pin.itemId);
@@ -151,14 +149,14 @@ export function ResourcePinCard({ id, pin, onUnpin }: Readonly<PinCardProps & { 
   };
 
   return (
-    <SortablePinSection id={id} dragLabel={t('card.dragHandle', { title })}>
-      {(dragHandle) => (
+    <SortablePinSection id={id} title={title} isEditing={isEditing} onRemove={onRemove}>
+      {(controls) => (
         <>
           <header className="flex flex-row items-center gap-3">
-            {dragHandle}
+            {controls.dragHandle}
             <h3 className="min-w-0 flex-1 truncate text-sm font-medium">{title}</h3>
             <StatusChip resourceId={resourceId} />
-            <UnpinButton label={t('card.unpin', { title })} onUnpin={onUnpin} />
+            {controls.removeButton}
           </header>
           <div className="flex flex-col gap-4">
             {otherSession && <SessionTimer startTime={otherSession.startTime} />}

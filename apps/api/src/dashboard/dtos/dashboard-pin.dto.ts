@@ -14,15 +14,16 @@ import {
 } from 'class-validator';
 import type { DashboardPinItemType } from '@attraccess/database-entities';
 
-export const DASHBOARD_PIN_ITEM_TYPES: DashboardPinItemType[] = ['page', 'resource'];
+export const DASHBOARD_PIN_ITEM_TYPES: DashboardPinItemType[] = ['page', 'resource', 'widget'];
 export const DASHBOARD_PIN_OPERATIONS = ['add', 'remove', 'move'] as const;
 export type DashboardPinOperationKind = (typeof DASHBOARD_PIN_OPERATIONS)[number];
 
 // A page is a route path of plain segments, without query, hash or traversal. A resource is a positive integer in
-// canonical form, so "7" and "007" cannot both be pinned.
+// canonical form, so "7" and "007" cannot both be pinned. A widget is a lowercase kebab-case id of at most 64 characters.
 const ITEM_ID_PATTERNS: Record<DashboardPinItemType, RegExp> = {
   page: /^(\/[A-Za-z0-9_-]+)+$/,
   resource: /^[1-9][0-9]{0,14}$/,
+  widget: /^(?=.{1,64}$)[a-z0-9]+(?:-[a-z0-9]+)*$/,
 };
 
 @ValidatorConstraint({ name: 'dashboardPinItemId' })
@@ -33,7 +34,7 @@ class DashboardPinItemIdConstraint implements ValidatorConstraintInterface {
   }
 
   defaultMessage(): string {
-    return 'itemId must be a route path for page pins and a resource id for resource pins';
+    return 'itemId must be a route path for page pins, a resource id for resource pins and a widget id for widget pins';
   }
 }
 
@@ -43,7 +44,8 @@ export class DashboardPinItemDto {
   itemType!: DashboardPinItemType;
 
   @ApiProperty({
-    description: 'The route path of a page pin (e.g. "/projects"), or the id of a resource pin (e.g. "42")',
+    description:
+      'The route path of a page pin (e.g. "/projects"), the id of a resource pin (e.g. "42"), or the id of a widget pin (e.g. "messages")',
     example: '/projects',
   })
   @IsString()

@@ -1,10 +1,11 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Button, Link, Spinner } from '@heroui/react';
-import { LayoutDashboardIcon } from 'lucide-react';
-import { PageHeader, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { CheckIcon, LayoutDashboardIcon, PencilIcon, PlusIcon } from 'lucide-react';
+import { PageAction, PageHeader, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { RootRedirect } from '../routes/RootRedirect';
+import { AddToDashboardModal } from './AddToDashboardModal';
 import { DashboardGrid } from './DashboardGrid';
-import { useDashboardPins } from './pins';
+import { DashboardPin, useDashboardPins } from './pins';
 import de from './de.json';
 import en from './en.json';
 
@@ -16,7 +17,30 @@ function LoadingDashboard() {
   );
 }
 
-function DashboardContent() {
+interface DashboardContentProps {
+  isEditing: boolean;
+  /** Enters edit mode with the picker open. */
+  onAdd: () => void;
+}
+
+function EmptyDashboard({ onAdd }: Readonly<Pick<DashboardContentProps, 'onAdd'>>) {
+  const { t } = useTranslations({ en, de });
+
+  return (
+    <div className="flex flex-col items-center gap-3 py-12 text-center" data-cy="dashboard-empty">
+      <LayoutDashboardIcon className="w-10 h-10 text-muted" aria-hidden />
+      <h2 className="text-lg font-semibold">{t('empty.title')}</h2>
+      <p className="max-w-md text-sm text-muted">{t('empty.description')}</p>
+      <Button variant="primary" onPress={onAdd} data-cy="dashboard-empty-add">
+        <PlusIcon className="w-4 h-4" />
+        {t('edit.add')}
+      </Button>
+      <Link href="/resources">{t('empty.browseResources')}</Link>
+    </div>
+  );
+}
+
+function DashboardContent({ isEditing, onAdd }: Readonly<DashboardContentProps>) {
   const { t } = useTranslations({ en, de });
   const { data: pins, isPending, refetch, isRefetching } = useDashboardPins();
 
@@ -36,27 +60,74 @@ function DashboardContent() {
     );
   }
 
-  if (pins.length === 0) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-12 text-center" data-cy="dashboard-empty">
-        <LayoutDashboardIcon className="w-10 h-10 text-muted" aria-hidden />
-        <h2 className="text-lg font-semibold">{t('empty.title')}</h2>
-        <p className="max-w-md text-sm text-muted">{t('empty.description')}</p>
-        <Link href="/resources">{t('empty.browseResources')}</Link>
-      </div>
-    );
-  }
+  if (pins.length === 0) return <EmptyDashboard onAdd={onAdd} />;
+  return <DashboardGrid pins={pins} isEditing={isEditing} />;
+}
 
-  return <DashboardGrid pins={pins} />;
+/** "Add to dashboard" while editing, and the one Edit/Done toggle, which keeps focus as its label changes. */
+function useEditActions(
+  pins: DashboardPin[] | undefined,
+  isEditing: boolean,
+  setIsEditing: (isEditing: boolean) => void,
+  openPicker: () => void,
+): PageAction[] {
+  const { t } = useTranslations({ en, de });
+  const label = isEditing ? t('edit.done') : t('edit.start');
+
+  return [
+    {
+      key: 'add',
+      label: t('edit.add'),
+      icon: <PlusIcon className="w-4 h-4" />,
+      variant: 'primary',
+      isHidden: !isEditing || !pins?.length,
+      onPress: openPicker,
+      dataCy: 'dashboard-add',
+    },
+    {
+      key: 'edit',
+      label,
+      isHidden: !pins,
+      renderTrigger: (triggerProps) => (
+        <Button
+          {...triggerProps}
+          variant={isEditing ? 'primary' : 'secondary'}
+          aria-pressed={isEditing}
+          onPress={() => setIsEditing(!isEditing)}
+          data-cy="dashboard-edit-toggle"
+        >
+          {isEditing ? <CheckIcon className="w-4 h-4" /> : <PencilIcon className="w-4 h-4" />}
+          {label}
+        </Button>
+      ),
+    },
+  ];
 }
 
 export function DashboardPage() {
   const { t } = useTranslations({ en, de });
+  const { data: pins } = useDashboardPins();
+  // Local on purpose: leaving the page leaves edit mode.
+  const [isEditing, setIsEditing] = useState(false);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const actions = useEditActions(pins, isEditing, setIsEditing, () => setIsPickerOpen(true));
 
   return (
     <div>
-      <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<LayoutDashboardIcon />} />
-      <DashboardContent />
+      <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<LayoutDashboardIcon />} actions={actions} />
+      {isEditing && !!pins?.length && (
+        <p className="mb-4 text-sm text-muted" data-cy="dashboard-edit-hint">
+          {t('edit.hint')}
+        </p>
+      )}
+      <DashboardContent
+        isEditing={isEditing}
+        onAdd={() => {
+          setIsEditing(true);
+          setIsPickerOpen(true);
+        }}
+      />
+      {pins && <AddToDashboardModal isOpen={isPickerOpen} onOpenChange={setIsPickerOpen} pins={pins} />}
     </div>
   );
 }

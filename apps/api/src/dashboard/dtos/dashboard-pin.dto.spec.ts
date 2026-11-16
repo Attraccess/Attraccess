@@ -9,6 +9,7 @@ describe('UpdateDashboardPinsDto', () => {
   it.each([
     { kind: 'add', item: { itemType: 'page', itemId: '/devices/mqtt/servers' } },
     { kind: 'add', item: { itemType: 'resource', itemId: '42' } },
+    { kind: 'add', item: { itemType: 'widget', itemId: 'reservations-upcoming' } },
     { kind: 'move', item: { itemType: 'resource', itemId: '42' }, before: { itemType: 'page', itemId: '/projects' } },
   ])('accepts %j', async (body) => {
     expect(await errorsOf(body)).toEqual([]);
@@ -25,6 +26,10 @@ describe('UpdateDashboardPinsDto', () => {
     [{ kind: 'add', item: { itemType: 'resource', itemId: '0' } }, 'item'],
     [{ kind: 'add', item: { itemType: 'resource', itemId: '/projects' } }, 'item'],
     [{ kind: 'add', item: { itemType: 'resource', itemId: 7 } }, 'item'],
+    [{ kind: 'add', item: { itemType: 'widget', itemId: 'Messages' } }, 'item'],
+    [{ kind: 'add', item: { itemType: 'widget', itemId: 'my--sessions' } }, 'item'],
+    [{ kind: 'add', item: { itemType: 'widget', itemId: '/messages' } }, 'item'],
+    [{ kind: 'add', item: { itemType: 'widget', itemId: 'a'.repeat(65) } }, 'item'],
     [{ kind: 'move', item: { itemType: 'page', itemId: '/a' }, before: { itemType: 'page', itemId: 'x' } }, 'before'],
   ])('rejects %j', async (body, property) => {
     expect(await errorsOf(body)).toContain(property);

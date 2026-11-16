@@ -12,6 +12,7 @@ import { DashboardPinItemDto } from './dtos/dashboard-pin.dto';
 
 const page = (itemId: string): DashboardPinItemDto => ({ itemType: 'page', itemId });
 const resource = (itemId: string): DashboardPinItemDto => ({ itemType: 'resource', itemId });
+const widget = (itemId: string): DashboardPinItemDto => ({ itemType: 'widget', itemId });
 
 describe('applyDashboardPinOperation', () => {
   const pins = [page('/a'), page('/b'), page('/c')];
@@ -146,6 +147,54 @@ describe('DashboardPinsService', () => {
     expect(await ids()).toEqual(['/projects', '/uninstalled-plugin']);
     await service.updatePins(userId, { kind: 'remove', item: page('/uninstalled-plugin') });
     expect(await ids()).toEqual(['/projects']);
+  });
+
+  it('adds, moves and removes built-in widgets beside pages', async () => {
+    await service.updatePins(userId, { kind: 'add', item: page('/projects') });
+    await service.updatePins(userId, { kind: 'add', item: widget('messages') });
+    await service.updatePins(userId, { kind: 'add', item: widget('my-sessions') });
+    expect(
+      await service.updatePins(userId, { kind: 'move', item: widget('my-sessions'), before: page('/projects') }),
+    ).toEqual([widget('my-sessions'), page('/projects'), widget('messages')]);
+    await service.updatePins(userId, { kind: 'remove', item: widget('messages') });
+    expect(await ids()).toEqual(['my-sessions', '/projects']);
+  });
+
+  it('rejects adding an unknown widget', async () => {
+    await expect(service.updatePins(userId, { kind: 'add', item: widget('weather') })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it('accepts widgets declared by active plugins only', async () => {
+    const plugin = {
+      status: 'unknown',
+      pluginDirectory: '/plugins/reservations',
+      main: { frontend: { dashboardWidgets: ['reservations-upcoming'] } },
+    };
+    const plugins = jest.spyOn(PluginService, 'getPluginsWithLoadStatus').mockReturnValue([plugin as never]);
+    await service.updatePins(userId, { kind: 'add', item: widget('reservations-upcoming') });
+    expect(await ids()).toEqual(['reservations-upcoming']);
+
+    const rejected = () => service.updatePins(userId, { kind: 'add', item: widget('reservations-manage') });
+    await expect(rejected()).rejects.toBeInstanceOf(BadRequestException);
+    plugins.mockReturnValue([
+      { ...plugin, status: 'error', main: { frontend: { dashboardWidgets: ['reservations-manage'] } } } as never,
+    ]);
+    await expect(rejected()).rejects.toBeInstanceOf(BadRequestException);
+    plugins.mockReturnValue([
+      { ...plugin, main: { frontend: { dashboardWidgets: ['reservations-manage'] } } } as never,
+    ]);
+    jest.spyOn(pluginsDisabled, 'arePluginsDisabled').mockReturnValue(true);
+    await expect(rejected()).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('still removes a widget whose plugin is gone', async () => {
+    await source
+      .getRepository(DashboardPin)
+      .insert([{ userId, itemType: 'widget', itemId: 'gone-widget', position: 0 }]);
+    await service.updatePins(userId, { kind: 'remove', item: widget('gone-widget') });
+    expect(await ids()).toEqual([]);
   });
 
   it('pins existing resources with their name and rejects missing ones', async () => {

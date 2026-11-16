@@ -23,6 +23,7 @@ import { SessionBillingSummary } from './billing/sessionSummary/index';
 import { Layout } from './layout/layout';
 import { DashboardPinHeaderAccessory } from './dashboard/DashboardPinToggle';
 import { PinnablePagesProvider } from './dashboard/pinnablePages';
+import { DashboardWidgetsProvider } from './dashboard/widgets/DashboardWidgetsProvider';
 import { useAllRoutes } from './routes/index';
 import { VerifyEmail } from './verify-email/index';
 import { ResetPassword } from './reset-password/resetPassword';
@@ -136,9 +137,11 @@ export function AppRoutes() {
           <Layout>
             {/* Page headers inside the app layout get the dashboard pin. Kiosk routes have no layout. */}
             <PinnablePagesProvider>
-              <PageHeaderAccessoryProvider accessory={DashboardPinHeaderAccessory}>
-                <Outlet />
-              </PageHeaderAccessoryProvider>
+              <DashboardWidgetsProvider>
+                <PageHeaderAccessoryProvider accessory={DashboardPinHeaderAccessory}>
+                  <Outlet />
+                </PageHeaderAccessoryProvider>
+              </DashboardWidgetsProvider>
             </PinnablePagesProvider>
           </Layout>
         }

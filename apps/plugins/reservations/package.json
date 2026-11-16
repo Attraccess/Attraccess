@@ -39,6 +39,9 @@
       "/reservations",
       "/reservations/manage"
     ],
+    "dashboardWidgets": [
+      "reservations-upcoming"
+    ],
     "permissions": [
       "DATABASE_ACCESS",
       "ACCESS_HOOKS",

@@ -67,3 +67,25 @@ describe('PluginManifestSchema dashboard paths', () => {
     expect(() => PluginManifestSchema.parse(withDashboardPaths([path]))).toThrow();
   });
 });
+
+describe('PluginManifestSchema dashboard widgets', () => {
+  const withDashboardWidgets = (dashboardWidgets: string[]) => ({
+    ...BASE,
+    main: { ...BASE.main, frontend: { ...BASE.main.frontend, dashboardWidgets } },
+  });
+
+  it('accepts kebab-case widget ids and keeps manifests without them valid', () => {
+    expect(
+      PluginManifestSchema.parse(withDashboardWidgets(['reservations-upcoming', 'report2'])).main.frontend
+        ?.dashboardWidgets,
+    ).toEqual(['reservations-upcoming', 'report2']);
+    expect(PluginManifestSchema.parse(BASE).main.frontend?.dashboardWidgets).toBeUndefined();
+  });
+
+  it.each(['Report', 'report_summary', '-report', 'report-', 'report--summary', '/report', '', 'a'.repeat(65)])(
+    'rejects %j',
+    (id) => {
+      expect(() => PluginManifestSchema.parse(withDashboardWidgets([id]))).toThrow();
+    },
+  );
+});

@@ -1,0 +1,61 @@
+{
+  "loadError": "This widget could not be loaded.",
+  "crashed": "This widget stopped working. Reload the page to try again.",
+  "search": "Search",
+  "messages": {
+    "title": "Messages",
+    "description": "Your latest conversations and unread messages",
+    "unread": "{{count}} unread",
+    "empty": "No conversations yet.",
+    "unknownUser": "Unknown user",
+    "noMessages": "No messages yet",
+    "online": "Online",
+    "openInbox": "Open inbox"
+  },
+  "resources": {
+    "title": "Resources",
+    "description": "Search resources and jump to resource management",
+    "searchLabel": "Search resources",
+    "all": "All resources",
+    "create": "Create resource",
+    "flows": "Flows",
+    "mqtt": "MQTT servers",
+    "readers": "Readers",
+    "reports": "Usage reports"
+  },
+  "users": {
+    "title": "Users",
+    "description": "Search users and manage invitations",
+    "searchLabel": "Search users",
+    "all": "All users",
+    "invite": "Invite user",
+    "unverified": "Unverified email addresses",
+    "roles": "Roles"
+  },
+  "my-sessions": {
+    "title": "My sessions",
+    "description": "Your running sessions, with a button to stop each",
+    "empty": "No session running.",
+    "browse": "Browse resources",
+    "stop": "Stop",
+    "stopLabel": "Stop your session at {{name}}",
+    "confirmTitle": "Stop your session?",
+    "confirmDescription": "Your session at {{name}} ends now.",
+    "stopped": "Your session at {{name}} was stopped."
+  },
+  "billing-balance": {
+    "title": "Balance",
+    "description": "Your credit balance",
+    "balance": "{{balance}} {{currency}}",
+    "topUp": "Top up",
+    "transactions": "Transactions"
+  },
+  "readers": {
+    "title": "Readers",
+    "description": "Paired readers and those that have not connected lately",
+    "paired": "Paired",
+    "stale": "Not connected for 24 h",
+    "allConnected": "Every reader connected within the last 24 hours.",
+    "all": "All readers"
+  }
+}
