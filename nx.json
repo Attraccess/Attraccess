@@ -15,7 +15,7 @@
       "!{projectRoot}/**/*.cy.[jt]s?(x)",
       "!{projectRoot}/cypress.config.[jt]s"
     ],
-    "sharedGlobals": [],
+    "sharedGlobals": ["{workspaceRoot}/tools/vite/**/*", "{workspaceRoot}/tsconfig.base.json"],
     "testing": ["default", "{workspaceRoot}/jest.preset.js"],
     "swagger": ["default", "{projectRoot}/webpack.config.swagger.js"],
     "typeorm": ["default", "{projectRoot}/src/database/**/*"]
@@ -120,24 +120,31 @@
       "dependsOn": ["^build"],
       "inputs": ["production", "^production"]
     },
-    "test": {
-      "cache": true,
-      "inputs": [
-        "default",
-        "^production",
-        "{workspaceRoot}/jest.preset.js",
-        {
-          "externalDependencies": ["jest"]
-        }
-      ],
-      "outputs": ["{workspaceRoot}/coverage/{projectRoot}/test"],
-      "options": {
-        "env": {
-          "NODE_OPTIONS": "--experimental-vm-modules",
-          "TS_NODE_COMPILER_OPTIONS": "{\"moduleResolution\":\"node10\",\"module\":\"commonjs\",\"customConditions\":null}"
+    "test": [
+      {
+        "cache": true,
+        "inputs": [
+          "default",
+          "^production",
+          "{workspaceRoot}/jest.preset.js",
+          {
+            "externalDependencies": ["jest"]
+          }
+        ],
+        "outputs": ["{workspaceRoot}/coverage/{projectRoot}/test"]
+      },
+      {
+        "filter": {
+          "plugin": "@nx/jest/plugin"
+        },
+        "options": {
+          "env": {
+            "NODE_OPTIONS": "--experimental-vm-modules",
+            "TS_NODE_COMPILER_OPTIONS": "{\"moduleResolution\":\"node10\",\"module\":\"commonjs\",\"customConditions\":null}"
+          }
         }
       }
-    },
+    ],
     "typecheck": {
       "cache": true,
       "dependsOn": ["generate", "^generate"],

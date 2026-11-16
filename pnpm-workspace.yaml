@@ -13,6 +13,7 @@ verifyDepsBeforeRun: false
 
 overrides:
   node-gyp: 13.1.0
+  # Tools that need the TypeScript 6 JS API get the @typescript/typescript6 build instead of the native TS 7 package.
   '@swc-node/register>typescript': npm:@typescript/typescript6@^6.0.0
   ts-api-utils>typescript: npm:@typescript/typescript6@^6.0.0
   '@typescript-eslint/typescript-estree>typescript': npm:@typescript/typescript6@^6.0.0
@@ -52,6 +53,8 @@ allowBuilds:
   unrs-resolver: false
 
 patchedDependencies:
+  # typescript@7.0.2: bridges the TS 7 package to the TS 6 JS API (relies on the `>typescript` overrides above).
+  # @nestjs/swagger@12.1.2: exports the dist/* internals that nestjs-asyncapi 2 deep-imports.
   ts-api-utils@2.5.0: patches/ts-api-utils@2.5.0.patch
   typescript@7.0.2: patches/typescript@7.0.2.patch
   '@swc-node/register@1.12.1': patches/@swc-node__register@1.12.1.patch

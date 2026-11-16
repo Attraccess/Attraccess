@@ -44,7 +44,7 @@ runs:
 
     - name: Login to GitHub Container Registry
       if: inputs.push == 'true'
-      uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+      uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
@@ -52,7 +52,7 @@ runs:
 
     - name: Login to Docker Hub
       if: inputs.dockerhub-username != '' && inputs.dockerhub-token != ''
-      uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+      uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
       with:
         username: ${{ inputs.dockerhub-username }}
         password: ${{ inputs.dockerhub-token }}

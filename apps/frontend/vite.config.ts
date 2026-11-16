@@ -127,7 +127,6 @@ export default defineConfig(({ command }) => {
     ],
     worker: {
       format: 'es',
-      plugins: () => [],
     },
     build: {
       outDir: '../../dist/apps/frontend',
