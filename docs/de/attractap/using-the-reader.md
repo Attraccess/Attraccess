@@ -1,4 +1,5 @@
 # Den Attractap-Leser benutzen
+
 <!-- llms-description: So bedienen Sie den Attractap-Touchleser: mit Karte anmelden, Maschinen starten oder beenden, Türen öffnen und Formulare ausfüllen. -->
 
 Mit Ihrer RFID-Karte und dem Attractap-Touchdisplay können Sie die Nutzung einer Maschine starten oder beenden, eine Tür öffnen oder eine Aufsicht anfordern. Der Leser zeigt die ihm zugeordneten Maschinen und Türen sowie die für Sie verfügbaren Aktionen.
@@ -171,12 +172,12 @@ Solange die Verbindung zum Server gut ist, zeigt der Leser keinen Netzwerk-Hinwe
 | **! NET** | Die Verbindung ist eingeschränkt: Nachrichten kommen verspätet an, Pings sind langsam oder gehen verloren, oder das Senden ist fehlgeschlagen. Der Leser funktioniert weiter, reagiert aber eventuell langsam. |
 | **x NET** | Der Leser ist offline und erreicht den Server nicht. Er verbindet sich automatisch neu.                                                                                                                        |
 
-Für Details ziehen Sie den Griff am oberen Rand herunter, tippen auf **Netzwerk** und geben die Geräte-PIN ein. Der Bildschirm **Netzwerkstatus** zeigt den aktuellen Verbindungszustand und aktualisiert sich jede Sekunde. Der Leser bleibt dabei verbunden, sodass Sie Änderungen der Verbindung direkt verfolgen können. Der Pfeil zurück führt zum vorherigen Bildschirm:
+Für Details öffnen Sie das Wartungsmenü (den Griff am oberen Rand herunterziehen), tippen auf **Netzwerk** und geben die Geräte-PIN ein. Der Bildschirm **Netzwerkstatus** zeigt den aktuellen Verbindungszustand und aktualisiert sich jede Sekunde. Der Leser bleibt dabei verbunden, sodass Sie Änderungen der Verbindung direkt verfolgen können. Der Pfeil zurück führt zum vorherigen Bildschirm, oder zum Startbildschirm, wenn die Verbindung zwischendurch abgebrochen ist:
 
 | Wert                                   | Bedeutung                                                                                            |
 | -------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | Verbindungsqualität                    | **Gut**, **Eingeschränkt** oder **Offline**, dieselbe Einschätzung wie beim Hinweis.                 |
-| Zeit seit letzter Nachricht            | Wie lange der Leser nichts mehr vom Server empfangen hat.                                            |
+| Zeit seit letzter Nachricht            | Wie lange der Leser nichts mehr vom Server empfangen oder sich zuletzt mit ihm verbunden hat.        |
 | Letzter Ping / Durchschnittlicher Ping | Antwortzeit des letzten Pings und der Durchschnitt der letzten Minute.                               |
 | Ping-Trend                             | Unterschied zwischen dem ältesten und dem neuesten Ping der letzten Minute; positiv heißt langsamer. |
 | Neuverbindungen (1 Min.)               | Wie oft die Verbindung in der letzten Minute neu aufgebaut wurde.                                    |
@@ -187,7 +188,7 @@ Für Details ziehen Sie den Griff am oberen Rand herunter, tippen auf **Netzwerk
 | Ping-Timeouts / Ping-Verlust           | Pings ohne Antwort, als Anzahl und als Anteil aller Pings der letzten Minute.                        |
 | Verpasste Heartbeats (1 Min.)          | Heartbeats, die der Leser nicht rechtzeitig senden konnte.                                           |
 
-**Nicht verfügbar** bedeutet, dass es noch keinen Messwert gibt, zum Beispiel direkt nach dem Verbindungsaufbau.
+**Nicht verfügbar** bedeutet, dass es keinen Messwert gibt: Die Pings zeigen es, bis nach dem Start des Lesers der erste Ping beantwortet wurde, Durchschnitt und Trend zusätzlich, wenn in der letzten Minute kein Ping beantwortet wurde.
 
 > [!NOTE]
 > Leser-Firmware und Server werden gemeinsam ausgeliefert. Der Server aktualisiert die Leser automatisch auf die mitgelieferte Firmware-Version (siehe [Firmware-Updates](attractap/firmware-updates.md)).
