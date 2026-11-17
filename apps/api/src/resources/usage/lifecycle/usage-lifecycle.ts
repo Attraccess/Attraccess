@@ -12,10 +12,6 @@ import { ConflictException, Inject, Injectable, Logger, Optional } from '@nestjs
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { EntityManagerResolver } from '../../../database/adapters/entity-manager-resolver';
-
-import type { TransactionContext } from '../../../database/transaction-context';
-
 import { TransactionScope, UNIT_OF_WORK, UnitOfWork } from '../../../database/unit-of-work';
 
 import { ResourceUsageLifecycleAbortedEvent } from '../events/resource-usage.events';
@@ -44,9 +40,6 @@ import type { PreStartOrigin } from '@attraccess/plugins-backend-sdk';
 import type { ReaderUiLanguage } from '../../../plugin-system/reader-ui/host-texts';
 import { usageFlowPayload } from './usage-flow-payload';
 import { MissingBillingTransactionError, USAGE_SESSION_STORE, UsageSessionStore } from '../usage-session-store.port';
-
-/** The engine transaction handle of collaborators that have not moved to scopes yet (forms, billing, hooks). */
-export type LegacyTransactionHandle = ReturnType<EntityManagerResolver['legacyHandle']>;
 
 /** Log context shared by the usage collaborators, so their log lines read as before the split. */
 export const RESOURCE_USAGE_LOG_CONTEXT = 'ResourceUsageService';
@@ -128,7 +121,6 @@ export class UsageLifecycle {
   constructor(
     @Inject(USAGE_SESSION_STORE) readonly sessions: UsageSessionStore,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
-    private readonly handles: EntityManagerResolver,
     private readonly eventEmitter: EventEmitter2,
     private readonly billingService: BillingService,
     private readonly turns: SessionChangeTurns,
@@ -147,11 +139,6 @@ export class UsageLifecycle {
     return this.unitOfWork.run(work);
   }
 
-  /** The engine handle that collaborators not yet moved to the unit of work still take. */
-  legacyHandle(context: TransactionContext): LegacyTransactionHandle {
-    return this.handles.legacyHandle(context);
-  }
-
   /** Whether sessions are metered at all, so their meter rates are worth recording. */
   get metered(): boolean {
     return Boolean(this.metering);
@@ -168,20 +155,19 @@ export class UsageLifecycle {
 
   /** Attributes operating time, settles the meter and charges an ended session; returns the charge transaction id. */
   async settleEndedSession(
-    context: TransactionContext,
+    scope: TransactionScope,
     endedSession: UsageSession,
     final: FinalCollection,
   ): Promise<number | undefined> {
-    const manager = this.handles.legacyHandle(context);
-    const operatingShare = await this.persistAttributedOperatingDuration(endedSession, context);
-    await this.metering?.settleInTransaction(manager, endedSession.id, final);
+    const operatingShare = await this.persistAttributedOperatingDuration(endedSession, scope);
+    await this.metering?.settleInTransaction(scope, endedSession.id, final);
     const charge = operatingShare?.shared
-      ? await this.billingService.chargeForResourceUsage(endedSession, manager, operatingShare)
-      : await this.billingService.chargeForResourceUsage(endedSession, manager);
+      ? await this.billingService.chargeForResourceUsage(endedSession, scope, operatingShare)
+      : await this.billingService.chargeForResourceUsage(endedSession, scope);
     return charge?.id;
   }
 
-  async applyLifecycleDrafts(context: TransactionContext, attempt: UsageLifecycleAttempt): Promise<void> {
+  async applyLifecycleDrafts(context: TransactionScope, attempt: UsageLifecycleAttempt): Promise<void> {
     try {
       await this.sessions.applyAttemptDrafts(attempt, context);
     } catch (error) {
@@ -207,13 +193,12 @@ export class UsageLifecycle {
 
   /** Removes the tentative session of an attempt and gives the session it was about to end back to the meter. */
   private async discardAttemptState(scope: TransactionScope, attempt: UsageLifecycleAttempt): Promise<void> {
-    const manager = this.handles.legacyHandle(scope);
     if (attempt.candidateUsageId !== null) {
-      await this.metering?.discardCandidate(manager, attempt.candidateUsageId);
+      await this.metering?.discardCandidate(scope, attempt.candidateUsageId);
       await this.sessions.deletePendingSession(attempt.candidateUsageId, scope);
     }
     // The session a stop or takeover was about to end keeps running, so it still shares the meter.
-    if (attempt.previousUsageId !== null) await this.metering?.restoreParticipant(manager, attempt.previousUsageId);
+    if (attempt.previousUsageId !== null) await this.metering?.restoreParticipant(scope, attempt.previousUsageId);
   }
 
   /** A flow may end the tentative session it was started for before it becomes visible. */
@@ -334,7 +319,7 @@ export class UsageLifecycle {
   }
 
   async runUsageFlow(
-    context: TransactionContext | undefined,
+    scope: TransactionScope | undefined,
     resourceId: number,
     triggerNodeType: ResourceFlowNodeType,
     payload: object,
@@ -342,13 +327,7 @@ export class UsageLifecycle {
     options: Pick<FlowExecutionOptions, 'lifecycleAttemptId' | 'lifecycleCandidateCancellation' | 'actorUserId'>,
   ): Promise<void> {
     try {
-      await this.flowExecutorService.runFlow(
-        resourceId,
-        triggerNodeType,
-        payload,
-        context && this.handles.legacyHandle(context),
-        options,
-      );
+      await this.flowExecutorService.runFlow(resourceId, triggerNodeType, payload, scope, options);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Usage ${description} flow failed for resource ${resourceId}: ${message}`, error);
@@ -361,7 +340,7 @@ export class UsageLifecycle {
   /** Stores the running time attributed to the session and returns how it was split with the sessions it shared the machine with. */
   private async persistAttributedOperatingDuration(
     usage: UsageSession,
-    context: TransactionContext,
+    context: TransactionScope,
   ): Promise<OperatingShare | null> {
     const share = (await this.operatingAttributionService?.getShareForUsage(usage, context)) ?? null;
     const attributedOperatingDurationInMinutes = share ? share.shareMs / 60_000 : 0;
@@ -371,7 +350,7 @@ export class UsageLifecycle {
   }
 
   /** Effective number of parallel sessions. Doors and unknown resources behave like a limit of 1. */
-  getSessionLimit(context: TransactionContext | undefined, resourceId: number): Promise<number> {
+  getSessionLimit(context: TransactionScope | undefined, resourceId: number): Promise<number> {
     return this.sessions.findSessionLimit(resourceId, context);
   }
 
@@ -381,7 +360,7 @@ export class UsageLifecycle {
    * enforced by the caller, and the same session cannot be ended twice (unique attempt index).
    */
   async assertLifecycleAvailable(
-    context: TransactionContext | undefined,
+    context: TransactionScope | undefined,
     resourceId: number,
     sharedMachine = false,
   ): Promise<void> {
@@ -390,11 +369,7 @@ export class UsageLifecycle {
     }
   }
 
-  async getLifecycleAttempt(
-    context: TransactionContext,
-    id: string,
-    resourceId: number,
-  ): Promise<UsageLifecycleAttempt> {
+  async getLifecycleAttempt(context: TransactionScope, id: string, resourceId: number): Promise<UsageLifecycleAttempt> {
     const attempt = await this.sessions.findAttempt(id, resourceId, context);
     if (!attempt) throw new SessionChangeInterruptedError();
     return attempt;

@@ -8,7 +8,6 @@ import type {
   UsageSessionResource,
   UsageSessionUser,
 } from '@attraccess/application-models';
-import type { TransactionContext } from '../../../../database/transaction-context';
 import type { TransactionScope, UnitOfWork } from '../../../../database/unit-of-work';
 import {
   DoorActionDraft,
@@ -180,7 +179,7 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
 
   // ---- the port --------------------------------------------------------------------------------------------
 
-  async findSessionLimit(resourceId: number, _context?: TransactionContext): Promise<number> {
+  async findSessionLimit(resourceId: number, _context?: TransactionScope): Promise<number> {
     return sessionLimitOf(this.resources.get(resourceId));
   }
 
@@ -189,7 +188,7 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     return resource ? { type: resource.type, maxParallelSessions: resource.maxParallelSessions ?? 1 } : null;
   }
 
-  async findActiveSessions(resourceId: number, _context?: TransactionContext): Promise<UsageSession[]> {
+  async findActiveSessions(resourceId: number, _context?: TransactionScope): Promise<UsageSession[]> {
     return this.published(resourceId).map((stored) => this.withRelations(stored));
   }
 
@@ -199,14 +198,14 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     );
   }
 
-  async countActiveSessions(resourceId: number, _context?: TransactionContext): Promise<number> {
+  async countActiveSessions(resourceId: number, _context?: TransactionScope): Promise<number> {
     return this.published(resourceId).length;
   }
 
   async findOwnOpenSession(
     resourceId: number,
     userId: number,
-    _context?: TransactionContext,
+    _context?: TransactionScope,
   ): Promise<UsageSession | null> {
     const own = this.sessions.find(
       (stored) =>
@@ -218,11 +217,11 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     return own ? this.withRelations(own) : null;
   }
 
-  async findOccupyingUserIds(resourceId: number, _context?: TransactionContext): Promise<number[]> {
+  async findOccupyingUserIds(resourceId: number, _context?: TransactionScope): Promise<number[]> {
     return this.occupying(resourceId).flatMap((stored) => (stored.userId === null ? [] : [stored.userId]));
   }
 
-  async countOccupiedSlots(resourceId: number, _context?: TransactionContext): Promise<number> {
+  async countOccupiedSlots(resourceId: number, _context?: TransactionScope): Promise<number> {
     return this.occupying(resourceId).length;
   }
 
@@ -257,7 +256,7 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     return this.withRelations(stored);
   }
 
-  async findSessionForEvent(usageId: number, _context?: TransactionContext): Promise<UsageSession | null> {
+  async findSessionForEvent(usageId: number, _context?: TransactionScope): Promise<UsageSession | null> {
     const found = this.sessions.find((stored) => stored.id === usageId);
     return found ? this.withRelations(found) : null;
   }
@@ -265,7 +264,7 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
   async findEndableSession(
     resourceId: number,
     usageId: number,
-    _context?: TransactionContext,
+    _context?: TransactionScope,
   ): Promise<UsageSession | null> {
     const found = this.published(resourceId).find((stored) => stored.id === usageId);
     if (!found) return null;
@@ -275,7 +274,7 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     return beingEnded ? null : this.withRelations(found);
   }
 
-  async findSessionIdsBeingEnded(resourceId: number, _context?: TransactionContext): Promise<Set<number>> {
+  async findSessionIdsBeingEnded(resourceId: number, _context?: TransactionScope): Promise<Set<number>> {
     return new Set(
       [...this.attempts.values()].flatMap((attempt) =>
         attempt.resourceId === resourceId && attempt.kind === 'end' && attempt.previousUsageId !== null
@@ -285,11 +284,11 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     );
   }
 
-  async findMeterRates(resourceId: number, _context?: TransactionContext): Promise<UsageMeterRate[]> {
+  async findMeterRates(resourceId: number, _context?: TransactionScope): Promise<UsageMeterRate[]> {
     return this.meterRates.get(resourceId) ?? [];
   }
 
-  async findResource(resourceId: number, _context?: TransactionContext): Promise<UsageSessionResource | null> {
+  async findResource(resourceId: number, _context?: TransactionScope): Promise<UsageSessionResource | null> {
     return this.resources.get(resourceId) ?? null;
   }
 
@@ -302,7 +301,7 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     );
   }
 
-  async userExists(userId: number, _context?: TransactionContext): Promise<boolean> {
+  async userExists(userId: number, _context?: TransactionScope): Promise<boolean> {
     return this.users.has(userId);
   }
 
@@ -320,11 +319,7 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     ).length;
   }
 
-  async isLifecycleBlocked(
-    resourceId: number,
-    sharedMachine: boolean,
-    _context?: TransactionContext,
-  ): Promise<boolean> {
+  async isLifecycleBlocked(resourceId: number, sharedMachine: boolean, _context?: TransactionScope): Promise<boolean> {
     const attempts = [...this.attempts.values()].filter((attempt) => attempt.resourceId === resourceId);
     if (sharedMachine) return attempts.some((attempt) => attempt.kind === 'takeover');
     return (
@@ -338,36 +333,32 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
   async findAttempt(
     attemptId: string,
     resourceId: number,
-    _context?: TransactionContext,
+    _context?: TransactionScope,
   ): Promise<UsageLifecycleAttempt | null> {
     const attempt = this.attempts.get(attemptId);
     return attempt && attempt.resourceId === resourceId ? { ...attempt } : null;
   }
 
-  async isSessionBeingEnded(usageId: number, _context?: TransactionContext): Promise<boolean> {
+  async isSessionBeingEnded(usageId: number, _context?: TransactionScope): Promise<boolean> {
     return [...this.attempts.values()].some((attempt) => attempt.previousUsageId === usageId);
   }
 
-  async saveAttempt(attempt: UsageLifecycleAttempt, _context?: TransactionContext): Promise<UsageLifecycleAttempt> {
+  async saveAttempt(attempt: UsageLifecycleAttempt, _context?: TransactionScope): Promise<UsageLifecycleAttempt> {
     const saved = { createdAt: new Date(), ...attempt };
     this.attempts.set(attempt.id, saved);
     return { ...saved };
   }
 
-  async deleteAttempt(attemptId: string, resourceId: number, _context?: TransactionContext): Promise<void> {
+  async deleteAttempt(attemptId: string, resourceId: number, _context?: TransactionScope): Promise<void> {
     if (this.attempts.get(attemptId)?.resourceId === resourceId) this.attempts.delete(attemptId);
   }
 
-  async clearAttemptCandidate(attemptId: string, resourceId: number, _context?: TransactionContext): Promise<void> {
+  async clearAttemptCandidate(attemptId: string, resourceId: number, _context?: TransactionScope): Promise<void> {
     const attempt = this.attempts.get(attemptId);
     if (attempt?.resourceId === resourceId) attempt.candidateUsageId = null;
   }
 
-  async setBillingItems(
-    attemptId: string,
-    items: UsageBillingItemDraft[],
-    _context?: TransactionContext,
-  ): Promise<void> {
+  async setBillingItems(attemptId: string, items: UsageBillingItemDraft[], _context?: TransactionScope): Promise<void> {
     const attempt = this.attempts.get(attemptId);
     if (attempt) attempt.billingItems = items;
   }
@@ -376,13 +367,13 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     return [...this.attempts.values()].map(({ id, createdAt }) => ({ id, createdAt: createdAt ?? new Date() }));
   }
 
-  async findAttemptsByIds(ids: string[], _context?: TransactionContext): Promise<UsageLifecycleAttempt[]> {
+  async findAttemptsByIds(ids: string[], _context?: TransactionScope): Promise<UsageLifecycleAttempt[]> {
     return ids.flatMap((id) =>
       this.attempts.has(id) ? [{ ...(this.attempts.get(id) as UsageLifecycleAttempt) }] : [],
     );
   }
 
-  async createPendingSession(draft: PendingSessionDraft, _context?: TransactionContext): Promise<UsageSession> {
+  async createPendingSession(draft: PendingSessionDraft, _context?: TransactionScope): Promise<UsageSession> {
     const owner = this.users.get(draft.userId);
     const stored = session({
       id: this.nextId++,
@@ -404,25 +395,25 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     return this.withRelations(stored);
   }
 
-  async findPendingSession(usageId: number, _context?: TransactionContext): Promise<UsageSession | null> {
+  async findPendingSession(usageId: number, _context?: TransactionScope): Promise<UsageSession | null> {
     const found = this.sessions.find((stored) => stored.id === usageId && stored.lifecyclePending);
     return found ? this.withRelations(found) : null;
   }
 
-  async deletePendingSession(usageId: number, _context?: TransactionContext): Promise<boolean> {
+  async deletePendingSession(usageId: number, _context?: TransactionScope): Promise<boolean> {
     const before = this.sessions.length;
     this.sessions = this.sessions.filter((stored) => !(stored.id === usageId && stored.lifecyclePending));
     return this.sessions.length !== before;
   }
 
-  async publishSession(usageId: number, _context?: TransactionContext): Promise<void> {
+  async publishSession(usageId: number, _context?: TransactionScope): Promise<void> {
     Object.assign(this.required(usageId), { isFinalized: true, lifecyclePending: false });
   }
 
   async endSessionIfOpen(
     usageId: number,
     end: { endTime: Date; endNotes: string | null | undefined },
-    _context?: TransactionContext,
+    _context?: TransactionScope,
   ): Promise<boolean> {
     const stored = this.required(usageId);
     if (stored.endTime !== null) return false;
@@ -432,19 +423,19 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     return true;
   }
 
-  async setAttributedOperatingDuration(usageId: number, minutes: number, _context?: TransactionContext): Promise<void> {
+  async setAttributedOperatingDuration(usageId: number, minutes: number, _context?: TransactionScope): Promise<void> {
     this.required(usageId).attributedOperatingDurationInMinutes = minutes;
   }
 
   async findSessionWithRelations(
     usageId: number,
     _shape?: 'ended' | 'started',
-    _context?: TransactionContext,
+    _context?: TransactionScope,
   ): Promise<UsageSession> {
     return this.withRelations(this.required(usageId));
   }
 
-  async applyAttemptDrafts(attempt: UsageLifecycleAttempt, _context?: TransactionContext): Promise<void> {
+  async applyAttemptDrafts(attempt: UsageLifecycleAttempt, _context?: TransactionScope): Promise<void> {
     this.appliedDrafts.push(attempt);
   }
 
@@ -463,7 +454,7 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     return this.withRelations(stored);
   }
 
-  async recoverOrphanedSessions(_context?: TransactionContext): Promise<number> {
+  async recoverOrphanedSessions(_context?: TransactionScope): Promise<number> {
     return 0;
   }
 }

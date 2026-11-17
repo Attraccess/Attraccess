@@ -11,7 +11,7 @@ import {
   Session,
   User,
 } from '@attraccess/database-entities';
-import { activeUsageWhere } from '../../../resources/usage/sessions/active-usage';
+import { activeUsageWhere } from '../usage/active-usage-queries';
 import {
   GaugeCountReader,
   InitialGaugeCounts,

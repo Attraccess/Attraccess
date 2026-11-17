@@ -8,6 +8,7 @@ import { ResourceSessionStartedEvent } from '../events/resource-usage.events';
 import { arrangeIntroducedUser, InMemoryUsageScope } from './fixtures/arrangements.test-fixture';
 
 import { usageInternals } from './fixtures/compose.test-fixture';
+import { fakeTransactionScope } from '../../../database/fake-transaction-scope.test-fixture';
 
 describe('ResourceUsageService', () => {
   let scope: InMemoryUsageScope;
@@ -335,7 +336,7 @@ describe('ResourceUsageService', () => {
     });
 
     it('uses cache even when a transaction is provided', async () => {
-      const transaction = {};
+      const transaction = fakeTransactionScope();
 
       // First call (no transaction) populates the cache.
       await scope.service.canControllResource(resourceId, mockUser);

@@ -128,6 +128,7 @@ async function hookEvents(audit: any) {
       } as never,
       audit,
       { get: () => ({ READER_UI_BREAKER_THRESHOLD: 1 }) } as never,
+      {} as never,
     );
   const run = {
     resourceId: 12,

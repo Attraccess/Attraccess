@@ -4,12 +4,13 @@ import type { StartCapacityContext, StartCapacityHook } from '@attraccess/plugin
 import { ConflictException } from '@nestjs/common';
 import { rm } from 'node:fs/promises';
 import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
+import { unitOfWorkFor } from '../../../database/adapters/shared-unit-of-work';
 import { createSqlitePluginPersistence, sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { ReaderUiHooksService } from '../../../plugin-system/reader-ui/reader-ui-hooks.service';
 import { AlreadyHasActiveSessionError } from '../errors/already-has-active-session.error';
 import { ResourceFullError } from '../errors/resource-full.error';
 import { StartBlockedException } from '../pre-start/start-confirmation.errors';
-import { countOccupiedSlots, findOccupyingUserIds } from '../sessions/active-usage';
+import { countOccupiedSlots, findOccupyingUserIds } from '../../../database/adapters/usage/active-usage-queries';
 import { usageInternals } from '../sessions/fixtures/compose.test-fixture';
 import { resetTestFixture } from '../../../database/adapters/usage/lifecycle-fixtures/setup.test-fixture';
 import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../../../database/adapters/usage/lifecycle-fixtures/state.test-fixture';
@@ -56,6 +57,7 @@ describe('Start capacity hook', () => {
       { onCleared: jest.fn(), raise: jest.fn(), clearWhere: jest.fn() } as never,
       { record: jest.fn().mockResolvedValue(undefined) } as never,
       { get: () => ({}) } as never,
+      unitOfWorkFor(scope.source),
     );
     Object.assign(usageInternals(scope.usage).preparation, { pluginHooks: service });
   };

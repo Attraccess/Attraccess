@@ -8,6 +8,8 @@ import type {
 
 import { BadRequestException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 
+import type { TransactionScope } from '../../../database/unit-of-work';
+
 import { SettingsService } from '../../../settings/settings.service';
 
 import {
@@ -42,7 +44,6 @@ import { MachineBusyError } from '../errors/machine-busy.error';
 
 import {
   ActiveSessionCounts,
-  LegacyTransactionHandle,
   RESOURCE_USAGE_LOG_CONTEXT,
   StartSessionOptions,
   UsageLifecycle,
@@ -90,8 +91,6 @@ export class UsageSessionStartPreparation {
       : null;
     return this.lifecycle
       .transaction(async (scope) => {
-        // Collaborators that have not moved to scopes yet take the engine handle of this transaction.
-        const transactionalEntityManager = this.lifecycle.legacyHandle(scope);
         const sessionLimit = await this.lifecycle.getSessionLimit(scope, resourceId);
         const sharedMachine = sessionLimit > 1;
         await this.lifecycle.assertLifecycleAvailable(scope, resourceId, sharedMachine);
@@ -104,13 +103,13 @@ export class UsageSessionStartPreparation {
             checkMaintenance: true,
             checkControlPermission: false,
           },
-          transactionalEntityManager,
+          scope,
         );
 
         // Gate: the solo path stays identical to today's behavior. Only when the user cannot start
         // solo (or the resource mandates supervision) does the supervised path apply.
         if (supervisorUserId === null) {
-          const userCanControl = await this.access.canControllResource(resourceId, user, transactionalEntityManager);
+          const userCanControl = await this.access.canControllResource(resourceId, user, scope);
           if (!userCanControl) {
             this.logger.warn(`User ${user.id} cannot control resource ${resourceId} - missing introduction`);
             throw new BadRequestException('You must complete the resource introduction before using it');
@@ -119,13 +118,7 @@ export class UsageSessionStartPreparation {
             throw new BadRequestException('This resource requires a supervisor; request a supervised session instead');
           }
         } else {
-          await this.gate.validateSupervisedStart(
-            resourceId,
-            user,
-            supervisorUserId,
-            transactionalEntityManager,
-            resource,
-          );
+          await this.gate.validateSupervisedStart(resourceId, user, supervisorUserId, scope, resource);
         }
 
         if (resource.type !== ResourceType.Machine) {
@@ -149,7 +142,7 @@ export class UsageSessionStartPreparation {
           if (capacityLanguage) {
             const outcome = await this.runCapacityHooks(
               { resourceId, user, options, supervisorUserId },
-              { language: capacityLanguage, sessionLimit, usersInSession, manager: transactionalEntityManager },
+              { language: capacityLanguage, sessionLimit, usersInSession, scope },
             );
             flushCapacityAudit = outcome?.flush;
             if (outcome?.refusal) throw new StartBlockedException(outcome.refusal.reason);
@@ -183,10 +176,7 @@ export class UsageSessionStartPreparation {
         }
 
         const startTime = new Date();
-        const billingConfiguration = await this.billingService.getResourceBillingConfiguration(
-          resourceId,
-          transactionalEntityManager,
-        );
+        const billingConfiguration = await this.billingService.getResourceBillingConfiguration(resourceId, scope);
         const meterRates = this.lifecycle.metered ? await this.sessions.findMeterRates(resourceId, scope) : [];
         const projectId =
           dto.projectId === undefined ? undefined : (await this.projectsService.findOneById(user.id, dto.projectId)).id;
@@ -222,16 +212,11 @@ export class UsageSessionStartPreparation {
             submissions: dto.formSubmissions,
             userId: user.id,
             resourceUsageId: createdSession.id,
-            manager: transactionalEntityManager,
+            scope,
           });
         }
 
-        await this.billingService.validateResourceUsageStart(
-          resourceId,
-          createdSession,
-          asLegacy(user),
-          transactionalEntityManager,
-        );
+        await this.billingService.validateResourceUsageStart(resourceId, createdSession, asLegacy(user), scope);
         const attempt: UsageLifecycleAttempt = await this.sessions.saveAttempt(
           {
             id: attemptId,
@@ -273,7 +258,7 @@ export class UsageSessionStartPreparation {
       options: StartSessionOptions;
       supervisorUserId: number | null;
     },
-    state: { language: 'en' | 'de'; sessionLimit: number; usersInSession: number[]; manager: LegacyTransactionHandle },
+    state: { language: 'en' | 'de'; sessionLimit: number; usersInSession: number[]; scope: TransactionScope },
   ): Promise<StartCapacityOutcome> | undefined {
     const { resourceId, user, options, supervisorUserId } = start;
     return this.pluginHooks?.runStartCapacity({
@@ -287,7 +272,7 @@ export class UsageSessionStartPreparation {
       sessionLimit: state.sessionLimit,
       occupiedSlots: state.usersInSession.length,
       usersInSession: state.usersInSession,
-      manager: state.manager,
+      scope: state.scope,
       satisfied: new Map(
         Object.entries(options.confirmedStepKeys ?? {}).map(([plugin, keys]) => [plugin, new Set(keys)]),
       ),

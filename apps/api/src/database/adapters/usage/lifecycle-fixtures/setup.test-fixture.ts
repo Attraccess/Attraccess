@@ -2,7 +2,9 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Logger } from '@nestjs/common';
 import { BillingTransaction, Form, Resource, ResourceUsage, User } from '@attraccess/database-entities';
 import { BillingTransactionStatus, ResourceType, SupervisionMode } from '@attraccess/application-models';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource } from 'typeorm';
+import type { TransactionScope } from '../../../unit-of-work';
+import { unitOfWorkFor } from '../../shared-unit-of-work';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -48,21 +50,24 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
     scope.events,
   );
   scope.flow = { runFlow: jest.fn(), trackResourceActivity: jest.fn() };
+  // The billing stand-in writes through the unit of work the lifecycle hands it, like the real ledger adapter.
+  const managerOf = (transaction: TransactionScope) => unitOfWorkFor(scope.source).handleOf(transaction);
   scope.billing = {
     getResourceBillingConfiguration: jest
       .fn()
       .mockResolvedValue({ creditsPerUsage: 5, creditsPerMinute: 2, creditsPerOperatingMinute: 3 }),
     validateResourceUsageStart: jest.fn().mockResolvedValue(undefined),
     handleResourceUsageStart: jest.fn(
-      async (_resourceId: number, session: ResourceUsage, user: User, manager: EntityManager) =>
-        manager.save(BillingTransaction, {
+      async (_resourceId: number, session: ResourceUsage, user: User, transaction: TransactionScope) =>
+        managerOf(transaction).save(BillingTransaction, {
           resourceUsageId: session.id,
           userId: user.id,
           amount: 0,
           status: BillingTransactionStatus.Pending,
         }),
     ),
-    chargeForResourceUsage: jest.fn(async (session: ResourceUsage, manager: EntityManager) => {
+    chargeForResourceUsage: jest.fn(async (session: ResourceUsage, unitOfWorkScope: TransactionScope) => {
+      const manager = managerOf(unitOfWorkScope);
       const transaction = await manager.findOneByOrFail(BillingTransaction, { resourceUsageId: session.id });
       await manager.update(BillingTransaction, transaction.id, {
         amount: 23,

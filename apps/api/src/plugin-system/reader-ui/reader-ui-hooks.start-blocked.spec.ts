@@ -22,6 +22,7 @@ function setup(queries: Record<string, StartBlockedQuery>, preStart: Record<stri
     alerts as never,
     audit as never,
     { get: () => ({}) } as never,
+    {} as never,
   );
   return { service, audit };
 }

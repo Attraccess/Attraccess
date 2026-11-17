@@ -4,7 +4,7 @@ import { Resource, ResourceUsage } from '@attraccess/database-entities';
 import type { AttractapLinkedResource } from '@attraccess/application-models';
 import { In, Repository } from 'typeorm';
 import type { AttractapResourceReads } from '../../../attractap/reader-resource-reads.port';
-import { activeUsageWhere } from '../../../resources/usage/sessions/active-usage';
+import { activeUsageWhere } from '../usage/active-usage-queries';
 import { toLinkedResource } from './attractap-mappers';
 
 @Injectable()

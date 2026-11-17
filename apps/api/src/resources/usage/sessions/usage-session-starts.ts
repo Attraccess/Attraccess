@@ -115,20 +115,13 @@ export class UsageSessionStarts {
         { lifecycleAttemptId: attemptId, actorUserId: auditOrigin.id ?? user.id },
       );
       newSession = await this.lifecycle.transaction(async (scope) => {
-        // Collaborators that have not moved to scopes yet take the engine handle of this transaction.
-        const manager = this.lifecycle.legacyHandle(scope);
         const currentAttempt = await this.lifecycle.getLifecycleAttempt(scope, attemptId, resourceId);
         if (currentAttempt.candidateUsageId !== createdSession.id) {
           throw new TentativeSessionCancelledError();
         }
         // The flow may have independently triggered maintenance while this start was pending.
         // Recheck the gate before making the candidate session visible.
-        await this.gate.getResource(
-          resourceId,
-          user,
-          { checkMaintenance: true, checkControlPermission: false },
-          manager,
-        );
+        await this.gate.getResource(resourceId, user, { checkMaintenance: true, checkControlPermission: false }, scope);
         if (existingActiveSession) {
           await this.lifecycle.applyLifecycleDrafts(scope, currentAttempt);
           const ended = await this.lifecycle.sessions.endSessionIfOpen(
@@ -151,7 +144,7 @@ export class UsageSessionStarts {
         }
         // The outgoing charge must affect the final balance check, including same-user takeovers.
         // Both changes remain atomic if the replacement can no longer be afforded.
-        await this.billingService.handleResourceUsageStart(resourceId, createdSession, asLegacy(user), manager);
+        await this.billingService.handleResourceUsageStart(resourceId, createdSession, asLegacy(user), scope);
         if (!existingActiveSession) await this.lifecycle.applyLifecycleDrafts(scope, currentAttempt);
         await this.lifecycle.sessions.publishSession(createdSession.id, scope);
         await this.lifecycle.sessions.deleteAttempt(attemptId, resourceId, scope);
@@ -165,7 +158,7 @@ export class UsageSessionStarts {
               subject: { type: 'resource', id: resourceId },
               details: { usageId: existingActiveSession.id, usageUserId: existingActiveSession.user.id },
             },
-            manager,
+            scope,
           );
         }
         await this.audit.record(
@@ -180,7 +173,7 @@ export class UsageSessionStarts {
               ...(supervisorUserId === null ? {} : { supervisorUserId }),
             },
           },
-          manager,
+          scope,
         );
         return this.lifecycle.sessions.findSessionWithRelations(createdSession.id, 'started', scope);
       });

@@ -2,7 +2,7 @@ import type { UsageBillingItemDraft, UsageSession, UsageSessionUser } from '@att
 
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 
-import type { TransactionContext } from '../../../database/transaction-context';
+import type { TransactionScope } from '../../../database/unit-of-work';
 
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
@@ -75,7 +75,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
    */
   public async getActiveSession(
     resourceId: number,
-    transactionalEntityManager?: TransactionContext,
+    transactionalEntityManager?: TransactionScope,
     preferUserId?: number,
   ): Promise<UsageSession | null> {
     return this.records.getActiveSession(resourceId, transactionalEntityManager, preferUserId);
@@ -84,7 +84,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
   /** All active sessions of one resource, earliest started first. */
   public async getActiveSessionsForResource(
     resourceId: number,
-    transactionalEntityManager?: TransactionContext,
+    transactionalEntityManager?: TransactionScope,
   ): Promise<UsageSession[]> {
     return this.records.getActiveSessionsForResource(resourceId, transactionalEntityManager);
   }
@@ -191,7 +191,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     resourceId: number,
     target: SessionEndTarget,
     notes: string,
-    manager?: TransactionContext,
+    manager?: TransactionScope,
     triggeredByUserId?: number,
   ): Promise<void> {
     return this.ends.deferSessionEnds(attemptId, resourceId, target, notes, manager, triggeredByUserId);
@@ -202,7 +202,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     resourceId: number,
     target: SessionEndTarget,
     notes: string,
-    manager?: TransactionContext,
+    manager?: TransactionScope,
     triggeredByUserId?: number,
   ): Promise<void> {
     return this.ends.endSessionsOfTarget(resourceId, target, notes, manager, triggeredByUserId);
@@ -245,40 +245,32 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     resourceId: number,
     requester: UsageSessionUser,
     supervisorUserId: number,
-    transactionalEntityManager?: TransactionContext,
+    transactionalEntityManager?: TransactionScope,
     preloadedResource?: GateResource,
   ): Promise<void> {
     return this.gate.validateSupervisedStart(
       resourceId,
       requester,
       supervisorUserId,
-      transactionalEntityManager && this.lifecycle.legacyHandle(transactionalEntityManager),
+      transactionalEntityManager,
       preloadedResource,
     );
   }
 
   public async assertSupportsSupervision(
     resourceId: number,
-    transactionalEntityManager?: TransactionContext,
+    transactionalEntityManager?: TransactionScope,
     preloadedResource?: GateResource,
   ): Promise<GateResource> {
-    return this.gate.assertSupportsSupervision(
-      resourceId,
-      transactionalEntityManager && this.lifecycle.legacyHandle(transactionalEntityManager),
-      preloadedResource,
-    );
+    return this.gate.assertSupportsSupervision(resourceId, transactionalEntityManager, preloadedResource);
   }
 
   public async canControllResource(
     resourceId: number,
     user: UsageSessionUser,
-    transactionalEntityManager?: TransactionContext,
+    transactionalEntityManager?: TransactionScope,
   ): Promise<boolean> {
-    return this.access.canControllResource(
-      resourceId,
-      user,
-      transactionalEntityManager && this.lifecycle.legacyHandle(transactionalEntityManager),
-    );
+    return this.access.canControllResource(resourceId, user, transactionalEntityManager);
   }
 
   // The access cache listens to these events itself; the handlers stay callable here as before.

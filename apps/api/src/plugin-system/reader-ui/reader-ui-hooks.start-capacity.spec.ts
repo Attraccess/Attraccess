@@ -1,8 +1,17 @@
 import type { StartCapacityHook } from '@attraccess/plugins-backend-sdk';
 import { createSqlitePluginPersistence, sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
+import { ScopedUnitOfWork, type TransactionScope } from '../../database/unit-of-work';
 import { ReaderUiHooksService, type StartCapacityRun } from './reader-ui-hooks.service';
 
 const reason = { code: 'RESERVED', title: 'Reserved', body: 'Held for a booking' };
+
+// The host's start transaction stays open for the whole file, as it is while the capacity hooks run.
+const unitOfWork = new ScopedUnitOfWork<object>({ transaction: (work) => work({ marker: 'manager' }) });
+let hostScope!: TransactionScope;
+void unitOfWork.run((scope) => {
+  hostScope = scope;
+  return new Promise<void>(() => undefined);
+});
 
 function setup(hooks: Record<string, StartCapacityHook>, policy: 'fail-closed' | 'fail-open' = 'fail-closed') {
   const registry = {
@@ -22,6 +31,7 @@ function setup(hooks: Record<string, StartCapacityHook>, policy: 'fail-closed' |
     alerts as never,
     audit as never,
     { get: () => ({}) } as never,
+    unitOfWork,
   );
   return { service, audit, alerts, cleared };
 }
@@ -36,7 +46,7 @@ const run = (occupiedSlots: number, satisfied: StartCapacityRun['satisfied'] = n
   sessionLimit: 3,
   occupiedSlots,
   usersInSession: [11, 12, 13].slice(0, occupiedSlots),
-  manager: { marker: 'manager' } as never,
+  scope: hostScope,
   satisfied,
 });
 

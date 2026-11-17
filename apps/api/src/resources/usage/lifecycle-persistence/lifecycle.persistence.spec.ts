@@ -18,6 +18,7 @@ import { recoverOrphanedUsages } from '../../../database/resource-usage-integrit
 import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
 import { ResourceInUseError } from '../errors/resource-in-use.error';
 import { resetTestFixture } from '../../../database/adapters/usage/lifecycle-fixtures/setup.test-fixture';
+import { unitOfWorkFor } from '../../../database/adapters/shared-unit-of-work';
 import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../../../database/adapters/usage/lifecycle-fixtures/state.test-fixture';
 
 // Real repositories and relations for the lifecycle boundary; peripheral domain tables are omitted.
@@ -376,8 +377,8 @@ describe('Usage lifecycle persistence around external flows', () => {
   });
 
   it('publishes neither the session nor its bill if pending transaction creation fails', async () => {
-    scope.billing.handleResourceUsageStart.mockImplementation(async (_resourceId, session, user, manager) => {
-      await manager.save(BillingTransaction, {
+    scope.billing.handleResourceUsageStart.mockImplementation(async (_resourceId, session, user, tx) => {
+      await unitOfWorkFor(scope.source).handleOf(tx).save(BillingTransaction, {
         resourceUsageId: session.id,
         userId: user.id,
         amount: 0,
@@ -439,14 +440,14 @@ describe('Usage lifecycle persistence around external flows', () => {
     await scope.source.getRepository(User).update(scope.users[0].id, { creditBalance: 23 });
     const before = await scope.publishedState();
     const checkedBalances: number[] = [];
-    scope.billing.validateResourceUsageStart.mockImplementation(async (_resourceId, session, user, manager) => {
-      const storedUser = await manager.findOneByOrFail(User, { id: user.id });
+    scope.billing.validateResourceUsageStart.mockImplementation(async (_resourceId, session, user, tx) => {
+      const storedUser = await unitOfWorkFor(scope.source).handleOf(tx).findOneByOrFail(User, { id: user.id });
       checkedBalances.push(storedUser.creditBalance);
       if (storedUser.creditBalance < session.sessionDurationCreditsPerMinute) throw new InsufficientBalanceError();
     });
-    scope.billing.handleResourceUsageStart.mockImplementation(async (resourceId, session, user, manager) => {
-      await scope.billing.validateResourceUsageStart(resourceId, session, user, manager);
-      return manager.save(BillingTransaction, {
+    scope.billing.handleResourceUsageStart.mockImplementation(async (resourceId, session, user, tx) => {
+      await scope.billing.validateResourceUsageStart(resourceId, session, user, tx);
+      return unitOfWorkFor(scope.source).handleOf(tx).save(BillingTransaction, {
         resourceUsageId: session.id,
         userId: user.id,
         amount: 0,

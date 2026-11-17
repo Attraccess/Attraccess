@@ -3,6 +3,7 @@ import { ResourceType, ResourceUsageAction } from '@attraccess/application-model
 import type { UsageSession } from '@attraccess/application-models';
 import { UsageSessionStore } from '../usage-session-store.port';
 import { UsageSessionRecords } from './usage-session-records';
+import { fakeTransactionScope } from '../../../database/fake-transaction-scope.test-fixture';
 
 /** The records read through the usage session port only: no ORM, no database. */
 describe('UsageSessionRecords', () => {
@@ -58,7 +59,7 @@ describe('UsageSessionRecords', () => {
     });
 
     it('hands the caller transaction to the store, so a read sees what the transaction wrote', async () => {
-      const transaction = {};
+      const transaction = fakeTransactionScope();
 
       await records.getActiveSessionsForResource(5, transaction);
 

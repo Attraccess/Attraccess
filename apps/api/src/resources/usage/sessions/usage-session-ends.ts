@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 
 import { AUDIT_RECORDER, AuditActor, AuditRecorder, SYSTEM_AUDIT_ACTOR } from '../../../audit/recorder/audit-event';
 
-import type { TransactionContext } from '../../../database/transaction-context';
+import type { TransactionScope } from '../../../database/unit-of-work';
 
 import { NoUsageSessionError } from '../../flows/errors/no-usage-session.error';
 
@@ -137,7 +137,7 @@ export class UsageSessionEnds {
           submissions: dto.formSubmissions,
           userId: user.id,
           resourceUsageId: activeSession.id,
-          manager: this.lifecycle.legacyHandle(scope),
+          scope,
         });
       }
 
@@ -206,7 +206,7 @@ export class UsageSessionEnds {
               ...(options.triggeredByUserId === undefined ? {} : { triggeredByUserId: options.triggeredByUserId }),
             },
           },
-          this.lifecycle.legacyHandle(scope),
+          scope,
         );
         return endedSession;
       });
@@ -289,7 +289,7 @@ export class UsageSessionEnds {
     resourceId: number,
     target: SessionEndTarget,
     notes: string,
-    manager?: TransactionContext,
+    manager?: TransactionScope,
     triggeredByUserId?: number,
   ): Promise<void> {
     const sessions = await this.findEndableSessions(resourceId, target, manager);
@@ -304,7 +304,7 @@ export class UsageSessionEnds {
     resourceId: number,
     target: SessionEndTarget,
     notes: string,
-    manager?: TransactionContext,
+    manager?: TransactionScope,
     triggeredByUserId?: number,
   ): Promise<void> {
     const sessions = await this.findEndableSessions(resourceId, target, manager);
@@ -323,7 +323,7 @@ export class UsageSessionEnds {
     usageIds: number[],
     notes: string,
     withinSessionChange: boolean,
-    manager?: TransactionContext,
+    manager?: TransactionScope,
     triggeredByUserId?: number,
   ): Promise<void> {
     let firstError: unknown;
@@ -357,7 +357,7 @@ export class UsageSessionEnds {
   private findEndableSession(
     resourceId: number,
     usageId: number,
-    context?: TransactionContext,
+    context?: TransactionScope,
   ): Promise<UsageSession | null> {
     return this.lifecycle.sessions.findEndableSession(resourceId, usageId, context);
   }
@@ -366,7 +366,7 @@ export class UsageSessionEnds {
   private async findEndableSessions(
     resourceId: number,
     target: SessionEndTarget,
-    context?: TransactionContext,
+    context?: TransactionScope,
   ): Promise<UsageSession[]> {
     const sessions = (await this.records.getActiveSessionsForResource(resourceId, context)).filter(
       (session) => target.kind === 'all' || session.userId === target.userId,

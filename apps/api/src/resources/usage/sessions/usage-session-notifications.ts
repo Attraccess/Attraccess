@@ -7,7 +7,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import type { TransactionContext } from '../../../database/transaction-context';
+import type { TransactionScope } from '../../../database/unit-of-work';
 
 import { BillingService } from '../../../billing/charges/billing.service';
 
@@ -191,7 +191,7 @@ export class UsageSessionNotifications {
     }
   }
 
-  async emitUsageEvent(usageId: number, context?: TransactionContext): Promise<void> {
+  async emitUsageEvent(usageId: number, context?: TransactionScope): Promise<void> {
     const usage = await this.sessions.findSessionForEvent(usageId, context);
     // An ended usage session is announced by ResourceUsageSessionEndedEvent (or the take-over event), never as a
     // start. Door actions are stored already ended and still fire this event.
