@@ -1,8 +1,8 @@
-import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import {
   type PluginAuditPrincipal,
   type PluginContext,
   type PluginMqttSubscription,
+  type PluginTransactionScope,
 } from '@attraccess/plugins-backend-sdk';
 
 import {
@@ -20,15 +20,13 @@ import { WagoAudit } from '../audit/index';
 
 import { WagoController } from '../controllers/entity';
 
-import { WagoCredentialRotationEntity } from '../credentials/service';
-
 import { WagoDeviceOperations } from '../runtime/device-operations';
 
-import { WagoDeviceOperation, WagoManagedAccess, WagoRuntimeUpdateEntity } from '../runtime/managed/access.entity';
+import { WagoManagedAccess } from '../runtime/managed/access.entity';
 
 import { WagoManagedRuntimeService } from '../runtime/managed/service';
 
-import { WagoNetworkChange, WagoMqttCredentialRetirement } from './entity';
+import { WagoNetworkChange } from './entity';
 
 import { NetworkChangeError } from './model';
 
@@ -46,7 +44,7 @@ import { NetworkPayload } from './model';
 
 import { EVIDENCE_MS } from './model';
 
-import { WagoCommissioningSession } from '../commissioning/sessions/session.entity';
+import { openWagoStorage, type WagoStorage } from '../storage';
 
 import { assertCommissioningBroker } from '../commissioning/delivery/preflight';
 
@@ -69,11 +67,12 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
   async apply(controllerId: number, body: unknown, principal: PluginAuditPrincipal, retry = false) {
     if (this.destroyed) throw new ConflictException('Controller operation has stopped. Retry the request.');
     const input = retry ? null : networkChangeInput(body);
-    const access = await sqlitePersistence(this.context)
-      .getRepository(WagoManagedAccess)
-      .findOne({ where: { controllerId, state: 'managed' }, order: { sessionId: 'DESC' } });
+    const access = await this.storage.managedAccess.findOne({
+      where: { controllerId, state: 'managed' },
+      orderBy: [{ field: 'sessionId', direction: 'desc' }],
+    });
     if (!access) throw new ConflictException('Automatic SSH management is required for this operation.');
-    const operations = new WagoDeviceOperations(sqlitePersistence(this.context).getRepository(WagoDeviceOperation));
+    const operations = new WagoDeviceOperations(this.storage.deviceOperations);
     const owner = randomBytes(16).toString('hex'),
       now = Date.now();
     if (!(await operations.acquire(access.fingerprint, owner, now, now + OPERATION_MS + 60_000)))
@@ -81,24 +80,20 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
     const abort = new AbortController();
     this.active.add(abort);
     const timer = setTimeout(() => abort.abort(), OPERATION_MS).unref();
-    const assertOwned = async () => {
+    // Inside a storage transaction the lease is read through the same scope: every call of a transaction joins it.
+    const assertOwned = async (scope?: PluginTransactionScope) => {
       abort.signal.throwIfAborted();
-      await operations.assertOwned(access.fingerprint, owner);
+      if (scope) await this.assertLeaseIn(scope, access.fingerprint, owner);
+      else await operations.assertOwned(access.fingerprint, owner);
     };
     let row: WagoNetworkChange | null = null;
     let audited = false;
     const lifecycle = new WagoAudit(this.context).begin(principal, controllerId, 'network_change');
     try {
-      const controller = await sqlitePersistence(this.context)
-        .getRepository(WagoController)
-        .findOneBy({ id: controllerId, trustState: 'claimed' });
+      const controller = await this.storage.controllers.findOne({ where: { id: controllerId, trustState: 'claimed' } });
       if (!controller?.mqttServerId || !controller.credentialEpoch)
         throw new ConflictException('Managed enrolled controller required.');
-      row = await this.repository
-        .createQueryBuilder('change')
-        .addSelect('change.encryptedPayload')
-        .where('change.controllerId = :controllerId', { controllerId })
-        .getOne();
+      row = await this.storage.networkChanges.get(controllerId);
       if (retry && (!row || row.phase === 'completed')) return this.status(controllerId);
       if (!retry) assertNoUnfinishedChange(row);
       await this.assertNoPendingRecovery(controllerId);
@@ -142,12 +137,10 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
 
   /** Network changes must not race credential rotation or runtime update recovery. */
   protected async assertNoPendingRecovery(controllerId: number): Promise<void> {
-    const rotation = await sqlitePersistence(this.context)
-      .getRepository(WagoCredentialRotationEntity)
-      .findOneBy({ controllerId });
-    const update = await sqlitePersistence(this.context)
-      .getRepository(WagoRuntimeUpdateEntity)
-      .findOneBy({ controllerId });
+    const [rotation, update] = await Promise.all([
+      this.storage.credentialRotations.get(controllerId),
+      this.storage.runtimeUpdates.get(controllerId),
+    ]);
     if ((rotation && rotation.phase !== 'completed') || (update?.metadata && JSON.parse(update.metadata).token))
       throw new ConflictException(
         'Finish credential rotation or runtime update recovery before changing MQTT/address settings.',
@@ -162,19 +155,31 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
     assertOwned: () => Promise<void>,
   ): Promise<WagoNetworkChange> {
     if (!input) throw new BadRequestException('Invalid MQTT/address change');
-    const row = this.repository.create({
+    const row = {
       controllerId,
       sessionId: access.sessionId,
       fingerprint: access.fingerprint,
       ...input,
-      phase: 'connecting',
+      phase: 'connecting' as const,
       failure: null,
       encryptedPayload: null,
       updatedAt: new Date().toISOString(),
-    });
+    };
     await assertOwned();
-    await this.repository.save(row);
-    return row;
+    // A completed or failed earlier change of this controller is replaced by the new intent.
+    return this.storage.networkChanges.upsert(row, {
+      conflictOn: ['controllerId'],
+      update: [
+        'sessionId',
+        'fingerprint',
+        'targetHost',
+        'mqttServerId',
+        'phase',
+        'failure',
+        'encryptedPayload',
+        'updatedAt',
+      ],
+    });
   }
 
   /** Apply an address-only change; the broker binding stays unchanged. */
@@ -198,7 +203,7 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
     row.failure =
       error instanceof RuntimeUpdateError || error instanceof NetworkChangeError ? error.failure : 'interrupted';
     await assertOwned()
-      .then(() => this.repository.save(row))
+      .then(() => this.persist(row))
       .catch(() => undefined);
   }
 
@@ -385,45 +390,60 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
     row: WagoNetworkChange,
     encryptedCredentials: string,
     payload: NetworkPayload | null,
-    assertOwned: () => Promise<void>,
+    assertOwned: (scope?: PluginTransactionScope) => Promise<void>,
   ) {
-    await this.repository.manager.transaction(async (manager) => {
-      await assertOwned();
-      await manager
-        .getRepository(WagoManagedAccess)
-        .update(row.sessionId, { host: row.targetHost, encryptedCredentials });
-      await manager.getRepository(WagoCommissioningSession).update(row.sessionId, {
-        targetHost: row.targetHost,
-        ...(payload ? { mqttServerId: payload.mqttServerId } : {}),
-      });
+    // One atomic unit: the managed identity, the session, the broker bindings and the rotation record change together.
+    await this.context.persistence.transaction(async (scope) => {
+      await assertOwned(scope);
+      const { managedAccess, commissioningSessions, mqttCredentialRetirements, controllers, credentialRotations } =
+        this.storage;
+      await managedAccess.update(
+        { sessionId: row.sessionId },
+        { host: row.targetHost, encryptedCredentials },
+        { scope },
+      );
+      await commissioningSessions.update(
+        { id: row.sessionId },
+        { targetHost: row.targetHost, ...(payload ? { mqttServerId: payload.mqttServerId } : {}) },
+        { scope },
+      );
       if (payload) {
         if (payload.previousServerId !== payload.mqttServerId)
-          await manager
-            .getRepository(WagoMqttCredentialRetirement)
-            .save({ controllerId: row.controllerId, mqttServerId: payload.previousServerId });
+          await mqttCredentialRetirements.upsert(
+            { controllerId: row.controllerId, mqttServerId: payload.previousServerId },
+            { conflictOn: ['controllerId', 'mqttServerId'], update: [], scope },
+          );
         // A return to a previous broker makes that identity current again.
-        await manager
-          .getRepository(WagoMqttCredentialRetirement)
-          .delete({ controllerId: row.controllerId, mqttServerId: payload.mqttServerId });
-        await manager.getRepository(WagoController).update(row.controllerId, {
-          mqttServerId: payload.mqttServerId,
-          credentialMqttServerId: payload.mqttServerId,
-          credentialEpoch: payload.credentialEpoch,
-          lastHeartbeatAt: null,
-          updatedAt: new Date().toISOString(),
-        });
-        await manager.getRepository(WagoCredentialRotationEntity).save({
-          controllerId: row.controllerId,
-          revision: 1,
-          token: payload.token,
-          phase: 'completed',
-          credentialEpoch: payload.credentialEpoch,
-          mqttServerId: payload.mqttServerId,
-          prefix: payload.prefix,
-          encryptedCredentials: null,
-        });
+        await mqttCredentialRetirements.delete(
+          { controllerId: row.controllerId, mqttServerId: payload.mqttServerId },
+          { scope },
+        );
+        await controllers.update(
+          { id: row.controllerId },
+          {
+            mqttServerId: payload.mqttServerId,
+            credentialMqttServerId: payload.mqttServerId,
+            credentialEpoch: payload.credentialEpoch,
+            lastHeartbeatAt: null,
+            updatedAt: new Date().toISOString(),
+          },
+          { scope },
+        );
+        await credentialRotations.upsert(
+          {
+            controllerId: row.controllerId,
+            revision: 1,
+            token: payload.token,
+            phase: 'completed',
+            credentialEpoch: payload.credentialEpoch,
+            mqttServerId: payload.mqttServerId,
+            prefix: payload.prefix,
+            encryptedCredentials: null,
+          },
+          { conflictOn: ['controllerId'], scope },
+        );
       }
-      await assertOwned();
+      await assertOwned(scope);
     });
   }
 
@@ -474,30 +494,41 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
     row.phase = phase;
     row.failure = null;
     row.updatedAt = new Date().toISOString();
-    await this.repository.save(row);
+    await this.persist(row);
+  }
+
+  /** Writes the mutable columns of the held intent. A vanished row (controller removed) is a lost operation. */
+  protected async persist(row: WagoNetworkChange): Promise<void> {
+    const affected = await this.storage.networkChanges.update(
+      { controllerId: row.controllerId },
+      { phase: row.phase, failure: row.failure, encryptedPayload: row.encryptedPayload, updatedAt: row.updatedAt },
+    );
+    if (affected !== 1) throw new ConflictException('The network change no longer exists.');
+  }
+
+  /** Lease check that joins the given transaction. */
+  protected async assertLeaseIn(scope: PluginTransactionScope, fingerprint: string, owner: string): Promise<void> {
+    const row = await this.storage.deviceOperations.findOne({ where: { fingerprint, owner } }, { scope });
+    if (!row || Number(row.leaseUntil) <= Date.now()) throw new Error('Controller operation ownership lost');
   }
 
   async status(controllerId: number) {
-    const controller = await sqlitePersistence(this.context)
-      .getRepository(WagoController)
-      .findOneBy({ id: controllerId });
+    const controller = await this.storage.controllers.get(controllerId);
     if (!controller) throw new NotFoundException('WAGO controller not found');
-    const access = await sqlitePersistence(this.context)
-      .getRepository(WagoManagedAccess)
-      .findOne({ where: { controllerId }, order: { sessionId: 'DESC' } });
-    const row = await this.repository.findOneBy({ controllerId });
-    const lease =
-      row &&
-      (await sqlitePersistence(this.context)
-        .getRepository(WagoDeviceOperation)
-        .findOneBy({ fingerprint: row.fingerprint }));
+    const [access, row, pendingCredentialRetirements] = await Promise.all([
+      this.storage.managedAccess.findOne({
+        where: { controllerId },
+        orderBy: [{ field: 'sessionId', direction: 'desc' }],
+      }),
+      this.storage.networkChanges.get(controllerId),
+      this.storage.mqttCredentialRetirements.count({ controllerId }),
+    ]);
+    const lease = row && (await this.storage.deviceOperations.get(row.fingerprint));
     return {
       available: access?.state === 'managed',
       targetHost: access?.host ?? null,
       mqttServerId: controller.mqttServerId,
-      pendingCredentialRetirements: await sqlitePersistence(this.context)
-        .getRepository(WagoMqttCredentialRetirement)
-        .countBy({ controllerId }),
+      pendingCredentialRetirements,
       operation: row
         ? {
             targetHost: row.targetHost,
@@ -511,11 +542,12 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
   }
 
   async retirePreviousCredentials(controllerId: number, principal: PluginAuditPrincipal) {
-    const access = await sqlitePersistence(this.context)
-      .getRepository(WagoManagedAccess)
-      .findOne({ where: { controllerId }, order: { sessionId: 'DESC' } });
+    const access = await this.storage.managedAccess.findOne({
+      where: { controllerId },
+      orderBy: [{ field: 'sessionId', direction: 'desc' }],
+    });
     if (!access) throw new ConflictException('Controller management identity is unavailable.');
-    const operations = new WagoDeviceOperations(sqlitePersistence(this.context).getRepository(WagoDeviceOperation)),
+    const operations = new WagoDeviceOperations(this.storage.deviceOperations),
       owner = randomBytes(16).toString('hex');
     if (!(await operations.acquire(access.fingerprint, owner, Date.now(), Date.now() + 120_000)))
       throw new ConflictException('Controller is busy');
@@ -525,13 +557,12 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
       await this.managed.assertNetworkSettled(controllerId);
       await lifecycle.attempt();
       audited = true;
-      const controller = await sqlitePersistence(this.context)
-        .getRepository(WagoController)
-        .findOneByOrFail({ id: controllerId });
+      const controller = await this.storage.controllers.get(controllerId);
+      if (!controller) throw new Error();
       const current = controller.mqttServerId && (await this.context.getMqttServerConfig(controller.mqttServerId));
       if (!current) throw new Error();
-      const repository = sqlitePersistence(this.context).getRepository(WagoMqttCredentialRetirement);
-      for (const row of await repository.findBy({ controllerId })) {
+      const repository = this.storage.mqttCredentialRetirements;
+      for (const row of await repository.find({ where: { controllerId } })) {
         const previous = await this.context.getMqttServerConfig(row.mqttServerId);
         if (!previous) throw new Error();
         // Duplicate server records and DNS aliases share the active credentials.
@@ -592,7 +623,9 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
     this.active.forEach((controller) => controller.abort());
   }
 
-  protected get repository() {
-    return sqlitePersistence(this.context).getRepository(WagoNetworkChange);
+  private storageCache?: WagoStorage;
+
+  protected get storage(): WagoStorage {
+    return (this.storageCache ??= openWagoStorage(this.context));
   }
 }
