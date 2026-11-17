@@ -30,7 +30,7 @@ import {
 } from '@simplewebauthn/server';
 
 import { UserEmailNotVerifiedException } from '../errors/userEmailNotVerified.exception';
-import type { AuthenticatorTransportFuture } from '@simplewebauthn/server';
+import type { AuthenticatorTransport } from '@simplewebauthn/server';
 
 export const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 
@@ -51,11 +51,11 @@ export function readChallengeFromClientData(clientDataJSON: string): string | nu
   }
 }
 
-export function parseTransports(value: string | null): AuthenticatorTransportFuture[] | undefined {
+export function parseTransports(value: string | null): AuthenticatorTransport[] | undefined {
   if (!value) {
     return undefined;
   }
-  return value.split(',').filter(Boolean) as AuthenticatorTransportFuture[];
+  return value.split(',').filter(Boolean) as AuthenticatorTransport[];
 }
 
 export function safeOrigin(url: string | null | undefined): string | null {
