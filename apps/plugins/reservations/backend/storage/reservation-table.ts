@@ -1,4 +1,10 @@
-import { f, table, type PluginStoragePatch, type PluginStorageRow, type PluginStorageWhere } from '@attraccess/plugins-backend-sdk';
+import {
+  f,
+  table,
+  type PluginStoragePatch,
+  type PluginStorageRow,
+  type PluginStorageWhere,
+} from '@attraccess/plugins-backend-sdk';
 
 export const RESERVATION_STATUSES = [
   'pending',
