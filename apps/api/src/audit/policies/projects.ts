@@ -1,6 +1,6 @@
 import { PROJECT_AUDIT_ACTIONS } from './domains';
 import { dataFields, oneOf, positive, uuid, isAuthenticationMethod } from './projection';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 /** Projection input of a project-domain event. */
 export interface ProjectAuditInput {
   action: (typeof PROJECT_AUDIT_ACTIONS)[number];

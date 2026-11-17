@@ -1,5 +1,5 @@
 import { dataFields, oneOf, positive, isAuthenticationMethod } from './projection';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 /** Projection input: the attractap action without its `attractap.` prefix. */
 export interface AttractapAuditInput {

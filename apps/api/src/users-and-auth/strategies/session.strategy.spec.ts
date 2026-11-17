@@ -11,6 +11,7 @@ import { ApiTokenService } from '../auth/api-token/api-token.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { SessionPermissionSync } from '../auth/sso/session-permission-sync';
+import { setMcpDelegation } from './mcp-delegation';
 
 describe('SessionStrategy', () => {
   let strategy: SessionStrategy;
@@ -341,6 +342,48 @@ describe('SessionStrategy', () => {
         await expect(strategy.validate(sessionRequest())).rejects.toThrow('sync exploded');
         expect(rbacService.getEffectivePermissions).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  describe('MCP OAuth delegation', () => {
+    const delegatedRequest = (permissionKeys: string[], path = '/api/resources') => {
+      const request = { headers: {}, cookies: {}, path } as Request;
+      setMcpDelegation(request, { user: { ...mockUser }, permissionKeys, grantId: 'grant-1', clientId: 'client-1' });
+      return request;
+    };
+
+    it('grants the approved permissions intersected with the current ones, without any token or session lookup', async () => {
+      rbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.read', 'users.read']));
+
+      const result = (await strategy.validate(
+        delegatedRequest(['resources.read', 'resources.write']),
+      )) as AuthenticatedUser;
+
+      expect(Array.from(result.effectivePermissions ?? [])).toEqual(['resources.read']);
+      expect(result.authenticationMethod).toBe('mcp-oauth');
+      expect(rbacService.getEffectivePermissions).toHaveBeenCalledWith(mockUser.id, true);
+      expect(sessionService.authenticateSession).not.toHaveBeenCalled();
+      expect(apiTokenService.authenticate).not.toHaveBeenCalled();
+    });
+
+    it('still blocks a user whose required two-factor setup is missing', async () => {
+      twoFactorService.getStatus.mockResolvedValue({
+        enabled: false,
+        required: true,
+        policy: TwoFactorPolicy.REQUIRED,
+      });
+
+      await expect(strategy.validate(delegatedRequest(['resources.read']))).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('lets the two-factor setup pages through', async () => {
+      twoFactorService.getStatus.mockResolvedValue({
+        enabled: false,
+        required: true,
+        policy: TwoFactorPolicy.REQUIRED,
+      });
+
+      await expect(strategy.validate(delegatedRequest(['resources.read'], '/api/users/me'))).resolves.toBeDefined();
     });
   });
 });

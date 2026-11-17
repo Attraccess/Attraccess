@@ -1,4 +1,4 @@
-import type { User } from '@attraccess/database-entities';
+import type { AuthenticatedSessionUser } from '@attraccess/application-models';
 
 /**
  * The principal behind an MCP OAuth tool call, attached to the in-process REST request that executes it.
@@ -8,7 +8,7 @@ import type { User } from '@attraccess/database-entities';
  * into the request user with `granted ∩ current` permissions.
  */
 export interface McpDelegation {
-  user: User;
+  user: AuthenticatedSessionUser;
   /** Permissions the user approved for this grant. */
   permissionKeys: readonly string[];
   grantId: string;

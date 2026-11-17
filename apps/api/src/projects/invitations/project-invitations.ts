@@ -15,9 +15,9 @@ import { AuditRecorder } from '../../audit/recorder/audit-event';
 import { EmailService } from '../../email/email.service';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 
-import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
 import { ProjectAccessService } from '../project-access.service';
 import type { ProjectInvitationStore, ProjectStore } from '../project.port';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 // The mail and notification services still take the ORM shapes; their migration is tracked outside this area.
 type MailUser = Parameters<EmailService['sendProjectInvitationEmail']>[0];

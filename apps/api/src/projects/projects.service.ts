@@ -32,7 +32,7 @@ import { CreateProjectDto } from './dto/create.dto';
 import { UpdateProjectDto } from './dto/update.dto';
 
 import { ProjectInvitations } from './invitations/project-invitations';
-import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 import {
   PROJECT_INVITATION_STORE,

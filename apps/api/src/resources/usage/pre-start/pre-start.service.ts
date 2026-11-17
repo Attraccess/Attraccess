@@ -13,7 +13,7 @@ import { ResourceUsageService } from '../sessions/resource-usage.service';
 import { StartBlockedException, StartConfirmationRequiredException } from './start-confirmation.errors';
 import { WebStartStepStore } from './web-start-step.store';
 import type { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
-import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 export interface PreStartInput {
   resourceId: number;

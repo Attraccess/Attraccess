@@ -23,7 +23,7 @@ import { NotificationCategory } from '../../notifications/notification-types';
 import { UpdateResourceIntroductionDto } from './dtos/update.request.dto';
 
 import { ResourceIntroductionChangedEvent } from './events/resource-introduction-changed.event';
-import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 import { RESOURCE_INTRODUCTION_STORE, type ResourceIntroductionStore } from './resource-introduction-store.port';
 

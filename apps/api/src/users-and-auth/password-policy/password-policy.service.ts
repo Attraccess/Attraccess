@@ -49,7 +49,7 @@ import { randomUUID } from 'node:crypto';
 import * as bcrypt from 'bcrypt';
 
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
-import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 export const POLICY_FIELDS: Array<keyof PasswordPolicyConfig> = [...PASSWORD_POLICY_FIELDS];
 

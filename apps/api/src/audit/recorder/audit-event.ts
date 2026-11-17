@@ -11,7 +11,7 @@ import type {
 } from '../policies/domains';
 import type { IdentityAuditAction } from '../policies/identity';
 import type { RESOURCE_AUDIT_ACTIONS } from '../policies/resources';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 /**
  * The persisted action strings of every core audit domain. The envelope carries the stored action exactly as it

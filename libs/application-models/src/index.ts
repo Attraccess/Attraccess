@@ -75,3 +75,4 @@ export * from './lib/authentication-credential';
 export * from './lib/password-policy-records';
 export * from './lib/user-account';
 export * from './lib/dashboard-pins';
+export * from './lib/mcp-oauth';

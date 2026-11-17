@@ -14,6 +14,7 @@ import type { AuthenticatedSessionUser } from '@attraccess/application-models';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { databaseBusyException, isDatabaseBusyError } from '../../database/persistence-errors';
 import { isValkeyUnavailableError, valkeyUnavailableException } from '../../valkey/valkey-unavailable';
+import { getMcpDelegation, McpDelegation } from './mcp-delegation';
 
 const TWO_FACTOR_SETUP_ALLOWED_PREFIXES = ['/auth/two-factor', '/auth/session', '/users/me'];
 
@@ -53,6 +54,10 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
   }
 
   private async resolveUser(req: Request & { authSession?: LogoutSession }): Promise<AuthenticatedSessionUser> {
+    // An MCP OAuth tool call: the principal was attached in-process after the access token was verified.
+    const delegation = getMcpDelegation(req);
+    if (delegation) return this.validateMcpDelegation(req, delegation);
+
     const { token, fromAuthorizationHeader } = this.extractTokenFromRequest(req);
 
     if (!token) {
@@ -110,15 +115,33 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     );
     principal.authenticationMethod = 'session';
 
-    if (!this.isTwoFactorSetupAllowedPath(req)) {
-      const status = await this.twoFactorService.getStatus(principal);
-      if (status.required && !status.enabled) {
-        this.logger.debug(`Blocked request for user ${user.id} due to missing 2FA setup`);
-        throw new ForbiddenException('TwoFactorSetupRequired');
-      }
-    }
+    await this.assertTwoFactorSetup(req, principal);
 
     return principal;
+  }
+
+  /**
+   * MCP OAuth principal: the permissions the user approved, intersected with what they hold right now, so a role
+   * removed in Attraccess disappears from MCP on the next call. No session exists for it.
+   */
+  private async validateMcpDelegation(req: Request, delegation: McpDelegation): Promise<AuthenticatedSessionUser> {
+    const principal = delegation.user as unknown as AuthenticatedUser;
+    const current = await this.rbacService.getEffectivePermissions(principal.id, true);
+    principal.effectivePermissions = new SerializablePermissionSet(
+      delegation.permissionKeys.filter((permission) => current.has(permission)),
+    );
+    principal.authenticationMethod = 'mcp-oauth';
+    await this.assertTwoFactorSetup(req, principal);
+    return delegation.user;
+  }
+
+  private async assertTwoFactorSetup(req: Request, user: AuthenticatedUser): Promise<void> {
+    if (this.isTwoFactorSetupAllowedPath(req)) return;
+    const status = await this.twoFactorService.getStatus(user);
+    if (status.required && !status.enabled) {
+      this.logger.debug(`Blocked request for user ${user.id} due to missing 2FA setup`);
+      throw new ForbiddenException('TwoFactorSetupRequired');
+    }
   }
 
   /**

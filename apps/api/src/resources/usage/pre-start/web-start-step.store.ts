@@ -2,7 +2,7 @@ import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { READER_UI_TIMING } from '@attraccess/plugins-backend-sdk';
 import { AUDIT_RECORDER, AuditRecorder } from '../../../audit/recorder/audit-event';
-import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 export interface WebStepBinding {
   userId: number;
