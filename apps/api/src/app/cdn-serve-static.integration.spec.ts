@@ -10,6 +10,7 @@ import { request as httpRequest } from 'http';
 import { AddressInfo } from 'net';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { rejectInvalidRequestTarget } from '../common/security/request-target';
 import { cdnServeStaticOptions } from './cdn-serve-static';
 
 const SECRET = 'SECRET-2d81c6a0-outside-the-cdn-root';
@@ -44,6 +45,8 @@ describe('/cdn serve-static', () => {
     // NestFactory, not Test.createTestingModule: serve-static picks its loader from the
     // HTTP adapter while the module compiles, and a testing module has none yet.
     app = await NestFactory.create(CdnModule, { logger: false });
+    // As configureBootstrapHttp does: ahead of every mount.
+    app.use(rejectInvalidRequestTarget);
     await app.listen(0, '127.0.0.1');
     port = (app.getHttpServer().address() as AddressInfo).port;
   }, 30_000);
@@ -81,13 +84,32 @@ describe('/cdn serve-static', () => {
     '/cdn/resources/1/',
     'http://localhost/cdn/missing.png',
     'http://localhost:1/cdn/',
-    'http:///cdn/missing.png',
-    'HTTP:///cdn/',
+    'HTTP://localhost/cdn/',
   ])('answers %s from the router, not the index fallback', async (path) => {
     const res = await rawGet(path);
 
     expect(res.status).toBe(404);
     expect(JSON.parse(res.body)).toMatchObject({ message: `Cannot GET ${path}` });
+    expect(res.body).not.toContain(storageRoot);
+  });
+
+  // Without a host (or with another scheme), Express strips the mount prefix down to a URL with no path,
+  // which serve-static answered with a 500. These targets are invalid (RFC 9110, 4.2.1), so they get a 400.
+  it.each([
+    'http:///cdn/missing.png',
+    'HTTP:///cdn/',
+    'http:///cdn',
+    'https:///cdn/?a=1',
+    'http://:80/cdn/',
+    'http://@/cdn/',
+    'HTTP:///CDN/',
+    'foo://localhost/cdn/',
+    'file:///cdn/',
+  ])('rejects the invalid request target %s with 400', async (path) => {
+    const res = await rawGet(path);
+
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body)).toMatchObject({ message: 'Invalid request target' });
     expect(res.body).not.toContain(storageRoot);
   });
 });

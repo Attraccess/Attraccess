@@ -24,6 +24,7 @@ import { readFile, writeFile } from 'fs/promises';
 import type { Request } from 'express';
 import type { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 import { ApprovedOriginsService } from './common/security/approved-origins.service';
+import { rejectInvalidRequestTarget } from './common/security/request-target';
 import { createCA, createCert } from 'mkcert';
 import { McpToolRegistry } from './mcp/mcp-tool-registry';
 import type { OpenApiDocument } from './mcp/openapi-tools';
@@ -93,6 +94,9 @@ export function configureBootstrapApi(app: NestExpressApplication, appConfig: Ap
 }
 
 export function configureBootstrapHttp(app: NestExpressApplication, appConfig: AppConfigType, bootstrapLogger: Logger) {
+  // First, so no route or static mount sees a request target Express cannot take apart.
+  app.use(rejectInvalidRequestTarget);
+
   // Plugin configurations can include large device profiles and a previous
   // draft for conflict detection, exceeding Express's default 100 KiB limit.
   app.useBodyParser('json', { limit: '10mb' });
