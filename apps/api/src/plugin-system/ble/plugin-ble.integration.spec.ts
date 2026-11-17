@@ -71,7 +71,7 @@ describe('plugin BLE through the plugin module', () => {
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
         permissions: [PluginPermission.BLE_TRANSPORT],
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       }),
     );
     writeFileSync(join(fixture.root, directory, 'dist', 'index.js'), pluginSource(name));
@@ -178,7 +178,7 @@ describe('plugin BLE through the plugin module', () => {
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
         permissions: [PluginPermission.BLE_TRANSPORT],
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       }),
     );
     const service = (limit: number) =>
