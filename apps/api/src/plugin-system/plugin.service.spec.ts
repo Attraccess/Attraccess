@@ -1,4 +1,5 @@
 import { registerPluginServiceFixture } from './plugin.service.plugin-service.test-fixture';
+import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 import { BadRequestException } from '@nestjs/common';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
@@ -334,6 +335,33 @@ describe('PluginService', () => {
       const service = new PluginService();
       const file = zipFileUpload({ 'plugin.json': '{}' }, { mimetype: 'text/plain' });
       await expect(service.uploadPlugin(file)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('refuses a plugin that declares only engines this host does not run, with a client error and no changes', async () => {
+      const service = new PluginService();
+      const manifest = {
+        ...fixture.VALID_MANIFEST,
+        permissions: [PluginPermission.DATABASE_ACCESS],
+        persistence: { backends: ['postgres'] },
+      };
+
+      const upload = service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(manifest) }));
+
+      await expect(upload).rejects.toBeInstanceOf(BadRequestException);
+      await expect(upload).rejects.toThrow('supports the database engines postgres but this host runs sqlite');
+      expect(existsSync(join(fixture.root, 'uploaded-plugin'))).toBe(false);
+      expect(fixture.restartSpy).not.toHaveBeenCalled();
+    });
+
+    it('answers an invalid plugin.json with a client error that names the field', async () => {
+      const service = new PluginService();
+      const manifest = { ...fixture.VALID_MANIFEST, persistence: { backends: [] } };
+
+      const upload = service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(manifest) }));
+
+      await expect(upload).rejects.toBeInstanceOf(BadRequestException);
+      await expect(upload).rejects.toThrow(/Invalid plugin\.json: persistence\.backends/);
+      expect(existsSync(join(fixture.root, 'uploaded-plugin'))).toBe(false);
     });
 
     it('unpacks a valid plugin, moves it into place and schedules a restart', async () => {

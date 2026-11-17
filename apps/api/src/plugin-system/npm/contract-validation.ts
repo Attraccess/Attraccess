@@ -1,11 +1,10 @@
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 import { BadRequestException } from '@nestjs/common';
 import * as semver from 'semver';
-import { SUPPORTED_DATABASE_TYPES } from '../../database/backend/database-backend';
 import { assertHostRangeTargetsSdk2 } from '../runtime/plugin-compatibility';
 import { z } from 'zod';
 import { PluginDependenciesSchema } from '../runtime/dependencies';
-import { dashboardPathsSchema, dashboardWidgetsSchema } from '../runtime/manifest-schema';
+import { PluginBackendNameSchema, dashboardPathsSchema, dashboardWidgetsSchema } from '../runtime/manifest-schema';
 import { PluginManifest, PluginManifestSchema } from '../plugin.manifest';
 
 const entryPath = z
@@ -38,7 +37,7 @@ const packageSchema = z
       dashboardPaths: dashboardPathsSchema.optional(),
       dashboardWidgets: dashboardWidgetsSchema.optional(),
       permissions: z.array(z.nativeEnum(PluginPermission)).default([]),
-      persistence: z.object({ backends: z.array(z.enum(SUPPORTED_DATABASE_TYPES)).min(1) }).optional(),
+      persistence: z.object({ backends: z.array(PluginBackendNameSchema).min(1) }).optional(),
       sdk: z
         .object({
           backend: z.string().optional(),

@@ -176,7 +176,13 @@ export class PluginService {
 
       // validate manifest
       PluginService.logger.debug(`Validating manifest`, manifestContent);
-      const manifest = PluginManifestSchema.parse(manifestContent);
+      const parsed = PluginManifestSchema.safeParse(manifestContent);
+      if (!parsed.success) {
+        // A client error with the offending fields, not a 500: nothing was moved or changed.
+        const issues = parsed.error.issues.map((issue) => `${issue.path.join('.') || 'plugin.json'}: ${issue.message}`);
+        throw new BadRequestException(`Invalid plugin.json: ${issues.join('; ')}`);
+      }
+      const manifest = parsed.data;
       try {
         PluginService.assertManifestCompatible(manifest);
       } catch (error) {
