@@ -1,4 +1,8 @@
-import { SupervisionMode, type ResourceRecord } from '@attraccess/application-models';
+import {
+  SupervisionMode,
+  type AuditAuthenticationMethod as AuthenticationMethod,
+  type ResourceRecord,
+} from '@attraccess/application-models';
 
 import { Inject, Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 
@@ -198,7 +202,7 @@ export class ResourcesService {
   async createResource(
     dto: CreateResourceDto,
     image?: FileUpload,
-    actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+    actor?: { id: number; authenticationMethod?: AuthenticationMethod; apiTokenId?: number },
   ): Promise<ResourceRecord> {
     // verifying usage limits
     const currentAmountOfResources = await this.store.count();
@@ -267,7 +271,7 @@ export class ResourcesService {
     id: number,
     dto: UpdateResourceDto,
     image?: FileUpload,
-    actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+    actor?: { id: number; authenticationMethod?: AuthenticationMethod; apiTokenId?: number },
   ): Promise<ResourceRecord> {
     const resource = await this.getResourceById(id);
     const before = resourceAuditSnapshot(resource);
@@ -318,7 +322,7 @@ export class ResourcesService {
 
   async deleteResource(
     id: number,
-    actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+    actor?: { id: number; authenticationMethod?: AuthenticationMethod; apiTokenId?: number },
   ): Promise<void> {
     const resource = actor ? await this.getResourceById(id) : undefined;
     // A soft delete keeps the flow rows; the counts say what flow the resource had when it was deleted.

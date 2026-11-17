@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
 
 export type AuthAuditType =
   | 'login'

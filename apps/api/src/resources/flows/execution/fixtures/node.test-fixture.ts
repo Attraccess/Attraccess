@@ -1,7 +1,7 @@
 import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 
-export // Helper to create a node
-function createNode(partial: Partial<FlowNodeRecord>): FlowNodeRecord {
+// Helper to create a node
+export function createNode(partial: Partial<FlowNodeRecord>): FlowNodeRecord {
   return {
     id: 'node-' + Math.random().toString(36).slice(2, 8),
     type: ResourceFlowNodeType.INPUT_BUTTON,

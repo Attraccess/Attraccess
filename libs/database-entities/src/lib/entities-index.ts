@@ -37,7 +37,7 @@ export { Form, FormField, FormSubmission } from './entities/form';
 export { Message } from './entities/message.entity';
 export { MqttServer } from './entities/mqttServer.entity';
 export { NotificationPreference } from './entities/notification-preference.entity';
-export { DashboardPin, type DashboardPinItemType, type DashboardPinSize } from './entities/dashboard-pin.entity';
+export { DashboardPin } from './entities/dashboard-pin.entity';
 export { Passkey, PasskeyChallenge } from './entities/passkey.entity';
 export { PasswordHistory } from './entities/password-history.entity';
 export { PASSWORD_POLICY_ROLES, PasswordPolicyOverride } from './entities/password-policy-override.entity';

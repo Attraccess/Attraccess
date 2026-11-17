@@ -1,7 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { Brackets, DataSource, In } from 'typeorm';
-import { Resource, ResourceFlowEdge, ResourceFlowNode, ResourceUsage } from '@attraccess/database-entities';
+import {
+  DashboardPin,
+  Resource,
+  ResourceFlowEdge,
+  ResourceFlowNode,
+  ResourceUsage,
+} from '@attraccess/database-entities';
 import type { ResourceRecord, ResourceType, UsageSession } from '@attraccess/application-models';
 import type { ListResourcesQuery, NewResource, ResourceStore } from '../../../resources/resource-store.port';
 import { activeUsageSql, activeUsageWhere } from '../usage/active-usage-queries';
@@ -232,7 +238,11 @@ export class TypeOrmResourceStore implements ResourceStore {
 
   async softDelete(resourceId: number): Promise<number> {
     const result = await this.resources.softDelete(resourceId);
-    return result.affected ?? 0;
+    const affected = result.affected ?? 0;
+    if (affected === 0) return 0;
+    // A soft delete keeps the row, so the database cannot cascade to the dashboard pins of the resource.
+    await this.dataSource.manager.delete(DashboardPin, { itemType: 'resource', itemId: String(resourceId) });
+    return affected;
   }
 
   async countFlowParts(resourceId: number): Promise<{ nodes: number; edges: number }> {

@@ -10,7 +10,7 @@ import {
   type UserPatch,
   type UserRecord,
 } from '@attraccess/application-models';
-import { AuthenticationDetail, ResourceUsage, Session, User } from '@attraccess/database-entities';
+import { AuthenticationDetail, DashboardPin, ResourceUsage, Session, User } from '@attraccess/database-entities';
 import { DataSource, EntityManager, FindOptionsWhere, ILike, In, IsNull, Not } from 'typeorm';
 import type {
   DeleteAccountRequest,
@@ -275,6 +275,8 @@ export class TypeOrmUserStore implements UserStore {
 
       await manager.getRepository(AuthenticationDetail).delete({ userId: user.id });
       await manager.getRepository(Session).delete({ userId: user.id });
+      // The user row stays (soft delete), so its ON DELETE CASCADE never removes the dashboard pins.
+      await manager.getRepository(DashboardPin).delete({ userId: user.id });
       await repository.update(user.id, {
         username: identity.username,
         email: identity.email,

@@ -1,6 +1,6 @@
 export type AuditOutcome = 'attempted' | 'succeeded' | 'failed';
 
-export type AuditAuthenticationMethod = 'session' | 'api-token';
+export type AuditAuthenticationMethod = 'session' | 'api-token' | 'mcp-oauth';
 
 export type AuditEntryDetails = Record<string, string | number | boolean | null>;
 

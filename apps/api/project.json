@@ -215,7 +215,11 @@
       "cache": true,
       "inputs": ["default", "^production", "{workspaceRoot}/jest.preset.js"],
       "options": {
-        "command": "jest -c apps/api/jest.config.ts --coverage=false --testPathPatterns=src/database/conformance"
+        "command": "jest -c apps/api/jest.config.ts --coverage=false --testPathPatterns=src/database/conformance",
+        "cwd": ".",
+        "env": {
+          "NODE_OPTIONS": "--experimental-vm-modules"
+        }
       }
     },
     "browser-e2e": {
@@ -243,7 +247,12 @@
     "build-migration-datasource": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["typeorm", "{projectRoot}/src/config/storage-path.ts", "{projectRoot}/migration-tracks.cjs", { "env": "DATABASE_TYPE" }],
+      "inputs": [
+        "typeorm",
+        "{projectRoot}/src/config/storage-path.ts",
+        "{projectRoot}/migration-tracks.cjs",
+        { "env": "DATABASE_TYPE" }
+      ],
       "outputs": ["{workspaceRoot}/dist/apps/migrations"],
       "options": {
         "cwd": "apps/api",

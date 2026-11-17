@@ -178,7 +178,7 @@ export class AuthService {
   }
 
   async validateAuthenticationDetails(userId: number, options: AuthenticationOptions): Promise<boolean> {
-    let isValid = false;
+    let isValid: boolean;
     switch (options.type) {
       case AuthenticationType.LOCAL_PASSWORD: {
         const passwordHash = await this.credentials.findLocalPasswordHash(userId);

@@ -8,6 +8,7 @@ import {
 } from '@attraccess/application-models';
 import {
   AuthenticationDetail,
+  DashboardPin,
   Resource,
   ResourceUsage,
   Role,
@@ -422,6 +423,9 @@ describe('user store on a real SQLite file', () => {
       await source
         .getRepository(Session)
         .save({ token: 'session-token', userId: user.id, expiresAt: new Date(Date.now() + 1000) });
+      await source
+        .getRepository(DashboardPin)
+        .insert({ userId: user.id, itemType: 'page', itemId: '/projects', position: 0 });
       await store.recordDeleteAccountRequest(user.id, {
         tokenHash: 'hashed',
         expiresAt: new Date(Date.now() + 60_000),
@@ -433,6 +437,8 @@ describe('user store on a real SQLite file', () => {
 
       expect(await source.getRepository(AuthenticationDetail).count()).toBe(0);
       expect(await source.getRepository(Session).count()).toBe(0);
+      // The soft-deleted row stays, so the database never cascades to the pins.
+      expect(await source.getRepository(DashboardPin).count()).toBe(0);
       expect(await store.findUser({ id: user.id })).toBeNull();
       const retained = await source.getRepository(User).findOne({ where: { id: user.id }, withDeleted: true });
       expect(retained).toMatchObject({

@@ -15,6 +15,7 @@ import { AuditRecorder } from '../../audit/recorder/audit-event';
 import { EmailService } from '../../email/email.service';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 
+import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
 import { ProjectAccessService } from '../project-access.service';
 import type { ProjectInvitationStore, ProjectStore } from '../project.port';
 
@@ -51,7 +52,7 @@ export class ProjectInvitations {
   public async acceptInvitation(
     userId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitationRecord> {
     return await this.respondToInvitation(
@@ -66,7 +67,7 @@ export class ProjectInvitations {
   public async declineInvitation(
     userId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitationRecord> {
     return await this.respondToInvitation(
@@ -82,7 +83,7 @@ export class ProjectInvitations {
     userId: number,
     invitationId: number,
     status: ProjectInvitationStatus,
-    authenticationMethod: 'session' | 'api-token',
+    authenticationMethod: AuthenticationMethod,
     apiTokenId?: number,
   ): Promise<ProjectInvitationRecord> {
     const invitation = await this.getInvitationWithRelations(invitationId);
@@ -166,7 +167,7 @@ export class ProjectInvitations {
     projectId: number,
     invitedUserId: number,
     role: ProjectMemberRole = ProjectMemberRole.VIEWER,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitationRecord> {
     const project = await this.projectAccessService.ensureOwner(ownerId, projectId);
@@ -213,7 +214,7 @@ export class ProjectInvitations {
     ownerId: number,
     projectId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitationRecord> {
     await this.projectAccessService.ensureOwner(ownerId, projectId);
@@ -248,7 +249,7 @@ export class ProjectInvitations {
     ownerId: number,
     projectId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitationRecord> {
     await this.projectAccessService.ensureOwner(ownerId, projectId);

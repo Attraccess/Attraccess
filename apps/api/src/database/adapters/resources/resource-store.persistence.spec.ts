@@ -1,5 +1,6 @@
 import { DataSource } from 'typeorm';
 import {
+  DashboardPin,
   entities,
   Resource,
   ResourceGroup,
@@ -86,6 +87,27 @@ describe('TypeOrmResourceStore on real SQLite', () => {
     const other = await store.create(base('Mill'));
     await store.hardDelete(other.id);
     expect(await store.existingIds([other.id, created.id])).toEqual([]);
+  });
+
+  it('deletes the dashboard pins of a soft-deleted resource only', async () => {
+    const [user] = await source.getRepository(User).save([{ username: 'pinner', email: 'pinner@example.com' } as User]);
+    const laser = await store.create(base('Laser'));
+    const mill = await store.create(base('Mill'));
+    const pins = source.getRepository(DashboardPin);
+    await pins.insert([
+      { userId: user.id, itemType: 'resource', itemId: String(laser.id), position: 0 },
+      { userId: user.id, itemType: 'resource', itemId: String(mill.id), position: 1 },
+      { userId: user.id, itemType: 'page', itemId: '/projects', position: 2 },
+    ]);
+
+    expect(await store.softDelete(999)).toBe(0);
+    expect(await pins.count()).toBe(3);
+
+    expect(await store.softDelete(laser.id)).toBe(1);
+    expect((await pins.find({ order: { position: 'ASC' } })).map(({ itemId }) => itemId)).toEqual([
+      String(mill.id),
+      '/projects',
+    ]);
   });
 
   it('counts the flow parts of a resource and reports existing ids', async () => {
