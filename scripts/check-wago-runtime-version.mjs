@@ -68,13 +68,16 @@ export function isBuildCandidate(path) {
 const checkOnlyTarget = /^(?:test|lint|typecheck|crap-score|pack-test)(?:-|$)/;
 // The plugin's `build` target only assembles the npm package: it copies package.json, plugin.json and LICENSE.md next
 // to the bundles built by build-backend and build-frontend. It never builds the CC100 runtime (build-runtime and
-// build-cc100-runtime do, and stay gated), so changing which files it copies cannot change the runtime.
-const npmPackageTarget = 'build';
+// build-cc100-runtime do, and stay gated), so changing which files it copies cannot change the runtime. `build-backend` bundles the plugin's own backend entry
+// (the NestJS plugin, no CC100 runtime), so dropping or adding a backend bundle entry cannot change it either.
+const npmPackageTargets = new Set(['build', 'build-backend']);
 
 function runtimeProjectConfig(text) {
   const config = JSON.parse(text);
   const targets = Object.fromEntries(
-    Object.entries(config.targets ?? {}).filter(([name]) => !checkOnlyTarget.test(name) && name !== npmPackageTarget),
+    Object.entries(config.targets ?? {}).filter(
+      ([name]) => !checkOnlyTarget.test(name) && !npmPackageTargets.has(name),
+    ),
   );
   return JSON.stringify({ ...config, targets });
 }

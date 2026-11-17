@@ -48,7 +48,9 @@ import { openWagoStorage, type WagoStorage } from '../storage';
 
 import { assertCommissioningBroker } from '../commissioning/delivery/preflight';
 
-import { lookup } from 'node:dns/promises';
+import { networkStatus } from './status';
+
+import { sharesCredentialDestination } from './credential-destination';
 
 export { networkChangeInput } from './model';
 
@@ -513,32 +515,7 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
   }
 
   async status(controllerId: number) {
-    const controller = await this.storage.controllers.get(controllerId);
-    if (!controller) throw new NotFoundException('WAGO controller not found');
-    const [access, row, pendingCredentialRetirements] = await Promise.all([
-      this.storage.managedAccess.findOne({
-        where: { controllerId },
-        orderBy: [{ field: 'sessionId', direction: 'desc' }],
-      }),
-      this.storage.networkChanges.get(controllerId),
-      this.storage.mqttCredentialRetirements.count({ controllerId }),
-    ]);
-    const lease = row && (await this.storage.deviceOperations.get(row.fingerprint));
-    return {
-      available: access?.state === 'managed',
-      targetHost: access?.host ?? null,
-      mqttServerId: controller.mqttServerId,
-      pendingCredentialRetirements,
-      operation: row
-        ? {
-            targetHost: row.targetHost,
-            mqttServerId: row.mqttServerId,
-            phase: row.phase,
-            failure: row.failure,
-            running: row.phase !== 'completed' && !!lease?.owner && Number(lease.leaseUntil) > Date.now(),
-          }
-        : null,
-    };
+    return networkStatus(this.storage, controllerId);
   }
 
   async retirePreviousCredentials(controllerId: number, principal: PluginAuditPrincipal) {
@@ -565,29 +542,7 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
       for (const row of await repository.find({ where: { controllerId } })) {
         const previous = await this.context.getMqttServerConfig(row.mqttServerId);
         if (!previous) throw new Error();
-        // Duplicate server records and DNS aliases share the active credentials.
-        // Clear that redundant association without revoking the username in use.
-        const sameHost =
-          previous.host.toLowerCase().replace(/\.$/, '') === current.host.toLowerCase().replace(/\.$/, '');
-        let sharedDestination = sameHost;
-        if (!sameHost) {
-          const destinations = await Promise.all([
-            lookup(previous.host, { all: true }),
-            lookup(current.host, { all: true }),
-          ]);
-          const address = (value: string) => value.toLowerCase().replace(/^::ffff:/, '');
-          if (!destinations[0].length || !destinations[1].length) throw new Error();
-          const previousAddresses = new Set(destinations[0].map((item) => address(item.address)));
-          const currentAddresses = new Set(destinations[1].map((item) => address(item.address)));
-          const overlaps = [...previousAddresses].some((item) => currentAddresses.has(item));
-          const sameAddresses =
-            previousAddresses.size === currentAddresses.size &&
-            [...previousAddresses].every((item) => currentAddresses.has(item));
-          // A partial overlap may include another credential store. Neither
-          // revocation nor dropping the cleanup obligation is safe in that case.
-          if (overlaps && !sameAddresses) throw new Error();
-          sharedDestination = sameAddresses;
-        }
+        const sharedDestination = await sharesCredentialDestination(previous, current);
         if (sharedDestination) {
           // Different listeners on a shared host may belong to distinct brokers.
           // Keep ambiguous retirements retryable rather than revoking active credentials.
