@@ -14,7 +14,11 @@ import {
 } from '@attraccess/application-models';
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 import { ResourceOperatingAttributionService } from '../operating-intervals/resource-operating-attribution.service';
-import { MaintenanceResourceEvaluation } from './evaluation/resource-evaluation';
+import {
+  TypeOrmMaintenanceEvaluationStore,
+  TypeOrmMaintenanceEvaluationView,
+} from '../../database/adapters/resources/maintenance-evaluation-store.adapter';
+import { unitOfWorkFor } from '../../database/adapters/shared-unit-of-work';
 
 const UsageSchema = new EntitySchema<ResourceUsage>({
   name: 'ResourceUsage',
@@ -77,21 +81,15 @@ describe('Maintenance duration from authoritative intervals', () => {
       synchronize: true,
       entities: [UsageSchema, IntervalSchema, AttemptSchema],
     }).initialize();
-    const usageRepository = dataSource.getRepository(ResourceUsage);
     attribution = new ResourceOperatingAttributionService(createOperatingTimelineStore(dataSource));
     evaluator = new MaintenanceScheduleEvaluatorService(
-      {} as never,
-      {} as never,
-      {} as never,
-      usageRepository,
+      new TypeOrmMaintenanceEvaluationStore(dataSource, unitOfWorkFor(dataSource)),
       {} as never,
       {} as never,
       {} as never,
       attribution,
     );
-    jest
-      .spyOn(Reflect.get(evaluator, 'evaluation') as MaintenanceResourceEvaluation, 'getBaselineDate')
-      .mockResolvedValue(baseline);
+    jest.spyOn(TypeOrmMaintenanceEvaluationView.prototype, 'baselineDate').mockResolvedValue(baseline);
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] }).setSystemTime(now);
   });
 

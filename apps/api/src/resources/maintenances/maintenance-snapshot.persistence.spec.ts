@@ -15,12 +15,19 @@ import {
   ResourceDurationWindow,
   ResourceOperatingAttributionService,
 } from '../operating-intervals/resource-operating-attribution.service';
-import { MaintenanceSnapshotReader, captureDurationState } from './evaluation/snapshot-reader';
+import {
+  MaintenanceSnapshotReader,
+  captureDurationState,
+} from '../../database/adapters/resources/maintenance-snapshot-reader';
+import {
+  TypeOrmMaintenanceEvaluationStore,
+  TypeOrmMaintenanceEvaluationView,
+} from '../../database/adapters/resources/maintenance-evaluation-store.adapter';
+import { unitOfWorkFor } from '../../database/adapters/shared-unit-of-work';
 import {
   closeResourceTransactionConnection,
   runSerializedTransaction,
 } from '../../database/sqlite/run-serialized-transaction';
-import { MaintenanceResourceEvaluation } from './evaluation/resource-evaluation';
 
 const UsageSchema = new EntitySchema<ResourceUsage>({
   name: 'ResourceUsage',
@@ -136,23 +143,36 @@ describe('Maintenance snapshots (file-backed SQLite)', () => {
       }
       return durations;
     });
+    const store = new TypeOrmMaintenanceEvaluationStore(source, unitOfWorkFor(source));
+    // Only schedule configuration and the maintenance table are fixtures; reads and writes use real SQLite.
+    jest.spyOn(store, 'hasEnabledSchedules').mockImplementation(async () => schedule.enabled);
+    jest.spyOn(store, 'listEnabledSchedules').mockImplementation(async () => schedules() as never);
+    jest.spyOn(store, 'findResourceCreatedAt').mockResolvedValue(new Map([[1, startTime]]));
+    jest
+      .spyOn(store, 'loadServiceCycleStates')
+      .mockResolvedValue([
+        { resourceId: 1, scheduleId: 1, baseline: startTime, hasActiveMaintenance: false, completedSessions: 0 },
+      ]);
+    jest
+      .spyOn(TypeOrmMaintenanceEvaluationView.prototype, 'baselineDate')
+      .mockImplementation(async () => new Date(baseline.getTime()));
+    const handle = (context: object) =>
+      context instanceof EntityManager ? context : unitOfWorkFor(source).handleOf(context as never);
     evaluator = new MaintenanceScheduleEvaluatorService(
-      { manager: source.manager, existsBy: async () => schedule.enabled, find: schedules } as never,
-      { metadata: { tableName: 'maintenance_probe' } } as never,
-      { find: async () => [{ id: 1, createdAt: startTime }] } as never,
-      { query: async () => [{ resourceId: 1, scheduleId: 1, baseline: startTime }] } as never,
+      store,
       {
-        hasActiveMaintenance: async (resourceId: number, manager: EntityManager) =>
-          (await manager.query('SELECT * FROM maintenance_probe WHERE resourceId = ?', [resourceId])).length > 0,
+        hasActiveMaintenance: async (resourceId: number, context: object) =>
+          (await handle(context).query('SELECT * FROM maintenance_probe WHERE resourceId = ?', [resourceId])).length >
+          0,
         createMaintenanceFromSchedule: async (
           resourceId: number,
           _scheduleId: number,
           _reason: string,
-          manager: EntityManager,
+          context: object,
           notify: boolean,
         ) => {
           expect(notify).toBe(false);
-          await manager.query('INSERT INTO maintenance_probe VALUES (?)', [resourceId]);
+          await handle(context).query('INSERT INTO maintenance_probe VALUES (?)', [resourceId]);
           return { id: resourceId };
         },
         emitScheduledMaintenanceCreated: () => {
@@ -163,9 +183,6 @@ describe('Maintenance snapshots (file-backed SQLite)', () => {
       { maintenanceUsageQueryWindowDays: { observe: jest.fn() } } as never,
       { getDurationsForWindows: durationScan } as never,
     );
-    jest
-      .spyOn(Reflect.get(evaluator, 'evaluation') as MaintenanceResourceEvaluation, 'getBaselineDate')
-      .mockImplementation(async () => new Date(baseline.getTime()));
   });
 
   afterEach(async () => {

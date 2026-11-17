@@ -4,9 +4,9 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { ResourceUsage } from '@attraccess/database-entities';
 import type { UsageSession } from '@attraccess/application-models';
 import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper';
+import { ResourceUsageResponseDto } from '../usage/dtos/resource-usage-response.dto';
 import { SupervisionService } from './supervision.service';
 import { SupervisionLiveService } from './supervision-live.service';
 import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto';
@@ -32,7 +32,7 @@ export class SupervisionController {
   @ApiResponse({
     status: 201,
     description: 'The supervisor approved within 30 seconds and the supervised session started.',
-    type: ResourceUsage,
+    type: ResourceUsageResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Bad Request - resource does not allow supervision or self-supervision' })
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
@@ -90,7 +90,7 @@ export class SupervisionController {
     summary: 'Approve a pending supervised session request',
     operationId: 'supervisionApproveRequest',
   })
-  @ApiResponse({ status: 201, description: 'The supervised session started.', type: ResourceUsage })
+  @ApiResponse({ status: 201, description: 'The supervised session started.', type: ResourceUsageResponseDto })
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
   @ApiResponse({ status: 403, description: 'You are not the requested supervisor for this session.' })
   @ApiResponse({ status: 404, description: 'The request was not found or has already expired.' })

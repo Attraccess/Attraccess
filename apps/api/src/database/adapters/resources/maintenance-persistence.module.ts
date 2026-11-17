@@ -18,6 +18,8 @@ import {
   MAINTENANCE_REQUEST_STORE,
 } from '../../../resources/maintenances/maintenance-request-store.port';
 import { MAINTENANCE_SCHEDULE_STORE } from '../../../resources/maintenances/maintenance-schedule-store.port';
+import { MAINTENANCE_EVALUATION_STORE } from '../../../resources/maintenances/maintenance-evaluation-store.port';
+import { UnitOfWorkModule } from '../unit-of-work.module';
 import { TypeOrmResourceMaintenanceStore } from './maintenance-store.adapter';
 import {
   TypeOrmMaintenanceNotificationStore,
@@ -25,13 +27,15 @@ import {
 } from './maintenance-request-store.adapter';
 import { TypeOrmResourceRecipientStore } from './resource-recipient-store.adapter';
 import { TypeOrmMaintenanceScheduleStore } from './maintenance-schedule-store.adapter';
+import { TypeOrmMaintenanceEvaluationStore } from './maintenance-evaluation-store.adapter';
 
 /**
- * TypeORM-backed implementations of the maintenance ports. The repositories of the schedule evaluator are exported
- * too, until the evaluator (which reads usage history with engine-specific SQL) moves behind a port of its own.
+ * TypeORM-backed implementations of the maintenance ports, among them the evaluation store of the schedule
+ * evaluator (engine-specific SQL and the read-only snapshot connection).
  */
 @Module({
   imports: [
+    UnitOfWorkModule,
     TypeOrmModule.forFeature([
       ResourceMaintenance,
       ResourceMaintenanceRequest,
@@ -51,6 +55,7 @@ import { TypeOrmMaintenanceScheduleStore } from './maintenance-schedule-store.ad
     { provide: MAINTENANCE_REQUEST_STORE, useClass: TypeOrmMaintenanceRequestStore },
     { provide: MAINTENANCE_NOTIFICATION_STORE, useClass: TypeOrmMaintenanceNotificationStore },
     { provide: MAINTENANCE_SCHEDULE_STORE, useClass: TypeOrmMaintenanceScheduleStore },
+    { provide: MAINTENANCE_EVALUATION_STORE, useClass: TypeOrmMaintenanceEvaluationStore },
   ],
   exports: [
     TypeOrmModule,
@@ -58,6 +63,7 @@ import { TypeOrmMaintenanceScheduleStore } from './maintenance-schedule-store.ad
     MAINTENANCE_REQUEST_STORE,
     MAINTENANCE_NOTIFICATION_STORE,
     MAINTENANCE_SCHEDULE_STORE,
+    MAINTENANCE_EVALUATION_STORE,
   ],
 })
 export class MaintenancePersistenceModule {}

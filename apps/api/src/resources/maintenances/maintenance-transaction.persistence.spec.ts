@@ -9,6 +9,11 @@ import {
   closeResourceTransactionConnection,
   runSerializedTransaction,
 } from '../../database/sqlite/run-serialized-transaction';
+import {
+  TypeOrmMaintenanceEvaluationStore,
+  TypeOrmMaintenanceEvaluationView,
+} from '../../database/adapters/resources/maintenance-evaluation-store.adapter';
+import { unitOfWorkFor } from '../../database/adapters/shared-unit-of-work';
 import { MaintenanceResourceEvaluation } from './evaluation/resource-evaluation';
 
 const deferred = () => {
@@ -65,29 +70,36 @@ describe('Maintenance transaction coordination (file-backed SQLite)', () => {
       }
       return getRepository.call(this, target) as never;
     });
+    const store = new TypeOrmMaintenanceEvaluationStore(source, unitOfWorkFor(source));
+    jest.spyOn(store, 'hasEnabledSchedules').mockImplementation(async () => enabled);
+    jest.spyOn(store, 'listEnabledSchedules').mockImplementation(async () => (enabled ? [schedule] : []) as never);
+    jest.spyOn(store, 'findResourceCreatedAt').mockResolvedValue(new Map([[1, new Date('2020-01-01')]]));
+    jest.spyOn(store, 'loadServiceCycleStates').mockResolvedValue([
+      {
+        resourceId: 1,
+        scheduleId: 1,
+        baseline: new Date('2020-01-01'),
+        hasActiveMaintenance: false,
+        completedSessions: 0,
+      },
+    ]);
+    const handle = (context: object) =>
+      context instanceof EntityManager ? context : unitOfWorkFor(source).handleOf(context as never);
     evaluator = new MaintenanceScheduleEvaluatorService(
+      store,
       {
-        manager: source.manager,
-        existsBy: async () => enabled,
-        find: async () => (enabled ? [schedule] : []),
-      } as never,
-      { metadata: { tableName: 'maintenance_probe' } } as never,
-      { find: async () => [{ id: 1, createdAt: new Date('2020-01-01') }] } as never,
-      {
-        query: async () => [{ resourceId: 1, scheduleId: 1, baseline: '2020-01-01 00:00:00.000' }],
-      } as never,
-      {
-        hasActiveMaintenance: async (resourceId: number, manager: EntityManager) =>
-          (await manager.query('SELECT * FROM maintenance_probe WHERE resourceId = ?', [resourceId])).length > 0,
+        hasActiveMaintenance: async (resourceId: number, context: object) =>
+          (await handle(context).query('SELECT * FROM maintenance_probe WHERE resourceId = ?', [resourceId])).length >
+          0,
         createMaintenanceFromSchedule: async (
           resourceId: number,
           _scheduleId: number,
           _reason: string,
-          manager: EntityManager,
+          context: object,
           notify: boolean,
         ) => {
           expect(notify).toBe(false);
-          await manager.query('INSERT INTO maintenance_probe VALUES (?)', [resourceId]);
+          await handle(context).query('INSERT INTO maintenance_probe VALUES (?)', [resourceId]);
           if (failCreation) throw new Error('Maintenance creation failed');
           return { id: resourceId };
         },
@@ -103,9 +115,7 @@ describe('Maintenance transaction coordination (file-backed SQLite)', () => {
     jest
       .spyOn(Reflect.get(evaluator, 'evaluation') as MaintenanceResourceEvaluation, 'shouldTrigger')
       .mockResolvedValue(true);
-    jest
-      .spyOn(Reflect.get(evaluator, 'evaluation') as MaintenanceResourceEvaluation, 'getBaselineDate')
-      .mockResolvedValue(new Date('2020-01-01'));
+    jest.spyOn(TypeOrmMaintenanceEvaluationView.prototype, 'baselineDate').mockResolvedValue(new Date('2020-01-01'));
   });
 
   afterEach(async () => {

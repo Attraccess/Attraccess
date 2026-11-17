@@ -1,19 +1,9 @@
-import { MaintenanceSnapshotReader, captureDurationState } from './snapshot-reader';
-
-import { runSerializedTransaction } from '../../../database/sqlite/run-serialized-transaction';
 import {
-  ResourceMaintenanceSchedule,
-  Resource,
-  ResourceMaintenance,
-  ResourceUsage,
-} from '@attraccess/database-entities';
-import {
+  MaintenanceScheduleRecord,
   ResourceMaintenanceScheduleDurationBasis,
   ResourceMaintenanceScheduleTriggerType,
   UsageDurationUnit,
 } from '@attraccess/application-models';
-
-import { EntityManager, Repository } from 'typeorm';
 
 import {
   ResourceDurations,
@@ -22,21 +12,25 @@ import {
 
 import { Logger } from '@nestjs/common';
 import { ResourceMaintenanceService } from '../maintenance.service';
+import type { MaintenanceEvaluationStore, MaintenanceEvaluationView } from '../maintenance-evaluation-store.port';
+
+interface TriggeredCandidate {
+  schedule: MaintenanceScheduleRecord;
+  definition: string;
+  baseline: number;
+  durationState: string;
+}
 
 /**
  * Evaluates the maintenance schedules of one resource and creates the maintenance a triggered schedule asks for.
  * Tracks running evaluations so shutdown can wait for them.
  */
 export class MaintenanceResourceEvaluation {
-  private snapshotReader?: MaintenanceSnapshotReader;
   private readonly activeEvaluations = new Set<Promise<void>>();
   private stopped = false;
 
   constructor(
-    private readonly scheduleRepository: Repository<ResourceMaintenanceSchedule>,
-    private readonly maintenanceRepository: Repository<ResourceMaintenance>,
-    private readonly resourceRepository: Repository<Resource>,
-    private readonly usageRepository: Repository<ResourceUsage>,
+    private readonly store: MaintenanceEvaluationStore,
     private readonly maintenanceService: ResourceMaintenanceService,
     private readonly operatingAttributionService: ResourceOperatingAttributionService,
     private readonly logger: Logger,
@@ -55,7 +49,7 @@ export class MaintenanceResourceEvaluation {
 
   async drain(): Promise<void> {
     await Promise.allSettled(this.activeEvaluations);
-    await this.snapshotReader?.close();
+    await this.store.close();
   }
 
   /**
@@ -73,32 +67,25 @@ export class MaintenanceResourceEvaluation {
   }
 
   private async evaluateResourceInternal(resourceId: number): Promise<void> {
-    // Avoid opening a SQLite transaction alongside session writes when no
+    // Avoid opening a write transaction alongside session writes when no
     // enabled schedule can produce maintenance. Re-read inside for correctness.
-    if (!(await this.scheduleRepository.existsBy({ resourceId, enabled: true }))) return;
-    if (this.scheduleRepository.manager.connection?.options.type === 'sqlite') {
+    if (!(await this.store.hasEnabledSchedules(resourceId))) return;
+    if (this.store.snapshotReads) {
       await this.evaluateResourceSnapshot(resourceId);
       return;
     }
     let createdMaintenanceId: number | undefined;
-    await runSerializedTransaction(this.scheduleRepository.manager, async (transactionalEntityManager) => {
-      const scheduleRepo = transactionalEntityManager.getRepository(ResourceMaintenanceSchedule);
-      const schedules = await scheduleRepo.find({
-        where: { resourceId, enabled: true },
-        relations: ['usageHoursConfig', 'usageCountConfig', 'timeIntervalConfig'],
-      });
+    await this.store.inTransaction(async (view) => {
+      const schedules = await view.enabledSchedules(resourceId);
 
       for (const schedule of schedules) {
         // Re-check active maintenance (another schedule might have just created one)
-        const hasActiveMaintenance = await this.maintenanceService.hasActiveMaintenance(
-          resourceId,
-          transactionalEntityManager,
-        );
+        const hasActiveMaintenance = await this.maintenanceService.hasActiveMaintenance(resourceId, view.context);
         if (hasActiveMaintenance) {
           continue;
         }
 
-        const triggers = await this.shouldTrigger(schedule, resourceId, transactionalEntityManager);
+        const triggers = await this.shouldTrigger(schedule, resourceId, view);
         if (!triggers) {
           continue;
         }
@@ -108,7 +95,7 @@ export class MaintenanceResourceEvaluation {
           resourceId,
           schedule.id,
           reason,
-          transactionalEntityManager,
+          view.context,
           false,
         );
         createdMaintenanceId = maintenance.id;
@@ -125,48 +112,21 @@ export class MaintenanceResourceEvaluation {
 
   /** Read history independently; only validate the resource's mutable state and write in the usage queue. */
   private async evaluateResourceSnapshot(resourceId: number): Promise<void> {
-    this.snapshotReader ??= new MaintenanceSnapshotReader(this.scheduleRepository.manager.connection);
-    const reader = await this.snapshotReader.manager();
-    if (await this.maintenanceService.hasActiveMaintenance(resourceId, reader)) return;
-    const schedules = await reader.getRepository(ResourceMaintenanceSchedule).find({
-      where: { resourceId, enabled: true },
-      relations: ['usageHoursConfig', 'usageCountConfig', 'timeIntervalConfig'],
-    });
-    const candidates: Array<{
-      schedule: ResourceMaintenanceSchedule;
-      definition: string;
-      baseline: number;
-      durationState: string;
-    }> = [];
-    for (const schedule of schedules) {
-      const definition = JSON.stringify(schedule);
-      const baseline = (await this.getBaselineDate(resourceId, schedule.id, reader)).getTime();
-      const durationState =
-        schedule.triggerType === ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL
-          ? ''
-          : await captureDurationState(resourceId, reader);
-      if (await this.shouldTrigger(schedule, resourceId, reader)) {
-        candidates.push({ schedule, definition, baseline, durationState });
-      }
-    }
+    const candidates = await this.store.inSnapshot((reader) => this.collectCandidates(resourceId, reader));
     if (candidates.length === 0) return;
 
     let stale = false;
-    const created = await runSerializedTransaction(this.scheduleRepository.manager, async (manager) => {
-      // This read establishes the SQLite transaction snapshot before freshness checks.
-      if (await this.maintenanceService.hasActiveMaintenance(resourceId, manager)) return;
-      const currentSchedules = await manager.getRepository(ResourceMaintenanceSchedule).find({
-        where: { resourceId, enabled: true },
-        relations: ['usageHoursConfig', 'usageCountConfig', 'timeIntervalConfig'],
-      });
+    const created = await this.store.inTransaction(async (view) => {
+      // This read establishes the transaction snapshot before freshness checks.
+      if (await this.maintenanceService.hasActiveMaintenance(resourceId, view.context)) return;
+      const currentSchedules = await view.enabledSchedules(resourceId);
       for (const candidate of candidates) {
         const current = currentSchedules.find((schedule) => schedule.id === candidate.schedule.id);
         if (
           !current ||
           JSON.stringify(current) !== candidate.definition ||
-          (await this.getBaselineDate(resourceId, current.id, manager)).getTime() !== candidate.baseline ||
-          (candidate.durationState !== '' &&
-            (await captureDurationState(resourceId, manager)) !== candidate.durationState)
+          (await view.baselineDate(resourceId, current.id)).getTime() !== candidate.baseline ||
+          (candidate.durationState !== '' && (await view.durationFingerprint(resourceId)) !== candidate.durationState)
         ) {
           stale = true;
           continue;
@@ -175,7 +135,7 @@ export class MaintenanceResourceEvaluation {
           resourceId,
           current.id,
           this.buildMaintenanceReasonFromScheduleDefinition(current),
-          manager,
+          view.context,
           false,
         );
       }
@@ -185,13 +145,34 @@ export class MaintenanceResourceEvaluation {
     else if (stale) this.requeue(resourceId);
   }
 
+  private async collectCandidates(
+    resourceId: number,
+    reader: MaintenanceEvaluationView,
+  ): Promise<TriggeredCandidate[]> {
+    if (await this.maintenanceService.hasActiveMaintenance(resourceId, reader.context)) return [];
+    const schedules = await reader.enabledSchedules(resourceId);
+    const candidates: TriggeredCandidate[] = [];
+    for (const schedule of schedules) {
+      const definition = JSON.stringify(schedule);
+      const baseline = (await reader.baselineDate(resourceId, schedule.id)).getTime();
+      const durationState =
+        schedule.triggerType === ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL
+          ? ''
+          : await reader.durationFingerprint(resourceId);
+      if (await this.shouldTrigger(schedule, resourceId, reader)) {
+        candidates.push({ schedule, definition, baseline, durationState });
+      }
+    }
+    return candidates;
+  }
+
   /**
    * Builds the schedule's reason as JSON for i18n: { i18nKey, details }.
    * Stored in maintenance.reason; describes what triggered this maintenance (the schedule).
    * Frontend keys: name.auto.usageHours, name.auto.usageCount, name.auto.intervalDays,
    * name.auto.thresholdHours, name.auto.fallback
    */
-  buildMaintenanceReasonFromScheduleDefinition(schedule: ResourceMaintenanceSchedule): string {
+  buildMaintenanceReasonFromScheduleDefinition(schedule: MaintenanceScheduleRecord): string {
     const scheduleName = schedule.name ?? undefined;
     const withParams = (details: Record<string, number | string | undefined>) => ({
       i18nKey: '' as string,
@@ -264,7 +245,7 @@ export class MaintenanceResourceEvaluation {
    * switch-on-triggerType logic lives in exactly one place.
    */
   evaluateTriggerThreshold(
-    schedule: ResourceMaintenanceSchedule,
+    schedule: MaintenanceScheduleRecord,
     baseline: Date,
     now: Date,
     durationMs: number,
@@ -296,11 +277,11 @@ export class MaintenanceResourceEvaluation {
    * Returns true if the schedule's condition is met.
    */
   async shouldTrigger(
-    schedule: ResourceMaintenanceSchedule,
+    schedule: MaintenanceScheduleRecord,
     resourceId: number,
-    manager?: EntityManager,
+    view: MaintenanceEvaluationView = this.store.current(),
   ): Promise<boolean> {
-    const baseline = await this.getBaselineDate(resourceId, schedule.id, manager);
+    const baseline = await view.baselineDate(resourceId, schedule.id);
     const now = new Date();
     let durationMs = 0;
     let usageCount = 0;
@@ -310,17 +291,17 @@ export class MaintenanceResourceEvaluation {
       const durations = await this.operatingAttributionService.getDurationsForWindows(
         [{ key, resourceId, start: baseline }],
         now,
-        manager,
+        view.context,
       );
       durationMs = this.selectedDuration(schedule, durations.get(key));
     } else if (schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT) {
-      usageCount = await this.getUsageSessionCountSince(resourceId, baseline, manager);
+      usageCount = await view.completedSessionCountSince(resourceId, baseline);
     }
 
     return this.evaluateTriggerThreshold(schedule, baseline, now, durationMs, usageCount);
   }
 
-  selectedDuration(schedule: ResourceMaintenanceSchedule, durations?: ResourceDurations): number {
+  selectedDuration(schedule: MaintenanceScheduleRecord, durations?: ResourceDurations): number {
     return schedule.durationBasis === ResourceMaintenanceScheduleDurationBasis.ATTRIBUTABLE_OPERATING_DURATION
       ? (durations?.operatingDurationMs ?? 0)
       : (durations?.sessionDurationMs ?? 0);
@@ -330,39 +311,11 @@ export class MaintenanceResourceEvaluation {
    * Get the baseline date for a schedule: when the last maintenance created by this schedule was done,
    * or the resource's creation date if no such maintenance exists.
    */
-  async getBaselineDate(resourceId: number, scheduleId: number, manager?: EntityManager): Promise<Date> {
-    const maintenanceRepository = manager?.getRepository(ResourceMaintenance) ?? this.maintenanceRepository;
-    const resourceRepository = manager?.getRepository(Resource) ?? this.resourceRepository;
-    const lastDone = await maintenanceRepository
-      .createQueryBuilder('m')
-      .where('m.resourceId = :resourceId', { resourceId })
-      .andWhere('m.maintenanceScheduleId = :scheduleId', { scheduleId })
-      .andWhere('m.endTime IS NOT NULL')
-      .orderBy('m.endTime', 'DESC')
-      .limit(1)
-      .getOne();
-
-    if (lastDone?.endTime) {
-      return lastDone.endTime;
-    }
-
-    const resource = await resourceRepository.findOne({
-      where: { id: resourceId },
-      select: ['id', 'createdAt'],
-    });
-    return resource?.createdAt ?? new Date(0);
-  }
-
-  /**
-   * Count usage sessions for the resource since baseline (completed sessions only).
-   */
-  async getUsageSessionCountSince(resourceId: number, since: Date, manager?: EntityManager): Promise<number> {
-    return (manager?.getRepository(ResourceUsage) ?? this.usageRepository)
-      .createQueryBuilder('usage')
-      .where('usage.resourceId = :resourceId', { resourceId })
-      .andWhere('usage.lifecyclePending = :lifecyclePending', { lifecyclePending: false })
-      .andWhere('usage.endTime IS NOT NULL')
-      .andWhere('usage.endTime >= :since', { since })
-      .getCount();
+  async getBaselineDate(
+    resourceId: number,
+    scheduleId: number,
+    view: MaintenanceEvaluationView = this.store.current(),
+  ): Promise<Date> {
+    return view.baselineDate(resourceId, scheduleId);
   }
 }
