@@ -1,5 +1,6 @@
 #include "application.hpp"
 #include "../platform.hpp"
+#include "lite_door_tap.hpp"
 
 void Application::processState() {
   // OTA owns the UI even across disconnects and late card-flow callbacks.
@@ -551,7 +552,7 @@ void Application::renderResourceState()
     this->cardRemoved = false;
 
     if (this->resourceIsDoor) {
-      if (this->cardPresentationWasLong) {
+      if (liteDoorAction(this->resourceIsAccessOnlyDoor, this->cardPresentationWasLong) == LiteDoorAction::Lock) {
         this->api.lockDoor(this->selectedResourceId);
       } else {
         this->api.unlockDoor(this->selectedResourceId);

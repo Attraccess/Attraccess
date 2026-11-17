@@ -259,7 +259,8 @@ void Application::handleResourceListAction(const API::ResourceBrief &resource, R
   auto type = ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION;
   if (action == ResourceListAction::Stop) type = ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION;
   if (action == ResourceListAction::OpenDoor)
-    type = current->separateUnlockAndUnlatch ? ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR : ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR;
+    type = current->separateUnlockAndUnlatch && !current->accessOnly ? ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR
+                                                                     : ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR;
   this->handleResourceDetailsButtonClick({&Display::resourceDetailsScreen, type, {}});
 }
 
@@ -360,12 +361,17 @@ void Application::handleResourceDetailsButtonClick(
     this->beginActionPause();
     this->api.lockDoor(this->selectedResourceId);
     break;
-  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR:
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR: {
+    // An access-only door's Open is an unlock on the wire.
+    bool accessOnly = false;
+    for (uint16_t i = 0; i < this->resourceList.count; ++i)
+      if (this->resourceList.items[i].id == this->selectedResourceId) accessOnly = this->resourceList.items[i].accessOnly;
     this->pendingUiAction = "UNLOCK_DOOR";
-    this->showReaderActionProgress(FirmwareI18n::Message::UnlockingDoor);
+    this->showReaderActionProgress(accessOnly ? FirmwareI18n::Message::OpeningDoor : FirmwareI18n::Message::UnlockingDoor);
     this->beginActionPause();
     this->api.unlockDoor(this->selectedResourceId);
     break;
+  }
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR:
     this->pendingUiAction = "UNLATCH_DOOR";
     this->showReaderActionProgress(FirmwareI18n::Message::ReleasingDoorLatch);

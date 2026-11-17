@@ -246,6 +246,8 @@ void API::onResourceList(JsonObject data)
         const char *typeStr = resource["type"].as<const char *>();
         dst.type = (typeStr && strcmp(typeStr, "door") == 0) ? 1 : 0;
         dst.separateUnlockAndUnlatch = resource["separateUnlockAndUnlatch"].is<bool>() ? resource["separateUnlockAndUnlatch"].as<bool>() : false;
+        // Older servers do not send it: a regular door.
+        dst.accessOnly = dst.type == 1 && (resource["accessOnly"] | false);
         dst.allowTakeOver = resource["allowTakeOver"].is<bool>() ? resource["allowTakeOver"].as<bool>() : false;
         dst.accessKnown = resource["hasIntroduction"].is<bool>();
         dst.canManageMaintenance = resource["canManageMaintenance"] | false;

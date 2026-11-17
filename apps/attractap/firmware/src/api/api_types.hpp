@@ -52,6 +52,8 @@ struct ResourceBrief
         uint32_t id;
         uint8_t type; // 0: machine, 1: door (encode from API strings)
         bool separateUnlockAndUnlatch;
+        // Access-only door: its only action is Open (sent as an unlock); it is never locked or unlatched from here.
+        bool accessOnly = false;
         bool allowTakeOver;
         bool accessKnown = false;
         bool canManageMaintenance = false;
