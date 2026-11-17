@@ -38,9 +38,6 @@ export function createOidcTestServices(dataSource: DataSource) {
   const authDetailRepo = dataSource.getRepository(AuthenticationDetail);
   const sessionRepo = dataSource.getRepository(Session);
   const resourceUsageRepo = dataSource.getRepository(ResourceUsage);
-  const userRoleRepo = dataSource.getRepository(UserRole);
-  const roleRepo = dataSource.getRepository(Role);
-  const permissionRepo = dataSource.getRepository(Permission);
 
   const mockConfigService = {
     get: (key: string): AppConfigType | undefined => {
