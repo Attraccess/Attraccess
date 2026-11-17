@@ -88,7 +88,9 @@ import { EncryptionService } from '../encryption/encryption.service';
 import { ResourceFlowsExecutorService } from '../resources/flows/execution/resource-flows-executor.service';
 
 import { createPluginAuditContext } from './runtime/audit-context';
-import { createPluginBleContext } from './ble/plugin-ble-context';
+import { closePluginBleSessions, createPluginBleContext } from './ble/plugin-ble-context';
+import { cancelPluginCardConversations, createPluginCardsContext } from './cards/plugin-cards-context';
+import { CardOperationsService } from '../attractap/websockets/card-operations.service';
 import { PluginBleService } from './ble/plugin-ble.service';
 import { preparePluginNotifications } from './runtime/plugin-notifications';
 import { preparePluginPermissions } from './runtime/plugin-permissions';
@@ -350,8 +352,14 @@ export class PluginModule {
               getImplementationClass().pluginLiveUpdates().clearPlugin(manifest.id);
               unregisterReaderUi(manifest.name);
               categories.unregister();
+              // Ends this plugin's card conversations with CANCELLED; a plugin that never got host refs has none.
+              cancelPluginCardConversations(getImplementationClass().moduleRef, manifest.id);
               // Closes this plugin's BLE sessions with `shutdown`; a plugin that never got host refs has none.
-              return getImplementationClass().closePluginBleSessions(manifest.id);
+              return closePluginBleSessions(
+                getImplementationClass().moduleRef,
+                manifest.id,
+                getImplementationClass().logger,
+              );
             },
           }),
         },
@@ -419,6 +427,9 @@ export class PluginModule {
       readerUi: { invalidate: (scope) => invalidateReaderUi(manifest.name, scope) },
       ble: createPluginBleContext({ id: manifest.id, logger: new Logger(`Plugin:${manifest.name}`) }, () =>
         getImplementationClass().hostRefs().get(PluginBleService),
+      ),
+      cards: createPluginCardsContext(manifest.id, () =>
+        getImplementationClass().hostRefs().get(CardOperationsService),
       ),
       startBlocked: {
         invalidate: ({ resourceId }) => {
@@ -570,18 +581,6 @@ export class PluginModule {
     return getImplementationClass()
       .requireRef(getImplementationClass().moduleRef, 'ModuleRef')
       .get(PluginLiveUpdatesService, { strict: false });
-  }
-
-  protected static async closePluginBleSessions(pluginId: string): Promise<void> {
-    const ref = getImplementationClass().moduleRef;
-    if (!ref) return;
-    try {
-      await ref.get(PluginBleService, { strict: false }).closePluginSessions(pluginId, 'shutdown');
-    } catch (error) {
-      getImplementationClass().logger.warn(
-        `Closing BLE sessions of plugin ${pluginId} failed: ${(error as Error).message}`,
-      );
-    }
   }
 
   protected static pluginMqtt(): PluginMqttService {

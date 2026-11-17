@@ -357,6 +357,21 @@ describe('PluginSandboxService', () => {
       expect(() => withoutHostSupport.ble).toThrow(/unavailable/);
     });
 
+    it('gates cards behind CARD_AUTHENTICATION', () => {
+      const cards = { authenticate: jest.fn() };
+      const base = { ...buildBaseContext(events), cards } as never as PluginContext;
+      const denied = PluginSandboxService.createGuardedContext(base, [PluginPermission.BLE_TRANSPORT]);
+      expect(() => denied.cards).toThrow(PluginPermissionError);
+      expect(() => denied.cards).toThrow(/CARD_AUTHENTICATION/);
+
+      const granted = PluginSandboxService.createGuardedContext(base, [PluginPermission.CARD_AUTHENTICATION]);
+      expect(granted.cards).toBe(cards);
+      const withoutHostSupport = PluginSandboxService.createGuardedContext(buildBaseContext(events), [
+        PluginPermission.CARD_AUTHENTICATION,
+      ]);
+      expect(() => withoutHostSupport.cards).toThrow(/unavailable in this host/);
+    });
+
     it('gates readerUi.invalidate behind READER_UI', () => {
       const base = { ...buildBaseContext(events), readerUi: { invalidate: jest.fn() } };
       const denied = PluginSandboxService.createGuardedContext(base, []);

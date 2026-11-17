@@ -12,6 +12,7 @@ import { PluginBleService } from './plugin-ble.service';
 import { PluginMqttService } from '../plugin-mqtt.service';
 import { PluginLiveUpdatesService } from '../plugin-live-updates.service';
 import { clearPluginBleProfiles } from './plugin-ble-profile-registry';
+import { CardConversationService } from '../../attractap/websockets/card-conversation.service';
 import { createHostBleHarness, type HostBleHarness } from './__test__/ble-host-harness.test-fixture';
 
 const PROFILE = `{
@@ -61,6 +62,7 @@ describe('plugin BLE through the plugin module', () => {
   const fixture = registerPluginModuleFixture();
   let harness: HostBleHarness;
   const moduleRefGet = jest.fn();
+  const cardConversations = { cancelPlugin: jest.fn() };
 
   const writePlugin = (name: string, directory = name) => {
     mkdirSync(join(fixture.root, directory, 'dist'), { recursive: true });
@@ -82,6 +84,7 @@ describe('plugin BLE through the plugin module', () => {
       get: (token: unknown) => {
         moduleRefGet(token);
         if (token === PluginBleService) return harness.service;
+        if (token === CardConversationService) return cardConversations;
         if (token === PluginMqttService || token === PluginLiveUpdatesService) return { clearPlugin: jest.fn() };
         throw new Error('unexpected token');
       },
@@ -209,5 +212,7 @@ describe('plugin BLE through the plugin module', () => {
 
     await expect(session.closed).resolves.toEqual({ reason: 'shutdown' });
     await expect(ble.listEndpoints()).resolves.toHaveLength(1);
+    // The same hook ends the plugin's card conversations with CANCELLED.
+    expect(cardConversations.cancelPlugin).toHaveBeenCalledWith(pluginId);
   });
 });
