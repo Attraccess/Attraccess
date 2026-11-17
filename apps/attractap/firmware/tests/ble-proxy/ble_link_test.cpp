@@ -12,7 +12,7 @@ namespace bletest
         void linkRequestStaysWithinTheSpec()
         {
             expect(link::INTERVAL_MIN * 125 / 100 >= 15 && link::INTERVAL_MAX * 125 / 100 <= 30,
-                   "the reader asks for a 15..30 ms interval");
+                   "the reader asks for an interval within 15..30 ms");
             expect(link::valid(link::INTERVAL_MIN, link::INTERVAL_MAX, link::LATENCY, link::SUPERVISION_TIMEOUT),
                    "the requested parameters are valid");
             expect(!link::valid(24, 24, 0, 5), "a timeout shorter than two intervals is not");

@@ -106,6 +106,11 @@ namespace ble
         // Whether the next request may be taken. Answers are never dropped: the outbox keeps room for everything
         // already accepted work still owes, so a request waits (in the proxy's command queue) while it is full.
         bool acceptsRequests() const;
+        // A write without response waits for controller buffers (NimBLE reports none freeing): poll it quickly.
+        bool waitsForRadioBuffers() const
+        {
+            return currentOwner == Owner::Session && session.current.active && session.current.retry;
+        }
         uint16_t mtu() const { return session.mtu; }
         size_t pendingRequests() const { return session.queue.size() + (session.current.active ? 1 : 0); }
 

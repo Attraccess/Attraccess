@@ -186,11 +186,8 @@ namespace ble
     void NimbleRadio::tuneLink()
     {
         // Requests only: a peripheral that refuses them keeps the link it has, and the session goes on.
-        int rc = ble_gap_set_data_len(conn, link::DATA_LENGTH_OCTETS, link::DATA_LENGTH_TIME_US);
+        const int rc = ble_gap_set_data_len(conn, link::DATA_LENGTH_OCTETS, link::DATA_LENGTH_TIME_US);
         if (rc != 0) reportLink("data-length-refused", rc);
-        if (!link::REQUEST_2M_PHY) return;
-        rc = ble_gap_set_prefered_le_phy(conn, BLE_GAP_LE_PHY_2M_MASK, BLE_GAP_LE_PHY_2M_MASK, BLE_GAP_LE_PHY_CODED_ANY);
-        if (rc != 0) reportLink("phy-refused", rc);
     }
 
     void NimbleRadio::reportLink(const char *what, int status)
@@ -340,7 +337,7 @@ namespace ble
             // The peripheral asks for other connection parameters: accepted as they are (its battery, its call).
             return 0;
         case BLE_GAP_EVENT_DATA_LEN_CHG:
-            if (event->data_len_chg.conn_handle != conn) return 0;
+            // NimBLE leaves data_len_chg.conn_handle at 0; it calls only this link's callback, the one connection.
             link.txOctets = event->data_len_chg.max_tx_octets;
             link.rxOctets = event->data_len_chg.max_rx_octets;
             reportLink("data-length", 0);

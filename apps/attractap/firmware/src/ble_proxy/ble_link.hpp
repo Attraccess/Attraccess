@@ -1,7 +1,7 @@
 #pragma once
 
 // The link the reader asks for on every plugin BLE connect (ATT-1296): a short connection interval and the
-// largest LE data length, so bulk writes without response and their acks need fewer connection events. These are
+// largest LE data length (no 2M PHY: it measured no gain, the round trip is the websocket's), so bulk writes without response and their acks need fewer connection events. These are
 // requests: a peripheral may refuse or change any of them and the session works with whatever it ends up with.
 // Plain C++ (no NimBLE), so host tests cover the values and the log line.
 
@@ -13,18 +13,16 @@ namespace ble
 {
     namespace link
     {
-        // Connection interval in 1.25 ms units: 15..30 ms (NimBLE's default is 30..50 ms).
+        // Connection interval in 1.25 ms units: 15 ms (NimBLE's default is 30..50 ms). The controller picks the top
+        // of a range, so the range is a single value: 15..30 ms measured 30 ms (16 KiB/s at window 8), 15 ms 18.5.
         constexpr uint16_t INTERVAL_MIN = 12;
-        constexpr uint16_t INTERVAL_MAX = 24;
+        constexpr uint16_t INTERVAL_MAX = 12;
         constexpr uint16_t LATENCY = 0;
         // Supervision timeout in 10 ms units: NimBLE's default 2.56 s, so a lost link is noticed as before.
         constexpr uint16_t SUPERVISION_TIMEOUT = 256;
         // LE Data Length Extension: the largest link-layer payload and its airtime on the 1M PHY.
         constexpr uint16_t DATA_LENGTH_OCTETS = 251;
         constexpr uint16_t DATA_LENGTH_TIME_US = 2120;
-        // Ask for the 2M PHY (twice the bit rate). The ESP32-S3 controller supports it without NimBLE's BLE 5.0
-        // host features; a peripheral without it keeps the 1M PHY.
-        constexpr bool REQUEST_2M_PHY = true;
         // The LE data length without the extension, and the PHYs (HCI values: 1 = 1M, 2 = 2M, 3 = coded).
         constexpr uint16_t DEFAULT_DATA_LENGTH_OCTETS = 27;
         constexpr uint8_t PHY_1M = 1;

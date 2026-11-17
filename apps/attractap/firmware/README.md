@@ -215,18 +215,21 @@ service UUIDs, 8 manufacturer ids and a name prefix of 64 bytes (larger filters 
 the secure link, re-authenticating, and starting an OTA end the session and disconnect the device at
 once; BLE requests during an OTA get `READER_BUSY` (`ota`).
 
-**Link (2.5.1).** For bulk transfers (ATT-1296) the reader connects with a 15–30 ms connection
-interval (NimBLE's default is 30–50 ms; latency 0, supervision timeout 2.56 s), then asks for the
-largest LE data length (251 bytes) and the 2M PHY (`src/ble_proxy/ble_link.hpp`). These are
-requests: a peripheral that refuses them, or later asks for other connection parameters (accepted
-as they are), keeps a working session with whatever it ends up with. Every change logs the
-negotiated values at info (`ble link <what> interval=… latency=… timeout=… data=tx…/rx… phy=tx…/rx…`),
-a refused request at warn. The 2M PHY needs no NimBLE BLE 5.0 host features
-(`CONFIG_BT_NIMBLE_50_FEATURE_SUPPORT` stays off). Each session end also logs `retries` (writes
-without response NimBLE refused for lack of buffers) and `queued` (answers that waited for room in
-the websocket send queue). The proxy task wakes as soon as the websocket frees a send slot while it
-waits for one (`IReaderTransport::setSendSlotFreedCallback`), instead of polling every 20 ms; without
-BLE work it still sleeps until a request arrives.
+**Link (2.5.1).** For bulk transfers (ATT-1296) the reader connects with a 15 ms connection
+interval (NimBLE's default is 30–50 ms; latency 0, supervision timeout 2.56 s; a 15–30 ms range
+ended at 30 ms, because the controller picks its top), then asks for the largest LE data length
+(251 bytes) (`src/ble_proxy/ble_link.hpp`). These are requests: a peripheral that refuses them, or
+later asks for other connection parameters (accepted as they are), keeps a working session with
+whatever it ends up with. Every change logs the negotiated values at info
+(`ble link <what> interval=… latency=… timeout=… data=tx…/rx… phy=tx…/rx…`), a refused request at
+warn. The reader does not ask for the 2M PHY: on the lab reader the request changed nothing and
+throughput stayed the same, because the round trip is the websocket's, not the radio's. Each
+session end also logs `retries` (writes without response NimBLE refused for lack of buffers) and
+`queued` (answers that waited for room in the websocket send queue). A write waiting for
+controller buffers is retried every 2 ms (NimBLE reports no buffers freeing); the proxy task wakes
+as soon as the websocket frees a send slot while it waits for one
+(`IReaderTransport::setSendSlotFreedCallback`). Otherwise it polls every 20 ms only for deadlines,
+and without BLE work it still sleeps until a request arrives.
 
 **Memory.** NimBLE (central and observer roles only, no security) starts lazily on the first BLE
 request and stays until the next reboot, so readers that never use BLE keep their RAM and radio as

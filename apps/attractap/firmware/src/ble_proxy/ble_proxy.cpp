@@ -32,6 +32,9 @@ namespace
     // While work is pending (deadlines, controller buffers) the task polls this often as a fallback; requests, radio
     // events and a freed websocket send slot (while it waits for one) wake it at once. Without work it sleeps.
     constexpr TickType_t POLL_WAIT = pdMS_TO_TICKS(20);
+    // A write without response refused for lack of controller buffers: NimBLE has no event when they free up, and a
+    // bulk transfer hits this dozens of times per 256 KiB, so it is retried sooner than the deadline poll.
+    constexpr TickType_t RETRY_WAIT = pdMS_TO_TICKS(2);
     constexpr uint32_t PSRAM_CAPS = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
 
     QueueHandle_t createQueue(UBaseType_t depth, UBaseType_t itemSize)
@@ -249,7 +252,7 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
         {
             // A reader that never uses BLE never wakes this task: nothing has a deadline and nothing waits.
             const bool idle = core.idle() && uxQueueMessagesWaiting(commands) == 0;
-            ulTaskNotifyTake(pdTRUE, idle ? portMAX_DELAY : POLL_WAIT);
+            ulTaskNotifyTake(pdTRUE, idle ? portMAX_DELAY : core.waitsForRadioBuffers() ? RETRY_WAIT : POLL_WAIT);
             uint32_t now = millis();
             const uint32_t current = generation.load();
             if (current != handledGeneration)
