@@ -5,7 +5,7 @@
 Backend-Plugins mit der Berechtigung `BLE_TRANSPORT` können über Attractap-Reader mit Bluetooth-Low-Energy-Geräten (BLE) sprechen. Der Transport ist bewusst **keine** rohe GATT-Schnittstelle: Jede Operation läuft über ein Profil, das Ihr Plugin registriert hat, und einen Endpunkt, den Ihr Plugin besitzt. Der Kern setzt die Grenzen durch; Ihr Plugin liefert die herstellerspezifische Semantik.
 
 > [!NOTE]
-> Für Plugin-Bluetooth brauchen Reader die Attractap-Firmware **2.4.0 oder neuer**. Mit älterer Firmware enden `scan` und `openSession` mit `READER_UNSUPPORTED`. `TRANSPORT_UNAVAILABLE` tritt nur auf Hosts ohne Reader-Transport auf (zum Beispiel auf einem Test-Host); wiederholen Sie den Fehler nicht in einer engen Schleife.
+> Für Plugin-Bluetooth brauchen Reader die Attractap-Firmware **2.5.0 oder neuer**. Mit älterer Firmware enden `scan` und `openSession` mit `READER_UNSUPPORTED`. `TRANSPORT_UNAVAILABLE` tritt nur auf Hosts ohne Reader-Transport auf (zum Beispiel auf einem Test-Host); wiederholen Sie den Fehler nicht in einer engen Schleife.
 
 ## Vertrauensgrenze
 
@@ -220,7 +220,7 @@ Werte über einer Grenze werden mit `INVALID_ARGUMENT` abgelehnt (in einem Profi
 
 ## Echte Reader
 
-Die Reader-Firmware (2.4.0 oder neuer) meldet Plugin-Bluetooth beim Verbinden an. Host und Reader setzen die Regeln beide durch:
+Die Reader-Firmware (2.5.0 oder neuer) meldet Plugin-Bluetooth beim Verbinden an. Host und Reader setzen die Regeln beide durch:
 
 - **Kompatibilität.** Ein Reader ohne diese Fähigkeit oder mit einer Protokollversion, die der Host nicht unterstützt, lässt `scan` und `openSession` mit `READER_UNSUPPORTED` enden. `detail` ist `no-ble-capability`, `protocol-version:<n>` oder `missing-operation:<op>`. Ein Profil mit mehr Characteristics, als der Reader annimmt (16), endet mit `READER_UNSUPPORTED`, Detail `allowlist-too-large:<n>`. Im ersten Fall hilft ein Firmware-Update des Readers (OTA vom Server).
 - **Durchsetzung am Reader.** Mit jeder Sitzung schickt der Host dem Reader das Profil als Allowlist: die gebundene Adresse und je Characteristic den Service, die Operationen und die Größenlimits. Der Reader lehnt alles andere ab, bevor er das Funkmodul benutzt. Das schützt vor Fehlern im Host, nicht vor einem kompromittierten Server, der jede beliebige Allowlist schicken könnte.
@@ -342,4 +342,4 @@ Um einen Timeout zu testen, geben Sie einer Characteristic ein `delayMs`, das l�
 
 ## Der Fake und echte Reader
 
-Fake und Host teilen dieselbe Validierung und werden von einer gemeinsamen Vertrags-Testsuite geprüft. Sie läuft gegen den Fake, gegen den Host mit einem Testtreiber und gegen den Host mit dem echten Reader-Treiber, der mit einem simulierten Reader spricht. Ein Plugin, dessen Tests gegen den Fake bestehen, verhält sich an einem echten Reader genauso; dort aktiviert ein Administrator **Bluetooth-Nutzung durch Plugins erlauben** an einem Reader mit Firmware 2.4.0 oder neuer.
+Fake und Host teilen dieselbe Validierung und werden von einer gemeinsamen Vertrags-Testsuite geprüft. Sie läuft gegen den Fake, gegen den Host mit einem Testtreiber und gegen den Host mit dem echten Reader-Treiber, der mit einem simulierten Reader spricht. Ein Plugin, dessen Tests gegen den Fake bestehen, verhält sich an einem echten Reader genauso; dort aktiviert ein Administrator **Bluetooth-Nutzung durch Plugins erlauben** an einem Reader mit Firmware 2.5.0 oder neuer.

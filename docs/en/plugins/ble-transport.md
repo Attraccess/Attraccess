@@ -5,7 +5,7 @@
 Backend plugins with the `BLE_TRANSPORT` permission can talk to Bluetooth Low Energy (BLE) devices through Attractap readers. The transport is deliberately **not** a raw GATT API: every operation goes through a profile your plugin registered and an endpoint your plugin owns. Core enforces the boundaries; your plugin supplies the vendor semantics.
 
 > [!NOTE]
-> Readers need Attractap firmware **2.4.0 or later** for plugin Bluetooth. On older firmware `scan` and `openSession` reject with `READER_UNSUPPORTED`. `TRANSPORT_UNAVAILABLE` only occurs on hosts that run without the reader transport (for example a test host); do not retry it in a tight loop.
+> Readers need Attractap firmware **2.5.0 or later** for plugin Bluetooth. On older firmware `scan` and `openSession` reject with `READER_UNSUPPORTED`. `TRANSPORT_UNAVAILABLE` only occurs on hosts that run without the reader transport (for example a test host); do not retry it in a tight loop.
 
 ## Trust boundary
 
@@ -220,7 +220,7 @@ Values above a cap are rejected with `INVALID_ARGUMENT` (or `INVALID_PROFILE` in
 
 ## Real readers
 
-The reader firmware (2.4.0 or later) announces plugin Bluetooth when it connects. The host and the reader both enforce the rules:
+The reader firmware (2.5.0 or later) announces plugin Bluetooth when it connects. The host and the reader both enforce the rules:
 
 - **Compatibility.** A reader without the capability, or with a protocol version the host does not support, makes `scan` and `openSession` reject with `READER_UNSUPPORTED`. `detail` is `no-ble-capability`, `protocol-version:<n>` or `missing-operation:<op>`. A profile with more characteristics than the reader accepts (16) rejects with `READER_UNSUPPORTED`, detail `allowlist-too-large:<n>`. Update the reader firmware (OTA from the server) to fix the first case.
 - **Enforcement on the reader.** With each session the host sends the reader the profile as an allowlist: the bound address and, per characteristic, the service, the operations and the payload bounds. The reader refuses anything else before it touches the radio. This protects against host bugs, not against a compromised server, which could send any allowlist.
@@ -342,4 +342,4 @@ To test a timeout, give a characteristic a `delayMs` longer than the timeout, st
 
 ## The fake and real readers
 
-The fake and the host share the same validation and are checked by one contract test suite, which runs against the fake, against the host with a test driver, and against the host with the real reader driver talking to a simulated reader. A plugin that passes its tests against the fake behaves the same on a real reader; there, an administrator enables **Allow plugins to use Bluetooth** on a reader that runs firmware 2.4.0 or later.
+The fake and the host share the same validation and are checked by one contract test suite, which runs against the fake, against the host with a test driver, and against the host with the real reader driver talking to a simulated reader. A plugin that passes its tests against the fake behaves the same on a real reader; there, an administrator enables **Allow plugins to use Bluetooth** on a reader that runs firmware 2.5.0 or later.

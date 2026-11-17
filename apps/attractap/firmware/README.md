@@ -155,9 +155,9 @@ and reports success only after the card proved the new key or its factory state.
 `CARD_APDU_RESPONSE` without an INFO serial line (DEBUG only); every other event is logged as
 `Sending reader event: <TYPE>`.
 
-## BLE proxy protocol (2.4.0)
+## BLE proxy protocol (2.5.0)
 
-Firmware 2.4.0 lets server plugins with the `BLE_TRANSPORT` permission talk to Bluetooth Low Energy
+Firmware 2.5.0 lets server plugins with the `BLE_TRANSPORT` permission talk to Bluetooth Low Energy
 devices through the reader (ATT-1033, ATT-1036). The reader is a bounded proxy, not a raw GATT
 gateway: the server opens a session for one device and sends the profile with it as an allowlist,
 and the reader refuses everything outside it before it touches the radio. The reader announces

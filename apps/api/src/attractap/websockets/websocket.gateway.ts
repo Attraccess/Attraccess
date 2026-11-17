@@ -67,9 +67,8 @@ const ALLOWED_WHILE_PAIRING_REQUIRED = new Set<AttractapEventType>([
 ]);
 
 /**
- * Card relay, coredump and plugin BLE events: a card conversation must not wait for the reader's lastConnection
- * update. Coredump chunks arrive dozens per upload; the BEGIN and COMPLETE around them record the activity. A BLE
- * transfer must not write the database per chunk or notification.
+ * Card relay, coredump and BLE events: a card conversation must not wait for the lastConnection update, and coredump
+ * chunks and BLE traffic must not write it per chunk (a coredump's BEGIN and COMPLETE record the activity).
  */
 const SKIPS_ACTIVITY_WRITE = new Set<AttractapEventType>([
   AttractapEventType.CARD_DETECTED,
