@@ -1,15 +1,6 @@
 import { Project, Resource, ResourceUsage, ResourceUsageLifecycleAttempt, User } from '@attraccess/database-entities';
 import { ResourceType, ResourceUsageAction, SupervisionMode } from '@attraccess/application-models';
-import { DataSource } from 'typeorm';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { schemas } from './lifecycle-fixtures/schemas.test-fixture';
-import { resolveDatabaseBackend } from '../../backend';
-import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-transaction';
-import { createSqliteUnitOfWork } from '../../sqlite/sqlite-unit-of-work';
-import { EntityManagerResolver } from '../entity-manager-resolver';
-import { TypeOrmUsageSessionStore } from './typeorm-usage-session.store';
+import { createMigratedUsageDatabase, userRow } from './migrated-usage-database.test-fixture';
 
 jest.setTimeout(30_000);
 
@@ -19,18 +10,8 @@ jest.setTimeout(30_000);
  * second connection standing for another API instance.
  */
 describe('TypeOrmUsageSessionStore reads and ends', () => {
-  let directory: string;
-  const sources: DataSource[] = [];
-
-  const connect = async (file: string, first = false) => {
-    const source = await resolveDatabaseBackend()
-      .createDataSource({ type: 'sqlite', database: file, entities: schemas, synchronize: first })
-      .initialize();
-    sources.push(source);
-    const unitOfWork = createSqliteUnitOfWork(source);
-    return { source, unitOfWork, store: new TypeOrmUsageSessionStore(new EntityManagerResolver(unitOfWork, source)) };
-  };
-  type Instance = Awaited<ReturnType<typeof connect>>;
+  let database: Awaited<ReturnType<typeof createMigratedUsageDatabase>>;
+  type Instance = Awaited<ReturnType<typeof database.connect>>;
   let a: Instance;
   let b: Instance;
 
@@ -50,25 +31,21 @@ describe('TypeOrmUsageSessionStore reads and ends', () => {
     } as ResourceUsage);
 
   beforeEach(async () => {
-    directory = await mkdtemp(join(tmpdir(), 'attraccess-usage-reads-'));
-    const file = join(directory, 'test.sqlite');
-    a = await connect(file, true);
+    // The schema, its unique indexes and triggers come from the released migrations.
+    database = await createMigratedUsageDatabase('attraccess-usage-reads-');
+    a = await database.connect();
     await a.source.getRepository(Resource).save([
       { id: 1, name: 'Printer', type: ResourceType.Machine, supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED },
       { id: 2, name: 'Saw', type: ResourceType.Machine, supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED },
       { id: 3, name: 'Door', type: ResourceType.Door, supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED },
     ]);
-    await a.source.getRepository(User).save([1, 2, 3].map((id) => ({ id, username: `user-${id}` })));
-    await a.source.getRepository(Project).save({ id: 9 });
-    b = await connect(file);
+    await a.source.getRepository(User).save([1, 2, 3].map((id) => userRow(id)));
+    await a.source.getRepository(Project).save({ id: 9, name: 'Thesis', owner: { id: 1 } });
+    b = await database.connect();
   });
 
   afterEach(async () => {
-    for (const source of sources.splice(0)) {
-      await closeResourceTransactionConnection(source);
-      await source.destroy();
-    }
-    await rm(directory, { recursive: true, force: true });
+    await database.close();
   });
 
   describe('running sessions', () => {

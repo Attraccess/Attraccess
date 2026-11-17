@@ -1,18 +1,9 @@
 import { Resource, User } from '@attraccess/database-entities';
 import { ResourceType, SupervisionMode } from '@attraccess/application-models';
 import type { UsageLifecycleAttempt } from '@attraccess/application-models';
-import { DataSource } from 'typeorm';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { schemas } from './lifecycle-fixtures/schemas.test-fixture';
 import { PendingSessionDraft } from '../../../resources/usage/usage-session-store.port';
-import { resolveDatabaseBackend } from '../../backend';
 import { isUniqueViolation } from '../../persistence-errors';
-import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-transaction';
-import { createSqliteUnitOfWork } from '../../sqlite/sqlite-unit-of-work';
-import { EntityManagerResolver } from '../entity-manager-resolver';
-import { TypeOrmUsageSessionStore } from './typeorm-usage-session.store';
+import { createMigratedUsageDatabase, userRow } from './migrated-usage-database.test-fixture';
 
 jest.setTimeout(30_000);
 
@@ -21,20 +12,9 @@ jest.setTimeout(30_000);
  * file: what the application relies on when several API instances (or several requests) change one machine.
  */
 describe('TypeOrmUsageSessionStore with two independent connections', () => {
-  let directory: string;
-  const sources: DataSource[] = [];
-
+  let database: Awaited<ReturnType<typeof createMigratedUsageDatabase>>;
   /** One API instance: its own connection, unit of work and store. */
-  const connect = async (file: string, first = false) => {
-    const source = await resolveDatabaseBackend()
-      .createDataSource({ type: 'sqlite', database: file, entities: schemas, synchronize: first })
-      .initialize();
-    sources.push(source);
-    const unitOfWork = createSqliteUnitOfWork(source);
-    const store = new TypeOrmUsageSessionStore(new EntityManagerResolver(unitOfWork, source));
-    return { source, unitOfWork, store };
-  };
-  type Instance = Awaited<ReturnType<typeof connect>>;
+  type Instance = Awaited<ReturnType<typeof database.connect>>;
   let a: Instance;
   let b: Instance;
 
@@ -72,32 +52,19 @@ describe('TypeOrmUsageSessionStore with two independent connections', () => {
   });
 
   beforeEach(async () => {
-    directory = await mkdtemp(join(tmpdir(), 'attraccess-usage-store-'));
-    const file = join(directory, 'test.sqlite');
-    a = await connect(file, true);
+    // The schema, its unique indexes and triggers come from the released migrations, so index drift is caught.
+    database = await createMigratedUsageDatabase('attraccess-usage-store-');
+    a = await database.connect();
     await a.source.getRepository(Resource).save([
       { id: 1, name: 'Printer', type: ResourceType.Machine, supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED },
       { id: 2, name: 'Saw', type: ResourceType.Machine, supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED },
     ]);
-    await a.source.getRepository(User).save([1, 2, 3].map((id) => ({ id, username: `user-${id}` })));
-    // The constraints the released migrations add (parallel-machine-sessions).
-    await a.source.query(`CREATE UNIQUE INDEX IDX_resource_usage_pending_resource_user
-      ON resource_usage (resourceId, userId) WHERE lifecyclePending = 1 AND endTime IS NULL`);
-    await a.source.query(
-      'CREATE UNIQUE INDEX "IDX_resource_usage_lifecycle_attempt_candidate" ON resource_usage_lifecycle_attempt (candidateUsageId)',
-    );
-    await a.source.query(
-      'CREATE UNIQUE INDEX "IDX_resource_usage_lifecycle_attempt_previous" ON resource_usage_lifecycle_attempt (previousUsageId)',
-    );
-    b = await connect(file);
+    await a.source.getRepository(User).save([1, 2, 3].map((id) => userRow(id)));
+    b = await database.connect();
   });
 
   afterEach(async () => {
-    for (const source of sources.splice(0)) {
-      await closeResourceTransactionConnection(source);
-      await source.destroy();
-    }
-    await rm(directory, { recursive: true, force: true });
+    await database.close();
   });
 
   it('cannot create two reservations for the same person on one machine, whichever instance asks', async () => {
