@@ -1,6 +1,8 @@
 import { Auth, AuthenticatedRequest, ResourceFlowNodeType } from '@attraccess/plugins-backend-sdk';
 import { ResourceFlowNode } from '@attraccess/database-entities';
 
+import type { FlowNodeRecord } from '@attraccess/application-models';
+
 import { Body, Controller, Delete, Get, Logger, Param, ParseIntPipe, Post, Sse, Req, Put } from '@nestjs/common';
 
 import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -197,7 +199,7 @@ export class ResourceFlowsController {
     status: 403,
     description: 'Insufficient permissions to manage resources',
   })
-  async getButtons(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<ResourceFlowNode[]> {
+  async getButtons(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<FlowNodeRecord[]> {
     return await this.resourceFlowsService.getNodes(resourceId, ResourceFlowNodeType.INPUT_BUTTON);
   }
 

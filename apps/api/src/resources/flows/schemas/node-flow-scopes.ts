@@ -1,4 +1,4 @@
-import { FlowScope } from '@attraccess/database-entities';
+import { FlowScope } from '@attraccess/application-models';
 import { getPluginFlowNode } from '../../../plugin-system/flows/node-registry';
 import { getCoreNodeFlowScopes } from './core-node-schemas';
 

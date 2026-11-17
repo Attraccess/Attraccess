@@ -3,8 +3,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import { ResourceFlowNode } from './resourceFlowNode';
 import { ResourceFlowEdge } from './resourceFlowEdge';
 
-/** Which kind of flow an owner is: bound to one resource, or reacting to events of every resource. */
-export type FlowScope = 'resource' | 'global';
+import type { FlowScope } from '@attraccess/application-models';
+
+export type { FlowScope };
 
 /**
  * A named flow that is not tied to one resource. Its nodes and edges point here through `flowId`

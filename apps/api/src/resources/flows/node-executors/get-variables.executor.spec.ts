@@ -1,18 +1,17 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode } from '@attraccess/database-entities';
-import { ResourceFlowVariableScope } from '@attraccess/application-models';
+import { FlowNodeRecord, ResourceFlowVariableScope } from '@attraccess/application-models';
 import { GetVariablesExecutor } from './get-variables.executor';
 import { ResourceFlowVariablesService } from '../variables/resource-flow-variables.service';
 import { NodeExecutionContext, TemplateVariables } from './node-executor.interface';
 
-function makeNode(partial: Partial<ResourceFlowNode>): ResourceFlowNode {
+function makeNode(partial: Partial<FlowNodeRecord>): FlowNodeRecord {
   return {
     id: 'n1',
     type: 'processing.variables.get',
     resourceId: 42,
     data: {},
     ...partial,
-  } as unknown as ResourceFlowNode;
+  } as unknown as FlowNodeRecord;
 }
 
 describe('GetVariablesExecutor', () => {

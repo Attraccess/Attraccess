@@ -1,5 +1,5 @@
 import { compileFlowTemplate } from '../execution/flow-template';
-import { ResourceFlowNode } from '@attraccess/database-entities';
+import { FlowNodeRecord } from '@attraccess/application-models';
 import { MeteringReadyExecutor } from './metering-ready.executor';
 import { MeteringReportExecutor } from './metering-report.executor';
 import { MeteringRunContext, NodeExecutionContext } from './node-executor.interface';
@@ -15,7 +15,7 @@ const context = (metering?: Partial<MeteringRunContext>): NodeExecutionContext &
   } as never;
 };
 
-const node = (data: object) => ({ resourceId: 1, data: { meterId: 1, ...data } }) as unknown as ResourceFlowNode;
+const node = (data: object) => ({ resourceId: 1, data: { meterId: 1, ...data } }) as unknown as FlowNodeRecord;
 
 describe('metering completion nodes', () => {
   it('report renders a converted value, time and source from the flow payload and replies once', async () => {

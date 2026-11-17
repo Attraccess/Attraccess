@@ -1,8 +1,7 @@
-import { ResourceFlowNode } from '@attraccess/database-entities';
-import { ResourceFlowNodeType } from '@attraccess/application-models';
+import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 
 export // Helper to create a node
-function createNode(partial: Partial<ResourceFlowNode>): ResourceFlowNode {
+function createNode(partial: Partial<FlowNodeRecord>): FlowNodeRecord {
   return {
     id: 'node-' + Math.random().toString(36).slice(2, 8),
     type: ResourceFlowNodeType.INPUT_BUTTON,
@@ -12,7 +11,6 @@ function createNode(partial: Partial<ResourceFlowNode>): ResourceFlowNode {
     updatedAt: new Date(),
     resourceId: 1,
     flowId: null,
-    resource: undefined,
     ...partial,
-  } as unknown as ResourceFlowNode;
+  } as unknown as FlowNodeRecord;
 }

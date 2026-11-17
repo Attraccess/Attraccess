@@ -1,6 +1,5 @@
-import { EntityManager } from 'typeorm';
-import { ResourceFlowNode } from '@attraccess/database-entities';
-import { ResourceType } from '@attraccess/application-models';
+import type { TransactionContext } from '../../../database/transaction-context';
+import { FlowNodeRecord, ResourceType } from '@attraccess/application-models';
 
 export interface NodeProcessingResult {
   payload: object;
@@ -49,7 +48,7 @@ export interface NodeExecutionContext {
   resourceId?: number | null;
   /** The type of `resourceId`'s resource; undefined when there is none. */
   getResourceType?(): Promise<ResourceType | undefined>;
-  transactionManager?: EntityManager;
+  transactionManager?: TransactionContext;
   compileTemplate(template: string, data: object): string;
   getTemplateVariables(data: object): TemplateVariables | undefined;
   setTemplateVariables(data: object, variables: TemplateVariables): void;
@@ -60,6 +59,6 @@ export interface NodeExecutionContext {
  * service dispatches to these via a registry, keeping itself a thin orchestrator.
  */
 export interface NodeExecutor {
-  execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult>;
+  execute(node: FlowNodeRecord, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult>;
   getFailureKind?(error: unknown): FlowFailureKind;
 }

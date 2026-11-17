@@ -1,6 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode } from '@attraccess/database-entities';
-import { ResourceFlowNodeType } from '@attraccess/application-models';
+import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 import { SetPayloadExecutor } from './set-payload.executor';
 import { NodeExecutionContext } from './node-executor.interface';
 
@@ -14,13 +13,13 @@ function makeCtx(overrides: Partial<NodeExecutionContext> = {}): NodeExecutionCo
   } as unknown as NodeExecutionContext;
 }
 
-function makeNode(data: unknown): ResourceFlowNode {
+function makeNode(data: unknown): FlowNodeRecord {
   return {
     id: 'n1',
     type: ResourceFlowNodeType.PROCESSING_SET_PAYLOAD,
     resourceId: 1,
     data,
-  } as unknown as ResourceFlowNode;
+  } as unknown as FlowNodeRecord;
 }
 
 describe('SetPayloadExecutor', () => {

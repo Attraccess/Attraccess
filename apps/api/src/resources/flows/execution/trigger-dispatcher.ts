@@ -1,29 +1,28 @@
 import { Logger } from '@nestjs/common';
 import {
-  ResourceFlowNode,
+  FlowNodeRecord,
   MqttMessageReceivedNodeDataSchema,
   MqttWaitForMessageNodeDataSchema,
   CompanionUsbDeviceNodeDataSchema,
-} from '@attraccess/database-entities';
-import { ResourceFlowNodeType } from '@attraccess/application-models';
-import { Repository } from 'typeorm';
+  ResourceFlowNodeType,
+} from '@attraccess/application-models';
 import z from 'zod';
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
 import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../../mqtt/mqtt-message.event';
 import { CompanionUsbDeviceDto } from '../../../companion/companion.types';
 import { getPluginFlowNode, getPluginFlowNodeOwner } from '../../../plugin-system/flows/node-registry';
 import { NodeProcessingResult, topicMatches } from '../node-executors';
-import { resourceAndGlobalNodesWhere } from './flow-node-queries';
+import type { FlowTriggerStore } from '../flow-trigger-store.port';
 
 /** Finds matching external-event trigger nodes and preserves plugin lookup ordering. */
 export class FlowTriggerDispatcher {
   private pluginFlowLookupQueue: Promise<void> = Promise.resolve();
 
   constructor(
-    private readonly flowNodeRepository: Repository<ResourceFlowNode>,
+    private readonly store: Pick<FlowTriggerStore, 'findTriggerNodes' | 'findPluginTriggerPage'>,
     private readonly mqttClientService: MqttClientService,
     private readonly startFlow: (
-      nodes: ResourceFlowNode | ResourceFlowNode[],
+      nodes: FlowNodeRecord | FlowNodeRecord[],
       data: NodeProcessingResult,
     ) => Promise<NodeProcessingResult[]>,
     private readonly logger: Logger,
@@ -31,12 +30,8 @@ export class FlowTriggerDispatcher {
 
   async subscribeToMqttTopics() {
     const [mqttMessageReceivedNodes, mqttWaitForMessageNodes] = await Promise.all([
-      this.flowNodeRepository.find({
-        where: resourceAndGlobalNodesWhere(ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED),
-      }),
-      this.flowNodeRepository.find({
-        where: resourceAndGlobalNodesWhere(ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE),
-      }),
+      this.store.findTriggerNodes(ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED),
+      this.store.findTriggerNodes(ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE),
     ]);
 
     const subscribePairs: Array<{ serverId: number; topic: string; qos?: 0 | 1 | 2 }> = [];
@@ -69,9 +64,7 @@ export class FlowTriggerDispatcher {
   async handleMqttMessageReceivedEvent(event: MqttMessageReceivedEvent) {
     const { topic, payload, serverId } = event;
 
-    const messageReceivedNodes = await this.flowNodeRepository.find({
-      where: resourceAndGlobalNodesWhere(ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED),
-    });
+    const messageReceivedNodes = await this.store.findTriggerNodes(ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED);
 
     const filteredMessageReceivedNodes = messageReceivedNodes.filter((node) => {
       const { serverId: nodeServerId, topic: nodeTopic } = MqttMessageReceivedNodeDataSchema.parse(node.data);
@@ -107,7 +100,9 @@ export class FlowTriggerDispatcher {
     const concurrency = 10;
     let lastId: string | undefined;
     for (;;) {
-      const nodes = await this.queuedPluginFlowLookup(() => this.pluginTriggerPage(nodeType, lastId, pageSize));
+      const nodes = await this.queuedPluginFlowLookup(() =>
+        this.store.findPluginTriggerPage(nodeType, lastId, pageSize),
+      );
 
       if (nodes.length === 0) return;
       lastId = nodes[nodes.length - 1].id;
@@ -137,30 +132,7 @@ export class FlowTriggerDispatcher {
     }
   }
 
-  /**
-   * One page of plugin trigger nodes: resource flows and enabled global flows. A single query with a plain
-   * LIMIT, since a relation filter plus `take` makes TypeORM paginate in two queries.
-   */
-  private pluginTriggerPage(
-    nodeType: string,
-    lastId: string | undefined,
-    pageSize: number,
-  ): Promise<ResourceFlowNode[]> {
-    const query = this.flowNodeRepository
-      .createQueryBuilder('node')
-      .leftJoin('node.flow', 'flow')
-      .where('node.type = :type', { type: nodeType })
-      .andWhere('(node.flowId IS NULL OR (flow.enabled = :enabled AND flow.scope = :scope))', {
-        enabled: true,
-        scope: 'global',
-      });
-    if (lastId) {
-      query.andWhere('node.id > :lastId', { lastId });
-    }
-    return query.orderBy('node.id', 'ASC').limit(pageSize).getMany();
-  }
-
-  private queuedPluginFlowLookup(lookup: () => Promise<ResourceFlowNode[]>): Promise<ResourceFlowNode[]> {
+  private queuedPluginFlowLookup(lookup: () => Promise<FlowNodeRecord[]>): Promise<FlowNodeRecord[]> {
     const queued = this.pluginFlowLookupQueue.then(lookup, lookup);
     this.pluginFlowLookupQueue = queued.then(
       () => undefined,
@@ -175,7 +147,7 @@ export class FlowTriggerDispatcher {
     payload: object,
     schema: { safeParse: (d: unknown) => { success: boolean; data?: { deviceId: number } } },
   ): Promise<void> {
-    const allNodes = await this.flowNodeRepository.find({ where: resourceAndGlobalNodesWhere(type) });
+    const allNodes = await this.store.findTriggerNodes(type);
     const matching = allNodes.filter((node) => {
       const parsed = schema.safeParse(node.data ?? {});
       return parsed.success && parsed.data?.deviceId === deviceId;
@@ -189,7 +161,7 @@ export class FlowTriggerDispatcher {
     type: ResourceFlowNodeType,
     payload: CompanionUsbDeviceDto,
   ): Promise<void> {
-    const allNodes = await this.flowNodeRepository.find({ where: resourceAndGlobalNodesWhere(type) });
+    const allNodes = await this.store.findTriggerNodes(type);
     const matching = allNodes.filter((node) => {
       const parsed = CompanionUsbDeviceNodeDataSchema.safeParse(node.data ?? {});
       if (!parsed.success || parsed.data.deviceId !== deviceId) return false;

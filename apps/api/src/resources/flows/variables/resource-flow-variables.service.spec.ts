@@ -1,73 +1,65 @@
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ResourceFlowVariable } from '@attraccess/database-entities';
-import { ResourceFlowVariableScope } from '@attraccess/application-models';
+import { FlowVariableRecord, ResourceFlowVariableScope } from '@attraccess/application-models';
+import { FLOW_VARIABLE_STORE, FlowVariableKey, FlowVariableStore } from '../flow-variable-store.port';
 import { projectAuditRow } from '../../../audit/recorder/audit-row';
 import { AUDIT_RECORDER } from '../../../audit/recorder/audit-event';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 import { ResourceFlowVariableChangedEvent } from '../events/flow-variable-changed.event';
 
-const isNullOp = (v: unknown): boolean =>
-  v !== null && typeof v === 'object' && (v as Record<string, unknown>)['_type'] === 'isNull';
-
-const matchResourceId = (whereRid: unknown, rowRid: number | null): boolean =>
-  isNullOp(whereRid) ? rowRid === null : (whereRid ?? null) === rowRid;
-
 describe('ResourceFlowVariablesService', () => {
   let service: ResourceFlowVariablesService;
-  let repo: jest.Mocked<Repository<ResourceFlowVariable>>;
   let emitter: { emit: jest.Mock };
   const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
-  let store: ResourceFlowVariable[];
+  let rows: FlowVariableRecord[];
+
+  const same = (row: FlowVariableRecord, key: FlowVariableKey) =>
+    row.scope === key.scope && row.key === key.key && row.resourceId === key.resourceId;
+
+  /** An in-memory FlowVariableStore. */
+  const fakeStore: FlowVariableStore = {
+    find: async (key) => rows.find((row) => same(row, key)) ?? null,
+    findMany: async (scope, resourceId, keys) =>
+      rows.filter((row) => row.scope === scope && row.resourceId === resourceId && keys.includes(row.key)),
+    findVisibleTo: async (resourceId) =>
+      rows.filter(
+        (row) =>
+          (row.scope === ResourceFlowVariableScope.GLOBAL && row.resourceId === null) ||
+          (resourceId !== null && row.scope === ResourceFlowVariableScope.RESOURCE && row.resourceId === resourceId),
+      ),
+    listForResource: async (resourceId) =>
+      rows.filter((row) => row.resourceId === null || row.resourceId === resourceId),
+    save: async (key, value, valueType, existing) => {
+      const persisted: FlowVariableRecord = {
+        createdAt: new Date(),
+        ...(existing ?? {}),
+        id: existing?.id ?? rows.length + 1,
+        ...key,
+        value,
+        valueType,
+        updatedAt: new Date(),
+      };
+      const idx = rows.findIndex((row) => same(row, key));
+      if (idx >= 0) rows[idx] = persisted;
+      else rows.push(persisted);
+      return persisted;
+    },
+    delete: async (key) => {
+      const before = rows.length;
+      rows = rows.filter((row) => !same(row, key));
+      return rows.length < before;
+    },
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    store = [];
-    repo = {
-      findOne: jest.fn(
-        ({ where }) =>
-          store.find(
-            (r) => r.scope === where.scope && r.key === where.key && matchResourceId(where.resourceId, r.resourceId),
-          ) ?? null,
-      ),
-      find: jest.fn(({ where }) =>
-        store.filter((r) =>
-          (Array.isArray(where) ? where : [where]).some(
-            (w) => r.scope === w.scope && matchResourceId(w.resourceId, r.resourceId),
-          ),
-        ),
-      ),
-      save: jest.fn(async (row) => {
-        const idx = store.findIndex(
-          (r) => r.scope === row.scope && r.key === row.key && (row.resourceId ?? null) === r.resourceId,
-        );
-        const persisted = { ...row, id: row.id ?? store.length + 1, updatedAt: new Date() } as ResourceFlowVariable;
-        if (idx >= 0) store[idx] = persisted;
-        else store.push(persisted);
-        return persisted;
-      }),
-      delete: jest.fn(async (criteria) => {
-        const before = store.length;
-        store = store.filter(
-          (r) =>
-            !(
-              r.scope === criteria.scope &&
-              r.key === criteria.key &&
-              matchResourceId(criteria.resourceId, r.resourceId)
-            ),
-        );
-        return { affected: before - store.length, raw: [] };
-      }),
-    } as unknown as jest.Mocked<Repository<ResourceFlowVariable>>;
-
+    rows = [];
     emitter = { emit: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         ResourceFlowVariablesService,
-        { provide: getRepositoryToken(ResourceFlowVariable), useValue: repo },
+        { provide: FLOW_VARIABLE_STORE, useValue: fakeStore },
         { provide: EventEmitter2, useValue: emitter },
         { provide: AUDIT_RECORDER, useValue: audit },
       ],

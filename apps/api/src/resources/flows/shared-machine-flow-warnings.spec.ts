@@ -1,5 +1,4 @@
-import { ResourceFlowEdge, ResourceFlowNode } from '@attraccess/database-entities';
-import { ResourceFlowNodeType } from '@attraccess/application-models';
+import { FlowEdgeRecord, FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 import type { PluginFlowNodeDefinition } from '@attraccess/plugins-backend-sdk';
 import { registerPluginFlowNodes } from '../../plugin-system/flows/node-registry';
 import { findFlowsWithoutSessionCountCheck } from './shared-machine-flow-warnings';
@@ -28,9 +27,9 @@ registerPluginFlowNodes('warnings-spec', [
   } as Partial<PluginFlowNodeDefinition>),
 ]);
 
-const node = (id: string, type: string, data: object = {}) => ({ id, type, data }) as unknown as ResourceFlowNode;
+const node = (id: string, type: string, data: object = {}) => ({ id, type, data }) as unknown as FlowNodeRecord;
 const edges = (...pairs: [string, string][]) =>
-  pairs.map(([source, target]) => ({ id: `${source}-${target}`, source, target })) as unknown as ResourceFlowEdge[];
+  pairs.map(([source, target]) => ({ id: `${source}-${target}`, source, target })) as unknown as FlowEdgeRecord[];
 
 const STOPPED = ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED;
 const HTTP = ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST;

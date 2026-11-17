@@ -1,6 +1,4 @@
-import { ResourceFlowNode } from '@attraccess/database-entities';
-import { ResourceFlowNodeType } from '@attraccess/application-models';
-import { EntityManager } from 'typeorm';
+import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 import { ResourceOperatingIntervalService } from '../../operating-intervals/resource-operating-interval.service';
 import { ExternalEffectFailureError } from '../errors/external-effect-failure.error';
 import { OperatingTransitionExecutor } from './operating-transition.executor';
@@ -15,10 +13,10 @@ describe('OperatingTransitionExecutor', () => {
       id: 'operating-node',
       resourceId: 7,
       type: ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_OPERATING,
-    } as ResourceFlowNode;
+    } as FlowNodeRecord;
     const payload = { source: 'mqtt' };
 
-    const transactionManager = {} as EntityManager;
+    const transactionManager = {};
 
     await expect(
       executor.execute(node, payload, { transactionManager, flowRunId: 'flow-run' } as never),
@@ -38,7 +36,7 @@ describe('OperatingTransitionExecutor', () => {
       id: 'idle-node',
       resourceId: 7,
       type: ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE,
-    } as ResourceFlowNode;
+    } as FlowNodeRecord;
 
     await executor.execute(node, {}, {} as never);
 
@@ -55,7 +53,7 @@ describe('OperatingTransitionExecutor', () => {
       id: 'idle-node',
       resourceId: 7,
       type: ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE,
-    } as ResourceFlowNode;
+    } as FlowNodeRecord;
 
     await expect(executor.execute(node, {}, {} as never)).rejects.toEqual(
       expect.objectContaining<Partial<ExternalEffectFailureError>>({

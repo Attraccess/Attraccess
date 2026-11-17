@@ -1,21 +1,15 @@
 import {
-  Resource,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  getNodeDataSchema,
-  ResourceMeter,
-  Flow,
+  FlowEdgeRecord,
+  FlowNodeRecord,
   FlowScope,
-} from '@attraccess/database-entities';
-import { ResourceFlowNodeType } from '@attraccess/application-models';
+  ResourceFlowNodeType,
+  ResourceType,
+  getNodeDataSchema,
+} from '@attraccess/application-models';
 
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
-
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { EntityManager, In, Repository } from 'typeorm';
 
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 
@@ -24,6 +18,10 @@ import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../../audit/recorder/audit-event';
 
 import { canvasSaveDetails, diffCanvas } from './flow-audit';
+
+import { FLOW_GRAPH_STORE, FlowCanvasIdConflictError, FlowGraphStore } from './flow-graph.port';
+
+import { FLOW_RESOURCE_DIRECTORY, FlowResourceDirectory } from './flow-resource-directory.port';
 
 import { ResourceFlowResponseDto, ResourceFlowSaveDto } from './dto/index';
 
@@ -48,24 +46,18 @@ export interface ValidationError {
 }
 
 export interface ResourceFlowResponse {
-  nodes: ResourceFlowNode[];
-  edges: ResourceFlowEdge[];
+  nodes: FlowNodeRecord[];
+  edges: FlowEdgeRecord[];
   validationErrors?: ValidationError[];
 }
 
 @Injectable()
 export class ResourceFlowsService {
   constructor(
-    @InjectRepository(ResourceFlowNode)
-    protected readonly flowNodeRepository: Repository<ResourceFlowNode>,
-    @InjectRepository(ResourceFlowEdge)
-    protected readonly flowEdgeRepository: Repository<ResourceFlowEdge>,
-    @InjectRepository(Resource)
-    protected readonly resourceRepository: Repository<Resource>,
+    @Inject(FLOW_GRAPH_STORE) protected readonly graph: FlowGraphStore,
+    @Inject(FLOW_RESOURCE_DIRECTORY) protected readonly resources: FlowResourceDirectory,
     protected readonly mqttClientService: MqttClientService,
     protected readonly eventEmitter: EventEmitter2,
-    @InjectRepository(Flow)
-    protected readonly flowRepository: Repository<Flow>,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
 
@@ -73,23 +65,12 @@ export class ResourceFlowsService {
 
   public async getResourceFlow(resourceId: number): Promise<ResourceFlowResponse> {
     // Verify resource exists
-    const resource = await this.resourceRepository.findOne({
-      where: { id: resourceId },
-    });
-
-    if (!resource) {
+    if (!(await this.resources.find(resourceId))) {
       throw new ResourceNotFoundException(resourceId);
     }
 
     // Get all nodes and edges for the resource
-    const [nodes, edges] = await Promise.all([
-      this.flowNodeRepository.find({
-        where: { resource: { id: resourceId } },
-      }),
-      this.flowEdgeRepository.find({
-        where: { resource: { id: resourceId } },
-      }),
-    ]);
+    const { nodes, edges } = await this.graph.loadResourceCanvas(resourceId);
 
     const validationContext = new Map<string, unknown>([['meterResourceId', resourceId]]);
     const validationErrors: ValidationError[] = [];
@@ -106,67 +87,30 @@ export class ResourceFlowsService {
 
   /** Flows that switch something on every start or stop without looking at how many people are using the machine. */
   public async getSharedMachineFlowWarnings(resourceId: number): Promise<SharedMachineFlowWarning[]> {
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
-    if (!resource) {
+    if (!(await this.resources.find(resourceId))) {
       throw new ResourceNotFoundException(resourceId);
     }
-    const [nodes, edges] = await Promise.all([
-      this.flowNodeRepository.find({ where: { resourceId } }),
-      this.flowEdgeRepository.find({ where: { resource: { id: resourceId } } }),
-    ]);
+    const { nodes, edges } = await this.graph.loadResourceCanvas(resourceId);
     const warnings = findFlowsWithoutSessionCountCheck(nodes, edges);
 
     // Enabled global flows run for this machine's starts and stops too.
-    const globalFlows = await this.flowRepository.find({
-      where: { enabled: true, scope: 'global' },
-      order: { id: 'ASC' },
-    });
-    if (globalFlows.length === 0) return warnings;
-    const flowIds = globalFlows.map((flow) => flow.id);
-    const [flowNodes, flowEdges] = await Promise.all([
-      this.flowNodeRepository.find({ where: { flowId: In(flowIds) } }),
-      this.flowEdgeRepository.find({ where: { flowId: In(flowIds) } }),
-    ]);
-    for (const flow of globalFlows) {
-      warnings.push(
-        ...findFlowsWithoutSessionCountCheck(
-          flowNodes.filter((node) => node.flowId === flow.id),
-          flowEdges.filter((edge) => edge.flowId === flow.id),
-          flow,
-        ),
-      );
+    for (const { flow, canvas } of await this.graph.loadEnabledGlobalCanvases()) {
+      warnings.push(...findFlowsWithoutSessionCountCheck(canvas.nodes, canvas.edges, flow));
     }
     return warnings;
   }
 
-  /**
-   * Node and edge ids are global. Call after deleting the saving flow's own rows: any id still present belongs to
-   * another resource or global flow, and saving it would move it out of its owner.
-   */
-  public async assertCanvasIdsNotOwnedElsewhere(
-    manager: EntityManager,
-    canvas: { nodes: { id: string }[]; edges: { id: string }[] },
-  ): Promise<void> {
-    const nodeIds = canvas.nodes.map((node) => node.id);
-    const edgeIds = canvas.edges.map((edge) => edge.id);
-    const [nodes, edges] = await Promise.all([
-      nodeIds.length > 0
-        ? manager.find(ResourceFlowNode, { where: { id: In(nodeIds) }, select: { id: true } })
-        : Promise.resolve([]),
-      edgeIds.length > 0
-        ? manager.find(ResourceFlowEdge, { where: { id: In(edgeIds) }, select: { id: true } })
-        : Promise.resolve([]),
-    ]);
-    if (nodes.length === 0 && edges.length === 0) return;
-    throw new BadRequestException({
+  /** The 400 response for a canvas that uses ids another flow owns (node and edge ids are global). */
+  public canvasIdConflict(error: FlowCanvasIdConflictError): BadRequestException {
+    return new BadRequestException({
       message: [
-        ...nodes.map((node) => `Node id ${node.id} is already used by another flow`),
-        ...edges.map((edge) => `Edge id ${edge.id} is already used by another flow`),
+        ...error.nodeIds.map((id) => `Node id ${id} is already used by another flow`),
+        ...error.edgeIds.map((id) => `Edge id ${id} is already used by another flow`),
       ],
       error: 'Bad Request',
       statusCode: 400,
-      nodeIds: nodes.map((node) => node.id),
-      edgeIds: edges.map((edge) => edge.id),
+      nodeIds: error.nodeIds,
+      edgeIds: error.edgeIds,
     });
   }
 
@@ -222,23 +166,18 @@ export class ResourceFlowsService {
     });
   }
 
-  public async getNodes(resourceId: number, type: ResourceFlowNodeType): Promise<ResourceFlowNode[]> {
-    return await this.flowNodeRepository.find({
-      where: { resourceId, type },
-    });
+  public async getNodes(resourceId: number, type: ResourceFlowNodeType): Promise<FlowNodeRecord[]> {
+    return await this.graph.findResourceNodes(resourceId, type);
   }
 
   public async getNodesForResources(
     resourceIds: number[],
     type: ResourceFlowNodeType,
-  ): Promise<Map<number, ResourceFlowNode[]>> {
-    const map = new Map<number, ResourceFlowNode[]>(resourceIds.map((id) => [id, []]));
-    if (resourceIds.length === 0) return map;
-    const nodes = await this.flowNodeRepository.find({
-      where: { resourceId: In(resourceIds), type },
-    });
+  ): Promise<Map<number, FlowNodeRecord[]>> {
+    const map = new Map<number, FlowNodeRecord[]>(resourceIds.map((id) => [id, []]));
+    const nodes = await this.graph.findNodesForResources(resourceIds, type);
     for (const node of nodes) {
-      const bucket = map.get(node.resourceId);
+      const bucket = map.get(node.resourceId as number);
       if (bucket) bucket.push(node);
     }
     return map;
@@ -250,11 +189,7 @@ export class ResourceFlowsService {
     actor: AuditActor,
   ): Promise<ResourceFlowResponseDto> {
     // Verify resource exists
-    const resource = await this.resourceRepository.findOne({
-      where: { id: resourceId },
-    });
-
-    if (!resource) {
+    if (!(await this.resources.find(resourceId))) {
       throw new ResourceNotFoundException(resourceId);
     }
 
@@ -268,140 +203,33 @@ export class ResourceFlowsService {
       allValidationErrors.push(...nodeErrors);
     }
 
-    // Start transaction to ensure data consistency
-    const result = await this.flowNodeRepository.manager.transaction(async (transactionalEntityManager) => {
-      const previousCanvas = {
-        nodes: await transactionalEntityManager.find(ResourceFlowNode, { where: { resource: { id: resourceId } } }),
-        edges: await transactionalEntityManager.find(ResourceFlowEdge, { where: { resource: { id: resourceId } } }),
-      };
-      const oldMqttMessageReceivedNodes = previousCanvas.nodes.filter(
-        (node) => node.type === ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED,
-      );
-      const oldMqttWaitForMessageNodes = previousCanvas.nodes.filter(
-        (node) => node.type === ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE,
-      );
-
-      const newOrChangedMqttMessageReceivedNodes = [] as typeof flowData.nodes;
-      const newOrChangedMqttWaitForMessageNodes = [] as typeof flowData.nodes;
-
-      for (const nodeData of flowData.nodes) {
-        if (nodeData.type === ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED) {
-          const existingNode = oldMqttMessageReceivedNodes.find((oldNode) => oldNode.id === nodeData.id);
-          if (!existingNode) {
-            newOrChangedMqttMessageReceivedNodes.push(nodeData);
-          } else if (
-            existingNode.data.topic !== nodeData.data.topic ||
-            existingNode.data.serverId !== nodeData.data.serverId
-          ) {
-            newOrChangedMqttMessageReceivedNodes.push(nodeData);
-          }
-        }
-
-        if (nodeData.type === ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE) {
-          const existingNode = oldMqttWaitForMessageNodes.find((oldNode) => oldNode.id === nodeData.id);
-          if (!existingNode) {
-            newOrChangedMqttWaitForMessageNodes.push(nodeData);
-          } else if (
-            existingNode.data.topic !== nodeData.data.topic ||
-            existingNode.data.serverId !== nodeData.data.serverId
-          ) {
-            newOrChangedMqttWaitForMessageNodes.push(nodeData);
-          }
-        }
-      }
-
-      // Delete existing nodes and edges (cascading will handle relationships)
-      await transactionalEntityManager.delete(ResourceFlowNode, { resource: { id: resourceId } });
-      await transactionalEntityManager.delete(ResourceFlowEdge, { resource: { id: resourceId } });
-      await this.assertCanvasIdsNotOwnedElsewhere(transactionalEntityManager, flowData);
-
-      // Create new nodes
-      const newNodes = flowData.nodes.map((nodeData) => {
-        const node = new ResourceFlowNode();
-        node.id = nodeData.id;
-        node.type = nodeData.type as ResourceFlowNodeType;
-        node.position = {
-          x: nodeData.position.x,
-          y: nodeData.position.y,
-        };
-        node.data = nodeData.data || {};
-        node.resource = resource;
-        return node;
+    // The canvas is replaced atomically, together with its audit row.
+    let result: Awaited<ReturnType<FlowGraphStore['replaceResourceCanvas']>>;
+    try {
+      result = await this.graph.replaceResourceCanvas(resourceId, flowData, (previous) => {
+        const diff = diffCanvas(previous, flowData);
+        return diff
+          ? {
+              domain: 'resource',
+              action: 'resource_flow.updated',
+              actor,
+              subject: { type: 'resource', id: resourceId },
+              details: canvasSaveDetails(previous, flowData, diff),
+            }
+          : undefined;
       });
+    } catch (error) {
+      if (error instanceof FlowCanvasIdConflictError) throw this.canvasIdConflict(error);
+      throw error;
+    }
 
-      // Create new edges
-      const newEdges = flowData.edges.map((edgeData) => {
-        const edge = new ResourceFlowEdge();
-        edge.id = edgeData.id;
-        edge.source = edgeData.source;
-        edge.sourceHandle = edgeData.sourceHandle;
-        edge.target = edgeData.target;
-        edge.targetHandle = edgeData.targetHandle;
-        edge.resource = resource;
-        return edge;
-      });
-
-      // Save all nodes and edges
-      const [savedNodes, savedEdges] = await Promise.all([
-        transactionalEntityManager.save(ResourceFlowNode, newNodes),
-        transactionalEntityManager.save(ResourceFlowEdge, newEdges),
-      ]);
-
-      for (const nodeData of newOrChangedMqttMessageReceivedNodes) {
-        if (!nodeData.data.serverId || !nodeData.data.topic) {
-          this.logger.warn(
-            `Skipping subscription to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId} because it is missing`,
-          );
-          continue;
-        }
-        this.mqttClientService
-          .subscribe(nodeData.data.serverId as number, nodeData.data.topic as string)
-          .catch((error) => {
-            this.logger.error(
-              `Failed to subscribe to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId}`,
-              error.stack,
-            );
-          });
-      }
-
-      for (const nodeData of newOrChangedMqttWaitForMessageNodes) {
-        if (!nodeData.data.serverId || !nodeData.data.topic) {
-          this.logger.warn(
-            `Skipping subscription to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId} because it is missing`,
-          );
-          continue;
-        }
-        this.mqttClientService
-          .subscribe(nodeData.data.serverId as number, nodeData.data.topic as string)
-          .catch((error) => {
-            this.logger.error(
-              `Failed to subscribe to topic ${nodeData.data.topic} for server ID ${nodeData.data.serverId}`,
-              error.stack,
-            );
-          });
-      }
-
-      const diff = diffCanvas(previousCanvas, flowData);
-      if (diff) {
-        await this.audit.record(
-          {
-            domain: 'resource',
-            action: 'resource_flow.updated',
-            actor,
-            subject: { type: 'resource', id: resourceId },
-            details: canvasSaveDetails(previousCanvas, flowData, diff),
-          },
-          transactionalEntityManager,
-        );
-      }
-
-      return { nodes: savedNodes, edges: savedEdges };
-    });
+    // Topics of new or changed MQTT nodes are subscribed once the canvas is committed.
+    this.subscribeToChangedMqttNodes(result.previous.nodes, flowData.nodes);
 
     // Include validation errors in the response if any exist
     const response: ResourceFlowResponse = {
-      nodes: result.nodes,
-      edges: result.edges,
+      nodes: result.saved.nodes,
+      edges: result.saved.edges,
     };
 
     if (allValidationErrors.length > 0) {
@@ -419,8 +247,7 @@ export class ResourceFlowsService {
     config: Record<string, unknown>,
     purpose: 'editor' | 'preview' = 'editor',
   ): Promise<ResourceFlowNodeSchemaDto> {
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
-    if (!resource) {
+    if (!(await this.resources.find(resourceId))) {
       throw new ResourceNotFoundException(resourceId);
     }
 
@@ -539,9 +366,7 @@ export class ResourceFlowsService {
     const cacheKey = `resource-flow:meter-ids:${resourceId}`;
     let meterIds = validationContext.get(cacheKey) as Promise<Set<number>> | undefined;
     if (!meterIds) {
-      meterIds = this.resourceRepository.manager
-        .find(ResourceMeter, { where: { resourceId }, select: { id: true } })
-        .then((meters) => new Set(meters.map((meter) => meter.id)));
+      meterIds = this.resources.meterIds(resourceId).then((ids) => new Set(ids));
       // Share the pending lookup with concurrent validators; each flow request has a fresh context.
       validationContext.set(cacheKey, meterIds);
     }
@@ -550,11 +375,9 @@ export class ResourceFlowsService {
 
   /** Pass the resource id for a resource flow; global flows have no resource and get every node, marked by scope. */
   public async getNodeSchemas(resourceId?: number): Promise<ResourceFlowNodeSchemaDto[]> {
-    let resourceType: Resource['type'] | undefined;
+    let resourceType: ResourceType | undefined;
     if (resourceId !== undefined) {
-      const resource = await this.resourceRepository.findOne({
-        where: { id: resourceId },
-      });
+      const resource = await this.resources.find(resourceId);
 
       if (!resource) {
         throw new ResourceNotFoundException(resourceId);

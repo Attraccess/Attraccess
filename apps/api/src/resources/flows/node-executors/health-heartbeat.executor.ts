@@ -1,6 +1,10 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode, ResourceHealthHeartbeatNodeDataSchema } from '@attraccess/database-entities';
-import { ResourceHealthSource, ResourceHealthStatus } from '@attraccess/application-models';
+import {
+  FlowNodeRecord,
+  ResourceHealthHeartbeatNodeDataSchema,
+  ResourceHealthSource,
+  ResourceHealthStatus,
+} from '@attraccess/application-models';
 import { ResourceHealthService } from '../../health/resource-health.service';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 import { globalHeartbeatKey, heartbeatKey, requireRunResourceId } from './flow.utils';
@@ -18,7 +22,7 @@ export class HealthHeartbeatExecutor implements NodeExecutor {
     private readonly heartbeatLastSeen: Map<string, Date>,
   ) {}
 
-  async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
+  async execute(node: FlowNodeRecord, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
     const parsed = ResourceHealthHeartbeatNodeDataSchema.safeParse(node.data ?? {});
     if (!parsed.success) {
       this.logger.warn(`Heartbeat node ${node.id} has invalid data: ${parsed.error.message}`);

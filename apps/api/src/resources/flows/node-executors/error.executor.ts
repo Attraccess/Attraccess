@@ -1,10 +1,10 @@
-import { ResourceFlowNode, ErrorNodeDataSchema } from '@attraccess/database-entities';
+import { ErrorNodeDataSchema, FlowNodeRecord } from '@attraccess/application-models';
 import z from 'zod';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 
 export class ErrorExecutor implements NodeExecutor {
-  async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
+  async execute(node: FlowNodeRecord, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
     const { message: messageTemplate } = node.data as z.infer<typeof ErrorNodeDataSchema>;
 
     const message = ctx.compileTemplate(messageTemplate, input);

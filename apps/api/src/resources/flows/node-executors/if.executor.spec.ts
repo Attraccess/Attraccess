@@ -1,16 +1,15 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode } from '@attraccess/database-entities';
-import { ResourceFlowNodeType } from '@attraccess/application-models';
+import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 import { IfExecutor } from './if.executor';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 
-function makeNode(data: Record<string, unknown>): ResourceFlowNode {
+function makeNode(data: Record<string, unknown>): FlowNodeRecord {
   return {
     id: 'n1',
     type: ResourceFlowNodeType.PROCESSING_IF,
     resourceId: 1,
     data,
-  } as unknown as ResourceFlowNode;
+  } as unknown as FlowNodeRecord;
 }
 
 describe('IfExecutor', () => {

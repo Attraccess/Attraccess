@@ -1,18 +1,17 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode } from '@attraccess/database-entities';
-import { ResourceFlowNodeType } from '@attraccess/application-models';
+import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 import { ResourceHealthService } from '../../health/resource-health.service';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { HealthSetExecutor } from './health-set.executor';
 import { NodeExecutionContext } from './node-executor.interface';
 
-function createNode(data: object, resourceId = 1): ResourceFlowNode {
+function createNode(data: object, resourceId = 1): FlowNodeRecord {
   return {
     id: 'health-set-1',
     type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
     resourceId,
     data,
-  } as unknown as ResourceFlowNode;
+  } as unknown as FlowNodeRecord;
 }
 
 describe('HealthSetExecutor', () => {
@@ -182,7 +181,7 @@ describe('HealthSetExecutor', () => {
       id: 'n',
       type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
       resourceId: 1,
-    } as unknown as ResourceFlowNode;
+    } as unknown as FlowNodeRecord;
 
     await expect(executor.execute(node, {}, ctx)).rejects.toBeInstanceOf(FlowExecutionError);
     expect(resourceHealthService.reportHealth).not.toHaveBeenCalled();

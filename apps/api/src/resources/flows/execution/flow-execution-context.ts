@@ -1,24 +1,16 @@
-import { Resource } from '@attraccess/database-entities';
-import { EntityManager, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
+import type { TransactionContext } from '../../../database/transaction-context';
+import type { FlowTriggerStore } from '../flow-trigger-store.port';
 import { ResourceFlowVariablesService } from '../variables/resource-flow-variables.service';
 import { compileFlowTemplate } from './flow-template';
 import type { FlowExecutionOptions, FlowResourceContext } from './flow-execution.types';
 import { NodeExecutionContext, TemplateVariables } from '../node-executors';
-
-export function getFlowRepository<T extends ObjectLiteral>(
-  entity: EntityTarget<T>,
-  defaultRepository: Repository<T>,
-  transactionManager?: EntityManager,
-): Repository<T> {
-  return transactionManager ? transactionManager.getRepository<T>(entity) : defaultRepository;
-}
 
 /** Resource enrichment and template variables shared by every node in a run. */
 export class FlowExecutionContext {
   private readonly templateVariables = new WeakMap<object, TemplateVariables>();
 
   constructor(
-    private readonly resourceRepository: Repository<Resource>,
+    private readonly store: Pick<FlowTriggerStore, 'findResource'>,
     private readonly variablesService: ResourceFlowVariablesService,
   ) {}
 
@@ -28,7 +20,7 @@ export class FlowExecutionContext {
 
   private async getResourceContext(
     resourceId: number,
-    transactionManager?: EntityManager,
+    transactionManager?: TransactionContext,
     cache?: Map<number, FlowResourceContext>,
   ): Promise<FlowResourceContext> {
     const cached = cache?.get(resourceId);
@@ -36,8 +28,7 @@ export class FlowExecutionContext {
       return cached;
     }
 
-    const repository = getFlowRepository(Resource, this.resourceRepository, transactionManager);
-    const resource = await repository.findOne({ where: { id: resourceId } });
+    const resource = await this.store.findResource(resourceId, transactionManager);
 
     const context: FlowResourceContext = {
       id: resourceId,
@@ -66,7 +57,7 @@ export class FlowExecutionContext {
   async withResourceContext(
     resourceId: number | null,
     payload: unknown,
-    transactionManager?: EntityManager,
+    transactionManager?: TransactionContext,
     cache?: Map<number, FlowResourceContext>,
   ): Promise<unknown> {
     if (!this.isPlainObject(payload)) {
@@ -110,7 +101,7 @@ export class FlowExecutionContext {
 
   buildExecutionContext(
     flowRunId: string,
-    transactionManager?: EntityManager,
+    transactionManager?: TransactionContext,
     options: FlowExecutionOptions = {},
     resourceId: number | null = options.triggeringResourceId ?? null,
   ): NodeExecutionContext {

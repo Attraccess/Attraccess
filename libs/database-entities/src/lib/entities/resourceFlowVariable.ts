@@ -13,7 +13,9 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
 
-export type ResourceFlowVariableValueType = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null';
+import type { ResourceFlowVariableValueType } from '@attraccess/application-models';
+
+export type { ResourceFlowVariableValueType };
 
 @Entity()
 @Unique('UQ_resource_flow_variable_scope_resource_key', ['scope', 'resourceId', 'key'])

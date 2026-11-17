@@ -1,11 +1,6 @@
 import { Logger } from '@nestjs/common';
-import {
-  BillingTransaction,
-  BillingTransactionItem,
-  ResourceFlowNode,
-  ResourceUsage,
-} from '@attraccess/database-entities';
-import { BillingTransactionStatus } from '@attraccess/application-models';
+import { BillingTransaction, BillingTransactionItem, ResourceUsage } from '@attraccess/database-entities';
+import { BillingTransactionStatus, FlowNodeRecord } from '@attraccess/application-models';
 import { DataSource, EntitySchema } from 'typeorm';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -14,6 +9,8 @@ import {
   closeResourceTransactionConnection,
   runSerializedTransaction,
 } from '../../../database/sqlite/run-serialized-transaction';
+import { unitOfWorkFor } from '../../../database/adapters/shared-unit-of-work';
+import { TypeOrmFlowBillingItemStore } from '../../../database/adapters/flows/typeorm-flow-billing-item.store';
 import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { BillingSetAdditionalItemsExecutor } from './billing-set-additional-items.executor';
@@ -61,7 +58,7 @@ describe('Additional billing items around finalization', () => {
   let directory: string;
   let executor: BillingSetAdditionalItemsExecutor;
   const item = { name: 'Energy', description: 'Meter', externalReference: 'meter-1', quantity: 3, unitPrice: 5 };
-  const node = { resourceId: 1, data: item } as ResourceFlowNode;
+  const node = { resourceId: 1, data: item } as unknown as FlowNodeRecord;
   const ctx = { compileTemplate: (template: string) => template } as NodeExecutionContext;
 
   beforeEach(async () => {
@@ -77,9 +74,11 @@ describe('Additional billing items around finalization', () => {
     await source
       .getRepository(BillingTransaction)
       .save({ id: 1, resourceUsageId: 1, status: BillingTransactionStatus.Pending, amount: 0 });
+    const unitOfWork = unitOfWorkFor(source);
     executor = new BillingSetAdditionalItemsExecutor(
       { getActiveSessionsForResource: jest.fn().mockResolvedValue([{ id: 1 }]) } as unknown as ResourceUsageService,
-      source.getRepository(BillingTransactionItem),
+      new TypeOrmFlowBillingItemStore(source, unitOfWork),
+      unitOfWork,
     );
   });
 

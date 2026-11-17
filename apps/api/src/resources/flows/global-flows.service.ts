@@ -1,8 +1,5 @@
-import { Flow, ResourceFlowEdge, ResourceFlowNode } from '@attraccess/database-entities';
-import { ResourceFlowNodeType } from '@attraccess/application-models';
+import { FlowRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
 import {
   CreateGlobalFlowDto,
   GlobalFlowSummaryDto,
@@ -10,6 +7,7 @@ import {
   ResourceFlowSaveDto,
   UpdateGlobalFlowDto,
 } from './dto/index';
+import { FLOW_GRAPH_STORE, FlowCanvasIdConflictError, FlowGraphStore } from './flow-graph.port';
 import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../../audit/recorder/audit-event';
 import { fitAuditText, fitAuditTexts } from '../../audit/policies/projection';
 import { FLOW_NAME_BYTES, canvasDetails, canvasSaveDetails, diffCanvas } from './flow-audit';
@@ -22,9 +20,7 @@ const MQTT_TYPES = [
 ];
 
 /** A flow row known to be a global flow. */
-export type GlobalFlow = Flow & { scope: 'global' };
-
-const GLOBAL_SCOPE = { scope: 'global' } as const;
+export type GlobalFlow = FlowRecord & { scope: 'global' };
 
 /** Trims a flow name and rejects null or blank names. */
 function requireName(name: unknown): string {
@@ -39,32 +35,18 @@ export class GlobalFlowsService {
   private readonly logger = new Logger(GlobalFlowsService.name);
 
   constructor(
-    @InjectRepository(Flow) private readonly flowRepository: Repository<Flow>,
-    @InjectRepository(ResourceFlowNode) private readonly nodeRepository: Repository<ResourceFlowNode>,
-    @InjectRepository(ResourceFlowEdge) private readonly edgeRepository: Repository<ResourceFlowEdge>,
+    @Inject(FLOW_GRAPH_STORE) private readonly graph: FlowGraphStore,
     private readonly resourceFlows: ResourceFlowsService,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
 
   public async list(): Promise<GlobalFlowSummaryDto[]> {
-    const flows = (await this.flowRepository.find({
-      where: GLOBAL_SCOPE,
-      order: { name: 'ASC', id: 'ASC' },
-    })) as GlobalFlow[];
-    const counts: Array<{ flowId: number; count: string | number }> = await this.nodeRepository
-      .createQueryBuilder('node')
-      .innerJoin('node.flow', 'flow', 'flow.scope = :scope', GLOBAL_SCOPE)
-      .select('node.flowId', 'flowId')
-      .addSelect('COUNT(*)', 'count')
-      .groupBy('node.flowId')
-      .getRawMany();
-    const countByFlow = new Map(counts.map((row) => [Number(row.flowId), Number(row.count)]));
-    return flows.map((flow) => ({ ...flow, nodeCount: countByFlow.get(flow.id) ?? 0 }));
+    return (await this.graph.listGlobalFlows()).map((flow) => ({ ...flow, scope: 'global' as const }));
   }
 
   /** Only flows of the global scope; other scopes (ATT-1204) are not reachable here. */
   public async get(flowId: number): Promise<GlobalFlow> {
-    const flow = await this.flowRepository.findOne({ where: { id: flowId, ...GLOBAL_SCOPE } });
+    const flow = await this.graph.findGlobalFlow(flowId);
     if (!flow) throw new NotFoundException(`Flow with ID ${flowId} not found`);
     return flow as GlobalFlow;
   }
@@ -74,23 +56,16 @@ export class GlobalFlowsService {
     actor: AuditActor,
     flowId: number,
     details: Record<string, string | number>,
-    manager?: EntityManager,
   ) {
-    return this.audit.record(
-      { domain: 'resource', action, actor, subject: { type: 'flow', id: flowId }, details },
-      manager,
-    );
+    return this.audit.record({ domain: 'resource', action, actor, subject: { type: 'flow', id: flowId }, details });
   }
 
   public async create(dto: CreateGlobalFlowDto, actor: AuditActor): Promise<GlobalFlow> {
-    const flow = (await this.flowRepository.save(
-      this.flowRepository.create({
-        name: requireName(dto.name),
-        description: dto.description?.trim() || null,
-        enabled: dto.enabled ?? true,
-        scope: 'global',
-      }),
-    )) as GlobalFlow;
+    const flow = (await this.graph.createGlobalFlow({
+      name: requireName(dto.name),
+      description: dto.description?.trim() || null,
+      enabled: dto.enabled ?? true,
+    })) as GlobalFlow;
     const enabled = { 'after.enabled': flow.enabled ? 1 : 0 };
     await this.recordFlow('flow.created', actor, flow.id, {
       ...fitAuditTexts(
@@ -113,11 +88,11 @@ export class GlobalFlowsService {
     if (name !== undefined) flow.name = name;
     if (dto.description !== undefined) flow.description = dto.description?.trim() || null;
     if (dto.enabled !== undefined) flow.enabled = dto.enabled;
-    const saved = (await this.flowRepository.save(flow)) as GlobalFlow;
+    const saved = (await this.graph.updateGlobalFlow(flow)) as GlobalFlow;
     await this.recordFlowUpdate(flowId, actor, before, saved);
     if (!wasEnabled && saved.enabled) {
       // Topics of a flow that was off may not be subscribed yet.
-      const nodes = await this.nodeRepository.find({ where: { flowId } });
+      const nodes = await this.graph.findGlobalFlowNodes(flowId);
       for (const node of nodes.filter((n) => MQTT_TYPES.includes(n.type))) {
         this.resourceFlows.subscribeToNodeTopic(node.data ?? {});
       }
@@ -159,31 +134,21 @@ export class GlobalFlowsService {
    */
   public async delete(flowId: number, actor: AuditActor): Promise<void> {
     const flow = await this.get(flowId);
-    await this.nodeRepository.manager.transaction(async (manager) => {
-      const nodes = await manager.find(ResourceFlowNode, { where: { flowId } });
-      const edges = await manager.find(ResourceFlowEdge, { where: { flowId } });
-      const deleted = await manager.delete(Flow, { id: flowId });
-      // A concurrent delete got there first and recorded it.
-      if (!deleted.affected) return;
-      await this.recordFlow(
-        'flow.deleted',
-        actor,
-        flowId,
-        canvasDetails(
-          { 'before.name': fitAuditText(flow.name, FLOW_NAME_BYTES), 'before.enabled': flow.enabled ? 1 : 0 },
-          { nodes, edges },
-        ) as Record<string, string | number>,
-        manager,
-      );
-    });
+    await this.graph.deleteGlobalFlow(flowId, (canvas) => ({
+      domain: 'resource',
+      action: 'flow.deleted',
+      actor,
+      subject: { type: 'flow', id: flowId },
+      details: canvasDetails(
+        { 'before.name': fitAuditText(flow.name, FLOW_NAME_BYTES), 'before.enabled': flow.enabled ? 1 : 0 },
+        canvas,
+      ) as Record<string, string | number>,
+    }));
   }
 
   public async getCanvas(flowId: number): Promise<ResourceFlowResponse> {
     await this.get(flowId);
-    const [nodes, edges] = await Promise.all([
-      this.nodeRepository.find({ where: { flowId } }),
-      this.edgeRepository.find({ where: { flowId } }),
-    ]);
+    const { nodes, edges } = await this.graph.loadGlobalCanvas(flowId);
     const validationErrors: ValidationError[] = [];
     const validationContext = new Map<string, unknown>();
     for (let index = 0; index < nodes.length; index += 4) {
@@ -212,61 +177,32 @@ export class GlobalFlowsService {
       validationErrors.push(...(await this.resourceFlows.validateNodeData(nodeData, validationContext)));
     }
 
-    const result = await this.nodeRepository.manager.transaction(async (manager) => {
-      const oldNodes = await manager.find(ResourceFlowNode, { where: { flowId } });
-      const oldEdges = await manager.find(ResourceFlowEdge, { where: { flowId } });
-      await manager.delete(ResourceFlowNode, { flowId });
-      await manager.delete(ResourceFlowEdge, { flowId });
-      await this.resourceFlows.assertCanvasIdsNotOwnedElsewhere(manager, flowData);
-
-      const newNodes = flowData.nodes.map((nodeData) => {
-        const node = new ResourceFlowNode();
-        node.id = nodeData.id;
-        node.type = nodeData.type as ResourceFlowNodeType;
-        node.position = { x: nodeData.position.x, y: nodeData.position.y };
-        node.data = nodeData.data || {};
-        node.flowId = flow.id;
-        node.resourceId = null;
-        return node;
+    let result: Awaited<ReturnType<FlowGraphStore['replaceGlobalCanvas']>>;
+    try {
+      result = await this.graph.replaceGlobalCanvas(flowId, flowData, (previous) => {
+        const diff = diffCanvas(previous, flowData);
+        return diff
+          ? {
+              domain: 'resource',
+              action: 'flow.canvas_updated',
+              actor,
+              subject: { type: 'flow', id: flowId },
+              details: canvasSaveDetails(previous, flowData, diff, flow.name),
+            }
+          : undefined;
       });
-      const newEdges = flowData.edges.map((edgeData) => {
-        const edge = new ResourceFlowEdge();
-        edge.id = edgeData.id;
-        edge.source = edgeData.source;
-        edge.sourceHandle = edgeData.sourceHandle;
-        edge.target = edgeData.target;
-        edge.targetHandle = edgeData.targetHandle;
-        edge.flowId = flow.id;
-        edge.resourceId = null;
-        return edge;
-      });
-      const [savedNodes, savedEdges] = await Promise.all([
-        manager.save(ResourceFlowNode, newNodes),
-        manager.save(ResourceFlowEdge, newEdges),
-      ]);
-      const diff = diffCanvas({ nodes: oldNodes, edges: oldEdges }, flowData);
-      if (diff) {
-        await this.audit.record(
-          {
-            domain: 'resource',
-            action: 'flow.canvas_updated',
-            actor,
-            subject: { type: 'flow', id: flowId },
-            details: canvasSaveDetails({ nodes: oldNodes, edges: oldEdges }, flowData, diff, flow.name),
-          },
-          manager,
-        );
-      }
-      return { savedNodes, savedEdges, oldNodes };
-    });
+    } catch (error) {
+      if (error instanceof FlowCanvasIdConflictError) throw this.resourceFlows.canvasIdConflict(error);
+      throw error;
+    }
 
     if (flow.enabled) {
-      this.resourceFlows.subscribeToChangedMqttNodes(result.oldNodes, flowData.nodes);
+      this.resourceFlows.subscribeToChangedMqttNodes(result.previous.nodes, flowData.nodes);
     }
 
     return {
-      nodes: result.savedNodes,
-      edges: result.savedEdges,
+      nodes: result.saved.nodes,
+      edges: result.saved.edges,
       ...(validationErrors.length > 0 ? { validationErrors } : {}),
     };
   }

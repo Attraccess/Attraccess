@@ -1,6 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode } from '@attraccess/database-entities';
-import { ResourceFlowNodeType } from '@attraccess/application-models';
+import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 import { ErrorExecutor } from './error.executor';
 import { NodeExecutionContext } from './node-executor.interface';
 import { FlowExecutionError } from '../errors/flow-execution.error';
@@ -15,13 +14,13 @@ function createCtx(overrides: Partial<NodeExecutionContext> = {}): NodeExecution
   } as unknown as NodeExecutionContext;
 }
 
-function createNode(data: object): ResourceFlowNode {
+function createNode(data: object): FlowNodeRecord {
   return {
     id: 'n1',
     type: ResourceFlowNodeType.PROCESSING_ERROR,
     resourceId: 1,
     data,
-  } as unknown as ResourceFlowNode;
+  } as unknown as FlowNodeRecord;
 }
 
 describe('ErrorExecutor', () => {

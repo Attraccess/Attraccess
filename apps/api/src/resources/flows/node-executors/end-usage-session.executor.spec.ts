@@ -1,20 +1,19 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode } from '@attraccess/database-entities';
-import { ResourceFlowNodeType } from '@attraccess/application-models';
+import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 import { EndUsageSessionExecutor } from './end-usage-session.executor';
 import { NodeExecutionContext } from './node-executor.interface';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 
-function createNode(partial: Partial<ResourceFlowNode>): ResourceFlowNode {
+function createNode(partial: Partial<FlowNodeRecord>): FlowNodeRecord {
   return {
     id: 'n1',
     type: ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION,
     resourceId: 1,
     data: {},
     ...partial,
-  } as unknown as ResourceFlowNode;
+  } as unknown as FlowNodeRecord;
 }
 
 describe('EndUsageSessionExecutor', () => {

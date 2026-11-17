@@ -1,20 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ResourceFlowsExecutorService } from './resource-flows-executor.service';
 import { ResourceSessionStartedEvent } from '../../usage/events/resource-usage.events';
-import { ResourceUsage, Resource } from '@attraccess/database-entities';
-import { ResourceType, ResourceUsageAction } from '@attraccess/application-models';
+import { ResourceType, ResourceUsageAction, UsageSession } from '@attraccess/application-models';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 
 describe('ResourceFlowsExecutorService – handleResourceSessionStartedEvent', () => {
   let service: ResourceFlowsExecutorService;
   let triggerResourceUsageNodeSpy: jest.SpyInstance;
 
-  const mockResource: Resource = {
+  const mockResource = {
     id: 1,
     name: 'Test Door',
     type: ResourceType.Door,
     metadata: null,
-  } as Resource;
+  } as unknown as UsageSession['resource'];
 
   const mockUser = {
     id: 1,
@@ -22,7 +21,7 @@ describe('ResourceFlowsExecutorService – handleResourceSessionStartedEvent', (
     externalIdentifier: 'ext-1',
   };
 
-  function makeUsage(action: ResourceUsageAction): ResourceUsage {
+  function makeUsage(action: ResourceUsageAction): UsageSession {
     return {
       id: 100,
       resourceId: 1,
@@ -32,7 +31,7 @@ describe('ResourceFlowsExecutorService – handleResourceSessionStartedEvent', (
       endTime: new Date('2025-01-01T00:00:01Z'),
       resource: mockResource,
       user: mockUser,
-    } as unknown as ResourceUsage;
+    } as unknown as UsageSession;
   }
 
   beforeEach(() => {
@@ -43,7 +42,7 @@ describe('ResourceFlowsExecutorService – handleResourceSessionStartedEvent', (
       warn: jest.fn(),
       debug: jest.fn(),
     };
-    (service as any).flowNodeRepository = { find: jest.fn().mockResolvedValue([]) };
+    (service as any).flowStore = { findTriggerNodesForResource: jest.fn().mockResolvedValue([]) };
 
     triggerResourceUsageNodeSpy = jest.spyOn(service as any, 'triggerResourceUsageNode').mockResolvedValue(undefined);
   });

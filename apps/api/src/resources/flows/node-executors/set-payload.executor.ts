@@ -1,10 +1,10 @@
-import { ResourceFlowNode, SetPayloadNodeDataSchema } from '@attraccess/database-entities';
+import { FlowNodeRecord, SetPayloadNodeDataSchema } from '@attraccess/application-models';
 import { set as lodashSet } from 'lodash-es';
 import z from 'zod';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 
 export class SetPayloadExecutor implements NodeExecutor {
-  async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
+  async execute(node: FlowNodeRecord, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
     const { entries } = node.data as z.infer<typeof SetPayloadNodeDataSchema>;
 
     const newPayload: Record<string, unknown> = JSON.parse(JSON.stringify(input ?? {}));
