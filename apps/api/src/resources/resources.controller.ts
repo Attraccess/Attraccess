@@ -18,7 +18,8 @@ import { ResourcesService } from './resources.service';
 import { UpdateResourceDto } from './dtos/updateResource.dto';
 import { CreateResourceDto } from './dtos/createResource.dto';
 import { ListResourcesDto } from './dtos/listResources.dto';
-import { Resource } from '@attraccess/database-entities';
+import type { ResourceRecord } from '@attraccess/application-models';
+import { Resource, toResourceDto } from './dtos/resource.dto';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { PaginatedResponse } from '../types/response';
 import { FileUpload } from '../common/types/file-upload.types';
@@ -40,13 +41,13 @@ export class ResourcesController {
     private readonly introducers: ResourceIntroducersService,
   ) {}
 
-  private transformResource(resource: Resource): Resource {
-    return {
+  private transformResource(resource: ResourceRecord): Resource {
+    return toResourceDto({
       ...resource,
       imageFilename: resource.imageFilename
         ? this.resourceImageService.getPublicPath(resource.id, resource.imageFilename)
         : null,
-    };
+    });
   }
 
   @Post()
@@ -101,10 +102,7 @@ export class ResourcesController {
       onlyWithPermissionForUserId,
     });
 
-    resources.data = resources.data.map((resource) => {
-      return this.transformResource(resource);
-    });
-    return resources;
+    return { ...resources, data: resources.data.map((resource) => this.transformResource(resource)) };
   }
 
   @Get('in-use')
@@ -121,7 +119,7 @@ export class ResourcesController {
   })
   async getAllInUse(@Req() req: AuthenticatedRequest): Promise<Resource[]> {
     // Every in-use machine, not one page: the visibility filter below would otherwise drop machines past the first page.
-    const inUse: Resource[] = [];
+    const inUse: ResourceRecord[] = [];
     for (let page = 1; ; page++) {
       const { data, total } = await this.resourcesService.listResources({
         onlyInUse: true,
