@@ -1,1 +1,62 @@
 packages: []
+
+# pnpm 11+ reads settings only from this file; .npmrc is limited to auth and registry settings.
+strictPeerDependencies: false
+autoInstallPeers: true
+publicHoistPattern:
+  - '*@heroui/*'
+  - webpack
+injectWorkspacePackages: true
+# pnpm 11+ installs before `pnpm run`/`pnpm exec` by default; keep scripts from rewriting the lockfile or
+# installing nested package.json files (e.g. apps/api) as standalone projects.
+verifyDepsBeforeRun: false
+
+overrides:
+  node-gyp: 13.1.0
+  # Tools that need the TypeScript 6 JS API get the @typescript/typescript6 build instead of the native TS 7 package.
+  '@swc-node/register>typescript': npm:@typescript/typescript6@^6.0.0
+  ts-api-utils>typescript: npm:@typescript/typescript6@^6.0.0
+  '@typescript-eslint/typescript-estree>typescript': npm:@typescript/typescript6@^6.0.0
+  '@internationalized/date': 3.12.4
+  react: 19.3.1
+  react-dom: 19.3.1
+
+allowBuilds:
+  '@balena/compose-parser': true
+  '@nestjs/core': true
+  '@swc/core': true
+  bcrypt: true
+  esbuild: true
+  electron: true
+  nx: true
+  sharp: true
+  sqlite3: true
+  typeorm: true
+  # Their install scripts are optional (prebuilt binaries, telemetry, download helpers) and stay disabled.
+  '@hyperjump/json-pointer': false
+  '@hyperjump/json-schema-core': false
+  '@hyperjump/json-schema': false
+  '@hyperjump/pact': false
+  '@parcel/watcher': false
+  '@scarf/scarf': false
+  core-js: false
+  cpu-features: false
+  docsify: false
+  electron-winstaller: false
+  es5-ext: false
+  less: false
+  lmdb: false
+  msgpackr-extract: false
+  protobufjs: false
+  puppeteer: false
+  ssh2: false
+  unrs-resolver: false
+
+patchedDependencies:
+  # typescript@7.0.2: bridges the TS 7 package to the TS 6 JS API (relies on the `>typescript` overrides above).
+  # @nestjs/swagger@12.1.2: exports the dist/* internals that nestjs-asyncapi 2 deep-imports.
+  ts-api-utils@2.5.0: patches/ts-api-utils@2.5.0.patch
+  typescript@7.0.2: patches/typescript@7.0.2.patch
+  '@swc-node/register@1.12.1': patches/@swc-node__register@1.12.1.patch
+  crap-score@1.2.1: patches/crap-score@1.2.1.patch
+  '@nestjs/swagger@12.1.2': patches/@nestjs__swagger@12.1.2.patch

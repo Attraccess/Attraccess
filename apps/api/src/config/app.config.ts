@@ -113,7 +113,7 @@ const appConfigFactory = (): AppConfigType => {
 
     // eslint-disable-next-line no-console
     console.error('Failed to parse App Environment Variables:', zodErrors);
-    throw new Error(zodErrors);
+    throw new Error(zodErrors, { cause: e });
   }
 };
 

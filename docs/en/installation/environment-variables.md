@@ -90,7 +90,7 @@ In containers, give the API write access to the file path and mount its director
 | `VALKEY_URL`             | –           | Connection URL for a Valkey/Redis-compatible session store (e.g. `redis://valkey:6379`). When set, sessions are stored in Valkey with native TTL instead of SQLite — required for horizontal scaling. Falls back to SQLite when unset. Accepts any `ioredis`-compatible URL including `rediss://` (TLS), Redis Cluster, Sentinel, ElastiCache, and Upstash. |
 
 > [!NOTE]
-> The bundled Docker Compose variants (Balena, Coolify) include a `valkey/valkey:8-alpine` sidecar and set `VALKEY_URL` automatically. For external deployments, point `VALKEY_URL` at your own Valkey/Redis instance.
+> The bundled Docker Compose variants (Balena, Coolify) include a `valkey/valkey:9-alpine` sidecar and set `VALKEY_URL` automatically. For external deployments, point `VALKEY_URL` at your own Valkey/Redis instance.
 
 > [!NOTE]
 > When `VALKEY_URL` is set, the API still starts when Valkey cannot be reached (for example while the Valkey container is still starting). It logs a warning, and a `Valkey connection error` line for each reconnect attempt, until Valkey is reachable. Sessions are not moved to SQLite: until Valkey is back, sign-in, requests from signed-in users and API token requests are answered with `503 Service Unavailable`, while public pages keep working. Once Valkey is reachable again, signing in works again, and authorization cache invalidation and the locking of machine starts and stops across API instances resume on their own, without restarting the API.

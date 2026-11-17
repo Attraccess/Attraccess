@@ -92,7 +92,7 @@ export class VersionService {
 
     const { version: currentVersion } = this.getCurrentVersion();
 
-    let releases: GithubReleaseApiResponse[] = [];
+    let releases: GithubReleaseApiResponse[];
     try {
       const response = await this.http.get<GithubReleaseApiResponse[]>(GITHUB_RELEASES_URL, {
         params: { per_page: 30 },

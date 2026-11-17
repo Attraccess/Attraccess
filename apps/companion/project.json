@@ -62,42 +62,29 @@
       }
     },
     "test": {
-      "executor": "@nx/jest:jest",
-      "cache": true,
-      "inputs": [
-        "default",
-        "^production",
-        "{workspaceRoot}/jest.preset.js",
-        {
-          "externalDependencies": ["jest"]
-        }
-      ],
-      "outputs": ["{workspaceRoot}/coverage/apps/companion/test"],
       "options": {
-        "jestConfig": "apps/companion/jest.config.ts",
         "passWithNoTests": true
       }
     },
     "lint": {
-      "executor": "@nx/eslint:lint",
       "options": {
-        "lintFilePatterns": ["apps/companion/**/*.ts", "apps/companion/**/*.tsx"]
+        "command": "eslint \"**/*.ts\" \"**/*.tsx\" --max-warnings=0"
       }
     },
     "crap-score": {
       "executor": "nx:run-commands",
+      "dependsOn": ["test", "test-renderer"],
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/companion"
-      },
-      "dependsOn": ["test", "test-renderer"]
+      }
     },
     "test-renderer": {
       "executor": "nx:run-commands",
       "cache": true,
+      "outputs": ["{workspaceRoot}/coverage/apps/companion/test-renderer"],
       "options": {
         "command": "vitest run --config apps/companion/renderer/vitest.config.mts"
-      },
-      "outputs": ["{workspaceRoot}/coverage/apps/companion/test-renderer"]
+      }
     }
   }
 }

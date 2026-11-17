@@ -15,6 +15,36 @@ async function generate(spec: unknown) {
   );
 }
 
+type Payload = { $ref: string } | Record<string, unknown>;
+
+// Builds the AsyncAPI 3 shape nestjs-asyncapi emits: channels keyed by an id that holds the address,
+// operations per direction and message payloads under components.messages.
+function asyncApi3(
+  channels: Record<string, { receive?: Payload | null; send?: Payload | null }>,
+  schemas?: Record<string, unknown>,
+) {
+  const spec = {
+    channels: {} as Record<string, unknown>,
+    operations: {} as Record<string, unknown>,
+    components: { schemas, messages: {} as Record<string, unknown> },
+  };
+  for (const [address, actions] of Object.entries(channels)) {
+    const key = address.toLowerCase();
+    spec.channels[key] = { address };
+    for (const action of ['receive', 'send'] as const) {
+      if (actions[action] === undefined) continue;
+      const message = `${key}_${action}`;
+      spec.components.messages[message] = actions[action] ? { payload: actions[action] } : {};
+      spec.operations[`${action}_${key}`] = {
+        action,
+        channel: { $ref: `#/channels/${key}` },
+        messages: [{ $ref: `#/channels/${key}/messages/${message}` }],
+      };
+    }
+  }
+  return spec;
+}
+
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
@@ -22,14 +52,14 @@ beforeEach(() => {
 
 describe('companion websocket generator', () => {
   it('preserves required properties, references, arrays and message directions', async () => {
-    const output = await generate({
-      channels: {
-        COMPANION_REGISTER: { publish: { message: { payload: { $ref: '#/components/schemas/Register' } } } },
-        COMPANION_REGISTER_RESPONSE: { subscribe: { message: { payload: { $ref: '#/components/schemas/Response' } } } },
-        COMPANION_PING: { publish: {}, subscribe: { message: { payload: { $ref: '#/components/schemas/Object' } } } },
-      },
-      components: {
-        schemas: {
+    const output = await generate(
+      asyncApi3(
+        {
+          COMPANION_REGISTER: { receive: { $ref: '#/components/schemas/Register' } },
+          COMPANION_REGISTER_RESPONSE: { send: { $ref: '#/components/schemas/Response' } },
+          COMPANION_PING: { receive: null, send: { $ref: '#/components/schemas/Object' } },
+        },
+        {
           Register: {
             type: 'object',
             required: ['name'],
@@ -47,8 +77,8 @@ describe('companion websocket generator', () => {
           Nested: { type: 'object', properties: { id: { type: 'integer' } } },
           Response: { type: 'object', required: ['ok'], properties: { ok: { type: 'boolean' } } },
         },
-      },
-    });
+      ),
+    );
     expect(output['types.ts']).toContain('name: string;');
     expect(output['types.ts']).toContain('/** Device name */');
     expect(output['types.ts']).toContain('nested?: Nested;');
@@ -71,19 +101,19 @@ describe('companion websocket generator', () => {
   });
 
   it('supports an empty spec without producing a dangling type import', async () => {
-    const output = await generate({ channels: {} });
+    const output = await generate(asyncApi3({}));
     expect(output['types.ts']).not.toContain('interface');
     expect(output['client.ts']).not.toContain('import type');
     expect(output['client.ts']).toContain("on(event: 'connected'");
   });
 
   it('handles inline payloads and missing referenced schemas without crashing', async () => {
-    const output = await generate({
-      channels: {
-        COMPANION_INLINE: { publish: { message: { payload: { type: 'array', items: { type: 'string' } } } } },
-        COMPANION_MISSING: { subscribe: { message: { payload: { $ref: '#/components/schemas/Missing' } } } },
-      },
-    });
+    const output = await generate(
+      asyncApi3({
+        COMPANION_INLINE: { receive: { type: 'array', items: { type: 'string' } } },
+        COMPANION_MISSING: { send: { $ref: '#/components/schemas/Missing' } },
+      }),
+    );
     expect(output['types.ts']).not.toContain('interface');
     expect(output['client.ts']).toContain('sendInline()');
     expect(output['client.ts']).toContain("this.emit('missing', data)");

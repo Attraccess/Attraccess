@@ -44,13 +44,13 @@ jobs:
       - run: pnpm nx run plugin-wago:typecheck-cc100-runtime
       - run: pnpm nx run plugin-wago:test-cc100-runtime
       - run: pnpm nx run plugin-wago:build-cc100-runtime
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wago-cc100-runtime-manifest
           path: apps/plugins/wago/cc100-runtime/manifest.json
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         if: github.event_name == 'push'
         with:
           registry: ghcr.io
@@ -59,7 +59,7 @@ jobs:
       - name: Read Node.js version
         id: node-version
         run: echo "value=$(tr -d '[:space:]' < .nvmrc)" >> "$GITHUB_OUTPUT"
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         id: image
         with:
           context: .
@@ -89,12 +89,12 @@ jobs:
           VERSION=$(node -p "require('./apps/plugins/wago/cc100-runtime/manifest.json').runtimeVersion")
           PROFILE=$(node -p "require('./apps/plugins/wago/cc100-runtime/manifest.json').deployment.hardwareProfile")
           node apps/plugins/wago/scripts/package-runtime-artifact.mjs --image-archive image.tar --image "$IMAGE@$DIGEST" --version "$VERSION" --hardware-profile "$PROFILE" --out runtime-release
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: github.event_name == 'push'
         with:
           name: wago-cc100-runtime-image
           path: wago-cc100-runtime-image.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: github.event_name == 'push'
         with:
           name: wago-cc100-runtime-bundle

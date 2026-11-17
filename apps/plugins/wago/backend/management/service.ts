@@ -115,6 +115,7 @@ export class WagoManagementService {
       record.failure = 'rollback_failed';
       await this.save(record, owner);
     } finally {
+      // eslint-disable-next-line no-useless-assignment -- drop the key reference as soon as the rollback ends.
       retainedKey = undefined;
     }
     return publicStatus(record);

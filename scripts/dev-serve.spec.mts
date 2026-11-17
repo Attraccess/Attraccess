@@ -1,15 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { main, parseArgs, resolvePort } from './dev-serve.mts';
+import { descendantPids, main, parseArgs, resolvePort } from './dev-serve.mts';
 
 const state = vi.hoisted(() => ({
   spawn: vi.fn(),
+  execFileSync: vi.fn(),
   write: vi.fn(),
   remove: vi.fn(),
   free: vi.fn(),
   available: vi.fn(),
 }));
-vi.mock('node:child_process', () => ({ spawn: state.spawn }));
+vi.mock('node:child_process', () => ({ spawn: state.spawn, execFileSync: state.execFileSync }));
 vi.mock('node:fs', () => ({ writeFileSync: state.write, rmSync: state.remove }));
 vi.mock('./lib/find-free-port.mts', () => ({ findFreePort: state.free, isPortFree: state.available }));
 let child: EventEmitter & { killed: boolean; kill: ReturnType<typeof vi.fn> };
@@ -136,6 +137,28 @@ describe('development server launcher', () => {
     expect(process.on).toHaveBeenCalledWith('exit', expect.any(Function));
     expect(process.on).toHaveBeenCalledWith('SIGINT', expect.any(Function));
   });
+  it('lists every process below a parent from ps output', () => {
+    const ps = ['  1     0', ' 10     1', ' 11    10', ' 12    11', ' 13    11', ' 20     1', 'junk'].join('\n');
+    expect(descendantPids(10, ps)).toEqual([11, 12, 13]);
+    expect(descendantPids(13, ps)).toEqual([]);
+  });
+  it.skipIf(process.platform === 'win32')(
+    'signals the whole tree below the child, since the pnpm shim does not pass signals on',
+    async () => {
+      Object.assign(child, { pid: 10 });
+      state.execFileSync.mockReturnValue(' 11    10\n 12    11\n 99     1\n');
+      const kill = vi.spyOn(process, 'kill').mockReturnValue(true);
+      vi.spyOn(process, 'argv', 'get').mockReturnValue(['node', 'script']);
+      await main();
+      const onSigterm = vi.mocked(process.on).mock.calls.find(([event]) => event === 'SIGTERM')?.[1] as () => void;
+      onSigterm();
+      expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+      expect(kill.mock.calls).toEqual([
+        [11, 'SIGTERM'],
+        [12, 'SIGTERM'],
+      ]);
+    },
+  );
   it('enables the terminal UI explicitly', async () => {
     vi.spyOn(process, 'argv', 'get').mockReturnValue(['node', 'script', '--tui']);
     await main();

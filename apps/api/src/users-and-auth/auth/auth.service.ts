@@ -226,7 +226,7 @@ export class AuthService {
       return false;
     }
 
-    let isValid = false;
+    let isValid: boolean;
     switch (options.type) {
       case AuthenticationType.LOCAL_PASSWORD: {
         const isSSOUser = await this.usersService.isSSOUser(userId);

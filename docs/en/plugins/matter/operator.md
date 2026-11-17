@@ -15,7 +15,7 @@ export MATTER_SIDECAR_AUTH_TOKEN="$(openssl rand -base64 48)"   # keep this valu
 node dist/apps/matter-sidecar/main.js
 ```
 
-The build bundles the sidecar into `dist/apps/matter-sidecar/main.js` and stamps the current Git revision. matter.js is loaded from `node_modules` at run time, so the pinned release is the one that runs. Node.js `>=24.22.1 <25` is required.
+The build bundles the sidecar into `dist/apps/matter-sidecar/main.js` and stamps the current Git revision. matter.js is loaded from `node_modules` at run time, so the pinned release is the one that runs. Node.js `>=26.13.0 <27` is required.
 
 The sidecar **refuses to start without a service token** (see below). Starting it loads matter.js and opens the storage directory (see `MATTER_SIDECAR_STORAGE_DIR` below). It **never creates a fabric on its own**: an administrator does that in Attraccess. While no fabric exists, the sidecar opens no Matter ports. **Once a fabric exists, it opens Matter networking** (mDNS and UDP on `MATTER_SIDECAR_MATTER_PORT`, which defaults to a free port chosen at start), so the host and any container network must allow that traffic. By default it listens on `127.0.0.1` only. Prefer `MATTER_SIDECAR_AUTH_TOKEN_FILE` (a file or a deployment secret) over the environment variable where you can, because environment variables are visible to other processes of the same user.
 

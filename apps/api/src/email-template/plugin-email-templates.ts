@@ -67,7 +67,7 @@ function validate(pluginName: string, template: PluginEmailTemplate): void {
     checkTemplateSyntax('The subject', template.subject);
     checkTemplateSyntax('The body', template.body);
   } catch (error) {
-    throw new Error(`${where}: ${(error as Error).message}`);
+    throw new Error(`${where}: ${(error as Error).message}`, { cause: error });
   }
   const missing = extractTranslationKeys(`${template.subject}\n${template.body}`)
     .map(({ key }) => key)

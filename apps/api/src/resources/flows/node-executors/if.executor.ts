@@ -20,7 +20,7 @@ export class IfExecutor implements NodeExecutor {
       comparisonValue = get(input, comparisonValue, '');
     }
 
-    let result = false;
+    let result: boolean;
     switch (comparisonOperator) {
       case '=':
         result = String(comparisonValue) === String(sourceValue);

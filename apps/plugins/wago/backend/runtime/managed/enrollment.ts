@@ -293,7 +293,7 @@ export abstract class WagoManagedRuntimeEnrollment extends WagoManagedRuntimeSer
         this.context.secrets.decrypt(encryptedCredentials) !== plaintext
       )
         throw new ConflictException('Managed credential encryption failed.');
-      access = await this.access.save(
+      await this.access.save(
         this.access.create({
           sessionId: session.id,
           controllerId: null,

@@ -1,8 +1,8 @@
 diff --git a/package.json b/package.json
-index aa8c42889ccac658eeeeec1287ee5e2cf94befb5..3f5facaf76539c9c6999a8633497f0d6e8449731 100644
+index 45e233ffdc349cf1334d5581fd7f281fe5a284cd..291e5ce397a27514e4d55445941e162ebc8c2ddf 100644
 --- a/package.json
 +++ b/package.json
-@@ -20,7 +20,47 @@
+@@ -33,7 +33,47 @@
        "require": "./dist/plugin/index.js",
        "default": "./dist/plugin/index.js"
      },
@@ -49,5 +49,5 @@ index aa8c42889ccac658eeeeec1287ee5e2cf94befb5..3f5facaf76539c9c6999a8633497f0d6
 +      "default": "./dist/utils/strip-last-slash.util.js"
 +    }
    },
-   "scripts": {
-     "build": "tsc -p tsconfig.build.json",
+   "engines": {
+     "node": "^20.19.0 || >=22.12.0"

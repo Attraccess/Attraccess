@@ -66,7 +66,7 @@ export function useSummaryCardState(props: Props) {
 
   const getDetailsCellContent = useCallback(
     (transaction: BillingTransaction, skipNested = false): string => {
-      let type = '';
+      let type: string;
       let details = {} as Record<string, unknown>;
 
       if (transaction.refundOfId) {
@@ -80,12 +80,10 @@ export function useSummaryCardState(props: Props) {
           } else {
             // Skip deeper recursion but still provide a human-friendly label
             if (originalTransaction.resourceUsageId) {
-              type = 'resourceUsage';
               const tmp = t('transactions.table.cells.details.resourceUsage', {
                 resourceUsage: originalTransaction.resourceUsage,
               }) as string;
               originalDetails = tmp;
-              type = '';
             } else if (originalTransaction.initiatorId) {
               const tmp = t('transactions.table.cells.details.manual', {
                 initiator: originalTransaction.initiator,

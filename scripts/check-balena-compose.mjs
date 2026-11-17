@@ -8,7 +8,9 @@ import { parse } from '@balena/compose-parser';
 const file = process.argv[2] ?? 'docker-compose.balena.yml';
 
 try {
-  await parse(file);
+  // Our own file, read like `balena push` reads it on the pushing machine: env_file is followed. Since v1.0.0 the
+  // parser only does that when asked to trust the file.
+  await parse(file, { hostEnvironment: true });
   console.log(`✓ ${file} is balena-compatible`);
 } catch (err) {
   console.error(`✗ ${file} is not balena-compatible:\n  ${err.message}`);

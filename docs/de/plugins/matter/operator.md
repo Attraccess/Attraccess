@@ -15,7 +15,7 @@ export MATTER_SIDECAR_AUTH_TOKEN="$(openssl rand -base64 48)"   # Wert aufbewahr
 node dist/apps/matter-sidecar/main.js
 ```
 
-Der Build bündelt den Sidecar in `dist/apps/matter-sidecar/main.js` und stempelt die aktuelle Git-Revision ein. matter.js wird zur Laufzeit aus `node_modules` geladen, es läuft also das festgelegte Release. Erforderlich ist Node.js `>=24.22.1 <25`.
+Der Build bündelt den Sidecar in `dist/apps/matter-sidecar/main.js` und stempelt die aktuelle Git-Revision ein. matter.js wird zur Laufzeit aus `node_modules` geladen, es läuft also das festgelegte Release. Erforderlich ist Node.js `>=26.13.0 <27`.
 
 Der Sidecar **startet nicht ohne Service-Token** (siehe unten). Beim Start lädt er matter.js und öffnet das Speicherverzeichnis (siehe `MATTER_SIDECAR_STORAGE_DIR` unten). Er **erzeugt nie von sich aus eine Fabric**: Das tut ein Administrator in Attraccess. Solange keine Fabric existiert, öffnet der Sidecar keine Matter-Ports. **Sobald eine Fabric existiert, öffnet er das Matter-Netzwerk** (mDNS und UDP auf `MATTER_SIDECAR_MATTER_PORT`, standardmäßig ein beim Start gewählter freier Port); Host und Container-Netz müssen diesen Verkehr zulassen. Standardmäßig lauscht er nur auf `127.0.0.1`. Bevorzugen Sie, wo möglich, `MATTER_SIDECAR_AUTH_TOKEN_FILE` (eine Datei oder ein Deployment-Secret) gegenüber der Umgebungsvariable, weil Umgebungsvariablen für andere Prozesse desselben Benutzers sichtbar sind.
 

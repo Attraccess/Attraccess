@@ -179,7 +179,7 @@ export function classifyHttpFailure(
   headerCorrelationId?: string | null,
   outcome?: 'uncertain',
 ): SidecarClientError {
-  let envelope: ReturnType<typeof errorEnvelopeSchema.safeParse> | null = null;
+  let envelope: ReturnType<typeof errorEnvelopeSchema.safeParse> | null;
   try {
     envelope = errorEnvelopeSchema.safeParse(JSON.parse(raw));
   } catch {

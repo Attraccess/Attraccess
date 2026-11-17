@@ -55,8 +55,8 @@ export const consoleDriver: LogDestinationDriver = {
   configure: () => () => {
     const transport = new transports.Console({
       format: nestFormat(),
-      // Nest sends only error (including its supplied stack) to stderr.
-      stderrLevels: ['error'],
+      // Nest sends error (including its supplied stack) and, since Nest 12, fatal to stderr.
+      stderrLevels: ['error', 'fatal'],
       eol: '\n',
     });
     // Winston Console acknowledges writes immediately. Empty writes form a

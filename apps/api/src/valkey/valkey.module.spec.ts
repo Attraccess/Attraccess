@@ -3,7 +3,7 @@ import { inspect } from 'node:util';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
-import { ValkeyClientService } from './valkey.module';
+import { ValkeyClientService, valkeyRetryDelay } from './valkey.module';
 
 jest.mock('ioredis', () => ({ __esModule: true, default: jest.fn() }));
 
@@ -58,9 +58,14 @@ describe('ValkeyClientService', () => {
       lazyConnect: false,
       enableReadyCheck: true,
       maxRetriesPerRequest: 3,
+      retryStrategy: valkeyRetryDelay,
     });
     expect(fake.listenerCount('error')).toBe(1);
     expect(() => fake.emit('error', new Error('connect ECONNREFUSED'))).not.toThrow();
+  });
+
+  it('retries an outage at most every 2 s, so requests fail fast with 503', () => {
+    expect([1, 2, 10, 40, 1000].map(valkeyRetryDelay)).toEqual([50, 100, 500, 2000, 2000]);
   });
 
   it('fails startup on an invalid VALKEY_URL without printing the URL', () => {

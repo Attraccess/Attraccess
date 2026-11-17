@@ -264,9 +264,10 @@ export class WagoRuntimeArtifactCatalog {
       } catch (error) {
         if (!['EEXIST', 'ENOTEMPTY'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error;
         const existing = await lstat(destination);
-        if (!existing.isDirectory() || existing.isSymbolicLink()) throw new Error('Invalid catalog object');
+        if (!existing.isDirectory() || existing.isSymbolicLink())
+          throw new Error('Invalid catalog object', { cause: error });
         const existingMetadata = await this.verify(destination);
-        if (existingMetadata.digest !== metadata.digest) throw new Error('Invalid catalog object');
+        if (existingMetadata.digest !== metadata.digest) throw new Error('Invalid catalog object', { cause: error });
         await this.backfillMetadata(destination, existingMetadata);
       }
       const objectsHandle = await open(join(root, 'objects'), constants.O_RDONLY | constants.O_NOFOLLOW);

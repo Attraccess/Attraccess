@@ -3,8 +3,8 @@
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "sourceRoot": "apps/plugins/rabbitmq",
-  "tags": ["type:plugin", "scope:plugin"],
   "// lint": "lint runs from the workspace root on purpose: @nx/enforce-module-boundaries no-ops when eslint runs from inside a project directory. See eslint.config.cjs for the plugin isolation rules.",
+  "tags": ["type:plugin", "scope:plugin"],
   "targets": {
     "install-dev": {
       "executor": "nx:run-commands",
@@ -24,24 +24,12 @@
       }
     },
     "test": {
-      "executor": "@nx/jest:jest",
-      "cache": true,
-      "inputs": [
-        "default",
-        "^production",
-        "{workspaceRoot}/jest.preset.js",
-        {
-          "externalDependencies": ["jest"]
-        }
-      ],
-      "outputs": ["{workspaceRoot}/coverage/apps/plugins/rabbitmq/test"],
       "options": {
-        "jestConfig": "apps/plugins/rabbitmq/jest.config.ts",
         "passWithNoTests": true
       }
     },
     "e2e": {
-      "executor": "@nx/jest:jest",
+      "executor": "nx:run-commands",
       "cache": false,
       "inputs": [
         "default",
@@ -53,7 +41,12 @@
       ],
       "outputs": ["{workspaceRoot}/coverage/apps/plugins/rabbitmq-e2e"],
       "options": {
-        "jestConfig": "apps/plugins/rabbitmq/jest.e2e.config.ts",
+        "command": "jest --config ./apps/plugins/rabbitmq/jest.e2e.config.ts",
+        "cwd": ".",
+        "env": {
+          "TS_NODE_COMPILER_OPTIONS": "{\"moduleResolution\":\"node10\",\"module\":\"commonjs\",\"customConditions\":null}",
+          "NODE_OPTIONS": "--experimental-vm-modules"
+        },
         "passWithNoTests": true
       }
     },
@@ -142,19 +135,19 @@
     },
     "crap-score": {
       "executor": "nx:run-commands",
+      "dependsOn": ["test", "test-frontend"],
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/plugins/rabbitmq"
-      },
-      "dependsOn": ["test", "test-frontend"]
+      }
     },
     "test-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
       "inputs": ["default", "{workspaceRoot}/libs/plugins-frontend-ui/src/**/*"],
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/rabbitmq/test-frontend"],
       "options": {
         "command": "vitest run --config apps/plugins/rabbitmq/frontend/vitest.config.ts"
-      },
-      "outputs": ["{workspaceRoot}/coverage/apps/plugins/rabbitmq/test-frontend"]
+      }
     }
   }
 }

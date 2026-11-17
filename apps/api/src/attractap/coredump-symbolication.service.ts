@@ -64,7 +64,7 @@ export class CoredumpSymbolicationService {
 
     const buildId = options.buildId ?? this.extractBuildId(coredump);
 
-    let elf: ReturnType<AttractapFirmwareService['resolveElfFile']> = null;
+    let elf: ReturnType<AttractapFirmwareService['resolveElfFile']>;
     if (buildId) {
       // Strict match on the build id embedded in the coredump. A variant-matched ELF for a
       // different build would only produce esp-coredump's misleading SHA-mismatch failure.

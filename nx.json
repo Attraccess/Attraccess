@@ -15,7 +15,7 @@
       "!{projectRoot}/**/*.cy.[jt]s?(x)",
       "!{projectRoot}/cypress.config.[jt]s"
     ],
-    "sharedGlobals": [],
+    "sharedGlobals": ["{workspaceRoot}/tools/vite/**/*", "{workspaceRoot}/tsconfig.base.json"],
     "testing": ["default", "{workspaceRoot}/jest.preset.js"],
     "swagger": ["default", "{projectRoot}/webpack.config.swagger.js"],
     "typeorm": ["default", "{projectRoot}/src/database/**/*"]
@@ -50,11 +50,16 @@
       "plugin": "@nx/vite/plugin",
       "options": {
         "buildTargetName": "build",
-        "testTargetName": "test",
         "serveTargetName": "serve",
         "previewTargetName": "preview",
         "serveStaticTargetName": "serve-static",
         "typecheckTargetName": "typecheck"
+      }
+    },
+    {
+      "plugin": "@nx/vitest",
+      "options": {
+        "testTargetName": "test"
       }
     },
     {
@@ -72,8 +77,7 @@
         "devTargetName": "dev",
         "startTargetName": "start",
         "watchDepsTargetName": "watch-deps",
-        "buildDepsTargetName": "build-deps",
-        "typecheckTargetName": "typecheck"
+        "buildDepsTargetName": "build-deps"
       }
     }
   ],
@@ -106,11 +110,6 @@
       ],
       "outputs": ["{options.outputFile}"]
     },
-    "@nx/eslint:lint": {
-      "options": {
-        "max-warnings": 0
-      }
-    },
     "@nx/esbuild:esbuild": {
       "cache": true,
       "dependsOn": ["^build"],
@@ -121,18 +120,31 @@
       "dependsOn": ["^build"],
       "inputs": ["production", "^production"]
     },
-    "test": {
-      "cache": true,
-      "inputs": [
-        "default",
-        "^production",
-        "{workspaceRoot}/jest.preset.js",
-        {
-          "externalDependencies": ["jest"]
+    "test": [
+      {
+        "cache": true,
+        "inputs": [
+          "default",
+          "^production",
+          "{workspaceRoot}/jest.preset.js",
+          {
+            "externalDependencies": ["jest"]
+          }
+        ],
+        "outputs": ["{workspaceRoot}/coverage/{projectRoot}/test"]
+      },
+      {
+        "filter": {
+          "plugin": "@nx/jest/plugin"
+        },
+        "options": {
+          "env": {
+            "NODE_OPTIONS": "--experimental-vm-modules",
+            "TS_NODE_COMPILER_OPTIONS": "{\"moduleResolution\":\"node10\",\"module\":\"commonjs\",\"customConditions\":null}"
+          }
         }
-      ],
-      "outputs": ["{workspaceRoot}/coverage/{projectRoot}/test"]
-    },
+      }
+    ],
     "typecheck": {
       "cache": true,
       "dependsOn": ["generate", "^generate"],
@@ -251,5 +263,8 @@
     }
   },
   "neverConnectToCloud": true,
-  "analytics": false
+  "analytics": false,
+  "affected": {
+    "legacy": true
+  }
 }

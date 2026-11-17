@@ -51,6 +51,12 @@ describe('MCP reviewed manifest drift', () => {
     expect(vague.map(([id]) => id)).toEqual([]);
   });
 
+  it('keeps the optional preview wording off the required role path parameter', () => {
+    const schemas = (document as { components?: { schemas?: Record<string, { description?: string }> } }).components
+      ?.schemas;
+    expect(schemas?.PasswordPolicyRole?.description).toBeUndefined();
+  });
+
   it('exposes no plugin operations', () => {
     const { tools } = analyzeMcpManifest(document, readManifest());
     expect(tools.filter((tool) => /^\/api\/(wago|matter|shelly|rabbitmq|reservations)(\/|$)/.test(tool.path))).toEqual(

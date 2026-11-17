@@ -234,8 +234,10 @@ export function filterRequest(
     if (!known) return { error: 'invalidSubjectType' };
   }
   if (subjectType) request.subjectType = subjectType;
-  for (const key of ['domain', 'outcome'] as const) {
-    if (filters[key].trim()) request[key] = filters[key].trim();
-  }
+  const domain = filters.domain.trim();
+  if (domain) request.domain = domain;
+  // The outcome select only offers the API's enum values.
+  const outcome = filters.outcome.trim();
+  if (outcome) request.outcome = outcome as typeof request.outcome;
   return { request };
 }

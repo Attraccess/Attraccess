@@ -76,7 +76,6 @@ export class UsageSessionStarts {
 
     // Defer event emission until after the transaction commits to avoid stale reads in listeners
     let startedUsageIdToEmit: number | null = null;
-    let takeoverEndedUser: User | null = null;
 
     let chargeTransactionId: number | undefined;
     const prepared = await this.preparation.prepareSessionStart(
@@ -87,7 +86,7 @@ export class UsageSessionStarts {
       attemptId,
       options,
     );
-    takeoverEndedUser = prepared.existingActiveSession?.user ?? null;
+    const takeoverEndedUser = prepared.existingActiveSession?.user ?? null;
 
     let newSession: ResourceUsage;
     try {

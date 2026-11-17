@@ -31,7 +31,7 @@ module.exports = [
         'error',
         {
           enforceBuildableLibDependency: true,
-          allow: ['^.*/eslint(\\.base)?\\.config\\.[cm]?js$'],
+          allow: ['^.*/eslint(\\.base)?\\.config\\.[cm]?js$', '^(\\.\\./)+tools/vite/'],
           depConstraints: [
             // Plugins are encapsulated, separately shipped products. They may build
             // only on the public plugin SDKs — never on core apps, core libs, or
