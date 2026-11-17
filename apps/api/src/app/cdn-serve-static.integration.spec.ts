@@ -95,6 +95,11 @@ describe('/cdn serve-static', () => {
     'HTTPS:///cdn/',
     'hTtPs:///cdn/missing.png',
     'http:///cdn/?x=1',
+    'http://:80/cdn/',
+    'http://:/cdn/',
+    'http://@/cdn/',
+    'http://u:p@/cdn/',
+    'http://@:80/cdn/',
   ])('answers %s from the router, not the index fallback', async (path) => {
     const res = await rawGet(path);
 
