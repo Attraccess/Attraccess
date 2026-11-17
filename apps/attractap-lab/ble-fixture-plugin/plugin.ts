@@ -122,24 +122,85 @@ function stream(state: ScriptState, key: unknown): PluginBleNotificationStream {
   return found;
 }
 
-/** Long transfer: MTU-sized writes without response, each acknowledged by a notification (echo mode). */
+/** Unacknowledged chunks a transfer may keep in flight (the peripheral queues up to 64 acks). */
+const MAX_WINDOW = 32;
+
+function percentile(sorted: number[], fraction: number): number | null {
+  if (sorted.length === 0) return null;
+  return sorted[Math.min(sorted.length - 1, Math.ceil(fraction * sorted.length) - 1)];
+}
+
+/**
+ * Long transfer: MTU-sized writes without response, each acknowledged by a notification (echo mode: `u32` running
+ * byte count + `u32` chunk sequence). Up to `window` chunks (default 1) stay unacknowledged; acks must arrive in
+ * order and count every byte, otherwise the step fails.
+ */
 async function transfer(state: ScriptState, step: Step): Promise<StepResult> {
   const { session } = state;
   const acks = stream(state, 'notify');
   const chunk = Math.min(session.mtu - 3, 512);
   const total = Number(step.bytes);
+  const minDurationMs = Number(step.minDurationMs ?? 0);
+  const window = Math.min(Math.max(Math.trunc(Number(step.window ?? 1)) || 1, 1), MAX_WINDOW);
   const startedAt = Date.now();
+  const sentAt: number[] = [];
+  const latencies: number[] = [];
   let sent = 0;
   let chunks = 0;
-  while (sent < total || Date.now() - startedAt < Number(step.minDurationMs ?? 0)) {
-    const size = Math.min(chunk, Math.max(total - sent, chunk));
-    await session.write('wwr', new Uint8Array(size).fill(chunks & 0xff), { withoutResponse: true });
-    await acks.next({ timeoutMs: 10_000 });
-    sent += size;
-    chunks += 1;
+  let acked = 0;
+  let ackedBytes = 0;
+  let writing = true;
+  let freed: (() => void) | undefined;
+  const stop = new AbortController();
+  // Acks are read as they arrive, so their latency is not inflated while the writer waits for a write slot.
+  const receiver = (async () => {
+    try {
+      while (writing || acked < chunks) {
+        const ack = Buffer.from((await acks.next({ timeoutMs: 10_000, signal: stop.signal })).value);
+        const sequence = ack.readUInt32LE(4);
+        if (sequence !== acked + 1) throw new Error(`ack ${sequence} out of order, expected ${acked + 1}`);
+        latencies.push(Date.now() - sentAt[acked]);
+        ackedBytes += chunk;
+        if (ack.readUInt32LE(0) !== ackedBytes) throw new Error(`ack ${sequence} counts ${ack.readUInt32LE(0)} bytes`);
+        acked += 1;
+        freed?.();
+      }
+    } catch (error) {
+      if (writing || acked < chunks) throw error;
+    }
+  })();
+  receiver.catch(() => undefined);
+  try {
+    while (sent < total || Date.now() - startedAt < minDurationMs) {
+      while (chunks - acked >= window)
+        await Promise.race([new Promise<void>((resolve) => (freed = resolve)), receiver]);
+      sentAt[chunks] = Date.now();
+      await session.write('wwr', new Uint8Array(chunk).fill(chunks & 0xff), { withoutResponse: true });
+      sent += chunk;
+      chunks += 1;
+    }
+  } catch (error) {
+    stop.abort();
+    throw error;
   }
+  writing = false;
+  if (acked === chunks) stop.abort();
+  await receiver;
   const seconds = (Date.now() - startedAt) / 1000;
-  return { ok: true, mtu: session.mtu, chunk, chunks, bytes: sent, seconds, kibPerSecond: sent / 1024 / seconds };
+  latencies.sort((a, b) => a - b);
+  return {
+    ok: true,
+    mtu: session.mtu,
+    chunk,
+    window,
+    chunks,
+    acked,
+    bytes: sent,
+    seconds,
+    kibPerSecond: sent / 1024 / seconds,
+    ackMedianMs: percentile(latencies, 0.5),
+    ackP95Ms: percentile(latencies, 0.95),
+  };
 }
 
 /** Reads `count` notifications as fast as they come (burst tests). */
