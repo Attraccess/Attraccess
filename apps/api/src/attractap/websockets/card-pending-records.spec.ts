@@ -28,7 +28,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('recovery records (%s)', (kind) 
     const card = new EmulatedCard(kind);
     const reader = createRelayReader(card, services.conversations);
     const atSave: Array<{ lastApdu: string; key: Buffer }> = [];
-    const save = services.operations['pendingRepository'].save;
+    const save = services.operations['cardStore'].savePending;
     save.mockImplementation(async (change: any) => {
       atSave.push({ lastApdu: reader.apdus().at(-1).payload.apdu, key: Buffer.from(card.keys[1]) });
       const saved = { id: 1000, ...change };
@@ -53,7 +53,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('recovery records (%s)', (kind) 
     const result = await services.operations.enroll(reader.socket, detect(), enrollmentFor(5));
 
     expect(result.ok).toBe(false);
-    expect(services.operations['pendingRepository'].save).not.toHaveBeenCalled();
+    expect(services.operations['cardStore'].savePending).not.toHaveBeenCalled();
   });
 
   it('writes no reset record when the master key is refused', async () => {
@@ -62,10 +62,10 @@ describe.each<CardKind>(['desfire', 'ntag424'])('recovery records (%s)', (kind) 
     copy.keys[0] = Buffer.alloc(16, 7);
     copy.keys[1] = Buffer.alloc(16, 9);
     const reader = createRelayReader(copy, conversations);
-    operations['pendingRepository'].save.mockClear();
+    operations['cardStore'].savePending.mockClear();
 
     expect((await operations.reset(reader.socket, detect(), resetBy(cards[0].id))).ok).toBe(false);
-    expect(operations['pendingRepository'].save).not.toHaveBeenCalled();
+    expect(operations['cardStore'].savePending).not.toHaveBeenCalled();
   });
 
   it('keeps one reset record per card across failed attempts', async () => {

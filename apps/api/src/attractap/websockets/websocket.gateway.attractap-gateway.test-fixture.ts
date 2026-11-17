@@ -1,10 +1,8 @@
 import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import { ReaderTimeZoneService } from './reader-time-zone.service';
 import { readerTimeZoneStub } from './reader-time-zone.test-fixture';
-import { Resource } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Provider } from '@nestjs/common';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { SettingsService } from '../../settings/settings.service';
 
 import { BillingService } from '../../billing/charges/billing.service';
@@ -28,6 +26,7 @@ import { ResourceUsageService } from '../../resources/usage/sessions/resource-us
 import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import { UsersService } from '../../users-and-auth/users/users.service';
 import { AttractapService } from '../attractap.service';
+import { ATTRACTAP_RESOURCE_READS } from '../reader-resource-reads.port';
 import { AttractapFirmwareService } from '../firmware.service';
 import { AttractapAuthHandler } from './handlers/auth/auth.handler';
 import { AttractapBillingHandler } from './handlers/billing/billing.handler';
@@ -145,7 +144,7 @@ export function gatewayProviders(
     { provide: CardOperationsService, useValue: { verifyCard: jest.fn(), enroll: jest.fn(), reset: jest.fn() } },
     { provide: CardWriterPolicyService, useValue: { assertAllowed: jest.fn() } },
     { provide: SettingsService, useValue: { getDefaultLanguage: jest.fn().mockResolvedValue('de') } },
-    { provide: getRepositoryToken(Resource), useValue: {} },
+    { provide: ATTRACTAP_RESOURCE_READS, useValue: { findResource: jest.fn() } },
     ResourceListService,
     ResourceActionGuard,
     AttractapAuthHandler,

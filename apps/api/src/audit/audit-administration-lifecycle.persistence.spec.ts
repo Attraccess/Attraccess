@@ -1,4 +1,3 @@
-import { MqttServer } from '@attraccess/database-entities';
 import { EmailTemplateType } from '@attraccess/application-models';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { EmailLayoutController } from '../email-layout/email-layout.controller';
@@ -6,6 +5,7 @@ import { EmailLayoutService } from '../email-layout/email-layout.service';
 import { EmailTemplateController } from '../email-template/email-template.controller';
 import { EmailTemplateService } from '../email-template/email-template.service';
 import { MqttServerController } from '../mqtt/servers/mqtt-server.controller';
+import { FixedIdMqttServerStore } from './fixed-id-mqtt-store.test-fixture';
 import { MqttServerService } from '../mqtt/servers/mqtt-server.service';
 import { PluginAdministrationService } from '../plugin-system/plugin-administration.service';
 import { InstalledNpmPlugin, NpmPluginAuditState } from '../plugin-system/npm-plugin.service';
@@ -52,31 +52,21 @@ function recorded(audit: ReturnType<typeof recorder>) {
 
 describe('administration lifecycle hooks', () => {
   it('awaits MQTT recording, covers create/update/delete, and excludes credentials and certificates', async () => {
-    const server = {
-      id: 7,
+    const mqttServerFields = {
       name: 'Workshop',
       host: 'mqtt.example',
       port: 8883,
       username: secret,
-      password: secret,
       caCert: secret,
       useTls: true,
       defaultPublishQos: 1,
       defaultPublishRetain: false,
       defaultSubscribeQos: 1,
-    } as MqttServer;
-    const repository = {
-      create: jest.fn((value) => ({ ...server, ...value })),
-      save: jest.fn(async () => ({ ...server })),
-      findOne: jest.fn(async () => ({ ...server })),
-      remove: jest.fn(async (entity: MqttServer) => {
-        // TypeORM clears the id of a removed entity; the audit must not depend on it.
-        delete (entity as Partial<MqttServer>).id;
-      }),
     };
+    const repository = new FixedIdMqttServerStore();
     const audit = recorder();
     const service = new MqttServerService(
-      repository as never,
+      repository,
       { encrypt: (value: string) => `enc:${value}`, decryptIfEncrypted: (value: string) => value } as never,
       { mqttServersTotal: { inc: jest.fn(), dec: jest.fn() } } as never,
       { emit: jest.fn() } as never,
@@ -91,7 +81,7 @@ describe('administration lifecycle hooks', () => {
     );
     const controller = new MqttServerController(service);
     let returned = false;
-    const pending = controller.createOne({ password: secret } as never, req).then(() => {
+    const pending = controller.createOne({ ...mqttServerFields, password: secret } as never, req).then(() => {
       returned = true;
     });
     await new Promise(setImmediate);
@@ -110,9 +100,11 @@ describe('administration lifecycle hooks', () => {
       details: { passwordChanged: 1 },
     });
     expect(recorded(audit)[2]).toMatchObject({ subject: { type: 'mqtt-server', id: 7 } });
+    // The delete above removed the server; store it again for the failure-path checks.
+    await repository.createServer({ ...mqttServerFields });
     audit.record.mockResolvedValueOnce({ status: 'unavailable' });
     await expect(controller.updateOne(7, {} as never, req)).resolves.toMatchObject({ id: 7 });
-    repository.save.mockRejectedValueOnce(new Error('primary failure'));
+    jest.spyOn(repository, 'updateServer').mockRejectedValueOnce(new Error('primary failure'));
     audit.record.mockClear();
     await expect(controller.updateOne(7, {} as never, req)).rejects.toThrow('primary failure');
     expect(audit.record).not.toHaveBeenCalled();

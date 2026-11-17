@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { type User } from '@attraccess/database-entities';
 import type { PluginBlockReason, PluginConfirmation } from '@attraccess/plugins-backend-sdk';
 import { hostReason } from '../../../../plugin-system/reader-ui/host-texts';
 import { PreStartService } from '../../../../resources/usage/pre-start/pre-start.service';
@@ -7,6 +6,7 @@ import { SessionEndNotifier } from '../../../../resources/usage/pre-start/sessio
 import { ReaderUiAlertsService } from '../../../../plugin-system/reader-ui/reader-ui-alerts.service';
 import { ReaderUiSettingsService } from '../../../../plugin-system/reader-ui/reader-ui-settings.service';
 import { AttractapService } from '../../../attractap.service';
+import type { CoreUser } from '../../../core-user';
 import { type AuthenticatedWebSocket } from '../../websocket.types';
 import { CardSessionService } from '../ui/card-session.service';
 import { UiAuditService } from '../ui/ui-audit.service';
@@ -21,7 +21,7 @@ export type StartGateResult =
   | { kind: 'held' };
 
 export interface StartGateInput {
-  user: User;
+  user: CoreUser;
   resourceId: number;
   projectId?: number;
   forceTakeOver?: boolean;

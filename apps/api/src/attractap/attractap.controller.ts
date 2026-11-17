@@ -1,4 +1,4 @@
-import { Attractap, Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
 import {
   Body,
@@ -28,6 +28,8 @@ import { AttractapService } from './attractap.service';
 import { isPaired } from './reader-pairing';
 
 import { UpdateReaderResponseDto } from './dtos/update-reader-response.dto';
+
+import { AttractapReaderDto, toReaderDto } from './dtos/reader.dto';
 
 import { UpdateReaderDto } from './dtos/update-reader.dto';
 
@@ -86,7 +88,7 @@ export class AttractapController {
 
       return {
         message: 'Reader updated successfully',
-        reader: updatedReader,
+        reader: toReaderDto(updatedReader),
       };
     } catch (error) {
       if (error.message?.includes('not found')) {
@@ -102,14 +104,14 @@ export class AttractapController {
   @ApiResponse({
     status: 200,
     description: 'The list of readers',
-    type: [Attractap],
+    type: [AttractapReaderDto],
   })
-  async getReaders(): Promise<Attractap[]> {
+  async getReaders(): Promise<AttractapReaderDto[]> {
     // `resources` is a plain ManyToMany with no eager loading, so without this the relation is
     // absent from the response entirely. Callers that group readers by resource — the supervised
     // start popup (ATT-816) — silently see every reader as unattached.
     // Readers that are not paired yet are listed by GET /attractap/readers/to-pair, for the pairing session only.
-    return await this.attractapService.getPairedReaders({ relations: ['resources'] });
+    return (await this.attractapService.getPairedReaders({ withResources: true })).map(toReaderDto);
   }
 
   @Get('to-pair')
@@ -121,10 +123,10 @@ export class AttractapController {
   @ApiResponse({
     status: 200,
     description: 'Readers that were never paired or whose pairing was removed',
-    type: [Attractap],
+    type: [AttractapReaderDto],
   })
-  async getReadersToPair(): Promise<Attractap[]> {
-    return await this.attractapService.getReadersToPair();
+  async getReadersToPair(): Promise<AttractapReaderDto[]> {
+    return (await this.attractapService.getReadersToPair()).map(toReaderDto);
   }
 
   @Get(':readerId')
@@ -134,15 +136,15 @@ export class AttractapController {
   @ApiResponse({
     status: 200,
     description: 'The reader',
-    type: Attractap,
+    type: AttractapReaderDto,
   })
   @ApiResponse({ status: 404, description: 'Reader not found' })
-  async getReaderById(@Param('readerId', ParseIntPipe) readerId: number): Promise<Attractap> {
-    return await this.requirePairedReader(readerId);
+  async getReaderById(@Param('readerId', ParseIntPipe) readerId: number): Promise<AttractapReaderDto> {
+    return toReaderDto(await this.requirePairedReader(readerId));
   }
 
   /** A reader that is not paired yet is not visible outside the pairing session. */
-  private async requirePairedReader(readerId: number): Promise<Attractap> {
+  private async requirePairedReader(readerId: number) {
     const reader = await this.attractapService.findReaderById(readerId);
     if (!reader || !isPaired(reader)) throw new NotFoundException(`Reader with ID ${readerId} not found`);
     return reader;

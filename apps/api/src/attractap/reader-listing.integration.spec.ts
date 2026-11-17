@@ -1,6 +1,7 @@
 import { Attractap, entities, Resource } from '@attraccess/database-entities';
 import { ResourceType } from '@attraccess/application-models';
 import { DataSource, Table } from 'typeorm';
+import { TypeOrmAttractapReaderStore } from '../database/adapters/attractap/typeorm-reader.store';
 import { AttractapService } from './attractap.service';
 
 /**
@@ -46,9 +47,8 @@ describe('reader listings and pairing state', () => {
     await addReader('paired', 'paired');
     await addReader('never paired', 'unpaired');
     await addReader('pairing removed', 'revoked');
-    service = Object.assign(Object.create(AttractapService.prototype), {
-      readerRepository: source.getRepository(Attractap),
-    });
+    const store = new TypeOrmAttractapReaderStore(source.getRepository(Attractap), source.getRepository(Resource));
+    service = Object.assign(Object.create(AttractapService.prototype), { readerStore: store });
   });
 
   afterAll(async () => {
@@ -56,25 +56,30 @@ describe('reader listings and pairing state', () => {
   });
 
   it('lists only paired readers', async () => {
-    const readers = await service.getPairedReaders({ relations: ['resources'] });
+    const readers = await service.getPairedReaders({ withResources: true });
     expect(readers.map((reader) => reader.name)).toEqual(['paired']);
     expect(readers[0].resources).toHaveLength(1);
   });
 
   it('keeps a caller condition and still leaves out readers that are not paired', async () => {
-    const readers = await service.getPairedReaders({ where: { resources: { id: resource.id } } });
+    const readers = await service.getPairedReaders({ resourceId: resource.id });
     expect(readers.map((reader) => reader.name)).toEqual(['paired']);
   });
 
-  it('applies the pairing condition to every alternative of an OR condition', async () => {
-    const readers = await service.getPairedReaders({
-      where: [{ name: 'paired' }, { name: 'never paired' }, { name: 'pairing removed' }],
-    });
+  it('leaves the resources out of a list that did not ask for them', async () => {
+    const [reader] = await service.getPairedReaders();
+    expect(reader.name).toBe('paired');
+    expect(reader).not.toHaveProperty('resources');
+  });
+
+  it('keeps the paired condition when the caller can only ask for paired readers', async () => {
+    const readers = await service.getPairedReaders({ paired: false, resourceId: resource.id });
     expect(readers.map((reader) => reader.name)).toEqual(['paired']);
   });
 
   it('gives the pairing session the readers that are not paired, and only those', async () => {
     const readers = await service.getReadersToPair();
     expect(readers.map((reader) => reader.name).sort()).toEqual(['never paired', 'pairing removed']);
+    expect(readers[0].resources).toHaveLength(1);
   });
 });

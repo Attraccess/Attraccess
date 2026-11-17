@@ -3,7 +3,7 @@ import { SSOProviderType } from '@attraccess/application-models';
 import { Logger } from '@nestjs/common';
 import { ssoProviderAuditEvent } from '../users-and-auth/auth/sso/audit/provider-audit';
 import { randomUUID } from 'node:crypto';
-import { droppedRecords, setupAuditDatabase } from './audit.test-fixture';
+import { droppedRecords, setupAuditDatabase } from '../database/adapters/audit/audit.test-fixture';
 import { billingTransactionAuditEvent } from './policies/billing';
 import { AuditEvent } from './recorder/audit-event';
 import { projectAuditRow } from './recorder/audit-row';

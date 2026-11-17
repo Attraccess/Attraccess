@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import type { Attractap } from '@attraccess/database-entities';
+import type { AttractapReader } from '@attraccess/application-models';
 import { AttractapEvent, AttractapEventType, type AuthenticatedWebSocket } from './websockets/websocket.types';
 
 /** Error code the frontend translates; see api-errors.{en,de}.json. */
@@ -10,13 +10,13 @@ export const READER_NOT_PAIRED = 'READER_NOT_PAIRED';
  * pairing session: it is listed there and nowhere else, and it is never a target for card writing,
  * supervision or mass introduction.
  */
-export const isPaired = (reader: Pick<Attractap, 'pairingState'> | null | undefined): boolean =>
+export const isPaired = (reader: Pick<AttractapReader, 'pairingState'> | null | undefined): boolean =>
   reader?.pairingState === 'paired';
 
 /** Why a card tap of a reader that is not paired is refused. */
 export const PAIRING_REQUIRED = 'PAIRING_REQUIRED';
 
-export function assertReaderPaired(reader: Pick<Attractap, 'pairingState'>): void {
+export function assertReaderPaired(reader: Pick<AttractapReader, 'pairingState'>): void {
   if (!isPaired(reader)) throw new BadRequestException(READER_NOT_PAIRED);
 }
 

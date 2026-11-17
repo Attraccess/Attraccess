@@ -13,6 +13,7 @@ import { randomUUID } from 'node:crypto';
 import { DataSource } from 'typeorm';
 import { MqttMessageEvent } from '../mqtt/mqtt-message.event';
 import { MqttServerController } from '../mqtt/servers/mqtt-server.controller';
+import { FixedIdMqttServerStore } from './fixed-id-mqtt-store.test-fixture';
 import { MqttServerService } from '../mqtt/servers/mqtt-server.service';
 import { registerPluginFlowNodes } from '../plugin-system/flows/node-registry';
 import { LoadedPluginManifest } from '../plugin-system/plugin.manifest';
@@ -20,7 +21,7 @@ import { PluginModule } from '../plugin-system/plugin.module';
 import { ResourceFlowsExecutorService } from '../resources/flows/execution/resource-flows-executor.service';
 import { FlowLogRecorderService } from '../resources/flows/logs/flow-log-recorder.service';
 import { ResourceHealthService } from '../resources/health/resource-health.service';
-import { setupAuditDatabase } from './audit.test-fixture';
+import { setupAuditDatabase } from '../database/adapters/audit/audit.test-fixture';
 import { auditActorOf, AuditRecorder } from './recorder/audit-event';
 
 /**
@@ -218,17 +219,7 @@ describe('audit recorded through flows, MQTT and the plugin context', () => {
 
     it('a plugin calling a core service it resolved records the same row as the HTTP route', async () => {
       const servers = new MqttServerService(
-        {
-          create: (value: object) => ({
-            id: 7,
-            useTls: false,
-            defaultPublishQos: 0,
-            defaultPublishRetain: false,
-            defaultSubscribeQos: 0,
-            ...value,
-          }),
-          save: async (value: object) => ({ ...value, id: 7 }),
-        } as never,
+        new FixedIdMqttServerStore(),
         { encrypt: (value: string) => `enc:${value}` } as never,
         { mqttServersTotal: { inc: jest.fn() } } as never,
         { emit: jest.fn() } as never,

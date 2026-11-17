@@ -1,4 +1,3 @@
-import { AttractapCredentialEvent } from '@attraccess/database-entities';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import {
   Body,
@@ -18,6 +17,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { LicenseModuleType } from '../license/license.service';
 import { RequiresLicense } from '../license/require-license.decorator';
 import { ApprovePairingDto, PairingDto, RequestPairingResponseDto, ResolvePairingDto } from './dtos/pairing.dto';
+import { AttractapCredentialEventDto, toCredentialEventDto } from './dtos/credential-event.dto';
 import { CredentialRegistryService } from './security/credential-registry.service';
 import { Actor, PairingService } from './security/pairing.service';
 import { AttractapEvent, AttractapEventType } from './websockets/websocket.types';
@@ -133,8 +133,8 @@ export class AttractapPairingController {
   @Get('readers/:readerId/credentials')
   @Auth('resources.update')
   @ApiOperation({ summary: 'Credential history of a reader', operationId: 'getReaderCredentialHistory' })
-  @ApiResponse({ status: 200, type: [AttractapCredentialEvent] })
-  public async history(@Param('readerId', ParseIntPipe) readerId: number): Promise<AttractapCredentialEvent[]> {
-    return await this.registry.history(readerId);
+  @ApiResponse({ status: 200, type: [AttractapCredentialEventDto] })
+  public async history(@Param('readerId', ParseIntPipe) readerId: number): Promise<AttractapCredentialEventDto[]> {
+    return (await this.registry.history(readerId)).map(toCredentialEventDto);
   }
 }

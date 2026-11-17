@@ -25,7 +25,7 @@ class FakeClient extends EventEmitter {
 const viewer = (): jest.Mocked<ExplorerViewer> => ({ onMessage: jest.fn(), onError: jest.fn() });
 
 describe('MqttExplorerConnectionsService', () => {
-  const findOneBy = jest.fn();
+  const findServer = jest.fn();
   const resolveServerPassword = jest.fn();
   const clients: FakeClient[] = [];
   let service: MqttExplorerConnectionsService;
@@ -39,7 +39,7 @@ describe('MqttExplorerConnectionsService', () => {
     jest.resetAllMocks();
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     clients.length = 0;
-    findOneBy.mockImplementation(async ({ id }: { id: number }) => ({
+    findServer.mockImplementation(async (id: number) => ({
       id,
       name: 'Broker',
       host: 'broker',
@@ -53,7 +53,7 @@ describe('MqttExplorerConnectionsService', () => {
       clients.push(client);
       return client;
     });
-    service = new MqttExplorerConnectionsService({ findOneBy } as never, { resolveServerPassword } as never);
+    service = new MqttExplorerConnectionsService({ findServer } as never, { resolveServerPassword } as never);
   });
   afterEach(() => {
     service.onModuleDestroy();
@@ -220,7 +220,7 @@ describe('MqttExplorerConnectionsService', () => {
   });
 
   it('fails when the server does not exist, without opening a connection', async () => {
-    findOneBy.mockResolvedValue(null);
+    findServer.mockResolvedValue(null);
     await expect(service.subscribe(9, '#', viewer())).rejects.toThrow();
     expect(mqtt.connect).not.toHaveBeenCalled();
     expect(service.openConnectionCount).toBe(0);

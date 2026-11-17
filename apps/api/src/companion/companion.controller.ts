@@ -15,11 +15,11 @@ import {
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
-import { CompanionDevice } from '@attraccess/database-entities';
 import { Response } from 'express';
 import { CompanionService } from './companion.service';
 import { CompanionGateway } from './companion.gateway';
 import { CompanionGatewayService } from './companion-gateway.service';
+import { CompanionDeviceDetailDto, CompanionDeviceDto, toCompanionDeviceDto } from './dtos/companion-device.dto';
 import { CompanionManifestDto } from './dtos/companion.dto';
 import { MetricsService } from '../metrics/metrics.service';
 
@@ -112,28 +112,31 @@ export class CompanionController {
   @Get()
   @Auth('resources.update')
   @ApiOperation({ summary: 'List all registered companion devices', operationId: 'listCompanionDevices' })
-  @ApiResponse({ status: 200, type: [CompanionDevice] })
-  async list(): Promise<CompanionDevice[]> {
-    return this.service.findAll();
+  @ApiResponse({ status: 200, type: [CompanionDeviceDto] })
+  async list(): Promise<CompanionDeviceDto[]> {
+    return (await this.service.findAll()).map(toCompanionDeviceDto);
   }
 
   @Get(':id')
   @Auth('resources.update')
   @ApiOperation({ summary: 'Get a companion device', operationId: 'getCompanionDevice' })
   @ApiParam({ name: 'id', type: Number })
-  @ApiResponse({ status: 200, type: CompanionDevice })
+  @ApiResponse({ status: 200, type: CompanionDeviceDetailDto })
   @ApiResponse({ status: 404 })
-  async getOne(@Param('id', ParseIntPipe) id: number): Promise<CompanionDevice & { connected: boolean }> {
+  async getOne(@Param('id', ParseIntPipe) id: number): Promise<CompanionDeviceDetailDto> {
     const device = await this.service.findById(id);
     if (!device) throw new NotFoundException(`Companion device ${id} not found`);
 
     const connected = [...this.gatewayService.sockets.values()].some((s) => s.deviceId === id);
-    return { ...device, connected };
+    return { ...toCompanionDeviceDto(device), connected };
   }
 
   @Get(':id/resources')
   @Auth()
-  @ApiOperation({ summary: 'List resources that reference this companion device', operationId: 'getCompanionDeviceResources' })
+  @ApiOperation({
+    summary: 'List resources that reference this companion device',
+    operationId: 'getCompanionDeviceResources',
+  })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({ status: 200 })
   @ApiResponse({ status: 404 })
@@ -149,17 +152,17 @@ export class CompanionController {
   @ApiOperation({ summary: 'Rename a companion device', operationId: 'renameCompanionDevice' })
   @ApiParam({ name: 'id', type: Number })
   @ApiBody({ type: RenameCompanionDeviceDto })
-  @ApiResponse({ status: 200, type: CompanionDevice })
+  @ApiResponse({ status: 200, type: CompanionDeviceDto })
   @ApiResponse({ status: 404 })
   async rename(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: RenameCompanionDeviceDto,
-  ): Promise<CompanionDevice> {
+  ): Promise<CompanionDeviceDto> {
     const device = await this.service.findById(id);
     if (!device) throw new NotFoundException(`Companion device ${id} not found`);
     const updated = await this.service.updateName(id, dto.name);
     this.gatewayService.sendDeviceRenamed(id, dto.name);
-    return updated;
+    return toCompanionDeviceDto(updated);
   }
 
   @Delete(':id')
@@ -175,5 +178,4 @@ export class CompanionController {
     this.gateway.disconnectDevice(id);
     await this.service.delete(id);
   }
-
 }

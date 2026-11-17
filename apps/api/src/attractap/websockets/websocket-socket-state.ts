@@ -1,4 +1,4 @@
-import { Attractap } from '@attraccess/database-entities';
+import type { AttractapReader } from '@attraccess/application-models';
 import { ResourceFormAction } from '@attraccess/application-models';
 import type { CardConversation } from './card-conversation.service';
 import type { CardSessionState, UiSlotsState, UiStepState } from './handlers/ui/ui-socket-state';
@@ -228,7 +228,7 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
    * TLS rather than the WebSocket; read it through `queuedSendBytes`, which falls back to `bufferedAmount`.
    */
   pendingSendBytes?: () => number;
-  readerId: Attractap['id'] | null;
+  readerId: AttractapReader['id'] | null;
   readerName: string | null;
   /**
    * Resolves `true` once the reader ACKed, `false` when every retry timed out. It never rejects, so

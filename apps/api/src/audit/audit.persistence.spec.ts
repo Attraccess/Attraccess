@@ -1,3 +1,7 @@
+import {
+  auditConnectionOf,
+  createSqliteAuditService,
+} from '../database/adapters/audit/sqlite-audit-service.test-fixture';
 import { billingTransactionAuditEvent } from './policies/billing';
 import { AuditLog, Setting, entities } from '@attraccess/database-entities';
 import { Logger, ValidationPipe } from '@nestjs/common';
@@ -17,11 +21,15 @@ import { readAuditSettings } from './audit.config';
 import { AuditController } from './audit.controller';
 import { AuditQueryService } from './audit-query.service';
 import { PluginAuditHost } from './plugin-audit-host';
-import { AuditService } from './audit.service';
-import { AUDIT_BUSY_RETRIES, MAX_PENDING_AUDIT_WRITES } from './persistence/audit-storage';
+import { MAX_PENDING_AUDIT_WRITES } from './persistence/audit-storage';
+import { AUDIT_BUSY_RETRIES } from '../database/adapters/audit/sqlite-audit-store';
 import { SQLITE_BUSY_TIMEOUT_MS } from '../database/sqlite/sqlite-connection';
 import { AUDIT_DROP_REASONS } from '../metrics/definitions/audit.metrics';
-import { createTestAuditMetrics, droppedRecords, setupAuditDatabase } from './audit.test-fixture';
+import {
+  createTestAuditMetrics,
+  droppedRecords,
+  setupAuditDatabase,
+} from '../database/adapters/audit/audit.test-fixture';
 describe('durable audit SQLite', () => {
   const fixture = setupAuditDatabase();
   it('upgrades additively, survives connection restart and principal deletion, prevents updates, and reverts', async () => {
@@ -39,7 +47,7 @@ describe('durable audit SQLite', () => {
       'CREATE TABLE IF NOT EXISTS setting (id integer PRIMARY KEY AUTOINCREMENT, parent varchar NOT NULL, key varchar NOT NULL, value varchar NOT NULL, createdAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP)',
     );
     fixture.store = new SettingsStoreService(fixture.source.getRepository(Setting), null);
-    fixture.service = new AuditService(fixture.source, fixture.store, fixture.metrics);
+    fixture.service = createSqliteAuditService(fixture.source, fixture.store, fixture.metrics);
     await fixture.service.onModuleInit();
     expect((await fixture.query.list(new AuditQueryDto())).items).toEqual([
       expect.objectContaining({ actorId: 42, details: { revision: 2 } }),
@@ -224,7 +232,7 @@ describe('durable audit SQLite', () => {
     });
     await fixture.source.query(`CREATE TRIGGER fail_audit_cleanup BEFORE DELETE ON audit_log
       BEGIN SELECT RAISE(ROLLBACK, 'cleanup delete failure'); END`);
-    const storage = (fixture.service as unknown as { storage: DataSource }).storage;
+    const storage = auditConnectionOf(fixture.service);
     const originalTransaction = storage.transaction.bind(storage);
     let releaseCleanup!: () => void;
     const cleanupPaused = new Promise<void>((resolve) => {
@@ -279,7 +287,7 @@ describe('durable audit SQLite', () => {
       userAgent: null,
       details: { revision: 1 },
     });
-    const storage = (fixture.service as unknown as { storage: DataSource }).storage;
+    const storage = auditConnectionOf(fixture.service);
     const originalTransaction = storage.transaction.bind(storage);
     let releaseCleanup!: () => void;
     const cleanupPaused = new Promise<void>((resolve) => {
@@ -324,7 +332,7 @@ describe('durable audit SQLite', () => {
     ]) {
       for (const [key, value] of Object.entries(disabled))
         await fixture.store.setPlainSetting('audit', key, JSON.stringify(value));
-      const sink = new AuditService(fixture.source, fixture.store, fixture.metrics);
+      const sink = createSqliteAuditService(fixture.source, fixture.store, fixture.metrics);
       await sink.onModuleInit();
       expect(await new PluginAuditHost(sink).record(fixture.event())).toEqual({ status: 'unavailable' });
       await sink.onModuleDestroy();
@@ -454,7 +462,7 @@ describe('durable audit SQLite', () => {
       plugin_domains_disabled: [],
       retention_days: 2,
     });
-    fixture.service = new AuditService(fixture.source, fixture.store, fixture.metrics);
+    fixture.service = createSqliteAuditService(fixture.source, fixture.store, fixture.metrics);
     await fixture.service.onModuleInit();
     expect(await fixture.plugins.record(fixture.event())).toEqual({ status: 'unavailable' });
     await settings.updateAuditSettings({ enabled: true, domains: ['resource'] });
@@ -550,7 +558,7 @@ describe('durable audit SQLite', () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     const memory = new DataSource({ type: 'sqlite', database: ':memory:' });
     const metrics = createTestAuditMetrics();
-    const sink = new AuditService(memory, fixture.store, metrics);
+    const sink = createSqliteAuditService(memory, fixture.store, metrics);
     await sink.onModuleInit();
     try {
       expect(await new PluginAuditHost(sink).record(fixture.event())).toEqual({ status: 'unavailable' });
@@ -654,7 +662,11 @@ describe('durable audit SQLite', () => {
 
   it('creates zero series for registered plugin domains at startup', async () => {
     const metrics = createTestAuditMetrics();
-    const sink = new AuditService(new DataSource({ type: 'sqlite', database: ':memory:' }), fixture.store, metrics);
+    const sink = createSqliteAuditService(
+      new DataSource({ type: 'sqlite', database: ':memory:' }),
+      fixture.store,
+      metrics,
+    );
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     try {
       await sink.onModuleInit();
@@ -735,9 +747,9 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       },
     ]);
     const migratedStore = new SettingsStoreService(source.getRepository(Setting), null);
-    const migratedAudit = new AuditService(source, migratedStore, createTestAuditMetrics());
+    const migratedAudit = createSqliteAuditService(source, migratedStore, createTestAuditMetrics());
     await migratedAudit.onModuleInit();
-    const migratedList = await new AuditController(new AuditQueryService(migratedAudit, source, migratedStore)).list({
+    const migratedList = await new AuditController(new AuditQueryService(migratedAudit, migratedStore)).list({
       limit: 10,
     });
     const migratedOversizedEvent = migratedList.items.find((item) => item.details.legacyAuditId === 2);

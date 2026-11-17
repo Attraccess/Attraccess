@@ -1,8 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { MqttServer } from '@attraccess/database-entities';
+import type { MqttServerRecord } from '@attraccess/application-models';
+import { MQTT_SERVER_STORE, type MqttServerStore } from '../mqtt-server-store.port';
 import { CreateMqttServerDto, UpdateMqttServerDto } from './dtos/mqtt-server.dto';
 import { EncryptionService } from '../../encryption/encryption.service';
 import { MetricsService } from '../../metrics/metrics.service';
@@ -11,13 +10,13 @@ import { safeAuditHost } from '../../audit/policies/administration';
 import { AUDIT_RECORDER, AuditActor, AuditDetails, AuditRecorder } from '../../audit/recorder/audit-event';
 
 /** What a connection to the server is opened with (password decrypted). */
-function connectionSettings(server: MqttServer): string {
+function connectionSettings(server: MqttServerRecord): string {
   const { host, port, username, password, useTls, caCert, tlsServername, tlsInsecure } = server;
   return JSON.stringify([host, port, username, password, useTls, caCert, tlsServername, tlsInsecure]);
 }
 
 /** Connection metadata only: credentials and certificates are recorded as configured or changed flags. */
-function mqttServerAuditDetails(server: MqttServer, passwordChanged: boolean): AuditDetails {
+function mqttServerAuditDetails(server: MqttServerRecord, passwordChanged: boolean): AuditDetails {
   return {
     serverName: server.name,
     host: safeAuditHost(server.host),
@@ -35,11 +34,16 @@ function mqttServerAuditDetails(server: MqttServer, passwordChanged: boolean): A
   };
 }
 
+/** The fields a request actually set: `Object.assign` and the save of the entity ignored undefined ones. */
+function definedFields<T extends object>(changes: T): Partial<T> {
+  return Object.fromEntries(Object.entries(changes).filter(([, value]) => value !== undefined)) as Partial<T>;
+}
+
 @Injectable()
 export class MqttServerService {
   constructor(
-    @InjectRepository(MqttServer)
-    private readonly mqttServerRepository: Repository<MqttServer>,
+    @Inject(MQTT_SERVER_STORE)
+    private readonly servers: MqttServerStore,
     private readonly encryptionService: EncryptionService,
     private readonly metricsService: MetricsService,
     private readonly eventEmitter: EventEmitter2,
@@ -49,37 +53,32 @@ export class MqttServerService {
   /**
    * Get all MQTT servers
    */
-  async findAll(): Promise<MqttServer[]> {
-    const servers = await this.mqttServerRepository.find();
-    servers.forEach((server) => this.decryptServerPassword(server));
-    return servers;
+  async findAll(): Promise<MqttServerRecord[]> {
+    const servers = await this.servers.listServers();
+    return servers.map((server) => this.withDecryptedPassword(server));
   }
 
   /**
    * Get a single MQTT server by ID
    */
-  async findOne(id: number): Promise<MqttServer> {
-    const server = await this.mqttServerRepository.findOne({
-      where: { id },
-    });
+  async findOne(id: number): Promise<MqttServerRecord> {
+    const server = await this.servers.findServer(id);
 
     if (!server) {
       throw new NotFoundException(`MQTT server with ID ${id} not found`);
     }
 
-    this.decryptServerPassword(server);
-    return server;
+    return this.withDecryptedPassword(server);
   }
 
   /**
    * Create a new MQTT server
    */
-  async create(createMqttServerDto: CreateMqttServerDto, actor: AuditActor): Promise<MqttServer> {
-    const newServer = this.mqttServerRepository.create({
+  async create(createMqttServerDto: CreateMqttServerDto, actor: AuditActor): Promise<MqttServerRecord> {
+    const saved = await this.servers.createServer({
       ...createMqttServerDto,
       password: createMqttServerDto.password ? this.encryptionService.encrypt(createMqttServerDto.password) : null,
     });
-    const saved = await this.mqttServerRepository.save(newServer);
     this.metricsService.mqttServersTotal.inc();
     await this.record(
       actor,
@@ -93,16 +92,19 @@ export class MqttServerService {
   /**
    * Update an existing MQTT server
    */
-  async update(id: number, updateMqttServerDto: UpdateMqttServerDto, actor: AuditActor): Promise<MqttServer> {
+  async update(id: number, updateMqttServerDto: UpdateMqttServerDto, actor: AuditActor): Promise<MqttServerRecord> {
     const server = await this.findOne(id);
     const connectionBefore = connectionSettings(server);
 
-    // Update the server with the new values
-    Object.assign(server, updateMqttServerDto);
-    const connectionChanged = connectionSettings(server) !== connectionBefore;
-    server.password = server.password ? this.encryptionService.encrypt(server.password) : null;
+    // The server with the new values; its password is still decrypted here.
+    const merged: MqttServerRecord = { ...server, ...definedFields(updateMqttServerDto) };
+    const connectionChanged = connectionSettings(merged) !== connectionBefore;
 
-    const saved = await this.mqttServerRepository.save(server);
+    const saved = await this.servers.updateServer(id, {
+      ...definedFields(updateMqttServerDto),
+      password: merged.password ? this.encryptionService.encrypt(merged.password) : null,
+    });
+    if (!saved) throw new NotFoundException(`MQTT server with ID ${id} not found`);
     // A rename or new publish defaults leaves open connections valid.
     if (connectionChanged) this.emitChanged(id);
     await this.record(
@@ -119,9 +121,8 @@ export class MqttServerService {
    */
   async remove(id: number, actor: AuditActor): Promise<void> {
     const server = await this.findOne(id);
-    // Taken before the removal, which clears the entity's id.
     const details = mqttServerAuditDetails(server, false);
-    await this.mqttServerRepository.remove(server);
+    await this.servers.deleteServer(id);
     this.metricsService.mqttServersTotal.dec();
     this.emitChanged(id);
     await this.record(actor, 'mqtt_server.deleted', id, details);
@@ -148,12 +149,11 @@ export class MqttServerService {
   }
 
   /**
-   * Decrypts password in place for use in the app. Assumes stored values are
+   * Returns the server with its password decrypted for use in the app. Assumes stored values are
    * already encrypted (see migration EncryptSensitiveData).
    */
-  private decryptServerPassword(server: MqttServer): void {
-    if (server.password) {
-      server.password = this.encryptionService.decryptIfEncrypted(server.password) ?? server.password;
-    }
+  private withDecryptedPassword(server: MqttServerRecord): MqttServerRecord {
+    if (!server.password) return server;
+    return { ...server, password: this.encryptionService.decryptIfEncrypted(server.password) ?? server.password };
   }
 }

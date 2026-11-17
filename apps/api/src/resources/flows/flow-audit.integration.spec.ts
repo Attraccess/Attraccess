@@ -1,3 +1,4 @@
+import { createSqliteAuditService } from '../../database/adapters/audit/sqlite-audit-service.test-fixture';
 import {
   AuditLog,
   entities,
@@ -16,7 +17,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import { AuditService } from '../../audit/audit.service';
-import { createTestAuditMetrics } from '../../audit/audit.test-fixture';
+import { createTestAuditMetrics } from '../../database/adapters/audit/audit.test-fixture';
 import { auditActorOf } from '../../audit/recorder/audit-event';
 import * as migrations from '../../database/migrations';
 import { SettingsStoreService } from '../../settings/settings-store.service';
@@ -74,7 +75,7 @@ describe('flow audit rows in migrated storage', () => {
     await source.runMigrations();
     const store = new SettingsStoreService(source.getRepository(Setting), null);
     await store.setPlainSetting('audit', 'domains', JSON.stringify(['resource']));
-    audit = new AuditService(source, store, createTestAuditMetrics());
+    audit = createSqliteAuditService(source, store, createTestAuditMetrics());
     await audit.onModuleInit();
     const [nodes, edges, flows] = [ResourceFlowNode, ResourceFlowEdge, Flow].map((entity) =>
       source.getRepository(entity),

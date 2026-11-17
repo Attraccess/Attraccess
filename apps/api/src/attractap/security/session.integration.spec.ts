@@ -1,8 +1,6 @@
-import { Attractap } from '@attraccess/database-entities';
 import { INestApplication } from '@nestjs/common';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { createWsAdapter } from '../../common/text-frame-ws-adapter';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test } from '@nestjs/testing';
 import { AddressInfo } from 'net';
 import { WebSocket } from 'ws';
@@ -56,7 +54,6 @@ describe('reader session through the real gateway', () => {
       })),
     };
     const security = [
-      { provide: getRepositoryToken(Attractap), useValue: { update: jest.fn() } },
       { provide: HandshakeLimiter, useFactory: () => new HandshakeLimiter() },
       {
         provide: InstallationIdentityService,

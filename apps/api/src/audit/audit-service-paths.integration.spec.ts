@@ -11,6 +11,7 @@ import { WebsocketService } from '../attractap/websockets/websocket.service';
 import { AttractapEvent, AttractapEventType } from '../attractap/websockets/websocket.types';
 import { BillingService } from '../billing/charges/billing.service';
 import { MqttServerController } from '../mqtt/servers/mqtt-server.controller';
+import { FixedIdMqttServerStore } from './fixed-id-mqtt-store.test-fixture';
 import { MqttServerService } from '../mqtt/servers/mqtt-server.service';
 import { ProjectsController } from '../projects/projects.controller';
 import { ProjectsService } from '../projects/projects.service';
@@ -18,7 +19,7 @@ import { ResourceHealthController } from '../resources/health/resource-health.co
 import { ResourceHealthService } from '../resources/health/resource-health.service';
 import { SessionService } from '../users-and-auth/auth/session.service';
 import { SsoProvisioningService } from '../users-and-auth/auth/sso/provisioning/sso-provisioning.service';
-import { setupAuditDatabase } from './audit.test-fixture';
+import { setupAuditDatabase } from '../database/adapters/audit/audit.test-fixture';
 import { auditActorOf } from './recorder/audit-event';
 
 /**
@@ -62,22 +63,8 @@ describe('audit recorded by the owning services, without the HTTP layer', () => 
   });
 
   it('administration: creating an MQTT server through the service records the same row as the HTTP route', async () => {
-    // Entity defaults, as a saved row carries them.
-    const server = {
-      id: 7,
-      name: 'Workshop',
-      host: 'mqtt.example',
-      port: 1883,
-      useTls: false,
-      defaultPublishQos: 0,
-      defaultPublishRetain: false,
-      defaultSubscribeQos: 0,
-    };
     const service = new MqttServerService(
-      {
-        create: (value: object) => ({ ...server, ...value }),
-        save: async (value: object) => ({ ...value, id: 7 }),
-      } as never,
+      new FixedIdMqttServerStore(),
       { encrypt: (value: string) => `enc:${value}` } as never,
       { mqttServersTotal: { inc: jest.fn() } } as never,
       { emit: jest.fn() } as never,

@@ -22,7 +22,7 @@ describe('MQTT explorer isolation from flows', () => {
 
     const emit = jest.fn();
     const sharedClient = new MqttClientService(
-      { findOneBy: jest.fn() } as never,
+      { findServer: jest.fn() } as never,
       { emit } as unknown as EventEmitter2,
       {} as never,
       {} as never,
@@ -32,7 +32,7 @@ describe('MQTT explorer isolation from flows', () => {
     const sharedPublish = jest.spyOn(sharedClient, 'publish');
 
     const server = { id: 1, name: 'Broker', host: 'broker', port: 1883 };
-    const repository = { findOneBy: jest.fn().mockResolvedValue(server) };
+    const repository = { findServer: jest.fn().mockResolvedValue(server) };
     jest.spyOn(sharedClient, 'resolveServerPassword').mockResolvedValue(null);
     const connections = new MqttExplorerConnectionsService(repository as never, sharedClient);
     const service = new MqttExplorerService(repository as never, connections, sharedClient, {

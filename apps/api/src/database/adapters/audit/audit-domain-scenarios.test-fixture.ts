@@ -1,10 +1,10 @@
-import { billingTransactionAuditEvent } from './policies/billing';
+import { billingTransactionAuditEvent } from '../../../audit/policies/billing';
 import { AuditLog } from '@attraccess/database-entities';
 import { SSOProviderType } from '@attraccess/application-models';
 import { randomUUID } from 'node:crypto';
-import { ssoAuditSnapshot } from '../users-and-auth/auth/sso/audit/provider-audit';
-import { AuditService } from './audit.service';
-import { PluginAuditHost } from './plugin-audit-host';
+import { ssoAuditSnapshot } from '../../../users-and-auth/auth/sso/audit/provider-audit';
+import { AuditService } from '../../../audit/audit.service';
+import { PluginAuditHost } from '../../../audit/plugin-audit-host';
 export interface DomainScenario {
   domain: string;
   action: string;

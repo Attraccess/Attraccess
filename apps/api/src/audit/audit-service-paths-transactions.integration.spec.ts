@@ -1,3 +1,4 @@
+import { createSqliteAuditService } from '../database/adapters/audit/sqlite-audit-service.test-fixture';
 import {
   AuditLog,
   BillingTransaction,
@@ -23,7 +24,7 @@ import * as migrations from '../database/migrations';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { SSOService } from '../users-and-auth/auth/sso/sso.service';
 import { AuditService } from './audit.service';
-import { createTestAuditMetrics, droppedRecords } from './audit.test-fixture';
+import { createTestAuditMetrics, droppedRecords } from '../database/adapters/audit/audit.test-fixture';
 import { AuditMetrics } from '../metrics/definitions/audit.metrics';
 
 /**
@@ -66,7 +67,7 @@ describe('audit recorded by an owning service inside its transaction', () => {
     ])
       await source.query(`DELETE FROM "${source.getMetadata(entity).tableName}"`);
     metrics = createTestAuditMetrics();
-    audit = new AuditService(source, store, metrics);
+    audit = createSqliteAuditService(source, store, metrics);
     await audit.onModuleInit();
   });
 

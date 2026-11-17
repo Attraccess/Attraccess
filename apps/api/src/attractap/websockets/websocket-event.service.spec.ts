@@ -11,7 +11,6 @@ import { ResourceChangedEvent } from '../../resources/events/resource-changed.ev
 import { ResourceMaintenanceChangedEvent } from '../../resources/maintenances/events/resource-maintenance-changed.event';
 import { ResourceHealthChangedEvent } from '../../resources/health/events/resource-health-changed.event';
 import { ResourceIntroducerChangedEvent } from '../../resources/introducers/events/resource-introducer-changed.event';
-import { ResourceGroup } from '@attraccess/database-entities';
 import { ResourceHealthStatus } from '@attraccess/application-models';
 import { ResourceGroupIntroducerChangedEvent } from '../../resources/groups/introducers/events/resource-group-introducer-changed.event';
 import { ResourceGroupIntroductionChangedEvent } from '../../resources/groups/introductions/events/resource-group-introduction-changed.event';
@@ -138,7 +137,9 @@ describe('WebSocketEventService', () => {
 
   describe('onResourceGroupIntroducerChanged', () => {
     it('refreshes each affected reader once for the resources in the group', async () => {
-      resourceGroupsService.getOne.mockResolvedValue({ resources: [{ id: 60 }, { id: 70 }] } as ResourceGroup);
+      resourceGroupsService.getOne.mockResolvedValue({ resources: [{ id: 60 }, { id: 70 }] } as unknown as Awaited<
+        ReturnType<ResourceGroupsService['getOne']>
+      >);
 
       await service.onResourceGroupIntroducerChanged(new ResourceGroupIntroducerChangedEvent(5));
 

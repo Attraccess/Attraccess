@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { AuthenticatedUser, NFCCard } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import type { AttractapNfcCard } from '@attraccess/application-models';
 import { AttractapService } from './attractap.service';
 import { UsersService } from '../users-and-auth/users/users.service';
 
@@ -25,7 +26,7 @@ export class CardAccessService {
     return ownerId;
   }
 
-  async getCardForManagement(id: number, actor: AuthenticatedUser): Promise<NFCCard> {
+  async getCardForManagement(id: number, actor: AuthenticatedUser): Promise<AttractapNfcCard> {
     const card = await this.attractapService.getNFCCardByID(id);
     if (!card) throw new NotFoundException(`RFID card ${id} not found`);
     this.assertOwnerOrManager(card.user?.id, actor);

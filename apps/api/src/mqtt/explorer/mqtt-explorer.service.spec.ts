@@ -1,5 +1,4 @@
 import { Subject } from 'rxjs';
-import { In } from 'typeorm';
 import { projectAuditRow } from '../../audit/recorder/audit-row';
 import { MqttServerChangedEvent } from '../mqtt-server-changed.event';
 import { ExplorerConnectionReset, ExplorerViewer } from './mqtt-explorer-connections.service';
@@ -18,8 +17,8 @@ const user = { id: 7, authenticationMethod: 'session' } as never;
 const otherUser = { id: 8, authenticationMethod: 'session' } as never;
 
 describe('MqttExplorerService', () => {
-  const findOneBy = jest.fn();
-  const find = jest.fn();
+  const findServer = jest.fn();
+  const findExistingServerIds = jest.fn();
   const subscribe = jest.fn();
   const publish = jest.fn();
   const record = jest.fn();
@@ -28,12 +27,12 @@ describe('MqttExplorerService', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.resetAllMocks();
-    findOneBy.mockResolvedValue({ id: 1, name: 'Broker', defaultPublishQos: 0, defaultPublishRetain: false });
+    findServer.mockResolvedValue({ id: 1, name: 'Broker', defaultPublishQos: 0, defaultPublishRetain: false });
     publish.mockResolvedValue(undefined);
     record.mockResolvedValue(undefined);
     subscribe.mockResolvedValue({ unsubscribe: jest.fn() });
     service = new MqttExplorerService(
-      { findOneBy, find } as never,
+      { findServer, findExistingServerIds } as never,
       { subscribe } as never,
       { publish } as never,
       { record } as never,
@@ -86,7 +85,7 @@ describe('MqttExplorerService', () => {
     });
 
     it('answers 404 for an unknown server', async () => {
-      findOneBy.mockResolvedValue(null);
+      findServer.mockResolvedValue(null);
       await expect(service.subscribe(user, 9, '#')).rejects.toMatchObject({ status: 404 });
     });
 
@@ -342,7 +341,7 @@ describe('MqttExplorerService', () => {
       });
 
       it('keeps records valid for a long multibyte topic and a server name with control characters', async () => {
-        findOneBy.mockResolvedValue({ id: 1, name: `Work\tshop ${'é'.repeat(300)}` });
+        findServer.mockResolvedValue({ id: 1, name: `Work\tshop ${'é'.repeat(300)}` });
         // Filters are at most 256 bytes, so at most 256 UTF-16 units; publish topics may be 1024 bytes.
         const topic = `${'😀'.repeat(60)}/#`;
         (await service.subscribe(user, 1, topic)).subscribe().unsubscribe();
@@ -402,16 +401,11 @@ describe('MqttExplorerService', () => {
   });
 
   describe('existingServerIds', () => {
-    it('looks the distinct ids up in one query', async () => {
-      find.mockResolvedValue([{ id: 1 }, { id: 3 }]);
+    it('asks the store for the ids that exist', async () => {
+      findExistingServerIds.mockResolvedValue(new Set([1, 3]));
       await expect(service.existingServerIds([1, 2, 1, 3])).resolves.toEqual(new Set([1, 3]));
-      expect(find).toHaveBeenCalledTimes(1);
-      expect(find).toHaveBeenCalledWith({ where: { id: In([1, 2, 3]) }, select: { id: true } });
-    });
-
-    it('does not query for an empty set', async () => {
-      await expect(service.existingServerIds([])).resolves.toEqual(new Set());
-      expect(find).not.toHaveBeenCalled();
+      expect(findExistingServerIds).toHaveBeenCalledTimes(1);
+      expect(findExistingServerIds).toHaveBeenCalledWith([1, 2, 1, 3]);
     });
   });
 
@@ -430,7 +424,7 @@ describe('MqttExplorerService', () => {
     });
 
     it('uses the server defaults when QoS or retain are omitted, and audits the effective values', async () => {
-      findOneBy.mockResolvedValue({ id: 1, name: 'Broker', defaultPublishQos: 2, defaultPublishRetain: true });
+      findServer.mockResolvedValue({ id: 1, name: 'Broker', defaultPublishQos: 2, defaultPublishRetain: true });
       await service.publish(user, 1, { topic: 't' });
       expect(publish).toHaveBeenCalledWith(1, 't', '', { qos: 2, retain: true }, completion);
       expect(record.mock.calls[0][0].details).toMatchObject({ qos: 2, retain: 1, size: 0 });
@@ -441,7 +435,7 @@ describe('MqttExplorerService', () => {
     });
 
     it('falls back to QoS 0 without retain when the server has no usable defaults', async () => {
-      findOneBy.mockResolvedValue({ id: 1, name: 'Broker', defaultPublishQos: null, defaultPublishRetain: null });
+      findServer.mockResolvedValue({ id: 1, name: 'Broker', defaultPublishQos: null, defaultPublishRetain: null });
       await service.publish(user, 1, { topic: 't' });
       expect(publish).toHaveBeenCalledWith(1, 't', '', { qos: 0, retain: false }, completion);
     });
@@ -474,9 +468,9 @@ describe('MqttExplorerService', () => {
     });
 
     it('answers 404 for an unknown server and hides broker errors', async () => {
-      findOneBy.mockResolvedValue(null);
+      findServer.mockResolvedValue(null);
       await expect(service.publish(user, 9, { topic: 'a' })).rejects.toMatchObject({ status: 404 });
-      findOneBy.mockResolvedValue({ id: 1, name: 'Broker' });
+      findServer.mockResolvedValue({ id: 1, name: 'Broker' });
       publish.mockRejectedValue(new Error('mqtt://user:pass@host'));
       await expect(service.publish(user, 1, { topic: 'a' })).rejects.toMatchObject({
         status: 502,

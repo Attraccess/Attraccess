@@ -1,5 +1,5 @@
 import type { PluginAuditReceipt } from '@attraccess/plugins-backend-sdk';
-import type { EntityManager } from 'typeorm';
+import type { TransactionScope } from '../../database/unit-of-work';
 import type { AttractapAuditAction } from '../policies/attractap';
 import type { AdministrationAuditAction, PreviousAuditSettings } from '../policies/administration';
 import type {
@@ -110,11 +110,23 @@ export interface AuditRecordOptions {
 }
 
 /**
- * Records one audit event. Never rejects, except with AuditTransactionAbortedError when SQLite discarded the
- * caller's whole transaction. With `manager` inside an active transaction the row commits or rolls back with it.
+ * The caller's transaction. Pass the `TransactionScope` of the unit of work the business write runs in. Callers that
+ * still run their own engine transaction may pass that transaction's native handle (opaque here; the audit
+ * persistence adapter interprets it).
+ */
+export type AuditTransactionRef = TransactionScope | object;
+
+/**
+ * Records one audit event. Never rejects, except with AuditTransactionAbortedError when the database discarded the
+ * caller's whole transaction. With `transaction` inside an active transaction the row commits or rolls back with it;
+ * without one the row is written durably before the promise resolves.
  */
 export interface AuditRecorder {
-  record(event: AuditEvent, manager?: EntityManager, options?: AuditRecordOptions): Promise<PluginAuditReceipt>;
+  record(
+    event: AuditEvent,
+    transaction?: AuditTransactionRef,
+    options?: AuditRecordOptions,
+  ): Promise<PluginAuditReceipt>;
 }
 
 export const AUDIT_RECORDER = Symbol('AUDIT_RECORDER');

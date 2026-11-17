@@ -37,7 +37,7 @@ import { AUDIT_RECORDER } from './recorder/audit-event';
 import { SettingsAdministrationService } from '../settings/settings-administration.service';
 import { AuditModule } from './audit.module';
 import { AUDIT_METRICS } from '../metrics/definitions/tokens';
-import { demoDomain, setupAuditDatabase } from './audit.test-fixture';
+import { demoDomain, setupAuditDatabase } from '../database/adapters/audit/audit.test-fixture';
 import { SessionPermissionSync } from '../users-and-auth/auth/sso/session-permission-sync';
 describe('durable audit SQLite', () => {
   const fixture = setupAuditDatabase();
@@ -375,7 +375,7 @@ describe('audit authorization and query validation', () => {
         { type: 'query', metatype: AuditQueryDto },
       ),
     ).resolves.toMatchObject({ domain: 'resource', subjectType: 'flow', action: 'flow.canvas_updated' });
-    const meta = new AuditQueryService({} as never, {} as never, {} as never).meta();
+    const meta = new AuditQueryService({} as never, {} as never).meta();
     expect(meta.subjectTypes).toContain('flow');
     expect(meta.actions).toEqual(
       expect.arrayContaining([

@@ -6,15 +6,16 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
-import { DurableAudit1783700000000 } from '../database/migrations/1783700000000-durable-audit';
-import { IdentityAudit1783800000000 } from '../database/migrations/1783800000000-identity-audit';
-import { registerPluginAuditDomains, resetPluginAuditRegistry } from '../plugin-system/audit/audit-registry';
-import { SettingsStoreService } from '../settings/settings-store.service';
+import { DurableAudit1783700000000 } from '../../migrations/1783700000000-durable-audit';
+import { IdentityAudit1783800000000 } from '../../migrations/1783800000000-identity-audit';
+import { registerPluginAuditDomains, resetPluginAuditRegistry } from '../../../plugin-system/audit/audit-registry';
+import { SettingsStoreService } from '../../../settings/settings-store.service';
 import { Registry } from 'prom-client';
-import { AuditMetrics, createAuditMetrics } from '../metrics/definitions/audit.metrics';
-import { AuditService } from './audit.service';
-import { AuditQueryService } from './audit-query.service';
-import { PluginAuditHost } from './plugin-audit-host';
+import { AuditMetrics, createAuditMetrics } from '../../../metrics/definitions/audit.metrics';
+import { AuditService } from '../../../audit/audit.service';
+import { createSqliteAuditService } from './sqlite-audit-service.test-fixture';
+import { AuditQueryService } from '../../../audit/audit-query.service';
+import { PluginAuditHost } from '../../../audit/plugin-audit-host';
 
 /** Fresh registry per call so drop counters never leak between tests. */
 export const createTestAuditMetrics = (): AuditMetrics => createAuditMetrics(new Registry());
@@ -131,7 +132,7 @@ export function setupAuditDatabase() {
     );
     store = new SettingsStoreService(source.getRepository(Setting), null);
     metrics = createTestAuditMetrics();
-    service = new AuditService(source, store, metrics);
+    service = createSqliteAuditService(source, store, metrics);
     await service.onModuleInit();
   });
 
@@ -168,7 +169,7 @@ export function setupAuditDatabase() {
       return new PluginAuditHost(service);
     },
     get query() {
-      return new AuditQueryService(service, source, store);
+      return new AuditQueryService(service, store);
     },
     get store() {
       return store;
