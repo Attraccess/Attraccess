@@ -1,27 +1,4 @@
-import type {
-  PluginFlowNodeQuery,
-  PluginFlowNodeReference,
-  PluginHostDataContext,
-  PluginPersistenceContext,
-} from '@attraccess/plugins-backend-sdk';
-import { createSqlitePluginPersistence, type DataSource } from '@attraccess/plugins-backend-sdk/sqlite';
-
-/** Accepts every entity class: test doubles do not declare `persistence.sqlite.entities`. */
-const ANY_ENTITY = { includes: () => true } as unknown as unknown[];
-
-/** The plugin persistence context over a real database (or any object with the repository accessors). */
-export function persistenceOver(source: unknown): PluginPersistenceContext {
-  return createSqlitePluginPersistence({
-    pluginName: 'wago',
-    connection: () => source as DataSource,
-    entities: ANY_ENTITY,
-  });
-}
-
-/** The persistence context over repositories a test fakes: `getRepository(entity)` answers with the fake. */
-export function persistenceFaking(getRepository: (entity: never) => unknown): PluginPersistenceContext {
-  return persistenceOver({ getRepository });
-}
+import type { PluginFlowNodeQuery, PluginFlowNodeReference, PluginHostDataContext } from '@attraccess/plugins-backend-sdk';
 
 const unavailable = (name: string) => () => {
   throw new Error(`${name} is not faked by this test`);
@@ -50,12 +27,4 @@ export function flowNode(overrides: Partial<PluginFlowNodeReference> & Pick<Plug
     data: {},
     ...overrides,
   } as PluginFlowNodeReference;
-}
-
-/**
- * Context members for a test that fakes repositories: `persistence` serves them to the code under test, and the
- * given `getRepository` spy stays on the context so the test can assert on or re-program the lookups.
- */
-export function repositoryDouble<T extends (entity: never) => unknown>(getRepository: T) {
-  return { getRepository, persistence: persistenceFaking(getRepository) };
 }
