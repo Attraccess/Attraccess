@@ -51,6 +51,9 @@ import { TypeOrmCredentialStore } from '../../../database/adapters/auth/typeorm-
 import { SsoAccountResolver } from '../../../users-and-auth/auth/sso/account-resolution/sso-account-resolver.service';
 import { SSOSamlStrategy } from '../../../users-and-auth/auth/sso/saml/saml.strategy';
 import type { SSOSamlRequest } from '../../../users-and-auth/auth/sso/saml/saml.types';
+import { TypeOrmRbacStore } from '../../../database/adapters/users/typeorm-rbac.store';
+import { TransactionContextResolver } from '../../../database/adapters/transaction-context';
+import { unitOfWorkFor } from '../../../database/adapters/shared-unit-of-work';
 import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 import { UsersService } from '../../../users-and-auth/users/users.service';
 import { composeUsersService } from '../../../users-and-auth/users/fixtures/compose.test-fixture';
@@ -165,12 +168,10 @@ beforeAll(async () => {
   } as unknown as LicenseService;
 
   const tokenHashService = new TokenHashService(mockConfigService);
+  const rbacUow = unitOfWorkFor(dataSource);
   rbacService = new RbacService(
-    userRoleRepo,
-    roleRepo,
-    permissionRepo,
-    userRepo,
-    rolePermissionRepo,
+    new TypeOrmRbacStore(dataSource, new TransactionContextResolver(dataSource, rbacUow)),
+    rbacUow,
     new EventEmitter2(),
     null,
     { record: jest.fn().mockResolvedValue({ status: 'recorded' }) } as never,

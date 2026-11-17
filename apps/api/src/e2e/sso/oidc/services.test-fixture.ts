@@ -1,3 +1,4 @@
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SettingsService } from '../../../settings/settings.service';
 import { OidcTokenVerifier } from '../../../users-and-auth/auth/sso/oidc/oidc-token-verifier.service';
 import { EncryptionService } from '../../../encryption/encryption.service';
@@ -25,6 +26,9 @@ import { unitOfWorkFor } from '../../../database/adapters/shared-unit-of-work';
 import { TransactionContextResolver } from '../../../database/adapters/transaction-context';
 import { TypeOrmCredentialStore } from '../../../database/adapters/auth/typeorm-credential.store';
 import { SsoAccountResolver } from '../../../users-and-auth/auth/sso/account-resolution/sso-account-resolver.service';
+import { TypeOrmRbacStore } from '../../../database/adapters/users/typeorm-rbac.store';
+import { TransactionContextResolver } from '../../../database/adapters/transaction-context';
+import { unitOfWorkFor } from '../../../database/adapters/shared-unit-of-work';
 import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 import { UsersService } from '../../../users-and-auth/users/users.service';
 import { composeUsersService } from '../../../users-and-auth/users/fixtures/compose.test-fixture';
@@ -70,7 +74,14 @@ export function createOidcTestServices(dataSource: DataSource) {
   } as unknown as LicenseService;
 
   const tokenHashService = new TokenHashService(mockConfigService);
-  const rbacService = new RbacService(userRoleRepo, roleRepo, permissionRepo);
+  const rbacUow = unitOfWorkFor(dataSource);
+  const rbacService = new RbacService(
+    new TypeOrmRbacStore(dataSource, new TransactionContextResolver(dataSource, rbacUow)),
+    rbacUow,
+    new EventEmitter2(),
+    null,
+    { record: jest.fn().mockResolvedValue({ status: 'recorded' }) } as never,
+  );
   const usersService = composeUsersService(
     userRepo,
     authDetailRepo,
