@@ -10,7 +10,7 @@ Das Hinzufügen oder Entfernen eines Eintrags im Register verändert die Geräte
 ## Voraussetzungen
 
 - Attraccess 1.11.0 oder neuer und das Plugin `shelly`, installiert wie unter
-  [Plugins installieren](plugins/installing-plugins.md) beschrieben. Es benötigt die Berechtigung `DATABASE_ACCESS`.
+  [Plugins installieren](plugins/installing-plugins.md) beschrieben. Es benötigt die Berechtigung `PLUGIN_STORAGE` für seine eigenen Tabellen.
 - Shelly-Geräte, die der Attraccess-Server über das Netzwerk per IP-Adresse erreicht.
 - Nutzer benötigen die Berechtigung **Ressourcen verwalten** (`resources.update`), um die Seite zu öffnen.
 - Läuft Attraccess in einem Container, ist dessen Netzwerk nicht Ihr LAN. Geben Sie beim Suchen das Subnetz Ihrer Geräte

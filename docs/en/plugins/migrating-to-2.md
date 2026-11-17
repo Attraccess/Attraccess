@@ -1,6 +1,6 @@
 # Migrating Plugins to SDK 2.0
 
-<!-- llms-description: What plugin developers must change for Attraccess 2.0: plugins have no database access, host ports replace host entities, and own data moves to declared tables with neutral migrations and the record port, with a step-by-step porting guide and the refusal rules. -->
+<!-- llms-description: Migrating plugins to Attraccess 2.0: no database access, host ports instead of host entities, declared tables with neutral migrations and the record port, a porting guide and the refusal rules. -->
 
 Attraccess 2.0 takes the database away from plugins. This is a breaking change for plugins built for 1.x.
 

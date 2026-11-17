@@ -90,9 +90,19 @@ trotz gültiger Lizenz **Lizenz fehlt**, konnte die Lizenz beim Start nicht gepr
 
 ## Upgrade auf Attraccess 2.0
 
-Attraccess 2.0 hat das Plugin-SDK geändert. Für 1.x gebaute Plugins werden nicht geladen: Sie bleiben mit einem Fehler
-in der Plugin-Liste, der das Plugin nennt und auf die [Umstellungsanleitung](plugins/migrating-to-2.md) verweist, und
-ihre Daten bleiben unverändert. Installieren Sie vor oder direkt nach dem Upgrade den 2.0-Build jedes Plugins (Upload
+Attraccess 2.0 hat das Plugin-SDK geändert: Plugins haben keinen Datenbankzugriff mehr und halten ihre eigenen Daten in
+Tabellen, die der Host verwaltet (siehe [Plugin-Speicher](plugins/plugin-storage.md)). Für 1.x gebaute Plugins werden
+nicht geladen: Sie bleiben mit einem Fehler in der Plugin-Liste, der das Plugin nennt, den Grund angibt und auf die
+[Umstellungsanleitung](plugins/migrating-to-2.md) verweist, und ihre Daten bleiben unverändert. Typische Gründe:
+
+- das Plugin zielt auf das SDK 1.x (es deklariert keine Mindest-Host-Version ab `2.0.0-0`);
+- es fordert die entfernte Berechtigung `DATABASE_ACCESS` an (2.0-Plugins fordern `PLUGIN_STORAGE`);
+- es deklariert noch `persistence.backends`, einen TypeORM-Migrationseintrag oder Entitäten;
+- die Datenbank enthält nur einen Teil der alten (1.x-)Migrationen des Plugins. Installieren Sie zuerst das letzte
+  1.x-Release des Plugins, lassen Sie es fertig migrieren und installieren Sie dann den 2.0-Build. Es wurde nichts
+  geändert.
+
+Installieren Sie vor oder direkt nach dem Upgrade den 2.0-Build jedes Plugins (Upload
 oder Marktplatz) oder löschen Sie das alte Plugin aus der Liste. Das Löschen eines abgelehnten Plugins entfernt seine
 Dateien, ohne seinen Code auszuführen.
 

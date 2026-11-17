@@ -189,7 +189,7 @@ anderes Plugin liest WAGO-Geheimnisse; ein Plugin sendet mehr, als es deklariert
 
 **Aktuelle Schutzmaßnahmen**
 
-- Deklarierte Berechtigungen (`plugin.json`: `DATABASE_ACCESS`, `ACCESS_MQTT_SERVERS`, `TRIGGER_FLOWS`, `MANAGE_SECRETS`) werden vom abgesicherten Kontext des Hosts durchgesetzt.
+- Deklarierte Berechtigungen (`plugin.json`: `PLUGIN_STORAGE`, `ACCESS_MQTT_SERVERS`, `TRIGGER_FLOWS`, `MANAGE_SECRETS`) werden vom abgesicherten Kontext des Hosts durchgesetzt.
 - Plugin-Geheimnisse werden mit einem Schlüssel verschlüsselt, der pro Plugin-ID aus dem Server-Geheimnis abgeleitet wird (`apps/api/src/encryption/encryption.service.ts` `getPluginEncryptionKey`).
 - Eine Lint-Regel und ein Modulgrenzen-Skript verhindern, dass das Plugin Host-Interna oder andere Plugins importiert (`@nx/enforce-module-boundaries`, `scripts/lint-module-boundaries.mjs`).
 

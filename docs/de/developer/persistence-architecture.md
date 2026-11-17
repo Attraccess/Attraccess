@@ -64,8 +64,7 @@ Adapter-Interna sind `apps/api/src/database/adapters/**`, `apps/api/src/database
 `libs/database-entities`. Nur Nest-Kompositionsdateien (`*.module.ts`) und Tests dürfen sie importieren; Anwendungs-,
 Domänen- und Transportcode erreicht die Persistenz also nur über Ports. Die neutralen Nahtdateien in
 `apps/api/src/database` (`unit-of-work.ts`, `persistence-errors.ts`, `backend/database-backend.ts`) werden wie
-Anwendungscode geprüft. Den Engine-Unterpfad `@attraccess/plugins-backend-sdk/sqlite` darf im Host nur der
-Plugin-Modullader verwenden.
+Anwendungscode geprüft. Das Plugin-SDK hat keinen Engine-Unterpfad mehr: Plugins können weder TypeORM noch einen Treiber noch eine Entity importieren.
 
 Bestehende Nutzer stehen je Datei in `scripts/persistence-boundaries.baseline.json`. Die Baseline kann nur schrumpfen:
 ein neuer Verstoß schlägt fehl, ebenso eine Datei, die ihren Eintrag nicht mehr braucht, bis er mit
@@ -99,17 +98,18 @@ SQLite-Implementierung (`apps/api/src/database/adapters/<Bereich>`).
 | Nachrichten, Benachrichtigungen, Push, E-Mail, Vorlagen                           | `messaging`, `notifications`, `push`, `email*`                  | Konversations-, Benachrichtigungs-, Push-, Vorlagen- und Empfänger-Stores                                        | `adapters/messaging`, `notifications`, `push`, `email`                |
 | Einstellungen, Analytics, CSV-Export, Metriken                                    | `settings`, `analytics`, `metrics`                              | `SettingsRows`, `AnalyticsReader`, `CsvExportTemplateStore`, Metrik-Reader                                       | `adapters/settings`, `analytics`, `metrics`                           |
 | Projekte, Systemstatistik                                                         | `projects`, `version`                                           | `ProjectStore`, `ProjectInvitationStore`, `SystemStatsStore`                                                     | `adapters/projects`, `adapters/system`                                |
-| Plugin-Verwaltung, Plugin-SDK                                                     | `plugin-system`, `libs/plugins-backend-sdk`                     | Plugin-Persistenz-Host, Host-Daten, Migrationen                                                                  | `adapters/plugins`                                                    |
-| Eingebaute Plugins und Beispiele                                                  | `apps/plugins/*`, `examples/*`                                  | neutrale SDK-2.0-Wurzel plus der Engine-Unterpfad `/sqlite`                                                      | Plugin-eigen                                                          |
+| Plugin-Verwaltung, Plugin-SDK                                                     | `plugin-system`, `libs/plugins-backend-sdk`                     | Plugin-Speicher (Record-Port), Host-Daten, neutrale Migrationen, Transaktionen                                   | `adapters/plugins`                                                    |
+| Eingebaute Plugins und Beispiele                                                  | `apps/plugins/*`, `examples/*`                                  | nur die SDK-2.0-Wurzel: `context.storage`, Host-Ports                                                            | keiner: der Plugin-Speicher-Adapter des Hosts bedient sie             |
 | MCP-OAuth-Clients, -Freigaben und -Tokens                                         | `mcp`                                                           | `McpOAuthStore`                                                                                                  | `adapters/mcp`                                                        |
 | Dashboard-Pins                                                                    | `dashboard`                                                     | `DashboardPinStore`                                                                                              | `adapters/dashboard`                                                  |
 | Start, Herunterfahren, Persistenz-Fehlerfilter                                    | `main.bootstrap.ts`, `app`, `exceptions`                        | `DatabaseLifecycle`, neutrale Fehlerkategorien                                                                   | `database/sqlite`                                                     |
 | Seeds, Setup-Skripte, Testdatenbanken, Werkzeuge                                  | `apps/api/scripts`, `scripts/*`, `apps/api/src/e2e`             | `DATABASE_TYPE`-Provider (`apps/api/scripts/lib/database-provider.mjs`), `apps/api/migration-tracks.cjs`         | `database/sqlite`                                                     |
 | Frontend                                                                          | `apps/frontend`                                                 | keiner, importiert nur `@attraccess/application-models`                                                          | n/a                                                                   |
 
-Die SDK-Wurzel enthält kein TypeORM und keine Host-Entity. Die engine-spezifische Oberfläche ist der explizite Unterpfad
-`@attraccess/plugins-backend-sdk/sqlite`; er funktioniert nur, wenn das aktive Backend SQLite ist, und wird sonst mit
-einem klaren Fehler verweigert (siehe [Plugins auf SDK 2.0 umstellen](plugins/migrating-to-2.md)).
+Plugins haben keinen Datenbankzugriff. Das SDK enthält kein TypeORM, keine Host-Entity, kein rohes SQL und keinen
+Engine-Unterpfad. Ein Plugin deklariert Tabellen in einem neutralen Schema und nutzt den Record-Port; der
+**Plugin-Speicher-Adapter** des Hosts bildet diesen Port und die neutralen Migrationen auf die aktive Engine ab (siehe
+[Plugin-Speicher](plugins/plugin-storage.md) und [Plugins auf SDK 2.0 umstellen](plugins/migrating-to-2.md)).
 
 ### Bekannte verbleibende Nahtstellen
 
@@ -122,13 +122,9 @@ Das sind akzeptierte Grenzen dieser Änderung, keine versteckte Arbeit:
   Adapter auf die Unit of Work um, entfällt er.
 - Adapter entpacken einen Scope mit einigen kleinen Helfern (`TransactionHandles`, `TransactionContextResolver`,
   `EntityManagerResolver`, `managerFor`). Alle lösen über die eine globale Unit of Work auf und lassen sich vereinen.
-- Die eingebauten Plugins nutzen den Unterpfad `@attraccess/plugins-backend-sdk/sqlite` direkt in ihren Services und
-  deklarieren nur `sqlite`. Für eine andere Engine braucht es zuerst plugin-eigene Stores, hinter die dieser Code zieht.
-- Der Transaktions-Manager des Unterpfads `/sqlite` erreicht jede Tabelle der Verbindung, wie `dataSource` in 1.x. Er
-  bleibt an die Berechtigung `DATABASE_ACCESS` gebunden; die neutrale SDK-Wurzel bietet keinen solchen Zugriff.
-- Die Engine-Deklaration in `plugin.json` wird vor Installation, Migration und Laden geprüft. Die Deklaration am
-  Backend-Modul ist erst bekannt, wenn dessen Code läuft; sie wird beim Laden geprüft, also nach den Migrationen, die
-  die `plugin.json`-Deklaration erlaubt hat.
+- Die eingebauten Plugins nutzen nur den Record-Port und laufen daher auf jeder Engine mit Plugin-Speicher-Adapter. Der
+  Port kennt keine Joins; Plugins lesen über mehrere eigene Tabellen mit mehreren Aufrufen.
+- Plugin-Transaktionen werden pro Host-Prozess serialisiert, wie die des Kerns.
 - Einige Lifecycle-Test-Fixtures bauen ältere Schemas absichtlich mit `synchronize`, um Upgrades und Wiederherstellung
   aus einem Schema vor den Integritätsmigrationen zu testen.
 - Swagger-Schemas, die geheime oder nie befüllte Felder dokumentierten, sind jetzt korrekt (siehe unten).
