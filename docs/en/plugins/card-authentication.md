@@ -22,9 +22,9 @@ both are protected by the card's secure messaging. The result carries the card's
 
 ## Permission
 
-Declare `CARD_AUTHENTICATION` in your manifest. Administrators see it with this description when they install the
-plugin: _"Authenticate NFC cards held to the plugin's own devices with the Attraccess card keys. The plugin receives the
-card and its owner, never the keys."_
+Declare `CARD_AUTHENTICATION` in your manifest. Administrators see the permission on the Plugins page when they install
+the plugin. The SDK describes it as _"Authenticate NFC cards held to the plugin's own devices with the Attraccess card
+keys. The plugin receives the card and its owner, never the keys."_
 
 ```json
 {
@@ -47,8 +47,10 @@ async function onCardPresented(
   channel: PluginCardChannel,
   resourceId: number,
 ) {
+  const cards = context.cards;
+  if (!cards) throw new Error('This plugin needs a host with card authentication support');
   const cardLeft = new AbortController(); // abort it when your device reports that the card left the field
-  const result = await context.cards.authenticate({ uid, device: deviceId, channel, signal: cardLeft.signal });
+  const result = await cards.authenticate({ uid, device: deviceId, channel, signal: cardLeft.signal });
   if (!result.ok) return deny(result.reason);
 
   // Authentication only says whose card it is. Whether that person may do something is your plugin's decision.
@@ -77,19 +79,24 @@ interface PluginCardChannel {
 
 | Field     | Meaning                                                                                                                                                        |
 | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `uid`     | The card UID as your device reports it, hex, 4 to 32 characters. Anything else resolves with `INVALID_UID`.                                                    |
+| `uid`     | The card UID, hex, 4 to 32 characters; anything else resolves with `INVALID_UID`. It is compared exactly: send it in lowercase, as Attractap readers do.       |
 | `device`  | Your own id of the device that holds the card (1 to 200 characters), for example a BLE endpoint id.                                                            |
 | `channel` | The card channel above.                                                                                                                                        |
 | `signal`  | Optional. Abort it when the card left the field or you give up; the conversation ends with `CARD_REMOVED`. An already aborted signal ends it before it starts. |
 
-`authenticate` resolves for every card or conversation outcome. It rejects only for programming errors: a missing
-permission, a missing `channel.exchange` or an invalid `device`.
+`authenticate` resolves for every card or conversation outcome. It rejects in two cases only:
+
+- A programming error (`TypeError`): a missing `channel.exchange`, a `device` that is empty or longer than 200
+  characters, or a `signal` that is not an `AbortSignal`. Such a request leaves the running conversation alone.
+- A host failure, for example the database is unavailable or the API is still starting: a generic `Error` without
+  details. It is temporary; retry later.
 
 ### One conversation per device
 
 Attraccess runs one conversation per plugin and `device`. A new `authenticate` for the same device ends the running one
 with `CARD_REMOVED` and aborts the `signal` of its pending exchange, just as a new card on an Attractap reader replaces
-the previous one. Conversations on different devices run side by side.
+the previous one. This happens before the UID and the server-wide limit are checked, so a request that then resolves
+with `INVALID_UID` or `BUSY` still ends the old one. Conversations on different devices, and devices of other plugins, run side by side.
 
 ## Limits
 
@@ -117,7 +124,7 @@ resolves with `BUSY`.
 | `TIMEOUT`                    | One exchange took longer than 3 s, or the conversation longer than 15 s.                                     |
 | `TOO_MANY_EXCHANGES`         | The conversation needed more than 32 exchanges.                                                              |
 | `DEVICE_ERROR`               | `exchange` rejected or threw, or answered with something that is not a `Uint8Array` or longer than 64 bytes. |
-| `CANCELLED`                  | The API is shutting down, or your plugin is being disabled, uninstalled or restarted.                        |
+| `CANCELLED`                  | The API is shutting down or unloading your plugin.                                                           |
 | `INVALID_UID`                | The UID is not 4 to 32 hex characters.                                                                       |
 | `CARD_NOT_FOUND`             | No card is enrolled for this UID.                                                                            |
 | `CARD_NOT_ACTIVE`            | The card is enrolled but not the user's active card.                                                         |
@@ -126,11 +133,20 @@ resolves with `BUSY`.
 
 Unlike on Attractap readers, `TIMEOUT` and `TOO_MANY_EXCHANGES` are reported separately.
 
+Disabling, enabling, installing or uninstalling a plugin restarts the API. Running conversations end with the process
+then; `CANCELLED` reaches your plugin when the API shuts down gracefully (for example on `SIGTERM`).
+
 ## Interrupted enrollments and resets
 
 When an enrollment or reset at an Attractap was interrupted after the key was written, the next presentation of the card
-finishes it, at a reader or at your device. Audit entries written in that case carry the source `plugin-recovery` and
-your plugin's id (`details.pluginId`) instead of a reader id.
+finishes it, at a reader or at your device. Your plugin gets the same result as a reader:
+
+- A finished enrollment resolves with the new card (`ok: true`), or with `CARD_NOT_ACTIVE` when the user already has
+  another active card.
+- A finished reset deletes the card and resolves with `CARD_NOT_FOUND`.
+
+Audit entries written in that case carry the source `plugin-recovery` and your plugin's id (`details.pluginId`) instead
+of a reader id.
 
 Enrolling or resetting cards through a plugin device is not possible: plugins can only authenticate.
 
@@ -142,9 +158,15 @@ made up for the example: the plugin writes `[seq, ...apdu]` to one characteristi
 `CARD_AUTHENTICATION`.
 
 ```ts
-import type { PluginBleSession, PluginCardChannel, PluginContext } from '@attraccess/plugins-backend-sdk';
+import type {
+  PluginBleContext,
+  PluginBleSession,
+  PluginCardChannel,
+  PluginCardsContext,
+} from '@attraccess/plugins-backend-sdk';
 
-context.ble.registerProfile({
+// In register(context), after checking that context.ble and context.cards exist:
+ble.registerProfile({
   id: 'nfc-terminal',
   services: [
     {
@@ -172,9 +194,9 @@ async function bleCardChannel(session: PluginBleSession): Promise<PluginCardChan
   };
 }
 
-function cardPresented(context: PluginContext, endpointId: string, uid: string) {
-  return context.ble.withSession(endpointId, async (session) =>
-    context.cards.authenticate({ uid, device: endpointId, channel: await bleCardChannel(session) }),
+function cardPresented(ble: PluginBleContext, cards: PluginCardsContext, endpointId: string, uid: string) {
+  return ble.withSession(endpointId, async (session) =>
+    cards.authenticate({ uid, device: endpointId, channel: await bleCardChannel(session) }),
   );
 }
 ```

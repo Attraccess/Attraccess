@@ -5,10 +5,10 @@
 Ein Backend-Plugin, das ein NFC-fähiges Gerät besitzt (ein Terminal, eine Türeinheit, ein Maschinenpanel), kann
 Attraccess eine Karte authentifizieren lassen, die an dieses Gerät gehalten wird. Das Plugin übergibt die UID der Karte
 und einen **Kartenkanal**: eine Funktion, die eine APDU an die Karte weiterleitet und die Antwort der Karte zurückgibt.
-Attraccess führt über diesen Kanal dieselbe Prüfung aus wie bei einem Tap an einem Attractap-Reader und teilt dem Plugin
+Attraccess führt über diesen Kanal dieselbe Prüfung aus wie beim Auflegen an einem Attractap-Reader und teilt dem Plugin
 mit, wem die Karte gehört.
 
-Eine an einem Attractap angelernte Karte funktioniert deshalb am Gerät des Plugins genauso, mit denselben Fehlerbedeutungen.
+Eine an einem Attractap registrierte Karte funktioniert deshalb am Gerät des Plugins genauso, mit denselben Fehlerbedeutungen.
 
 ## Vertrauensgrenze
 
@@ -24,9 +24,9 @@ die Antworten der Karte; beide sind durch das Secure Messaging der Karte geschü
 
 ## Berechtigung
 
-Deklarieren Sie `CARD_AUTHENTICATION` im Manifest. Administratoren sehen sie bei der Installation mit dieser
-Beschreibung: _„Authenticate NFC cards held to the plugin's own devices with the Attraccess card keys. The plugin
-receives the card and its owner, never the keys."_
+Deklarieren Sie `CARD_AUTHENTICATION` im Manifest. Administratoren sehen die Berechtigung bei der Installation auf der
+Plugins-Seite. Das SDK beschreibt sie so: _„Authenticate NFC cards held to the plugin's own devices with the Attraccess
+card keys. The plugin receives the card and its owner, never the keys.“_
 
 ```json
 {
@@ -35,7 +35,7 @@ receives the card and its owner, never the keys."_
 ```
 
 Ohne die Berechtigung wirft das Lesen von `context.cards` einen `PluginPermissionError`. `context.cards` ist im Typ
-optional, weil ältere Hosts es nicht anbieten; ein solcher Host wirft einen Fehler „unavailable in this host".
+optional, weil ältere Hosts es nicht anbieten; ein solcher Host wirft einen Fehler „unavailable in this host“.
 
 ## Verwendung
 
@@ -49,8 +49,10 @@ async function onCardPresented(
   channel: PluginCardChannel,
   resourceId: number,
 ) {
+  const cards = context.cards;
+  if (!cards) throw new Error('This plugin needs a host with card authentication support');
   const cardLeft = new AbortController(); // abbrechen, wenn das Gerät meldet, dass die Karte das Feld verlassen hat
-  const result = await context.cards.authenticate({ uid, device: deviceId, channel, signal: cardLeft.signal });
+  const result = await cards.authenticate({ uid, device: deviceId, channel, signal: cardLeft.signal });
   if (!result.ok) return deny(result.reason);
 
   // Die Authentifizierung sagt nur, wem die Karte gehört. Ob diese Person etwas darf, entscheidet Ihr Plugin.
@@ -81,19 +83,26 @@ interface PluginCardChannel {
 
 | Feld      | Bedeutung                                                                                                                                                                               |
 | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `uid`     | Die UID der Karte, wie Ihr Gerät sie meldet, hexadezimal, 4 bis 32 Zeichen. Alles andere ergibt `INVALID_UID`.                                                                          |
+| `uid`     | Die UID der Karte, hexadezimal, 4 bis 32 Zeichen; alles andere ergibt `INVALID_UID`. Sie wird exakt verglichen: Senden Sie sie in Kleinbuchstaben, wie Attractap-Reader.                |
 | `device`  | Ihre eigene Kennung des Geräts, an dem die Karte liegt (1 bis 200 Zeichen), zum Beispiel eine BLE-Endpunkt-ID.                                                                          |
 | `channel` | Der Kartenkanal von oben.                                                                                                                                                               |
 | `signal`  | Optional. Brechen Sie es ab, wenn die Karte das Feld verlassen hat oder Sie aufgeben; das Gespräch endet mit `CARD_REMOVED`. Ein bereits abgebrochenes Signal beendet es vor dem Start. |
 
-`authenticate` löst für jedes Karten- oder Gesprächsergebnis auf. Es lehnt nur bei Programmierfehlern ab: fehlende
-Berechtigung, fehlendes `channel.exchange` oder ungültiges `device`.
+`authenticate` löst für jedes Karten- oder Gesprächsergebnis auf. Es lehnt nur in zwei Fällen ab:
+
+- Bei einem Programmierfehler (`TypeError`): fehlendes `channel.exchange`, ein `device`, das leer oder länger als
+  200 Zeichen ist, oder ein `signal`, das kein `AbortSignal` ist. Eine solche Anfrage lässt das laufende Gespräch in
+  Ruhe.
+- Bei einem Fehler im Host, zum Beispiel wenn die Datenbank nicht erreichbar ist oder die API noch startet: ein
+  allgemeiner `Error` ohne Details. Der Fehler ist vorübergehend; versuchen Sie es später erneut.
 
 ### Ein Gespräch pro Gerät
 
 Attraccess führt ein Gespräch pro Plugin und `device`. Ein neues `authenticate` für dasselbe Gerät beendet das laufende
 mit `CARD_REMOVED` und bricht das `signal` seines offenen Austauschs ab, so wie eine neue Karte an einem Attractap-Reader
-die vorige ersetzt. Gespräche an verschiedenen Geräten laufen nebeneinander.
+die vorige ersetzt. Das geschieht, bevor UID und serverweites Limit geprüft werden: Auch eine Anfrage, die danach mit `INVALID_UID`
+oder `BUSY` auflöst, beendet das alte Gespräch. Gespräche an verschiedenen Geräten und an Geräten anderer Plugins laufen
+nebeneinander.
 
 ## Grenzwerte
 
@@ -121,22 +130,33 @@ Plugin-Gespräche zählen zum selben serverweiten Limit wie Reader-Gespräche. I
 | `TIMEOUT`                    | Ein Austausch dauerte länger als 3 s oder das Gespräch länger als 15 s.                                                 |
 | `TOO_MANY_EXCHANGES`         | Das Gespräch brauchte mehr als 32 Austausche.                                                                           |
 | `DEVICE_ERROR`               | `exchange` hat abgelehnt oder geworfen, oder mit etwas geantwortet, das kein `Uint8Array` oder länger als 64 Bytes ist. |
-| `CANCELLED`                  | Die API fährt herunter, oder Ihr Plugin wird deaktiviert, deinstalliert oder neu gestartet.                             |
+| `CANCELLED`                  | Die API fährt herunter oder entlädt Ihr Plugin.                                                                         |
 | `INVALID_UID`                | Die UID besteht nicht aus 4 bis 32 Hex-Zeichen.                                                                         |
-| `CARD_NOT_FOUND`             | Für diese UID ist keine Karte angelernt.                                                                                |
-| `CARD_NOT_ACTIVE`            | Die Karte ist angelernt, aber nicht die aktive Karte des Benutzers.                                                     |
+| `CARD_NOT_FOUND`             | Für diese UID ist keine Karte registriert.                                                                              |
+| `CARD_NOT_ACTIVE`            | Die Karte ist registriert, aber nicht die aktive Karte des Benutzers.                                                   |
 | `CARD_NOT_SUPPORTED`         | Der Kartentyp wird nicht unterstützt (zum Beispiel eine DESFire EV1).                                                   |
 | `CARD_AUTHENTICATION_FAILED` | Die Karte hat den gespeicherten Schlüssel nicht nachgewiesen: kopierte UID, fremde Karte oder manipulierte Antwort.     |
 
 Anders als bei Attractap-Readern werden `TIMEOUT` und `TOO_MANY_EXCHANGES` getrennt gemeldet.
 
-## Unterbrochenes Anlernen und Zurücksetzen
+Das Aktivieren, Deaktivieren, Installieren oder Deinstallieren eines Plugins startet die API neu. Laufende Gespräche
+enden dann mit dem Prozess; `CANCELLED` erreicht Ihr Plugin, wenn die API geordnet herunterfährt (zum Beispiel bei
+`SIGTERM`).
 
-Wurde das Anlernen oder Zurücksetzen an einem Attractap unterbrochen, nachdem der Schlüssel geschrieben war, schließt die
-nächste Vorlage der Karte es ab, an einem Reader oder an Ihrem Gerät. Audit-Einträge, die dabei entstehen, tragen die
-Quelle `plugin-recovery` und die ID Ihres Plugins (`details.pluginId`) statt einer Reader-ID.
+## Unterbrochenes Registrieren und Zurücksetzen
 
-Karten über ein Plugin-Gerät anzulernen oder zurückzusetzen ist nicht möglich: Plugins können nur authentifizieren.
+Wurde das Registrieren oder Zurücksetzen an einem Attractap unterbrochen, nachdem der Schlüssel geschrieben war, schließt
+das nächste Auflegen der Karte es ab, an einem Reader oder an Ihrem Gerät. Ihr Plugin bekommt dasselbe Ergebnis wie ein
+Reader:
+
+- Eine abgeschlossene Registrierung löst mit der neuen Karte auf (`ok: true`), oder mit `CARD_NOT_ACTIVE`, wenn der
+  Benutzer schon eine andere aktive Karte hat.
+- Ein abgeschlossenes Zurücksetzen löscht die Karte und löst mit `CARD_NOT_FOUND` auf.
+
+Audit-Einträge, die dabei entstehen, tragen die Quelle `plugin-recovery` und die ID Ihres Plugins (`details.pluginId`)
+statt einer Reader-ID.
+
+Karten über ein Plugin-Gerät zu registrieren oder zurückzusetzen ist nicht möglich: Plugins können nur authentifizieren.
 
 ## Beispiel: ein Kartenkanal über Bluetooth
 
@@ -146,9 +166,15 @@ antwortet mit einer Notification `[seq, ...antwort]` auf einer anderen. Ihr Ger�
 Deklarieren Sie `BLE_TRANSPORT` und `CARD_AUTHENTICATION`.
 
 ```ts
-import type { PluginBleSession, PluginCardChannel, PluginContext } from '@attraccess/plugins-backend-sdk';
+import type {
+  PluginBleContext,
+  PluginBleSession,
+  PluginCardChannel,
+  PluginCardsContext,
+} from '@attraccess/plugins-backend-sdk';
 
-context.ble.registerProfile({
+// In register(context), nachdem geprüft ist, dass context.ble und context.cards vorhanden sind:
+ble.registerProfile({
   id: 'nfc-terminal',
   services: [
     {
@@ -176,9 +202,9 @@ async function bleCardChannel(session: PluginBleSession): Promise<PluginCardChan
   };
 }
 
-function cardPresented(context: PluginContext, endpointId: string, uid: string) {
-  return context.ble.withSession(endpointId, async (session) =>
-    context.cards.authenticate({ uid, device: endpointId, channel: await bleCardChannel(session) }),
+function cardPresented(ble: PluginBleContext, cards: PluginCardsContext, endpointId: string, uid: string) {
+  return ble.withSession(endpointId, async (session) =>
+    cards.authenticate({ uid, device: endpointId, channel: await bleCardChannel(session) }),
   );
 }
 ```
