@@ -15,6 +15,5 @@
   "attraccessVersion": {
     "min": "2.0.0-0"
   },
-  "persistence": { "backends": ["sqlite"] },
   "permissions": ["ACCESS_MQTT_SERVERS"]
 }

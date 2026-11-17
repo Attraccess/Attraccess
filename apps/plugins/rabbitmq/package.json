@@ -33,11 +33,6 @@
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
     "styles": "frontend/style.css",
-    "persistence": {
-      "backends": [
-        "sqlite"
-      ]
-    },
     "permissions": [
       "ACCESS_MQTT_SERVERS"
     ],
