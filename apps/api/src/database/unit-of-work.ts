@@ -121,30 +121,59 @@ export class ScopedUnitOfWork<THandle> implements UnitOfWork {
 }
 
 export interface RetryOptions {
-  /** Total attempts including the first. Defaults to 3; never unbounded. */
+  /** Total attempts including the first. Defaults to 3, at most 10; never unbounded. */
   readonly attempts?: number;
-  /** Which failures are worth another attempt. Defaults to busy and write-conflict categories. */
+  /** Which failures are worth another attempt. Defaults to the busy and write-conflict categories. */
   readonly isTransient?: (error: unknown) => boolean;
+  /** Upper bound of the wait before the first retry; it doubles per retry. Defaults to 50 ms. */
+  readonly baseDelayMs?: number;
+  /** Upper bound of any single wait. Defaults to 1000 ms. */
+  readonly maxDelayMs?: number;
+  /** Waits between attempts (tests replace it). */
+  readonly sleep?: (ms: number) => Promise<void>;
+  /** Uniform random number in [0, 1) for the jitter (tests replace it). */
+  readonly random?: () => number;
+}
+
+const MAX_ATTEMPTS = 10;
+const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Full jitter: a random wait up to an exponentially growing, capped bound, so retrying writers spread out. */
+export function retryDelayMs(retry: number, options: RetryOptions = {}): number {
+  const base = Math.max(0, options.baseDelayMs ?? 50);
+  const cap = Math.max(0, options.maxDelayMs ?? 1000);
+  const bound = Math.min(cap, base * 2 ** Math.max(0, retry - 1));
+  return Math.floor((options.random ?? Math.random)() * bound);
 }
 
 /**
- * Runs a unit of work again when the database reports a transient failure (busy, write conflict), a bounded number of
- * times. The work must be free of external effects: a retry runs it again from the start. Effects belong in
+ * The sanctioned way to retry database work. Runs a unit of work again when the database reports a transient failure
+ * (busy, write conflict), a bounded number of times, with a short jittered exponential backoff between attempts. The
+ * work must be free of external effects: a retry runs it again from the start. Effects belong in
  * `scope.afterCommit`, which only runs for the attempt that committed, so retries never replay device commands,
  * payments, MQTT publishes or emails.
+ *
+ * It refuses to run inside an open unit of work: there `run` would join the caller's transaction, a retry could not
+ * roll back the failed attempt, and that attempt's post-commit callbacks would stay registered. Retry the outermost
+ * unit of work instead.
  */
 export async function runWithRetry<T>(
   uow: UnitOfWork,
   work: (scope: TransactionScope) => Promise<T>,
   options: RetryOptions = {},
 ): Promise<T> {
-  const attempts = Math.max(1, Math.min(options.attempts ?? 3, 10));
+  if (uow.current()?.isOpen) {
+    throw new TransactionScopeError('runWithRetry cannot run inside an open unit of work; retry the outermost one');
+  }
+  const attempts = Math.max(1, Math.min(options.attempts ?? 3, MAX_ATTEMPTS));
   const isTransient = options.isTransient ?? ((error) => isDatabaseBusyError(error) || isWriteConflict(error));
+  const sleep = options.sleep ?? defaultSleep;
   for (let attempt = 1; ; attempt++) {
     try {
       return await uow.run(work);
     } catch (error) {
       if (attempt >= attempts || !isTransient(error)) throw error;
     }
+    await sleep(retryDelayMs(attempt, options));
   }
 }

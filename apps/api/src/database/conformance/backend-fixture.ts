@@ -17,9 +17,19 @@ export interface ConformanceConnection {
   classify(error: unknown): PersistenceErrorKind | undefined;
 }
 
+export interface ConnectOptions {
+  /** How long a statement of this connection waits for another connection's lock before the engine gives up. */
+  readonly lockTimeoutMs?: number;
+}
+
 export interface ConformanceDatabase {
   /** An independent connection to the same database: its own pool/handle, not a promise on a shared one. */
-  connect(): Promise<ConformanceConnection>;
+  connect(options?: ConnectOptions): Promise<ConformanceConnection>;
+  /**
+   * Holds the database's write lock from a further connection until the returned release is called, so writers of
+   * other connections wait and, past their lock timeout, fail with the engine's busy error.
+   */
+  induceBusy(): Promise<() => Promise<void>>;
   close(): Promise<void>;
 }
 

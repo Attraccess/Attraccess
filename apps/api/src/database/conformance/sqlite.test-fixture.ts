@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import { sqliteBackend } from '../sqlite/sqlite-backend';
-import { createSqliteUnitOfWork } from '../sqlite/sqlite-unit-of-work';
 import type { BackendFixture, ConformanceConnection, ConformanceDatabase } from './backend-fixture';
 
 /** Real SQLite files, one DataSource (and so one set of connections) per `connect()`. */
@@ -14,8 +13,8 @@ export const sqliteFixture: BackendFixture = {
     const file = join(directory, 'conformance.sqlite');
     const sources: DataSource[] = [];
 
-    const open = async (): Promise<DataSource> => {
-      const source = await sqliteBackend.createDataSource({ type: 'sqlite', database: file }).initialize();
+    const open = async (busyTimeout?: number): Promise<DataSource> => {
+      const source = await sqliteBackend.createDataSource({ type: 'sqlite', database: file, busyTimeout }).initialize();
       sources.push(source);
       return source;
     };
@@ -26,9 +25,9 @@ export const sqliteFixture: BackendFixture = {
     await setup.query('CREATE TABLE unique_key (key TEXT PRIMARY KEY)');
 
     return {
-      async connect(): Promise<ConformanceConnection> {
-        const source = await open();
-        const unitOfWork = createSqliteUnitOfWork(source);
+      async connect(options = {}): Promise<ConformanceConnection> {
+        const source = await open(options.lockTimeoutMs);
+        const unitOfWork = sqliteBackend.createUnitOfWork(source);
         return {
           unitOfWork,
           async addToBalance(scope, accountId, delta) {
@@ -44,6 +43,16 @@ export const sqliteFixture: BackendFixture = {
             return balance;
           },
           classify: (error) => sqliteBackend.errors.classify(error),
+        };
+      },
+      async induceBusy() {
+        // A plain connection, outside the backend's flow guard: it only takes and holds the file's write lock.
+        const holder = await new DataSource({ type: 'sqlite', database: file }).initialize();
+        sources.push(holder);
+        await holder.query('BEGIN IMMEDIATE');
+        return async () => {
+          await holder.query('ROLLBACK');
+          await holder.destroy();
         };
       },
       async close() {
