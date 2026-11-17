@@ -295,6 +295,7 @@ export default plugin;
 | `context.runSerialized(fn)`                               | Run database work in one serialized transaction. See [Serialized transactions](#serialized-transactions).                                                         | `DATABASE_ACCESS`        |
 | `context.license`                                         | Query the license (`getLicense`, `hasModule`, `verify`). Optional: older hosts do not provide it. See [License requirements](#license-requirements).              | none                     |
 | `context.ble`                                             | Bluetooth transport through Attractap readers: profiles, endpoints, sessions. See [Bluetooth Transport for Plugins](plugins/ble-transport.md).                    | `BLE_TRANSPORT`          |
+| `context.cards`                                           | Authenticate NFC cards held to your plugin's own devices. See [Card Authentication for Plugins](plugins/card-authentication.md).                                  | `CARD_AUTHENTICATION`    |
 
 > [!IMPORTANT]
 > Resolve services and repositories through `context`, never by re-initialising
@@ -323,6 +324,7 @@ naming the missing permission.
 | `ACCESS_HOOKS`           | The `preStartHook`, `sessionEndHook`, `startBlockedQuery` and `startCapacityHook` — ask for a confirmation or block a session start, and show a blocked start in the UI. `startCapacityHook` also needs `DATABASE_ACCESS`. See [Reader UI](#reader-ui-and-start-hooks). |
 | `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` — send in-app, push and email notifications under categories the plugin declares, and declare editable email templates. See [Notifications](#notifications).                                                                      |
 | `BLE_TRANSPORT`          | `context.ble` — use the Bluetooth radio of Attractap readers an administrator opened for plugins, limited to the BLE profiles your plugin registers. See [Bluetooth Transport for Plugins](plugins/ble-transport.md).                                                   |
+| `CARD_AUTHENTICATION`    | `context.cards` — authenticate NFC cards held to your plugin's own devices with the Attraccess card keys; your plugin gets the card and its owner, never the keys. See [Card Authentication for Plugins](plugins/card-authentication.md).                               |
 
 ### Plugin-declared RBAC permissions
 

@@ -83,6 +83,7 @@
   - [Plugins installieren](plugins/installing-plugins.md)
   - [Plugins entwickeln](plugins/developing-plugins.md)
   - [Bluetooth-Transport für Plugins](plugins/ble-transport.md)
+  - [Kartenauthentifizierung für Plugins](plugins/card-authentication.md)
   - **Reservierungen**
     - [Überblick](plugins/reservations/overview.md)
     - [Reservierungen nutzen](plugins/reservations/using-reservations.md)
