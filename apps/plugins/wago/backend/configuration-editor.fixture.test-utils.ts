@@ -1,5 +1,6 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import type { WagoConfigurationSnapshot } from './configuration/model';
+import type { WagoConfigurationDraftRow } from './storage';
 import { spyOnWagoStorage } from './storage-spy.test-utils';
 import { createWagoTestStorage } from './storage/testing';
 import { revisionRow } from './rows.test-utils';
@@ -44,8 +45,12 @@ export function fixture({ capabilities = FIXTURE_CAPABILITIES }: { capabilities?
     add: (row: Record<string, unknown> & { revision: number }) =>
       test.tables.configurationRevisions.insert(
         revisionRow({
-          controllerId: 1,
-          ...Object.fromEntries(Object.entries(row).filter(([, value]) => value !== undefined)),
+          ...(Object.fromEntries(
+            Object.entries({ controllerId: 1, ...row }).filter(([, value]) => value !== undefined),
+          ) as {
+            controllerId: number;
+            revision: number;
+          }),
         }),
       ),
     update: (revision: number, patch: Parameters<typeof test.tables.configurationRevisions.update>[1]) =>
@@ -91,7 +96,7 @@ export function fixture({ capabilities = FIXTURE_CAPABILITIES }: { capabilities?
     revisions,
     flowQuery,
     audit,
-    draft: () => test.rows('configurationDrafts')[0] ?? null,
+    draft: () => (test.rows('configurationDrafts')[0] ?? null) as WagoConfigurationDraftRow | null,
   };
 }
 
