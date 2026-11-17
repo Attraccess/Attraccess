@@ -1,6 +1,11 @@
-import { FindOperator } from 'typeorm';
-import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
-import { ResourceHealthStatus, ResourceType, ResourceUsageAction } from '@attraccess/application-models';
+import {
+  ResourceHealthStatus,
+  ResourceType,
+  ResourceUsageAction,
+  type ResourceRecord as Resource,
+  type UsageSession as ResourceUsage,
+  type UserRecord as User,
+} from '@attraccess/application-models';
 import { ResourceEventsService } from './resource-events.service';
 import {
   ResourceSessionStartedEvent,
@@ -8,7 +13,7 @@ import {
   ResourceUsageSessionTakenOverEvent,
 } from '../usage/events/resource-usage.events';
 import { ResourceHealthChangedEvent } from '../health/events/resource-health-changed.event';
-import { activeUsageWhere } from '../usage/sessions/active-usage';
+import { isActiveUsage } from '../usage/sessions/active-usage';
 
 const flush = () => new Promise<void>((done) => setImmediate(done));
 
@@ -23,17 +28,6 @@ const row = (overrides: Partial<ResourceUsage> = {}) =>
     ...overrides,
   }) as ResourceUsage;
 
-/** Applies a TypeORM where object to in-memory rows, enough for equality and IsNull(). */
-const matches = (usage: ResourceUsage, where: Record<string, unknown>) =>
-  Object.entries(where).every(([column, expected]) => {
-    const value = usage[column as keyof ResourceUsage];
-    if (expected instanceof FindOperator) {
-      if (expected.type !== 'isNull') throw new Error(`Unsupported operator ${expected.type}`);
-      return value == null;
-    }
-    return value === expected;
-  });
-
 const createService = (options: { resource?: Partial<Resource>; usages?: ResourceUsage[] } = {}) => {
   const resource = { id: 1, type: ResourceType.Machine, maxParallelSessions: 1, ...options.resource };
   const usages = options.usages ?? [];
@@ -42,7 +36,7 @@ const createService = (options: { resource?: Partial<Resource>; usages?: Resourc
     findCapacity: jest.fn(async () => resource),
     countActiveSessions: jest.fn(
       async (resourceId: number) =>
-        usages.filter((usage) => matches(usage, { resourceId, ...activeUsageWhere() })).length,
+        usages.filter((usage) => usage.resourceId === resourceId && isActiveUsage(usage)).length,
     ),
   };
   const service = new ResourceEventsService(store as never);
@@ -55,9 +49,7 @@ const createService = (options: { resource?: Partial<Resource>; usages?: Resourc
 };
 
 const startedEvent = (overrides: Partial<ResourceUsage> = {}) =>
-  new ResourceSessionStartedEvent(
-    Object.assign(new ResourceUsage(), { resource: Object.assign(new Resource(), { id: 1 }), ...overrides }),
-  );
+  new ResourceSessionStartedEvent({ resource: { id: 1 }, ...overrides } as ResourceUsage);
 
 describe('resource initial state and subject cleanup', () => {
   it('delivers initial state only to the new consumer and releases the subject immediately', async () => {

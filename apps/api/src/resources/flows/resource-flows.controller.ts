@@ -1,5 +1,5 @@
 import { Auth, AuthenticatedRequest, ResourceFlowNodeType } from '@attraccess/plugins-backend-sdk';
-import { ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNodeResponseDto } from './dto/resource-flow-node-record-response.dto';
 
 import type { FlowNodeRecord } from '@attraccess/application-models';
 
@@ -188,7 +188,7 @@ export class ResourceFlowsController {
   @ApiResponse({
     status: 200,
     description: 'Buttons retrieved successfully',
-    type: ResourceFlowNode,
+    type: ResourceFlowNodeResponseDto,
     isArray: true,
   })
   @ApiResponse({

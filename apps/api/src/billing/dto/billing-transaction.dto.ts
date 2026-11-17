@@ -1,6 +1,7 @@
 import { BillingTransactionStatus } from '@attraccess/application-models';
 // The related user and usage are documented with their public schemas; they are not billing data.
-import { ResourceUsage, User } from '@attraccess/database-entities';
+import { UserDto } from '../../users-and-auth/users/dtos/user.dto';
+import { ResourceUsageResponseDto } from '../../resources/usage/dtos/resource-usage-response.dto';
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
 
 /** Schema names stay `BillingTransaction*` so the published API description does not change. */
@@ -75,7 +76,7 @@ export class BillingTransactionDto {
   @ApiProperty({ description: 'The ID of the user', example: 1 })
   userId!: number;
 
-  @ApiProperty({ description: 'The user who the billing transaction belongs to', type: () => User })
+  @ApiProperty({ description: 'The user who the billing transaction belongs to', type: () => UserDto })
   user?: unknown;
 
   @ApiProperty({ description: 'The date and time the billing transaction was created' })
@@ -90,13 +91,16 @@ export class BillingTransactionDto {
   @ApiProperty({ description: 'The user ID of the user who caused the billing transaction' })
   initiatorId?: number | null;
 
-  @ApiProperty({ description: 'The user who initiated the billing transaction', type: () => User })
+  @ApiProperty({ description: 'The user who initiated the billing transaction', type: () => UserDto })
   initiator?: unknown;
 
   @ApiProperty({ description: 'The resource usage ID of the resource usage that caused the billing transaction' })
   resourceUsageId?: number | null;
 
-  @ApiProperty({ description: 'The resource usage that caused the billing transaction', type: () => ResourceUsage })
+  @ApiProperty({
+    description: 'The resource usage that caused the billing transaction',
+    type: () => ResourceUsageResponseDto,
+  })
   resourceUsage?: unknown;
 
   @ApiProperty({ description: 'The billing transaction ID of the billing transaction that is being refunded' })

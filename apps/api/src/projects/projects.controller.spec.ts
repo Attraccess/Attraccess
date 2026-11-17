@@ -4,7 +4,11 @@ import { ProjectsService } from './projects.service';
 import { FileStorageService } from '../common/services/file-storage.service';
 import { FindManyProjectsQueryDto } from './dto/find-many-query.dto';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { Project, ProjectMember, User } from '@attraccess/database-entities';
+import type {
+  ProjectMemberRecord as ProjectMember,
+  ProjectRecord as Project,
+  UserRecord as User,
+} from '@attraccess/application-models';
 import { NotFoundException } from '@nestjs/common';
 import { CreateProjectDto } from './dto/create.dto';
 import { UpdateProjectDto } from './dto/update.dto';

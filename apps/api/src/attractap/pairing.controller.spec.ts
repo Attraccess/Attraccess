@@ -1,7 +1,7 @@
 import { ExecutionContext, INestApplication, UnauthorizedException, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { AuthenticatedRequest, DualAuthGuard } from '@attraccess/plugins-backend-sdk';
-import { User } from '@attraccess/database-entities';
+import type { PluginUserModel } from '@attraccess/application-models';
 import request from 'supertest';
 import { LicenseGuard } from '../license/license.guard';
 import { EnrollmentRateLimitedException } from '../device-enrollment/enrollment-rate-limited.exception';
@@ -38,7 +38,7 @@ describe('AttractapPairingController authorization and throttling', () => {
           const req = context.switchToHttp().getRequest<AuthenticatedRequest>();
           if (!req.headers['x-test-user']) throw new UnauthorizedException();
           const viaToken = req.headers['x-test-token'] === '1';
-          req.user = Object.assign(new User(), {
+          req.user = Object.assign({} as PluginUserModel, {
             id: Number(req.headers['x-test-user']),
             jwtTokenId: 'test',
             authenticationMethod: viaToken ? 'api-token' : 'session',

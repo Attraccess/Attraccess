@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResourcesController } from './resources.controller';
 import { ResourcesService } from './resources.service';
-import type { Resource } from '@attraccess/database-entities';
+
 import { toResourceDto } from './dtos/resource.dto';
 import { DocumentationType, ResourceType } from '@attraccess/application-models';
 import { createMockResource } from '../test-utils/resource.fixtures';
@@ -16,6 +16,7 @@ import { AuthenticatedRequest, DualAuthGuard } from '@attraccess/plugins-backend
 import supertest from 'supertest';
 
 // Only the documented columns and the relations a read loaded leave the controller, never a whole entity.
+type Resource = ReturnType<typeof createMockResource>;
 const dto = (resource: Resource, imageFilename = resource.imageFilename) =>
   toResourceDto({ ...resource, imageFilename } as never);
 

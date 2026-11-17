@@ -9,8 +9,12 @@ import {
 import { Test } from '@nestjs/testing';
 import { firstValueFrom, of, Subject } from 'rxjs';
 import supertest from 'supertest';
-import { Resource, ResourceUsage } from '@attraccess/database-entities';
-import { ResourceIntroducerType, SupervisionMode } from '@attraccess/application-models';
+import {
+  ResourceIntroducerType,
+  SupervisionMode,
+  type ResourceRecord as Resource,
+  type UsageSession as ResourceUsage,
+} from '@attraccess/application-models';
 import { AuthenticatedUser, DualAuthGuard } from '@attraccess/plugins-backend-sdk';
 import { ResourceActivityVisibility } from '../settings/constants';
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';

@@ -154,6 +154,13 @@ export class ResourceMaintenance {
     format: 'date-time',
   })
   completedAt!: Date | null;
+
+  @ApiProperty({
+    description: 'The schedule that triggered this maintenance (null for manual)',
+    required: false,
+    type: () => ResourceMaintenanceSchedule,
+  })
+  maintenanceSchedule?: ResourceMaintenanceSchedule | null;
 }
 
 export class ResourceMaintenanceRequest {

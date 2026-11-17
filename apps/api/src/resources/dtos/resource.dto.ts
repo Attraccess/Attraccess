@@ -7,7 +7,7 @@ import {
   type ResourceRecord,
   type UsageSession,
 } from '@attraccess/application-models';
-import { FormResponseDto } from '../forms/dto/form-response.dto';
+import { FormResponseDto, ResourceFormDto } from '../forms/dto/form-response.dto';
 import { ResourceGroup, toResourceGroupDto } from '../groups/dto/resource-group.dto';
 import { toIntroductionDto, type ResourceIntroduction } from '../introductions/dtos/introduction-records.dto';
 
@@ -94,6 +94,14 @@ export class Resource {
   })
   autoIntroductionGroupId!: number | null;
 
+  @ApiProperty({
+    description: 'The group the auto-introduction targets when autoIntroductionTarget is GROUP',
+    required: false,
+    nullable: true,
+    type: () => ResourceGroup,
+  })
+  autoIntroductionGroup?: ResourceGroup | null;
+
   @ApiProperty({ description: 'The unique identifier of the resource', example: 1 })
   id!: number;
 
@@ -173,7 +181,7 @@ export class Resource {
   @ApiProperty({ description: 'The groups the resource belongs to', type: ResourceGroup, isArray: true })
   groups?: ResourceGroup[];
 
-  @ApiProperty({ description: 'The forms attached to the resource', type: () => FormResponseDto, isArray: true })
+  @ApiProperty({ description: 'The forms attached to the resource', type: () => ResourceFormDto, isArray: true })
   forms?: FormResponseDto[];
 
   /** Embedded by the resource detail and in-use reads; not part of the documented schema. */
