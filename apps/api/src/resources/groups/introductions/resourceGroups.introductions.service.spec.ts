@@ -11,7 +11,7 @@ import { ResourceRetrainingService } from '../../retraining/resourceRetraining.s
 describe('ResourceGroupsIntroductionsService notifications', () => {
   let service: ResourceGroupsIntroductionsService;
   let store: Record<string, jest.Mock>;
-  let notifications: { dispatch: jest.Mock; sendEmailTemplate: jest.Mock };
+  let notifications: { dispatchToUser: jest.Mock; sendEmailTemplate: jest.Mock };
   let retraining: { getIntroductionRetrainingStatus: jest.Mock };
   let audit: { record: jest.Mock };
 
@@ -32,7 +32,7 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
       listForGroup: jest.fn(),
       historyOfGroupUser: jest.fn(),
     };
-    notifications = { dispatch: jest.fn().mockResolvedValue(undefined), sendEmailTemplate: jest.fn() };
+    notifications = { dispatchToUser: jest.fn().mockResolvedValue(undefined), sendEmailTemplate: jest.fn() };
     retraining = { getIntroductionRetrainingStatus: jest.fn().mockResolvedValue({ isDue: false }) };
     audit = { record: jest.fn().mockResolvedValue(undefined) };
 
@@ -54,16 +54,16 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
   it('notifies the user when a group introduction is granted', async () => {
     await service.grant(5, 3);
 
-    expect(notifications.dispatch).toHaveBeenCalledWith(
+    expect(notifications.dispatchToUser).toHaveBeenCalledWith(
+      3,
       expect.objectContaining({
         category: NotificationCategory.ACCESS_CHANGES,
-        recipients: [expect.objectContaining({ id: 3 })],
         title: 'Your group access changed',
         body: 'You received an introduction for group #5.',
         url: '/resource-groups/5',
       }),
     );
-    const request = notifications.dispatch.mock.calls[0][0];
+    const request = notifications.dispatchToUser.mock.calls[0][1];
     await request.sendEmail({ id: 3, email: 'user@example.com' });
     expect(notifications.sendEmailTemplate).toHaveBeenCalledWith(
       expect.objectContaining({ id: 3 }),
@@ -141,7 +141,7 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
 
     await service.grant(5, 3);
 
-    expect(notifications.dispatch).not.toHaveBeenCalled();
+    expect(notifications.dispatchToUser).not.toHaveBeenCalled();
   });
 
   it('notifies the user when a group introduction is revoked', async () => {
@@ -150,10 +150,10 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
 
     await service.revoke(5, 3);
 
-    expect(notifications.dispatch).toHaveBeenCalledWith(
+    expect(notifications.dispatchToUser).toHaveBeenCalledWith(
+      3,
       expect.objectContaining({
         category: NotificationCategory.ACCESS_CHANGES,
-        recipients: [expect.objectContaining({ id: 3 })],
         body: 'Your introduction for group #5 was revoked.',
         url: '/resource-groups/5',
         sendEmail: expect.any(Function),
@@ -167,12 +167,12 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
 
     await service.revoke(5, 3);
 
-    expect(notifications.dispatch).not.toHaveBeenCalled();
+    expect(notifications.dispatchToUser).not.toHaveBeenCalled();
   });
 
   it('does not notify when revoking a group introduction that was never granted', async () => {
     await service.revoke(5, 3);
 
-    expect(notifications.dispatch).not.toHaveBeenCalled();
+    expect(notifications.dispatchToUser).not.toHaveBeenCalled();
   });
 });

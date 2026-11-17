@@ -39,7 +39,4 @@ export interface ResourceIntroducerStore {
   insert(resourceId: number, userId: number, type: ResourceIntroducerType): Promise<ResourceIntroducerRecord>;
 
   remove(grantId: number): Promise<void>;
-
-  /** The locale to address a user in, for access change notifications. */
-  findUserLocale(userId: number): Promise<{ id: number; locale: string } | null>;
 }

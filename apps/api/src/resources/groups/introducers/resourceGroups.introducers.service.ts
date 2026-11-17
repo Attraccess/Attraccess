@@ -6,8 +6,6 @@ import { NotificationDispatchService } from '../../../notifications/notification
 import { NotificationCategory } from '../../../notifications/notification-types';
 import { RESOURCE_GROUP_INTRODUCER_STORE, type ResourceGroupIntroducerStore } from '../resource-group-store.port';
 
-type DispatchRecipient = Parameters<NotificationDispatchService['dispatch']>[0]['recipients'][number];
-
 @Injectable()
 export class ResourceGroupsIntroducersService {
   private readonly logger = new Logger(ResourceGroupsIntroducersService.name);
@@ -29,9 +27,8 @@ export class ResourceGroupsIntroducersService {
     const url = `/resource-groups/${groupId}`;
 
     void this.notifications
-      .dispatch({
+      .dispatchToUser(userId, {
         category: NotificationCategory.ACCESS_CHANGES,
-        recipients: [{ id: userId } as unknown as DispatchRecipient],
         title,
         body,
         url,

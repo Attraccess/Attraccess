@@ -25,7 +25,7 @@ const introduction = (overrides: Partial<IntroductionRecord> = {}): Introduction
 describe('ResourceIntroductionsService notifications', () => {
   let service: ResourceIntroductionsService;
   let store: { [K in keyof ResourceIntroductionStore]: jest.Mock };
-  let notifications: { dispatch: jest.Mock };
+  let notifications: { dispatchToUser: jest.Mock };
   let retraining: { getIntroductionRetrainingStatus: jest.Mock };
   let audit: { record: jest.Mock };
 
@@ -52,7 +52,7 @@ describe('ResourceIntroductionsService notifications', () => {
       markRetrainingRequiredAudited: jest.fn(),
       markRetrainingNotified: jest.fn(),
     };
-    notifications = { dispatch: jest.fn().mockResolvedValue(undefined) };
+    notifications = { dispatchToUser: jest.fn().mockResolvedValue(undefined) };
     retraining = { getIntroductionRetrainingStatus: jest.fn().mockResolvedValue({ isDue: false }) };
     audit = { record: jest.fn().mockResolvedValue(undefined) };
 
@@ -75,10 +75,10 @@ describe('ResourceIntroductionsService notifications', () => {
   it('notifies the user when a resource introduction is granted', async () => {
     await service.grant(7, 3);
 
-    expect(notifications.dispatch).toHaveBeenCalledWith(
+    expect(notifications.dispatchToUser).toHaveBeenCalledWith(
+      3,
       expect.objectContaining({
         category: NotificationCategory.ACCESS_CHANGES,
-        recipients: [expect.objectContaining({ id: 3 })],
         title: 'Your resource access changed',
         body: 'You received an introduction for resource #7.',
         url: '/resources/7',
@@ -160,7 +160,7 @@ describe('ResourceIntroductionsService notifications', () => {
 
     await service.grant(7, 3);
 
-    expect(notifications.dispatch).not.toHaveBeenCalled();
+    expect(notifications.dispatchToUser).not.toHaveBeenCalled();
   });
 
   it('notifies the user when a resource introduction is revoked', async () => {
@@ -168,10 +168,10 @@ describe('ResourceIntroductionsService notifications', () => {
     store.lastHistoryItem.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.GRANT });
     await service.revoke(7, 3);
 
-    expect(notifications.dispatch).toHaveBeenCalledWith(
+    expect(notifications.dispatchToUser).toHaveBeenCalledWith(
+      3,
       expect.objectContaining({
         category: NotificationCategory.ACCESS_CHANGES,
-        recipients: [expect.objectContaining({ id: 3 })],
         body: 'Your introduction for resource #7 was revoked.',
         url: '/resources/7',
       }),
@@ -184,13 +184,13 @@ describe('ResourceIntroductionsService notifications', () => {
 
     await service.revoke(7, 3);
 
-    expect(notifications.dispatch).not.toHaveBeenCalled();
+    expect(notifications.dispatchToUser).not.toHaveBeenCalled();
   });
 
   it('does not notify when revoking a resource introduction that was never granted', async () => {
     await service.revoke(7, 3);
 
-    expect(notifications.dispatch).not.toHaveBeenCalled();
+    expect(notifications.dispatchToUser).not.toHaveBeenCalled();
   });
 
   it('answers validity from the newest history item, inside the caller transaction when one is given', async () => {

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { NotificationRecipient, ResourceHealthStatus } from '@attraccess/application-models';
 import { PushService } from '../push/push.service';
 import { EmailService } from '../email/email.service';
@@ -6,6 +6,7 @@ import { NotificationPreferenceService } from './notification-preference.service
 import { NotificationLiveService } from './notification-live.service';
 import { AnyNotificationCategory, NotificationCategory, NotificationChannel } from './notification-types';
 import { SettingsService } from '../settings/settings.service';
+import { EMAIL_RECIPIENT_DIRECTORY, type EmailRecipientDirectory } from '../email/email-recipient-directory.port';
 
 export interface NotificationDispatchRequest {
   category: AnyNotificationCategory;
@@ -32,7 +33,18 @@ export class NotificationDispatchService {
     private readonly liveService: NotificationLiveService,
     private readonly emailService: EmailService,
     private readonly settingsService: SettingsService,
+    @Inject(EMAIL_RECIPIENT_DIRECTORY) private readonly recipientDirectory: EmailRecipientDirectory,
   ) {}
+
+  /**
+   * Dispatches to a user the caller knows only by id. The recipient is loaded first, so the texts use
+   * the user's language and the email has an address; a user that no longer exists gets nothing.
+   */
+  public async dispatchToUser(userId: number, request: Omit<NotificationDispatchRequest, 'recipients'>): Promise<void> {
+    const recipient = await this.recipientDirectory.findById(userId);
+    if (!recipient) return;
+    await this.dispatch({ ...request, recipients: [recipient] });
+  }
 
   public async dispatch(request: NotificationDispatchRequest): Promise<void> {
     await Promise.all(

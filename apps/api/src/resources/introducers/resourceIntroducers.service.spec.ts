@@ -203,17 +203,17 @@ describe('ResourceIntroducersService', () => {
       expect(fixture.store.insert).toHaveBeenCalledWith(1, 2, ResourceIntroducerType.MAINTAINER);
       expect(result.type).toBe(ResourceIntroducerType.MAINTAINER);
       expect(fixture.eventEmitter.emit).toHaveBeenCalled();
-      expect(fixture.notifications.dispatch).toHaveBeenCalledWith(
+      expect(fixture.notifications.dispatchToUser).toHaveBeenCalledWith(
+        2,
         expect.objectContaining({
           category: NotificationCategory.ACCESS_CHANGES,
-          recipients: [expect.objectContaining({ id: 2 })],
           title: expect.any(Function),
           body: expect.any(Function),
           url: '/resources/1',
           sendEmail: expect.any(Function),
         }),
       );
-      const request = fixture.notifications.dispatch.mock.calls[0][0];
+      const request = fixture.notifications.dispatchToUser.mock.calls[0][1];
       const enUser = { locale: 'en' } as User;
       expect(request.title(enUser)).toBe('Your resource access changed');
       expect(request.body(enUser)).toBe('You were made a maintainer for resource #1.');
@@ -240,7 +240,7 @@ describe('ResourceIntroducersService', () => {
       await Promise.resolve(); // flush notification promise chain
 
       expect(fixture.store.insert).toHaveBeenCalledWith(1, 2, ResourceIntroducerType.INTRODUCER);
-      const defaultsReq = fixture.notifications.dispatch.mock.calls[0][0];
+      const defaultsReq = fixture.notifications.dispatchToUser.mock.calls[0][1];
       expect(defaultsReq.body({ locale: 'en' } as User)).toBe('You were made an introducer for resource #1.');
     });
 
@@ -269,7 +269,7 @@ describe('ResourceIntroducersService', () => {
 
       expect(fixture.store.insert).not.toHaveBeenCalled();
       expect(fixture.eventEmitter.emit).not.toHaveBeenCalled();
-      expect(fixture.notifications.dispatch).not.toHaveBeenCalled();
+      expect(fixture.notifications.dispatchToUser).not.toHaveBeenCalled();
     });
 
     it('returns the concurrent grant when the insert lost a race', async () => {
@@ -299,9 +299,9 @@ describe('ResourceIntroducersService', () => {
       expect(fixture.store.findDirect).toHaveBeenCalledWith(1, 2, ResourceIntroducerType.MAINTAINER, undefined);
       expect(fixture.store.remove).toHaveBeenCalledWith(8);
 
-      const revokeReq = fixture.notifications.dispatch.mock.calls[0][0];
+      const revokeReq = fixture.notifications.dispatchToUser.mock.calls[0][1];
       expect(revokeReq.category).toBe(NotificationCategory.ACCESS_CHANGES);
-      expect(revokeReq.recipients).toEqual([expect.objectContaining({ id: 2 })]);
+      expect(fixture.notifications.dispatchToUser.mock.calls[0][0]).toBe(2);
       expect(revokeReq.url).toBe('/resources/1');
       expect(revokeReq.body({ locale: 'en' } as User)).toBe('Your maintainer status for resource #1 was revoked.');
     });
