@@ -7,14 +7,8 @@ import { LicenseService } from '../../license/license.service';
 // Mock the decorator
 jest.mock('./canManageMaintenance.decorator', () => ({
   // eslint-disable-next-line @typescript-eslint/no-empty-function
-  CanManageMaintenance: () => () => { },
+  CanManageMaintenance: () => () => {},
 }));
-
-const mockResource = {
-  id: 1,
-  name: 'Test Resource',
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-} as any;
 
 const mockMaintenance = {
   id: 1,
@@ -22,11 +16,23 @@ const mockMaintenance = {
   startTime: new Date('2025-01-01T10:00:00.000Z'),
   endTime: null,
   reason: 'Test maintenance',
-  resource: mockResource,
+  completedAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } as any;
+
+// Only the documented response fields leave the controller; anything else a record carries stays behind.
+const expectedDto = (record: typeof mockMaintenance) => ({
+  id: record.id,
+  createdAt: record.createdAt,
+  updatedAt: record.updatedAt,
+  resourceId: record.resourceId,
+  startTime: record.startTime,
+  endTime: record.endTime,
+  reason: record.reason,
+  completedAt: record.completedAt,
+});
 
 describe('ResourceMaintenanceController', () => {
   let controller: ResourceMaintenanceController;
@@ -73,7 +79,7 @@ describe('ResourceMaintenanceController', () => {
 
       const result = await controller.createMaintenance(1, dto, request);
 
-      expect(result).toEqual(mockMaintenance);
+      expect(result).toEqual(expectedDto(mockMaintenance));
       expect(service.createMaintenance).toHaveBeenCalledWith(1, dto, 42);
     });
   });
@@ -92,7 +98,7 @@ describe('ResourceMaintenanceController', () => {
 
       const result = await controller.getMaintenances(1, query);
 
-      expect(result).toEqual(expectedResponse);
+      expect(result).toEqual({ ...expectedResponse, data: [expectedDto(mockMaintenance)] });
       expect(service.findMaintenances).toHaveBeenCalledWith(1, query);
     });
   });
@@ -103,7 +109,7 @@ describe('ResourceMaintenanceController', () => {
 
       const result = await controller.getMaintenance(1, 1);
 
-      expect(result).toEqual(mockMaintenance);
+      expect(result).toEqual(expectedDto(mockMaintenance));
       expect(service.getMaintenanceById).toHaveBeenCalledWith(1);
     });
   });
@@ -118,7 +124,7 @@ describe('ResourceMaintenanceController', () => {
 
       const result = await controller.finishMaintenance(1, 1, { notes: 'Done' }, mockRequest as AuthenticatedRequest);
 
-      expect(result).toEqual(finishedMaintenance);
+      expect(result).toEqual(expectedDto(finishedMaintenance));
       expect(service.getMaintenanceById).toHaveBeenCalledWith(1);
       expect(service.finishMaintenance).toHaveBeenCalledWith(1, { userId: 42, notes: 'Done' });
     });

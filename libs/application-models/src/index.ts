@@ -38,3 +38,6 @@ export * from './lib/notification-preference-record';
 export * from './lib/notification-recipient';
 export * from './lib/messaging-models';
 export * from './lib/csv-export-template-record';
+export * from './lib/resource-actor-user';
+export * from './lib/resource-maintenance-records';
+export * from './lib/resource-health-records';

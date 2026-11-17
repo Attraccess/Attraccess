@@ -1,32 +1,32 @@
 // Sends emails to maintainers and admins when a resource health state transitions
 // FEATURE: Resource health monitoring system for subsystem-level status tracking
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
-import { Resource, ResourceIntroducer, User } from '@attraccess/database-entities';
-import { ResourceHealthStatus } from '@attraccess/application-models';
+import { ResourceHealthStatus, type ResourceNotificationRecipient } from '@attraccess/application-models';
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
 import { RbacService } from '../../users-and-auth/rbac/rbac.service';
+import { RESOURCE_RECIPIENT_STORE, type ResourceRecipientStore } from './resource-health-store.port';
 import { createTranslator } from '../../i18n/translate';
 import * as en from './resource-health-notification.en.json';
 import * as de from './resource-health-notification.de.json';
 
 const t = createTranslator({ en, de });
 
+type DispatchRecipient = Parameters<NotificationDispatchService['dispatch']>[0]['recipients'][number];
+
+/** The dispatcher reads the id, the address and the locale of a recipient, which the recipient model carries. */
+const asDispatchRecipient = (recipient: ResourceNotificationRecipient): DispatchRecipient =>
+  recipient as unknown as DispatchRecipient;
+
 @Injectable()
 export class ResourceHealthNotificationListener {
   private readonly logger = new Logger(ResourceHealthNotificationListener.name);
 
   constructor(
-    @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(ResourceIntroducer)
-    private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    @Inject(RESOURCE_RECIPIENT_STORE)
+    private readonly recipientStore: ResourceRecipientStore,
     private readonly notifications: NotificationDispatchService,
     private readonly rbacService: RbacService,
   ) {}
@@ -38,10 +38,7 @@ export class ResourceHealthNotificationListener {
     }
 
     try {
-      const resource = await this.resourceRepository.findOne({
-        where: { id: event.resourceId },
-        relations: ['groups'],
-      });
+      const resource = await this.recipientStore.findResource(event.resourceId);
       if (!resource) {
         this.logger.warn(`Health event for missing resource ${event.resourceId}; skipping notifications`);
         return;
@@ -55,7 +52,7 @@ export class ResourceHealthNotificationListener {
       const becameUnhealthy = event.status === ResourceHealthStatus.UNHEALTHY;
       await this.notifications.dispatch({
         category: NotificationCategory.RESOURCE_HEALTH,
-        recipients,
+        recipients: recipients.map(asDispatchRecipient),
         title: (recipient) =>
           t(recipient.locale, becameUnhealthy ? 'titleDegraded' : 'titleRecovered', { resourceName: resource.name }),
         body: (recipient) =>
@@ -86,30 +83,23 @@ export class ResourceHealthNotificationListener {
     }
   }
 
-  private async collectRecipients(resource: Resource): Promise<User[]> {
-    const groupIds = (resource.groups ?? []).map((group) => group.id);
-
+  private async collectRecipients(resource: {
+    id: number;
+    groupIds: number[];
+  }): Promise<ResourceNotificationRecipient[]> {
     const adminIds = await this.rbacService.getUserIdsWithPermission('resources.maintenance.manage');
-    const admins = adminIds.length > 0 ? await this.userRepository.findBy({ id: In(adminIds) }) : [];
+    const admins = adminIds.length > 0 ? await this.recipientStore.findUsersByIds(adminIds) : [];
+    const introducerUsers = await this.recipientStore.findIntroducerUsers(resource.id, resource.groupIds);
 
-    const introducerWhere: Array<Record<string, unknown>> = [{ resourceId: resource.id }];
-    if (groupIds.length > 0) {
-      introducerWhere.push({ resourceGroupId: In(groupIds) });
-    }
-    const introducerRows = await this.resourceIntroducerRepository.find({
-      where: introducerWhere,
-      relations: ['user'],
-    });
-
-    const byId = new Map<number, User>();
+    const byId = new Map<number, ResourceNotificationRecipient>();
     for (const admin of admins) {
       if (admin.email) {
         byId.set(admin.id, admin);
       }
     }
-    for (const row of introducerRows) {
-      if (row.user?.email && !byId.has(row.user.id)) {
-        byId.set(row.user.id, row.user);
+    for (const user of introducerUsers) {
+      if (user.email && !byId.has(user.id)) {
+        byId.set(user.id, user);
       }
     }
 

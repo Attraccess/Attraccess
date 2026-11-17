@@ -41,11 +41,9 @@ describe('plugin resourceAccess', () => {
     maintainerOf = new Set();
     groupMaintainer = false;
     const maintenanceService = new ResourceMaintenanceService(
-      null as never,
-      { findOne: async ({ where }) => ({ id: where.id, groups: [{ id: 9 }] }) } as never,
       {
-        findOne: async ({ where }) =>
-          (where.resource ? maintainerOf.has(where.resource.id) : groupMaintainer) ? { id: 1 } : null,
+        lookupMaintenanceAccess: async (_userId: number, resourceId: number) =>
+          maintainerOf.has(resourceId) ? 'direct' : groupMaintainer ? 'group' : 'none',
       } as never,
       null as never,
       null as never,
