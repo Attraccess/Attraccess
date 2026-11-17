@@ -1,4 +1,4 @@
-import { DataSource, DataSourceOptions } from 'typeorm';
+import { DataSource, DataSourceOptions, DefaultNamingStrategy, getMetadataArgsStorage } from 'typeorm';
 import { entities } from '@attraccess/database-entities';
 import { resolveDatabasePath } from '../../config/storage-path';
 import * as migrations from '../migrations';
@@ -7,8 +7,11 @@ import type { TypeOrmDatabaseBackend } from '../backend/resolve-database-backend
 import { closeResourceTransactionConnection, onResourceConnection } from './run-serialized-transaction';
 import { createDataSource } from './sqlite-connection';
 import { sqliteErrorClassifier } from './sqlite-errors';
-import { createSqlitePluginMigrationEngine } from './sqlite-plugin-migration-engine';
-import { createSqlitePluginPersistenceHost, sqliteHostTransactionScope } from './sqlite-plugin-persistence';
+import {
+  createSqlitePluginMigrationEngine,
+  createSqlitePluginPersistenceHost,
+  sqliteHostTransactionScope,
+} from './plugin-storage/sqlite-plugin-storage';
 import { readSqlitePermissionOwners } from './sqlite-permission-owners';
 import { openSqliteStartupSettings } from './sqlite-startup-settings';
 import { createSqliteTransfer } from './sqlite-transfer';
@@ -22,6 +25,24 @@ const migrationTrack: MigrationTrack = {
   directory: 'apps/api/src/database/migrations',
   migrations: Object.values(migrations),
 };
+
+/**
+ * The tables of the host's own schema. A plugin may not claim one of them for its storage. The names follow
+ * TypeORM's table naming, from the entity list the application connection is opened with.
+ */
+function coreTableNames(): ReadonlySet<string> {
+  const targets = new Set<unknown>(entityList);
+  const naming = new DefaultNamingStrategy();
+  const names = new Set<string>([migrationTrack.tableName]);
+  for (const table of getMetadataArgsStorage().tables) {
+    if (typeof table.target !== 'function' || !targets.has(table.target)) continue;
+    names.add((table.name ?? naming.tableName(table.target.name, undefined)).toLowerCase());
+  }
+  for (const join of getMetadataArgsStorage().joinTables) {
+    if (join.name) names.add(join.name.toLowerCase());
+  }
+  return names;
+}
 
 function createDataSourceOptions(): DataSourceOptions {
   return {
@@ -46,9 +67,9 @@ export const sqliteBackend: TypeOrmDatabaseBackend = {
   errors: sqliteErrorClassifier,
   plugins: {
     createMigrationEngine: (config) => createSqlitePluginMigrationEngine(config, createDataSourceOptions),
-    // The application connection is opened with `entityList`, so plugin entities added to it are mapped.
-    createPersistenceHost: (getConnection) => createSqlitePluginPersistenceHost(getConnection, entityList),
+    createPersistenceHost: createSqlitePluginPersistenceHost,
     hostTransactionScope: sqliteHostTransactionScope,
+    coreTableNames,
     readPermissionOwners: () => readSqlitePermissionOwners(createDataSourceOptions()),
     openStartupSettings: () => openSqliteStartupSettings(createDataSourceOptions()),
   },

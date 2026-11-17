@@ -18,8 +18,8 @@ import type {
   PluginTransactionScope,
   PluginUserDirectory,
 } from '@attraccess/plugins-backend-sdk';
-import { managerOfTransactionScope } from '@attraccess/plugins-backend-sdk/sqlite';
-import { Brackets, DataSource, In, SelectQueryBuilder } from 'typeorm';
+import { handleOfScope } from '../../../plugin-system/persistence/plugin-transaction-scope';
+import { Brackets, DataSource, EntityManager, In, SelectQueryBuilder } from 'typeorm';
 import type { PluginResourceModel } from '@attraccess/application-models';
 
 /** Same predicate core uses for hidden resource groups (ResourceGroupsService.ACTIVE_INTRODUCTION_EXISTS_SQL). */
@@ -55,7 +55,7 @@ class ResourceDirectory implements PluginResourceDirectory {
 
   async get(resourceId: number, scope?: PluginTransactionScope): Promise<PluginResourceModel | null> {
     // With a scope the read joins the plugin's transaction (its connection), never the shared one.
-    const manager = scope ? managerOfTransactionScope(scope) : this.source().manager;
+    const manager = scope ? handleOfScope<EntityManager>(scope) : this.source().manager;
     const row = await manager.getRepository(Resource).findOne({ where: { id: resourceId } });
     return row ? toResourceModel(row) : null;
   }

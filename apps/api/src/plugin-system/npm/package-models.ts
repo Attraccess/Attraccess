@@ -179,11 +179,10 @@ export function validateEntries(
     main: {
       backend?: { directory: string; entryPoint: string };
       frontend?: { directory: string; entryPoint: string; styles?: string };
-      migrations?: { directory: string; entryPoint: string };
     };
   },
 ): void {
-  for (const entry of [manifest.main.backend, manifest.main.frontend, manifest.main.migrations]) {
+  for (const entry of [manifest.main.backend, manifest.main.frontend]) {
     if (entry && !existsSync(join(root, entry.directory, entry.entryPoint)))
       throw new BadRequestException('Package declares an entry point that is not present');
   }

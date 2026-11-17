@@ -21,8 +21,7 @@ export interface ReaderUiContributions {
 /**
  * Collects the reader UI contributions of a plugin module and enforces the permissions.
  * Throws PluginPermissionError (quarantines the plugin) when `readerUi` is declared without
- * READER_UI, a hook without ACCESS_HOOKS, or the start capacity hook (handed the host's transaction) without
- * DATABASE_ACCESS. Returns null when the plugin contributes nothing.
+ * READER_UI or a hook without ACCESS_HOOKS. Returns null when the plugin contributes nothing.
  */
 export function collectReaderUiContributions(
   pluginName: string,
@@ -49,9 +48,6 @@ export function collectReaderUiContributions(
     if (!hook) continue;
     if (!granted.has(PluginPermission.ACCESS_HOOKS)) {
       throw new PluginPermissionError(pluginName, field, PluginPermission.ACCESS_HOOKS);
-    }
-    if (field === 'startCapacityHook' && !granted.has(PluginPermission.DATABASE_ACCESS)) {
-      throw new PluginPermissionError(pluginName, field, PluginPermission.DATABASE_ACCESS);
     }
     if (typeof hook !== 'function') throw new Error(`Plugin ${pluginName}: ${field} must be a function`);
     out[field] = hook as never;

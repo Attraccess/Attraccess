@@ -1,21 +1,18 @@
-import type {
-  PluginEntityClass,
-  PluginPersistenceBackend,
-  PluginPersistenceContext,
-} from '@attraccess/plugins-backend-sdk';
+import type { PluginPersistenceContext, PluginStorageContext } from '@attraccess/plugins-backend-sdk';
+import type { CompiledPluginStorage } from '../plugin-storage/storage-model';
 
 /**
- * What the plugin runtime needs from the active database engine to give a plugin its persistence capabilities.
- * The engine adapter registers the plugin's storage classes, builds the plugin-facing context on the engine's
- * connection and transaction rules.
+ * What the plugin runtime needs from the active database engine to give a plugin its transaction capability and its
+ * record port. The engine adapter builds both on its connection and transaction rules; the plugin never receives the
+ * connection, a transaction handle or a statement API.
  */
 export interface PluginPersistenceHost {
-  readonly backend: PluginPersistenceBackend;
   /**
-   * Adds a plugin's storage classes to the host connection's schema description. It must run before the connection
-   * opens (module import time). Returns how many classes were new.
+   * The contexts of one plugin: `persistence` (transactions) and `storage` (the record port of the tables of its
+   * compiled storage declaration; `null` when the plugin declares none, then `open` always throws).
    */
-  registerEntities(entities: readonly PluginEntityClass[]): number;
-  /** The persistence context of one plugin. `entities` are the classes it registered. */
-  createContext(pluginName: string, entities: readonly PluginEntityClass[]): PluginPersistenceContext;
+  createContexts(
+    pluginName: string,
+    storage: CompiledPluginStorage | null,
+  ): { persistence: PluginPersistenceContext; storage: PluginStorageContext };
 }

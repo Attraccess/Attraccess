@@ -14,8 +14,6 @@ import {
   PLUGIN_AUDIT_HOST_PROVIDER,
   PluginAuditHostProvider,
   PluginContext,
-  PluginEntityClass,
-  declaredPersistenceBackends,
   PluginFlowsContext,
   PluginPermission,
   PluginSecretsContext,
@@ -79,7 +77,10 @@ import { PluginPersistenceModule } from '../database/adapters/plugins/plugin-per
 import { createPluginPersistenceHost } from '../database/adapters/plugins/plugin-persistence-host';
 import { PLUGIN_HOST_CONNECTION } from './persistence/plugin-host-data.port';
 import type { PluginPersistenceHost } from './persistence/plugin-persistence-host.port';
-import { assertModulePersistenceSupportsBackend } from './runtime/plugin-compatibility';
+import { assertModuleHasNoDatabaseInjection } from './runtime/module-injection';
+import { compileModuleStorage } from './plugin-storage/storage-loader';
+import { claimStorageNames } from './plugin-storage/storage-registry';
+import type { CompiledPluginStorage } from './plugin-storage/storage-model';
 import { PluginLicenseWatcher } from './license/plugin-license-watcher.service';
 
 import { EncryptionService } from '../encryption/encryption.service';
@@ -266,24 +267,13 @@ export class PluginModule {
 
     const exported = importedModule.default as PluginBackendModule | DynamicModule;
 
-    // A plugin whose storage code does not support the engine the host runs fails here, before anything of it is
-    // registered or migrated.
-    const persistence = (exported as PluginBackendModule)?.persistence;
-    const persistenceHost = getImplementationClass().persistenceHost();
-    assertModulePersistenceSupportsBackend(
-      manifest.name,
-      declaredPersistenceBackends(persistence),
-      persistenceHost.backend,
-    );
+    // The plugin's storage declaration is validated before anything of it is registered or migrated: every table and
+    // index name must stay in the plugin's namespace and the migrations must produce the declared tables. A plugin
+    // that declares storage without PLUGIN_STORAGE, or leaves its namespace, does not load.
+    const storage = compileModuleStorage(manifest, exported as Partial<PluginBackendModule>);
+    if (storage) claimStorageNames(storage);
 
-    // Register any entities the plugin owns into the shared connection BEFORE it
-    // initialises (which happens later, at NestFactory.create). The schema is
-    // owned by the plugin's migrations — this only makes the entity metadata
-    // resolvable so the plugin can use its engine subpath's getRepository(Entity).
-    const entities = persistence?.[persistenceHost.backend]?.entities ?? [];
-    getImplementationClass().registerPluginEntities(manifest, entities);
-
-    const context = getImplementationClass().createPluginContext(manifest, entities);
+    const context = getImplementationClass().createPluginContext(manifest, storage);
 
     // Register any custom flow nodes contributed by this plugin.
     const configuredFlowNodes = (exported as PluginBackendModule)?.flowNodes;
@@ -345,6 +335,8 @@ export class PluginModule {
     }
 
     const pluginModule = (exported as PluginBackendModule).register(context);
+    // A plugin has no database access: its module may not inject the host connection, a manager or a repository.
+    assertModuleHasNoDatabaseInjection(manifest.name, pluginModule);
     const credentialProvider = (exported as PluginBackendModule).credentialProvisioningProvider;
     if (credentialProvider) {
       MqttCredentialProvisioningService.register(credentialProvider(context));
@@ -375,31 +367,6 @@ export class PluginModule {
     };
   }
 
-  /**
-   * Adds a plugin's declared entities to the host connection's entity set so the engine subpath's
-   * `getRepository(Entity)` resolves their metadata. The host runs with `synchronize: false`, so this never alters
-   * the schema: the table is owned by the plugin's migration. Gated on DATABASE_ACCESS (the permission the
-   * persistence context requires); a plugin without it could not use the entity anyway.
-   */
-  protected static registerPluginEntities(manifest: LoadedPluginManifest, entities: PluginEntityClass[]): void {
-    if (entities.length === 0) {
-      return;
-    }
-
-    if (!(manifest.permissions ?? []).includes(PluginPermission.DATABASE_ACCESS)) {
-      this.logger.warn(
-        `Plugin ${manifest.name} declares ${entities.length} entit(y/ies) but lacks the DATABASE_ACCESS ` +
-          `permission; skipping entity registration (persistence would be denied anyway).`,
-      );
-      return;
-    }
-
-    const added = getImplementationClass().persistenceHost().registerEntities(entities);
-    if (added > 0) {
-      this.logger.log(`Registered ${added} entit(y/ies) from plugin ${manifest.name} into the host connection.`);
-    }
-  }
-
   /** The persistence host of the active database backend, resolving the host connection lazily. */
   protected static persistenceHost(): PluginPersistenceHost {
     const owner = getImplementationClass();
@@ -410,8 +377,10 @@ export class PluginModule {
 
   protected static createPluginContext(
     manifest: LoadedPluginManifest,
-    entities: PluginEntityClass[] = [],
+    storage: CompiledPluginStorage | null = null,
   ): PluginContext {
+    // Both contexts are built on the host connection when first used; the plugin never receives the connection.
+    const contexts = getImplementationClass().persistenceHost().createContexts(manifest.name, storage);
     const base: PluginContext = {
       // The same version the host uses to check plugin compatibility.
       hostVersion: resolveAppVersion(),
@@ -501,7 +470,8 @@ export class PluginModule {
       notifications: createHostNotificationsContext(manifest.name, getImplementationClass().hostRefs()),
       resourceAccess: createHostResourceAccessContext(getImplementationClass().hostRefs()),
       hostData: createHostDataContext(getImplementationClass().hostRefs()),
-      persistence: getImplementationClass().persistenceHost().createContext(manifest.name, entities),
+      persistence: contexts.persistence,
+      storage: contexts.storage,
     };
 
     return PluginSandboxService.createGuardedContext(base, manifest.permissions ?? []);

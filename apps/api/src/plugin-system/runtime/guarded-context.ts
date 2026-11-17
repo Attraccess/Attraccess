@@ -6,6 +6,7 @@ import {
   PluginFlowsContext,
   PluginHostDataContext,
   PluginPersistenceContext,
+  PluginStorageContext,
   PluginNotificationsContext,
   PluginResourceAccessContext,
   PluginPermission,
@@ -20,6 +21,7 @@ import {
 } from '@attraccess/plugins-backend-sdk';
 import { Type } from '@nestjs/common';
 import type { PluginSandboxService } from '../plugin-sandbox.service';
+import { assertNotDatabaseToken } from './database-tokens';
 
 interface PluginSandboxServicePluginGuardedContextContext {
   guardEvents: (typeof PluginSandboxService)['guardEvents'];
@@ -30,7 +32,7 @@ const HOST_DATA_PERMISSIONS: Record<keyof PluginHostDataContext, PluginPermissio
   resources: PluginPermission.ACCESS_RESOURCES,
   users: PluginPermission.READ_USERS,
   settings: PluginPermission.READ_SETTINGS,
-  flows: PluginPermission.DATABASE_ACCESS,
+  flows: PluginPermission.TRIGGER_FLOWS,
 };
 
 /** Wraps one host data group so every method checks the group's permission when it is called. */
@@ -93,6 +95,8 @@ export function createGuardedContext(
     events: guardedEvents,
     get<T>(token: Type<T> | string | symbol): T {
       require(PluginPermission.RESOLVE_HOST_PROVIDERS, `get(${String(token)})`);
+      // No permission opens the database: plugin data goes through `storage`, never through a connection.
+      assertNotDatabaseToken(pluginName, token);
       return base.get<T>(token);
     },
     onEvent<E extends SystemEvent>(event: E, handler: SystemEventHandler<E>): SystemEventSubscription {
@@ -142,8 +146,12 @@ export function createGuardedContext(
       return base.resourceAccess;
     },
     get persistence(): PluginPersistenceContext {
-      require(PluginPermission.DATABASE_ACCESS, 'persistence');
+      require(PluginPermission.PLUGIN_STORAGE, 'persistence');
       return base.persistence;
+    },
+    get storage(): PluginStorageContext {
+      require(PluginPermission.PLUGIN_STORAGE, 'storage');
+      return base.storage;
     },
     get hostData(): PluginHostDataContext {
       const hostData = base.hostData;
