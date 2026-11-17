@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "driver/i2c_master.h"
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_timer.h"
@@ -395,8 +396,45 @@ static void host_task(void *param)
     nimble_port_freertos_deinit();
 }
 
+// The Touch V1 (Waveshare ESP32-S3-Touch-LCD-4 V3) runs from a power-bank chip that switches the board off about
+// 30 s after its load drops below roughly 60 mA, which an idle BLE peripheral does. A lit backlight keeps it on:
+// all TCA9554 pins are outputs, only the backlight pin (P0.1) is high, as in the reader firmware.
+#define EXPANDER_SDA 15
+#define EXPANDER_SCL 7
+#define EXPANDER_ADDR 0x20
+
+static void keep_board_powered(void)
+{
+    i2c_master_bus_config_t bus_config = {
+        .i2c_port = I2C_NUM_0,
+        .sda_io_num = EXPANDER_SDA,
+        .scl_io_num = EXPANDER_SCL,
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,
+    };
+    i2c_master_bus_handle_t bus = NULL;
+    i2c_master_dev_handle_t expander = NULL;
+    i2c_device_config_t device_config = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = EXPANDER_ADDR,
+        .scl_speed_hz = 100000,
+    };
+    const uint8_t config[] = {0x03, 0x00}; // configuration: all outputs
+    const uint8_t output[] = {0x01, 1 << 1}; // output: backlight on
+    esp_err_t err = i2c_new_master_bus(&bus_config, &bus);
+    if (err == ESP_OK) err = i2c_master_bus_add_device(bus, &device_config, &expander);
+    if (err == ESP_OK) err = i2c_master_transmit(expander, config, sizeof config, 50);
+    if (err == ESP_OK) err = i2c_master_transmit(expander, output, sizeof output, 50);
+    if (err == ESP_OK)
+        ESP_LOGI(TAG, "backlight on (keeps the Touch V1 powered)");
+    else
+        ESP_LOGW(TAG, "backlight not switched on (%s); a Touch V1 switches itself off", esp_err_to_name(err));
+}
+
 void app_main(void)
 {
+    keep_board_powered();
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());

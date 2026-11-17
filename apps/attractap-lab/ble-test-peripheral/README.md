@@ -2,8 +2,9 @@
 
 A generic GATT peripheral for the plugin BLE transport hardware tests: throughput, long sessions, notification
 bursts and indications. It is not shipped and is not part of the reader firmware. It runs on an Attractap Touch (v1)
-board (ESP32-S3, 16 MB flash) at a lab place such as `attractap-touch-1`. It does not use the display; it logs over
-the USB-Serial-JTAG console. The janitor erases and parks the place when the session releases it.
+board (ESP32-S3, 16 MB flash) at a lab place such as `attractap-touch-1`. It only switches the display backlight on:
+the Touch V1's power-bank chip turns the board off about 30 s after its load drops below roughly 60 mA, which an idle
+BLE peripheral does. It logs over the USB-Serial-JTAG console. The janitor erases and parks the place when the session releases it.
 
 ## GATT table
 
