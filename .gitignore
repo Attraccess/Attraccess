@@ -18,6 +18,8 @@ vitest.config.*.timestamp*
 .worktree-bootstrap-complete
 
 storage/
+# Plugin storage definitions live in source folders named storage.
+!apps/plugins/*/backend/storage/
 storage-docker/
 .env
 .env.*

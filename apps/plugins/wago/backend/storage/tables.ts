@@ -1,0 +1,252 @@
+import { f, table } from '@attraccess/plugins-backend-sdk';
+
+/**
+ * Head shape of the WAGO plugin tables. Baseline version 1 of the storage definition creates exactly this layout,
+ * which is what the nineteen 1.x TypeORM migrations produced; installed databases are adopted without running DDL.
+ *
+ * Conventions kept from the 1.x layout (adoption must not change a column):
+ * - Field names are the entity property names, `column` is the existing snake_case column.
+ * - Timestamps are ISO-8601 strings in `varchar` columns, compared lexicographically (so `f.string`, not `f.timestamp`).
+ * - Snapshots, provenance and metadata are JSON documents in `text` columns, serialized by the plugin (so `f.text`).
+ * - Free-form text that can exceed 255 characters is declared `f.text`; SQLite gives both the same TEXT affinity.
+ * - Core identifiers (MQTT server ids, user ids) are plain integers. Only plugin tables are referenced.
+ * - Lease deadlines are epoch milliseconds in integer columns (`bigint` in the 1.x layout).
+ */
+export const wagoTables = {
+  controllers: table(
+    {
+      id: f.id(),
+      hardwareId: f.string({ column: 'hardware_id' }),
+      trustState: f.string({ column: 'trust_state' }),
+      name: f.text().optional(),
+      mqttServerId: f.integer({ column: 'mqtt_server_id' }).optional(),
+      /** Durable permanent-identity provisioning intent, retained until confirmed revocation. */
+      credentialMqttServerId: f.integer({ column: 'credential_mqtt_server_id' }).optional(),
+      /** Changes whenever permanent broker credentials are issued, binding later rotations to that claim. */
+      credentialEpoch: f.string({ column: 'credential_epoch' }).optional(),
+      enrollmentId: f.integer({ column: 'enrollment_id' }).optional(),
+      pairingCodeHash: f.string({ column: 'pairing_code_hash' }),
+      fingerprint: f.string().optional(),
+      protocolVersion: f.string({ column: 'protocol_version' }),
+      runtimeVersion: f.string({ column: 'runtime_version' }),
+      /** JSON array of capability names. */
+      capabilities: f.text(),
+      lastSequence: f.integer({ column: 'last_sequence' }).withDefault(0),
+      lastHeartbeatAt: f.string({ column: 'last_heartbeat_at' }).optional(),
+      lastSeenAt: f.string({ column: 'last_seen_at' }),
+      compatibilityError: f.text({ column: 'compatibility_error' }).optional(),
+      createdAt: f.string({ column: 'created_at' }),
+      updatedAt: f.string({ column: 'updated_at' }),
+    },
+    {
+      physicalName: 'plugin_wago_controllers',
+      indexes: [{ name: 'UQ_plugin_wago_controllers_hardware_id', fields: ['hardwareId'], unique: true }],
+    },
+  ),
+  settings: table(
+    {
+      id: f.id(),
+      defaultMqttServerId: f.integer({ column: 'default_mqtt_server_id' }).optional(),
+      operationalPrefix: f.string({ column: 'operational_prefix' }).withDefault('attraccess/wago'),
+    },
+    { physicalName: 'plugin_wago_settings' },
+  ),
+  enrollments: table(
+    {
+      id: f.id(),
+      mqttServerId: f.integer({ column: 'mqtt_server_id' }),
+      hardwareId: f.string({ column: 'hardware_id' }),
+      secretHash: f.string({ column: 'secret_hash' }),
+      identity: f.string(),
+      createdAt: f.string({ column: 'created_at' }),
+      expiresAt: f.string({ column: 'expires_at' }),
+      consumedAt: f.string({ column: 'consumed_at' }).optional(),
+      revokedAt: f.string({ column: 'revoked_at' }).optional(),
+    },
+    {
+      physicalName: 'plugin_wago_enrollments',
+      indexes: [
+        { name: 'UQ_plugin_wago_enrollments_secret_hash', fields: ['secretHash'], unique: true },
+        { name: 'IDX_plugin_wago_enrollments_active', fields: ['consumedAt', 'expiresAt'] },
+      ],
+    },
+  ),
+  configurationDrafts: table(
+    {
+      id: f.id(),
+      controllerId: f.integer({ column: 'controller_id' }),
+      snapshot: f.text(),
+      reviewedHash: f.string({ column: 'reviewed_hash' }).optional(),
+      presetProvenance: f.text({ column: 'preset_provenance' }).optional(),
+      updatedAt: f.string({ column: 'updated_at' }),
+    },
+    {
+      physicalName: 'plugin_wago_configuration_drafts',
+      indexes: [{ name: 'UQ_plugin_wago_configuration_drafts_controller_id', fields: ['controllerId'], unique: true }],
+    },
+  ),
+  configurationRevisions: table(
+    {
+      id: f.id(),
+      controllerId: f.integer({ column: 'controller_id' }),
+      revision: f.integer(),
+      snapshot: f.text(),
+      presetProvenance: f.text({ column: 'preset_provenance' }).optional(),
+      contentHash: f.string({ column: 'content_hash' }),
+      state: f.string(),
+      rejectionErrors: f.text({ column: 'rejection_errors' }).optional(),
+      rejectionAcknowledgedAt: f.string({ column: 'rejection_acknowledged_at' }).optional(),
+      /** Core user id of the acknowledging user. */
+      rejectionAcknowledgedBy: f.integer({ column: 'rejection_acknowledged_by' }).optional(),
+      publishedAt: f.string({ column: 'published_at' }),
+      reportedAt: f.string({ column: 'reported_at' }).optional(),
+    },
+    {
+      physicalName: 'plugin_wago_configuration_revisions',
+      indexes: [
+        {
+          name: 'UQ_plugin_wago_configuration_revisions_controller_revision',
+          fields: ['controllerId', 'revision'],
+          unique: true,
+        },
+        { name: 'IDX_plugin_wago_configuration_revisions_controller', fields: ['controllerId', 'revision'] },
+      ],
+    },
+  ),
+  commissioningSessions: table(
+    {
+      id: f.id(),
+      hardwareId: f.string({ column: 'hardware_id' }),
+      mqttServerId: f.integer({ column: 'mqtt_server_id' }),
+      targetHost: f.string({ column: 'target_host' }),
+      hostKeyFingerprint: f.string({ column: 'host_key_fingerprint' }),
+      firmwareBaseline: f.string({ column: 'firmware_baseline' }),
+      controllerName: f.text({ column: 'controller_name' }).optional(),
+      state: f.string(),
+      enrollmentExpiresAt: f.string({ column: 'enrollment_expires_at' }).optional(),
+      enrollmentId: f.integer({ column: 'enrollment_id' }).optional(),
+      pairingCode: f.string({ column: 'pairing_code' }).optional(),
+      deliveryToken: f.string({ column: 'delivery_token' }).optional(),
+      /** JSON document of the initiating principal. */
+      initiatingPrincipal: f.text({ column: 'initiating_principal' }).optional(),
+      /** Last attempted delivery's digest for observation only; never used to choose the next bundle. */
+      runtimeArtifactDigest: f.string({ column: 'runtime_artifact_digest' }).optional(),
+      managementControllerId: f.integer({ column: 'management_controller_id' }).optional(),
+      dockerProvisionToken: f.string({ column: 'docker_provision_token' }).optional(),
+      dockerProvisionState: f.string({ column: 'docker_provision_state' }).optional(),
+      platformReport: f.text({ column: 'platform_report' }).optional(),
+      codesysState: f.string({ column: 'codesys_state' }).optional(),
+      progressPercent: f.integer({ column: 'progress_percent' }).optional(),
+      progressStep: f.string({ column: 'progress_step' }).optional(),
+      progressDetail: f.text({ column: 'progress_detail' }).optional(),
+      auditLog: f.text({ column: 'audit_log' }),
+      failureReason: f.text({ column: 'failure_reason' }).optional(),
+      createdAt: f.string({ column: 'created_at' }),
+      updatedAt: f.string({ column: 'updated_at' }),
+    },
+    { physicalName: 'plugin_wago_commissioning_sessions' },
+  ),
+  /** New enrolments only. Never serialize this row or its encrypted envelope. */
+  managedAccess: table(
+    {
+      sessionId: f.integer({ column: 'session_id' }),
+      controllerId: f.integer({ column: 'controller_id' }).optional(),
+      host: f.string(),
+      fingerprint: f.string(),
+      token: f.string(),
+      state: f.string(),
+      encryptedCredentials: f.text({ column: 'encrypted_credentials' }),
+      keyFingerprint: f.string({ column: 'key_fingerprint' }),
+    },
+    {
+      physicalName: 'plugin_wago_managed_access',
+      primaryKey: ['sessionId'],
+      indexes: [{ name: 'wago_managed_controller', fields: ['controllerId'] }],
+    },
+  ),
+  runtimeUpdates: table(
+    {
+      controllerId: f.integer({ column: 'controller_id' }),
+      metadata: f.text().optional(),
+    },
+    { physicalName: 'plugin_wago_runtime_updates', primaryKey: ['controllerId'] },
+  ),
+  /** Shared by commissioning, managed SSH and updates; keyed by pinned device identity. */
+  deviceOperations: table(
+    {
+      fingerprint: f.string(),
+      owner: f.string().optional(),
+      leaseUntil: f.integer({ column: 'lease_until' }).withDefault(0),
+    },
+    { physicalName: 'plugin_wago_device_operations', primaryKey: ['fingerprint'] },
+  ),
+  /** Never return this row from an API. */
+  management: table(
+    {
+      controllerId: f.integer({ column: 'controller_id' }),
+      metadataJson: f.text({ column: 'metadata_json' }).optional(),
+      encryptedPrivateKey: f.text({ column: 'encrypted_private_key' }).optional(),
+      leaseOwner: f.string({ column: 'lease_owner' }).optional(),
+      leaseUntil: f.integer({ column: 'lease_until' }).withDefault(0),
+    },
+    { physicalName: 'plugin_wago_management', primaryKey: ['controllerId'] },
+  ),
+  /** Never expose this recovery record through an API. */
+  credentialRotations: table(
+    {
+      controllerId: f.integer({ column: 'controller_id' }),
+      revision: f.integer(),
+      credentialEpoch: f.string({ column: 'credential_epoch' }),
+      phase: f.string(),
+      mqttServerId: f.integer({ column: 'mqtt_server_id' }),
+      prefix: f.string(),
+      token: f.string(),
+      encryptedCredentials: f.text({ column: 'encrypted_credentials' }).optional(),
+    },
+    {
+      physicalName: 'plugin_wago_credential_rotations',
+      primaryKey: ['controllerId'],
+      foreignKeys: [
+        { fields: ['controllerId'], references: 'controllers', referencedFields: ['id'], onDelete: 'cascade' },
+      ],
+    },
+  ),
+  /** Durable roll-forward intent. Only an explicit public projection may leave the backend. */
+  networkChanges: table(
+    {
+      controllerId: f.integer({ column: 'controller_id' }),
+      sessionId: f.integer({ column: 'session_id' }),
+      fingerprint: f.string(),
+      targetHost: f.string({ column: 'target_host' }),
+      mqttServerId: f.integer({ column: 'mqtt_server_id' }).optional(),
+      phase: f.string(),
+      failure: f.text().optional(),
+      encryptedPayload: f.text({ column: 'encrypted_payload' }).optional(),
+      updatedAt: f.string({ column: 'updated_at' }),
+    },
+    {
+      physicalName: 'plugin_wago_network_changes',
+      primaryKey: ['controllerId'],
+      foreignKeys: [
+        { fields: ['controllerId'], references: 'controllers', referencedFields: ['id'], onDelete: 'cascade' },
+      ],
+    },
+  ),
+  /**
+   * Retain the old identity's broker association when it cannot be contacted. Migration success never relies on
+   * revocation through an unreachable broker.
+   */
+  mqttCredentialRetirements: table(
+    {
+      controllerId: f.integer({ column: 'controller_id' }),
+      mqttServerId: f.integer({ column: 'mqtt_server_id' }),
+    },
+    {
+      physicalName: 'plugin_wago_mqtt_credential_retirements',
+      primaryKey: ['controllerId', 'mqttServerId'],
+      foreignKeys: [
+        { fields: ['controllerId'], references: 'controllers', referencedFields: ['id'], onDelete: 'cascade' },
+      ],
+    },
+  ),
+};
