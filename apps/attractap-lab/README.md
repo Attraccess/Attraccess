@@ -377,6 +377,24 @@ evidence only, never commit it. Plugin BLE bytes are the exception: for
 because they carry device credentials (a lock's user code and crypt token) and
 CI uploads `hil-artifacts/` as an artifact.
 
+One reader serves the whole run, so every test that uses it starts from an
+idle reader (`hil/reader_reset.py`, autouse fixtures in `hil/conftest.py`):
+before each test, and before a module's own fixtures, the run checks that the
+reader is connected and shows the signed-out resource list, and that no usage
+session is open. Only what it finds is cleaned up: open sessions are ended
+through the API, notices dismissed, armed enroll/reset/supervision/mass
+introduction screens cancelled, the user signed out, a revoked reader approved
+again, and as the last resort the reader is rebooted. A clean check costs
+about 0.2 s. Each cleanup is logged to `reader-resets.jsonl` with the test
+that left the state behind. If even a reboot fails, the later tests fail at
+setup at once instead of rebooting again.
+
+The end of the pytest output (section "HIL failure order and reader resets")
+names the first failure, lists the later ones in order, marks failures that
+repeat one shared fixture error, and shows the resets. On GitHub Actions the
+first failure is also an error annotation and the summary goes to the job
+summary.
+
 The tests in `test_nfc_cards.py` build on each other: one whose prerequisite
 (an enrolled card from an earlier test) is missing fails and names it, so
 run that file whole rather than picking single tests from it with `-k`.
