@@ -556,6 +556,11 @@ namespace
         expect(ble["version"] == 1 && ble["maxMtu"] == 517 && ble["maxPayloadBytes"] == 512 &&
                    ble["operations"].size() == 8 && ble["maxConnections"] == 1,
                "capabilities.ble v1 as the API expects");
+        JsonObjectConst watch = ble["watch"];
+        expect(watch["version"] == 1 && watch["maxFilters"] == 8 && watch["maxDevices"] == 32 &&
+                   watch["maxEventsPerSecond"] == 20,
+               "capabilities.ble.watch v1 as the API expects");
+        std::printf("capabilities.ble: %s\n", bleCaps);
     }
 }
 
@@ -590,5 +595,6 @@ int main()
     capabilityFitsTheFirmwareInfo();
     runEdgeTests();
     runLinkTests();
+    runWatchTests();
     std::puts("PASS ble proxy");
 }

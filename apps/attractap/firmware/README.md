@@ -155,6 +155,14 @@ and reports success only after the card proved the new key or its factory state.
 `CARD_APDU_RESPONSE` without an INFO serial line (DEBUG only); every other event is logged as
 `Sending reader event: <TYPE>`.
 
+## Access-only doors (2.6.0)
+
+The resource list marks a door `accessOnly: true` when its only action is Open (a door the reader
+can open but never lock or unlatch). A Touch reader shows one full-width Open button for it instead
+of Lock, Unlock and Release latch, and a Lite reader opens it on any tap, short or long. Open is sent
+as the existing unlock request; the server records it as the door being opened. A resource list
+without the field (an older server) means a regular door.
+
 ## BLE proxy protocol (2.5.0)
 
 Firmware 2.5.0 lets server plugins with the `BLE_TRANSPORT` permission talk to Bluetooth Low Energy
@@ -169,30 +177,33 @@ protocol" below) after it signed in, and refuses them on the legacy token channe
 sign-in. The server reports a reader that is not on the secure link as `READER_OFFLINE`
 (`pairing-required`) and sends it no BLE requests.
 
-| Direction       | Event               | Payload (besides `v: 1` and `sessionId`)                                                                                          |
-| --------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Server → reader | `BLE_SCAN`          | `requestId`, `durationMs` (≤ 15 s), `filter` (`serviceUuids`, `manufacturerIds`, `namePrefix`), `maxResults` (≤ 32)                |
-| Server → reader | `BLE_SESSION_OPEN`  | `requestId`, `address`, `addressType`, `connectTimeoutMs`, `leaseMs`, `allowlist` (≤ 16 entries `{s, c, ops, r, w, n}`)            |
-| Server → reader | `BLE_READ`          | `requestId`, `s`, `c`, `timeoutMs`                                                                                                |
-| Server → reader | `BLE_WRITE`         | `requestId`, `s`, `c`, `value` (base64, ≤ 512 bytes), `withoutResponse`, `timeoutMs`                                              |
-| Server → reader | `BLE_SUBSCRIBE`     | `requestId`, `s`, `c`, `indicate`, `timeoutMs` (the reader writes the CCCD)                                                       |
-| Server → reader | `BLE_UNSUBSCRIBE`   | `requestId`, `s`, `c`, `timeoutMs`                                                                                                |
-| Server → reader | `BLE_CANCEL`        | `requestId` of the request to abandon (no answer of its own)                                                                      |
-| Server → reader | `BLE_SESSION_CLOSE` | `requestId`                                                                                                                       |
-| Reader → server | `BLE_RESULT`        | `requestId`, `ok`, then `value` (read) or `mtu` (open), or `error` `{code, detail}`                                               |
-| Reader → server | `BLE_SCAN_RESULT`   | `requestId`, `ok`, `advertisements` (deduplicated by address) or `error`                                                          |
-| Reader → server | `BLE_NOTIFICATION`  | `subscriptionId` (the subscribe's `requestId`), `seq` (1, 2, … without gaps), `value` or a stream-ending `error`                    |
-| Reader → server | `BLE_SESSION_ENDED` | `reason` (`disconnected`, `lease-expired`, `timeout`, `ota`, …), `detail`                                                         |
+| Direction       | Event               | Payload (besides `v: 1` and `sessionId`)                                                                                   |
+| --------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Server → reader | `BLE_SCAN`          | `requestId`, `durationMs` (≤ 15 s), `filter` (`serviceUuids`, `manufacturerIds`, `namePrefix`), `maxResults` (≤ 32)        |
+| Server → reader | `BLE_SESSION_OPEN`  | `requestId`, `address`, `addressType`, `connectTimeoutMs`, `leaseMs`, `allowlist` (≤ 16 entries `{s, c, ops, r, w, n}`)    |
+| Server → reader | `BLE_READ`          | `requestId`, `s`, `c`, `timeoutMs`                                                                                         |
+| Server → reader | `BLE_WRITE`         | `requestId`, `s`, `c`, `value` (base64, ≤ 512 bytes), `withoutResponse`, `timeoutMs`                                       |
+| Server → reader | `BLE_SUBSCRIBE`     | `requestId`, `s`, `c`, `indicate`, `timeoutMs` (the reader writes the CCCD)                                                |
+| Server → reader | `BLE_UNSUBSCRIBE`   | `requestId`, `s`, `c`, `timeoutMs`                                                                                         |
+| Server → reader | `BLE_CANCEL`        | `requestId` of the request to abandon (no answer of its own)                                                               |
+| Server → reader | `BLE_SESSION_CLOSE` | `requestId`                                                                                                                |
+| Reader → server | `BLE_RESULT`        | `requestId`, `ok`, then `value` (read) or `mtu` (open), or `error` `{code, detail}`                                        |
+| Reader → server | `BLE_SCAN_RESULT`   | `requestId`, `ok`, `advertisements` (deduplicated by address) or `error`                                                   |
+| Reader → server | `BLE_NOTIFICATION`  | `subscriptionId` (the subscribe's `requestId`), `seq` (1, 2, … without gaps), `value` or a stream-ending `error`           |
+| Reader → server | `BLE_SESSION_ENDED` | `reason` (`disconnected`, `lease-expired`, `timeout`, `ota`, …), `detail`                                                  |
+| Server → reader | `BLE_WATCH_SET`     | no `sessionId`: `requestId`, `filters` (≤ 8 `{id, serviceUuids, manufacturerIds, namePrefix}`), `keepaliveMs` (1 s to 1 h) |
+| Reader → server | `BLE_WATCH_STATE`   | no `sessionId`: `requestId` (none when unsolicited), `ok`, then `active` and `detail`, or `error`                          |
+| Reader → server | `BLE_WATCH_EVENT`   | no `sessionId`: `events` (≤ 8), each `filters` (matching ids), the `BLE_SCAN_RESULT` advertisement fields and `changed`    |
 
-None of these is acknowledged. Every request gets exactly one answer; error codes are the plugin
-codes of the SDK (`READER_BUSY`, `OPERATION_NOT_ALLOWED`, `GATT_ERROR`, …) and `detail` carries
-the raw radio reason as text (`nimble:rc=<n>`, `hci:0x<xx>`, `att:0x<xx>`, `reason:0x<xx>`),
+None of these is acknowledged. Every request gets exactly one answer (`BLE_WATCH_SET` gets a
+`BLE_WATCH_STATE`); error codes are the plugin codes of the SDK (`READER_BUSY`,
+`OPERATION_NOT_ALLOWED`, `GATT_ERROR`, …) and `detail` carries the raw radio reason as text (`nimble:rc=<n>`, `hci:0x<xx>`, `att:0x<xx>`, `reason:0x<xx>`),
 never payload bytes. Requests with another `v` are refused.
 
 **Architecture.** `src/ble_proxy/`: the websocket task only parses a request and queues it (bounded
 queue) for the `ble_proxy` task, which runs the state machine (`ble_core*.cpp`); NimBLE's host task
 reports radio events back through a second queue. The state machine, allowlist, codec, deadlines,
-notification buffer and error mapping are free of NimBLE and FreeRTOS and covered by host tests
+notification buffer, advertisement watch (`ble_watch.cpp`) and error mapping are free of NimBLE and FreeRTOS and covered by host tests
 (`tests/ble-proxy`); `ble_radio_nimble*.cpp` is the only NimBLE code.
 
 **Rules.** One owner at a time: a scan or one session (`CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1`); a
@@ -231,6 +242,29 @@ as soon as the websocket frees a send slot while it waits for one
 (`IReaderTransport::setSendSlotFreedCallback`). Otherwise it polls every 20 ms only for deadlines,
 and without BLE work it still sleeps until a request arrives.
 
+**Advertisement watch.** Since 2.6.0 the reader also announces `capabilities.ble.watch`
+(`version: 1`, `maxFilters: 8`, `maxDevices: 32`, `maxEventsPerSecond: 20`) and can watch
+advertisements continuously for the server. `BLE_WATCH_SET` replaces the reader's whole filter set
+(the server sends the union of all watches on the reader); `filters: []` stops the watch. A filter
+matches like the scan filter, under the `id` the server chose. While at least one filter is set, the
+reader scans passively (no scan requests, so names only from the advertising data) and keeps a table
+of at most 32 matching devices (the device seen longest ago makes room). Per device it compares the
+manufacturer data, name and service UUIDs, never the RSSI: a device that first matches or whose data
+changed is reported at once with `changed: true`, and one that is still seen and unchanged is reported
+again every `keepaliveMs` with `changed: false`. Events go out at most every 50 ms, at most 8 per
+message and at most 20 per second per reader; changes go before keepalives. Like notifications,
+events only use room the websocket send queue has to spare: while it is full, keepalives are dropped
+and changes wait. The watch is no owner: it runs beside a session (scanning 30 ms of every 200 ms
+while a device is connected, 30 ms of every 100 ms otherwise, which leaves air time for the
+connection and Wi-Fi), pauses while a connection is being established (NimBLE cannot scan and connect
+at once) and while an on-demand `BLE_SCAN` runs (whose reports it still uses), and resumes
+afterwards. `BLE_WATCH_STATE` answers whether it scans right now (`active`, with the reason in
+`detail` when not, e.g. `connecting`); the reader also sends one without `requestId` when the watch
+stops or runs again for its own reasons (`ota`, a radio failure, which it retries every 2 s). An OTA
+pauses the watch; losing the websocket ends it, and the server sends its filter set again on the
+next connection. A first non-empty filter set brings NimBLE up like any other BLE request; an empty
+one never does.
+
 **Memory.** NimBLE (central and observer roles only, no security) starts lazily on the first BLE
 request and stays until the next reboot, so readers that never use BLE keep their RAM and radio as
 before. Host memory and the proxy task stack live in PSRAM; the controller runs from flash
@@ -239,7 +273,8 @@ boot and after the first BLE init. Init failure is reported as `READER_OFFLINE` 
 and never stops the reader.
 
 **Logs.** Each scan, operation and session end logs the session id, operation, outcome, NimBLE code
-and duration, never payload bytes. Successful operations log at debug level, cancels and expected session ends at info, failures,
+and duration, never payload bytes. The watch logs its filter count, starts, stops and radio failures,
+never advertisement data. Successful operations log at debug level, cancels and expected session ends at info, failures,
 allowlist rejections and notification failures at warn, and an init failure at error.
 
 **Trust boundary.** The allowlist protects devices against bugs in the server, not against a
@@ -375,14 +410,14 @@ python3 tools/check_secure_profile.py build/attractap-touch-v2-secure
 
 ### eFuse key block layout (fixed)
 
-| Block | Content |
-| ----- | ------- |
-| KEY0 | Secure Boot digest: per-installation signing key |
-| KEY1 | Secure Boot digest: recovery key |
-| KEY2 | Flash encryption key (XTS-AES-128) |
-| KEY3 | DS identity (HMAC key, read-protected) |
-| KEY4 | NVS encryption (HMAC key, read-protected) |
-| KEY5 | Spare |
+| Block | Content                                          |
+| ----- | ------------------------------------------------ |
+| KEY0  | Secure Boot digest: per-installation signing key |
+| KEY1  | Secure Boot digest: recovery key                 |
+| KEY2  | Flash encryption key (XTS-AES-128)               |
+| KEY3  | DS identity (HMAC key, read-protected)           |
+| KEY4  | NVS encryption (HMAC key, read-protected)        |
+| KEY5  | Spare                                            |
 
 ### eFuse read protection (RD_DIS)
 
@@ -546,18 +581,18 @@ maintenance drawer and touch timeouts behave as with a finger. Touch commands
 reply after LVGL has processed the whole gesture. Coordinates are display
 pixels (480 x 480, origin top left as shown on screen).
 
-| Topic               | Payload (besides `authCode`)                                                                          | Reply                                                       |
-| ------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `ui.widgets.get`    | —                                                                                                     | `{"screen","width","height","widgets":[...]}`               |
-| `ui.widgets.tap`    | `text`, optional `match` (`exact`/`contains`), `index` (default 0), `holdMs` (default 60)             | `{"success":true,"widget":{...}}`                           |
-| `ui.touch.tap`      | `x`, `y`, optional `holdMs` (1-60000, default 60)                                                     | `{"success":true}`                                          |
-| `ui.touch.press`    | `x`, `y`, optional `holdMs`; without it the finger stays down until `ui.touch.release` (at most 60 s) | `{"success":true}` once pressed or, with `holdMs`, released |
-| `ui.touch.release`  | —                                                                                                     | `{"success":true}`                                          |
-| `ui.touch.swipe`    | `x1`, `y1`, `x2`, `y2`, optional `durationMs` (1-10000, default 300)                                  | `{"success":true}`                                          |
-| `ui.screenshot.get` | —                                                                                                     | header, data lines and end line (below)                     |
-| `system.heap.get`   | —                                                                                                     | `{"internalFree","internalLargest","internalMinFree","windowMinFree","windowMinLargest","psramFree"}` |
-| `system.heap.reset` | —                                                                                                     | same as `system.heap.get`, then restarts the `window*` high-water marks |
-| `ui.touch.controller.get` | — (GT911 displays only)                                                                         | `{"reads","failures"}`: GT911 register reads since boot       |
+| Topic                     | Payload (besides `authCode`)                                                                          | Reply                                                                                                 |
+| ------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `ui.widgets.get`          | —                                                                                                     | `{"screen","width","height","widgets":[...]}`                                                         |
+| `ui.widgets.tap`          | `text`, optional `match` (`exact`/`contains`), `index` (default 0), `holdMs` (default 60)             | `{"success":true,"widget":{...}}`                                                                     |
+| `ui.touch.tap`            | `x`, `y`, optional `holdMs` (1-60000, default 60)                                                     | `{"success":true}`                                                                                    |
+| `ui.touch.press`          | `x`, `y`, optional `holdMs`; without it the finger stays down until `ui.touch.release` (at most 60 s) | `{"success":true}` once pressed or, with `holdMs`, released                                           |
+| `ui.touch.release`        | —                                                                                                     | `{"success":true}`                                                                                    |
+| `ui.touch.swipe`          | `x1`, `y1`, `x2`, `y2`, optional `durationMs` (1-10000, default 300)                                  | `{"success":true}`                                                                                    |
+| `ui.screenshot.get`       | —                                                                                                     | header, data lines and end line (below)                                                               |
+| `system.heap.get`         | —                                                                                                     | `{"internalFree","internalLargest","internalMinFree","windowMinFree","windowMinLargest","psramFree"}` |
+| `system.heap.reset`       | —                                                                                                     | same as `system.heap.get`, then restarts the `window*` high-water marks                               |
+| `ui.touch.controller.get` | — (GT911 displays only)                                                                               | `{"reads","failures"}`: GT911 register reads since boot                                               |
 
 `system.heap.*` report the internal (8-bit capable) heap in bytes.
 `internalMinFree` is ESP-IDF's lowest free size since boot. ESP-IDF keeps no

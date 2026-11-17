@@ -31,6 +31,8 @@ namespace ble
         virtual void radioAdvertisement(const Address &address, int8_t rssi, bool hasRssi, const uint8_t *data,
                                         size_t length) = 0;
         virtual void radioScanComplete() = 0;
+        // The watch's scan ended without being asked to (the controller dropped it).
+        virtual void radioWatchScanEnded() = 0;
         virtual void radioConnected(const Address &peer, uint16_t mtu) = 0;
         virtual void radioConnectFailed(const Error &error) = 0;
         virtual void radioDisconnected(int reason) = 0;
@@ -48,6 +50,7 @@ namespace ble
 
         Error init() override;
         Error startScan(uint32_t durationMs) override;
+        Error startWatchScan(bool connected) override;
         void stopScan() override;
         Error connect(const Address &address, uint32_t timeoutMs, const PsVector<AllowEntry> &allowlist) override;
         void cancelConnect() override;
@@ -60,6 +63,7 @@ namespace ble
 
         // NimBLE C callbacks (public so the static trampolines in the .cpp can reach them).
         int onGapEvent(::ble_gap_event *event);
+        int onWatchGapEvent(::ble_gap_event *event);
         int onMtu(uint16_t conn, const ::ble_gatt_error *error, uint16_t mtu);
         int onService(uint16_t conn, const ::ble_gatt_error *error, const ::ble_gatt_svc *service);
         int onCharacteristic(uint16_t conn, const ::ble_gatt_error *error, const ::ble_gatt_chr *chr);

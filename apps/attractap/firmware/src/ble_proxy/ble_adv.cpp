@@ -110,25 +110,38 @@ namespace ble
         }
     }
 
+    namespace
+    {
+        bool matches(const Advertisement &ad, const PsVector<Uuid> &services, const PsVector<uint16_t> &manufacturers,
+                     bool hasNamePrefix, const char *namePrefix)
+        {
+            if (services.empty() && manufacturers.empty() && !hasNamePrefix) return false;
+            if (!services.empty())
+            {
+                bool any = false;
+                for (const Uuid &uuid : ad.serviceUuids)
+                    any = any || std::find(services.begin(), services.end(), uuid) != services.end();
+                if (!any) return false;
+            }
+            if (!manufacturers.empty())
+            {
+                bool any = false;
+                for (const auto &m : ad.manufacturers)
+                    any = any || std::find(manufacturers.begin(), manufacturers.end(), m.companyId) != manufacturers.end();
+                if (!any) return false;
+            }
+            if (hasNamePrefix && ad.name.compare(0, std::strlen(namePrefix), namePrefix) != 0) return false;
+            return true;
+        }
+    }
+
     bool matchesFilter(const Advertisement &ad, const Command &scan)
     {
-        if (scan.filterServices.empty() && scan.filterManufacturers.empty() && !scan.hasNamePrefix) return false;
-        if (!scan.filterServices.empty())
-        {
-            bool any = false;
-            for (const Uuid &uuid : ad.serviceUuids)
-                any = any || std::find(scan.filterServices.begin(), scan.filterServices.end(), uuid) != scan.filterServices.end();
-            if (!any) return false;
-        }
-        if (!scan.filterManufacturers.empty())
-        {
-            bool any = false;
-            for (const auto &m : ad.manufacturers)
-                any = any || std::find(scan.filterManufacturers.begin(), scan.filterManufacturers.end(), m.companyId) !=
-                                 scan.filterManufacturers.end();
-            if (!any) return false;
-        }
-        if (scan.hasNamePrefix && ad.name.compare(0, std::strlen(scan.namePrefix), scan.namePrefix) != 0) return false;
-        return true;
+        return matches(ad, scan.filterServices, scan.filterManufacturers, scan.hasNamePrefix, scan.namePrefix);
+    }
+
+    bool matchesFilter(const Advertisement &ad, const WatchFilter &filter)
+    {
+        return matches(ad, filter.services, filter.manufacturers, filter.hasNamePrefix, filter.namePrefix);
     }
 }

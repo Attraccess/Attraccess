@@ -36,6 +36,12 @@ namespace ble
             cancel(command, now);
             return;
         }
+        // Taken during an OTA too: it waits for the OTA's end instead of being lost (the API sends it only once).
+        if (command.type == CommandType::WatchSet)
+        {
+            setWatch(std::move(command), now);
+            return;
+        }
         // A close always goes through: it only ever frees the radio.
         if (ota() && command.type != CommandType::Close)
         {
@@ -82,6 +88,8 @@ namespace ble
             return;
         }
         if (!ensureRadio(command)) return;
+        // The on-demand scan replaces the watch's for its duration (and feeds the watch meanwhile).
+        stopWatchScan();
         const Error error = radio.startScan(command.durationMs);
         if (!error.ok())
         {
@@ -112,6 +120,8 @@ namespace ble
         session.connectDeadline = now + command.connectTimeoutMs + OP_GRACE_MS;
         session.state = SessionState::Connecting;
         notifications.clear();
+        // NimBLE cannot scan while it initiates a connection: the watch resumes once the link is up or failed.
+        stopWatchScan();
         const Error error = radio.connect(command.address, command.connectTimeoutMs, session.allowlist);
         if (!error.ok())
         {

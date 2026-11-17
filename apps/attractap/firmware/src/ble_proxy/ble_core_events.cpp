@@ -18,8 +18,11 @@ namespace ble
     // ------------------------------------------------------------------------------------------- scan
 
     void BleProxyCore::onAdvertisement(const Address &address, int8_t rssi, bool hasRssi, const uint8_t *data,
-                                       size_t length)
+                                       size_t length, uint32_t now)
     {
+        // Reports of an on-demand scan feed the watch too, so it does not go blind while the scan replaces its own.
+        if (watch.active() && (watchScanning || currentOwner == Owner::Scan))
+            watch.onAdvertisement(address, rssi, hasRssi, data, length, now);
         if (currentOwner != Owner::Scan) return;
         Advertisement *target = nullptr;
         for (Advertisement &candidate : scan.candidates)
@@ -217,6 +220,12 @@ namespace ble
     void BleProxyCore::linkLost(uint32_t now)
     {
         outbox.clear();
+        // The API sends its filter set again on the next connection.
+        if (watch.active()) logf(LogLevel::Info, "ble watch stopped reason=link-lost");
+        watch.clear();
+        stopWatchScan();
+        watchRetry = false;
+        watchAnnouncedInactive = false;
         if (currentOwner == Owner::Scan)
         {
             radio.stopScan();
@@ -237,6 +246,13 @@ namespace ble
 
     void BleProxyCore::otaStarted(uint32_t now)
     {
+        if (watch.active())
+        {
+            // Paused, not ended: it resumes if the OTA fails and the reader keeps running.
+            stopWatchScan();
+            if (!watchAnnouncedInactive) send(watchStateMessage(0, Error(), false, "ota"));
+            watchAnnouncedInactive = true;
+        }
         if (currentOwner == Owner::Scan)
         {
             radio.stopScan();
@@ -314,7 +330,9 @@ namespace ble
             }
             }
         }
+        updateWatchScan(now);
         drainNotifications();
+        flushWatch(now);
     }
 
     void BleProxyCore::drainNotifications()
@@ -373,6 +391,8 @@ namespace ble
              static_cast<unsigned>(now ? now - command.receivedMs : 0));
         if (command.type == CommandType::Scan)
             send(scanResultMessage(command.sessionId, command.requestId, error, nullptr));
+        else if (command.type == CommandType::WatchSet)
+            send(watchStateMessage(command.requestId, error, false));
         else
             send(resultMessage(command.sessionId, command.requestId, error, value, mtu));
     }

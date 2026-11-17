@@ -25,6 +25,8 @@ namespace
     // Requests: the session queue (16) plus a scan/open/close/cancel in flight.
     constexpr UBaseType_t COMMAND_QUEUE_DEPTH = ble::MAX_PENDING_REQUESTS + 8;
     constexpr UBaseType_t EVENT_QUEUE_DEPTH = 32;
+    // Advertisements (many, droppable) never take the last slots: connection and operation results always fit.
+    constexpr UBaseType_t EVENT_QUEUE_RESERVE = 8;
     // Radio results must not get lost; NimBLE's host task waits this long for room.
     constexpr TickType_t EVENT_POST_TIMEOUT = pdMS_TO_TICKS(200);
     constexpr uint32_t TASK_STACK = 6144;
@@ -62,6 +64,7 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
         {
             Advertisement,
             ScanComplete,
+            WatchScanEnded,
             Connected,
             ConnectFailed,
             Disconnected,
@@ -140,6 +143,8 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
     void radioAdvertisement(const ble::Address &address, int8_t rssi, bool hasRssi, const uint8_t *data,
                             size_t length) override
     {
+        // A crowded band under a continuous watch scan must not crowd out radio results.
+        if (uxQueueSpacesAvailable(events) <= EVENT_QUEUE_RESERVE) return;
         RadioEvent *event = make(RadioEvent::Kind::Advertisement);
         if (!event) return;
         event->address = address;
@@ -152,6 +157,10 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
     void radioScanComplete() override
     {
         if (RadioEvent *event = make(RadioEvent::Kind::ScanComplete)) post(event, EVENT_POST_TIMEOUT);
+    }
+    void radioWatchScanEnded() override
+    {
+        if (RadioEvent *event = make(RadioEvent::Kind::WatchScanEnded)) post(event, EVENT_POST_TIMEOUT);
     }
     void radioConnected(const ble::Address &peer, uint16_t mtu) override
     {
@@ -209,8 +218,9 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
     {
         // A link event posted just before a new connect (the old link's disconnect, say) would otherwise fail the
         // new session. Scan events belong to no link.
-        const bool linkEvent =
-            event.kind != RadioEvent::Kind::Advertisement && event.kind != RadioEvent::Kind::ScanComplete;
+        const bool linkEvent = event.kind != RadioEvent::Kind::Advertisement &&
+                               event.kind != RadioEvent::Kind::ScanComplete &&
+                               event.kind != RadioEvent::Kind::WatchScanEnded;
         if (linkEvent && event.epoch != radio.linkEpoch())
         {
             logger.debug("ble stale radio event dropped");
@@ -219,10 +229,13 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
         switch (event.kind)
         {
         case RadioEvent::Kind::Advertisement:
-            core.onAdvertisement(event.address, event.rssi, event.hasRssi, event.data.data(), event.data.size());
+            core.onAdvertisement(event.address, event.rssi, event.hasRssi, event.data.data(), event.data.size(), now);
             break;
         case RadioEvent::Kind::ScanComplete:
             core.onScanComplete(now);
+            break;
+        case RadioEvent::Kind::WatchScanEnded:
+            core.onWatchScanEnded(now);
             break;
         case RadioEvent::Kind::Connected:
             core.onConnected(event.address, event.mtu, now);

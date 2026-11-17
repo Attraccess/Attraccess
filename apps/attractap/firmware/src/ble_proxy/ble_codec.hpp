@@ -40,7 +40,12 @@ namespace ble
     std::string notificationMessage(const char *sessionId, uint32_t subscriptionId, uint32_t seq, const Error &error,
                                     const uint8_t *value, size_t length);
     std::string sessionEndedMessage(const char *sessionId, const char *reason, const char *detail);
+    // BLE_WATCH_STATE: the answer to BLE_WATCH_SET (`requestId` set) or a change the reader made on its own (0).
+    std::string watchStateMessage(uint32_t requestId, const Error &error, bool active, const char *detail = "");
+    // BLE_WATCH_EVENT with up to MAX_WATCH_EVENTS_PER_MESSAGE entries.
+    std::string watchEventMessage(const WatchEvent *events, size_t count);
     // The answer to a request refused before the state machine sees it (untrusted channel, malformed, no room).
-    // Empty when it cannot be addressed: no requestId or sessionId, or a BLE_CANCEL (never answered).
+    // Empty when it cannot be addressed: no requestId or sessionId (BLE_WATCH_SET needs none), or a BLE_CANCEL
+    // (never answered).
     std::string refusalMessage(const Command &command, const Error &error);
 }
