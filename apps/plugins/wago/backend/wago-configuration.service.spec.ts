@@ -15,7 +15,7 @@ describe('configuration editor service boundaries', () => {
       snapshot,
     );
     expect(JSON.parse(result.snapshot).logicalChannels[0].pulse.durationMs).toBe(500);
-    expect(drafts.save).not.toHaveBeenCalled();
+    expect(drafts.writes()).toBe(0);
     expect(mqtt.publish).not.toHaveBeenCalled();
   });
 
@@ -97,7 +97,7 @@ describe('configuration editor service boundaries', () => {
     await service.saveDraft(1, snapshot);
     await service.reviewDraft(1);
     await service.publishDraft(1);
-    const original = { ...revisions[0] };
+    const original = { ...(await revisions.at(0)) };
     flowQuery.getMany.mockResolvedValue([
       { id: 'command-1', resourceId: 2, type: 'plugin.wago.command', data: { controllerId: 1, channelId: 'output' } },
     ]);
@@ -116,11 +116,11 @@ describe('configuration editor service boundaries', () => {
     await service.publishDraft(1, true);
     const preview = await service.previewRevision(1, 1);
     expect(preview.revision.revision).toBe(1);
-    expect(revisions).toHaveLength(2);
+    expect(await revisions.count()).toBe(2);
     const restored = await rollback(service, 1, true);
     expect(restored.revision).toBe(3);
     expect(restored.contentHash).toBe(configurationHash(snapshot));
-    expect(revisions[0]).toEqual(original);
+    expect(await revisions.at(0)).toEqual(original);
   });
 
   it('does not overwrite the draft when a rollback requires acknowledgement', async () => {
@@ -141,7 +141,7 @@ describe('configuration editor service boundaries', () => {
     const result = await service.validateDraft(1, { ...snapshot, physicalPoints: [] });
     expect(result.valid).toBe(false);
     expect(result.errors).toContainEqual(expect.objectContaining({ path: 'logicalChannels[0].physicalPointId' }));
-    expect(drafts.save).not.toHaveBeenCalled();
+    expect(drafts.writes()).toBe(0);
   });
 
   it('rejects publishing another editor’s reviewed draft with a stale review hash', async () => {
@@ -196,8 +196,8 @@ describe('configuration editor service boundaries', () => {
       await service.saveDraft(1, snapshot);
       await service.reviewDraft(1);
       await service.publishDraft(1);
-      revisions[0].presetProvenance = historicalMetadata;
-      const historical = { ...revisions[0] };
+      await revisions.update(1, { presetProvenance: historicalMetadata ?? null });
+      const historical = { ...(await revisions.at(0)) };
       await service.saveDraft(1, snapshot, {
         names: { output: 'Newer name' },
         presets: [{ presetId: 'generic-digital-output', channelId: 'output', physicalPointId: 'point' }],
@@ -206,7 +206,7 @@ describe('configuration editor service boundaries', () => {
       expect(JSON.parse(restored.presetProvenance ?? '{}')).toEqual({ editor: { names: {}, presets: [] } });
       expect(draft()?.presetProvenance).toBe(restored.presetProvenance);
       expect(restored.contentHash).toBe(historical.contentHash);
-      expect(revisions[0]).toEqual(historical);
+      expect(await revisions.at(0)).toEqual(historical);
       expect(JSON.parse(String(mqtt.publish.mock.calls[1][2])).snapshot).toEqual(snapshot);
     },
   );
@@ -244,8 +244,8 @@ describe('configuration editor service boundaries', () => {
 
   it('requires a fresh review for previously stored snapshot-only review hashes', async () => {
     const { service, drafts, mqtt } = fixture();
-    const saved = await service.saveDraft(1, snapshot);
-    await drafts.save({ ...saved, reviewedHash: configurationHash(snapshot) });
+    await service.saveDraft(1, snapshot);
+    await drafts.update({ reviewedHash: configurationHash(snapshot) });
     await expect(service.publishDraft(1, true)).rejects.toThrow('review the current');
     expect(mqtt.publish).not.toHaveBeenCalled();
     const review = await service.reviewDraft(1);
@@ -319,11 +319,11 @@ describe('configuration editor service boundaries', () => {
   it('does not authorize a failed review or bypass a failed lookup with force', async () => {
     const { service, draft, drafts, mqtt, flowQuery } = fixture();
     await service.saveDraft(1, snapshot);
-    drafts.save.mockClear();
+    drafts.clear();
     flowQuery.getMany.mockRejectedValueOnce(new Error('flow lookup failed'));
     await expect(service.reviewDraft(1)).rejects.toThrow('flow lookup failed');
     expect(draft()?.reviewedHash).toBeNull();
-    expect(drafts.save).not.toHaveBeenCalled();
+    expect(drafts.writes()).toBe(0);
     await expect(service.publishDraft(1, true)).rejects.toThrow('review');
     await service.reviewDraft(1);
     flowQuery.getMany.mockRejectedValueOnce(new Error('flow lookup failed'));
@@ -394,8 +394,8 @@ describe('configuration editor service boundaries', () => {
     await service.reviewDraft(1);
     await service.publishDraft(1);
     const historical = { ...snapshot, physicalPoints: [{ ...snapshot.physicalPoints[0], channel: 12 }] };
-    revisions[0].snapshot = canonicalSnapshot(historical);
-    revisions[0].contentHash = configurationHash(historical);
+    await revisions.update(1, { snapshot: canonicalSnapshot(historical) });
+    await revisions.update(1, { contentHash: configurationHash(historical) });
     const before = { ...draft() };
     await expect(rollback(service, 1, true)).rejects.toThrow('rollback configuration is invalid');
     expect(draft()).toEqual(before);
@@ -411,7 +411,11 @@ describe('configuration editor service boundaries', () => {
     mqtt.publish.mockRejectedValueOnce(new Error('delivery failed'));
     await expect(rollback(service, 1, true)).rejects.toThrow('delivery failed');
     expect(draft()?.snapshot).toBe(canonicalSnapshot(snapshot));
-    expect(revisions[1]).toMatchObject({ revision: 2, state: 'pending', snapshot: canonicalSnapshot(snapshot) });
+    expect(await revisions.at(1)).toMatchObject({
+      revision: 2,
+      state: 'pending',
+      snapshot: canonicalSnapshot(snapshot),
+    });
   });
 
   it.each(['names', 'presets', 'unchanged'] as const)(
@@ -423,7 +427,7 @@ describe('configuration editor service boundaries', () => {
       await service.reviewDraft(1);
       mqtt.publish.mockRejectedValueOnce(new Error('delivery failed'));
       await expect(service.publishDraft(1)).rejects.toThrow('delivery failed');
-      const original = { ...revisions[0] };
+      const original = { ...(await revisions.at(0)) };
       const nextMetadata = {
         names: { output: change === 'names' ? 'Renamed' : 'Original' },
         presets:
@@ -436,7 +440,7 @@ describe('configuration editor service boundaries', () => {
       const published = await service.publishDraft(1);
       expect(published.revision).toBe(change === 'unchanged' ? 1 : 2);
       expect(JSON.parse(published.presetProvenance ?? '{}').editor).toEqual(nextMetadata);
-      if (change !== 'unchanged') expect(revisions[0]).toEqual(original);
+      if (change !== 'unchanged') expect(await revisions.at(0)).toEqual(original);
     },
   );
 
@@ -468,20 +472,24 @@ describe('configuration editor service boundaries', () => {
       await service.publishDraft(1);
       const preview = await service.previewRevision(1, 1);
       const before = draft();
-      if (change === 'current revision') revisions.push({ ...revisions[0], revision: 2 });
+      const published = await revisions.first();
+      if (change === 'current revision') await revisions.add({ ...published, revision: 2, id: undefined });
       else if (change === 'current metadata')
-        revisions.push({
-          ...revisions[0],
+        await revisions.add({
+          ...published,
+          id: undefined,
           revision: 2,
           presetProvenance: JSON.stringify({ editor: { names: { output: 'Renamed' }, presets: [] } }),
         });
       else if (change === 'source metadata')
-        revisions[0].presetProvenance = JSON.stringify({ editor: { names: { output: 'Source name' }, presets: [] } });
+        await revisions.update(1, {
+          presetProvenance: JSON.stringify({ editor: { names: { output: 'Source name' }, presets: [] } }),
+        });
       else
         flowQuery.getMany.mockResolvedValue([
           { id: 'new', resourceId: 2, type: 'plugin.wago.command', data: { controllerId: 1, channelId: 'output' } },
         ]);
-      drafts.save.mockClear();
+      drafts.clear();
       mqtt.publish.mockClear();
       await expect(
         service.rollback(
@@ -493,7 +501,7 @@ describe('configuration editor service boundaries', () => {
           preview.draftHash,
         ),
       ).rejects.toThrow('preview');
-      expect(drafts.save).not.toHaveBeenCalled();
+      expect(drafts.writes()).toBe(0);
       expect(mqtt.publish).not.toHaveBeenCalled();
       expect(draft()).toEqual(before);
     },
@@ -550,7 +558,7 @@ describe('configuration editor service boundaries', () => {
       capabilities: '["claim","heartbeat","configuration-v1"]',
     };
     Object.assign(service, {
-      controllers: { findOneBy: jest.fn().mockResolvedValue({ ...controller, protocolVersion: '2.0.0' }) },
+      controllers: { get: jest.fn().mockResolvedValue({ ...controller, protocolVersion: '2.0.0' }) },
     });
     mqtt.publish.mockClear();
     await expect(
@@ -743,13 +751,16 @@ describe('configuration editor service boundaries', () => {
     await service.saveDraft(1, snapshot);
     await service.reviewDraft(1);
     await service.publishDraft(1);
-    Object.assign(revisions[0], {
+    await revisions.update(1, {
       state: 'rejected',
       reportedAt: '2026-01-01T00:00:00.000Z',
       rejectionErrors: '[{"path":"$","message":"invalid"}]',
     });
     const principal = { userId: 7, authenticationMethod: 'session' as const };
-    const expected = { contentHash: revisions[0].contentHash, reportedAt: revisions[0].reportedAt! };
+    const expected = {
+      contentHash: (await revisions.at(0)).contentHash,
+      reportedAt: (await revisions.at(0)).reportedAt!,
+    };
     mqtt.publish.mockClear();
     const acknowledged = await service.acknowledgeRejection(1, 1, expected, principal);
     expect(acknowledged).toMatchObject({
@@ -757,14 +768,14 @@ describe('configuration editor service boundaries', () => {
       rejectionAcknowledgedBy: 7,
       rejectionAcknowledgedAt: expect.any(String),
     });
-    expect(acknowledged.rejectionErrors).toEqual(revisions[0].rejectionErrors);
+    expect(acknowledged.rejectionErrors).toEqual((await revisions.at(0)).rejectionErrors);
     expect(audit.record.mock.calls.map(([event]) => [event.action, event.outcome])).toEqual([
       ['wago.rejection_acknowledgement', 'attempted'],
       ['wago.rejection_acknowledgement', 'succeeded'],
     ]);
     expect(audit.record).toHaveBeenLastCalledWith(expect.objectContaining({ principal, details: { revision: 1 } }));
     await service.acknowledgeRejection(1, 1, expected, { ...principal, userId: 8 });
-    expect(revisions[0].rejectionAcknowledgedBy).toBe(7);
+    expect((await revisions.at(0)).rejectionAcknowledgedBy).toBe(7);
     expect(audit.record).toHaveBeenCalledTimes(2);
     expect(mqtt.publish).not.toHaveBeenCalled();
   });
@@ -774,15 +785,18 @@ describe('configuration editor service boundaries', () => {
     await service.saveDraft(1, snapshot);
     await service.reviewDraft(1);
     await service.publishDraft(1);
-    Object.assign(revisions[0], { state: 'rejected', reportedAt: '2026-01-01T00:00:00.000Z' });
-    const expected = { contentHash: revisions[0].contentHash, reportedAt: revisions[0].reportedAt! };
-    if (change === 'state') revisions[0].state = 'applied';
+    await revisions.update(1, { state: 'rejected', reportedAt: '2026-01-01T00:00:00.000Z' });
+    const expected = {
+      contentHash: (await revisions.at(0)).contentHash,
+      reportedAt: (await revisions.at(0)).reportedAt!,
+    };
+    if (change === 'state') await revisions.update(1, { state: 'applied' });
     if (change === 'hash') expected.contentHash = 'stale';
     if (change === 'report') expected.reportedAt = 'stale';
     await expect(
       service.acknowledgeRejection(1, 1, expected, { userId: 7, authenticationMethod: 'session' }),
     ).rejects.toThrow('rejection changed');
-    expect(revisions[0].rejectionAcknowledgedAt).toBeUndefined();
+    expect((await revisions.at(0)).rejectionAcknowledgedAt).toBeNull();
     expect(audit.record).not.toHaveBeenCalled();
   });
 
@@ -803,7 +817,7 @@ describe('configuration editor service boundaries', () => {
       principal,
     );
     expect(result.revision).toBe(2);
-    expect(revisions[0].revision).toBe(1);
+    expect((await revisions.at(0)).revision).toBe(1);
     expect(audit.record.mock.calls.map(([event]) => [event.action, event.outcome])).toEqual([
       ['wago.rollback', 'attempted'],
       ['wago.rollback', 'succeeded'],

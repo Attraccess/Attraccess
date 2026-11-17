@@ -30,8 +30,8 @@ describe('configuration editor service limits', () => {
       ...snapshot,
       logicalChannels: [{ ...snapshot.logicalChannels[0], id: 'x'.repeat(MAX_IDENTIFIER_CHARS + 1) }],
     };
-    revisions[0].snapshot = canonicalSnapshot(historical);
-    revisions[0].contentHash = configurationHash(historical);
+    await revisions.update(1, { snapshot: canonicalSnapshot(historical) });
+    await revisions.update(1, { contentHash: configurationHash(historical) });
     expect((await service.previewRevision(1, 1)).errors).toEqual([
       {
         path: '$.logicalChannels[0].id',
@@ -65,8 +65,8 @@ describe('configuration editor service limits', () => {
     await service.saveDraft(1, snapshot);
     await service.reviewDraft(1);
     await service.publishDraft(1);
-    revisions.push({
-      ...revisions[0],
+    await revisions.add({
+      ...(await revisions.first()),
       id: 99,
       revision: 2,
       snapshot: JSON.stringify(tooManyChannels),
@@ -135,7 +135,7 @@ describe('configuration editor service limits', () => {
       await service.reviewDraft(1);
       await expect(service.publishDraft(1)).rejects.toMatchObject(refusal);
       expect(mqtt.publish).not.toHaveBeenCalled();
-      expect(revisions).toHaveLength(0);
+      expect(await revisions.count()).toBe(0);
     });
 
     it('still publishes a configuration without disabled channels to an older runtime', async () => {
@@ -171,8 +171,8 @@ describe('configuration editor service limits', () => {
           await setup.service.reviewDraft(1);
           await setup.service.publishDraft(1);
           const disabled = meterFleet(1, 11);
-          setup.revisions.push({
-            ...setup.revisions[0],
+          await setup.revisions.add({
+            ...(await setup.revisions.first()),
             id: 99,
             revision: 2,
             snapshot: canonicalSnapshot(disabled),
@@ -208,17 +208,16 @@ describe('configuration editor service limits', () => {
     });
 
     it('refuses at publication when the controller lost the capability after the draft was checked', async () => {
-      const { service, mqtt } = fixture();
+      const { service, mqtt, revisions } = fixture();
       const controller = await (
-        service as unknown as { controllers: { findOneBy: () => Promise<{ capabilities: string }> } }
-      ).controllers.findOneBy();
-      const revision = {
-        controllerId: 1,
+        service as unknown as { controllers: { get: (id: number) => Promise<{ capabilities: string }> } }
+      ).controllers.get(1);
+      const revision = await revisions.add({
         revision: 1,
         snapshot: canonicalSnapshot(meterFleet(1, 11)),
         contentHash: configurationHash(meterFleet(1, 11)),
         state: 'pending',
-      };
+      });
       const publishRevision = Reflect.get(service, 'publishRevision').bind(service) as (
         controller: unknown,
         revision: unknown,
@@ -253,7 +252,7 @@ describe('configuration editor service limits', () => {
         response: { code: CONFIGURATION_LIMIT_CODE, message: pointsError.message, errors: [pointsError] },
       });
       expect(mqtt.publish).not.toHaveBeenCalled();
-      expect(revisions).toHaveLength(0);
+      expect(await revisions.count()).toBe(0);
     });
 
     it('publishes the same snapshot to a current runtime', async () => {
@@ -270,8 +269,8 @@ describe('configuration editor service limits', () => {
       await service.reviewDraft(1);
       await service.publishDraft(1);
       const stored = manyPoints();
-      revisions.push({
-        ...revisions[0],
+      await revisions.add({
+        ...(await revisions.first()),
         id: 99,
         revision: 2,
         snapshot: canonicalSnapshot(stored),
