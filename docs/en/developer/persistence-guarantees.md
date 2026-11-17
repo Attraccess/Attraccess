@@ -55,6 +55,26 @@ These live only in `apps/api/src/database/sqlite` and in the audit storage conne
 
 Another backend implements the same behavioural contract with its own locking and isolation.
 
+## Plugin storage
+
+Plugins have no database access; they keep data in declared tables through the record port (see
+[Plugin Storage](plugins/plugin-storage.md)). The host guarantees, on every backend:
+
+- **Isolation by namespace.** A plugin's tables are `plugin_<plugin>_<table>` (or an adopted physical name inside that
+  namespace). The port serves only the tables of the plugin's own declaration; no core table, no other plugin's table.
+- **Atomic migrations.** Each neutral migration (DDL steps, data step and the history record) is one transaction, or it
+  leaves nothing behind. Adoption of a 1.x installation records the baseline without running anything and refuses a
+  partial legacy history without mutation.
+- **Atomic `update`.** The `where` of `update` is evaluated with the write, so it is a compare-and-set that returns 0
+  when another writer won. Plugin transactions follow the unit-of-work contract above: `afterCommit` callbacks never
+  run on rollback, nesting is rejected and a conflict is reported as `PluginStorageConflict`.
+- **Neutral errors and values.** Unique violations, conflicts, missing rows and invalid input are the same neutral
+  errors on every engine; timestamps are UTC instants, decimals are exact strings.
+- **Backup.** Plugin tables and each plugin's schema state (applied version) are part of the transfer snapshot and are
+  restored as one unit with the database.
+
+These are covered by the plugin-storage conformance suite that every backend adapter has to pass.
+
 ## Single instance versus several replicas
 
 Attraccess is designed and tested as **one API process per database**. With SQLite that is also a hard requirement: the
