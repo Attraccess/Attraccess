@@ -20,6 +20,7 @@ import urllib.error
 import pytest
 
 from attractap_lab import efuse, ota_images
+from attractap_lab.hil_report import RunReport
 from attractap_lab.drivers import (
     ESPToolDriver, NfcEmulatorDriver, NfcEmulatorFlashDriver, ScreenCaptureDriver,
 )
@@ -27,6 +28,7 @@ from attractap_lab.enrollment import approve, latest_code
 from attractap_lab.reader_screen import ReaderTestHooks
 from attractap_lab.workflow import claim, flash_reader, send_reader_wifi
 
+from reader_reset import ReaderNotIdle, settle
 from support import Api, ReaderConsole
 import wire as wiretap
 
@@ -339,6 +341,69 @@ def laser(api, admin, reader, resource, users):
     assert status == 200, body
     reader["console"].expect(r"Resource list updated: 2", mark, 20)
     return created
+
+
+REPORT = RunReport()
+# Set once a reboot could not bring the reader back: later tests then fail fast instead of rebooting again.
+UNUSABLE = {}
+
+
+def reset_reader(request, label):
+    """Run ``settle`` before ``label`` and record what it cleaned up (see reader_reset.py)."""
+    names = ("target", "reader", "api", "admin", "emulator")
+    target, reader, api, admin, emulator = (request.getfixturevalue(name) for name in names)
+    started = time.monotonic()
+    try:
+        actions = settle(target, reader, api, admin, emulator, PIN, allow_reboot=not UNUSABLE)
+    except Exception as error:
+        UNUSABLE.setdefault("since", label)
+        REPORT.checked(label, [f"FAILED: {error}"], time.monotonic() - started)
+        message = f"reader could not be reset after {REPORT.previous or 'the session setup'}"
+        if UNUSABLE["since"] != label:
+            message += f" (unusable since {UNUSABLE['since']})"
+        raise ReaderNotIdle(f"{message}: {error}") from error
+    UNUSABLE.clear()
+    seconds = time.monotonic() - started
+    REPORT.checked(label, actions, seconds)
+    if actions:
+        entry = {"before": label, "left_by": REPORT.previous, "seconds": round(seconds, 1), "actions": actions}
+        print(f"reader reset: {entry}")
+        with (request.getfixturevalue("artifacts") / "reader-resets.jsonl").open("a") as out:
+            out.write(json.dumps(entry) + "\n")
+
+
+@pytest.fixture(scope="module", autouse=True)
+def idle_reader_for_module(request):
+    """Reset before the module's own fixtures (enrolled cards and the like) touch the reader."""
+    if any(item.module is request.module and "reader" in item.fixturenames for item in request.session.items):
+        reset_reader(request, f"{request.node.nodeid} (module fixtures)")
+
+
+@pytest.fixture(autouse=True)
+def idle_reader_for_test(request):
+    """Every test that uses the reader starts from the idle, connected reader with no open session."""
+    if "reader" in request.fixturenames:
+        reset_reader(request, request.node.nodeid)
+
+
+def pytest_runtest_logreport(report):
+    REPORT.add(report)
+
+
+def pytest_terminal_summary(terminalreporter):
+    lines = REPORT.lines()
+    if not lines:
+        return
+    terminalreporter.section("HIL failure order and reader resets")
+    for line in lines:
+        terminalreporter.write_line(line)
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        if REPORT.annotation():
+            terminalreporter.write_line(REPORT.annotation())
+        summary = os.environ.get("GITHUB_STEP_SUMMARY")
+        if summary and REPORT.markdown():
+            with open(summary, "a") as out:
+                out.write(REPORT.markdown())
 
 
 @pytest.fixture(scope="session")
