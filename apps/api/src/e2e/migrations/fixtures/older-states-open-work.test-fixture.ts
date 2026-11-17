@@ -132,6 +132,6 @@ async function verifyThroughPorts(source: DataSource): Promise<void> {
   });
   expect(attempt?.transitionTime).toEqual(utc('2026-03-01 08:05:00'));
   expect(await sessions.isSessionBeingEnded(1)).toBe(false);
-  // The plugin lifecycle still finds what it applied, so it neither re-runs nor reverts the plugin's migrations.
+  // The plugin's legacy migration history is intact: the host adopts it as the baseline, it never re-runs or drops it.
   expect(await appliedPluginMigrationsOn(source, PLUGIN_TRACK)).toEqual([...PLUGIN_MIGRATIONS].reverse());
 }

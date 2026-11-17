@@ -21,7 +21,7 @@ import {
 } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
 import type { PluginTransactionScope } from '@attraccess/plugins-backend-sdk';
-import { createHostTransactionScope } from '@attraccess/plugins-backend-sdk/sqlite';
+import { createTransactionScope } from '../../../plugin-system/persistence/plugin-transaction-scope';
 import * as migrations from '../../migrations';
 import { createPluginCoreLookup, createPluginHostData } from './plugin-host-data.adapter';
 
@@ -198,7 +198,11 @@ describe('plugin host data adapter on a real database', () => {
       let kept: PluginTransactionScope | undefined;
       await source.transaction(async (manager) => {
         await manager.getRepository(Resource).update(ids.printer, { maxParallelSessions: 5 });
-        kept = createHostTransactionScope(manager);
+        kept = createTransactionScope(
+          manager,
+          () => manager.queryRunner?.isTransactionActive ?? true,
+          () => undefined,
+        );
         // The uncommitted change is only visible inside the transaction.
         expect(await hostData().resources.get(ids.printer, kept)).toMatchObject({ maxParallelSessions: 5 });
         throw new Error('roll back');

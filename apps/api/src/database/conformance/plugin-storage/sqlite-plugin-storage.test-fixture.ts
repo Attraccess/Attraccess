@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Resource } from '@attraccess/database-entities';
 import { ResourceType } from '@attraccess/application-models';
-import type { DataSource, DataSourceOptions } from 'typeorm';
+import { DataSource, type DataSourceOptions } from 'typeorm';
 import { createPluginHostData } from '../../adapters/plugins/plugin-host-data.adapter';
 import { sqliteBackend } from '../../sqlite/sqlite-backend';
 import {
@@ -91,6 +91,15 @@ export const sqliteStorageFixture: StorageBackendFixture = {
           }
         }
         return lines.join('\n');
+      },
+      async committed(sql) {
+        // Outside the guarded connections: a statement of the flow that owns a transaction would join it there.
+        const plain = await new DataSource({ type: 'sqlite', database: file }).initialize();
+        try {
+          return await plain.query(sql);
+        } finally {
+          await plain.destroy();
+        }
       },
       async execute(sql) {
         await query(sql);

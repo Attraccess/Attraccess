@@ -1,7 +1,6 @@
 import { execFile } from 'node:child_process';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { PLUGIN_PERSISTENCE_BACKENDS } from '@attraccess/plugins-backend-sdk';
 import { DATABASE_BACKENDS, resolveDatabaseBackend } from './resolve-database-backend';
 import { SUPPORTED_DATABASE_TYPES } from './database-type';
 
@@ -45,10 +44,14 @@ describe('the supported database engines', () => {
     expect(sorted(await scriptProviders())).toEqual(engines);
   });
 
-  it('agrees with the plugin SDK, and every backend brings its plugin persistence', () => {
-    expect(sorted(PLUGIN_PERSISTENCE_BACKENDS)).toEqual(engines);
-    for (const [type, backend] of Object.entries(DATABASE_BACKENDS)) {
-      expect(backend.plugins.createPersistenceHost(() => undefined).backend).toBe(type);
+  it('brings every backend its plugin storage: persistence host, migration engine and the tables it owns', () => {
+    for (const backend of Object.values(DATABASE_BACKENDS)) {
+      const host = backend.plugins.createPersistenceHost(() => undefined);
+      expect(typeof host.createContexts).toBe('function');
+      expect(backend.plugins.createMigrationEngine(null)).toEqual(
+        expect.objectContaining({ migrate: expect.any(Function), assess: expect.any(Function), dropAll: expect.any(Function) }),
+      );
+      expect(backend.plugins.coreTableNames().size).toBeGreaterThan(10);
     }
   });
 });

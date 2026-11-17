@@ -31,7 +31,7 @@ export function claimStorageNames(storage: CompiledPluginStorage): void {
     if (owner !== undefined && owner !== storage.pluginName) {
       throw new PluginStorageDeclarationError(
         storage.pluginName,
-        `the ${name.replace(':', ' ')} "${name.slice(name.indexOf(':') + 1)}" already belongs to plugin "${owner}"`,
+        `the ${name.slice(0, name.indexOf(':'))} "${name.slice(name.indexOf(':') + 1)}" already belongs to plugin "${owner}"`,
       );
     }
   }

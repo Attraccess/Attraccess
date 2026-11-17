@@ -5,7 +5,8 @@ import { ConflictException } from '@nestjs/common';
 import { rm } from 'node:fs/promises';
 import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
 import { unitOfWorkFor } from '../../../database/adapters/shared-unit-of-work';
-import { createSqlitePluginPersistence, sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
+import type { EntityManager } from 'typeorm';
+import { handleOfScope } from '../../../plugin-system/persistence/plugin-transaction-scope';
 import { ReaderUiHooksService } from '../../../plugin-system/reader-ui/reader-ui-hooks.service';
 import { AlreadyHasActiveSessionError } from '../errors/already-has-active-session.error';
 import { ResourceFullError } from '../errors/resource-full.error';
@@ -218,13 +219,7 @@ describe('Start capacity hook', () => {
   });
 });
 
-/** What an SQLite plugin does with the scope of a capacity hook. */
-function managerOfHostScope(hostScope: StartCapacityContext['scope']) {
-  const persistence = createSqlitePluginPersistence({
-    pluginName: 'reservations',
-    connection: () => {
-      throw new Error('unused');
-    },
-  });
-  return sqlitePersistence({ persistence }).managerOf(hostScope);
+/** The host's start transaction behind the scope of a capacity hook (a plugin joins it through the record port). */
+function managerOfHostScope(hostScope: StartCapacityContext['scope']): EntityManager {
+  return handleOfScope<EntityManager>(hostScope);
 }
