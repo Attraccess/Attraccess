@@ -82,7 +82,9 @@ describe('/cdn serve-static', () => {
     'http://localhost/cdn/missing.png',
     'http://localhost:1/cdn/',
     'http:///cdn/missing.png',
+    'http:///cdn/',
     'HTTP:///cdn/',
+    'HTTP:///cdn/resources/1/',
   ])('answers %s from the router, not the index fallback', async (path) => {
     const res = await rawGet(path);
 
