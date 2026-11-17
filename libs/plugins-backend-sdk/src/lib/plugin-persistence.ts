@@ -26,8 +26,7 @@ export interface PluginPersistenceContext {
    * Runs `work` in one atomic, isolated transaction: it commits when `work` resolves and rolls back when it throws.
    * Concurrent transactions (core writes included) never see each other's uncommitted writes, and a check-then-write
    * sequence inside one transaction (an overlap check, then the insert) cannot be raced by another transaction: the
-   * engine either orders the transactions or fails one of them with an error, which rolls it back. How an engine
-   * achieves this (for example SQLite runs transactions one at a time) is described by its engine subpath.
+   * host either orders the transactions or fails one of them with an error, which rolls it back.
    *
    * Keep `work` short and limited to database work: no HTTP, MQTT, email or other I/O inside. Register such effects
    * with `scope.afterCommit`; they run only after the commit. Do not nest calls: the host rejects a transaction

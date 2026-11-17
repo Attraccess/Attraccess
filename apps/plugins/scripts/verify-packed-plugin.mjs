@@ -60,14 +60,34 @@ export async function verifyPackedPlugin(
     const modules = join(extracted, 'node_modules', '@attraccess');
     mkdirSync(modules, { recursive: true });
     cpSync(join(workspace, 'dist/libs/plugins-backend-sdk'), join(modules, 'plugins-backend-sdk'), { recursive: true });
-    for (const library of ['application-models', 'database-entities', 'shared'])
+    for (const library of ['application-models', 'shared'])
       symlinkSync(join(workspace, 'dist/libs', library), join(modules, library), 'dir');
     process.env.NODE_PATH = join(workspace, 'node_modules');
     Module._initPaths();
+    if (pkg.attraccess?.backend) assertNoForbiddenBackendImports(join(extracted, pkg.attraccess.backend));
     if (pkg.attraccess?.backend) await import(pathToFileURL(join(extracted, pkg.attraccess.backend)).href);
   } finally {
     rmSync(archive, { force: true });
     rmSync(unpacked, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Plugins have no database access: their backend must not load TypeORM, the host entities or an SDK subpath. They
+ * are not provided at runtime, so the check is on the bundle text, before the plugin gets imported.
+ */
+const FORBIDDEN_IMPORT =
+  /(?:require\(|\bfrom\s*|\bimport\(|\bimport\s*)\s*["'](typeorm(?:\/[^"']*)?|@attraccess\/database-entities(?:\/[^"']*)?|@attraccess\/plugins-backend-sdk\/[^"']+)["']/;
+
+export function assertNoForbiddenBackendImports(backendEntry) {
+  const files = [backendEntry];
+  for (const entry of readdirSync(dirname(backendEntry))) {
+    const file = join(dirname(backendEntry), entry);
+    if (file !== backendEntry && /\.(?:c|m)?js$/.test(entry)) files.push(file);
+  }
+  for (const file of files) {
+    const match = FORBIDDEN_IMPORT.exec(readFileSync(file, 'utf8'));
+    if (match) throw new Error(`Packed plugin backend imports ${match[1]} in ${file}; plugins have no database access`);
   }
 }
 
