@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync 
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import {
+  assertNoForbiddenBackendImports,
   resolvePluginTestHostVersion,
   validateLicenseFile,
   validatePackageContract,
@@ -96,7 +97,6 @@ test('verifies actual packed entries and removes archives after success or failu
       'plugin/frontend',
       'dist/libs/plugins-backend-sdk',
       'dist/libs/application-models',
-      'dist/libs/database-entities',
       'dist/libs/shared',
       'node_modules',
     ])
@@ -129,5 +129,29 @@ test('verifies actual packed entries and removes archives after success or failu
     assert.ok(existsSync(path.join(packageDir, 'frontend/index.js')));
   } finally {
     rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
+test('rejects a backend bundle that imports TypeORM, host entities or an SDK subpath', () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'attraccess-backend-imports-'));
+  try {
+    const entry = path.join(directory, 'index.js');
+    writeFileSync(
+      entry,
+      'const { Module } = require("@nestjs/common"); import x from "@attraccess/plugins-backend-sdk";',
+    );
+    assert.doesNotThrow(() => assertNoForbiddenBackendImports(entry));
+    for (const source of [
+      'const t = require("typeorm");',
+      'import { Entity } from "typeorm";',
+      'const t = await import("typeorm/driver/sqlite/SqliteDriver");',
+      'const e = require("@attraccess/database-entities");',
+      'import { Column } from "@attraccess/plugins-backend-sdk/sqlite";',
+    ]) {
+      writeFileSync(path.join(directory, 'chunk.js'), source);
+      assert.throws(() => assertNoForbiddenBackendImports(entry), /plugins have no database access/, source);
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 });

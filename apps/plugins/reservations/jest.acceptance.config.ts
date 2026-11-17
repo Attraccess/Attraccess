@@ -13,7 +13,6 @@ module.exports = {
   moduleNameMapper: {
     // Same ESM-only mapping as the API's own jest config (the start gate pulls in core's usage service).
     '^lodash-es$': 'lodash',
-    '^@attraccess/plugins-backend-sdk/sqlite$': '<rootDir>/../../../libs/plugins-backend-sdk/src/sqlite.ts',
     '^@attraccess/(.*)$': '<rootDir>/../../../libs/$1/src/index.ts',
   },
 };

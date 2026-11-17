@@ -1,6 +1,40 @@
 const nx = require('@nx/eslint-plugin');
 const noHookReturnTypeConfig = require('./tools/eslint-rules/no-hook-return-type.config.cjs');
 
+// Plugins have no database access (ATT-1146): no ORM, driver, host entity or SDK subpath in plugin code, examples
+// and the SDK itself. The same list lives in scripts/check-persistence-boundaries.mjs, which also catches dynamic
+// import() and require(); this rule gives editor feedback on static imports. A flat-config rule entry replaces an
+// earlier one for the same files, so blocks that set `no-restricted-imports` for plugin code spread these.
+const PERSISTENCE_PACKAGES = [
+  'typeorm',
+  '@nestjs/typeorm',
+  'sqlite3',
+  'better-sqlite3',
+  'pg',
+  'mysql2',
+  'knex',
+  '@attraccess/database-entities',
+];
+const PLUGIN_STORAGE_BOUNDARY_MESSAGE =
+  'Plugins have no database access: keep data in declared tables through context.storage (see docs/en/plugins/plugin-storage.md). Only the package root of @attraccess/plugins-backend-sdk is public.';
+const pluginStorageBoundary = {
+  paths: PERSISTENCE_PACKAGES.map((name) => ({ name, message: PLUGIN_STORAGE_BOUNDARY_MESSAGE })),
+  patterns: [
+    {
+      group: [
+        ...PERSISTENCE_PACKAGES.map((name) => `${name}/**`),
+        '@attraccess/plugins-backend-sdk/**',
+        '!@attraccess/plugins-backend-sdk/package.json',
+      ],
+      message: PLUGIN_STORAGE_BOUNDARY_MESSAGE,
+    },
+  ],
+};
+const pluginStorageBoundaryConfig = (files) => ({
+  files,
+  rules: { 'no-restricted-imports': ['error', pluginStorageBoundary] },
+});
+
 module.exports = [
   // {
   //   files: ['**/*.json'],
@@ -41,6 +75,14 @@ module.exports = [
             {
               sourceTag: 'type:plugin',
               onlyDependOnLibsWithTags: ['scope:plugin-sdk'],
+              bannedExternalImports: [...PERSISTENCE_PACKAGES, ...PERSISTENCE_PACKAGES.map((name) => `${name}/**`)],
+            },
+            // The plugin SDK is neutral: it never builds on the persistence libraries (database-entities) or names
+            // an ORM or driver. The host implements the record port; the SDK only declares it.
+            {
+              sourceTag: 'scope:plugin-sdk',
+              notDependOnLibsWithTags: ['scope:persistence'],
+              bannedExternalImports: [...PERSISTENCE_PACKAGES, ...PERSISTENCE_PACKAGES.map((name) => `${name}/**`)],
             },
             // The core application must never know any concrete plugin: no core
             // project may depend on anything tagged type:plugin.
@@ -72,6 +114,8 @@ module.exports = [
     'libs/plugins-frontend-*/**/*.{ts,tsx}',
     'apps/companion/renderer/**/*.{ts,tsx}',
   ]),
+  // Plugin code, plugin tests and the examples (the SDK lints from its own folder and adds the block itself).
+  pluginStorageBoundaryConfig(['apps/plugins/**/*.{ts,tsx,js,mjs,cjs}', 'examples/**/*.{ts,tsx,js,mjs,cjs}']),
   {
     // ATT-1224: plugin dialogs use the shared StandardModal / StatusDialog.
     files: ['apps/plugins/*/frontend/**/*.{ts,tsx}'],
@@ -79,7 +123,9 @@ module.exports = [
       'no-restricted-imports': [
         'error',
         {
+          patterns: pluginStorageBoundary.patterns,
           paths: [
+            ...pluginStorageBoundary.paths,
             {
               name: '@heroui/react',
               importNames: ['Modal', 'ModalBackdrop', 'ModalContainer', 'ModalDialog'],
@@ -122,3 +168,4 @@ module.exports = [
 
 // Shared with project configs that lint from their own folder (see no-hook-return-type.config.cjs).
 module.exports.noHookReturnTypeConfig = noHookReturnTypeConfig;
+module.exports.pluginStorageBoundaryConfig = pluginStorageBoundaryConfig;

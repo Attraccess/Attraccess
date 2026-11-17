@@ -89,7 +89,7 @@ export interface PluginFlowNodeQuery {
   limit?: number;
 }
 
-/** Flow node lookups. Requires DATABASE_ACCESS. */
+/** Flow node lookups. Requires TRIGGER_FLOWS. */
 export interface PluginFlowDirectory {
   findNodes(query: PluginFlowNodeQuery): Promise<PluginFlowNodeReference[]>;
 }
