@@ -33,6 +33,8 @@ export function compileModuleStorage(
 export function loadPluginStorage(manifest: LoadedPluginManifest, pluginPath: string): CompiledPluginStorage | null {
   if (!(manifest.permissions ?? []).includes(PluginPermission.PLUGIN_STORAGE)) return null;
   if (!manifest.main.backend?.directory || !manifest.main.backend?.entryPoint) return null;
-  const exports = loadPluginEntryExports(join(pluginPath, manifest.main.backend.directory, manifest.main.backend.entryPoint));
+  const exports = loadPluginEntryExports(
+    join(pluginPath, manifest.main.backend.directory, manifest.main.backend.entryPoint),
+  );
   return compileModuleStorage(manifest, exports.default as Partial<PluginBackendModule> | undefined);
 }

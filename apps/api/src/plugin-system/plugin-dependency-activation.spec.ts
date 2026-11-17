@@ -26,12 +26,9 @@ describe('plugin dependency activation', () => {
         name,
         version: '1.0.0',
         attraccessVersion: { min: '2.0.0-0' },
-        persistence: { backends: ['sqlite'] },
+        ...(migrations ? { permissions: ['PLUGIN_STORAGE'] } : {}),
         dependencies: dependencies.map((name) => ({ name, version: '^1.0.0', required: true })),
-        main: {
-          backend: { directory: 'dist', entryPoint: 'index.js' },
-          ...(migrations ? { migrations: { directory: 'dist', entryPoint: 'migrations.js' } } : {}),
-        },
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
       }),
     );
     writeFileSync(

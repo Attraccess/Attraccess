@@ -68,37 +68,41 @@ describe('NpmPluginService host compatibility', () => {
   });
 
   it.each([
-    ['declares DATABASE_ACCESS but no persistence.backends', {}, 'declares no persistence.backends'],
-    ['supports only another engine', { persistence: { backends: ['postgres'] } }, 'this host runs sqlite'],
-  ])('refuses a package that %s before any state or file', async (_case, attraccess, message) => {
-    const tarball = await fixture.packageTarball(name, ['DATABASE_ACCESS'], { attraccess });
-    const service = serviceServing({ '1.2.3': tarball });
+    ['requests the removed DATABASE_ACCESS permission', ['DATABASE_ACCESS'], {}, 'DATABASE_ACCESS permission'],
+    ['declares persistence.backends', [], { persistence: { backends: ['sqlite'] } }, 'persistence.backends'],
+    ['ships a TypeORM migrations entry', [], { migrations: 'dist/migrations.js' }, 'migrations entry'],
+  ])(
+    'refuses a package that %s with the plugin name and the migration guide, before any state or file',
+    async (_case, permissions, attraccess, message) => {
+      const tarball = await fixture.packageTarball(name, permissions, { attraccess });
+      const service = serviceServing({ '1.2.3': tarball });
 
-    await expect(service.install(name, '1.2.3')).rejects.toThrow(message);
-    expect(existsSync(join(fixture.root, '.npm-plugin-state.json'))).toBe(false);
-    expect(visibleEntries()).toEqual([]);
-  });
+      const install = service.install(name, '1.2.3');
 
-  it('refuses an incompatible replacement without loading its migration code', async () => {
+      await expect(install).rejects.toBeInstanceOf(BadRequestException);
+      await expect(install).rejects.toThrow(message);
+      await expect(install).rejects.toThrow(/Plugin @attraccess\/legacy .*migrating-to-2/s);
+      expect(existsSync(join(fixture.root, '.npm-plugin-state.json'))).toBe(false);
+      expect(visibleEntries()).toEqual([]);
+    },
+  );
+
+  it('refuses a replacement that still uses database access without reading its storage history', async () => {
     const current = await fixture.packageTarball(name);
-    const replacement = await fixture.packageTarball(name, ['DATABASE_ACCESS'], {
-      version: '1.3.0',
-      attraccess: { migrations: 'dist/migrations.js', persistence: { backends: ['postgres'] } },
-    });
+    const replacement = await fixture.packageTarball(name, ['DATABASE_ACCESS'], { version: '1.3.0' });
     const service = serviceServing(
       { '1.2.3': current, '1.3.0': replacement },
       {
         '1.2.3': versionEntry('1.2.3', current, []),
-        '1.3.0': versionEntry('1.3.0', replacement, ['DATABASE_ACCESS'], {
-          migrations: 'dist/migrations.js',
-          persistence: { backends: ['postgres'] },
-        }),
+        '1.3.0': versionEntry('1.3.0', replacement, ['DATABASE_ACCESS']),
       },
     );
     await service.install(name, '1.2.3');
     const history = jest.spyOn(PluginMigrationService, 'assertReplacementMigrationHistory');
 
-    await expect(service.replaceInstalled(name, '1.3.0', ['DATABASE_ACCESS'])).rejects.toThrow('this host runs sqlite');
+    await expect(service.replaceInstalled(name, '1.3.0', ['DATABASE_ACCESS'])).rejects.toThrow(
+      'DATABASE_ACCESS permission',
+    );
 
     expect(history).not.toHaveBeenCalled();
     expect(service.listInstalled()).toEqual([expect.objectContaining({ name, version: '1.2.3' })]);

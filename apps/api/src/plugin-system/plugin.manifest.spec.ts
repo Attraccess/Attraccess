@@ -11,27 +11,24 @@ const BASE = {
   permissions: [],
 };
 
-describe('PluginManifestSchema migrations entry', () => {
-  it('accepts a manifest without a migrations entry', () => {
-    const parsed = PluginManifestSchema.parse(BASE);
-    expect(parsed.main.migrations).toBeUndefined();
+describe('PluginManifestSchema SDK 2.0 contract', () => {
+  it('knows PLUGIN_STORAGE and no longer knows the removed database permissions', () => {
+    expect(PluginManifestSchema.parse({ ...BASE, permissions: ['PLUGIN_STORAGE'] }).permissions).toEqual([
+      'PLUGIN_STORAGE',
+    ]);
+    for (const removed of ['DATABASE_ACCESS', 'PLUGIN_ENGINE_ACCESS']) {
+      expect(() => PluginManifestSchema.parse({ ...BASE, permissions: [removed] })).toThrow();
+    }
   });
 
-  it('accepts and parses a migrations entry', () => {
+  it('has no migrations entry and no persistence field: they are dropped, never parsed', () => {
     const parsed = PluginManifestSchema.parse({
       ...BASE,
       main: { ...BASE.main, migrations: { directory: 'dist', entryPoint: 'migrations.js' } },
+      persistence: { backends: ['sqlite'] },
     });
-    expect(parsed.main.migrations).toEqual({ directory: 'dist', entryPoint: 'migrations.js' });
-  });
-
-  it('rejects a malformed migrations entry', () => {
-    expect(() =>
-      PluginManifestSchema.parse({
-        ...BASE,
-        main: { ...BASE.main, migrations: { directory: 'dist' } },
-      }),
-    ).toThrow();
+    expect(parsed.main).not.toHaveProperty('migrations');
+    expect(parsed).not.toHaveProperty('persistence');
   });
 });
 

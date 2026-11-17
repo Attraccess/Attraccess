@@ -16,8 +16,9 @@ export function isDatabaseToken(token: unknown): boolean {
   if (typeof token === 'function') {
     // A class from another copy of typeorm has the same name; subclasses of Repository are repositories.
     return (
-      DATABASE_CLASSES.some((klass) => token === klass || (token as { prototype?: unknown }).prototype instanceof (klass as never)) ||
-      DATABASE_CLASS_NAMES.has(token.name)
+      DATABASE_CLASSES.some(
+        (klass) => token === klass || (token as { prototype?: unknown }).prototype instanceof (klass as never),
+      ) || DATABASE_CLASS_NAMES.has(token.name)
     );
   }
   if (typeof token === 'string') return DATABASE_TOKEN_NAME.test(token);

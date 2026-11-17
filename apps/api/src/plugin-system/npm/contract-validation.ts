@@ -130,7 +130,8 @@ export function parseNpmPluginPackage(
  */
 function refuseRemovedContract(value: unknown): void {
   const root = value as { name?: unknown; attraccess?: Record<string, unknown> } | null;
-  if (typeof root !== 'object' || root === null || typeof root.attraccess !== 'object' || root.attraccess === null) return;
+  if (typeof root !== 'object' || root === null || typeof root.attraccess !== 'object' || root.attraccess === null)
+    return;
   const attraccess = root.attraccess;
   refuseIncompatible(() => {
     if (typeof root.name === 'string' && typeof attraccess.host === 'string') {

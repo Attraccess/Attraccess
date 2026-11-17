@@ -46,7 +46,8 @@ function applyStep(
   switch (step.op) {
     case 'createTable': {
       const logical = step.table;
-      if (typeof logical !== 'string' || schema.has(logical)) return fail(naming, `${label}: table "${String(logical)}" exists`);
+      if (typeof logical !== 'string' || schema.has(logical))
+        return fail(naming, `${label}: table "${String(logical)}" exists`);
       const declared = (step.definition as { physicalName?: unknown } | undefined)?.physicalName;
       const physical = physicalTableName(naming, logical, declared ?? headPhysical.get(logical) ?? undefined);
       const table = compileTable(naming, logical, step.definition, physical, (name) =>
@@ -71,8 +72,10 @@ function applyStep(
       if (table.fields.has(name)) return fail(naming, `${label}: field "${table.logical}.${name}" exists`);
       const field = compileField(naming, table.logical, name, step.definition);
       if (field.generated) fail(naming, `${label}: a generated field cannot be added to an existing table`);
-      if (!field.nullable && !field.hasDefault) fail(naming, `${label}: adding the required field "${name}" needs a default`);
-      if (field.default && typeof field.default === 'object') fail(naming, `${label}: an added column cannot default to now`);
+      if (!field.nullable && !field.hasDefault)
+        fail(naming, `${label}: adding the required field "${name}" needs a default`);
+      if (field.default && typeof field.default === 'object')
+        fail(naming, `${label}: an added column cannot default to now`);
       const columns = [...table.fields.values()].map((existing) => existing.column);
       if (columns.includes(field.column)) fail(naming, `${label}: column "${field.column}" exists`);
       const next = { ...table, fields: new Map(table.fields).set(name, field) };
@@ -112,9 +115,17 @@ function applyStep(
     }
     case 'addIndex': {
       const table = tableOf(naming, schema, step.table, label);
-      const probe = compileTable(naming, table.logical, { ...rawOf(table), indexes: [step.index] }, table.physical, () => undefined);
+      const probe = compileTable(
+        naming,
+        table.logical,
+        { ...rawOf(table), indexes: [step.index] },
+        table.physical,
+        () => undefined,
+      );
       const index = probe.indexes[0];
-      const clash = [...schema.values()].some((other) => other.indexes.some((i) => i.name.toLowerCase() === index.name.toLowerCase()));
+      const clash = [...schema.values()].some((other) =>
+        other.indexes.some((i) => i.name.toLowerCase() === index.name.toLowerCase()),
+      );
       if (clash) fail(naming, `${label}: index "${index.name}" exists`);
       return {
         resolved: { op: 'addIndex', table, index },
@@ -157,8 +168,10 @@ function compileMigrations(
   declared.forEach((migration, position) => {
     if (!isRecord(migration)) return fail(naming, `migration #${position + 1} is malformed`);
     const { version, name, steps, data } = migration;
-    if (version !== position + 1) fail(naming, `migration #${position + 1} must have version ${position + 1} (versions start at 1, no gaps)`);
-    if (typeof name !== 'string' || name.length === 0 || name.length > 200) fail(naming, `migration ${version} needs a name`);
+    if (version !== position + 1)
+      fail(naming, `migration #${position + 1} must have version ${position + 1} (versions start at 1, no gaps)`);
+    if (typeof name !== 'string' || name.length === 0 || name.length > 200)
+      fail(naming, `migration ${version} needs a name`);
     if (data !== undefined && typeof data !== 'function') fail(naming, `migration ${version}: data must be a function`);
     if (steps !== undefined && !Array.isArray(steps)) fail(naming, `migration ${version}: steps must be a list`);
     if (((steps as unknown[] | undefined)?.length ?? 0) > MAX_STEPS_PER_MIGRATION) {
@@ -170,7 +183,13 @@ function compileMigrations(
       resolved.push(applied.resolved);
       schema = applied.schema;
     });
-    result.push({ version, name: name as string, steps: resolved, schemaAfter: schema, data: data as CompiledMigration['data'] });
+    result.push({
+      version,
+      name: name as string,
+      steps: resolved,
+      schemaAfter: schema,
+      data: data as CompiledMigration['data'],
+    });
   });
   return result;
 }
@@ -215,8 +234,13 @@ export function compilePluginStorage(
   definition: unknown,
   options: CompileOptions,
 ): CompiledPluginStorage {
-  const naming: StorageNaming = { pluginName, namespace: namespaceOf(pluginName), reservedTables: options.reservedTables };
-  if (!isRecord(definition) || !isRecord(definition.tables)) return fail(naming, 'use definePluginStorage({ tables, migrations })');
+  const naming: StorageNaming = {
+    pluginName,
+    namespace: namespaceOf(pluginName),
+    reservedTables: options.reservedTables,
+  };
+  if (!isRecord(definition) || !isRecord(definition.tables))
+    return fail(naming, 'use definePluginStorage({ tables, migrations })');
 
   const headPhysical = new Map<string, string>();
   for (const [logical, decl] of Object.entries(definition.tables)) {
@@ -255,7 +279,11 @@ export function compilePluginStorage(
 function readLegacy(naming: StorageNaming, adoption: unknown): string[] {
   if (adoption === undefined) return [];
   const names = isRecord(adoption) ? adoption.legacyMigrations : undefined;
-  if (!Array.isArray(names) || names.length === 0 || names.some((name) => typeof name !== 'string' || !LEGACY_NAME.test(name))) {
+  if (
+    !Array.isArray(names) ||
+    names.length === 0 ||
+    names.some((name) => typeof name !== 'string' || !LEGACY_NAME.test(name))
+  ) {
     return fail(naming, 'adoption.legacyMigrations must list the class names of the 1.x migrations');
   }
   if (new Set(names).size !== names.length) fail(naming, 'adoption.legacyMigrations lists a name twice');

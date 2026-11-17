@@ -28,7 +28,9 @@ interface TableContext {
 }
 
 const selectList = ({ table, dialect }: TableContext): string =>
-  [...table.fields.values()].map((field) => `${dialect.quote(field.column)} AS ${dialect.quote(field.name)}`).join(', ');
+  [...table.fields.values()]
+    .map((field) => `${dialect.quote(field.column)} AS ${dialect.quote(field.name)}`)
+    .join(', ');
 
 function decodeRow({ table, dialect }: TableContext, raw: Row): Row {
   const row: Row = {};
@@ -72,7 +74,11 @@ function buildInsert(table: CompiledTable, input: unknown): InsertValues {
   return { values, provided };
 }
 
-function insertStatement(context: TableContext, values: ReadonlyMap<string, unknown>, tail = ''): { sql: string; params: unknown[] } {
+function insertStatement(
+  context: TableContext,
+  values: ReadonlyMap<string, unknown>,
+  tail = '',
+): { sql: string; params: unknown[] } {
   const { table, dialect } = context;
   const params = new StorageParams(dialect);
   const names = [...values.keys()];
@@ -106,7 +112,8 @@ async function insertRow(context: TableContext, executor: PluginStorageExecutor,
 /** The where clause that selects one row by its primary key given as a value (one-field key) or an object. */
 function keyFilter(table: CompiledTable, key: unknown): Row {
   if (table.primaryKey.length === 1 && !isPlainObject(key)) return { [table.primaryKey[0]]: key };
-  if (!isPlainObject(key)) throw new PluginStorageInvalid(`The key of "${table.logical}" is an object of its key fields.`);
+  if (!isPlainObject(key))
+    throw new PluginStorageInvalid(`The key of "${table.logical}" is an object of its key fields.`);
   const filter: Row = {};
   for (const name of table.primaryKey) {
     if (key[name] === undefined || key[name] === null) {
@@ -160,7 +167,9 @@ async function upsertRow(
   }
   const overwrite =
     options?.update === undefined
-      ? [...table.fields.values()].filter((field) => !field.generated && !target.includes(field.name)).map((field) => field.name)
+      ? [...table.fields.values()]
+          .filter((field) => !field.generated && !target.includes(field.name))
+          .map((field) => field.name)
       : (options.update as unknown[]).map((name) => fieldOf(table, name, 'update').name);
   if (overwrite.some((name) => target.includes(name))) {
     throw new PluginStorageInvalid('update may not list a field of conflictOn.');
@@ -199,7 +208,9 @@ function patchAssignments(context: TableContext, params: StorageParams, patch: u
       }
       assignments.push(`${column} = COALESCE(${column}, 0) + ${params.add(by)}`);
     } else {
-      assignments.push(`${column} = ${params.add(dialect.encode(field, normalizeValue(field, value, `${table.logical}.${name}`)))}`);
+      assignments.push(
+        `${column} = ${params.add(dialect.encode(field, normalizeValue(field, value, `${table.logical}.${name}`)))}`,
+      );
     }
   }
   if (assignments.length === 0) throw new PluginStorageInvalid('A patch needs at least one field.');
@@ -212,7 +223,9 @@ async function aggregateRows(context: TableContext, executor: PluginStorageExecu
   const { table, dialect } = context;
   const field = fieldOf(table, name, 'aggregate');
   if (!AGGREGATE_TYPES.has(field.type)) {
-    throw new PluginStorageInvalid(`aggregate applies to integer, decimal, timestamp and date fields ("${field.name}").`);
+    throw new PluginStorageInvalid(
+      `aggregate applies to integer, decimal, timestamp and date fields ("${field.name}").`,
+    );
   }
   const params = new StorageParams(dialect);
   const column = dialect.quote(field.column);
@@ -225,7 +238,10 @@ async function aggregateRows(context: TableContext, executor: PluginStorageExecu
   return {
     min: dialect.decode(field, raw?.min ?? null),
     max: dialect.decode(field, raw?.max ?? null),
-    sum: summable && raw?.sum !== null && raw?.sum !== undefined ? (dialect.decode(field, raw.sum) as number | string) : null,
+    sum:
+      summable && raw?.sum !== null && raw?.sum !== undefined
+        ? (dialect.decode(field, raw.sum) as number | string)
+        : null,
     count: Number(raw?.count ?? 0),
   };
 }
@@ -286,11 +302,15 @@ function createTableApi(context: TableContext): AnyTableApi {
       run('write', options, async (executor) => {
         const params = new StorageParams(dialect);
         const condition = compileWhere(table, dialect, params, where);
-        const result = await executor.execute(`DELETE FROM ${dialect.quote(table.physical)} WHERE ${condition}`, params.values);
+        const result = await executor.execute(
+          `DELETE FROM ${dialect.quote(table.physical)} WHERE ${condition}`,
+          params.values,
+        );
         return result.affected;
       }),
     upsert: (row, options) => run('write', options, (executor) => upsertRow(context, executor, row, options)),
-    aggregate: (field, where, options) => run('read', options, (executor) => aggregateRows(context, executor, field, where)),
+    aggregate: (field, where, options) =>
+      run('read', options, (executor) => aggregateRows(context, executor, field, where)),
   } as AnyTableApi);
 }
 

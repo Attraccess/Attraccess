@@ -71,21 +71,21 @@ export function assertNoRemovedContract(pluginName: string, fields: RemovedContr
     throw refuse(
       pluginName,
       `requests the ${removed} permission, which SDK 2.0 removed: plugins have no database access`,
-      'Declare the plugin\'s tables with definePluginStorage and request PLUGIN_STORAGE instead.',
+      "Declare the plugin's tables with definePluginStorage and request PLUGIN_STORAGE instead.",
     );
   }
   if (fields.persistence !== undefined) {
     throw refuse(
       pluginName,
       'declares persistence.backends in plugin.json, which SDK 2.0 removed: the host owns the database engine',
-      'Remove the field and describe the plugin\'s tables with definePluginStorage.',
+      "Remove the field and describe the plugin's tables with definePluginStorage.",
     );
   }
   if (fields.migrations !== undefined) {
     throw refuse(
       pluginName,
       'ships a TypeORM migrations entry (main.migrations), which SDK 2.0 removed',
-      'Declare neutral migrations in the plugin\'s storage definition instead.',
+      "Declare neutral migrations in the plugin's storage definition instead.",
     );
   }
 }

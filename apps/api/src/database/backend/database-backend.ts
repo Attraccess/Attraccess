@@ -65,7 +65,7 @@ export interface DatabaseBackend<TSource = unknown, TOptions = unknown, THandle 
   readonly type: DatabaseType;
   /** Options for the application connection (entities, migration track, connection location). */
   createDataSourceOptions(): TOptions;
-  /** The entity classes of this backend's schema. Plugins append their own at load time. */
+  /** The entity classes of this backend's schema. Plugins have none: their tables are declared storage, never entities. */
   readonly entities: unknown[];
   /** Core migration track. A second track for another engine is a separate MigrationTrack on that backend. */
   readonly migrationTrack: MigrationTrack;

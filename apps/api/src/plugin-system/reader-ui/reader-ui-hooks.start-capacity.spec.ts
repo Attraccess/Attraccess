@@ -1,5 +1,5 @@
 import type { StartCapacityHook } from '@attraccess/plugins-backend-sdk';
-import { createSqlitePluginPersistence, sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
+import { handleOfScope } from '../persistence/plugin-transaction-scope';
 import { ScopedUnitOfWork, type TransactionScope } from '../../database/unit-of-work';
 import { ReaderUiHooksService, type StartCapacityRun } from './reader-ui-hooks.service';
 
@@ -77,15 +77,11 @@ describe('ReaderUiHooksService.runStartCapacity', () => {
         userId: 7,
       }),
     );
-    // The plugin reads the host's own transaction through the engine subpath.
+    // The scope is the host's own transaction: the record port joins it, the plugin cannot commit or defer onto it.
     const [{ scope }] = hook.mock.calls[0];
-    const persistence = createSqlitePluginPersistence({
-      pluginName: 'reservations',
-      connection: () => {
-        throw new Error('unused');
-      },
-    });
-    expect(sqlitePersistence({ persistence }).managerOf(scope)).toEqual({ marker: 'manager' });
+    expect(handleOfScope(scope)).toEqual({ marker: 'manager' });
+    expect(Object.getOwnPropertySymbols(scope)).toEqual([]);
+    expect(() => scope.afterCommit(() => undefined)).toThrow(/owned by the host/);
   });
 
   it('refuses with the plugin reason when occupied + held reaches the limit, and audits it after the fact', async () => {

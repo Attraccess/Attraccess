@@ -1,8 +1,4 @@
-import {
-  PluginStorageInvalid,
-  PluginStorageUniqueViolation,
-  increment,
-} from '@attraccess/plugins-backend-sdk';
+import { PluginStorageInvalid, PluginStorageUniqueViolation, increment } from '@attraccess/plugins-backend-sdk';
 import { createHarness, type Harness } from './storage-harness.test-fixture';
 import type { StorageBackendFixture } from './storage-fixture';
 
@@ -56,7 +52,9 @@ export function describePluginStorageRecords(fixture: StorageBackendFixture): vo
         const total = await items.aggregate('price', { status: 'dec' });
         expect(total).toMatchObject({ sum: '-5.20', min: '-5.50', max: '0.20', count: 3 });
         await expect(items.insert({ name: 'dec-d', price: '1.005' })).rejects.toBeInstanceOf(PluginStorageInvalid);
-        await expect(items.insert({ name: 'dec-e', price: '123456789.00' })).rejects.toBeInstanceOf(PluginStorageInvalid);
+        await expect(items.insert({ name: 'dec-e', price: '123456789.00' })).rejects.toBeInstanceOf(
+          PluginStorageInvalid,
+        );
         await expect(items.insert({ name: 'dec-f', price: 1.5 })).rejects.toBeInstanceOf(PluginStorageInvalid);
       });
 
@@ -65,8 +63,14 @@ export function describePluginStorageRecords(fixture: StorageBackendFixture): vo
         const instant = new Date('1999-12-31T23:59:59.001Z');
         const row = await items.insert({ name: 'ts', created: instant });
         expect((await items.get(row.id)).created.getTime()).toBe(instant.getTime());
-        expect(await items.count({ created: { between: [new Date('1999-12-31T23:59:59.000Z'), new Date('2000-01-01T00:00:00Z')] } })).toBe(1);
-        await expect(items.insert({ name: 'ts-bad', created: new Date('nope') })).rejects.toBeInstanceOf(PluginStorageInvalid);
+        expect(
+          await items.count({
+            created: { between: [new Date('1999-12-31T23:59:59.000Z'), new Date('2000-01-01T00:00:00Z')] },
+          }),
+        ).toBe(1);
+        await expect(items.insert({ name: 'ts-bad', created: new Date('nope') })).rejects.toBeInstanceOf(
+          PluginStorageInvalid,
+        );
       });
 
       it('rejects values a field cannot hold', async () => {
@@ -110,9 +114,9 @@ export function describePluginStorageRecords(fixture: StorageBackendFixture): vo
 
       const names = async (query: object) => {
         const { items } = await harness.open();
-        return (await items.find({ ...query, where: { status: 'q', ...((query as { where?: object }).where ?? {}) } })).map(
-          (row: { name: string }) => row.name,
-        );
+        return (
+          await items.find({ ...query, where: { status: 'q', ...((query as { where?: object }).where ?? {}) } })
+        ).map((row: { name: string }) => row.name);
       };
 
       it('filters with every operator and the combinators', async () => {
@@ -133,7 +137,10 @@ export function describePluginStorageRecords(fixture: StorageBackendFixture): vo
       });
 
       it('matches prefixes case-sensitively', async () => {
-        expect(await names({ where: { name: { startsWith: 'alpha' } }, orderBy: [{ field: 'name' }] })).toEqual(['alpha', 'alphabet']);
+        expect(await names({ where: { name: { startsWith: 'alpha' } }, orderBy: [{ field: 'name' }] })).toEqual([
+          'alpha',
+          'alphabet',
+        ]);
         expect(await names({ where: { name: { startsWith: 'Alpha' } } })).toEqual(['Alpha2']);
         expect(await names({ where: { name: { startsWith: '%' } } })).toEqual([]);
       });
@@ -162,7 +169,11 @@ export function describePluginStorageRecords(fixture: StorageBackendFixture): vo
           'alphabet',
           'gamma',
         ]);
-        expect(await names({ orderBy: [{ field: 'due', direction: 'desc' }, { field: 'name' }] }).then((rows) => rows.slice(-3))).toEqual(['Alpha2', 'beta', 'delta']);
+        expect(
+          await names({ orderBy: [{ field: 'due', direction: 'desc' }, { field: 'name' }] }).then((rows) =>
+            rows.slice(-3),
+          ),
+        ).toEqual(['Alpha2', 'beta', 'delta']);
         const all = await names({ orderBy: [{ field: 'qty' }] });
         expect(await names({ orderBy: [{ field: 'qty' }], limit: 2, offset: 1 })).toEqual(all.slice(1, 3));
         expect(await names({ orderBy: [{ field: 'qty' }], offset: 4 })).toEqual(all.slice(4));
@@ -216,13 +227,18 @@ export function describePluginStorageRecords(fixture: StorageBackendFixture): vo
         const first = await items.upsert({ name: 'ups', qty: 1, status: 's1' }, { conflictOn: ['name'] });
         const again = await items.upsert({ name: 'ups', qty: 2 }, { conflictOn: ['name'] });
         expect(again).toMatchObject({ id: first.id, qty: 2, status: 'new' });
-        const kept = await items.upsert({ name: 'ups', qty: 3, status: 's3' }, { conflictOn: ['name'], update: ['status'] });
+        const kept = await items.upsert(
+          { name: 'ups', qty: 3, status: 's3' },
+          { conflictOn: ['name'], update: ['status'] },
+        );
         expect(kept).toMatchObject({ id: first.id, qty: 2, status: 's3' });
         // Default: every non-key field is overwritten, fields the row omits take their defaults.
         const reset = await items.upsert({ name: 'ups', qty: 9 }, { conflictOn: ['name'] });
         expect(reset).toMatchObject({ id: first.id, qty: 9, status: 'new' });
         expect(await items.count({ name: 'ups' })).toBe(1);
-        await expect(items.upsert({ name: 'ups2' }, { conflictOn: ['qty'] })).rejects.toBeInstanceOf(PluginStorageInvalid);
+        await expect(items.upsert({ name: 'ups2' }, { conflictOn: ['qty'] })).rejects.toBeInstanceOf(
+          PluginStorageInvalid,
+        );
       });
 
       it('updates by condition and returns the number of changed rows', async () => {
@@ -233,7 +249,9 @@ export function describePluginStorageRecords(fixture: StorageBackendFixture): vo
         expect(await items.get(row.id)).toMatchObject({ status: 'done', qty: 7 });
         await expect(items.update({ id: row.id }, { id: 99 })).rejects.toBeInstanceOf(PluginStorageInvalid);
         await expect(items.update({ id: row.id }, {})).rejects.toBeInstanceOf(PluginStorageInvalid);
-        await expect(items.update({ id: row.id }, { status: increment(1) })).rejects.toBeInstanceOf(PluginStorageInvalid);
+        await expect(items.update({ id: row.id }, { status: increment(1) })).rejects.toBeInstanceOf(
+          PluginStorageInvalid,
+        );
       });
 
       it('claims a row exactly once when writers race on independent connections (compare-and-set)', async () => {
@@ -255,7 +273,9 @@ export function describePluginStorageRecords(fixture: StorageBackendFixture): vo
         const [a, b] = [await harness.open(), await harness.open()];
         const row = await a.items.insert({ name: 'counter' });
         await Promise.all(
-          Array.from({ length: 40 }, (_, index) => (index % 2 ? a : b).items.update({ id: row.id }, { qty: increment(1) })),
+          Array.from({ length: 40 }, (_, index) =>
+            (index % 2 ? a : b).items.update({ id: row.id }, { qty: increment(1) }),
+          ),
         );
         expect((await a.items.get(row.id)).qty).toBe(40);
       });

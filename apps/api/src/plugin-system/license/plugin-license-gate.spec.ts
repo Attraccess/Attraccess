@@ -31,12 +31,9 @@ describe('plugin license gate', () => {
         attraccessVersion: { min: '2.0.0-0' },
         dependencies: dependencies.map((dependency) => ({ name: dependency, version: '^1.0.0', required: true })),
         ...(license === undefined ? {} : { license }),
-        // SDK 2.0: a plugin that ships migrations declares the engines it supports.
-        ...(migrations ? { persistence: { backends: ['sqlite'] } } : {}),
-        main: {
-          backend: { directory: 'dist', entryPoint: 'index.js' },
-          ...(migrations ? { migrations: { directory: 'dist', entryPoint: 'migrations.js' } } : {}),
-        },
+        // A plugin with storage asks for PLUGIN_STORAGE; the host migrates its declared tables.
+        ...(migrations ? { permissions: ['PLUGIN_STORAGE'] } : {}),
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
       }),
     );
     writeFileSync(

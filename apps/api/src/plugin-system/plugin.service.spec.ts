@@ -1,5 +1,4 @@
 import { registerPluginServiceFixture } from './plugin.service.plugin-service.test-fixture';
-import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 import { BadRequestException } from '@nestjs/common';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
@@ -339,30 +338,53 @@ describe('PluginService', () => {
       await expect(service.uploadPlugin(file)).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('refuses a plugin that declares only engines this host does not run, with a client error and no changes', async () => {
-      const service = new PluginService();
-      const manifest = {
-        ...fixture.VALID_MANIFEST,
-        permissions: [PluginPermission.DATABASE_ACCESS],
-        persistence: { backends: ['postgres'] },
-      };
+    it.each([
+      ['the removed DATABASE_ACCESS permission', { permissions: ['DATABASE_ACCESS'] }, 'DATABASE_ACCESS permission'],
+      ['persistence.backends', { persistence: { backends: ['sqlite'] } }, 'persistence.backends'],
+      [
+        'a legacy migrations entry',
+        { main: { ...fixture.VALID_MANIFEST.main, migrations: { directory: 'dist', entryPoint: 'migrations.js' } } },
+        'migrations entry',
+      ],
+    ])(
+      'refuses a ZIP that uses %s: a 400 naming plugin, reason and guide, and no changes',
+      async (_label, extra, reason) => {
+        const service = new PluginService();
+        const manifest = { ...fixture.VALID_MANIFEST, ...extra };
 
-      const upload = service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(manifest) }));
+        const upload = service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(manifest) }));
+
+        await expect(upload).rejects.toBeInstanceOf(BadRequestException);
+        await expect(upload).rejects.toThrow(reason);
+        await expect(upload).rejects.toThrow(/Plugin uploaded-plugin .*migrating-to-2/s);
+        expect(existsSync(join(fixture.root, 'uploaded-plugin'))).toBe(false);
+        expect(fixture.restartSpy).not.toHaveBeenCalled();
+      },
+    );
+
+    it('refuses a ZIP whose backend bundle imports a database package, before it moves anything', async () => {
+      const service = new PluginService();
+      const upload = service.uploadPlugin(
+        zipFileUpload({
+          'plugin.json': JSON.stringify(fixture.VALID_MANIFEST),
+          'dist/index.js': "const { DataSource } = require('typeorm');",
+        }),
+      );
 
       await expect(upload).rejects.toBeInstanceOf(BadRequestException);
-      await expect(upload).rejects.toThrow('supports the database engines postgres but this host runs sqlite');
+      await expect(upload).rejects.toThrow(/Plugin uploaded-plugin .*"typeorm".*migrating-to-2/s);
       expect(existsSync(join(fixture.root, 'uploaded-plugin'))).toBe(false);
       expect(fixture.restartSpy).not.toHaveBeenCalled();
     });
 
     it('answers an invalid plugin.json with a client error that names the field', async () => {
       const service = new PluginService();
-      const manifest = { ...fixture.VALID_MANIFEST, persistence: { backends: [] } };
+      const manifest = { ...fixture.VALID_MANIFEST, permissions: ['NOT_A_PERMISSION'] };
 
       const upload = service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(manifest) }));
 
       await expect(upload).rejects.toBeInstanceOf(BadRequestException);
-      await expect(upload).rejects.toThrow(/Invalid plugin\.json: persistence\.backends/);
+      await expect(upload).rejects.toThrow(/Invalid plugin\.json: permissions\.0/);
       expect(existsSync(join(fixture.root, 'uploaded-plugin'))).toBe(false);
     });
 

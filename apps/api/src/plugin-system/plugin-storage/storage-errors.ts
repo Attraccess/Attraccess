@@ -9,7 +9,10 @@ import { classifyPersistenceError, persistenceErrorCode } from '../../database/p
 /** A driver failure: it carries the engine's error (and with it the statement and its parameters). */
 function isDriverFailure(error: unknown): boolean {
   const failure = error as { name?: unknown; driverError?: unknown; query?: unknown } | null;
-  return failure?.name === 'QueryFailedError' || (typeof failure === 'object' && failure !== null && 'driverError' in failure);
+  return (
+    failure?.name === 'QueryFailedError' ||
+    (typeof failure === 'object' && failure !== null && 'driverError' in failure)
+  );
 }
 
 /**

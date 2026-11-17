@@ -11,7 +11,19 @@ import { isOrderable, normalizeValue } from './storage-values';
 
 const MAX_IN_LIST = 20_000;
 const MAX_FILTER_DEPTH = 16;
-const OPERATOR_NAMES = new Set(['eq', 'ne', 'in', 'notIn', 'lt', 'lte', 'gt', 'gte', 'between', 'isNull', 'startsWith']);
+const OPERATOR_NAMES = new Set([
+  'eq',
+  'ne',
+  'in',
+  'notIn',
+  'lt',
+  'lte',
+  'gt',
+  'gte',
+  'between',
+  'isNull',
+  'startsWith',
+]);
 
 /** Collects the bound parameters of one statement and hands out their markers. */
 export class StorageParams {
@@ -67,7 +79,13 @@ class Compiler {
       if (key === 'and' || key === 'or') {
         if (!Array.isArray(value)) throw new PluginStorageInvalid(`"${key}" takes a list of filters.`);
         const parts = value.map((part) => this.where(part, depth + 1));
-        terms.push(parts.length === 0 ? (key === 'and' ? '1 = 1' : '0 = 1') : `(${parts.join(key === 'and' ? ' AND ' : ' OR ')})`);
+        terms.push(
+          parts.length === 0
+            ? key === 'and'
+              ? '1 = 1'
+              : '0 = 1'
+            : `(${parts.join(key === 'and' ? ' AND ' : ' OR ')})`,
+        );
       } else if (key === 'not') {
         terms.push(`(NOT ${this.where(value, depth + 1)})`);
       } else {
@@ -82,7 +100,8 @@ class Compiler {
     if (!isPlainObject(condition)) return this.operator(field, 'eq', condition);
     const operators = Object.entries(condition);
     const missing = operators.find(([, value]) => value === undefined);
-    if (missing) throw new PluginStorageInvalid(`The operator "${missing[0]}" on "${field.name}" has an undefined value.`);
+    if (missing)
+      throw new PluginStorageInvalid(`The operator "${missing[0]}" on "${field.name}" has an undefined value.`);
     const unknown = operators.find(([name]) => !OPERATOR_NAMES.has(name));
     if (unknown) throw new PluginStorageInvalid(`Unknown filter operator "${unknown[0]}" on field "${field.name}".`);
     if (field.type === 'json' && operators.some(([name]) => name !== 'isNull' && name !== 'eq')) {
@@ -96,9 +115,13 @@ class Compiler {
 
   private list(field: CompiledField, operator: string, value: unknown): { values: string[]; hasNull: boolean } {
     if (!Array.isArray(value)) throw new PluginStorageInvalid(`"${operator}" on "${field.name}" takes a list.`);
-    if (value.length > MAX_IN_LIST) throw new PluginStorageInvalid(`"${operator}" takes at most ${MAX_IN_LIST} values.`);
+    if (value.length > MAX_IN_LIST)
+      throw new PluginStorageInvalid(`"${operator}" takes at most ${MAX_IN_LIST} values.`);
     const present = value.filter((entry) => entry !== null);
-    return { values: present.map((entry) => this.bind({ ...field, nullable: false }, entry)), hasNull: present.length < value.length };
+    return {
+      values: present.map((entry) => this.bind({ ...field, nullable: false }, entry)),
+      hasNull: present.length < value.length,
+    };
   }
 
   private operator(field: CompiledField, name: string, value: unknown): string {
@@ -161,7 +184,8 @@ class Compiler {
         const field = fieldOf(this.table, (entry as { field?: unknown })?.field, 'orderBy');
         this.requireOrderable(field, 'orderBy');
         const direction = (entry as { direction?: unknown }).direction ?? 'asc';
-        if (direction !== 'asc' && direction !== 'desc') throw new PluginStorageInvalid('direction is "asc" or "desc".');
+        if (direction !== 'asc' && direction !== 'desc')
+          throw new PluginStorageInvalid('direction is "asc" or "desc".');
         if (seen.has(field.name)) continue;
         seen.add(field.name);
         terms.push(this.dialect.orderTerm(this.column(field), direction));

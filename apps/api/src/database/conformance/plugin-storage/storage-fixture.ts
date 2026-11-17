@@ -1,4 +1,8 @@
-import type { PluginPersistenceContext, PluginStorageContext, PluginTransactionScope } from '@attraccess/plugins-backend-sdk';
+import type {
+  PluginPersistenceContext,
+  PluginStorageContext,
+  PluginTransactionScope,
+} from '@attraccess/plugins-backend-sdk';
 import type { PluginMigrationEngine } from '../../../plugin-system/persistence/plugin-migration-engine.port';
 import type { CompiledPluginStorage } from '../../../plugin-system/plugin-storage/storage-model';
 import type { PluginHostDataPort } from '../../../plugin-system/persistence/plugin-host-data.port';
@@ -42,6 +46,11 @@ export interface StorageDatabase {
   indexes(table: string): Promise<string[]>;
   /** Every table that is not part of the host schema, rows included: equal before and after a refusal. */
   snapshot(): Promise<string>;
+  /**
+   * Rows as another process would read them: on a plain connection outside the host's flow guards, so uncommitted
+   * writes of a running transaction are invisible. `sql` is in the engine's own syntax.
+   */
+  committed(sql: string): Promise<Array<Record<string, unknown>>>;
   /** A statement in the engine's own syntax, for building states the host itself no longer creates (1.x tables). */
   execute(sql: string): Promise<void>;
   /** A core resource, committed. Returns its id. */

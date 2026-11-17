@@ -1,6 +1,6 @@
 import { registerPluginServiceFixture } from './plugin.service.plugin-service.test-fixture';
 import { BadRequestException } from '@nestjs/common';
-import { existsSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { PluginMigrationService } from './plugin-migration.service';
 import { PluginService } from './plugin.service';
@@ -38,11 +38,10 @@ describe('PluginService refused plugins', () => {
 
   it('never hands a refused plugin to loading or migrations', () => {
     writeLegacyPlugin();
-    fixture.writePlugin(fixture.root, 'engine-mismatch', {
+    fixture.writePlugin(fixture.root, 'database-access', {
       ...fixture.VALID_MANIFEST,
-      name: 'engine-mismatch',
-      persistence: { backends: ['postgres'] },
-      main: { ...fixture.VALID_MANIFEST.main, migrations: { directory: 'dist', entryPoint: 'migrations.js' } },
+      name: 'database-access',
+      permissions: ['DATABASE_ACCESS'],
     });
 
     expect(PluginService.getPlugins()).toEqual([]);
@@ -50,10 +49,33 @@ describe('PluginService refused plugins', () => {
     for (const plugin of PluginService.getDiscoveredPlugins()) expect(PluginService.isPluginRefused(plugin)).toBe(true);
   });
 
-  it('deletes a refused plugin without running its down() migrations', async () => {
+  it('refuses a plugin whose bundle imports a database package, without running it', () => {
+    fixture.writePlugin(fixture.root, 'orm-plugin', { ...fixture.VALID_MANIFEST, name: 'orm-plugin' });
+    mkdirSync(join(fixture.root, 'orm-plugin', 'dist'));
+    writeFileSync(join(fixture.root, 'orm-plugin', 'dist', 'index.js'), "require('typeorm');");
+
+    expect(PluginService.getPlugins()).toEqual([]);
+    const [listed] = PluginService.getPluginsWithLoadStatus();
+    expect(listed).toMatchObject({ name: 'orm-plugin', status: 'error' });
+    expect(listed.error).toMatch(/orm-plugin.*"typeorm".*migrating-to-2/s);
+  });
+
+  it('keeps a refused 1.x copy from disabling a valid 2.0 plugin of the same name', () => {
+    writeLegacyPlugin();
+    fixture.writePlugin(fixture.root, 'legacy-plugin-2', { ...fixture.VALID_MANIFEST, name: 'legacy-plugin' });
+
+    expect(PluginService.getPlugins().map((plugin) => plugin.pluginDirectory)).toEqual(['legacy-plugin-2']);
+    const statuses = Object.fromEntries(
+      PluginService.getPluginsWithLoadStatus().map((plugin) => [plugin.pluginDirectory, plugin.status]),
+    );
+    expect(statuses['legacy-plugin']).toBe('error');
+    expect(statuses['legacy-plugin-2']).not.toBe('error');
+  });
+
+  it('deletes a refused plugin without loading its code or dropping its tables', async () => {
     writeLegacyPlugin();
     const [plugin] = PluginService.getDiscoveredPlugins();
-    const runDown = jest.spyOn(PluginMigrationService, 'runDownMigrations').mockResolvedValue(1);
+    const runDown = jest.spyOn(PluginMigrationService, 'dropStorage').mockResolvedValue(true);
     const ble = { deleteAllForPlugin: jest.fn().mockResolvedValue(undefined) };
 
     await new PluginUninstallService(new PluginService(), ble as never).deletePlugin(plugin.id, true);
