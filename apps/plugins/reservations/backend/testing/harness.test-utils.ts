@@ -48,17 +48,34 @@ interface AccessState {
   hidden: Set<number>; // resourceIds only in hidden groups (invisible to everyone in these tests)
 }
 
-/** Real SQLite (temp file), real services, scripted host facade. Time is controlled via `setNow`. */
-export async function createHarness() {
-  const dir = mkdtempSync(join(tmpdir(), 'reservations-test-'));
+/**
+ * Like the host's SQLite connection: transactions begin IMMEDIATE (reserving the writer up front, waiting through the
+ * busy timeout), so two connections on one file serialize their writes instead of failing a lock upgrade.
+ */
+function beginImmediately(dataSource: DataSource): void {
+  const runner = dataSource.createQueryRunner(); // the SQLite driver hands every caller this one runner
+  const query = runner.query.bind(runner) as (...args: unknown[]) => Promise<unknown>;
+  runner.query = ((sql: string, ...rest: unknown[]) =>
+    query(sql === 'BEGIN TRANSACTION' ? 'BEGIN IMMEDIATE TRANSACTION' : sql, ...rest)) as typeof runner.query;
+}
+
+/**
+ * Real SQLite (temp file), real services, scripted host facade. Time is controlled via `setNow`. Pass the
+ * `databasePath` of another harness to run a second, independent host (own connection, own services) on its file.
+ */
+export async function createHarness(options: { databasePath?: string } = {}) {
+  const dir = options.databasePath ? null : mkdtempSync(join(tmpdir(), 'reservations-test-'));
+  const databasePath = options.databasePath ?? join(dir as string, 'db.sqlite');
   const dataSource = await new DataSource({
     type: 'sqlite',
-    database: join(dir, 'db.sqlite'),
+    database: databasePath,
+    busyTimeout: 10_000,
     entities: [ReservationEntity, ResourceSettingsEntity, GlobalSettingsEntity, IcalFeedEntity, NoticeEntity],
     // Every migration the plugin registers (migrations.ts), as the host would run them.
     migrations: Object.values(pluginMigrations),
     synchronize: false,
   }).initialize();
+  beginImmediately(dataSource);
   await dataSource.runMigrations();
 
   let now = new Date('2026-06-01T08:00:00.000Z');
@@ -213,6 +230,7 @@ export async function createHarness() {
 
   return {
     dataSource,
+    databasePath,
     context,
     state,
     audit,
@@ -262,7 +280,7 @@ export async function createHarness() {
     async close() {
       await reservations.flushNotifications();
       await dataSource.destroy();
-      rmSync(dir, { recursive: true, force: true });
+      if (dir) rmSync(dir, { recursive: true, force: true });
     },
   };
 }

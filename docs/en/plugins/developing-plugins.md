@@ -73,17 +73,17 @@ keyword and an `attraccess` object:
 }
 ```
 
-| Field                                        | Required     | Notes                                                                                                  |
-| -------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------ |
-| `name`                                       | yes          | Immutable npm package identifier.                                                                      |
-| `version`                                    | yes          | Your plugin's semantic version.                                                                        |
-| `attraccess.backend` / `attraccess.frontend` | at least one | Relative package entry point.                                                                          |
-| `attraccess.styles`                          | no           | Stylesheet alongside the frontend entry point.                                                         |
-| `attraccess.dashboardPaths`                  | no           | Sidebar paths users may pin to their dashboard. See [Dashboard pins](#dashboard-pins).                 |
-| `attraccess.dashboardWidgets`                | no           | Ids of the dashboard widgets the plugin offers. See [Dashboard widgets](#dashboard-widgets).           |
+| Field                                        | Required     | Notes                                                                                              |
+| -------------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------- |
+| `name`                                       | yes          | Immutable npm package identifier.                                                                  |
+| `version`                                    | yes          | Your plugin's semantic version.                                                                    |
+| `attraccess.backend` / `attraccess.frontend` | at least one | Relative package entry point.                                                                      |
+| `attraccess.styles`                          | no           | Stylesheet alongside the frontend entry point.                                                     |
+| `attraccess.dashboardPaths`                  | no           | Sidebar paths users may pin to their dashboard. See [Dashboard pins](#dashboard-pins).             |
+| `attraccess.dashboardWidgets`                | no           | Ids of the dashboard widgets the plugin offers. See [Dashboard widgets](#dashboard-widgets).       |
 | `attraccess.migrations`                      | no           | Module exporting SQL migration classes. See [Database Migrations](plugins/database-migrations.md). |
-| `attraccess.host`                            | yes          | Compatible Attraccess host semver range.                                                               |
-| `attraccess.permissions`                     | no           | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`.      |
+| `attraccess.host`                            | yes          | Compatible Attraccess host semver range.                                                           |
+| `attraccess.permissions`                     | no           | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`.  |
 
 ## Dependencies on other Attraccess plugins
 
@@ -510,12 +510,12 @@ decorator metadata (esbuild does not).
 `context.hostData` answers read-only questions about host data with neutral models and plain values, never entities or
 query handles. Each group checks its own permission when a method is called.
 
-| Group                | Permission         | Methods                                                                                                                                                                                                                              |
-| -------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `hostData.resources` | `ACCESS_RESOURCES` | `get(id)` (a `PluginResourceModel` or `null`), `getNames(ids)`, `filterVisible(userId, ids, { seeAll? })`, `filterRequiringSupervision(ids)`, `listIdsInGroups(groupIds)`, `countUnhealthyEntries(id)`, `listIntroducerUserIds(id)`. |
-| `hostData.users`     | `READ_USERS`       | `getUsernames(ids)`, `getLocales(ids)`, `isActive(id)` (exists, not deleted, not disabled), `listIdsWithAnyPermission(keys)`.                                                                                                        |
-| `hostData.settings`  | `READ_SETTINGS`    | `getApp(key)`: the trimmed value of an application setting, or `null`.                                                                                                                                                               |
-| `hostData.flows`     | `DATABASE_ACCESS`  | `findNodes(query)`: flow nodes by `type`, `typePrefix`, `dataEquals`, `dataIn`, `resourceId`, `excludeResourceId`, `excludeFlowId`, `orderById` and `limit`, as `{ id, type, resourceId, resourceName, flowId, flowName, data }`.    |
+| Group                | Permission         | Methods                                                                                                                                                                                                                                                                                                 |
+| -------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hostData.resources` | `ACCESS_RESOURCES` | `get(id, scope?)` (a `PluginResourceModel` or `null`; with a transaction scope it reads inside that transaction), `getNames(ids)`, `filterVisible(userId, ids, { seeAll? })`, `filterRequiringSupervision(ids)`, `listIdsInGroups(groupIds)`, `countUnhealthyEntries(id)`, `listIntroducerUserIds(id)`. |
+| `hostData.users`     | `READ_USERS`       | `getUsernames(ids)`, `getLocales(ids)`, `isActive(id)` (exists, not deleted, not disabled), `listIdsWithAnyPermission(keys)`.                                                                                                                                                                           |
+| `hostData.settings`  | `READ_SETTINGS`    | `getApp(key)`: the trimmed value of an application setting, or `null`.                                                                                                                                                                                                                                  |
+| `hostData.flows`     | `DATABASE_ACCESS`  | `findNodes(query)`: flow nodes by `type`, `typePrefix`, `dataEquals`, `dataIn`, `resourceId`, `excludeResourceId`, `excludeFlowId`, `orderById` and `limit`, as `{ id, type, resourceId, resourceName, flowId, flowName, data }`.                                                                       |
 
 `PluginUserModel` (`id`, `username`, `locale`, `isDisabled`) and `PluginResourceModel` (`id`, `name`, `type`,
 `description`, `allowTakeOver`, `maxParallelSessions`, `supervisionMode`) come from `@attraccess/application-models` and

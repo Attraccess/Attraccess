@@ -1,4 +1,4 @@
-import type { PluginActiveSession, PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginActiveSession, PluginContext, PluginTransactionScope } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import { PLUGIN_CONTEXT } from '../constants';
 import { sessionLimitOf } from './capacity';
@@ -18,14 +18,17 @@ export class DirectoryService {
     return row ? { id: row.id, name: row.name } : null;
   }
 
-  /** Effective session limit (core's rule): 1 for doors, unknown resources and machines without parallel sessions. */
-  async getSessionLimit(resourceId: number): Promise<number> {
-    return (await this.findSessionLimit(resourceId)) ?? 1;
+  /**
+   * Effective session limit (core's rule): 1 for doors, unknown resources and machines without parallel sessions.
+   * With `scope` it is read inside that transaction.
+   */
+  async getSessionLimit(resourceId: number, scope?: PluginTransactionScope): Promise<number> {
+    return (await this.findSessionLimit(resourceId, scope)) ?? 1;
   }
 
   /** Effective session limit, or null when the resource does not exist (anymore: deleted resources are not found). */
-  async findSessionLimit(resourceId: number): Promise<number | null> {
-    const row = await this.context.hostData.resources.get(resourceId);
+  async findSessionLimit(resourceId: number, scope?: PluginTransactionScope): Promise<number | null> {
+    const row = await this.context.hostData.resources.get(resourceId, scope);
     return row ? sessionLimitOf(row) : null;
   }
 

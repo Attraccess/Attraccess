@@ -186,7 +186,7 @@ export class ReservationService implements OnModuleDestroy {
       if (maintenance.length > 0) {
         throw new ReservationError('MAINTENANCE', 'The resource is in maintenance during this time');
       }
-      return sqlitePersistence(this.context).transaction(async (manager) => {
+      return sqlitePersistence(this.context).transaction(async (manager, scope) => {
         if (settings.maxActiveBookingsPerUser > 0) {
           const live = await this.store.countLiveForUser(manager, actor.userId, input.resourceId, now);
           if (live >= settings.maxActiveBookingsPerUser) {
@@ -200,7 +200,7 @@ export class ReservationService implements OnModuleDestroy {
         const overlapping = candidates.filter((other) => spansOverlap(span, blockedSpan(other)));
         // Read inside the serialized transaction (and under the resource mutex), so concurrent creates and a
         // concurrent limit change cannot exceed the limit.
-        const limit = await this.directory.getSessionLimit(input.resourceId);
+        const limit = await this.directory.getSessionLimit(input.resourceId, scope);
         if (limit <= 1) {
           if (overlapping.length > 0) throw new ReservationError('OVERLAP', 'The time is already reserved');
         } else {
