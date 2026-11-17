@@ -28,8 +28,14 @@ dass es funktioniert.
    Verhalten und isolieren echte Unterschiede.
 7. **Conformance-Fixture ergänzen.** `BackendFixture` (`database/conformance/backend-fixture.ts`) für die Engine
    implementieren und `describePersistenceConformance` darauf ausführen. Jeder Fall nutzt unabhängige Verbindungen.
-8. **Plugin-Unterstützung deklarieren.** Plugins nennen ihre Engines in `persistence.backends`; der Host verweigert ein
-   Plugin ohne die aktive Engine vor Installation, Migration und Start.
+8. **Plugin-Speicher-Adapter bereitstellen.** Plugins haben keinen engine-spezifischen Code und deklarieren keine
+   Engines: Sie nutzen den neutralen Record-Port und neutrale Migrationen. Für die neue Engine den Adapter
+   implementieren, der den Port bedient (insert, insertMany, get, find, findOne, count, update als Compare-and-Set,
+   delete, upsert, aggregate, die strukturierten Filter, neutrale Fehler, Transaktions-Scopes mit `afterCommit`), sowie
+   den **DDL-Generator**, der jeden neutralen Migrationsschritt (`createTable`, `dropTable`, `addColumn`, `dropColumn`,
+   `renameColumn`, `addIndex`, `dropIndex`) in DDL der Engine übersetzt, samt physischer Typabbildung (Dezimalzahlen
+   exakt, Zeitpunkte UTC, `date`, `json`, `uuid`), generierten Schlüsseln, Namensräumen und der Baseline-Übernahme.
+   Die Plugin-Speicher-Conformance-Suite darauf ausführen.
 9. **Betrieb dokumentieren**: Konfiguration, Backup und Restore der Engine.
 
 ## Export-, Import- und Backup-Vertrag (für ATT-584)
@@ -43,8 +49,9 @@ Ein Transfer oder Restore muss, egal mit welchem Werkzeug, erhalten:
 - **Exakte Geld- und Zählerwerte:** Abrechnungsbeträge, Guthaben, Preis-Snapshots und Zählerstände als exakte
   Dezimalzahlen oder Ganzzahlen, nie als Gleitkomma. Preis-Snapshots von Sitzungen und akzeptierte Zählerbeobachtungen
   sind Nachweise und werden unverändert kopiert.
-- **Plugin-Daten und Plugin-Migrationsstand:** die Tabellen jedes Plugins und seine Plugin-Migrationstabelle werden mit
-  der Plugin-Version kopiert.
+- **Plugin-Daten und Plugin-Schemastand:** die deklarierten Tabellen jedes Plugins und sein Schemastand (die angewendete
+  neutrale Migrationsversion, bei übernommenen Installationen der Baseline-Eintrag) werden zusammen mit der
+  Plugin-Version kopiert, sodass ein Restore nie Daten ohne den passenden Schemastand liefert.
 - **Kern-Migrationsstand:** die Migrationstabelle der Quellspur. Eine wiederhergestellte Datenbank ist nur mit der
   Anwendungsversion gültig, die ihrem Migrationsstand entspricht.
 - **Abgeleitete Daten:** Guthaben und Nutzungsinvarianten werden nach dem Import mit den Integritätsprüfungen der Engine
@@ -66,5 +73,7 @@ eine `TransferBackendFixture`. Der Engine-übergreifende Transferbefehl selbst g
 - Eine PostgreSQL-Fixture für `describePersistenceConformance` und die anderen engineparametrisierten Suiten, in der CI.
 - Der Transferbefehl SQLite nach PostgreSQL nach obigem Vertrag.
 - Ports und Adapter für die Bereiche auf der Baseline (siehe
-  [Persistenz-Architektur](developer/persistence-architecture.md)) und die Plugin-Persistenz-API für SDK 2.0.
+  [Persistenz-Architektur](developer/persistence-architecture.md)).
+- Der PostgreSQL-Plugin-Speicher-Adapter und DDL-Generator samt Tests, mit der Plugin-Speicher-Conformance-Suite in der
+  CI. Die Plugin-Seite ist engineneutral und braucht keine Änderung.
 - Garantien für mehrere Replikate (Sperren, Zeitgeber-Leadership, geteilte Live Updates), separat verfolgt.

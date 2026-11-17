@@ -59,8 +59,7 @@ Adapter internals are `apps/api/src/database/adapters/**`, `apps/api/src/databas
 `libs/database-entities`. Only Nest composition files (`*.module.ts`) and tests may import them, so application,
 domain and transport code reaches persistence through ports alone. The neutral seam files in `apps/api/src/database`
 (`unit-of-work.ts`, `persistence-errors.ts`, `backend/database-backend.ts`) are checked like application code. The
-plugin SDK's engine subpath `@attraccess/plugins-backend-sdk/sqlite` is allowed in the host only in the plugin module
-loader.
+plugin SDK has no engine subpath any more: plugins cannot import TypeORM, a driver or an entity at all.
 
 Existing users are recorded per file in `scripts/persistence-boundaries.baseline.json`. The baseline can only shrink:
 a new violation fails, and so does a file that no longer needs its entry until the entry is lowered with
@@ -94,17 +93,18 @@ implementation lives (`apps/api/src/database/adapters/<area>`).
 | Messaging, notifications, push, email, templates                       | `messaging`, `notifications`, `push`, `email*`                  | conversation, notification, push, template and recipient stores                                                  | `adapters/messaging`, `notifications`, `push`, `email`              |
 | Settings, analytics, CSV export, metrics                               | `settings`, `analytics`, `metrics`                              | `SettingsRows`, `AnalyticsReader`, `CsvExportTemplateStore`, metrics readers                                     | `adapters/settings`, `analytics`, `metrics`                         |
 | Projects, system statistics                                            | `projects`, `version`                                           | `ProjectStore`, `ProjectInvitationStore`, `SystemStatsStore`                                                     | `adapters/projects`, `adapters/system`                              |
-| Plugin management, plugin SDK                                          | `plugin-system`, `libs/plugins-backend-sdk`                     | plugin persistence host, host data, migrations                                                                   | `adapters/plugins`                                                  |
-| Built-in plugins and examples                                          | `apps/plugins/*`, `examples/*`                                  | SDK 2.0 neutral root plus the `/sqlite` engine subpath                                                           | plugin-owned                                                        |
+| Plugin management, plugin SDK                                          | `plugin-system`, `libs/plugins-backend-sdk`                     | plugin storage (record port), host data, neutral migrations, transactions                                        | `adapters/plugins`                                                  |
+| Built-in plugins and examples                                          | `apps/plugins/*`, `examples/*`                                  | SDK 2.0 root only: `context.storage` over declared tables, host ports                                            | none: the host's plugin-storage adapter serves them                 |
 | MCP OAuth clients, grants and tokens                                   | `mcp`                                                           | `McpOAuthStore`                                                                                                  | `adapters/mcp`                                                      |
 | Dashboard pins                                                         | `dashboard`                                                     | `DashboardPinStore`                                                                                              | `adapters/dashboard`                                                |
 | Bootstrap, shutdown, persistence error filters                         | `main.bootstrap.ts`, `app`, `exceptions`                        | `DatabaseLifecycle`, neutral error categories                                                                    | `database/sqlite`                                                   |
 | Seeds, setup scripts, test databases, tooling                          | `apps/api/scripts`, `scripts/*`, `apps/api/src/e2e`             | `DATABASE_TYPE` provider (`apps/api/scripts/lib/database-provider.mjs`), `apps/api/migration-tracks.cjs`         | `database/sqlite`                                                   |
 | Frontend                                                               | `apps/frontend`                                                 | none, imports `@attraccess/application-models` only                                                              | n/a                                                                 |
 
-The plugin SDK root has no TypeORM or host entity. The engine-specific surface is the explicit subpath
-`@attraccess/plugins-backend-sdk/sqlite`, usable only when the active backend is SQLite and refused with a clear error
-otherwise (see [Migrating Plugins to SDK 2.0](plugins/migrating-to-2.md)).
+Plugins have no database access. The SDK has no TypeORM, no host entity, no raw SQL and no engine subpath. A plugin
+declares tables in a neutral schema and uses the record port; the host's **plugin-storage adapter** maps that port and
+the neutral migrations to the active engine (see [Plugin Storage](plugins/plugin-storage.md) and
+[Migrating Plugins to SDK 2.0](plugins/migrating-to-2.md)).
 
 ### Known remaining seams
 
@@ -117,13 +117,9 @@ These are accepted limits of this change, not hidden work:
   these adapters onto the unit of work removes it.
 - Adapters unwrap a scope with a few small helpers (`TransactionHandles`, `TransactionContextResolver`,
   `EntityManagerResolver`, `managerFor`). All resolve through the one global unit of work and can be merged into one.
-- The built-in plugins use the `@attraccess/plugins-backend-sdk/sqlite` subpath directly in their services and declare
-  only `sqlite`. Running them on another engine first needs plugin-owned stores behind which that code moves.
-- The `/sqlite` subpath's transaction manager can reach every table of the connection, as `dataSource` could in 1.x.
-  It stays gated by the `DATABASE_ACCESS` permission; the neutral SDK root offers no such access.
-- A plugin's engine declaration in `plugin.json` is checked before install, migration and load. The declaration on
-  its backend module is only known once that code runs, so it is checked at load, after the migrations that the
-  `plugin.json` declaration allowed.
+- The built-in plugins use only the record port, so they run on any engine that has a plugin-storage adapter. The port
+  has no joins; plugins read over several of their own tables with several calls.
+- Plugin transactions are serialized per host process, like core's.
 - Some lifecycle test fixtures build older schemas with `synchronize` on purpose, to test upgrades and recovery from a
   schema before the integrity migrations.
 - Swagger schemas that documented secret or never-populated fields are now accurate (see below).

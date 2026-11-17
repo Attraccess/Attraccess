@@ -10,7 +10,7 @@ The registry does not change the devices when you add or remove an entry.
 ## Prerequisites
 
 - Attraccess 1.11.0 or newer and the `shelly` plugin, installed as described in
-  [Installing Plugins](plugins/installing-plugins.md). It needs the `DATABASE_ACCESS` permission.
+  [Installing Plugins](plugins/installing-plugins.md). It needs the `PLUGIN_STORAGE` permission for its own tables.
 - Shelly devices that the Attraccess server can reach over the network by IP address.
 - Users need the **Manage Resources** permission (`resources.update`) to open the page.
 - If Attraccess runs in a container, its network is not your LAN. Enter the subnet of your devices when you

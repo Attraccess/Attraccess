@@ -17,7 +17,7 @@
 
 | Berechtigung         | Verwendet für                                                                                         |
 | -------------------- | ----------------------------------------------------------------------------------------------------- |
-| `DATABASE_ACCESS`    | Eigene Tabellen für Buchungen, Einstellungen, Kalender-Feeds und versendete Hinweise.                 |
+| `PLUGIN_STORAGE`     | Eigene Tabellen für Buchungen, Einstellungen, Kalender-Feeds und versendete Hinweise.                 |
 | `ACCESS_HOOKS`       | Die Prüfung vor dem Start (blockieren oder bestätigen) und die Frage „Behalten oder Rest freigeben?“. |
 | `LISTEN_EVENTS`      | Sitzungsstart/-ende, Wartungs- und Gesundheitsänderungen (Check-in, Hinweise).                        |
 | `ACCESS_RESOURCES`   | Lesende Prüfung, wer eine Ressource starten oder warten darf, und Wartungsfenster.                    |

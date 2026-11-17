@@ -84,7 +84,7 @@
   - [Plugins entwickeln](plugins/developing-plugins.md)
   - [Plugins auf SDK 2.0 umstellen](plugins/migrating-to-2.md)
   - [Bluetooth-Transport für Plugins](plugins/ble-transport.md)
-  - [Datenbankmigrationen](plugins/database-migrations.md)
+  - [Plugin-Speicher](plugins/plugin-storage.md)
   - **Reservierungen**
     - [Überblick](plugins/reservations/overview.md)
     - [Reservierungen nutzen](plugins/reservations/using-reservations.md)

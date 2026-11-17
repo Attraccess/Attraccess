@@ -13,7 +13,7 @@ Geräte-Oberfläche.
 ## Voraussetzungen
 
 - Attraccess 1.11.0 oder neuer und das Plugin `matter`, installiert wie unter
-  [Plugins installieren](plugins/installing-plugins.md) beschrieben. Es benötigt die Berechtigungen `DATABASE_ACCESS`
+  [Plugins installieren](plugins/installing-plugins.md) beschrieben. Es benötigt die Berechtigungen `PLUGIN_STORAGE`
   und `MANAGE_SECRETS`.
 - Der **Matter-Sidecar**, ein separater Node.js-Prozess oder Container (Node.js `>=26.13.0 <27`), den Sie selbst bauen,
   absichern und betreiben. Attraccess spricht ihn mit einem Service-Token an. Siehe die

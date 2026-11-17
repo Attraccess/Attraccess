@@ -1,168 +1,181 @@
 # Plugins auf SDK 2.0 umstellen
 
-<!-- llms-description: Was Plugin-Entwickler für Attraccess 2.0 ändern müssen: die Mindest-Host-Version, deklarierte Engines, die neue Persistenz-API mit Vorher-Nachher-Code und die Ablehnung älterer Plugins. -->
+<!-- llms-description: Plugins auf Attraccess 2.0 umstellen: kein Datenbankzugriff, Host-Ports statt Host-Entitäten, deklarierte Tabellen mit neutralen Migrationen und Record-Port, Portierungsanleitung und Ablehnungsregeln. -->
 
-Attraccess 2.0 trennt Plugins von der Datenbank-Engine. Für Plugins, die für 1.x gebaut wurden, ist das ein
-Breaking Change.
+Attraccess 2.0 nimmt Plugins die Datenbank weg. Für Plugins, die für 1.x gebaut wurden, ist das ein Breaking Change.
+
+**Ein Plugin hat keinen Datenbankzugriff.** Es gibt keinen `DataSource`, `EntityManager`, kein TypeORM-Repository, kein
+rohes SQL, keine Entity-Dekoratoren, kein Engine-Handle und keinen Unterpfad `@attraccess/plugins-backend-sdk/sqlite`,
+und keinen Weg, eine Kerntabelle zu lesen. Stattdessen bekommt ein Plugin zwei Dinge:
+
+- **Host-Ports** für alles, was der Host besitzt (Benutzer, Ressourcen, Einstellungen, Autorisierung, Audit,
+  Benachrichtigungen, Hooks, Events, Flows).
+- **Plugin-Speicher** für eigene Daten: Tabellen, die das Plugin in einem neutralen Schema _deklariert_, neutrale
+  Migrationen und der Record-Port `context.storage`. Engine, DDL, Transaktionen, Migrationen und Backups gehören dem Host.
+
+Plugins, die ihre eigene Persistenz mitbringen (eigene Verbindung, eigenen Treiber oder eigenes ORM), werden abgelehnt.
 
 ## Was der Host durchsetzt
 
-- **Mindest-Host-Version.** `plugin.json` muss `attraccessVersion.min` von `2.0.0-0` oder höher deklarieren. Bei
-  npm-Plugins zählt die niedrigste von `attraccess.host` in der `package.json` erlaubte Version. Ein Plugin darunter oder
-  ohne Minimum wird beim Hochladen, Installieren oder Starten verweigert. Der Fehler nennt das Plugin und verlinkt diese
-  Anleitung. Es wird nichts entpackt, installiert oder migriert, die Datenbank bleibt unberührt.
-- **Deklarierte Engines.** Ein Plugin, das Daten speichert (Migrations-Eintrag oder Berechtigung `DATABASE_ACCESS`),
-  muss die Engines nennen, die seine Persistenz unterstützt:
+- **Mindest-Host-Version.** `plugin.json` muss `attraccessVersion.min` ab `2.0.0-0` deklarieren. Bei npm-Plugins zählt
+  die niedrigste von `attraccess.host` in der `package.json` erlaubte Version. Ein Plugin darunter oder ohne Minimum
+  wird beim Hochladen, Installieren oder Starten abgelehnt.
+- **Keine Datenbank-Berechtigung.** `DATABASE_ACCESS` entfällt. Eigene Daten brauchen `PLUGIN_STORAGE`, das nur Ihre
+  eigenen deklarierten Tabellen abdeckt.
+- **Keine Legacy-Persistenzdeklaration.** Der Eintrag `persistence.backends`, der TypeORM-Eintrag `migrations`
+  (`main.migrations` / `attraccess.migrations`) und Entitätsdeklarationen am Backend-Modul gehören nicht mehr zu 2.0.
+- **Namensraum.** Tabellen heißen `plugin_<plugin>_<tabelle>`. Ein Name außerhalb des Namensraums des Plugins oder ein
+  Fremdschlüssel auf eine Tabelle eines anderen Plugins oder des Kerns wird abgelehnt.
 
-  ```json
-  { "persistence": { "backends": ["sqlite"] } }
-  ```
-
-  Bei npm-Plugins steht dasselbe Objekt im `attraccess`-Block der `package.json`. Läuft der Host mit einer nicht
-  genannten Engine, wird das Plugin nicht installiert, migriert oder gestartet, und es ändern sich keine Daten.
-
-- **Berechtigungen bleiben.** `DATABASE_ACCESS` und die anderen Berechtigungen steuern weiterhin, was ein Plugin nutzen
-  darf. Installations-, Start- und Deinstallations-Migrationen und die Schutzmechanismen der Plugin-Migrationshistorie
-  funktionieren wie bisher.
+Ein abgelehntes Plugin wird nicht entpackt, installiert, registriert, migriert oder gestartet, und die Datenbank bleibt
+unberührt. Der Fehler nennt das Plugin, gibt den Grund an und verweist auf diese Anleitung (siehe
+[Ablehnungen](#ablehnungen)).
 
 ## Checkliste
 
-1. `attraccessVersion.min` auf `2.0.0-0` setzen (bei npm-Paketen `attraccess.host` auf `^2.0.0-0`).
-2. Peer-Dependencies und `attraccess.sdk`-Bereiche für `@attraccess/plugins-backend-sdk`, `-frontend-sdk` und
+1. `attraccessVersion.min` auf `2.0.0-0` setzen (bei npm-Paketen auch `attraccess.host` auf `^2.0.0-0`).
+2. Die Peer-Abhängigkeits- und `attraccess.sdk`-Bereiche für `@attraccess/plugins-backend-sdk`, `-frontend-sdk` und
    `-frontend-ui` auf `^2.0.0-0` anheben.
-3. `persistence.backends` ergänzen, wenn das Plugin Daten speichert.
-4. Persistenz auf die neue API umstellen (siehe [Persistenz-API](#persistenz-api)): `sqlitePersistence(context)` statt `getRepository`/`dataSource`/`runSerialized`, `persistence: { sqlite: { entities } }` statt `entities`, `hostData` und die neutralen Modelle statt Host-Entitäten, Migrations-Imports aus `@attraccess/plugins-backend-sdk/sqlite`.
-5. `@attraccess/plugins-backend-sdk/sqlite` zu den esbuild-Externals hinzufügen und die eigene `typeorm`-Abhängigkeit entfernen.
-6. Plugin neu bauen und gegen einen 2.0-Host testen.
+3. Zugriff auf Host-Entitäten durch [Host-Ports](#host-entitäten-werden-zu-host-ports) ersetzen.
+4. Speichert das Plugin Daten: `DATABASE_ACCESS` durch `PLUGIN_STORAGE` ersetzen, `persistence.backends` und den
+   Migrationseintrag entfernen und [Entitäten und Migrationen portieren](#typeorm-entitäten-und-migrationen-portieren).
+5. `getRepository`/`dataSource`/`runSerialized` durch [`context.storage` und
+   `context.persistence.transaction`](#record-port-und-transaktionen) ersetzen.
+6. `@attraccess/plugins-backend-sdk/sqlite` aus Importen und esbuild-Externals entfernen und die eigene
+   `typeorm`-Abhängigkeit streichen.
+7. Neu bauen und gegen einen 2.0-Host testen (Unit-Tests mit dem [In-Memory-Fake](#tests)).
 
-## Persistenz-API
+## Host-Entitäten werden zu Host-Ports
 
-Der SDK-Root enthält kein TypeORM, `DataSource`, `Repository`, `EntityManager` und keine Host-Entitätsklassen mehr,
-und es gibt keinen veralteten Pfad. Was im 1.x-Kontext Daten gespeichert hat, läuft jetzt über das neutrale
-`context.persistence`, das lesende `context.hostData` und den expliziten Engine-Unterpfad
-`@attraccess/plugins-backend-sdk/sqlite`. Der Unterpfad funktioniert nur, solange der Host SQLite betreibt; bei einer
-anderen Engine wirft er einen `PluginPersistenceBackendError`, und ein Plugin, dessen deklarierte Engines die aktive
-ausschließen, wird vor jeder Änderung verweigert.
-
-### Eigene Tabellen: `getRepository`
-
-```ts
-// 1.x
-const widgets = context.getRepository(Widget);
-```
-
-```ts
-// 2.0
-import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
-
-const widgets = sqlitePersistence(context).getRepository(Widget);
-```
-
-`getRepository` liefert nur Entitätsklassen, die Ihr Plugin registriert hat. Dekoratoren (`Entity`, `Column`, ...)
-stammen jetzt aus demselben Unterpfad, und der `entities`-Export des Backend-Moduls wird zur Engine-Deklaration:
-
-```ts
-// 1.x
-export default { entities: [Widget], register };
-```
-
-```ts
-// 2.0
-export default { persistence: { sqlite: { entities: [Widget] } }, register } satisfies PluginBackendModule;
-```
-
-### Transaktionen: `runSerialized`
-
-```ts
-// 1.x
-await context.runSerialized(async (manager) => {
-  await manager.getRepository(Widget).save(widget);
-  await context.mqtt.publish(1, 'widgets/created', '{}'); // Ein-/Ausgabe innerhalb der Transaktion
-});
-```
-
-```ts
-// 2.0
-await sqlitePersistence(context).transaction(async (manager, scope) => {
-  await manager.getRepository(Widget).save(widget);
-  scope.afterCommit(() => context.mqtt.publish(1, 'widgets/created', '{}')); // erst nach dem Commit
-});
-// oder backend-neutral, ohne den SQLite-Manager:
-await context.persistence.transaction(async (scope) => {
-  scope.afterCommit(() => notify());
-});
-```
-
-Die Regeln bleiben: Callback kurz halten, nicht verschachteln, keine Sitzungsschreibvorgänge des Kerns darin. Effekte
-gehören in `scope.afterCommit`, das bei einem Rollback nie läuft.
-
-### `dataSource` entfällt
-
-`context.dataSource` gibt es nicht mehr. Nutzen Sie `sqlitePersistence(context).getRepository(...)`, `.manager` zum
-Lesen und `.transaction(...)` zum Schreiben. `context.persistence.backend` und `supports('sqlite')` verraten, welche
-Engine läuft.
-
-### Host-Entitäten: `User`, `Resource`, `Setting`, `ResourceFlowNode`, ...
-
-Host-Entitätsklassen werden nicht mehr exportiert, und `getRepository` erreicht keine Host-Tabellen. Nutzen Sie die
-vorhandenen Fähigkeiten und die neutralen Abfragen:
-
-```ts
-// 1.x
-const row = await context.getRepository(Setting).findOneBy({ parent: 'app', key: 'backend_url' });
-const users = await context.getRepository(User).find({ where: { id: In(ids) } });
-const nodes = await context.dataSource
-  .getRepository(ResourceFlowNode)
-  .createQueryBuilder('node') /* ... */
-  .getMany();
-```
-
-```ts
-// 2.0
-const url = await context.hostData.settings.getApp('backend_url'); // READ_SETTINGS
-const names = await context.hostData.users.getUsernames(ids); // READ_USERS
-const nodes = await context.hostData.flows.findNodes({ typePrefix: 'plugin.x.', dataEquals: { controllerId } }); // DATABASE_ACCESS
-```
+Host-Entitätsklassen werden nicht mehr exportiert, und kein Repository erreicht eine Host-Tabelle. Nutzen Sie die Ports:
 
 | 1.x                                            | 2.0                                                                                                        |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `getRepository(User)` (`READ_USERS`)           | `hostData.users` (`READ_USERS`)                                                                            |
 | `getRepository(Resource)` (`ACCESS_RESOURCES`) | `hostData.resources` und `resourceAccess` (`ACCESS_RESOURCES`)                                             |
 | `getRepository(Setting)` (`READ_SETTINGS`)     | `hostData.settings` (`READ_SETTINGS`)                                                                      |
-| weitere Host-Tabellen über `DATABASE_ACCESS`   | `hostData.flows` (`DATABASE_ACCESS`); kein Zugriff auf andere Host-Tabellen                                |
+| Flow-Knoten-Abfragen über `DATABASE_ACCESS`    | `hostData.flows` (**`TRIGGER_FLOWS`**) und `context.flows.trigger(...)`                                    |
+| von Hand geschriebene Audit-Zeilen             | `context.audit` (der Audit-Port)                                                                           |
+| von Hand geschriebene Benachrichtigungszeilen  | `context.notifications.dispatch(...)` (`SEND_NOTIFICATIONS`)                                               |
+| Sitzungsstart/-ende-Zeilen, Hook-Transaktionen | die Hooks (`preStartHook`, `startCapacityHook`, ... mit `ACCESS_HOOKS`) und die Events `RESOURCE_USAGE_*`  |
 | Entitätstypen `User`, `Resource`               | `PluginUserModel`, `PluginResourceModel` aus `@attraccess/application-models` (vom SDK-Root re-exportiert) |
-
-Event-Nutzlasten (`RESOURCE_USAGE_STARTED`, `RESOURCE_USAGE_ENDED`) enthalten nur diese neutralen Felder; Tokens und
-Kontaktdaten gehören nicht dazu. `AuthenticatedRequest.user` ist mit diesen Feldern typisiert: Der Host kann zur
-Laufzeit mehr Felder übergeben, sie gehören aber nicht zur Plugin-API und können sich ohne Ankündigung ändern. `DATABASE_ACCESS` schließt `READ_USERS`,
-`ACCESS_RESOURCES` und `READ_SETTINGS` nicht mehr ein: Deklarieren Sie jede, die Sie nutzen.
-
-### Migrationen
 
 ```ts
 // 1.x
-import { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk';
+const row = await context.getRepository(Setting).findOneBy({ parent: 'app', key: 'backend_url' });
+const users = await context.getRepository(User).find({ where: { id: In(ids) } });
 ```
 
 ```ts
 // 2.0
-import { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk/sqlite';
+const url = await context.hostData.settings.getApp('backend_url'); // READ_SETTINGS
+const names = await context.hostData.users.getUsernames(ids); // READ_USERS
+const nodes = await context.hostData.flows.findNodes({ typePrefix: 'plugin.x.', dataEquals: { controllerId } }); // TRIGGER_FLOWS
 ```
 
-Installations-, Start- und Deinstallations-Migrationen, der plugin-bezogene Verlauf `plugin_migrations_<name>` und die
-Schutzmechanismen beim Ersetzen verhalten sich wie bisher; Up-Migrationen und das Zurücknehmen bei der Deinstallation
-laufen jeweils als eine Transaktion. Siehe [Plugin-Datenbankmigrationen](plugins/database-migrations.md).
+Event-Nutzlasten enthalten nur neutrale Felder; Tokens und Kontaktdaten gehören nicht dazu. `DATABASE_ACCESS` schloss
+`READ_USERS`, `ACCESS_RESOURCES` und `READ_SETTINGS` nie ein: Deklarieren Sie jede, die Sie nutzen. `hostData.flows`
+wird jetzt durch `TRIGGER_FLOWS` geschützt, die Hooks allein durch `ACCESS_HOOKS` (`startCapacityHook` braucht keine
+Datenbank-Berechtigung mehr).
 
-### Bündeln
+## TypeORM-Entitäten und -Migrationen portieren
 
-Ergänzen Sie den Unterpfad in den Externals Ihrer Backend- und Migrations-Builds und entfernen Sie Ihre eigene
-`typeorm`-Abhängigkeit:
+Das Ergebnis der Portierung: Die physischen Tabellen bleiben, wo sie sind, sodass eine aktualisierte Installation alle
+ihre Daten behält.
 
-```bash
---external:@attraccess/plugins-backend-sdk --external:@attraccess/plugins-backend-sdk/sqlite
+1. **Legacy-Migrationen auflisten.** Sammeln Sie die Klassennamen (mit Zeitstempel-Suffix) **jeder** TypeORM-Migration,
+   die das letzte 1.x-Release mitgeliefert hat, in Reihenfolge, zum Beispiel `CreateWidgets1700000000000`.
+2. **Das Tabellenlayout beschreiben, das diese Migrationen erzeugen.** Lesen Sie die Migrationen (nicht die Entitäten:
+   Sie können abgewichen sein) und schreiben Sie je Tabelle ein `table(...)` mit denselben Spalten, Typen,
+   Standardwerten, Nullbarkeiten, Indizes und Fremdschlüsseln. Nutzen Sie `physicalName` für den bestehenden
+   Tabellennamen und `column`, wo der Spaltenname vom Feldnamen abweicht. Fremdschlüssel dürfen nur auf Tabellen Ihres
+   eigenen Plugins zeigen; eine Spalte, die eine Kerntabelle referenzierte (`userId`, `resourceId`, ...), wird ein
+   einfaches `f.integer()` ohne Fremdschlüssel.
+3. **Version 1 zur Baseline machen.** Deklarieren Sie eine neutrale Migration `{ version: 1, ... }`, deren Schritte genau
+   dieses Layout anlegen. Neuinstallationen führen sie aus; bestehende überspringen sie.
+4. **Die Übernahme deklarieren.** Ergänzen Sie `adoption: { legacyMigrations: [...] }` mit der Liste aus Schritt 1.
+5. **Spätere Änderungen als Version 2, 3, ... ergänzen**, mit `step.*` und, wenn Zeilen umgeschrieben werden müssen,
+   einem Datenschritt, der nur den Record-Port nutzt.
+6. **Registrieren** Sie `storage: ihreDefinition` am Backend-Modul und löschen Sie die `entities`-/`persistence`-
+   Deklaration, die Entitätsklassen, die TypeORM-Migrationsklassen, `main.migrations` / `attraccess.migrations` und
+   `persistence.backends`.
+7. **Den Code ersetzen**, der Repositories nutzte, durch den Record-Port (siehe unten), und `DATABASE_ACCESS` im
+   Manifest durch `PLUGIN_STORAGE`.
+
+```ts
+// 1.x Entität + Migration
+@Entity({ name: 'plugin_widgets' })
+class Widget {
+  @PrimaryGeneratedColumn() id!: number;
+  @Column({ type: 'varchar', name: 'label' }) label!: string;
+}
 ```
 
-esbuild erzeugt keine Dekorator-Metadaten, geben Sie daher jedem `@Column` einen expliziten `type`.
+```ts
+// 2.0 Deklaration
+const widgets = table({ id: f.id(), label: f.string() }, { physicalName: 'plugin_widgets' });
+
+export const widgetStorage = definePluginStorage({
+  tables: { widgets },
+  migrations: [{ version: 1, name: 'baseline', steps: [step.createTable('widgets', widgets)] }],
+  adoption: { legacyMigrations: ['CreateWidgets1700000000000'] },
+});
+```
+
+### Die Baseline- und Übernahmeregel
+
+Beim ersten Start des 2.0-Builds prüft der Host die Legacy-Migrationstabelle des Plugins:
+
+- **Alle** `legacyMigrations` angewendet: Der Host vermerkt die Baseline-Version 1 **ohne etwas auszuführen** und
+  macht mit späteren Versionen weiter.
+- **Keine** angewendet (Neuinstallation): Version 1 läuft wie üblich.
+- **Nur einige** angewendet: Das Plugin wird **abgelehnt** und nichts wird geändert. Ein partieller Legacy-Verlauf
+  bedeutet, dass die Datenbank älter ist als Ihr letztes 1.x-Release: **Installieren Sie zuerst das letzte
+  1.x-Release**, lassen Sie es seine Migrationen abschließen und aktualisieren Sie dann auf den 2.0-Build.
+
+Version 1 muss das Legacy-Ergebnis daher exakt treffen. Eine Abweichung wird bei der Übernahme nicht erkannt, sie zeigt
+sich später als fehlschlagende Abfrage; vergleichen Sie deshalb Spalte für Spalte.
+
+## Record-Port und Transaktionen
+
+```ts
+// 1.x
+const widgets = context.getRepository(Widget);
+await widgets.update({ id, status: 'pending' }, { status: 'confirmed' });
+await context.runSerialized(async (manager) => {
+  await manager.getRepository(Widget).save(widget);
+  await context.mqtt.publish(1, 'widgets/created', '{}'); // I/O innerhalb der Transaktion
+});
+```
+
+```ts
+// 2.0
+const { widgets } = context.storage.open(widgetStorage);
+const changed = await widgets.update({ id, status: 'pending' }, { status: 'confirmed' }); // atomares Compare-and-Set
+await context.persistence.transaction(async (scope) => {
+  await widgets.insert(widget, { scope });
+  scope.afterCommit(() => context.mqtt.publish(1, 'widgets/created', '{}')); // erst nach dem Commit
+});
+```
+
+Der Port bietet `insert`, `insertMany`, `get`, `find`, `findOne`, `count`, `update` (liefert die Zahl geänderter Zeilen,
+atomar geprüft, also ein Compare-and-Set), `delete`, `upsert` und `aggregate` mit strukturierten Filtern (`eq`, `ne`,
+`in`, `notIn`, `lt`, `lte`, `gt`, `gte`, `between`, `isNull`, `startsWith`, `and`, `or`, `not`). Fehler sind die
+neutralen `PluginStorageUniqueViolation`, `PluginStorageConflict`, `PluginStorageNotFound` und `PluginStorageInvalid`
+statt Treiberfehlern. Details: [Plugin-Speicher](plugins/plugin-storage.md).
+
+Hinweise zur Portierung:
+
+- **Keine Joins.** Fragen Sie Ihre eigenen Tabellen nacheinander ab und nutzen Sie `in`-Filter statt einer Abfrage je
+  Zeile.
+- **Kein Query Builder, kein rohes SQL.** Aggregate drücken Sie mit `aggregate` aus, Zähler mit `increment(n)` und
+  Sperren mit Compare-and-Set-`update`.
+- **Zeitstempel** sind `Date` hinein und heraus (UTC), **Dezimalzahlen** sind Strings, JSON-Felder halten jeden
+  JSON-Wert.
+- **Transaktionen.** Geben Sie `{ scope }` an jeden Aufruf, der teilnehmen soll; Effekte gehören in
+  `scope.afterCommit`. Die Regeln (kurzer Callback, kein Verschachteln, keine Kern-Sitzungsschreibvorgänge darin)
+  bleiben.
+- `context.persistence` hat nur `transaction`. `persistence.backend`, `supports(...)` und jede Engine-Naht entfallen.
 
 ### Start-Kapazitäts-Hook
 
@@ -173,25 +186,52 @@ const held = await countSlotsHeldForOthers(ctx.manager, ctx.resourceId, ctx.user
 
 ```ts
 // 2.0
-const manager = sqlitePersistence(context).managerOf(ctx.scope);
-const held = await countSlotsHeldForOthers(manager, ctx.resourceId, ctx.userId, ctx.now);
+const slots = await heldSlots.find({ where: { resourceId: ctx.resourceId } }, { scope: ctx.scope });
 ```
 
-`ctx.scope` ist ein `PluginTransactionScope` der Start-Transaktion des Hosts. Lesen Sie nur darüber; starten Sie im
-Hook nie eine Transaktion.
+`ctx.scope` ist die Start-Transaktion des Hosts: Lesen Sie nur darüber und starten Sie im Hook nie eine Transaktion.
 
-### Frontend-SDK
+## Tests
+
+Plugin-Tests brauchen keine Datenbank. Bauen Sie den Fake-Kontext mit `createInMemoryPluginStorage()` aus dem SDK und
+setzen Sie ihn als `storage` (und seinen Transaktions-Runner als `persistence`). Er folgt dem Vertrag des Record-Ports:
+Filter, Compare-and-Set, neutrale Fehler und Transaktions-Scopes. Siehe [Plugin-Speicher](plugins/plugin-storage.md#5-testen).
+
+## Bundling
+
+Externalisieren Sie in Ihrem Backend-Build nur noch `@attraccess/plugins-backend-sdk` (den Unterpfad `/sqlite` gibt es
+nicht mehr) und streichen Sie die eigene `typeorm`-Abhängigkeit:
+
+```bash
+--external:@attraccess/plugins-backend-sdk
+```
+
+Es gibt kein Migrations-Bundle mehr: Die Migrationen stehen in Ihrer Deklaration im Backend-Einstiegspunkt.
+
+## Ablehnungen
+
+Jede Ablehnung geschieht vor jeder Änderung, nennt das Plugin, gibt den Grund an und verweist auf diese Anleitung:
+
+| Grund                                                    | Was die Meldung sagt                                                                                                               |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| SDK 1.x (kein oder zu niedriges `attraccessVersion.min`) | Das Plugin zielt auf das SDK 1.x, das dieser Host nicht mehr unterstützt; neu bauen und `>= 2.0.0-0` deklarieren.                  |
+| `DATABASE_ACCESS` angefordert                            | Die Berechtigung wurde entfernt; Plugins haben keinen Datenbankzugriff; `PLUGIN_STORAGE` deklarieren und `context.storage` nutzen. |
+| Legacy-Persistenzdeklaration                             | `persistence.backends`, ein TypeORM-Migrationseintrag oder Entitäten werden nicht unterstützt; stattdessen `storage` deklarieren.  |
+| Speicher ohne `PLUGIN_STORAGE`                           | Das Plugin deklariert Speicher, aber nicht die Berechtigung `PLUGIN_STORAGE`.                                                      |
+| Name außerhalb des Namensraums / Fremdschlüssel          | Tabelle, physischer Name oder Fremdschlüssel zeigt aus den eigenen Tabellen des Plugins heraus.                                    |
+| Ungültige Migrationsliste                                | Versionen steigen nicht streng ab 1 an, oder ein Schritt oder Feld ist ungültig.                                                   |
+| Partieller Legacy-Verlauf                                | Nur einige `adoption.legacyMigrations` sind angewendet; zuerst das letzte 1.x-Release installieren. Nichts wurde geändert.         |
+
+Jede Meldung endet mit `Migration guide: https://docs.attraccess.org/#/en/plugins/migrating-to-2`. Ein abgelehntes
+Plugin bleibt mit dem Fehler in der Plugin-Liste und seine Daten bleiben unverändert; das Löschen entfernt seine Dateien,
+ohne seinen Code auszuführen.
+
+## Frontend-SDK
 
 `@attraccess/plugins-frontend-sdk` folgt derselben Trennung. `AttraccessFrontendPluginAuthData.user` ist jetzt ein
-`PluginUserModel` (`id`, `username`, `locale`, `isDisabled`) statt der `User`-Entity. Ein Frontend-Plugin, das weitere
-Benutzerfelder wie `email`, `creditBalance` oder `createdAt` gelesen hat, lädt sie stattdessen über den API-Client.
-Installieren Sie `@attraccess/plugins-frontend-sdk` und `@attraccess/plugins-frontend-ui` im selben Bereich `^2.0.0-0`.
+`PluginUserModel` (`id`, `username`, `locale`, `isDisabled`) statt der `User`-Entität. Ein Frontend-Plugin, das andere
+Benutzerfelder wie `email`, `creditBalance` oder `createdAt` las, lädt sie über den API-Client. Installieren Sie
+`@attraccess/plugins-frontend-sdk` und `@attraccess/plugins-frontend-ui` im selben `^2.0.0-0`-Bereich.
 
-### Tests
-
-Plugin-Tests mit Datenbank bauen den Kontext mit
-`createSqlitePluginPersistence({ pluginName, connection: () => dataSource, entities })` aus dem Unterpfad und setzen ihn
-als `persistence` ihres Fake-Kontexts.
-
-Die Beispiele unter `examples/` und die eingebauten Plugins (Shelly, WAGO, Matter, Reservations, RabbitMQ) zeigen das
-2.0-Manifest.
+Die Beispiele unter `examples/` und die eingebauten Plugins (Shelly, WAGO, Matter, Reservierungen, RabbitMQ) zeigen das
+2.0-Manifest und den deklarierten Speicher.

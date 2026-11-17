@@ -24,7 +24,7 @@ im Browser in Betrieb, benennen seine Ein- und Ausgänge, lesen Modbus-Zähler u
   [Plugins installieren](plugins/installing-plugins.md#lizenz-fehlt). Lizenzen:
   [contact@attraccess.org](mailto:contact@attraccess.org).
 - Attraccess 1.11.0 oder neuer und das Plugin `wago`, installiert wie unter
-  [Plugins installieren](plugins/installing-plugins.md) beschrieben. Es benötigt die Berechtigungen `DATABASE_ACCESS`,
+  [Plugins installieren](plugins/installing-plugins.md) beschrieben. Es benötigt die Berechtigungen `PLUGIN_STORAGE`,
   `ACCESS_MQTT_SERVERS`, `TRIGGER_FLOWS` und `MANAGE_SECRETS`.
 - Ein in Attraccess eingerichteter [MQTT-Server](mqtt/server-setup.md), den der Controller erreichen kann.
 - WAGO-CC100-Hardware (`751-9301`, Firmware 31) im selben privaten Netzwerk wie Attraccess. Die getestete Kompatibilität

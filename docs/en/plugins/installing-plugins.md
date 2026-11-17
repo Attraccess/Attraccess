@@ -90,10 +90,18 @@ restart Attraccess.
 
 ## Upgrading to Attraccess 2.0
 
-Attraccess 2.0 changed the plugin SDK. Plugins built for 1.x are not loaded: they stay in the plugin list with an error
-that names the plugin and links the [migration guide](plugins/migrating-to-2.md), and their data is left untouched.
-Before or right after upgrading, install the 2.0 build of each plugin (upload or marketplace), or delete the old plugin
-from the list. Deleting a refused plugin removes its files without running its code.
+Attraccess 2.0 changed the plugin SDK: plugins have no database access any more and keep their own data in tables the
+host manages (see [Plugin Storage](plugins/plugin-storage.md)). Plugins built for 1.x are not loaded: they stay in the
+plugin list with an error that names the plugin, states the reason and links the
+[migration guide](plugins/migrating-to-2.md), and their data is left untouched. Typical reasons:
+
+- the plugin targets the SDK 1.x (it declares no minimum host version of `2.0.0-0` or higher);
+- it requests the removed `DATABASE_ACCESS` permission (2.0 plugins ask for `PLUGIN_STORAGE`);
+- it still declares `persistence.backends`, a TypeORM migrations entry or entities;
+- the database holds only part of the plugin's old (1.x) migrations. Install the plugin's last 1.x release first, let it
+  finish, then install the 2.0 build. Nothing was changed.
+  Before or right after upgrading, install the 2.0 build of each plugin (upload or marketplace), or delete the old plugin
+  from the list. Deleting a refused plugin removes its files without running its code.
 
 ## Troubleshooting
 

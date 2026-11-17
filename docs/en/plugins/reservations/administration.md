@@ -17,7 +17,7 @@
 
 | Permission           | Used for                                                                           |
 | -------------------- | ---------------------------------------------------------------------------------- |
-| `DATABASE_ACCESS`    | Its own tables for bookings, settings, calendar feeds and sent notices.            |
+| `PLUGIN_STORAGE`     | Its own tables for bookings, settings, calendar feeds and sent notices.            |
 | `ACCESS_HOOKS`       | The pre-start check (block or confirm) and the "keep or free the rest?" question.  |
 | `LISTEN_EVENTS`      | Session start/end, maintenance and health changes (check-in, notices).             |
 | `ACCESS_RESOURCES`   | Read-only checks of who may start or maintain a resource, and maintenance windows. |

@@ -57,6 +57,28 @@ Diese liegen nur in `apps/api/src/database/sqlite` und in den Audit-Speicherverb
 
 Ein anderes Backend erfüllt denselben Verhaltensvertrag mit eigener Sperr- und Isolationstechnik.
 
+## Plugin-Speicher
+
+Plugins haben keinen Datenbankzugriff; sie halten Daten in deklarierten Tabellen über den Record-Port (siehe
+[Plugin-Speicher](plugins/plugin-storage.md)). Der Host garantiert auf jedem Backend:
+
+- **Isolation per Namensraum.** Die Tabellen eines Plugins heißen `plugin_<plugin>_<tabelle>` (oder ein übernommener
+  physischer Name innerhalb dieses Namensraums). Der Port bedient nur die Tabellen der eigenen Deklaration des Plugins:
+  keine Kerntabelle, keine Tabelle eines anderen Plugins.
+- **Atomare Migrationen.** Jede neutrale Migration (DDL-Schritte, Datenschritt und Verlaufseintrag) ist eine
+  Transaktion oder hinterlässt nichts. Die Übernahme einer 1.x-Installation vermerkt die Baseline, ohne etwas
+  auszuführen, und verweigert einen partiellen Legacy-Verlauf ohne Änderung.
+- **Atomares `update`.** Das `where` von `update` wird zusammen mit dem Schreiben ausgewertet; es ist ein
+  Compare-and-Set, das 0 liefert, wenn ein anderer Schreiber gewonnen hat. Plugin-Transaktionen folgen dem
+  Unit-of-Work-Vertrag oben: `afterCommit`-Callbacks laufen nie bei Rollback, Verschachteln wird abgewiesen und ein
+  Konflikt wird als `PluginStorageConflict` gemeldet.
+- **Neutrale Fehler und Werte.** Unique-Verletzungen, Konflikte, fehlende Zeilen und ungültige Eingaben sind auf jeder
+  Engine dieselben neutralen Fehler; Zeitstempel sind UTC-Zeitpunkte, Dezimalzahlen exakte Strings.
+- **Backup.** Plugin-Tabellen und der Schemastand jedes Plugins (angewendete Version) sind Teil des Transfer-Snapshots
+  und werden zusammen mit der Datenbank als eine Einheit wiederhergestellt.
+
+Das deckt die Plugin-Speicher-Conformance-Suite ab, die jeder Backend-Adapter bestehen muss.
+
 ## Eine Instanz gegenüber mehreren Replikaten
 
 Attraccess ist als **ein API-Prozess je Datenbank** entworfen und getestet. Mit SQLite ist das auch zwingend: die

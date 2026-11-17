@@ -1,77 +1,142 @@
 # Migrating Plugins to SDK 2.0
 
-<!-- llms-description: What plugin developers must change for Attraccess 2.0: the minimum host version, declared database engines, the new persistence API with before/after code and the refusal of older plugins. -->
+<!-- llms-description: Migrating plugins to Attraccess 2.0: no database access, host ports instead of host entities, declared tables with neutral migrations and the record port, a porting guide and the refusal rules. -->
 
-Attraccess 2.0 separates plugins from the database engine. This is a breaking change for plugins built for 1.x.
+Attraccess 2.0 takes the database away from plugins. This is a breaking change for plugins built for 1.x.
+
+**A plugin has no database access.** There is no `DataSource`, `EntityManager`, TypeORM repository, raw SQL, entity
+decorator, engine handle or `@attraccess/plugins-backend-sdk/sqlite` subpath, and no way to read a core table. A plugin
+gets two things instead:
+
+- **Host ports** for everything the host owns (users, resources, settings, authorization, audit, notifications, hooks,
+  events, flows).
+- **Plugin storage** for data of its own: tables the plugin _declares_ in a neutral schema, neutral migrations and the
+  record port `context.storage`. The host owns the engine, the DDL, the transactions, the migrations and the backups.
+
+Plugins that bring their own persistence (their own connection, driver or ORM) are rejected.
 
 ## What the host enforces
 
 - **Minimum host version.** `plugin.json` must declare `attraccessVersion.min` of `2.0.0-0` or higher. For npm plugins
   the lowest version allowed by `attraccess.host` in `package.json` counts. A plugin below that, or without a minimum,
-  is refused when it is uploaded, installed or started. The error names the plugin and links this guide. Nothing is
-  extracted, installed or migrated, and the database is not touched.
-- **Declared engines.** A plugin that stores data (it has a migrations entry or the `DATABASE_ACCESS` permission) must
-  declare the engines its persistence supports:
+  is refused when it is uploaded, installed or started.
+- **No database permission.** `DATABASE_ACCESS` is gone. Data of your own needs `PLUGIN_STORAGE`, which covers your own
+  declared tables only.
+- **No legacy persistence declaration.** The `persistence.backends` entry, the TypeORM `migrations` entry
+  (`main.migrations` / `attraccess.migrations`) and entity declarations on the backend module are not part of 2.0.
+- **Namespace.** Tables are named `plugin_<plugin>_<table>`. A name outside the plugin's namespace, or a foreign key
+  to a table of another plugin or the core, is refused.
 
-  ```json
-  { "persistence": { "backends": ["sqlite"] } }
-  ```
-
-  For npm plugins the same object goes into the `attraccess` block of `package.json`. If the host runs an engine that
-  is not listed, the plugin is not installed, migrated or started, and no data changes.
-
-- **Permissions are unchanged.** `DATABASE_ACCESS` and the other permissions still gate what a plugin may use. Install,
-  start and uninstall migrations and the plugin migration history safeguards work as before.
+A refused plugin is not extracted, installed, registered, migrated or started, and the database is not touched. The
+error names the plugin, states the reason and links this guide (see [Refusals](#refusals)).
 
 ## Checklist
 
 1. Set `attraccessVersion.min` to `2.0.0-0` (and `attraccess.host` to `^2.0.0-0` for npm packages).
 2. Raise the peer dependency and `attraccess.sdk` ranges on `@attraccess/plugins-backend-sdk`, `-frontend-sdk` and
    `-frontend-ui` to `^2.0.0-0`.
-3. Add `persistence.backends` if the plugin stores data.
-4. Move persistence to the new API (see [Persistence API](#persistence-api)): `sqlitePersistence(context)` instead of `getRepository`/`dataSource`/`runSerialized`, `persistence: { sqlite: { entities } }` instead of `entities`, `hostData` and the neutral models instead of host entities, migration imports from `@attraccess/plugins-backend-sdk/sqlite`.
-5. Add `@attraccess/plugins-backend-sdk/sqlite` to your esbuild externals and drop your own `typeorm` dependency.
-6. Rebuild and test the plugin against a 2.0 host.
+3. Replace host entity access with [host ports](#host-entities-become-host-ports).
+4. If the plugin stores data: replace `DATABASE_ACCESS` with `PLUGIN_STORAGE`, remove `persistence.backends` and the
+   migrations entry, and [port the entities and migrations](#porting-typeorm-entities-and-migrations).
+5. Replace `getRepository`/`dataSource`/`runSerialized` with [`context.storage` and
+   `context.persistence.transaction`](#the-record-port-and-transactions).
+6. Remove `@attraccess/plugins-backend-sdk/sqlite` from imports and esbuild externals, and drop your own `typeorm`
+   dependency.
+7. Rebuild and test against a 2.0 host (unit tests with the [in-memory fake](#tests)).
 
-## Persistence API
+## Host entities become host ports
 
-The SDK root has no TypeORM, `DataSource`, `Repository`, `EntityManager` or host entity classes any more, and there is
-no deprecated path. What stored data through the 1.x context now goes through the neutral `context.persistence`, the
-read-only `context.hostData` and the explicit engine subpath `@attraccess/plugins-backend-sdk/sqlite`. The subpath
-only works while the host runs SQLite; with another engine it throws a `PluginPersistenceBackendError`, and a plugin
-whose declared engines exclude the active one is refused before any mutation.
+Host entity classes are not exported any more and no repository can reach a host table. Use the ports:
 
-### Your own tables: `getRepository`
+| 1.x                                            | 2.0                                                                                                          |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `getRepository(User)` (`READ_USERS`)           | `hostData.users` (`READ_USERS`)                                                                              |
+| `getRepository(Resource)` (`ACCESS_RESOURCES`) | `hostData.resources` and `resourceAccess` (`ACCESS_RESOURCES`)                                               |
+| `getRepository(Setting)` (`READ_SETTINGS`)     | `hostData.settings` (`READ_SETTINGS`)                                                                        |
+| flow node queries via `DATABASE_ACCESS`        | `hostData.flows` (**`TRIGGER_FLOWS`**), and `context.flows.trigger(...)`                                     |
+| audit rows written by hand                     | `context.audit` (the audit port)                                                                             |
+| notification rows written by hand              | `context.notifications.dispatch(...)` (`SEND_NOTIFICATIONS`)                                                 |
+| session start/end rows, hook transactions      | the hooks (`preStartHook`, `startCapacityHook`, ... with `ACCESS_HOOKS`) and the `RESOURCE_USAGE_*` events   |
+| `User`, `Resource` entity types                | `PluginUserModel`, `PluginResourceModel` from `@attraccess/application-models` (re-exported by the SDK root) |
+
+```ts
+// 1.x
+const row = await context.getRepository(Setting).findOneBy({ parent: 'app', key: 'backend_url' });
+const users = await context.getRepository(User).find({ where: { id: In(ids) } });
+```
+
+```ts
+// 2.0
+const url = await context.hostData.settings.getApp('backend_url'); // READ_SETTINGS
+const names = await context.hostData.users.getUsernames(ids); // READ_USERS
+const nodes = await context.hostData.flows.findNodes({ typePrefix: 'plugin.x.', dataEquals: { controllerId } }); // TRIGGER_FLOWS
+```
+
+Event payloads carry only neutral fields; tokens and contact data are not part of them. `DATABASE_ACCESS` never implied
+`READ_USERS`, `ACCESS_RESOURCES` or `READ_SETTINGS`: declare each one you use. `hostData.flows` is gated by
+`TRIGGER_FLOWS` now, and the hooks by `ACCESS_HOOKS` alone (`startCapacityHook` no longer needs a database permission).
+
+## Porting TypeORM entities and migrations
+
+The result of the port: the physical tables stay where they are, so an upgrading installation keeps all its data.
+
+1. **List your legacy migrations.** Collect the class names (with timestamp suffix) of **every** TypeORM migration the
+   last 1.x release shipped, in order, for example `CreateWidgets1700000000000`.
+2. **Describe the table layout those migrations produce.** Read the migrations (not the entities: they may have
+   drifted) and write one `table(...)` per table with the same columns, types, defaults, nullability, indexes and
+   foreign keys. Use `physicalName` for the existing table name and `column` where the column name differs from the
+   field name. Foreign keys may point to tables of your own plugin only; a column that referenced a core table
+   (`userId`, `resourceId`, ...) becomes a plain `f.integer()` without a foreign key.
+3. **Make version 1 the baseline.** Declare one neutral migration `{ version: 1, ... }` whose steps create exactly that
+   layout. Fresh installations run it; existing ones skip it.
+4. **Declare the adoption.** Add `adoption: { legacyMigrations: [...] }` with the list from step 1.
+5. **Add later changes as version 2, 3, ...** with `step.*` and, if rows must be rewritten, a data step with the record
+   port only.
+6. **Register** `storage: yourDefinition` on the backend module, delete the `entities`/`persistence` declaration, the
+   entity classes, the TypeORM migration classes, `main.migrations` / `attraccess.migrations` and `persistence.backends`.
+7. **Replace the code** that used repositories with the record port (see below), and `DATABASE_ACCESS` with
+   `PLUGIN_STORAGE` in the manifest.
+
+```ts
+// 1.x entity + migration
+@Entity({ name: 'plugin_widgets' })
+class Widget {
+  @PrimaryGeneratedColumn() id!: number;
+  @Column({ type: 'varchar', name: 'label' }) label!: string;
+}
+```
+
+```ts
+// 2.0 declaration
+const widgets = table({ id: f.id(), label: f.string() }, { physicalName: 'plugin_widgets' });
+
+export const widgetStorage = definePluginStorage({
+  tables: { widgets },
+  migrations: [{ version: 1, name: 'baseline', steps: [step.createTable('widgets', widgets)] }],
+  adoption: { legacyMigrations: ['CreateWidgets1700000000000'] },
+});
+```
+
+### The baseline and adoption rule
+
+On the first start of the 2.0 build the host looks at the plugin's legacy migrations table:
+
+- **All** `legacyMigrations` applied: the host records baseline version 1 **without running anything** and continues
+  with later versions.
+- **None** applied (a fresh installation): version 1 runs as usual.
+- **Only some** applied: the plugin is **refused** and nothing is changed. A partial legacy history means the
+  database predates your last 1.x release: **install the last 1.x release first**, let it finish its migrations, then
+  upgrade to the 2.0 build.
+
+Version 1 must therefore match the legacy result exactly. A mismatch is not detected on adoption, it surfaces later as
+a failing query, so compare column by column.
+
+## The record port and transactions
 
 ```ts
 // 1.x
 const widgets = context.getRepository(Widget);
-```
-
-```ts
-// 2.0
-import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
-
-const widgets = sqlitePersistence(context).getRepository(Widget);
-```
-
-`getRepository` only serves entity classes your plugin registered. Decorators (`Entity`, `Column`, ...) now come from
-the same subpath, and the `entities` export of the backend module becomes an engine declaration:
-
-```ts
-// 1.x
-export default { entities: [Widget], register };
-```
-
-```ts
-// 2.0
-export default { persistence: { sqlite: { entities: [Widget] } }, register } satisfies PluginBackendModule;
-```
-
-### Transactions: `runSerialized`
-
-```ts
-// 1.x
+await widgets.update({ id, status: 'pending' }, { status: 'confirmed' });
 await context.runSerialized(async (manager) => {
   await manager.getRepository(Widget).save(widget);
   await context.mqtt.publish(1, 'widgets/created', '{}'); // I/O inside the transaction
@@ -80,84 +145,29 @@ await context.runSerialized(async (manager) => {
 
 ```ts
 // 2.0
-await sqlitePersistence(context).transaction(async (manager, scope) => {
-  await manager.getRepository(Widget).save(widget);
+const { widgets } = context.storage.open(widgetStorage);
+const changed = await widgets.update({ id, status: 'pending' }, { status: 'confirmed' }); // atomic compare-and-set
+await context.persistence.transaction(async (scope) => {
+  await widgets.insert(widget, { scope });
   scope.afterCommit(() => context.mqtt.publish(1, 'widgets/created', '{}')); // only after the commit
 });
-// or backend-neutral, without the SQLite manager:
-await context.persistence.transaction(async (scope) => {
-  scope.afterCommit(() => notify());
-});
 ```
 
-The rules stay: keep the callback short, no nesting, no core session writes inside. Effects belong in
-`scope.afterCommit`, which never runs on rollback.
+The port offers `insert`, `insertMany`, `get`, `find`, `findOne`, `count`, `update` (returns the number of changed rows,
+checked atomically, so it is a compare-and-set), `delete`, `upsert` and `aggregate`, with structured filters (`eq`,
+`ne`, `in`, `notIn`, `lt`, `lte`, `gt`, `gte`, `between`, `isNull`, `startsWith`, `and`, `or`, `not`). Errors are the
+neutral `PluginStorageUniqueViolation`, `PluginStorageConflict`, `PluginStorageNotFound` and `PluginStorageInvalid`
+instead of driver errors. Details: [Plugin Storage](plugins/plugin-storage.md).
 
-### `dataSource` is gone
+Porting notes:
 
-`context.dataSource` no longer exists. Use `sqlitePersistence(context).getRepository(...)`, `.manager` for reads and
-`.transaction(...)` for writes. `context.persistence.backend` and `supports('sqlite')` tell you which engine runs.
-
-### Host entities: `User`, `Resource`, `Setting`, `ResourceFlowNode`, ...
-
-Host entity classes are not exported any more, and `getRepository` cannot reach host tables. Use the existing
-capabilities and the neutral lookups:
-
-```ts
-// 1.x
-const row = await context.getRepository(Setting).findOneBy({ parent: 'app', key: 'backend_url' });
-const users = await context.getRepository(User).find({ where: { id: In(ids) } });
-const nodes = await context.dataSource
-  .getRepository(ResourceFlowNode)
-  .createQueryBuilder('node') /* ... */
-  .getMany();
-```
-
-```ts
-// 2.0
-const url = await context.hostData.settings.getApp('backend_url'); // READ_SETTINGS
-const names = await context.hostData.users.getUsernames(ids); // READ_USERS
-const nodes = await context.hostData.flows.findNodes({ typePrefix: 'plugin.x.', dataEquals: { controllerId } }); // DATABASE_ACCESS
-```
-
-| 1.x                                            | 2.0                                                                                                          |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `getRepository(User)` (`READ_USERS`)           | `hostData.users` (`READ_USERS`)                                                                              |
-| `getRepository(Resource)` (`ACCESS_RESOURCES`) | `hostData.resources` and `resourceAccess` (`ACCESS_RESOURCES`)                                               |
-| `getRepository(Setting)` (`READ_SETTINGS`)     | `hostData.settings` (`READ_SETTINGS`)                                                                        |
-| other host tables via `DATABASE_ACCESS`        | `hostData.flows` (`DATABASE_ACCESS`); no access to other host tables                                         |
-| `User`, `Resource` entity types                | `PluginUserModel`, `PluginResourceModel` from `@attraccess/application-models` (re-exported by the SDK root) |
-
-Event payloads (`RESOURCE_USAGE_STARTED`, `RESOURCE_USAGE_ENDED`) carry only these neutral fields; tokens and contact
-data are not part of them. `AuthenticatedRequest.user` is typed with them: the host may pass more fields at runtime,
-but they are not part of the plugin API and can change without notice. `DATABASE_ACCESS` no longer implies `READ_USERS`,
-`ACCESS_RESOURCES` or `READ_SETTINGS`: declare each one you use.
-
-### Migrations
-
-```ts
-// 1.x
-import { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk';
-```
-
-```ts
-// 2.0
-import { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk/sqlite';
-```
-
-Install, start and uninstall migrations, the plugin-scoped `plugin_migrations_<name>` history and the replacement
-safeguards behave as before; up-migrations and uninstall reverts each run as one transaction. See
-[Database Migrations](plugins/database-migrations.md).
-
-### Bundling
-
-Add the subpath to the externals of your backend and migrations builds and drop your own `typeorm` dependency:
-
-```bash
---external:@attraccess/plugins-backend-sdk --external:@attraccess/plugins-backend-sdk/sqlite
-```
-
-esbuild does not emit decorator metadata, so give every `@Column` an explicit `type`.
+- **No joins.** Query your own tables one after another, and use `in` filters instead of one query per row.
+- **No query builder, no raw SQL.** Express aggregates with `aggregate`, counters with `increment(n)` and locks with
+  compare-and-set `update`.
+- **Timestamps** are `Date` in and out (UTC), **decimals** are strings, JSON fields hold any JSON value.
+- **Transactions.** Pass `{ scope }` to every call that must take part; effects go into `scope.afterCommit`. The rules
+  (short callback, no nesting, no core session writes inside) are unchanged.
+- `context.persistence` has only `transaction`. `persistence.backend`, `supports(...)` and every engine seam are gone.
 
 ### Start capacity hook
 
@@ -168,25 +178,52 @@ const held = await countSlotsHeldForOthers(ctx.manager, ctx.resourceId, ctx.user
 
 ```ts
 // 2.0
-const manager = sqlitePersistence(context).managerOf(ctx.scope);
-const held = await countSlotsHeldForOthers(manager, ctx.resourceId, ctx.userId, ctx.now);
+const slots = await heldSlots.find({ where: { resourceId: ctx.resourceId } }, { scope: ctx.scope });
 ```
 
-`ctx.scope` is a `PluginTransactionScope` of the host's start transaction. Read through it only; never start a
-transaction inside the hook.
+`ctx.scope` is the host's start transaction: read through it only, never start a transaction inside the hook.
 
-### Frontend SDK
+## Tests
+
+Plugin tests do not need a database. Build the fake context with `createInMemoryPluginStorage()` from the SDK and set
+it as `storage` (and its transaction runner as `persistence`). It follows the contract of the record port: filters,
+compare-and-set, neutral errors and transaction scopes. See [Plugin Storage](plugins/plugin-storage.md#5-testing).
+
+## Bundling
+
+Externalize only `@attraccess/plugins-backend-sdk` in your backend build (the `/sqlite` subpath no longer exists) and
+drop your own `typeorm` dependency:
+
+```bash
+--external:@attraccess/plugins-backend-sdk
+```
+
+There is no migrations bundle any more: the migrations live in your declaration inside the backend entry.
+
+## Refusals
+
+Each refusal happens before any mutation, names the plugin, states the reason and links this guide:
+
+| Reason                                            | What the message says                                                                                            |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| SDK 1.x (no or too low `attraccessVersion.min`)   | The plugin targets the SDK 1.x, which this host no longer supports; rebuild it and declare `>= 2.0.0-0`.         |
+| `DATABASE_ACCESS` requested                       | The permission was removed; plugins have no database access; declare `PLUGIN_STORAGE` and use `context.storage`. |
+| Legacy persistence declaration                    | `persistence.backends`, a TypeORM migrations entry or entities are not supported; declare `storage` instead.     |
+| Storage without `PLUGIN_STORAGE`                  | The plugin declares storage but not the `PLUGIN_STORAGE` permission.                                             |
+| Name outside the plugin's namespace / foreign key | The table, physical name or foreign key points outside the plugin's own tables.                                  |
+| Invalid migration list                            | Versions are not strictly increasing from 1, or a step or field is invalid.                                      |
+| Partial legacy history                            | Only some `adoption.legacyMigrations` are applied; install the last 1.x release first. Nothing was changed.      |
+
+Each message ends with `Migration guide: https://docs.attraccess.org/#/en/plugins/migrating-to-2`. A refused plugin
+stays in the plugin list with the error and its data is left untouched; deleting it removes its files without running
+its code.
+
+## Frontend SDK
 
 `@attraccess/plugins-frontend-sdk` follows the same split. `AttraccessFrontendPluginAuthData.user` is now a
 `PluginUserModel` (`id`, `username`, `locale`, `isDisabled`) instead of the `User` entity. A frontend plugin that read
 other user fields, such as `email`, `creditBalance` or `createdAt`, loads them through the API client instead. Install
 `@attraccess/plugins-frontend-sdk` and `@attraccess/plugins-frontend-ui` at the same `^2.0.0-0` range.
 
-### Tests
-
-Plugin tests that need a database build the context with
-`createSqlitePluginPersistence({ pluginName, connection: () => dataSource, entities })` from the subpath and set it as
-`persistence` of their fake context.
-
 The examples under `examples/` and the built-in plugins (Shelly, WAGO, Matter, Reservations, RabbitMQ) show the 2.0
-manifest.
+manifest and declared storage.

@@ -26,8 +26,13 @@ contract has to change. PostgreSQL (ATT-584) is the first intended target; nothi
    identical and isolate real differences.
 7. **Add a conformance fixture.** Implement `BackendFixture` (`database/conformance/backend-fixture.ts`) for the engine and
    run `describePersistenceConformance` against it. Every case uses independent connections.
-8. **Declare plugin support.** Plugins list the engines they support in `persistence.backends`; the host refuses a plugin
-   that does not list the active engine before installing, migrating or starting it.
+8. **Provide the plugin-storage adapter.** Plugins have no engine-specific code and declare no engines: they use the
+   neutral record port and neutral migrations. For the new engine implement the adapter that serves the port (insert,
+   insertMany, get, find, findOne, count, update as compare-and-set, delete, upsert, aggregate, the structured filters,
+   neutral errors, transaction scopes with `afterCommit`) and the **DDL generator** that turns each neutral migration
+   step (`createTable`, `dropTable`, `addColumn`, `dropColumn`, `renameColumn`, `addIndex`, `dropIndex`) into DDL for
+   the engine, including the physical type mapping (decimals exact, timestamps UTC, `date`, `json`, `uuid`), generated
+   keys, namespacing and the adoption baseline. Run the plugin-storage conformance suite against it.
 9. **Document operations**: configuration, backup and restore for the engine.
 
 ## Export, import and backup contract (for ATT-584)
@@ -41,8 +46,9 @@ A transfer or restore, whatever its tooling, must preserve:
 - **Exact monetary and meter values:** billing amounts, balances, price snapshots and meter readings as exact
   decimals or integers, never floating point. Session price snapshots and accepted meter observations are evidence and
   are copied unchanged.
-- **Plugin data and plugin migration state:** each plugin's tables and its plugin-scoped migrations table are copied
-  with the plugin version.
+- **Plugin data and plugin schema state:** each plugin's declared tables and its schema state (the applied neutral
+  migration version, and for adopted installations the baseline record) are copied together with the plugin version, so
+  a restore never has data without the matching schema state.
 - **Core migration state:** the core migrations table of the source track. A restored database is only valid with the
   application version that matches its migration state.
 - **Derived data:** balances and usage invariants are checked after import by running the engine's integrity checks;
@@ -64,5 +70,7 @@ command itself is not part of this work.
 - A PostgreSQL fixture for `describePersistenceConformance` and the other engine-parameterised suites, run in CI.
 - The SQLite to PostgreSQL transfer command honouring the contract above.
 - Ports and adapters for the feature areas still on the baseline (see
-  [Persistence architecture](developer/persistence-architecture.md)), and the plugin persistence API for SDK 2.0.
+  [Persistence architecture](developer/persistence-architecture.md)).
+- The PostgreSQL plugin-storage adapter and DDL generator and its tests, with the
+  plugin-storage conformance suite run in CI. The plugin side is engine-neutral and needs no change.
 - Multi-replica guarantees (locks, scheduler leadership, shared live updates), tracked separately.
