@@ -1,3 +1,6 @@
+// Loaded first, as in the API process: it brings its own @peculiar/x509, and every copy registers its
+// algorithms in tsyringe's one global container. A second major version breaks certificate generation.
+import '@simplewebauthn/server';
 import { X509Certificate } from 'crypto';
 import {
   INSTALLATION_URI_PREFIX,

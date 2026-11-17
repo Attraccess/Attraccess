@@ -1,5 +1,3 @@
-// @peculiar/x509 3 resolves its services through tsyringe, which needs the Reflect metadata polyfill.
-import 'reflect-metadata';
 import * as x509 from '@peculiar/x509';
 import { createHash, randomBytes, webcrypto } from 'crypto';
 

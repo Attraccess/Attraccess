@@ -28,6 +28,11 @@
       "groupName": "npm non-major dependencies"
     },
     {
+      "description": "@peculiar/x509 stays on the major @simplewebauthn/server uses: every copy registers its algorithms in tsyringe's one global container, and two majors break certificate generation",
+      "matchPackageNames": ["@peculiar/x509"],
+      "allowedVersions": "<2"
+    },
+    {
       "description": "Group all Docker image updates into a single PR",
       "matchDatasources": ["docker"],
       "groupName": "docker images"
