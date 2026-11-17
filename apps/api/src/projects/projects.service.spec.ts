@@ -176,7 +176,7 @@ describe('ProjectsService', () => {
           action: 'project.deleted',
           details: { projectId: 99, 'before.hasLogo': 0, 'before.nameOmitted': 1 },
         }),
-        undefined,
+        fixture.uow.scopes[0],
       );
     });
 
@@ -196,7 +196,7 @@ describe('ProjectsService', () => {
           subject: { type: 'project', id: 99 },
           details: { projectId: 99, 'before.name': 'Deleted', 'before.hasLogo': 0 },
         },
-        undefined,
+        fixture.uow.scopes[0],
       );
       expect(fixture.mockMetricsService.projectsTotal.dec).toHaveBeenCalledTimes(1);
     });

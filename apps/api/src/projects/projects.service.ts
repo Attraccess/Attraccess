@@ -19,8 +19,6 @@ import { NotificationDispatchService } from '../notifications/notification-dispa
 
 import { UNIT_OF_WORK, type UnitOfWork } from '../database/unit-of-work';
 
-import { auditTransactionOf } from '../database/adapters/transaction-scope';
-
 import { FindManyProjectsQueryDto } from './dto/find-many-query.dto';
 
 import { ProjectAccessService, type ProjectWithAccess } from './project-access.service';
@@ -235,7 +233,7 @@ export class ProjectsService {
           subject: { type: 'project', id: id },
           details: details,
         },
-        auditTransactionOf(this.uow, scope),
+        scope,
       );
     });
     this.metricsService.projectsTotal.dec();

@@ -8,9 +8,14 @@ import { excludedDirectory, generatedClients, git } from './lib/repo-files.mjs';
 /**
  * ATT-1146: application, domain and transport code must not depend on the persistence implementation.
  *
- * Forbidden everywhere outside the allowed persistence code: `typeorm`, `@nestjs/typeorm`, the SQLite drivers,
- * `@attraccess/database-entities`, and relative imports of adapter internals (`database/sqlite`). Every import form
- * counts: static imports, type-only imports, re-exports, dynamic `import()`, `require()` and `import x = require()`.
+ * Forbidden everywhere outside the allowed persistence code: `typeorm`, `@nestjs/typeorm`, the SQLite drivers and
+ * `@attraccess/database-entities` (each with every subpath). Every import form counts: static imports, type-only
+ * imports, re-exports, dynamic `import()`, `require()` and `import x = require()`.
+ *
+ * Adapter internals (apps/api/src/database/adapters, apps/api/src/database/sqlite, libs/database-entities) may only
+ * be imported by Nest composition files (`*.module.ts`) and tests. The plugin SDK's engine subpath
+ * (`@attraccess/plugins-backend-sdk/sqlite`) is for plugins; in the host only the plugin module loader and tests
+ * name it.
  *
  * Existing violations are recorded per file in scripts/persistence-boundaries.baseline.json. The baseline can only
  * shrink: a file that is not listed, or has more violations than listed, fails the check; a file that has fewer
@@ -18,13 +23,21 @@ import { excludedDirectory, generatedClients, git } from './lib/repo-files.mjs';
  */
 
 export const forbiddenPackage =
-  /^(?:typeorm(?:\/.*)?|@nestjs\/typeorm|sqlite3|better-sqlite3|@attraccess\/database-entities)$/;
-const adapterInternals = /(?:^|\/)database\/sqlite(?:\/|$)|(?:^|\/)libs\/database-entities(?:\/|$)/;
+  /^(?:typeorm|@nestjs\/typeorm|sqlite3|better-sqlite3|@attraccess\/database-entities)(?:\/.*)?$/;
+const sdkEngineSubpath = /^@attraccess\/plugins-backend-sdk\/sqlite(?:\/.*)?$/;
+const adapterInternals =
+  /^apps\/api\/src\/database\/(?:adapters|sqlite)(?:\/|$)|(?:^|\/)libs\/database-entities(?:\/|$)/;
 
-// Persistence implementation code that may use the ORM and the drivers.
+// Persistence implementation code that may use the ORM and the drivers. Only the engine folders of
+// apps/api/src/database are listed: its neutral seam (unit-of-work.ts, persistence-errors.ts, transaction-context.ts,
+// backend/database-backend.ts, ...) stays checked.
 const allowedPaths = [
   /^libs\/database-entities\//,
-  /^apps\/api\/src\/database\//,
+  /^apps\/api\/src\/database\/(?:adapters|sqlite|conformance|migrations|migration-helpers)\//,
+  // The backend registry: the one file that lists the engines and types the selected one for the composition root.
+  /^apps\/api\/src\/database\/backend\/resolve-database-backend\.ts$/,
+  // The import path released migration 1790100000000 uses for the engine's usage recovery (a re-export of sqlite/).
+  /^apps\/api\/src\/database\/resource-usage-integrity\.ts$/,
   /(^|\/)migrations\//,
   // Real-engine tests: they open actual databases to prove migrations, constraints, transactions and concurrency.
   // Unit specs that only fake repositories stay checked.
@@ -37,6 +50,15 @@ const allowedPaths = [
 ];
 // Code that may never carry a baseline entry.
 const zeroTolerance = [/^libs\/application-models\//, /^apps\/frontend\//, /^libs\/(?:ui|shared|env|api-client)\//];
+
+// Nest composition files wire adapters to ports; tests build adapters by hand.
+const compositionFile = /\.module\.ts$/;
+const testFile =
+  /\.(?:spec|test)\.[cm]?tsx?$|\.test-(?:fixture|utils)\.ts$|(?:^|\/)(?:test|tests|__test__|test-utils|testing|e2e)\//;
+// Host application code that may not name the SDK's engine subpath, and the one host file that must (it hands the
+// subpath to plugin bundles).
+const hostApplication = /^apps\/api\/src\//;
+const sdkEngineSubpathHosts = new Set(['apps/api/src/plugin-system/runtime/module-loader.ts']);
 
 const sourceFile = /^(apps|libs|examples)\/.*\.(?:[cm]?ts|tsx)$/;
 const baselineFile = fileURLToPath(new URL('./persistence-boundaries.baseline.json', import.meta.url));
@@ -87,9 +109,12 @@ export function findViolations(file, content) {
   const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, false, kind);
   const specifiers = [];
   collectSpecifiers(source, specifiers);
+  const mayWireAdapters = compositionFile.test(file) || testFile.test(file);
+  const mayNameSdkEngine = !hostApplication.test(file) || testFile.test(file) || sdkEngineSubpathHosts.has(file);
   return specifiers.filter((specifier) => {
     if (forbiddenPackage.test(specifier)) return true;
-    if (!specifier.startsWith('.')) return false;
+    if (sdkEngineSubpath.test(specifier)) return !mayNameSdkEngine;
+    if (!specifier.startsWith('.') || mayWireAdapters) return false;
     const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier));
     return adapterInternals.test(resolved);
   });
@@ -139,7 +164,7 @@ export function compareWithBaseline(counts, baseline) {
     if (count > allowed) {
       problems.push(
         `${file}: ${count} forbidden persistence import(s), ${allowed} allowed. Use an application port instead of ` +
-          `typeorm, drivers, @attraccess/database-entities or adapter internals.`,
+          `typeorm, drivers, @attraccess/database-entities, the SDK engine subpath or adapter internals.`,
       );
     }
   }
