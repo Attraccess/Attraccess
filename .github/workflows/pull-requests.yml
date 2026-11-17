@@ -168,6 +168,10 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
+      # Blocking, all severities, prod and dev: only GHSAs listed (with a reason) under auditConfig.ignoreGhsas in
+      # pnpm-workspace.yaml may stay open.
+      - name: Audit dependencies
+        run: pnpm audit
       # Always repo-wide: an import cycle can close through a project the change does not touch.
       - name: Enforce file size limits and reject import cycles
         run: pnpm lint:files
