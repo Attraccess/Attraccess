@@ -9,7 +9,8 @@ the API it starts) and select these tests with ``-k ble``. The devices are confi
   factory CRYPT_OFF mode. The code comes only from the environment and is never committed. Without it, the
   real-lock smoke skips.
 - ``HIL_BLE_LONG=1``: the 10-minute transfer (>= 256 KiB of MTU-sized writes without response with acks).
-- ``HIL_BLE_BULK_RUNS``: how often ``test_ble_bulk_throughput`` repeats each window (default 1; 3 for measurements).
+- ``HIL_BLE_BULK_RUNS``: how often ``test_ble_bulk_throughput`` repeats each window (default 1; 3 for measurements),
+  ``HIL_BLE_BULK_WINDOWS`` which windows it runs (default ``1,8``; the floor applies to the largest).
 
 Results (throughput, notification rate, heap before and after BLE init) land in ``ble-*.json`` artifacts.
 """
@@ -225,7 +226,7 @@ def test_ble_long_session_throughput(ble, peripheral, reader, artifacts):
 
 
 BULK_BYTES = 256 * 1024
-BULK_WINDOWS = (1, 8)
+BULK_WINDOWS = tuple(sorted(int(w) for w in os.environ.get("HIL_BLE_BULK_WINDOWS", "1,8").split(",")))
 # Regression floor for windowed transfers, well below the 8 KiB/s target: the lab's 2.4 GHz band is crowded.
 BULK_FLOOR_KIB_S = 6.0
 BULK_TARGET_KIB_S = 8.0
