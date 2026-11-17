@@ -24,6 +24,23 @@ overrides:
   # dropping the generator removes simple-git, jsonpath-plus, tar 6, pacote, markdown-it, puppeteer and extract-zip.
   'nestjs-asyncapi>@asyncapi/generator': '-'
   'nestjs-asyncapi>@asyncapi/html-template': '-'
+  # crap-score 1.2.1 (latest) is a nest-commander app pinned to Nest 10; it never imports @nestjs/cli.
+  'crap-score>@nestjs/cli': '-'
+  'crap-score>@nestjs/common': ^12.5.1
+  'crap-score>@nestjs/core': ^12.5.1
+  'crap-score>nest-commander': ^3.21.0
+  # monaco-editor 0.57.0 (latest) pins dompurify 3.4.15.
+  'monaco-editor>dompurify': ^3.4.17
+  # @tailwindcss/typography 0.5.20 (latest) pins postcss-selector-parser 6.0.10.
+  '@tailwindcss/typography>postcss-selector-parser': ^6.1.5
+  # sockjs 0.3.24 (latest, via webpack-dev-server 5) asks for uuid ^8; it only calls uuid.v4().
+  'sockjs>uuid': ^11.1.1
+  # @cyclonedx/cdxgen 12.9.2 (latest) pins body-parser 2.3.0 for its optional server mode.
+  '@cyclonedx/cdxgen>body-parser': ^2.4.0
+  # glob 9-14.0.1 and minimatch 7-11.0.0 have advisories; js-beautify, test-exclude, mjml-cli, editorconfig, @swc/cli,
+  # workbox-build, cdxgen and nx (all latest) still ask for them. Same CJS/ESM exports up to glob 14 and minimatch 11.
+  'glob@>=9.0.0 <14.0.2': ^14.0.2
+  'minimatch@>=7.0.0 <11.0.1': ^11.0.1
 
 allowBuilds:
   '@balena/compose-parser': true
@@ -69,3 +86,4 @@ patchedDependencies:
   '@nestjs/swagger@12.1.2': patches/@nestjs__swagger@12.1.2.patch
   '@peculiar/x509@3.1.0': patches/@peculiar__x509@3.1.0.patch
   nestjs-asyncapi@2.0.1: patches/nestjs-asyncapi@2.0.1.patch
+
