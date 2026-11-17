@@ -8,40 +8,16 @@ import {
   ResourceFlowNode,
   ResourceUsage,
 } from '@attraccess/database-entities';
-import type { ResourceRecord, ResourceType, UsageSession } from '@attraccess/application-models';
+import type { ResourceRecord, ResourceType } from '@attraccess/application-models';
 import type { ListResourcesQuery, NewResource, ResourceStore } from '../../../resources/resource-store.port';
 import { activeUsageSql, activeUsageWhere } from '../usage/active-usage-queries';
-import { toGroupRecord, toIntroductionRecord } from './introduction-mappers';
+import { toUsageSession } from '../usage/usage-session-mapping';
+import { toResourceRecord as toResourceRecordBase } from './resource-mapping';
 
+/** A resource row as a record, with its embedded sessions mapped like every other session read. */
 export const toResourceRecord = (entity: Resource): ResourceRecord => {
-  const record: ResourceRecord = {
-    id: entity.id,
-    name: entity.name,
-    type: entity.type,
-    separateUnlockAndUnlatch: entity.separateUnlockAndUnlatch,
-    description: entity.description,
-    imageFilename: entity.imageFilename,
-    documentationType: entity.documentationType,
-    documentationMarkdown: entity.documentationMarkdown,
-    documentationUrl: entity.documentationUrl,
-    metadata: entity.metadata,
-    allowTakeOver: entity.allowTakeOver,
-    maxParallelSessions: entity.maxParallelSessions,
-    retrainingMaxAgeDays: entity.retrainingMaxAgeDays,
-    retrainingMaxInactivityDays: entity.retrainingMaxInactivityDays,
-    retrainingBlocksAccess: entity.retrainingBlocksAccess,
-    supervisionMode: entity.supervisionMode,
-    supervisedUsagesUntilIntroduction: entity.supervisedUsagesUntilIntroduction,
-    autoIntroductionTarget: entity.autoIntroductionTarget,
-    autoIntroductionGroupId: entity.autoIntroductionGroupId,
-    createdAt: entity.createdAt,
-    updatedAt: entity.updatedAt,
-    deletedAt: entity.deletedAt ?? null,
-  };
-  if (entity.groups !== undefined) record.groups = entity.groups.map(toGroupRecord);
-  if (entity.introductions !== undefined) record.introductions = entity.introductions.map(toIntroductionRecord);
-  // Sessions are handed on as the rows the database returned, like the usage store does.
-  if (entity.usages !== undefined) record.usages = entity.usages as unknown as UsageSession[];
+  const record = toResourceRecordBase(entity);
+  if (entity.usages !== undefined) record.usages = entity.usages.map(toUsageSession);
   return record;
 };
 

@@ -8,7 +8,7 @@ import type {
 import type { Form, FormSubmission, ResourceUsage, ResourceUsageLifecycleAttempt } from '@attraccess/database-entities';
 import { toTransactionRecord } from '../billing/billing-mappers';
 import { toProjectRecord } from '../projects/project-mapping';
-import { toResourceRecord } from '../resources/resource-store.adapter';
+import { toResourceRecord } from '../resources/resource-mapping';
 import { toUserContact, toUserProfile } from '../users/user-mapping';
 
 /**

@@ -5,11 +5,11 @@ import {
   ResourceType,
   SupervisionMode,
   type ResourceRecord,
-  type UsageSession,
 } from '@attraccess/application-models';
 import { FormResponseDto, ResourceFormDto } from '../forms/dto/form-response.dto';
 import { ResourceGroup, toResourceGroupDto } from '../groups/dto/resource-group.dto';
 import { toIntroductionDto, type ResourceIntroduction } from '../introductions/dtos/introduction-records.dto';
+import { toUsageSessionResponse, type UsageSessionResponse } from '../usage/dtos/usage-session-response';
 
 /*
  * Response shape of the resource endpoints. The class name is the OpenAPI schema name the generated client and the
@@ -185,7 +185,7 @@ export class Resource {
   forms?: FormResponseDto[];
 
   /** Embedded by the resource detail and in-use reads; not part of the documented schema. */
-  usages?: UsageSession[];
+  usages?: UsageSessionResponse[];
 
   /** Embedded by the resource detail read for people who may see the access lists; not documented. */
   introductions?: ResourceIntroduction[];
@@ -218,7 +218,7 @@ export function toResourceDto(record: ResourceRecord): Resource {
     deletedAt: record.deletedAt,
   };
   if (record.groups !== undefined) dto.groups = record.groups.map(toResourceGroupDto);
-  if (record.usages !== undefined) dto.usages = record.usages;
+  if (record.usages !== undefined) dto.usages = record.usages.map(toUsageSessionResponse);
   if (record.introductions !== undefined) dto.introductions = record.introductions.map(toIntroductionDto);
   return dto;
 }

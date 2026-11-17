@@ -33,7 +33,7 @@ import type { TransactionContext } from '../../transaction-context';
 import { EntityManagerResolver } from '../entity-manager-resolver';
 import { activeUsageWhere, countOccupiedSlots, findOccupyingUserIds } from './active-usage-queries';
 import { toUsageLifecycleAttempt, toUsageSession } from './usage-session-mapping';
-import { toResourceRecord } from '../resources/resource-store.adapter';
+import { toResourceRecord } from '../resources/resource-mapping';
 
 /** Relations of running sessions and of session details (exported for the mapping spec). */
 export const ACTIVE_RELATIONS = ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'];
