@@ -37,7 +37,7 @@ export interface Props {
   isDisabled?: boolean;
 }
 
-export function useSummaryCardState(props: Props) {
+export function SummaryCard(props: Props) {
   const { className, transactionsPerPage = 5, userId: userIdFromProps, isDisabled } = props;
   const { t } = useTranslations({ en, de });
 
@@ -153,39 +153,6 @@ export function useSummaryCardState(props: Props) {
     setOpenedTransactionId(transactionId);
     setIsOpenDetails(true);
   }, []);
-  return {
-    className,
-    t,
-    configuration,
-    balance,
-    isLoadingBalance,
-    transactions,
-    getDetailsCellContent,
-    statusColor,
-    formatCredits,
-    openedTransactionId,
-    isOpenDetails,
-    setIsOpenDetails,
-    openDetails,
-  };
-}
-
-export function SummaryCard(props: Props) {
-  const {
-    className,
-    t,
-    configuration,
-    balance,
-    isLoadingBalance,
-    transactions,
-    getDetailsCellContent,
-    statusColor,
-    formatCredits,
-    openedTransactionId,
-    isOpenDetails,
-    setIsOpenDetails,
-    openDetails,
-  } = useSummaryCardState(props);
 
   if (!configuration) {
     return <Skeleton className="h-10 w-full" />;

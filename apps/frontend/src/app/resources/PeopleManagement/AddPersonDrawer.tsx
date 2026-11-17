@@ -1,11 +1,12 @@
 import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Label, TextArea, TextField } from '@heroui/react';
 import { useCallback, useState } from 'react';
-import { Button, StandardDrawer, TFunction, UserIdentity, UserSearch } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardDrawer, useTranslations, UserIdentity, UserSearch } from '@attraccess/plugins-frontend-ui';
 import { IntroductionTabs } from './IntroductionTabs';
 import { AddMode, PeopleTarget } from './types';
+import en from './en.json';
+import de from './de.json';
 
 interface AddPersonDrawerProps {
-  t: TFunction;
   target: PeopleTarget;
   isOpen: boolean;
   mode: AddMode | null;
@@ -17,7 +18,8 @@ interface AddPersonDrawerProps {
 }
 
 export function AddPersonDrawer(props: Readonly<AddPersonDrawerProps>) {
-  const { t, target, isOpen, mode, comment, isPending, onCommentChange, onAdd, onClose } = props;
+  const { target, isOpen, mode, comment, isPending, onCommentChange, onAdd, onClose } = props;
+  const { t } = useTranslations({ en, de });
 
   const [selectedUser, setSelectedUser] = useState<UserIdentity | null>(null);
   const [isMassIntroductionRunning, setIsMassIntroductionRunning] = useState(false);
@@ -88,7 +90,6 @@ export function AddPersonDrawer(props: Readonly<AddPersonDrawerProps>) {
       </DrawerHeader>
       {mode === 'introduction' ? (
         <IntroductionTabs
-          t={t}
           target={target}
           individualFields={fields}
           individualActions={actions}

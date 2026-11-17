@@ -29,4 +29,6 @@ module.exports = [
       ...reactCompilerRulesAsWarn,
     },
   },
+  // ATT-1224: this project lints from its own folder, where the root config's workspace-relative globs never match.
+  baseConfig.noHookReturnTypeConfig(['src/**/*.{ts,tsx}']),
 ];

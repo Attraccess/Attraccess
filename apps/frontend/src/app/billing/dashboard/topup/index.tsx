@@ -34,7 +34,15 @@ import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 
-export function useBillingDashboardTopupCardState(props: Props) {
+export interface Props {
+  className?: string;
+  title?: string;
+  subtitle?: string;
+  desiredAmount?: number;
+  onProcessingComplete?: () => void;
+}
+
+export function BillingDashboardTopupCard(props: Props) {
   const { className, title, subtitle, desiredAmount, onProcessingComplete } = props;
   const { t, tExists } = useTranslations({
     en: {
@@ -118,59 +126,6 @@ export function useBillingDashboardTopupCardState(props: Props) {
   }, [amount, topUpWithSumUpReader, readerId, configuration]);
 
   const formatNumber = useNumberFormatter();
-  return {
-    className,
-    title,
-    subtitle,
-    onProcessingComplete,
-    t,
-    topUpTransaction,
-    setTopUpTransaction,
-    configuration,
-    sumUpConfiguration,
-    isLoadingSumUpConfiguration,
-    isSumUpConfigurationError,
-    readers,
-    isPendingTopUpWithSumUpReader,
-    amount,
-    setAmount,
-    readerId,
-    setReaderId,
-    onSubmit,
-    formatNumber,
-  } as const;
-}
-
-export interface Props {
-  className?: string;
-  title?: string;
-  subtitle?: string;
-  desiredAmount?: number;
-  onProcessingComplete?: () => void;
-}
-
-export function BillingDashboardTopupCard(props: Props) {
-  const {
-    className,
-    title,
-    subtitle,
-    onProcessingComplete,
-    t,
-    topUpTransaction,
-    setTopUpTransaction,
-    configuration,
-    sumUpConfiguration,
-    isLoadingSumUpConfiguration,
-    isSumUpConfigurationError,
-    readers,
-    isPendingTopUpWithSumUpReader,
-    amount,
-    setAmount,
-    readerId,
-    setReaderId,
-    onSubmit,
-    formatNumber,
-  } = useBillingDashboardTopupCardState(props);
 
   if (isLoadingSumUpConfiguration) {
     return (

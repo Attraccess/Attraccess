@@ -7,19 +7,19 @@
 //   - calls `getSidebarGroups()` to declare the plugin's navigation group, and
 //   - calls `getSidebarItems()` to add navigation entries to the app sidebar.
 
-export // The context shape the host documents for both MQTT slots.
-interface MqttServerSlotContext {
+// The context shape the host documents for both MQTT slots.
+export interface MqttServerSlotContext {
   mqttServerId: number;
   [key: string]: unknown;
 }
 // See ../vite.config.ts for the build.
 //
 
-export // Shared shell so both pages get the title, intro and cross-links. Tailwind
+// Shared shell so both pages get the title, intro and cross-links. Tailwind
 // utility classes (`text-default-*`, `border-default-*`, …) resolve against the
 // host's compiled stylesheet because the plugin renders inside the host DOM, so
 // spacing and colours match the rest of the app in both light and dark mode.
-function PluginShell({ title, children }: { title: string; children: React.ReactNode }) {
+export function PluginShell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="hw:flex hw:flex-col hw:gap-6 hw:p-6 hw:max-w-4xl hw:mx-auto">
       <div className="hw:flex hw:items-center hw:gap-3">
@@ -45,22 +45,22 @@ function PluginShell({ title, children }: { title: string; children: React.React
   );
 }
 
-export // The SDK's ready-made client: the host's API origin, the session cookie and
+// The SDK's ready-made client: the host's API origin, the session cookie and
 // JSON/error handling are already wired up, so plugins never build their own.
-const api = createPluginApiClient('/api/hello-world');
+export const api = createPluginApiClient('/api/hello-world');
 
-export // Host slot ids exposed by the MQTT UI. These are documented host strings (the
+// Host slot ids exposed by the MQTT UI. These are documented host strings (the
 // SDK is vendor-agnostic and does not export them, and the host owns them in
 // apps/frontend, which a plugin cannot import — so a plugin restates them, the
 // same way it restates a route `path` it links to). Both slots receive
 // `{ mqttServerId }`, declared here so each `render` is typed end-to-end with
 // no runtime casting.
-const MQTT_SERVER_DETAIL_SLOT = 'mqtt.server.detail';
+export const MQTT_SERVER_DETAIL_SLOT = 'mqtt.server.detail';
 
 export const MQTT_SERVER_LIST_ROW_SLOT = 'mqtt.server.list.row';
 
-export // Page 2: a static showcase of the capabilities the example exercises.
-function CapabilitiesPage() {
+// Page 2: a static showcase of the capabilities the example exercises.
+export function CapabilitiesPage() {
   const items: { title: string; body: string; icon: ComponentType<{ className?: string }> }[] = [
     { title: 'Backend controller', body: 'Adds GET /hello-world/greetings to the host API.', icon: ServerIcon },
     {
@@ -105,8 +105,8 @@ function CapabilitiesPage() {
   );
 }
 
-export // Page 1: calls the example backend endpoint and renders the live result.
-function HelloWorldPage() {
+// Page 1: calls the example backend endpoint and renders the live result.
+export function HelloWorldPage() {
   const [greetings, setGreetings] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -159,9 +159,9 @@ function HelloWorldPage() {
   );
 }
 
-export // Embedded into the MQTT server detail view through the generic slot mechanism.
+// Embedded into the MQTT server detail view through the generic slot mechanism.
 // Reads the host-supplied context to scope itself to the selected server.
-function MqttServerDetailExtension({ mqttServerId }: { mqttServerId: number }) {
+export function MqttServerDetailExtension({ mqttServerId }: { mqttServerId: number }) {
   return (
     <Card
       data-cy="hello-world-mqtt-detail-slot"
@@ -185,8 +185,8 @@ function MqttServerDetailExtension({ mqttServerId }: { mqttServerId: number }) {
   );
 }
 
-export // Embedded into each MQTT server list row through the per-row slot.
-function MqttServerListBadge({ mqttServerId }: { mqttServerId: number }) {
+// Embedded into each MQTT server list row through the per-row slot.
+export function MqttServerListBadge({ mqttServerId }: { mqttServerId: number }) {
   return (
     <Chip data-cy={`hello-world-mqtt-list-slot-${mqttServerId}`} color="accent" variant="soft">
       <PlugIcon className="hw:w-3.5 hw:h-3.5" />

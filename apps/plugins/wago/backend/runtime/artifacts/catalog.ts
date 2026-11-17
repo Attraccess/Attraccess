@@ -107,10 +107,10 @@ export function storedMetadata(value: unknown, maxBytes: number): RuntimeArtifac
   return Object.freeze({ digest: data.digest, bytes, image: data.image, manifest });
 }
 
-export // The name is an atomic ownership marker: no mkdir/write-marker crash window and no
+// The name is an atomic ownership marker: no mkdir/write-marker crash window and no
 // lease expiry that could collect a slow live owner. Unknown/remote owners and reused
 // live PIDs are retained conservatively. UUIDs prevent names being reused by a new process.
-function temporaryName(kind: 'upload' | 'delivery' | 'current') {
+export function temporaryName(kind: 'upload' | 'delivery' | 'current') {
   return `${kind}-v1-${hostId}-${process.pid}-${processId}-${randomUUID()}`;
 }
 

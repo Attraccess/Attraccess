@@ -27,9 +27,9 @@ export function subscribe(
 
 import { validateDesired } from '../runtime';
 
-export // Rejection is a simulator protocol scenario, not an optional production-runtime
+// Rejection is a simulator protocol scenario, not an optional production-runtime
 // constructor hook. Normal configuration always reaches the shared runtime.
-async function rejectDesired(mqtt: MqttClient, topic: string, payload: Buffer): Promise<void> {
+export async function rejectDesired(mqtt: MqttClient, topic: string, payload: Buffer): Promise<void> {
   let desired;
   try {
     desired = JSON.parse(payload.toString('utf8'));

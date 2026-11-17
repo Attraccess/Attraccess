@@ -9,7 +9,26 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNodePreviewRows } from './preview/index';
 import { DeleteConfirmationModal, TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 
-export function useAttraccessNodeState(props: Props) {
+export interface Props {
+  tNodeTranslations: TFunction;
+  tNodeExists?: TExists;
+  schema: ResourceFlowNodeSchemaDto;
+  node?: NodeProps;
+  previewMode?: boolean;
+  data?: {
+    forceToolbarVisible?: boolean;
+    toolbarPosition?: Position;
+  };
+  validationError?: string;
+}
+export enum ProcessingState {
+  IDLE = 'idle',
+  PROCESSING = 'processing',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+}
+
+export function AttraccessNode(props: Props) {
   const { schema, previewMode, tNodeTranslations: t, tNodeExists, data, validationError } = props;
 
   const nodeId = useNodeId();
@@ -148,72 +167,6 @@ export function useAttraccessNodeState(props: Props) {
   const descriptionKey = 'nodes.' + schema.type + '.description';
   const nodeTitle = tNodeExists?.(titleKey) ? t(titleKey) : (schema.label ?? schema.type);
   const nodeDescription = tNodeExists?.(descriptionKey) ? t(descriptionKey) : (schema.description ?? '');
-  return {
-    schema,
-    previewMode,
-    t,
-    tNodeExists,
-    data,
-    validationError,
-    processingState,
-    remove,
-    showDeleteConfirmation,
-    userWantsToDelete,
-    userDoesNotWantToDelete,
-    cardClasses,
-    targetHandlesWithStyles,
-    sourceHandlesWithStyles,
-    isEditable,
-    previewRows,
-    supportedByOwner,
-    unsupportedMessageKey,
-    nodeTitle,
-    nodeDescription,
-  } as const;
-}
-
-export interface Props {
-  tNodeTranslations: TFunction;
-  tNodeExists?: TExists;
-  schema: ResourceFlowNodeSchemaDto;
-  node?: NodeProps;
-  previewMode?: boolean;
-  data?: {
-    forceToolbarVisible?: boolean;
-    toolbarPosition?: Position;
-  };
-  validationError?: string;
-}
-export enum ProcessingState {
-  IDLE = 'idle',
-  PROCESSING = 'processing',
-  COMPLETED = 'completed',
-  FAILED = 'failed',
-}
-
-export function AttraccessNode(props: Props) {
-  const {
-    schema,
-    previewMode,
-    t,
-    tNodeExists,
-    data,
-    validationError,
-    processingState,
-    remove,
-    showDeleteConfirmation,
-    userWantsToDelete,
-    userDoesNotWantToDelete,
-    cardClasses,
-    targetHandlesWithStyles,
-    sourceHandlesWithStyles,
-    isEditable,
-    previewRows,
-    supportedByOwner,
-    unsupportedMessageKey,
-    nodeTitle,
-    nodeDescription,
-  } = useAttraccessNodeState(props);
 
   return (
     <NodeEditor schema={schema} tNodeTranslations={t} tNodeExists={tNodeExists}>

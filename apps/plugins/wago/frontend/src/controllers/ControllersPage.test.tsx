@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ControllersPage } from './Page';
+import { ControllersPage } from './ControllersPage';
 
 const state = vi.hoisted(() => ({ navigate: vi.fn(), refetch: vi.fn(), pending: false, error: null as Error | null }));
 vi.mock('react-router-dom', () => ({ useNavigate: () => state.navigate }));
@@ -15,7 +15,7 @@ vi.mock('../api/queries', () => ({
   }),
   useCommissioningSessionsQuery: () => ({ data: [] }),
 }));
-vi.mock('./Table', () => ({
+vi.mock('./ControllersTable', () => ({
   ControllersTable: ({ onConfigure }: { onConfigure: (id: number) => void }) => (
     <button onClick={() => onConfigure(7)}>Configure fixture controller</button>
   ),

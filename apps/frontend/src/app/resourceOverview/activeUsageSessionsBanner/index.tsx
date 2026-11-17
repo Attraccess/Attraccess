@@ -26,7 +26,7 @@ export type ActiveUsageSessionsBannerProps = {
   onShowMySessions: () => void;
 };
 
-export function useActiveUsageSessionsBannerState({ onShowMySessions }: ActiveUsageSessionsBannerProps) {
+export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessionsBannerProps) {
   const { t } = useTranslations({ en, de });
   const queryClient = useQueryClient();
   const toast = useToastMessage();
@@ -157,44 +157,6 @@ export function useActiveUsageSessionsBannerState({ onShowMySessions }: ActiveUs
     t,
     toast,
   ]);
-  return {
-    t,
-    isLoading,
-    isFetching,
-    activeCount,
-    isEndingAll,
-    isModalOpen,
-    setIsModalOpen,
-    endStatuses,
-    endErrors,
-    allCompleted,
-    activeResources,
-    successfulResources,
-    isLoadingResources,
-    openConfirmModal,
-    confirmEndAll,
-    onShowMySessions,
-  } as const;
-}
-
-export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessionsBannerProps) {
-  const {
-    t,
-    isLoading,
-    isFetching,
-    activeCount,
-    isEndingAll,
-    isModalOpen,
-    setIsModalOpen,
-    endStatuses,
-    endErrors,
-    allCompleted,
-    activeResources,
-    successfulResources,
-    isLoadingResources,
-    openConfirmModal,
-    confirmEndAll,
-  } = useActiveUsageSessionsBannerState({ onShowMySessions });
 
   if (isLoading || isFetching) {
     return (

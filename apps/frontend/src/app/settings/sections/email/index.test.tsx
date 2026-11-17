@@ -176,4 +176,33 @@ describe('EmailSection', () => {
     expect(saveSettings).not.toHaveBeenCalled();
     expect(screen.getByText('inputs.port.errors.invalid')).toBeInTheDocument();
   });
+
+  it('reads the system settings once, in the section, so the form and the aside do not refetch them', () => {
+    render(<EmailSection />);
+
+    expect(useSettingsServiceGetSystemSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps an unsaved edit and the shown validation through a refetch that passes through loading', async () => {
+    // Settings that failed to load have no data, so their next refetch goes back to loading and the
+    // spinner replaces the form. The edit and the validation state must survive that.
+    const mockSettings = (data: unknown, isLoading: boolean) =>
+      vi
+        .mocked(useSettingsServiceGetSystemSettings)
+        .mockReturnValue({ data, isLoading } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
+    mockSettings(undefined, false);
+    const { rerender } = render(<EmailSection />);
+    await userEvent.type(screen.getByLabelText('inputs.host.label'), 'relay.example.org');
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
+    expect(screen.getByText('inputs.port.errors.required')).toBeInTheDocument();
+
+    mockSettings(undefined, true);
+    rerender(<EmailSection />);
+    expect(screen.getByText('loading')).toBeInTheDocument();
+    mockSettings(undefined, false);
+    rerender(<EmailSection />);
+
+    expect(screen.getByLabelText('inputs.host.label')).toHaveValue('relay.example.org');
+    expect(screen.getByText('inputs.port.errors.required')).toBeInTheDocument();
+  });
 });

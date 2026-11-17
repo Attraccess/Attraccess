@@ -1,8 +1,9 @@
 import { Form, Label, ModalBody, ModalFooter, ModalHeader, ModalHeading, TextArea, TextField } from '@heroui/react';
-import { Button, StandardModal, TFunction } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import en from './en.json';
+import de from './de.json';
 
 interface IntroductionCommentModalProps {
-  t: TFunction;
   isOpen: boolean;
   comment: string;
   isPending: boolean;
@@ -12,7 +13,8 @@ interface IntroductionCommentModalProps {
 }
 
 export function IntroductionCommentModal(props: Readonly<IntroductionCommentModalProps>) {
-  const { t, isOpen, comment, isPending, onCommentChange, onSubmit, onClose } = props;
+  const { isOpen, comment, isPending, onCommentChange, onSubmit, onClose } = props;
+  const { t } = useTranslations({ en, de });
 
   return (
     <StandardModal

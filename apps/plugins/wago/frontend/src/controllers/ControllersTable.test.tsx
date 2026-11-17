@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { CommissioningSession, CommissioningVerification, WagoController } from '../api/client';
-import { ControllersTable } from './Table';
+import { ControllersTable } from './ControllersTable';
 
 const getVerification = vi.hoisted(() => vi.fn());
 const getUpdateStatus = vi.hoisted(() => vi.fn());

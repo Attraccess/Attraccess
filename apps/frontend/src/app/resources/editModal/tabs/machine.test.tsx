@@ -34,6 +34,18 @@ vi.mock('@attraccess/react-query-client', () => ({
   }),
 }));
 
+// The tab's own texts show their keys (with the count); flow node titles keep their real texts.
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>();
+  const { default: editorEn } = await import('../resourceEditModal.en.json');
+  const t = (key: string, params?: { count: number }) => (params ? `${key} ${params.count}` : key);
+  return {
+    ...original,
+    useTranslations: (modules: Parameters<typeof original.useTranslations>[0]) =>
+      modules.en === editorEn ? { t, tExists: () => true } : original.useTranslations(modules),
+  };
+});
+
 const stopWarning: Warning = {
   flowId: null,
   flowName: null,
@@ -46,13 +58,11 @@ const stopWarning: Warning = {
   ],
 };
 
-const t = (key: string, params?: { count: number }) => (params ? `${key} ${params.count}` : key);
 
 function mount(maxParallelSessions: number) {
   const setField = vi.fn();
   render(
     <MachineTab
-      t={t as never}
       formData={{ allowTakeOver: false, maxParallelSessions }}
       setField={setField}
       resource={{ id: 5 } as Resource}

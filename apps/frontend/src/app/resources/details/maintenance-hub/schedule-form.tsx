@@ -37,7 +37,7 @@ export interface Props {
   onCancel: () => void;
 }
 
-export function useScheduleFormState(props: Props) {
+export function ScheduleForm(props: Props) {
   const { resourceId, supportsOperatingDuration, scheduleId, onSaved, onCancel } = props;
   const { t } = useTranslations({ de, en });
   const queryClient = useQueryClient();
@@ -152,71 +152,6 @@ export function useScheduleFormState(props: Props) {
     create,
     update,
   ]);
-  return {
-    resourceId,
-    supportsOperatingDuration,
-    onCancel,
-    t,
-    formRef,
-    name,
-    setName,
-    triggerType,
-    setTriggerType,
-    usageHoursDuration,
-    setUsageHoursDuration,
-    usageHoursUnit,
-    setUsageHoursUnit,
-    durationBasis,
-    setDurationBasis,
-    usesOperatingDuration,
-    trackingReadiness,
-    thresholdSessions,
-    setThresholdSessions,
-    timeIntervalDuration,
-    setTimeIntervalDuration,
-    timeIntervalUnit,
-    setTimeIntervalUnit,
-    enabled,
-    setEnabled,
-    isCreating,
-    isUpdating,
-    error,
-    onSubmit,
-  } as const;
-}
-
-export function ScheduleForm(props: Props) {
-  const {
-    resourceId,
-    supportsOperatingDuration,
-    onCancel,
-    t,
-    formRef,
-    name,
-    setName,
-    triggerType,
-    setTriggerType,
-    usageHoursDuration,
-    setUsageHoursDuration,
-    usageHoursUnit,
-    setUsageHoursUnit,
-    durationBasis,
-    setDurationBasis,
-    usesOperatingDuration,
-    trackingReadiness,
-    thresholdSessions,
-    setThresholdSessions,
-    timeIntervalDuration,
-    setTimeIntervalDuration,
-    timeIntervalUnit,
-    setTimeIntervalUnit,
-    enabled,
-    setEnabled,
-    isCreating,
-    isUpdating,
-    error,
-    onSubmit,
-  } = useScheduleFormState(props);
 
   return (
     <Form

@@ -113,29 +113,35 @@ vi.mock('@xyflow/react', () => ({
   Controls: () => null,
   Background: () => null,
 }));
-vi.mock('./context/index', () => ({
-  FlowProvider: ({ children }: { children: ReactNode }) => children,
-  useFlowContext: () => {
-    const [nodes, setNodes] = useState<Node[]>([]);
-    const [edges, setEdges] = useState<Edge[]>([]);
-    Object.assign(state, { nodes, edges, setNodes, setEdges });
-    return {
-      nodes,
-      edges,
-      setNodes,
-      setEdges,
-      addNode: state.add,
-      copySelectedNodes: state.copy,
-      cutSelectedNodes: state.cut,
-      pasteNodes: state.paste,
-      addLiveLogReceiver: state.receive,
-      removeLiveLogReceiver: state.remove,
-      setValidationErrors: state.validation,
-      flowNodeTypes: {},
-      owner: { kind: 'resource', resourceId: 7 },
-    };
-  },
-}));
+vi.mock('./context/index', async () => {
+  // One shared flow state for every consumer, like the real provider.
+  const { createContext, useContext } = await import('react');
+  const FlowStateContext = createContext<object | null>(null);
+  return {
+    FlowProvider: ({ children }: { children: ReactNode }) => {
+      const [nodes, setNodes] = useState<Node[]>([]);
+      const [edges, setEdges] = useState<Edge[]>([]);
+      Object.assign(state, { nodes, edges, setNodes, setEdges });
+      const value = {
+        nodes,
+        edges,
+        setNodes,
+        setEdges,
+        addNode: state.add,
+        copySelectedNodes: state.copy,
+        cutSelectedNodes: state.cut,
+        pasteNodes: state.paste,
+        addLiveLogReceiver: state.receive,
+        removeLiveLogReceiver: state.remove,
+        setValidationErrors: state.validation,
+        flowNodeTypes: {},
+        owner: { kind: 'resource', resourceId: 7 },
+      };
+      return <FlowStateContext.Provider value={value}>{children}</FlowStateContext.Provider>;
+    },
+    useFlowContext: () => useContext(FlowStateContext),
+  };
+});
 vi.mock('./flowImportExport', () => ({
   useFlowImportExport: () => ({ handleImportClick: state.imported, handleExport: state.exported }),
 }));

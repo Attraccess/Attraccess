@@ -8,7 +8,6 @@ import {
   type MassIntroductionLiveEventDto,
   type MassIntroductionSessionDto,
 } from '@attraccess/react-query-client';
-import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { AddPersonDrawer } from './AddPersonDrawer';
 import { PeopleTarget } from './types';
 
@@ -58,7 +57,7 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
     massIntroductionCancel: (data: unknown) => state.serviceCancel(data),
   },
 }));
-vi.mock('./usePeopleMutations', () => ({ useInvalidatePeopleIntroductions: () => state.invalidate }));
+vi.mock('./useInvalidatePeopleIntroductions', () => ({ useInvalidatePeopleIntroductions: () => state.invalidate }));
 vi.mock('../../../utils/live-updates', () => ({
   useLiveUpdates: (props: NonNullable<typeof state.live>) => {
     state.live = props;
@@ -80,10 +79,17 @@ vi.mock('../../attractap/AttractapSelect', () => ({
   },
 }));
 // The individual tab's user picker is covered by AddPersonDrawer.test.tsx.
-vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
-  UserSearch: () => <p>User picker</p>,
-}));
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>();
+  const { default: peopleEn } = await import('./en.json');
+  return {
+    ...original,
+    UserSearch: () => <p>User picker</p>,
+    // The drawer and tabs read the people texts themselves: show their keys; the mass introduction keeps real texts.
+    useTranslations: (modules: Parameters<typeof original.useTranslations>[0]) =>
+      modules.en === peopleEn ? { t: (key: string) => key, tExists: () => true } : original.useTranslations(modules),
+  };
+});
 vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => ({ apiError: state.apiError }) }));
 vi.mock('react-qrcode-logo', () => ({ QRCode: ({ value }: { value: string }) => <output>{value}</output> }));
 
@@ -113,13 +119,10 @@ const participant = (userId: number, username: string, extra: object = {}) =>
     ...extra,
   }) as MassIntroductionSessionDto['participants'][number];
 
-const t = ((key: string) => key) as TFunction;
-
 function renderDrawer(target: PeopleTarget = { type: 'resource', id: 7 }) {
   const onClose = vi.fn();
   const view = render(
     <AddPersonDrawer
-      t={t}
       target={target}
       isOpen
       mode="introduction"

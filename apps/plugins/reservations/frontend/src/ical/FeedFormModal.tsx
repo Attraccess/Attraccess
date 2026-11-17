@@ -6,7 +6,7 @@ import { createFeed, listHostGroups, updateFeed } from '../api';
 import { useReservationsTranslations } from '../i18n';
 import { describeError } from '../lib/errors';
 import type { IcalFeed, IcalFeedSecret, IcalSelection } from '../lib/types';
-import { TextInput } from '../shared/fields';
+import { TextInput } from '../shared/TextInput';
 
 const EMPTY: IcalSelection = { resourceIds: [], groupIds: [], introduced: false, maintained: false, ownOnly: false };
 

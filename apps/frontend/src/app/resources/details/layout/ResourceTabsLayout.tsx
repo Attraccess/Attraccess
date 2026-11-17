@@ -41,13 +41,18 @@ export const TAB_ICONS: Record<ResourceTabKey, JSX.Element> = {
   maintenance: <WrenchIcon className="w-4 h-4" />,
 };
 
-export function useResourceTabsLayoutInnerState({
-  resourceId,
-  children,
-}: {
-  resourceId: number;
-  children?: ReactNode;
-}) {
+function ResourceTabsLayoutComponent({ children }: { children?: ReactNode }) {
+  const { id } = useParams<{ id: string }>();
+  const resourceId = Number.parseInt(id ?? '', 10);
+
+  if (!Number.isFinite(resourceId)) {
+    return <Navigate to="/resources" replace />;
+  }
+
+  return <ResourceTabsLayoutInner resourceId={resourceId}>{children}</ResourceTabsLayoutInner>;
+}
+
+function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number; children?: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -101,56 +106,6 @@ export function useResourceTabsLayoutInnerState({
       throw err;
     }
   };
-  return {
-    navigate,
-    isOpen,
-    open,
-    closeDeleteModal,
-    t,
-    canUpdateResources,
-    canDeleteResources,
-    resource,
-    isLoadingResource,
-    resourceError,
-    qrOpenRef,
-    tabs,
-    activeTabKey,
-    handleDelete,
-    resourceId,
-    children,
-    confirmationDialog,
-  };
-}
-
-function ResourceTabsLayoutComponent({ children }: { children?: ReactNode }) {
-  const { id } = useParams<{ id: string }>();
-  const resourceId = Number.parseInt(id ?? '', 10);
-
-  if (!Number.isFinite(resourceId)) {
-    return <Navigate to="/resources" replace />;
-  }
-
-  return <ResourceTabsLayoutInner resourceId={resourceId}>{children}</ResourceTabsLayoutInner>;
-}
-
-function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number; children?: ReactNode }) {
-  const {
-    navigate,
-    isOpen,
-    open,
-    closeDeleteModal,
-    t,
-    canUpdateResources,
-    canDeleteResources,
-    resource,
-    isLoadingResource,
-    resourceError,
-    qrOpenRef,
-    tabs,
-    activeTabKey,
-    handleDelete,
-    confirmationDialog,
-  } = useResourceTabsLayoutInnerState({ resourceId, children });
 
   if (isLoadingResource) {
     return (

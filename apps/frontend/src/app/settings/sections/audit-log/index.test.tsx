@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuditEntryDto, AuditMetaDto, AuditSettingsDto } from '@attraccess/react-query-client';
 import { AuditLogSection } from './index';
-import { auditLabel } from './components/AuditLogPanels';
+import { auditLabel } from './components/auditLabel';
 import { humanize } from './audit-log-model';
 import de from './de.json';
 import en from './en.json';
@@ -346,6 +346,18 @@ describe('audit admin workflows', () => {
     await waitFor(() =>
       expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ actorId: 7, beforeId: undefined })),
     );
+  });
+
+  it('keeps the expanded filters after switching to the settings tab and back', async () => {
+    // The Activity panel unmounts on a tab switch, so the disclosure state has to live above the tabs.
+    mount();
+    await screen.findByRole('button', { name: 'View event #52' });
+    await userEvent.click(screen.getByRole('button', { name: 'More filters' }));
+    expect(screen.getByLabelText('Actor ID')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Logging settings' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Activity' }));
+    expect(await screen.findByLabelText('Actor ID')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fewer filters' })).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('clears partially typed dates when resetting all filters', async () => {

@@ -2,10 +2,11 @@ import { ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Dro
 import { buttonVariants } from '@heroui/styles';
 import { ChevronDownIcon, PlayIcon } from 'lucide-react';
 import { ProjectsSelect } from '../../../../../components/projectsSelect';
-import { Button, TFunction } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
+import en from './translations/en.json';
+import de from './translations/de.json';
 
 interface MachineStartControlsProps {
-  t: TFunction;
   selectedProjectId?: number;
   onProjectChange: (projectId: number | undefined) => void;
   onStart: () => void;
@@ -14,13 +15,13 @@ interface MachineStartControlsProps {
 }
 
 export function MachineStartControls({
-  t,
   selectedProjectId,
   onProjectChange,
   onStart,
   onStartWithNotes,
   isStarting,
-}: MachineStartControlsProps) {
+}: Readonly<MachineStartControlsProps>) {
+  const { t } = useTranslations({ en, de });
   return (
     <>
       <p className="text-gray-500 dark:text-gray-400">{t('machine.noActiveSession')}</p>

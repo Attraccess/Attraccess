@@ -33,8 +33,8 @@ import { verifyTimeline as verifyTimelineImplementation } from './operating-time
 
 import { ResourceOperatingAttributionService } from './resource-operating-attribution.service';
 
-export /** A resource with tracking configured but no transition for this long is reported as stale. */
-const STALE_SIGNAL_DAYS = 7;
+/** A resource with tracking configured but no transition for this long is reported as stale. */
+export const STALE_SIGNAL_DAYS = 7;
 
 export const DAY_MS = 24 * 60 * 60_000;
 

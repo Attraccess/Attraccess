@@ -5,62 +5,78 @@
 // tags and per-vhost permissions, and offers create / edit / permission /
 // delete actions. All operations go through the plugin backend, which talks to
 // the RabbitMQ management HTTP API with the MQTT server's credentials.
-import {
-  StatusAlert,
-  StatusDialog,
-  TableDataLoadingIndicator,
-  type TranslationMessage,
-} from '@attraccess/plugins-frontend-ui';
-import {
-  Button,
-  Card,
-  Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableContent,
-  TableHeader,
-  TableRow,
-  TableScrollContainer,
-} from '@heroui/react';
-import { KeyRoundIcon, PencilIcon, Trash2Icon } from 'lucide-react';
-import { type RabbitmqUser } from './users-api';
-import { RabbitmqPermissionsModal } from './permissions/RabbitmqPermissionsModal';
-import { RabbitmqUserFormModal } from './RabbitmqUserFormModal';
+import { StatusAlert, TableDataLoadingIndicator, type TranslationMessage } from '@attraccess/plugins-frontend-ui';
+import { Card } from '@heroui/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useDetection } from '../detection/detection';
 import { useRabbitmqTranslations } from '../i18n';
-import { useRabbitmqUserPanelState } from './useRabbitmqUserPanelState';
+import { RabbitmqPermissionsModal } from './permissions/RabbitmqPermissionsModal';
+import { RabbitmqUserDeleteDialog } from './RabbitmqUserDeleteDialog';
+import { RabbitmqUserFormModal } from './RabbitmqUserFormModal';
 import { RabbitmqUserPanelCardHeader } from './RabbitmqUserPanelCardHeader';
-
-function PermissionChips({ user }: { user: RabbitmqUser }) {
-  const { t } = useRabbitmqTranslations();
-  if (user.permissions.length === 0) {
-    return <span className="rmq:text-xs rmq:text-default-400">{t('users.none')}</span>;
-  }
-  return (
-    <div className="rmq:flex rmq:flex-wrap rmq:gap-1">
-      {user.permissions.map((permission) => (
-        <Chip key={permission.vhost} size="sm" variant="soft" title={t('permissions.summary', { ...permission })}>
-          {permission.vhost}
-        </Chip>
-      ))}
-    </div>
-  );
-}
-
-// A failure without a server message falls back to the generic text, which is
-// already the title — show it only once, as the description.
-function errorTitle(error: string | TranslationMessage, title: string) {
-  return typeof error === 'string' ? title : undefined;
-}
+import { RabbitmqUserTable } from './RabbitmqUserTable';
+import { errorTitle } from './errorTitle';
+import { fetchUsers, type RabbitmqUser, type RabbitmqUserList } from './users-api';
 
 export function RabbitmqUserPanel({ mqttServerId, canManage = false }: { mqttServerId: number; canManage?: boolean }) {
-  const model = useRabbitmqUserPanelState({ mqttServerId });
+  const { t, tMessage } = useRabbitmqTranslations();
+  const { result } = useDetection(mqttServerId);
+
+  const [data, setData] = useState<RabbitmqUserList | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | TranslationMessage | null>(null);
+
+  // Modal state. `formUser` doubles as the mode flag (null = create).
+  const [formOpen, setFormOpen] = useState(false);
+  const [formUser, setFormUser] = useState<RabbitmqUser | null>(null);
+  const [permissionsUser, setPermissionsUser] = useState<RabbitmqUser | null>(null);
+  const [userToDelete, setUserToDelete] = useState<RabbitmqUser | null>(null);
+
+  // The panel can unmount while a fetch is in flight (navigation away) — drop
+  // the result instead of calling setState on an unmounted component.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const list = await fetchUsers(mqttServerId);
+      if (mounted.current) {
+        setData(list);
+        // Keep the permissions modal's user in sync after edits.
+        setPermissionsUser((current) =>
+          current ? (list.users.find((user) => user.name === current.name) ?? current) : null,
+        );
+      }
+    } catch (err) {
+      if (mounted.current) {
+        setLoadError(err instanceof Error ? err.message : { key: 'users.loadError' });
+      }
+    } finally {
+      if (mounted.current) {
+        setLoading(false);
+      }
+    }
+  }, [mqttServerId]);
+
+  const manageable = result?.isRabbitMQ === true && result.authOk;
+
+  useEffect(() => {
+    if (manageable) {
+      void reload();
+    }
+  }, [manageable, reload]);
 
   // Render nothing unless the server is positively detected as RabbitMQ with
   // working management credentials — the status panel already explains
   // detection / auth problems.
-  if (!model.manageable) {
+  if (!manageable) {
     return null;
   }
   return (
@@ -69,161 +85,71 @@ export function RabbitmqUserPanel({ mqttServerId, canManage = false }: { mqttSer
       className="rmq:w-full rmq:border rmq:border-default-200 rmq:dark:border-default-100"
     >
       <RabbitmqUserPanelCardHeader
-        {...{
-          t: model.t,
-          reload: model.reload,
-          loading: model.loading,
-          mqttServerId,
-          setFormUser: model.setFormUser,
-          setFormOpen: model.setFormOpen,
-          canManage,
+        reload={reload}
+        loading={loading}
+        mqttServerId={mqttServerId}
+        onCreate={() => {
+          setFormUser(null);
+          setFormOpen(true);
         }}
+        canManage={canManage}
       />
       <Card.Content className="rmq:flex rmq:flex-col rmq:gap-3">
-        {model.loadError && (
+        {loadError && (
           <StatusAlert
             status="danger"
-            title={errorTitle(model.loadError, model.t('users.loadError'))}
+            title={errorTitle(loadError, t('users.loadError'))}
             data-cy="rabbitmq-user-panel-error-alert"
           >
-            {model.tMessage(model.loadError)}
+            {tMessage(loadError)}
           </StatusAlert>
         )}
 
-        {!model.data && !model.loadError && (
+        {!data && !loadError && (
           <div data-cy="rabbitmq-user-panel-loading-spinner">
             <TableDataLoadingIndicator />
           </div>
         )}
 
-        {model.data && (
-          <Table data-cy="rabbitmq-user-panel-table">
-            <TableScrollContainer>
-              <TableContent aria-label={model.t('users.title')}>
-                <TableHeader>
-                  <TableColumn isRowHeader>{model.t('users.username')}</TableColumn>
-                  <TableColumn>{model.t('users.tags')}</TableColumn>
-                  <TableColumn>{model.t('users.access')}</TableColumn>
-                  {canManage && <TableColumn>{model.t('common.actions')}</TableColumn>}
-                </TableHeader>
-                <TableBody items={model.data.users} dependencies={[model.language]}>
-                  {(user) => (
-                    <TableRow key={user.name} id={user.name}>
-                      <TableCell className="rmq:whitespace-nowrap rmq:font-medium">{user.name}</TableCell>
-                      <TableCell>
-                        {user.tags.length === 0 ? (
-                          <span className="rmq:text-xs rmq:text-default-400">{model.t('users.none')}</span>
-                        ) : (
-                          <div className="rmq:flex rmq:flex-wrap rmq:gap-1">
-                            {user.tags.map((tag) => (
-                              <Chip key={tag} size="sm" color="accent" variant="soft">
-                                {tag}
-                              </Chip>
-                            ))}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <PermissionChips user={user} />
-                      </TableCell>
-                      {canManage && (
-                        <TableCell>
-                          <div className="rmq:flex rmq:flex-row rmq:gap-1">
-                            <Button
-                              isIconOnly
-                              size="sm"
-                              variant="ghost"
-                              aria-label={model.t('users.edit', { name: user.name })}
-                              onPress={() => {
-                                model.setFormUser(user);
-                                model.setFormOpen(true);
-                              }}
-                              data-cy={`rabbitmq-user-edit-button-${user.name}`}
-                            >
-                              <PencilIcon className="rmq:w-4 rmq:h-4" />
-                            </Button>
-                            <Button
-                              isIconOnly
-                              size="sm"
-                              variant="ghost"
-                              aria-label={model.t('users.permissions', { name: user.name })}
-                              onPress={() => model.setPermissionsUser(user)}
-                              data-cy={`rabbitmq-user-permissions-button-${user.name}`}
-                            >
-                              <KeyRoundIcon className="rmq:w-4 rmq:h-4" />
-                            </Button>
-                            <Button
-                              isIconOnly
-                              size="sm"
-                              variant="ghost"
-                              aria-label={model.t('users.delete', { name: user.name })}
-                              onPress={() => {
-                                model.setDeleteError(null);
-                                model.setUserToDelete(user);
-                              }}
-                              data-cy={`rabbitmq-user-delete-button-${user.name}`}
-                            >
-                              <Trash2Icon className="rmq:w-4 rmq:h-4 rmq:text-danger" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  )}
-                </TableBody>
-              </TableContent>
-            </TableScrollContainer>
-          </Table>
+        {data && (
+          <RabbitmqUserTable
+            users={data.users}
+            canManage={canManage}
+            onEdit={(user) => {
+              setFormUser(user);
+              setFormOpen(true);
+            }}
+            onPermissions={setPermissionsUser}
+            onDelete={setUserToDelete}
+          />
         )}
       </Card.Content>
 
       <RabbitmqUserFormModal
         mqttServerId={mqttServerId}
-        isOpen={model.formOpen}
-        user={model.formUser}
-        vhosts={model.data?.vhosts ?? []}
-        existingUsernames={model.data?.users.map((user) => user.name)}
-        onClose={() => model.setFormOpen(false)}
-        onSaved={() => void model.reload()}
+        isOpen={formOpen}
+        user={formUser}
+        vhosts={data?.vhosts ?? []}
+        existingUsernames={data?.users.map((user) => user.name)}
+        onClose={() => setFormOpen(false)}
+        onSaved={() => void reload()}
       />
 
       <RabbitmqPermissionsModal
         mqttServerId={mqttServerId}
-        isOpen={model.permissionsUser !== null}
-        user={model.permissionsUser}
-        vhosts={model.data?.vhosts ?? []}
-        onClose={() => model.setPermissionsUser(null)}
-        onSaved={() => void model.reload()}
+        isOpen={permissionsUser !== null}
+        user={permissionsUser}
+        vhosts={data?.vhosts ?? []}
+        onClose={() => setPermissionsUser(null)}
+        onSaved={() => void reload()}
       />
 
-      <StatusDialog
-        isOpen={model.userToDelete !== null}
-        onClose={() => model.setUserToDelete(null)}
-        status="error"
-        title={model.t('users.deleteTitle')}
-        action={{
-          label: model.t('common.delete'),
-          onPress: model.confirmDelete,
-          isPending: model.deleting,
-          'data-cy': 'rabbitmq-user-delete-confirm-button',
-        }}
-        closeLabel={model.t('common.cancel')}
-        closeDataCy="rabbitmq-user-delete-cancel-button"
-        data-cy={`rabbitmq-user-delete-modal-${mqttServerId}`}
-      >
-        <div className="rmq:flex rmq:flex-col rmq:gap-3">
-          <p>{model.t('users.deleteDescription', { name: model.userToDelete?.name })}</p>
-          {model.deleteError && (
-            <StatusAlert
-              status="danger"
-              title={errorTitle(model.deleteError, model.t('users.deleteError'))}
-              data-cy="rabbitmq-user-delete-error-alert"
-            >
-              {model.tMessage(model.deleteError)}
-            </StatusAlert>
-          )}
-        </div>
-      </StatusDialog>
+      <RabbitmqUserDeleteDialog
+        mqttServerId={mqttServerId}
+        user={userToDelete}
+        onClose={() => setUserToDelete(null)}
+        onDeleted={() => void reload()}
+      />
     </Card>
   );
 }

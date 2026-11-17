@@ -6,6 +6,10 @@ const state = vi.hoisted(() => ({ preview: vi.fn() }));
 vi.mock('@attraccess/react-query-client', () => ({
   PasswordPolicyAdminService: { previewAdminPasswordPolicy: state.preview },
 }));
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  useTranslations: () => ({ t: (key: string) => key }),
+}));
 const policy: PasswordPolicyDto = {
   minLength: 12,
   maxLength: 64,
@@ -20,7 +24,6 @@ const policy: PasswordPolicyDto = {
   checkHIBP: true,
   checkCommonPasswords: true,
 };
-const t = (key: string) => key;
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
@@ -48,7 +51,7 @@ async function type(value: string) {
 it('debounces the candidate, submits the unsaved policy and shows validation errors and visibility controls', async () => {
   const request = pending();
   state.preview.mockReturnValue(request.promise);
-  render(<PasswordPreview policy={policy} t={t} />);
+  render(<PasswordPreview policy={policy} />);
   const input = screen.getByLabelText('preview.passwordLabel');
   fireEvent.change(input, { target: { value: 'weak' } });
   expect(state.preview).not.toHaveBeenCalled();
@@ -68,7 +71,7 @@ it('ignores an older response after a newer candidate passes and cancels on clea
   const old = pending();
   const current = pending();
   state.preview.mockReturnValueOnce(old.promise).mockReturnValueOnce(current.promise);
-  const view = render(<PasswordPreview policy={policy} t={t} />);
+  const view = render(<PasswordPreview policy={policy} />);
   await type('old');
   await type('Strong candidate 123!');
   expect(old.promise.cancel).toHaveBeenCalledOnce();
@@ -86,7 +89,7 @@ it('ignores an older response after a newer candidate passes and cancels on clea
 it('settles a failed request without claiming the password passed', async () => {
   const request = pending();
   state.preview.mockReturnValue(request.promise);
-  render(<PasswordPreview policy={policy} t={t} />);
+  render(<PasswordPreview policy={policy} />);
   await type('candidate');
   await act(async () => request.reject(new Error('Offline')));
   expect(screen.queryByText('preview.loading')).toBeNull();

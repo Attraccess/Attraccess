@@ -8,7 +8,7 @@ import type {
   WagoPresetApplication,
 } from '../api/client';
 import { useApplyPresetMutation, usePresetsQuery, usePreviewPresetMutation } from '../api/queries';
-import { Choice } from './channels/DigitalChannelEditorFields';
+import { OptionSelect } from './channels/OptionSelect';
 import { ConfigurationChanges, ConfigurationErrors } from './ConfigurationChanges';
 import { boundMeasurement, emptyModbus } from './modbus/modbus-editor';
 import { isEditableDigitalChannel } from '../../../backend/configuration/digital';
@@ -122,7 +122,7 @@ export function ConfigurationPresets({
       <legend className="wg:font-medium">{t('presets.title')}</legend>
       <p>{t('presets.description')}</p>
       {presets.isError && <p role="alert">{t('presets.loadError', { error: presets.error.message })}</p>}
-      <Choice
+      <OptionSelect
         label={t('presets.preset')}
         value={presetId}
         options={(presets.data ?? []).map((item) => ({
@@ -139,7 +139,7 @@ export function ConfigurationPresets({
           ? t(`presets.items.${presetId}.description`)
           : presets.data?.find((item) => item.id === presetId)?.description}
       </p>
-      <Choice
+      <OptionSelect
         label={t('presets.applyTo')}
         value={target?.id ?? ''}
         options={compatibleChannels.map((item) => ({ id: item.id, label: metadata.names[item.id] ?? item.id }))}
@@ -155,10 +155,15 @@ export function ConfigurationPresets({
         </p>
       )}
       {presetId === 'guarded-enable-request' && (
-        <Choice label={t('channels.guardInput')} value={guardChannelId} options={inputs} onChange={setGuardChannelId} />
+        <OptionSelect
+          label={t('channels.guardInput')}
+          value={guardChannelId}
+          options={inputs}
+          onChange={setGuardChannelId}
+        />
       )}
       {presetId === 'generic-digital-output' && (
-        <Choice
+        <OptionSelect
           label={t('presets.feedback')}
           value={feedbackChannelId || 'none'}
           options={[{ id: 'none', label: t('presets.noFeedback') }, ...inputs]}

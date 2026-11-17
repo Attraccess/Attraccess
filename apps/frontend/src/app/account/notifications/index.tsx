@@ -32,7 +32,7 @@ export interface PreferenceGroup {
   rows: PreferenceRow[];
 }
 
-export function useNotificationPreferencesFormState() {
+export function NotificationPreferencesForm() {
   const { t } = useTranslations({ en, de });
   const queryClient = useQueryClient();
   const push = usePushNotifications();
@@ -221,39 +221,6 @@ export function useNotificationPreferencesFormState() {
       />
     );
   };
-  return {
-    t,
-    push,
-    showSuccess,
-    showError,
-    groups,
-    toggleCategory,
-    toggleGroupChannel,
-    toggleAll,
-    isCategoryAllEnabled,
-    isGroupChannelAllEnabled,
-    isAllEnabled,
-    disabled,
-    renderChannelSwitch,
-  } as const;
-}
-
-export function NotificationPreferencesForm() {
-  const {
-    t,
-    push,
-    showSuccess,
-    showError,
-    groups,
-    toggleCategory,
-    toggleGroupChannel,
-    toggleAll,
-    isCategoryAllEnabled,
-    isGroupChannelAllEnabled,
-    isAllEnabled,
-    disabled,
-    renderChannelSwitch,
-  } = useNotificationPreferencesFormState();
 
   return (
     <div className="flex flex-col gap-4">

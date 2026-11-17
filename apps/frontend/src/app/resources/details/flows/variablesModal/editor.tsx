@@ -1,8 +1,10 @@
 import { Input, Label, TextArea, TextField } from '@heroui/react';
 import { Select } from '../../../../../components/select';
 import { ResourceFlowVariableScope } from '@attraccess/react-query-client';
-import { Button, LabeledSwitch, TFunction } from '@attraccess/plugins-frontend-ui';
+import { Button, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useMemo, useState } from 'react';
+import en from './en.json';
+import de from './de.json';
 
 export type ValueType = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null';
 
@@ -21,7 +23,6 @@ interface Props {
   isSaving: boolean;
   onCancel: () => void;
   onSubmit: (values: VariableFormValues) => void;
-  t: TFunction;
 }
 
 const ALL_TYPES: ValueType[] = ['string', 'number', 'boolean', 'object', 'array', 'null'];
@@ -44,7 +45,8 @@ function stringifyJson(value: unknown): string {
 }
 
 export function VariableEditor(props: Props) {
-  const { mode, initial, isSaving, onCancel, onSubmit, t } = props;
+  const { mode, initial, isSaving, onCancel, onSubmit } = props;
+  const { t } = useTranslations({ en, de });
   const isEdit = mode.mode === 'edit';
 
   const [scope, setScope] = useState<ResourceFlowVariableScope>(

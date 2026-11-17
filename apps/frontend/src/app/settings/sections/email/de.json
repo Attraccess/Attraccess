@@ -19,7 +19,10 @@
     "port": {
       "label": "Port",
       "description": "Port des SMTP-Servers.",
-      "errors": { "required": "Ein Port ist erforderlich.", "invalid": "Bitte einen Port zwischen 1 und 65535 angeben." }
+      "errors": {
+        "required": "Ein Port ist erforderlich.",
+        "invalid": "Bitte einen Port zwischen 1 und 65535 angeben."
+      }
     },
     "secure": {
       "label": "TLS verwenden",

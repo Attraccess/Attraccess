@@ -31,7 +31,7 @@ import { useToastMessage } from '../../../components/toastProvider';
 import * as enTranslationsFile from './en.json';
 import * as deTranslationsFile from './de.json';
 
-export function useEditEmailTemplatePageState() {
+export function EditEmailTemplatePage() {
   const navigate = useNavigate();
   const basePath = '/settings/email';
   const { t, language } = useTranslations({ en: enTranslationsFile, de: deTranslationsFile });
@@ -151,61 +151,6 @@ export function useEditEmailTemplatePageState() {
     setTranslationsContent(subject + '\n' + body);
     setTranslationsOpen(true);
   }, [subject]);
-  return {
-    navigate,
-    basePath,
-    t,
-    language,
-    templateType,
-    initialBodyRef,
-    headMjmlRef,
-    isWrappedRef,
-    editorSeed,
-    handleBodyChange,
-    updateTemplate,
-    onSave,
-    resetConfirmOpen,
-    setResetConfirmOpen,
-    resetTemplate,
-    onResetConfirm,
-    variables,
-    templateTitle,
-    pluginInfo,
-    copyVariable,
-    translationsOpen,
-    setTranslationsOpen,
-    translationsContent,
-    openTranslations,
-  } as const;
-}
-
-export function EditEmailTemplatePage() {
-  const {
-    navigate,
-    basePath,
-    t,
-    language,
-    templateType,
-    initialBodyRef,
-    headMjmlRef,
-    isWrappedRef,
-    editorSeed,
-    handleBodyChange,
-    updateTemplate,
-    onSave,
-    resetConfirmOpen,
-    setResetConfirmOpen,
-    resetTemplate,
-    onResetConfirm,
-    variables,
-    templateTitle,
-    pluginInfo,
-    copyVariable,
-    translationsOpen,
-    setTranslationsOpen,
-    translationsContent,
-    openTranslations,
-  } = useEditEmailTemplatePageState();
 
   return (
     <div className="h-full flex flex-col gap-3" data-cy="edit-email-template-page">

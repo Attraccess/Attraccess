@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Chip, Separator } from '@heroui/react';
 import { useRbacCatalogTranslations } from '../../hooks/useRbacCatalogTranslations';
-import { CATEGORY_ORDER } from '../permissionPicker/components/PermissionDrawer';
+import { CATEGORY_ORDER } from '../permissionPicker/groupPermissionsByCategory';
 
 export interface PermissionListItem {
   key: string;

@@ -6,6 +6,8 @@ import { RolesSection } from './index';
 
 const hoisted = vi.hoisted(() => ({
   locale: 'en',
+  rolesLoading: false,
+  listPermissions: vi.fn(() => ({ data: [] })),
   roles: [
     {
       id: 1,
@@ -20,8 +22,11 @@ const hoisted = vi.hoisted(() => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useRbacServiceListPermissions: () => ({ data: [] }),
-  useRbacServiceListRoles: () => ({ data: hoisted.roles, isLoading: false }),
+  useRbacServiceListPermissions: hoisted.listPermissions,
+  useRbacServiceListRoles: () => ({
+    data: hoisted.rolesLoading ? undefined : hoisted.roles,
+    isLoading: hoisted.rolesLoading,
+  }),
 }));
 
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
@@ -59,6 +64,20 @@ vi.mock('../../../roles/delete-role-modal', () => ({ DeleteRoleModal: () => null
 describe('RolesSection', () => {
   beforeEach(() => {
     hoisted.locale = 'en';
+    hoisted.rolesLoading = false;
+    hoisted.listPermissions.mockClear();
+  });
+
+  it('requests the permission catalog in parallel with the roles, not after them', () => {
+    hoisted.rolesLoading = true;
+    render(
+      <MemoryRouter>
+        <RolesSection />
+      </MemoryRouter>,
+    );
+
+    expect(document.querySelector('[data-cy="role-source-chip-custom-role"]')).toBeNull();
+    expect(hoisted.listPermissions).toHaveBeenCalled();
   });
 
   it('updates collection row cells when the UI language changes', () => {

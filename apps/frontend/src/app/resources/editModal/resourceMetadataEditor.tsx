@@ -1,7 +1,9 @@
 import { Button, TextField, Input } from '@heroui/react';
 import { Plus, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { TFunction } from '@attraccess/plugins-frontend-ui';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import en from './resourceEditModal.en.json';
+import de from './resourceEditModal.de.json';
 
 type MetadataValue = Record<string, unknown>;
 
@@ -14,7 +16,6 @@ interface MetadataEntry {
 }
 
 interface ResourceMetadataEditorProps {
-  t: TFunction;
   value?: MetadataValue;
   onChange: (value: MetadataValue) => void;
 }
@@ -76,7 +77,8 @@ const buildMetadata = (entries: MetadataEntry[]): MetadataValue => {
   return Object.keys(result).length > 0 ? result : {};
 };
 
-export function ResourceMetadataEditor({ t, value, onChange }: ResourceMetadataEditorProps) {
+export function ResourceMetadataEditor({ value, onChange }: ResourceMetadataEditorProps) {
+  const { t } = useTranslations({ en, de });
   const [entries, setEntries] = useState<MetadataEntry[]>(() => normalizeMetadata(value));
   const shouldSyncRef = useRef(true);
   const lastKeyInputRef = useRef<HTMLInputElement>(null);

@@ -33,9 +33,8 @@ function anchor(corner: Corner): React.CSSProperties {
   };
 }
 
-type Translate = ReturnType<typeof useTranslations>['t'];
-
-function DownloadingRing({ percent, hintId, t }: { percent: number | null; hintId: string; t: Translate }) {
+function DownloadingRing({ percent, hintId }: { percent: number | null; hintId: string }) {
+  const { t } = useTranslations({ en, de });
   const label = percent === null ? t('downloadingTooltipIndeterminate') : t('downloadingTooltip', { percent });
   return (
     <Tooltip>
@@ -77,10 +76,10 @@ interface ReadyCardProps {
   titleId: string;
   focusReload: boolean;
   onLater: () => void;
-  t: Translate;
 }
 
-function ReadyCard({ applying, titleId, focusReload, onLater, t }: ReadyCardProps) {
+function ReadyCard({ applying, titleId, focusReload, onLater }: ReadyCardProps) {
+  const { t } = useTranslations({ en, de });
   return (
     <>
       <div
@@ -110,7 +109,8 @@ function ReadyCard({ applying, titleId, focusReload, onLater, t }: ReadyCardProp
   );
 }
 
-function useDownloadToast(status: PwaUpdateStatus, t: Translate) {
+function useDownloadToast(status: PwaUpdateStatus) {
+  const { t } = useTranslations({ en, de });
   const [toastDone, setToastDone] = useState(false);
   const sawDownload = useRef(false);
 
@@ -156,20 +156,21 @@ export function PwaUpdateIndicator() {
       <span id={hintId} hidden>
         {t('moveHint')}
       </span>
-      <FloatingIndicator status={status} hintId={hintId} t={t} />
+      <FloatingIndicator status={status} hintId={hintId} />
     </>,
     document.body,
   );
 }
 
-function FloatingIndicator({ status, hintId, t }: { status: PwaUpdateStatus; hintId: string; t: Translate }) {
+function FloatingIndicator({ status, hintId }: { status: PwaUpdateStatus; hintId: string }) {
+  const { t } = useTranslations({ en, de });
   const progress = usePwaUpdateStore((s) => s.progress);
   const { ref, corner, offset, animating, handlers } = useDraggableCorner();
   const [collapsed, setCollapsed] = useState(false);
   // Only a user's Later / reopen moves focus; the indicator never takes focus on its own.
   const [focusOnMount, setFocusOnMount] = useState<FocusOnMount>(null);
   const titleId = useId();
-  const toastDone = useDownloadToast(status, t);
+  const toastDone = useDownloadToast(status);
 
   useEffect(() => {
     // A later update must not take focus because of an earlier Later / reopen.
@@ -196,7 +197,7 @@ function FloatingIndicator({ status, hintId, t }: { status: PwaUpdateStatus; hin
         style={style}
         {...handlers}
       >
-        <DownloadingRing percent={progress === null ? null : Math.round(progress * 100)} hintId={hintId} t={t} />
+        <DownloadingRing percent={progress === null ? null : Math.round(progress * 100)} hintId={hintId} />
       </div>
     );
   }
@@ -243,7 +244,6 @@ function FloatingIndicator({ status, hintId, t }: { status: PwaUpdateStatus; hin
           setFocusOnMount('collapsed');
           setCollapsed(true);
         }}
-        t={t}
       />
     </div>
   );

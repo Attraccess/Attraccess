@@ -16,6 +16,7 @@ import { useWagoTranslations } from '../i18n';
 import type { WorkingCopy } from './configurationSession';
 import { draftIdentity } from './configurationSession';
 
+/** Draft loading, saving and close guard for ConfigurationEditor's ConfigurationSession only (legacy editor, removed in ATT-1216). */
 export function useConfigurationSessionState({ controllerId, onClose }: { controllerId: number; onClose: () => void }) {
   const { t } = useWagoTranslations();
   const client = useQueryClient();

@@ -10,7 +10,7 @@ import { SettingsStep } from './steps/SettingsStep';
 import { UrlStep } from './steps/UrlStep';
 import type { CompanionSettings, Permissions, Step } from './types';
 
-export function useWizardAppState() {
+export function WizardApp() {
   const [step, setStep] = useState<Step>('loading');
   const [serverUrl, setServerUrl] = useState('');
   const [connectError, setConnectError] = useState('');
@@ -172,68 +172,6 @@ export function useWizardAppState() {
       setConnecting(false);
     }
   }
-  return {
-    step,
-    setStep,
-    serverUrl,
-    setServerUrl,
-    connectError,
-    statusText,
-    connecting,
-    deviceId,
-    perms,
-    pendingAction,
-    registered,
-    connected,
-    pinInput,
-    setPinInput,
-    pinConfirm,
-    setPinConfirm,
-    pinSetupError,
-    pinEntry,
-    setPinEntry,
-    pinEntryError,
-    appSettings,
-    setAppSettings,
-    handleGrantAccessibility,
-    handleSetPin,
-    handleVerifyPin,
-    handleDisconnect,
-    handleConnect,
-  } as const;
-}
-
-export function WizardApp() {
-  const {
-    step,
-    setStep,
-    serverUrl,
-    setServerUrl,
-    connectError,
-    statusText,
-    connecting,
-    deviceId,
-    perms,
-    pendingAction,
-    registered,
-    connected,
-    pinInput,
-    setPinInput,
-    pinConfirm,
-    setPinConfirm,
-    pinSetupError,
-    pinEntry,
-    setPinEntry,
-    pinEntryError,
-    appSettings,
-    setAppSettings,
-    handleGrantAccessibility,
-    handleSetPin,
-    handleVerifyPin,
-    handleDisconnect,
-    handleConnect,
-  } = useWizardAppState();
-
   return (
     <div className="flex h-full flex-col bg-background">
       <header className="flex shrink-0 justify-end px-4 pt-2">

@@ -7,7 +7,7 @@ import { useReservationsTranslations } from '../i18n';
 import { describeError } from '../lib/errors';
 import { useInvalidateReservations } from '../lib/queries';
 import { isValidTimeZone } from '../lib/time';
-import { TextInput } from '../shared/fields';
+import { TextInput } from '../shared/TextInput';
 
 const MAX_LISTED = 200;
 

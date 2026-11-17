@@ -3,8 +3,8 @@ import { assertManagementPublicKey } from '../../../management/key';
 import { wagoShellFilesystemGuard } from '../../../host/shell/filesystem';
 import { wagoShellStat } from '../../../host/shell/stat';
 
-export /** Only handles startup policy; no password, key or arbitrary command execution. */
-const dropbearWrapper = `#!/bin/sh
+/** Only handles startup policy; no password, key or arbitrary command execution. */
+export const dropbearWrapper = `#!/bin/sh
 set -eu
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 export PATH
@@ -68,9 +68,9 @@ else
 fi
 `;
 
-export // CC100 FW31 ships shadow's passwd, but omits chpasswd, getent and visudo.
+// CC100 FW31 ships shadow's passwd, but omits chpasswd, getent and visudo.
 // Keep passwords on stdin and validate the installed, fixed sudo rule using sudo.
-const managedAccountPreflight = String.raw`
+export const managedAccountPreflight = String.raw`
 wago_management_stage=tools
 for tool in groupadd useradd passwd sudo cut flock timeout nohup openssl awk; do command -v "$tool" >/dev/null; done
 wago_management_stage=accounts

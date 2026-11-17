@@ -24,7 +24,7 @@ import {
 } from '@heroui/react';
 import { PlugZapIcon, RefreshCwIcon, UnplugIcon } from 'lucide-react';
 import { useState } from 'react';
-import { MISSING_VALUE, useRabbitmqFormatters } from '../format';
+import { MISSING_VALUE, useRabbitmqFormatters } from '../useRabbitmqFormatters';
 import { useRabbitmqTranslations } from '../i18n';
 import { usePolledResource } from '../usePolledResource';
 import { closeConnection, fetchConnections, type RabbitmqConnection } from './connections-api';

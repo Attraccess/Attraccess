@@ -61,7 +61,7 @@ export interface Props {
   children: (open: () => void) => React.ReactNode;
 }
 
-export function useVariablesModalState(props: Props) {
+export function VariablesModal(props: Props) {
   const { resourceId } = props;
   const { isOpen, open, setOpen, close } = useOverlayState();
   const { t, tExists } = useTranslations({
@@ -161,54 +161,6 @@ export function useVariablesModalState(props: Props) {
   );
 
   const rowKey = (row: FlowVariableDto) => `${row.scope}:${row.key}`;
-  return {
-    isOpen,
-    open,
-    setOpen,
-    close,
-    t,
-    formatDateTime,
-    activeScope,
-    setActiveScope,
-    pendingDeleteKey,
-    setPendingDeleteKey,
-    editor,
-    setEditor,
-    upsert,
-    remove,
-    rows,
-    handleAdd,
-    handleEdit,
-    handleSubmit,
-    handleDelete,
-    rowKey,
-    props,
-  } as const;
-}
-
-export function VariablesModal(props: Props) {
-  const {
-    isOpen,
-    open,
-    setOpen,
-    close,
-    t,
-    formatDateTime,
-    activeScope,
-    setActiveScope,
-    pendingDeleteKey,
-    setPendingDeleteKey,
-    editor,
-    setEditor,
-    upsert,
-    remove,
-    rows,
-    handleAdd,
-    handleEdit,
-    handleSubmit,
-    handleDelete,
-    rowKey,
-  } = useVariablesModalState(props);
 
   return (
     <>
@@ -226,7 +178,6 @@ export function VariablesModal(props: Props) {
               isSaving={upsert.isPending}
               onCancel={() => setEditor({ open: false })}
               onSubmit={handleSubmit}
-              t={t}
             />
           ) : (
             <div className="flex flex-col gap-3">

@@ -65,3 +65,19 @@ export function channelAssignment(snapshot: WagoConfigurationSnapshot, channel: 
     );
   return t('channels.module', { profile: point.hardwareProfile, channel: point.channel });
 }
+
+/** The wizard's proposal; nothing of it enters the working draft until the user confirms. */
+export interface AddChannelDraft {
+  purpose: Purpose;
+  name: string;
+  assignment: number | undefined;
+  pulseMs: number;
+  guardId: string;
+  disconnect: string;
+  timeoutMs: number;
+}
+
+export interface TerminalOption {
+  channel: number;
+  label: string;
+}

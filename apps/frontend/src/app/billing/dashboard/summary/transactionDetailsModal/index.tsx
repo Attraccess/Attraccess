@@ -1,11 +1,7 @@
 import { UsageNotesModal } from '../../../../resources/usage/components/UsageNotesModal/index';
-import { TransactionDetailsModalView, type TransactionDetailsModalProps } from './view';
+import { TransactionDetailsModalView, type TransactionDetailsModalProps } from './TransactionDetailsModalView';
 
-export {
-  TransactionDetailsModalItemsTitle,
-  useTransactionDetailsModalState,
-  type TransactionDetailsModalProps,
-} from './view';
+export { type TransactionDetailsModalProps } from './TransactionDetailsModalView';
 
 export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
   return (

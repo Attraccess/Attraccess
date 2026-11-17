@@ -19,6 +19,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { normalizeEnrollmentCode } from './enrollmentCode';
+import { useRetryCountdown } from './useRetryCountdown';
 import { classifyPairingError, isPairingRunning, PairingError, TERMINAL_PAIRING_STATES } from './pairingUtils';
 import de from './de.json';
 import en from './en.json';
@@ -38,7 +39,6 @@ export interface PairingFlowProps {
 
 const POLL_INTERVAL_MS = 1000;
 const NO_RESPONSE_TIMEOUT_MS = 30_000;
-const COUNTDOWN_TICK_MS = 250;
 // After these the request moved on or ended: read it again so the dialog shows what the reader shows.
 const REREAD_ERRORS: ReadonlySet<string> = new Set(['stale', 'notWaiting', 'failed', 'readerGone']);
 // The request is over; once the dialog shows how it ended, the error would only repeat it.
@@ -165,31 +165,6 @@ function useCodeInput(presetCode: string | undefined) {
   };
 }
 
-/** Counts down the wait the server asked for after too many attempts. */
-export function useRetryCountdown() {
-  const [deadline, setDeadline] = useState<number | null>(null);
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (deadline === null) return;
-    const timer = setInterval(() => {
-      const time = Date.now();
-      setNow(time);
-      if (time >= deadline) setDeadline(null);
-    }, COUNTDOWN_TICK_MS);
-    return () => clearInterval(timer);
-  }, [deadline]);
-
-  return {
-    secondsLeft: deadline === null ? 0 : Math.max(0, Math.ceil((deadline - now) / 1000)),
-    start: (seconds: number) => {
-      const time = Date.now();
-      setNow(time);
-      setDeadline(time + seconds * 1000);
-    },
-  };
-}
-
 /** The error to show: a rate limit counts down live and disappears when it is over; an ended request explains itself. */
 function visibleError(error: PairingError | null, secondsLeft: number, finished: boolean): PairingError | null {
   if (!error) return null;
@@ -216,7 +191,53 @@ function useCancelAndClose(
   };
 }
 
-export function usePairingFlow(props: PairingFlowProps) {
+/** Everything the pairing dialog and its steps read from, and call on, the pairing flow. */
+export interface PairingFlow {
+  running: PairingDto[];
+  activeId: string | null;
+  current: PairingDto | null;
+  resolvedByCode: boolean;
+  noResponse: boolean;
+  pollingFailed: boolean;
+  readers: Attractap[] | undefined;
+  codeInput: string;
+  codeRejected: boolean;
+  setCodeInput: (value: string) => void;
+  setCodeFromScan: (value: string) => void;
+  setPickedId: (id: string | null) => void;
+  /** Back to the list of waiting Lite readers after one was picked. */
+  pickedFromList: boolean;
+  backToList: () => void;
+  choice: Choice;
+  setChoice: (choice: Choice) => void;
+  pickedTarget: number | undefined;
+  setPickedTarget: (readerId: number | undefined) => void;
+  name: string;
+  setName: (name: string) => void;
+  error: PairingError | null;
+  notice: string | null;
+  idle: boolean;
+  normalizedCode: string | null;
+  bound: boolean;
+  byPattern: boolean;
+  finished: boolean;
+  canFind: boolean;
+  canApprove: boolean;
+  submit: () => Promise<void>;
+  findByCode: () => void;
+  /** Enter in the dialog: look the reader up while it is not known, otherwise approve. */
+  submitForm: () => void;
+  /** The dialog's Cancel button: ends the waiting request on the server, then closes. */
+  cancel: () => void;
+  resolvePending: boolean;
+  approvePending: boolean;
+  waitingForReader: boolean;
+  needsCodeToFind: boolean;
+  needsChoice: boolean;
+}
+
+/** Shared by PairingDialog and its step components: the pairing request, the admin's inputs and the approval. */
+export function usePairingFlow(props: PairingFlowProps): PairingFlow {
   const { onClose } = props;
   const { t } = useTranslations({ de, en });
   const toast = useToastMessage();
@@ -364,8 +385,12 @@ export function usePairingFlow(props: PairingFlowProps) {
   // Typing a new code answers an error about the old one, but not a wait the server asked for.
   const clearError = () => setError((previous) => (previous?.kind === 'rateLimited' ? previous : null));
   return {
-    ...active,
-    t,
+    running: active.running,
+    activeId: active.activeId,
+    current,
+    resolvedByCode,
+    noResponse: active.noResponse,
+    pollingFailed: active.pollingFailed,
     readers,
     codeInput,
     codeRejected: code.codeRejected,
@@ -378,7 +403,6 @@ export function usePairingFlow(props: PairingFlowProps) {
       clearError();
     },
     setPickedId,
-    /** Back to the list of waiting Lite readers after one was picked. */
     pickedFromList: pickedId !== null && active.activeId === pickedId && !finished,
     backToList: () => {
       setPickedId(null);
@@ -402,9 +426,7 @@ export function usePairingFlow(props: PairingFlowProps) {
     canApprove,
     submit,
     findByCode,
-    /** Enter in the dialog: look the reader up while it is not known, otherwise approve. */
     submitForm: () => (needsCodeToFind ? findByCode() : void submit()),
-    /** The dialog's Cancel button: ends the waiting request on the server, then closes. */
     cancel: cancelAndClose,
     resolvePending: resolving,
     approvePending: approve.isPending,
@@ -413,5 +435,3 @@ export function usePairingFlow(props: PairingFlowProps) {
     needsChoice: current !== null && !finished && !bound && props.presetTargetReaderId === undefined,
   };
 }
-
-export type PairingFlow = ReturnType<typeof usePairingFlow>;

@@ -1,4 +1,5 @@
 const nx = require('@nx/eslint-plugin');
+const noHookReturnTypeConfig = require('./tools/eslint-rules/no-hook-return-type.config.cjs');
 
 module.exports = [
   // {
@@ -27,6 +28,7 @@ module.exports = [
     // Override or add rules here
     rules: {
       '@nx/workspace-multiline-import-specifiers': 'error',
+      '@nx/workspace-no-export-comment': 'error',
       '@nx/enforce-module-boundaries': [
         'error',
         {
@@ -62,6 +64,33 @@ module.exports = [
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     },
   },
+  // ATT-1224: no hook ReturnType in frontend source. For lint targets that run from the workspace root (plugins,
+  // companion); frontend and the plugin UI libs lint from their own folder and add the block themselves.
+  noHookReturnTypeConfig([
+    'apps/frontend/**/*.{ts,tsx}',
+    'apps/plugins/*/frontend/**/*.{ts,tsx}',
+    'libs/plugins-frontend-*/**/*.{ts,tsx}',
+    'apps/companion/renderer/**/*.{ts,tsx}',
+  ]),
+  {
+    // ATT-1224: plugin dialogs use the shared StandardModal / StatusDialog.
+    files: ['apps/plugins/*/frontend/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@heroui/react',
+              importNames: ['Modal', 'ModalBackdrop', 'ModalContainer', 'ModalDialog'],
+              message:
+                'Use StandardModal or StatusDialog from @attraccess/plugins-frontend-ui instead of the raw HeroUI Modal.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   {
     // Plugin acceptance tests are the one place where host and plugin are composed
     // inside a single process: they boot real core services around a real plugin
@@ -90,3 +119,6 @@ module.exports = [
       ]
     : []),
 ];
+
+// Shared with project configs that lint from their own folder (see no-hook-return-type.config.cjs).
+module.exports.noHookReturnTypeConfig = noHookReturnTypeConfig;

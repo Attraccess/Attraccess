@@ -54,9 +54,9 @@ export type SidebarItemGroup = {
   licenseModule?: string;
 };
 
-export // Takes LucideProps like every other sidebar icon, so callers can size it the same way. `size` is
+// Takes LucideProps like every other sidebar icon, so callers can size it the same way. `size` is
 // lucide-only and would land on the <svg> as an invalid attribute, so it is translated here.
-const BalenaSidebarIcon = ({ size = 16, ...props }: LucideProps) => (
+export const BalenaSidebarIcon = ({ size = 16, ...props }: LucideProps) => (
   <BalenaIcon {...props} width={size} height={size} />
 );
 

@@ -22,4 +22,6 @@ function Harness() {
   );
 }
 
-createRoot(document.getElementById('root')!).render(<Harness />);
+const root = document.getElementById('root');
+if (!root) throw new Error('Harness root element is missing');
+createRoot(root).render(<Harness />);

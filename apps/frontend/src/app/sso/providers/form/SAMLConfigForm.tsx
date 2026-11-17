@@ -10,7 +10,11 @@ import de from '../de.json';
 const EMAIL_ATTRIBUTE_KEYS_DEFAULT =
   'email · mail · Email · http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress · urn:oid:1.2.840.113549.1.9.1';
 
-export function useSAMLConfigFormState({ form }: SAMLConfigFormProps) {
+export interface SAMLConfigFormProps {
+  form: SSOProviderFormApi;
+}
+
+export function SAMLConfigForm({ form }: SAMLConfigFormProps) {
   const { t } = useTranslations({ en, de });
   const {
     formValues,
@@ -28,47 +32,6 @@ export function useSAMLConfigFormState({ form }: SAMLConfigFormProps) {
     roles,
     isLoadingRoles,
   } = form;
-  return {
-    t,
-    formValues,
-    setSaml,
-    emailAttributeKeys,
-    setEmailAttributeKeys,
-    roleAttributeKeys,
-    setRoleAttributeKeys,
-    showSamlProvisioningSecret,
-    setShowSamlProvisioningSecret,
-    samlRoleMappingEntries,
-    setSamlRoleMappingEntries,
-    handleSamlToggleChange,
-    providerDetails,
-    roles,
-    isLoadingRoles,
-  } as const;
-}
-
-export interface SAMLConfigFormProps {
-  form: SSOProviderFormApi;
-}
-
-export function SAMLConfigForm({ form }: SAMLConfigFormProps) {
-  const {
-    t,
-    formValues,
-    setSaml,
-    emailAttributeKeys,
-    setEmailAttributeKeys,
-    roleAttributeKeys,
-    setRoleAttributeKeys,
-    showSamlProvisioningSecret,
-    setShowSamlProvisioningSecret,
-    samlRoleMappingEntries,
-    setSamlRoleMappingEntries,
-    handleSamlToggleChange,
-    providerDetails,
-    roles,
-    isLoadingRoles,
-  } = useSAMLConfigFormState({ form });
 
   return (
     <>

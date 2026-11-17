@@ -35,7 +35,7 @@ export const FALLBACK_POLICY: PublicPasswordPolicy = {
   minZxcvbnScore: 3,
 };
 
-export function useRegistrationFormState({ onHasAccount }: RegisterFormProps) {
+export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
   const { t, tExists } = useTranslations({
     en: {
       ...en,
@@ -165,58 +165,6 @@ export function useRegistrationFormState({ onHasAccount }: RegisterFormProps) {
     }
     sessionStorage.setItem('twoFactorSetupIntent', 'true');
   }, []);
-  return {
-    t,
-    registeredEmail,
-    isOpen,
-    setOpen,
-    username,
-    setUsername,
-    email,
-    setEmail,
-    password,
-    setPassword,
-    passwordConfirmation,
-    setPasswordConfirmation,
-    serverErrors,
-    setServerErrors,
-    policy,
-    usernameValidationMessages,
-    trimmedUsername,
-    trimmedEmail,
-    canSubmit,
-    isPending,
-    handleSubmit,
-    markTwoFactorSetupIntent,
-    onHasAccount,
-  } as const;
-}
-
-export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
-  const {
-    t,
-    registeredEmail,
-    isOpen,
-    setOpen,
-    username,
-    setUsername,
-    email,
-    setEmail,
-    password,
-    setPassword,
-    passwordConfirmation,
-    setPasswordConfirmation,
-    serverErrors,
-    setServerErrors,
-    policy,
-    usernameValidationMessages,
-    trimmedUsername,
-    trimmedEmail,
-    canSubmit,
-    isPending,
-    handleSubmit,
-    markTwoFactorSetupIntent,
-  } = useRegistrationFormState({ onHasAccount });
 
   return (
     <>

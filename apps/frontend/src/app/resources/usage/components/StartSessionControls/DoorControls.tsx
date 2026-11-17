@@ -1,8 +1,9 @@
-import { Button, TFunction } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
+import en from './translations/en.json';
+import de from './translations/de.json';
 import { LockIcon } from 'lucide-react';
 
 interface DoorControlsProps {
-  t: TFunction;
   onLock: () => void;
   onUnlock: () => void;
   onUnlatch?: () => void;
@@ -13,7 +14,6 @@ interface DoorControlsProps {
 }
 
 export function DoorControls({
-  t,
   onLock,
   onUnlock,
   onUnlatch,
@@ -21,7 +21,8 @@ export function DoorControls({
   unlockIsPending,
   unlatchIsPending,
   separateUnlockAndUnlatch,
-}: DoorControlsProps) {
+}: Readonly<DoorControlsProps>) {
+  const { t } = useTranslations({ en, de });
   return (
     <div className="flex flex-row flex-wrap gap-2 w-full justify-between">
       <Button variant="danger" className="flex-1" isPending={lockIsPending} onPress={onLock}>

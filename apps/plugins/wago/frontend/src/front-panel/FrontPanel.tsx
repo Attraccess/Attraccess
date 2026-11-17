@@ -1,129 +1,144 @@
-import { FrontPanelStatusAlerts } from './working-copy/StatusAlerts';
 // Combines controller configuration and live controls on one responsive page.
 // FEATURE: WAGO front panel exposes physical terminals and device settings.
 import { Button, PageHeader, StatusAlert, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
 import { ArrowLeft, History } from 'lucide-react';
+import { useState } from 'react';
+import { useWagoTranslations } from '../i18n';
 import { OnboardCard } from './controls/Cards';
-import { DeviceSettings } from './settings/DeviceSettings';
-import { BusSettings, TerminalSettings } from './settings/SettingsDrawer';
+import { FrontPanelDevices } from './controls/FrontPanelDevices';
 import { channelEnabledSupport, type Terminal, type PanelConfiguration } from './model';
-import { useFrontPanelState } from './working-copy/useFrontPanelState';
-import { FrontPanelModalBackdrop } from './working-copy/ModalBackdrop';
-import { FrontPanelPanelDevices } from './controls/Devices';
-import { FrontPanelLeaveDialog } from './working-copy/LeaveDialog';
-import { AddDeviceButton, ManualOverrideAlert, UnappliedChangesAlert } from './working-copy/ChangeAlerts';
+import { DeviceSettings } from './settings/DeviceSettings';
+import { BusSettings } from './settings/BusSettings';
+import { TerminalSettings } from './settings/TerminalSettings';
+import { AddDeviceButton } from './working-copy/AddDeviceButton';
+import { ApplyReviewDialog } from './working-copy/ApplyReviewDialog';
+import { FrontPanelLeaveDialog } from './working-copy/FrontPanelLeaveDialog';
+import { FrontPanelStatusAlerts } from './working-copy/FrontPanelStatusAlerts';
+import { ManualOverrideAlert } from './working-copy/ManualOverrideAlert';
+import { UnappliedChangesAlert } from './working-copy/UnappliedChangesAlert';
+import { useFrontPanel } from './working-copy/useFrontPanel';
 
 export type Selection =
   | { kind: 'terminal'; terminal: Terminal }
   | { kind: 'bus' }
   | { kind: 'device'; id: string; provisional?: PanelConfiguration };
 
-export function FrontPanel({
-  controllerId,
-  onClose,
-  onHistory,
-}: {
+interface FrontPanelProps {
   controllerId: number;
   onClose: () => void;
   onHistory: () => void;
-}) {
-  const model = useFrontPanelState({ controllerId, onClose, onHistory });
-  const support = channelEnabledSupport(model.panel.diagnostics);
-  const flowChannelIds = new Set(
-    (model.panel.diagnostics.data?.references ?? []).map((reference) => reference.channelId),
-  );
+}
+
+export function FrontPanel({ controllerId, onClose, onHistory }: FrontPanelProps) {
+  const { t, tBackendMessage } = useWagoTranslations();
+  const panel = useFrontPanel(controllerId);
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const [leave, setLeave] = useState<(() => void) | null>(null);
+  const closeSettings = () => setSelection(null);
+  const navigate = (action: () => void) => (panel.dirty ? setLeave(() => action) : action());
+  const device =
+    selection?.kind === 'device'
+      ? (selection.provisional ?? panel.configuration)?.snapshot.modbus?.devices.find(
+          (device) => device.id === selection.id,
+        )
+      : undefined;
+  const manualCount = panel.diagnostics.data?.manualOutputChannelIds?.length ?? 0;
+  const support = channelEnabledSupport(panel.diagnostics);
+  const flowChannelIds = new Set((panel.diagnostics.data?.references ?? []).map((reference) => reference.channelId));
 
   return (
     <main
       className="wg:mx-auto wg:flex wg:w-full wg:max-w-[1440px] wg:min-w-0 wg:flex-col wg:gap-5 wg:p-4 wg:md:p-6"
-      aria-label={model.t('panel.title')}
+      aria-label={t('panel.title')}
     >
       <header className="wg:flex wg:flex-col wg:gap-4">
         <div className="wg:flex wg:flex-wrap wg:justify-between wg:gap-2">
-          <Button variant="ghost" isDisabled={model.panel.busy} onPress={() => model.navigate(onClose)}>
+          <Button variant="ghost" isDisabled={panel.busy} onPress={() => navigate(onClose)}>
             <ArrowLeft className="wg:size-4" />
-            {model.t('controllers.title')}
+            {t('controllers.title')}
           </Button>
-          <Button variant="ghost" isDisabled={model.panel.busy} onPress={() => model.navigate(onHistory)}>
+          <Button variant="ghost" isDisabled={panel.busy} onPress={() => navigate(onHistory)}>
             <History className="wg:size-4" />
-            {model.t('panel.history')}
+            {t('panel.history')}
           </Button>
         </div>
         <PageHeader
-          title={model.t('panel.title')}
-          subtitle={`WAGO / ${model.panel.diagnostics.data?.name ?? model.t('editor.controller', { id: controllerId })}`}
+          title={t('panel.title')}
+          subtitle={`WAGO / ${panel.diagnostics.data?.name ?? t('editor.controller', { id: controllerId })}`}
           noMargin
         />
       </header>
-      <FrontPanelStatusAlerts model={model} />
-      <UnappliedChangesAlert model={model} />
-      {model.panel.conflict && (
-        <StatusAlert status="warning" title={model.t('panel.conflict')}>
-          {model.t('panel.conflictHint')}
+      <FrontPanelStatusAlerts panel={panel} />
+      <UnappliedChangesAlert panel={panel} />
+      {panel.conflict && (
+        <StatusAlert status="warning" title={t('panel.conflict')}>
+          {t('panel.conflictHint')}
         </StatusAlert>
       )}
-      {model.panel.pending && <StatusAlert status="accent" title={model.t('panel.applying')} />}
-      {model.panel.diagnostics.data?.configuration.rejected && (
-        <StatusAlert status="danger" title={model.t('panel.rejected')}>
-          {model.panel.diagnostics.data.configuration.rejectionErrors
-            .map((error) => `${error.path}: ${model.tBackendMessage(error.code)}`)
+      {panel.pending && <StatusAlert status="accent" title={t('panel.applying')} />}
+      {panel.diagnostics.data?.configuration.rejected && (
+        <StatusAlert status="danger" title={t('panel.rejected')}>
+          {panel.diagnostics.data.configuration.rejectionErrors
+            .map((error) => `${error.path}: ${tBackendMessage(error.code)}`)
             .join(', ')}
         </StatusAlert>
       )}
-      <ManualOverrideAlert model={model} />
-      {model.panel.ready && !model.panel.live.enabled && (
+      <ManualOverrideAlert manualCount={manualCount} panel={panel} />
+      {panel.ready && !panel.live.enabled && (
         <p role="status" className="wg:text-sm wg:text-muted">
-          {model.t('panel.liveUnavailable')}
+          {t('panel.liveUnavailable')}
         </p>
       )}
-      {!model.panel.ready && !model.panel.loadError && <TableDataLoadingIndicator />}
-      {model.panel.ready && model.panel.configuration && (
+      {!panel.ready && !panel.loadError && <TableDataLoadingIndicator />}
+      {panel.ready && panel.configuration && (
         <>
           <OnboardCard
-            configuration={model.panel.configuration}
-            live={model.panel.live}
-            disabled={model.panel.busy || model.panel.pending}
-            editBus={() => model.setSelection({ kind: 'bus' })}
-            editTerminal={(terminal) => model.setSelection({ kind: 'terminal', terminal })}
+            configuration={panel.configuration}
+            live={panel.live}
+            disabled={panel.busy || panel.pending}
+            editBus={() => setSelection({ kind: 'bus' })}
+            editTerminal={(terminal) => setSelection({ kind: 'terminal', terminal })}
           />
-          <FrontPanelPanelDevices {...model} />
-          <AddDeviceButton model={model} support={support} />
-          {model.selection?.kind === 'terminal' && (
+          <FrontPanelDevices
+            configuration={panel.configuration}
+            panel={panel}
+            onEditDevice={(id) => setSelection({ kind: 'device', id })}
+          />
+          <AddDeviceButton
+            panel={panel}
+            support={support}
+            onAdded={(id, provisional) => setSelection({ kind: 'device', id, provisional })}
+          />
+          {selection?.kind === 'terminal' && (
             <TerminalSettings
-              key={model.selection.terminal.label}
-              configuration={model.panel.configuration}
-              terminal={model.selection.terminal}
-              onChange={model.panel.edit}
-              onClose={model.closeSettings}
+              key={selection.terminal.label}
+              configuration={panel.configuration}
+              terminal={selection.terminal}
+              onChange={panel.edit}
+              onClose={closeSettings}
             />
           )}
-          {model.selection?.kind === 'bus' && (
-            <BusSettings
-              configuration={model.panel.configuration}
-              onChange={model.panel.edit}
-              onClose={model.closeSettings}
-            />
+          {selection?.kind === 'bus' && (
+            <BusSettings configuration={panel.configuration} onChange={panel.edit} onClose={closeSettings} />
           )}
-          {model.device && (
+          {device && (
             <DeviceSettings
-              key={model.device.id}
-              isNew={model.selection?.kind === 'device' && Boolean(model.selection.provisional)}
+              key={device.id}
+              isNew={selection?.kind === 'device' && Boolean(selection.provisional)}
               support={support}
               flowChannelIds={flowChannelIds}
               configuration={
-                model.selection?.kind === 'device'
-                  ? (model.selection.provisional ?? model.panel.configuration)
-                  : model.panel.configuration
+                selection?.kind === 'device' ? (selection.provisional ?? panel.configuration) : panel.configuration
               }
-              device={model.device}
-              onChange={model.panel.edit}
-              onClose={model.closeSettings}
+              device={device}
+              onChange={panel.edit}
+              onClose={closeSettings}
             />
           )}
         </>
       )}
-      <FrontPanelModalBackdrop {...model} />
-      <FrontPanelLeaveDialog {...model} />
+      <ApplyReviewDialog panel={panel} />
+      <FrontPanelLeaveDialog leave={leave} onCancel={() => setLeave(null)} />
     </main>
   );
 }

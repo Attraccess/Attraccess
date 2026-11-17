@@ -94,6 +94,10 @@ Use `StatusDialog` for notices and confirmations (info, success, warning, error)
 action button. Use `StandardModal` only for richer dialog content. Shared UI comes from
 `@attraccess/plugins-frontend-ui`; do not add copies of these components in core or in plugins.
 
+Structure: a component reads its own data or takes a small explicit props interface; never type props or helpers
+with `ReturnType<typeof useX>` (lint rejects it). Keep a `use*State` hook only for state several components share, next
+to its owner with a one-line JSDoc naming them. One component or hook per file, named after its export.
+
 Use HeroUI React documentation from @Docs https://heroui.com/react/llms.txt
 For component-specific documentation @Docs https://heroui.com/react/llms-components.txt
 For patterns and best practices @Docs https://heroui.com/react/llms-patterns.txt

@@ -1,27 +1,31 @@
+import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
 import { Card } from '@heroui/react';
+import type { UseQueryResult } from '@tanstack/react-query';
+import type { Dispatch, SetStateAction } from 'react';
+import type { ConfigurationEditorMetadata, WagoConfigurationDraft, WagoConfigurationSnapshot } from '../api/client';
+import type { Section } from './ConfigurationEditor';
 import { emptyConfiguration, readMetadata } from './model';
 import { ConfigurationRevisions } from './ConfigurationRevisions';
 import { draftIdentity } from './configurationSession';
-import { useConfigurationSessionState } from './useConfigurationSessionState';
-type Props = Pick<
-  ReturnType<typeof useConfigurationSessionState>,
-  | 'section'
-  | 'controllerId'
-  | 'metadata'
-  | 'generation'
-  | 'reviewDisabled'
-  | 'draft'
-  | 'setRevisionBusy'
-  | 'setInitialized'
-  | 'setNotice'
-  | 'setError'
-  | 'loadedDraft'
-  | 'setDraftConflict'
-  | 'setSnapshot'
-  | 'setMetadata'
-  | 'setDirty'
-  | 'setGeneration'
->;
+interface ConfigurationSessionContentProps {
+  section: Section;
+  controllerId: number;
+  metadata: ConfigurationEditorMetadata;
+  generation: number;
+  reviewDisabled: boolean;
+  draft: UseQueryResult<WagoConfigurationDraft | null>;
+  setRevisionBusy: (busy: boolean) => void;
+  setInitialized: (initialized: boolean) => void;
+  setNotice: (notice: string | TranslationMessage) => void;
+  setError: (error: string | TranslationMessage | null) => void;
+  loadedDraft: { current: string | null };
+  setDraftConflict: (conflict: boolean) => void;
+  setSnapshot: (snapshot: WagoConfigurationSnapshot) => void;
+  setMetadata: (metadata: ConfigurationEditorMetadata) => void;
+  setDirty: (dirty: boolean) => void;
+  setGeneration: Dispatch<SetStateAction<number>>;
+}
+
 export function ConfigurationSessionContent({
   section,
   controllerId,
@@ -39,7 +43,7 @@ export function ConfigurationSessionContent({
   setMetadata,
   setDirty,
   setGeneration,
-}: Props) {
+}: ConfigurationSessionContentProps) {
   return (
     <div hidden={section !== 'review' && section !== 'history'}>
       <Card>
