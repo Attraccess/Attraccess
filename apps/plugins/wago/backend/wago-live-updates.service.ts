@@ -1,4 +1,3 @@
-import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { ForbiddenException, Inject, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { createSharedLiveSampler, type AuthenticatedUser, type PluginContext } from '@attraccess/plugins-backend-sdk';
 import { WagoService } from './controllers/service';
@@ -6,8 +5,7 @@ import { WagoCommissioningService } from './commissioning/service';
 import { WagoDiagnosticsService } from './diagnostics/service';
 import { WagoManagedRuntimeService } from './runtime/managed/service';
 import { WagoNetworkChangeService } from './network/service';
-import { WagoController } from './controllers/entity';
-import { WagoCommissioningSession } from './commissioning/sessions/session.entity';
+import { openWagoStorage } from './storage';
 
 /** Sample authoritative services once per active topic, shared across tabs/users. */
 @Injectable()
@@ -43,10 +41,11 @@ export class WagoLiveUpdatesService implements OnModuleInit {
           if (!pattern.test(identifier ?? '')) throw new NotFoundException();
           const [id, offset = 0] = identifier.split(':').map(Number);
           if (!Number.isSafeInteger(id) || !Number.isSafeInteger(offset)) throw new NotFoundException();
+          const storage = openWagoStorage(this.context);
           const exists =
             kind === 'session'
-              ? await sqlitePersistence(this.context).getRepository(WagoCommissioningSession).existsBy({ id })
-              : await sqlitePersistence(this.context).getRepository(WagoController).existsBy({ id });
+              ? await storage.commissioningSessions.count({ id })
+              : await storage.controllers.count({ id });
           if (!exists) throw new NotFoundException();
         },
         source: ({ identifier }) =>

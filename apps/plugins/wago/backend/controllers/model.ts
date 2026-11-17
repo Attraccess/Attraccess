@@ -98,6 +98,6 @@ export class MqttSubscriptionError extends Error {
 
 export class WagoCredentialOperationUncertainError extends ConflictException {}
 
-export type WagoControllerSummary = Omit<WagoController, 'fingerprint' | 'pairingCodeHash'> & {
+export type WagoControllerSummary = Omit<WagoController, 'fingerprint' | 'pairingCodeHash' | 'credentialMqttServerId' | 'credentialEpoch'> & {
   connectivity: 'online' | 'stale' | 'untrusted' | 'runtime_check' | 'runtime_update';
 };

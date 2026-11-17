@@ -21,7 +21,11 @@ import { hash, isValidHardwareId } from './model';
 
 import { WagoController } from './entity';
 
-import { type PluginContext, type PluginMqttSubscription } from '@attraccess/plugins-backend-sdk';
+import {
+  PluginStorageUniqueViolation,
+  type PluginContext,
+  type PluginMqttSubscription,
+} from '@attraccess/plugins-backend-sdk';
 
 import { MqttSubscriptionError } from './model';
 
@@ -33,7 +37,7 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
     if (!parsed) return;
     const { heartbeat, rawHeartbeat } = parsed;
     const canonical = canonicalEnvelope(rawHeartbeat, 'heartbeat');
-    const controller = await this.controllers.findOneBy({ hardwareId });
+    const controller = await this.controllers.findOne({ where: { hardwareId } });
     if (
       !controller ||
       controller.trustState !== 'claimed' ||
@@ -118,7 +122,7 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
       controller.lastSequence = this.diagnostics.read(controller.id).legacyHeartbeatSequence ?? controller.lastSequence;
       controller.lastHeartbeatAt = now;
     } else {
-      controller.lastHeartbeatAt = heartbeatAt;
+      controller.lastHeartbeatAt = heartbeatAt ?? controller.lastHeartbeatAt;
     }
     controller.lastSeenAt = now;
     controller.compatibilityError = compatibilityError(heartbeat);
@@ -126,17 +130,19 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
     // A heartbeat may have loaded this entity before a concurrent SSH network
     // change commits. Persist telemetry fields only; never overwrite that
     // operation's broker, credential or enrollment bindings with an old snapshot.
-    await this.controllers.save({
-      id: controller.id,
-      protocolVersion: controller.protocolVersion,
-      runtimeVersion: controller.runtimeVersion,
-      capabilities: controller.capabilities,
-      lastSequence: controller.lastSequence,
-      lastHeartbeatAt: controller.lastHeartbeatAt,
-      lastSeenAt: controller.lastSeenAt,
-      compatibilityError: controller.compatibilityError,
-      updatedAt: controller.updatedAt,
-    });
+    await this.controllers.update(
+      { id: controller.id },
+      {
+        protocolVersion: controller.protocolVersion,
+        runtimeVersion: controller.runtimeVersion,
+        capabilities: controller.capabilities,
+        lastSequence: controller.lastSequence,
+        lastHeartbeatAt: controller.lastHeartbeatAt,
+        lastSeenAt: controller.lastSeenAt,
+        compatibilityError: controller.compatibilityError,
+        updatedAt: controller.updatedAt,
+      },
+    );
   }
 
   protected async onDiscovery(serverId: number, topic: string, payload: Buffer): Promise<void> {
@@ -162,41 +168,48 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
       this.context.logger.warn(`Ignoring WAGO announcement without a valid enrollment secret on ${topic}`);
       return;
     }
-    const existing = await this.controllers.findOneBy({ hardwareId });
+    const existing = await this.controllers.findOne({ where: { hardwareId } });
     if (existing?.trustState === 'claimed') return; // Discovery can never modify trusted identity or configuration.
     const now = new Date().toISOString();
-    const candidate =
-      existing ??
-      this.controllers.create({
-        hardwareId,
-        trustState: 'untrusted',
-        name: null,
-        mqttServerId: serverId,
-        enrollmentId: enrollment.id,
-        pairingCodeHash: '',
-        fingerprint: null,
-        protocolVersion: '',
-        runtimeVersion: '',
-        capabilities: '[]',
-        lastSequence: 0,
-        lastHeartbeatAt: null,
-        lastSeenAt: now,
-        compatibilityError: null,
-        createdAt: now,
-        updatedAt: now,
-      });
-    candidate.mqttServerId = serverId;
-    candidate.enrollmentId = enrollment.id;
-    candidate.pairingCodeHash = hash(announcement.pairingCode);
-    candidate.fingerprint = announcement.fingerprint ?? null;
-    candidate.protocolVersion = announcement.protocolVersion;
-    candidate.runtimeVersion = announcement.runtimeVersion;
-    candidate.capabilities = JSON.stringify(announcement.capabilities);
-    candidate.lastSequence = announcement.sequence ?? candidate.lastSequence;
-    candidate.lastSeenAt = now;
-    candidate.compatibilityError = compatibilityError(announcement);
-    candidate.updatedAt = now;
-    await this.controllers.save(candidate);
+    const discovered = {
+      mqttServerId: serverId,
+      enrollmentId: enrollment.id,
+      pairingCodeHash: hash(announcement.pairingCode),
+      fingerprint: announcement.fingerprint ?? null,
+      protocolVersion: announcement.protocolVersion,
+      runtimeVersion: announcement.runtimeVersion,
+      capabilities: JSON.stringify(announcement.capabilities),
+      lastSeenAt: now,
+      compatibilityError: compatibilityError(announcement),
+      updatedAt: now,
+    };
+    let candidate: WagoController;
+    if (existing) {
+      const lastSequence = announcement.sequence ?? existing.lastSequence;
+      // Compare-and-set on the untrusted state: a claim that won the race keeps its trusted identity.
+      const updated = await this.controllers.update(
+        { id: existing.id, trustState: 'untrusted' },
+        { ...discovered, lastSequence },
+      );
+      if (!updated) return;
+      candidate = { ...existing, ...discovered, lastSequence };
+    } else {
+      try {
+        candidate = await this.controllers.insert({
+          ...discovered,
+          hardwareId,
+          trustState: 'untrusted',
+          name: null,
+          lastSequence: announcement.sequence ?? 0,
+          lastHeartbeatAt: null,
+          createdAt: now,
+        });
+      } catch (error) {
+        // A concurrent announcement created the controller first; handle this one as an update of it.
+        if (error instanceof PluginStorageUniqueViolation) return this.onDiscovery(serverId, topic, payload);
+        throw error;
+      }
+    }
     if (this.commissioningDiscoveryHandler) {
       try {
         await this.commissioningDiscoveryHandler(candidate);
