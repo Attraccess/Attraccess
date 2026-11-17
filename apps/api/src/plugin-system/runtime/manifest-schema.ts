@@ -27,11 +27,6 @@ export const mainSchema = z.object({
   entryPoint: z.string(),
 });
 
-/** An engine name as written in plugin.json, for example "sqlite". */
-export const PluginBackendNameSchema = z
-  .string()
-  .regex(/^[a-z][a-z0-9_-]{0,31}$/, 'engine names are lowercase identifiers such as "sqlite"');
-
 export const PluginManifestSchema = z.object({
   dependencies: PluginDependenciesSchema,
   name: z.string(),
@@ -44,7 +39,6 @@ export const PluginManifestSchema = z.object({
       })
       .optional(),
     backend: mainSchema.optional(),
-    migrations: mainSchema.optional(),
   }),
   version: z.string(),
   attraccessVersion: z
@@ -73,12 +67,6 @@ export const PluginManifestSchema = z.object({
       },
       { message: 'min, max or exact must be provided' },
     ),
-  /**
-   * Database engines this plugin's own persistence supports. Required when the plugin stores data. Any engine name is
-   * accepted here (a plugin may already list engines this host cannot run); `assertPluginSupportsBackend` then refuses
-   * it with a message that names the plugin and both engine lists.
-   */
-  persistence: z.object({ backends: z.array(PluginBackendNameSchema).min(1) }).optional(),
   permissions: z
     .array(z.nativeEnum(PluginPermission, { message: 'unknown plugin permission' }))
     .optional()

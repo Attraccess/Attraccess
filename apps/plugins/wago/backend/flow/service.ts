@@ -191,7 +191,8 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
       const found = await Promise.all(
         controllerIds.slice(start, start + 50).map(async (controllerId) => ({
           controllerId,
-          revision: (await this.revisions.aggregate('revision', { controllerId, state: 'applied' })).max as number | null,
+          revision: (await this.revisions.aggregate('revision', { controllerId, state: 'applied' })).max as
+            number | null,
         })),
       );
       for (const entry of found) if (entry.revision !== null) latest.push({ ...entry, revision: entry.revision });
@@ -227,7 +228,12 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
     return this.cacheChannels(revision);
   }
 
-  protected store(controller: WagoControllerRow, channelId: string, event: WagoOperationalMessage, value: unknown): void {
+  protected store(
+    controller: WagoControllerRow,
+    channelId: string,
+    event: WagoOperationalMessage,
+    value: unknown,
+  ): void {
     const state: CachedState = {
       controllerId: controller.id,
       hardwareId: controller.hardwareId,

@@ -52,6 +52,9 @@ describe('WagoFlowService schemas and dispatch', () => {
 
   it('isolates filtered preview controller lookups in a shared context', async () => {
     const { service, tables } = await createService();
+    await tables.configurationRevisions.insert(
+      revisionRow({ controllerId: 2, revision: 1, state: 'applied', snapshot: revision.snapshot }),
+    );
     tables.controllers.find.mockClear();
     const context = new Map<string, unknown>();
     const first = await service.resolveConfigSchema(
@@ -401,11 +404,12 @@ describe('WagoFlowService schemas and dispatch', () => {
 
     // The newest revision number is one aggregate per controller (no snapshots move); with no applied revision left
     // there is nothing to read, and the per-controller channel lookup is never used.
-    expect(tables.configurationRevisions.aggregate).toHaveBeenCalledTimes(1);
-    expect(tables.configurationRevisions.aggregate).toHaveBeenCalledWith('revision', {
-      controllerId: 1,
-      state: 'applied',
-    });
+    expect(tables.configurationRevisions.aggregate).toHaveBeenCalledTimes(2);
+    for (const controllerId of [1, 2])
+      expect(tables.configurationRevisions.aggregate).toHaveBeenCalledWith('revision', {
+        controllerId,
+        state: 'applied',
+      });
     expect(tables.configurationRevisions.find).not.toHaveBeenCalled();
     expect(service.read({ controllerId: 1, channelId: 'door' })).toBeNull();
   });

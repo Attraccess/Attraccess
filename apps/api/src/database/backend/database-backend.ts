@@ -26,12 +26,14 @@ export interface MigrationTrack {
   readonly migrations: readonly unknown[];
 }
 
-/** What the plugin runtime needs from a backend: plugin schema migrations, plugin persistence, host transactions. */
+/** What the plugin runtime needs from a backend: plugin storage migrations, plugin storage, host transactions. */
 export interface DatabaseBackendPluginHooks {
-  /** The engine that runs a plugin's own migrations. `config` redirects its connection (tests only). */
+  /** The engine that creates, migrates and drops a plugin's own tables. `config` redirects its connection (tests only). */
   createMigrationEngine(config: PluginMigrationEngineConfig | null): PluginMigrationEngine;
-  /** The plugin persistence host. `getConnection` resolves the host connection lazily. */
+  /** The plugin persistence host (transactions and record port). `getConnection` resolves the host connection lazily. */
   createPersistenceHost(getConnection: () => unknown): PluginPersistenceHost;
+  /** Tables of the host's own schema, lowercase. A plugin's storage may not claim one. */
+  coreTableNames(): ReadonlySet<string>;
   /**
    * The read-only scope plugin hooks receive for a unit of work the host opened itself. It closes together with the
    * host's scope.

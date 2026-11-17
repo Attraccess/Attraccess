@@ -247,9 +247,7 @@ describe('WagoFlowService canonical protocol and freshness', () => {
       ];
       async function setup() {
         const fixture = await createService();
-        await fixture.setApplied([
-          { ...revision, snapshot: JSON.stringify({ logicalChannels: channels }) },
-        ]);
+        await fixture.setApplied([{ ...revision, snapshot: JSON.stringify({ logicalChannels: channels }) }]);
         await fixture.service.refresh();
         return fixture;
       }

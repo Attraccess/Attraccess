@@ -2,8 +2,6 @@ import type { WagoStorage } from './storage';
 
 type InsertOf<T extends keyof WagoStorage> = Parameters<WagoStorage[T]['insert']>[0];
 
-
-
 const NOW = '2026-09-05T12:00:00.000Z';
 
 /** A controller row with every required column filled; `overrides` win. */
@@ -22,7 +20,9 @@ export function controllerRow(overrides: Record<string, unknown> & { hardwareId:
 }
 
 /** A configuration revision row with every required column filled; `overrides` win. */
-export function revisionRow(overrides: Record<string, unknown> & { controllerId: number; revision: number }): InsertOf<'configurationRevisions'> {
+export function revisionRow(
+  overrides: Record<string, unknown> & { controllerId: number; revision: number },
+): InsertOf<'configurationRevisions'> {
   return {
     snapshot: '{}',
     contentHash: 'a'.repeat(64),
@@ -47,4 +47,3 @@ export function sessionRow(overrides: Record<string, unknown> = {}): InsertOf<'c
     ...overrides,
   } as never;
 }
-

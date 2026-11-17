@@ -82,13 +82,11 @@ describe('WagoCommissioningService transport and diagnostics', () => {
     });
     const update = spied.commissioningSessions.update;
     // Only the first write (the checkpoint) waits for the gate; the failure save that follows runs for real.
-    update.mockImplementationOnce(async (where, patch, options) => {
-      await gate;
+    update.mockImplementation(async (where, patch, options) => {
+      // A checkpoint patch carries only the progress fields; the failure save writes the whole row.
+      if (!('hardwareId' in patch)) await gate;
       return storage.tables.commissioningSessions.update(where, patch, options);
     });
-    update.mockImplementation((where, patch, options) =>
-      storage.tables.commissioningSessions.update(where, patch, options),
-    );
     service['sudoRunScript'] = jest
       .fn()
       .mockResolvedValueOnce('')
@@ -99,8 +97,7 @@ describe('WagoCommissioningService transport and diagnostics', () => {
     const result = service['prepareController'](session, { username: 'root', password: 'fixture-only' }, 512);
     const rejection = expect(result).rejects.toThrow('fixture interruption');
     await new Promise((resolve) => setImmediate(resolve));
-    expect(update).toHaveBeenNthCalledWith(
-      1,
+    expect(update).toHaveBeenCalledWith(
       { id: 1 },
       expect.objectContaining({ progressPercent: 33, progressStep: 'Verifying exclusive output access' }),
     );

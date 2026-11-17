@@ -14,7 +14,11 @@ describe('WagoService configuration and commands', () => {
     services.splice(0).forEach((service) => service.onModuleDestroy());
   });
 
-  function createService(controllers = [controller()], enrollments: never[] = [], defaultMqttServerId: number | null = null) {
+  function createService(
+    controllers = [controller()],
+    enrollments: never[] = [],
+    defaultMqttServerId: number | null = null,
+  ) {
     return createWagoServiceFixture(services, controllers, enrollments, defaultMqttServerId);
   }
 
@@ -408,9 +412,7 @@ describe('WagoService configuration and commands', () => {
   });
 
   it('ignores controller rejections without field-level error details', async () => {
-    const { context, service, tables } = await createService([
-      { ...controller(), trustState: 'claimed' as const },
-    ]);
+    const { context, service, tables } = await createService([{ ...controller(), trustState: 'claimed' as const }]);
     const onConfigurationReported = (
       Reflect.get(service, 'onConfigurationReported') as (controllerId: number, payload: Buffer) => Promise<void>
     ).bind(service);
@@ -646,9 +648,7 @@ describe('WagoService configuration and commands', () => {
   });
 
   it('starts the editor from the last applied revision without creating a draft', async () => {
-    const { service, tables } = await createService([
-      { ...controller(), trustState: 'claimed' },
-    ]);
+    const { service, tables } = await createService([{ ...controller(), trustState: 'claimed' }]);
     const revision = {
       revision: 4,
       state: 'applied',

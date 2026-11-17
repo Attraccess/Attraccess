@@ -18,8 +18,7 @@ import { PluginManifestSchema, LoadedPluginManifest, PluginManifest } from './pl
 
 import { type PluginManifestInfo } from '@attraccess/plugins-backend-sdk';
 
-import { resolveDatabaseBackend } from '../database/backend';
-import { assertManifestCompatible } from './runtime/plugin-compatibility';
+import { assertBundleCompatible, assertManifestCompatible } from './runtime/plugin-compatibility';
 import { PluginBootGuard } from './runtime/boot-guard';
 
 import { PluginSandboxService } from './plugin-sandbox.service';
@@ -244,8 +243,18 @@ export class PluginService {
       PluginService.logger.debug(`Reading manifest from ${sourceFolder}`);
       const manifestContent = JSON.parse(readFileSync(join(sourceFolder, 'plugin.json'), 'utf8'));
 
-      // validate manifest
+      // validate manifest. The SDK 2.0 contract is checked on the raw manifest first, so a plugin still built for
+      // SDK 1.x (the removed DATABASE_ACCESS permission, an engine list, TypeORM migrations, database imports) gets
+      // the refusal that names it instead of a schema error. Refused before anything moves: no files, no database.
       PluginService.logger.debug(`Validating manifest`, manifestContent);
+      try {
+        PluginService.assertManifestCompatible(manifestContent);
+        if (manifestContent?.main?.backend?.directory) {
+          assertBundleCompatible(manifestContent.name, join(sourceFolder, manifestContent.main.backend.directory));
+        }
+      } catch (error) {
+        throw new BadRequestException((error as Error).message);
+      }
       const parsed = PluginManifestSchema.safeParse(manifestContent);
       if (!parsed.success) {
         // A client error with the offending fields, not a 500: nothing was moved or changed.
@@ -253,12 +262,6 @@ export class PluginService {
         throw new BadRequestException(`Invalid plugin.json: ${issues.join('; ')}`);
       }
       const manifest = parsed.data;
-      try {
-        PluginService.assertManifestCompatible(manifest);
-      } catch (error) {
-        // Refused before anything moves into the plugins folder: no files and no database change.
-        throw new BadRequestException((error as Error).message);
-      }
 
       const pluginName = PluginService.safePluginName(manifest.name);
       await PluginService.withPluginUploadLock(pluginName, async () => {
@@ -541,6 +544,10 @@ export class PluginService {
 
         try {
           PluginService.assertManifestCompatible(manifest);
+          // The bundle is read, never run: a database import refuses the plugin before any of its code loads.
+          if (manifest.main?.backend?.directory) {
+            assertBundleCompatible(manifest.name, join(rootFolder, manifest.main.backend.directory));
+          }
           manifest.permissions = PluginSandboxService.validateDeclaredPermissions(manifest.name, manifest.permissions);
           // A malformed license block is refused like invalid permissions: the host cannot tell what it requires.
           const license = parseManifestLicense(manifest.name, manifest.license);
@@ -556,9 +563,9 @@ export class PluginService {
       .filter((manifest) => manifest !== null);
   }
 
-  /** SDK 2.0 and engine support, checked before a plugin is installed, started or migrated. */
-  protected static assertManifestCompatible(manifest: PluginManifest): void {
-    assertManifestCompatible(manifest, resolveDatabaseBackend().type);
+  /** The SDK 2.0 contract of a manifest, checked before a plugin is installed, started or migrated. */
+  protected static assertManifestCompatible(manifest: Parameters<typeof assertManifestCompatible>[0]): void {
+    assertManifestCompatible(manifest);
   }
 
   protected static findPluginManifestInPluginFolder(rootFolder: string, pluginFolder: string): PluginManifest | null {
@@ -579,9 +586,7 @@ export class PluginService {
       manifest.main.frontend.directory = join(pluginFolder, manifest.main.frontend.directory);
     }
 
-    if (manifest.main.migrations?.directory) {
-      manifest.main.migrations.directory = join(pluginFolder, manifest.main.migrations.directory);
-    }
+    // A legacy migrations entry is kept as written: it is refused (SDK 2.0 has none), never resolved or run.
 
     return manifest;
   }

@@ -29,7 +29,6 @@ import { WagoService } from '../../backend/controllers/service';
 import { WagoCredentialRotationService } from '../../backend/credentials/service';
 import { WagoFlowService } from '../../backend/flow/service';
 import { WAGO_COMMAND_NODE_TYPE, createWagoCommandNode } from '../../backend/flow/command-node';
-import plugin from '../../backend/plugin';
 import { WagoCommandError } from '../../backend/commands/handler';
 import { hash, type Snapshot } from '../../cc100-runtime/src/runtime';
 import type { CommandRecord, ControllerSnapshot, FarmRequest } from './controller-farm.test-utils';

@@ -8,7 +8,6 @@ import { type CommissioningOperationGuard } from '../../runtime/operation-guard'
 
 import { WagoDeviceOperations } from '../../runtime/device-operations';
 
-
 import { SSH_TIMEOUT_MS } from '../model';
 
 import { WagoRecoveryError } from '../../runtime/recovery-error';

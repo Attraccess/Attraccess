@@ -1,5 +1,4 @@
 import * as pluginsBackendSdk from '@attraccess/plugins-backend-sdk';
-import * as pluginsBackendSdkSqlite from '@attraccess/plugins-backend-sdk/sqlite';
 import { readFileSync } from 'fs';
 import { createRequire, Module as NodeModuleClass } from 'module';
 import { dirname, isAbsolute } from 'path';
@@ -7,7 +6,7 @@ import { runInThisContext } from 'vm';
 
 // Host-internal workspace libraries a plugin externalizes (to share the host's
 // single instance for DI-token / decorator-metadata identity) but which — unlike
-// the other externals (@nestjs/*, typeorm, reflect-metadata, …) — are bundled
+// the other externals (@nestjs/*, reflect-metadata, …) — are bundled
 // straight INTO the host bundle (dist/apps/api/main.js) rather than installed
 // under node_modules. A shipped plugin entry therefore emits a bare
 // `require('@attraccess/plugins-backend-sdk')` that hostRequire cannot resolve on
@@ -18,18 +17,16 @@ import { runInThisContext } from 'vm';
 // decorator identity).
 const HOST_BUNDLED_MODULES: Record<string, unknown> = {
   '@attraccess/plugins-backend-sdk': pluginsBackendSdk,
-  // The SDK's engine subpath. It re-exports the host's single TypeORM copy, so decorator metadata and the
-  // persistence seam it shares with the root stay the host's own objects.
-  '@attraccess/plugins-backend-sdk/sqlite': pluginsBackendSdkSqlite,
 };
 
 // Loads a plugin's CommonJS entry so that its *externalized* host-shared packages
-// (@nestjs/common, typeorm, reflect-metadata, …) resolve to the host's single
+// (@nestjs/common, reflect-metadata, …) resolve to the host's single
 // copy. Plugins deliberately do not bundle those packages — a bundled copy is a
-// different class/symbol object and breaks DI token identity, constructor-metadata
-// reflection AND TypeORM type identity (a migration's `QueryRunner`/`MigrationInterface`
-// must be the host's, see docs/en/plugins/developing-plugins.md "Packaging the backend").
-// The shipped entry therefore does bare `require('typeorm')` etc. at runtime.
+// different class/symbol object and breaks DI token identity and constructor-metadata
+// reflection (see docs/en/plugins/developing-plugins.md "Packaging the backend").
+// The shipped entry therefore does bare `require('@nestjs/common')` etc. at runtime. Database packages are not
+// among them: a plugin has no database access, and a bundle that requires one is refused before it is loaded
+// (see assertBundleCompatible).
 //
 // Two failure modes have to be avoided at once:
 //   1. Resolution — in a production image the plugin lives under

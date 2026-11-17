@@ -14,7 +14,6 @@ import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { DualAuthGuard, type PluginContext } from '@attraccess/plugins-backend-sdk';
 import type { Request, Response, NextFunction } from 'express';
-import plugin from '../../backend/plugin';
 import { WagoRuntimeArtifactCatalog } from '../../backend/runtime/artifacts/catalog';
 import { WagoRuntimeArtifactsService } from '../../backend/runtime/artifacts/service';
 import { WagoArtifactsController } from '../../backend/runtime/artifacts/controller';

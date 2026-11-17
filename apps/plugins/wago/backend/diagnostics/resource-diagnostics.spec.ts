@@ -55,7 +55,13 @@ describe('resource diagnostics', () => {
     expect(controllers.find).not.toHaveBeenCalled();
   });
   it('bounds nodes and controller work and rejects malformed controller IDs', async () => {
-    const { service, controllers } = await setup([null, '1', -1, 1.5, ...Array.from({ length: 1000 }, (_, i) => i + 1)]);
+    const { service, controllers } = await setup([
+      null,
+      '1',
+      -1,
+      1.5,
+      ...Array.from({ length: 1000 }, (_, i) => i + 1),
+    ]);
     const result = await service.getResource(42);
     expect(result.invalidControllerReferences).toBe(4);
     expect(result.truncated).toBe(true);

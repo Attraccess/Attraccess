@@ -13,7 +13,10 @@ export function spyOnWagoStorage(test: WagoTestStorage) {
     Object.entries(test.tables).map(([name, table]) => [
       name,
       Object.fromEntries(
-        Object.entries(table as object).map(([method, call]) => [method, jest.fn(call as (...args: never[]) => unknown)]),
+        Object.entries(table as object).map(([method, call]) => [
+          method,
+          jest.fn(call as (...args: never[]) => unknown),
+        ]),
       ),
     ]),
   ) as unknown as Spied;

@@ -6,7 +6,15 @@ import { spyOnWagoStorage } from '../../backend/storage-spy.test-utils';
 import { createWagoTestStorage } from '../../backend/storage/testing';
 import { WagoCommissioningService } from '../../backend/commissioning/service';
 import { WagoService } from '../../backend/controllers/service';
-import { AuditFixtureState, AuditSink, privateValue, snapshot, verifier, pluginId, FixtureMqtt } from './fixture.test-utils';
+import {
+  AuditFixtureState,
+  AuditSink,
+  privateValue,
+  snapshot,
+  verifier,
+  pluginId,
+  FixtureMqtt,
+} from './fixture.test-utils';
 import type { PluginAuditDomainDeclaration, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { mkdtemp, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -150,20 +158,22 @@ describe('composed WAGO hooks through the host audit bridge and the plugin recor
     state.commissioning['copyTo'] = jest.fn(async () => undefined);
     await state.commissioning.onApplicationBootstrap();
     await state.mountApi();
-    state.session = await state.storage.tables.commissioningSessions.insert(sessionRow({
-      hardwareId: 'audit-fixture',
-      mqttServerId: 1,
-      targetHost: '10.99.0.1',
-      hostKeyFingerprint: `SHA256:${'A'.repeat(43)}`,
-      firmwareBaseline: '31',
-      controllerName: 'Fixture',
-      state: 'awaiting_delivery',
-      pairingCode: `encrypted:v1:${state.context.secrets.encrypt(verifier)}`,
-      auditLog: '[]',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      runtimeArtifactDigest: 'a'.repeat(64),
-    }));
+    state.session = await state.storage.tables.commissioningSessions.insert(
+      sessionRow({
+        hardwareId: 'audit-fixture',
+        mqttServerId: 1,
+        targetHost: '10.99.0.1',
+        hostKeyFingerprint: `SHA256:${'A'.repeat(43)}`,
+        firmwareBaseline: '31',
+        controllerName: 'Fixture',
+        state: 'awaiting_delivery',
+        pairingCode: `encrypted:v1:${state.context.secrets.encrypt(verifier)}`,
+        auditLog: '[]',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        runtimeArtifactDigest: 'a'.repeat(64),
+      }),
+    );
   });
 
   afterEach(async () => {
@@ -181,11 +191,14 @@ describe('composed WAGO hooks through the host audit bridge and the plugin recor
     await state.post(path, { confirm: true, retry: 'yes' }).expect(400);
     // Successful discovery/claim alone cannot establish permanent runtime readiness.
     await state.post(path, { confirm: true }).expect(409);
-    expect(
-      JSON.parse((await state.controllerById(controller.id)).capabilities),
-    ).not.toContain('credential-rotation-v1');
+    expect(JSON.parse((await state.controllerById(controller.id)).capabilities)).not.toContain(
+      'credential-rotation-v1',
+    );
     await state.rotationReady(controller);
-    await state.storage.tables.controllers.update({ id: controller.id }, { lastHeartbeatAt: new Date(Date.now() - 91_000).toISOString() });
+    await state.storage.tables.controllers.update(
+      { id: controller.id },
+      { lastHeartbeatAt: new Date(Date.now() - 91_000).toISOString() },
+    );
     await state.post(path, { confirm: true }).expect(409);
     await state.storage.tables.controllers.update({ id: controller.id }, { lastHeartbeatAt: new Date().toISOString() });
     await state.storage.tables.commissioningSessions.delete({ id: state.session.id });
@@ -307,7 +320,10 @@ describe('composed WAGO hooks through the host audit bridge and the plugin recor
     expect(await state.rotationRecord(controller.id)).toEqual(pending);
     expect(await state.rows('credential_rotation')).toEqual(failedEvidence);
     // Broker credentials have already changed: recovery remains possible without fresh runtime liveness.
-    await state.storage.tables.controllers.update({ id: controller.id }, { lastHeartbeatAt: new Date(Date.now() - 91_000).toISOString() });
+    await state.storage.tables.controllers.update(
+      { id: controller.id },
+      { lastHeartbeatAt: new Date(Date.now() - 91_000).toISOString() },
+    );
     state.mqtt.publish.mockImplementation(async (_serverId, topic, payload) => {
       const packet = JSON.parse(String(payload));
       expect(packet).toMatchObject({
@@ -417,9 +433,7 @@ describe('composed WAGO hooks through the host audit bridge and the plugin recor
       .post(`controllers/${controller.id}/configuration/revisions/${rejected.revision}/acknowledge-rejection`, expected)
       .expect(201);
     await state.lifecycle('rejection_acknowledgement', controller.id, 'succeeded', { revision: rejected.revision });
-    expect(
-      (await state.storage.tables.configurationRevisions.get(rejected.id))?.rejectionAcknowledgedBy,
-    ).toBe(42);
+    expect((await state.storage.tables.configurationRevisions.get(rejected.id))?.rejectionAcknowledgedBy).toBe(42);
     expect(await state.rows('publication')).toHaveLength(2); // Rollback must not nest publication lifecycles.
     expect(JSON.stringify(state.sink.rows)).not.toContain(privateValue);
   });
@@ -462,7 +476,9 @@ describe('composed WAGO hooks through the host audit bridge and the plugin recor
     await state
       .post(`controllers/${controller.id}/configuration/publish`, { reviewedHash: review.contentHash })
       .expect(500);
-    const [revision] = await state.storage.tables.configurationRevisions.find({ where: { controllerId: controller.id } });
+    const [revision] = await state.storage.tables.configurationRevisions.find({
+      where: { controllerId: controller.id },
+    });
     expect(revision).toMatchObject({ revision: 1, state: 'pending' });
     const records = await state.rows('publication');
     expect(records.map((row) => row.outcome)).toEqual(['attempted', 'failed']);
@@ -509,7 +525,9 @@ describe('composed WAGO hooks through the host audit bridge and the plugin recor
     await state.post(`controllers/${controller.id}/configuration/publish`, { force: true }).expect(500);
     await state.post(`controllers/${controller.id}/configuration/review`).expect(201);
     await state.post(`controllers/${controller.id}/configuration/publish`, { force: true }).expect(500);
-    const revisions = await state.storage.tables.configurationRevisions.find({ where: { controllerId: controller.id } });
+    const revisions = await state.storage.tables.configurationRevisions.find({
+      where: { controllerId: controller.id },
+    });
     expect(revisions).toHaveLength(1);
     const records = await state.rows('forced_publication');
     expect(records.map((row) => row.outcome)).toEqual(['attempted', 'failed', 'attempted', 'failed']);
@@ -616,9 +634,7 @@ describe('composed WAGO hooks through the host audit bridge and the plugin recor
     });
     await state.lifecycle('manual_credential_fallback', controller.id);
     expect(provision).not.toHaveBeenCalled();
-    expect((await state.controllerById(controller.id)).trustState).toBe(
-      'claimed',
-    );
+    expect((await state.controllerById(controller.id)).trustState).toBe('claimed');
     expect(JSON.stringify(await state.rows('manual_credential_fallback'))).not.toContain(privateValue);
   });
 
@@ -636,16 +652,17 @@ describe('composed WAGO hooks through the host audit bridge and the plugin recor
     await state.lifecycle('manual_credential_fallback', controller.id, 'failed');
     expect(provision).not.toHaveBeenCalled();
     expect(state.mqtt.publish).not.toHaveBeenCalled();
-    expect((await state.controllerById(controller.id)).trustState).toBe(
-      'untrusted',
-    );
+    expect((await state.controllerById(controller.id)).trustState).toBe('untrusted');
     expect(JSON.stringify(await state.rows('manual_credential_fallback'))).not.toContain(privateValue);
   });
 
   it('preserves acknowledged credentials when the later publish receipt fails', async () => {
     const { controller, provision } = await state.manuallyEnrolledController();
     // Associate the manually enrolled controller with a real pinned commissioning session.
-    await state.storage.tables.commissioningSessions.update({ id: state.session.id }, { hardwareId: controller.hardwareId });
+    await state.storage.tables.commissioningSessions.update(
+      { id: state.session.id },
+      { hardwareId: controller.hardwareId },
+    );
     state.mqtt.publish.mockImplementation(async (_server, topic, payload) => {
       if (!topic.endsWith('/claim')) return;
       const credentials = JSON.parse(payload.toString());
@@ -665,15 +682,16 @@ describe('composed WAGO hooks through the host audit bridge and the plugin recor
     expect(state.revoke.mock.calls).not.toContainEqual([
       expect.objectContaining({ identity: 'wago-controller-manual-fixture' }),
     ]);
-    expect((await state.controllerById(controller.id)).trustState).toBe(
-      'claimed',
-    );
+    expect((await state.controllerById(controller.id)).trustState).toBe('claimed');
     expect(JSON.stringify(await state.rows('manual_credential_fallback'))).not.toContain(privateValue);
   });
 
   it('rejects a manual handoff to a runtime without expiry support before dispatch or audit admission', async () => {
     const { controller } = await state.manuallyEnrolledController();
-    await state.storage.tables.controllers.update({ id: controller.id }, { capabilities: '["claim","configuration-v1"]' });
+    await state.storage.tables.controllers.update(
+      { id: controller.id },
+      { capabilities: '["claim","configuration-v1"]' },
+    );
     state.mqtt.publish.mockClear();
     await state
       .post(`controllers/${controller.id}/credentials/manual/complete`, {
