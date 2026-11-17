@@ -33,12 +33,6 @@
     "host": "^2.0.0-0",
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
-    "persistence": {
-      "backends": [
-        "sqlite"
-      ]
-    },
-    "migrations": "dist/migrations.js",
     "styles": "frontend/style.css",
     "license": {
       "required": true,
@@ -50,7 +44,7 @@
       "/wago"
     ],
     "permissions": [
-      "DATABASE_ACCESS",
+      "PLUGIN_STORAGE",
       "ACCESS_MQTT_SERVERS",
       "TRIGGER_FLOWS",
       "MANAGE_SECRETS"

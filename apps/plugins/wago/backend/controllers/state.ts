@@ -1,7 +1,7 @@
 import { ConflictException, Inject } from '@nestjs/common';
 
 import { PluginContext, PluginMqttSubscription, type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
-import { Repository } from '@attraccess/plugins-backend-sdk/sqlite';
+import type { WagoStorage } from '../storage';
 
 import { WagoController } from './entity';
 
@@ -45,19 +45,22 @@ export abstract class WagoServiceState {
 
   readonly diagnostics = new WagoDiagnosticsStore();
 
-  protected controllers!: Repository<WagoController>;
+  /** The record port of every WAGO table; opened when the application has bootstrapped. */
+  protected storage!: WagoStorage;
+
+  protected controllers!: WagoStorage['controllers'];
 
   protected readonly networkSubscriptions = new Map<number, PluginMqttSubscription[]>();
 
   protected networkSubscriptionRevision = 0;
 
-  protected settings!: Repository<WagoSettings>;
+  protected settings!: WagoStorage['settings'];
 
-  protected enrollments!: Repository<WagoEnrollment>;
+  protected enrollments!: WagoStorage['enrollments'];
 
-  protected drafts!: Repository<WagoConfigurationDraft>;
+  protected drafts!: WagoStorage['configurationDrafts'];
 
-  protected revisions!: Repository<WagoConfigurationRevision>;
+  protected revisions!: WagoStorage['configurationRevisions'];
 
   protected readonly subscriptions: PluginMqttSubscription[] = [];
 

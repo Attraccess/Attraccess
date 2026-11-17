@@ -1,7 +1,9 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import type { WagoConfigurationSnapshot } from './configuration/model';
-import type { WagoConfigurationDraft } from './configuration/draft.entity';
-import type { WagoConfigurationRevision } from './configuration/revision.entity';
+import type { WagoConfigurationDraftRow } from './storage';
+import { spyOnWagoStorage } from './storage-spy.test-utils';
+import { createWagoTestStorage } from './storage/testing';
+import { revisionRow } from './rows.test-utils';
 import { hostDataWithFlows } from './persistence.test-utils';
 import { WagoService } from './controllers/service';
 import { CHANNEL_ENABLED_CAPABILITY } from '../shared/capabilities';
@@ -24,26 +26,35 @@ export const snapshot: WagoConfigurationSnapshot = {
   ],
 };
 export function fixture({ capabilities = FIXTURE_CAPABILITIES }: { capabilities?: string[] } = {}) {
-  let draft: WagoConfigurationDraft | null = null;
-  const revisions: WagoConfigurationRevision[] = [];
+  const test = createWagoTestStorage();
+  const spy = spyOnWagoStorage(test);
+  /** Draft writes since the last `clear`: assertions that a code path saved nothing. */
   const drafts = {
-    findOneBy: jest.fn(async () => (draft ? { ...draft } : null)),
-    create: jest.fn((value) => value),
-    save: jest.fn(async (value) => {
-      draft = { ...value };
-      return draft;
-    }),
+    writes: () => spy.writes('configurationDrafts'),
+    clear: () => Object.values(spy.spied.configurationDrafts).forEach((method) => method.mockClear()),
+    /** Edits the stored draft row directly, as another editor session would. */
+    update: (patch: Parameters<typeof test.tables.configurationDrafts.update>[1]) =>
+      test.tables.configurationDrafts.update({ controllerId: 1 }, patch),
   };
-  const revisionRepository = {
-    find: jest.fn(async () => [...revisions].sort((a, b) => b.revision - a.revision)),
-    findOneBy: jest.fn(async ({ revision }) => revisions.find((item) => item.revision === revision) ?? null),
-    create: jest.fn((value) => value),
-    save: jest.fn(async (value) => {
-      const index = revisions.findIndex((item) => item.revision === value.revision);
-      if (index === -1) revisions.push({ ...value });
-      else revisions[index] = { ...value };
-      return value;
-    }),
+  /** The stored revisions in revision order: seed or edit them as another writer would. */
+  const revisions = {
+    all: () => test.tables.configurationRevisions.find({ orderBy: [{ field: 'revision' }] }),
+    at: async (index: number) => (await revisions.all())[index],
+    first: async () => (await revisions.all())[0],
+    count: () => test.tables.configurationRevisions.count(),
+    add: (row: Record<string, unknown> & { revision: number }) =>
+      test.tables.configurationRevisions.insert(
+        revisionRow({
+          ...(Object.fromEntries(
+            Object.entries({ controllerId: 1, ...row }).filter(([, value]) => value !== undefined),
+          ) as {
+            controllerId: number;
+            revision: number;
+          }),
+        }),
+      ),
+    update: (revision: number, patch: Parameters<typeof test.tables.configurationRevisions.update>[1]) =>
+      test.tables.configurationRevisions.update({ controllerId: 1, revision }, patch),
   };
   const mqtt = {
     publish: jest.fn<ReturnType<PluginContext['mqtt']['publish']>, Parameters<PluginContext['mqtt']['publish']>>(
@@ -57,26 +68,36 @@ export function fixture({ capabilities = FIXTURE_CAPABILITIES }: { capabilities?
     mqtt,
     audit,
     logger: { warn: jest.fn() },
+    ...spy.context,
     hostData: hostDataWithFlows(() => flowQuery.getMany()),
   } as unknown as PluginContext);
+  // The controller is not under test: one claimed controller answers every lookup.
+  const claimed = {
+    id: 1,
+    hardwareId: 'local-test',
+    trustState: 'claimed',
+    mqttServerId: 1,
+    protocolVersion: '1.0.0',
+    capabilities: JSON.stringify(capabilities),
+  };
   Object.assign(service, {
-    controllers: {
-      findOneBy: jest.fn(async () => ({
-        id: 1,
-        hardwareId: 'local-test',
-        trustState: 'claimed',
-        mqttServerId: 1,
-        protocolVersion: '1.0.0',
-        capabilities: JSON.stringify(capabilities),
-      })),
-    },
-    drafts,
-    revisions: revisionRepository,
+    storage: spy.spied,
+    controllers: { get: jest.fn(async () => claimed), findOne: jest.fn(async () => claimed) },
+    drafts: spy.spied.configurationDrafts,
+    revisions: spy.spied.configurationRevisions,
   });
   jest
     .spyOn(service, 'getSettings')
     .mockResolvedValue({ id: 1, defaultMqttServerId: 1, operationalPrefix: 'test/wago' });
-  return { service, drafts, mqtt, revisions, flowQuery, audit, draft: () => draft };
+  return {
+    service,
+    drafts,
+    mqtt,
+    revisions,
+    flowQuery,
+    audit,
+    draft: () => (test.rows('configurationDrafts')[0] ?? null) as WagoConfigurationDraftRow | null,
+  };
 }
 
 export async function rollback(service: WagoService, revision: number, force = false) {

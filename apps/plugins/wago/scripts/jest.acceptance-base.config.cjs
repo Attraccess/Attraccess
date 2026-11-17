@@ -19,7 +19,6 @@ module.exports = {
     ],
   },
   moduleNameMapper: {
-    '^@attraccess/plugins-backend-sdk/sqlite$': '<rootDir>/libs/plugins-backend-sdk/src/sqlite.ts',
     '^@attraccess/(.*)$': '<rootDir>/libs/$1/src/index.ts',
     '^lodash-es$': 'lodash',
     '^@node-saml/passport-saml$': '<rootDir>/apps/api/src/test/mocks/node-saml-passport-saml.ts',

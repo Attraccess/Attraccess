@@ -1,9 +1,9 @@
 import { Inject } from '@nestjs/common';
 
 import { PluginContext, type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
-import { Repository } from '@attraccess/plugins-backend-sdk/sqlite';
+import type { WagoStorage } from '../../storage';
 
-import { WagoManagedAccess, WagoRuntimeUpdateEntity } from './access.entity';
+import { WagoManagedAccess } from './access.entity';
 
 import { WagoDeviceOperations } from '../device-operations';
 
@@ -48,13 +48,28 @@ export abstract class WagoManagedRuntimeServiceState {
     @Inject(WagoCommissioningReadiness) protected readonly readiness: WagoCommissioningReadiness,
   ) {}
 
-  protected access!: Repository<WagoManagedAccess>;
+  protected storage!: WagoStorage;
 
-  protected updates!: Repository<WagoRuntimeUpdateEntity>;
+  protected get access(): WagoStorage['managedAccess'] {
+    return this.storage.managedAccess;
+  }
 
-  protected sessions!: Repository<WagoCommissioningSession>;
+  protected get updates(): WagoStorage['runtimeUpdates'] {
+    return this.storage.runtimeUpdates;
+  }
 
-  protected controllers!: Repository<WagoController>;
+  protected get sessions(): WagoStorage['commissioningSessions'] {
+    return this.storage.commissioningSessions;
+  }
+
+  protected get controllers(): WagoStorage['controllers'] {
+    return this.storage.controllers;
+  }
+
+  /** The newest managed access bound to the controller. */
+  protected latestAccess(controllerId: number): Promise<WagoManagedAccess | null> {
+    return this.access.findOne({ where: { controllerId }, orderBy: [{ field: 'sessionId', direction: 'desc' }] });
+  }
 
   protected operations!: WagoDeviceOperations;
 

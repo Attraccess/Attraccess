@@ -94,11 +94,11 @@ describe('production managed SSH transport', () => {
       children.push(child);
       return child;
     }) as typeof processes.spawn);
-    const target = Object.assign(new WagoManagedAccess(), {
+    const target = {
       host: selectedHost,
       fingerprint: hostKey.fingerprint,
       keyFingerprint: identity.fingerprint,
-    });
+    } as WagoManagedAccess;
     return { identity, hostKey, target, children, calls, started, directory: () => directory };
   }
 
