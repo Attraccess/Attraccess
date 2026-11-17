@@ -7,10 +7,12 @@ import type { CardOperationsService } from '../../attractap/websockets/card-oper
 /** Longest plugin device id the host keeps as a conversation key. */
 const MAX_DEVICE_LENGTH = 200;
 
+const logger = new Logger('PluginModule');
+
 /**
  * `context.cards` for one plugin. The card service is resolved per call, because it lives in the Attractap module
  * and is only available once the host finished bootstrapping. Invalid requests are programming errors and reject;
- * every card or conversation outcome resolves.
+ * a host failure rejects with a generic error; every card or conversation outcome resolves.
  */
 export function createPluginCardsContext(
   pluginId: string,
@@ -28,14 +30,20 @@ export function createPluginCardsContext(
       if (signal !== undefined && !(signal instanceof AbortSignal)) {
         throw new TypeError('cards.authenticate needs signal to be an AbortSignal');
       }
-      const operations = resolveOperations();
-      return operations.verifyPluginCard({
-        pluginId,
-        device,
-        uid,
-        exchange: (apdu, options) => channel.exchange(apdu, options),
-        signal,
-      });
+      try {
+        return await resolveOperations().verifyPluginCard({
+          pluginId,
+          device,
+          uid,
+          exchange: (apdu, options) => channel.exchange(apdu, options),
+          signal,
+        });
+      } catch (error) {
+        // A host failure (database, not yet bootstrapped). Its error may carry queries or card data: it stays here.
+        logger.warn(`Card authentication for plugin ${pluginId} failed in the host: ${(error as Error)?.message}`);
+        // eslint-disable-next-line preserve-caught-error -- the cause must not reach plugin code
+        throw new Error('Card authentication failed in the host; try again later');
+      }
     },
   };
 }
@@ -49,8 +57,6 @@ export function cancelPluginCardConversations(moduleRef: ModuleRef | null, plugi
   try {
     moduleRef.get(CardConversationService, { strict: false }).cancelPlugin(pluginId);
   } catch (error) {
-    new Logger('PluginModule').warn(
-      `Cancelling card conversations of plugin ${pluginId} failed: ${(error as Error).message}`,
-    );
+    logger.warn(`Cancelling card conversations of plugin ${pluginId} failed: ${(error as Error).message}`);
   }
 }

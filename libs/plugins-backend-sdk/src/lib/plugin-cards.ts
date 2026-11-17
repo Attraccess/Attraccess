@@ -22,7 +22,7 @@ export const PluginCardFailureReason = {
   DEVICE_ERROR: 'DEVICE_ERROR',
   /** The host is shutting down, or the plugin is being disabled, uninstalled or restarted. */
   CANCELLED: 'CANCELLED',
-  /** The UID is not 2 to 16 bytes of hex. */
+  /** The UID is not 4 to 32 hex characters. */
   INVALID_UID: 'INVALID_UID',
   /** No card is enrolled for this UID. */
   CARD_NOT_FOUND: 'CARD_NOT_FOUND',
@@ -57,11 +57,14 @@ export interface PluginCardChannel {
 }
 
 export interface PluginCardAuthenticationRequest {
-  /** Card UID as reported by the device, hex (4 to 32 characters). */
+  /**
+   * Card UID as reported by the device, hex (4 to 32 characters). It is compared exactly with the UID stored at
+   * enrollment, which Attractap readers report in lowercase.
+   */
   uid: string;
   /**
-   * Plugin-chosen id of the device that holds the card. One conversation runs per plugin and device: a new
-   * `authenticate` for the same device ends the running one with `CARD_REMOVED`.
+   * Plugin-chosen id of the device that holds the card (1 to 200 characters). One conversation runs per plugin
+   * and device: a new `authenticate` for the same device ends the running one with `CARD_REMOVED`.
    */
   device: string;
   channel: PluginCardChannel;
@@ -84,7 +87,9 @@ export type PluginCardAuthenticationResult =
 export interface PluginCardsContext {
   /**
    * Authenticates the card held to the plugin's device over its channel. Resolves for every card or conversation
-   * outcome; rejects only for programming errors, such as a missing `channel.exchange` or an empty `device`.
+   * outcome. Rejects with a `TypeError` for an invalid request (no `channel.exchange`, a `device` that is empty or
+   * longer than 200 characters, a `signal` that is not an `AbortSignal`), and with a generic `Error` when the host
+   * fails (database unavailable, host still starting); retry later then.
    */
   authenticate(request: PluginCardAuthenticationRequest): Promise<PluginCardAuthenticationResult>;
 }

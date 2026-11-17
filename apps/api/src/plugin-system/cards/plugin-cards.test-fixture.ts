@@ -51,7 +51,7 @@ export function createPluginCardsHost(
     return card;
   };
 
-  /** What the plugin module's cleanup does when a plugin is unloaded. */
+  /** The helper the plugin module's cleanup calls on unload (the hook itself: plugin-ble.integration.spec.ts). */
   const unloadPlugin = (pluginId: string) => cancelPluginCardConversations(moduleRef, pluginId);
 
   return { ...services, context, enroll, unloadPlugin };

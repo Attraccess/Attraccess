@@ -39,6 +39,16 @@ type CardRecoverySource = 'reader-recovery' | 'plugin-recovery';
 const recoverySource = (origin: CardCheckOrigin): CardRecoverySource =>
   'pluginId' in origin ? 'plugin-recovery' : 'reader-recovery';
 
+/** The card reasons a card check can end with. A check without one (a card without owner) counts as not found. */
+const PLUGIN_CARD_REASONS: readonly PluginCardFailureReason[] = [
+  'CARD_NOT_FOUND',
+  'CARD_NOT_ACTIVE',
+  'CARD_NOT_SUPPORTED',
+  'CARD_AUTHENTICATION_FAILED',
+];
+const pluginCardReason = (error: string | undefined): PluginCardFailureReason =>
+  PLUGIN_CARD_REASONS.find((reason) => reason === error) ?? 'CARD_NOT_FOUND';
+
 /** Error codes the reader shows; conversation failures keep their own name. */
 const conversationError = (reason: CardConversationFailure): string =>
   ({
@@ -122,6 +132,8 @@ export class CardOperationsService {
     signal?: AbortSignal;
   }): Promise<PluginCardAuthenticationResult> {
     const { pluginId, device, uid, exchange, signal } = request;
+    // A new request ends the one running on the device before any check, as a new detection does on a reader.
+    this.conversations.endPluginDevice({ pluginId, device });
     if (typeof uid !== 'string' || !/^[0-9a-fA-F]{4,32}$/.test(uid)) return { ok: false, reason: 'INVALID_UID' };
     // Before any database work, as for reader detections.
     if (this.conversations.atLimit) return { ok: false, reason: 'BUSY' };
@@ -139,7 +151,7 @@ export class CardOperationsService {
     if (!result.ok) return { ok: false, reason: result.reason };
     const { ok, error, card } = result.value;
     const userId = card?.user?.id;
-    if (!ok || userId == null) return { ok: false, reason: (error ?? 'CARD_NOT_FOUND') as PluginCardFailureReason };
+    if (!ok || userId == null) return { ok: false, reason: pluginCardReason(error) };
     // Copied field by field: the entity carries the card key.
     return { ok: true, card: { id: card.id, uid: card.uid, userId } };
   }

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { PluginPermission, PluginPermissionError } from '@attraccess/plugins-backend-sdk';
+import { PLUGIN_CARD_LIMITS, PluginPermission, PluginPermissionError } from '@attraccess/plugins-backend-sdk';
+import { MAX_RELAYED_COMMAND_LENGTH } from '../../attractap/card-crypto';
 import { EmulatedCard } from '../../attractap/card-crypto/card-emulator.test-fixture';
 import { CardKind } from '../../attractap/card-crypto/card-operations';
 import { CARD_CONVERSATION_LIMITS } from '../../attractap/websockets/card-conversation.service';
@@ -20,6 +21,27 @@ describe('context.cards', () => {
 
     expect(() => context.cards).toThrow(PluginPermissionError);
     expect(() => context.cards).toThrow(/CARD_AUTHENTICATION/);
+  });
+
+  it('publishes the limits the host enforces', () => {
+    expect(PLUGIN_CARD_LIMITS).toEqual({
+      exchangeTimeoutMs: CARD_CONVERSATION_LIMITS.exchangeTimeoutMs,
+      conversationTimeoutMs: CARD_CONVERSATION_LIMITS.conversationTimeoutMs,
+      maxExchanges: CARD_CONVERSATION_LIMITS.maxExchanges,
+      maxResponseBytes: CARD_CONVERSATION_LIMITS.maxResponseLength,
+      maxCommandBytes: MAX_RELAYED_COMMAND_LENGTH,
+    });
+  });
+
+  it('rejects a host failure with a generic error that carries none of its details', async () => {
+    const services = host();
+    services.attractapService.getNFCCardByUID.mockRejectedValueOnce(new Error('SQLITE_BUSY: select key from nfc_card'));
+
+    const result = services.context.cards.authenticate({ uid: UID, device: 'd', channel: { exchange: jest.fn() } });
+
+    await expect(result).rejects.toThrow('Card authentication failed in the host; try again later');
+    await expect(result).rejects.not.toThrow(/SQLITE|nfc_card/);
+    expect(services.conversations.activeConversations).toBe(0);
   });
 
   it('rejects requests a plugin got wrong instead of resolving with a card reason', async () => {
@@ -198,21 +220,35 @@ describe('context.cards', () => {
       const services = host();
       const card = await services.enroll('desfire');
       jest.useFakeTimers();
-      let late: () => void;
-      const exchange = jest.fn((apdu: Uint8Array) => {
-        if (exchange.mock.calls.length > 1) return Promise.resolve(new Uint8Array([0x91, 0x00]));
-        return new Promise<Uint8Array>((resolve) => {
-          late = () => resolve(new Uint8Array(card.transceive(Buffer.from(apdu))));
-        });
-      });
+      let late: () => void = () => undefined;
+      let signal: AbortSignal | undefined;
+      const slow = {
+        exchange: (_apdu: Uint8Array, options: { signal: AbortSignal }) => {
+          signal = options.signal;
+          // An answer that would end the next conversation's first exchange with the wrong bytes if it got through.
+          return new Promise<Uint8Array>((resolve) => (late = () => resolve(new Uint8Array([0x91, 0xae]))));
+        },
+      };
 
-      const result = services.context.cards.authenticate({ uid: UID, device: 'd', channel: { exchange } });
+      const first = services.context.cards.authenticate({ uid: UID, device: 'd', channel: slow });
       await jest.advanceTimersByTimeAsync(CARD_CONVERSATION_LIMITS.exchangeTimeoutMs);
-      expect(await result).toEqual({ ok: false, reason: 'TIMEOUT' });
+      expect(await first).toEqual({ ok: false, reason: 'TIMEOUT' });
+      expect(signal?.aborted).toBe(true);
 
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      const relay = cardChannel(card);
+      const second = services.context.cards.authenticate({
+        uid: UID,
+        device: 'd',
+        channel: { exchange: async (apdu, options) => (await gate, relay.exchange(apdu, options)) },
+      });
+      await jest.advanceTimersByTimeAsync(0);
       late();
-      await Promise.resolve();
-      expect(exchange).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(0);
+      release();
+
+      expect(await second).toMatchObject({ ok: true });
       expect(services.conversations.activeConversations).toBe(0);
     });
 
@@ -225,8 +261,12 @@ describe('context.cards', () => {
           setTimeout(() => resolve(new Uint8Array(card.transceive(Buffer.from(apdu)))), 2900),
         );
 
+      let settled = false;
       const result = services.context.cards.authenticate({ uid: UID, device: 'd', channel: { exchange } });
-      await jest.advanceTimersByTimeAsync(CARD_CONVERSATION_LIMITS.conversationTimeoutMs);
+      void result.then(() => (settled = true));
+      await jest.advanceTimersByTimeAsync(CARD_CONVERSATION_LIMITS.conversationTimeoutMs - 1);
+      expect(settled).toBe(false);
+      await jest.advanceTimersByTimeAsync(1);
 
       expect(await result).toEqual({ ok: false, reason: 'TIMEOUT' });
     });
@@ -299,6 +339,89 @@ describe('context.cards', () => {
       expect(result).toEqual({ ok: false, reason: 'DEVICE_ERROR' });
     });
 
+    it.each([
+      ['shorter', 2, CARD_CONVERSATION_LIMITS.maxResponseLength * 2],
+      ['longer', CARD_CONVERSATION_LIMITS.maxResponseLength, 4],
+    ])('judges an answer that claims to be %s than it is by its real bytes', async (_name, claimed, real) => {
+      const services = host();
+      await services.enroll('desfire');
+      class Lying extends Uint8Array {
+        override get length() {
+          return claimed;
+        }
+      }
+      const answers: Buffer[] = [];
+      const result = await services.conversations.runForPlugin(
+        { pluginId: PLUGIN_ID, device: 'd' },
+        UID,
+        async () => new Lying(real),
+        undefined,
+        async (channel) => answers.push(await channel.exchange(GET_VERSION)),
+      );
+
+      if (real > CARD_CONVERSATION_LIMITS.maxResponseLength) {
+        expect(result).toEqual({ ok: false, reason: 'DEVICE_ERROR' });
+      } else {
+        expect(result).toMatchObject({ ok: true });
+        expect(answers[0]).toEqual(Buffer.alloc(real));
+      }
+      expect(services.conversations.activeConversations).toBe(0);
+    });
+
+    it('reports a device whose answer throws when awaited', async () => {
+      const services = host();
+      const answer = Promise.resolve(new Uint8Array([0x91, 0x00]));
+      answer.then = () => {
+        throw new Error('broken then');
+      };
+
+      const result = await services.conversations.runForPlugin(
+        { pluginId: PLUGIN_ID, device: 'd' },
+        UID,
+        () => answer,
+        undefined,
+        (channel) => channel.exchange(GET_VERSION),
+      );
+
+      expect(result).toEqual({ ok: false, reason: 'DEVICE_ERROR' });
+    });
+
+    it('refuses an APDU longer than the limit without relaying it', async () => {
+      const services = host();
+      const exchange = jest.fn(async () => new Uint8Array([0x91, 0x00]));
+
+      const result = services.conversations.runForPlugin(
+        { pluginId: PLUGIN_ID, device: 'd' },
+        UID,
+        exchange,
+        undefined,
+        (channel) => channel.exchange(Buffer.alloc(MAX_RELAYED_COMMAND_LENGTH + 1)),
+      );
+
+      await expect(result).rejects.toThrow(/longer than/);
+      expect(exchange).not.toHaveBeenCalled();
+      expect(services.conversations.activeConversations).toBe(0);
+    });
+
+    it('fails a conversation aborted while its work was still finishing', async () => {
+      const services = host();
+      const controller = new AbortController();
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+
+      const result = services.conversations.runForPlugin(
+        { pluginId: PLUGIN_ID, device: 'd' },
+        UID,
+        jest.fn(),
+        controller.signal,
+        async () => (await gate, 'done'),
+      );
+      controller.abort();
+      release();
+
+      expect(await result).toEqual({ ok: false, reason: 'CARD_REMOVED' });
+    });
+
     it('ends with CARD_REMOVED when the plugin aborts its signal', async () => {
       const services = host();
       await services.enroll('desfire');
@@ -341,6 +464,41 @@ describe('context.cards', () => {
       expect(await first).toEqual({ ok: false, reason: 'CARD_REMOVED' });
       expect(signals[0].aborted).toBe(true);
       expect(await second).toMatchObject({ ok: true });
+    });
+
+    it('lets a request with an invalid UID end the one running on the device, as a new reader detection does', async () => {
+      const services = host();
+      await services.enroll('desfire');
+      const { channel } = silentChannel();
+
+      const first = services.context.cards.authenticate({ uid: UID, device: 'd', channel });
+      await new Promise(setImmediate);
+      const second = await services.context.cards.authenticate({ uid: 'zz', device: 'd', channel });
+
+      expect(second).toEqual({ ok: false, reason: 'INVALID_UID' });
+      expect(await first).toEqual({ ok: false, reason: 'CARD_REMOVED' });
+    });
+
+    it('keeps the same device id of two plugins apart', async () => {
+      const services = host();
+      const card = await services.enroll('desfire');
+      const { channel, signals } = silentChannel();
+      const controller = new AbortController();
+
+      const other = services.conversations.runForPlugin(
+        { pluginId: 'other-plugin', device: 'd' },
+        UID,
+        channel.exchange,
+        controller.signal,
+        (relay) => relay.exchange(GET_VERSION),
+      );
+      await new Promise(setImmediate);
+      const mine = await services.context.cards.authenticate({ uid: UID, device: 'd', channel: cardChannel(card) });
+
+      expect(mine).toMatchObject({ ok: true });
+      expect(signals[0].aborted).toBe(false);
+      controller.abort();
+      expect(await other).toEqual({ ok: false, reason: 'CARD_REMOVED' });
     });
 
     it('keeps requests on different devices apart', async () => {

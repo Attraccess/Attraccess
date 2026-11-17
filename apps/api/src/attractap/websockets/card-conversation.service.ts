@@ -1,3 +1,4 @@
+import type { PluginCardFailureReason } from '@attraccess/plugins-backend-sdk';
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { MAX_RELAYED_COMMAND_LENGTH } from '../card-crypto';
@@ -42,8 +43,10 @@ export class CardConversationError extends Error {
  * DEVICE_ERROR means its `exchange` failed or answered with something unusable, CANCELLED that the host or the
  * plugin is going away.
  */
-export type PluginCardConversationFailure =
-  'BUSY' | 'CARD_REMOVED' | 'TIMEOUT' | 'TOO_MANY_EXCHANGES' | 'DEVICE_ERROR' | 'CANCELLED';
+export type PluginCardConversationFailure = Extract<
+  PluginCardFailureReason,
+  'BUSY' | 'CARD_REMOVED' | 'TIMEOUT' | 'TOO_MANY_EXCHANGES' | 'DEVICE_ERROR' | 'CANCELLED'
+>;
 
 class PluginCardConversationError extends Error {
   constructor(public readonly reason: PluginCardConversationFailure) {
@@ -58,6 +61,10 @@ export type PluginCardExchange = (apdu: Uint8Array, options: { signal: AbortSign
 export interface PluginCardConversationOwner {
   pluginId: string;
   device: string;
+}
+
+function pluginDeviceKey(owner: PluginCardConversationOwner): string {
+  return JSON.stringify([owner.pluginId, owner.device]);
 }
 
 export interface PluginCardConversationResult<T> {
@@ -265,8 +272,8 @@ export class CardConversationService implements OnModuleDestroy {
     signal: AbortSignal | undefined,
     work: (channel: CardChannel) => Promise<T>,
   ): Promise<PluginCardConversationResult<T>> {
-    const key = JSON.stringify([owner.pluginId, owner.device]);
-    this.byPluginDevice.get(key)?.abort('CARD_REMOVED');
+    const key = pluginDeviceKey(owner);
+    this.endPluginDevice(owner);
     if (signal?.aborted) return { ok: false, reason: 'CARD_REMOVED' };
     if (this.atLimit) return { ok: false, reason: 'BUSY' };
 
@@ -301,6 +308,11 @@ export class CardConversationService implements OnModuleDestroy {
       this.active--;
       if (this.byPluginDevice.get(key) === conversation) this.byPluginDevice.delete(key);
     }
+  }
+
+  /** A new request for a plugin device ends the conversation running there, like a new detection on a reader. */
+  endPluginDevice(owner: PluginCardConversationOwner): void {
+    this.byPluginDevice.get(pluginDeviceKey(owner))?.abort('CARD_REMOVED');
   }
 
   /** The plugin is unloaded (disabled, uninstalled, restarted): its running conversations end with CANCELLED. */
@@ -429,7 +441,9 @@ export class CardConversationService implements OnModuleDestroy {
       return Promise.reject(new PluginCardConversationError(conversation.abortReason ?? 'CARD_REMOVED'));
     }
     if (conversation.pending) return Promise.reject(new Error('card exchange already in flight'));
-    if (apdu.length > MAX_RELAYED_COMMAND_LENGTH) return Promise.reject(new Error('APDU does not fit the PN532'));
+    if (apdu.length > MAX_RELAYED_COMMAND_LENGTH) {
+      return Promise.reject(new Error(`APDU longer than ${MAX_RELAYED_COMMAND_LENGTH} bytes`));
+    }
     if (conversation.exchanges >= CARD_CONVERSATION_LIMITS.maxExchanges) {
       conversation.abort('TOO_MANY_EXCHANGES');
       return Promise.reject(new PluginCardConversationError('TOO_MANY_EXCHANGES'));
@@ -441,22 +455,30 @@ export class CardConversationService implements OnModuleDestroy {
       const timer = setTimeout(() => conversation.abort('TIMEOUT'), CARD_CONVERSATION_LIMITS.exchangeTimeoutMs);
       conversation.pending = { controller, resolve, reject, timer };
       const current = () => conversation.pending?.controller === controller;
-      let answer: Promise<Uint8Array>;
-      try {
-        answer = Promise.resolve(exchange(Uint8Array.from(apdu), { signal: controller.signal }));
-      } catch (error) {
-        answer = Promise.reject(error);
-      }
+      // Settled through a fresh promise: a throwing `exchange` or a throwing `then` of its answer becomes a rejection.
+      const answer = new Promise<Uint8Array>((settle) =>
+        settle(exchange(Uint8Array.from(apdu), { signal: controller.signal })),
+      );
       answer.then(
         (response) => {
           if (!current()) return;
-          if (!(response instanceof Uint8Array) || response.length > CARD_CONVERSATION_LIMITS.maxResponseLength) {
+          // Copied before any check: the answer is plugin input and may lie about its length or change later. The
+          // Uint8Array constructor reads the real length, never a `length` getter.
+          let copy: Buffer;
+          try {
+            if (!(response instanceof Uint8Array)) throw new TypeError('not bytes');
+            copy = Buffer.from(new Uint8Array(response));
+          } catch {
+            conversation.abort('DEVICE_ERROR');
+            return;
+          }
+          if (copy.length > CARD_CONVERSATION_LIMITS.maxResponseLength) {
             conversation.abort('DEVICE_ERROR');
             return;
           }
           clearTimeout(timer);
           conversation.pending = null;
-          resolve(Buffer.from(response));
+          resolve(copy);
         },
         () => {
           if (current()) conversation.abort('DEVICE_ERROR');
