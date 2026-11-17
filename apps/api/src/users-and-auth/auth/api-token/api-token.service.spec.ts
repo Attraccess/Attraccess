@@ -20,7 +20,10 @@ describe('ApiTokenService', () => {
   const userRepository = { findOneBy: jest.fn() };
   const apiTokenPermissionRepository = { create: jest.fn((value) => value), save: jest.fn(), delete: jest.fn() };
   const tokenHashService = { hashApiToken: jest.fn((token) => `hashed:${token}`) };
-  const rbacService = { getEffectivePermissions: jest.fn() };
+  const rbacService = {
+    getEffectivePermissions: jest.fn(),
+    getUnavailablePermissionKeys: jest.fn(async () => new Set<string>()),
+  };
   const service = new ApiTokenService(
     repository as never,
     userRepository as never,

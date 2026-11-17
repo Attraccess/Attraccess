@@ -1,12 +1,14 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
+import type { Permission } from '@attraccess/react-query-client';
 import { PermissionPicker } from './index';
+const core = { pluginName: null, labelDe: null, descriptionDe: null, categoryLabel: null, categoryLabelDe: null };
 const permissions = [
   { key: 'resources.read', label: 'Read resources', description: 'View resource details', category: 'resources' },
   { key: 'resources.update', label: 'Edit resources', description: 'Edit resource details', category: 'resources' },
   { key: 'users.read', label: 'Read users', description: 'View accounts', category: 'users' },
-];
+].map((permission) => ({ ...core, ...permission })) as Permission[];
 afterEach(cleanup);
 function Picker({
   changed,

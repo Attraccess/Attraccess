@@ -6,7 +6,7 @@ import type { SidebarItem } from './navigation';
 
 /** Returns a predicate telling whether the current user may see a sidebar entry, based on its target route's auth. */
 export function useShowNavItem() {
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermissionKey } = useAuth();
   const routes = useAllRoutes();
 
   return useCallback(
@@ -25,8 +25,8 @@ export function useShowNavItem() {
         return true;
       }
 
-      return hasRequiredPermissions(routeOfItem.authRequired, hasPermission);
+      return hasRequiredPermissions(routeOfItem.authRequired, hasPermissionKey);
     },
-    [user, hasPermission, routes],
+    [user, hasPermissionKey, routes],
   );
 }

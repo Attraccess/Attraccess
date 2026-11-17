@@ -101,7 +101,7 @@ describe('user invitation endpoints (HTTP)', () => {
     expect(response.body).toEqual([{ id: 7, username: 'alex', email: 'alex@example.com' }]);
     expect(users.createMany).toHaveBeenCalledWith(
       [{ email: 'alex@example.com', username: 'alex', row: 1, locale: undefined }],
-      expect.objectContaining({ actorId: 1 }),
+      expect.objectContaining({ actor: expect.objectContaining({ id: 1 }) }),
     );
   });
 

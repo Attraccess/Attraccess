@@ -78,6 +78,7 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
           tokenPrincipal.apiToken.permissionKeys.filter((permission) => ownerPermissions.has(permission)),
         );
         authenticatedUser.authenticationMethod = 'api-token';
+        authenticatedUser.permissionScope = tokenPrincipal.apiToken.permissionKeys;
         authenticatedUser.apiTokenId = tokenPrincipal.apiToken.id;
         this.authAuditLogger.log({
           type: 'api_token',
@@ -129,6 +130,7 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
       delegation.permissionKeys.filter((permission) => current.has(permission)),
     );
     (user as AuthenticatedUser).authenticationMethod = 'mcp-oauth';
+    (user as AuthenticatedUser).permissionScope = delegation.permissionKeys;
     await this.assertTwoFactorSetup(req, user);
     return user;
   }

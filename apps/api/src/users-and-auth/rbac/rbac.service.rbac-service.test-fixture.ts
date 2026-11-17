@@ -122,6 +122,7 @@ export function registerRbacServiceFixture() {
 
     permissionRepo = {
       find: jest.fn(),
+      findBy: jest.fn().mockResolvedValue([]),
       count: jest.fn().mockResolvedValue(0),
     } as unknown as jest.Mocked<Repository<Permission>>;
 

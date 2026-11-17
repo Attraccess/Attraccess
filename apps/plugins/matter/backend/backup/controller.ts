@@ -12,6 +12,7 @@ import {
   Req,
   StreamableFile,
 } from '@nestjs/common';
+import { MATTER_OPERATIONS } from '../permissions';
 import { principalOf } from '../connection/controller';
 import { parse } from '../fabric/controller';
 import { confirmSchema, idParamSchema, validateSchema } from '../fabric/schemas';
@@ -19,8 +20,6 @@ import { MatterBackupService, type BackupView } from './backup.service';
 import { MatterRestoreService, type RestoreResult, type RestoreValidation } from './restore.service';
 
 /** Admin REST API for backups and restore. Never returns the recovery key or decrypted content. */
-// TODO(ATT-1003): replace system.plugins.manage with a dedicated Matter permission
-@Auth('system.plugins.manage')
 @Controller('matter')
 export class MatterBackupController {
   constructor(
@@ -28,12 +27,14 @@ export class MatterBackupController {
     @Inject(MatterRestoreService) private readonly restore: MatterRestoreService,
   ) {}
 
+  @Auth(...MATTER_OPERATIONS.backupList)
   @Get('backups')
   list(): Promise<BackupView[]> {
     return this.backups.list();
   }
 
   /** Back up now. */
+  @Auth(...MATTER_OPERATIONS.backupCreate)
   @Post('backups')
   @HttpCode(200)
   create(@Req() request: AuthenticatedRequest): Promise<BackupView> {
@@ -41,12 +42,13 @@ export class MatterBackupController {
   }
 
   /** The encrypted file only: useless without the recovery key. */
+  @Auth(...MATTER_OPERATIONS.backupDownload)
   @Get('backups/:id/download')
   @Header('Content-Type', 'application/octet-stream')
-  async download(@Param('id') id: string): Promise<StreamableFile> {
+  async download(@Param('id') id: string, @Req() request: AuthenticatedRequest): Promise<StreamableFile> {
     const parsedId = idParamSchema.safeParse(id);
     if (!parsedId.success) throw new BadRequestException(['id: must be a UUID']);
-    const { filename, file } = await this.backups.download(parsedId.data);
+    const { filename, file } = await this.backups.download(parsedId.data, principalOf(request));
     return new StreamableFile(file, {
       type: 'application/octet-stream',
       disposition: `attachment; filename="${filename}"`,
@@ -54,6 +56,7 @@ export class MatterBackupController {
     });
   }
 
+  @Auth(...MATTER_OPERATIONS.restoreValidate)
   @Post('restore/validate')
   @HttpCode(200)
   validate(@Body() body: unknown, @Req() request: AuthenticatedRequest): Promise<RestoreValidation> {
@@ -61,6 +64,7 @@ export class MatterBackupController {
     return this.restore.validate(input.source, input.recoveryKey, principalOf(request));
   }
 
+  @Auth(...MATTER_OPERATIONS.restoreConfirm)
   @Post('restore/confirm')
   @HttpCode(200)
   confirm(@Body() body: unknown, @Req() request: AuthenticatedRequest): Promise<RestoreResult> {
@@ -68,6 +72,7 @@ export class MatterBackupController {
     return this.restore.confirm(input.validationId, input.confirmFabricId, principalOf(request));
   }
 
+  @Auth(...MATTER_OPERATIONS.restoreCancel)
   @Post('restore/:validationId/cancel')
   @HttpCode(204)
   async cancel(@Param('validationId') validationId: string, @Req() request: AuthenticatedRequest): Promise<void> {

@@ -119,7 +119,7 @@ describe('WAGO audit lifecycles', () => {
     actor.userId = 99;
     details.before.logicalChannelCount = 100;
     await lifecycle.finish('succeeded');
-    expect(record.mock.calls[1][0].principal.userId).toBe(7);
+    expect(record.mock.calls[1][0].principal).toMatchObject({ userId: 7 });
     expect(record.mock.calls[1][0].details['before.logicalChannelCount']).toBe(3);
   });
 

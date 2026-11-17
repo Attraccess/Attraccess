@@ -1,10 +1,10 @@
-import { EffectivePermissionsGuard } from '@attraccess/plugins-backend-sdk';
+import { EffectivePermissionsGuard, validatePluginPermissionsDeclaration } from '@attraccess/plugins-backend-sdk';
 import { ForbiddenException, type ExecutionContext, type Type } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RabbitmqCapabilitiesController } from './capabilities';
 import { RabbitmqConnectionsController } from './connections/service';
 import { RabbitmqDetectionController } from './detection/service';
-import { RABBITMQ_MANAGE_PERMISSION, RABBITMQ_VIEW_PERMISSION } from './permissions';
+import { RABBITMQ_MANAGE_PERMISSION, RABBITMQ_PERMISSIONS, RABBITMQ_VIEW_PERMISSION } from './permissions';
 import plugin from './plugin';
 import { RabbitmqStatsController } from './stats/service';
 import { RabbitmqUsersController } from './users/service';
@@ -53,9 +53,21 @@ function check(controller: Type, method: string, granted: string[]): boolean {
 }
 
 describe('RabbitMQ plugin permission tiers', () => {
-  it('keeps the two tiers on distinct core keys', () => {
-    expect(VIEW).toBe('resources.update');
-    expect(MANAGE).toBe('system.settings.manage');
+  it('declares the two tiers as its own keys, keeping the system roles that had access before', () => {
+    expect(VIEW).toBe('rabbitmq.broker.read');
+    expect(MANAGE).toBe('rabbitmq.broker.manage');
+    expect(plugin.permissions).toBe(RABBITMQ_PERMISSIONS);
+    expect(() => validatePluginPermissionsDeclaration(RABBITMQ_PERMISSIONS)).not.toThrow();
+    expect(RABBITMQ_PERMISSIONS.permissions.map((permission) => [permission.key, permission.defaultRoles])).toEqual([
+      ['rabbitmq.broker.read', ['administrator', 'resource-manager', 'system-admin']],
+      ['rabbitmq.broker.manage', ['administrator', 'system-admin']],
+    ]);
+  });
+
+  it('no longer accepts the core keys the tiers used before', () => {
+    for (const [controller, method] of ROUTES) {
+      expect(check(controller, method, ['resources.update', 'system.settings.manage'])).toBe(false);
+    }
   });
 
   it.each(ROUTES)('%p.%s requires %s', (controller, method, required) => {

@@ -14,7 +14,7 @@ export interface PermissionPickerProps {
   lockedTagIndicator?: string;
   permissionLabel: (permission: Permission) => string;
   permissionDescription: (permission: Permission) => string;
-  permissionCategory: (category: string) => string;
+  permissionCategory: (category: string, permission?: Permission) => string;
   dataCy?: string;
   searchDataCy?: string;
   itemDataCy?: (permissionKey: string) => string;

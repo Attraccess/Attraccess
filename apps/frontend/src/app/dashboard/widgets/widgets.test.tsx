@@ -30,7 +30,11 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../hooks/useAuth', () => ({
-  useAuth: () => ({ user: { id: 7 }, hasPermission: (permission: string) => state.permissions.has(permission) }),
+  useAuth: () => ({
+    user: { id: 7 },
+    hasPermission: (permission: string) => state.permissions.has(permission),
+    hasPermissionKey: (permission: string) => state.permissions.has(permission),
+  }),
 }));
 vi.mock('../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: state.toastSuccess, error: state.toastError }),

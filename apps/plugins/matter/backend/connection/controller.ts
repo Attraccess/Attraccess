@@ -1,5 +1,6 @@
 import { Auth, type AuthenticatedRequest, type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Inject, Put, Req } from '@nestjs/common';
+import { MATTER_OPERATIONS } from '../permissions';
 import { MatterConnectionService } from './connection.service';
 import { MissingCredentialError, MatterSettingsService, type PublicSettings } from './settings.service';
 import { settingsSchema, validationMessages } from './validation';
@@ -14,8 +15,6 @@ export function principalOf(request: AuthenticatedRequest): PluginAuditPrincipal
   };
 }
 
-// TODO(ATT-1003): replace system.plugins.manage with a dedicated Matter permission
-@Auth('system.plugins.manage')
 @Controller('matter/connection')
 export class MatterConnectionController {
   constructor(
@@ -24,11 +23,13 @@ export class MatterConnectionController {
   ) {}
 
   /** The saved settings. The credential is never part of the answer. */
+  @Auth(...MATTER_OPERATIONS.connectionSettings)
   @Get()
   get(): Promise<PublicSettings> {
     return this.settings.publicView();
   }
 
+  @Auth(...MATTER_OPERATIONS.connectionSave)
   @Put()
   async put(@Body() body: unknown, @Req() request: AuthenticatedRequest): Promise<PublicSettings> {
     const parsed = settingsSchema.safeParse(body);
@@ -52,6 +53,7 @@ export class MatterConnectionController {
   }
 
   /** Clears the configuration. The client stops and reports `not_configured`. */
+  @Auth(...MATTER_OPERATIONS.connectionRemove)
   @Delete()
   @HttpCode(204)
   async remove(@Req() request: AuthenticatedRequest): Promise<void> {
@@ -60,6 +62,7 @@ export class MatterConnectionController {
     await this.service.reload();
   }
 
+  @Auth(...MATTER_OPERATIONS.connectionStatus)
   @Get('status')
   status(): ConnectionStatus {
     return this.service.connection.status();

@@ -10,6 +10,7 @@ import {
   type Harness,
 } from '../testing/devices-harness.test-utils';
 import { SidecarUnavailableError } from '../client/errors';
+import { CONNECTION_ROW_ID, MatterConnection } from '../connection/entity';
 
 const nodes = (h: Harness) => h.dataSource.getRepository(MatterNode);
 const live = (h: Harness, nodeId: string, fabricId = '1') =>
@@ -391,13 +392,26 @@ describe('Matter reconciliation', () => {
 
   it('attributes automatic runs to the system and manual ones to the administrator', async () => {
     await h.reconcile(inventory('1', [node('5')]));
-    const [system] = h.audit.mock.calls[0] as unknown as [{ principal: { userId: number }; details: object }];
-    expect(system).toMatchObject({ principal: { userId: 1 }, details: { initiator: 'system', fabricId: '1' } });
+    const [system] = h.audit.mock.calls[0] as unknown as [{ principal: object; details: object }];
+    // The system principal, never the administrator who last saved the connection settings.
+    expect(system.principal).toEqual({ kind: 'system' });
+    expect(system).toMatchObject({ details: { initiator: 'system', fabricId: '1' } });
     h.audit.mockClear();
     h.sidecar.list = inventory('1', [node('5'), node('6')]);
     await h.reconciliation.request(ADMIN);
     const [manual] = h.audit.mock.calls[0] as unknown as [{ principal: { userId: number }; details: object }];
     expect(manual).toMatchObject({ principal: { userId: 7 }, details: { initiator: 'administrator' } });
+  });
+
+  it('records system entries even when no administrator ever saved the connection, sharing one operation ID', async () => {
+    await h.dataSource.getRepository(MatterConnection).update({ id: CONNECTION_ROW_ID }, { updatedBy: null });
+    await h.reconcile(inventory('1', [node('5'), node('6')]));
+    const events = h.audit.mock.calls.map(
+      (call) => (call as unknown as [{ principal: object; operationId: string }])[0],
+    );
+    expect(events.length).toBeGreaterThan(1);
+    expect(events.every((event) => (event.principal as { kind?: string }).kind === 'system')).toBe(true);
+    expect(new Set(events.map((event) => event.operationId)).size).toBe(1);
   });
 
   describe('around a restore', () => {

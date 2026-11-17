@@ -15,6 +15,7 @@ export function usePluginAuthSync() {
       plugin.plugin.onApiAuthStateChange({
         authToken: '', // No longer using tokens - authentication is handled by cookies
         user: user as unknown as AttraccessFrontendPluginAuthData['user'],
+        effectivePermissions: user?.effectivePermissions ?? [],
       });
     });
   }, [plugins, user]);

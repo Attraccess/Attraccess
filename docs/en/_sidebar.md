@@ -104,6 +104,7 @@
     - [Matter: Operator Guide](plugins/matter/operator.md)
     - [Matter: Data Model and Lifecycle](plugins/matter/data-model.md)
     - [Matter: Backup and Recovery](plugins/matter/backup-restore.md)
+    - [Matter: Permissions](plugins/matter/permissions.md)
   - **RabbitMQ**
     - [Overview](plugins/rabbitmq/overview.md)
   - **Shelly**

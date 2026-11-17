@@ -9,14 +9,15 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { type Redis } from 'ioredis';
-import { EntityManager, Repository, QueryFailedError, In } from 'typeorm';
+import { EntityManager, Repository, In } from 'typeorm';
 import { VALKEY_CLIENT } from '../../valkey/valkey.module';
 import { describeValkeyError } from '../../valkey/valkey-outage-logging';
 import { AUDIT_RECORDER, AuditOrigin, AuditRecorder } from '../../audit/recorder/audit-event';
 import { roleAuditEvent } from './role-audit';
+import { syncSsoRolesInTransaction } from './sso-role-sync';
 import {
   AUTHORIZATION_CACHE_INVALIDATION_CHANNEL,
   authorizationCacheInvalidationSource,
@@ -71,20 +72,79 @@ export class RbacService {
     }
   }
 
-  async getEffectivePermissions(userId: number, bypassCache = false): Promise<Set<string>> {
-    const entry = this.permissionsCache.get(userId);
-    if (!bypassCache && entry && Date.now() - entry.ts < this.CACHE_TTL_MS) return new Set(entry.permissions);
+  /**
+   * Also fires for invalidations published by other instances (usage-access-cache re-emits them locally), so a
+   * permission change or a plugin key changing availability elsewhere does not wait for the cache TTL here.
+   */
+  @OnEvent(UserPermissionsChangedEvent.EVENT_NAME)
+  onPermissionsChanged(event: UserPermissionsChangedEvent): void {
+    if (event.userId === undefined) this.permissionsCache.clear();
+    else this.permissionsCache.delete(event.userId);
+  }
 
+  /** Drops every cached permission set, here and on other instances (e.g. plugin keys changed availability). */
+  async invalidateAllPermissions(): Promise<void> {
+    this.permissionsCache.clear();
+    await this.permissionsChanged();
+  }
+
+  /**
+   * Keys of plugins that are not loaded. Their grants stay in role_permission and api_token_permission, but they are
+   * hidden from every catalog, grant nothing, and survive edits made by clients that cannot see them.
+   */
+  async getUnavailablePermissionKeys(): Promise<Set<string>> {
+    const rows = await this.permissionRepository.findBy({ available: false });
+    return new Set(rows.map((row) => row.key));
+  }
+
+  /** The role with its grants of unavailable plugin keys left out, as clients see it. */
+  protected withoutUnavailable<T extends Role>(role: T, unavailable: Set<string>): T {
+    if (unavailable.size === 0 || !role.rolePermissions) return role;
+    role.rolePermissions = role.rolePermissions.filter((rp) => !unavailable.has(rp.permissionKey));
+    return role;
+  }
+
+  protected async rolePermissionKeysOf(userId: number, available: boolean): Promise<Set<string>> {
     const rows = await this.userRoleRepository
       .createQueryBuilder('ur')
       .innerJoin('ur.role', 'r')
       .innerJoin('r.rolePermissions', 'rp')
+      .innerJoin('rp.permission', 'p', 'p.available = :available', { available: available ? 1 : 0 })
       .select('rp.permissionKey', 'permissionKey')
       .distinct(true)
       .where('ur.userId = :userId', { userId })
       .getRawMany<{ permissionKey: string }>();
+    return new Set(rows.map((r) => r.permissionKey));
+  }
 
-    const permissions = new Set(rows.map((r) => r.permissionKey));
+  /**
+   * The keys an actor may grant or revoke: their effective permissions plus the unavailable plugin keys their own
+   * roles hold. Roles keep grants of unavailable keys and those apply again once the plugin loads, so the "cannot
+   * grant what you don't have" rule must cover them; otherwise anyone could hand out a dormant `matter.*` grant while
+   * Matter is not loaded. An API token or MCP grant adds only the dormant keys inside its own scope, which it keeps
+   * like role grants.
+   */
+  async getGrantCeiling(actor: {
+    id: number;
+    effectivePermissions?: Set<string>;
+    authenticationMethod?: string;
+    permissionScope?: readonly string[];
+  }): Promise<Set<string>> {
+    const ceiling = new Set(actor.effectivePermissions ?? []);
+    const scoped = actor.authenticationMethod === 'api-token' || actor.authenticationMethod === 'mcp-oauth';
+    const scope = new Set(actor.permissionScope ?? []);
+    for (const key of await this.rolePermissionKeysOf(actor.id, false)) {
+      if (!scoped || scope.has(key)) ceiling.add(key);
+    }
+    return ceiling;
+  }
+
+  async getEffectivePermissions(userId: number, bypassCache = false): Promise<Set<string>> {
+    const entry = this.permissionsCache.get(userId);
+    if (!bypassCache && entry && Date.now() - entry.ts < this.CACHE_TTL_MS) return new Set(entry.permissions);
+
+    // unavailable plugin keys grant nothing while their plugin is not loaded
+    const permissions = await this.rolePermissionKeysOf(userId, true);
     // FIFO eviction: drop the oldest entry when the cache is full
     if (this.permissionsCache.size >= this.MAX_CACHE_SIZE) {
       const oldestKey = this.permissionsCache.keys().next().value;
@@ -128,6 +188,7 @@ export class RbacService {
       // details and sessions), so without this a deleted admin still counts as a permission
       // holder forever — e.g. as a supervisor who provably cannot supervise (ATT-867).
       .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
+      .innerJoin('permission', 'p', 'p.key = rp.permissionKey AND p.available = 1')
       .select('DISTINCT ur.userId', 'userId')
       .where('rp.permissionKey = :permKey', { permKey: permissionKey })
       .getRawMany<{ userId: number }>();
@@ -141,13 +202,11 @@ export class RbacService {
     ssoProviderId: number,
   ): Promise<{ added: string[]; removed: string[]; updated: string[] }> {
     const changes = await this.userRoleRepository.manager.transaction(async (manager) =>
-      this.syncSsoRolesInTransaction(
-        userId,
-        roles,
-        ssoProviderType,
-        ssoProviderId,
+      syncSsoRolesInTransaction(
+        { userId, roles, ssoProviderType, ssoProviderId },
         manager.getRepository(UserRole),
         manager.getRepository(Role),
+        this.logger,
       ),
     );
     // Periodic session re-syncs usually find no delta; skip invalidation fan-out for those.
@@ -156,90 +215,6 @@ export class RbacService {
       await this.permissionsChanged(userId);
     }
     return changes;
-  }
-
-  protected async syncSsoRolesInTransaction(
-    userId: number,
-    roles: Array<{ roleKey: string; externalValue?: string | null }>,
-    ssoProviderType: string,
-    ssoProviderId: number,
-    userRoleRepository: Repository<UserRole>,
-    roleRepository: Repository<Role>,
-  ): Promise<{ added: string[]; removed: string[]; updated: string[] }> {
-    // roleKey -> external claim value that granted it (source metadata for the UI)
-    const targetByKey = new Map(roles.map((r) => [r.roleKey, r.externalValue ?? null]));
-
-    const currentSsoRoles = await userRoleRepository.find({
-      where: { userId, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId },
-      relations: ['role'],
-    });
-    const removed: string[] = [];
-    const added: string[] = [];
-    const updated: string[] = [];
-
-    for (const ur of currentSsoRoles) {
-      if (!targetByKey.has(ur.role.key)) {
-        // ponytail: last-administrator guardrail — transient IdP claim omission must not silently strip the last administrator
-        if (ur.role.key === 'administrator') {
-          const otherAdministratorCount = await userRoleRepository
-            .createQueryBuilder('ur2')
-            .innerJoin('ur2.user', 'u', 'u.deletedAt IS NULL')
-            .where('ur2.roleId = :roleId', { roleId: ur.roleId })
-            .andWhere('ur2.id != :id', { id: ur.id })
-            .getCount();
-          if (otherAdministratorCount === 0) {
-            continue;
-          }
-        }
-        await userRoleRepository.delete({ id: ur.id });
-        removed.push(ur.role.key);
-      }
-    }
-
-    const currentByKey = new Map(currentSsoRoles.map((ur) => [ur.role.key, ur]));
-    for (const [roleKey, externalValue] of targetByKey) {
-      const current = currentByKey.get(roleKey);
-      if (current) {
-        if ((current.externalValue ?? null) !== externalValue) {
-          await userRoleRepository.update({ id: current.id }, { externalValue });
-          updated.push(roleKey);
-        }
-        continue;
-      }
-      const role = await roleRepository.findOne({ where: { key: roleKey } });
-      if (!role) continue;
-      const existing = await userRoleRepository.findOne({
-        where: { userId, roleId: role.id, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId },
-      });
-      if (!existing) {
-        try {
-          await userRoleRepository.save(
-            userRoleRepository.create({
-              userId,
-              roleId: role.id,
-              source: UserRoleSource.SSO,
-              ssoProviderType,
-              ssoProviderId,
-              externalValue,
-            }),
-          );
-          added.push(roleKey);
-        } catch (err) {
-          // ponytail: '23505' = Postgres unique; SQLite reuses SQLITE_CONSTRAINT for FK/CHECK/NOT NULL too, so narrow by message
-          const code = (err as QueryFailedError & { code?: string }).code;
-          const isUniqueViolation =
-            err instanceof QueryFailedError &&
-            (code === '23505' || (code === 'SQLITE_CONSTRAINT' && err.message.includes('UNIQUE constraint failed')));
-          if (isUniqueViolation) {
-            // Another SSO provider already granted this role — unique(userId, roleId, source) violated; ignore
-            this.logger.debug(`syncSsoRoles: role ${roleKey} already held via another provider for user ${userId}`);
-          } else {
-            throw err;
-          }
-        }
-      }
-    }
-    return { added, removed, updated };
   }
 
   async assignRoleByKey(userId: number, roleKey: string, em?: EntityManager): Promise<UserRole | null> {
@@ -292,7 +267,8 @@ export class RbacService {
       throw new NotFoundException(`Role ${roleId} not found`);
     }
 
-    // cannot-grant-what-you-don't-have: actor must hold every permission the role grants
+    // cannot-grant-what-you-don't-have: actor must hold every permission the role grants, dormant grants of
+    // unavailable plugin keys included (callers pass getGrantCeiling)
     const rolePermKeys = role.rolePermissions.map((rp) => rp.permissionKey);
     const missing = rolePermKeys.filter((k) => !actorPermissions.has(k));
     if (missing.length > 0) {
@@ -368,8 +344,12 @@ export class RbacService {
     await this.permissionsChanged(userId);
   }
 
-  async getRoles(): Promise<Role[]> {
-    return this.roleRepository.find({ relations: ['rolePermissions'] });
+  /** Ceiling checks pass `includeUnavailable`: they must see dormant grants of unavailable plugin keys. */
+  async getRoles(includeUnavailable = false): Promise<Role[]> {
+    const roles = await this.roleRepository.find({ relations: ['rolePermissions'] });
+    if (includeUnavailable) return roles;
+    const unavailable = await this.getUnavailablePermissionKeys();
+    return roles.map((role) => this.withoutUnavailable(role, unavailable));
   }
 
   async getRoleKey(roleId: number): Promise<string | null> {
@@ -389,15 +369,19 @@ export class RbacService {
       .groupBy('ur.roleId')
       .getRawMany<{ roleId: number; userCount: string }>();
     const countByRoleId = new Map(counts.map((c) => [Number(c.roleId), Number(c.userCount)]));
+    const unavailable = await this.getUnavailablePermissionKeys();
     return roles.map((role) =>
-      Object.assign(new RoleWithUsageDto(), role, { userCount: countByRoleId.get(role.id) ?? 0 }),
+      Object.assign(new RoleWithUsageDto(), this.withoutUnavailable(role, unavailable), {
+        userCount: countByRoleId.get(role.id) ?? 0,
+      }),
     );
   }
 
+  // only available keys can be granted; an unavailable plugin key is reported as unknown, like it looks to clients
   protected async resolvePermissionKeys(keys: string[]): Promise<string[]> {
     const unique = [...new Set(keys)];
     if (unique.length === 0) return [];
-    const found = await this.permissionRepository.find({ where: { key: In(unique) } });
+    const found = await this.permissionRepository.find({ where: { key: In(unique), available: true } });
     if (found.length !== unique.length) {
       const known = new Set(found.map((p) => p.key));
       const unknown = unique.filter((k) => !known.has(k));
@@ -408,12 +392,14 @@ export class RbacService {
 
   // pass `manager` to count against uncommitted in-transaction state (permissions table itself is never
   // modified by role CRUD, so the total always comes from the plain repository)
+  // Only available keys count: an unloaded plugin's keys grant nothing, so they cannot make anyone less of an admin.
   protected async countAdministratorEquivalentUsers(excludeRoleId?: number, manager?: EntityManager): Promise<number> {
-    const totalPermissions = await this.permissionRepository.count();
+    const totalPermissions = await this.permissionRepository.count({ where: { available: true } });
     if (totalPermissions === 0) return 0;
     const qb = (manager ? manager.createQueryBuilder(UserRole, 'ur') : this.userRoleRepository.createQueryBuilder('ur'))
       .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
       .innerJoin('role_permission', 'rp', 'rp.roleId = ur.roleId')
+      .innerJoin('permission', 'p', 'p.key = rp.permissionKey AND p.available = 1')
       .select('ur.userId', 'userId')
       .groupBy('ur.userId')
       .having('COUNT(DISTINCT rp.permissionKey) = :totalPermissions', { totalPermissions });
@@ -425,7 +411,7 @@ export class RbacService {
   }
 
   async getPermissions(): Promise<Permission[]> {
-    return this.permissionRepository.find({ order: { category: 'ASC', key: 'ASC' } });
+    return this.permissionRepository.find({ where: { available: true }, order: { category: 'ASC', key: 'ASC' } });
   }
 
   protected async generateRoleKey(name: string): Promise<string> {
@@ -483,7 +469,13 @@ export class RbacService {
     if (dto.description !== undefined) role.description = dto.description.trim();
 
     if (dto.permissionKeys !== undefined) {
-      const targetKeys = await this.resolvePermissionKeys(dto.permissionKeys);
+      // Grants of unavailable plugin keys are invisible to the editor, so a full-set update must keep them.
+      const hidden = await this.getUnavailablePermissionKeys();
+      const keptHidden = role.rolePermissions.map((rp) => rp.permissionKey).filter((key) => hidden.has(key));
+      const targetKeys = [
+        ...(await this.resolvePermissionKeys(dto.permissionKeys.filter((key) => !keptHidden.includes(key)))),
+        ...keptHidden,
+      ];
       const currentKeys = new Set(role.rolePermissions.map((rp) => rp.permissionKey));
       const added = targetKeys.filter((k) => !currentKeys.has(k));
       const removed = [...currentKeys].filter((k) => !targetKeys.includes(k));
@@ -516,7 +508,7 @@ export class RbacService {
 
     const updated = await this.roleRepository.findOne({ where: { id: roleId }, relations: ['rolePermissions'] });
     await this.audit.record(roleAuditEvent('role_updated', updated as Role, origin));
-    return updated as Role;
+    return this.withoutUnavailable(updated as Role, await this.getUnavailablePermissionKeys());
   }
 
   async deleteRole(

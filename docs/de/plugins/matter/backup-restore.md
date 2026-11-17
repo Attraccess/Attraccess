@@ -7,7 +7,7 @@
 
 > **Bewahren Sie Ihren Wiederherstellungsschlüssel außerhalb des Servers auf.** Die Matter-Fabric ist die Identität, der jedes in Betrieb genommene Gerät vertraut. Geht die Fabric verloren, muss jedes Gerät auf Werkseinstellungen zurückgesetzt und neu in Betrieb genommen werden. Attraccess speichert verschlüsselte Backups der Fabric, sie lassen sich aber nur mit dem **Wiederherstellungsschlüssel** öffnen, der **genau einmal** angezeigt wird. Verlieren Sie Schlüssel und Server, ist die Fabric nicht wiederherstellbar.
 
-Diese Seite beschreibt, wie die Matter-Fabric geschützt, gesichert und wiederhergestellt wird, auch auf einem neuen Host. Sie baut auf der [Architektur](plugins/matter/architecture.md) und der [Betriebsanleitung](plugins/matter/operator.md) auf. Alle Aktionen finden Sie unter **Geräte → Matter → Fabric & Backup**, sie erfordern die Berechtigung `system.plugins.manage`.
+Diese Seite beschreibt, wie die Matter-Fabric geschützt, gesichert und wiederhergestellt wird, auch auf einem neuen Host. Sie baut auf der [Architektur](plugins/matter/architecture.md) und der [Betriebsanleitung](plugins/matter/operator.md) auf. Alle Aktionen finden Sie unter **Geräte → Matter → Fabric & Backup**. Den Status anzuzeigen erfordert `matter.devices.read`; jede Aktion, auch das Herunterladen eines Backups, erfordert `matter.devices.manage` (siehe [Berechtigungen](plugins/matter/permissions.md)).
 
 ## Was ein Matter-Backup enthält
 

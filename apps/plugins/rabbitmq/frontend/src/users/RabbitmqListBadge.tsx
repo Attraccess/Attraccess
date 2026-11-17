@@ -6,8 +6,14 @@
 import { Chip } from '@heroui/react';
 import { RabbitIcon } from 'lucide-react';
 import { useDetection } from '../detection/detection';
+import { useCanViewBroker } from '../access';
 
 export function RabbitmqListBadge({ mqttServerId }: { mqttServerId: number }) {
+  // Without `rabbitmq.broker.read` detection answers 403: don't ask.
+  return useCanViewBroker() ? <DetectedBadge mqttServerId={mqttServerId} /> : null;
+}
+
+function DetectedBadge({ mqttServerId }: { mqttServerId: number }) {
   const { result } = useDetection(mqttServerId);
 
   // Stay invisible until we have a positive RabbitMQ verdict — no spinner, no

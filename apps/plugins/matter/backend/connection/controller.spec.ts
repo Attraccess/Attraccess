@@ -103,22 +103,52 @@ describe('Matter connection settings API', () => {
     expect(JSON.stringify(harness.controller.status())).not.toContain(TOKEN);
   });
 
-  it('keeps the credential when it is omitted and clears the CA only when told to', async () => {
+  it('keeps the credential when it is omitted and the URL and CA stay the same', async () => {
     const harness = await setup();
     service = harness.service;
     const { cert } = await selfSignedCertificate();
     await harness.controller.put({ url: 'http://127.0.0.1:1', credential: TOKEN, caCertificate: cert }, request());
     const first = harness.getRow() as Row;
-    await harness.controller.put({ url: 'http://127.0.0.1:2' }, request());
+    // The same URL in another spelling, and the CA omitted (kept) or sent unchanged.
+    await harness.controller.put({ url: 'HTTP://127.0.0.1:1/' }, request());
+    await harness.controller.put({ url: 'http://127.0.0.1:1', caCertificate: cert }, request());
     expect(harness.getRow()).toMatchObject({
-      url: 'http://127.0.0.1:2',
+      url: 'http://127.0.0.1:1',
       encryptedCredential: first.encryptedCredential,
       caCertificate: cert,
       credentialUpdatedAt: first.credentialUpdatedAt,
     });
-    await harness.controller.put({ url: 'http://127.0.0.1:2', caCertificate: null }, request());
-    expect(harness.getRow()?.caCertificate).toBeNull();
+    await harness.controller.put({ url: 'http://127.0.0.1:2', credential: TOKEN, caCertificate: null }, request());
+    expect(harness.getRow()).toMatchObject({ url: 'http://127.0.0.1:2', caCertificate: null });
   });
+
+  it.each([
+    ['the URL', { url: 'https://attacker.example' }],
+    ['the path prefix', { url: 'http://127.0.0.1:1/other' }],
+    ['the CA certificate', { url: 'http://127.0.0.1:1', caCertificate: 'other' }],
+    ['a cleared CA certificate', { url: 'http://127.0.0.1:1', caCertificate: null }],
+  ] as Array<[string, { url: string; caCertificate?: string | null }]>)(
+    'refuses to reuse the stored credential for a changed endpoint: %s',
+    async (_case, change) => {
+      const harness = await setup();
+      service = harness.service;
+      const { cert } = await selfSignedCertificate();
+      const other = (await selfSignedCertificate()).cert;
+      await harness.controller.put({ url: 'http://127.0.0.1:1', credential: TOKEN, caCertificate: cert }, request());
+      const before = { ...(harness.getRow() as Row) };
+      harness.audit.mockClear();
+      const body = change.caCertificate === 'other' ? { ...change, caCertificate: other } : change;
+      const failure = await harness.controller.put(body, request()).catch((error) => error);
+      expect(failure).toBeInstanceOf(BadRequestException);
+      expect(failure.getResponse()).toMatchObject({
+        message: ['credential: Enter the credential again when changing the URL or the CA certificate.'],
+      });
+      expect(harness.getRow()).toEqual(before);
+      expect(harness.audit).not.toHaveBeenCalled();
+      // With the credential entered again, the same change is saved.
+      await expect(harness.controller.put({ ...body, credential: TOKEN }, request())).resolves.toBeDefined();
+    },
+  );
 
   it('requires a credential for the first configuration and rejects invalid input without echoing it', async () => {
     const harness = await setup();
@@ -255,11 +285,11 @@ describe('Matter connection settings API', () => {
     });
   });
 
-  it('guards every route with system.plugins.manage and documents the permission follow-up', () => {
+  it('guards every route with its key from the Matter permission map (see permissions.spec.ts)', () => {
     const source = readFileSync(join(__dirname, 'controller.ts'), 'utf8');
-    expect(source).toContain('// TODO(ATT-1003): replace system.plugins.manage with a dedicated Matter permission');
-    expect(source).toContain("@Auth('system.plugins.manage')");
-    expect(source.match(/@Auth\(/g)).toHaveLength(1); // class level: no route can skip it
+    expect(source.match(/@Auth\(\.\.\.MATTER_OPERATIONS\./g)).toHaveLength(
+      source.match(/@(Get|Put|Delete)\(/g)?.length ?? -1,
+    );
     expect(COMPATIBILITY_TABLE).toHaveLength(1);
   });
 });

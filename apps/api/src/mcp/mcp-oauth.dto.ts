@@ -12,6 +12,21 @@ export class McpOAuthConsentPermissionDto {
 
   @ApiProperty({ example: 'resources' })
   category!: string;
+
+  @ApiProperty({ type: String, nullable: true, description: 'Declaring plugin; null for core permissions.' })
+  pluginName!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: 'German label of a plugin permission.' })
+  labelDe!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: 'German description of a plugin permission.' })
+  descriptionDe!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: 'English category heading of a plugin permission.' })
+  categoryLabel!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: 'German category heading of a plugin permission.' })
+  categoryLabelDe!: string | null;
 }
 
 export class McpOAuthConsentDto {

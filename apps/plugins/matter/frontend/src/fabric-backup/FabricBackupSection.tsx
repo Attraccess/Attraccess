@@ -32,8 +32,11 @@ type Notice = { title: string; message: string } | null;
  *
  * The recovery key lives only in `reveal` state while the reveal modal is open; it is never put into the status,
  * a cache or storage, and is dropped as soon as the administrator acknowledged it.
+ *
+ * Shown with `matter.devices.read`. Every action, the recovery panel and the downloads need `canManage`
+ * (`matter.devices.manage`) and are hidden without it.
  */
-export function FabricBackupSection() {
+export function FabricBackupSection({ canManage }: Readonly<{ canManage: boolean }>) {
   const { t } = useMatterTranslations();
   const errorText = useErrorText();
   const formatDateTime = useDateTimeFormatter({ showSeconds: true });
@@ -110,10 +113,11 @@ export function FabricBackupSection() {
           status={status}
           busy={busy}
           creating={pending === 'create'}
+          canManage={canManage}
           onCreate={() => void create()}
           onRestore={openRestore}
         />
-        {status.recovery.required && (
+        {canManage && status.recovery.required && (
           <RecoveryPanel
             status={status}
             pending={pending}
@@ -126,6 +130,7 @@ export function FabricBackupSection() {
           status={status}
           busy={busy}
           generating={pending === 'generateKey'}
+          canManage={canManage}
           onGenerateKey={() => void generateKey()}
           onRotate={() => setRotating(true)}
           formatDateTime={formatDateTime}
@@ -136,6 +141,7 @@ export function FabricBackupSection() {
           onBackup={() => void backup()}
           onDownload={(item) => void download(item)}
           onRestore={openRestore}
+          canManage={canManage}
           formatDateTime={formatDateTime}
         />
       </>
@@ -154,7 +160,7 @@ export function FabricBackupSection() {
       {body}
 
       {reveal && <RecoveryKeyModal reveal={reveal} onAcknowledge={acknowledge} onDone={() => setReveal(null)} />}
-      {restoring && status && (
+      {canManage && restoring && status && (
         <RestoreWizard
           stored={status.backups.stored}
           onClose={() => {

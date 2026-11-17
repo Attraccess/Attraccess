@@ -55,7 +55,10 @@ export class SsoProviderAdministrationService {
     const samlMappings = createDto.samlConfiguration?.roleMappings;
     if (oidcMappings !== undefined || samlMappings !== undefined) {
       this.assertCanManageSsoRoles(actor, 'SSO role mappings');
-      await this.assertPermissionMappingCeiling([oidcMappings, samlMappings], actor.effectivePermissions);
+      await this.assertPermissionMappingCeiling(
+        [oidcMappings, samlMappings],
+        await this.rbacService.getGrantCeiling(actor),
+      );
     }
     if (customRolePaths(createDto.oidcConfiguration?.roleClaimPaths)) {
       this.assertCanManageSsoRoles(actor, 'SSO role claim paths');
@@ -74,7 +77,10 @@ export class SsoProviderAdministrationService {
 
     if (oidcMappings !== undefined || samlMappings !== undefined) {
       this.assertCanManageSsoRoles(actor, 'SSO role mappings');
-      await this.assertPermissionMappingCeiling([oidcMappings, samlMappings], actor.effectivePermissions);
+      await this.assertPermissionMappingCeiling(
+        [oidcMappings, samlMappings],
+        await this.rbacService.getGrantCeiling(actor),
+      );
     }
 
     if (!sameRolePaths(updateDto.oidcConfiguration?.roleClaimPaths, before.oidcConfiguration?.roleClaimPaths)) {
@@ -105,7 +111,7 @@ export class SsoProviderAdministrationService {
     const roleKeys = new Set(mappings.flatMap((m) => Object.keys(m ?? {})));
     if (roleKeys.size === 0) return;
 
-    const allRoles = await this.rbacService.getRoles();
+    const allRoles = await this.rbacService.getRoles(true);
     const roleByKey = new Map(allRoles.map((r) => [r.key, r]));
 
     for (const roleKey of roleKeys) {

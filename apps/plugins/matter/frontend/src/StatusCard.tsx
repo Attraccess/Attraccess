@@ -27,8 +27,24 @@ function Field({ label, children, dataCy }: Readonly<{ label: string; children: 
   );
 }
 
-/** What the administrator can do about the current state. */
-export function hintKey(status: ConnectionStatus): string {
+// Hints that tell the reader to change the settings or the installation; read-only users, who cannot see the settings,
+// are told to ask an administrator instead.
+const READ_ONLY_HINTS = new Set([
+  'hint.not_configured',
+  'hint.unauthorized',
+  'hint.unavailable',
+  'hint.misconfigured',
+  'hint.incompatible',
+  'hint.hostVersion',
+]);
+
+/** What the administrator can do about the current state, or what a read-only user should expect. */
+export function hintKey(status: ConnectionStatus, canManage = true): string {
+  const key = baseHintKey(status);
+  return !canManage && READ_ONLY_HINTS.has(key) ? `${key}ReadOnly` : key;
+}
+
+function baseHintKey(status: ConnectionStatus): string {
   if (status.state !== 'degraded') return `hint.${status.state}`;
   if (status.reasonDetail === 'host version unavailable') return 'hint.hostVersion';
   return `hint.${status.reason ?? 'unavailable'}`;
@@ -55,7 +71,7 @@ function Combination({ entry }: Readonly<{ entry: SupportedCombination | Record<
   );
 }
 
-export function StatusCard({ status }: Readonly<{ status: ConnectionStatus }>) {
+export function StatusCard({ status, canManage }: Readonly<{ status: ConnectionStatus; canManage: boolean }>) {
   const { t } = useMatterTranslations();
   const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const error = status.lastError;
@@ -76,7 +92,7 @@ export function StatusCard({ status }: Readonly<{ status: ConnectionStatus }>) {
             </Chip>
           )}
         </div>
-        <p data-cy="matter-hint">{t(hintKey(status), { attraccess: minimumAttraccess(status) })}</p>
+        <p data-cy="matter-hint">{t(hintKey(status, canManage), { attraccess: minimumAttraccess(status) })}</p>
         <dl className="mt:grid mt:grid-cols-1 mt:gap-3 mt:sm:grid-cols-2">
           <Field label={t('status.since')}>{formatDateTime(status.since)}</Field>
           {status.nextRetryAt && (

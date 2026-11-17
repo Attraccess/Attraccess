@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { MatterConnectionService } from '../connection/connection.service';
-import { DeviceAuditService } from '../devices/audit.service';
+import { DeviceAuditService, type AuditActor } from '../devices/audit.service';
 import { MatterFabric as MatterFabricEntity } from '../devices/entities';
 import { MatterReconciliationService } from '../devices/reconciliation.service';
 import { conflict, sidecarCode, unprocessable } from '../fabric/errors';
@@ -117,8 +117,10 @@ export class MatterRestoreService implements OnModuleDestroy {
     principal: PluginAuditPrincipal,
   ): Promise<RestoreValidation> {
     const audited = { ref: randomUUID() };
-    const refuse: Refuse = (code) => this.refused(code, audited.ref, principal, unprocessable(code, MESSAGES[code]));
-    if (this.running) await this.refuseBusy(audited.ref, principal);
+    // The validation ID doubles as the operation ID: the check, the confirmation, the outcome and a cancel share it.
+    const actor = this.audit.actorFor(principal);
+    const refuse: Refuse = (code) => this.refused(code, audited.ref, actor, unprocessable(code, MESSAGES[code]));
+    if (this.running) await this.refuseBusy(audited.ref, actor);
 
     const status = this.connection.status();
     if (status.state !== 'connected') return refuse('sidecar_unavailable');
@@ -133,18 +135,18 @@ export class MatterRestoreService implements OnModuleDestroy {
 
     const preflight = await this.preflight(opened.header.fabricId);
     // Checked again right before staging: a restore may have started while the file was being read.
-    if (this.running) await this.refuseBusy(audited.ref, principal);
+    if (this.running) await this.refuseBusy(audited.ref, actor);
     this.running = true;
     let validation: RestoreValidation;
     try {
       const stageId = await this.stage(opened.body, refuse);
-      validation = await this.keep(opened, stageId, preflight, principal);
+      validation = await this.keep(opened, stageId, preflight, principal, actor.operationId);
     } finally {
       this.running = false;
     }
     await this.audit.record(
       'matter.restore_validated',
-      principal,
+      actor,
       { type: 'matter.backup', ref: audited.ref },
       { backupRef: audited.ref, fabricGeneration: opened.header.fabricGeneration, kind: preflight.kind },
     );
@@ -156,17 +158,24 @@ export class MatterRestoreService implements OnModuleDestroy {
     const pending = this.pending;
     if (!pending || pending.validationId !== validationId || pending.userId !== principal.userId) return;
     await this.discardPending();
+    const ref = pending.header.backupId;
+    await this.audit.record(
+      'matter.restore_cancelled',
+      this.audit.actorFor(principal, validationId),
+      { type: 'matter.backup', ref },
+      { backupRef: ref },
+    );
   }
 
   private async refused(
     reason: RestoreValidationCode | 'busy',
     ref: string,
-    principal: PluginAuditPrincipal,
+    actor: AuditActor,
     error: HttpException,
   ): Promise<never> {
     await this.audit.record(
       'matter.restore_refused',
-      principal,
+      actor,
       { type: 'matter.backup', ref },
       { backupRef: ref, reason },
       'failed',
@@ -174,11 +183,11 @@ export class MatterRestoreService implements OnModuleDestroy {
     throw error;
   }
 
-  private refuseBusy(ref: string, principal: PluginAuditPrincipal): Promise<never> {
+  private refuseBusy(ref: string, actor: AuditActor): Promise<never> {
     return this.refused(
       'busy',
       ref,
-      principal,
+      actor,
       conflict('busy', 'A restore is in progress. Check the backup again once it has finished.'),
     );
   }
@@ -243,10 +252,10 @@ export class MatterRestoreService implements OnModuleDestroy {
     stageId: string,
     preflight: RestorePreflight,
     principal: PluginAuditPrincipal,
+    validationId: string,
   ): Promise<RestoreValidation> {
     await this.discardPending();
     const { header } = opened;
-    const validationId = randomUUID();
     const expiresAt = new Date(Date.now() + this.validationTtlMs);
     const timer = setTimeout(() => void this.expire(validationId), this.validationTtlMs);
     timer.unref();
@@ -313,10 +322,11 @@ export class MatterRestoreService implements OnModuleDestroy {
     }
     if (this.running) throw conflict('busy', 'A restore is already in progress.');
     const ref = pending.header.backupId;
+    const actor = this.audit.actorFor(principal, validationId);
     const refuse = async (code: ConfirmRefusal, message: string) => {
       await this.audit.record(
         'matter.restore_refused',
-        principal,
+        actor,
         { type: 'matter.backup', ref },
         { backupRef: ref, reason: code },
         'failed',
@@ -348,7 +358,7 @@ export class MatterRestoreService implements OnModuleDestroy {
       this.pending = null;
       clearTimeout(pending.timer);
       try {
-        return await this.apply(pending, now, principal, refuse);
+        return await this.apply(pending, now, actor, refuse);
       } catch (error) {
         // Whatever the outcome, settle again whether the sidecar and the plugin's records agree. A restore of unknown
         // outcome may still land right after this check, so this one does not count as the sidecar having settled.
@@ -365,16 +375,17 @@ export class MatterRestoreService implements OnModuleDestroy {
   private async apply(
     pending: Pending,
     preflight: RestorePreflight,
-    principal: PluginAuditPrincipal,
+    actor: AuditActor,
     refuse: (code: 'pre_restore_backup_failed', message: string) => Promise<Error>,
   ): Promise<RestoreResult> {
     const ref = pending.header.backupId;
+    // Every entry of the restore, including the backups, key and reconciliation it starts, carries its validation ID.
     // Any healthy fabric is backed up first, also one the plugin does not agree with while it is in recovery.
     const needsBackup = preflight.sidecarState === 'initialized';
-    if (this.guard.recoveryRequired) await this.fabric.auditRecoveryChoice('restore', principal);
+    if (this.guard.recoveryRequired) await this.fabric.auditRecoveryChoice('restore', actor);
     await this.audit.record(
       'matter.restore_confirmed',
-      principal,
+      actor,
       { type: 'matter.backup', ref },
       {
         backupRef: ref,
@@ -383,13 +394,13 @@ export class MatterRestoreService implements OnModuleDestroy {
         preRestoreBackup: needsBackup,
       },
     );
-    if (needsBackup) await this.preRestoreBackup(pending.stageId, principal, refuse);
+    if (needsBackup) await this.preRestoreBackup(pending.stageId, actor, refuse);
 
-    await this.committer.commitAndRecord(pending, preflight.sidecarState, principal);
-    await this.keepSuppliedKey(pending, principal);
+    await this.committer.commitAndRecord(pending, preflight.sidecarState, actor);
+    await this.keepSuppliedKey(pending, actor);
     await this.fabric.detect('connect');
-    await this.reconciliation.request(principal).catch(() => undefined);
-    await this.backups.backup('restore', principal).catch(() => undefined);
+    await this.reconciliation.request(actor).catch(() => undefined);
+    await this.backups.backup('restore', actor).catch(() => undefined);
     return { outcome: 'succeeded', status: await this.fabric.status() };
   }
 
@@ -399,11 +410,11 @@ export class MatterRestoreService implements OnModuleDestroy {
    */
   private async preRestoreBackup(
     stageId: string,
-    principal: PluginAuditPrincipal,
+    actor: AuditActor,
     refuse: (code: 'pre_restore_backup_failed', message: string) => Promise<Error>,
   ): Promise<void> {
     try {
-      await this.backups.backup('pre_restore', principal, { allowInRecovery: this.guard.recoveryRequired });
+      await this.backups.backup('pre_restore', actor, { allowInRecovery: this.guard.recoveryRequired });
     } catch {
       await this.committer.abortStage(stageId);
       throw await refuse(
@@ -417,10 +428,10 @@ export class MatterRestoreService implements OnModuleDestroy {
    * Disaster recovery onto an installation without a recovery key: the key the administrator restored with becomes
    * the current one, so the backups after the restore can be made. It never leaves this service in a response.
    */
-  private async keepSuppliedKey(pending: Pending, principal: PluginAuditPrincipal): Promise<void> {
+  private async keepSuppliedKey(pending: Pending, actor: AuditActor): Promise<void> {
     if (!pending.suppliedKey) return;
     try {
-      await this.keys.adopt(pending.suppliedKey, pending.header.recoveryKeyId, principal);
+      await this.keys.adopt(pending.suppliedKey, pending.header.recoveryKeyId, actor);
     } catch {
       this.context.logger.warn?.('The recovery key used for the restore could not be stored.');
     }
