@@ -41,6 +41,8 @@ overrides:
   # workbox-build, cdxgen and nx (all latest) still ask for them. Same CJS/ESM exports up to glob 14 and minimatch 11.
   'glob@>=9.0.0 <14.0.2': ^14.0.2
   'minimatch@>=7.0.0 <11.0.1': ^11.0.1
+  # One picomatch 4 to patch (see patchedDependencies); @angular-devkit/core pins 4.0.4.
+  '@angular-devkit/core>picomatch': 4.0.7
 
 allowBuilds:
   '@balena/compose-parser': true
@@ -79,6 +81,8 @@ patchedDependencies:
   # @peculiar/x509@3.1.0: registers in its own tsyringe child container; @simplewebauthn/server brings x509 2,
   #   and two majors in tsyringe's global container break certificate generation (ATT-1312).
   # nestjs-asyncapi@2.0.1: requires @asyncapi/generator only when rendering HTML, so the override above can drop it.
+  # picomatch@4.0.7 / picomatch@2.3.2: backport the GHSA-fc5q-39xc-vjpf ReDoS fix (micromatch/picomatch#237 for v4,
+  #   #246 for v2) until picomatch releases it; scripts/picomatch-patch.test.mjs checks every locked copy is patched.
   ts-api-utils@2.5.0: patches/ts-api-utils@2.5.0.patch
   typescript@7.0.2: patches/typescript@7.0.2.patch
   '@swc-node/register@1.12.1': patches/@swc-node__register@1.12.1.patch
@@ -86,4 +90,10 @@ patchedDependencies:
   '@nestjs/swagger@12.1.2': patches/@nestjs__swagger@12.1.2.patch
   '@peculiar/x509@3.1.0': patches/@peculiar__x509@3.1.0.patch
   nestjs-asyncapi@2.0.1: patches/nestjs-asyncapi@2.0.1.patch
+  picomatch@4.0.7: patches/picomatch@4.0.7.patch
+  picomatch@2.3.2: patches/picomatch@2.3.2.patch
 
+auditConfig:
+  ignoreGhsas:
+    # picomatch <=4.0.7 extglob ReDoS: no release yet; patched; remove when picomatch ships a fix.
+    - GHSA-fc5q-39xc-vjpf
