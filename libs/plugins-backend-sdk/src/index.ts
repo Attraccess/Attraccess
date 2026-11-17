@@ -16,6 +16,7 @@ export * from './lib/plugin-license';
 export * from './lib/plugin-ble';
 export * from './lib/plugin-ble-validation';
 export * from './lib/plugin-ble-fake';
+export * from './lib/plugin-cards';
 
 export * from './lib/auth-decorator';
 export * from '@attraccess/database-entities';

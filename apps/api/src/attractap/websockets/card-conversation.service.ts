@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { MAX_RELAYED_COMMAND_LENGTH } from '../card-crypto';
 import type { CardChannel } from '../card-crypto/card-operations';
@@ -37,6 +37,50 @@ export class CardConversationError extends Error {
   }
 }
 
+/**
+ * Why a plugin card conversation ended early. Unlike reader conversations, a plugin owns its device protocol:
+ * DEVICE_ERROR means its `exchange` failed or answered with something unusable, CANCELLED that the host or the
+ * plugin is going away.
+ */
+export type PluginCardConversationFailure =
+  'BUSY' | 'CARD_REMOVED' | 'TIMEOUT' | 'TOO_MANY_EXCHANGES' | 'DEVICE_ERROR' | 'CANCELLED';
+
+class PluginCardConversationError extends Error {
+  constructor(public readonly reason: PluginCardConversationFailure) {
+    super(reason);
+  }
+}
+
+/** Relays one APDU to the card through the plugin's own device. */
+export type PluginCardExchange = (apdu: Uint8Array, options: { signal: AbortSignal }) => Promise<Uint8Array>;
+
+/** Who asks: one conversation per plugin and device, the newest wins. */
+export interface PluginCardConversationOwner {
+  pluginId: string;
+  device: string;
+}
+
+export interface PluginCardConversationResult<T> {
+  ok: boolean;
+  value?: T;
+  reason?: PluginCardConversationFailure;
+}
+
+interface PluginCardConversation {
+  readonly pluginId: string;
+  exchanges: number;
+  pending: {
+    controller: AbortController;
+    resolve: (response: Buffer) => void;
+    reject: (error: Error) => void;
+    timer: NodeJS.Timeout;
+  } | null;
+  readonly deadline: NodeJS.Timeout;
+  ended: boolean;
+  abortReason: PluginCardConversationFailure | null;
+  abort: (reason: PluginCardConversationFailure) => void;
+}
+
 /** The API compiles without strict null checks, so this is a plain shape instead of a discriminated union. */
 export interface CardConversationResult<T> {
   ok: boolean;
@@ -70,11 +114,13 @@ export interface CardConversation {
  * conversation id and a sequence number the reader echoes; anything that does not match is ignored.
  */
 @Injectable()
-export class CardConversationService {
+export class CardConversationService implements OnModuleDestroy {
   private readonly logger = new Logger(CardConversationService.name);
   private active = 0;
   /** One conversation per reader, even when the reader has more than one connection. */
   private readonly byReader = new Map<number, CardConversation>();
+  /** One conversation per plugin device, keyed by plugin id and device id. */
+  private readonly byPluginDevice = new Map<string, PluginCardConversation>();
 
   get activeConversations(): number {
     return this.active;
@@ -200,6 +246,75 @@ export class CardConversationService {
     conversation?.abort(reason);
   }
 
+  /** Would a new plugin conversation be refused with BUSY right now? Checked before any database work. */
+  get atLimit(): boolean {
+    return this.active >= CARD_CONVERSATION_LIMITS.maxConcurrent;
+  }
+
+  /**
+   * Runs `work` over a card held to a plugin's own device. The plugin relays each APDU through `exchange`; no
+   * websocket traffic is involved. Same limits as reader conversations, and the server-wide limit is shared with
+   * them. A conversation already running for the same plugin device is aborted with CARD_REMOVED. Aborting
+   * `signal` ends the conversation with CARD_REMOVED. Like a read-only reader check, a conversation aborted before
+   * `work` finished is a failure even if `work` resolved afterwards.
+   */
+  async runForPlugin<T>(
+    owner: PluginCardConversationOwner,
+    uid: string,
+    exchange: PluginCardExchange,
+    signal: AbortSignal | undefined,
+    work: (channel: CardChannel) => Promise<T>,
+  ): Promise<PluginCardConversationResult<T>> {
+    const key = JSON.stringify([owner.pluginId, owner.device]);
+    this.byPluginDevice.get(key)?.abort('CARD_REMOVED');
+    if (signal?.aborted) return { ok: false, reason: 'CARD_REMOVED' };
+    if (this.atLimit) return { ok: false, reason: 'BUSY' };
+
+    this.active++;
+    const conversation = this.openForPlugin(owner.pluginId);
+    this.byPluginDevice.set(key, conversation);
+    const onAbort = () => conversation.abort('CARD_REMOVED');
+    signal?.addEventListener('abort', onAbort, { once: true });
+
+    const channel: CardChannel = {
+      uid,
+      exchange: (apdu) => this.exchangeForPlugin(conversation, exchange, apdu),
+    };
+
+    try {
+      const value = await work(channel);
+      if (conversation.abortReason) return { ok: false, reason: conversation.abortReason };
+      return { ok: true, value };
+    } catch (error) {
+      if (conversation.abortReason) return { ok: false, reason: conversation.abortReason };
+      if (error instanceof PluginCardConversationError) return { ok: false, reason: error.reason };
+      throw error;
+    } finally {
+      signal?.removeEventListener('abort', onAbort);
+      clearTimeout(conversation.deadline);
+      if (conversation.pending) {
+        clearTimeout(conversation.pending.timer);
+        conversation.pending.controller.abort();
+      }
+      conversation.pending = null;
+      conversation.ended = true;
+      this.active--;
+      if (this.byPluginDevice.get(key) === conversation) this.byPluginDevice.delete(key);
+    }
+  }
+
+  /** The plugin is unloaded (disabled, uninstalled, restarted): its running conversations end with CANCELLED. */
+  cancelPlugin(pluginId: string): void {
+    for (const conversation of [...this.byPluginDevice.values()]) {
+      if (conversation.pluginId === pluginId) conversation.abort('CANCELLED');
+    }
+  }
+
+  /** Host shutdown: every plugin conversation ends with CANCELLED. Reader conversations end with their sockets. */
+  onModuleDestroy(): void {
+    for (const conversation of [...this.byPluginDevice.values()]) conversation.abort('CANCELLED');
+  }
+
   private queueIsFull(socket: AuthenticatedWebSocket): boolean {
     return queuedSendBytes(socket) > CARD_CONVERSATION_LIMITS.maxBufferedBytes;
   }
@@ -273,6 +388,80 @@ export class CardConversationService {
         }),
       );
       if (!sent) conversation.abort('READER_UNREACHABLE');
+    });
+  }
+
+  private openForPlugin(pluginId: string): PluginCardConversation {
+    const conversation: PluginCardConversation = {
+      pluginId,
+      exchanges: 0,
+      pending: null,
+      ended: false,
+      abortReason: null,
+      deadline: setTimeout(() => conversation.abort('TIMEOUT'), CARD_CONVERSATION_LIMITS.conversationTimeoutMs),
+      abort: (reason) => {
+        if (conversation.ended) return;
+        conversation.ended = true;
+        conversation.abortReason = reason;
+        const pending = conversation.pending;
+        conversation.pending = null;
+        if (pending) {
+          clearTimeout(pending.timer);
+          pending.controller.abort();
+          pending.reject(new PluginCardConversationError(reason));
+        }
+      },
+    };
+    return conversation;
+  }
+
+  /**
+   * One APDU through the plugin. Its answer is plugin input: anything but bytes within the response limit ends the
+   * conversation with DEVICE_ERROR. An answer that arrives after the exchange ended (timeout, abort) is ignored.
+   * APDUs and answers carry cryptograms and are never logged.
+   */
+  private exchangeForPlugin(
+    conversation: PluginCardConversation,
+    exchange: PluginCardExchange,
+    apdu: Buffer,
+  ): Promise<Buffer> {
+    if (conversation.ended) {
+      return Promise.reject(new PluginCardConversationError(conversation.abortReason ?? 'CARD_REMOVED'));
+    }
+    if (conversation.pending) return Promise.reject(new Error('card exchange already in flight'));
+    if (apdu.length > MAX_RELAYED_COMMAND_LENGTH) return Promise.reject(new Error('APDU does not fit the PN532'));
+    if (conversation.exchanges >= CARD_CONVERSATION_LIMITS.maxExchanges) {
+      conversation.abort('TOO_MANY_EXCHANGES');
+      return Promise.reject(new PluginCardConversationError('TOO_MANY_EXCHANGES'));
+    }
+
+    conversation.exchanges++;
+    const controller = new AbortController();
+    return new Promise<Buffer>((resolve, reject) => {
+      const timer = setTimeout(() => conversation.abort('TIMEOUT'), CARD_CONVERSATION_LIMITS.exchangeTimeoutMs);
+      conversation.pending = { controller, resolve, reject, timer };
+      const current = () => conversation.pending?.controller === controller;
+      let answer: Promise<Uint8Array>;
+      try {
+        answer = Promise.resolve(exchange(Uint8Array.from(apdu), { signal: controller.signal }));
+      } catch (error) {
+        answer = Promise.reject(error);
+      }
+      answer.then(
+        (response) => {
+          if (!current()) return;
+          if (!(response instanceof Uint8Array) || response.length > CARD_CONVERSATION_LIMITS.maxResponseLength) {
+            conversation.abort('DEVICE_ERROR');
+            return;
+          }
+          clearTimeout(timer);
+          conversation.pending = null;
+          resolve(Buffer.from(response));
+        },
+        () => {
+          if (current()) conversation.abort('DEVICE_ERROR');
+        },
+      );
     });
   }
 }

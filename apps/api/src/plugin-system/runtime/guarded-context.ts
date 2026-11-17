@@ -3,6 +3,7 @@ import {
   MqttCredentialProvisioningHostProvider,
   MqttServerConnectionConfig,
   PluginBleContext,
+  PluginCardsContext,
   PluginContext,
   PluginFlowsContext,
   PluginNotificationsContext,
@@ -106,6 +107,11 @@ export function createGuardedContext(
       require(PluginPermission.BLE_TRANSPORT, 'ble');
       if (!base.ble) throw new Error('BLE transport is unavailable in this host');
       return base.ble;
+    },
+    get cards(): PluginCardsContext {
+      require(PluginPermission.CARD_AUTHENTICATION, 'cards');
+      if (!base.cards) throw new Error('Card authentication is unavailable in this host');
+      return base.cards;
     },
     get secrets(): PluginSecretsContext {
       require(PluginPermission.MANAGE_SECRETS, 'secrets');

@@ -9,6 +9,7 @@ import type { PluginResourceAccessContext } from './plugin-resource-access';
 import type { PluginLiveUpdatesContext } from './plugin-live-updates';
 import type { PluginLicenseContext } from './plugin-license';
 import type { PluginBleContext } from './plugin-ble';
+import type { PluginCardsContext } from './plugin-cards';
 import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscription } from './plugin.interface';
 /**
  * DI token under which the host registers its MqttServerHostProvider
@@ -149,6 +150,11 @@ export interface PluginContext {
    * without BLE_TRANSPORT. Optional so plugins still type-check against hosts predating it.
    */
   readonly ble?: PluginBleContext;
+  /**
+   * Card authentication over the plugin's own NFC devices. Guarded getter: throws PluginPermissionError without
+   * CARD_AUTHENTICATION. Optional so plugins still type-check against hosts predating it.
+   */
+  readonly cards?: PluginCardsContext;
   /** This plugin's own manifest (name, version, directory, id). */
   readonly manifest: PluginManifestInfo;
 
