@@ -18,7 +18,7 @@ Each resource in Attraccess has:
 | Type | Description |
 |------|-------------|
 | **Machine** | Standard resource (3D printer, laser cutter, CNC mill, etc.) |
-| **Door** | Access point with unlock function. Optional separate unlock and unlatch actions. |
+| **Door** | Access point with lock and unlock actions. Optional separate unlock and unlatch actions, or [access only](resources/creating-resources.md#door-options) with a single Open action. |
 
 ## Resource Overview
 

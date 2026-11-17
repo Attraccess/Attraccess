@@ -56,6 +56,10 @@
       "separateUnlockAndUnlatch": {
         "label": "Separate Unlock and Unlatch",
         "description": "Can be useful if the door needs to be unlocked and the latch needs to be opened separately"
+      },
+      "accessOnly": {
+        "label": "Access only",
+        "description": "The door has a single action, Open: it opens and closes again by itself. Lock and unlatch are not offered. Cannot be combined with \"Separate Unlock and Unlatch\"."
       }
     },
     "retraining": {

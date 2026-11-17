@@ -37,6 +37,17 @@ You can lower the limit at any time. Running sessions are never ended automatica
 > [!WARNING]
 > [Flows](flows/overview.md) run for every session start and stop, so a flow that switches power off when a session ends cuts the power for everybody on the machine unless it checks the number of active sessions. Meters and running time are split fairly between the people using the machine at the same time; the per-use fee and session time stay per person. Read [Shared machines](resources/usage-tracking.md#shared-machines-parallel-sessions) before enabling parallel sessions on a machine with power control or metered billing.
 
+### Door Options
+
+A door offers **Lock** and **Unlock** by default. In the resource settings under **Resource type and behavior** (with **Door** selected) you can change that:
+
+- **Separate Unlock and Unlatch** adds a third action, **Unlatch**, for doors whose lock and latch are opened in two steps.
+- **Access only** is for doors that cannot stay unlocked, for example one that opens briefly and closes again by itself. The door then has a single action, **Open**. Lock and unlatch are not offered and are refused from every place: the web app, readers and the API.
+
+The two options cannot be combined: while one is on, the other is disabled. Only doors can be access only.
+
+An Open is recorded as an unlock, so the usage history shows it as **Opened** and [flows](flows/overview.md) that react to a door being unlocked run for it. Attractap readers with older firmware show **Unlock** for an access-only door; it opens the door. Their **Lock** is refused.
+
 ## Editing a Resource
 
 1. Open the resource [detail page](resources/resource-details.md)

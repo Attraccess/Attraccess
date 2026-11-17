@@ -12,6 +12,7 @@ export const toResourceRecord = (entity: Resource): ResourceRecord => {
     name: entity.name,
     type: entity.type,
     separateUnlockAndUnlatch: entity.separateUnlockAndUnlatch,
+    accessOnly: entity.accessOnly,
     description: entity.description,
     imageFilename: entity.imageFilename,
     documentationType: entity.documentationType,

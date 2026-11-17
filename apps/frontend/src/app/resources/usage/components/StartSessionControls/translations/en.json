@@ -22,6 +22,7 @@
     "unlock": "unlock",
     "lock": "lock",
     "unlatch": "unlatch",
+    "open": "Open",
     "success": {
       "title": "Success",
       "description": "The door was controlled successfully."

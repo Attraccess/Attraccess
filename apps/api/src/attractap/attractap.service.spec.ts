@@ -1,4 +1,5 @@
 import type { AttractapCardOwner, AttractapNfcCard } from '@attraccess/application-models';
+import { ResourceType } from '@attraccess/application-models';
 import { AttractapService, SYMBOLICATION_CONCURRENCY } from './attractap.service';
 import { ReaderUpdatedEvent } from './events';
 import { EncryptionService } from '../encryption/encryption.service';
@@ -151,8 +152,8 @@ describe('AttractapService reader maintenance and crash reports', () => {
     );
     reader.firmware.capabilities.resourceSelection = false;
     reader.resources = [];
-    readers.resources.set(1, makeResource(1));
-    readers.resources.set(2, makeResource(2));
+    readers.resources.set(1, { ...makeResource(1), name: 'Lathe', type: ResourceType.Machine });
+    readers.resources.set(2, { ...makeResource(2), name: 'Side Door', type: ResourceType.Door, accessOnly: true });
     const reports = new FakeCrashReportStore();
     const events = { emit: jest.fn() };
     const symbolication = {
@@ -212,6 +213,16 @@ describe('AttractapService reader maintenance and crash reports', () => {
     readers.add(makeReader({ id: 5, pairingState: 'unpaired' }));
     expect((await service.getPairedReaders()).map((r) => r.id)).toEqual([4]);
     expect((await service.getReadersToPair()).map((r) => r.id)).toEqual([5]);
+  });
+
+  it('refuses to assign a resource the reader cannot serve', async () => {
+    const { service, readers } = setup();
+    readers.resources.set(3, { ...makeResource(3), name: 'Unknown', type: 'unknown' as ResourceType });
+
+    await expect(service.updateReader(4, { connectedResourceIds: [3] }, false)).rejects.toThrow(
+      'This reader cannot serve "Unknown"',
+    );
+    expect(readers.edits).toEqual([]);
   });
   it('normalizes crash report metrics and avoids symbolication when no dump is provided', async () => {
     const { service, reports, symbolication } = setup();

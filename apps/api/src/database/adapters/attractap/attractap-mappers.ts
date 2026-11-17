@@ -28,6 +28,7 @@ export function toLinkedResource(resource: Resource): AttractapLinkedResource {
     name: resource.name,
     type: resource.type,
     separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch,
+    accessOnly: resource.accessOnly,
     description: resource.description,
     imageFilename: resource.imageFilename,
     documentationType: resource.documentationType,

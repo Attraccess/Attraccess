@@ -1,5 +1,5 @@
 import type { AuditAuthenticationMethod } from '@attraccess/application-models';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
@@ -47,6 +47,8 @@ import { ATTRACTAP_CARD_STORE, type AttractapCardStore } from './card-store.port
 import { ATTRACTAP_CRASH_REPORT_STORE, type AttractapCrashReportStore } from './crash-report-store.port';
 
 import { ATTRACTAP_READER_STORE, type AttractapReaderStore } from './reader-store.port';
+
+import { ATTRACTAP_READER_CAPABILITIES, canAssign } from '../resources/reader-capabilities/reader-capabilities';
 
 import { NotificationCategory } from '../notifications/notification-types';
 
@@ -301,6 +303,12 @@ export class AttractapService {
       let resources = await this.readerStore.findResourcesByIds(updateData.connectedResourceIds);
 
       this.logger.debug('resources from db', resources);
+      const unserved = resources.filter((resource) => !canAssign(ATTRACTAP_READER_CAPABILITIES, resource));
+      if (unserved.length > 0) {
+        throw new BadRequestException(
+          `This reader cannot serve ${unserved.map((resource) => `"${resource.name}"`).join(', ')}`,
+        );
+      }
 
       if (!firmware.capabilities.resourceSelection && resources.length > 1) {
         this.logger.warn(

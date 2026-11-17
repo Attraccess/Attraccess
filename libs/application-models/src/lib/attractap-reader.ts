@@ -29,6 +29,7 @@ export interface AttractapLinkedResource {
   name: string;
   type: ResourceType;
   separateUnlockAndUnlatch: boolean | null;
+  accessOnly: boolean;
   description: string | null;
   imageFilename: string | null;
   documentationType: DocumentationType | null;

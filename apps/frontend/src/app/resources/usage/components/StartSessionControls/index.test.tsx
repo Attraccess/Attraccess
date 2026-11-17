@@ -91,6 +91,7 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
   useUnlockDoor: () => ({ mutate: vi.fn(), isPending: false }),
   useLockDoor: () => ({ mutate: vi.fn(), isPending: false }),
   useUnlatchDoor: () => ({ mutate: vi.fn(), isPending: false }),
+  useOpenDoor: () => ({ mutate: vi.fn(), isPending: false }),
   UseResourceUsageGetActiveSessionKeyFn: () => ['activeSession'],
   UseResourceUsageGetHistoryKeyFn: () => ['history'],
 }));
