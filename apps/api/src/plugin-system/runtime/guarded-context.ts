@@ -2,6 +2,7 @@ import type { EntityTarget, ObjectLiteral } from '@attraccess/plugins-backend-sd
 import {
   MqttCredentialProvisioningHostProvider,
   MqttServerConnectionConfig,
+  PluginBleContext,
   PluginContext,
   PluginFlowsContext,
   PluginNotificationsContext,
@@ -100,6 +101,11 @@ export function createGuardedContext(
       require(PluginPermission.READER_UI, 'readerUi.invalidate()');
       if (!base.readerUi) throw new Error('Reader UI is unavailable in this host');
       return base.readerUi;
+    },
+    get ble(): PluginBleContext {
+      require(PluginPermission.BLE_TRANSPORT, 'ble');
+      if (!base.ble) throw new Error('BLE transport is unavailable in this host');
+      return base.ble;
     },
     get secrets(): PluginSecretsContext {
       require(PluginPermission.MANAGE_SECRETS, 'secrets');

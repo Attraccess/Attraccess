@@ -23,6 +23,22 @@ export class PluginMainFrontend {
     required: false,
   })
   styles?: string;
+  @ApiProperty({
+    description:
+      'Sidebar route paths of the plugin that users may pin to their dashboard. Each must also be a path returned by getSidebarItems() and getRoutes().',
+    example: ['/hello-world'],
+    required: false,
+    type: [String],
+  })
+  dashboardPaths?: string[];
+  @ApiProperty({
+    description:
+      'Ids of the dashboard widgets the plugin contributes through getDashboardWidgets(). Lowercase kebab-case; a built-in widget id always wins over a clashing plugin id.',
+    example: ['hello-world'],
+    required: false,
+    type: [String],
+  })
+  dashboardWidgets?: string[];
 }
 
 export class PluginMainBackend {

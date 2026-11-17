@@ -11,7 +11,7 @@ describe('UsersService', () => {
     beforeEach(() => {
       jest.spyOn(fixture.accounts, 'findOne').mockResolvedValueOnce(actor).mockResolvedValue(null);
     });
-    it('changes and reverifies an email inside the transaction', async () => {
+    it('changes and reverifies an email in a transaction, then sends the verification email', async () => {
       const updated = Object.assign(new User(), { id: 1, email: 'new@example.com' });
       jest
         .mocked(fixture.accounts.findOne)
@@ -38,6 +38,45 @@ describe('UsersService', () => {
       );
       expect(fixture.accounts.findOne).toHaveBeenLastCalledWith({ id: 1 }, undefined, manager);
       expect(fixture.emailService.sendVerificationEmail).toHaveBeenCalledWith(updated, expect.any(String));
+      expect(fixture.dataSource.transaction.mock.invocationCallOrder[0]).toBeLessThan(
+        jest.mocked(fixture.emailService.sendVerificationEmail).mock.invocationCallOrder[0],
+      );
+    });
+    it('takes the email change back when the verification email cannot be sent', async () => {
+      const previous = Object.assign(new User(), {
+        id: 1,
+        email: 'old@example.com',
+        isEmailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationTokenExpiresAt: null,
+      });
+      jest
+        .mocked(fixture.accounts.findOne)
+        .mockReset()
+        .mockResolvedValueOnce(previous)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(Object.assign(new User(), { id: 1, email: 'new@example.com' }));
+      const manager = new EntityManager(fixture.dataSource);
+      jest.spyOn(manager, 'getRepository').mockReturnValue(fixture.userRepository);
+      fixture.dataSource.transaction.mockImplementation(async (workOrIsolation, work) => {
+        const callback = typeof workOrIsolation === 'function' ? workOrIsolation : work;
+        if (!callback) throw new Error('Missing transaction callback');
+        return callback(manager);
+      });
+      const smtpDown = new Error('SMTP down');
+      jest.mocked(fixture.emailService.sendVerificationEmail).mockRejectedValueOnce(smtpDown);
+
+      await expect(fixture.service.changeEmail(1, 'new@example.com', previous)).rejects.toBe(smtpDown);
+      const [, change] = jest.mocked(fixture.userRepository.update).mock.calls[0];
+      expect(fixture.userRepository.update).toHaveBeenLastCalledWith(
+        { id: 1, emailVerificationToken: (change as { emailVerificationToken: string }).emailVerificationToken },
+        {
+          email: 'old@example.com',
+          isEmailVerified: true,
+          emailVerificationToken: null,
+          emailVerificationTokenExpiresAt: null,
+        },
+      );
     });
     it('treats a case-only change of the own email as unchanged', async () => {
       expect(await fixture.service.changeEmail(1, ' OLD@Example.com ', actor)).toBe(actor);

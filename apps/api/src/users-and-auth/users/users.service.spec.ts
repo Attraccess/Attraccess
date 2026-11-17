@@ -4,7 +4,7 @@ jest.mock('crypto', () => {
 });
 
 import { registerUsersServiceFixture } from './users.service.users-service.test-fixture';
-import { Role, User, AuthenticationDetail, ResourceUsage } from '@attraccess/database-entities';
+import { Role, User, AuthenticationDetail, DashboardPin, ResourceUsage } from '@attraccess/database-entities';
 import { EntityManager, ILike, UpdateResult } from 'typeorm';
 import { ForbiddenException, BadRequestException } from '@nestjs/common';
 import { UserNotFoundException } from './../../exceptions/user.notFound.exception';
@@ -843,11 +843,13 @@ describe('UsersService', () => {
       const usageRepo = { findOne: jest.fn().mockResolvedValue(null) };
       const authRepo = { delete: jest.fn().mockResolvedValue({ affected: 1 }) };
       const sessionRepo = { delete: jest.fn().mockResolvedValue({ affected: 1 }) };
+      const pinRepo = { delete: jest.fn().mockResolvedValue({ affected: 2 }) };
       const manager = {
         getRepository: jest.fn((entity) => {
           if (entity === User) return userRepo;
           if (entity === ResourceUsage) return usageRepo;
           if (entity === AuthenticationDetail) return authRepo;
+          if (entity === DashboardPin) return pinRepo;
           return sessionRepo;
         }),
       } as unknown as EntityManager;
@@ -875,6 +877,7 @@ describe('UsersService', () => {
           deleteAccountRequestedAt: expect.anything(),
         }),
       );
+      expect(pinRepo.delete).toHaveBeenCalledWith({ userId: 1 });
     });
   });
 

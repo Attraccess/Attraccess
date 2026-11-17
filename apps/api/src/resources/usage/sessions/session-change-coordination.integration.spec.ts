@@ -21,7 +21,7 @@ describe('session change coordination against Valkey', () => {
   let clientB: Redis;
 
   beforeAll(async () => {
-    container = await new GenericContainer('valkey/valkey:8-alpine').withExposedPorts(6379).start();
+    container = await new GenericContainer('valkey/valkey:9-alpine').withExposedPorts(6379).start();
     clientA = new Redis(container.getMappedPort(6379), container.getHost());
     clientB = new Redis(container.getMappedPort(6379), container.getHost());
   });

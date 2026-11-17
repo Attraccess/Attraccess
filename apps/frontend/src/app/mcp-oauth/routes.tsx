@@ -1,4 +1,5 @@
 import type { RouteConfig } from '@attraccess/plugins-frontend-sdk';
+import { McpOAuthErrorPage } from './error';
 import { McpOAuthAuthorizePage } from './index';
 
 export const mcpOAuthRoutes: RouteConfig[] = [
@@ -8,6 +9,13 @@ export const mcpOAuthRoutes: RouteConfig[] = [
     path: '/oauth/authorize',
     element: <McpOAuthAuthorizePage />,
     authRequired: true,
+    noLayout: true,
+  },
+  {
+    // An authorization request that cannot be sent back to the client; explaining it needs no sign-in.
+    path: '/oauth/error',
+    element: <McpOAuthErrorPage />,
+    authRequired: false,
     noLayout: true,
   },
 ];

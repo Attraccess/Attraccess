@@ -3,8 +3,8 @@
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "sourceRoot": "apps/plugins/wago",
-  "tags": ["type:plugin", "scope:plugin", "host:fhs"],
   "// lint": "lint runs from the workspace root on purpose: @nx/enforce-module-boundaries no-ops when eslint runs from inside a project directory. See eslint.config.cjs for the plugin isolation rules.",
+  "tags": ["type:plugin", "scope:plugin", "host:fhs"],
   "targets": {
     "install-dev": {
       "executor": "nx:run-commands",
@@ -38,10 +38,13 @@
     },
     "test-reliability-plan": {
       "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/wago/test-reliability-plan"],
       "options": {
-        "command": "pnpm exec jest --config apps/plugins/wago/scripts/jest.reliability-plan.config.cjs"
-      },
-      "outputs": ["{workspaceRoot}/coverage/apps/plugins/wago/test-reliability-plan"]
+        "command": "pnpm exec jest --config apps/plugins/wago/scripts/jest.reliability-plan.config.cjs",
+        "env": {
+          "NODE_OPTIONS": "--experimental-vm-modules"
+        }
+      }
     },
     "typecheck-acceptance": {
       "executor": "nx:run-commands",
@@ -51,10 +54,10 @@
     },
     "test-production-fleet-cleanup": {
       "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/wago/test-production-fleet-cleanup"],
       "options": {
         "command": "node scripts/crap-score/node-test.mjs apps/plugins/wago coverage/apps/plugins/wago/test-production-fleet-cleanup apps/plugins/wago/scripts/test-production-fleet.test.mjs"
-      },
-      "outputs": ["{workspaceRoot}/coverage/apps/plugins/wago/test-production-fleet-cleanup"]
+      }
     },
     "typecheck": {
       "executor": "nx:run-commands",
@@ -73,10 +76,8 @@
       }
     },
     "test": {
-      "executor": "@nx/jest:jest",
       "dependsOn": ["test-frontend", "test-runtime-build"],
       "options": {
-        "jestConfig": "apps/plugins/wago/jest.config.ts",
         "passWithNoTests": true,
         "runInBand": true
       }
@@ -94,10 +95,10 @@
         "{workspaceRoot}/apps/plugins/shelly/frontend/src/{i18n.ts,en.json,de.json}",
         "{workspaceRoot}/apps/plugins/rabbitmq/frontend/src/{i18n.ts,en.json,de.json}"
       ],
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/wago/test-frontend"],
       "options": {
         "command": "pnpm exec vitest run --config apps/plugins/wago/frontend/vitest.config.mts"
-      },
-      "outputs": ["{workspaceRoot}/coverage/apps/plugins/wago/test-frontend"]
+      }
     },
     "build-backend": {
       "executor": "nx:run-commands",
@@ -229,23 +230,26 @@
     "test-typecheck-frontend-gate": {
       "executor": "nx:run-commands",
       "dependsOn": ["react-query-client:generate"],
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/wago/test-typecheck-frontend-gate"],
       "options": {
         "commands": [
           "node scripts/crap-score/node-test.mjs apps/plugins/wago coverage/apps/plugins/wago/test-typecheck-frontend-gate apps/plugins/wago/scripts/typecheck-frontend-tests.test.mjs",
           "node apps/plugins/wago/scripts/typecheck-frontend-tests.mjs"
         ],
         "parallel": false
-      },
-      "outputs": ["{workspaceRoot}/coverage/apps/plugins/wago/test-typecheck-frontend-gate"]
+      }
     },
     "e2e": {
       "executor": "nx:run-commands",
       "cache": true,
       "dependsOn": ["typecheck-acceptance"],
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/wago/e2e"],
       "options": {
-        "command": "pnpm exec jest --config apps/plugins/wago/scripts/jest.audit-hooks.config.cjs --runInBand"
-      },
-      "outputs": ["{workspaceRoot}/coverage/apps/plugins/wago/e2e"]
+        "command": "pnpm exec jest --config apps/plugins/wago/scripts/jest.audit-hooks.config.cjs --runInBand",
+        "env": {
+          "NODE_OPTIONS": "--experimental-vm-modules"
+        }
+      }
     },
     "test-commissioning-acceptance": {
       "executor": "nx:run-commands",
@@ -256,14 +260,14 @@
           "pnpm exec vite build --config apps/plugins/wago/frontend/tests/commissioning-harness/vite.config.mts",
           "pnpm exec jest --config apps/plugins/wago/scripts/jest.commissioning-browser.config.cjs --runInBand"
         ],
-        "parallel": false
+        "parallel": false,
+        "env": {
+          "NODE_OPTIONS": "--experimental-vm-modules"
+        }
       }
     },
     "crap-score": {
       "executor": "nx:run-commands",
-      "options": {
-        "command": "node scripts/crap-score/run.mjs apps/plugins/wago"
-      },
       "dependsOn": [
         "test",
         "test-cc100-runtime",
@@ -275,15 +279,18 @@
         "test-production-fleet-cleanup",
         "test-typecheck-frontend-gate",
         "test-scripts"
-      ]
+      ],
+      "options": {
+        "command": "node scripts/crap-score/run.mjs apps/plugins/wago"
+      }
     },
     "test-runtime-build": {
       "executor": "nx:run-commands",
       "cache": false,
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/wago/test-runtime-build"],
       "options": {
         "command": "node scripts/crap-score/node-test.mjs apps/plugins/wago coverage/apps/plugins/wago/test-runtime-build apps/plugins/wago/scripts/install-dev-runtime.test.mjs apps/plugins/wago/scripts/docker-image-identity.test.mjs"
-      },
-      "outputs": ["{workspaceRoot}/coverage/apps/plugins/wago/test-runtime-build"]
+      }
     },
     "build-runtime": {
       "executor": "nx:run-commands",
@@ -331,6 +338,7 @@
       ],
       "executor": "@nx/esbuild:esbuild",
       "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-runtime"],
+      "dependsOn": [],
       "options": {
         "main": "apps/plugins/wago/cc100-runtime/src/main.ts",
         "tsConfig": "apps/plugins/wago/cc100-runtime/tsconfig.json",
@@ -343,8 +351,7 @@
         "esbuildOptions": {
           "target": "node24"
         }
-      },
-      "dependsOn": []
+      }
     },
     "build-cc100-simulator": {
       "executor": "nx:run-commands",
@@ -373,6 +380,7 @@
       ],
       "executor": "@nx/esbuild:esbuild",
       "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-simulator"],
+      "dependsOn": [],
       "options": {
         "main": "apps/plugins/wago/cc100-runtime/src/simulator.ts",
         "tsConfig": "apps/plugins/wago/cc100-runtime/tsconfig.json",
@@ -385,10 +393,10 @@
         "esbuildOptions": {
           "target": "node24"
         }
-      },
-      "dependsOn": []
+      }
     },
     "test-cc100-runtime": {
+      "executor": "nx:run-commands",
       "inputs": [
         "default",
         "{projectRoot}/cc100-runtime/src/**/*",
@@ -402,11 +410,15 @@
         "{projectRoot}/cc100-runtime/manifest.json",
         "{workspaceRoot}/jest.preset.js"
       ],
-      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/wago/test-cc100-runtime"],
       "options": {
-        "jestConfig": "apps/plugins/wago/cc100-runtime/jest.config.ts"
-      },
-      "outputs": ["{workspaceRoot}/coverage/apps/plugins/wago/test-cc100-runtime"]
+        "command": "jest --config ./apps/plugins/wago/cc100-runtime/jest.config.ts",
+        "cwd": ".",
+        "env": {
+          "TS_NODE_COMPILER_OPTIONS": "{\"moduleResolution\":\"node10\",\"module\":\"commonjs\",\"customConditions\":null}",
+          "NODE_OPTIONS": "--experimental-vm-modules"
+        }
+      }
     },
     "lint-cc100-runtime": {
       "executor": "nx:run-commands",
@@ -437,7 +449,10 @@
       "executor": "nx:run-commands",
       "cache": false,
       "options": {
-        "command": "node apps/plugins/wago/cc100-runtime/integration/run.mjs"
+        "command": "node apps/plugins/wago/cc100-runtime/integration/run.mjs",
+        "env": {
+          "NODE_OPTIONS": "--experimental-vm-modules"
+        }
       }
     },
     "crap-score-cc100-runtime": {
@@ -450,7 +465,10 @@
       "executor": "nx:run-commands",
       "outputs": ["{workspaceRoot}/coverage/apps/plugins/wago/test-commissioning"],
       "options": {
-        "command": "pnpm exec jest --config apps/plugins/wago/scripts/jest.commissioning.config.cjs --runInBand"
+        "command": "pnpm exec jest --config apps/plugins/wago/scripts/jest.commissioning.config.cjs --runInBand",
+        "env": {
+          "NODE_OPTIONS": "--experimental-vm-modules"
+        }
       }
     },
     "test-scripts": {

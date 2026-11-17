@@ -82,6 +82,7 @@
   - [Überblick](plugins/overview.md)
   - [Plugins installieren](plugins/installing-plugins.md)
   - [Plugins entwickeln](plugins/developing-plugins.md)
+  - [Bluetooth-Transport für Plugins](plugins/ble-transport.md)
   - **Reservierungen**
     - [Überblick](plugins/reservations/overview.md)
     - [Reservierungen nutzen](plugins/reservations/using-reservations.md)
@@ -131,6 +132,7 @@
   - [Anmeldung](end-user/login.md)
   - [Mein Konto](end-user/account.md)
   - [Ressourcen nutzen](end-user/using-resources.md)
+  - [Dashboard](end-user/dashboard.md)
   - [Mobile Nutzung (PWA)](end-user/mobile-pwa.md)
 
 - **FAQ & Hilfe**

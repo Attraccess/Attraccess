@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 
 import {
   AdministrationAuditAction,
+  auditPluginIdentity,
   auditSubjectKeyId,
   safeAuditOrigin,
   safeRequestedSpec,
@@ -166,6 +167,7 @@ export class PluginAdministrationService {
 
     PluginService.clearPluginQuarantine(plugin.pluginDirectory);
     await this.record(actor, 'plugin.retry_requested', auditSubjectKeyId(plugin.name), 'plugin-package', {
+      ...auditPluginIdentity(plugin),
       pluginId,
       restartRequested: 1,
     });
@@ -175,8 +177,7 @@ export class PluginAdministrationService {
   async uploadPlugin(file: FileUpload, actor?: AuditActor) {
     const plugin = await this.pluginService.uploadPlugin(file, Boolean(actor));
     await this.record(actor, 'plugin.zip_uploaded', auditSubjectKeyId(plugin.name), 'plugin-package', {
-      pluginName: plugin.name,
-      pluginVersion: plugin.version,
+      ...auditPluginIdentity(plugin),
       restartRequested: 1,
     });
     if (actor) this.pluginService.requestRestart();
@@ -199,6 +200,7 @@ export class PluginAdministrationService {
     }
     await this.pluginUninstall.deletePlugin(pluginId, Boolean(actor));
     await this.record(actor, 'plugin.zip_deleted', auditSubjectKeyId(plugin?.name ?? pluginId), 'plugin-package', {
+      ...auditPluginIdentity(plugin),
       pluginId,
       restartRequested: 1,
     });

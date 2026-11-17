@@ -57,7 +57,7 @@ export const TOOLTIP_LABEL_CLASS = 'text-xs font-medium text-muted';
 
 export const TOOLTIP_VALUE_CLASS = 'ml-auto font-semibold text-foreground';
 
-export function useProjectUsageChartsState({ projectId }: ProjectUsageChartsProps) {
+export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
   const { t } = useTranslations({ en, de });
   const formatNumber = useNumberFormatter();
   const formatHours = useNumberFormatter(HOURS_FORMAT);
@@ -176,33 +176,6 @@ export function useProjectUsageChartsState({ projectId }: ProjectUsageChartsProp
     },
     [data, formatNumber, formatTooltipValue],
   );
-  return {
-    t,
-    formatNumber,
-    formatHours,
-    data,
-    isLoading,
-    canRenderCharts,
-    chartData,
-    topResources,
-    renderTimeSeriesTooltip,
-    renderTopResourcesTooltip,
-  } as const;
-}
-
-export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
-  const {
-    t,
-    formatNumber,
-    formatHours,
-    data,
-    isLoading,
-    canRenderCharts,
-    chartData,
-    topResources,
-    renderTimeSeriesTooltip,
-    renderTopResourcesTooltip,
-  } = useProjectUsageChartsState({ projectId });
 
   return (
     <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">

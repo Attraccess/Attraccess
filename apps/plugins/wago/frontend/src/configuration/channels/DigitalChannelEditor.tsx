@@ -5,59 +5,11 @@ import { outputBehavior } from '../../../../channel-behavior';
 import type { ConfigurationEditorMetadata, WagoConfigurationSnapshot } from '../../api/client';
 import type { Channel } from '../model';
 import { pointLabel, presetDisplayName } from '../model';
-import { DigitalChannelEditorChannelsSafetyHint } from './DigitalChannelEditorChannelsSafetyHint';
-import { DigitalChannelEditorDetails } from './DigitalChannelEditorDetails';
 import { useWagoTranslations } from '../../i18n';
-import { bindModbusPoint, emptyModbus } from '../modbus/modbus-editor';
-import { ModbusPointForm } from '../modbus/ConfigurationForm';
-import { useDigitalChannelEditorState } from './useDigitalChannelEditorState';
-import { Choice, NumericField } from './DigitalChannelEditorFields';
-
-export function PhysicalAssignments({
-  snapshot,
-  metadata,
-  onChange,
-}: {
-  snapshot: WagoConfigurationSnapshot;
-  metadata: ConfigurationEditorMetadata;
-  onChange: (snapshot: WagoConfigurationSnapshot) => void;
-}) {
-  const { t } = useWagoTranslations();
-  const unused = snapshot.physicalPoints.filter(
-    (point) =>
-      (point.hardwareProfile === '751-9301' || point.hardwareProfile === 'modbus') &&
-      !snapshot.logicalChannels.some((channel) => channel.physicalPointId === point.id),
-  );
-  if (!unused.length) return null;
-  return (
-    <section aria-label={t('channels.unusedAssignments')} className="wg:min-w-0">
-      <h3>{t('channels.unusedAssignments')}</h3>
-      {unused.map((point) => (
-        <fieldset key={point.id} className="wg:flex wg:min-w-0 wg:flex-col wg:gap-3">
-          <legend className="wg:max-w-full wg:whitespace-normal wg:break-words">
-            {pointLabel(point, metadata.names, t)}
-          </legend>
-          {point.hardwareProfile === 'modbus' && (
-            <ModbusPointForm
-              configuration={snapshot.modbus ?? emptyModbus}
-              value={point.modbus ?? { deviceId: '' }}
-              onChange={(binding) => onChange(bindModbusPoint(snapshot, point.id, binding))}
-            />
-          )}
-          <Button
-            className="wg:h-auto wg:min-h-10 wg:whitespace-normal wg:py-2"
-            variant="secondary"
-            onPress={() =>
-              onChange({ ...snapshot, physicalPoints: snapshot.physicalPoints.filter((item) => item.id !== point.id) })
-            }
-          >
-            {t('channels.release', { point: pointLabel(point, metadata.names, t) })}
-          </Button>
-        </fieldset>
-      ))}
-    </section>
-  );
-}
+import { ChannelConditionsEditor } from './ChannelConditionsEditor';
+import { ChannelRangeEditor } from './ChannelRangeEditor';
+import { NumericField } from './NumericField';
+import { OptionSelect } from './OptionSelect';
 
 export function DigitalChannelEditor({
   channel,
@@ -78,16 +30,25 @@ export function DigitalChannelEditor({
   onAssign: (terminal: number) => void;
   assignment?: ReactNode;
 }) {
-  const { t, inputs, output, point, guard, feedback, range, capability } = useDigitalChannelEditorState({
-    channel,
-    snapshot,
-    metadata,
-    onChange,
-    onRename,
-    onRemove,
-    onAssign,
-    assignment,
-  });
+  const { t } = useWagoTranslations();
+  const inputs = snapshot.logicalChannels
+    .filter((item) => item.id !== channel.id && item.capabilities.includes('input'))
+    .map((item) => ({ id: item.id, label: metadata.names[item.id] ?? item.id }));
+  const output = channel.capabilities.includes('output');
+  const point = snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
+  const { guard, feedback } = channel;
+
+  function capability(kind: 'pulse' | 'guard' | 'feedback', enabled: boolean) {
+    const next = { ...channel, capabilities: channel.capabilities.filter((item) => item !== kind) };
+    delete next[kind];
+    if (enabled) {
+      next.capabilities.push(kind);
+      if (kind === 'pulse') next.pulse = { durationMs: 500 };
+      if (kind === 'guard') next.guard = { channelId: inputs[0]?.id ?? '', when: 'on' };
+      if (kind === 'feedback') next.feedback = { channelId: inputs[0]?.id ?? '', expected: 'match', timeoutMs: 1000 };
+    }
+    onChange(next);
+  }
 
   if (!point) return <p role="alert">{t('channels.noAssignment')}</p>;
   return (
@@ -105,7 +66,7 @@ export function DigitalChannelEditor({
         />
       </TextField>
       {assignment ?? (
-        <Choice
+        <OptionSelect
           label={t('channels.terminal')}
           value={String(point.channel)}
           options={availableDigitalTerminals(snapshot, output ? 'output' : 'input', point.id).map((terminal) => ({
@@ -130,7 +91,7 @@ export function DigitalChannelEditor({
       <p className="wg:text-sm wg:text-muted">
         {t(output ? 'channels.outputDescription' : 'channels.inputDescription')}
       </p>
-      <Choice
+      <OptionSelect
         label={t('channels.disconnect')}
         value={channel.disconnectPolicy.mode}
         options={[
@@ -155,7 +116,7 @@ export function DigitalChannelEditor({
       )}
       {output && (
         <>
-          <Choice
+          <OptionSelect
             label={t('channels.outputBehavior')}
             value={outputBehavior(channel) ?? 'switched'}
             options={[
@@ -177,14 +138,17 @@ export function DigitalChannelEditor({
           )}
           <details className="wg:rounded-lg wg:border wg:border-border wg:p-3" open={!!guard || !!feedback}>
             <summary className="wg:cursor-pointer wg:font-medium">{t('channels.conditions')}</summary>
-            <DigitalChannelEditorChannelsSafetyHint
-              {...{ t, channel, capability, guard, inputs, onChange, feedback }}
+            <ChannelConditionsEditor
+              channel={channel}
+              inputs={inputs}
+              onChange={onChange}
+              onCapabilityChange={capability}
             />
           </details>
         </>
       )}
       {(channel.capabilities.includes('input') || channel.capabilities.includes('measurement')) && (
-        <DigitalChannelEditorDetails {...{ range, t, channel, onChange }} />
+        <ChannelRangeEditor channel={channel} onChange={onChange} />
       )}
       <details>
         <summary>{t('channels.reference')}</summary>

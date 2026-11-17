@@ -4,7 +4,7 @@ import { spawn } from 'child_process';
 
 import { existsSync, readdirSync, readFileSync } from 'fs';
 
-import { rm, rename } from 'fs/promises';
+import { mkdir, mkdtemp, rm, rmdir, rename } from 'fs/promises';
 
 import { join, basename, isAbsolute, relative, resolve } from 'path';
 
@@ -54,6 +54,8 @@ export class PluginService {
   protected static licenseGate: { snapshot: PluginLicenseSnapshot } | null = null;
 
   protected static logger = new Logger('PluginService');
+
+  protected static readonly UPLOAD_STAGING_PREFIX = '.zip-upload-';
 
   protected static readonly pluginUploadLocks = new Map<string, Promise<void>>();
 
@@ -224,12 +226,18 @@ export class PluginService {
 
     // unzip file
     PluginService.logger.debug(`Unzipping file ${zipFile.originalname}`);
-    const tempFolder = join(PluginService.PLUGIN_PATH, 'temp', randomBytes(16).toString('base64url').slice(0, 21));
+    // One dot-prefixed staging folder per upload inside the plugin folder: no shared parent
+    // to leave behind or race on, discovery skips it, and rename() stays on one filesystem.
+    await mkdir(PluginService.PLUGIN_PATH, { recursive: true });
+    const stagingFolder = await mkdtemp(join(PluginService.PLUGIN_PATH, PluginService.UPLOAD_STAGING_PREFIX));
+    // Extract one level down, like the npm path's `package` folder: the private (0700) mkdtemp
+    // folder itself must never be renamed into place as the plugin folder.
+    const extractFolder = join(stagingFolder, 'contents');
 
     try {
       let extracted: unknown[] = [];
       try {
-        extracted = await decompress(zipFile.buffer, tempFolder);
+        extracted = await decompress(zipFile.buffer, extractFolder);
       } catch (error) {
         PluginService.logger.error(`Failed to extract ${zipFile.originalname}`, error as Error);
       }
@@ -240,7 +248,7 @@ export class PluginService {
       }
 
       // read manifest, tolerating the single wrapper folder that Finder and most GUI zip tools add
-      const sourceFolder = PluginService.findManifestFolder(tempFolder);
+      const sourceFolder = PluginService.findManifestFolder(extractFolder);
       PluginService.logger.debug(`Reading manifest from ${sourceFolder}`);
       const manifestContent = JSON.parse(readFileSync(join(sourceFolder, 'plugin.json'), 'utf8'));
 
@@ -299,7 +307,23 @@ export class PluginService {
       PluginService.logger.debug(`Returning manifest ${manifest}`);
       return manifest;
     } finally {
-      await rm(tempFolder, { recursive: true, force: true });
+      await PluginService.cleanupUploadStaging(stagingFolder);
+    }
+  }
+
+  /** Best effort: cleanup problems must never change the upload's result. */
+  protected static async cleanupUploadStaging(stagingFolder: string): Promise<void> {
+    try {
+      await rm(stagingFolder, { recursive: true, force: true });
+    } catch (error) {
+      PluginService.logger.warn(`Failed to remove upload staging folder ${stagingFolder}`, error as Error);
+    }
+    // Earlier versions staged uploads in a shared `temp` folder. Non-recursive on purpose:
+    // only an empty folder goes, a plugin named `temp` stays untouched.
+    try {
+      await rmdir(join(PluginService.PLUGIN_PATH, 'temp'));
+    } catch (error) {
+      PluginService.logger.debug(`Legacy temp folder not removed: ${(error as Error).message}`);
     }
   }
 

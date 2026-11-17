@@ -468,6 +468,20 @@ deployments). With a prebuilt `READER_IMAGE` the tests skip unless
   (rejecting a lower `secure_version` needs the SECURE_VERSION eFuse raised
   first, and the tests never burn eFuses).
 
+**Crash report test (`test_crash_upload.py`, plain place only).** Plain reader
+images are built with the lab-only crash trigger (`-DATTRACTAP_CRASH_TRIGGER=ON`,
+firmware README "Crash trigger"). The test panics the reader with 64 KiB of
+filled stacks (an ~83 KB coredump) and makes it rejoin Wi-Fi as soon as the API
+logs the start of the chunked upload (a crash whose upload finished first is
+repeated, at most three times). After the reconnect the upload must restart for
+the same report and complete: one new report, the stored dump's
+size and CRC-32 equal to what the reader announced, the crash firmware version,
+and a symbolicated backtrace (`run.sh` publishes the reader's ELF as a
+symbol-only firmware entry). It also fails on a watchdog, panic, allocation
+failure or `LCD underrun` line, on a widget list slower than 3 s during the
+upload, and on the heap high-water marks. `crash-upload.json` and
+`crash-upload-backtrace.txt` hold the results.
+
 **RAM tests (`test_ram.py`).** Each workload resets the reader's heap high-water
 window (`system.heap.reset`), runs, and checks the lowest free internal heap and
 the smallest largest free block (`windowMinFree`, `windowMinLargest`) against

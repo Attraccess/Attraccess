@@ -1,0 +1,510 @@
+import '@testing-library/jest-dom/vitest';
+import { render, waitFor, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { type AttraccessFrontendPlugin, getApiBaseUrl } from '@attraccess/plugins-frontend-sdk';
+import { PluginProvider } from './PluginProvider';
+import usePluginState from './plugin.state';
+import React from 'react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Routes, Route, Link } from 'react-router-dom';
+
+const hoisted = vi.hoisted(() => ({
+  setRemoteMock: vi.fn(),
+  getRemoteMock: vi.fn(),
+  refetchMock: vi.fn(),
+  getBaseUrlMock: vi.fn(() => 'http://test.local'),
+  toastWarningMock: vi.fn(),
+  user: { id: 1, username: 'admin' } as Record<string, unknown> | null,
+}));
+
+vi.mock('virtual:__federation__', () => ({
+  __federation_method_setRemote: hoisted.setRemoteMock,
+  __federation_method_getRemote: hoisted.getRemoteMock,
+}));
+
+vi.mock('@attraccess/react-query-client', () => ({
+  usePluginsServiceGetPlugins: () => ({ refetch: hoisted.refetchMock }),
+}));
+
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: () => ({ user: hoisted.user }),
+}));
+
+vi.mock('../../api', () => ({
+  getBaseUrl: hoisted.getBaseUrlMock,
+}));
+
+vi.mock('../../components/toastProvider', () => ({
+  useToastMessage: () => ({ showToast: vi.fn(), success: vi.fn(), error: vi.fn(), warning: hoisted.toastWarningMock }),
+}));
+
+let pluginCounter = 0;
+
+function createFakePlugin(name: string, routes: unknown[] = []): AttraccessFrontendPlugin {
+  return {
+    getPluginName: () => name,
+    getDependencies: () => [],
+    init: vi.fn(),
+    activate: vi.fn(),
+    deactivate: vi.fn(),
+    onApiAuthStateChange: vi.fn(),
+    onApiEndpointChange: vi.fn(),
+    getRoutes: () => routes,
+  } as unknown as AttraccessFrontendPlugin;
+}
+
+interface ManifestOptions {
+  name?: string;
+  entryPoint?: string | undefined;
+  styles?: string;
+  routes?: unknown[];
+}
+
+function primeManifest(options: ManifestOptions = {}) {
+  const name = options.name ?? `Plugin${++pluginCounter}`;
+  const manifest = {
+    name,
+    version: '1.0.0',
+    main: {
+      frontend: {
+        entryPoint: 'entryPoint' in options ? options.entryPoint : 'index.js',
+        ...(options.styles ? { styles: options.styles } : {}),
+      },
+    },
+  };
+  hoisted.refetchMock.mockResolvedValue({ data: [manifest] });
+  hoisted.getRemoteMock.mockResolvedValue({
+    default: function () {
+      return createFakePlugin(name, options.routes ?? []);
+    },
+  });
+  return { name, manifest };
+}
+
+beforeEach(() => {
+  usePluginState.setState({ plugins: [], isInitialized: false });
+  hoisted.setRemoteMock.mockReset();
+  hoisted.getRemoteMock.mockReset();
+  hoisted.refetchMock.mockReset();
+  hoisted.getBaseUrlMock.mockReturnValue('http://test.local');
+  hoisted.toastWarningMock.mockReset();
+  hoisted.user = { id: 1, username: 'admin' };
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe('PluginProvider', () => {
+  it('renders its children', async () => {
+    hoisted.refetchMock.mockResolvedValue({ data: [] });
+    render(
+      <PluginProvider>
+        <div>app-shell</div>
+      </PluginProvider>,
+    );
+    expect(screen.getByText('app-shell')).toBeInTheDocument();
+  });
+
+  it('keeps the application shell available while plugin discovery is pending', () => {
+    hoisted.refetchMock.mockReturnValue(new Promise(() => undefined));
+
+    render(
+      <PluginProvider>
+        <div>core route</div>
+      </PluginProvider>,
+    );
+
+    expect(screen.getByText('core route')).toBeInTheDocument();
+    expect(usePluginState.getState().isInitialized).toBe(false);
+  });
+
+  it('marks the plugins initialized only after the remote modules have loaded', async () => {
+    const { name } = primeManifest();
+    let finishRemote!: (module: { default: () => AttraccessFrontendPlugin }) => void;
+    hoisted.getRemoteMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishRemote = resolve;
+        }),
+    );
+
+    render(<PluginProvider />);
+    await waitFor(() => expect(hoisted.getRemoteMock).toHaveBeenCalled());
+    expect(usePluginState.getState().isInitialized).toBe(false);
+
+    finishRemote({
+      default: function () {
+        return createFakePlugin(name);
+      },
+    });
+    await waitFor(() => expect(usePluginState.getState().isInitialized).toBe(true));
+    expect(usePluginState.getState().plugins).toHaveLength(1);
+  });
+
+  it('sets up the module-federation remote and loads the plugin into the store', async () => {
+    const { name } = primeManifest();
+
+    render(
+      <PluginProvider>
+        <div>app-shell</div>
+      </PluginProvider>,
+    );
+
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(1));
+    await waitFor(() => expect(usePluginState.getState().isInitialized).toBe(true));
+
+    expect(hoisted.setRemoteMock).toHaveBeenCalledWith(name, expect.objectContaining({ format: 'esm', from: 'vite' }));
+    expect(hoisted.getRemoteMock).toHaveBeenCalledWith(name, './plugin');
+
+    const remoteConfig = hoisted.setRemoteMock.mock.calls.at(-1)?.[1] as { url: () => Promise<string> };
+    await expect(remoteConfig.url()).resolves.toBe(
+      `http://test.local/api/plugins/${name}/frontend/module-federation/index.js?v=1.0.0`,
+    );
+  });
+
+  it('loads a recovered plugin when the tab regains focus without reinstalling loaded plugins', async () => {
+    const recovered = {
+      name: '@attraccess/plugin-wago',
+      version: '1.0.0',
+      main: { frontend: { entryPoint: 'remoteEntry.js' } },
+    };
+    const healthy = {
+      name: '@attraccess/plugin-rabbitmq',
+      version: '1.0.0',
+      main: { frontend: { entryPoint: 'remoteEntry.js' } },
+    };
+    hoisted.refetchMock
+      .mockResolvedValueOnce({ data: [{ ...recovered, status: 'error', error: 'incomplete startup' }, healthy] })
+      .mockResolvedValue({ data: [{ ...recovered, status: 'loaded', error: null }, healthy] });
+    hoisted.getRemoteMock.mockImplementation(async (name: string) => ({
+      default: function () {
+        return createFakePlugin(name);
+      },
+    }));
+
+    render(<PluginProvider />);
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(1));
+    expect(hoisted.toastWarningMock).toHaveBeenCalledTimes(1);
+
+    window.dispatchEvent(new Event('focus'));
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(2));
+    expect(hoisted.getRemoteMock).toHaveBeenCalledTimes(2);
+    expect(hoisted.toastWarningMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('replaces a plugin instance when its version changes on focus', async () => {
+    const name = '@attraccess/plugin-wago';
+    const manifest = { name, version: '1.0.0', main: { frontend: { entryPoint: 'remoteEntry.js' } } };
+    hoisted.refetchMock
+      .mockResolvedValueOnce({ data: [manifest] })
+      .mockResolvedValue({ data: [{ ...manifest, version: '2.0.0' }] });
+    hoisted.getRemoteMock.mockImplementation(async () => ({
+      default: function () {
+        return createFakePlugin(name);
+      },
+    }));
+
+    render(<PluginProvider />);
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(1));
+    const previous = usePluginState.getState().plugins[0].plugin;
+
+    window.dispatchEvent(new Event('focus'));
+    await waitFor(() => expect(usePluginState.getState().plugins[0].version).toBe('2.0.0'));
+    expect(usePluginState.getState().plugins).toHaveLength(1);
+    expect(usePluginState.getState().plugins[0].plugin).not.toBe(previous);
+    expect(hoisted.getRemoteMock).toHaveBeenCalledTimes(2);
+
+    window.dispatchEvent(new Event('focus'));
+    await waitFor(() => expect(hoisted.refetchMock).toHaveBeenCalledTimes(3));
+    expect(hoisted.getRemoteMock).toHaveBeenCalledTimes(2);
+    expect(usePluginState.getState().plugins).toHaveLength(1);
+  });
+
+  it('unwraps the default export when the remote returns one', async () => {
+    primeManifest();
+    render(<PluginProvider />);
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(1));
+    expect(usePluginState.getState().plugins[0].plugin.getPluginName()).toMatch(/^Plugin/);
+  });
+
+  it('encodes scoped package names in frontend asset URLs', async () => {
+    const { name } = primeManifest({ name: '@attraccess/plugin-demo', styles: 'style.css' });
+    const appendChild = vi.spyOn(document.head, 'appendChild').mockImplementation((node) => node);
+
+    render(<PluginProvider />);
+
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(1));
+
+    const remoteConfig = hoisted.setRemoteMock.mock.calls.at(-1)?.[1] as { url: () => Promise<string> };
+    await expect(remoteConfig.url()).resolves.toBe(
+      'http://test.local/api/plugins/%40attraccess%2Fplugin-demo/frontend/module-federation/index.js?v=1.0.0',
+    );
+    const styleLink = appendChild.mock.calls.find(([node]) => node instanceof HTMLLinkElement)?.[0];
+    expect(styleLink).toHaveAttribute('id', `plugin-styles-${name}`);
+    expect(styleLink).toHaveAttribute(
+      'href',
+      'http://test.local/api/plugins/%40attraccess%2Fplugin-demo/frontend/module-federation/style.css?v=1.0.0',
+    );
+  });
+
+  it('skips plugins without a frontend entry point', async () => {
+    primeManifest({ entryPoint: undefined });
+
+    render(<PluginProvider />);
+
+    await waitFor(() => expect(hoisted.refetchMock).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(hoisted.setRemoteMock).not.toHaveBeenCalled();
+    expect(usePluginState.getState().plugins).toHaveLength(0);
+  });
+
+  it('notifies loaded plugins of the API endpoint and auth state', async () => {
+    primeManifest();
+
+    render(<PluginProvider />);
+
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(1));
+
+    const instance = usePluginState.getState().plugins[0].plugin;
+    await waitFor(() => expect(instance.onApiEndpointChange).toHaveBeenCalledWith('http://test.local'));
+    expect(instance.onApiAuthStateChange).toHaveBeenCalledWith(
+      expect.objectContaining({ authToken: '', user: hoisted.user }),
+    );
+  });
+
+  // The SDK's preconfigured client reads the origin off `window`, so it has to
+  // be published before a plugin bundle can run a module-level request.
+
+  it('publishes the API base URL before loading plugin bundles', async () => {
+    const { name } = primeManifest();
+    let baseUrlDuringLoad: string | undefined;
+    hoisted.getRemoteMock.mockImplementation(() => {
+      baseUrlDuringLoad = getApiBaseUrl();
+      return Promise.resolve({
+        default: function () {
+          return createFakePlugin(name);
+        },
+      });
+    });
+
+    render(<PluginProvider />);
+
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(1));
+    expect(baseUrlDuringLoad).toBe('http://test.local');
+  });
+
+  it('isolates a failing remote load without crashing the app shell', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    hoisted.refetchMock.mockResolvedValue({
+      data: [{ name: 'BrokenPlugin', version: '1.0.0', main: { frontend: { entryPoint: 'index.js' } } }],
+    });
+    hoisted.getRemoteMock.mockRejectedValue(new Error('federation boom'));
+
+    render(
+      <PluginProvider>
+        <div>app-shell</div>
+      </PluginProvider>,
+    );
+
+    await waitFor(() => expect(consoleError).toHaveBeenCalled());
+    // A failed plugin still ends the first load, so its pinned pages can be shown as inaccessible.
+    await waitFor(() => expect(usePluginState.getState().isInitialized).toBe(true));
+    expect(usePluginState.getState().plugins).toHaveLength(0);
+    expect(screen.getByText('app-shell')).toBeInTheDocument();
+  });
+
+  it('does not load a quarantined plugin and warns the user with its failure detail', async () => {
+    hoisted.refetchMock.mockResolvedValue({
+      data: [
+        {
+          name: 'BrokenPlugin',
+          version: '1.0.0',
+          status: 'error',
+          error: 'Plugin was automatically disabled after startup failed',
+          main: { frontend: { entryPoint: 'index.js' } },
+        },
+      ],
+    });
+
+    render(<PluginProvider />);
+
+    await waitFor(() => expect(hoisted.toastWarningMock).toHaveBeenCalled());
+    expect(hoisted.toastWarningMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Plugin "BrokenPlugin" is disabled',
+        description: expect.stringContaining('startup failed'),
+      }),
+    );
+    expect(hoisted.getRemoteMock).not.toHaveBeenCalled();
+  });
+
+  it('neither loads the frontend of a license_missing plugin nor shows a toast for it', async () => {
+    hoisted.refetchMock.mockResolvedValue({
+      data: [
+        {
+          name: 'wago',
+          version: '1.0.0',
+          status: 'license_missing',
+          error: 'Requires license module: wago',
+          main: { frontend: { entryPoint: 'index.js' } },
+        },
+      ],
+    });
+
+    render(<PluginProvider />);
+
+    await waitFor(() => expect(hoisted.refetchMock).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(hoisted.getRemoteMock).not.toHaveBeenCalled();
+    expect(hoisted.toastWarningMock).not.toHaveBeenCalled();
+    expect(usePluginState.getState().plugins).toHaveLength(0);
+  });
+
+  it('injects plugin routes that render and are navigable', async () => {
+    primeManifest({
+      routes: [
+        {
+          path: '/plugin-a',
+          authRequired: false,
+          element: (
+            <div>
+              Plugin Page A<Link to="/plugin-b">Go to B</Link>
+            </div>
+          ),
+        },
+        { path: '/plugin-b', authRequired: false, element: <div>Plugin Page B</div> },
+      ],
+    });
+
+    render(<PluginProvider />);
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(1));
+
+    const routes = usePluginState.getState().plugins.flatMap((p) => p.plugin.getRoutes?.() ?? []) as Array<{
+      path: string;
+      element: React.ReactNode;
+    }>;
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/plugin-a']}>
+        <Routes>
+          {routes.map((route) => (
+            <Route key={route.path} path={route.path} element={route.element} />
+          ))}
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('Plugin Page A')).toBeInTheDocument();
+    await user.click(screen.getByRole('link', { name: 'Go to B' }));
+    expect(screen.getByText('Plugin Page B')).toBeInTheDocument();
+  });
+});
+
+describe('required frontend dependencies', () => {
+  const manifest = (name: string, dependencies: string[] = []) => ({
+    name,
+    version: '1.0.0',
+    status: 'loaded',
+    dependencies: dependencies.map((name) => ({ name, version: '^1', required: true })),
+    main: { frontend: { entryPoint: 'index.js' } },
+  });
+  it('loads a dependency frontend before its dependant', async () => {
+    hoisted.refetchMock.mockResolvedValue({ data: [manifest('provider', ['core']), manifest('core')] });
+    hoisted.getRemoteMock.mockImplementation(async (name) => ({
+      default: function () {
+        return createFakePlugin(name);
+      },
+    }));
+    render(<PluginProvider />);
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(2));
+    expect(hoisted.getRemoteMock.mock.calls.map(([name]) => name)).toEqual(['core', 'provider']);
+  });
+  it('loads unrelated plugins while a required remote is still pending, loading shared dependencies once', async () => {
+    hoisted.refetchMock.mockResolvedValue({
+      data: [
+        manifest('provider', ['core']),
+        manifest('second-provider', ['core']),
+        manifest('core'),
+        manifest('independent'),
+      ],
+    });
+    let finishCore: (value: unknown) => void;
+    const coreRemote = new Promise((resolve) => {
+      finishCore = resolve;
+    });
+    hoisted.getRemoteMock.mockImplementation(async (name: string) =>
+      name === 'core'
+        ? coreRemote
+        : {
+            default: function () {
+              return createFakePlugin(name);
+            },
+          },
+    );
+    render(<PluginProvider />);
+
+    try {
+      await waitFor(() => expect(usePluginState.getState().plugins.map(({ name }) => name)).toEqual(['independent']));
+      expect(hoisted.getRemoteMock.mock.calls.map(([name]) => name)).toEqual(['core', 'independent']);
+    } finally {
+      finishCore({
+        default: function () {
+          return createFakePlugin('core');
+        },
+      });
+    }
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(4));
+    expect(hoisted.getRemoteMock.mock.calls.filter(([name]) => name === 'core')).toHaveLength(1);
+  });
+  it('rejects dependency cycles without blocking independent plugins', async () => {
+    hoisted.refetchMock.mockResolvedValue({
+      data: [manifest('a', ['b']), manifest('b', ['a']), manifest('independent')],
+    });
+    hoisted.getRemoteMock.mockImplementation(async (name: string) => ({
+      default: function () {
+        return createFakePlugin(name);
+      },
+    }));
+    render(<PluginProvider />);
+    await waitFor(() => expect(usePluginState.getState().plugins.map(({ name }) => name)).toEqual(['independent']));
+    expect(hoisted.getRemoteMock.mock.calls.map(([name]) => name)).toEqual(['independent']);
+    expect(hoisted.toastWarningMock).toHaveBeenCalledWith(expect.objectContaining({ title: 'Plugin "a" is disabled' }));
+    expect(hoisted.toastWarningMock).toHaveBeenCalledWith(expect.objectContaining({ title: 'Plugin "b" is disabled' }));
+  });
+  it('skips a dependant after a dependency frontend fails and explains the failure', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    hoisted.refetchMock.mockResolvedValue({ data: [manifest('provider', ['core']), manifest('core')] });
+    hoisted.getRemoteMock.mockRejectedValue(new Error('core remote unavailable'));
+    render(<PluginProvider />);
+    await waitFor(() =>
+      expect(hoisted.toastWarningMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Plugin "provider" is disabled',
+          description: expect.stringContaining('core failed to load'),
+        }),
+      ),
+    );
+    expect(hoisted.getRemoteMock.mock.calls.map(([name]) => name)).toEqual(['core']);
+    expect(usePluginState.getState().plugins).toHaveLength(0);
+  });
+  it('allows a required plugin with only a backend and rejects missing dependencies', async () => {
+    hoisted.refetchMock.mockResolvedValue({
+      data: [manifest('provider', ['core']), { ...manifest('core'), main: {} }, manifest('broken', ['missing'])],
+    });
+    hoisted.getRemoteMock.mockImplementation(async (name) => ({
+      default: function () {
+        return createFakePlugin(name);
+      },
+    }));
+    render(<PluginProvider />);
+    await waitFor(() =>
+      expect(hoisted.toastWarningMock).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Plugin "broken" is disabled' }),
+      ),
+    );
+    expect(hoisted.getRemoteMock.mock.calls.map(([name]) => name)).toEqual(['provider']);
+  });
+});

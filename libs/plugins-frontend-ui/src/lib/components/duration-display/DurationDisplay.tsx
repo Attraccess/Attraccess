@@ -1,5 +1,5 @@
 import React from 'react';
-import { useFormatedDuration } from '../../hooks/useFormatDuration';
+import { useFormatedDuration } from '../../hooks/useFormatedDuration';
 
 interface DurationDisplayProps {
   minutes: number | null;

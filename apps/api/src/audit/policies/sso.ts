@@ -1,11 +1,12 @@
-import { dataFields, positive, uuid } from './projection';
+import { dataFields, positive, uuid, isAuthenticationMethod } from './projection';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 /** Projection input of an sso-domain event. */
 export type SsoAuditInput = {
   action: string;
   operationId: string;
   actorId: number | null;
-  authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' | null;
+  authenticationMethod: AuthenticationMethod | null;
   apiTokenId?: number;
   subject: { type: 'sso.provider' | 'user'; id: number };
   details: Record<string, string>;
@@ -353,12 +354,7 @@ export function projectSsoAuditEvent(input: unknown): SsoAuditInput | null {
   if (!event || !ssoActions.has(event.action as string) || !uuid(event.operationId)) return null;
   if (event.actorId === null) {
     if (event.authenticationMethod !== null || event.apiTokenId !== undefined) return null;
-  } else if (
-    !positive(event.actorId) ||
-    (event.authenticationMethod !== 'session' &&
-      event.authenticationMethod !== 'api-token' &&
-      event.authenticationMethod !== 'mcp-oauth')
-  ) {
+  } else if (!positive(event.actorId) || !isAuthenticationMethod(event.authenticationMethod)) {
     return null;
   }
   if (event.authenticationMethod === 'api-token' ? !positive(event.apiTokenId) : event.apiTokenId !== undefined)

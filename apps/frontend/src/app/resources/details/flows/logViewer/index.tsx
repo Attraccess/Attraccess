@@ -23,16 +23,14 @@ import {
   useDateTimeFormatter,
   useTranslations,
 } from '@attraccess/plugins-frontend-ui';
-import {
-  ResourceFlowLog,
-  ResourceFlowNodeDto,
-} from '@attraccess/react-query-client';
+import { ResourceFlowLog, ResourceFlowNodeDto } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import de from './de.json';
 import en from './en.json';
 import nodeTranslationsDe from '../node/de.json';
 import nodeTranslationsEn from '../node/en.json';
 import { useFlowContext } from '../context/index';
+import { useCountdown } from './useCountdown';
 import { useFlowCanvasQuery, useFlowLogRecording, useFlowNodeSchemasQuery } from '../flowOwner';
 
 export interface Props {
@@ -67,32 +65,7 @@ export function triggerNodeOfRun<T extends { node?: ResourceFlowNodeDto }>(logsN
   return [...logsNewestFirst].reverse().find((log) => log.node)?.node;
 }
 
-export function useCountdown(until: Date | string | null | undefined) {
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (!until) {
-      return;
-    }
-
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, [until]);
-
-  if (!until) {
-    return null;
-  }
-
-  const remainingSeconds = Math.max(0, Math.floor((new Date(until).getTime() - now) / 1000));
-  const hours = Math.floor(remainingSeconds / 3600);
-  const minutes = Math.floor((remainingSeconds % 3600) / 60);
-  const seconds = remainingSeconds % 60;
-
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`;
-}
-
-export function useLogViewerState(props: Props) {
+export function LogViewer(props: Props) {
   const { isOpen, setOpen, open } = useOverlayState();
 
   const { t, tExists } = useTranslations({
@@ -198,50 +171,6 @@ export function useLogViewerState(props: Props) {
     () => DURATION_OPTIONS.map(({ minutes, labelKey }) => ({ key: String(minutes), label: t(labelKey) })),
     [t],
   );
-  return {
-    isOpen,
-    setOpen,
-    open,
-    t,
-    durationMinutes,
-    setDurationMinutes,
-    isRecording,
-    startRecording,
-    isStarting,
-    stopRecording,
-    isStopping,
-    countdown,
-    logsOrdered,
-    logsByRunId,
-    runHeader,
-    durationItems,
-    props,
-  } as const;
-}
-
-// Payloads over the recorder's limit arrive truncated, so they are no longer valid JSON.
-// Logs are newest-first and a run's oldest entry is the synthetic flow.start, which has
-// no node — so the node that triggered the run is the oldest entry that does have one.
-
-export function LogViewer(props: Props) {
-  const {
-    isOpen,
-    setOpen,
-    open,
-    t,
-    durationMinutes,
-    setDurationMinutes,
-    isRecording,
-    startRecording,
-    isStarting,
-    stopRecording,
-    isStopping,
-    countdown,
-    logsOrdered,
-    logsByRunId,
-    runHeader,
-    durationItems,
-  } = useLogViewerState(props);
 
   return (
     <>

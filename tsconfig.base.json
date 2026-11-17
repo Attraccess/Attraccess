@@ -37,6 +37,9 @@
       "@attraccess/plugins-backend-sdk": [
         "./libs/plugins-backend-sdk/src/index.ts"
       ],
+      "@attraccess/plugins-backend-sdk/internal": [
+        "./libs/plugins-backend-sdk/src/internal.ts"
+      ],
       "@attraccess/plugins-frontend-sdk": [
         "./libs/plugins-frontend-sdk/src/index.ts"
       ],

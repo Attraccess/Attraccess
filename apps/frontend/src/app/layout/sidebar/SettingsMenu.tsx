@@ -1,4 +1,4 @@
-import { Settings, LogOut, User, Languages, Check, Moon, Sun, Monitor } from 'lucide-react';
+import { Settings, LogOut, User, Languages, Check, Moon, Sun, Monitor, Download } from 'lucide-react';
 import {
   Dropdown,
   DropdownTrigger,
@@ -9,48 +9,51 @@ import {
   Description,
 } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
-import { useSidebarState } from './HelpfulLinks';
-type Props = Pick<
-  ReturnType<typeof useSidebarState>,
-  | 'isCollapsed'
-  | 'user'
-  | 'isSettingsMenuOpen'
-  | 'handleSettingsMenuOpenChange'
-  | 't'
-  | 'setLanguage'
-  | 'language'
-  | 'navigate'
-  | 'cycleTheme'
-  | 'theme'
-  | 'logout'
-  | 'logoutEverywhere'
-  | 'logoutPending'
-  | 'canLogoutEverywhere'
-  | 'logoutUnavailableReason'
-  | 'logoutEverywhereLabel'
-  | 'logoutPendingLabel'
-  | 'logoutProviderNotice'
->;
-export function SettingsMenu({
-  isCollapsed,
-  user,
-  isSettingsMenuOpen,
-  handleSettingsMenuOpenChange,
-  t,
-  setLanguage,
-  language,
-  navigate,
-  cycleTheme,
-  theme,
-  logout,
-  logoutEverywhere,
-  logoutPending,
-  canLogoutEverywhere,
-  logoutUnavailableReason,
-  logoutEverywhereLabel,
-  logoutPendingLabel,
-  logoutProviderNotice,
-}: Props) {
+import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useAppTheme } from '@attraccess/ui';
+import { useAuth } from '../../../hooks/useAuth';
+import { useInstallApp } from '../../../pwa-install';
+import de from '../sidebar.de.json';
+import en from '../sidebar.en.json';
+
+interface SettingsMenuProps {
+  isCollapsed: boolean;
+}
+
+export function SettingsMenu({ isCollapsed }: SettingsMenuProps) {
+  const {
+    logout,
+    logoutEverywhere,
+    logoutPending,
+    canLogoutEverywhere,
+    logoutUnavailableReason,
+    logoutEverywhereLabel,
+    logoutPendingLabel,
+    logoutProviderNotice,
+    user,
+  } = useAuth();
+  const { t, language, setLanguage } = useTranslations({ en, de });
+  const installApp = useInstallApp();
+  const navigate = useNavigate();
+  const { theme, setTheme } = useAppTheme();
+  const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+  const keepSettingsMenuOpen = useRef(false);
+
+  const cycleTheme = () => {
+    keepSettingsMenuOpen.current = true;
+    setTheme(theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light');
+    window.requestAnimationFrame(() => {
+      keepSettingsMenuOpen.current = false;
+    });
+  };
+
+  const handleSettingsMenuOpenChange = (isOpen: boolean) => {
+    if (!isOpen && keepSettingsMenuOpen.current) return;
+    setIsSettingsMenuOpen(isOpen);
+  };
+
   return (
     <div className={isCollapsed ? 'p-2' : 'p-4'}>
       {user && (
@@ -118,6 +121,17 @@ export function SettingsMenu({
                   )}
                   {t('design', { variant: t(`designVariants.${theme}`) })}
                 </DropdownItem>
+                {installApp.mode && (
+                  <DropdownItem
+                    key="install-app"
+                    id="install-app"
+                    onPress={installApp.install}
+                    data-cy="sidebar-install-app"
+                  >
+                    <Download className="h-4 w-4" />
+                    {t('installApp')}
+                  </DropdownItem>
+                )}
                 <DropdownItem
                   key="logout"
                   id="logout"

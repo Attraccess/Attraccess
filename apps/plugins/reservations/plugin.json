@@ -13,7 +13,9 @@
     "frontend": {
       "directory": "frontend",
       "entryPoint": "remoteEntry.js",
-      "styles": "style.css"
+      "styles": "style.css",
+      "dashboardPaths": ["/reservations", "/reservations/manage"],
+      "dashboardWidgets": ["reservations-upcoming"]
     }
   },
   "attraccessVersion": {

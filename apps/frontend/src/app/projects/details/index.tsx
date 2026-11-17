@@ -30,7 +30,7 @@ import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 
-export function useProjectDetailsPageState() {
+export function ProjectDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = parseInt(id || '', 10);
   const hasValidProjectId = Number.isFinite(projectId);
@@ -124,38 +124,6 @@ export function useProjectDetailsPageState() {
   const onDeleteProject = useCallback(() => {
     deleteProject({ id: projectId });
   }, [deleteProject, projectId]);
-  return {
-    id,
-    projectId,
-    hasValidProjectId,
-    navigate,
-    t,
-    project,
-    showDeleteConfirmationModal,
-    setShowDeleteConfirmationModal,
-    archiveProject,
-    isArchiving,
-    unarchiveProject,
-    isUnarchiving,
-    onDeleteProject,
-  } as const;
-}
-
-export function ProjectDetailsPage() {
-  const {
-    projectId,
-    hasValidProjectId,
-    navigate,
-    t,
-    project,
-    showDeleteConfirmationModal,
-    setShowDeleteConfirmationModal,
-    archiveProject,
-    isArchiving,
-    unarchiveProject,
-    isUnarchiving,
-    onDeleteProject,
-  } = useProjectDetailsPageState();
 
   return (
     <>

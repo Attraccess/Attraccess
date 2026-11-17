@@ -86,6 +86,44 @@ void testGallery(SdlDisplay &display, const std::filesystem::path &screenshots)
         }
         settings.enablePinLock();
 
+        // Network status from the drawer: the PIN lock, a good connection, then a degraded one
+        // after its 1 s refresh, scrolled to the last row.
+        State::NetworkQualityState quality;
+        quality.quality = State::NETWORK_QUALITY_GOOD;
+        quality.lastInboundAgeMs = 820;
+        quality.hasInboundMessage = true;
+        quality.lastPongRttMs = 24;
+        quality.averagePongRttMs = 31;
+        quality.pongRttTrendMs = -7;
+        quality.hasPongRttSample = true;
+        quality.hasRecentPongRttSample = true;
+        quality.hasCompletedPongProbe = true;
+        State::setNetworkQualityState(quality);
+        auto &networkStatus = Display::networkStatusScreen;
+        networkStatus.lock();
+        show(&networkStatus, "network-status-pin-lock");
+        lv_textarea_set_text(findWidget(networkStatus.getScreen(), &lv_textarea_class), Settings::getDeviceConfig().passCode.c_str());
+        lv_obj_send_event(findWidget(networkStatus.getScreen(), &lv_keyboard_class), LV_EVENT_READY, nullptr);
+        shot("network-status-good");
+        quality.quality = State::NETWORK_QUALITY_DEGRADED;
+        quality.lastInboundAgeMs = 6400;
+        quality.lastPongRttMs = 2140;
+        quality.averagePongRttMs = 1870;
+        quality.pongRttTrendMs = 1650;
+        quality.reconnectsLastMinute = 2;
+        quality.pongTimeoutsLastMinute = 3;
+        quality.pongProbeLossPercentLastMinute = 50;
+        State::setNetworkQualityState(quality);
+        hostAdvanceMillis(1000);
+        shot("network-status-degraded");
+        assert(findLabel(networkStatus.getScreen(), german ? "Eingeschränkt" : "Degraded"));
+        auto *lastRow = lv_obj_get_parent(findLabel(networkStatus.getScreen(), german ? "Verpasste Heartbeats (1 Min.)" : "Missed heartbeats (1 min)"));
+        lv_obj_scroll_to_view_recursive(lastRow, LV_ANIM_OFF);
+        shot("network-status-degraded-end");
+        quality = {};
+        quality.quality = State::NETWORK_QUALITY_OFFLINE;
+        State::setNetworkQualityState(quality);
+
         // Firmware update, before the version is known, while it loads and when it is done.
         auto &update = Display::firmwareUpdateScreen;
         update.setAvailableVersion("");

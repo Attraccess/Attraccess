@@ -39,6 +39,7 @@ import { VersionModule } from '../version/version.module';
 import { MessagingModule } from '../messaging/messaging.module';
 import { PushModule } from '../push/push.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { DashboardModule } from '../dashboard/dashboard.module';
 import { McpModule } from '../mcp/mcp.module';
 
 const logger = new Logger('AppModule');
@@ -139,6 +140,7 @@ const logger = new Logger('AppModule');
     MessagingModule,
     PushModule,
     NotificationsModule,
+    DashboardModule,
     McpModule,
     LiveUpdatesModule,
   ],

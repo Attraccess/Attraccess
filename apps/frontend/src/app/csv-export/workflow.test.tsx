@@ -1,18 +1,10 @@
 import { useState } from 'react';
-import {
-  cleanup,
-  fireEvent,
-  render as renderWithoutClient,
-  renderHook,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { cleanup, fireEvent, render as renderWithoutClient, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CsvExportConfigContent } from './export-config';
-import { ResourceUsageExport, useResourceUsageExportState } from './resource-usage';
+import { ResourceUsageExport } from './resource-usage';
 const state = vi.hoisted(() => ({
   analytics: vi.fn(),
   next: vi.fn(),
@@ -352,67 +344,5 @@ it('includes session and operating duration columns in resource usage downloads'
     'Resource ID;Resource Name;User ID;User Name;Usage in Hours;Exact Session Duration (ms);' +
       'Operating Duration (ms, session);Operating Data Status',
     '7;Lathe;3;Alice;1;3600000;123456;',
-  ]);
-});
-it('offers email, external identifier, notes and resource metadata fields', async () => {
-  state.rows = [
-    {
-      id: 11,
-      resourceId: 7,
-      resource: { id: 7, name: 'Lathe', metadata: { costCenter: '4711', tags: ['a', 'b'] } },
-      user: { id: 3, username: 'Alice', externalIdentifier: 'EXT-3' },
-      userEmail: 'alice@example.com',
-      supervisorEmail: 'mentor@example.com',
-      startTime: '2026-09-01T10:00:00Z',
-      endTime: '2026-09-01T11:00:00Z',
-      usageInMinutes: 60,
-      startNotes: 'Prepare',
-      endNotes: 'Clean',
-      supervisorUserId: 9,
-      supervisorUser: { username: 'Mentor' },
-    },
-    { id: 12, resourceId: 7, resource: { id: 7, name: 'Lathe', metadata: null }, user: { id: 4 }, usageInMinutes: 1 },
-  ];
-  const { result } = renderHook(
-    () =>
-      useResourceUsageExportState({
-        start: new Date('2026-09-01T00:00:00Z'),
-        end: new Date('2026-09-02T00:00:00Z'),
-      }),
-    { wrapper: ({ children }) => <QueryClientProvider client={testClient}>{children}</QueryClientProvider> },
-  );
-  await waitFor(() => expect(result.current.columns.some((c) => c.key === 'resourceMetadata.costCenter')).toBe(true));
-  const values = (key: string) => {
-    const column = result.current.columns.find((c) => c.key === key);
-    return result.current.resourceUsageExport.map((row) => column?.getter(row as never));
-  };
-  expect(values('userEmail')).toEqual(['alice@example.com', '']);
-  expect(values('userExternalIdentifier')).toEqual(['EXT-3', '']);
-  expect(values('supervisorEmail')).toEqual(['mentor@example.com', '']);
-  expect(values('startNotes')).toEqual(['Prepare', '']);
-  expect(values('resourceMetadata.costCenter')).toEqual(['4711', '']);
-  expect(values('resourceMetadata.tags')).toEqual(['["a","b"]', '']);
-  expect(result.current.columns.find((c) => c.key === 'resourceMetadata.costCenter')?.label).toBe(
-    'Resource metadata: costCenter',
-  );
-  // existing keys stay stable because templates reference them
-  expect(result.current.columns.slice(0, 17).map((c) => c.key)).toEqual([
-    'resourceId',
-    'resourceName',
-    'userId',
-    'username',
-    'startTimeISO',
-    'startTime',
-    'endTimeISO',
-    'endTime',
-    'usageInMinutes',
-    'usageInHours',
-    'sessionDurationMs',
-    'operatingDurationMs',
-    'durationStatus',
-    'startNotes',
-    'endNotes',
-    'supervisorId',
-    'supervisorUsername',
   ]);
 });

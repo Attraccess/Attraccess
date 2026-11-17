@@ -41,6 +41,9 @@
         "wago"
       ]
     },
+    "dashboardPaths": [
+      "/wago"
+    ],
     "permissions": [
       "DATABASE_ACCESS",
       "ACCESS_MQTT_SERVERS",

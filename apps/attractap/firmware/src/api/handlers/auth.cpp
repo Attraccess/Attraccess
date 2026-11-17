@@ -150,7 +150,7 @@ void API::onReaderAuthenticated(JsonObject data)
     logger.info("Reader Authentication successful.");
 
     this->sendFirmwareInfo();
-    this->sendPendingCrashReport();
+    this->crashUploader.onAuthenticated(millis());
 }
 
 void API::onServerTime(JsonVariantConst serverTime)

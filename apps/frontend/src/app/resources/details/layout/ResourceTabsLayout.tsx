@@ -32,6 +32,7 @@ import { DeleteConfirmationModal, PageAction, PageHeader, useTranslations } from
 import { useQrCodeAction } from '../useQrCodeAction';
 import de from '../resourceDetails.de.json';
 import en from '../resourceDetails.en.json';
+import { DashboardPinTargetContext, resourcePinTarget } from '../../../dashboard/pinTarget';
 
 export const TAB_ICONS: Record<ResourceTabKey, JSX.Element> = {
   overview: <Gauge className="w-4 h-4" />,
@@ -40,13 +41,18 @@ export const TAB_ICONS: Record<ResourceTabKey, JSX.Element> = {
   maintenance: <WrenchIcon className="w-4 h-4" />,
 };
 
-export function useResourceTabsLayoutInnerState({
-  resourceId,
-  children,
-}: {
-  resourceId: number;
-  children?: ReactNode;
-}) {
+function ResourceTabsLayoutComponent({ children }: { children?: ReactNode }) {
+  const { id } = useParams<{ id: string }>();
+  const resourceId = Number.parseInt(id ?? '', 10);
+
+  if (!Number.isFinite(resourceId)) {
+    return <Navigate to="/resources" replace />;
+  }
+
+  return <ResourceTabsLayoutInner resourceId={resourceId}>{children}</ResourceTabsLayoutInner>;
+}
+
+function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number; children?: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -100,56 +106,6 @@ export function useResourceTabsLayoutInnerState({
       throw err;
     }
   };
-  return {
-    navigate,
-    isOpen,
-    open,
-    closeDeleteModal,
-    t,
-    canUpdateResources,
-    canDeleteResources,
-    resource,
-    isLoadingResource,
-    resourceError,
-    qrOpenRef,
-    tabs,
-    activeTabKey,
-    handleDelete,
-    resourceId,
-    children,
-    confirmationDialog,
-  };
-}
-
-function ResourceTabsLayoutComponent({ children }: { children?: ReactNode }) {
-  const { id } = useParams<{ id: string }>();
-  const resourceId = Number.parseInt(id ?? '', 10);
-
-  if (!Number.isFinite(resourceId)) {
-    return <Navigate to="/resources" replace />;
-  }
-
-  return <ResourceTabsLayoutInner resourceId={resourceId}>{children}</ResourceTabsLayoutInner>;
-}
-
-function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number; children?: ReactNode }) {
-  const {
-    navigate,
-    isOpen,
-    open,
-    closeDeleteModal,
-    t,
-    canUpdateResources,
-    canDeleteResources,
-    resource,
-    isLoadingResource,
-    resourceError,
-    qrOpenRef,
-    tabs,
-    activeTabKey,
-    handleDelete,
-    confirmationDialog,
-  } = useResourceTabsLayoutInnerState({ resourceId, children });
 
   if (isLoadingResource) {
     return (
@@ -207,18 +163,20 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <PageHeader
-        title={resource.name}
-        icon={!resource.imageFilename && <ShapesIcon className="w-6 h-6" />}
-        thumbnailSrc={resource.imageFilename ? filenameToUrl(resource.imageFilename) : undefined}
-        thumbnailAlt={resource.name}
-        subtitle={resource.description ?? undefined}
-        backTo="/resources"
-        actions={overflowActions}
-        maxVisibleActions={0}
-        moreActionsLabel={t('actions.moreLabel')}
-        noMargin
-      />
+      <DashboardPinTargetContext.Provider value={resourcePinTarget(resourceId)}>
+        <PageHeader
+          title={resource.name}
+          icon={!resource.imageFilename && <ShapesIcon className="w-6 h-6" />}
+          thumbnailSrc={resource.imageFilename ? filenameToUrl(resource.imageFilename) : undefined}
+          thumbnailAlt={resource.name}
+          subtitle={resource.description ?? undefined}
+          backTo="/resources"
+          actions={overflowActions}
+          maxVisibleActions={0}
+          moreActionsLabel={t('actions.moreLabel')}
+          noMargin
+        />
+      </DashboardPinTargetContext.Provider>
 
       <ResourceHealthWarning resourceId={resourceId} />
 

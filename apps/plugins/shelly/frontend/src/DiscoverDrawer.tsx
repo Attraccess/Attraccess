@@ -9,7 +9,7 @@ import { Chip, DrawerBody, DrawerHeader, DrawerHeading, Form, Spinner } from '@h
 import { SearchIcon, XIcon } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { discoverDevices, type DiscoveryResult } from './api';
-import { TextFieldRow } from './shared/drawer';
+import { TextFieldRow } from './shared/TextFieldRow';
 import { useShellyTranslations } from './i18n';
 
 function ResultSummary({ result }: { result: DiscoveryResult }) {

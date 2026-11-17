@@ -2,6 +2,7 @@ import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import {
+  DashboardPin,
   DocumentationType,
   Resource,
   ResourceFlowEdge,
@@ -420,9 +421,32 @@ describe('ResourcesService', () => {
       expect(deleteResourceScope.resourceRepository.softDelete).toHaveBeenCalledWith(1);
     });
 
+    it('deletes the dashboard pins of the deleted resource', async () => {
+      (deleteResourceScope.resourceRepository.softDelete as jest.Mock).mockResolvedValue({ affected: 1 });
+
+      await deleteResourceScope.service.deleteResource(1);
+
+      const { delete: deletePins } = (
+        deleteResourceScope.resourceRepository as unknown as { manager: { delete: jest.Mock } }
+      ).manager;
+      expect(deletePins).toHaveBeenCalledWith(DashboardPin, { itemType: 'resource', itemId: '1' });
+    });
+
+    it('keeps the dashboard pins when the resource does not exist', async () => {
+      (deleteResourceScope.resourceRepository.softDelete as jest.Mock).mockResolvedValue({ affected: 0 });
+
+      await expect(deleteResourceScope.service.deleteResource(999)).rejects.toThrow(ResourceNotFoundException);
+
+      const { delete: deletePins } = (
+        deleteResourceScope.resourceRepository as unknown as { manager: { delete: jest.Mock } }
+      ).manager;
+      expect(deletePins).not.toHaveBeenCalled();
+    });
+
     beforeEach(() => {
       (deleteResourceScope.resourceRepository as { manager: unknown }).manager = {
         count: jest.fn().mockResolvedValueOnce(3).mockResolvedValueOnce(2),
+        delete: jest.fn().mockResolvedValue({ affected: 0 }),
       };
     });
 

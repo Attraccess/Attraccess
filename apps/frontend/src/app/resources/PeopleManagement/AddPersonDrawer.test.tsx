@@ -3,8 +3,13 @@ import { ReactNode } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { AddPersonDrawer } from './AddPersonDrawer';
+
+// The drawer reads its own texts: show translation keys, so assertions name what each control is for.
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
+}));
 
 // The embedded UserSearch picker fetches users through the generated client;
 // mock the hook so the test drives the real picker UI without a network layer.
@@ -29,11 +34,8 @@ vi.mock('./IntroductionTabs', () => ({
   ),
 }));
 
-const t = ((key: string) => key) as TFunction;
-
 const renderDrawer = (overrides: Partial<Parameters<typeof AddPersonDrawer>[0]> = {}) => {
   const props = {
-    t,
     target: { type: 'resource' as const, id: 7 },
     isOpen: true,
     mode: 'introducer' as const,

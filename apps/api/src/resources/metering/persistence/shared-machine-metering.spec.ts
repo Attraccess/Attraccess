@@ -58,7 +58,12 @@ describe('Metering on a shared machine', () => {
   const start = (user: number) => scope.usage.startSession(1, scope.users[user], {} as never);
   const end = (user: number) => scope.usage.endSession(1, scope.users[user], {} as never);
   const charged = async (usageId: number) => Math.abs((await scope.items(usageId)).transaction.amount);
-  const segments = () => scope.source.getRepository(ResourceMeteringSegment).find({ order: { startedAt: 'ASC' } });
+  // Segments opened in the same millisecond tie on startedAt (the id is random); the meter only counts up, so the
+  // opening reading keeps them in the order they were opened.
+  const segments = async () =>
+    (await scope.source.getRepository(ResourceMeteringSegment).find()).sort(
+      (a, b) => a.startedAt.getTime() - b.startedAt.getTime() || Number(BigInt(a.startValue) - BigInt(b.startValue)),
+    );
   const meterSessions = () => scope.source.getRepository(ResourceMeteringSession);
   const meterItem = async (usageId: number) =>
     (await scope.items(usageId)).items.find((item) => item.name === 'Energy (kWh)');
@@ -463,21 +468,25 @@ describe('Metering on a shared machine', () => {
 
       const all = await segments();
       expect(all.every((segment) => segment.status === 'closed')).toBe(true);
-      all.slice(1).forEach((segment, index) => {
-        expect(segment.startValue).toBe(all[index].endValue);
+      // start(0) and end(2) race. If end(2) goes first, it is the last stop, and start(0) starts the meter over from a
+      // fresh baseline: the one reading taken while nobody used the machine falls between two segments.
+      const gaps = all.slice(1).map((segment, index) => {
         expect(segment.startedAt.getTime()).toBeGreaterThanOrEqual(all[index].startedAt.getTime());
+        return Number((BigInt(segment.startValue) - BigInt(all[index].endValue ?? 0)) / BigInt(1_000_000_000));
       });
+      expect(gaps.filter((gap) => gap !== 0)).toEqual(gaps.some((gap) => gap !== 0) ? [1] : []);
+      const counted = last - 100 - gaps.reduce((sum, gap) => sum + gap, 0);
       const consumed = all.reduce(
         (sum, segment) => sum + (BigInt(segment.endValue ?? 0) - BigInt(segment.startValue)),
         BigInt(0),
       );
-      expect(consumed).toBe(BigInt(last - 100) * BigInt(1_000_000_000));
+      expect(consumed).toBe(BigInt(counted) * BigInt(1_000_000_000));
       const total = (await Promise.all([...first, second].map((usage) => charged(usage.id)))).reduce(
         (sum, value) => sum + value,
         0,
       );
-      // Whole kWh per segment at 30 credits: the charges add up to what the meter counted.
-      expect(total).toBe((last - 100) * 30);
+      // Whole kWh per segment at 30 credits: the charges add up to what the meter counted in segments.
+      expect(total).toBe(counted * 30);
     });
 
     it('produces ordered, non-overlapping segments for simultaneous starts and stops', async () => {

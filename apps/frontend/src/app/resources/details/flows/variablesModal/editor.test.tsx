@@ -4,8 +4,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ResourceFlowVariableScope } from '@attraccess/react-query-client';
 import { VariableEditor, type ValueType, type VariableFormValues } from './editor';
 
+vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
+  useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
+}));
+
 afterEach(cleanup);
-const t = (key: string) => key;
 function setup(initial?: VariableFormValues, edit = false) {
   const onSubmit = vi.fn();
   const onCancel = vi.fn();
@@ -16,7 +20,6 @@ function setup(initial?: VariableFormValues, edit = false) {
       isSaving={false}
       onSubmit={onSubmit}
       onCancel={onCancel}
-      t={t}
     />,
   );
   return { onSubmit, onCancel };

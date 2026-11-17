@@ -46,10 +46,11 @@ import { readerHeartbeat } from './websocket-reader-payloads';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
 import { randomBytes } from 'crypto';
 import type { IncomingMessage } from 'http';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 /**
  * The only events a reader that is not paired may send: signing in again, the firmware update, its crash
- * report and the end of its login. Everything else runs no handler; the reader is asked to start pairing
+ * report (with its coredump upload) and the end of its login. Everything else runs no handler; the reader is asked to start pairing
  * (see promptPairing for how often).
  */
 const ALLOWED_WHILE_PAIRING_REQUIRED = new Set<AttractapEventType>([
@@ -58,14 +59,21 @@ const ALLOWED_WHILE_PAIRING_REQUIRED = new Set<AttractapEventType>([
   AttractapEventType.READER_FIRMWARE_INFO,
   AttractapEventType.FIRMWARE_REQUEST_CHUNK,
   AttractapEventType.READER_CRASH_REPORT,
+  AttractapEventType.READER_COREDUMP_BEGIN,
+  AttractapEventType.READER_COREDUMP_CHUNK,
+  AttractapEventType.READER_COREDUMP_COMPLETE,
   AttractapEventType.READER_SESSION_ENDED,
 ]);
 
-/** Card relay events: a card conversation must not wait for the reader's lastConnection update. */
+/**
+ * Card relay events: a card conversation must not wait for the reader's lastConnection update. Coredump
+ * chunks arrive dozens per upload; the BEGIN and COMPLETE around them record the activity.
+ */
 const SKIPS_ACTIVITY_WRITE = new Set<AttractapEventType>([
   AttractapEventType.CARD_DETECTED,
   AttractapEventType.CARD_APDU_RESPONSE,
   AttractapEventType.CARD_REMOVED,
+  AttractapEventType.READER_COREDUMP_CHUNK,
 ]);
 
 @WebSocketGateway({
@@ -267,7 +275,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     readerId: number;
     userId: number;
     actorId?: number;
-    authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
+    authenticationMethod?: AuthenticationMethod;
     apiTokenId?: number;
   }) {
     return this.cardHandler.startEnrollOfNewNfcCard(data);
@@ -277,7 +285,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     readerId: number;
     userId: number;
     cardId: number;
-    authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
+    authenticationMethod?: AuthenticationMethod;
     apiTokenId?: number;
   }) {
     return this.cardHandler.startResetOfNfcCard(data);
@@ -568,8 +576,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     // the supervisor's web popup) are torn down.
     this.resetReaderConnectionState(socket, readerId, 'READER_UNREACHABLE');
 
-    // Open reader UI steps, timers and the OTA file descriptor.
-    cleanupSocketState(socket, { uiHandler: this.uiHandler });
+    // Open reader UI steps, timers, the OTA file descriptor and a partial coredump upload.
+    cleanupSocketState(socket, { uiHandler: this.uiHandler, crashReportHandler: this.crashReportHandler });
     this.websocketService.sockets.delete(socket.id);
     this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
   }

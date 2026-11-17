@@ -1,0 +1,45 @@
+name: Merge Queue Cleanup
+
+# When an entry leaves the merge queue (removed, failed or unmergeable),
+# GitHub rebuilds every entry behind it on new gh-readonly-queue/* branches and
+# deletes the old ones. The old "Pull Requests" runs keep their place in the
+# runner queue though, and each one holds macOS runners that live entries are
+# waiting for. A run whose queue branch is gone can never count toward a merge,
+# so this cancels it. Every rebuild fires merge_group, so this runs exactly when
+# there is something to clean up.
+on:
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: merge-queue-cleanup
+  cancel-in-progress: true
+
+jobs:
+  cancel-abandoned-runs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Cancel runs whose merge-queue branch was deleted
+        run: |
+          set -euo pipefail
+          live="$(gh api --paginate "repos/$GH_REPO/git/matching-refs/heads/gh-readonly-queue/" \
+            --jq '.[].ref | sub("^refs/heads/"; "")')"
+          for status in queued in_progress waiting pending requested; do
+            gh api --paginate \
+              "repos/$GH_REPO/actions/workflows/pull-requests.yml/runs?event=merge_group&status=$status&per_page=100" \
+              --jq '.workflow_runs[] | "\(.id) \(.head_branch)"'
+          done | sort -u | while read -r id branch; do
+            if ! grep -qxF "$branch" <<<"$live"; then
+              echo "Cancelling run $id ($branch): its queue branch no longer exists"
+              gh api -X POST "repos/$GH_REPO/actions/runs/$id/cancel" >/dev/null || echo "::warning::Could not cancel run $id"
+            fi
+          done

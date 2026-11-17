@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { McpTestApp, startMcpTestApp } from './mcp-app.test-fixture';
 
 // A plain-HTTP deployment on a LAN address: neither https nor loopback.
@@ -6,15 +7,29 @@ const PUBLIC_URL = 'http://192.168.1.50:3000';
 describe('MCP on a plain-HTTP, non-loopback deployment (real application)', () => {
   let t: McpTestApp;
   let token: string;
+  const startupWarnings: string[] = [];
 
   beforeAll(async () => {
-    t = await startMcpTestApp(PUBLIC_URL);
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation((message: unknown) => {
+      startupWarnings.push(String(message));
+    });
+    try {
+      t = await startMcpTestApp(PUBLIC_URL);
+    } finally {
+      warn.mockRestore();
+    }
     const user = await t.createUser(['users.api-tokens.manage', 'users.roles.manage']);
     token = await t.createApiToken(user.id, ['users.api-tokens.manage', 'users.roles.manage']);
   }, 240_000);
 
   afterAll(async () => {
     await t?.close();
+  });
+
+  it('warns at startup, before any request, that OAuth is disabled', () => {
+    expect(startupWarnings.filter((message) => message.includes('MCP OAuth is disabled'))).toEqual([
+      expect.stringContaining(PUBLIC_URL),
+    ]);
   });
 
   it('boots and keeps /mcp working with API tokens', async () => {
@@ -32,6 +47,12 @@ describe('MCP on a plain-HTTP, non-loopback deployment (real application)', () =
       .expect(404);
     await t.http.get('/api/mcp/oauth/authorize').expect(404);
     await t.http.post('/api/mcp/oauth/token').type('form').send({ grant_type: 'refresh_token' }).expect(404);
+  });
+
+  it('tells the account page that only API tokens work here', async () => {
+    const session = await t.createSessionToken(await t.createUser([]));
+    const response = await t.http.get('/api/mcp/connection').set('Cookie', `auth-session=${session}`).expect(200);
+    expect(response.body).toEqual({ url: `${PUBLIC_URL}/api/mcp`, oauthEnabled: false });
   });
 
   it('answers 401 without pointing clients at metadata that does not exist', async () => {

@@ -1,4 +1,5 @@
 import { pairedReadersOnly } from '../cardWriting';
+import { isReaderStale } from '../readerStaleness';
 import {
   Button,
   Card,
@@ -39,7 +40,7 @@ import { useNow } from '../../../hooks/useNow';
 import de from './de.json';
 import en from './en.json';
 
-export function useAttractapListState() {
+export function AttractapList() {
   const { t } = useTranslations({
     de,
     en,
@@ -96,9 +97,7 @@ export function useAttractapListState() {
     const active = [];
     // Readers that are not paired are only listed in the Not paired card until they are paired.
     for (const reader of pairedReadersOnly(allReaders)) {
-      const lastConnection = new Date(reader.lastConnection);
-      const isStale = lastConnection.getTime() < now.getTime() - 24 * 60 * 60 * 1000;
-      if (isStale) {
+      if (isReaderStale(reader, now)) {
         stale.push(reader);
       } else {
         active.push(reader);
@@ -137,37 +136,6 @@ export function useAttractapListState() {
     },
     [firmwares],
   );
-  return {
-    t,
-    license,
-    navigate,
-    openedReaderEditor,
-    setOpenedReaderEditor,
-    formatDateTime,
-    staleReaders,
-    activeReaders,
-    firmwareUpdateChip,
-    allReaders,
-    readersToPair,
-    toast,
-  } as const;
-}
-
-export function AttractapList() {
-  const {
-    t,
-    license,
-    navigate,
-    openedReaderEditor,
-    setOpenedReaderEditor,
-    formatDateTime,
-    staleReaders,
-    activeReaders,
-    firmwareUpdateChip,
-    allReaders,
-    readersToPair,
-    toast,
-  } = useAttractapListState();
 
   if (license && !license.modules.includes('attractap')) {
     return null;

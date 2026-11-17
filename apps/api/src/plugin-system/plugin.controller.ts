@@ -53,6 +53,9 @@ import {
   ReplaceInstalledPluginDto,
 } from './dto/npm-plugin-request.dto';
 import { PluginDependencyPlanDto, PluginRemovalItemDto } from './dto/plugin-dependency-plan.dto';
+import { PluginRegistryDto } from './dto/plugin-registry.dto';
+import { MarketplacePluginDto, MarketplaceSearchResponseDto } from './dto/marketplace-plugin.dto';
+import { InstalledNpmPluginDto, InstalledPluginVersionDto } from './dto/installed-npm-plugin.dto';
 
 export const PLUGIN_SYSTEM_INSTANCE_ID = randomUUID();
 
@@ -67,12 +70,14 @@ export class PluginController {
   private readonly logger = new Logger(PluginController.name);
 
   @Get('registries')
+  @ApiResponse({ status: 200, type: PluginRegistryDto, isArray: true })
   @Auth('system.plugins.manage')
   listRegistries() {
     return this.npmPluginService.listRegistries();
   }
 
   @Post('registries')
+  @ApiResponse({ status: 201, type: PluginRegistryDto })
   @Auth('system.plugins.manage')
   addRegistry(@Body() body: AddPluginRegistryDto, @Req() req: AuthenticatedRequest) {
     return this.pluginAdministration.addRegistry(body, auditActorOf(req.user));
@@ -106,6 +111,7 @@ export class PluginController {
   }
 
   @Get('marketplace/search')
+  @ApiResponse({ status: 200, type: MarketplaceSearchResponseDto })
   @Auth('system.plugins.manage')
   @ApiQuery({ name: 'query', required: false, type: String })
   @ApiQuery({ name: 'registryId', required: false, type: String })
@@ -114,6 +120,7 @@ export class PluginController {
   }
 
   @Get('marketplace/:packageName')
+  @ApiResponse({ status: 200, type: MarketplacePluginDto })
   @Auth('system.plugins.manage')
   @ApiQuery({ name: 'registryId', required: false, type: String })
   marketplacePackage(@Param('packageName') packageName: string, @Query('registryId') registryId?: string) {
@@ -192,6 +199,7 @@ export class PluginController {
   }
 
   @Get('installed')
+  @ApiResponse({ status: 200, type: InstalledNpmPluginDto, isArray: true })
   @Auth('system.plugins.manage')
   installedPackages() {
     return this.npmPluginService.listInstalled();
@@ -210,6 +218,7 @@ export class PluginController {
   }
 
   @Post('installed/check')
+  @ApiResponse({ status: 201, type: InstalledNpmPluginDto, isArray: true })
   @Auth('system.plugins.manage')
   checkAllInstalledPackages(@Req() req: AuthenticatedRequest) {
     return this.pluginAdministration.checkAllInstalled(auditActorOf(req.user));
@@ -242,6 +251,7 @@ export class PluginController {
   }
 
   @Post('installed/:packageName/update-policy')
+  @ApiResponse({ status: 201, type: InstalledNpmPluginDto })
   @Auth('system.plugins.manage')
   updateInstalledPackagePolicy(
     @Param('packageName') packageName: string,
@@ -257,12 +267,14 @@ export class PluginController {
   }
 
   @Get('installed/:packageName/versions')
+  @ApiResponse({ status: 200, type: InstalledPluginVersionDto, isArray: true })
   @Auth('system.plugins.manage')
   installedPackageVersions(@Param('packageName') packageName: string) {
     return this.npmPluginService.installedVersionCandidates(packageName);
   }
 
   @Post('installed/:packageName/versions/:version')
+  @ApiResponse({ status: 201, type: InstalledNpmPluginDto })
   @Auth('system.plugins.manage')
   replaceInstalledPackage(
     @Param('packageName') packageName: string,

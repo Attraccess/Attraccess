@@ -51,7 +51,7 @@ export interface CreatedApiToken extends ApiToken {
 
 export const PAGE_SIZE = 10;
 
-export function useApiTokensCardState({ availablePermissions }: { availablePermissions: string[] }) {
+export function ApiTokensCard({ availablePermissions }: { availablePermissions: string[] }) {
   const { t } = useTranslations({ en, de });
   const { showToast } = useToastMessage();
   const { permissionLabel, permissionDescription, permissionCategory } = useRbacCatalogTranslations();
@@ -117,61 +117,6 @@ export function useApiTokensCardState({ availablePermissions }: { availablePermi
     await navigator.clipboard.writeText(secret);
     showToast({ title: t('success.copied'), type: 'success' });
   };
-  return {
-    t,
-    permissionLabel,
-    permissionDescription,
-    permissionCategory,
-    page,
-    setPage,
-    name,
-    setName,
-    permissionKeys,
-    setPermissionKeys,
-    expiresAt,
-    setExpiresAt,
-    expiryValid,
-    setExpiryValid,
-    secret,
-    setSecret,
-    tokenPage,
-    isLoadingTokens,
-    isCreating,
-    isRevoking,
-    availablePermissionDetails,
-    createToken,
-    revokeToken,
-    copySecret,
-  } as const;
-}
-
-export function ApiTokensCard({ availablePermissions }: { availablePermissions: string[] }) {
-  const {
-    t,
-    permissionLabel,
-    permissionDescription,
-    permissionCategory,
-    page,
-    setPage,
-    name,
-    setName,
-    permissionKeys,
-    setPermissionKeys,
-    expiresAt,
-    setExpiresAt,
-    expiryValid,
-    setExpiryValid,
-    secret,
-    setSecret,
-    tokenPage,
-    isLoadingTokens,
-    isCreating,
-    isRevoking,
-    availablePermissionDetails,
-    createToken,
-    revokeToken,
-    copySecret,
-  } = useApiTokensCardState({ availablePermissions });
 
   if (isLoadingTokens) return <Skeleton className="w-full h-10" />;
   const apiTokens = tokenPage?.data ?? [];

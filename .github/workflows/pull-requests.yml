@@ -31,9 +31,10 @@ permissions:
   pull-requests: write
 
 # A push to a PR cancels that PR's previous run. A superseded run can never
-# count toward a merge, yet it holds its three macOS runners, which a few
+# count toward a merge, yet it holds its macOS runners, which a few
 # busy PRs are enough to exhaust. Merge-queue runs each get their own group
 # (github.ref is the queue entry's branch) and are never cancelled.
+# Abandoned merge-queue runs are cancelled by merge-queue-cleanup.yml.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -82,7 +83,6 @@ jobs:
         crap-score,
         build-companion,
         build-attractap-firmware,
-        build-attractap-desktop,
         plugins,
         attractap-firmware-version,
         wago-runtime-version,
@@ -149,7 +149,7 @@ jobs:
       # pnpm and Node are only used when the gate has to build the runtime at the merge-base and at HEAD; it installs
       # each checkout itself, so no workspace install happens here. No `cache: pnpm`: without an install on the fast
       # path the store never exists, and setup-node then fails its post step ("Path Validation Error").
-      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
@@ -276,7 +276,7 @@ jobs:
         run: pnpm crap-score:affected --base=${{ env.NX_AFFECTED_BASE }}
       - name: Upload CRAP reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: crap-score-reports
           path: coverage/crap/
@@ -286,7 +286,7 @@ jobs:
   plugins:
     # RabbitMQ plugin E2E tests use Testcontainers and require Docker, which is
     # available on the stable Ubuntu runner image.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -353,7 +353,7 @@ jobs:
         run: ./scripts/grafana-provisioning-prepare.spec.sh
       - name: Test managed Grafana provisioning sync
         run: ./scripts/grafana-managed-sync.spec.sh
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: '.nvmrc'
       - name: Test legacy Pushover contact point cleanup
@@ -377,9 +377,6 @@ jobs:
   build-attractap-firmware:
     uses: ./.github/workflows/attractap-firmware.yml
     secrets: inherit
-
-  build-attractap-desktop:
-    uses: ./.github/workflows/build-attractap-desktop.yml
 
   containerize:
     # Build the preview image while core/plugin/simulator checks run. The

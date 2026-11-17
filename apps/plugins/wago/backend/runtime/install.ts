@@ -37,7 +37,7 @@ export function quote(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
-export /**
+/**
  * Read-only capacity/tool checks. Staging is checked before preparation; the full
  * check requires activated Docker on its local socket and never guesses its root.
  *
@@ -51,7 +51,7 @@ export /**
  * compressed/sparse layers and filesystem metadata can exceed it. A verified
  * image expansion bound is needed before claiming guaranteed Docker capacity.
  */
-function bundleCapacityPreflightScript(
+export function bundleCapacityPreflightScript(
   bytes: number,
   testRoot: string,
   includeDocker: boolean,

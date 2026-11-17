@@ -10,6 +10,7 @@ import { ToastProvider } from '../../components/toastProvider';
 import { Providers } from '@attraccess/ui';
 import en from './en.json';
 import de from './de.json';
+import { viewportHeightClasses } from '../../test-utils/helpers';
 
 const verifyMutateMock = vi.fn();
 const resendMutateMock = vi.fn();
@@ -143,6 +144,22 @@ describe('VerifyEmail', () => {
       expect(screen.getByText(en.success.title)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Go to sign in' })).toBeInTheDocument();
     });
+  });
+
+  it('renders the success state without a viewport-height wrapper so the page can scroll', async () => {
+    const { container } = renderWithRoute('/verify-email?email=test%40example.com&token=abc123');
+    act(() => verifyOnSuccess?.());
+
+    await screen.findByRole('button', { name: 'Go to sign in' });
+    expect(viewportHeightClasses(container)).toEqual([]);
+  });
+
+  it('renders the error state without a viewport-height wrapper so the page can scroll', async () => {
+    const { container } = renderWithRoute('/verify-email?email=test%40example.com&token=expired');
+    act(() => verifyOnError?.(new Error('expired')));
+
+    await screen.findByText(en.error.title);
+    expect(viewportHeightClasses(container)).toEqual([]);
   });
 
   it('shows error card and resend form when verification fails', async () => {

@@ -3,8 +3,8 @@
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "sourceRoot": "apps/plugins/shelly",
-  "tags": ["type:plugin", "scope:plugin"],
   "// lint": "lint runs from the workspace root on purpose: @nx/enforce-module-boundaries no-ops when eslint runs from inside a project directory. See eslint.config.cjs for the plugin isolation rules.",
+  "tags": ["type:plugin", "scope:plugin"],
   "targets": {
     "install-dev": {
       "executor": "nx:run-commands",
@@ -38,20 +38,8 @@
       }
     },
     "test": {
-      "executor": "@nx/jest:jest",
-      "cache": true,
       "dependsOn": ["test-frontend"],
-      "inputs": [
-        "default",
-        "^production",
-        "{workspaceRoot}/jest.preset.js",
-        {
-          "externalDependencies": ["jest"]
-        }
-      ],
-      "outputs": ["{workspaceRoot}/coverage/apps/plugins/shelly/test"],
       "options": {
-        "jestConfig": "apps/plugins/shelly/jest.config.ts",
         "passWithNoTests": true
       }
     },
@@ -145,10 +133,10 @@
     },
     "crap-score": {
       "executor": "nx:run-commands",
+      "dependsOn": ["test", "test-frontend"],
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/plugins/shelly"
-      },
-      "dependsOn": ["test", "test-frontend"]
+      }
     }
   }
 }

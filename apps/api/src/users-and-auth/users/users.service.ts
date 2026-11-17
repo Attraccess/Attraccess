@@ -1,6 +1,7 @@
 import { DateTimePreferences, getSupportedDeviceLanguage, validateDateTimeLocale } from '@attraccess/shared';
 import {
   AuthenticationDetail,
+  DashboardPin,
   ResourceUsage,
   Session,
   SSOProviderType,
@@ -291,6 +292,17 @@ export class UsersService {
     return savedUsers;
   }
 
+  /**
+   * Removes invited users whose invitation email could not be sent, unless they already accepted it. They were created
+   * moments ago, so nothing else refers to them yet; their role assignments cascade.
+   */
+  async deleteUnacceptedInvitations(ids: number[]): Promise<void> {
+    if (!ids.length) {
+      return;
+    }
+    await this.userRepository.delete({ id: In(ids), isEmailVerified: false });
+  }
+
   async deleteOne(id: number): Promise<void> {
     this.logger.debug(`Deleting user with ID: ${id}`);
     await this.anonymizeAndSoftDelete(id);
@@ -402,6 +414,8 @@ export class UsersService {
 
       await authRepo.delete({ userId: user.id });
       await sessionRepo.delete({ userId: user.id });
+      // The user row stays (soft delete), so its ON DELETE CASCADE never removes the pins.
+      await em.getRepository(DashboardPin).delete({ userId: user.id });
 
       await repo.update(user.id, {
         username: anonymizedUsername,

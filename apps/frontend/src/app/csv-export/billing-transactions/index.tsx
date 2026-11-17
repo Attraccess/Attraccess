@@ -14,7 +14,7 @@ import { FieldDefinition, metadataFields } from '../export-config/csv';
 import { useEffect, useMemo, useState } from 'react';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 
-export function useBillingTransactionsExportState(props: ExporterProps) {
+export function BillingTransactionsExport(props: ExporterProps) {
   const { start, end } = props;
 
   const { t } = useTranslations({
@@ -121,20 +121,7 @@ export function useBillingTransactionsExportState(props: ExporterProps) {
       ),
     ] as FieldDefinition<BillingTransactionExportRowDto>[];
   }, [t, billingConfiguration, formatDateTimeFull, billingTransactions]);
-
-  return {
-    columns,
-    billingTransactions,
-    queryStatus: billingConfigurationFetchStatus === 'success' ? fetchStatus : billingConfigurationFetchStatus,
-    hasNextPage,
-    isFetchingAllPages,
-    setFetchAll,
-  } as const;
-}
-
-export function BillingTransactionsExport(props: ExporterProps) {
-  const { columns, billingTransactions, queryStatus, hasNextPage, isFetchingAllPages, setFetchAll } =
-    useBillingTransactionsExportState(props);
+  const queryStatus = billingConfigurationFetchStatus === 'success' ? fetchStatus : billingConfigurationFetchStatus;
 
   return (
     <CsvExportConfigContent

@@ -28,9 +28,10 @@ async function main() {
     .setVersion(resolveAppVersion())
     .setDefaultContentType('application/json')
     .addServer('companion', {
-      url: '{serverUrl}/api/companion/websocket',
+      host: '{serverHost}',
+      pathname: '/api/companion/websocket',
       protocol: 'ws',
-      description: 'Companion WebSocket endpoint — replace {serverUrl} with the Attraccess server URL',
+      description: 'Companion WebSocket endpoint — replace {serverHost} with the Attraccess server host',
     })
     .build();
 

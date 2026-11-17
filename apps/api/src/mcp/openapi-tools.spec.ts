@@ -343,6 +343,37 @@ describe('generateMcpTools', () => {
     expect(props.extra).toEqual({ description: 'anything' });
   });
 
+  it('keeps the base fields of a schema that extends one allOf branch with its own properties', () => {
+    const doc: OpenApiDocument = {
+      paths: {
+        '/things': {
+          post: {
+            operationId: 'createThing',
+            requestBody: {
+              required: true,
+              content: {
+                'application/json': {
+                  schema: {
+                    allOf: [{ $ref: '#/components/schemas/Base' }],
+                    properties: { extra: { type: 'string' } },
+                    required: ['extra'],
+                  },
+                },
+              },
+            },
+            responses: { '200': {} },
+          },
+        },
+      },
+      components: {
+        schemas: { Base: { type: 'object', required: ['name'], properties: { name: { type: 'string' } } } },
+      },
+    };
+    const [tool] = generateMcpTools(doc, manifest(doc, { createThing: { decision: 'allow', reason: 'Reviewed.' } }));
+    expect(tool.bodyProperties.sort()).toEqual(['extra', 'name']);
+    expect((tool.inputSchema.required as string[]).sort()).toEqual(['extra', 'name']);
+  });
+
   it('passes an array or primitive body whole as `body`', () => {
     const doc: OpenApiDocument = {
       paths: {
@@ -424,7 +455,40 @@ describe('generateMcpTools', () => {
       const unreviewed = analyzeMcpManifest(doc, reviewed).problems.find((problem) => problem.kind === 'unreviewed');
       expect(unreviewed?.detail).toContain('"newOperation"');
       expect(unreviewed?.detail).toContain(unreviewed?.shape as string);
-      expect(kinds(drifted)).toContain('shape-drift');
+      const stale = analyzeMcpManifest(doc, reviewed).problems.find((problem) => problem.kind === 'stale');
+      expect(stale?.detail).toContain('remove "removedOperation"');
+    });
+
+    it('reports a changed shape alone, naming the entry and its new shape', () => {
+      const reviewed = manifest(document, {
+        getResource: { decision: 'allow', reason: 'Read-only resource lookup.' },
+        updateResource: { decision: 'allow', reason: 'Resource updates use normal REST authorization.' },
+      });
+      expect(analyzeMcpManifest(document, reviewed).problems).toEqual([]);
+      const drifted: OpenApiDocument = structuredClone(document);
+      (drifted.paths?.['/resources/{id}']?.get as { summary?: string }).summary = 'Changed';
+      const problems = analyzeMcpManifest(drifted, reviewed).problems;
+      expect(problems).toHaveLength(1);
+      expect(problems[0]).toMatchObject({ kind: 'shape-drift', operationId: 'getResource' });
+      expect(problems[0].detail).toContain(`set its "shape" to "${problems[0].shape}"`);
+    });
+
+    it('reports an allowed operation that stops being tool-compatible once its new shape is pinned', () => {
+      const reviewed = manifest(document, {
+        getResource: { decision: 'allow', reason: 'Read-only resource lookup.' },
+        updateResource: { decision: 'allow', reason: 'Resource updates use normal REST authorization.' },
+      });
+      const binary: OpenApiDocument = structuredClone(document);
+      const operation = binary.paths?.['/resources/{id}']?.get as { responses: Record<string, unknown> };
+      operation.responses = { '200': { content: { 'application/octet-stream': {} } } };
+      const drift = analyzeMcpManifest(binary, reviewed).problems;
+      expect(drift.map((problem) => problem.kind)).toEqual(['shape-drift']);
+      // MCP_MANIFEST_WRITE=1 re-pins shapes but keeps decisions: the allow must still be refused.
+      reviewed.getResource.shape = drift[0].shape as string;
+      const after = analyzeMcpManifest(binary, reviewed);
+      expect(after.problems).toEqual([expect.objectContaining({ kind: 'incompatible', operationId: 'getResource' })]);
+      expect(after.problems[0].detail).toContain('Change its manifest decision to "deny"');
+      expect(after.tools.map((tool) => tool.name)).not.toContain('getResource');
     });
 
     it('still lists the individually valid tools next to a problem so a running server can skip the rest', () => {

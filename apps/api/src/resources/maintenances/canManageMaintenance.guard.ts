@@ -25,7 +25,7 @@ export class CanManageMaintenanceGuard implements CanActivate {
     }
 
     // Get the resourceId from the URL path
-    const resourceIdParam = request.params.resourceId;
+    const { resourceId: resourceIdParam } = request.params as { resourceId?: string };
 
     // If no resourceId param, deny access
     if (!resourceIdParam) {

@@ -375,7 +375,8 @@ describe('Modbus review regressions', () => {
     const host = await screen.findByRole('textbox', { name: 'Host' });
     await user.click(host);
     const refreshed = fixture();
-    const connection = refreshed.modbus!.connections[0];
+    const connection = refreshed.modbus?.connections[0];
+    if (!connection) throw new Error('Fixture has no Modbus connection');
     if (connection.transport === 'tcp') connection.host = 'new.fixture.invalid';
     await act(async () => {
       client.setQueryData(['wago', 'configuration-draft', 1], draftRecord(refreshed, 'refreshed'));

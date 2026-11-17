@@ -53,7 +53,7 @@ export class UserInvitationService {
       throw error;
     }
 
-    return this.usersService
+    const invitations = await this.usersService
       .withTransaction(async (manager: EntityManager) => {
         const createdUsers = await this.usersService.createMany(candidates, {
           grantAllPermissionsToFirst: options?.grantAllPermissionsToFirst ?? false,
@@ -61,14 +61,29 @@ export class UserInvitationService {
           actorId: options?.actorId,
         });
 
+        const invited: Array<{ user: User; token: string }> = [];
         for (const user of createdUsers) {
-          const verificationToken = await this.authService.generateEmailVerificationToken(user, manager);
-          await this.emailService.sendUserInvitationEmail(user, verificationToken, manager);
+          invited.push({ user, token: await this.authService.generateEmailVerificationToken(user, manager) });
         }
-
-        return createdUsers;
+        return invited;
       })
       .catch((error) => mapEmailSendError(error));
+
+    // SMTP can take seconds, and while a transaction is open every other request waits for the connection: send after
+    // the commit. A failed send takes the invitation back, as the rollback did when sending ran inside it.
+    try {
+      for (const { user, token } of invitations) {
+        await this.emailService.sendUserInvitationEmail(user, token);
+      }
+    } catch (error) {
+      try {
+        await this.usersService.deleteUnacceptedInvitations(invitations.map(({ user }) => user.id));
+      } catch (revertError) {
+        this.logger.error('Failed to take back invitations after an email failure', (revertError as Error).stack);
+      }
+      mapEmailSendError(error);
+    }
+    return invitations.map(({ user }) => user);
   }
 
   public async inviteUser(body: InviteUserDto, adminLocale?: string): Promise<User> {

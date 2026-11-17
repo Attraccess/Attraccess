@@ -8,6 +8,7 @@ import { DualAuthGuard, EffectivePermissionsGuard } from '@attraccess/plugins-ba
 import { PluginController } from './plugin.controller';
 import { NpmPluginService } from './npm-plugin.service';
 import { PluginService } from './plugin.service';
+import { PluginBleService } from './ble/plugin-ble.service';
 
 describe('npm plugin request DTOs (HTTP integration)', () => {
   let app: INestApplication;
@@ -33,6 +34,7 @@ describe('npm plugin request DTOs (HTTP integration)', () => {
         { provide: NpmPluginService, useValue: npmPluginService },
         { provide: AUDIT_RECORDER, useValue: { record: jest.fn() } },
         PluginAdministrationService,
+        { provide: PluginBleService, useValue: { deleteAllForPlugin: jest.fn() } },
         PluginUninstallService,
         DualAuthGuard,
         EffectivePermissionsGuard,

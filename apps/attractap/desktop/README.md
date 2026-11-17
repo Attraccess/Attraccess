@@ -6,11 +6,12 @@ libcurl 8.7+ with WebSocket support. On macOS, the build prefers Homebrew curl.
 
 ## Download for macOS
 
-Nightly CI produces separate Apple Silicon (`arm64`) and Intel (`x86_64`) DMGs in
-the **Build Attractap Desktop for macOS** artifacts of the main-branch nightly
-run. Each published GitHub Release also has the two DMGs as release assets.
-The CI downloads target macOS 15 or newer and bundle their libraries, so
-Homebrew and a source checkout are not needed on the user's Mac.
+The simulator is a development tool, so no automatic pipeline builds it.
+To get DMGs, start the **Build Attractap Desktop for macOS** workflow by hand
+(Actions → Run workflow). It produces separate Apple Silicon (`arm64`) and
+Intel (`x86_64`) DMGs as run artifacts. They target macOS 15 or newer and
+bundle their libraries, so Homebrew and a source checkout are not needed on
+the user's Mac.
 
 Open the DMG, drag **Attractap Simulator.app** to Applications, then open it.
 Enter the Attraccess server URL in the launch dialog. For the imec demo,

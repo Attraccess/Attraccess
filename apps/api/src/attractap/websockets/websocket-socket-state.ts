@@ -1,6 +1,7 @@
 import { Attractap, ResourceFormAction } from '@attraccess/database-entities';
 import type { CardConversation } from './card-conversation.service';
 import type { CardSessionState, UiSlotsState, UiStepState } from './handlers/ui/ui-socket-state';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 export interface AttractapMessageBaseData<TPayload = unknown> {
   auth?: {
@@ -21,6 +22,11 @@ export enum AttractapEventType {
   READER_FIRMWARE_UPDATE_REQUIRED = 'READER_FIRMWARE_UPDATE_REQUIRED',
   READER_FIRMWARE_INFO = 'READER_FIRMWARE_INFO',
   READER_CRASH_REPORT = 'READER_CRASH_REPORT',
+  // Chunked coredump upload (ATT-1144), one message in flight: the reader announces the dump of a report,
+  // sends it in chunks and completes it; every reply comes without an ACK round trip.
+  READER_COREDUMP_BEGIN = 'READER_COREDUMP_BEGIN',
+  READER_COREDUMP_CHUNK = 'READER_COREDUMP_CHUNK',
+  READER_COREDUMP_COMPLETE = 'READER_COREDUMP_COMPLETE',
   /** Server-pushed: asks a token-signed-in reader to open a pairing connection. */
   READER_START_PAIRING = 'READER_START_PAIRING',
   FIRMWARE_REQUEST_CHUNK = 'FIRMWARE_REQUEST_CHUNK',
@@ -273,7 +279,7 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       userId: number;
       auditPrincipal: {
         userId: number;
-        authenticationMethod: 'session' | 'api-token' | 'mcp-oauth';
+        authenticationMethod: AuthenticationMethod;
         apiTokenId?: number;
       };
       /** When the enrollment was armed (ms since epoch); a card arriving much later is refused. */
@@ -284,7 +290,7 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       cardId: number;
       auditPrincipal: {
         userId: number;
-        authenticationMethod: 'session' | 'api-token' | 'mcp-oauth';
+        authenticationMethod: AuthenticationMethod;
         apiTokenId?: number;
       };
       /** When the reset was armed (ms since epoch); a card arriving much later is refused. */

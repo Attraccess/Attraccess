@@ -1,7 +1,10 @@
 import { Label, Radio, RadioGroup, TextField, Input } from '@heroui/react';
 import { AutoIntroductionTarget, SupervisionMode, useResourcesServiceResourceGroupsGetMany } from '@attraccess/react-query-client';
 import { Select } from '../../../../components/select';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { EditorTabProps } from './props';
+import en from '../resourceEditModal.en.json';
+import de from '../resourceEditModal.de.json';
 
 const SUPERVISION_MODES: SupervisionMode[] = [
   SupervisionMode.INTRODUCTION_REQUIRED,
@@ -10,7 +13,8 @@ const SUPERVISION_MODES: SupervisionMode[] = [
 ];
 
 export function SupervisionTab(props: EditorTabProps) {
-  const { t, formData, setField } = props;
+  const { formData, setField } = props;
+  const { t } = useTranslations({ en, de });
 
   const supervisionMode = formData.supervisionMode ?? SupervisionMode.INTRODUCTION_REQUIRED;
   const supervisionAllowed =

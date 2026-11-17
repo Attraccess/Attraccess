@@ -339,7 +339,7 @@ export class FlowExecutionEngine {
 
       this.flowLogs.record({ flowRunId, nodeId: null, ...owner, type: ResourceFlowLogType.FLOW_START });
 
-      let leafResults: NodeProcessingResult[] = [];
+      let leafResults: NodeProcessingResult[];
       try {
         leafResults = await settleFlowBranches(
           nodes.map((node) => {

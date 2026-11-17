@@ -124,6 +124,46 @@ describe('MessagingSection', () => {
     expect(saveBar(container)).toBeNull();
   });
 
+  it('requests the VAPID config in parallel with the limits, once each', () => {
+    // Subscribing in the rows delayed VAPID until the limits had arrived, and the rows refetched
+    // the limits on mount (the shared client has no `staleTime`).
+    mockLimitsQuery(undefined, true);
+    const { rerender } = render(<MessagingSection />);
+
+    expect(screen.getByText('loading')).toBeInTheDocument();
+    expect(usePushServicePushGetVapidConfig).toHaveBeenCalledTimes(1);
+
+    vi.clearAllMocks();
+    mockLimitsQuery(LIMITS);
+    rerender(<MessagingSection />);
+
+    expect(useSettingsServiceGetMessagingRateLimitSettings).toHaveBeenCalledTimes(1);
+    expect(usePushServicePushGetVapidConfig).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps typed custom keys and an open confirmation through a limits refetch after an error', async () => {
+    // A refetch of a query without data goes back to loading, which shows the spinner and unmounts
+    // the rows. The keys and the confirmation step must still be there when the rows come back.
+    mockLimitsQuery(undefined);
+    const { rerender } = render(<MessagingSection />);
+
+    await userEvent.type(screen.getByLabelText('publicKeyInputLabel'), 'BCustomPublic');
+    await userEvent.type(screen.getByLabelText('privateKeyInputLabel'), 'custom-private');
+    await userEvent.click(screen.getByRole('button', { name: 'applyCustomButton' }));
+    expect(await screen.findByRole('alertdialog', { name: 'confirmWarning.title' })).toBeInTheDocument();
+
+    mockLimitsQuery(undefined, true);
+    rerender(<MessagingSection />);
+    expect(screen.getByText('loading')).toBeInTheDocument();
+
+    mockLimitsQuery(undefined);
+    rerender(<MessagingSection />);
+
+    expect(screen.getByLabelText('publicKeyInputLabel')).toHaveValue('BCustomPublic');
+    expect(screen.getByLabelText('privateKeyInputLabel')).toHaveValue('custom-private');
+    expect(await screen.findByRole('alertdialog', { name: 'confirmWarning.title' })).toBeInTheDocument();
+  });
+
   it('walks the two-step key replacement and goes back to step one on Escape', async () => {
     const replace = vi.fn();
     vi.mocked(usePushServicePushReplaceVapidKeys).mockReturnValue({

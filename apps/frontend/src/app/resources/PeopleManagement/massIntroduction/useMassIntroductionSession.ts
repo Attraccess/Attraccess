@@ -16,7 +16,7 @@ import { useLiveUpdates } from '../../../../utils/live-updates';
 import { useToastMessage } from '../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
-import { useInvalidatePeopleIntroductions } from '../usePeopleMutations';
+import { useInvalidatePeopleIntroductions } from '../useInvalidatePeopleIntroductions';
 import { PeopleTarget } from '../types';
 
 export type MassIntroductionPhase = 'setup' | 'active' | 'ended';
@@ -27,9 +27,21 @@ export function secondsUntil(timestamp: string): number {
   return Math.max(0, Math.ceil((new Date(timestamp).getTime() - Date.now()) / 1000));
 }
 
-export type MassIntroductionSessionState = ReturnType<typeof useMassIntroductionSession>;
+/** A mass-introduction session as the drawer tabs, the panel content and the footer actions see it. */
+export interface MassIntroductionSessionState {
+  phase: MassIntroductionPhase;
+  session: MassIntroductionSessionDto | null;
+  endReason: MassIntroductionEndState | null;
+  secondsLeft: number;
+  isStarting: boolean;
+  /** Starts a session for the target, optionally on a reader's display. */
+  start: (readerId?: number) => void;
+  cancel: () => void;
+  reset: () => void;
+}
 
-export function useMassIntroductionSession(target: PeopleTarget) {
+/** Shared by IntroductionTabs, MassIntroductionContent and MassIntroductionActions, which all follow the same running session. */
+export function useMassIntroductionSession(target: PeopleTarget): MassIntroductionSessionState {
   const invalidateIntroductions = useInvalidatePeopleIntroductions(target);
   const toast = useToastMessage();
   const { t, tExists } = useTranslations({
@@ -200,5 +212,5 @@ export function useMassIntroductionSession(target: PeopleTarget) {
     start,
     cancel,
     reset,
-  } as const;
+  };
 }

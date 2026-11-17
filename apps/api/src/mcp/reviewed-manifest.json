@@ -30,8 +30,8 @@
     "shape": "6b6797f7"
   },
   "createOneUser": {
-    "decision": "allow",
-    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "decision": "deny",
+    "reason": "Credential flow: public sign-up that sets the new account password.",
     "shape": "2f091df1"
   },
   "findMany": {
@@ -582,27 +582,27 @@
   "previewAdminPasswordPolicy": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "98f5b61e"
+    "shape": "0d063b4f"
   },
   "listPasswordPolicyOverrides": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "92ece3cd"
+    "shape": "95d71bed"
   },
   "getPasswordPolicyOverride": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "8fc880c9"
+    "shape": "a7f3cc77"
   },
   "upsertPasswordPolicyOverride": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "6d792ae9"
+    "shape": "07a99849"
   },
   "deletePasswordPolicyOverride": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "1f6cc9aa"
+    "shape": "579522ae"
   },
   "notificationsLive": {
     "decision": "deny",
@@ -657,7 +657,7 @@
   "AuditController_list": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "a72063d8"
+    "shape": "32ef66b3"
   },
   "createOneResource": {
     "decision": "deny",
@@ -1522,12 +1522,12 @@
   "PluginController_listRegistries": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "f9109973"
+    "shape": "ff36031c"
   },
   "PluginController_addRegistry": {
     "decision": "deny",
-    "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
-    "shape": "78526244"
+    "reason": "Secret management: stores an npm registry and its access token.",
+    "shape": "0979ba5d"
   },
   "PluginController_testRegistry": {
     "decision": "allow",
@@ -1536,7 +1536,7 @@
   },
   "PluginController_removeRegistry": {
     "decision": "deny",
-    "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
+    "reason": "Secret management: removes an npm registry and its stored access token.",
     "shape": "db78bcff"
   },
   "PluginController_packageMetadata": {
@@ -1552,12 +1552,12 @@
   "PluginController_searchMarketplace": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "892bc1a8"
+    "shape": "5eb0691b"
   },
   "PluginController_marketplacePackage": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "928042fa"
+    "shape": "bad56e7e"
   },
   "PluginController_dependencyPlan": {
     "decision": "allow",
@@ -1590,28 +1590,28 @@
     "shape": "0ba3a01b"
   },
   "PluginController_installedPackages": {
-    "decision": "deny",
-    "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
-    "shape": "290d1dbe"
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "c2bc81ba"
   },
   "PluginController_updatePolicy": {
-    "decision": "deny",
-    "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
     "shape": "f4d76c00"
   },
   "PluginController_setUpdatePolicy": {
     "decision": "deny",
-    "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
+    "reason": "Host lifecycle: changes automatic plugin updates, which install code and restart the host.",
     "shape": "141e3c2a"
   },
   "PluginController_checkAllInstalledPackages": {
-    "decision": "deny",
-    "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
-    "shape": "f031bc54"
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "9836a353"
   },
   "PluginController_checkInstalledPackage": {
-    "decision": "deny",
-    "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
     "shape": "939cf255"
   },
   "PluginController_updateInstalledPackageSpec": {
@@ -1627,22 +1627,22 @@
   "PluginController_updateInstalledPackagePolicy": {
     "decision": "deny",
     "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
-    "shape": "f3760cf2"
+    "shape": "649455ec"
   },
   "PluginController_installedPackageVersions": {
-    "decision": "deny",
-    "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
-    "shape": "aa04fc57"
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "c843e8c9"
   },
   "PluginController_replaceInstalledPackage": {
     "decision": "deny",
     "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
-    "shape": "ebbd4fcd"
+    "shape": "b6702017"
   },
   "getPlugins": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "2f14785b"
+    "shape": "e0bfa403"
   },
   "uploadPlugin": {
     "decision": "deny",
@@ -1672,12 +1672,12 @@
   "updateReader": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "9cde0c27"
+    "shape": "8770aa15"
   },
   "getReaderById": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "5c867131"
+    "shape": "e5d411ea"
   },
   "deleteReader": {
     "decision": "allow",
@@ -1687,17 +1687,17 @@
   "getReaders": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "6b03ad0c"
+    "shape": "976ecc51"
   },
   "getReadersToPair": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "f5b8f9b6"
+    "shape": "54f503fb"
   },
   "getReaderCrashReports": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "ddb23c45"
+    "shape": "d354ff2d"
   },
   "getReaderCrashReportCoredump": {
     "decision": "deny",
@@ -1752,12 +1752,12 @@
   "getResourceAttractaps": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "5e4878c3"
+    "shape": "17cb3e74"
   },
   "getResourceGroupAttractaps": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "6ac19d6c"
+    "shape": "cc6861f1"
   },
   "getPairings": {
     "decision": "allow",
@@ -1949,10 +1949,20 @@
     "reason": "JSON request and response; the REST endpoint authorises every call.",
     "shape": "3a8d32ca"
   },
+  "dashboardGetPins": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "a514cf61"
+  },
+  "dashboardUpdatePins": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "e078a73b"
+  },
   "getMcpOAuthRequest": {
     "decision": "deny",
     "reason": "MCP OAuth endpoint: the consent decision belongs to the signed-in user in a browser, never to an MCP client.",
-    "shape": "439b09a6"
+    "shape": "81774ff0"
   },
   "approveMcpOAuthRequest": {
     "decision": "deny",
@@ -1963,5 +1973,10 @@
     "decision": "deny",
     "reason": "MCP OAuth endpoint: the consent decision belongs to the signed-in user in a browser, never to an MCP client.",
     "shape": "013d9cf4"
+  },
+  "getMcpConnectionInfo": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "f86a3b4b"
   }
 }

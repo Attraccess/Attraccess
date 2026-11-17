@@ -19,7 +19,8 @@ import { validDurations, validStarts } from '../lib/slots';
 import { addLocalDays, fromDateKey, localDateOf, startOfLocalDay, toDateKey } from '../lib/time';
 import type { Availability, Reservation } from '../lib/types';
 import { useFormatters } from '../lib/useFormatters';
-import { SelectField, TextInput } from '../shared/fields';
+import { SelectField } from '../shared/SelectField';
+import { TextInput } from '../shared/TextInput';
 import { CheckInRules } from './CheckInRules';
 
 const DAY_MS = 86_400_000;

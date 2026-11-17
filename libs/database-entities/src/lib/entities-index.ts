@@ -5,8 +5,9 @@ export { McpOAuthGrant } from './entities/mcp-oauth-grant.entity';
 export { McpOAuthToken } from './entities/mcp-oauth-token.entity';
 export type { McpOAuthTokenKind } from './entities/mcp-oauth-token.entity';
 export { Attractap, AttractapFirmwareVersion } from './entities/attractap.entity';
-export { AttractapCrashReport } from './entities/attractapCrashReport.entity';
+export { AttractapCrashReport, type CoredumpStatus } from './entities/attractapCrashReport.entity';
 export { AttractapCredentialEvent } from './entities/attractap-credential-event.entity';
+export { PluginBleEndpointEntity } from './entities/plugin-ble-endpoint.entity';
 export { AttractapInstallation } from './entities/attractap-installation.entity';
 export { AttractapSecureBootKey } from './entities/attractap-secure-boot-key.entity';
 export type { SecureBootKeyRole } from './entities/attractap-secure-boot-key.entity';
@@ -17,7 +18,8 @@ export {
   ReaderUiResourceSettings,
 } from './entities/reader-ui-settings.entity';
 export type { ReaderUiAlertKind } from './entities/reader-ui-settings.entity';
-export { AuditLog } from './entities/audit-log.entity';
+export { AuditLog, AUTHENTICATION_METHODS } from './entities/audit-log.entity';
+export type { AuthenticationMethod } from './entities/audit-log.entity';
 export { AuthenticationDetail } from './entities/authenticationDetail.entity';
 export {
   BillingTransactionItem,
@@ -35,6 +37,7 @@ export { Form, FormField, FormFieldType, FormSubmission, ResourceFormAction } fr
 export { Message, MessageReferenceType } from './entities/message.entity';
 export { MqttServer } from './entities/mqttServer.entity';
 export { NotificationPreference } from './entities/notification-preference.entity';
+export { DashboardPin, type DashboardPinItemType, type DashboardPinSize } from './entities/dashboard-pin.entity';
 export { Passkey, PasskeyChallenge } from './entities/passkey.entity';
 export { PasswordHistory } from './entities/password-history.entity';
 export {
@@ -157,6 +160,7 @@ import { McpOAuthToken } from './entities/mcp-oauth-token.entity';
 import { Attractap } from './entities/attractap.entity';
 import { AttractapCrashReport } from './entities/attractapCrashReport.entity';
 import { AttractapCredentialEvent } from './entities/attractap-credential-event.entity';
+import { PluginBleEndpointEntity } from './entities/plugin-ble-endpoint.entity';
 import { AttractapInstallation } from './entities/attractap-installation.entity';
 import { AttractapSecureBootKey } from './entities/attractap-secure-boot-key.entity';
 import {
@@ -178,6 +182,7 @@ import { Form, FormField, FormSubmission } from './entities/form';
 import { Message } from './entities/message.entity';
 import { MqttServer } from './entities/mqttServer.entity';
 import { NotificationPreference } from './entities/notification-preference.entity';
+import { DashboardPin } from './entities/dashboard-pin.entity';
 import { Passkey, PasskeyChallenge } from './entities/passkey.entity';
 import { PasswordHistory } from './entities/password-history.entity';
 import { PasswordPolicyOverride } from './entities/password-policy-override.entity';
@@ -246,6 +251,7 @@ export const entities = {
   Attractap,
   AttractapCrashReport,
   AttractapCredentialEvent,
+  PluginBleEndpointEntity,
   AttractapInstallation,
   AttractapSecureBootKey,
   ReaderUiAlert,
@@ -282,6 +288,7 @@ export const entities = {
   ConversationParticipant,
   Message,
   NotificationPreference,
+  DashboardPin,
   PushSubscription,
   Passkey,
   PasskeyChallenge,

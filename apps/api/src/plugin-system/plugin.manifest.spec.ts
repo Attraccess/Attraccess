@@ -30,7 +30,62 @@ describe('PluginManifestSchema migrations entry', () => {
       PluginManifestSchema.parse({
         ...BASE,
         main: { ...BASE.main, migrations: { directory: 'dist' } },
-      })
+      }),
     ).toThrow();
   });
+});
+
+describe('PluginManifestSchema dashboard paths', () => {
+  const withDashboardPaths = (dashboardPaths: string[]) => ({
+    ...BASE,
+    main: { ...BASE.main, frontend: { ...BASE.main.frontend, dashboardPaths } },
+  });
+
+  it('accepts sidebar route paths', () => {
+    const parsed = PluginManifestSchema.parse(withDashboardPaths(['/plugin-report', '/reservations/manage']));
+    expect(parsed.main.frontend?.dashboardPaths).toEqual(['/plugin-report', '/reservations/manage']);
+  });
+
+  it('accepts a path that only starts like a reserved one', () => {
+    expect(PluginManifestSchema.parse(withDashboardPaths(['/kiosk-guide'])).main.frontend?.dashboardPaths).toEqual([
+      '/kiosk-guide',
+    ]);
+  });
+
+  it.each([
+    '/kiosk',
+    '/Kiosk',
+    '/kiosk/companion',
+    '/dashboard',
+    '/DASHBOARD',
+    '/dashboard/x',
+    'https://example.com',
+    '/foo/../bar',
+    '/',
+    '/a b',
+  ])('rejects %s', (path) => {
+    expect(() => PluginManifestSchema.parse(withDashboardPaths([path]))).toThrow();
+  });
+});
+
+describe('PluginManifestSchema dashboard widgets', () => {
+  const withDashboardWidgets = (dashboardWidgets: string[]) => ({
+    ...BASE,
+    main: { ...BASE.main, frontend: { ...BASE.main.frontend, dashboardWidgets } },
+  });
+
+  it('accepts kebab-case widget ids and keeps manifests without them valid', () => {
+    expect(
+      PluginManifestSchema.parse(withDashboardWidgets(['reservations-upcoming', 'report2'])).main.frontend
+        ?.dashboardWidgets,
+    ).toEqual(['reservations-upcoming', 'report2']);
+    expect(PluginManifestSchema.parse(BASE).main.frontend?.dashboardWidgets).toBeUndefined();
+  });
+
+  it.each(['Report', 'report_summary', '-report', 'report-', 'report--summary', '/report', '', 'a'.repeat(65)])(
+    'rejects %j',
+    (id) => {
+      expect(() => PluginManifestSchema.parse(withDashboardWidgets([id]))).toThrow();
+    },
+  );
 });

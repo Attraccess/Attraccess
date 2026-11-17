@@ -106,7 +106,6 @@ export class UsageSessionEnds {
 
     // Defer event emission until after the transaction commits to avoid stale reads in listeners
     let activeSession: ResourceUsage | null = null;
-    let endedUsageIdToEmit: number | null = null;
     let formSubmissions: FormSubmission[] = [];
     let activeSessionCounts: ActiveSessionCounts | undefined;
     const prepared = await runSerializedTransaction(this.lifecycle.manager, async (transactionalEntityManager) => {
@@ -225,7 +224,7 @@ export class UsageSessionEnds {
       await this.lifecycle.abortLifecycleAttempt(attemptId, resourceId);
       throw error;
     }
-    endedUsageIdToEmit = updatedUsage.id;
+    const endedUsageIdToEmit = updatedUsage.id;
     await this.notifications.notifySessionEnded(
       resourceId,
       user,

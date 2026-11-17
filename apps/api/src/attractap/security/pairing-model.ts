@@ -1,6 +1,7 @@
 import { webcrypto } from 'crypto';
 import type { WebSocket } from 'ws';
 import type { DerivedCode, LiteColour } from './pairing-protocol';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 const MAX_FIRMWARE_FIELD = 64;
 
@@ -25,7 +26,7 @@ export type PairingFailureReason = (typeof PAIRING_FAILURE_REASONS)[number];
 
 export interface Actor {
   userId: number;
-  authenticationMethod: 'session' | 'api-token' | 'mcp-oauth';
+  authenticationMethod: AuthenticationMethod;
   apiTokenId?: number;
 }
 

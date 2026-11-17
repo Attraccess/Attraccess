@@ -30,6 +30,7 @@ import { MqttModule } from './../mqtt/mqtt.module';
 import { MqttCredentialProvisioningService } from './../mqtt/mqtt-credential-provisioning.service';
 import * as readerUiWiring from './runtime/reader-ui-wiring';
 import { PluginSystemEventsBridge } from './plugin-system-events.bridge';
+import { PluginBleService } from './ble/plugin-ble.service';
 import {
   listPluginNotificationCategories,
   unregisterPluginNotificationCategories,
@@ -80,6 +81,7 @@ describe('PluginModule', () => {
         PluginClassificationService,
         PluginLiveUpdatesService,
         PluginSystemEventsBridge,
+        PluginBleService,
       ]);
       expect(module.exports).toEqual([PluginEventsService]);
       expect(module.controllers).toEqual([PluginController]);

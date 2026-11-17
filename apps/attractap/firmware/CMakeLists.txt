@@ -17,6 +17,11 @@ set(ATTRACTAP_LOG_LEVEL "INFO" CACHE STRING "Runtime log level (ERROR/WARN/INFO/
 # them: build_firmwares.py forces this OFF. See README "Test hooks".
 option(ATTRACTAP_TEST_HOOKS "Compile the ui.* serial test hooks (display variants only)" OFF)
 
+# Lab/test-only `debug.crash` serial topic that panics on purpose (crash report and
+# coredump upload tests, ATT-1144). Never ship it: build_firmwares.py forces this OFF
+# and tools/check_release_build.py fails a release image that contains it.
+option(ATTRACTAP_CRASH_TRIGGER "Compile the debug.crash serial crash trigger (lab builds only)" OFF)
+
 # Beeper state of a reader that has no saved beeper setting yet (fresh or
 # erased). Lab builds set it OFF; the setting itself still works.
 # Reader UI self-test (ATT-1187): fills every plugin slot, opens a step and the keyboard, runs the hostile
@@ -41,6 +46,9 @@ option(ATTRACTAP_SECURE_PROFILE "Build the secure firmware profile (sdkconfig.se
 option(ATTRACTAP_SECURE_LAB "Build the lab-only secure test reader profile (needs ATTRACTAP_SECURE_PROFILE)" OFF)
 if(ATTRACTAP_SECURE_LAB AND NOT ATTRACTAP_SECURE_PROFILE)
     message(FATAL_ERROR "ATTRACTAP_SECURE_LAB=ON needs ATTRACTAP_SECURE_PROFILE=ON")
+endif()
+if(ATTRACTAP_CRASH_TRIGGER AND ATTRACTAP_SECURE_PROFILE)
+    message(FATAL_ERROR "ATTRACTAP_CRASH_TRIGGER=ON is not available with the secure profile (coredumps are off there)")
 endif()
 if(ATTRACTAP_SECURE_PROFILE)
     if(ATTRACTAP_FIRMWARE_VARIANT STREQUAL "demo")

@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import * as semver from 'semver';
 import { z } from 'zod';
 import { PluginDependenciesSchema } from '../runtime/dependencies';
+import { dashboardPathsSchema, dashboardWidgetsSchema } from '../runtime/manifest-schema';
 import { PluginManifest, PluginManifestSchema } from '../plugin.manifest';
 import { PluginLicenseDeclarationSchema } from '../license/plugin-license';
 
@@ -33,6 +34,8 @@ const packageSchema = z
       frontend: entryPath.optional(),
       migrations: entryPath.optional(),
       styles: entryPath.optional(),
+      dashboardPaths: dashboardPathsSchema.optional(),
+      dashboardWidgets: dashboardWidgetsSchema.optional(),
       permissions: z.array(z.nativeEnum(PluginPermission)).default([]),
       // npm installs get a synthesized plugin.json, so the license requirement travels in package.json.
       license: PluginLicenseDeclarationSchema.optional(),
@@ -90,6 +93,8 @@ export function parseNpmPluginPackage(
             ...(pkg.attraccess.styles
               ? { styles: styleForFrontend(pkg.attraccess.frontend, pkg.attraccess.styles) }
               : {}),
+            ...(pkg.attraccess.dashboardPaths ? { dashboardPaths: pkg.attraccess.dashboardPaths } : {}),
+            ...(pkg.attraccess.dashboardWidgets ? { dashboardWidgets: pkg.attraccess.dashboardWidgets } : {}),
           },
         }
       : {}),

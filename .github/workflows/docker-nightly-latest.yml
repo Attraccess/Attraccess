@@ -100,18 +100,7 @@ jobs:
   # The single publish gate: plugins and the server image publish from the same outcome.
   # A failed or cancelled job blocks; a skipped one (HIL variable off) does not.
   publish-gate:
-    needs:
-      [
-        lint,
-        typecheck,
-        test,
-        build,
-        plugins,
-        build-companion,
-        build-attractap-firmware,
-        build-attractap-desktop,
-        attractap-lab-hil,
-      ]
+    needs: [lint, typecheck, test, build, plugins, build-companion, build-attractap-firmware, attractap-lab-hil]
     if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     runs-on: ubuntu-latest
     steps:
@@ -142,9 +131,6 @@ jobs:
   build-companion:
     uses: ./.github/workflows/build-companion-binaries.yml
     secrets: inherit
-
-  build-attractap-desktop:
-    uses: ./.github/workflows/build-attractap-desktop.yml
 
   attractap-lab-hil:
     # Real reader firmware against the NFC card emulator in the Attractap lab;

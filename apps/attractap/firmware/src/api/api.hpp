@@ -56,8 +56,6 @@ protected:
     std::function<void(const ResourceUsageFormRequest &)> resourceFormsRequestCallback;
     std::function<void(const ResourceUsageFormFieldsPage &)> resourceFormFieldsCallback;
     std::function<void(const ResourceUsageFormPageResult &)> resourceFormPageResultCallback;
-    bool crashReportAwaitingAck = false;
-    bool crashReportSentCoredump = false;
     std::function<void(std::string username)> enrollNewCardGetAvailableKeyNoCallback;
     std::function<void()> enrollNewCardSucceededCallback;
     std::function<void(std::string error)> enrollNewCardErrorCallback;
@@ -80,7 +78,9 @@ protected:
 #include "../state/state.hpp"
 #include "../logger/logger.hpp"
 #include "reader_transport.hpp"
+#include "diagnostics/coredump-upload.hpp"
 #include "../utils.hpp"
+#include <memory>
 #ifdef ATTRACTAP_HOST
 class HostOtaUpdater
 {
@@ -271,12 +271,6 @@ private:
     void onServerTime(JsonVariantConst serverTime);
     void sendFirmwareInfo();
 
-    // Persisted crash/boot diagnostics upload (ATT-474). On a successful
-    // connect the stored NVS record + (if present) the coredump blob are
-    // pushed to the server; both are cleared once the server confirms receipt.
-    void sendPendingCrashReport();
-    void onCrashReportResponse(JsonObject data);
-
     void onResourceList(JsonObject data);
     void onProjectsOfUserResponse(JsonObject data);
     void onCardAuthenticationDetailsResponse(JsonObject data);
@@ -311,4 +305,10 @@ private:
 #else
     OtaUpdater firmware;
 #endif
+
+    // Persisted crash/boot diagnostics upload (ATT-474, ATT-1144). After each
+    // sign-in the stored NVS record goes up, then its coredump in chunks, one per
+    // loop iteration; both are cleared only once the server stored them.
+    std::unique_ptr<crashupload::Ports> crashUploadPorts;
+    crashupload::Uploader crashUploader;
 };

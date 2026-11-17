@@ -5,8 +5,7 @@ import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import babel from '@rolldown/plugin-babel';
 import dts from 'vite-plugin-dts';
 import * as path from 'path';
-import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
-import { nxCopyAssetsPlugin } from '@nx/vite/plugins/nx-copy-assets.plugin';
+import { copyAssets } from '../../tools/vite/copy-assets.plugin';
 
 const sharedLibs = [
   'react',
@@ -21,13 +20,15 @@ const sharedLibs = [
 ];
 
 export default defineConfig({
+  resolve: {
+    tsconfigPaths: true,
+  },
   root: __dirname,
   cacheDir: '../../node_modules/.vite/libs/plugins-frontend-sdk',
   plugins: [
     react(),
     babel({ presets: [reactCompilerPreset()] }),
-    nxViteTsPaths(),
-    nxCopyAssetsPlugin(['*.md']),
+    copyAssets(['*.md']),
     dts({ entryRoot: 'src', tsconfigPath: path.join(__dirname, 'tsconfig.lib.json') }),
   ],
   // Uncomment this if you are using workers.
@@ -52,7 +53,7 @@ export default defineConfig({
       // Don't forget to update your package.json as well.
       formats: ['es'],
     },
-    rollupOptions: {
+    rolldownOptions: {
       // External packages that should not be bundled into your library.
       external: sharedLibs,
     },

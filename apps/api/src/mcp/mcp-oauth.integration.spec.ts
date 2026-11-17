@@ -1,6 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { TokenHashService } from '../encryption/token-hash.service';
 import { McpOAuthGrant } from '@attraccess/database-entities';
 import { McpOAuthService } from './mcp-oauth.service';
+import { McpRateLimitGuard } from './mcp-rate-limit.guard';
 import { McpTestApp, startMcpTestApp } from './mcp-app.test-fixture';
 
 const PUBLIC_URL = 'http://localhost:3000';
@@ -22,6 +24,12 @@ describe('MCP OAuth (real application)', () => {
 
   afterAll(async () => {
     await t?.close();
+  });
+
+  // Every request comes from 127.0.0.1: start each test with fresh windows so that the suite never trips the per-IP
+  // limits by its size alone. The limiter tests count within one test.
+  beforeEach(() => {
+    t.app.get(McpRateLimitGuard)['counters'].clear();
   });
 
   // Registration is rate limited per IP, so flows register through the service; the HTTP endpoint has its own tests.
@@ -108,6 +116,13 @@ describe('MCP OAuth (real application)', () => {
         expect(response.body.scopes_supported).toContain('resources.read');
       }
     });
+
+    it('tells a signed-in user the MCP URL and that OAuth sign-in works', async () => {
+      const session = await t.createSessionToken(await t.createUser([]));
+      const response = await t.http.get('/api/mcp/connection').set('Cookie', `auth-session=${session}`).expect(200);
+      expect(response.body).toEqual({ url: RESOURCE, oauthEnabled: true });
+      await t.http.get('/api/mcp/connection').expect(401);
+    });
   });
 
   describe('dynamic client registration', () => {
@@ -138,15 +153,31 @@ describe('MCP OAuth (real application)', () => {
   });
 
   describe('authorization', () => {
-    it('shows an error page, never a redirect, for an unknown client or unregistered redirect URI', async () => {
+    it('sends an unknown client or unregistered redirect URI to the Attraccess error page, never to the URI', async () => {
       const { challenge } = pkce();
       const unknown = await authorize('nobody', challenge);
-      expect(unknown.status).toBe(400);
-      expect(unknown.headers.location).toBeUndefined();
+      expect(unknown.status).toBe(302);
+      expect(unknown.headers.location).toBe(`${PUBLIC_URL}/oauth/error?error=invalid_client`);
       const clientId = await register();
       const wrongRedirect = await authorize(clientId, challenge, { redirect_uri: 'http://127.0.0.1:9/evil' });
-      expect(wrongRedirect.status).toBe(400);
-      expect(wrongRedirect.headers.location).toBeUndefined();
+      expect(wrongRedirect.status).toBe(302);
+      expect(wrongRedirect.headers.location).toBe(`${PUBLIC_URL}/oauth/error?error=invalid_redirect_uri`);
+    });
+
+    it('does not bounce errors to a self-registered https redirect URI without the user (no open redirect)', async () => {
+      const external = 'https://client.example/callback';
+      const clientId = await register([external]);
+      const response = await authorize(clientId, pkce().challenge, { redirect_uri: external, resource: '' });
+      expect(response.status).toBe(302);
+      expect(response.headers.location).toBe(`${PUBLIC_URL}/oauth/error?error=invalid_target`);
+    });
+
+    it('refuses an over-long state without echoing it', async () => {
+      const clientId = await register();
+      const response = await authorize(clientId, pkce().challenge, { state: 'x'.repeat(1025) });
+      const location = new URL(response.headers.location);
+      expect(location.searchParams.get('error')).toBe('invalid_request');
+      expect(location.searchParams.has('state')).toBe(false);
     });
 
     it.each([
@@ -190,7 +221,8 @@ describe('MCP OAuth (real application)', () => {
         clientName: 'Test client',
         redirectHost: '127.0.0.1:8123',
         loopbackRedirect: true,
-        permissions: ['users.roles.manage'],
+        registeredByOperator: false,
+        permissions: [expect.objectContaining({ key: 'users.roles.manage', category: 'users' })],
         unavailablePermissions: [],
         resource: RESOURCE,
       });
@@ -284,6 +316,7 @@ describe('MCP OAuth (real application)', () => {
       // Refresh rotates the token.
       const refreshed = await tokenRequest({
         grant_type: 'refresh_token',
+        resource: RESOURCE,
         client_id: clientId,
         refresh_token: tokens.body.refresh_token,
       });
@@ -294,6 +327,7 @@ describe('MCP OAuth (real application)', () => {
       // Replaying the rotated token fails and ends the whole family.
       const replay = await tokenRequest({
         grant_type: 'refresh_token',
+        resource: RESOURCE,
         client_id: clientId,
         refresh_token: tokens.body.refresh_token,
       });
@@ -302,6 +336,7 @@ describe('MCP OAuth (real application)', () => {
       expect((await t.callTool(refreshed.body.access_token, 'listRoles')).status).toBe(401);
       const afterRevoke = await tokenRequest({
         grant_type: 'refresh_token',
+        resource: RESOURCE,
         client_id: clientId,
         refresh_token: refreshed.body.refresh_token,
       });
@@ -315,7 +350,9 @@ describe('MCP OAuth (real application)', () => {
       const stored = rows.map((row: { tokenHash: string }) => row.tokenHash);
       expect(stored).not.toContain(tokens.body.access_token);
       expect(stored).not.toContain(tokens.body.refresh_token);
-      expect(stored).toContain(createHash('sha256').update(tokens.body.access_token).digest('hex'));
+      // Keyed hashes (HMAC-SHA-256, base64url), like session and API tokens.
+      expect(stored).toContain(t.app.get(TokenHashService).hashMcpToken(tokens.body.access_token));
+      expect(stored.every((hash: string) => /^[A-Za-z0-9_-]{43}$/.test(hash))).toBe(true);
     });
 
     it.each([
@@ -405,6 +442,7 @@ describe('MCP OAuth (real application)', () => {
       expect((await t.callTool(tokens.body.access_token, 'listRoles')).status).toBe(401);
       const refreshed = await tokenRequest({
         grant_type: 'refresh_token',
+        resource: RESOURCE,
         client_id: clientId,
         refresh_token: tokens.body.refresh_token,
       });
@@ -415,6 +453,7 @@ describe('MCP OAuth (real application)', () => {
       expect((await t.callTool(refreshed.body.access_token, 'listRoles')).status).toBe(401);
       const expired = await tokenRequest({
         grant_type: 'refresh_token',
+        resource: RESOURCE,
         client_id: clientId,
         refresh_token: refreshed.body.refresh_token,
       });
@@ -444,17 +483,109 @@ describe('MCP OAuth (real application)', () => {
       await t.db.query(`UPDATE "user" SET isDisabled = 1 WHERE id = ?`, [user.id]);
       expect((await t.callTool(tokens.body.access_token, 'listRoles')).status).toBe(401);
     });
+
+    it('does not refresh the tokens of a disabled user and ends the grant', async () => {
+      const user = await t.createUser(ADMIN_PERMISSIONS);
+      const { clientId, tokens } = await fullFlow(user.id);
+      await t.db.query(`UPDATE "user" SET isDisabled = 1 WHERE id = ?`, [user.id]);
+      const refreshed = await tokenRequest({
+        grant_type: 'refresh_token',
+        client_id: clientId,
+        refresh_token: tokens.body.refresh_token,
+        resource: RESOURCE,
+      });
+      expect(refreshed.status).toBe(400);
+      expect(refreshed.body.error).toBe('invalid_grant');
+      // The grant is gone for good: re-enabling the user does not bring the old tokens back.
+      await t.db.query(`UPDATE "user" SET isDisabled = 0 WHERE id = ?`, [user.id]);
+      expect((await t.callTool(tokens.body.access_token, 'listRoles')).status).toBe(401);
+    });
+  });
+
+  describe('grant lifecycle', () => {
+    it('requires the resource on refresh as well', async () => {
+      const user = await t.createUser(ADMIN_PERMISSIONS);
+      const { clientId, tokens } = await fullFlow(user.id);
+      const refreshed = await tokenRequest({
+        grant_type: 'refresh_token',
+        client_id: clientId,
+        refresh_token: tokens.body.refresh_token,
+      });
+      expect(refreshed.status).toBe(400);
+      expect(refreshed.body.error).toBe('invalid_target');
+    });
+
+    it('refuses a write the grant does not cover and changes nothing', async () => {
+      const user = await t.createUser(ADMIN_PERMISSIONS);
+      const { tokens } = await fullFlow(user.id, 'users.roles.manage');
+      const before = await t.db.query(`SELECT COUNT(*) AS n FROM role`);
+      const denied = (
+        await t.callTool(tokens.body.access_token, 'createRole', { name: 'From MCP', permissionKeys: [] })
+      ).body.result;
+      expect(denied.isError).toBe(true);
+      expect(denied.content[0].text).toMatch(/^HTTP 403 Forbidden/);
+      expect(await t.db.query(`SELECT COUNT(*) AS n FROM role`)).toEqual(before);
+    });
+
+    it('ends the grants of a deleted user', async () => {
+      const user = await t.createUser(ADMIN_PERMISSIONS);
+      const { tokens } = await fullFlow(user.id);
+      await t.db.query(`DELETE FROM "user" WHERE id = ?`, [user.id]);
+      expect((await t.callTool(tokens.body.access_token, 'listRoles')).status).toBe(401);
+      expect(await t.db.query(`SELECT id FROM mcp_oauth_grant WHERE userId = ?`, [user.id])).toEqual([]);
+    });
+
+    it('serves a client from MCP_OAUTH_CLIENTS and ends its grants once the operator removes it', async () => {
+      const oauth = t.app.get(McpOAuthService);
+      const staticClients = oauth['staticClients'];
+      staticClients.set('inspector', {
+        clientId: 'inspector',
+        clientName: 'Inspector',
+        redirectUris: [REDIRECT],
+        isStatic: true,
+      });
+      try {
+        const user = await t.createUser(ADMIN_PERMISSIONS);
+        const { verifier, challenge } = pkce();
+        const started = await authorize('inspector', challenge);
+        const approved = await consent(user.id, started.headers.location, 'approve');
+        const code = new URL(approved.body.redirectUrl).searchParams.get('code') as string;
+        const tokens = await tokenRequest({
+          grant_type: 'authorization_code',
+          client_id: 'inspector',
+          code,
+          redirect_uri: REDIRECT,
+          code_verifier: verifier,
+          resource: RESOURCE,
+        });
+        expect(tokens.status).toBe(200);
+        expect((await t.callTool(tokens.body.access_token, 'listRoles')).body.result.isError).toBeUndefined();
+
+        staticClients.delete('inspector');
+        const refreshed = await tokenRequest({
+          grant_type: 'refresh_token',
+          client_id: 'inspector',
+          refresh_token: tokens.body.refresh_token,
+          resource: RESOURCE,
+        });
+        expect(refreshed.body.error).toBe('invalid_grant');
+        expect((await t.callTool(tokens.body.access_token, 'listRoles')).status).toBe(401);
+      } finally {
+        staticClients.delete('inspector');
+      }
+    });
   });
 
   describe('rate limiting', () => {
-    it('limits open client registration per IP', async () => {
-      let limited = false;
-      for (let i = 0; i < 40 && !limited; i++) {
-        const response = await t.http.post('/api/mcp/oauth/register').send({ redirect_uris: [REDIRECT] });
-        limited = response.status === 429;
-        if (limited) expect(response.headers['retry-after']).toBeDefined();
+    it('allows 20 open client registrations per IP and hour, then answers 429', async () => {
+      for (let i = 0; i < 20; i++) {
+        expect((await t.http.post('/api/mcp/oauth/register').send({ redirect_uris: [REDIRECT] })).status).toBe(201);
       }
-      expect(limited).toBe(true);
+      // Other limits starting new windows must not reset the hourly registration window.
+      await t.http.get('/.well-known/oauth-authorization-server').expect(200);
+      const refused = await t.http.post('/api/mcp/oauth/register').send({ redirect_uris: [REDIRECT] });
+      expect(refused.status).toBe(429);
+      expect(refused.headers['retry-after']).toBeDefined();
     });
   });
 });

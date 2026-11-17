@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
-import { PageHeader } from './index';
+import { PageHeader, PageHeaderAccessoryProvider } from './index';
 
 vi.mock('../../i18n', () => ({
   useTranslations: () => ({ t: (key: string) => (key === 'more' ? 'More actions' : key), language: 'en' }),
@@ -78,5 +78,71 @@ describe('PageHeader', () => {
 
     renderAt(<PageHeader title="Devices" actions={[{ key: 'add', label: 'Add device', onPress, isHidden: true }]} />);
     expect(screen.queryByRole('button', { name: 'Add device' })).toBeNull();
+  });
+});
+
+describe('PageHeader host accessory', () => {
+  const Pin = () => <button type="button">Pin page</button>;
+
+  it('shows the accessory once, in the first header of the page', () => {
+    renderAt(
+      <PageHeaderAccessoryProvider accessory={Pin}>
+        <PageHeader title="Devices" />
+        <section>
+          <PageHeader title="Active devices" noMargin />
+        </section>
+      </PageHeaderAccessoryProvider>,
+    );
+
+    const buttons = screen.getAllByRole('button', { name: 'Pin page' });
+    expect(buttons).toHaveLength(1);
+    expect(screen.getByRole('heading', { name: 'Devices' }).closest('[class*="justify-between"]')).toContainElement(
+      buttons[0],
+    );
+  });
+
+  it('moves the accessory to the next header when the first one unmounts', () => {
+    const { rerender } = renderAt(
+      <PageHeaderAccessoryProvider accessory={Pin}>
+        <PageHeader key="loading" title="Loading" />
+        <PageHeader key="section" title="Section" />
+      </PageHeaderAccessoryProvider>,
+    );
+    const sectionHeader = () => screen.getByRole('heading', { name: 'Section' }).closest('[class*="justify-between"]');
+    expect(sectionHeader()).not.toContainElement(screen.getByRole('button', { name: 'Pin page' }));
+    rerender(
+      <MemoryRouter initialEntries={['/current']}>
+        <Routes>
+          <Route
+            path="/current"
+            element={
+              <PageHeaderAccessoryProvider accessory={Pin}>
+                <PageHeader key="section" title="Section" />
+              </PageHeaderAccessoryProvider>
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getAllByRole('button', { name: 'Pin page' })).toHaveLength(1);
+    expect(sectionHeader()).toContainElement(screen.getByRole('button', { name: 'Pin page' }));
+  });
+
+  it('renders exactly as before without a provider', () => {
+    renderAt(<PageHeader title="Devices" />);
+    const header = screen.getByRole('heading', { name: 'Devices' }).closest('[class*="justify-between"]');
+    // Only the title block: no (empty) action area.
+    expect(header?.children).toHaveLength(1);
+  });
+
+  it('shows the accessory before the actions', () => {
+    renderAt(
+      <PageHeaderAccessoryProvider accessory={Pin}>
+        <PageHeader title="Devices" actions={[{ key: 'add', label: 'Add device', onPress: vi.fn() }]} />
+      </PageHeaderAccessoryProvider>,
+    );
+    const buttons = screen.getAllByRole('button').map((button) => button.textContent);
+    expect(buttons.indexOf('Pin page')).toBeLessThan(buttons.indexOf('Add device'));
   });
 });
