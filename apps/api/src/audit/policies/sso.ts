@@ -1,5 +1,5 @@
 import { dataFields, positive, uuid, isAuthenticationMethod } from './projection';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 /** Projection input of an sso-domain event. */
 export type SsoAuditInput = {

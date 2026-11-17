@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { McpTestApp, startMcpTestApp } from './mcp-app.test-fixture';
+import { McpTestApp, startMcpTestApp } from '../test-utils/mcp-app.test-fixture';
 
 // A plain-HTTP deployment on a LAN address: neither https nor loopback.
 const PUBLIC_URL = 'http://192.168.1.50:3000';

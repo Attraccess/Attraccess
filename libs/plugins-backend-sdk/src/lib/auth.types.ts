@@ -1,5 +1,7 @@
-import type { PluginUserModel } from '@attraccess/application-models';
+import type { AuthenticationMethod, PluginUserModel } from '@attraccess/application-models';
 import { Request as BaseRequest } from 'express';
+
+export type { AuthenticationMethod };
 
 /**
  * Extension point of the host application: the core augments it with its own user record. Plugins see only the
@@ -10,7 +12,7 @@ export interface AuthenticatedUserExtensions {}
 
 export interface AuthenticatedUser extends PluginUserModel, AuthenticatedUserExtensions {
   jwtTokenId: string;
-  authenticationMethod?: 'session' | 'api-token';
+  authenticationMethod?: AuthenticationMethod;
   apiTokenId?: number;
   /**
    * Effective permissions for this user. Stored as a Set for O(1) has() lookups.

@@ -1,8 +1,8 @@
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { AUTHENTICATION_METHODS, type AuthenticationMethod } from '@attraccess/application-models';
 
-/** How a principal authenticated. Extend this list (not a copy of it) when a new method is added. */
-export const AUTHENTICATION_METHODS = ['session', 'api-token', 'mcp-oauth'] as const;
-export type AuthenticationMethod = (typeof AUTHENTICATION_METHODS)[number];
+export { AUTHENTICATION_METHODS };
+export type { AuthenticationMethod };
 
 /** Historical identifiers deliberately have no foreign keys or cascade relations. */
 @Entity('audit_log')

@@ -2,7 +2,7 @@ import type { PluginAuditEvent } from '@attraccess/plugins-backend-sdk';
 import { CompiledPluginAuditField, getPluginAuditDomain } from '../../plugin-system/audit/audit-registry';
 import { AUDIT_DOMAIN_QUERY_PATTERN } from './domains';
 import { dataFields, positive, uuid, withinDetailsLimit, isAuthenticationMethod } from './projection';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 export interface ProjectedPluginAuditEvent {
   domain: string;

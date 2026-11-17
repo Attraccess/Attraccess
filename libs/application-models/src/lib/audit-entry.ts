@@ -1,6 +1,10 @@
 export type AuditOutcome = 'attempted' | 'succeeded' | 'failed';
 
-export type AuditAuthenticationMethod = 'session' | 'api-token';
+/** How a principal authenticated. Extend this list (not a copy of it) when a new method is added. */
+export const AUTHENTICATION_METHODS = ['session', 'api-token', 'mcp-oauth'] as const;
+export type AuthenticationMethod = (typeof AUTHENTICATION_METHODS)[number];
+
+export type AuditAuthenticationMethod = AuthenticationMethod;
 
 export type AuditEntryDetails = Record<string, string | number | boolean | null>;
 

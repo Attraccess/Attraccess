@@ -21,7 +21,7 @@ import { NotificationCategory } from '../../../notifications/notification-types'
 import { UpdateResourceGroupIntroductionDto } from './dtos/update.request.dto';
 
 import { ResourceGroupIntroductionChangedEvent } from './events/resource-group-introduction-changed.event';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 import {
   RESOURCE_INTRODUCTION_STORE,

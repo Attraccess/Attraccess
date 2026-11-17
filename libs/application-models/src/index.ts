@@ -74,3 +74,4 @@ export * from './lib/api-token';
 export * from './lib/authentication-credential';
 export * from './lib/password-policy-records';
 export * from './lib/user-account';
+export * from './lib/mcp-oauth';

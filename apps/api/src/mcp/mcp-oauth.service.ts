@@ -1,12 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
-import { LessThan, Repository } from 'typeorm';
-import { McpOAuthClient, McpOAuthGrant, McpOAuthToken, User } from '@attraccess/database-entities';
-import type { McpOAuthTokenKind } from '@attraccess/database-entities';
+import type { McpOAuthGrantRecord, McpOAuthTokenKind, McpOAuthTokenRecord } from '@attraccess/application-models';
 import type { AppConfigType } from '../config/app.config';
 import { TokenHashService } from '../encryption/token-hash.service';
+import {
+  SESSION_USER_DIRECTORY,
+  SessionUserDirectory,
+} from '../users-and-auth/auth/session-store/session-user-directory.port';
 import { RbacService } from '../users-and-auth/rbac/rbac.service';
 import type { McpDelegation } from '../users-and-auth/strategies/mcp-delegation';
 import {
@@ -28,6 +29,7 @@ import {
   randomSecret,
   verifyPkceS256,
 } from './mcp-oauth-rules';
+import { MCP_OAUTH_STORE, McpOAuthStore } from './mcp-oauth.port';
 
 export type McpOAuthErrorCode =
   | 'invalid_request'
@@ -147,10 +149,8 @@ export class McpOAuthService {
   constructor(
     config: ConfigService,
     private readonly rbac: RbacService,
-    @InjectRepository(McpOAuthClient) private readonly clients: Repository<McpOAuthClient>,
-    @InjectRepository(McpOAuthGrant) private readonly grants: Repository<McpOAuthGrant>,
-    @InjectRepository(McpOAuthToken) private readonly tokens: Repository<McpOAuthToken>,
-    @InjectRepository(User) private readonly users: Repository<User>,
+    @Inject(MCP_OAUTH_STORE) private readonly oauthStore: McpOAuthStore,
+    @Inject(SESSION_USER_DIRECTORY) private readonly users: SessionUserDirectory,
     private readonly tokenHash: TokenHashService,
   ) {
     try {
@@ -169,7 +169,7 @@ export class McpOAuthService {
     if (!clientId || clientId.length > 200) return null;
     const fixed = this.staticClients.get(clientId);
     if (fixed) return fixed;
-    const stored = await this.clients.findOneBy({ clientId });
+    const stored = await this.oauthStore.findClient(clientId);
     return stored
       ? { clientId: stored.clientId, clientName: stored.clientName, redirectUris: stored.redirectUris, isStatic: false }
       : null;
@@ -216,20 +216,18 @@ export class McpOAuthService {
         .trim()
         .slice(0, 120) || 'MCP client';
     void this.purgeExpired();
-    if ((await this.clients.count()) >= MAX_REGISTERED_CLIENTS) {
-      await this.pruneUnusedClients();
-      if ((await this.clients.count()) >= MAX_REGISTERED_CLIENTS) {
-        throw new McpOAuthError('invalid_client_metadata', 'Too many registered clients', 503);
-      }
-    }
-    const client = await this.clients.save(
-      this.clients.create({
+    const client = await this.oauthStore.registerClient(
+      {
         clientId: randomUUID(),
         clientName,
         redirectUris: [...new Set(redirectUris)],
         registeredIp: ip,
-      }),
+      },
+      MAX_REGISTERED_CLIENTS,
+      // Drops registrations that never obtained a grant and are older than a day.
+      new Date(Date.now() - 24 * 60 * 60 * 1000),
     );
+    if (!client) throw new McpOAuthError('invalid_client_metadata', 'Too many registered clients', 503);
     return {
       client_id: client.clientId,
       client_id_issued_at: Math.floor(client.createdAt.getTime() / 1000),
@@ -239,16 +237,6 @@ export class McpOAuthService {
       grant_types: ['authorization_code', 'refresh_token'],
       response_types: ['code'],
     };
-  }
-
-  /** Drops registrations that never obtained a grant and are older than a day. */
-  private async pruneUnusedClients(): Promise<void> {
-    await this.clients
-      .createQueryBuilder()
-      .delete()
-      .where('createdAt < :cutoff', { cutoff: new Date(Date.now() - 24 * 60 * 60 * 1000) })
-      .andWhere('clientId NOT IN (SELECT clientId FROM mcp_oauth_grant)')
-      .execute();
   }
 
   // --- authorization request -------------------------------------------------------------------
@@ -350,18 +338,14 @@ export class McpOAuthService {
         }),
       };
     }
-    const grant = await this.grants.save(
-      this.grants.create({
-        id: randomUUID(),
-        userId: user.id,
-        clientId: payload.clientId,
-        permissionKeys: requested,
-        resource: payload.resource,
-        expiresAt: new Date(Date.now() + GRANT_LIFETIME_MS),
-        lastUsedAt: null,
-        revokedAt: null,
-      }),
-    );
+    const grant = await this.oauthStore.createGrant({
+      id: randomUUID(),
+      userId: user.id,
+      clientId: payload.clientId,
+      permissionKeys: requested,
+      resource: payload.resource,
+      expiresAt: new Date(Date.now() + GRANT_LIFETIME_MS),
+    });
     const code = randomSecret(AUTHORIZATION_CODE_PREFIX);
     const codePayload: CodePayload = {
       clientId: payload.clientId,
@@ -409,7 +393,7 @@ export class McpOAuthService {
       throw new McpOAuthError('invalid_request', 'client_id, code, redirect_uri and code_verifier are required');
     }
     if (input.resource !== resource) throw new McpOAuthError('invalid_target', `resource must be ${resource}`);
-    const row = await this.tokens.findOneBy({ tokenHash: this.hash(input.code), kind: 'code' });
+    const row = await this.oauthStore.findToken(this.hash(input.code), 'code');
     if (!row?.grantId) throw new McpOAuthError('invalid_grant', 'Invalid authorization code');
     const consumed = await this.consume(row.tokenHash);
     if (!consumed) {
@@ -418,7 +402,7 @@ export class McpOAuthService {
       throw new McpOAuthError('invalid_grant', 'Authorization code was already used');
     }
     const payload = row.payload as CodePayload | null;
-    const grant = await this.grants.findOneBy({ id: row.grantId });
+    const grant = await this.oauthStore.findGrant(row.grantId);
     if (
       !payload ||
       !grant ||
@@ -443,9 +427,9 @@ export class McpOAuthService {
     }
     // RFC 8707 on every token request, refreshes included, so no token is ever minted for another audience.
     if (input.resource !== resource) throw new McpOAuthError('invalid_target', `resource must be ${resource}`);
-    const row = await this.tokens.findOneBy({ tokenHash: this.hash(input.refreshToken), kind: 'refresh' });
+    const row = await this.oauthStore.findToken(this.hash(input.refreshToken), 'refresh');
     if (!row?.grantId) throw new McpOAuthError('invalid_grant', 'Invalid refresh token');
-    const grant = await this.grants.findOneBy({ id: row.grantId });
+    const grant = await this.oauthStore.findGrant(row.grantId);
     if (
       !grant ||
       grant.revokedAt ||
@@ -455,7 +439,7 @@ export class McpOAuthService {
     ) {
       throw new McpOAuthError('invalid_grant', 'The grant is no longer valid');
     }
-    const user = await this.users.findOneBy({ id: grant.userId });
+    const user = await this.users.findSessionUser(grant.userId);
     // The owner was deleted or disabled, or the operator removed the client from MCP_OAUTH_CLIENTS: nothing this grant
     // issues should be accepted any more, so end it instead of rotating.
     if (!user || user.isDisabled || !(await this.findClient(grant.clientId))) {
@@ -472,7 +456,7 @@ export class McpOAuthService {
     return this.issueTokens(grant);
   }
 
-  private async issueTokens(grant: McpOAuthGrant): Promise<TokenResponse> {
+  private async issueTokens(grant: McpOAuthGrantRecord): Promise<TokenResponse> {
     const accessToken = randomSecret(ACCESS_TOKEN_PREFIX);
     const refreshToken = randomSecret(REFRESH_TOKEN_PREFIX);
     const now = Date.now();
@@ -493,23 +477,22 @@ export class McpOAuthService {
   /** Resolves an MCP access token for the given audience, or `null`. Never throws for an unknown token. */
   async authenticateAccessToken(token: string, resource: string): Promise<McpDelegation | null> {
     if (!token.startsWith(ACCESS_TOKEN_PREFIX)) return null;
-    const row = await this.tokens.findOneBy({ tokenHash: this.hash(token), kind: 'access' });
+    const row = await this.oauthStore.findToken(this.hash(token), 'access');
     if (!row?.grantId || row.expiresAt <= new Date()) return null;
-    const grant = await this.grants.findOneBy({ id: row.grantId });
+    const grant = await this.oauthStore.findGrant(row.grantId);
     if (!grant || grant.revokedAt || grant.expiresAt <= new Date()) return null;
     // Audience binding: a token issued for another resource is never accepted here.
     if (grant.resource !== resource) return null;
-    const user = await this.users.findOneBy({ id: grant.userId });
+    const user = await this.users.findSessionUser(grant.userId);
     if (!user || user.isDisabled) return null;
     if (!grant.lastUsedAt || Date.now() - grant.lastUsedAt.getTime() >= LAST_USED_WRITE_INTERVAL_MS) {
-      await this.grants.update({ id: grant.id }, { lastUsedAt: new Date() });
+      await this.oauthStore.touchGrant(grant.id, new Date());
     }
     return { user, permissionKeys: grant.permissionKeys, grantId: grant.id, clientId: grant.clientId };
   }
 
   async revokeGrant(grantId: string): Promise<void> {
-    await this.grants.update({ id: grantId }, { revokedAt: new Date() });
-    await this.tokens.delete({ grantId });
+    await this.oauthStore.revokeGrant(grantId, new Date());
   }
 
   // --- storage helpers -------------------------------------------------------------------------
@@ -525,29 +508,22 @@ export class McpOAuthService {
     ttlMs: number,
     grantId: string | null = null,
   ): Promise<void> {
-    await this.tokens.insert({
+    await this.oauthStore.insertToken({
       tokenHash: this.hash(secret),
       kind,
       grantId,
       payload,
       expiresAt: new Date(Date.now() + ttlMs),
-      usedAt: null,
     });
   }
 
   /** Atomically marks a single-use value as used. False when somebody else already did. */
   private async consume(tokenHash: string): Promise<boolean> {
-    const result = await this.tokens
-      .createQueryBuilder()
-      .update(McpOAuthToken)
-      .set({ usedAt: new Date() })
-      .where('tokenHash = :tokenHash AND usedAt IS NULL', { tokenHash })
-      .execute();
-    return result.affected === 1;
+    return this.oauthStore.consumeToken(tokenHash, new Date());
   }
 
-  private async loadRequest(requestId: string): Promise<{ payload: RequestPayload; token: McpOAuthToken }> {
-    const token = await this.tokens.findOneBy({ tokenHash: this.hash(requestId), kind: 'request' });
+  private async loadRequest(requestId: string): Promise<{ payload: RequestPayload; token: McpOAuthTokenRecord }> {
+    const token = await this.oauthStore.findToken(this.hash(requestId), 'request');
     if (!token?.payload || token.usedAt || token.expiresAt <= new Date()) {
       throw new McpOAuthError('not_found', 'This authorization request has expired or was already answered', 404);
     }
@@ -568,9 +544,7 @@ export class McpOAuthService {
     try {
       const now = Date.now();
       // Anyone can open an authorization request, so unanswered ones must not pile up.
-      await this.tokens.delete({ kind: 'request', expiresAt: LessThan(new Date(now)) });
-      await this.tokens.delete({ expiresAt: LessThan(new Date(now - PURGE_GRACE_MS)) });
-      await this.grants.delete({ expiresAt: LessThan(new Date(now - PURGE_GRACE_MS)) });
+      await this.oauthStore.purgeExpired(new Date(now), new Date(now - PURGE_GRACE_MS));
     } catch (error) {
       this.logger.warn(`Could not purge expired MCP OAuth data: ${(error as Error).message}`);
     }

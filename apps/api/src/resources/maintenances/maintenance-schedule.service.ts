@@ -13,7 +13,7 @@ import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-eval
 import { CreateMaintenanceScheduleDto } from './dtos/create-maintenance-schedule.dto';
 
 import { UpdateMaintenanceScheduleDto } from './dtos/update-maintenance-schedule.dto';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 import {
   MAINTENANCE_SCHEDULE_STORE,

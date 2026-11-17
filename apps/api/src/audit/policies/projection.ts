@@ -1,4 +1,4 @@
-import { AUTHENTICATION_METHODS, type AuthenticationMethod } from '@attraccess/database-entities';
+import { AUTHENTICATION_METHODS, type AuthenticationMethod } from '@attraccess/application-models';
 
 /** Shared low-level projection primitives for audit policies. Never serialize caller objects directly. */
 

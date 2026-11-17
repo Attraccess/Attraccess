@@ -44,6 +44,7 @@ export type {
   ReaderSupervisionCallbacks,
   ReaderSupervisionArmer,
 } from './supervision.types';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 @Injectable()
 export class SupervisionService {
@@ -133,7 +134,7 @@ export class SupervisionService {
   public async approve(
     requestId: string,
     supervisor: SupervisionUser,
-    authenticationMethod: 'session' | 'api-token' | null = 'session',
+    authenticationMethod: AuthenticationMethod | null = 'session',
     apiTokenId?: number,
   ): Promise<UsageSession> {
     const request = this.getPendingForSupervisorOrThrow(requestId, supervisor, { allowAnyAuthorized: true });
@@ -190,7 +191,7 @@ export class SupervisionService {
   public reject(
     requestId: string,
     supervisor: SupervisionUser,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): SupervisionDecisionResponseDto {
     const request = this.getPendingForSupervisorOrThrow(requestId, supervisor);

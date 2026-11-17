@@ -237,9 +237,12 @@ export class ResourceUsageController {
     @Body() dto: StartUsageSessionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<UsageSession> {
-    const origin = req.user.authenticationMethod === 'api-token' ? 'api' : 'web';
+    // Only a browser session is "web"; API-token and MCP clients are programmatic.
+    const origin =
+      req.user.authenticationMethod === undefined || req.user.authenticationMethod === 'session' ? 'web' : 'api';
     const confirmedStepKeys = await this.preStart.gateHttp(resourceId, req.user, dto, {
       origin,
+      authenticationMethod: req.user.authenticationMethod,
       ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
     });
     return this.resourceUsageService.startSession(resourceId, req.user, dto, {
@@ -282,7 +285,7 @@ export class ResourceUsageController {
       // Nobody can answer an after-stop question on web/API, also when a manager ends someone else's session.
       void this.sessionEnd.applyDefault(
         { resourceId, userId: ended.userId, sessionId: ended.id },
-        req.user.authenticationMethod === 'api-token' ? 'api' : 'web',
+        req.user.authenticationMethod === undefined || req.user.authenticationMethod === 'session' ? 'web' : 'api',
         req.user.locale,
       );
     }

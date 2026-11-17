@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import { EmailTemplateType } from '@attraccess/application-models';
 import { valid, validRange } from 'semver';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 import { isAuthenticationMethod } from './projection';
 
 /** URLs may carry credentials, query tokens or private paths: record the origin only. */
