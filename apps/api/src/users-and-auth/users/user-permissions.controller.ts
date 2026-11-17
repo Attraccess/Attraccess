@@ -12,12 +12,12 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { UserRole } from '@attraccess/database-entities';
 import { AuthenticatedRequest, Auth, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
 import { RbacService } from '../rbac/rbac.service';
 import { AssignRoleDto } from '../rbac/dtos/assign-role.dto';
 import { UserPermissionsService } from './user-permissions.service';
+import { UserRoleDto, toUserRoleDto } from './dtos/user.dto';
 import { auditOriginOf } from '../../audit/recorder/audit-event';
 
 @ApiTags('Users')
@@ -34,25 +34,25 @@ export class UserPermissionsController {
   @Get(':id/roles')
   @Auth('users.roles.manage')
   @ApiOperation({ summary: "Get a user's role assignments", operationId: 'getUserRoleAssignments' })
-  @ApiResponse({ status: 200, type: [UserRole] })
-  getUserRoles(@Param('id', ParseIntPipe) id: number): Promise<UserRole[]> {
-    return this.rbacService.getUserRoles(id);
+  @ApiResponse({ status: 200, type: [UserRoleDto] })
+  async getUserRoles(@Param('id', ParseIntPipe) id: number): Promise<UserRoleDto[]> {
+    return (await this.rbacService.getUserRoles(id)).map(toUserRoleDto);
   }
 
   @Post(':id/roles')
   @Auth('users.roles.manage')
   @ApiOperation({ summary: 'Assign a role to a user', operationId: 'assignRoleToUser' })
-  @ApiResponse({ status: 201, type: UserRole })
+  @ApiResponse({ status: 201, type: UserRoleDto })
   async assignRole(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: AssignRoleDto,
     @Req() request: AuthenticatedRequest,
-  ): Promise<UserRole> {
+  ): Promise<UserRoleDto> {
     const actor = request.user as AuthenticatedUser;
     if (actor.id === id) {
       throw new ForbiddenException('You cannot modify your own roles');
     }
-    return this.permissionsService.assignRole(id, body.roleId, actor, auditOriginOf(request));
+    return toUserRoleDto(await this.permissionsService.assignRole(id, body.roleId, actor, auditOriginOf(request)));
   }
 
   @Delete(':id/roles/:roleId')

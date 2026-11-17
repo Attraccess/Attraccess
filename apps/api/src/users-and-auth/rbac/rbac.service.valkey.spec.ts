@@ -20,9 +20,6 @@ describe('RbacService authorization cache invalidation', () => {
     const service = new TestRbacService(
       null as never,
       null as never,
-      null as never,
-      null as never,
-      null as never,
       { emit: jest.fn() } as never,
       valkeyClient,
       null as never,

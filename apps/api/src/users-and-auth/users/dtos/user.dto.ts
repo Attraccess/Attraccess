@@ -1,6 +1,7 @@
 import { AuthenticationType, SSOProviderType, UserRoleSource, type UserProfile } from '@attraccess/application-models';
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
-import { RoleDto } from '../../rbac/dtos/role.dto';
+import type { UserRoleRecord } from '@attraccess/application-models';
+import { RoleDto, toRoleDto } from '../../rbac/dtos/role.dto';
 
 /** The authentication detail schema of the API; secrets (password hash, TOTP secret) are not part of it. */
 @ApiSchema({ name: 'AuthenticationDetail' })
@@ -36,6 +37,10 @@ export class AuthenticationDetailDto {
 
 @ApiSchema({ name: 'UserRole' })
 export class UserRoleDto {
+  id!: number;
+
+  userId!: number;
+
   @ApiProperty({ description: 'ID of the assigned role' })
   roleId!: number;
 
@@ -61,6 +66,10 @@ export class UserRoleDto {
 
   @ApiPropertyOptional({ type: () => RoleDto, description: 'The role object, populated when loaded with relations' })
   role?: RoleDto;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
 }
 
 /** The user schema of the API. It lists only public fields: email, tokens and lockout state are never mapped. */
@@ -135,5 +144,20 @@ export function toUserDto(user: UserProfile): UserDto {
     externalIdentifier: user.externalIdentifier,
     creditBalance: user.creditBalance,
     billingFactor: user.billingFactor,
+  };
+}
+
+export function toUserRoleDto(userRole: UserRoleRecord): UserRoleDto {
+  return {
+    id: userRole.id,
+    userId: userRole.userId,
+    roleId: userRole.roleId,
+    source: userRole.source,
+    ssoProviderType: userRole.ssoProviderType,
+    ssoProviderId: userRole.ssoProviderId,
+    externalValue: userRole.externalValue,
+    createdAt: userRole.createdAt,
+    updatedAt: userRole.updatedAt,
+    ...(userRole.role ? { role: toRoleDto(userRole.role) } : {}),
   };
 }

@@ -1,10 +1,17 @@
+import type { PermissionRecord, RoleRecord, RoleWithUserCount } from '@attraccess/application-models';
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
 
 /** The role schema of the API. The OpenAPI schema names stay `Role`, `RolePermission` and `Permission`. */
 @ApiSchema({ name: 'RolePermission' })
 export class RolePermissionDto {
+  id!: number;
+
+  roleId!: number;
+
   @ApiProperty({ description: 'The permission key granted by this assignment', example: 'resources.read' })
   permissionKey!: string;
+
+  createdAt!: Date;
 }
 
 @ApiSchema({ name: 'Role' })
@@ -62,3 +69,39 @@ export class PermissionDto {
 
   updatedAt!: Date;
 }
+
+export function toRoleDto(role: RoleRecord): RoleDto {
+  return {
+    id: role.id,
+    key: role.key,
+    name: role.name,
+    description: role.description,
+    isSystemManaged: role.isSystemManaged,
+    isDefault: role.isDefault,
+    createdAt: role.createdAt,
+    updatedAt: role.updatedAt,
+    ...(role.rolePermissions
+      ? {
+          rolePermissions: role.rolePermissions.map((rp) => ({
+            id: rp.id,
+            roleId: rp.roleId,
+            permissionKey: rp.permissionKey,
+            createdAt: rp.createdAt,
+          })),
+        }
+      : {}),
+  };
+}
+
+export function toPermissionDto(permission: PermissionRecord): PermissionDto {
+  return {
+    key: permission.key,
+    label: permission.label,
+    description: permission.description,
+    category: permission.category,
+    createdAt: permission.createdAt,
+    updatedAt: permission.updatedAt,
+  };
+}
+
+export type { RoleWithUserCount };
