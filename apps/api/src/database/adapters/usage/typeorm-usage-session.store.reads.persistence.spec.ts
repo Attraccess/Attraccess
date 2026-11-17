@@ -184,14 +184,12 @@ describe('TypeOrmUsageSessionStore reads and ends', () => {
       const session = await a.store.findSessionForProjectChange(1, 2);
       expect(session).toMatchObject({ id: 2, user: { id: 2 }, resource: { id: 1 }, project: null });
 
-      expect(await a.store.assignProject(session as never, { id: 9 })).toMatchObject({
+      expect(await a.store.assignProject(2, 9)).toMatchObject({
         id: 2,
         projectId: 9,
         project: { id: 9 },
       });
-      expect(
-        await a.store.assignProject((await a.store.findSessionForProjectChange(1, 2)) as never, null),
-      ).toMatchObject({ id: 2, projectId: null, project: null });
+      expect(await a.store.assignProject(2, null)).toMatchObject({ id: 2, projectId: null, project: null });
       expect(await a.store.findSessionForProjectChange(2, 2)).toBeNull();
     });
   });

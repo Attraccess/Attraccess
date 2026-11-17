@@ -17,8 +17,6 @@ import {
   type StartCapacityOutcome,
 } from '../../../plugin-system/reader-ui/reader-ui-hooks.service';
 
-import { asLegacy } from '../legacy-seams';
-
 import { hookPrincipal } from '../pre-start/hook-principal';
 
 import { StartBlockedException } from '../pre-start/start-confirmation.errors';
@@ -216,7 +214,7 @@ export class UsageSessionStartPreparation {
           });
         }
 
-        await this.billingService.validateResourceUsageStart(resourceId, createdSession, asLegacy(user), scope);
+        await this.billingService.validateResourceUsageStart(resourceId, createdSession, user, scope);
         const attempt: UsageLifecycleAttempt = await this.sessions.saveAttempt(
           {
             id: attemptId,

@@ -1,5 +1,11 @@
 import { ResourceUsageAction } from '@attraccess/application-models';
-import type { UsageSession, UsageSessionResource, UsageSessionUser } from '@attraccess/application-models';
+import type {
+  ResourceRecord,
+  UsageSession,
+  UsageSessionUser,
+  UsageSessionUserRecord,
+  UserProfile,
+} from '@attraccess/application-models';
 
 import { SystemEvent } from '@attraccess/plugins-backend-sdk';
 
@@ -30,13 +36,11 @@ import {
   ResourceUsageSessionTakenOverEvent,
 } from '../events/resource-usage.events';
 
-import { emitPluginSessionEnded, emitPluginSessionStart } from '../events/plugin-usage-events';
+import { emitPluginSessionEnded, emitPluginSessionStart, pluginUsageParties } from '../events/plugin-usage-events';
 
 import { RESOURCE_USAGE_LOG_CONTEXT } from '../lifecycle/usage-lifecycle';
 
 import { USAGE_SESSION_STORE, UsageSessionStore } from '../usage-session-store.port';
-
-import { asLegacy } from '../legacy-seams';
 
 import { type PreparedSessionStart } from './usage-session-start-preparation';
 
@@ -62,7 +66,7 @@ export class UsageSessionNotifications {
     prepared: PreparedSessionStart,
     newSession: UsageSession,
     startedUsageIdToEmit: number | null,
-    takeoverEndedUser: UsageSessionUser | null,
+    takeoverEndedUser: UsageSessionUserRecord | null,
     chargeTransactionId: number | undefined,
   ): Promise<void> {
     if (chargeTransactionId !== undefined) await this.billingService.notifyResourceUsageCharge(chargeTransactionId);
@@ -201,14 +205,14 @@ export class UsageSessionNotifications {
 
   private emitSystemUsageEvent(
     event: SystemEvent.RESOURCE_USAGE_STARTED | SystemEvent.RESOURCE_USAGE_ENDED,
-    resource: UsageSessionResource | undefined,
-    user: UsageSessionUser | undefined,
+    resource: ResourceRecord | undefined,
+    user: UserProfile | null | undefined,
   ): void {
     if (!resource || !user) {
       return;
     }
     try {
-      this.pluginEvents.emit(event, { resource: asLegacy(resource), user: asLegacy(user) });
+      this.pluginEvents.emit(event, pluginUsageParties(resource, user));
     } catch (error) {
       this.logger.error(`Failed to emit plugin SystemEvent ${event}`, (error as Error).stack);
     }

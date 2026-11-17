@@ -19,8 +19,6 @@ import { TentativeSessionCancelledError } from '../errors/tentative-session-canc
 
 import { RESOURCE_USAGE_LOG_CONTEXT, StartSessionOptions, UsageLifecycle } from '../lifecycle/usage-lifecycle';
 
-import { asLegacy } from '../legacy-seams';
-
 import { usageFlowPayload } from '../lifecycle/usage-flow-payload';
 
 import { UsageSessionEnds } from './usage-session-ends';
@@ -144,7 +142,7 @@ export class UsageSessionStarts {
         }
         // The outgoing charge must affect the final balance check, including same-user takeovers.
         // Both changes remain atomic if the replacement can no longer be afforded.
-        await this.billingService.handleResourceUsageStart(resourceId, createdSession, asLegacy(user), scope);
+        await this.billingService.handleResourceUsageStart(resourceId, createdSession, user, scope);
         if (!existingActiveSession) await this.lifecycle.applyLifecycleDrafts(scope, currentAttempt);
         await this.lifecycle.sessions.publishSession(createdSession.id, scope);
         await this.lifecycle.sessions.deleteAttempt(attemptId, resourceId, scope);

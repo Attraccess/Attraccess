@@ -1,11 +1,9 @@
-import { ResourceFlowNodeType, ResourceUsageAction } from '@attraccess/application-models';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import type {
   UsageBillingItemDraft,
   UsageLifecycleAttempt,
-  UsageRelatedRecord,
   UsageSession,
-  UsageSessionResource,
-  UsageSessionUser,
+  UsageSessionWithParties,
 } from '@attraccess/application-models';
 
 import { ConflictException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
@@ -81,36 +79,6 @@ export interface ActiveSessionCounts {
   limit: number;
 }
 
-export type UsageFlowPayload = {
-  resource: Partial<UsageSessionResource>;
-  user: Partial<UsageSessionUser> & Pick<UsageSessionUser, 'id'>;
-  formSubmissions: {
-    [key: string]: { formName: string; answers: { [key: number]: { value: string; name: string } } };
-  };
-  id: number;
-  usageAction: ResourceUsageAction;
-  resourceId: number;
-  userId: number | null;
-  startTime: Date;
-  startNotes: string | null;
-  endTime: Date | null;
-  endNotes: string | null;
-  usageInMinutes: number;
-  billingTransaction: UsageRelatedRecord | null;
-  projectId: number | null;
-  project: UsageRelatedRecord | null;
-  isFinalized: boolean;
-  lifecyclePending: boolean;
-  supervisorUserId: number | null;
-  supervisorUser: UsageRelatedRecord | null;
-  sessionDurationCreditsPerMinute: number | null;
-  operatingDurationCreditsPerMinute: number | null;
-  creditsPerUsage: number | null;
-  billingFactor: number | null;
-  meterRates: UsageSession['meterRates'];
-  attributedOperatingDurationInMinutes: number | null;
-};
-
 /** Lifecycle attempts of starts, stops and takeovers: their drafts, flows, metering, recovery and abort. */
 @Injectable()
 export class UsageLifecycle {
@@ -156,7 +124,7 @@ export class UsageLifecycle {
   /** Attributes operating time, settles the meter and charges an ended session; returns the charge transaction id. */
   async settleEndedSession(
     scope: TransactionScope,
-    endedSession: UsageSession,
+    endedSession: UsageSessionWithParties,
     final: FinalCollection,
   ): Promise<number | undefined> {
     const operatingShare = await this.persistAttributedOperatingDuration(endedSession, scope);

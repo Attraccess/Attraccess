@@ -8,8 +8,6 @@ import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 import { USAGE_SESSION_STORE, UsageSessionStore } from '../usage-session-store.port';
 
-import { asLegacy } from '../legacy-seams';
-
 import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../../exceptions/resource.maintenance.inUse.exception';
 
 import { ResourceNotFoundException } from '../../../exceptions/resource.notFound.exception';
@@ -66,7 +64,7 @@ export class UsageResourceGate {
       if (hasActiveMaintenance) {
         // Check if user can manage maintenance (which allows them to use during maintenance)
         const canManageMaintenance = await this.resourceMaintenanceService.canManageMaintenance(
-          asLegacy(user),
+          user,
           resourceId,
           scope,
         );
@@ -86,7 +84,7 @@ export class UsageResourceGate {
       const isUnhealthy = await this.resourceHealthService.isResourceUnhealthy(resourceId, scope);
       if (isUnhealthy) {
         const canManageMaintenance = await this.resourceMaintenanceService.canManageMaintenance(
-          asLegacy(user),
+          user,
           resourceId,
           scope,
         );

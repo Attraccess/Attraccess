@@ -131,7 +131,10 @@ describe('BillingService configuration and usage start', () => {
     });
 
     it('bills a session that did not share exactly as before even when a share is passed', async () => {
-      const transaction = await f.service.chargeForResourceUsage(usage, {}, { ...share, shared: false } as never);
+      const transaction = await f.service.chargeForResourceUsage(usage, fakeTransactionScope(), {
+        ...share,
+        shared: false,
+      } as never);
 
       // 3.75 operating minutes round up to 4 at 6 credits.
       expect(transaction?.amount).toBe(-(5 + 20 + 24));

@@ -4,9 +4,14 @@ import type {
   UsageBillingItemDraft,
   UsageLifecycleAttempt,
   UsageMeterRate,
+  ProjectRecord,
+  ResourceRecord,
   UsageSession,
   UsageSessionResource,
   UsageSessionUser,
+  UsageSessionUserRecord,
+  UsageSessionWithParties,
+  UserProfile,
 } from '@attraccess/application-models';
 import type { TransactionScope, UnitOfWork } from '../../../../database/unit-of-work';
 import {
@@ -138,13 +143,15 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     this.appliedDrafts = snapshot.appliedDrafts;
   }
 
-  private withRelations(stored: StoredSession): UsageSession {
+  /** The fake keeps only the fields of users and resources the specs arrange; relations are those partial records. */
+  private withRelations(stored: StoredSession): UsageSessionWithParties {
+    const user = (id: number | null) => (id === null ? null : (this.users.get(id) ?? null));
     return {
       ...stored,
-      user: stored.userId === null ? null : (this.users.get(stored.userId) ?? null),
-      resource: this.resources.get(stored.resourceId) ?? null,
-      project: stored.projectId === null ? null : { id: stored.projectId },
-      supervisorUser: stored.supervisorUserId === null ? null : (this.users.get(stored.supervisorUserId) ?? null),
+      user: user(stored.userId) as UsageSessionUserRecord | null,
+      resource: (this.resources.get(stored.resourceId) ?? null) as ResourceRecord,
+      project: (stored.projectId === null ? null : { id: stored.projectId }) as ProjectRecord | null,
+      supervisorUser: user(stored.supervisorUserId) as UserProfile | null,
     };
   }
 
@@ -250,13 +257,13 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     return found ? this.withRelations(found) : null;
   }
 
-  async assignProject(usage: UsageSession, project: { id: number } | null): Promise<UsageSession> {
-    const stored = this.required(usage.id);
-    stored.projectId = project?.id ?? null;
+  async assignProject(usageId: number, projectId: number | null): Promise<UsageSessionWithParties> {
+    const stored = this.required(usageId);
+    stored.projectId = projectId;
     return this.withRelations(stored);
   }
 
-  async findSessionForEvent(usageId: number, _context?: TransactionScope): Promise<UsageSession | null> {
+  async findSessionForEvent(usageId: number, _context?: TransactionScope): Promise<UsageSessionWithParties | null> {
     const found = this.sessions.find((stored) => stored.id === usageId);
     return found ? this.withRelations(found) : null;
   }
@@ -373,7 +380,10 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     );
   }
 
-  async createPendingSession(draft: PendingSessionDraft, _context?: TransactionScope): Promise<UsageSession> {
+  async createPendingSession(
+    draft: PendingSessionDraft,
+    _context?: TransactionScope,
+  ): Promise<UsageSessionWithParties> {
     const owner = this.users.get(draft.userId);
     const stored = session({
       id: this.nextId++,
@@ -395,7 +405,7 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     return this.withRelations(stored);
   }
 
-  async findPendingSession(usageId: number, _context?: TransactionScope): Promise<UsageSession | null> {
+  async findPendingSession(usageId: number, _context?: TransactionScope): Promise<UsageSessionWithParties | null> {
     const found = this.sessions.find((stored) => stored.id === usageId && stored.lifecyclePending);
     return found ? this.withRelations(found) : null;
   }
@@ -431,7 +441,7 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     usageId: number,
     _shape?: 'ended' | 'started',
     _context?: TransactionScope,
-  ): Promise<UsageSession> {
+  ): Promise<UsageSessionWithParties> {
     return this.withRelations(this.required(usageId));
   }
 
@@ -439,7 +449,7 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     this.appliedDrafts.push(attempt);
   }
 
-  async recordDoorAction(draft: DoorActionDraft): Promise<UsageSession> {
+  async recordDoorAction(draft: DoorActionDraft): Promise<UsageSessionWithParties> {
     const now = new Date();
     const stored = session({
       id: this.nextId++,

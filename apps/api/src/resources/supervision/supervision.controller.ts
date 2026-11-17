@@ -4,9 +4,9 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import type { UsageSession } from '@attraccess/application-models';
 import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper';
 import { ResourceUsageResponseDto } from '../usage/dtos/resource-usage-response.dto';
+import { toUsageSessionResponse, type UsageSessionResponse } from '../usage/dtos/usage-session-response';
 import { SupervisionService } from './supervision.service';
 import { SupervisionLiveService } from './supervision-live.service';
 import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto';
@@ -44,14 +44,16 @@ export class SupervisionController {
     @Body() dto: RequestSupervisedSessionDto,
     @Req() req: AuthenticatedRequest,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<UsageSession> {
+  ): Promise<UsageSessionResponse> {
     const controller = new AbortController();
     const onClose = () => {
       if (!res.writableEnded) controller.abort();
     };
     res.on('close', onClose);
     try {
-      return await this.supervisionService.requestSupervisedSession(resourceId, req.user, dto, controller.signal);
+      return toUsageSessionResponse(
+        await this.supervisionService.requestSupervisedSession(resourceId, req.user, dto, controller.signal),
+      );
     } finally {
       res.off('close', onClose);
     }
@@ -94,12 +96,17 @@ export class SupervisionController {
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
   @ApiResponse({ status: 403, description: 'You are not the requested supervisor for this session.' })
   @ApiResponse({ status: 404, description: 'The request was not found or has already expired.' })
-  approveRequest(@Param('requestId') requestId: string, @Req() req: AuthenticatedRequest): Promise<UsageSession> {
-    return this.supervisionService.approve(
-      requestId,
-      req.user,
-      req.user.authenticationMethod ?? 'session',
-      req.user.apiTokenId,
+  async approveRequest(
+    @Param('requestId') requestId: string,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<UsageSessionResponse> {
+    return toUsageSessionResponse(
+      await this.supervisionService.approve(
+        requestId,
+        req.user,
+        req.user.authenticationMethod ?? 'session',
+        req.user.apiTokenId,
+      ),
     );
   }
 

@@ -156,6 +156,6 @@ export class UsageSessionRecords {
 
     const project = dto.projectId === null ? null : await this.projectsService.findOneById(user.id, dto.projectId);
 
-    return this.sessionStore.assignProject(usage, project);
+    return this.sessionStore.assignProject(usage.id, project?.id ?? null);
   }
 }

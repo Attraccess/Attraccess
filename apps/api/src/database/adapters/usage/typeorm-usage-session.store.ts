@@ -15,6 +15,7 @@ import type {
   UsageLifecycleAttempt,
   UsageMeterRate,
   UsageSession,
+  UsageSessionWithParties,
 } from '@attraccess/application-models';
 import { Injectable } from '@nestjs/common';
 import { In, IsNull, Not } from 'typeorm';
@@ -31,9 +32,12 @@ import { recoverOrphanedUsages } from '../../resource-usage-integrity';
 import type { TransactionContext } from '../../transaction-context';
 import { EntityManagerResolver } from '../entity-manager-resolver';
 import { activeUsageWhere, countOccupiedSlots, findOccupyingUserIds } from './active-usage-queries';
+import { toUsageLifecycleAttempt, toUsageSession } from './usage-session-mapping';
+import { toResourceRecord } from '../resources/resource-store.adapter';
 
-const ACTIVE_RELATIONS = ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'];
-const DETAIL_RELATIONS = [
+/** Relations of running sessions and of session details (exported for the mapping spec). */
+export const ACTIVE_RELATIONS = ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'];
+export const DETAIL_RELATIONS = [
   'user',
   'project',
   'supervisorUser',
@@ -42,10 +46,13 @@ const DETAIL_RELATIONS = [
   'formSubmissions.user',
 ];
 
-/** Sessions and attempts leave the adapter as plain records of the neutral model; the shape is unchanged. */
-const toSession = (row: ResourceUsage): UsageSession => row;
-const toSessions = (rows: ResourceUsage[]): UsageSession[] => rows;
-const toAttempt = (row: ResourceUsageLifecycleAttempt): UsageLifecycleAttempt => row;
+/** Sessions and attempts leave the adapter as plain records of the neutral model, mapped field by field. */
+const toSession = toUsageSession;
+const toSessions = (rows: ResourceUsage[]): UsageSession[] => rows.map(toUsageSession);
+const toAttempt = toUsageLifecycleAttempt;
+/** For reads that load the resource and the user relation. */
+const toSessionWithParties = (row: ResourceUsage): UsageSessionWithParties =>
+  toUsageSession(row) as UsageSessionWithParties;
 
 /** TypeORM implementation of the usage session port. */
 @Injectable()
@@ -61,10 +68,11 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
   }
 
   async findResource(resourceId: number, context?: TransactionContext): Promise<UsageSessionResource | null> {
-    return this.managers
+    const resource = await this.managers
       .resolve(context)
       .getRepository(Resource)
       .findOne({ where: { id: resourceId } });
+    return resource && toResourceRecord(resource);
   }
 
   async findSupervisionModes(resourceIds: number[]): Promise<Map<number, SupervisionMode | undefined>> {
@@ -144,7 +152,7 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
         order: { startTime: 'ASC', id: 'ASC' },
         relations: ACTIVE_RELATIONS,
       });
-    for (const session of sessions) map.get(session.resourceId)?.push(session);
+    for (const session of sessions) map.get(session.resourceId)?.push(toSession(session));
     return map;
   }
 
@@ -212,14 +220,15 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     return session && toSession(session);
   }
 
-  async assignProject(usage: UsageSession, project: { id: number } | null): Promise<UsageSession> {
+  async assignProject(usageId: number, projectId: number | null): Promise<UsageSessionWithParties> {
     const repository = this.managers.resolve().getRepository(ResourceUsage);
-    Object.assign(usage, { projectId: project?.id ?? null, project });
-    await repository.save(usage as ResourceUsage);
-    return toSession(await repository.findOne({ where: { id: usage.id }, relations: ['resource', 'user', 'project'] }));
+    await repository.update(usageId, { projectId });
+    return toSessionWithParties(
+      await repository.findOneOrFail({ where: { id: usageId }, relations: ['resource', 'user', 'project'] }),
+    );
   }
 
-  async findSessionForEvent(usageId: number, context?: TransactionContext): Promise<UsageSession | null> {
+  async findSessionForEvent(usageId: number, context?: TransactionContext): Promise<UsageSessionWithParties | null> {
     const session = await this.managers
       .resolve(context)
       .getRepository(ResourceUsage)
@@ -227,7 +236,7 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
         where: { id: usageId },
         relations: ['resource', 'user'],
       });
-    return session && toSession(session);
+    return session && toSessionWithParties(session);
   }
 
   async findEndableSession(
@@ -341,7 +350,10 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     );
   }
 
-  async createPendingSession(draft: PendingSessionDraft, context?: TransactionContext): Promise<UsageSession> {
+  async createPendingSession(
+    draft: PendingSessionDraft,
+    context?: TransactionContext,
+  ): Promise<UsageSessionWithParties> {
     const manager = this.managers.resolve(context);
     const { resourceId, userId } = draft;
     const usageData: Partial<ResourceUsage> = {
@@ -374,15 +386,15 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     // Use the user read inside this transaction, not the potentially stale authentication object.
     createdSession.billingFactor = createdSession.user.billingFactor;
     await manager.update(ResourceUsage, createdSession.id, { billingFactor: createdSession.billingFactor });
-    return toSession(createdSession);
+    return toSessionWithParties(createdSession);
   }
 
-  async findPendingSession(usageId: number, context?: TransactionContext): Promise<UsageSession | null> {
+  async findPendingSession(usageId: number, context?: TransactionContext): Promise<UsageSessionWithParties | null> {
     const session = await this.managers.resolve(context).findOne(ResourceUsage, {
       where: { id: usageId, lifecyclePending: true },
       relations: ['resource', 'user', 'project'],
     });
-    return session && toSession(session);
+    return session && toSessionWithParties(session);
   }
 
   async deletePendingSession(usageId: number, context?: TransactionContext): Promise<boolean> {
@@ -415,8 +427,8 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     usageId: number,
     shape: 'ended' | 'started',
     context?: TransactionContext,
-  ): Promise<UsageSession> {
-    return toSession(
+  ): Promise<UsageSessionWithParties> {
+    return toSessionWithParties(
       await this.managers.resolve(context).findOneOrFail(ResourceUsage, {
         where: { id: usageId },
         relations: shape === 'ended' ? ['user', 'resource'] : ['resource', 'user', 'project'],
@@ -453,7 +465,7 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     }
   }
 
-  async recordDoorAction(draft: DoorActionDraft): Promise<UsageSession> {
+  async recordDoorAction(draft: DoorActionDraft): Promise<UsageSessionWithParties> {
     const repository = this.managers.resolve().getRepository(ResourceUsage);
     const usageData = {
       resourceId: draft.resourceId,
@@ -465,7 +477,9 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
       endNotes: null,
     };
     const saved = await repository.save(usageData, { reload: true });
-    return toSession(await repository.findOne({ where: { id: saved.id }, relations: ['user', 'resource'] }));
+    return toSessionWithParties(
+      await repository.findOneOrFail({ where: { id: saved.id }, relations: ['user', 'resource'] }),
+    );
   }
 
   recoverOrphanedSessions(context?: TransactionContext): Promise<number> {

@@ -5,6 +5,7 @@ import type {
   UsageMeterRate,
   UsageSession,
   UsageSessionResource,
+  UsageSessionWithParties,
 } from '@attraccess/application-models';
 import type { SupervisionMode } from '@attraccess/application-models';
 import type { ResourceUsageAction } from '@attraccess/application-models';
@@ -85,9 +86,9 @@ export interface UsageSessionStore {
   findHistory(resourceId: number, page: number, limit: number, userId?: number): Promise<SessionPage>;
   findSessionForProjectChange(resourceId: number, usageId: number): Promise<UsageSession | null>;
   /** Moves an ended session to a project (or out of any) and returns it with resource, user and project. */
-  assignProject(usage: UsageSession, project: { id: number } | null): Promise<UsageSession>;
+  assignProject(usageId: number, projectId: number | null): Promise<UsageSessionWithParties>;
   /** A session (published or not) with its resource and user, for the events that announce it. */
-  findSessionForEvent(usageId: number, context?: TransactionScope): Promise<UsageSession | null>;
+  findSessionForEvent(usageId: number, context?: TransactionScope): Promise<UsageSessionWithParties | null>;
   /** The published session, unless it has ended or another stop is already ending it. */
   findEndableSession(resourceId: number, usageId: number, context?: TransactionScope): Promise<UsageSession | null>;
   /** The usage ids of the machine's sessions that a stop attempt is ending right now. */
@@ -119,9 +120,9 @@ export interface UsageSessionStore {
   findAttemptsByIds(ids: string[], context?: TransactionScope): Promise<UsageLifecycleAttempt[]>;
 
   /** Reserves a session for a start or takeover: pending, never visible, with the owner's billing factor. */
-  createPendingSession(draft: PendingSessionDraft, context?: TransactionScope): Promise<UsageSession>;
+  createPendingSession(draft: PendingSessionDraft, context?: TransactionScope): Promise<UsageSessionWithParties>;
   /** The tentative session with relations, or null when it no longer exists. */
-  findPendingSession(usageId: number, context?: TransactionScope): Promise<UsageSession | null>;
+  findPendingSession(usageId: number, context?: TransactionScope): Promise<UsageSessionWithParties | null>;
   /** Removes a tentative session. Reports whether one was removed; a published session is never touched. */
   deletePendingSession(usageId: number, context?: TransactionScope): Promise<boolean>;
   /** Makes the tentative session visible. */
@@ -139,10 +140,10 @@ export interface UsageSessionStore {
     usageId: number,
     shape: 'ended' | 'started',
     context?: TransactionScope,
-  ): Promise<UsageSession>;
+  ): Promise<UsageSessionWithParties>;
   /** Stores the forms and billing items an attempt carried, on the session's bill. */
   applyAttemptDrafts(attempt: UsageLifecycleAttempt, context?: TransactionScope): Promise<void>;
-  recordDoorAction(draft: DoorActionDraft): Promise<UsageSession>;
+  recordDoorAction(draft: DoorActionDraft): Promise<UsageSessionWithParties>;
   /** Cancels sessions that are neither pending nor finalized nor ended (impossible state). Returns how many. */
   recoverOrphanedSessions(context?: TransactionScope): Promise<number>;
 }
