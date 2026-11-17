@@ -228,6 +228,7 @@ The reader firmware (2.5.0 or later) announces plugin Bluetooth when it connects
 - **Notifications** are buffered on the reader (32 notifications or 16 KiB per session) and forwarded in order with a sequence number. A full reader buffer fails the stream with `NOTIFICATION_OVERFLOW`; a gap or duplicate fails it with `INTERNAL` (detail `malformed-notification`). Nothing is dropped silently.
 - **Diagnostics.** Radio failures map to the codes above; `detail` carries the raw reason as safe text, for example `nimble:rc=13`, `hci:0x3e`, `att:0x0a` or `reason:0x08`.
 - **Latency.** Every operation you await travels from the server to the reader and back, typically 0.2 to 0.3 s over Wi-Fi. A protocol that waits for an acknowledgement after every chunk is limited by that round trip (measured: about 1.8 KiB/s with 512-byte chunks). Send bulk data as pipelined writes without response, or in larger windows between acknowledgements.
+- **Cancelling on the reader.** A cancelled `scan` or `openSession` rejects at once, but the reader stays busy until it confirmed the cancel, usually one round trip (0.2 to 0.3 s). A `scan` or `openSession` in that window rejects with `READER_BUSY` (retryable); retry after a short pause.
 - **Firmware updates.** A reader that starts a firmware update ends its BLE session (`disconnected`) and refuses new BLE work with `READER_BUSY` (detail `ota`) until it restarted.
 
 ## Cleanup obligations

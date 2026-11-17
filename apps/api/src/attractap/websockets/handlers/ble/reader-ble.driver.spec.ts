@@ -7,7 +7,12 @@ import {
 } from '../../../../plugin-system/ble/__test__/ble-host-harness.test-fixture';
 import { AttractapEventType, type AttractapEvent } from '../../websocket.types';
 import { decodeBleBytes, parseBleCapability } from './ble-wire';
-import { BLE_MAX_PENDING_REQUESTS, BLE_WRITE_WINDOW, type ReaderBleChannel } from './reader-ble-channel';
+import {
+  BLE_CONNECT_REPORT_MARGIN_MS,
+  BLE_MAX_PENDING_REQUESTS,
+  BLE_WRITE_WINDOW,
+  type ReaderBleChannel,
+} from './reader-ble-channel';
 
 const SERVICE = 'fff0';
 const ADDRESS = 'AA:BB:CC:DD:EE:01';
@@ -186,7 +191,8 @@ describe('ReaderBleDriver (plugin BLE over the reader websocket)', () => {
         sessionId: session.id,
         address: ADDRESS,
         addressType: 'public',
-        connectTimeoutMs: 5_000,
+        // The reader stops a moment before the host deadline, so its own answer reaches the plugin.
+        connectTimeoutMs: 5_000 - BLE_CONNECT_REPORT_MARGIN_MS,
         leaseMs: 600_000,
       });
       expect(open.payload.allowlist).toEqual([
@@ -461,6 +467,31 @@ describe('ReaderBleDriver (plugin BLE over the reader websocket)', () => {
       expect(harness.openSessions()).toEqual([]);
       const session = await ble.openSession(created.id);
       await session.close();
+    });
+
+    it('reports DEVICE_NOT_FOUND, not TIMEOUT, when the reader never saw the device before the deadline', async () => {
+      const created = await endpoint();
+      // A short deadline is passed through unchanged.
+      const quick = await ble.openSession(created.id, { connectTimeoutMs: 1_500 });
+      expect(sent(AttractapEventType.BLE_SESSION_OPEN)[0].payload.connectTimeoutMs).toBe(1_500);
+      await quick.close();
+      firmware().silent = true;
+      const opening = capture(ble.openSession(created.id, { connectTimeoutMs: 5_000 }));
+      await until(() => sent(AttractapEventType.BLE_SESSION_OPEN).length === 2);
+      const open = sent(AttractapEventType.BLE_SESSION_OPEN)[1];
+      // The reader's connect window ends, and its answer takes a Wi-Fi round trip.
+      await harness.advance((open.payload.connectTimeoutMs as number) + 300);
+      fromReader(socket(), AttractapEventType.BLE_RESULT, {
+        v: 1,
+        sessionId: open.payload.sessionId,
+        requestId: open.payload.requestId,
+        ok: false,
+        error: { code: 'DEVICE_NOT_FOUND', detail: 'connect-timeout' },
+      });
+      await expect(opening).resolves.toMatchObject({
+        ok: false,
+        error: { code: 'DEVICE_NOT_FOUND', detail: 'connect-timeout', retryable: true },
+      });
     });
 
     it('maps unknown codes to INTERNAL and drops unsafe details', async () => {

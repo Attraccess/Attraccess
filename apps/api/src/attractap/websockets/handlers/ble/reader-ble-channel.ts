@@ -28,6 +28,13 @@ export const BLE_MAX_PENDING_REQUESTS = 32;
 const REQUEST_GRACE_MS = 5_000;
 /** Close and cancellation answers the API waits for before it frees the reader on its side anyway. */
 const CLOSE_DEADLINE_MS = 5_000;
+/**
+ * The reader gets this much less than the plugin's connect deadline, so its own answer for a device that never
+ * showed up (`DEVICE_NOT_FOUND`) arrives before the session engine gives up with a bare `TIMEOUT`.
+ */
+export const BLE_CONNECT_REPORT_MARGIN_MS = 1_000;
+const readerConnectTimeout = (timeoutMs: number) =>
+  timeoutMs > 2 * BLE_CONNECT_REPORT_MARGIN_MS ? timeoutMs - BLE_CONNECT_REPORT_MARGIN_MS : timeoutMs;
 
 export type WirePayload = Record<string, unknown>;
 
@@ -332,7 +339,7 @@ export class ReaderBleChannel {
         {
           address: request.address,
           addressType: request.addressType,
-          connectTimeoutMs: request.timeoutMs,
+          connectTimeoutMs: readerConnectTimeout(request.timeoutMs),
           leaseMs: request.leaseMs,
           allowlist: request.allowlist.map(wireAllowlistEntry),
         },
