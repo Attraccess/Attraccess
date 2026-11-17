@@ -1,35 +1,12 @@
-// TypeORM entity for the single row of Matter sidecar connection settings.
-//
-// The schema is owned by the plugin migration (backend/migrations): the host runs with `synchronize: false`, so this
-// entity only describes the existing `plugin_matter_connection` table. Every column declares an explicit `type`
-// because the esbuild bundle does not emit decorator type metadata.
-import { Column, Entity, PrimaryColumn } from '@attraccess/plugins-backend-sdk/sqlite';
+// Row type of the single row of Matter sidecar connection settings. The table is declared in `../plugin-storage/tables.ts`.
+import type { PluginStorageRow } from '@attraccess/plugins-backend-sdk';
+import type { MATTER_TABLES } from '../plugin-storage/tables';
 
 /** The settings are a singleton: there is exactly one row, with this ID. */
 export const CONNECTION_ROW_ID = 1;
 
-@Entity({ name: 'plugin_matter_connection' })
-export class MatterConnection {
-  @PrimaryColumn({ type: 'integer' })
-  id!: number;
-
-  @Column({ type: 'varchar' })
-  url!: string;
-
-  /** The service token, encrypted with `context.secrets`. Never returned by the API. */
-  @Column({ type: 'text', name: 'encrypted_credential' })
-  encryptedCredential!: string;
-
-  /** Optional PEM trust anchors for a private CA. */
-  @Column({ type: 'text', name: 'ca_certificate', nullable: true })
-  caCertificate!: string | null;
-
-  @Column({ type: 'varchar', name: 'credential_updated_at' })
-  credentialUpdatedAt!: string;
-
-  @Column({ type: 'varchar', name: 'updated_at' })
-  updatedAt!: string;
-
-  @Column({ type: 'integer', name: 'updated_by', nullable: true })
-  updatedBy!: number | null;
-}
+/**
+ * The service token (`encryptedCredential`) is encrypted with `context.secrets` and never returned by the API;
+ * `caCertificate` holds optional PEM trust anchors for a private CA.
+ */
+export type MatterConnection = PluginStorageRow<(typeof MATTER_TABLES)['connection']>;

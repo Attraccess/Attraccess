@@ -2,11 +2,10 @@ import type { CommandOutcomePayload, DeviceStatePayload } from '@attraccess/matt
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import type { EntityManager } from '@attraccess/plugins-backend-sdk/sqlite';
-import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { PLUGIN_CONTEXT } from '../plugin-context';
+import { matterStorage, type MatterTables } from '../plugin-storage/access';
 import { pruneCommands } from './commands';
-import { MatterCommand, MatterEndpoint, MatterEndpointState, MatterFabric, MatterNode } from './entities';
+import type { MatterEndpoint } from './entities';
 import { stateKeyFor } from './profile';
 import {
   TIMEOUT_OUTCOME,
@@ -60,11 +59,25 @@ export const MAX_CLOCK_SKEW_MS = 5 * 60_000;
 export const MAX_VALUE_BYTES = 4_096;
 
 type Resolved = { endpoint: MatterEndpoint } | { ignored: 'unknownEndpoint' | 'inactiveNode' };
+/** The counters an event can raise. They are merged into `stats` only once the event's transaction committed. */
+type Delta = Omit<IngestStats, 'dropped'>;
+const newDelta = (): Delta => ({
+  applied: 0,
+  outOfOrder: 0,
+  unknownEndpoint: 0,
+  inactiveNode: 0,
+  unmappedCluster: 0,
+  unknownCommand: 0,
+  futureTimestamp: 0,
+  oversizedValue: 0,
+});
+/** The active fabrics events may reach, by the fabric ID an event names (`''` when it names none). */
+type FabricLookup = Map<string, Promise<string[]>>;
 
 /**
  * The current state of endpoints: reported, requested, accepted, external change and faults, one row per state key
  * updated in place. Telemetry only ever updates that row: it writes no history and no audit entries. The commands
- * table is a bounded log of requests. Every write runs inside `runSerialized`.
+ * table is a bounded log of requests. Every write runs in a host transaction.
  */
 @Injectable()
 export class MatterStateService {
@@ -82,14 +95,17 @@ export class MatterStateService {
 
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
 
-  private get states() {
-    return sqlitePersistence(this.context).getRepository(MatterEndpointState);
+  private get storage() {
+    return matterStorage(this.context);
   }
 
   // --- reads ---------------------------------------------------------------------------------------------------
 
   async read(endpointRef: string, now: number = Date.now()): Promise<StateEntryView[]> {
-    const rows = await this.states.find({ where: { endpointRef }, order: { stateKey: 'ASC' } });
+    const rows = await this.storage.tables.endpointState.find({
+      where: { endpointRef },
+      orderBy: [{ field: 'stateKey', direction: 'asc' }],
+    });
     return rows.map((row) => toView(row, now));
   }
 
@@ -97,10 +113,11 @@ export class MatterStateService {
 
   /** Records that a command was requested for a state key. Sets `requested`; the command stays unconfirmed. */
   async recordRequest(input: RecordRequestInput, now: string = new Date().toISOString()): Promise<StateEntryView> {
-    return sqlitePersistence(this.context).transaction(async (manager) => {
-      const states = manager.getRepository(MatterEndpointState);
-      const current = await states.findOneBy({ endpointRef: input.endpointRef, stateKey: input.stateKey });
-      if (await manager.findOneBy(MatterCommand, { requestId: input.requestId })) {
+    return this.storage.transaction(async (tables) => {
+      const current = await tables.endpointState.findOne({
+        where: { endpointRef: input.endpointRef, stateKey: input.stateKey },
+      });
+      if (await tables.commands.get(input.requestId)) {
         // Recorded before: nothing changes, whatever happened to the state row since.
         return toView(current ?? emptyState(input.endpointRef, input.stateKey, randomUUID(), now));
       }
@@ -111,8 +128,8 @@ export class MatterStateService {
         requestId: input.requestId,
         correlationId: input.correlationId ?? null,
       });
-      await states.save(next);
-      await manager.getRepository(MatterCommand).insert({
+      await tables.endpointState.upsert(next, { conflictOn: ['id'] });
+      await tables.commands.insert({
         requestId: input.requestId,
         endpointRef: input.endpointRef,
         clusterId: input.clusterId,
@@ -126,48 +143,77 @@ export class MatterStateService {
         reportedAt: null,
         failureCode: null,
       });
-      await pruneCommands(manager, new Date(now));
+      await pruneCommands(tables, new Date(now));
       return toView(next);
     });
   }
 
   /** A physical command timed out: the effect is unknown. It becomes `uncertain` and is never retried here. */
   async recordTimeout(requestId: string, now: string = new Date().toISOString()): Promise<void> {
-    await sqlitePersistence(this.context).transaction((manager) =>
+    const delta = newDelta();
+    await this.storage.transaction((tables) =>
       this.applyOutcomeFor(
-        manager,
+        tables,
         requestId,
         null,
         { outcome: TIMEOUT_OUTCOME, acceptedAt: null, reportedAt: null },
         null,
         now,
+        delta,
       ),
     );
+    this.merge(delta);
   }
 
   // --- event ingestion -------------------------------------------------------------------------------------------
 
   /**
-   * Applies events in order, in one serialized transaction: one commit for a whole burst of telemetry. Each event runs
-   * in its own savepoint, so one that cannot be applied is undone alone and the others still apply.
+   * Applies events in order, in one transaction: one commit for a whole burst of telemetry. The record port has no
+   * savepoints, so an event that cannot be applied cannot be undone alone inside that transaction: the whole batch
+   * is rolled back and its events are applied one by one, each in a transaction of its own. The rare failing event is
+   * then skipped alone, and the others still apply.
    */
   async ingest(events: readonly StateEvent[], receivedAt: string = new Date().toISOString()): Promise<void> {
     if (events.length === 0) return;
-    await sqlitePersistence(this.context).transaction(async (manager) => {
-      for (const event of events) {
-        const at = event.receivedAt ?? receivedAt;
-        await manager.query('SAVEPOINT matter_event');
-        try {
-          if (event.type === 'device.state') await this.reportIn(manager, event.payload, at);
-          else await this.outcomeIn(manager, event.payload, at);
-        } catch {
-          // Fails, and fails the batch, when SQLite already rolled the whole transaction back (disk full, I/O).
-          await manager.query('ROLLBACK TO SAVEPOINT matter_event');
-          this.context.logger.warn?.('A Matter event could not be applied to the device state.');
-        }
-        await manager.query('RELEASE SAVEPOINT matter_event');
+    const batch = newDelta();
+    try {
+      const fabrics: FabricLookup = new Map();
+      await this.storage.transaction(async (tables) => {
+        for (const event of events)
+          await this.applyEvent(tables, fabrics, event, event.receivedAt ?? receivedAt, batch);
+      });
+      this.merge(batch);
+      return;
+    } catch {
+      this.context.logger.debug?.('A batch of Matter events is applied one by one after one of them failed.');
+    }
+    for (const event of events) {
+      const delta = newDelta();
+      try {
+        await this.storage.transaction((tables) =>
+          this.applyEvent(tables, new Map(), event, event.receivedAt ?? receivedAt, delta),
+        );
+        this.merge(delta);
+      } catch {
+        this.context.logger.warn?.('A Matter event could not be applied to the device state.');
       }
-    });
+    }
+  }
+
+  private applyEvent(
+    tables: MatterTables,
+    fabrics: FabricLookup,
+    event: StateEvent,
+    at: string,
+    delta: Delta,
+  ): Promise<void> {
+    return event.type === 'device.state'
+      ? this.reportIn(tables, fabrics, event.payload, at, delta)
+      : this.outcomeIn(tables, fabrics, event.payload, at, delta);
+  }
+
+  private merge(delta: Delta): void {
+    for (const key of Object.keys(delta) as (keyof Delta)[]) this.stats[key] += delta[key];
   }
 
   /** One `device.state` event on its own. */
@@ -180,18 +226,23 @@ export class MatterStateService {
     return this.ingest([{ type: 'command.outcome', payload }], now);
   }
 
-  private async reportIn(manager: EntityManager, payload: DeviceStatePayload, receivedAt: string): Promise<void> {
+  private async reportIn(
+    tables: MatterTables,
+    fabrics: FabricLookup,
+    payload: DeviceStatePayload,
+    receivedAt: string,
+    delta: Delta,
+  ): Promise<void> {
     const stateKey = stateKeyFor(payload.clusterId, payload.attributeId);
-    if (stateKey === null) return void (this.stats.unmappedCluster += 1);
+    if (stateKey === null) return void (delta.unmappedCluster += 1);
     if (Date.parse(payload.observedAt) > Date.parse(receivedAt) + MAX_CLOCK_SKEW_MS) {
-      return void (this.stats.futureTimestamp += 1);
+      return void (delta.futureTimestamp += 1);
     }
-    if (!fitsValueBound(payload.value)) return void (this.stats.oversizedValue += 1);
-    const resolved = await this.resolve(manager, payload);
-    if ('ignored' in resolved) return void (this.stats[resolved.ignored] += 1);
-    const states = manager.getRepository(MatterEndpointState);
+    if (!fitsValueBound(payload.value)) return void (delta.oversizedValue += 1);
+    const resolved = await this.resolve(tables, fabrics, payload);
+    if ('ignored' in resolved) return void (delta[resolved.ignored] += 1);
     const row =
-      (await states.findOneBy({ endpointRef: resolved.endpoint.id, stateKey })) ??
+      (await tables.endpointState.findOne({ where: { endpointRef: resolved.endpoint.id, stateKey } })) ??
       emptyState(resolved.endpoint.id, stateKey, randomUUID(), receivedAt);
     const next = applyReport(
       row,
@@ -204,51 +255,58 @@ export class MatterStateService {
       },
       receivedAt,
     );
-    if (!next) return void (this.stats.outOfOrder += 1);
-    await states.save(next);
+    if (!next) return void (delta.outOfOrder += 1);
+    await tables.endpointState.upsert(next, { conflictOn: ['id'] });
     // A matching report resolves the command; keep the bounded command record in step with the state row.
     if (next.commandState === 'reported' && row.commandState !== 'reported' && next.requestId) {
-      await manager.update(
-        MatterCommand,
+      await tables.commands.update(
         { requestId: next.requestId },
         { outcome: 'reported', reportedAt: next.commandReportedAt },
       );
     }
-    this.stats.applied += 1;
+    delta.applied += 1;
   }
 
-  private async outcomeIn(manager: EntityManager, payload: CommandOutcomePayload, now: string): Promise<void> {
-    const resolved = await this.resolve(manager, payload);
-    if ('ignored' in resolved) return void (this.stats[resolved.ignored] += 1);
+  private async outcomeIn(
+    tables: MatterTables,
+    fabrics: FabricLookup,
+    payload: CommandOutcomePayload,
+    now: string,
+    delta: Delta,
+  ): Promise<void> {
+    const resolved = await this.resolve(tables, fabrics, payload);
+    if ('ignored' in resolved) return void (delta[resolved.ignored] += 1);
     await this.applyOutcomeFor(
-      manager,
+      tables,
       payload.requestId,
       resolved.endpoint.id,
       { outcome: payload.outcome, acceptedAt: payload.acceptedAt, reportedAt: payload.reportedAt },
       payload.failureCode ?? null,
       now,
+      delta,
     );
   }
 
   /** `endpointRef` is where the event says the command ran; null for the plugin's own timeout. */
   private async applyOutcomeFor(
-    manager: EntityManager,
+    tables: MatterTables,
     requestId: string,
     endpointRef: string | null,
     input: OutcomeInput,
     failureCode: string | null,
     now: string,
+    delta: Delta,
   ): Promise<void> {
-    const command = await manager.findOneBy(MatterCommand, { requestId });
+    const command = await tables.commands.get(requestId);
     // A command this plugin did not record (or that was pruned) cannot be attributed to any state. Neither can one
     // that the event places on another endpoint.
     if (!command || (endpointRef !== null && command.endpointRef !== endpointRef)) {
-      return void (this.stats.unknownCommand += 1);
+      return void (delta.unknownCommand += 1);
     }
     if (outcomeAdvances(command.outcome, input.outcome)) {
-      await manager.update(
-        MatterCommand,
-        { requestId },
+      // Compare-and-set on the outcome this decision was made from: a writer that got there first is not overwritten.
+      await tables.commands.update(
+        { requestId, outcome: command.outcome },
         {
           outcome: input.outcome,
           acceptedAt: input.acceptedAt ?? command.acceptedAt,
@@ -257,39 +315,52 @@ export class MatterStateService {
         },
       );
     }
-    this.stats.applied += 1;
+    delta.applied += 1;
     if (!command.stateKey) return;
-    const states = manager.getRepository(MatterEndpointState);
-    const row = await states.findOneBy({ endpointRef: command.endpointRef, stateKey: command.stateKey });
+    const row = await tables.endpointState.findOne({
+      where: { endpointRef: command.endpointRef, stateKey: command.stateKey },
+    });
     if (!row) return;
     const next = applyOutcome(row, requestId, input, now);
-    if (next !== row) await states.save(next);
+    if (next !== row) await tables.endpointState.upsert(next, { conflictOn: ['id'] });
   }
 
   /**
    * Events only reach live endpoints of a claimed, unclaimed or detached node of the active fabric (or of the fabric
-   * the event names, which must be the active one).
+   * the event names, which must be the active one). The active fabrics are looked up once per batch, and the node and
+   * endpoint by one query each.
    */
   private async resolve(
-    manager: EntityManager,
+    tables: MatterTables,
+    fabrics: FabricLookup,
     target: { fabricId?: string; nodeId: string; endpointId: number },
   ): Promise<Resolved> {
-    const query = manager
-      .createQueryBuilder(MatterNode, 'n')
-      .innerJoin(MatterFabric, 'f', 'f.id = n.fabricRef')
-      .where(`n.nodeId = :nodeId AND f.status = 'active' AND f.retiredAt IS NULL`, { nodeId: target.nodeId })
-      .andWhere('n.removedAt IS NULL');
-    if (target.fabricId !== undefined) query.andWhere('f.fabricId = :fabricId', { fabricId: target.fabricId });
-    const found = await query.getOne();
+    const lookupKey = target.fabricId ?? '';
+    let active = fabrics.get(lookupKey);
+    if (!active) {
+      active = tables.fabrics
+        .find({
+          where: {
+            status: 'active',
+            retiredAt: null,
+            ...(target.fabricId === undefined ? {} : { fabricId: target.fabricId }),
+          },
+        })
+        .then((rows) => rows.map((row) => row.id));
+      fabrics.set(lookupKey, active);
+    }
+    const fabricRefs = await active;
+    const found =
+      fabricRefs.length === 0
+        ? null
+        : await tables.nodes.findOne({
+            where: { nodeId: target.nodeId, fabricRef: { in: fabricRefs }, removedAt: null },
+          });
     if (!found) return { ignored: 'unknownEndpoint' };
     if (found.lifecycleState === 'archived' || found.lifecycleState === 'removed') return { ignored: 'inactiveNode' };
-    const endpoint = await manager
-      .createQueryBuilder(MatterEndpoint, 'e')
-      .where('e.nodeRef = :ref AND e.endpointId = :endpointId AND e.removedAt IS NULL', {
-        ref: found.id,
-        endpointId: target.endpointId,
-      })
-      .getOne();
+    const endpoint = await tables.endpoints.findOne({
+      where: { nodeRef: found.id, endpointId: target.endpointId, removedAt: null },
+    });
     return endpoint ? { endpoint } : { ignored: 'unknownEndpoint' };
   }
 }

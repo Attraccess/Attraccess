@@ -1,8 +1,7 @@
 import { createHash } from 'node:crypto';
-import { MatterNode } from '../devices/entities';
-import { ADMIN, createFabricHarness, type FabricHarness } from '../testing/fabric-harness.test-utils';
+import { decodeBlob } from '../plugin-storage/blob';
+import { ADMIN, createFabricHarness, nodeRow, type FabricHarness } from '../testing/fabric-harness.test-utils';
 import { BACKUP_RETENTION } from './backup.service';
-import { MatterBackup } from './entities';
 import { decryptBackup, readHeader } from './format';
 
 const codeOf = async (promise: Promise<unknown>) => {
@@ -23,22 +22,13 @@ describe('MatterBackupService', () => {
   });
   afterEach(() => h.close());
 
-  const stored = () => h.dataSource.getRepository(MatterBackup).find({ order: { createdAt: 'DESC' } });
+  const stored = () => h.tables.backups.find({ orderBy: [{ field: 'createdAt', direction: 'desc' }] });
 
   it('stores an encrypted file whose header, hash and size match, and that the recovery key opens', async () => {
-    await h.dataSource.getRepository(MatterNode).save({
-      id: 'node-1',
-      fabricRef: 'x',
-      nodeId: '5',
-      lifecycleState: 'unclaimed',
-      firstSeenAt: 't',
-      lastSeenAt: 't',
-      createdAt: 't',
-      updatedAt: 't',
-    } as MatterNode);
+    await h.tables.nodes.insert(nodeRow());
     const view = await h.backups.backup('manual', ADMIN);
     const [row] = await stored().then((rows) => rows.filter((r) => r.id === view.id));
-    const file = row.blob as Buffer;
+    const file = decodeBlob(row.blob) as Buffer;
 
     expect(view).toMatchObject({
       trigger: 'manual',
@@ -65,7 +55,7 @@ describe('MatterBackupService', () => {
 
   it('records the plugin migration the installation ran last', async () => {
     const view = await h.backups.backup('manual', ADMIN);
-    const row = await h.dataSource.getRepository(MatterBackup).findOneByOrFail({ id: view.id });
+    const row = await h.one('backups', { id: view.id });
     expect(row.pluginMigration).toMatch(/^CreateMatterBackup1793900002000$/);
   });
 
@@ -125,8 +115,9 @@ describe('MatterBackupService', () => {
     });
 
     it('fails as inconsistent for another fabric ID or storage instance', async () => {
-      await h.dataSource.query(
-        `UPDATE plugin_matter_fabrics SET storage_instance_id = '00000000-0000-4000-8000-0000000000aa'`,
+      await h.tables.fabrics.update(
+        { id: { isNull: false } },
+        { storageInstanceId: '00000000-0000-4000-8000-0000000000aa' },
       );
       expect(await codeOf(h.backups.backup('manual', ADMIN))).toBe('inconsistent');
     });
@@ -182,7 +173,7 @@ describe('MatterBackupService', () => {
       expect(view.consistent).toBe(false);
       const [row] = await stored().then((rows) => rows.filter((r) => r.id === view.id));
       expect(row.consistent).toBe(false);
-      expect(readHeader(row.blob as Buffer).consistent).toBe(false);
+      expect(readHeader(decodeBlob(row.blob) as Buffer).consistent).toBe(false);
       expect((await h.backups.list()).find((b) => b.id === view.id)?.consistent).toBe(false);
     });
 
@@ -193,7 +184,7 @@ describe('MatterBackupService', () => {
         expect(view.consistent).toBe(true);
         const [row] = await stored().then((rows) => rows.filter((r) => r.id === view.id));
         expect(row.consistent).toBe(true);
-        expect(readHeader(row.blob as Buffer)).not.toHaveProperty('consistent');
+        expect(readHeader(decodeBlob(row.blob) as Buffer)).not.toHaveProperty('consistent');
       }
     });
 
@@ -226,7 +217,7 @@ describe('MatterBackupService', () => {
     });
 
     it('treats an unreadable stored key as a failed attempt', async () => {
-      await h.dataSource.query(`UPDATE plugin_matter_recovery_keys SET encrypted_key = 'enc:AAAA'`);
+      await h.tables.recoveryKeys.update({ id: { isNull: false } }, { encryptedKey: 'enc:AAAA' });
       expect(await codeOf(h.backups.backup('manual', ADMIN))).toBe('recovery_key_unreadable');
     });
 
@@ -296,7 +287,7 @@ describe('MatterBackupSchedulerService', () => {
   it('takes the daily backup when none is recent, and only then', async () => {
     await make();
     await h.fabric.create(undefined, ADMIN);
-    await h.dataSource.query(`UPDATE plugin_matter_backups SET created_at = '2020-01-01T00:00:00.000Z'`);
+    await h.tables.backups.update({ id: { isNull: false } }, { createdAt: '2020-01-01T00:00:00.000Z' });
     await h.scheduler.tick();
     const list = await h.backups.list();
     expect(list.map((entry) => entry.trigger)).toEqual(['daily', 'fabric_created']);
@@ -326,7 +317,7 @@ describe('MatterBackupSchedulerService', () => {
     expect(h.backend.calls).not.toContain('backup.snapshot');
 
     await h.fabric.create(undefined, ADMIN);
-    await h.dataSource.query(`UPDATE plugin_matter_backups SET created_at = '2020-01-01T00:00:00.000Z'`);
+    await h.tables.backups.update({ id: { isNull: false } }, { createdAt: '2020-01-01T00:00:00.000Z' });
     h.connection.setState('degraded');
     await h.scheduler.tick();
     expect(await h.backups.list()).toHaveLength(1);
@@ -373,7 +364,7 @@ describe('MatterBackupSchedulerService', () => {
   it('does not bring the next run back when the connection dropped during a check', async () => {
     await make();
     await h.fabric.create(undefined, ADMIN);
-    await h.dataSource.query(`UPDATE plugin_matter_backups SET created_at = '2020-01-01T00:00:00.000Z'`);
+    await h.tables.backups.update({ id: { isNull: false } }, { createdAt: '2020-01-01T00:00:00.000Z' });
     h.connection.setState('connected');
     const backup = h.backups.backup.bind(h.backups);
     jest.spyOn(h.backups, 'backup').mockImplementation(async (...args) => {
@@ -397,7 +388,7 @@ describe('MatterBackupSchedulerService', () => {
   it('starts when the connection comes up and stops when it goes away', async () => {
     await make();
     await h.fabric.create(undefined, ADMIN);
-    await h.dataSource.query(`UPDATE plugin_matter_backups SET created_at = '2020-01-01T00:00:00.000Z'`);
+    await h.tables.backups.update({ id: { isNull: false } }, { createdAt: '2020-01-01T00:00:00.000Z' });
     h.connection.setState('degraded');
     h.scheduler.onModuleInit();
     h.connection.setState('connected');

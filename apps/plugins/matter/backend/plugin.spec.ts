@@ -5,16 +5,14 @@ import plugin from './plugin';
 import { MATTER_AUDIT_DOMAIN } from './connection/audit';
 import { MatterConnectionController } from './connection/controller';
 import { MatterBackupController } from './backup/controller';
-import { BACKUP_ENTITIES } from './backup/entities';
 import { MatterFabricController } from './fabric/controller';
 import { MatterDevicesController } from './devices/controller';
-import { DEVICE_ENTITIES } from './devices/entities';
-import { MatterConnection } from './connection/entity';
+import { MATTER_STORAGE } from './plugin-storage/tables';
 
 const read = (name: string) => JSON.parse(readFileSync(join(__dirname, '..', name), 'utf8'));
 
 describe('matter plugin backend', () => {
-  it('registers the controllers, the services, the entities and the audit domain', () => {
+  it('registers the controllers, the services, the storage definition and the audit domain', () => {
     const module = plugin.register({} as never);
     expect(module.controllers).toEqual([
       MatterConnectionController,
@@ -23,19 +21,20 @@ describe('matter plugin backend', () => {
       MatterBackupController,
     ]);
     expect(module.providers).toHaveLength(15);
-    expect(plugin.persistence).toEqual({
-      sqlite: { entities: [MatterConnection, ...DEVICE_ENTITIES, ...BACKUP_ENTITIES] },
-    });
+    expect(plugin.storage).toBe(MATTER_STORAGE);
     expect(plugin.auditDomains).toEqual([MATTER_AUDIT_DOMAIN]);
   });
 
-  it('declares exactly the permissions it uses, a migrations entry and a frontend entry', () => {
+  it('declares exactly the permissions it uses, no legacy persistence entry and a frontend entry', () => {
     const pkg = read('package.json');
     const manifest = read('plugin.json');
-    expect(pkg.attraccess.permissions).toEqual(['DATABASE_ACCESS', 'MANAGE_SECRETS']);
-    expect(manifest.permissions).toEqual(['DATABASE_ACCESS', 'MANAGE_SECRETS']);
-    expect(pkg.attraccess.migrations).toBe('dist/migrations.js');
-    expect(manifest.main.migrations).toEqual({ directory: 'dist', entryPoint: 'migrations.js' });
+    expect(pkg.attraccess.permissions).toEqual(['PLUGIN_STORAGE', 'MANAGE_SECRETS']);
+    expect(manifest.permissions).toEqual(['PLUGIN_STORAGE', 'MANAGE_SECRETS']);
+    // The host owns the tables and their migrations: no engine list, no TypeORM migrations bundle.
+    expect(pkg.attraccess).not.toHaveProperty('persistence');
+    expect(pkg.attraccess).not.toHaveProperty('migrations');
+    expect(manifest).not.toHaveProperty('persistence');
+    expect(manifest.main).not.toHaveProperty('migrations');
     expect(pkg.attraccess.frontend).toBe('frontend/remoteEntry.js');
     expect(manifest.main.frontend).toMatchObject({ entryPoint: 'remoteEntry.js' });
   });

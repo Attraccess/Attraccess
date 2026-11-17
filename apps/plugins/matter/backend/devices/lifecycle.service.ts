@@ -1,20 +1,11 @@
 import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { ConflictException, Inject, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { In, type EntityManager, sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { SidecarClientError } from '../client/errors';
 import { MatterConnectionService } from '../connection/connection.service';
 import { PLUGIN_CONTEXT } from '../plugin-context';
+import { matterStorage, type MatterTables } from '../plugin-storage/access';
 import { DeviceAuditService } from './audit.service';
-import {
-  MatterCommand,
-  MatterEndpoint,
-  MatterEndpointCapability,
-  MatterEndpointCluster,
-  MatterEndpointState,
-  MatterFabric,
-  MatterNode,
-  type LifecycleState,
-} from './entities';
+import type { LifecycleState, MatterEndpoint, MatterFabric, MatterNode } from './entities';
 import type { MetadataInput } from './schemas';
 import type { NodeView } from './sidecar-types';
 import {
@@ -32,8 +23,9 @@ const METADATA_FIELDS = ['displayName', 'description', 'location'] as const;
 
 /**
  * Explicit administrator decisions about nodes. Each one is validated, audited, and returns 409 when not allowed.
- * Every check-then-write runs inside `runSerialized` on freshly read rows, so a reconciliation or another
- * administrator in between can neither be overwritten nor slip past the state check.
+ * Every check-then-write runs in one host transaction on freshly read rows, and each state change is a compare-and-set
+ * on the state that was checked, so a reconciliation or another administrator in between can neither be overwritten
+ * nor slip past the state check.
  */
 @Injectable()
 export class MatterLifecycleService {
@@ -43,35 +35,38 @@ export class MatterLifecycleService {
     @Inject(DeviceAuditService) private readonly audit: DeviceAuditService,
   ) {}
 
-  private get nodes() {
-    return sqlitePersistence(this.context).getRepository(MatterNode);
+  private get storage() {
+    return matterStorage(this.context);
   }
 
   // --- reads -----------------------------------------------------------------------------------------------------
 
   async listNodes(filter: { lifecycleState?: LifecycleState; includeInactive?: boolean }): Promise<MatterNode[]> {
-    const query = this.nodes.createQueryBuilder('n').orderBy('n.createdAt', 'ASC').addOrderBy('n.nodeId', 'ASC');
-    if (filter.lifecycleState) query.where('n.lifecycleState = :state', { state: filter.lifecycleState });
-    else if (!filter.includeInactive) query.where(`n.lifecycleState NOT IN ('archived', 'removed')`);
-    return query.getMany();
+    const where = filter.lifecycleState
+      ? { lifecycleState: filter.lifecycleState }
+      : filter.includeInactive
+        ? undefined
+        : { lifecycleState: { notIn: ['archived', 'removed'] as LifecycleState[] } };
+    return this.storage.tables.nodes.find({
+      where,
+      orderBy: [{ field: 'createdAt' }, { field: 'nodeId' }],
+    });
   }
 
   async getNode(id: string) {
-    const manager = this.nodes.manager;
-    const node = await this.require(manager, id);
-    const endpoints = await findLive(manager, MatterEndpoint, 'nodeRef', node.id);
+    const { tables } = this.storage;
+    const node = await this.require(tables, id);
+    const endpoints = await findLive(tables.endpoints, 'nodeRef', node.id);
     endpoints.sort((a, b) => a.endpointId - b.endpointId);
-    const fabric = await manager.getRepository(MatterFabric).findOneBy({ id: node.fabricRef });
+    const fabric = await tables.fabrics.get(node.fabricRef);
     const refs = endpoints.map((endpoint) => endpoint.id);
+    // One query per table for all endpoints of the node, never one per endpoint.
     const [clusters, capabilities] =
       refs.length === 0
         ? [[], []]
         : await Promise.all([
-            manager
-              .createQueryBuilder(MatterEndpointCluster, 'c')
-              .where('c.endpointRef IN (:...refs) AND c.removedAt IS NULL', { refs })
-              .getMany(),
-            manager.findBy(MatterEndpointCapability, { endpointRef: In(refs) }),
+            tables.endpointClusters.find({ where: { endpointRef: { in: refs }, removedAt: null } }),
+            tables.endpointCapabilities.find({ where: { endpointRef: { in: refs } } }),
           ]);
     const detailed = endpoints.map((endpoint) => ({
       endpoint,
@@ -82,7 +77,7 @@ export class MatterLifecycleService {
   }
 
   async getEndpoint(id: string): Promise<MatterEndpoint> {
-    const endpoint = await sqlitePersistence(this.context).getRepository(MatterEndpoint).findOneBy({ id });
+    const endpoint = await this.storage.tables.endpoints.get(id);
     if (!endpoint) throw new NotFoundException('Unknown Matter endpoint.');
     return endpoint;
   }
@@ -90,16 +85,17 @@ export class MatterLifecycleService {
   // --- actions ---------------------------------------------------------------------------------------------------
 
   async claim(id: string, input: { displayName?: string }, actor: Actor): Promise<MatterNode> {
-    const node = await sqlitePersistence(this.context).transaction(async (manager) => {
-      const node = await this.require(manager, id);
+    const node = await this.storage.transaction(async (tables) => {
+      const node = await this.require(tables, id);
       this.expect(node, ['unclaimed'], 'claimed');
       const now = new Date().toISOString();
-      node.lifecycleState = 'claimed';
-      node.claimedAt = now;
-      node.claimedBy = actor.userId;
-      node.updatedAt = now;
-      if (input.displayName !== undefined) node.displayName = input.displayName;
-      await manager.save(MatterNode, node);
+      await this.transition(tables, node, ['unclaimed'], {
+        lifecycleState: 'claimed',
+        claimedAt: now,
+        claimedBy: actor.userId,
+        updatedAt: now,
+        ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
+      });
       return node;
     });
     await this.audit.record('matter.node_claimed', actor, nodeSubject(node), {
@@ -119,10 +115,10 @@ export class MatterLifecycleService {
     input: { sourceNodeId: string; confirmIdentityMismatch?: boolean },
     actor: Actor,
   ): Promise<MatterNode> {
-    const { target, source, mismatch } = await sqlitePersistence(this.context).transaction(async (manager) => {
-      const target = await this.require(manager, id);
+    const { target, source, mismatch } = await this.storage.transaction(async (tables) => {
+      const target = await this.require(tables, id);
       this.expect(target, ['detached'], 'relinked');
-      const source = await manager.findOneBy(MatterNode, { id: input.sourceNodeId });
+      const source = await tables.nodes.get(input.sourceNodeId);
       if (!source) throw new NotFoundException('Unknown source node (sourceNodeId).');
       if (source.id === target.id) throw new ConflictException('A node cannot be relinked to itself.');
       if (source.lifecycleState !== 'unclaimed') {
@@ -141,21 +137,26 @@ export class MatterLifecycleService {
       const identity = Object.fromEntries(NODE_IDENTITY_COLUMNS.map((key) => [key, source[key]]));
       const sourceFabricRef = source.fabricRef;
       const sourceNodeId = source.nodeId;
-      source.lifecycleState = 'removed';
-      source.removedAt = now;
-      source.removedBy = actor.userId;
-      source.removalReason = 'merged';
-      source.mergedInto = target.id;
-      source.updatedAt = now;
-      await manager.save(MatterNode, source);
+      await this.transition(tables, source, ['unclaimed'], {
+        lifecycleState: 'removed',
+        removedAt: now,
+        removedBy: actor.userId,
+        removalReason: 'merged',
+        mergedInto: target.id,
+        updatedAt: now,
+      });
 
-      Object.assign(target, identity, { fabricRef: sourceFabricRef, nodeId: sourceNodeId });
-      target.lifecycleState = reattachedState(target);
-      target.detachedReason = null;
-      target.detachedAt = null;
-      target.updatedAt = now;
-      await manager.save(MatterNode, target);
-      await this.moveEndpoints(manager, source, target, now);
+      // The target takes the source's identity; the state it returns to is decided on the target as it is.
+      await this.transition(tables, target, ['detached'], {
+        ...identity,
+        fabricRef: sourceFabricRef,
+        nodeId: sourceNodeId,
+        lifecycleState: reattachedState(target),
+        detachedReason: null,
+        detachedAt: null,
+        updatedAt: now,
+      });
+      await this.moveEndpoints(tables, source, target, now);
       return { target, source, mismatch };
     });
     await this.audit.record('matter.node_relinked', actor, nodeSubject(target), {
@@ -168,19 +169,19 @@ export class MatterLifecycleService {
 
   /** Re-reads one node from the sidecar. Changes nothing when the sidecar cannot answer. */
   async repair(id: string, actor: Actor): Promise<MatterNode> {
-    const before = await this.require(this.nodes.manager, id);
+    const before = await this.require(this.storage.tables, id);
     this.expect(before, ['unclaimed', 'claimed', 'detached'], 'repaired');
-    const fabric = await this.nodes.manager.findOneBy(MatterFabric, { id: before.fabricRef });
+    const fabric = await this.storage.tables.fabrics.get(before.fabricRef);
     if (!fabric) throw new ConflictException('The node has no fabric record.');
-    // Sidecar I/O stays outside the serialized transaction.
+    // Sidecar I/O stays outside the transaction.
     const view = await this.readFromSidecar(fabric, before.nodeId);
-    const { node, reattached } = await sqlitePersistence(this.context).transaction(async (manager) => {
-      const node = await this.require(manager, id);
+    const { node, reattached } = await this.storage.transaction(async (tables) => {
+      const node = await this.require(tables, id);
       this.expect(node, ['unclaimed', 'claimed', 'detached'], 'repaired');
       if (node.fabricRef !== fabric.id || node.nodeId !== before.nodeId) {
         throw new ConflictException('The node changed while it was read from the sidecar. Nothing was changed.');
       }
-      const current = await manager.findOneBy(MatterFabric, { id: fabric.id });
+      const current = await tables.fabrics.get(fabric.id);
       if (current?.status !== 'active') {
         // Another fabric may still be active here: run a reconciliation first, which settles the fabrics, so events
         // can never reach a node of the wrong fabric.
@@ -191,14 +192,15 @@ export class MatterLifecycleService {
       const now = new Date().toISOString();
       let reattached = false;
       if (node.lifecycleState === 'detached') {
-        node.lifecycleState = reattachedState(node);
-        node.detachedReason = null;
-        node.detachedAt = null;
-        node.updatedAt = now;
-        await manager.save(MatterNode, node);
+        await this.transition(tables, node, ['detached'], {
+          lifecycleState: reattachedState(node),
+          detachedReason: null,
+          detachedAt: null,
+          updatedAt: now,
+        });
         reattached = true;
       }
-      await syncNode(manager, node, view, now, newCounters());
+      await syncNode(tables, node, view, now, newCounters());
       return { node, reattached };
     });
     await this.audit.record('matter.node_repaired', actor, nodeSubject(node), { nodeRef: node.id, reattached });
@@ -207,17 +209,18 @@ export class MatterLifecycleService {
 
   async archive(id: string, actor: Actor): Promise<MatterNode> {
     let previousState: 'detached' | 'unclaimed' = 'detached';
-    const node = await sqlitePersistence(this.context).transaction(async (manager) => {
-      const node = await this.require(manager, id);
+    const node = await this.storage.transaction(async (tables) => {
+      const node = await this.require(tables, id);
       this.expect(node, ['detached', 'unclaimed'], 'archived');
       previousState = node.lifecycleState as 'detached' | 'unclaimed';
       const now = new Date().toISOString();
       // `detached_reason` stays, so a restore keeps a fabric mismatch from being re-attached by itself.
-      node.lifecycleState = 'archived';
-      node.archivedAt = now;
-      node.archivedBy = actor.userId;
-      node.updatedAt = now;
-      await manager.save(MatterNode, node);
+      await this.transition(tables, node, ['detached', 'unclaimed'], {
+        lifecycleState: 'archived',
+        archivedAt: now,
+        archivedBy: actor.userId,
+        updatedAt: now,
+      });
       return node;
     });
     await this.audit.record('matter.node_archived', actor, nodeSubject(node), { nodeRef: node.id, previousState });
@@ -229,21 +232,22 @@ export class MatterLifecycleService {
    * by a fabric mismatch keeps that reason, so only repair or relink bring it back.
    */
   async restore(id: string, actor: Actor): Promise<MatterNode> {
-    const node = await sqlitePersistence(this.context).transaction(async (manager) => {
-      const node = await this.require(manager, id);
+    const node = await this.storage.transaction(async (tables) => {
+      const node = await this.require(tables, id);
       this.expect(node, ['archived'], 'restored');
       const now = new Date().toISOString();
-      const fabric = await manager.findOneBy(MatterFabric, { id: node.fabricRef });
-      node.lifecycleState = 'detached';
-      // A node archived while unclaimed has no reason yet. If its fabric is no longer the sidecar's, it belongs to a
-      // fabric mismatch like its siblings and must not be re-attached by itself either.
-      node.detachedReason =
-        node.detachedReason ?? (fabric?.status === 'active' ? 'absent_from_sidecar' : 'fabric_mismatch');
-      node.detachedAt = now;
-      node.archivedAt = null;
-      node.archivedBy = null;
-      node.updatedAt = now;
-      await manager.save(MatterNode, node);
+      const fabric = await tables.fabrics.get(node.fabricRef);
+      await this.transition(tables, node, ['archived'], {
+        lifecycleState: 'detached',
+        // A node archived while unclaimed has no reason yet. If its fabric is no longer the sidecar's, it belongs to a
+        // fabric mismatch like its siblings and must not be re-attached by itself either.
+        detachedReason:
+          node.detachedReason ?? (fabric?.status === 'active' ? 'absent_from_sidecar' : 'fabric_mismatch'),
+        detachedAt: now,
+        archivedAt: null,
+        archivedBy: null,
+        updatedAt: now,
+      });
       return node;
     });
     await this.audit.record('matter.node_restored', actor, nodeSubject(node), { nodeRef: node.id });
@@ -256,19 +260,20 @@ export class MatterLifecycleService {
    */
   async forceRemove(id: string, actor: Actor): Promise<MatterNode> {
     let previousState: 'unclaimed' | 'claimed' | 'detached' | 'archived' = 'detached';
-    const node = await sqlitePersistence(this.context).transaction(async (manager) => {
-      const node = await this.require(manager, id);
+    const node = await this.storage.transaction(async (tables) => {
+      const node = await this.require(tables, id);
       this.expect(node, ['unclaimed', 'claimed', 'detached', 'archived'], 'force-removed');
       previousState = node.lifecycleState as typeof previousState;
       const now = new Date().toISOString();
-      node.lifecycleState = 'removed';
-      node.removedAt = now;
-      node.removedBy = actor.userId;
-      node.removalReason = 'force_removed';
-      node.updatedAt = now;
-      await manager.save(MatterNode, node);
-      for (const endpoint of await findLive(manager, MatterEndpoint, 'nodeRef', node.id)) {
-        await retireEndpoint(manager, endpoint, 'force_removed', now);
+      await this.transition(tables, node, ['unclaimed', 'claimed', 'detached', 'archived'], {
+        lifecycleState: 'removed',
+        removedAt: now,
+        removedBy: actor.userId,
+        removalReason: 'force_removed',
+        updatedAt: now,
+      });
+      for (const endpoint of await findLive(tables.endpoints, 'nodeRef', node.id)) {
+        await retireEndpoint(tables, endpoint, 'force_removed', now);
       }
       return node;
     });
@@ -279,15 +284,14 @@ export class MatterLifecycleService {
   // --- metadata --------------------------------------------------------------------------------------------------
 
   async updateNode(id: string, input: MetadataInput, actor: Actor): Promise<MatterNode> {
-    const { node, flags } = await sqlitePersistence(this.context).transaction(async (manager) => {
-      const node = await this.require(manager, id);
+    const { node, flags } = await this.storage.transaction(async (tables) => {
+      const node = await this.require(tables, id);
       if (node.lifecycleState === 'removed') throw new ConflictException('A removed node cannot be edited.');
       const flags = applyMetadata(node, input);
       if (!flags) return { node, flags };
       node.updatedAt = new Date().toISOString();
-      await manager.update(
-        MatterNode,
-        { id: node.id },
+      const changed = await tables.nodes.update(
+        { id: node.id, lifecycleState: { ne: 'removed' } },
         {
           displayName: node.displayName,
           description: node.description,
@@ -295,6 +299,7 @@ export class MatterLifecycleService {
           updatedAt: node.updatedAt,
         },
       );
+      if (changed === 0) throw new ConflictException('A removed node cannot be edited.');
       return { node, flags };
     });
     if (!flags) return node;
@@ -303,14 +308,13 @@ export class MatterLifecycleService {
   }
 
   async updateEndpoint(id: string, input: MetadataInput, actor: Actor): Promise<MatterEndpoint> {
-    const { endpoint, flags } = await sqlitePersistence(this.context).transaction(async (manager) => {
-      const endpoint = await manager.findOneBy(MatterEndpoint, { id });
+    const { endpoint, flags } = await this.storage.transaction(async (tables) => {
+      const endpoint = await tables.endpoints.get(id);
       if (!endpoint) throw new NotFoundException('Unknown Matter endpoint.');
       if (endpoint.removedAt !== null) throw new ConflictException('A removed endpoint cannot be edited.');
       const flags = applyMetadata(endpoint, input);
       if (flags) {
-        await manager.update(
-          MatterEndpoint,
+        await tables.endpoints.update(
           { id: endpoint.id },
           { displayName: endpoint.displayName, description: endpoint.description, location: endpoint.location },
         );
@@ -333,10 +337,25 @@ export class MatterLifecycleService {
 
   // --- helpers ---------------------------------------------------------------------------------------------------
 
-  private async require(manager: EntityManager, id: string): Promise<MatterNode> {
-    const node = await manager.findOneBy(MatterNode, { id });
+  private async require(tables: MatterTables, id: string): Promise<MatterNode> {
+    const node = await tables.nodes.get(id);
     if (!node) throw new NotFoundException('Unknown Matter node.');
     return node;
+  }
+
+  /**
+   * Writes `patch` to the node, compare-and-set on the lifecycle state the caller checked: another writer that moved
+   * the node first makes this fail with 409 instead of being overwritten. The in-memory node follows the patch.
+   */
+  private async transition(
+    tables: MatterTables,
+    node: MatterNode,
+    allowed: LifecycleState[],
+    patch: Partial<MatterNode>,
+  ): Promise<void> {
+    const changed = await tables.nodes.update({ id: node.id, lifecycleState: { in: allowed } }, patch);
+    if (changed === 0) throw new ConflictException('The node changed in the meantime. Nothing was changed.');
+    Object.assign(node, patch);
   }
 
   private expect(node: MatterNode, allowed: LifecycleState[], verb: string): void {
@@ -381,13 +400,13 @@ export class MatterLifecycleService {
 
   /** Moves the source node's endpoints onto the target, matched by endpoint ID (and bridged unique ID when known). */
   private async moveEndpoints(
-    manager: EntityManager,
+    tables: MatterTables,
     source: MatterNode,
     target: MatterNode,
     now: string,
   ): Promise<void> {
-    const sourceEndpoints = await findLive(manager, MatterEndpoint, 'nodeRef', source.id);
-    const targetEndpoints = await findLive(manager, MatterEndpoint, 'nodeRef', target.id);
+    const sourceEndpoints = await findLive(tables.endpoints, 'nodeRef', source.id);
+    const targetEndpoints = await findLive(tables.endpoints, 'nodeRef', target.id);
     const targetById = new Map(targetEndpoints.map((endpoint) => [endpoint.endpointId, endpoint]));
     const matched = new Set<string>();
 
@@ -400,13 +419,13 @@ export class MatterLifecycleService {
         (candidate.bridgedUniqueId === null ||
           from.bridgedUniqueId === null ||
           candidate.bridgedUniqueId === from.bridgedUniqueId);
-      if (candidate && !sameHardware) await retireEndpoint(manager, candidate, 'replaced', now);
+      if (candidate && !sameHardware) await retireEndpoint(tables, candidate, 'replaced', now);
       moves.push({ from, to: sameHardware ? candidate : null });
       if (sameHardware && candidate) matched.add(candidate.id);
     }
     for (const endpoint of targetEndpoints) {
       if (!matched.has(endpoint.id) && endpoint.removedAt === null) {
-        await retireEndpoint(manager, endpoint, 'absent_from_sidecar', now);
+        await retireEndpoint(tables, endpoint, 'absent_from_sidecar', now);
       }
     }
 
@@ -414,33 +433,25 @@ export class MatterLifecycleService {
       if (!to) {
         // New to the detached record: the source's row (and UUID) moves over as it is.
         from.nodeRef = target.id;
-        await manager.update(MatterEndpoint, { id: from.id }, { nodeRef: target.id });
+        await tables.endpoints.update({ id: from.id }, { nodeRef: target.id });
         continue;
       }
-      Object.assign(to, Object.fromEntries(ENDPOINT_PROTOCOL_COLUMNS.map((key) => [key, from[key]])));
-      await manager.save(MatterEndpoint, to);
-      await manager
-        .createQueryBuilder()
-        .update(MatterEndpointCluster)
-        .set({ removedAt: now })
-        .where('endpoint_ref = :ref AND removed_at IS NULL', { ref: to.id })
-        .execute();
-      await manager.delete(MatterEndpointCapability, { endpointRef: to.id });
+      await tables.endpoints.update(
+        { id: to.id },
+        Object.fromEntries(ENDPOINT_PROTOCOL_COLUMNS.map((key) => [key, from[key]])),
+      );
+      await tables.endpointClusters.update({ endpointRef: to.id, removedAt: null }, { removedAt: now });
+      await tables.endpointCapabilities.delete({ endpointRef: to.id });
       // The current state comes from the source, the node the sidecar reports now. The target's rows describe
       // the hardware as the old fabric last saw it; one row per state key, so those are replaced.
-      await manager.delete(MatterEndpointState, { endpointRef: to.id });
-      await manager
-        .createQueryBuilder()
-        .update(MatterEndpointCluster)
-        .set({ endpointRef: to.id })
-        .where('endpoint_ref = :ref AND removed_at IS NULL', { ref: from.id })
-        .execute();
-      await manager.update(MatterEndpointCapability, { endpointRef: from.id }, { endpointRef: to.id });
-      await manager.update(MatterEndpointState, { endpointRef: from.id }, { endpointRef: to.id });
-      await manager.update(MatterCommand, { endpointRef: from.id }, { endpointRef: to.id });
+      await tables.endpointState.delete({ endpointRef: to.id });
+      await tables.endpointClusters.update({ endpointRef: from.id, removedAt: null }, { endpointRef: to.id });
+      await tables.endpointCapabilities.update({ endpointRef: from.id }, { endpointRef: to.id });
+      await tables.endpointState.update({ endpointRef: from.id }, { endpointRef: to.id });
+      await tables.commands.update({ endpointRef: from.id }, { endpointRef: to.id });
       from.removedAt = now;
       from.removalReason = 'merged';
-      await manager.update(MatterEndpoint, { id: from.id }, { removedAt: now, removalReason: 'merged' });
+      await tables.endpoints.update({ id: from.id }, { removedAt: now, removalReason: 'merged' });
     }
   }
 }

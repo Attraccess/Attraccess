@@ -1,20 +1,17 @@
-import { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk/sqlite';
-
-/**
- * Creates the Matter device model: fabrics, nodes, endpoints, clusters, capabilities, current state, the bounded
- * command log and the reconciliation status. Additive: it leaves `plugin_matter_connection` and its data alone.
- *
- * Self-contained: no foreign key to host tables (plugin up-migrations may run before the host's own) and none
- * between the plugin tables either, because history is kept and nothing is ever deleted by cascade. Uniqueness of
- * live identities is enforced by partial unique indexes, so a removed row stays as history while the same identity
- * can appear again as a new row.
- */
-export class CreateMatterDeviceModel1793900001000 implements MigrationInterface {
-  name = 'CreateMatterDeviceModel1793900001000';
-
-  public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `CREATE TABLE "plugin_matter_fabrics" (
+// The DDL the three 1.x TypeORM migrations ran (their `up` methods, in order), kept verbatim as the fixture the
+// baseline test compares the declared storage layout with. Not used at runtime.
+export const LEGACY_UP_STATEMENTS: readonly string[] = [
+  `CREATE TABLE IF NOT EXISTS "plugin_matter_connection" (
+        "id" integer PRIMARY KEY NOT NULL,
+        "url" varchar NOT NULL,
+        "encrypted_credential" text NOT NULL,
+        "ca_certificate" text,
+        "credential_updated_at" varchar NOT NULL,
+        "updated_at" varchar NOT NULL,
+        "updated_by" integer,
+        CONSTRAINT "CHK_plugin_matter_connection_singleton" CHECK ("id" = 1)
+      )`,
+  `CREATE TABLE "plugin_matter_fabrics" (
         "id" varchar PRIMARY KEY NOT NULL,
         "fabric_id" varchar NOT NULL,
         "label" varchar,
@@ -24,13 +21,8 @@ export class CreateMatterDeviceModel1793900001000 implements MigrationInterface 
         "retired_at" varchar,
         CONSTRAINT "CHK_plugin_matter_fabrics_status" CHECK ("status" IN ('active', 'absent'))
       )`,
-    );
-    await queryRunner.query(
-      `CREATE UNIQUE INDEX "UQ_plugin_matter_fabrics_live" ON "plugin_matter_fabrics" ("fabric_id") WHERE "retired_at" IS NULL`,
-    );
-
-    await queryRunner.query(
-      `CREATE TABLE "plugin_matter_nodes" (
+  `CREATE UNIQUE INDEX "UQ_plugin_matter_fabrics_live" ON "plugin_matter_fabrics" ("fabric_id") WHERE "retired_at" IS NULL`,
+  `CREATE TABLE "plugin_matter_nodes" (
         "id" varchar PRIMARY KEY NOT NULL,
         "fabric_ref" varchar NOT NULL,
         "node_id" varchar NOT NULL,
@@ -69,16 +61,9 @@ export class CreateMatterDeviceModel1793900001000 implements MigrationInterface 
         CONSTRAINT "CHK_plugin_matter_nodes_removal_reason" CHECK ("removal_reason" IS NULL OR "removal_reason" IN ('force_removed', 'merged', 'replaced')),
         CONSTRAINT "CHK_plugin_matter_nodes_attestation" CHECK ("attestation_status" IS NULL OR "attestation_status" IN ('verified', 'unverified', 'failed', 'unknown'))
       )`,
-    );
-    await queryRunner.query(
-      `CREATE UNIQUE INDEX "UQ_plugin_matter_nodes_live_identity" ON "plugin_matter_nodes" ("fabric_ref", "node_id") WHERE "removed_at" IS NULL`,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "IDX_plugin_matter_nodes_lifecycle" ON "plugin_matter_nodes" ("lifecycle_state")`,
-    );
-
-    await queryRunner.query(
-      `CREATE TABLE "plugin_matter_endpoints" (
+  `CREATE UNIQUE INDEX "UQ_plugin_matter_nodes_live_identity" ON "plugin_matter_nodes" ("fabric_ref", "node_id") WHERE "removed_at" IS NULL`,
+  `CREATE INDEX "IDX_plugin_matter_nodes_lifecycle" ON "plugin_matter_nodes" ("lifecycle_state")`,
+  `CREATE TABLE "plugin_matter_endpoints" (
         "id" varchar PRIMARY KEY NOT NULL,
         "node_ref" varchar NOT NULL,
         "endpoint_id" integer NOT NULL,
@@ -102,13 +87,8 @@ export class CreateMatterDeviceModel1793900001000 implements MigrationInterface 
         CONSTRAINT "CHK_plugin_matter_endpoints_range" CHECK ("endpoint_id" BETWEEN 0 AND 65534),
         CONSTRAINT "CHK_plugin_matter_endpoints_removal_reason" CHECK ("removal_reason" IS NULL OR "removal_reason" IN ('absent_from_sidecar', 'replaced', 'force_removed', 'merged'))
       )`,
-    );
-    await queryRunner.query(
-      `CREATE UNIQUE INDEX "UQ_plugin_matter_endpoints_live" ON "plugin_matter_endpoints" ("node_ref", "endpoint_id") WHERE "removed_at" IS NULL`,
-    );
-
-    await queryRunner.query(
-      `CREATE TABLE "plugin_matter_endpoint_clusters" (
+  `CREATE UNIQUE INDEX "UQ_plugin_matter_endpoints_live" ON "plugin_matter_endpoints" ("node_ref", "endpoint_id") WHERE "removed_at" IS NULL`,
+  `CREATE TABLE "plugin_matter_endpoint_clusters" (
         "id" varchar PRIMARY KEY NOT NULL,
         "endpoint_ref" varchar NOT NULL,
         "cluster_id" integer NOT NULL,
@@ -120,26 +100,16 @@ export class CreateMatterDeviceModel1793900001000 implements MigrationInterface 
         "removed_at" varchar,
         CONSTRAINT "CHK_plugin_matter_endpoint_clusters_role" CHECK ("role" IN ('server', 'client'))
       )`,
-    );
-    await queryRunner.query(
-      `CREATE UNIQUE INDEX "UQ_plugin_matter_endpoint_clusters_live" ON "plugin_matter_endpoint_clusters" ("endpoint_ref", "cluster_id", "role") WHERE "removed_at" IS NULL`,
-    );
-
-    await queryRunner.query(
-      `CREATE TABLE "plugin_matter_endpoint_capabilities" (
+  `CREATE UNIQUE INDEX "UQ_plugin_matter_endpoint_clusters_live" ON "plugin_matter_endpoint_clusters" ("endpoint_ref", "cluster_id", "role") WHERE "removed_at" IS NULL`,
+  `CREATE TABLE "plugin_matter_endpoint_capabilities" (
         "id" varchar PRIMARY KEY NOT NULL,
         "endpoint_ref" varchar NOT NULL,
         "capability" varchar NOT NULL,
         "source_cluster_id" integer NOT NULL,
         "details" text NOT NULL
       )`,
-    );
-    await queryRunner.query(
-      `CREATE UNIQUE INDEX "UQ_plugin_matter_endpoint_capabilities" ON "plugin_matter_endpoint_capabilities" ("endpoint_ref", "capability")`,
-    );
-
-    await queryRunner.query(
-      `CREATE TABLE "plugin_matter_endpoint_state" (
+  `CREATE UNIQUE INDEX "UQ_plugin_matter_endpoint_capabilities" ON "plugin_matter_endpoint_capabilities" ("endpoint_ref", "capability")`,
+  `CREATE TABLE "plugin_matter_endpoint_state" (
         "id" varchar PRIMARY KEY NOT NULL,
         "endpoint_ref" varchar NOT NULL,
         "state_key" varchar NOT NULL,
@@ -167,13 +137,8 @@ export class CreateMatterDeviceModel1793900001000 implements MigrationInterface 
         CONSTRAINT "CHK_plugin_matter_endpoint_state_quality" CHECK ("quality" IS NULL OR "quality" IN ('good', 'uncertain', 'fault', 'unavailable')),
         CONSTRAINT "CHK_plugin_matter_endpoint_state_source" CHECK ("source" IS NULL OR "source" IN ('subscription_report', 'read', 'command_response'))
       )`,
-    );
-    await queryRunner.query(
-      `CREATE UNIQUE INDEX "UQ_plugin_matter_endpoint_state_key" ON "plugin_matter_endpoint_state" ("endpoint_ref", "state_key")`,
-    );
-
-    await queryRunner.query(
-      `CREATE TABLE "plugin_matter_commands" (
+  `CREATE UNIQUE INDEX "UQ_plugin_matter_endpoint_state_key" ON "plugin_matter_endpoint_state" ("endpoint_ref", "state_key")`,
+  `CREATE TABLE "plugin_matter_commands" (
         "request_id" varchar PRIMARY KEY NOT NULL,
         "endpoint_ref" varchar NOT NULL,
         "cluster_id" integer NOT NULL,
@@ -188,13 +153,8 @@ export class CreateMatterDeviceModel1793900001000 implements MigrationInterface 
         "failure_code" varchar,
         CONSTRAINT "CHK_plugin_matter_commands_outcome" CHECK ("outcome" IN ('requested', 'accepted', 'reported', 'uncertain', 'failed'))
       )`,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "IDX_plugin_matter_commands_requested_at" ON "plugin_matter_commands" ("requested_at", "request_id")`,
-    );
-
-    await queryRunner.query(
-      `CREATE TABLE "plugin_matter_reconciliation_status" (
+  `CREATE INDEX "IDX_plugin_matter_commands_requested_at" ON "plugin_matter_commands" ("requested_at", "request_id")`,
+  `CREATE TABLE "plugin_matter_reconciliation_status" (
         "id" integer PRIMARY KEY NOT NULL,
         "last_started_at" varchar,
         "last_finished_at" varchar,
@@ -204,18 +164,51 @@ export class CreateMatterDeviceModel1793900001000 implements MigrationInterface 
         CONSTRAINT "CHK_plugin_matter_reconciliation_status_singleton" CHECK ("id" = 1),
         CONSTRAINT "CHK_plugin_matter_reconciliation_status_result" CHECK ("last_result" IS NULL OR "last_result" IN ('applied', 'skipped_unavailable', 'skipped_non_authoritative', 'failed'))
       )`,
-    );
-  }
+  `ALTER TABLE "plugin_matter_fabrics" ADD COLUMN "fabric_generation" integer`,
+  `ALTER TABLE "plugin_matter_fabrics" ADD COLUMN "storage_instance_id" varchar`,
+  `ALTER TABLE "plugin_matter_fabrics" ADD COLUMN "root_cert_fingerprint" varchar`,
+  `ALTER TABLE "plugin_matter_fabrics" ADD COLUMN "recorded_at" varchar`,
+  `CREATE TABLE "plugin_matter_recovery_keys" (
+        "id" varchar PRIMARY KEY NOT NULL,
+        "key_id" varchar NOT NULL,
+        "encrypted_key" text NOT NULL,
+        "created_at" varchar NOT NULL,
+        "acknowledged_at" varchar,
+        "retired_at" varchar
+      )`,
+  `CREATE UNIQUE INDEX "UQ_plugin_matter_recovery_keys_current" ON "plugin_matter_recovery_keys" ((1)) WHERE "retired_at" IS NULL`,
+  `CREATE UNIQUE INDEX "UQ_plugin_matter_recovery_keys_key_id" ON "plugin_matter_recovery_keys" ("key_id")`,
+  `CREATE TABLE "plugin_matter_backups" (
+        "id" varchar PRIMARY KEY NOT NULL,
+        "created_at" varchar NOT NULL,
+        "trigger" varchar NOT NULL,
+        "actor" integer,
+        "outcome" varchar NOT NULL,
+        "reason" varchar,
+        "size_bytes" integer,
+        "sha256" varchar,
+        "format_version" integer,
+        "plugin_version" varchar,
+        "sidecar_version" varchar,
+        "matter_js_version" varchar,
+        "storage_schema_version" integer,
+        "plugin_migration" varchar,
+        "fabric_id" varchar,
+        "root_cert_fingerprint" varchar,
+        "fabric_generation" integer,
+        "storage_instance_id" varchar,
+        "recovery_key_id" varchar,
+        "consistent" boolean,
+        "blob" blob,
+        CONSTRAINT "CHK_plugin_matter_backups_outcome" CHECK ("outcome" IN ('succeeded', 'failed')),
+        CONSTRAINT "CHK_plugin_matter_backups_trigger" CHECK ("trigger" IN ('manual', 'fabric_created', 'restore', 'daily', 'fabric_changed', 'pre_restore'))
+      )`,
+  `CREATE INDEX "IDX_plugin_matter_backups_created_at" ON "plugin_matter_backups" ("created_at")`,
+];
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
-    // Reverse order of creation. Dropping a table drops its indexes.
-    await queryRunner.query(`DROP TABLE "plugin_matter_reconciliation_status"`);
-    await queryRunner.query(`DROP TABLE "plugin_matter_commands"`);
-    await queryRunner.query(`DROP TABLE "plugin_matter_endpoint_state"`);
-    await queryRunner.query(`DROP TABLE "plugin_matter_endpoint_capabilities"`);
-    await queryRunner.query(`DROP TABLE "plugin_matter_endpoint_clusters"`);
-    await queryRunner.query(`DROP TABLE "plugin_matter_endpoints"`);
-    await queryRunner.query(`DROP TABLE "plugin_matter_nodes"`);
-    await queryRunner.query(`DROP TABLE "plugin_matter_fabrics"`);
-  }
-}
+/** The class names of the three 1.x migrations, in the order they ran. */
+export const LEGACY_MIGRATION_CLASS_NAMES: readonly string[] = [
+  'CreateMatterConnection1793900000000',
+  'CreateMatterDeviceModel1793900001000',
+  'CreateMatterBackup1793900002000',
+];

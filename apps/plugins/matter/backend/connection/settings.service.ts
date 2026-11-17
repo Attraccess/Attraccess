@@ -1,11 +1,10 @@
 import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
-import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { SidecarClientConfig } from '../client/rest-client';
-import { runTransaction } from '../fabric/db';
 import { PLUGIN_CONTEXT } from '../plugin-context';
-import { CONNECTION_ROW_ID, MatterConnection } from './entity';
+import { matterStorage } from '../plugin-storage/access';
+import { CONNECTION_ROW_ID, type MatterConnection } from './entity';
 import { normalizeUrl, type SettingsInput } from './validation';
 
 export type PublicSettings = {
@@ -24,12 +23,12 @@ export class CredentialUnreadableError extends Error {}
 export class MatterSettingsService {
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
 
-  private get repository() {
-    return sqlitePersistence(this.context).getRepository(MatterConnection);
+  private get storage() {
+    return matterStorage(this.context);
   }
 
   async publicView(): Promise<PublicSettings> {
-    const row = await this.repository.findOneBy({ id: CONNECTION_ROW_ID });
+    const row = await this.storage.tables.connection.get(CONNECTION_ROW_ID);
     if (!row) {
       return {
         url: null,
@@ -50,7 +49,7 @@ export class MatterSettingsService {
 
   /** The decrypted settings for the sidecar client, or null when nothing is configured. */
   async clientConfig(): Promise<SidecarClientConfig | null> {
-    const row = await this.repository.findOneBy({ id: CONNECTION_ROW_ID });
+    const row = await this.storage.tables.connection.get(CONNECTION_ROW_ID);
     if (!row) return null;
     try {
       return {
@@ -63,15 +62,10 @@ export class MatterSettingsService {
     }
   }
 
-  /**
-   * Writes go through the host's serialized write queue like the plugin's other writes. A plain transaction here
-   * reads first and then has to upgrade its SQLite lock, which fails at once with SQLITE_BUSY (no busy wait) while
-   * the queue's connection holds the write lock, e.g. for the reconciliation that every reconnect starts.
-   */
+  /** Read and write in one host transaction, so a concurrent save cannot slip between them. */
   save(input: SettingsInput, userId: number | null): Promise<{ credentialChanged: boolean; caChanged: boolean }> {
-    return runTransaction(this.context, async (manager) => {
-      const repository = manager.getRepository(MatterConnection);
-      const existing = await repository.findOneBy({ id: CONNECTION_ROW_ID });
+    return this.storage.transaction(async (tables) => {
+      const existing = await tables.connection.get(CONNECTION_ROW_ID);
       if (!existing && input.credential === undefined) {
         throw new MissingCredentialError('credential: The credential is required for the first configuration.');
       }
@@ -90,26 +84,26 @@ export class MatterSettingsService {
         );
       }
       const credentialChanged = input.credential !== undefined;
-      await repository.save({
-        id: CONNECTION_ROW_ID,
-        url,
-        encryptedCredential: credentialChanged
-          ? this.context.secrets.encrypt(input.credential as string)
-          : (existing as MatterConnection).encryptedCredential,
-        caCertificate,
-        credentialUpdatedAt: credentialChanged || !existing ? now : existing.credentialUpdatedAt,
-        updatedAt: now,
-        updatedBy: userId,
-      });
+      await tables.connection.upsert(
+        {
+          id: CONNECTION_ROW_ID,
+          url,
+          encryptedCredential: credentialChanged
+            ? this.context.secrets.encrypt(input.credential as string)
+            : (existing as MatterConnection).encryptedCredential,
+          caCertificate,
+          credentialUpdatedAt: credentialChanged || !existing ? now : existing.credentialUpdatedAt,
+          updatedAt: now,
+          updatedBy: userId,
+        },
+        { conflictOn: ['id'] },
+      );
       return { credentialChanged, caChanged: caCertificate !== (existing?.caCertificate ?? null) };
     });
   }
 
   remove(): Promise<boolean> {
-    return runTransaction(this.context, async (manager) => {
-      const result = await manager.getRepository(MatterConnection).delete({ id: CONNECTION_ROW_ID });
-      return (result.affected ?? 0) > 0;
-    });
+    return this.storage.transaction(async (tables) => (await tables.connection.delete({ id: CONNECTION_ROW_ID })) > 0);
   }
 
   /** Records a settings change. Details are flags only. A missing or failing audit sink never fails the request. */

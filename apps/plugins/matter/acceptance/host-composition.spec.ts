@@ -1,13 +1,10 @@
-import { AuditLog } from '@attraccess/database-entities';
 import { DualAuthGuard } from '@attraccess/plugins-backend-sdk';
-import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { Test } from '@nestjs/testing';
-import type { Database } from 'sqlite3';
 import request from 'supertest';
 import { MatterConnectionService } from '../backend/connection/connection.service';
 import plugin from '../backend/plugin';
 import { FakeSidecar, TOKEN } from '../backend/testing/fake-sidecar.test-utils';
-import { ADMIN, auditRows, bootHost, type Host } from './host.test-utils';
+import { ADMIN, auditRows, bootHost, connectionRows, type Host } from './host.test-utils';
 
 async function until(predicate: () => boolean | Promise<boolean>, timeoutMs = 5_000) {
   const deadline = Date.now() + timeoutMs;
@@ -61,18 +58,18 @@ describe('Matter plugin composed with the host', () => {
       .expect(200);
     expect(saved.body).toMatchObject({ url: fake.url, credentialConfigured: true, caCertificate: null });
     expect(JSON.stringify(saved.body)).not.toContain(TOKEN);
-    const rows = (await host.db.query('SELECT * FROM plugin_matter_connection')) as Record<string, unknown>[];
+    const rows = await connectionRows(host);
     expect(rows).toHaveLength(1);
     expect(JSON.stringify(rows)).not.toContain(TOKEN);
-    expect(rows[0]).toMatchObject({ id: 1, updated_by: 7 });
-    expect(host.context.secrets.decrypt(rows[0].encrypted_credential as string)).toBe(TOKEN);
+    expect(rows[0]).toMatchObject({ id: 1, updatedBy: 7 });
+    expect(host.context.secrets.decrypt(rows[0].encryptedCredential)).toBe(TOKEN);
 
     await until(async () => (await api().get('/api/matter/connection/status').set(ADMIN)).body.state === 'connected');
     const read = await api().get('/api/matter/connection').set(ADMIN).expect(200);
     expect(JSON.stringify(read.body)).not.toContain(TOKEN);
 
-    const audit = await auditRows(host.db);
-    expect(audit.map((row: AuditLog) => row.action)).toEqual(['matter.connection_saved']);
+    const audit = auditRows(host);
+    expect(audit.map((row) => row.action)).toEqual(['matter.connection_saved']);
     expect(JSON.stringify(audit)).not.toMatch(new RegExp(`${TOKEN}|127\\.0\\.0\\.1|Bearer`));
     expect(JSON.stringify(audit)).toContain('credentialChanged');
   });
@@ -96,44 +93,8 @@ describe('Matter plugin composed with the host', () => {
     await api().put('/api/matter/connection').set(ADMIN).send({ url: fake.url, credential: TOKEN }).expect(200);
     await api().delete('/api/matter/connection').set(ADMIN).expect(204);
     expect((await api().get('/api/matter/connection/status').set(ADMIN)).body.state).toBe('not_configured');
-    expect(await host.db.query('SELECT * FROM plugin_matter_connection')).toHaveLength(0);
-    expect((await auditRows(host.db)).map((row: AuditLog) => row.action)).toEqual([
-      'matter.connection_saved',
-      'matter.connection_removed',
-    ]);
-  });
-
-  // The flaky 500 of the credential rotation acceptance test: a reconnect starts fabric detection and a reconciliation,
-  // which read on the main SQLite connection and write through the host's serialized queue on its own connection. A
-  // settings write on the main connection then needs the write lock while that connection is still reading, and SQLite
-  // fails it with SQLITE_BUSY at once instead of waiting (a wait could deadlock). Through the queue it waits its turn.
-  it('saves and removes the settings while a reconciliation holds the write lock and a read is in progress', async () => {
-    fake = await FakeSidecar.start();
-    await api().put('/api/matter/connection').set(ADMIN).send({ url: fake.url, credential: TOKEN }).expect(200);
-    const sqlite = (host.db.driver as unknown as { databaseConnection: Database }).databaseConnection;
-    const contended = async (send: () => Promise<unknown>) => {
-      // A read on the main connection that has returned its first row and not finished yet.
-      const reading = sqlite.prepare('SELECT * FROM migrations');
-      await new Promise<void>((resolve, reject) => reading.get((error) => (error ? reject(error) : resolve())));
-      let locked!: () => void;
-      const lockHeld = new Promise<void>((resolve) => (locked = resolve));
-      const writing = host.context.persistence.transaction(async (scope) => {
-        const manager = sqlitePersistence(host.context).managerOf(scope);
-        await manager.query("UPDATE migrations SET name = name WHERE name = ''");
-        locked();
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        // The read ends before this transaction commits, as a status request's would.
-        await new Promise<void>((resolve) => reading.finalize(() => resolve()));
-      });
-      await lockHeld;
-      // supertest only sends the request once it is awaited or then-ed.
-      const response = Promise.resolve(send());
-      await writing;
-      await response;
-    };
-    await contended(() => api().put('/api/matter/connection').set(ADMIN).send({ url: fake?.url }).expect(200));
-    await contended(() => api().delete('/api/matter/connection').set(ADMIN).expect(204));
-    expect(await host.db.query('SELECT * FROM plugin_matter_connection')).toHaveLength(0);
+    expect(await connectionRows(host)).toHaveLength(0);
+    expect(auditRows(host).map((row) => row.action)).toEqual(['matter.connection_saved', 'matter.connection_removed']);
   });
 
   it('degrades, instead of crashing, on a host that cannot report its version', async () => {

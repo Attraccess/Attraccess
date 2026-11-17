@@ -1,20 +1,19 @@
-// Test harness for the device model: a real in-memory SQLite database with the plugin's own migrations, a plugin
-// context on top of it, and a scripted stand-in for the sidecar connection.
+// Test harness for the device model: the in-memory fake of the plugin record port over the plugin's declared tables,
+// a plugin context on top of it, and a scripted stand-in for the sidecar connection.
 import type { NodeListView, NodeView } from '../devices/sidecar-types';
-import type { PluginContext } from '@attraccess/plugins-backend-sdk';
-import { createSqlitePluginPersistence, DataSource, type EntityManager } from '@attraccess/plugins-backend-sdk/sqlite';
+import { createInMemoryPluginStorage, type PluginContext } from '@attraccess/plugins-backend-sdk';
 import { SidecarClientError, SidecarTimeoutError, SidecarUnavailableError } from '../client/errors';
 import type { ConnectionStatus } from '../client/connection';
 import { MatterConnectionService } from '../connection/connection.service';
-import { CONNECTION_ROW_ID, MatterConnection } from '../connection/entity';
-import { BACKUP_ENTITIES } from '../backup/entities';
+import { CONNECTION_ROW_ID } from '../connection/entity';
 import { DeviceAuditService } from '../devices/audit.service';
-import { DEVICE_ENTITIES } from '../devices/entities';
+import type { MatterNode } from '../devices/entities';
 import { MatterLifecycleService } from '../devices/lifecycle.service';
 import { MatterFabricGuard } from '../fabric/guard';
 import { MatterReconciliationService } from '../devices/reconciliation.service';
 import { MatterStateService } from '../devices/state.service';
-import * as migrations from '../migrations';
+import { matterStorage, type MatterTables } from '../plugin-storage/access';
+import { MATTER_STORAGE, MATTER_TABLES } from '../plugin-storage/tables';
 
 export const ADMIN = { userId: 7, authenticationMethod: 'session' as const };
 
@@ -116,16 +115,70 @@ export const unsupportedCapability = () =>
   new SidecarClientError('request', 'Not implemented in this sidecar release.', { code: 'unsupported_capability' });
 export const timeoutError = () => new SidecarTimeoutError('timed out');
 
+/** A complete node row for fixtures; `overrides` set what a test cares about. */
+export const nodeRow = (overrides: Partial<MatterNode> = {}): MatterNode => ({
+  id: 'node-1',
+  fabricRef: 'x',
+  nodeId: '5',
+  vendorId: null,
+  productId: null,
+  vendorName: null,
+  productName: null,
+  serialNumber: null,
+  uniqueId: null,
+  hardwareVersion: null,
+  softwareVersion: null,
+  softwareVersionString: null,
+  attestationStatus: null,
+  attestationCheckedAt: null,
+  displayName: null,
+  description: null,
+  location: null,
+  lifecycleState: 'unclaimed',
+  detachedReason: null,
+  reachable: null,
+  firstSeenAt: 't',
+  lastSeenAt: 't',
+  claimedAt: null,
+  claimedBy: null,
+  detachedAt: null,
+  archivedAt: null,
+  archivedBy: null,
+  removedAt: null,
+  removedBy: null,
+  removalReason: null,
+  mergedInto: null,
+  createdAt: 't',
+  updatedAt: 't',
+  ...overrides,
+});
+
+type Logical = keyof MatterTables;
+const logicalOf = (physical: string): Logical => {
+  const found = (Object.keys(MATTER_TABLES) as Logical[]).find((name) => MATTER_TABLES[name].physicalName === physical);
+  if (!found) throw new Error(`unknown table ${physical}`);
+  return found;
+};
+
 export async function createHarness() {
-  const dataSource = await new DataSource({
-    type: 'sqlite',
-    database: ':memory:',
-    entities: [MatterConnection, ...DEVICE_ENTITIES, ...BACKUP_ENTITIES],
-    migrations: Object.values(migrations),
-  }).initialize();
-  await dataSource.runMigrations();
+  const fake = createInMemoryPluginStorage(MATTER_STORAGE);
+  const audit = jest.fn(async () => ({ status: 'recorded' as const }));
+  const context = {
+    hostVersion: '2.0.0',
+    manifest: { id: 'matter', name: 'matter', version: '0.4.0-alpha.0', pluginDirectory: 'matter' },
+    logger: { debug: jest.fn(), warn: jest.fn(), error: jest.fn(), log: jest.fn() },
+    storage: fake.storage,
+    persistence: fake.persistence,
+    audit: { record: audit },
+    // A reversible stand-in for the host's encryption, visibly not plaintext.
+    secrets: {
+      encrypt: (text: string) => `enc:${Buffer.from(text).toString('base64')}`,
+      decrypt: (text: string) => Buffer.from(text.slice(4), 'base64').toString(),
+    },
+  } as unknown as PluginContext;
+  const tables = matterStorage(context).tables;
   // A saved connection by user 1: system-initiated audit entries must never be attributed to that user.
-  await dataSource.getRepository(MatterConnection).save({
+  await tables.connection.insert({
     id: CONNECTION_ROW_ID,
     url: 'http://127.0.0.1:1',
     encryptedCredential: 'x',
@@ -134,32 +187,6 @@ export async function createHarness() {
     updatedAt: '2026-10-29T10:00:00.000Z',
     updatedBy: 1,
   });
-  const audit = jest.fn(async () => ({ status: 'recorded' as const }));
-  // Mirrors the host: concurrent callers run one at a time inside a transaction.
-  let tail: Promise<unknown> = Promise.resolve();
-  const runSerialized = <T>(work: (manager: EntityManager) => Promise<T>): Promise<T> => {
-    const next = tail.catch(() => undefined).then(() => dataSource.transaction(work));
-    tail = next;
-    return next;
-  };
-  const persistence = createSqlitePluginPersistence({
-    pluginName: 'matter',
-    connection: () => dataSource,
-    entities: [MatterConnection, ...DEVICE_ENTITIES, ...BACKUP_ENTITIES],
-    runInTransaction: runSerialized,
-  });
-  const context = {
-    hostVersion: '2.0.0',
-    manifest: { id: 'matter', name: 'matter', version: '0.4.0-alpha.0', pluginDirectory: 'matter' },
-    logger: { debug: jest.fn(), warn: jest.fn(), error: jest.fn(), log: jest.fn() },
-    persistence,
-    audit: { record: audit },
-    // A reversible stand-in for the host's encryption, visibly not plaintext.
-    secrets: {
-      encrypt: (text: string) => `enc:${Buffer.from(text).toString('base64')}`,
-      decrypt: (text: string) => Buffer.from(text.slice(4), 'base64').toString(),
-    },
-  } as unknown as PluginContext;
   const sidecar = new ScriptedSidecar();
   const connectionService = { connection: sidecar } as unknown as MatterConnectionService;
   const auditService = new DeviceAuditService(context);
@@ -169,8 +196,9 @@ export async function createHarness() {
   const lifecycle = new MatterLifecycleService(context, connectionService, auditService);
   const actions = () => audit.mock.calls.map((call) => (call as unknown as [{ action: string }])[0].action);
   return {
-    dataSource,
     context,
+    /** The tables outside a transaction, for assertions and fixtures. */
+    tables,
     audit,
     actions,
     sidecar,
@@ -182,8 +210,42 @@ export async function createHarness() {
       sidecar.list = list;
       return reconciliation.request();
     },
-    rows: <T extends object>(table: string) => dataSource.query(`SELECT * FROM ${table} ORDER BY 1, 2`) as Promise<T[]>,
-    close: () => dataSource.destroy(),
+    /** The row of a table that matches `where`; throws when there is none. */
+    one: async <K extends Logical>(
+      name: K,
+      where: NonNullable<Parameters<MatterTables[K]['findOne']>[0]>['where'],
+    ): Promise<NonNullable<Awaited<ReturnType<MatterTables[K]['findOne']>>>> => {
+      const row = await (tables[name] as MatterTables['nodes']).findOne({ where: where as never });
+      if (!row) throw new Error(`no row in ${name} for ${JSON.stringify(where)}`);
+      return row as never;
+    },
+    /** The live node (not removed) with this Matter node ID in the fabric with this Matter fabric ID. */
+    liveNode: async (nodeId: string, fabricId = '1'): Promise<MatterNode> => {
+      const fabrics = await tables.fabrics.find({ where: { fabricId } });
+      const found = await tables.nodes.findOne({
+        where: { nodeId, fabricRef: { in: fabrics.map((fabric) => fabric.id) }, removedAt: null },
+      });
+      if (!found) throw new Error(`no live node ${nodeId} in fabric ${fabricId}`);
+      return found;
+    },
+    /** Deletes every row of a table. */
+    clear: async (name: Logical) => {
+      const [key] = MATTER_TABLES[name].primaryKey;
+      await (tables[name] as MatterTables['nodes']).delete({ [key]: { isNull: false } } as never);
+    },
+    /** The rows of a table as `SELECT * ... ORDER BY 1, 2` would give them: physical column names. */
+    rows: async <T extends object>(table: string): Promise<T[]> => {
+      const logical = logicalOf(table);
+      const fields = Object.entries(MATTER_TABLES[logical].fields);
+      const found = (await tables[logical].find()) as unknown as Record<string, unknown>[];
+      const named = found.map((row) =>
+        Object.fromEntries(fields.map(([field, definition]) => [definition.column ?? field, row[field] ?? null])),
+      );
+      const [first, second] = fields.map(([field, definition]) => definition.column ?? field);
+      const order = (a: unknown, b: unknown) => (a === b ? 0 : (a as string) < (b as string) ? -1 : 1);
+      return named.sort((a, b) => order(a[first], b[first]) || order(a[second], b[second])) as T[];
+    },
+    close: async () => undefined,
   };
 }
 export type Harness = Awaited<ReturnType<typeof createHarness>>;

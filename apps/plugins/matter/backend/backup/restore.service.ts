@@ -1,5 +1,4 @@
 import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
-import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import {
   Inject,
   Injectable,
@@ -11,7 +10,6 @@ import {
 import { randomUUID } from 'node:crypto';
 import { MatterConnectionService } from '../connection/connection.service';
 import { DeviceAuditService, type AuditActor } from '../devices/audit.service';
-import { MatterFabric as MatterFabricEntity } from '../devices/entities';
 import { MatterReconciliationService } from '../devices/reconciliation.service';
 import { conflict, sidecarCode, unprocessable } from '../fabric/errors';
 import type { SidecarFabric } from '../fabric/facts';
@@ -130,14 +128,7 @@ export class MatterRestoreService implements OnModuleDestroy {
     const file = await this.load(source);
     if (!file) throw new NotFoundException({ code: 'not_found', message: 'There is no such backup.' });
     const opened = await this.open(file, recoveryKey, audited, refuse);
-    if (
-      !tablesAreAcceptable(
-        sqlitePersistence(this.context).getRepository(MatterFabricEntity).manager,
-        opened.body.tables,
-      )
-    ) {
-      return refuse('incompatible_schema');
-    }
+    if (!tablesAreAcceptable(opened.body.tables)) return refuse('incompatible_schema');
 
     const preflight = await this.preflight(opened.header.fabricId);
     // Checked again right before staging: a restore may have started while the file was being read.
