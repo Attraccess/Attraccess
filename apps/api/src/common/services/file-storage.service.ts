@@ -70,22 +70,32 @@ export class FileStorageService implements OnModuleInit {
     }
   }
 
+  /** Resolves a storage path and refuses anything outside the CDN root. */
+  private resolveInStorage(...segments: string[]): string {
+    const root = path.resolve(this.storageConfig.cdn.root);
+    const resolved = path.resolve(root, ...segments);
+    if (!resolved.startsWith(root + path.sep)) {
+      throw new FileNotFoundError(segments[segments.length - 1]);
+    }
+    return resolved;
+  }
+
   async saveFile(file: FileUpload, subDirectory: string): Promise<string> {
     await this.validateFile(file);
 
     const secureFilename = this.generateUniqueFilename(file.originalname);
-    const targetDir = path.join(this.storageConfig.cdn.root, subDirectory);
+    const targetDir = this.resolveInStorage(subDirectory);
 
     await fs.mkdir(targetDir, { recursive: true, mode: 0o755 });
 
-    const filePath = path.join(targetDir, secureFilename);
+    const filePath = this.resolveInStorage(subDirectory, secureFilename);
     await fs.writeFile(filePath, file.buffer, { mode: 0o644 });
 
     return secureFilename;
   }
 
   async deleteFile(subDirectory: string, filename: string): Promise<void> {
-    const filePath = path.join(this.storageConfig.cdn.root, subDirectory, filename);
+    const filePath = this.resolveInStorage(subDirectory, filename);
 
     try {
       await fs.unlink(filePath);
@@ -97,7 +107,7 @@ export class FileStorageService implements OnModuleInit {
   }
 
   async getFilePath(subDirectory: string, filename: string): Promise<string> {
-    const filePath = path.join(this.storageConfig.cdn.root, subDirectory, filename);
+    const filePath = this.resolveInStorage(subDirectory, filename);
 
     try {
       await fs.access(filePath);

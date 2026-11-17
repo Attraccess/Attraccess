@@ -1,8 +1,10 @@
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { BadRequestException, NotFoundException, StreamableFile } from '@nestjs/common';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { BadRequestException, Logger, NotFoundException, StreamableFile } from '@nestjs/common';
+import { Response } from 'express';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { PassThrough } from 'stream';
 import { PluginController } from './plugin.controller';
 import { PluginService } from './plugin.service';
 import { PluginModule } from './plugin.module';
@@ -50,11 +52,7 @@ describe('PluginController', () => {
       marketplacePackage: jest.fn(),
     };
     audit = { recordAdministration: jest.fn() };
-    controller = new PluginController(
-      service as unknown as PluginService,
-      npmService as never,
-      audit as never,
-    );
+    controller = new PluginController(service as unknown as PluginService, npmService as never, audit as never);
   });
 
   afterEach(() => {
@@ -97,7 +95,8 @@ describe('PluginController', () => {
 
       expect(audit.recordAdministration).toHaveBeenCalledWith(
         expect.objectContaining({
-          subjectId: auditSubjectKeyId(plugin.name), details: expect.objectContaining({ pluginId: plugin.id }),
+          subjectId: auditSubjectKeyId(plugin.name),
+          details: expect.objectContaining({ pluginId: plugin.id }),
         }),
         undefined,
       );
@@ -121,13 +120,19 @@ describe('PluginController', () => {
   });
 
   describe('getFrontendPluginFile', () => {
+    let res: Response;
+
+    beforeEach(() => {
+      res = new PassThrough() as unknown as Response;
+    });
+
     it('streams an existing frontend file', () => {
       const plugin = frontendPlugin('streamed');
       jest.spyOn(PluginService, 'getPlugins').mockReturnValue([plugin]);
       mkdirSync(join(root, 'streamed', 'frontend'), { recursive: true });
       writeFileSync(join(root, 'streamed', 'frontend', 'index.js'), 'console.log(1)');
 
-      const streamable = controller.getFrontendPluginFile('streamed', 'index.js');
+      const streamable = controller.getFrontendPluginFile('streamed', 'index.js', res);
       expect(streamable).toBeInstanceOf(StreamableFile);
       // the stream opens lazily, so afterEach's rmSync races it into an ENOENT 'error' event.
       // Unhandled, that kills the whole jest worker — swallow it and close the fd.
@@ -135,6 +140,27 @@ describe('PluginController', () => {
         .getStream()
         .on('error', () => undefined)
         .destroy();
+    });
+
+    it.each([
+      ['during the download', false],
+      ['before the handler runs', true],
+    ])('closes the file when the client disconnects %s', async (_label, closedEarly) => {
+      jest.spyOn(PluginService, 'getPlugins').mockReturnValue([frontendPlugin('aborted')]);
+      mkdirSync(join(root, 'aborted', 'frontend'), { recursive: true });
+      writeFileSync(join(root, 'aborted', 'frontend', 'index.js'), 'console.log(1)');
+      const settle = () => new Promise((resolvePromise) => setImmediate(resolvePromise));
+      if (closedEarly) {
+        res.destroy();
+        await settle();
+      }
+
+      const stream = controller.getFrontendPluginFile('aborted', 'index.js', res).getStream();
+      stream.on('error', () => undefined);
+      if (!closedEarly) res.destroy();
+      await settle();
+
+      expect(stream.destroyed).toBe(true);
     });
 
     it.each([
@@ -146,7 +172,7 @@ describe('PluginController', () => {
       mkdirSync(join(root, 'typed', 'frontend'), { recursive: true });
       writeFileSync(join(root, 'typed', 'frontend', fileName), '/* content */');
 
-      const file = controller.getFrontendPluginFile('typed', fileName);
+      const file = controller.getFrontendPluginFile('typed', fileName, res);
       expect(file.options.type).toBe(contentType);
       file
         .getStream()
@@ -156,7 +182,7 @@ describe('PluginController', () => {
 
     it('throws when the plugin is unknown', () => {
       jest.spyOn(PluginService, 'getPlugins').mockReturnValue([]);
-      expect(() => controller.getFrontendPluginFile('ghost', 'index.js')).toThrow(NotFoundException);
+      expect(() => controller.getFrontendPluginFile('ghost', 'index.js', res)).toThrow(NotFoundException);
     });
 
     it('throws when the plugin has no frontend entry', () => {
@@ -165,12 +191,143 @@ describe('PluginController', () => {
         main: { backend: { directory: 'backend', entryPoint: 'index.js' } },
       };
       jest.spyOn(PluginService, 'getPlugins').mockReturnValue([plugin as LoadedPluginManifest]);
-      expect(() => controller.getFrontendPluginFile('backend-only', 'index.js')).toThrow(NotFoundException);
+      expect(() => controller.getFrontendPluginFile('backend-only', 'index.js', res)).toThrow(NotFoundException);
     });
 
     it('throws when the requested file is missing', () => {
       jest.spyOn(PluginService, 'getPlugins').mockReturnValue([frontendPlugin('present')]);
-      expect(() => controller.getFrontendPluginFile('present', 'missing.js')).toThrow(NotFoundException);
+      expect(() => controller.getFrontendPluginFile('present', 'missing.js', res)).toThrow(NotFoundException);
+    });
+
+    describe('containment', () => {
+      let outside: string;
+
+      function readServed(file: StreamableFile): Promise<string> {
+        return new Promise((resolvePromise, reject) => {
+          let body = '';
+          file
+            .getStream()
+            .on('data', (chunk) => (body += chunk))
+            .on('end', () => resolvePromise(body))
+            .on('error', reject);
+        });
+      }
+
+      beforeEach(() => {
+        jest.spyOn(PluginService, 'getPlugins').mockReturnValue([frontendPlugin('guarded')]);
+        mkdirSync(join(root, 'guarded', 'frontend', 'assets', 'sub'), { recursive: true });
+        writeFileSync(join(root, 'guarded', 'frontend', 'assets', 'sub', 'chunk.js'), 'nested');
+        writeFileSync(join(root, 'guarded', 'frontend', 'chunk,with,commas.js'), 'commas');
+        writeFileSync(join(root, 'guarded', 'plugin.json'), '{"secret":true}');
+        outside = mkdtempSync(join(tmpdir(), 'plugin-controller-outside-'));
+        writeFileSync(join(outside, 'secret.txt'), 'secret');
+      });
+
+      afterEach(() => {
+        rmSync(outside, { recursive: true, force: true });
+      });
+
+      it('serves a nested file given as path-to-regexp segments', async () => {
+        await expect(
+          readServed(controller.getFrontendPluginFile('guarded', ['assets', 'sub', 'chunk.js'], res)),
+        ).resolves.toBe('nested');
+      });
+
+      it('serves a nested file given as a slash-separated string', async () => {
+        await expect(readServed(controller.getFrontendPluginFile('guarded', 'assets/sub/chunk.js', res))).resolves.toBe(
+          'nested',
+        );
+      });
+
+      it('serves a file whose name contains commas', async () => {
+        await expect(
+          readServed(controller.getFrontendPluginFile('guarded', ['chunk,with,commas.js'], res)),
+        ).resolves.toBe('commas');
+      });
+
+      it.each([
+        ['no segments', []],
+        ['an empty segment', ['assets', '', 'sub', 'chunk.js']],
+        ['a dot segment', ['.']],
+        ['a parent segment', ['..', 'plugin.json']],
+        ['a decoded slash', ['../plugin.json']],
+        ['a decoded backslash', ['..\\plugin.json']],
+        ['a NUL byte', ['assets', 'sub', 'chunk.js\0.css']],
+        ['an absolute path', ['/etc/passwd']],
+        ['a drive letter', ['C:', 'Windows', 'win.ini']],
+        ['a directory', ['assets']],
+      ])('refuses %s with a generic 404', (_label, segments) => {
+        expect(() => controller.getFrontendPluginFile('guarded', segments, res)).toThrow(
+          new NotFoundException('Frontend file not found for plugin guarded'),
+        );
+      });
+
+      it('refuses a symlink that points outside the frontend directory', () => {
+        symlinkSync(join(outside, 'secret.txt'), join(root, 'guarded', 'frontend', 'escape.js'));
+
+        expect(() => controller.getFrontendPluginFile('guarded', ['escape.js'], res)).toThrow(NotFoundException);
+      });
+
+      it('serves a symlink that stays inside the frontend directory', async () => {
+        symlinkSync(
+          join(root, 'guarded', 'frontend', 'assets', 'sub', 'chunk.js'),
+          join(root, 'guarded', 'frontend', 'alias.js'),
+        );
+
+        await expect(readServed(controller.getFrontendPluginFile('guarded', ['alias.js'], res))).resolves.toBe(
+          'nested',
+        );
+      });
+
+      it('refuses a manifest whose frontend directory points outside the plugin path', () => {
+        const plugin = frontendPlugin('malicious');
+        plugin.main.frontend = { directory: join('malicious', '..', '..'), entryPoint: 'index.mjs' };
+        jest.spyOn(PluginService, 'getPlugins').mockReturnValue([plugin]);
+        mkdirSync(join(root, 'malicious'), { recursive: true });
+        const escapedRoot = join(root, '..');
+
+        expect(() =>
+          controller.getFrontendPluginFile(
+            'malicious',
+            [root.slice(escapedRoot.length + 1), 'guarded', 'plugin.json'],
+            res,
+          ),
+        ).toThrow(NotFoundException);
+      });
+
+      it('logs a refused request at warn with only a short sanitized prefix', () => {
+        const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+        const input = ['../../../../\u001b[31m' + 'a'.repeat(100)];
+
+        expect(() => controller.getFrontendPluginFile('guarded', input, res)).toThrow(NotFoundException);
+
+        expect(warn).toHaveBeenCalledTimes(1);
+        const message = warn.mock.calls[0][0] as string;
+        expect(message).toContain('guarded');
+        expect(message).toContain('separator in segment');
+        expect(message).not.toContain(root);
+        expect(message).not.toContain('\u001b');
+        expect(message).not.toContain('a'.repeat(40));
+      });
+
+      it('logs an ordinary missing file below warn', () => {
+        const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+        const debug = jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+
+        expect(() => controller.getFrontendPluginFile('guarded', ['stale-chunk.js'], res)).toThrow(NotFoundException);
+
+        expect(warn).not.toHaveBeenCalled();
+        expect(debug).toHaveBeenCalledWith(expect.stringContaining('file missing'));
+      });
+
+      it('refuses a manifest whose frontend directory points into another plugin', () => {
+        const plugin = frontendPlugin('neighbour');
+        plugin.main.frontend = { directory: 'guarded', entryPoint: 'index.mjs' };
+        jest.spyOn(PluginService, 'getPlugins').mockReturnValue([plugin]);
+        mkdirSync(join(root, 'neighbour'), { recursive: true });
+
+        expect(() => controller.getFrontendPluginFile('neighbour', ['plugin.json'], res)).toThrow(NotFoundException);
+      });
     });
   });
 

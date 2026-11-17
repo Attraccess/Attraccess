@@ -10,6 +10,7 @@ import storageConfigObject, { StorageConfigType } from '../config/storage.config
 import appConfiguration from '../config/app.config';
 import { AppConfigType } from '../config/app.config';
 import { ServeStaticModule } from '@nestjs/serve-static';
+import { cdnServeStaticOptions } from './cdn-serve-static';
 import { resolve } from 'path';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -89,12 +90,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
         const cdnRoot = resolve(storageConfig.cdn.root);
         // eslint-disable-next-line no-console
         console.log('Serving cdn files from (via config): ', cdnRoot);
-        return [
-          {
-            rootPath: cdnRoot,
-            serveRoot: storageConfig.cdn.serveRoot,
-          },
-        ];
+        return [cdnServeStaticOptions(cdnRoot, storageConfig.cdn.serveRoot)];
       },
     }),
     ServeStaticModule.forRootAsync({
