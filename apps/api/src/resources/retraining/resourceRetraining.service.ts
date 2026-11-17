@@ -265,7 +265,10 @@ export class ResourceRetrainingService {
   }
 
   protected async getGroupLastUsedAt(groupId: number, userId: number): Promise<Date | null> {
-    const group = await this.resourceGroupRepository.findOne({ where: { id: groupId }, relations: ['resources'] });
+    const group = await this.resourceGroupRepository.findOne({
+      where: { id: groupId },
+      relations: { resources: true },
+    });
     const resourceIds = (group?.resources ?? []).map((resource) => resource.id);
     if (resourceIds.length === 0) {
       return null;

@@ -254,7 +254,7 @@ export class UsageLifecycle {
         }
         const candidate = await manager.findOneOrFail(ResourceUsage, {
           where: { id: attempt.candidateUsageId, lifecyclePending: true },
-          relations: ['resource', 'user', 'project'],
+          relations: { resource: true, user: true, project: true },
         });
         const result = await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
         if (result.affected === 0) throw new ConflictException('The tentative usage session no longer exists');

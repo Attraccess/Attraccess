@@ -28,9 +28,9 @@ describe('SQLite statements on the main connection inside a resource-lifecycle t
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'sqlite-cross-connection-'));
     source = await createDataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: join(directory, 'test.sqlite'),
-      busyTimeout: BUSY_TIMEOUT_MS,
+      timeout: BUSY_TIMEOUT_MS,
     }).initialize();
     await source.query('CREATE TABLE counter (id INTEGER PRIMARY KEY, value INTEGER NOT NULL)');
     await source.query('INSERT INTO counter VALUES (1, 0), (2, 0)');

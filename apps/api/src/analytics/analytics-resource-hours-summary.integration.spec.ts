@@ -44,7 +44,7 @@ describe('AnalyticsService resource hours summary (SQLite)', () => {
   // Schema synchronization under CI coverage can exceed Jest's five-second default.
   beforeEach(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: Object.values(entities),
       synchronize: true,

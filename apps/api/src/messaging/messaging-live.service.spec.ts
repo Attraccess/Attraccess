@@ -55,16 +55,14 @@ describe('MessagingLiveService', () => {
     const messageWithSender = { ...message, sender: { id: 5, username: 'sender' } } as Message;
     messageRepository.findOne.mockResolvedValue(messageWithSender);
 
-    const recipientEvents = firstValueFrom(
-      service.getUserMessageSubject(9).pipe(take(1), toArray()),
-    );
+    const recipientEvents = firstValueFrom(service.getUserMessageSubject(9).pipe(take(1), toArray()));
 
     const senderEvents: { data: Message }[] = [];
     service.getUserMessageSubject(5).subscribe((event) => senderEvents.push(event));
 
     await service.notifyNewMessage(new MessageCreatedEvent(message));
 
-    expect(messageRepository.findOne).toHaveBeenCalledWith({ where: { id: 3 }, relations: ['sender'] });
+    expect(messageRepository.findOne).toHaveBeenCalledWith({ where: { id: 3 }, relations: { sender: true } });
     await expect(recipientEvents).resolves.toEqual([{ data: messageWithSender }]);
     expect(senderEvents).toHaveLength(0);
   });

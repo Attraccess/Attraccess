@@ -2,7 +2,7 @@ import { DataSource } from 'typeorm';
 import { AddWagoRevisionEditorMetadata1780010580000 } from './migrations/1780010580000-add-wago-revision-editor-metadata';
 
 it('adds nullable revision metadata without changing existing history and can roll back', async () => {
-  const database = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+  const database = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
   try {
     const runner = database.createQueryRunner();
     await runner.query('CREATE TABLE "plugin_wago_configuration_revisions" (id integer PRIMARY KEY, snapshot text)');

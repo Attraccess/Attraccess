@@ -18,7 +18,7 @@ describe('RefreshMeterEvidenceReceipt1791200000000', () => {
 
   beforeEach(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: [EmailTemplateTranslation],
     }).initialize();

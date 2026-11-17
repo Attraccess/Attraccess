@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import { closeResourceTransactionConnection, runSerializedTransaction } from './run-serialized-transaction';
+import { createDataSource } from './sqlite-connection';
 
 describe('SQLite resource write transactions', () => {
   let directory: string;
@@ -10,7 +11,8 @@ describe('SQLite resource write transactions', () => {
 
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'resource-write-'));
-    source = await new DataSource({ type: 'sqlite', database: join(directory, 'test.sqlite') }).initialize();
+    // Guarded like the API's main connection: an unguarded better-sqlite3 writer would busy-wait on the event loop.
+    source = await createDataSource({ type: 'better-sqlite3', database: join(directory, 'test.sqlite') }).initialize();
     await source.query('CREATE TABLE counter (value INTEGER NOT NULL)');
     await source.query('INSERT INTO counter VALUES (0)');
   });
@@ -133,7 +135,7 @@ describe('SQLite resource write transactions', () => {
   });
   it('recovers after BEGIN IMMEDIATE times out behind another writer', async () => {
     // The dedicated connection inherits this timeout when first initialized.
-    source.setOptions({ busyTimeout: 30 });
+    source.setOptions({ timeout: 30 });
     await runSerializedTransaction(source.manager, async () => undefined);
     let release!: () => void;
     let entered!: () => void;

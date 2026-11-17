@@ -91,7 +91,10 @@ export class MeteringSettlement {
       const session = await manager.findOneOrFail(ResourceMeteringSession, { where: { id: sessionId } });
       if (session.status !== ResourceMeteringSessionStatus.Pending) return null;
       const operation = await manager.findOneOrFail(ResourceMeteringOperation, { where: { id: operationId } });
-      const usage = await manager.findOneOrFail(ResourceUsage, { where: { id: session.usageId }, relations: ['user'] });
+      const usage = await manager.findOneOrFail(ResourceUsage, {
+        where: { id: session.usageId },
+        relations: { user: true },
+      });
       if (session.creditsPerUnit === 0) {
         await manager.update(ResourceMeteringSession, session.id, {
           status: ResourceMeteringSessionStatus.Settled,
@@ -267,7 +270,10 @@ export class MeteringSettlement {
     const correction = await runSerializedTransaction(this.sessions.manager, async (manager) => {
       const session = await manager.findOneOrFail(ResourceMeteringSession, { where: { id: sessionId } });
       if (session.status !== ResourceMeteringSessionStatus.Pending) return null;
-      const usage = await manager.findOneOrFail(ResourceUsage, { where: { id: session.usageId }, relations: ['user'] });
+      const usage = await manager.findOneOrFail(ResourceUsage, {
+        where: { id: session.usageId },
+        relations: { user: true },
+      });
       if (!usage.endTime) return null;
       const billed = await this.segmentedItem(manager, session);
       if (billed === 'abandoned') {

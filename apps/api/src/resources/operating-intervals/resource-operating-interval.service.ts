@@ -149,6 +149,9 @@ export class ResourceOperatingIntervalService {
     }
 
     const code = (error as QueryFailedError & { code?: string | number }).code;
-    return code === '23505' || (code === 'SQLITE_CONSTRAINT' && error.message.includes('UNIQUE constraint failed'));
+    return (
+      code === '23505' ||
+      (String(code).startsWith('SQLITE_CONSTRAINT') && error.message.includes('UNIQUE constraint failed'))
+    );
   }
 }

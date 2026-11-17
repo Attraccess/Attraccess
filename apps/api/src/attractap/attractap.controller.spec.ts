@@ -32,7 +32,7 @@ describe('AttractapController', () => {
     await controller.getReaders();
 
     expect(attractapService.getPairedReaders).toHaveBeenCalledWith(
-      expect.objectContaining({ relations: ['resources'] }),
+      expect.objectContaining({ relations: { resources: true } }),
     );
   });
 

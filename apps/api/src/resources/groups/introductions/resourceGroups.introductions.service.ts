@@ -70,7 +70,7 @@ export class ResourceGroupsIntroductionsService {
       where: {
         resourceGroup: { id: groupId },
       },
-      relations: ['receiverUser', 'tutorUser', 'history'],
+      relations: { receiverUser: true, tutorUser: true, history: true },
       cache: false,
     });
   }

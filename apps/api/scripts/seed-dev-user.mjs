@@ -5,32 +5,25 @@
 import { existsSync, realpathSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import sqlite3pkg from 'sqlite3';
+import Database from 'better-sqlite3';
 import { assertUsageIntegrity } from './usage-integrity.mjs';
 import bcrypt from 'bcrypt';
 import { loadEnvFile } from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { resolveDatabasePath, resolveStorageRoot } from '../src/config/storage-path.ts';
 
-export function run(db, sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function callback(error) {
-      if (error) reject(error);
-      else resolve(this);
-    });
-  });
+// `db` is a better-sqlite3 Database. The helpers stay async so callers keep one shape.
+export async function run(db, sql, params = []) {
+  const { lastInsertRowid, changes } = db.prepare(sql).run(...params);
+  return { lastID: Number(lastInsertRowid), changes };
 }
 
-export function get(db, sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (error, row) => (error ? reject(error) : resolve(row)));
-  });
+export async function get(db, sql, params = []) {
+  return db.prepare(sql).get(...params);
 }
 
-export function all(db, sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (error, rows) => (error ? reject(error) : resolve(rows)));
-  });
+export async function all(db, sql, params = []) {
+  return db.prepare(sql).all(...params);
 }
 
 export async function hasTable(db, table) {
@@ -249,8 +242,6 @@ export async function applyRoles(db, entries) {
   }
 }
 
-const sqlite3 = sqlite3pkg.verbose();
-
 function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i++) {
@@ -300,7 +291,7 @@ export async function main(
     .toLowerCase();
   const password = String(args.password || 'password');
   const fixture = args.fixture ? loadFixture(path.resolve(String(args.fixture))) : null;
-  const db = new sqlite3.Database(dbPath);
+  const db = new Database(dbPath, { fileMustExist: true, timeout: 5000 });
   try {
     await run(db, 'BEGIN');
     const rbacTables = ['role', 'permission', 'role_permission', 'user_role'];
@@ -323,7 +314,7 @@ export async function main(
     if (args.demo) console.log('  demo fixture: applied');
     if (fixture) console.log(`  fixture: applied from ${args.fixture}`);
   } catch (error) {
-    await run(db, 'ROLLBACK');
+    if (db.inTransaction) db.exec('ROLLBACK');
     throw error;
   } finally {
     db.close();

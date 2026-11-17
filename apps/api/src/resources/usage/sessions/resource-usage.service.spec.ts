@@ -154,7 +154,11 @@ describe('ResourceUsageService', () => {
       );
       expect(getSessionDetailsScope.resourceUsageRepository.findOne).toHaveBeenCalledWith({
         where: { id: 8, resourceId: 5, lifecyclePending: false },
-        relations: expect.arrayContaining(['project', 'supervisorUser', 'formSubmissions.form']),
+        relations: expect.objectContaining({
+          project: true,
+          supervisorUser: true,
+          formSubmissions: expect.objectContaining({ form: true }),
+        }),
       });
       expect(getSessionDetailsScope.projectsService.findOneById).not.toHaveBeenCalled();
     });

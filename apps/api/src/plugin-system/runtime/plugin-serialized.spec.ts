@@ -12,7 +12,7 @@ describe('plugin runSerialized', () => {
 
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'plugin-serialized-'));
-    source = await new DataSource({ type: 'sqlite', database: join(directory, 'test.sqlite') }).initialize();
+    source = await new DataSource({ type: 'better-sqlite3', database: join(directory, 'test.sqlite') }).initialize();
     await source.query('CREATE TABLE counter (value INTEGER NOT NULL)');
     await source.query('INSERT INTO counter VALUES (0)');
     runSerialized = createPluginRunSerialized('booking', () => source.manager);

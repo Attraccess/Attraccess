@@ -364,10 +364,11 @@ export class EmailLayout1782200000000 implements MigrationInterface {
   name = 'EmailLayout1782200000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `INSERT INTO "setting" ("parent", "key", "value") VALUES ($1, $2, $3)`,
-      [EMAIL_LAYOUT_SETTINGS_PARENT, EMAIL_LAYOUT_SETTINGS_KEY, DEFAULT_GLOBAL_LAYOUT],
-    );
+    await queryRunner.query(`INSERT INTO "setting" ("parent", "key", "value") VALUES (?, ?, ?)`, [
+      EMAIL_LAYOUT_SETTINGS_PARENT,
+      EMAIL_LAYOUT_SETTINGS_KEY,
+      DEFAULT_GLOBAL_LAYOUT,
+    ]);
 
     const templates: Array<{ type: string; body: string; createdAt: string; updatedAt: string }> =
       await queryRunner.query(`SELECT "type", "body", "createdAt", "updatedAt" FROM "email_templates"`);
@@ -378,7 +379,7 @@ export class EmailLayout1782200000000 implements MigrationInterface {
 
       const bodyContent = newContent ?? extractMjmlBodyContent(template.body);
       if (bodyContent !== null) {
-        await queryRunner.query(`UPDATE "email_templates" SET "body" = $1 WHERE "type" = $2`, [
+        await queryRunner.query(`UPDATE "email_templates" SET "body" = ? WHERE "type" = ?`, [
           bodyContent,
           template.type,
         ]);
@@ -387,9 +388,9 @@ export class EmailLayout1782200000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `DELETE FROM "setting" WHERE "parent" = $1 AND "key" = $2`,
-      [EMAIL_LAYOUT_SETTINGS_PARENT, EMAIL_LAYOUT_SETTINGS_KEY],
-    );
+    await queryRunner.query(`DELETE FROM "setting" WHERE "parent" = ? AND "key" = ?`, [
+      EMAIL_LAYOUT_SETTINGS_PARENT,
+      EMAIL_LAYOUT_SETTINGS_KEY,
+    ]);
   }
 }

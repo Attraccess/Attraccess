@@ -37,7 +37,7 @@ describe('API token revocation with SQLite', () => {
 
   beforeEach(async () => {
     database = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: [tokenSchema, permissionSchema],
       synchronize: true,

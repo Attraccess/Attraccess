@@ -17,7 +17,7 @@ import {
   sqliteErrorCode,
 } from './persistence/audit-storage';
 
-import { SQLITE_BUSY_TIMEOUT_MS } from '../database/sqlite-connection';
+import { createDataSource, SQLITE_BUSY_TIMEOUT_MS } from '../database/sqlite-connection';
 
 import { getRegisteredPluginAuditDomains } from '../plugin-system/audit/audit-registry';
 
@@ -62,19 +62,24 @@ export class AuditService implements AuditRecorder, OnModuleInit, OnModuleDestro
     if (this.storage?.isInitialized || this.state.stopping) return;
     // A separate connection guarantees that a write without a caller transaction follows autocommit,
     // never a savepoint in another request's shared SQLite transaction. No schema sync.
-    if (this.source.options.type !== 'sqlite' || this.source.options.database === ':memory:') {
+    if (this.source.options.type !== 'better-sqlite3' || this.source.options.database === ':memory:') {
       this.logger.warn('Audit storage unavailable: requires a file-backed SQLite database');
       return;
     }
-    const storage = new DataSource({
-      type: 'sqlite',
-      database: this.source.options.database,
-      entities: [AuditLog],
-      synchronize: false,
-      migrationsRun: false,
-      logging: false,
-      busyTimeout: SQLITE_BUSY_TIMEOUT_MS,
-    });
+    // Guarded like the main connection, so its writes wait asynchronously for the file's write lock (better-sqlite3
+    // would busy-wait on the event loop). It never joins a caller's transaction on another connection.
+    const storage = createDataSource(
+      {
+        type: 'better-sqlite3',
+        database: this.source.options.database,
+        entities: [AuditLog],
+        synchronize: false,
+        migrationsRun: false,
+        logging: false,
+        timeout: SQLITE_BUSY_TIMEOUT_MS,
+      },
+      { joinsOwnedTransactions: false },
+    );
     try {
       await storage.initialize();
       await storage.query(`PRAGMA busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`);

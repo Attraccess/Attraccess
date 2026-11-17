@@ -70,7 +70,7 @@ class MetricsServer {
   ) {}
 
   static async start(file: string): Promise<MetricsServer> {
-    const source = await new DataSource({ type: 'sqlite', database: file, busyTimeout: 5000 }).initialize();
+    const source = await new DataSource({ type: 'better-sqlite3', database: file, timeout: 5000 }).initialize();
     const service = new MetricsService(...(Array(7).fill({}) as ConstructorParameters<typeof MetricsService>));
     const collector = new ResetReportMetricsCollector(service, source.getRepository(AttractapCrashReport));
     collector.onModuleInit();
@@ -134,7 +134,7 @@ export class AlertingStack {
   private async boot(rules: string): Promise<void> {
     this.dir = mkdtempSync(join(tmpdir(), 'attraccess-alerting-'));
     const file = join(this.dir, 'attraccess.sqlite');
-    this.db = await new DataSource({ type: 'sqlite', database: file, busyTimeout: 5000 }).initialize();
+    this.db = await new DataSource({ type: 'better-sqlite3', database: file, timeout: 5000 }).initialize();
     await this.createSchema();
     // Push each server as it starts, so a failed second start still stops the first.
     this.servers.push(await MetricsServer.start(file));

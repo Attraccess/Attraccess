@@ -52,7 +52,7 @@ export class ResourceGroupsIntroducersService {
           id: groupId,
         },
       },
-      relations: ['user'],
+      relations: { user: true },
     });
   }
 

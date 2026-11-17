@@ -33,7 +33,7 @@ describe('MQTT managementPort migration, persistence and service', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     dataSource = new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: [MqttServer],
       synchronize: false,

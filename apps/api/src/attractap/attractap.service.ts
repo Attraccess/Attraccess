@@ -266,12 +266,7 @@ export class AttractapService {
   public async findReaderById(id: number): Promise<Attractap | undefined> {
     return await this.readerRepository.findOne({
       where: { id },
-      relations: [
-        'resources',
-        'resources.billingConfigurations',
-        'resources.introducers',
-        'resources.introducers.user',
-      ],
+      relations: { resources: { billingConfigurations: true, introducers: { user: true } } },
     });
   }
 
@@ -421,7 +416,7 @@ export class AttractapService {
 
   /** Readers that must be paired before they can be used: the pairing session's list. */
   public async getReadersToPair(): Promise<Attractap[]> {
-    return await this.readerRepository.find({ where: { pairingState: Not('paired') }, relations: ['resources'] });
+    return await this.readerRepository.find({ where: { pairingState: Not('paired') }, relations: { resources: true } });
   }
 
   /** A new card key: 16 random bytes from the system CSPRNG, hex encoded. Nothing about it is derivable. */
@@ -454,7 +449,7 @@ export class AttractapService {
   }
 
   public async getNFCCardByID(id: number): Promise<NFCCard | undefined> {
-    const card = await this.nfcCardRepository.findOne({ where: { id }, relations: ['user'] });
+    const card = await this.nfcCardRepository.findOne({ where: { id }, relations: { user: true } });
     return this.decryptCardKey(card);
   }
 
@@ -471,7 +466,7 @@ export class AttractapService {
   }
 
   public async getNFCCardByUID(uid: string): Promise<NFCCard | undefined> {
-    const card = await this.nfcCardRepository.findOne({ where: { uid }, relations: ['user'] });
+    const card = await this.nfcCardRepository.findOne({ where: { uid }, relations: { user: true } });
     return this.decryptCardKey(card);
   }
 
@@ -506,7 +501,7 @@ export class AttractapService {
    */
   public async activateNFCCard(id: number): Promise<NFCCard> {
     const card = await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
-      const card = await transactionalEntityManager.findOne(NFCCard, { where: { id }, relations: ['user'] });
+      const card = await transactionalEntityManager.findOne(NFCCard, { where: { id }, relations: { user: true } });
 
       if (!card) {
         throw new Error(`Card with ID ${id} not found`);

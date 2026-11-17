@@ -3,7 +3,7 @@ import { AttractapPairing1791800000000 } from './1791800000000-attractap-pairing
 
 describe('AttractapPairing migration', () => {
   it('keeps existing readers unpaired and keeps the credential history and identity on rollback', async () => {
-    const database = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    const database = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
     const runner = database.createQueryRunner();
     try {
       await runner.query(

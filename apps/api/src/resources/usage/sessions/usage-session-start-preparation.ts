@@ -236,7 +236,7 @@ export class UsageSessionStartPreparation {
         order: {
           startTime: 'DESC',
         },
-        relations: ['resource', 'user', 'project'],
+        relations: { resource: true, user: true, project: true },
       });
 
       if (!createdSession) {

@@ -3,7 +3,7 @@ import { NfcCardPendingChange1792600000000 } from './1792600000000-nfc-card-pend
 
 describe('NfcCardPendingChange migration', () => {
   it('creates the pending card change table with its UID index and can be reverted', async () => {
-    const database = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    const database = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
     const runner = database.createQueryRunner();
     try {
       const migration = new NfcCardPendingChange1792600000000();
@@ -52,7 +52,7 @@ describe('NfcCardPendingChange migration', () => {
   });
 
   it('keeps an existing table and its rows when the migration ran before under an earlier name', async () => {
-    const database = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    const database = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
     const runner = database.createQueryRunner();
     try {
       const migration = new NfcCardPendingChange1792600000000();

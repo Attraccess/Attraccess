@@ -21,7 +21,7 @@ export async function syncSsoRolesInTransaction(
 
   const currentSsoRoles = await userRoleRepository.find({
     where: { userId, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId },
-    relations: ['role'],
+    relations: { role: true },
   });
   const removed: string[] = [];
   const added: string[] = [];
@@ -75,11 +75,12 @@ export async function syncSsoRolesInTransaction(
         );
         added.push(roleKey);
       } catch (err) {
-        // ponytail: '23505' = Postgres unique; SQLite reuses SQLITE_CONSTRAINT for FK/CHECK/NOT NULL too, so narrow by message
+        // ponytail: '23505' = Postgres unique; SQLite's SQLITE_CONSTRAINT(_*) codes cover FK/CHECK/NOT NULL too, so narrow by message
         const code = (err as QueryFailedError & { code?: string }).code;
         const isUniqueViolation =
           err instanceof QueryFailedError &&
-          (code === '23505' || (code === 'SQLITE_CONSTRAINT' && err.message.includes('UNIQUE constraint failed')));
+          (code === '23505' ||
+            (String(code).startsWith('SQLITE_CONSTRAINT') && err.message.includes('UNIQUE constraint failed')));
         if (isUniqueViolation) {
           // Another SSO provider already granted this role — unique(userId, roleId, source) violated; ignore
           logger.debug(`syncSsoRoles: role ${roleKey} already held via another provider for user ${userId}`);

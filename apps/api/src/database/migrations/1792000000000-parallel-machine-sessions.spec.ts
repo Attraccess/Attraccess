@@ -30,7 +30,7 @@ jest.setTimeout(30_000);
 
 describe('parallel machine sessions migration', () => {
   it('defaults existing machines to 1 and swaps single-session guards for per-person ones', async () => {
-    const source = await new DataSource({ type: 'sqlite', database: ':memory:', entities: [] }).initialize();
+    const source = await new DataSource({ type: 'better-sqlite3', database: ':memory:', entities: [] }).initialize();
     const runner = source.createQueryRunner();
     try {
       await legacySchema(runner);

@@ -23,7 +23,7 @@ describe('flow node queries (SQLite)', () => {
 
   beforeAll(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: Object.values(entities),
       synchronize: true,

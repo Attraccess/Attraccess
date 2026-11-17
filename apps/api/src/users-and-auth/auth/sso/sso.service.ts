@@ -9,7 +9,7 @@ import { Inject, Injectable, BadRequestException } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { Repository, DeepPartial } from 'typeorm';
+import { Repository, DeepPartial, FindOptionsRelations } from 'typeorm';
 
 import { EncryptionService } from '../../../encryption/encryption.service';
 
@@ -85,7 +85,7 @@ export class SSOService {
 
   public async getAllProviders(): Promise<SSOProvider[]> {
     const providers = await this.ssoProviderRepository.find({
-      relations: ['oidcConfiguration', 'samlConfiguration'],
+      relations: { oidcConfiguration: true, samlConfiguration: true },
     });
     providers.forEach((provider) => this.decryptProviderSecrets(provider));
     return providers;
@@ -94,7 +94,7 @@ export class SSOService {
   public async getProviderById(id: number): Promise<SSOProvider> {
     const provider = await this.ssoProviderRepository.findOne({
       where: { id },
-      relations: ['oidcConfiguration', 'samlConfiguration'],
+      relations: { oidcConfiguration: true, samlConfiguration: true },
     });
 
     if (!provider) {
@@ -109,15 +109,12 @@ export class SSOService {
     ssoType: SSOProviderType,
     providerId: number,
   ): Promise<SSOProvider | null> {
-    const relations: string[] = [];
-
-    if (ssoType === SSOProviderType.OIDC) {
-      relations.push('oidcConfiguration');
-    }
-
-    if (ssoType === SSOProviderType.SAML) {
-      relations.push('samlConfiguration');
-    }
+    const relations: FindOptionsRelations<SSOProvider> =
+      ssoType === SSOProviderType.OIDC
+        ? { oidcConfiguration: true }
+        : ssoType === SSOProviderType.SAML
+          ? { samlConfiguration: true }
+          : {};
 
     const provider = await this.ssoProviderRepository.findOne({
       where: { type: ssoType, id: providerId },
@@ -161,7 +158,7 @@ export class SSOService {
       }
       const loaded = await providerRepository.findOne({
         where: { type: provider.type, id: provider.id },
-        relations: [provider.type === SSOProviderType.OIDC ? 'oidcConfiguration' : 'samlConfiguration'],
+        relations: provider.type === SSOProviderType.OIDC ? { oidcConfiguration: true } : { samlConfiguration: true },
       });
       if (!loaded) throw new BadRequestException('Provider not found after create');
       this.decryptProviderSecrets(loaded);
@@ -193,7 +190,7 @@ export class SSOService {
       if (updateDto.name) await manager.getRepository(SSOProvider).update(provider.id, { name: updateDto.name });
       const updated = await manager.getRepository(SSOProvider).findOne({
         where: { type: provider.type, id: provider.id },
-        relations: [provider.type === SSOProviderType.OIDC ? 'oidcConfiguration' : 'samlConfiguration'],
+        relations: provider.type === SSOProviderType.OIDC ? { oidcConfiguration: true } : { samlConfiguration: true },
       });
       if (!updated) throw new BadRequestException('Provider not found after update');
       this.decryptProviderSecrets(updated);

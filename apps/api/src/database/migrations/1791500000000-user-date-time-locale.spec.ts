@@ -4,7 +4,7 @@ import { UserDateTimeLocale1791500000000 } from './1791500000000-user-date-time-
 
 describe('UserDateTimeLocale migration', () => {
   it('upgrades the draft schema and rolls back while retaining users and translation locale', async () => {
-    const database = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    const database = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
     const runner = database.createQueryRunner();
     try {
       await runner.query(`CREATE TABLE "user" (id integer PRIMARY KEY, locale varchar(35))`);

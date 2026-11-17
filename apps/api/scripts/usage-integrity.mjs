@@ -1,7 +1,7 @@
 /** Validate direct seed/import writes before committing; never repair them implicitly. */
 export async function assertUsageIntegrity(db) {
-  const all = (sql) =>
-    new Promise((resolve, reject) => db.all(sql, (error, rows) => (error ? reject(error) : resolve(rows))));
+  // `db` is a better-sqlite3 Database.
+  const all = async (sql) => db.prepare(sql).all();
   const tables = await all("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'resource_usage'");
   if (tables.length === 0) return;
   const invalid = await all(`SELECT id FROM resource_usage

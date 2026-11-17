@@ -54,7 +54,7 @@ export async function createHostBleHarness(
 ): Promise<HostBleHarness> {
   clearPluginBleProfiles();
   const source = await new DataSource({
-    type: 'sqlite',
+    type: 'better-sqlite3',
     database: ':memory:',
     entities: Object.values(entities),
   }).initialize();

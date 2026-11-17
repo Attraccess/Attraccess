@@ -123,7 +123,7 @@ describe('ResourceGroupsService partial updates', () => {
 
   beforeEach(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: [resourceGroupSchema],
       synchronize: true,

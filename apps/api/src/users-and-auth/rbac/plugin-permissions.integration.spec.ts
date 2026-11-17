@@ -63,7 +63,7 @@ describe('plugin-declared permissions (integration)', () => {
 
   beforeEach(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: Object.values(entities),
       migrations: Object.values(migrations),

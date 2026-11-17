@@ -48,7 +48,7 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
     abort = new AbortController();
     directory = await mkdtemp(join(tmpdir(), 'wago-rotation-database-'));
     db = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: join(directory, 'rotation.sqlite'),
       entities: [WagoController, WagoCredentialRotationEntity],
       synchronize: true,
@@ -226,7 +226,7 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
     jest.useRealTimers();
     await db.destroy();
     db = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: join(directory, 'rotation.sqlite'),
       entities: [WagoController, WagoCredentialRotationEntity],
       synchronize: false,

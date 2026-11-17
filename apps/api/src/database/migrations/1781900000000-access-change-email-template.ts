@@ -62,7 +62,7 @@ export class AccessChangeEmailTemplate1781900000000 implements MigrationInterfac
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES ($1, $2, $3, $4)`,
+      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES (?, ?, ?, ?)`,
       ['access-change', '{{accessChange.title}}', ACCESS_CHANGE_MJML, ACCESS_CHANGE_VARIABLES],
     );
   }

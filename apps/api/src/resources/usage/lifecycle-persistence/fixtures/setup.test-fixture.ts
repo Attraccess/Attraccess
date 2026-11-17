@@ -12,13 +12,14 @@ import {
   SupervisionMode,
   User,
 } from '@attraccess/database-entities';
-import { DataSource, EntityManager } from 'typeorm';
+import { EntityManager } from 'typeorm';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ResourceOperatingIntervalService } from '../../../operating-intervals/resource-operating-interval.service';
 import { ResourceOperatingAttributionService } from '../../../operating-intervals/resource-operating-attribution.service';
 import { USAGE_RECOVERY_TABLE_SQL } from '../../../../database/resource-usage-integrity';
+import { createDataSource } from '../../../../database/sqlite-connection';
 import type { UsageLifecyclePersistenceAroundExternalFlowsTestScope } from '../lifecycle.persistence.spec';
 import { composeResourceUsageService } from '../../sessions/fixtures/compose.test-fixture';
 export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExternalFlowsTestScope) {
@@ -26,8 +27,9 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
   jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
   jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
   scope.directory = await mkdtemp(join(tmpdir(), 'attraccess-lifecycle-'));
-  scope.source = await new DataSource({
-    type: 'sqlite',
+  // Guarded like the API's main connection: it shares the file with the resource-lifecycle (and audit) connections.
+  scope.source = await createDataSource({
+    type: 'better-sqlite3',
     database: join(scope.directory, 'test.sqlite'),
     synchronize: true,
     entities: scope.schemas,

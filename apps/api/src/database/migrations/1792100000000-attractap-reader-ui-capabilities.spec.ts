@@ -3,7 +3,7 @@ import { AttractapReaderUiCapabilities1792100000000 } from './1792100000000-attr
 
 describe('AttractapReaderUiCapabilities migration', () => {
   it('adds the columns, tolerates a rerun and keeps reader rows on rollback', async () => {
-    const database = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    const database = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
     const runner = database.createQueryRunner();
     try {
       await runner.query(`CREATE TABLE "attractap" (id integer PRIMARY KEY, name text NOT NULL)`);

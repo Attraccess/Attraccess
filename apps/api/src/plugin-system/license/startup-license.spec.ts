@@ -16,7 +16,7 @@ import { evaluateStartupLicense } from './startup-license';
 const mockDatabase = { file: '' };
 jest.mock('../../database/datasource', () => ({
   dataSourceConfig: {
-    type: 'sqlite',
+    type: 'better-sqlite3',
     get database() {
       return mockDatabase.file;
     },
@@ -51,7 +51,7 @@ describe('evaluateStartupLicense', () => {
 
   const seed = async (licenseKey: string | null, withTable = true) => {
     const dataSource = new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: mockDatabase.file,
       entities: [Setting],
       synchronize: withTable,

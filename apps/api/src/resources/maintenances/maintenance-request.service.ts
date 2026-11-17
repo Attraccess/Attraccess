@@ -1,12 +1,7 @@
 import { Injectable, Logger, BadRequestException, NotFoundException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-  MaintenanceRequestStatus,
-  Resource,
-  ResourceMaintenanceRequest,
-  User,
-} from '@attraccess/database-entities';
+import { MaintenanceRequestStatus, Resource, ResourceMaintenanceRequest, User } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
@@ -69,7 +64,7 @@ export class MaintenanceRequestService {
 
     const [data, total] = await this.requestRepository.findAndCount({
       where: { resourceId, status },
-      relations: ['createdByUser', 'resolvedByUser', 'resultingMaintenance'],
+      relations: { createdByUser: true, resolvedByUser: true, resultingMaintenance: true },
       order: { createdAt: 'DESC' },
       skip,
       take: limit,
@@ -84,7 +79,7 @@ export class MaintenanceRequestService {
   async getRequestById(requestId: number): Promise<ResourceMaintenanceRequest> {
     const request = await this.requestRepository.findOne({
       where: { id: requestId },
-      relations: ['createdByUser', 'resolvedByUser', 'resultingMaintenance'],
+      relations: { createdByUser: true, resolvedByUser: true, resultingMaintenance: true },
     });
     if (!request) {
       throw new NotFoundException(`Maintenance request with ID ${requestId} not found`);

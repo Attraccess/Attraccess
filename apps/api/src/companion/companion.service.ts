@@ -23,7 +23,9 @@ export class CompanionService {
     if (existsSync(manifestPath)) {
       try {
         this.manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as CompanionManifestDto;
-        this.logger.log(`Loaded companion manifest: version=${this.manifest.version}, platforms=${this.manifest.platforms.length}`);
+        this.logger.log(
+          `Loaded companion manifest: version=${this.manifest.version}, platforms=${this.manifest.platforms.length}`,
+        );
       } catch (err) {
         this.logger.error(`Failed to parse companions.json: ${(err as Error).message}`);
       }
@@ -78,7 +80,7 @@ export class CompanionService {
   }
 
   async findById(id: number): Promise<CompanionDevice | null> {
-    return this.deviceRepo.findOne({ where: { id }, relations: ['resources'] });
+    return this.deviceRepo.findOne({ where: { id }, relations: { resources: true } });
   }
 
   async verifyToken(device: CompanionDevice, token: string): Promise<boolean> {
@@ -86,11 +88,14 @@ export class CompanionService {
   }
 
   async touchLastConnection(device: CompanionDevice, appVersion?: string): Promise<void> {
-    await this.deviceRepo.update(device.id, { lastConnection: new Date(), ...(appVersion !== undefined && { appVersion }) });
+    await this.deviceRepo.update(device.id, {
+      lastConnection: new Date(),
+      ...(appVersion !== undefined && { appVersion }),
+    });
   }
 
   async findAll(): Promise<CompanionDevice[]> {
-    return this.deviceRepo.find({ relations: ['resources'] });
+    return this.deviceRepo.find({ relations: { resources: true } });
   }
 
   async updateName(id: number, name: string): Promise<CompanionDevice> {

@@ -20,7 +20,7 @@ describe('new account language persistence', () => {
 
   beforeAll(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: Object.values(entities),
       migrations: Object.values(migrations),

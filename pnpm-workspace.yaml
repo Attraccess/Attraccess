@@ -53,11 +53,11 @@ allowBuilds:
   '@nestjs/core': true
   '@swc/core': true
   bcrypt: true
+  better-sqlite3: true
   esbuild: true
   electron: true
   nx: true
   sharp: true
-  sqlite3: true
   typeorm: true
   # Their install scripts are optional (prebuilt binaries, telemetry, download helpers) and stay disabled.
   '@hyperjump/json-pointer': false

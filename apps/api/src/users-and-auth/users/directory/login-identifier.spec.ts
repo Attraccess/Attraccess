@@ -27,7 +27,7 @@ describe('UsersService', () => {
 
       beforeEach(async () => {
         db = await new DataSource({
-          type: 'sqlite',
+          type: 'better-sqlite3',
           database: ':memory:',
           entities: [schema],
           synchronize: true,

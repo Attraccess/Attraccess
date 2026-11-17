@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
-import sqlite3 from 'sqlite3';
+import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -9,18 +9,16 @@ import bcrypt from 'bcrypt';
 
 const script = path.resolve('apps/api/scripts/seed-dev-user.mjs');
 
-const execute = (db, sql) =>
-  new Promise((resolve, reject) => db.exec(sql, (error) => (error ? reject(error) : resolve())));
+const execute = async (db, sql) => void db.exec(sql);
 
-const rows = (db, sql) =>
-  new Promise((resolve, reject) => db.all(sql, (error, values) => (error ? reject(error) : resolve(values))));
+const rows = async (db, sql) => db.prepare(sql).all();
 
-const close = (db) => new Promise((resolve, reject) => db.close((error) => (error ? reject(error) : resolve())));
+const close = async (db) => void db.close();
 
 async function database() {
   const directory = mkdtempSync(path.join(tmpdir(), 'attraccess-seed-test-'));
   const file = path.join(directory, 'test.sqlite');
-  const db = new sqlite3.Database(file);
+  const db = new Database(file);
   await execute(
     db,
     `

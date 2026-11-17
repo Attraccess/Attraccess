@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import sqlite3pkg from 'sqlite3';
+import Database from 'better-sqlite3';
 import {
   decrypt,
   deriveKey,
@@ -12,12 +12,11 @@ import {
   resolveDatabasePath,
 } from './reencrypt-card-keys.mjs';
 
-const run = (db, sql, params = []) =>
-  new Promise((resolve, reject) => db.run(sql, params, (e) => (e ? reject(e) : resolve())));
-const all = (db, sql) => new Promise((resolve, reject) => db.all(sql, (e, rows) => (e ? reject(e) : resolve(rows))));
+const run = async (db, sql, params = []) => void db.prepare(sql).run(...params);
+const all = async (db, sql) => db.prepare(sql).all();
 
 async function database() {
-  const db = new (sqlite3pkg.verbose().Database)(':memory:');
+  const db = new Database(':memory:');
   await run(db, 'CREATE TABLE nfc_card (id integer primary key, key text)');
   await run(db, 'CREATE TABLE nfc_card_pending_change (id integer primary key, key text)');
   return db;

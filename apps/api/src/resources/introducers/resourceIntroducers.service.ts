@@ -43,7 +43,7 @@ export class ResourceIntroducersService {
   public async getMany(resourceId: number, type?: ResourceIntroducerType): Promise<ResourceIntroducer[]> {
     const directIntroducers = await this.resourceIntroducerRepository.find({
       where: { resourceId, ...(type ? { type } : {}) },
-      relations: ['user'],
+      relations: { user: true },
     });
 
     // Introducers granted at the group level apply to every resource in the group,
@@ -135,7 +135,7 @@ export class ResourceIntroducersService {
           : 'revokedIntroducer';
 
     void this.userRepository
-      .findOne({ where: { id: userId }, select: ['id', 'locale'] })
+      .findOne({ where: { id: userId }, select: { id: true, locale: true } })
       .then((user) => {
         const recipient = user ?? ({ id: userId } as User);
         return this.notifications.dispatch({
@@ -222,7 +222,7 @@ export class ResourceIntroducersService {
 
     const directIntroducers = await this.resourceIntroducerRepository.find({
       where: { resourceId: In(uniqueResourceIds), ...(type ? { type } : {}) },
-      relations: ['user'],
+      relations: { user: true },
     });
     for (const introducer of directIntroducers) {
       if (introducer.user) introducersByResourceId.get(introducer.resourceId)?.set(introducer.userId, introducer);

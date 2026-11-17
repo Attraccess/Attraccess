@@ -50,7 +50,7 @@ export class AddDeleteAccountEmailTemplate1768742247837 implements MigrationInte
     await queryRunner.query(`DROP TABLE "temporary_email_templates"`);
 
     await queryRunner.query(
-      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES ($1, $2, $3, $4)`,
+      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES (?, ?, ?, ?)`,
       [
         'delete-account-confirmation',
         'Confirm account deletion',

@@ -78,7 +78,7 @@ export function registerSsoOidcIntegrationE2eWithTestcontainersFixture() {
     process.env.AUTH_SESSION_SECRET = 'sso-oidc-e2e-test-secret-must-be-long-enough';
 
     dataSource = new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: path.join(tmpRoot, 'attraccess.sqlite'),
       entities: Object.values(entities),
       synchronize: true,

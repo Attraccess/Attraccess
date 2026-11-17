@@ -19,7 +19,7 @@ describe('RefreshDefaultMeterReceipt1790400000000', () => {
   let runner: QueryRunner;
 
   beforeEach(async () => {
-    source = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    source = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
     runner = source.createQueryRunner();
     await runner.query('CREATE TABLE email_templates(type varchar PRIMARY KEY, body text, subject text)');
     await runner.query('INSERT INTO email_templates VALUES (?, ?, ?)', [type, energyBody, 'Custom subject']);

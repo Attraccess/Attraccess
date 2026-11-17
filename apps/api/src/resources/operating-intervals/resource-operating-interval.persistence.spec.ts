@@ -41,7 +41,7 @@ describe('Operating interval persistence', () => {
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'attraccess-operating-'));
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: join(directory, 'test.sqlite'),
       entities: [IntervalSchema],
     }).initialize();

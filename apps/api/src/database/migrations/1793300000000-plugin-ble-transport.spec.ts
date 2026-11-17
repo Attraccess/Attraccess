@@ -6,7 +6,7 @@ describe('PluginBleTransport1793300000000', () => {
   const migration = new PluginBleTransport1793300000000();
 
   beforeEach(async () => {
-    source = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    source = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
     await source.query(
       `CREATE TABLE "attractap" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" text NOT NULL)`,
     );

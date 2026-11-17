@@ -5,7 +5,7 @@ const sqliteTransactions = new WeakMap<DataSource, Promise<unknown>>();
 const resourceConnections = new WeakMap<DataSource, Promise<DataSource>>();
 
 async function getResourceConnection(source: DataSource): Promise<DataSource> {
-  if (source.options.type !== 'sqlite') return source;
+  if (source.options.type !== 'better-sqlite3') return source;
   if (source.options.database === ':memory:') {
     throw new Error('Resource transactions require a file-backed SQLite database for independent commits');
   }
@@ -13,7 +13,6 @@ async function getResourceConnection(source: DataSource): Promise<DataSource> {
   if (!connection) {
     connection = createDataSource({
       ...source.options,
-      name: 'resource-lifecycle',
       synchronize: false,
       migrationsRun: false,
       dropSchema: false,
@@ -46,7 +45,7 @@ export async function runSerializedTransaction<T>(
   work: (transaction: EntityManager) => Promise<T>,
 ): Promise<T> {
   const connection = manager.connection;
-  if (connection?.options?.type !== 'sqlite') {
+  if (connection?.options?.type !== 'better-sqlite3') {
     return manager.transaction(work);
   }
   const previous = sqliteTransactions.get(connection) ?? Promise.resolve();
@@ -57,7 +56,7 @@ export async function runSerializedTransaction<T>(
       // Refresh before each phase: Nest services may register commit observers after initialization.
       dedicated.subscribers.splice(0, dedicated.subscribers.length, ...connection.subscribers);
       // createDataSource begins its transactions with BEGIN IMMEDIATE: a deferred read-to-write upgrade can fail
-      // immediately with SQLITE_BUSY even when busyTimeout is configured.
+      // immediately with SQLITE_BUSY even when a busy timeout is configured.
       return dedicated.transaction(work);
     });
   sqliteTransactions.set(connection, next);

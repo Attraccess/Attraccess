@@ -54,7 +54,10 @@ describe('LiveNotificationsService', () => {
 
       await service.notifyTransactionUpdate(123);
 
-      expect(billingTransactionRepository.findOne).toHaveBeenCalledWith({ where: { id: 123 }, relations: ['items'] });
+      expect(billingTransactionRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 123 },
+        relations: { items: true },
+      });
       expect(received).toHaveLength(1);
       expect(received[0]).toEqual({ data: transaction });
     });
@@ -68,7 +71,10 @@ describe('LiveNotificationsService', () => {
 
       await service.notifyTransactionUpdate(tx);
 
-      expect(billingTransactionRepository.findOne).toHaveBeenCalledWith({ where: { id: 555 }, relations: ['items'] });
+      expect(billingTransactionRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 555 },
+        relations: { items: true },
+      });
       expect(nextSpy).toHaveBeenCalledWith({ data: tx });
     });
 

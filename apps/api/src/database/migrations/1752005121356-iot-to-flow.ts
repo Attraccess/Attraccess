@@ -78,9 +78,9 @@ export class IotToFlow1752005121356 implements MigrationInterface {
       `
       INSERT INTO resource_flow_node (id, type, positionX, positionY, data, resourceId, createdAt, updatedAt)
       VALUES 
-        ($1, 'event.resource.usage.started', $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-        ($6, 'event.resource.usage.stopped', $7, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-        ($11, 'event.resource.usage.takeover', $12, $13, $14, $15, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        (?, 'event.resource.usage.started', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+        (?, 'event.resource.usage.stopped', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+        (?, 'event.resource.usage.takeover', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `,
       [
         startEventNodeId,
@@ -106,8 +106,8 @@ export class IotToFlow1752005121356 implements MigrationInterface {
       `
       INSERT INTO resource_flow_node (id, type, positionX, positionY, data, resourceId, createdAt, updatedAt)
       VALUES 
-        ($1, 'action.mqtt.sendMessage', $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-        ($6, 'action.mqtt.sendMessage', $7, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        (?, 'action.mqtt.sendMessage', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+        (?, 'action.mqtt.sendMessage', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `,
       [
         inUseActionNodeId,
@@ -136,7 +136,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
       await queryRunner.query(
         `
         INSERT INTO resource_flow_node (id, type, positionX, positionY, data, resourceId, createdAt, updatedAt)
-        VALUES ($1, 'action.mqtt.sendMessage', $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, 'action.mqtt.sendMessage', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
         [
           takeoverActionNodeId,
@@ -157,8 +157,8 @@ export class IotToFlow1752005121356 implements MigrationInterface {
       `
       INSERT INTO resource_flow_edge (id, source, target, resourceId, createdAt, updatedAt)
       VALUES 
-        ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-        ($5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+        (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `,
       [
         this.generateEdgeId(),
@@ -177,7 +177,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
       await queryRunner.query(
         `
         INSERT INTO resource_flow_edge (id, source, target, resourceId, createdAt, updatedAt)
-        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
         [this.generateEdgeId(), takeoverEventNodeId, takeoverActionNodeId, resourceId],
       );
@@ -188,7 +188,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
       await queryRunner.query(
         `
         INSERT INTO resource_flow_edge (id, source, target, resourceId, createdAt, updatedAt)
-        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
         [this.generateEdgeId(), takeoverEventNodeId, inUseActionNodeId, resourceId],
       );
@@ -198,7 +198,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
       await queryRunner.query(
         `
         INSERT INTO resource_flow_edge (id, source, target, resourceId, createdAt, updatedAt)
-        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
         [this.generateEdgeId(), takeoverEventNodeId, notInUseActionNodeId, resourceId],
       );
@@ -215,7 +215,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
     const existingNodes = await queryRunner.query(
       `
       SELECT id, type FROM resource_flow_node 
-      WHERE resourceId = $1 AND type IN ('event.resource.usage.started', 'event.resource.usage.stopped', 'event.resource.usage.takeover')
+      WHERE resourceId = ? AND type IN ('event.resource.usage.started', 'event.resource.usage.stopped', 'event.resource.usage.takeover')
     `,
       [resourceId],
     );
@@ -236,7 +236,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
       await queryRunner.query(
         `
         INSERT INTO resource_flow_node (id, type, positionX, positionY, data, resourceId, createdAt, updatedAt)
-        VALUES ($1, 'event.resource.usage.started', $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, 'event.resource.usage.started', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
         [startEventNodeId, basePosition.x, basePosition.y, JSON.stringify({}), resourceId],
       );
@@ -249,7 +249,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
       await queryRunner.query(
         `
         INSERT INTO resource_flow_node (id, type, positionX, positionY, data, resourceId, createdAt, updatedAt)
-        VALUES ($1, 'event.resource.usage.stopped', $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, 'event.resource.usage.stopped', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
         [stopEventNodeId, basePosition.x, basePosition.y + nodeSpacing, JSON.stringify({}), resourceId],
       );
@@ -262,7 +262,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
       await queryRunner.query(
         `
         INSERT INTO resource_flow_node (id, type, positionX, positionY, data, resourceId, createdAt, updatedAt)
-        VALUES ($1, 'event.resource.usage.takeover', $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, 'event.resource.usage.takeover', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
         [takeoverEventNodeId, basePosition.x, basePosition.y + nodeSpacing * 2, JSON.stringify({}), resourceId],
       );
@@ -289,8 +289,8 @@ export class IotToFlow1752005121356 implements MigrationInterface {
       `
       INSERT INTO resource_flow_node (id, type, positionX, positionY, data, resourceId, createdAt, updatedAt)
       VALUES 
-        ($1, 'action.http.sendRequest', $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-        ($6, 'action.http.sendRequest', $7, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        (?, 'action.http.sendRequest', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+        (?, 'action.http.sendRequest', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `,
       [
         inUseActionNodeId,
@@ -321,7 +321,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
       await queryRunner.query(
         `
         INSERT INTO resource_flow_node (id, type, positionX, positionY, data, resourceId, createdAt, updatedAt)
-        VALUES ($1, 'action.http.sendRequest', $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, 'action.http.sendRequest', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
         [
           takeoverActionNodeId,
@@ -343,8 +343,8 @@ export class IotToFlow1752005121356 implements MigrationInterface {
       `
       INSERT INTO resource_flow_edge (id, source, target, resourceId, createdAt, updatedAt)
       VALUES 
-        ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-        ($5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+        (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `,
       [
         this.generateEdgeId(),
@@ -363,7 +363,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
       await queryRunner.query(
         `
         INSERT INTO resource_flow_edge (id, source, target, resourceId, createdAt, updatedAt)
-        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
         [this.generateEdgeId(), takeoverEventNodeId, takeoverActionNodeId, resourceId],
       );
@@ -374,7 +374,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
       await queryRunner.query(
         `
         INSERT INTO resource_flow_edge (id, source, target, resourceId, createdAt, updatedAt)
-        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
         [this.generateEdgeId(), takeoverEventNodeId, inUseActionNodeId, resourceId],
       );
@@ -384,7 +384,7 @@ export class IotToFlow1752005121356 implements MigrationInterface {
       await queryRunner.query(
         `
         INSERT INTO resource_flow_edge (id, source, target, resourceId, createdAt, updatedAt)
-        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
         [this.generateEdgeId(), takeoverEventNodeId, notInUseActionNodeId, resourceId],
       );

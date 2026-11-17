@@ -68,7 +68,7 @@ export class MessagingLiveService {
     const messageWithSender =
       (await this.messageRepository.findOne({
         where: { id: message.id },
-        relations: ['sender'],
+        relations: { sender: true },
       })) ?? message;
 
     const participants = await this.participantRepository.find({

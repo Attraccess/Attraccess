@@ -59,7 +59,7 @@ describe('Resource health notifications', () => {
     });
     expect(introducers.find).toHaveBeenCalledWith({
       where: [{ resourceId: 3 }, { resourceGroupId: expect.objectContaining({ _value: [4] }) }],
-      relations: ['user'],
+      relations: { user: true },
     });
   });
   it('suppresses an initial healthy report and handles missing resources or empty recipient sets', async () => {

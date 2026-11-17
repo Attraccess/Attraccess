@@ -26,7 +26,7 @@ export type ManagedRuntimeFixture = {
 };
 export async function resetTestFixture(scope: ManagedRuntimeFixture) {
   scope.db = await new DataSource({
-    type: 'sqlite',
+    type: 'better-sqlite3',
     database: ':memory:',
     entities: [
       WagoManagedAccess,

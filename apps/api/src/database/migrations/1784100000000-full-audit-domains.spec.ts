@@ -11,7 +11,7 @@ describe('Full Audit Log domain rollout', () => {
     runner.query('INSERT OR REPLACE INTO setting (parent, key, value) VALUES (?, ?, ?)', ['audit', key, value]);
 
   beforeEach(async () => {
-    source = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    source = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
     runner = source.createQueryRunner();
     await runner.query(
       'CREATE TABLE setting (parent TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, UNIQUE(parent, key))',

@@ -67,7 +67,7 @@ export class FlowEventTriggersService {
     try {
       const request = await this.requests.findOne({
         where: { id: event.requestId },
-        relations: ['createdByUser'],
+        relations: { createdByUser: true },
       });
       if (!request) return;
       await this.run(event.resourceId, ResourceFlowNodeType.INPUT_RESOURCE_MAINTENANCE_REQUEST_CREATED, {

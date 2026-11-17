@@ -68,7 +68,7 @@ describe('flow audit rows in migrated storage', () => {
   beforeAll(async () => {
     directory = await mkdtemp(join(tmpdir(), 'flow-audit-'));
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: join(directory, 'flow-audit.sqlite'),
       entities: Object.values(entities),
       migrations: Object.values(migrations),

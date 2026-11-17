@@ -16,7 +16,7 @@ import { auditDomainLabel, AuditRow, projectAuditRow } from '../recorder/audit-r
 
 import { DataSource, EntityManager } from 'typeorm';
 
-import { sqliteErrorCode } from '../../database/sqlite-errors';
+import { isSqliteBusyError, sqliteErrorCode } from '../../database/sqlite-errors';
 
 import { AuditDropReason, AuditMetrics } from '../../metrics/definitions/audit.metrics';
 
@@ -270,8 +270,7 @@ export class AuditStorage {
           await storage.getRepository(AuditLog).insert({ at: new Date(), ...event });
           return { status: 'recorded' };
         } catch (error) {
-          const retry =
-            sqliteErrorCode(error) === 'SQLITE_BUSY' && attempt < AUDIT_BUSY_RETRIES && !this.state.stopping;
+          const retry = isSqliteBusyError(error) && attempt < AUDIT_BUSY_RETRIES && !this.state.stopping;
           if (!retry) return this.drop(event.domain, 'storage_error', event.action, error);
         }
       }

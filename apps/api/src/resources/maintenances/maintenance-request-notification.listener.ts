@@ -37,7 +37,7 @@ export class MaintenanceRequestNotificationListener {
     try {
       const request = await this.requestRepository.findOne({
         where: { id: event.requestId },
-        relations: ['createdByUser'],
+        relations: { createdByUser: true },
       });
       if (!request) {
         return;
@@ -45,7 +45,7 @@ export class MaintenanceRequestNotificationListener {
 
       const resource = await this.resourceRepository.findOne({
         where: { id: event.resourceId },
-        relations: ['groups'],
+        relations: { groups: true },
       });
       if (!resource) {
         this.logger.warn(`Maintenance request for missing resource ${event.resourceId}; skipping notifications`);
@@ -98,7 +98,7 @@ export class MaintenanceRequestNotificationListener {
     }
     const introducerRows = await this.resourceIntroducerRepository.find({
       where: introducerWhere,
-      relations: ['user'],
+      relations: { user: true },
     });
 
     const byId = new Map<number, User>();

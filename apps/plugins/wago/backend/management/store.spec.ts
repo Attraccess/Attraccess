@@ -11,7 +11,7 @@ describe('persistent management repository and migration', () => {
   let database: DataSource;
   beforeEach(async () => {
     database = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: [WagoManagementEntity],
       migrations: [WagoManagement1780000000010],

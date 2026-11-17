@@ -24,9 +24,12 @@ function isUniqueViolation(error: unknown): boolean {
   if (!(error instanceof QueryFailedError)) {
     return false;
   }
-  // '23505' = Postgres unique; SQLite reuses SQLITE_CONSTRAINT for FK/CHECK/NOT NULL too, so narrow by message
+  // '23505' = Postgres unique; SQLite's SQLITE_CONSTRAINT(_*) codes cover FK/CHECK/NOT NULL too, so narrow by message
   const code = (error as QueryFailedError & { code?: string | number }).code;
-  return code === '23505' || (code === 'SQLITE_CONSTRAINT' && error.message.includes('UNIQUE constraint failed'));
+  return (
+    code === '23505' ||
+    (String(code).startsWith('SQLITE_CONSTRAINT') && error.message.includes('UNIQUE constraint failed'))
+  );
 }
 
 @Injectable()

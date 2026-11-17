@@ -38,7 +38,10 @@ export class UsageDoorActions {
     this.logger.debug(`persisting door action for resource ${resourceId}`, { usageData });
 
     let usage = await this.resourceUsageRepository.save(usageData, { reload: true });
-    usage = await this.resourceUsageRepository.findOne({ where: { id: usage.id }, relations: ['user', 'resource'] });
+    usage = await this.resourceUsageRepository.findOne({
+      where: { id: usage.id },
+      relations: { user: true, resource: true },
+    });
 
     await this.notifications.emitUsageEvent(usage.id);
 

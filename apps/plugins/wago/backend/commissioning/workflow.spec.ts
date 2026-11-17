@@ -43,7 +43,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
 
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'wago-workflow-fixture-'));
-    db = new DataSource({ type: 'sqlite', database: ':memory:', entities: plugin.entities, synchronize: true });
+    db = new DataSource({ type: 'better-sqlite3', database: ':memory:', entities: plugin.entities, synchronize: true });
     await db.initialize();
     context = {
       getRepository: (entity) => db.getRepository(entity),

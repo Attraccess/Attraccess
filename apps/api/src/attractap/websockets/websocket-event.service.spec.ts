@@ -141,7 +141,7 @@ describe('WebSocketEventService', () => {
 
       await service.onResourceGroupIntroducerChanged(new ResourceGroupIntroducerChangedEvent(5));
 
-      expect(resourceGroupsService.getOne).toHaveBeenCalledWith({ id: 5 }, ['resources']);
+      expect(resourceGroupsService.getOne).toHaveBeenCalledWith({ id: 5 }, { resources: true });
       expect(gateway.sendResourceListToReadersWithResources).toHaveBeenCalledWith([60, 70]);
     });
 

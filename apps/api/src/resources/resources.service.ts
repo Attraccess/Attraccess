@@ -174,7 +174,7 @@ export class ResourcesService {
 
     const resources = await this.resourceRepository.find({
       where: { id: In(arrayOfIds) },
-      relations: ['introductions', 'usages', 'groups'],
+      relations: { introductions: true, usages: true, groups: true },
     });
 
     if (resources.length !== arrayOfIds.length) {

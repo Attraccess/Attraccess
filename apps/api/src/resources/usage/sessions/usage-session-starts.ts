@@ -146,7 +146,7 @@ export class UsageSessionStarts {
           if (result.affected === 0) throw new ConflictException('Usage session changed during takeover');
           const endedSession = await manager.findOneOrFail(ResourceUsage, {
             where: { id: existingActiveSession.id },
-            relations: ['user', 'resource'],
+            relations: { user: true, resource: true },
           });
           chargeTransactionId = await this.lifecycle.settleEndedSession(manager, endedSession, outgoingFinal);
         } else {
@@ -187,7 +187,7 @@ export class UsageSessionStarts {
         );
         return manager.findOneOrFail(ResourceUsage, {
           where: { id: createdSession.id },
-          relations: ['resource', 'user', 'project'],
+          relations: { resource: true, user: true, project: true },
         });
       });
     } catch (error) {

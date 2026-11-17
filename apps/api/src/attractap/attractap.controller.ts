@@ -109,7 +109,7 @@ export class AttractapController {
     // absent from the response entirely. Callers that group readers by resource — the supervised
     // start popup (ATT-816) — silently see every reader as unattached.
     // Readers that are not paired yet are listed by GET /attractap/readers/to-pair, for the pairing session only.
-    return await this.attractapService.getPairedReaders({ relations: ['resources'] });
+    return await this.attractapService.getPairedReaders({ relations: { resources: true } });
   }
 
   @Get('to-pair')

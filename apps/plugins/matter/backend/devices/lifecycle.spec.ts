@@ -214,7 +214,7 @@ describe('Matter lifecycle actions', () => {
         removalReason: 'merged',
         mergedInto: target.id,
       });
-      const endpoints = await h.dataSource.getRepository(MatterEndpoint).find({ where: { removedAt: null as never } });
+      const endpoints = await h.dataSource.getRepository(MatterEndpoint).find();
       const liveEndpoints = endpoints.filter((e) => e.removedAt === null);
       expect(
         liveEndpoints

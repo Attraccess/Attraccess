@@ -7,7 +7,6 @@ import { WebsocketService } from './websockets/websocket.service';
 import { AttractapGateway } from './websockets/websocket.gateway';
 import { AttractapNfcCardsController } from './card.controller';
 import { CardAccessService } from './card-access.service';
-import 'sqlite3';
 import '@nestjs/common';
 import { WebSocketEventService } from './websockets/websocket-event.service';
 import { ResourceListService } from './websockets/handlers/resource-list/resource-list.service';

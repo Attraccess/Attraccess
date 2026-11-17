@@ -5,9 +5,9 @@ FROM node:${NODE_VERSION}-${NODE_VERSION_NAME} AS builder
 
 # System deps required for native Node modules and tooling
 # - python3/py3-pip: node-gyp and Python-based tooling
-# - python3-setuptools: provides the distutils shim on Python 3.12+; sqlite3's
-#   pinned node-gyp 8 imports distutils when compiling from source (the
-#   fallback when the prebuild download fails)
+# - python3-setuptools: provides the distutils shim on Python 3.12+ for
+#   node-gyp source builds of native modules (better-sqlite3, bcrypt) when no
+#   prebuilt binary matches the Node version
 # - build-base (make, g++, etc.): compile native deps when prebuilds are unavailable
 # - libstdc++: runtime for some native modules (e.g., sharp)
 RUN apt-get update && apt-get install -y \
@@ -95,7 +95,7 @@ COPY --from=builder /app/docs docs
 COPY --from=builder /app/deploy/api /app/dist/apps/api
 
 # Operator command to move stored card keys to a new AUTH_SESSION_SECRET (docs/en/settings/security.md).
-# Plain Node script; placed inside the API package so it resolves sqlite3 from the API's node_modules.
+# Plain Node script; placed inside the API package so it resolves better-sqlite3 from the API's node_modules.
 COPY --from=builder /app/apps/api/scripts/reencrypt-card-keys.mjs /app/dist/apps/api/scripts/reencrypt-card-keys.mjs
 
 # Large controller assets are server-owned, never embedded in the 50 MiB npm

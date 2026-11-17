@@ -153,14 +153,14 @@ export class MessagingService {
   public async listConversations(userId: number): Promise<ConversationListItemDto[]> {
     const participations = await this.participantRepository.find({
       where: { userId },
-      relations: ['conversation'],
+      relations: { conversation: true },
     });
 
     const items = await Promise.all(
       participations.map(async (participation) => {
         const lastMessage = await this.messageRepository.findOne({
           where: { conversationId: participation.conversationId },
-          relations: ['sender'],
+          relations: { sender: true },
           order: { createdAt: 'DESC' },
         });
 
@@ -194,7 +194,7 @@ export class MessagingService {
 
     const [data, total] = await this.messageRepository.findAndCount({
       where: { conversationId },
-      relations: ['sender'],
+      relations: { sender: true },
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,

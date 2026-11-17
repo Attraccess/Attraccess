@@ -8,13 +8,13 @@ describe('FixIfNodeOperandOrder1782901000000', () => {
   let queryRunner: QueryRunner;
 
   beforeEach(async () => {
-    dataSource = new DataSource({ type: 'sqlite', database: ':memory:', synchronize: false, entities: [] });
+    dataSource = new DataSource({ type: 'better-sqlite3', database: ':memory:', synchronize: false, entities: [] });
     await dataSource.initialize();
     queryRunner = dataSource.createQueryRunner();
 
     // Mirrors the shape created by 1751827827663-resource-flows, so the migration's SQL is exercised for real.
     await queryRunner.query(
-      `CREATE TABLE "resource_flow_node" ("id" text PRIMARY KEY NOT NULL, "type" varchar NOT NULL, "data" json, "resourceId" integer NOT NULL)`
+      `CREATE TABLE "resource_flow_node" ("id" text PRIMARY KEY NOT NULL, "type" varchar NOT NULL, "data" json, "resourceId" integer NOT NULL)`,
     );
   });
 
@@ -24,11 +24,10 @@ describe('FixIfNodeOperandOrder1782901000000', () => {
   });
 
   async function insertNode(id: string, data: unknown, type = 'processing.if') {
-    await queryRunner.query(`INSERT INTO "resource_flow_node" ("id", "type", "data", "resourceId") VALUES (?, ?, ?, 1)`, [
-      id,
-      type,
-      JSON.stringify(data),
-    ]);
+    await queryRunner.query(
+      `INSERT INTO "resource_flow_node" ("id", "type", "data", "resourceId") VALUES (?, ?, ?, 1)`,
+      [id, type, JSON.stringify(data)],
+    );
   }
 
   async function readNode(id: string) {
@@ -98,7 +97,7 @@ describe('FixIfNodeOperandOrder1782901000000', () => {
 
   it('skips rows whose data is null', async () => {
     await queryRunner.query(
-      `INSERT INTO "resource_flow_node" ("id", "type", "data", "resourceId") VALUES ('n1', 'processing.if', NULL, 1)`
+      `INSERT INTO "resource_flow_node" ("id", "type", "data", "resourceId") VALUES ('n1', 'processing.if', NULL, 1)`,
     );
 
     await expect(migration.up(queryRunner)).resolves.toBeUndefined();

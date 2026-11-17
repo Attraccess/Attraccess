@@ -31,7 +31,7 @@ const infrastructure = (): NonNullable<ModuleMetadata['imports']> => [
   ConfigModule.forRoot({ load: [appConfiguration, storageConfigObject, sessionConfig, valkeyConfig], isGlobal: true }),
   EventEmitterModule.forRoot(),
   TypeOrmModule.forRoot({
-    type: 'sqlite',
+    type: 'better-sqlite3',
     database: ':memory:',
     synchronize: true,
     entities: Object.values(entities),
@@ -120,7 +120,9 @@ describe('UsersAndAuthModule boot (required security and audit collaborators)', 
 
       it.each(required)('fails to compile without %s', async (name, token) => {
         await expect(compileWithout(target, token)).rejects.toThrow(
-          new RegExp(`dependencies of the ${target.name}[\\s\\S]*argument ${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
+          new RegExp(
+            `dependencies of the ${target.name}[\\s\\S]*argument ${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+          ),
         );
       });
     },

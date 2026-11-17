@@ -478,7 +478,7 @@ describe('fixed managed executor and recovery programs', () => {
 
   it('migrates credential/update/operation storage together and refuses destructive downgrade with credentials', async () => {
     const db = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: [WagoManagedAccess, WagoRuntimeUpdateEntity, WagoDeviceOperation],
       migrations: [WagoManagedUpdates1780010650000],

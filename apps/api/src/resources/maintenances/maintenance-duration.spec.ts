@@ -69,7 +69,7 @@ describe('Maintenance duration from authoritative intervals', () => {
 
   beforeEach(async () => {
     dataSource = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       synchronize: true,
       entities: [UsageSchema, IntervalSchema, AttemptSchema],

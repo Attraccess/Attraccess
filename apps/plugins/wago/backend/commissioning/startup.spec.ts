@@ -13,7 +13,7 @@ it('boots the commissioning plugin and empty artifact catalog without privileged
   const storage = process.env.STORAGE_ROOT;
   process.env.STORAGE_ROOT = directory;
   const dataSource = new DataSource({
-    type: 'sqlite',
+    type: 'better-sqlite3',
     database: ':memory:',
     entities: plugin.entities,
     synchronize: true,

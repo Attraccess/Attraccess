@@ -44,7 +44,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     );
     state.schemaDirectory = await mkdtemp(join(tmpdir(), 'wago-audit-schema-'));
     const schema = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: join(state.schemaDirectory, 'schema.sqlite'),
       entities: [...Object.values(entities), ...plugin.entities],
       migrations: [...Object.values(coreMigrations), ...Object.values(wagoMigrations)],
@@ -67,7 +67,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     // Each case gets an independent copy of the fully migrated fixture schema.
     await copyFile(join(state.schemaDirectory, 'schema.sqlite'), join(state.directory, 'fixture.sqlite'));
     state.db = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: join(state.directory, 'fixture.sqlite'),
       entities: [...Object.values(entities), ...plugin.entities],
       synchronize: false,

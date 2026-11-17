@@ -96,7 +96,7 @@ describe('DashboardPinsService', () => {
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'dashboard-pins-'));
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: join(directory, 'test.sqlite'),
       entities: Object.values(entities),
       synchronize: true,
