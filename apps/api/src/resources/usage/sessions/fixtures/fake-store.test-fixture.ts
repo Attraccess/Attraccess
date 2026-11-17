@@ -24,6 +24,7 @@ import { ResourceRetrainingService } from '../../../retraining/resourceRetrainin
 import { RESOURCE_USAGE_COLLABORATORS } from '../../resource-usage.collaborators';
 import { USAGE_SESSION_STORE, UsageSessionStore } from '../../usage-session-store.port';
 import { ResourceUsageService } from '../resource-usage.service';
+import { InMemoryUsageSessionStore } from './in-memory-store.test-fixture';
 
 /**
  * A usage session store whose every operation is a jest mock that resolves to undefined until a spec says
@@ -63,7 +64,19 @@ export function createFakeUnitOfWork(): UnitOfWork {
  * mocked neighbouring services. No ORM is involved.
  */
 export async function createFakeStoreUsageScope() {
-  const store = createFakeUsageStore();
+  return buildUsageScope(createFakeUsageStore(), createFakeUnitOfWork());
+}
+
+/**
+ * The same service on a stateful in-memory store and the unit of work that belongs to it (a failed change is rolled
+ * back), for specs that assert what a business operation left in the store.
+ */
+export async function createInMemoryUsageScope() {
+  const store = new InMemoryUsageSessionStore();
+  return buildUsageScope(store, store.unitOfWork());
+}
+
+async function buildUsageScope<S extends UsageSessionStore>(store: S, unitOfWork: UnitOfWork) {
   const mocks = {
     resourcesService: { getResourceById: jest.fn() },
     introductions: { hasValidIntroduction: jest.fn(), canGiveIntroductions: jest.fn() },
@@ -81,6 +94,9 @@ export async function createFakeStoreUsageScope() {
     billing: {
       validateResourceUsageStart: jest.fn().mockResolvedValue(undefined),
       getResourceBillingConfiguration: jest.fn(),
+      handleResourceUsageStart: jest.fn().mockResolvedValue(undefined),
+      chargeForResourceUsage: jest.fn().mockResolvedValue(undefined),
+      notifyResourceUsageCharge: jest.fn().mockResolvedValue(undefined),
     },
     projects: { findOneById: jest.fn() },
     forms: { getFormsForAction: jest.fn(), prepareRequiredSubmissions: jest.fn().mockResolvedValue([]) },
@@ -102,8 +118,12 @@ export async function createFakeStoreUsageScope() {
       ResourceUsageService,
       ...RESOURCE_USAGE_COLLABORATORS,
       { provide: USAGE_SESSION_STORE, useValue: store },
-      { provide: UNIT_OF_WORK, useValue: createFakeUnitOfWork() },
-      { provide: EntityManagerResolver, useValue: { resolve: () => undefined, legacyHandle: () => undefined } },
+      { provide: UNIT_OF_WORK, useValue: unitOfWork },
+      // The legacy handle of a scope is the scope itself, so a spec can tell which transaction a collaborator joined.
+      {
+        provide: EntityManagerResolver,
+        useValue: { resolve: () => undefined, legacyHandle: (context: object) => context },
+      },
       { provide: ResourcesService, useValue: mocks.resourcesService },
       { provide: ResourceIntroductionsService, useValue: mocks.introductions },
       { provide: ResourceIntroducersService, useValue: mocks.introducers },

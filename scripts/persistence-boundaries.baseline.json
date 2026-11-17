@@ -9,17 +9,5 @@
   "apps/api/src/resources/groups/resourceGroups.service.spec.ts": 2,
   "apps/api/src/resources/groups/visibleResources.spec.ts": 2,
   "apps/api/src/resources/resources.controller.spec.ts": 1,
-  "apps/api/src/resources/sse/resource-events.service.spec.ts": 2,
-  "apps/api/src/resources/usage/sessions/authorization.spec.ts": 2,
-  "apps/api/src/resources/usage/sessions/end-session.spec.ts": 2,
-  "apps/api/src/resources/usage/sessions/fixtures/end-session.test-fixture.ts": 2,
-  "apps/api/src/resources/usage/sessions/fixtures/mocks.test-fixture.ts": 1,
-  "apps/api/src/resources/usage/sessions/fixtures/module.test-fixture.ts": 2,
-  "apps/api/src/resources/usage/sessions/fixtures/persistence.test-fixture.ts": 2,
-  "apps/api/src/resources/usage/sessions/fixtures/service.test-fixture.ts": 2,
-  "apps/api/src/resources/usage/sessions/fixtures/setup.test-fixture.ts": 3,
-  "apps/api/src/resources/usage/sessions/fixtures/start-session.test-fixture.ts": 1,
-  "apps/api/src/resources/usage/sessions/fixtures/supervised-start.test-fixture.ts": 2,
-  "apps/api/src/resources/usage/sessions/resource-usage-supervised-start.spec.ts": 1,
-  "apps/api/src/resources/usage/sessions/resource-usage.service.spec.ts": 2
+  "apps/api/src/resources/sse/resource-events.service.spec.ts": 2
 }
