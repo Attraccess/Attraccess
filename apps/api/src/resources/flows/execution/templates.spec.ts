@@ -1,9 +1,6 @@
-import { Resource, ResourceFlowEdge, ResourceFlowNode } from '@attraccess/database-entities';
-import { ResourceFlowNodeType } from '@attraccess/application-models';
+import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
-
-import { Repository } from 'typeorm';
 
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
 
@@ -23,61 +20,21 @@ import { resetTestFixture } from './fixtures/setup.test-fixture';
 
 import { createNode } from './fixtures/node.test-fixture';
 
+import type { FlowExecutionTestScope } from './fixtures/flow-test-scope.test-fixture';
+
+import type { FakeFlowTriggerStore } from './fixtures/fake-flow-trigger-store.test-fixture';
+
 import { Edge } from './fixtures/edge.test-fixture';
 
 jest.mock('axios');
 
-export type ResourceFlowsExecutorServiceRunFlowTestScope = {
-  initialNodes: ResourceFlowNode[];
-  createNode: typeof createNode;
-  mqttClientService: MqttClientService;
-  service: ResourceFlowsExecutorService;
-  resourceUsageService: ResourceUsageService;
-  nodesById: Record<string, ResourceFlowNode>;
-  errorShapeIndex: number;
-  edgesBySourceAndHandle: Record<string, Edge[]>;
-  flowLogs: FlowLogRecorderService;
-  operatingIntervals: { transition: jest.Mock };
-  flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
-  flowEdgeRepository: Partial<Repository<Edge>>;
-  resourceRepository: Partial<Repository<Resource>>;
-  eventEmitter: EventEmitter2;
-  resourceHealthService: ResourceHealthService;
-  variablesService: ResourceFlowVariablesService;
-};
-
-export type ResourceFlowsExecutorServiceMqttTestScope = {
-  initialNodes: ResourceFlowNode[];
-  service: ResourceFlowsExecutorService;
-  nodesById: Record<string, ResourceFlowNode>;
-  edgesBySourceAndHandle: Record<string, { source: string; target: string; sourceHandle?: string | null }[]>;
-  eventEmitter: EventEmitter2;
-  mqttClientService: MqttClientService;
-  flowLogs: FlowLogRecorderService;
-  createNode: typeof createNode;
-  flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
-  flowEdgeRepository: Partial<Repository<ResourceFlowEdge>>;
-  resourceRepository: Partial<Repository<Resource>>;
-  resourceUsageService: ResourceUsageService;
-  resourceHealthService: ResourceHealthService;
-  variablesService: ResourceFlowVariablesService;
-};
-
-// Minimal edge shape for our mocks
-// Helper to create a node
 describe('ResourceFlowsExecutorService.runFlow', () => {
   let errorShapeIndex = 0;
 
   let service: ResourceFlowsExecutorService;
 
   // Repositories and dependencies
-  let flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
-
-  let flowEdgeRepository: Partial<Repository<Edge>>;
-
   let flowLogs: FlowLogRecorderService;
-
-  let resourceRepository: Partial<Repository<Resource>>;
 
   let mqttClientService: MqttClientService;
 
@@ -92,11 +49,33 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   let operatingIntervals: { transition: jest.Mock };
 
   // Dynamic stores per test
-  let nodesById: Record<string, ResourceFlowNode>;
+  let nodesById: Record<string, FlowNodeRecord>;
 
-  let initialNodes: ResourceFlowNode[];
+  let initialNodes: FlowNodeRecord[];
+
+  let flowStore: FakeFlowTriggerStore;
+  let billingItems: FlowExecutionTestScope['billingItems'];
+  let unitOfWork: FlowExecutionTestScope['unitOfWork'];
 
   const scope = {
+    get flowStore() {
+      return flowStore;
+    },
+    set flowStore(value: typeof flowStore) {
+      flowStore = value;
+    },
+    get billingItems() {
+      return billingItems;
+    },
+    set billingItems(value: typeof billingItems) {
+      billingItems = value;
+    },
+    get unitOfWork() {
+      return unitOfWork;
+    },
+    set unitOfWork(value: typeof unitOfWork) {
+      unitOfWork = value;
+    },
     get initialNodes() {
       return initialNodes;
     },
@@ -153,24 +132,6 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     },
     set operatingIntervals(value: typeof operatingIntervals) {
       operatingIntervals = value;
-    },
-    get flowNodeRepository() {
-      return flowNodeRepository;
-    },
-    set flowNodeRepository(value: typeof flowNodeRepository) {
-      flowNodeRepository = value;
-    },
-    get flowEdgeRepository() {
-      return flowEdgeRepository;
-    },
-    set flowEdgeRepository(value: typeof flowEdgeRepository) {
-      flowEdgeRepository = value;
-    },
-    get resourceRepository() {
-      return resourceRepository;
-    },
-    set resourceRepository(value: typeof resourceRepository) {
-      resourceRepository = value;
     },
     get eventEmitter() {
       return eventEmitter;

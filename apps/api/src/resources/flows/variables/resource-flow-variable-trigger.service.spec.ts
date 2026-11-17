@@ -1,8 +1,6 @@
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ResourceFlowNode } from '@attraccess/database-entities';
-import { ResourceFlowNodeType, ResourceFlowVariableScope } from '@attraccess/application-models';
+import { FlowNodeRecord, ResourceFlowNodeType, ResourceFlowVariableScope } from '@attraccess/application-models';
+import { FLOW_TRIGGER_STORE } from '../flow-trigger-store.port';
 import { ResourceFlowVariableChangedEvent } from '../events/flow-variable-changed.event';
 import { ResourceFlowVariableTriggerService } from './resource-flow-variable-trigger.service';
 import { ResourceFlowsExecutorService } from '../execution/resource-flows-executor.service';
@@ -19,16 +17,16 @@ const node = (
     type: ResourceFlowNodeType.INPUT_VARIABLE_CHANGED,
     resourceId,
     data: { watches, source },
-  }) as unknown as ResourceFlowNode;
+  }) as unknown as FlowNodeRecord;
 
 describe('ResourceFlowVariableTriggerService', () => {
   let triggerService: ResourceFlowVariableTriggerService;
-  let nodeRepo: jest.Mocked<Repository<ResourceFlowNode>>;
+  let nodeRepo: { findVariableTriggerNodes: jest.Mock };
   let executor: jest.Mocked<ResourceFlowsExecutorService>;
   let variables: jest.Mocked<ResourceFlowVariablesService>;
 
   beforeEach(async () => {
-    nodeRepo = { find: jest.fn() } as never;
+    nodeRepo = { findVariableTriggerNodes: jest.fn() };
     executor = { startFlow: jest.fn() } as never;
     variables = {
       getMany: jest.fn(async () => ({ a: 1 })),
@@ -37,7 +35,7 @@ describe('ResourceFlowVariableTriggerService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         ResourceFlowVariableTriggerService,
-        { provide: getRepositoryToken(ResourceFlowNode), useValue: nodeRepo },
+        { provide: FLOW_TRIGGER_STORE, useValue: nodeRepo },
         { provide: ResourceFlowsExecutorService, useValue: executor },
         { provide: ResourceFlowVariablesService, useValue: variables },
       ],
@@ -47,7 +45,7 @@ describe('ResourceFlowVariableTriggerService', () => {
   });
 
   it('starts flow only for nodes whose watches match the event', async () => {
-    nodeRepo.find.mockResolvedValueOnce([
+    nodeRepo.findVariableTriggerNodes.mockResolvedValueOnce([
       node('match', 7, [{ scope: 'resource', key: 'a' }]),
       node('miss', 8, [{ scope: 'resource', key: 'other' }]),
     ]);
@@ -57,11 +55,13 @@ describe('ResourceFlowVariableTriggerService', () => {
     );
 
     expect(executor.startFlow).toHaveBeenCalledTimes(1);
-    expect((executor.startFlow.mock.calls[0][0] as ResourceFlowNode).id).toBe('match');
+    expect((executor.startFlow.mock.calls[0][0] as FlowNodeRecord).id).toBe('match');
   });
 
   it('drops same-source events when source=exclude-self', async () => {
-    nodeRepo.find.mockResolvedValueOnce([node('self', 7, [{ scope: 'global', key: 'k' }], 'exclude-self')]);
+    nodeRepo.findVariableTriggerNodes.mockResolvedValueOnce([
+      node('self', 7, [{ scope: 'global', key: 'k' }], 'exclude-self'),
+    ]);
 
     await triggerService.handle(
       new ResourceFlowVariableChangedEvent(ResourceFlowVariableScope.GLOBAL, null, 'k', 0, 1, new Date(), 7),
@@ -71,7 +71,7 @@ describe('ResourceFlowVariableTriggerService', () => {
   });
 
   it('payload exposes change meta and current watched values', async () => {
-    nodeRepo.find.mockResolvedValueOnce([node('n', 7, [{ scope: 'global', key: 'k' }])]);
+    nodeRepo.findVariableTriggerNodes.mockResolvedValueOnce([node('n', 7, [{ scope: 'global', key: 'k' }])]);
     const changedAt = new Date();
 
     await triggerService.handle(
@@ -96,11 +96,11 @@ describe('ResourceFlowVariableTriggerService', () => {
       flowId: number,
       watches: Array<{ scope: string; key: string }>,
       source: 'any' | 'exclude-self' = 'any',
-    ) => ({ ...node(id, null as never, watches, source), flowId }) as ResourceFlowNode;
+    ) => ({ ...node(id, null as never, watches, source), flowId }) as FlowNodeRecord;
 
     it('fires a resource-scope watch for any resource and makes it the triggering resource', async () => {
       const global = globalNode('g', 1, [{ scope: 'resource', key: 'a' }]);
-      nodeRepo.find.mockResolvedValueOnce([global]);
+      nodeRepo.findVariableTriggerNodes.mockResolvedValueOnce([global]);
 
       await triggerService.handle(
         new ResourceFlowVariableChangedEvent(ResourceFlowVariableScope.RESOURCE, 42, 'a', 0, 1, new Date(), 42),
@@ -112,7 +112,7 @@ describe('ResourceFlowVariableTriggerService', () => {
     });
 
     it('fires a global-scope watch without a triggering resource', async () => {
-      nodeRepo.find.mockResolvedValueOnce([globalNode('g', 1, [{ scope: 'global', key: 'a' }])]);
+      nodeRepo.findVariableTriggerNodes.mockResolvedValueOnce([globalNode('g', 1, [{ scope: 'global', key: 'a' }])]);
 
       await triggerService.handle(
         new ResourceFlowVariableChangedEvent(ResourceFlowVariableScope.GLOBAL, null, 'a', 0, 1, new Date(), null),
@@ -122,7 +122,7 @@ describe('ResourceFlowVariableTriggerService', () => {
     });
 
     it('excludes changes made by the same global flow when source is exclude-self', async () => {
-      nodeRepo.find.mockResolvedValueOnce([
+      nodeRepo.findVariableTriggerNodes.mockResolvedValueOnce([
         globalNode('self', 1, [{ scope: 'global', key: 'a' }], 'exclude-self'),
         globalNode('other', 2, [{ scope: 'global', key: 'a' }], 'exclude-self'),
       ]);
@@ -131,25 +131,18 @@ describe('ResourceFlowVariableTriggerService', () => {
         new ResourceFlowVariableChangedEvent(ResourceFlowVariableScope.GLOBAL, null, 'a', 0, 1, new Date(), null, 1),
       );
 
-      expect(executor.startFlow.mock.calls.map(([n]) => (n as ResourceFlowNode).id)).toEqual(['other']);
+      expect(executor.startFlow.mock.calls.map(([n]) => (n as FlowNodeRecord).id)).toEqual(['other']);
     });
   });
 
-  it('only loads variable triggers of resource flows and enabled global flows', async () => {
-    nodeRepo.find.mockResolvedValueOnce([]);
+  it('asks for the variable triggers of the changed resource', async () => {
+    nodeRepo.findVariableTriggerNodes.mockResolvedValueOnce([]);
 
     await triggerService.handle(
       new ResourceFlowVariableChangedEvent(ResourceFlowVariableScope.RESOURCE, 7, 'a', 0, 1, new Date(), 7),
     );
 
-    expect(nodeRepo.find).toHaveBeenCalledWith({
-      where: [
-        expect.objectContaining({ type: ResourceFlowNodeType.INPUT_VARIABLE_CHANGED, resourceId: 7 }),
-        {
-          type: ResourceFlowNodeType.INPUT_VARIABLE_CHANGED,
-          flow: { enabled: true, scope: 'global' },
-        },
-      ],
-    });
+    // The store adds the enabled global flows; a resource variable narrows the own flows to that resource.
+    expect(nodeRepo.findVariableTriggerNodes).toHaveBeenCalledWith(7);
   });
 });

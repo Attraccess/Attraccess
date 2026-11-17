@@ -7,8 +7,8 @@ import { FlowEventTriggersService } from './flow-event-triggers.service';
 
 describe('FlowEventTriggersService', () => {
   const executor = { runFlow: jest.fn() };
-  const maintenances = { findOne: jest.fn() };
-  const requests = { findOne: jest.fn() };
+  const maintenances = { findById: jest.fn() };
+  const requests = { findById: jest.fn() };
   const service = new FlowEventTriggersService(executor as never, maintenances as never, requests as never);
 
   beforeEach(() => {
@@ -39,7 +39,7 @@ describe('FlowEventTriggersService', () => {
       endTime: null,
       completedAt: null,
     };
-    maintenances.findOne.mockResolvedValueOnce(base);
+    maintenances.findById.mockResolvedValueOnce(base);
     await service.onMaintenanceChanged(new ResourceMaintenanceChangedEvent(4, 8));
     expect(executor.runFlow).toHaveBeenLastCalledWith(
       4,
@@ -50,7 +50,7 @@ describe('FlowEventTriggersService', () => {
     );
 
     const end = new Date('2026-01-01T11:00:00Z');
-    maintenances.findOne.mockResolvedValueOnce({ ...base, endTime: end, completedAt: end });
+    maintenances.findById.mockResolvedValueOnce({ ...base, endTime: end, completedAt: end });
     await service.onMaintenanceChanged(new ResourceMaintenanceChangedEvent(4, 8));
     expect(executor.runFlow).toHaveBeenLastCalledWith(
       4,
@@ -60,7 +60,7 @@ describe('FlowEventTriggersService', () => {
   });
 
   it('runs the maintenance request trigger with the user-visible fields', async () => {
-    requests.findOne.mockResolvedValue({
+    requests.findById.mockResolvedValue({
       id: 3,
       reason: 'Noisy',
       status: 'open',

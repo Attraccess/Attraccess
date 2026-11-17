@@ -1,6 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode } from '@attraccess/database-entities';
-import { ResourceFlowNodeType } from '@attraccess/application-models';
+import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
 import { MqttSendMessageExecutor } from './mqtt-send-message.executor';
 import { NodeExecutionContext } from './node-executor.interface';
@@ -10,13 +9,13 @@ describe('MqttSendMessageExecutor', () => {
   let mqttClientService: { publish: jest.Mock };
   let ctx: NodeExecutionContext;
 
-  const makeNode = (data: Record<string, unknown>): ResourceFlowNode =>
+  const makeNode = (data: Record<string, unknown>): FlowNodeRecord =>
     ({
       id: 'n1',
       type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE,
       resourceId: 1,
       data,
-    }) as unknown as ResourceFlowNode;
+    }) as unknown as FlowNodeRecord;
 
   beforeEach(() => {
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);

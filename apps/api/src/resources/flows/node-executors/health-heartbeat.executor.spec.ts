@@ -1,18 +1,22 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode } from '@attraccess/database-entities';
-import { ResourceFlowNodeType, ResourceHealthSource, ResourceHealthStatus } from '@attraccess/application-models';
+import {
+  FlowNodeRecord,
+  ResourceFlowNodeType,
+  ResourceHealthSource,
+  ResourceHealthStatus,
+} from '@attraccess/application-models';
 import { ResourceHealthService } from '../../health/resource-health.service';
 import { HealthHeartbeatExecutor } from './health-heartbeat.executor';
 import { globalHeartbeatKey, heartbeatKey } from './flow.utils';
 
-function createNode(partial: Partial<ResourceFlowNode>): ResourceFlowNode {
+function createNode(partial: Partial<FlowNodeRecord>): FlowNodeRecord {
   return {
     id: 'n1',
     type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT,
     resourceId: 1,
     data: {},
     ...partial,
-  } as unknown as ResourceFlowNode;
+  } as unknown as FlowNodeRecord;
 }
 
 describe('HealthHeartbeatExecutor', () => {

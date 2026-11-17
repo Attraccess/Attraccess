@@ -1,5 +1,4 @@
-import { FlowScope, getNodeDataSchema } from '@attraccess/database-entities';
-import { ResourceFlowNodeType, ResourceType } from '@attraccess/application-models';
+import { FlowScope, ResourceFlowNodeType, ResourceType, getNodeDataSchema } from '@attraccess/application-models';
 import { z } from 'zod';
 import { ResourceFlowNodeSchemaDto } from '../dto/resource-flow-node-schemas-response.dto';
 

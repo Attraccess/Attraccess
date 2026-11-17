@@ -1,6 +1,6 @@
 import { AuditLog, ResourceFlowNode } from '@attraccess/database-entities';
 import type { ResourceHealthRecord } from '@attraccess/application-models';
-import { ResourceFlowNodeType, ResourceType } from '@attraccess/application-models';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
 import {
   AuthenticatedRequest,
   PLUGIN_AUDIT_HOST_PROVIDER,
@@ -18,6 +18,10 @@ import { MqttServerService } from '../mqtt/servers/mqtt-server.service';
 import { registerPluginFlowNodes } from '../plugin-system/flows/node-registry';
 import { LoadedPluginManifest } from '../plugin-system/plugin.manifest';
 import { PluginModule } from '../plugin-system/plugin.module';
+import {
+  createFakeFlowTriggerStore,
+  type FakeFlowEdge,
+} from '../resources/flows/execution/fixtures/fake-flow-trigger-store.test-fixture';
 import { ResourceFlowsExecutorService } from '../resources/flows/execution/resource-flows-executor.service';
 import { FlowLogRecorderService } from '../resources/flows/logs/flow-log-recorder.service';
 import { ResourceHealthService } from '../resources/health/resource-health.service';
@@ -104,39 +108,21 @@ describe('audit recorded through flows, MQTT and the plugin context', () => {
     edges: { source: string; target: string; sourceHandle?: string }[],
     health: ResourceHealthService,
   ): ResourceFlowsExecutorService {
-    const ofType = (type: unknown) => nodes.filter((node) => node.type === type);
-    const flowNodeRepository = {
-      find: async ({ where }: { where: { type?: string } | { type?: string }[] }) =>
-        (Array.isArray(where) ? where : [where])
-          .flatMap(({ type }) => ofType(type))
-          .filter((node, index, all) => all.indexOf(node) === index),
-      findOne: async ({ where }: { where: { id: string } }) => nodes.find((node) => node.id === where.id) ?? null,
-      // The plugin trigger page query: one page of nodes of the requested type.
-      createQueryBuilder: () => {
-        let type: unknown;
-        const builder = {
-          leftJoin: () => builder,
-          where: (_sql: string, values: { type: string }) => ((type = values.type), builder),
-          andWhere: () => builder,
-          orderBy: () => builder,
-          limit: () => builder,
-          getMany: async () => ofType(type),
-        };
-        return builder;
-      },
-    };
-    const flowEdgeRepository = {
-      find: async ({ where }: { where: { source: string; sourceHandle?: string } }) =>
-        edges.filter(
-          (edge) => edge.source === where.source && (edge.sourceHandle ?? '') === (where.sourceHandle ?? ''),
-        ),
-    };
+    const edgesBySourceAndHandle: Record<string, FakeFlowEdge[]> = {};
+    for (const edge of edges) {
+      const key = `${edge.source}|${edge.sourceHandle ?? ''}`;
+      (edgesBySourceAndHandle[key] ??= []).push(edge);
+    }
+    const flowStore = createFakeFlowTriggerStore({
+      initialNodes: nodes,
+      nodesById: Object.fromEntries(nodes.map((node) => [node.id, node])),
+      edgesBySourceAndHandle,
+    });
     return new ResourceFlowsExecutorService(
-      flowNodeRepository as never,
-      flowEdgeRepository as never,
-      { findOne: async () => ({ id: 1, name: 'Lathe', type: ResourceType.Machine, metadata: {} }) } as never,
+      flowStore,
       new FlowLogRecorderService(),
       { publish: jest.fn(), subscribe: jest.fn() } as never,
+      {} as never,
       {} as never,
       new EventEmitter2(),
       health,

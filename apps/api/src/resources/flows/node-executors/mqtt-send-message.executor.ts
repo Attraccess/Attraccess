@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode, MqttSendMessageNodeDataSchema } from '@attraccess/database-entities';
+import { FlowNodeRecord, MqttSendMessageNodeDataSchema } from '@attraccess/application-models';
 import z from 'zod';
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
 import { FlowFailureKind, NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
@@ -9,7 +9,7 @@ export class MqttSendMessageExecutor implements NodeExecutor {
 
   constructor(private readonly mqttClientService: MqttClientService) {}
 
-  async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
+  async execute(node: FlowNodeRecord, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
     const { serverId, ...data } = node.data as z.infer<typeof MqttSendMessageNodeDataSchema>;
 
     const topic = ctx.compileTemplate(data.topic ?? '', input);

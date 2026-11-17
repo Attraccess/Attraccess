@@ -1,7 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ResourceFlowNode } from '@attraccess/database-entities';
-import { ResourceFlowNodeType } from '@attraccess/application-models';
+import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 import { MqttWaitForMessageExecutor } from './mqtt-wait-for-message.executor';
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
 import { MqttMessageEvent } from '../../../mqtt/mqtt-message.event';
@@ -11,13 +10,13 @@ describe('MqttWaitForMessageExecutor', () => {
   let mqttClientService: { subscribe: jest.Mock };
   let eventEmitter: EventEmitter2;
 
-  function makeNode(data: object): ResourceFlowNode {
+  function makeNode(data: object): FlowNodeRecord {
     return {
       id: 'n1',
       type: ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE,
       resourceId: 1,
       data,
-    } as unknown as ResourceFlowNode;
+    } as unknown as FlowNodeRecord;
   }
 
   beforeEach(() => {
