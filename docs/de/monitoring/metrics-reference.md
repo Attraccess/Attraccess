@@ -181,7 +181,7 @@ Plugins mit der Berechtigung `BLE_TRANSPORT` sprechen über Attractap-Reader mit
 
 | Metrik | Typ | Labels | Beschreibung |
 |--------|-----|--------|--------------|
-| `attraccess_plugin_ble_operations_total` | Counter | `operation`, `outcome` | Plugin-BLE-Operationen (`scan`, `read`, `write`, `subscribe`, `unsubscribe`, ...); `outcome` ist `ok` oder der Fehlercode |
+| `attraccess_plugin_ble_operations_total` | Counter | `operation`, `outcome` | Plugin-BLE-Operationen (`scan`, `connect`, `read`, `write`, `subscribe`, `unsubscribe`, ...); `outcome` ist `ok` oder der Fehlercode |
 | `attraccess_plugin_ble_operation_duration_seconds` | Histogram | `operation` | Dauer erfolgreicher Operationen, einschließlich des Roundtrips zum Reader |
 | `attraccess_plugin_ble_sessions_active` | Gauge | -- | Offene Plugin-BLE-Sitzungen |
 | `attraccess_plugin_ble_session_closes_total` | Counter | `reason` | Geschlossene Sitzungen nach Grund (`closed`, `lease-expired`, `disconnected`, `cancelled`, ...) |

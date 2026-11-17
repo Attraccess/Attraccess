@@ -181,7 +181,7 @@ Plugins with the `BLE_TRANSPORT` permission talk to Bluetooth devices through At
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `attraccess_plugin_ble_operations_total` | Counter | `operation`, `outcome` | Plugin BLE operations (`scan`, `read`, `write`, `subscribe`, `unsubscribe`, ...); `outcome` is `ok` or the error code |
+| `attraccess_plugin_ble_operations_total` | Counter | `operation`, `outcome` | Plugin BLE operations (`scan`, `connect`, `read`, `write`, `subscribe`, `unsubscribe`, ...); `outcome` is `ok` or the error code |
 | `attraccess_plugin_ble_operation_duration_seconds` | Histogram | `operation` | Duration of successful operations, including the reader round trip |
 | `attraccess_plugin_ble_sessions_active` | Gauge | -- | Open plugin BLE sessions |
 | `attraccess_plugin_ble_session_closes_total` | Counter | `reason` | Closed sessions by reason (`closed`, `lease-expired`, `disconnected`, `cancelled`, ...) |

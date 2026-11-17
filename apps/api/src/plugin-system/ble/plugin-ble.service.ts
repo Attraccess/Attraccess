@@ -343,12 +343,34 @@ export class PluginBleService implements OnModuleDestroy {
 
   // ------------------------------------------------------------ sessions
 
+  /** Opens a session and records the outcome as the `connect` operation, including refusals before the reader. */
   async openSession(
     caller: PluginBleCaller,
     endpointId: string,
     options?: PluginBleSessionOptions,
   ): Promise<PluginBleSession> {
+    const startedAt = this.clock.now();
+    // The plugin-supplied endpoint id is only logged once it resolved to an owned endpoint.
+    const trace = { scope: `plugin=${caller.pluginId}` };
+    try {
+      const session = await this.connectSession(caller, endpointId, options, trace);
+      this.recordOperation('connect', 'ok', this.clock.now() - startedAt, trace.scope);
+      return session;
+    } catch (error) {
+      const failure = error instanceof PluginBleError ? error : new PluginBleError('INTERNAL', 'openSession failed');
+      this.recordOperation('connect', failure.code, this.clock.now() - startedAt, trace.scope, failure.detail);
+      throw error;
+    }
+  }
+
+  private async connectSession(
+    caller: PluginBleCaller,
+    endpointId: string,
+    options: PluginBleSessionOptions | undefined,
+    trace: { scope: string },
+  ): Promise<PluginBleSession> {
     const endpoint = await this.findOwned(caller.pluginId, endpointId);
+    trace.scope = `reader=${endpoint.readerId} endpoint=${endpoint.id} plugin=${caller.pluginId}`;
     const profile = this.requireProfile(caller.pluginId, endpoint.profileId);
     const resolved = resolveBleSessionOptions(profile, options);
     if (options?.signal?.aborted)
@@ -370,9 +392,8 @@ export class PluginBleService implements OnModuleDestroy {
       throw new PluginBleError('ENDPOINT_BUSY', 'The endpoint already has an open session', { detail: endpoint.id });
     }
     const sessionId = randomUUID();
-    const logScope =
-      `reader=${endpoint.readerId} endpoint=${endpoint.id} plugin=${caller.pluginId} profile=${profile.id} ` +
-      `session=${sessionId}`;
+    const logScope = `${trace.scope} profile=${profile.id} session=${sessionId}`;
+    trace.scope = logScope;
     const session: BleSessionEngine = new BleSessionEngine({
       id: sessionId,
       endpointId: endpoint.id,
