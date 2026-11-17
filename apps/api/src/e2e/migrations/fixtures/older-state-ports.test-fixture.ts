@@ -6,7 +6,7 @@ import type { BillingLedgerStore } from '../../../billing/ports/billing-ledger.p
 import { SqliteAuditStore } from '../../../database/adapters/audit/sqlite-audit-store';
 import { TypeOrmBillingLedgerStore } from '../../../database/adapters/billing/typeorm-billing-ledger.store';
 import { EntityManagerResolver } from '../../../database/adapters/entity-manager-resolver';
-import { createPluginMigrationEngine } from '../../../database/adapters/plugins/plugin-migration-engine';
+import { sqliteBackend } from '../../../database/sqlite/sqlite-backend';
 import { unitOfWorkFor } from '../../../database/adapters/shared-unit-of-work';
 import { TransactionContextResolver } from '../../../database/adapters/transaction-context';
 import { TypeOrmUsageSessionStore } from '../../../database/adapters/usage/typeorm-usage-session.store';
@@ -49,9 +49,9 @@ export async function auditEntriesOn(source: DataSource): Promise<AuditEntry[]> 
 
 /** What the plugin lifecycle reads from a plugin's own migration table in the upgraded database file. */
 export function appliedPluginMigrationsOn(source: DataSource, tableName: string): Promise<string[]> {
-  return createPluginMigrationEngine({ type: 'sqlite', database: source.options.database as string }).listApplied(
-    tableName,
-  );
+  return sqliteBackend.plugins
+    .createMigrationEngine({ type: 'sqlite', database: source.options.database as string })
+    .listApplied(tableName);
 }
 
 /** A UTC timestamp as SQLite stores a `datetime` column: 'YYYY-MM-DD HH:MM:SS'. */
