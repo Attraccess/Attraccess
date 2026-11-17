@@ -1,4 +1,5 @@
-import { repositoryDouble } from './persistence.test-utils';
+import { createWagoTestStorage } from './storage/testing';
+import { controller } from './wago-service.test-fixture';
 import type { AuthenticatedUser, PluginContext, PluginLiveTopic } from '@attraccess/plugins-backend-sdk';
 import { WagoLiveUpdatesService } from './wago-live-updates.service';
 import { WagoService } from './controllers/service';
@@ -8,9 +9,10 @@ import { WagoManagedRuntimeService } from './runtime/managed/service';
 import { WagoNetworkChangeService } from './network/service';
 
 describe('WAGO bundled status sources', () => {
-  function setup() {
+  async function setup() {
     const topics = new Map<string, PluginLiveTopic>();
-    const existsBy = jest.fn(async () => true);
+    const test = createWagoTestStorage();
+    await test.tables.controllers.insert(controller());
     const context = {
       liveUpdates: {
         register: (topic: PluginLiveTopic) => {
@@ -18,7 +20,8 @@ describe('WAGO bundled status sources', () => {
           return () => undefined;
         },
       },
-      ...repositoryDouble(() => ({ existsBy })),
+      storage: test.storage,
+      persistence: test.persistence,
     } as unknown as PluginContext;
     const get = jest.fn(async () => ({ connected: true }));
     const service = new WagoLiveUpdatesService(
@@ -30,11 +33,11 @@ describe('WAGO bundled status sources', () => {
       {} as WagoNetworkChangeService,
     );
     service.onModuleInit();
-    return { topics, existsBy, get };
+    return { topics, tables: test.tables, get };
   }
 
   it('retains REST permissions, validates safe entity IDs, and distinguishes commissioning administration', async () => {
-    const { topics, existsBy } = setup();
+    const { topics, tables } = await setup();
     const user = { id: 1, effectivePermissions: new Set(['resources.update']) } as AuthenticatedUser;
     await expect(
       topics.get('diagnostics').authorize({ topic: 'diagnostics', identifier: '1' }, user),
@@ -45,16 +48,32 @@ describe('WAGO bundled status sources', () => {
     for (const identifier of ['0', '-1', '1.2', '1:a', '9007199254740992']) {
       await expect(topics.get('diagnostics').authorize({ topic: 'diagnostics', identifier }, user)).rejects.toThrow();
     }
-    existsBy.mockResolvedValue(false);
+    // Only stored controllers and sessions are addressable.
     await expect(
       topics.get('diagnostics').authorize({ topic: 'diagnostics', identifier: '2' }, user),
     ).rejects.toThrow();
+    const admin = { id: 1, effectivePermissions: new Set(['system.settings.manage']) } as AuthenticatedUser;
+    const verification = { topic: 'commissioning-verification', identifier: '5' };
+    await expect(topics.get('commissioning-verification').authorize(verification, admin)).rejects.toThrow();
+    await tables.commissioningSessions.insert({
+      id: 5,
+      hardwareId: 'cc100-01',
+      mqttServerId: 2,
+      targetHost: '192.168.1.10',
+      hostKeyFingerprint: 'fingerprint',
+      firmwareBaseline: 'baseline',
+      state: 'awaiting_delivery',
+      auditLog: '[]',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+    await expect(topics.get('commissioning-verification').authorize(verification, admin)).resolves.toBeUndefined();
   });
 
   it('shares samplers, survives transient errors, and stops sampling on final unsubscribe', async () => {
     jest.useFakeTimers();
     try {
-      const { topics, get } = setup();
+      const { topics, get } = await setup();
       const topic = topics.get('diagnostics');
       const subscription = { topic: 'diagnostics', identifier: '1' };
       const user = { id: 1 } as AuthenticatedUser;
