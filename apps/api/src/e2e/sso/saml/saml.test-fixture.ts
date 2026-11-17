@@ -21,13 +21,9 @@ import { SettingsService } from '../../../settings/settings.service';
 import type { SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
 import {
   AuthenticationDetail,
-  Permission,
   ResourceUsage,
-  Role,
-  RolePermission,
   Session,
   User,
-  UserRole,
 } from '@attraccess/database-entities';
 import { SSOProviderType } from '@attraccess/application-models';
 import type { ConfigService } from '@nestjs/config';
@@ -131,9 +127,6 @@ beforeAll(async () => {
   const authDetailRepo = dataSource.getRepository(AuthenticationDetail);
   const sessionRepo = dataSource.getRepository(Session);
   const resourceUsageRepo = dataSource.getRepository(ResourceUsage);
-  const roleRepo = dataSource.getRepository(Role);
-  const permissionRepo = dataSource.getRepository(Permission);
-  const rolePermissionRepo = dataSource.getRepository(RolePermission);
 
   const mockConfigService = {
     get: (key: string): AppConfigType | undefined => {
