@@ -41,6 +41,9 @@ export function symbolicationChipColor(
   }
 }
 
+/** Marks a coredump the reader found in flash without its boot record (firmware since ATT-1144). */
+export const ORPHAN_COREDUMP_REBOOT_REASON = 'COREDUMP_ORPHAN';
+
 type Model = ReturnType<typeof useAttractapDiagnosticsState>;
 
 type Props = Pick<
@@ -63,9 +66,25 @@ export function renderAttractapDiagnosticsReports(
           <Chip color="warning" variant="soft" size="sm">
             {report.resetReason}
           </Chip>
-          {report.rebootReason && (
-            <Chip color="danger" variant="soft" size="sm" data-cy="attractap-diagnostics-reboot-reason">
-              {report.rebootReason}
+          {report.rebootReason === ORPHAN_COREDUMP_REBOOT_REASON ? (
+            <Chip color="default" variant="soft" size="sm" data-cy="attractap-diagnostics-orphan-coredump">
+              {t('orphanCoredump')}
+            </Chip>
+          ) : (
+            report.rebootReason && (
+              <Chip color="danger" variant="soft" size="sm" data-cy="attractap-diagnostics-reboot-reason">
+                {report.rebootReason}
+              </Chip>
+            )
+          )}
+          {report.coredumpStatus === 'awaiting' && (
+            <Chip color="warning" variant="soft" size="sm" data-cy="attractap-diagnostics-coredump-pending">
+              {t('coredumpPending')}
+            </Chip>
+          )}
+          {report.coredumpStatus === 'rejected' && (
+            <Chip color="warning" variant="soft" size="sm" data-cy="attractap-diagnostics-coredump-rejected">
+              {t('coredumpRejected')}
             </Chip>
           )}
           {report.symbolicationStatus && (
@@ -118,6 +137,12 @@ export function renderAttractapDiagnosticsReports(
           </span>
         </span>
       </div>
+      {report.rebootReason === ORPHAN_COREDUMP_REBOOT_REASON && (
+        <p className="text-xs text-default-500" data-cy="attractap-diagnostics-orphan-hint">
+          {t('orphanCoredumpHint')}
+        </p>
+      )}
+
       {report.coredumpBuildId && (
         <div className="flex items-center gap-2 flex-wrap text-sm">
           <span className="font-mono text-xs text-default-500">
@@ -175,6 +200,16 @@ export function renderAttractapDiagnosticsReports(
           >
             {t('downloadCoredump')} ({formatBytes(report.coredumpSize, fallback)})
           </Button>
+        ) : report.coredumpStatus === 'awaiting' ? (
+          <span className="text-xs text-warning" data-cy="attractap-diagnostics-coredump-pending-hint">
+            {t('coredumpPendingHint', { size: formatBytes(report.coredumpExpectedSize, fallback) })}
+          </span>
+        ) : report.coredumpStatus === 'rejected' ? (
+          <span className="text-xs text-default-500" data-cy="attractap-diagnostics-coredump-rejected-hint">
+            {report.coredumpExpectedSize === null || report.coredumpExpectedSize === undefined
+              ? t('coredumpRejectedHintNoSize')
+              : t('coredumpRejectedHint', { size: formatBytes(report.coredumpExpectedSize, fallback) })}
+          </span>
         ) : (
           <span className="text-xs text-default-400">{t('noCoredump')}</span>
         )}

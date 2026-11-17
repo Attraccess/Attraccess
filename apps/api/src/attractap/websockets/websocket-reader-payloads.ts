@@ -26,7 +26,31 @@ export interface ReaderCrashReportPayload {
   wsState?: string | null;
   wifiState?: string | null;
   firmwareVersion?: string | null;
+  /** Legacy (firmware before ATT-1144): the whole dump inline, bounded by the 64 KiB session frame. */
   coredumpBase64?: string | null;
+  /** Size of the dump the reader uploads next with READER_COREDUMP_* (raw bytes). */
+  coredumpSize?: number | null;
+  /** zlib CRC-32 of those raw bytes. */
+  coredumpCrc32?: number | null;
+}
+
+export interface ReaderCoredumpBeginPayload {
+  reportId: number;
+  size: number;
+  crc32: number;
+}
+
+export interface ReaderCoredumpChunkPayload {
+  reportId: number;
+  offset: number;
+  /** base64 of at most COREDUMP_CHUNK_BYTES raw bytes */
+  data: string;
+}
+
+export interface ReaderCoredumpCompletePayload {
+  reportId: number;
+  totalSize: number;
+  crc32: number;
 }
 
 export interface ResourceThumbnailDescriptorPayload {

@@ -204,3 +204,4 @@ export * from './1793200000000-mcp-oauth';
 export * from './1793300000000-dashboard-pins';
 export * from './1793300000000-plugin-ble-transport';
 export * from './1793400000000-dashboard-pin-size';
+export * from './1793500000000-attractap-crash-report-coredump-upload';

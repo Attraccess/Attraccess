@@ -62,6 +62,12 @@ export function buildEventHandlers(d: EventHandlerDeps): Record<AttractapEventTy
       d.firmwareHandler.handleFirmwareInfo(socket, eventData),
     [AttractapEventType.READER_CRASH_REPORT]: (socket, eventData) =>
       d.crashReportHandler.handleCrashReport(socket, eventData),
+    [AttractapEventType.READER_COREDUMP_BEGIN]: (socket, eventData) =>
+      d.crashReportHandler.handleCoredumpBegin(socket, eventData),
+    [AttractapEventType.READER_COREDUMP_CHUNK]: (socket, eventData) =>
+      d.crashReportHandler.handleCoredumpChunk(socket, eventData),
+    [AttractapEventType.READER_COREDUMP_COMPLETE]: (socket, eventData) =>
+      d.crashReportHandler.handleCoredumpComplete(socket, eventData),
     // Card relay (ATT-1145): the reader announces a card and relays APDUs; the server runs the card crypto.
     [AttractapEventType.CARD_DETECTED]: (socket, eventData) => d.cardDetectedRouter.route(socket, eventData),
     [AttractapEventType.CARD_APDU_RESPONSE]: (socket, eventData) =>

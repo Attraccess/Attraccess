@@ -36,6 +36,9 @@ private:
     static void processLine(const std::string &line);
     static void handleAuthorizedCommand(const std::string &topic, JsonObject payloadObj);
     static void handleCommand(const std::string &topic, const std::string &payload);
+#ifdef ATTRACTAP_CRASH_TRIGGER
+    static void triggerCrash(uint32_t stackBytes);
+#endif
 
     static bool pinIsSet();
     static bool validateNewCode(const char *code);

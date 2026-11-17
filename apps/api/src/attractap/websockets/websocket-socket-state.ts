@@ -22,6 +22,11 @@ export enum AttractapEventType {
   READER_FIRMWARE_UPDATE_REQUIRED = 'READER_FIRMWARE_UPDATE_REQUIRED',
   READER_FIRMWARE_INFO = 'READER_FIRMWARE_INFO',
   READER_CRASH_REPORT = 'READER_CRASH_REPORT',
+  // Chunked coredump upload (ATT-1144), one message in flight: the reader announces the dump of a report,
+  // sends it in chunks and completes it; every reply comes without an ACK round trip.
+  READER_COREDUMP_BEGIN = 'READER_COREDUMP_BEGIN',
+  READER_COREDUMP_CHUNK = 'READER_COREDUMP_CHUNK',
+  READER_COREDUMP_COMPLETE = 'READER_COREDUMP_COMPLETE',
   /** Server-pushed: asks a token-signed-in reader to open a pairing connection. */
   READER_START_PAIRING = 'READER_START_PAIRING',
   FIRMWARE_REQUEST_CHUNK = 'FIRMWARE_REQUEST_CHUNK',

@@ -5,7 +5,7 @@ export { McpOAuthGrant } from './entities/mcp-oauth-grant.entity';
 export { McpOAuthToken } from './entities/mcp-oauth-token.entity';
 export type { McpOAuthTokenKind } from './entities/mcp-oauth-token.entity';
 export { Attractap, AttractapFirmwareVersion } from './entities/attractap.entity';
-export { AttractapCrashReport } from './entities/attractapCrashReport.entity';
+export { AttractapCrashReport, type CoredumpStatus } from './entities/attractapCrashReport.entity';
 export { AttractapCredentialEvent } from './entities/attractap-credential-event.entity';
 export { PluginBleEndpointEntity } from './entities/plugin-ble-endpoint.entity';
 export { AttractapInstallation } from './entities/attractap-installation.entity';
