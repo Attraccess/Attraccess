@@ -3,7 +3,6 @@ import { BadRequestException } from '@nestjs/common';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs';
 import fsPromises from 'fs/promises';
 import { join } from 'path';
-import { ZodError } from 'zod';
 import { PluginService } from './plugin.service';
 import { zipFileUpload } from './__test__/make-zip';
 
@@ -17,7 +16,12 @@ describe('PluginService.uploadPlugin staging cleanup', () => {
     readdirSync(fixture.root).filter((entry) => entry === 'temp' || entry.startsWith('.zip-upload-'));
 
   it.each([
-    ['an invalid manifest', () => zipFileUpload({ 'plugin.json': JSON.stringify({ name: 'x' }) }), ZodError, undefined],
+    [
+      'an invalid manifest',
+      () => zipFileUpload({ 'plugin.json': JSON.stringify({ name: 'x' }) }),
+      BadRequestException,
+      'Invalid plugin.json: ',
+    ],
     [
       'a missing plugin.json',
       () => zipFileUpload({ 'dist/index.js': '' }),
@@ -139,7 +143,7 @@ describe('PluginService.uploadPlugin staging cleanup', () => {
     it('still throws the original error of a failed upload', async () => {
       await expect(
         new PluginService().uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify({ name: 'x' }) })),
-      ).rejects.toBeInstanceOf(ZodError);
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 });

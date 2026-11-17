@@ -1247,7 +1247,7 @@
   "renameCompanionDevice": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "110dbcc9"
+    "shape": "de432e69"
   },
   "deleteCompanionDevice": {
     "decision": "allow",
