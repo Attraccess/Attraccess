@@ -20,6 +20,10 @@ overrides:
   '@internationalized/date': 3.12.4
   react: 19.3.1
   react-dom: 19.3.1
+  # nestjs-asyncapi only renders HTML docs in setup(), which we never call (its patch loads the generator lazily);
+  # dropping the generator removes simple-git, jsonpath-plus, tar 6, pacote, markdown-it, puppeteer and extract-zip.
+  'nestjs-asyncapi>@asyncapi/generator': '-'
+  'nestjs-asyncapi>@asyncapi/html-template': '-'
 
 allowBuilds:
   '@balena/compose-parser': true
@@ -57,9 +61,11 @@ patchedDependencies:
   # @nestjs/swagger@12.1.2: exports the dist/* internals that nestjs-asyncapi 2 deep-imports.
   # @peculiar/x509@3.1.0: registers in its own tsyringe child container; @simplewebauthn/server brings x509 2,
   #   and two majors in tsyringe's global container break certificate generation (ATT-1312).
+  # nestjs-asyncapi@2.0.1: requires @asyncapi/generator only when rendering HTML, so the override above can drop it.
   ts-api-utils@2.5.0: patches/ts-api-utils@2.5.0.patch
   typescript@7.0.2: patches/typescript@7.0.2.patch
   '@swc-node/register@1.12.1': patches/@swc-node__register@1.12.1.patch
   crap-score@1.2.1: patches/crap-score@1.2.1.patch
   '@nestjs/swagger@12.1.2': patches/@nestjs__swagger@12.1.2.patch
   '@peculiar/x509@3.1.0': patches/@peculiar__x509@3.1.0.patch
+  nestjs-asyncapi@2.0.1: patches/nestjs-asyncapi@2.0.1.patch
