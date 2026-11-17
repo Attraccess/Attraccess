@@ -1,7 +1,8 @@
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 import { BadRequestException } from '@nestjs/common';
 import * as semver from 'semver';
-import { assertHostRangeTargetsSdk2 } from '../runtime/plugin-compatibility';
+import { assertHostRangeTargetsSdk2, assertManifestCompatible } from '../runtime/plugin-compatibility';
+import { resolveDatabaseBackend } from '../../database/backend';
 import { z } from 'zod';
 import { PluginDependenciesSchema } from '../runtime/dependencies';
 import { PluginBackendNameSchema, dashboardPathsSchema, dashboardWidgetsSchema } from '../runtime/manifest-schema';
@@ -65,13 +66,10 @@ export function parseNpmPluginPackage(
   if (!pkg.keywords.includes('attraccess-plugin')) {
     throw new BadRequestException('Package must include the attraccess-plugin keyword');
   }
+  // The SDK 2.0 check first: an SDK 1.x package gets the message naming it and the migration guide.
+  refuseIncompatible(() => assertHostRangeTargetsSdk2(pkg.name, pkg.attraccess.host));
   if (!semver.satisfies(hostVersion, pkg.attraccess.host, { includePrerelease: true })) {
     throw new BadRequestException(`Plugin is not compatible with Attraccess ${hostVersion}`);
-  }
-  try {
-    assertHostRangeTargetsSdk2(pkg.name, pkg.attraccess.host);
-  } catch (error) {
-    throw new BadRequestException((error as Error).message);
   }
   validateSdkPeerDependency(
     pkg,
@@ -107,18 +105,28 @@ export function parseNpmPluginPackage(
   if (!main.backend && !main.frontend) {
     throw new BadRequestException('Package must declare a backend or frontend entry point');
   }
-  return {
-    pkg,
-    manifest: PluginManifestSchema.parse({
-      name: pkg.name,
-      version: pkg.version,
-      main,
-      attraccessVersion: { min: semver.minVersion(pkg.attraccess.host)?.version, exact: hostVersion },
-      persistence: pkg.attraccess.persistence,
-      permissions: pkg.attraccess.permissions,
-      dependencies: pkg.attraccess.dependencies,
-    }),
-  };
+  const manifest = PluginManifestSchema.parse({
+    name: pkg.name,
+    version: pkg.version,
+    main,
+    attraccessVersion: { min: semver.minVersion(pkg.attraccess.host)?.version, exact: hostVersion },
+    persistence: pkg.attraccess.persistence,
+    permissions: pkg.attraccess.permissions,
+    dependencies: pkg.attraccess.dependencies,
+  });
+  // Engine support at parse time: before any file move, state row or plugin code load (a replacement's migration
+  // history check loads its migrations), exactly as a ZIP upload and discovery check it.
+  refuseIncompatible(() => assertManifestCompatible(manifest, resolveDatabaseBackend().type));
+  return { pkg, manifest };
+}
+
+/** A host compatibility refusal is the client's problem: answered with 400 and its message (incl. the guide). */
+function refuseIncompatible(check: () => void): void {
+  try {
+    check();
+  } catch (error) {
+    throw new BadRequestException((error as Error).message);
+  }
 }
 
 function validateSdkPeerDependency(

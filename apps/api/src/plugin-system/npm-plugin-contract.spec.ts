@@ -19,6 +19,7 @@ const validPackage = {
     dashboardPaths: ['/plugin-report'],
     dashboardWidgets: ['plugin-report-summary'],
     permissions: [PluginPermission.DATABASE_ACCESS],
+    persistence: { backends: ['sqlite'] },
     sdk: { backend: '^2.0.0', frontend: '^2.0.0' },
   },
 };
@@ -84,6 +85,24 @@ describe('parseNpmPluginPackage', () => {
 
   it('accepts prerelease hosts covered by the declared compatibility ranges', () => {
     expect(() => parseNpmPluginPackage(validPackage, '2.0.1-beta.1')).not.toThrow();
+  });
+
+  it('names the plugin and the migration guide for an SDK 1.x host range, before the host version check', () => {
+    const legacy = { ...validPackage, attraccess: { ...validPackage.attraccess, host: '>=1.0.0' } };
+    expect(() => parseNpmPluginPackage(legacy, '2.0.0')).toThrow(
+      /Plugin @attraccess\/plugin-example .*migrating-to-2/s,
+    );
+    // A range the host does not even satisfy still gets the SDK 1.x explanation, not a generic one.
+    const old = { ...validPackage, attraccess: { ...validPackage.attraccess, host: '^1.11.0' } };
+    expect(() => parseNpmPluginPackage(old, '2.0.0')).toThrow(/migrating-to-2/);
+  });
+
+  it.each([
+    [{ persistence: undefined }, 'declares no persistence.backends'],
+    [{ persistence: { backends: ['postgres'] } }, 'this host runs sqlite'],
+  ])('refuses a package whose storage does not support the host engine', (override, message) => {
+    const pkg = { ...validPackage, attraccess: { ...validPackage.attraccess, ...override } };
+    expect(() => parseNpmPluginPackage(pkg, '2.0.0')).toThrow(message);
   });
 
   it.each([
