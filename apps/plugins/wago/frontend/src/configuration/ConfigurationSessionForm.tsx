@@ -1,32 +1,34 @@
+import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
 import { Form } from '@heroui/react';
+import type { Dispatch, SetStateAction } from 'react';
+import type { ConfigurationEditorMetadata, WagoConfigurationSnapshot } from '../api/client';
+import { useWagoTranslations } from '../i18n';
+import type { Section } from './ConfigurationEditor';
 import { ChannelWorkspace } from './channels/ChannelWorkspace';
 import { ConfigurationPresets } from './ConfigurationPresets';
-import { ModbusConfigurationForm } from './modbus/ConfigurationForm';
+import { ModbusConfigurationForm } from './modbus/ModbusConfigurationForm';
 import { ModbusChannels } from './channels/ModbusChannels';
 import { addModbusChannel, emptyModbus, updateModbusConfiguration } from './modbus/modbus-editor';
-import { useConfigurationSessionState } from './useConfigurationSessionState';
-type Props = Pick<
-  ReturnType<typeof useConfigurationSessionState>,
-  | 'saveDraft'
-  | 'editingDisabled'
-  | 't'
-  | 'section'
-  | 'focusChannelId'
-  | 'snapshot'
-  | 'metadata'
-  | 'edit'
-  | 'editMetadata'
-  | 'setSection'
-  | 'controllerId'
-  | 'setPresetBusy'
-  | 'setMetadata'
-  | 'setFocusChannelId'
-  | 'setNotice'
->;
+interface ConfigurationSessionFormProps {
+  saveDraft: () => Promise<void>;
+  editingDisabled: boolean;
+  section: Section;
+  focusChannelId: string | undefined;
+  snapshot: WagoConfigurationSnapshot;
+  metadata: ConfigurationEditorMetadata;
+  edit: (snapshot: WagoConfigurationSnapshot) => void;
+  editMetadata: (metadata: ConfigurationEditorMetadata) => void;
+  setSection: (section: Section) => void;
+  controllerId: number;
+  setPresetBusy: (busy: boolean) => void;
+  setMetadata: Dispatch<SetStateAction<ConfigurationEditorMetadata>>;
+  setFocusChannelId: (id: string) => void;
+  setNotice: (notice: string | TranslationMessage) => void;
+}
+
 export function ConfigurationSessionForm({
   saveDraft,
   editingDisabled,
-  t,
   section,
   focusChannelId,
   snapshot,
@@ -39,7 +41,8 @@ export function ConfigurationSessionForm({
   setMetadata,
   setFocusChannelId,
   setNotice,
-}: Props) {
+}: ConfigurationSessionFormProps) {
+  const { t } = useWagoTranslations();
   return (
     <Form
       onSubmit={(event) => {

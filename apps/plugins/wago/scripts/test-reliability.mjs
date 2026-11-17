@@ -140,6 +140,8 @@ try {
     child = spawn(
       process.execPath,
       [
+        // Jest needs VM modules to require the ESM-only Nest packages the acceptance host loads.
+        '--experimental-vm-modules',
         join(root, 'node_modules/jest/bin/jest.js'),
         '--config',
         'apps/plugins/wago/scripts/jest.reliability.config.cjs',

@@ -13,6 +13,7 @@ import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-eval
 import { CreateMaintenanceScheduleDto } from './dtos/create-maintenance-schedule.dto';
 
 import { UpdateMaintenanceScheduleDto } from './dtos/update-maintenance-schedule.dto';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 import {
   MAINTENANCE_SCHEDULE_STORE,
@@ -65,7 +66,7 @@ export class MaintenanceScheduleService {
     resourceId: number,
     dto: CreateMaintenanceScheduleDto,
     actorId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<MaintenanceScheduleRecord> {
     const resource = await this.ensureResourceExists(resourceId);
@@ -101,7 +102,7 @@ export class MaintenanceScheduleService {
     scheduleId: number,
     dto: UpdateMaintenanceScheduleDto,
     actorId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<MaintenanceScheduleRecord> {
     const schedule = await this.getOne(resourceId, scheduleId);
@@ -160,7 +161,7 @@ export class MaintenanceScheduleService {
     resourceId: number,
     scheduleId: number,
     actorId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<void> {
     const schedule = await this.getOne(resourceId, scheduleId);

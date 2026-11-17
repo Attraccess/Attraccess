@@ -3,7 +3,10 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PluginLiveUpdatesProvider, type PluginLiveUpdatesClient } from '@attraccess/plugins-frontend-sdk';
-import { FirmwareCell, FirmwareDetails, FirmwareDrawer, UpdateAvailableIndicator } from './FirmwareDrawer';
+import { FirmwareCell } from './FirmwareCell';
+import { FirmwareDetails } from './FirmwareDetails';
+import { FirmwareDrawer } from './FirmwareDrawer';
+import { UpdateAvailableIndicator } from './UpdateAvailableIndicator';
 import {
   getFirmware,
   startFirmwareUpdate,

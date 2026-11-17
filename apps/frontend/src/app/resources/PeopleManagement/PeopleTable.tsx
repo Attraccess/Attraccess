@@ -12,12 +12,13 @@ import {
 } from '@heroui/react';
 import { AwardIcon, CheckIcon, WrenchIcon } from 'lucide-react';
 import { ResourceIntroducerType, User } from '@attraccess/react-query-client';
-import { AttraccessUser, DateTimeDisplay, EmptyState, TFunction } from '@attraccess/plugins-frontend-ui';
+import { AttraccessUser, DateTimeDisplay, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PeopleRowActions } from './PeopleRowActions';
 import { PeopleTarget, PersonRow } from './types';
+import en from './en.json';
+import de from './de.json';
 
 interface PeopleTableProps {
-  t: TFunction;
   target: PeopleTarget;
   rows: PersonRow[];
   isLoading: boolean;
@@ -35,7 +36,6 @@ interface PeopleTableProps {
 
 export function PeopleTable(props: Readonly<PeopleTableProps>) {
   const {
-    t,
     target,
     rows,
     isLoading,
@@ -50,6 +50,7 @@ export function PeopleTable(props: Readonly<PeopleTableProps>) {
     onToggleIntroduction,
     onRevokeIntroducer,
   } = props;
+  const { t } = useTranslations({ en, de });
 
   return (
     <Table>
@@ -120,7 +121,6 @@ export function PeopleTable(props: Readonly<PeopleTableProps>) {
                 </TableCell>
                 <TableCell>
                   <PeopleRowActions
-                    t={t}
                     target={target}
                     row={row}
                     canManageIntroducers={canManageIntroducers}

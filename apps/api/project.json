@@ -57,6 +57,21 @@
         },
         {
           "externalDependencies": ["webpack-cli"]
+        },
+        "{workspaceRoot}/pnpm-workspace.yaml",
+        {
+          "json": "{workspaceRoot}/package.json",
+          "fields": [
+            "packageManager",
+            "pnpm.onlyBuiltDependencies",
+            "pnpm.neverBuiltDependencies",
+            "pnpm.allowBuilds",
+            "pnpm.supportedArchitectures",
+            "pnpm.patchedDependencies"
+          ]
+        },
+        {
+          "runtime": "node -e \"try{console.log('pnpm major '+require('child_process').execSync('pnpm --version',{stdio:['ignore','pipe','ignore']}).toString().trim().split('.')[0])}catch{console.log('pnpm major unavailable')}\""
         }
       ],
       "outputs": ["{workspaceRoot}/dist/apps/api"],
@@ -140,8 +155,6 @@
       }
     },
     "test": {
-      "executor": "@nx/jest:jest",
-      "cache": true,
       "inputs": [
         "default",
         "^production",
@@ -154,26 +167,19 @@
         "{workspaceRoot}/apps/attractap/firmware/tests/pairing/vectors.json",
         "{workspaceRoot}/apps/attractap/firmware/src/display/ui/ui_schema.hpp",
         "{workspaceRoot}/apps/attractap/firmware/tests/ui-fixtures/*.json",
+        "{workspaceRoot}/apps/frontend/src/app/layout/sidebar/navigation.tsx",
         {
           "externalDependencies": ["jest"]
         }
       ],
-      "outputs": ["{workspaceRoot}/coverage/apps/api/test"],
+      "dependsOn": ["test-scripts"],
       "options": {
-        "jestConfig": "apps/api/jest.config.ts",
-        "testMatch": [
-          "**/*.spec.ts",
-          "!**/*.e2e.spec.ts",
-          "!**/*.real-api.spec.ts",
-          "!**/*.alerting.spec.ts",
-          "!**/*.browser.spec.ts"
-        ],
+        "testMatch": "\"**/*.spec.ts\" \"!**/*.e2e.spec.ts\" \"!**/*.real-api.spec.ts\" \"!**/*.alerting.spec.ts\" \"!**/*.browser.spec.ts\"",
         "passWithNoTests": true
-      },
-      "dependsOn": ["test-scripts"]
+      }
     },
     "test-alerting": {
-      "executor": "@nx/jest:jest",
+      "executor": "nx:run-commands",
       "cache": true,
       "inputs": [
         "default",
@@ -195,7 +201,12 @@
         }
       ],
       "options": {
-        "jestConfig": "apps/api/jest.alerting.config.ts",
+        "command": "jest --config ./apps/api/jest.alerting.config.ts",
+        "cwd": ".",
+        "env": {
+          "TS_NODE_COMPILER_OPTIONS": "{\"moduleResolution\":\"node10\",\"module\":\"commonjs\",\"customConditions\":null}",
+          "NODE_OPTIONS": "--experimental-vm-modules"
+        },
         "passWithNoTests": false
       }
     },
@@ -207,44 +218,36 @@
         "command": "jest -c apps/api/jest.config.ts --coverage=false --testPathPatterns=src/database/conformance"
       }
     },
-    "e2e": {
-      "executor": "@nx/jest:jest",
-      "cache": true,
-      "inputs": ["testing", "^production"],
-      "outputs": ["{workspaceRoot}/coverage/apps/api-e2e"],
-      "options": {
-        "jestConfig": "apps/api/jest.e2e.config.ts",
-        "testMatch": ["**/*.e2e.spec.ts"],
-        "passWithNoTests": true
-      }
-    },
     "browser-e2e": {
-      "executor": "@nx/jest:jest",
+      "executor": "nx:run-commands",
       "cache": false,
       "outputs": [],
       "options": {
-        "jestConfig": "apps/api/jest.browser.config.ts",
+        "command": "jest --config ./apps/api/jest.browser.config.ts",
+        "cwd": ".",
+        "env": {
+          "TS_NODE_COMPILER_OPTIONS": "{\"moduleResolution\":\"node10\",\"module\":\"commonjs\",\"customConditions\":null}",
+          "NODE_OPTIONS": "--experimental-vm-modules"
+        },
         "passWithNoTests": false,
         "runInBand": true
       }
     },
     "start-services": {
       "executor": "nx:run-commands",
+      "cache": false,
       "options": {
         "command": "docker compose -f docker-compose.dev.yml up -d --remove-orphans"
-      },
-      "cache": false
+      }
     },
     "build-migration-datasource": {
-      "executor": "@nx/webpack:webpack",
+      "executor": "nx:run-commands",
       "cache": true,
       "inputs": ["typeorm", "{projectRoot}/src/config/storage-path.ts", "{projectRoot}/migration-tracks.cjs", { "env": "DATABASE_TYPE" }],
-      "outputs": ["{options.outputPath}"],
+      "outputs": ["{workspaceRoot}/dist/apps/migrations"],
       "options": {
-        "outputPath": "dist/apps/migrations",
-        "main": "apps/api/src/database/datasource.ts",
-        "tsConfig": "apps/api/tsconfig.app.json",
-        "webpackConfig": "apps/api/webpack.config.migrations.js"
+        "cwd": "apps/api",
+        "command": "webpack-cli build --config webpack.config.migrations.js --config-node-env=production"
       }
     },
     "migration-generate": {
@@ -302,10 +305,10 @@
     },
     "crap-score": {
       "executor": "nx:run-commands",
+      "dependsOn": ["test", "test-scripts"],
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/api"
-      },
-      "dependsOn": ["test", "test-scripts"]
+      }
     },
     "reencrypt-card-keys": {
       "executor": "nx:run-commands",
@@ -335,6 +338,20 @@
       "outputs": ["{workspaceRoot}/coverage/apps/api/test-scripts"],
       "options": {
         "command": "node scripts/crap-score/node-test.mjs apps/api coverage/apps/api/test-scripts apps/api/scripts/*.test.mjs"
+      }
+    },
+    "e2e": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["testing", "^production"],
+      "outputs": ["{workspaceRoot}/coverage/apps/api-e2e"],
+      "options": {
+        "command": "jest --config ./apps/api/jest.e2e.config.ts --testMatch=\"**/*.e2e.spec.ts\" --passWithNoTests",
+        "cwd": ".",
+        "env": {
+          "TS_NODE_COMPILER_OPTIONS": "{\"moduleResolution\":\"node10\",\"module\":\"commonjs\",\"customConditions\":null}",
+          "NODE_OPTIONS": "--experimental-vm-modules"
+        }
       }
     }
   }

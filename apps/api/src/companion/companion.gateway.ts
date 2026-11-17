@@ -12,7 +12,7 @@ import {
 
 import { randomBytes } from 'crypto';
 
-import { AsyncApi, AsyncApiPub, AsyncApiSub } from 'nestjs-asyncapi';
+import { AsyncApi, AsyncApiReceive, AsyncApiSend } from 'nestjs-asyncapi';
 
 import { Server } from 'ws';
 
@@ -74,7 +74,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
   // ─── Client → Server ─────────────────────────────────────────────────────
 
   @SubscribeMessage('COMPANION_REGISTER')
-  @AsyncApiPub({
+  @AsyncApiReceive({
     channel: 'COMPANION_REGISTER',
     message: { name: 'COMPANION_REGISTER', payload: Object },
     summary: 'Register a new companion device (first run)',
@@ -85,7 +85,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @SubscribeMessage('COMPANION_AUTHENTICATE')
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-  @AsyncApiPub({
+  @AsyncApiReceive({
     channel: 'COMPANION_AUTHENTICATE',
     message: { name: 'COMPANION_AUTHENTICATE', payload: CompanionAuthenticateDto },
     summary: 'Authenticate with stored device credentials',
@@ -99,7 +99,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   // ─── Server → Client ─────────────────────────────────────────────────────
 
-  @AsyncApiSub({
+  @AsyncApiSend({
     channel: 'COMPANION_REQUEST_AUTHENTICATION',
     message: { name: 'COMPANION_REQUEST_AUTHENTICATION', payload: Object },
     summary: 'Server requests the client to authenticate or register',
@@ -108,9 +108,9 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     socket.sendEvent(CompanionEventType.COMPANION_REQUEST_AUTHENTICATION, {});
   }
 
-  // ponytail: @AsyncApiSub stubs below — events emitted by CompanionAuthHandler, documented here for AsyncAPI spec
+  // ponytail: @AsyncApiSend stubs below — events emitted by CompanionAuthHandler, documented here for AsyncAPI spec
 
-  @AsyncApiSub({
+  @AsyncApiSend({
     channel: 'COMPANION_REGISTER_RESPONSE',
     message: { name: 'COMPANION_REGISTER_RESPONSE', payload: CompanionRegisterResponseDto },
     summary: 'Response to COMPANION_REGISTER with assigned credentials',
@@ -119,7 +119,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     /* emitted by CompanionAuthHandler.registerNewDevice */
   }
 
-  @AsyncApiSub({
+  @AsyncApiSend({
     channel: 'COMPANION_AUTHENTICATED',
     message: { name: 'COMPANION_AUTHENTICATED', payload: CompanionAuthenticatedDto },
     summary: 'Sent after successful authentication with device info and resources',
@@ -128,7 +128,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     /* emitted by CompanionAuthHandler.authenticateExistingDevice */
   }
 
-  @AsyncApiSub({
+  @AsyncApiSend({
     channel: 'COMPANION_LOCK_PC',
     message: { name: 'COMPANION_LOCK_PC', payload: Object },
     summary: 'Server instructs the companion to lock the PC',
@@ -137,7 +137,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     void this.gatewayService.sendLockCommand(deviceId);
   }
 
-  @AsyncApiSub({
+  @AsyncApiSend({
     channel: 'COMPANION_UNLOCK_PC',
     message: { name: 'COMPANION_UNLOCK_PC', payload: Object },
     summary: 'Server instructs the companion to unlock the PC',
@@ -146,7 +146,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     void this.gatewayService.sendUnlockCommand(deviceId);
   }
 
-  @AsyncApiSub({
+  @AsyncApiSend({
     channel: 'COMPANION_UPDATE_AVAILABLE',
     message: { name: 'COMPANION_UPDATE_AVAILABLE', payload: CompanionUpdateAvailableDto },
     summary: 'Notifies the companion that a new version is available',
@@ -155,7 +155,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
     /* emitted by CompanionAuthHandler.maybeSendUpdateAvailable on connect */
   }
 
-  @AsyncApiSub({
+  @AsyncApiSend({
     channel: 'COMPANION_DEVICE_RENAMED',
     message: { name: 'COMPANION_DEVICE_RENAMED', payload: CompanionDeviceRenamedDto },
     summary: 'Notifies the companion that its display name has been changed by an admin',
@@ -177,7 +177,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
   @SubscribeMessage('COMPANION_IDLE')
   @CompanionAuthenticated()
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-  @AsyncApiPub({
+  @AsyncApiReceive({
     channel: 'COMPANION_IDLE',
     message: { name: 'COMPANION_IDLE', payload: CompanionIdleDto },
     summary: 'Companion reports that the machine has become idle',
@@ -189,7 +189,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
   @SubscribeMessage('COMPANION_ACTIVE')
   @CompanionAuthenticated()
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-  @AsyncApiPub({
+  @AsyncApiReceive({
     channel: 'COMPANION_ACTIVE',
     message: { name: 'COMPANION_ACTIVE', payload: CompanionIdleDto },
     summary: 'Companion reports that the machine has become active after being idle',
@@ -201,7 +201,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
   @SubscribeMessage('COMPANION_FOREGROUND_APP')
   @CompanionAuthenticated()
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-  @AsyncApiPub({
+  @AsyncApiReceive({
     channel: 'COMPANION_FOREGROUND_APP',
     message: { name: 'COMPANION_FOREGROUND_APP', payload: CompanionForegroundAppDto },
     summary: 'Companion reports the currently focused foreground application',
@@ -213,7 +213,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
   @SubscribeMessage('COMPANION_USB_CONNECTED')
   @CompanionAuthenticated()
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-  @AsyncApiPub({
+  @AsyncApiReceive({
     channel: 'COMPANION_USB_CONNECTED',
     message: { name: 'COMPANION_USB_CONNECTED', payload: CompanionUsbDeviceDto },
     summary: 'Companion reports that a USB device was connected',
@@ -225,7 +225,7 @@ export class CompanionGateway implements OnGatewayConnection, OnGatewayDisconnec
   @SubscribeMessage('COMPANION_USB_DISCONNECTED')
   @CompanionAuthenticated()
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-  @AsyncApiPub({
+  @AsyncApiReceive({
     channel: 'COMPANION_USB_DISCONNECTED',
     message: { name: 'COMPANION_USB_DISCONNECTED', payload: CompanionUsbDeviceDto },
     summary: 'Companion reports that a USB device was disconnected',

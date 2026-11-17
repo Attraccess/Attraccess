@@ -33,6 +33,10 @@ if(NOT CMAKE_BUILD_EARLY_EXPANSION)
             list(FILTER ATTRACTAP_SRCS EXCLUDE REGEX "/src/testhooks/")
         endif()
 
+        if(ATTRACTAP_CRASH_TRIGGER)
+            list(APPEND ATTRACTAP_DEFINES ATTRACTAP_CRASH_TRIGGER=1)
+        endif()
+
         if(ATTRACTAP_UI_SELFTEST)
             if(NOT ATTRACTAP_UI OR "DEMO_MODE=1" IN_LIST ATTRACTAP_DEFINES)
                 message(FATAL_ERROR "ATTRACTAP_UI_SELFTEST needs a real display variant (not a demo variant)")

@@ -50,7 +50,7 @@ export class CardWriterPolicyService {
     const storedMode = await this.settings.getPlainSetting(ATTRACTAP_PARENT, ATTRACTAP_KEYS.cardWriterMode);
     const mode: CardWriterMode = storedMode === 'selected' ? 'selected' : 'all';
     const raw = await this.settings.getPlainSetting(ATTRACTAP_PARENT, ATTRACTAP_KEYS.cardWriterReaders);
-    let readerIds: number[] = [];
+    let readerIds: number[];
     try {
       const parsed: unknown = raw ? JSON.parse(raw) : [];
       readerIds = Array.isArray(parsed) ? parsed.filter((id): id is number => Number.isInteger(id)) : [];

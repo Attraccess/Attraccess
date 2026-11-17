@@ -23,7 +23,8 @@ import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-error
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 import en from './en.json';
 import de from './de.json';
-export /** Mirrors the API's `@IsUrl()`: a full absolute URL, scheme included. */
+
+/** Mirrors the API's `@IsUrl()`: a full absolute URL, scheme included. */
 const isAbsoluteUrl = (value: string) => {
   try {
     const { protocol } = new URL(value);

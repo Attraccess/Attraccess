@@ -72,7 +72,7 @@ export function ParallelSessionsDisplay({
   const confirmEnd = useCallback(
     async (notes: string) => {
       if (!usageToEnd) return;
-      let formSubmissions: FormSubmissionRequestDto[] = [];
+      let formSubmissions: FormSubmissionRequestDto[];
       try {
         formSubmissions = await requestForms('end');
       } catch (error) {

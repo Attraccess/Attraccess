@@ -4,7 +4,12 @@
   "main": {
     "backend": { "directory": "dist", "entryPoint": "index.js" },
     "migrations": { "directory": "dist", "entryPoint": "migrations.js" },
-    "frontend": { "directory": "frontend", "entryPoint": "remoteEntry.js", "styles": "style.css" }
+    "frontend": {
+      "directory": "frontend",
+      "entryPoint": "remoteEntry.js",
+      "styles": "style.css",
+      "dashboardPaths": ["/wago"]
+    }
   },
   "attraccessVersion": { "min": "2.0.0-0" },
   "persistence": { "backends": ["sqlite"] },

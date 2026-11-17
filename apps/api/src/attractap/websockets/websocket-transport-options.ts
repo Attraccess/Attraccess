@@ -2,8 +2,9 @@ import type { IncomingMessage } from 'http';
 import { PAIRING_SUBPROTOCOL, SESSION_SUBPROTOCOL } from '../security/session-framing';
 
 /**
- * Bounds every incoming message before it is buffered. The largest legitimate one is a crash
- * report (32 KiB coredump, ~44 KiB as JSON); session frames carry TLS records of <= ~16 KiB.
+ * Bounds every incoming message before it is buffered. The largest legitimate one is a legacy crash
+ * report (32 KiB inline coredump, ~44 KiB as JSON; newer firmware uploads dumps in 4 KiB chunks);
+ * session frames carry TLS records of <= ~16 KiB.
  */
 const MAX_READER_FRAME_BYTES = 128 * 1024;
 const ATTRACTAP_SUBPROTOCOL_PREFIX = 'attractap-';

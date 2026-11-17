@@ -244,6 +244,24 @@ describe('persisted audit names', () => {
     ]);
   });
 
+  it('labels deleted plugin archives and retries with the recorded plugin name', async () => {
+    for (const action of ['plugin.zip_deleted', 'plugin.retry_requested']) {
+      await service.record({
+        domain: 'administration',
+        action,
+        actor: { id: 7, authenticationMethod: 'session' },
+        subject: { type: 'plugin-package', id: 4242 },
+        details: { pluginId: 'my-plugin-dir', pluginName: 'my-plugin', pluginVersion: '1.2.3', restartRequested: 1 },
+      });
+    }
+    const { items } = await controller.list({ domain: 'administration' });
+    expect(items).toHaveLength(2);
+    for (const item of items) {
+      expect(item).toMatchObject({ subjectLabel: 'my-plugin', subjectLabelSource: 'recorded' });
+      expect(item.details).toMatchObject({ pluginName: 'my-plugin', pluginVersion: '1.2.3' });
+    }
+  });
+
   it('keeps recorded SSO provider names after deletion and labels provisioning targets as users', async () => {
     await source.getRepository(AuditLog).insert([
       {

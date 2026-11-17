@@ -57,6 +57,7 @@
       "outputs": ["{workspaceRoot}/coverage/apps/frontend/test"]
     },
     "typecheck": {
+      "executor": "nx:run-commands",
       "dependsOn": ["react-query-client:generate", "typecheck-tests"],
       "cache": true,
       "inputs": [
@@ -65,7 +66,11 @@
         {
           "externalDependencies": ["typescript"]
         }
-      ]
+      ],
+      "options": {
+        "command": "tsc --noEmit -p tsconfig.app.json",
+        "cwd": "apps/frontend"
+      }
     },
     "serve": {
       "dependsOn": ["react-query-client:generate"]

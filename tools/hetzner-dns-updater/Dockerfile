@@ -1,4 +1,4 @@
-ARG NODE_VERSION=24.22.1
+ARG NODE_VERSION=26.13.0
 FROM node:${NODE_VERSION}-alpine
 
 # Create unprivileged user for runtime
@@ -6,7 +6,7 @@ RUN addgroup -S appuser && adduser -S -G appuser -h /app appuser
 
 WORKDIR /app
 
-# Copy maintained script modules (Node 24+ supplies fetch).
+# Copy maintained script modules (Node 26+ supplies fetch).
 COPY *.js /usr/local/bin/
 
 RUN chown appuser:appuser /usr/local/bin/update-hetzner.js

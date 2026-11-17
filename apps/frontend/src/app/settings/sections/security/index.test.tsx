@@ -3,6 +3,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   usePasswordPolicyAdminServiceGetAdminPasswordPolicy,
+  usePasswordPolicyAdminServiceListPasswordPolicyOverrides,
   usePasswordPolicyAdminServiceUpdateAdminPasswordPolicy,
   useSettingsServiceGetAuthRateLimitSettings,
   useSettingsServiceUpdateAuthRateLimitSettings,
@@ -205,6 +206,34 @@ describe('SecuritySection', () => {
 
     expect(screen.getByText('loading')).toBeInTheDocument();
     expect(screen.queryByTestId('policy-load-failed')).not.toBeInTheDocument();
+  });
+
+  it('starts every query while the gating ones are still in flight, in one parallel round', () => {
+    // 2FA, the whitelist and the overrides do not depend on the policy or the throttling settings,
+    // so they must not wait for the spinner to clear before they are requested.
+    vi.mocked(usePasswordPolicyAdminServiceGetAdminPasswordPolicy).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    } as ReturnType<typeof usePasswordPolicyAdminServiceGetAdminPasswordPolicy>);
+
+    render(<SecuritySection />);
+
+    expect(screen.getByText('loading')).toBeInTheDocument();
+    expect(useTwoFactorAuthenticationServiceGetTwoFactorPolicy).toHaveBeenCalled();
+    expect(useUsersServiceGetLocalSignupDomainWhitelist).toHaveBeenCalled();
+    expect(usePasswordPolicyAdminServiceListPasswordPolicyOverrides).toHaveBeenCalled();
+  });
+
+  it('subscribes to each query once, so the rows do not refetch it on mount', () => {
+    // The shared client has no `staleTime`: a second subscriber mounting after the data arrived
+    // would send the same request again.
+    render(<SecuritySection />);
+
+    expect(usePasswordPolicyAdminServiceGetAdminPasswordPolicy).toHaveBeenCalledTimes(1);
+    expect(useSettingsServiceGetAuthRateLimitSettings).toHaveBeenCalledTimes(1);
+    expect(useTwoFactorAuthenticationServiceGetTwoFactorPolicy).toHaveBeenCalledTimes(1);
+    expect(useUsersServiceGetLocalSignupDomainWhitelist).toHaveBeenCalledTimes(1);
+    expect(usePasswordPolicyAdminServiceListPasswordPolicyOverrides).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the strength preview in the aside, not the content column', () => {

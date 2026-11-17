@@ -1,108 +1,70 @@
 import { Button, StandardModal } from '@attraccess/plugins-frontend-ui';
+import type { MarketplacePluginDto } from '@attraccess/react-query-client';
 import { ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
-import { dependencyError } from '../dependencies/DependencyPlan';
+import { useEffect, useEffectEvent, useState } from 'react';
+import { useToastMessage } from '../../../../../components/toastProvider';
+import type { MarketplaceDetailRequest, RegistryForm } from '../types';
+import { usePluginsTranslations } from '../usePluginsTranslations';
+import { MarketplacePluginDetails } from './MarketplacePluginDetails';
 import { MarketplaceSearchResults } from './MarketplaceSearchResults';
-import { usePluginsSectionState } from '../state/usePluginSettings';
-import { MarketplacePluginDetails } from './PluginDetails';
+import { RegistryManagement } from './RegistryManagement';
+import { useMarketplaceSearch } from './useMarketplaceSearch';
+import { useRegistries } from './useRegistries';
 
-type Props = Pick<
-  ReturnType<typeof usePluginsSectionState>,
-  | 'isMarketplaceOpen'
-  | 'setIsMarketplaceOpen'
-  | 'marketplaceDetailRequest'
-  | 'setIsLoadingMarketplaceDetail'
-  | 'setMarketplacePlugin'
-  | 'marketplacePlugin'
-  | 't'
-  | 'installedNpmPlugins'
-  | 'setApprovedInstallPlanToken'
-  | 'setPluginToInstall'
-  | 'openVersionManagement'
-  | 'dependencyPlan'
-  | 'planError'
-  | 'isResolvingDependencies'
-  | 'marketplaceQuery'
-  | 'marketplaceSearchRequest'
-  | 'setMarketplaceQuery'
-  | 'selectedRegistryId'
-  | 'setSelectedRegistryId'
-  | 'registries'
-  | 'isLoadingMarketplace'
-  | 'marketplacePlugins'
-  | 'openMarketplacePlugin'
-  | 'registryName'
-  | 'setRegistryName'
-  | 'registryUrl'
-  | 'setRegistryUrl'
-  | 'registryToken'
-  | 'setRegistryToken'
-  | 'addRegistry'
-  | 'isSavingRegistry'
-  | 'testRegistry'
-  | 'testingRegistryId'
-  | 'removeRegistry'
->;
+interface Props {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  /** The package whose details are shown instead of the catalogue. */
+  plugin: MarketplacePluginDto | null;
+  isLoadingDetail: boolean;
+  onOpenDetails: (request: MarketplaceDetailRequest) => void;
+  onBack: () => void;
+  onInstall: (plugin: MarketplacePluginDto) => void;
+  onManageVersion: (plugin: MarketplacePluginDto) => void;
+}
 
 export function MarketplaceBrowser({
-  isMarketplaceOpen,
-  setIsMarketplaceOpen,
-  marketplaceDetailRequest,
-  setIsLoadingMarketplaceDetail,
-  setMarketplacePlugin,
-  marketplacePlugin,
-  t,
-  installedNpmPlugins,
-  setApprovedInstallPlanToken,
-  setPluginToInstall,
-  openVersionManagement,
-  dependencyPlan,
-  planError,
-  isResolvingDependencies,
-  marketplaceQuery,
-  marketplaceSearchRequest,
-  setMarketplaceQuery,
-  selectedRegistryId,
-  setSelectedRegistryId,
-  registries,
-  isLoadingMarketplace,
-  marketplacePlugins,
-  openMarketplacePlugin,
-  registryName,
-  setRegistryName,
-  registryUrl,
-  setRegistryUrl,
-  registryToken,
-  setRegistryToken,
-  addRegistry,
-  isSavingRegistry,
-  testRegistry,
-  testingRegistryId,
-  removeRegistry,
+  isOpen,
+  onOpenChange,
+  plugin,
+  isLoadingDetail,
+  onOpenDetails,
+  onBack,
+  onInstall,
+  onManageVersion,
 }: Props) {
+  const { t } = usePluginsTranslations();
+  const toast = useToastMessage();
+  const [query, setQuery] = useState('');
+  const [registryId, setRegistryId] = useState('');
+  const [registryForm, setRegistryForm] = useState<RegistryForm>({
+    name: '',
+    url: '',
+    token: '',
+    isSaving: false,
+    test: null,
+  });
+  const { plugins, isLoading } = useMarketplaceSearch({ isOpen, query, registryId });
+
+  const { errorUpdatedAt: registriesErrorUpdatedAt } = useRegistries();
+  const reportRegistryLoadError = useEffectEvent(() => toast.error({ title: t('marketplace.registryLoadError') }));
+  useEffect(() => {
+    if (registriesErrorUpdatedAt) reportRegistryLoadError();
+  }, [registriesErrorUpdatedAt]);
+
   return (
-    <StandardModal
-      isOpen={isMarketplaceOpen}
-      onOpenChange={(open) => {
-        setIsMarketplaceOpen(open);
-        if (!open) {
-          ++marketplaceDetailRequest.current;
-          setIsLoadingMarketplaceDetail(false);
-          setMarketplacePlugin(null);
-        }
-      }}
-      size="cover"
-    >
+    <StandardModal isOpen={isOpen} onOpenChange={onOpenChange} size="cover">
       {({ close }) => (
         <>
           <ModalHeader>
-            {marketplacePlugin ? (
+            {plugin ? (
               <div className="flex items-center gap-3">
-                <Button variant="secondary" size="sm" onPress={() => setMarketplacePlugin(null)}>
+                <Button variant="secondary" size="sm" onPress={onBack}>
                   {t('marketplace.back')}
                 </Button>
                 <div className="min-w-0">
-                  <ModalHeading>{marketplacePlugin.displayName ?? marketplacePlugin.name}</ModalHeading>
-                  <p className="truncate text-sm text-muted">{marketplacePlugin.name}</p>
+                  <ModalHeading>{plugin.displayName ?? plugin.name}</ModalHeading>
+                  <p className="truncate text-sm text-muted">{plugin.name}</p>
                 </div>
               </div>
             ) : (
@@ -113,53 +75,29 @@ export function MarketplaceBrowser({
             )}
           </ModalHeader>
           <ModalBody>
-            {marketplacePlugin ? (
+            {plugin ? (
               <MarketplacePluginDetails
-                plugin={marketplacePlugin}
-                installedPlugin={installedNpmPlugins.get(marketplacePlugin.name)}
-                onInstall={() => {
-                  setApprovedInstallPlanToken(null);
-                  setPluginToInstall(marketplacePlugin);
-                }}
-                onManageVersion={() => {
-                  setIsMarketplaceOpen(false);
-                  void openVersionManagement({
-                    name: marketplacePlugin.name,
-                    version:
-                      installedNpmPlugins.get(marketplacePlugin.name)?.version ?? marketplacePlugin.version ?? '',
-                  });
-                }}
-                dependencyPlan={dependencyPlan}
-                dependencyError={dependencyError(planError)}
-                isResolvingDependencies={isResolvingDependencies}
-                t={t}
+                plugin={plugin}
+                onInstall={() => onInstall(plugin)}
+                onManageVersion={() => onManageVersion(plugin)}
               />
             ) : (
-              <MarketplaceSearchResults
-                {...{
-                  marketplaceQuery,
-                  marketplaceSearchRequest,
-                  setMarketplaceQuery,
-                  t,
-                  selectedRegistryId,
-                  setSelectedRegistryId,
-                  registries,
-                  isLoadingMarketplace,
-                  marketplacePlugins,
-                  openMarketplacePlugin,
-                  registryName,
-                  setRegistryName,
-                  registryUrl,
-                  setRegistryUrl,
-                  registryToken,
-                  setRegistryToken,
-                  addRegistry,
-                  isSavingRegistry,
-                  testRegistry,
-                  testingRegistryId,
-                  removeRegistry,
-                }}
-              />
+              <div className="flex flex-col gap-4">
+                <MarketplaceSearchResults
+                  query={query}
+                  onQueryChange={setQuery}
+                  registryId={registryId}
+                  onRegistryIdChange={setRegistryId}
+                  plugins={plugins}
+                  isLoading={isLoading || isLoadingDetail}
+                  onOpenDetails={onOpenDetails}
+                />
+                <RegistryManagement
+                  form={registryForm}
+                  onFormChange={setRegistryForm}
+                  onRegistryRemoved={(removedId) => setRegistryId((current) => (current === removedId ? '' : current))}
+                />
+              </div>
             )}
           </ModalBody>
           <ModalFooter>

@@ -345,7 +345,7 @@ describe('front panel', () => {
     fireEvent.change(await screen.findByRole('textbox', { name: 'Name' }), { target: { value: 'Changed label' } });
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     fireEvent.click(screen.getByRole('button', { name: 'Apply to controller' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Apply configuration?' });
+    const dialog = await screen.findByRole('alertdialog', { name: 'Apply configuration?' });
     expect(within(dialog).getByText(label)).toBeTruthy();
     expect(dialog.textContent).toContain('DO1 · Laser power');
     expect(api.publish).not.toHaveBeenCalled();
@@ -363,6 +363,45 @@ describe('front panel', () => {
     act(() => result.current.cancelReview());
     expect(result.current.review).toBeNull();
     expect(api.publish).not.toHaveBeenCalled();
+  });
+
+  async function openApplyReview() {
+    render(<FrontPanel controllerId={1} onClose={vi.fn()} onHistory={vi.fn()} />, { wrapper: wrapper });
+    fireEvent.click(await screen.findByRole('button', { name: /^Configure DO1/ }));
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Name' }), { target: { value: 'Changed label' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apply to controller' }));
+    return screen.findByRole('alertdialog', { name: 'Apply configuration?' });
+  }
+
+  it('closes the apply review with its Cancel button without publishing', async () => {
+    const dialog = await openApplyReview();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(api.publish).not.toHaveBeenCalled();
+  });
+
+  it('closes the idle apply review with Escape without publishing', async () => {
+    const dialog = await openApplyReview();
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(api.publish).not.toHaveBeenCalled();
+  });
+
+  it('keeps the apply review open while publishing: Cancel is disabled and Escape is ignored', async () => {
+    let finishPublish: (value: { revision: number; state: string }) => void = () => undefined;
+    api.publish.mockImplementation(() => new Promise((resolve) => (finishPublish = resolve)));
+    const dialog = await openApplyReview();
+    const confirm = within(dialog).getByRole('button', { name: 'Apply to controller' });
+    await waitFor(() => expect(confirm.hasAttribute('disabled')).toBe(false));
+    fireEvent.click(confirm);
+    await waitFor(() => expect(api.publish).toHaveBeenCalledWith(1, true, 'reviewed'));
+    const cancel = within(dialog).getByRole('button', { name: 'Cancel' });
+    await waitFor(() => expect(cancel.hasAttribute('disabled')).toBe(true));
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    fireEvent.click(cancel);
+    expect(screen.getByRole('alertdialog', { name: 'Apply configuration?' })).toBeTruthy();
+    await act(async () => finishPublish({ revision: 8, state: 'published' }));
   });
 
   it('requires flow impact confirmation before publication', async () => {

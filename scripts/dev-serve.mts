@@ -1,7 +1,7 @@
 // Dev-server launcher that auto-resolves ports and spawns nx serve
 // FEATURE: dev-server-port-isolation
 
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { writeFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -117,6 +117,45 @@ function banner(r: Resolved): string {
   return lines.join('\n');
 }
 
+/** Every process below `root` in `ps -A -o pid=,ppid=` output, parents before their children. */
+export function descendantPids(root: number, psOutput: string): number[] {
+  const children = new Map<number, number[]>();
+  for (const line of psOutput.split('\n')) {
+    const [pid, ppid] = line.trim().split(/\s+/).map(Number);
+    if (!Number.isInteger(pid) || !Number.isInteger(ppid)) continue;
+    children.set(ppid, [...(children.get(ppid) ?? []), pid]);
+  }
+  const found: number[] = [];
+  for (let queue = [root]; queue.length > 0;) {
+    const next = children.get(queue.shift() as number) ?? [];
+    found.push(...next);
+    queue.push(...next);
+  }
+  return found;
+}
+
+// pnpm 12's corepack shim exits on a signal without passing it on to pnpm's native binary, so signalling only the
+// child left nx and the dev servers running and holding their ports. Signal the whole tree below the child, as
+// listed before the shim exits and its children are re-parented.
+function signalTree(child: ReturnType<typeof spawn>, signal: NodeJS.Signals): void {
+  let tree: number[] = [];
+  if (child.pid && process.platform !== 'win32') {
+    try {
+      tree = descendantPids(child.pid, execFileSync('ps', ['-A', '-o', 'pid=,ppid='], { encoding: 'utf8' }));
+    } catch {
+      // Without ps only the direct child gets the signal, as before.
+    }
+  }
+  child.kill(signal);
+  for (const pid of tree) {
+    try {
+      process.kill(pid, signal);
+    } catch {
+      // Already gone.
+    }
+  }
+}
+
 export async function main() {
   const { only, tui, kiosk, attractap, passthroughArgs } = parseArgs(process.argv);
   const resolved: Resolved = {};
@@ -152,7 +191,7 @@ export async function main() {
   }
   let child: ReturnType<typeof spawn> | undefined;
   const forward = (sig: NodeJS.Signals) => {
-    if (child && !child.killed) child.kill(sig);
+    if (child && !child.killed) signalTree(child, sig);
   };
   process.on('SIGINT', () => forward('SIGINT'));
   process.on('SIGTERM', () => forward('SIGTERM'));

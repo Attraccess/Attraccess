@@ -60,7 +60,9 @@ describe('sibling website against a real API in headless Chromium', () => {
       const record = () =>
         answers.push({
           method: req.method ?? '',
-          url: req.url ?? '',
+          // Express rewrites req.url while a router mounted at the global prefix handles it (Nest 12 sends 404s
+          // from there); originalUrl keeps the path the browser requested.
+          url: (req as IncomingMessage & { originalUrl?: string }).originalUrl ?? req.url ?? '',
           status: res.statusCode,
           cookie: (req.headers.cookie ?? '').includes(`${AUTH_COOKIE_NAME}=`),
         });

@@ -2,6 +2,7 @@ import type { AttractapReader } from '@attraccess/application-models';
 import { ResourceFormAction } from '@attraccess/application-models';
 import type { CardConversation } from './card-conversation.service';
 import type { CardSessionState, UiSlotsState, UiStepState } from './handlers/ui/ui-socket-state';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 export interface AttractapMessageBaseData<TPayload = unknown> {
   auth?: {
@@ -22,6 +23,11 @@ export enum AttractapEventType {
   READER_FIRMWARE_UPDATE_REQUIRED = 'READER_FIRMWARE_UPDATE_REQUIRED',
   READER_FIRMWARE_INFO = 'READER_FIRMWARE_INFO',
   READER_CRASH_REPORT = 'READER_CRASH_REPORT',
+  // Chunked coredump upload (ATT-1144), one message in flight: the reader announces the dump of a report,
+  // sends it in chunks and completes it; every reply comes without an ACK round trip.
+  READER_COREDUMP_BEGIN = 'READER_COREDUMP_BEGIN',
+  READER_COREDUMP_CHUNK = 'READER_COREDUMP_CHUNK',
+  READER_COREDUMP_COMPLETE = 'READER_COREDUMP_COMPLETE',
   /** Server-pushed: asks a token-signed-in reader to open a pairing connection. */
   READER_START_PAIRING = 'READER_START_PAIRING',
   FIRMWARE_REQUEST_CHUNK = 'FIRMWARE_REQUEST_CHUNK',
@@ -272,14 +278,22 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
     abortedDetectionId?: number | null;
     enrollment: {
       userId: number;
-      auditPrincipal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number };
+      auditPrincipal: {
+        userId: number;
+        authenticationMethod: AuthenticationMethod;
+        apiTokenId?: number;
+      };
       /** When the enrollment was armed (ms since epoch); a card arriving much later is refused. */
       armedAt: number;
     } | null;
     /** Armed by an admin: the next card tapped on this reader is reset if it is this one. No key material here. */
     resetNfcCardData: {
       cardId: number;
-      auditPrincipal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number };
+      auditPrincipal: {
+        userId: number;
+        authenticationMethod: AuthenticationMethod;
+        apiTokenId?: number;
+      };
       /** When the reset was armed (ms since epoch); a card arriving much later is refused. */
       armedAt: number;
     } | null;

@@ -98,7 +98,7 @@ Zur Engine-Naht siehe [Datenbank-Backend hinzufügen](developer/adding-a-databas
 | `VALKEY_URL`             | –           | Verbindungs-URL für einen Valkey/Redis-kompatiblen Sitzungsspeicher (z. B. `redis://valkey:6379`). Wenn gesetzt, werden Sitzungen in Valkey mit nativem TTL gespeichert statt in SQLite — erforderlich für horizontale Skalierung. Ohne Konfiguration wird SQLite verwendet. Unterstützt jede `ioredis`-kompatible URL inkl. `rediss://` (TLS), Redis Cluster, Sentinel, ElastiCache und Upstash. |
 
 > [!NOTE]
-> Die mitgelieferten Docker-Compose-Varianten (Balena, Coolify) enthalten einen `valkey/valkey:8-alpine`-Sidecar und setzen `VALKEY_URL` automatisch. Für externe Deployments muss `VALKEY_URL` auf die eigene Valkey/Redis-Instanz zeigen.
+> Die mitgelieferten Docker-Compose-Varianten (Balena, Coolify) enthalten einen `valkey/valkey:9-alpine`-Sidecar und setzen `VALKEY_URL` automatisch. Für externe Deployments muss `VALKEY_URL` auf die eigene Valkey/Redis-Instanz zeigen.
 
 > [!NOTE]
 > Ist `VALKEY_URL` gesetzt, startet die API auch dann, wenn Valkey nicht erreichbar ist (etwa während der Valkey-Container noch startet). Bis Valkey erreichbar ist, protokolliert sie eine Warnung und bei jedem Verbindungsversuch eine Zeile `Valkey connection error`. Sitzungen werden nicht nach SQLite verlagert: Bis Valkey wieder erreichbar ist, werden Anmeldungen, Anfragen angemeldeter Benutzer und Anfragen mit API-Tokens mit `503 Service Unavailable` beantwortet; öffentliche Seiten funktionieren weiter. Sobald Valkey wieder erreichbar ist, funktioniert die Anmeldung wieder, und die Invalidierung des Berechtigungs-Caches sowie die Sperren für Starts und Enden von Maschinen über API-Instanzen hinweg laufen von selbst wieder an, ohne Neustart der API.

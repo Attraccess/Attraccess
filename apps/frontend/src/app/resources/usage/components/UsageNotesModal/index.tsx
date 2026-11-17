@@ -5,7 +5,7 @@ import {
   useResourcesServiceResourceUsageGetSession,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
-import { TransactionDetailsModalView } from '../../../../billing/dashboard/summary/transactionDetailsModal/view';
+import { TransactionDetailsModalView } from '../../../../billing/dashboard/summary/transactionDetailsModal/TransactionDetailsModalView';
 import { UsageNotesDrawer } from './drawer';
 import { useUsageSessionProject } from '../../hooks/useUsageSessionProject';
 import {

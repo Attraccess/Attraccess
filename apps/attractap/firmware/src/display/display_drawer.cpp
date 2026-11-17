@@ -6,9 +6,11 @@
 
 // Hidden maintenance drawer rendered on the LVGL top layer. It is revealed by a
 // pull-down gesture that starts at the very top edge of the screen and drags
-// downward (see handleGestureSample). The drawer exposes two admin actions:
+// downward (see handleGestureSample). The drawer exposes three admin actions:
 //   - "Settings": delegated to the application via onOpenSettingsCallback
 //                 (same path as the init screen's settings entry, incl. PIN lock)
+//   - "Network":  live connection health on NetworkStatusScreen, behind the
+//                 device PIN; the reader stays connected while it is open
 //   - "Reboot":   closes the drawer and asks for confirmation on a full-screen
 //                 ConfirmScreen, then esp_restart()
 //
@@ -28,7 +30,7 @@ namespace
                                lv_color_t color, lv_event_cb_t cb)
     {
         lv_obj_t *btn = lv_button_create(parent);
-        lv_obj_set_size(btn, lv_pct(44), 110);
+        lv_obj_set_size(btn, lv_pct(30), 110);
         DisplayTheme::button(btn, color);
         lv_obj_set_flex_flow(btn, LV_FLEX_FLOW_COLUMN);
         lv_obj_set_flex_align(btn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -79,6 +81,12 @@ void Display::updateDrawerAvailability()
     {
         Display::rebootConfirmShown = false;
         Display::logger.info("Drawer became unavailable: dismissing the reboot confirmation");
+        Display::returnFromTransient();
+    }
+    // The network status belongs to the drawer too.
+    else if (Display::isActive(&Display::networkStatusScreen))
+    {
+        Display::logger.info("Drawer became unavailable: closing the network status");
         Display::returnFromTransient();
     }
 }
@@ -146,6 +154,16 @@ void Display::initDrawer()
                              Display::onOpenSettingsCallback();
                      });
 
+    Display::drawerNetworkButton = makeDrawerButton(row, LV_SYMBOL_WIFI, FirmwareI18n::Message::NetworkStatusShort, DisplayTheme::primary(),
+                     [](lv_event_t *e)
+                     {
+                         if (lv_event_get_code(e) != LV_EVENT_CLICKED || !Display::isDrawerAvailable())
+                             return;
+                         Display::logger.info("Drawer: network status requested");
+                         Display::closeDrawer();
+                         Display::showNetworkStatus();
+                     });
+
     makeDrawerButton(row, LV_SYMBOL_POWER, FirmwareI18n::Message::Reboot, DisplayTheme::danger(),
                      [](lv_event_t *e)
                      {
@@ -182,6 +200,11 @@ void Display::openDrawer()
 
     Display::drawerOpen = true;
     Display::logger.info("Maintenance drawer opened (top-edge pull-down)");
+    // The connection settings stop the connection, so the network status would only show frozen values.
+    if (Display::isActive(&Display::connectionConfigurationScreen))
+        lv_obj_add_flag(Display::drawerNetworkButton, LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_remove_flag(Display::drawerNetworkButton, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(Display::drawerBackdrop, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(Display::drawerPanel, LV_OBJ_FLAG_HIDDEN);
 
@@ -227,11 +250,21 @@ void Display::requestReboot()
     Display::rebootConfirmShown = true;
 }
 
+void Display::showNetworkStatus()
+{
+    if (!Display::isDrawerAvailable() || Display::transientActive() ||
+        Display::isActive(&Display::connectionConfigurationScreen))
+        return;
+    Display::networkStatusScreen.setOnCloseCallback([] { Display::returnFromTransient(); });
+    Display::networkStatusScreen.lock();
+    Display::transitionToScreen(&Display::networkStatusScreen);
+}
+
 void Display::handleGestureSample(int16_t x, int16_t y, bool pressed)
 {
     (void)x;
 
-    // No drawer over a full-screen flow (status, confirmation, top-up, forms, project picker):
+    // No drawer over a full-screen flow (status, confirmation, top-up, forms, project picker, network status):
     // its reboot question would park that flow's origin while the application still waits on it.
     if (Display::transientActive())
     {

@@ -4,7 +4,7 @@ import { act, cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ModbusConfigurationForm } from './ConfigurationForm';
+import { ModbusConfigurationForm } from './ModbusConfigurationForm';
 import { BUILTIN_MODBUS_PROFILES, type ModbusConfiguration } from '../../../../modbus/model';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import germanModbus from '../../modbus.de.json';

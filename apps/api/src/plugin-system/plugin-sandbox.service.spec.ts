@@ -344,6 +344,21 @@ describe('PluginSandboxService', () => {
       expect(granted.secrets.decrypt(granted.secrets.encrypt('secret'))).toBe('secret');
     });
 
+    it('gates ble behind BLE_TRANSPORT', () => {
+      const ble = { registerProfile: jest.fn(), listReaders: jest.fn(async () => []) };
+      const base = { ...buildBaseContext(events), ble } as never as PluginContext;
+      const denied = PluginSandboxService.createGuardedContext(base, []);
+      expect(() => denied.ble).toThrow(PluginPermissionError);
+      expect(() => denied.ble).toThrow(/BLE_TRANSPORT/);
+
+      const granted = PluginSandboxService.createGuardedContext(base, [PluginPermission.BLE_TRANSPORT]);
+      expect(granted.ble).toBe(ble);
+      const withoutHostSupport = PluginSandboxService.createGuardedContext(buildBaseContext(events), [
+        PluginPermission.BLE_TRANSPORT,
+      ]);
+      expect(() => withoutHostSupport.ble).toThrow(/unavailable/);
+    });
+
     it('gates readerUi.invalidate behind READER_UI', () => {
       const base = { ...buildBaseContext(events), readerUi: { invalidate: jest.fn() } };
       const denied = PluginSandboxService.createGuardedContext(base, []);

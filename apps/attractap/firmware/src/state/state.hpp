@@ -28,36 +28,31 @@ public:
         NETWORK_QUALITY_OFFLINE,
     };
 
+    // A snapshot of the websocket's connection health. The has* flags tell a
+    // zero measurement apart from one that was never taken.
     struct NetworkQualityState
     {
-        NetworkQuality quality;
-        uint32_t lastInboundAgeMs;
-        uint8_t reconnectsLastMinute;
-        uint8_t txQueueDepth;
-        uint8_t txQueueFullEventsLastMinute;
-        uint8_t sendFailuresLastMinute;
-        uint8_t livenessTimeoutsLastMinute;
-        uint32_t lastPongRttMs;
-        uint32_t averagePongRttMs;
-        int32_t pongRttTrendMs;
-        uint8_t pongTimeoutsLastMinute;
-        uint8_t pongProbeLossPercentLastMinute;
-        uint8_t missedHeartbeatsLastMinute;
+        NetworkQuality quality = NETWORK_QUALITY_OFFLINE;
+        uint32_t lastInboundAgeMs = 0;
+        bool hasInboundMessage = false;
+        uint8_t reconnectsLastMinute = 0;
+        uint8_t txQueueDepth = 0;
+        uint8_t txQueueFullEventsLastMinute = 0;
+        uint8_t sendFailuresLastMinute = 0;
+        uint8_t livenessTimeoutsLastMinute = 0;
+        uint32_t lastPongRttMs = 0;
+        uint32_t averagePongRttMs = 0;
+        int32_t pongRttTrendMs = 0;
+        bool hasPongRttSample = false;
+        // Average and trend cover only the last minute; without a sample in it they are 0, not measured.
+        bool hasRecentPongRttSample = false;
+        uint8_t pongTimeoutsLastMinute = 0;
+        uint8_t pongProbeLossPercentLastMinute = 0;
+        bool hasCompletedPongProbe = false;
+        uint8_t missedHeartbeatsLastMinute = 0;
     };
 
-    static void setNetworkQualityState(NetworkQuality quality,
-                                       uint32_t lastInboundAgeMs,
-                                       uint8_t reconnectsLastMinute,
-                                       uint8_t txQueueDepth,
-                                       uint8_t txQueueFullEventsLastMinute,
-                                       uint8_t sendFailuresLastMinute,
-                                       uint8_t livenessTimeoutsLastMinute,
-                                       uint32_t lastPongRttMs,
-                                       uint32_t averagePongRttMs,
-                                       int32_t pongRttTrendMs,
-                                       uint8_t pongTimeoutsLastMinute,
-                                       uint8_t pongProbeLossPercentLastMinute,
-                                       uint8_t missedHeartbeatsLastMinute);
+    static void setNetworkQualityState(const NetworkQualityState &state);
     static NetworkQualityState getNetworkQualityState();
 
     // Connection phase of the websocket client. Mirrors Websocket::ConnectionState
@@ -193,19 +188,7 @@ private:
     static bool ethernet_connected;
 
     static std::string websocket_hostname;
-    static NetworkQuality network_quality;
-    static uint32_t network_quality_last_inbound_age_ms;
-    static uint8_t network_quality_reconnects_last_minute;
-    static uint8_t network_quality_tx_queue_depth;
-    static uint8_t network_quality_tx_queue_full_events_last_minute;
-    static uint8_t network_quality_send_failures_last_minute;
-    static uint8_t network_quality_liveness_timeouts_last_minute;
-    static uint32_t network_quality_last_pong_rtt_ms;
-    static uint32_t network_quality_average_pong_rtt_ms;
-    static int32_t network_quality_pong_rtt_trend_ms;
-    static uint8_t network_quality_pong_timeouts_last_minute;
-    static uint8_t network_quality_pong_probe_loss_percent_last_minute;
-    static uint8_t network_quality_missed_heartbeats_last_minute;
+    static NetworkQualityState network_quality_state;
 
     static uint16_t websocket_port;
     static bool websocket_use_ssl;

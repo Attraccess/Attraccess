@@ -27,44 +27,10 @@ import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.j
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import { useToastMessage } from '../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useCallback, useMemo, useState } from 'react';
+import { useInvitationHighlight } from './useInvitationHighlight';
 
-export function useInvitationHighlight(hasInvitations: boolean) {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const invitationRefs = useRef<Record<number, HTMLDivElement | null>>({});
-  const [highlightedInvitationId, setHighlightedInvitationId] = useState<number | null>(null);
-  useEffect(() => {
-    const target = searchParams.get('invitationId');
-    if (!target) {
-      return;
-    }
-    const invitationId = Number(target);
-    if (!invitationId || Number.isNaN(invitationId) || !hasInvitations) {
-      return;
-    }
-    const ref = invitationRefs.current[invitationId];
-    if (ref) {
-      ref.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setHighlightedInvitationId(invitationId);
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.delete('invitationId');
-      setSearchParams(nextParams, { replace: true });
-    }
-  }, [hasInvitations, searchParams, setSearchParams]);
-
-  useEffect(() => {
-    if (!highlightedInvitationId) {
-      return;
-    }
-    const timeout = setTimeout(() => setHighlightedInvitationId(null), 4000);
-    return () => clearTimeout(timeout);
-  }, [highlightedInvitationId]);
-
-  return { invitationRefs, highlightedInvitationId };
-}
-
-export function useProjectsListPageState() {
+export function ProjectsListPage() {
   const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const page = 1;
   const [includeArchived, setIncludeArchived] = useState(false);
@@ -207,29 +173,6 @@ export function useProjectsListPageState() {
     isLoadingInvitations,
     t,
   ]);
-  return {
-    includeArchived,
-    setIncludeArchived,
-    projects,
-    isLoading,
-    isLoadingInvitations,
-    t,
-    hasInvitations,
-    invitationContent,
-  } as const;
-}
-
-export function ProjectsListPage() {
-  const {
-    includeArchived,
-    setIncludeArchived,
-    projects,
-    isLoading,
-    isLoadingInvitations,
-    t,
-    hasInvitations,
-    invitationContent,
-  } = useProjectsListPageState();
 
   return (
     <div>

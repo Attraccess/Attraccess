@@ -4,6 +4,8 @@ import { emptyConfiguration, emptyMetadata } from './model';
 import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
 import type { Section } from './ConfigurationEditor';
 import type { WorkingCopy } from './configurationSession';
+
+/** ConfigurationEditor's working copy, shared by useConfigurationSessionState (loads and saves it) and ConfigurationSession (edits it). */
 export function useConfigurationWorkingCopyState(restored: WorkingCopy | undefined) {
   const [section, setSection] = useState<Section>('channels');
   const [focusChannelId, setFocusChannelId] = useState<string>();

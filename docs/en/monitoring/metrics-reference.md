@@ -100,7 +100,7 @@ attraccess_resource_maintenance_overdue > 0
 | `attraccess_attractap_devices_connected` | Gauge | -- | Number of connected Attractap RFID readers |
 | `attraccess_attractap_nfc_taps_total` | Counter | -- | Total RFID tap events |
 | `attraccess_attractap_firmware_updates_total` | Counter | -- | Total firmware update events |
-| `attraccess_attractap_crash_reports_total` | Counter | `reader_id`, `reset_reason` | Reset reports received from readers, for every reset reason (including `POWERON` and `SW`), so it is not a count of crashes. `reset_reason` is a normalized reset cause (e.g. `PANIC`, `INT_WDT`, `BROWNOUT`, `UNKNOWN`). Unchanged; used by the dashboards |
+| `attraccess_attractap_crash_reports_total` | Counter | `reader_id`, `reset_reason` | Reset reports received from readers, for every reset reason (including `POWERON` and `SW`), so it is not a count of crashes. `reset_reason` is a normalized reset cause (e.g. `PANIC`, `INT_WDT`, `BROWNOUT`, `UNKNOWN`). A recovered coredump (a dump the reader found in flash without its boot record) is reported with `UNKNOWN`. Unchanged; used by the dashboards |
 | `attraccess_attractap_reset_reports_last_hour` | Gauge | `category` | Exact number of stored reset reports received in the last hour. `category` is `crash_watchdog` (`PANIC`, `INT_WDT`, `TASK_WDT`, `WDT`) or `power_on` (`POWERON`). Other reasons (`SW`, `BROWNOUT`, `UNKNOWN`, ...) are not counted |
 | `attraccess_attractap_reset_report_readers_last_hour` | Gauge | `category`, `readers` | Same count, with the contributing readers and reset reasons as text in the `readers` label (e.g. `Door (#1): PANIC x2; Laser (#2): WDT x2`). Used only for the alert text. Reader names are shortened to 40 characters with `<` and `>` removed, and the list is capped at about 200 characters (`; +N more`) |
 | `attraccess_attractap_sessions_active` | Gauge | -- | Open encrypted reader sessions (TLS 1.3 inside the WebSocket). Readers still signed in with a token are not counted |
@@ -111,7 +111,7 @@ attraccess_resource_maintenance_overdue > 0
 
 The two `..._last_hour` gauges are counted from the database every time `/api/metrics` is scraped, over the last 3600 whole seconds, measured by when the server stored each report. A report exactly one hour old is excluded; a report stored at scrape time is included. Notes:
 
-- They count **stored reports**. A reader that uploads a report again after a lost acknowledgement is counted twice.
+- They count **stored reports**. A reader that uploads a report again after a lost acknowledgement is counted twice, unless the report announces a coredump that is still awaited: the server then acknowledges the existing report again.
 - The count has a 5-second timeout. If the query fails or times out, `/api/metrics` returns an error instead of zero, so Prometheus marks the target down (`AttractapServiceDown` and `ScrapeFailures` can fire). The timeout does not cancel the underlying SQLite query.
 - The alert rules use `max` across scrape targets, so several targets of **one** installation (one shared database) are not double counted. Combining independent installations in one Prometheus/Grafana instance gives incorrect totals and is unsupported.
 - The counts rely on an index on `attractap_crash_report.createdAt` added by a database migration.

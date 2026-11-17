@@ -84,6 +84,7 @@
   - [Installing Plugins](plugins/installing-plugins.md)
   - [Developing Plugins](plugins/developing-plugins.md)
   - [Migrating Plugins to SDK 2.0](plugins/migrating-to-2.md)
+  - [Bluetooth Transport for Plugins](plugins/ble-transport.md)
   - [Database Migrations](plugins/database-migrations.md)
   - **Reservations**
     - [Overview](plugins/reservations/overview.md)
@@ -128,6 +129,7 @@
   - [Adding a Database Backend](developer/adding-a-database-backend.md)
   - [API Log Destinations](developer/logging.md)
   - [API Reference](developer/api-reference.md)
+  - [MCP Server (AI Clients)](developer/mcp.md)
   - [AI Agents (llms.txt & WebMCP)](developer/ai-agents.md)
   - [Contributing](developer/contributing.md)
 
@@ -136,6 +138,7 @@
   - [Logging In](end-user/login.md)
   - [My Account](end-user/account.md)
   - [Using Resources](end-user/using-resources.md)
+  - [Dashboard](end-user/dashboard.md)
   - [Mobile Usage (PWA)](end-user/mobile-pwa.md)
 
 - **FAQ & Help**

@@ -1,19 +1,5 @@
-import { AlertStatusIcon, Button } from '@attraccess/plugins-frontend-ui';
-import {
-  Alert,
-  Form,
-  Input,
-  Label,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-  TextField,
-} from '@heroui/react';
+import { AlertStatusIcon, Button, StandardModal } from '@attraccess/plugins-frontend-ui';
+import { Alert, Form, Input, Label, ModalBody, ModalFooter, ModalHeader, ModalHeading, TextField } from '@heroui/react';
 import { useEffectEvent, useState } from 'react';
 import { useClaimControllerMutation } from '../api/queries';
 import { useWagoTranslations } from '../i18n';
@@ -51,57 +37,52 @@ export function ClaimControllerModal({ controllerId, onOpenChange }: ClaimContro
   }
 
   return (
-    <Modal
+    <StandardModal
+      size="sm"
       isOpen={controllerId !== null}
       onOpenChange={(isOpen) => {
         if (!isOpen) close();
       }}
     >
-      <ModalBackdrop>
-        <ModalContainer size="sm">
-          <ModalDialog>
-            <ModalHeader>
-              <ModalHeading>{t('claim.title')}</ModalHeading>
-            </ModalHeader>
-            <Form
-              onSubmit={(event) => {
-                event.preventDefault();
-                submitClaim();
-              }}
-            >
-              <ModalBody>
-                <p className="wg:text-sm wg:text-muted">{t('claim.description')}</p>
-                <TextField isRequired name="name">
-                  <Label>{t('claim.name')}</Label>
-                  <Input value={name} onChange={(event) => setName(event.target.value)} />
-                </TextField>
-                <TextField isRequired name="verifier">
-                  <Label>{t('claim.verifier')}</Label>
-                  <Input value={verifier} onChange={(event) => setVerifier(event.target.value)} />
-                </TextField>
-                {claimMutation.isError && (
-                  <Alert status="danger">
-                    <AlertStatusIcon status="danger" />
-                    <Alert.Content>
-                      <Alert.Description>
-                        {claimMutation.error instanceof Error ? claimMutation.error.message : t('common.retry')}
-                      </Alert.Description>
-                    </Alert.Content>
-                  </Alert>
-                )}
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="secondary" onPress={close}>
-                  {t('common.cancel')}
-                </Button>
-                <Button type="submit" isPending={claimMutation.isPending}>
-                  {t('claim.submit')}
-                </Button>
-              </ModalFooter>
-            </Form>
-          </ModalDialog>
-        </ModalContainer>
-      </ModalBackdrop>
-    </Modal>
+      <ModalHeader>
+        <ModalHeading>{t('claim.title')}</ModalHeading>
+      </ModalHeader>
+      <Form
+        onSubmit={(event) => {
+          event.preventDefault();
+          submitClaim();
+        }}
+      >
+        <ModalBody>
+          <p className="wg:text-sm wg:text-muted">{t('claim.description')}</p>
+          <TextField isRequired name="name">
+            <Label>{t('claim.name')}</Label>
+            <Input value={name} onChange={(event) => setName(event.target.value)} />
+          </TextField>
+          <TextField isRequired name="verifier">
+            <Label>{t('claim.verifier')}</Label>
+            <Input value={verifier} onChange={(event) => setVerifier(event.target.value)} />
+          </TextField>
+          {claimMutation.isError && (
+            <Alert status="danger">
+              <AlertStatusIcon status="danger" />
+              <Alert.Content>
+                <Alert.Description>
+                  {claimMutation.error instanceof Error ? claimMutation.error.message : t('common.retry')}
+                </Alert.Description>
+              </Alert.Content>
+            </Alert>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="secondary" onPress={close}>
+            {t('common.cancel')}
+          </Button>
+          <Button type="submit" isPending={claimMutation.isPending}>
+            {t('claim.submit')}
+          </Button>
+        </ModalFooter>
+      </Form>
+    </StandardModal>
   );
 }

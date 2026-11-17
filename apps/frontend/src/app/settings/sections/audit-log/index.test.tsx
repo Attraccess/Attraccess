@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuditEntryDto, AuditMetaDto, AuditSettingsDto } from '@attraccess/react-query-client';
 import { AuditLogSection } from './index';
-import { auditLabel } from './components/AuditLogPanels';
+import { auditLabel } from './components/auditLabel';
 import { humanize } from './audit-log-model';
 import de from './de.json';
 import en from './en.json';
@@ -348,6 +348,18 @@ describe('audit admin workflows', () => {
     );
   });
 
+  it('keeps the expanded filters after switching to the settings tab and back', async () => {
+    // The Activity panel unmounts on a tab switch, so the disclosure state has to live above the tabs.
+    mount();
+    await screen.findByRole('button', { name: 'View event #52' });
+    await userEvent.click(screen.getByRole('button', { name: 'More filters' }));
+    expect(screen.getByLabelText('Actor ID')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Logging settings' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Activity' }));
+    expect(await screen.findByLabelText('Actor ID')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fewer filters' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
   it('clears partially typed dates when resetting all filters', async () => {
     const user = userEvent.setup();
     mount();
@@ -474,6 +486,18 @@ it('labels the recorded details of MQTT explorer events in both languages', () =
     'QoS',
     'Nachricht behalten (retain)',
   ]);
+});
+
+it('labels the verification email resend apart from the password reset request in both languages', () => {
+  const translate = (strings: typeof en) => (key: string) => {
+    const [, section, value] = /^(\w+)\[(.*)\]$/.exec(key) ?? [];
+    return (strings as unknown as Record<string, Record<string, string>>)[section][JSON.parse(value)];
+  };
+  expect(auditLabel('events', 'identity.verification_email_resent', translate(en))).toBe('Verification email resent');
+  expect(auditLabel('events', 'identity.verification_email_resent', translate(de))).toBe(
+    'Bestätigungs-E-Mail erneut gesendet',
+  );
+  expect(auditLabel('events', 'identity.password_reset_requested', translate(en))).toBe('Password reset requested');
 });
 
 it('labels every flow audit event, target and detail field in both languages', () => {

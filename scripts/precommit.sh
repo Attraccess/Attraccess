@@ -1,24 +1,14 @@
 #!/bin/sh
-# Checks for the change set being committed. CI runs every check on its own.
+# Fast checks for the change set being committed. Lint, tests, CRAP score and the full
+# typecheck and build run in CI (.github/workflows/pull-requests.yml); `pnpm precommit:all`
+# runs everything locally.
 set -e
 
-pnpm lint:files
-pnpm lint:files --staged
-# Nx's --uncommitted reads the worktree; refuse when it differs from the index.
-node scripts/crap-score/check-staged.mjs
-
-exclude=tag:scope:hardware,tag:scope:companion
-# host:fhs tests run device shell scripts against /bin and /usr/bin tools, which
-# hosts such as NixOS do not have.
-if [ ! -x /bin/bash ] || [ ! -x /usr/bin/tr ] || [ ! -x /usr/bin/awk ]; then
-    echo "Skipping host:fhs projects: this host lacks /bin and /usr/bin tools; CI runs them." >&2
-    exclude="$exclude,tag:host:fhs"
+# These read the Git index, so they check exactly what is being committed.
+node scripts/check-file-size.mjs --staged
+# Parsing every source takes a while; only staged app or library TypeScript can add a cycle.
+if git diff --cached --name-only --diff-filter=ACMR | grep -qE '^(apps|libs)/.*\.([cm]?ts|tsx)$'; then
+    node scripts/check-import-cycles.mjs --staged
 fi
-
-# Tests create temporary repositories; an inherited GIT_INDEX_FILE would make their git
-# commands overwrite this repository's real index. The staged checks above already ran.
-# One task at a time: test runners start their own workers, and parallel Nx tasks on top of
-# them exhaust memory on developer machines.
-env -u GIT_INDEX_FILE pnpm nx affected --uncommitted --nxBail --parallel=1 --targets=lint,typecheck,test,crap-score --exclude="$exclude"
-# The Nx tasks above read the worktree; confirm it still matches what is being committed.
-node scripts/crap-score/check-staged.mjs
+# Incremental tsc for the projects that own staged TypeScript files (reads the worktree).
+node scripts/typecheck-staged.mjs

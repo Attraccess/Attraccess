@@ -40,6 +40,9 @@
     },
     "migrations": "dist/migrations.js",
     "styles": "frontend/style.css",
+    "dashboardPaths": [
+      "/wago"
+    ],
     "permissions": [
       "DATABASE_ACCESS",
       "ACCESS_MQTT_SERVERS",

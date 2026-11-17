@@ -58,7 +58,12 @@ describe('Metering on a shared machine', () => {
   const start = (user: number) => scope.usage.startSession(1, scope.users[user], {} as never);
   const end = (user: number) => scope.usage.endSession(1, scope.users[user], {} as never);
   const charged = async (usageId: number) => Math.abs((await scope.items(usageId)).transaction.amount);
-  const segments = () => scope.source.getRepository(ResourceMeteringSegment).find({ order: { startedAt: 'ASC' } });
+  // Segments opened in the same millisecond tie on startedAt (the id is random); the meter only counts up, so the
+  // opening reading keeps them in the order they were opened.
+  const segments = async () =>
+    (await scope.source.getRepository(ResourceMeteringSegment).find()).sort(
+      (a, b) => a.startedAt.getTime() - b.startedAt.getTime() || Number(BigInt(a.startValue) - BigInt(b.startValue)),
+    );
   const meterSessions = () => scope.source.getRepository(ResourceMeteringSession);
   const meterItem = async (usageId: number) =>
     (await scope.items(usageId)).items.find((item) => item.name === 'Energy (kWh)');

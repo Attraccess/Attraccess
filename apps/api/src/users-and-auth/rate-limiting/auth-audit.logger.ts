@@ -1,11 +1,13 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 export type AuthAuditType =
   | 'login'
   | 'register'
   | 'password_reset_request'
+  | 'verification_email_resend'
   | 'password_reset_complete'
   | 'delete_account_confirm'
   | 'api_token'
@@ -31,7 +33,7 @@ export interface AuthAuditFields {
   ip: string;
   userId?: number | null;
   username?: string | null;
-  authenticationMethod?: 'session' | 'api-token';
+  authenticationMethod?: AuthenticationMethod;
   apiTokenId?: number | null;
   reason?: string;
 }
@@ -74,6 +76,7 @@ function actionFor(type: AuthAuditType) {
   if (type === 'login') return 'login' as const;
   if (type === 'register') return 'registration' as const;
   if (type === 'password_reset_request') return 'password_reset_requested' as const;
+  if (type === 'verification_email_resend') return 'verification_email_resent' as const;
   if (type === 'password_reset_complete') return 'password_reset_completed' as const;
   if (type === 'sso_link_account') return 'sso_account_link' as const;
   return null;

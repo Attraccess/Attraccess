@@ -91,6 +91,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Installing Plugins](https://docs.attraccess.org/en/plugins/installing-plugins.md): How to upload, enable, disable and remove plugins in the web interface, with troubleshooting.
 - [Developing Plugins](https://docs.attraccess.org/en/plugins/developing-plugins.md): Developer guide to building Attraccess plugins: anatomy, SDKs, backend plugins, dependencies and reader UI integration.
 - [Migrating Plugins to SDK 2.0](https://docs.attraccess.org/en/plugins/migrating-to-2.md): What plugin developers must change for Attraccess 2.0: the minimum host version, declared database engines, the new persistence API with before/after code and the refusal of older plugins.
+- [Bluetooth Transport for Plugins](https://docs.attraccess.org/en/plugins/ble-transport.md): Describes the BLE transport contract that backend plugins use to talk to Bluetooth devices through Attractap readers: profiles, endpoints, sessions, errors, limits and testing with the fake.
 - [Database Migrations](https://docs.attraccess.org/en/plugins/database-migrations.md): How a plugin ships SQL migrations for its own tables through the SDK sqlite subpath: declaring, writing and bundling the migrations entry, rollback semantics and the engine gate.
 
 ## English: Reservations
@@ -140,6 +141,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Adding a Database Backend](https://docs.attraccess.org/en/developer/adding-a-database-backend.md): Exact steps to add another relational backend to Attraccess, the export, import and backup contract, and the concrete deliverables that remain for PostgreSQL (ATT-584).
 - [API Log Destinations](https://docs.attraccess.org/en/developer/logging.md): How the API routes logs to destinations with RoutedLogger, including registering a driver and startup ownership.
 - [API Reference](https://docs.attraccess.org/en/developer/api-reference.md): Describes the REST API and its OpenAPI docs, the generated API client and React Query hooks, authentication and key modules.
+- [MCP Server (AI Clients)](https://docs.attraccess.org/en/developer/mcp.md): Explains how to connect MCP clients to Attraccess with API tokens or OAuth, which tools are exposed, how permissions apply and how the reviewed manifest is maintained.
 - [AI Agents (llms.txt & WebMCP)](https://docs.attraccess.org/en/developer/ai-agents.md): Explains the llms.txt index and the experimental WebMCP tools of the docs site, how to try them in Chrome and how to add pages.
 - [Contributing](https://docs.attraccess.org/en/developer/contributing.md): How to contribute to Attraccess: forking, branching, code style, testing, issue tracking and reporting bugs.
 
@@ -148,6 +150,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Logging In](https://docs.attraccess.org/en/end-user/login.md): The ways to log in to Attraccess: password, SSO, two-factor authentication, registration and password reset.
 - [My Account](https://docs.attraccess.org/en/end-user/account.md): How to manage your own account: profile, security, RFID cards and account deletion.
 - [Using Resources](https://docs.attraccess.org/en/end-user/using-resources.md): How to find resources, get introduced, start supervised sessions and start and end usage sessions.
+- [Dashboard](https://docs.attraccess.org/en/end-user/dashboard.md): How to build your personal dashboard from widgets, page shortcuts and resources in three sizes, edit, resize and reorder it, and start or stop sessions from it.
 - [Mobile Usage (PWA)](https://docs.attraccess.org/en/end-user/mobile-pwa.md): How to install Attraccess as a Progressive Web App on iOS and Android, with updates and offline support.
 
 ## English: FAQ & Help
@@ -240,6 +243,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Plugins installieren](https://docs.attraccess.org/de/plugins/installing-plugins.md): Plugins über die Weboberfläche hochladen, aktivieren, deaktivieren und entfernen, mit Fehlerbehebung.
 - [Plugins entwickeln](https://docs.attraccess.org/de/plugins/developing-plugins.md): Entwicklerleitfaden für Attraccess-Plugins: SDKs, Frontend- und Backend-Plugins, Abhängigkeiten, Reader-UI und Start-Hooks.
 - [Plugins auf SDK 2.0 umstellen](https://docs.attraccess.org/de/plugins/migrating-to-2.md): Was Plugin-Entwickler für Attraccess 2.0 ändern müssen: die Mindest-Host-Version, deklarierte Engines, die neue Persistenz-API mit Vorher-Nachher-Code und die Ablehnung älterer Plugins.
+- [Bluetooth-Transport für Plugins](https://docs.attraccess.org/de/plugins/ble-transport.md): Beschreibt den BLE-Transportvertrag, über den Backend-Plugins mit Bluetooth-Geräten über Attractap-Reader sprechen: Profile, Endpunkte, Sitzungen, Fehler, Grenzwerte und Tests mit dem Fake.
 
 ## Deutsch: Reservierungen
 - [Überblick](https://docs.attraccess.org/de/plugins/reservations/overview.md): Das Plugin Reservierungen lässt Mitglieder eine Ressource für ein Zeitfenster buchen; Überblick, Voraussetzungen und Links zu Mitglieder-, Administrations- und API-Seiten.
@@ -288,6 +292,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Datenbank-Backend hinzufügen](https://docs.attraccess.org/de/developer/adding-a-database-backend.md): Genaue Schritte, um Attraccess ein weiteres relationales Backend hinzuzufügen, der Export-, Import- und Backup-Vertrag und die verbleibenden konkreten Lieferungen für PostgreSQL (ATT-584).
 - [API-Log-Ziele](https://docs.attraccess.org/de/developer/logging.md): Wie die API Logs mit RoutedLogger an Ziele leitet, inklusive Treiber-Registrierung und Start-Lebenszyklus.
 - [API-Referenz](https://docs.attraccess.org/de/developer/api-reference.md): Beschreibt die REST-API mit OpenAPI-Dokumentation, generiertem API-Client und React-Query-Hooks, Authentifizierung und wichtigen Modulen.
+- [MCP-Server (KI-Clients)](https://docs.attraccess.org/de/developer/mcp.md): Erklärt, wie MCP-Clients per API-Token oder OAuth mit Attraccess verbunden werden, welche Tools es gibt, wie Berechtigungen wirken und wie das geprüfte Manifest gepflegt wird.
 - [KI-Agenten (llms.txt & WebMCP)](https://docs.attraccess.org/de/developer/ai-agents.md): Erklärt den llms.txt-Index und die experimentellen WebMCP-Tools der Dokumentation, das Ausprobieren in Chrome und das Hinzufügen von Seiten.
 - [Mitwirken](https://docs.attraccess.org/de/developer/contributing.md): Wie Sie zu Attraccess beitragen: Fork, Branch, Code-Stil, Tests, Issue-Tracking und Fehlermeldungen.
 
@@ -296,6 +301,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Anmeldung](https://docs.attraccess.org/de/end-user/login.md): Die Anmeldemöglichkeiten bei Attraccess: Passwort, SSO, Zwei-Faktor-Authentifizierung, Registrierung und Passwort zurücksetzen.
 - [Mein Konto](https://docs.attraccess.org/de/end-user/account.md): So verwalten Sie Ihr eigenes Konto: Profil, Sicherheit, RFID-Karten und Konto löschen.
 - [Ressourcen nutzen](https://docs.attraccess.org/de/end-user/using-resources.md): Wie Sie Ressourcen finden, eingewiesen werden, beaufsichtigte Sitzungen starten sowie Nutzungssitzungen starten und beenden.
+- [Dashboard](https://docs.attraccess.org/de/end-user/dashboard.md): Wie Sie Ihr Dashboard aus Widgets, Seitenverknüpfungen und Ressourcen in drei Größen zusammenstellen, bearbeiten, in der Größe ändern und anordnen und von dort Sitzungen starten oder beenden.
 - [Mobile Nutzung (PWA)](https://docs.attraccess.org/de/end-user/mobile-pwa.md): Wie Sie Attraccess als Progressive Web App auf iOS und Android installieren, inklusive Updates und Offline-Unterstützung.
 
 ## Deutsch: FAQ & Hilfe

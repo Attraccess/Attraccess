@@ -25,7 +25,8 @@ export interface Props {
 
 export const PAGE_SIZE = 20;
 
-export function useMessageThreadState(props: Props) {
+export function MessageThread(props: Props) {
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const { conversationId, currentUserId, pendingResourceId } = props;
 
   const { t } = useTranslations({ en, de });
@@ -104,44 +105,6 @@ export function useMessageThreadState(props: Props) {
     viewport.addEventListener('resize', scrollToBottom);
     return () => viewport.removeEventListener('resize', scrollToBottom);
   }, []);
-  return {
-    currentUserId,
-    t,
-    draft,
-    setDraft,
-    setLimit,
-    attachedResourceId,
-    setAttachedResourceId,
-    bottomRef,
-    attachedResource,
-    isLoading,
-    messages,
-    hasOlder,
-    isSending,
-    handleSubmit,
-    handleKeyDown,
-  } as const;
-}
-
-export function MessageThread(props: Props) {
-  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
-  const {
-    currentUserId,
-    t,
-    draft,
-    setDraft,
-    setLimit,
-    attachedResourceId,
-    setAttachedResourceId,
-    bottomRef,
-    attachedResource,
-    isLoading,
-    messages,
-    hasOlder,
-    isSending,
-    handleSubmit,
-    handleKeyDown,
-  } = useMessageThreadState(props);
 
   return (
     <div className="flex h-full flex-col">

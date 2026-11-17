@@ -32,6 +32,7 @@ import { CreateProjectDto } from './dto/create.dto';
 import { UpdateProjectDto } from './dto/update.dto';
 
 import { ProjectInvitations } from './invitations/project-invitations';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 import {
   PROJECT_INVITATION_STORE,
@@ -84,7 +85,7 @@ export class ProjectsService {
   public async archiveOne(
     ownerUserId: number,
     id: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<ProjectRecord> {
     const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
@@ -104,7 +105,7 @@ export class ProjectsService {
   public async unarchiveOne(
     ownerUserId: number,
     id: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<ProjectRecord> {
     const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
@@ -128,7 +129,7 @@ export class ProjectsService {
     actorId: number,
     projectId: number,
     memberId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<void> {
     await this.projectAccessService.ensureOwner(actorId, projectId);
@@ -179,7 +180,7 @@ export class ProjectsService {
   public async create(
     ownerUserId: number,
     data: CreateProjectDto,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<ProjectRecord> {
     let project = await this.projects.create({
@@ -219,7 +220,7 @@ export class ProjectsService {
   public async deleteOne(
     ownerUserId: number,
     id: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<void> {
     const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
@@ -244,7 +245,7 @@ export class ProjectsService {
     ownerUserId: number,
     id: number,
     data: UpdateProjectDto,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<ProjectRecord> {
     const existing = await this.projectAccessService.ensureOwner(ownerUserId, id);
@@ -309,7 +310,7 @@ export class ProjectsService {
   async acceptInvitation(
     userId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitationRecord> {
     return this.invitations.acceptInvitation(userId, invitationId, authenticationMethod, apiTokenId);
@@ -318,7 +319,7 @@ export class ProjectsService {
   async declineInvitation(
     userId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitationRecord> {
     return this.invitations.declineInvitation(userId, invitationId, authenticationMethod, apiTokenId);
@@ -329,7 +330,7 @@ export class ProjectsService {
     projectId: number,
     invitedUserId: number,
     role: ProjectMemberRole = ProjectMemberRole.VIEWER,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitationRecord> {
     return this.invitations.createProjectInvitation(
@@ -346,7 +347,7 @@ export class ProjectsService {
     ownerId: number,
     projectId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitationRecord> {
     return this.invitations.resendProjectInvitation(ownerId, projectId, invitationId, authenticationMethod, apiTokenId);
@@ -356,7 +357,7 @@ export class ProjectsService {
     ownerId: number,
     projectId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitationRecord> {
     return this.invitations.cancelProjectInvitation(ownerId, projectId, invitationId, authenticationMethod, apiTokenId);

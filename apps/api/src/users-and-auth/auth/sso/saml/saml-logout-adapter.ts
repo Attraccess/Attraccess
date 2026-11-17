@@ -1,5 +1,5 @@
 import { SAML, Profile, SamlConfig } from '@node-saml/node-saml';
-import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
+import { DOMParser, XMLSerializer, onWarningStopParsing } from '@xmldom/xmldom';
 import { SignedXml } from 'xml-crypto';
 import { inflateRawSync } from 'node:zlib';
 import { BadRequestException } from '@nestjs/common';
@@ -16,19 +16,7 @@ const SHA256 = 'http://www.w3.org/2001/04/xmlenc#sha256';
 function parse(xml: string): Document {
   if (Buffer.byteLength(xml) > 262144 || /<!DOCTYPE|<!ENTITY/i.test(xml))
     throw new BadRequestException('Invalid SAML XML');
-  return new DOMParser({
-    errorHandler: {
-      warning: () => {
-        throw new Error('Invalid XML');
-      },
-      error: () => {
-        throw new Error('Invalid XML');
-      },
-      fatalError: () => {
-        throw new Error('Invalid XML');
-      },
-    },
-  }).parseFromString(xml, 'text/xml') as unknown as Document;
+  return new DOMParser({ onError: onWarningStopParsing }).parseFromString(xml, 'text/xml') as unknown as Document;
 }
 
 function children(root: Element, namespace: string, name: string): Element[] {

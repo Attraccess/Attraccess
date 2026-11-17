@@ -16,7 +16,7 @@ import {
 import { ReservationError } from '../reservations/errors';
 
 function fromEntity(row: ResourceSettingsEntity): ResourceSettings {
-  let bookableHours: BookableHours = {};
+  let bookableHours: BookableHours;
   try {
     bookableHours = normalizeBookableHours(JSON.parse(row.bookableHours || '{}') as BookableHours);
   } catch {

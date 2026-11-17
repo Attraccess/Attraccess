@@ -20,12 +20,13 @@ export const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as c
 
 export const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-export function useImageUploadState({
+export function ImageUpload({
   id,
   label,
   onChange,
   disabled = false,
-  className = '',
+  // Accepted but not applied: it must not reach the wrapper through `rest`.
+  className: _className = '',
   currentImageUrl,
   autoScale,
   ...rest
@@ -169,47 +170,6 @@ export function useImageUploadState({
     onChange(null);
     setImageWasChanged(true);
   }, [onChange]);
-  return {
-    t,
-    isDragActive,
-    selectedFile,
-    imageUrlToDisplay,
-    handleFileChange,
-    handleDragOver,
-    handleDragLeave,
-    handleDrop,
-    handleRemoveFile,
-    id,
-    label,
-    onChange,
-    disabled,
-    className,
-    autoScale,
-    rest,
-  } as const;
-}
-
-export function ImageUpload({
-  id,
-  label,
-  onChange,
-  disabled = false,
-  className = '',
-  currentImageUrl,
-  autoScale,
-  ...rest
-}: Readonly<ImageUploadProps>) {
-  const {
-    t,
-    isDragActive,
-    selectedFile,
-    imageUrlToDisplay,
-    handleFileChange,
-    handleDragOver,
-    handleDragLeave,
-    handleDrop,
-    handleRemoveFile,
-  } = useImageUploadState({ id, label, onChange, disabled, className, currentImageUrl, autoScale, ...rest });
 
   return (
     <div {...rest}>

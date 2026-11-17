@@ -1,9 +1,12 @@
-import { cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { BillingTransactionsExport, useBillingTransactionsExportState } from '.';
+import type { FieldDefinition } from '../export-config/csv';
+import { BillingTransactionsExport } from '.';
 
 const state = vi.hoisted(() => ({
+  fields: [] as FieldDefinition<unknown>[],
+  items: [] as unknown[],
   query: vi.fn(),
   rows: [] as unknown[],
   hasNext: false,
@@ -32,6 +35,18 @@ vi.mock('@attraccess/react-query-client', () => ({
   },
 }));
 
+// Records what the export hands to the config UI, which still renders for real.
+vi.mock('../export-config', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../export-config')>();
+  return {
+    ...original,
+    CsvExportConfigContent: (props: Parameters<typeof original.CsvExportConfigContent>[0]) => {
+      state.fields = props.fields as FieldDefinition<unknown>[];
+      state.items = props.items as unknown[];
+      return original.CsvExportConfigContent(props);
+    },
+  };
+});
 let client: QueryClient;
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -66,7 +81,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('offers user id, emails, external identifier and resource metadata fields after the existing ones', () => {
+it('offers user id, emails, external identifier and resource metadata fields after the existing ones', async () => {
   state.rows = [
     transaction,
     // no resource usage, emails withheld by the API (caller without billing.manage / reports permission)
@@ -81,7 +96,8 @@ it('offers user id, emails, external identifier and resource metadata fields aft
       items: [],
     },
   ];
-  const { result } = renderHook(() => useBillingTransactionsExportState(range), { wrapper });
+  render(<BillingTransactionsExport {...range} />, { wrapper });
+  await screen.findByRole('button', { name: 'Download CSV' });
 
   expect(state.query).toHaveBeenCalledWith(
     { start: '2026-09-01T00:00:00.000Z', end: '2026-09-02T00:00:00.000Z' },
@@ -89,7 +105,7 @@ it('offers user id, emails, external identifier and resource metadata fields aft
     { refetchOnWindowFocus: false },
   );
   // existing keys stay stable and in order because templates reference them
-  expect(result.current.columns.slice(0, 11).map((c) => c.key)).toEqual([
+  expect(state.fields.slice(0, 11).map((c) => c.key)).toEqual([
     'id',
     'user',
     'createdAt',
@@ -103,9 +119,9 @@ it('offers user id, emails, external identifier and resource metadata fields aft
     'items',
   ]);
   const values = (key: string) => {
-    const column = result.current.columns.find((c) => c.key === key);
+    const column = state.fields.find((c) => c.key === key);
     expect(column, key).toBeDefined();
-    return result.current.billingTransactions.map((row) => column?.getter(row as never));
+    return state.items.map((row) => column?.getter(row as never));
   };
   expect(values('userId')).toEqual([3, 4]);
   expect(values('userEmail')).toEqual(['alice@example.com', '']);
@@ -116,7 +132,7 @@ it('offers user id, emails, external identifier and resource metadata fields aft
   expect(values('items')).toEqual(['2x Wood @ 3', '']);
   expect(values('resourceMetadata.costCenter')).toEqual(['4711', '']);
   expect(values('resourceMetadata.tags')).toEqual(['["a","b"]', '']);
-  expect(result.current.columns.find((c) => c.key === 'resourceMetadata.costCenter')?.label).toBe(
+  expect(state.fields.find((c) => c.key === 'resourceMetadata.costCenter')?.label).toBe(
     'Resource metadata: costCenter',
   );
 });

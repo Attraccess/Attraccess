@@ -2,6 +2,7 @@
 // FEATURE: api-core
 
 #include "api.hpp"
+#include "diagnostics/crash-report.hpp"
 #include "../state/language.hpp"
 #include <functional>
 #include "../utils.hpp"
@@ -19,6 +20,11 @@ void API::updateSateInfo()
     auto apiState = State::getApiState();
 
     this->loopIsEnabled = websocketState.connected && (networkState.wifi_connected || networkState.ethernet_connected);
+
+    if (!this->loopIsEnabled)
+    {
+        this->crashUploader.onDisconnected();
+    }
 
     if (!this->loopIsEnabled && apiState.authenticated)
     {
@@ -85,6 +91,7 @@ void API::loop()
     if (this->loopIsEnabled)
     {
         this->sendHeartbeat();
+        this->crashUploader.tick(millis());
     }
 
     this->firmware.tick();
@@ -203,7 +210,13 @@ API::API(IReaderTransport &transport) : logger("API"),
                 { this->transport.forceReconnect(reason); },
                 firmwareUpdateProgressCallback,
                 firmwareUpdateMetaCallback,
-                errorCallback) {}
+                errorCallback),
+            crashUploadPorts(makeCrashUploadPorts(
+                [this](const char *json, size_t length)
+                { return this->transport.sendMessage(json, length); },
+                [this]()
+                { return this->firmware.inProgress(); })),
+            crashUploader(*crashUploadPorts, logger) {}
 
 void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
 {
@@ -340,7 +353,7 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
     }
     else if (strcmp(eventType, "READER_CRASH_REPORT") == 0)
     {
-        this->onCrashReportResponse(inboundDoc["data"].as<JsonObject>());
+        this->crashUploader.onResponse(eventType, inboundDoc["data"]["payload"].as<JsonObjectConst>(), millis());
     }
     else if (strcmp(eventType, "RESOURCE_USAGE_FORM_REQUEST") == 0)
     {
@@ -412,6 +425,13 @@ void API::processIncomingMessage(const char *buf, size_t len)
     if (strcmp(eventType, "CARD_CONVERSATION_END") == 0)
     {
         this->onCardConversationEnd(inboundDoc["data"].as<JsonObject>());
+        return;
+    }
+    // Coredump upload replies (ATT-1144) pace the upload themselves (one chunk in flight, retried on a
+    // timeout), so the server sends them without waiting for an ACK. Their errors are upload steps.
+    if (strncmp(eventType, "READER_COREDUMP_", 16) == 0)
+    {
+        this->crashUploader.onResponse(eventType, inboundDoc["data"]["payload"].as<JsonObjectConst>(), millis());
         return;
     }
 

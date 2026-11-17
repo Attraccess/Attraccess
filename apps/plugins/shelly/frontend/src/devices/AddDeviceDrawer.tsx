@@ -3,7 +3,7 @@ import { DrawerBody, DrawerHeader, DrawerHeading, Form } from '@heroui/react';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { addDevice } from '../api';
-import { TextFieldRow } from '../shared/drawer';
+import { TextFieldRow } from '../shared/TextFieldRow';
 import { useShellyTranslations } from '../i18n';
 import { Button, StandardDrawer, StatusAlert, TranslationMessage } from '@attraccess/plugins-frontend-ui';
 

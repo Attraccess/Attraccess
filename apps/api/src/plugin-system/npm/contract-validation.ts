@@ -5,6 +5,7 @@ import { SUPPORTED_DATABASE_TYPES } from '../../database/backend/database-backen
 import { assertHostRangeTargetsSdk2 } from '../runtime/plugin-compatibility';
 import { z } from 'zod';
 import { PluginDependenciesSchema } from '../runtime/dependencies';
+import { dashboardPathsSchema, dashboardWidgetsSchema } from '../runtime/manifest-schema';
 import { PluginManifest, PluginManifestSchema } from '../plugin.manifest';
 
 const entryPath = z
@@ -34,6 +35,8 @@ const packageSchema = z
       frontend: entryPath.optional(),
       migrations: entryPath.optional(),
       styles: entryPath.optional(),
+      dashboardPaths: dashboardPathsSchema.optional(),
+      dashboardWidgets: dashboardWidgetsSchema.optional(),
       permissions: z.array(z.nativeEnum(PluginPermission)).default([]),
       persistence: z.object({ backends: z.array(z.enum(SUPPORTED_DATABASE_TYPES)).min(1) }).optional(),
       sdk: z
@@ -95,6 +98,8 @@ export function parseNpmPluginPackage(
             ...(pkg.attraccess.styles
               ? { styles: styleForFrontend(pkg.attraccess.frontend, pkg.attraccess.styles) }
               : {}),
+            ...(pkg.attraccess.dashboardPaths ? { dashboardPaths: pkg.attraccess.dashboardPaths } : {}),
+            ...(pkg.attraccess.dashboardWidgets ? { dashboardWidgets: pkg.attraccess.dashboardWidgets } : {}),
           },
         }
       : {}),

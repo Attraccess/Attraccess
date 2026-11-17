@@ -36,12 +36,12 @@ export interface VapidKeys {
   privateKey: string;
 }
 
-export // Fallback VAPID subject when no app URL is configured. The subject is contact
+// Fallback VAPID subject when no app URL is configured. The subject is contact
 // information for push-service operators, not a functional endpoint.
-const DEFAULT_VAPID_SUBJECT = 'mailto:admin@localhost';
+export const DEFAULT_VAPID_SUBJECT = 'mailto:admin@localhost';
 
-export // Uncompressed P-256 public key (0x04 prefix + 2x32 bytes) and 32-byte private scalar.
-const VAPID_PUBLIC_KEY_BYTES = 65;
+// Uncompressed P-256 public key (0x04 prefix + 2x32 bytes) and 32-byte private scalar.
+export const VAPID_PUBLIC_KEY_BYTES = 65;
 
 export const VAPID_PRIVATE_KEY_BYTES = 32;
 

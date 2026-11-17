@@ -4,4 +4,5 @@
 struct JsonObject {};
 struct JsonObjectConst;
 struct JsonVariantConst;
+struct JsonDocument;
 template <size_t Capacity> struct StaticJsonDocument {};

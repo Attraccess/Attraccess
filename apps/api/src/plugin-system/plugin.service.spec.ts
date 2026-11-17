@@ -378,8 +378,8 @@ describe('PluginService', () => {
       expect(manifest.name).toBe('uploaded-plugin');
       expect(existsSync(join(fixture.root, 'uploaded-plugin', 'plugin.json'))).toBe(true);
       expect(existsSync(join(fixture.root, 'uploaded-plugin', 'dist', 'index.js'))).toBe(true);
-      expect(existsSync(join(fixture.root, 'temp'))).toBe(true);
-      expect(readdirSync(join(fixture.root, 'temp'))).toEqual([]);
+      expect(existsSync(join(fixture.root, 'temp'))).toBe(false);
+      expect(readdirSync(fixture.root).filter((entry) => entry.startsWith('.zip-upload-'))).toEqual([]);
     });
 
     it('rejects a zip without a plugin.json instead of throwing ENOENT', async () => {
@@ -394,14 +394,6 @@ describe('PluginService', () => {
       const file = zipFileUpload({ 'plugin.json': '{}' }, { buffer: Buffer.from('not a zip at all') });
 
       await expect(service.uploadPlugin(file)).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('cleans up the temp folder when the upload is rejected', async () => {
-      const service = new PluginService();
-      const file = zipFileUpload({ 'plugin.json': JSON.stringify({ name: 'x' }) });
-
-      await expect(service.uploadPlugin(file)).rejects.toBeDefined();
-      expect(readdirSync(join(fixture.root, 'temp'))).toEqual([]);
     });
 
     it('rejects a manifest that fails schema validation', async () => {

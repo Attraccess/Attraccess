@@ -122,8 +122,10 @@ describe('WagoCommissioningService transport and diagnostics', () => {
         });
         return child;
       }) as never);
+      // 60 s are reserved for cleanup; the second on top must outlast setup on a loaded runner, or the operation
+      // times out before the upload it is meant to stall.
       const result = service['operationContext'].run(
-        { deadline: Date.now() + 60_100, signal: new AbortController().signal, assertOwned: async () => undefined },
+        { deadline: Date.now() + 61_000, signal: new AbortController().signal, assertOwned: async () => undefined },
         () =>
           service['copyTo'](
             '192.0.2.1',

@@ -113,7 +113,7 @@ export class UsersRegistrationController {
   }
 
   @Post('resend-verification-email')
-  @AuthRateLimit('password_reset_request')
+  @AuthRateLimit('verification_email_resend')
   @ApiOperation({ summary: 'Resend the email verification link', operationId: 'resendVerificationEmail' })
   @ApiResponse({
     status: 200,

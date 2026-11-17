@@ -1,10 +1,10 @@
-export /**
+/**
  * SQLite stores `datetime` columns as `YYYY-MM-DD HH:mm:ss.SSS` in UTC (TypeORM's
  * DateUtils.mixedDateToUtcDatetimeString). `new Date(...)` parses that as *local* time, and
  * `.toISOString()` produces a `T`/`Z` form that doesn't compare correctly against stored values.
  * These two helpers are the only places that bridge the formats.
  */
-const parseDbDate = (value: string | Date): Date =>
+export const parseDbDate = (value: string | Date): Date =>
   value instanceof Date ? value : new Date(value.includes('T') ? value : `${value.replace(' ', 'T')}Z`);
 
 export const formatDbDate = (date: Date): string => date.toISOString().replace('T', ' ').replace('Z', '');

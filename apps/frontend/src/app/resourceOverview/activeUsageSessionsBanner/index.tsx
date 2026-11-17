@@ -14,46 +14,22 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   useResourcesServiceGetAllResources,
-  useResourcesServiceResourceUsageEndSession,
   useResourcesServiceGetAllResourcesKey,
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
-  ApiError,
-  ResourcesService,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
-import { useAuth } from '../../../hooks/useAuth';
-import { getTranslationKeyForApiError } from '../../../utils/apiError';
+import { MY_SESSIONS_QUERY } from './mySessionsQuery';
+import { useEndOwnSession, useEndSessionErrorMessage } from './useEndOwnSession';
 import en from './translations/en.json';
 import de from './translations/de.json';
-import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
-import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 
 export type ActiveUsageSessionsBannerProps = {
   onShowMySessions: () => void;
 };
 
-export const ACTIVE_RESOURCES_PAGE_SIZE = 50;
-
-export function useActiveUsageSessionsBannerState({ onShowMySessions }: ActiveUsageSessionsBannerProps) {
-  const { t, tExists } = useTranslations({
-    en: {
-      ...en,
-      api: {
-        ...API_ERROR_TRANSLATIONS_EN,
-        ...en.apiErrors,
-      },
-    },
-    de: {
-      ...de,
-      api: {
-        ...API_ERROR_TRANSLATIONS_DE,
-        ...de.apiErrors,
-      },
-    },
-  });
+export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessionsBannerProps) {
+  const { t } = useTranslations({ en, de });
   const queryClient = useQueryClient();
   const toast = useToastMessage();
-  const { user } = useAuth();
 
   // Fetch just the total count (1 item per page is sufficient)
   const { data, isLoading, isFetching, refetch } = useResourcesServiceGetAllResources({
@@ -65,13 +41,8 @@ export function useActiveUsageSessionsBannerState({ onShowMySessions }: ActiveUs
   const activeCount = useMemo(() => data?.total ?? 0, [data?.total]);
 
   const [isEndingAll, setIsEndingAll] = useState(false);
-  const { mutateAsync: endSession } = useResourcesServiceResourceUsageEndSession({
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({
-        queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId: data.resourceId }),
-      });
-    },
-  });
+  const endOwnSession = useEndOwnSession();
+  const endSessionErrorMessage = useEndSessionErrorMessage();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [endStatuses, setEndStatuses] = useState<Record<number, 'pending' | 'ending' | 'done' | 'error'>>({});
   const [endErrors, setEndErrors] = useState<Record<number, { title: string; description: string }>>({});
@@ -82,14 +53,10 @@ export function useActiveUsageSessionsBannerState({ onShowMySessions }: ActiveUs
     data: activeResourcesResponse,
     isLoading: isLoadingActiveResources,
     isFetching: isFetchingActiveResources,
-  } = useResourcesServiceGetAllResources(
-    { onlyInUseByMe: true, limit: ACTIVE_RESOURCES_PAGE_SIZE, page: 1 },
-    undefined,
-    {
-      enabled: isModalOpen,
-      refetchOnWindowFocus: false,
-    },
-  );
+  } = useResourcesServiceGetAllResources(MY_SESSIONS_QUERY, undefined, {
+    enabled: isModalOpen,
+    refetchOnWindowFocus: false,
+  });
 
   const activeResources = useMemo(() => activeResourcesResponse?.data ?? [], [activeResourcesResponse]);
   const successfulResources = useMemo(
@@ -149,18 +116,7 @@ export function useActiveUsageSessionsBannerState({ onShowMySessions }: ActiveUs
       const results = await Promise.allSettled(
         cachedResources.map(async (r) => {
           try {
-            // End my own session by its id: on a shared machine the resource may hold several sessions.
-            if (!user) throw new Error('Not signed in');
-            const active = await ResourcesService.resourceUsageGetActiveSession({ resourceId: r.id });
-            const ownSession = active.usages.find((usage) => usage.userId === user.id);
-            // No session of mine is left there (it ended meanwhile): nothing to end.
-            if (ownSession) {
-              await endSession({ resourceId: r.id, requestBody: { usageId: ownSession.id } });
-            } else {
-              queryClient.invalidateQueries({
-                queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId: r.id }),
-              });
-            }
+            await endOwnSession(r.id);
             setEndStatuses((prev) => ({ ...prev, [r.id]: 'done' }));
             setEndErrors((prev) => {
               if (!(r.id in prev)) return prev;
@@ -169,20 +125,8 @@ export function useActiveUsageSessionsBannerState({ onShowMySessions }: ActiveUs
             });
           } catch (err) {
             console.error('Failed to end session for resource', r.id, err);
-            const { key, errorMessage } = getTranslationKeyForApiError({
-              baseTranslationKey: 'api',
-              error: err as ApiError,
-              t,
-              tExists,
-            });
             setEndStatuses((prev) => ({ ...prev, [r.id]: 'error' }));
-            setEndErrors((prev) => ({
-              ...prev,
-              [r.id]: {
-                title: t(`${key}.title`),
-                description: t(`${key}.description`, { error: errorMessage }),
-              },
-            }));
+            setEndErrors((prev) => ({ ...prev, [r.id]: endSessionErrorMessage(err) }));
             throw err;
           }
         }),
@@ -202,45 +146,17 @@ export function useActiveUsageSessionsBannerState({ onShowMySessions }: ActiveUs
       setIsEndingAll(false);
       refetch();
     }
-  }, [cachedResources, endSession, isEndingAll, isLoadingResources, queryClient, refetch, t, tExists, toast, user]);
-  return {
-    t,
-    isLoading,
-    isFetching,
-    activeCount,
+  }, [
+    cachedResources,
+    endOwnSession,
+    endSessionErrorMessage,
     isEndingAll,
-    isModalOpen,
-    setIsModalOpen,
-    endStatuses,
-    endErrors,
-    allCompleted,
-    activeResources,
-    successfulResources,
     isLoadingResources,
-    openConfirmModal,
-    confirmEndAll,
-    onShowMySessions,
-  } as const;
-}
-
-export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessionsBannerProps) {
-  const {
+    queryClient,
+    refetch,
     t,
-    isLoading,
-    isFetching,
-    activeCount,
-    isEndingAll,
-    isModalOpen,
-    setIsModalOpen,
-    endStatuses,
-    endErrors,
-    allCompleted,
-    activeResources,
-    successfulResources,
-    isLoadingResources,
-    openConfirmModal,
-    confirmEndAll,
-  } = useActiveUsageSessionsBannerState({ onShowMySessions });
+    toast,
+  ]);
 
   if (isLoading || isFetching) {
     return (

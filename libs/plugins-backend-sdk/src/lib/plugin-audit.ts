@@ -1,3 +1,4 @@
+import type { AuthenticationMethod } from './auth.types';
 /**
  * Declarative audit policy a plugin contributes through `PluginBackendModule.auditDomains`.
  * The host registers the declaration, then enforces it on every event the plugin records:
@@ -127,7 +128,7 @@ export const PLUGIN_AUDIT_HOST_PROVIDER = Symbol.for('attraccess.plugin.auditHos
 
 export interface PluginAuditPrincipal {
   userId: number;
-  authenticationMethod: 'session' | 'api-token';
+  authenticationMethod: AuthenticationMethod;
   apiTokenId?: number;
 }
 

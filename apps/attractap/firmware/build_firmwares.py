@@ -104,12 +104,20 @@ def secure_profile_hardware_tested(variant, content):
                          "is not \"true\": CI would not build or gate the profile it advertises")
     return tested
 
+def check_release_build(variant, build_dir, python_cmd):
+    """Fail the release when lab-only code (crash trigger, test hooks) reached the image."""
+    gate = os.path.join(FIRMWARE_DIR, "tools", "check_release_build.py")
+    if subprocess.run([python_cmd, "-I", gate, build_dir]).returncode != 0:
+        print(f"Error: Release build gate failed for variant '{variant}'", file=sys.stderr)
+        sys.exit(1)
+
 def build_secure_profile(variant, variant_path, python_cmd):
     """Build the secure profile of a non-demo variant and run its build gates
     (tools/check_secure_profile.py). Returns the build directory; the caller
     packages the unsigned images (secure_packaging.py). They must never be
     offered to the web flasher: the API signs them per installation (ATT-1205)."""
     build_dir, _, _ = build_variant(variant, variant_path, "ERROR", secure=True)
+    check_release_build(variant, build_dir, python_cmd)
     gate = os.path.join(FIRMWARE_DIR, "tools", "check_secure_profile.py")
     if subprocess.run([python_cmd, "-I", gate, build_dir]).returncode != 0:
         print(f"Error: Secure profile gate failed for variant '{variant}'", file=sys.stderr)
@@ -291,8 +299,9 @@ def build_variant(variant, variant_path, log_level, secure=False):
         f"-DSDKCONFIG={sdkconfig_path}",
         f"-DATTRACTAP_VARIANT={variant}",
         f"-DATTRACTAP_LOG_LEVEL={log_level}",
-        # Shipped images never contain the lab test hooks and keep the beeper on.
+        # Shipped images never contain the lab test hooks or the crash trigger and keep the beeper on.
         "-DATTRACTAP_TEST_HOOKS=OFF",
+        "-DATTRACTAP_CRASH_TRIGGER=OFF",
         "-DATTRACTAP_BEEPER_DEFAULT=ON",
         *(["-DATTRACTAP_SECURE_PROFILE=ON"] if secure else []),
         "build",
@@ -466,6 +475,7 @@ def main(argv=None):
 
         # ERROR is the production runtime log level.
         build_dir, flash_files, flasher_args = build_variant(variant, variant_path, "ERROR")
+        check_release_build(variant, build_dir, python_cmd)
 
         app_bin = os.path.join(build_dir, flasher_args["app"]["file"])
         elf_path = os.path.join(build_dir, "attractap.elf")

@@ -1,4 +1,5 @@
-import { Separator, Chip } from '@heroui/react';
+import { Separator } from '@heroui/react';
+import { SsoAssignmentBadges } from './SsoAssignmentBadges';
 import { Button, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   SSOProvider,
@@ -20,35 +21,8 @@ import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 
-export function SsoAssignmentBadges({
-  assignments,
-  providersById,
-  t,
-}: {
-  assignments: UserRole[];
-  providersById?: Map<number, SSOProvider>;
-  t: ReturnType<typeof useTranslations>['t'];
-}) {
-  if (assignments.length === 0) return null;
-  return (
-    <div className="flex flex-wrap gap-1 mt-1 ml-1">
-      {assignments.map((ur) => {
-        const providerName = ur.ssoProviderId
-          ? (providersById?.get(ur.ssoProviderId)?.name ?? `#${ur.ssoProviderId}`)
-          : (ur.ssoProviderType ?? 'SSO');
-        const label = ur.externalValue ? `${providerName} · ${ur.externalValue}` : providerName;
-        return (
-          <Chip key={`${ur.ssoProviderId}-${ur.externalValue}`} size="sm" color="warning" variant="soft">
-            {t('ssoAssignment.assignedBy')}: {label}
-          </Chip>
-        );
-      })}
-    </div>
-  );
-}
-
-export // 'user' is auto-assigned to all users; 'administrator' is the initial system administrator — neither should be toggled manually
-const NON_MANAGEABLE_ROLE_KEYS = ['user', 'administrator'];
+// 'user' is auto-assigned to all users; 'administrator' is the initial system administrator — neither should be toggled manually
+export const NON_MANAGEABLE_ROLE_KEYS = ['user', 'administrator'];
 
 export interface UserPermissionFormProps {
   user: User;
@@ -58,7 +32,7 @@ export interface UserPermissionFormProps {
   roleIdToAssign?: number;
 }
 
-export function useUserPermissionFormState({
+export function UserPermissionForm({
   user,
   ssoManagedProviders,
   ssoManagedPermissionKeys,
@@ -170,57 +144,6 @@ export function useUserPermissionFormState({
       toast.success({ title: t('messages.updated') });
     }
   };
-  return {
-    t,
-    roleName,
-    isSsoManaged,
-    isRoleSsoManaged,
-    ssoProvidersLabel,
-    isLoadingRoles,
-    isLoadingUserRoles,
-    isSaving,
-    manageableRoles,
-    selectedRoleIds,
-    ssoAssignmentsByRoleId,
-    ssoOnlyRoles,
-    allManageableSsoManaged,
-    handleRoleToggle,
-    handleSave,
-    providersById,
-  };
-}
-
-// 'user' is auto-assigned to all users; 'administrator' is the initial system administrator — neither should be toggled manually
-export function UserPermissionForm({
-  user,
-  ssoManagedProviders,
-  ssoManagedPermissionKeys,
-  providersById,
-  roleIdToAssign,
-}: UserPermissionFormProps) {
-  const {
-    t,
-    roleName,
-    isSsoManaged,
-    isRoleSsoManaged,
-    ssoProvidersLabel,
-    isLoadingRoles,
-    isLoadingUserRoles,
-    isSaving,
-    manageableRoles,
-    selectedRoleIds,
-    ssoAssignmentsByRoleId,
-    ssoOnlyRoles,
-    allManageableSsoManaged,
-    handleRoleToggle,
-    handleSave,
-  } = useUserPermissionFormState({
-    user,
-    ssoManagedProviders,
-    ssoManagedPermissionKeys,
-    providersById,
-    roleIdToAssign,
-  });
 
   if (isLoadingRoles || isLoadingUserRoles) {
     return (
@@ -256,7 +179,7 @@ export function UserPermissionForm({
               >
                 {roleName(role)}
               </LabeledSwitch>
-              <SsoAssignmentBadges assignments={ssoAssignments} providersById={providersById} t={t} />
+              <SsoAssignmentBadges assignments={ssoAssignments} providersById={providersById} />
             </div>
           );
         })}
@@ -274,7 +197,7 @@ export function UserPermissionForm({
               return (
                 <div key={role?.id ?? assignments[0]?.roleId} className="flex flex-col gap-1">
                   <span className="text-sm text-default-700 font-medium">{label}</span>
-                  <SsoAssignmentBadges assignments={assignments} providersById={providersById} t={t} />
+                  <SsoAssignmentBadges assignments={assignments} providersById={providersById} />
                 </div>
               );
             })}

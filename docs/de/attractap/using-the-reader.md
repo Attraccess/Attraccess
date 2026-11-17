@@ -1,4 +1,5 @@
 # Den Attractap-Leser benutzen
+
 <!-- llms-description: So bedienen Sie den Attractap-Touchleser: mit Karte anmelden, Maschinen starten oder beenden, Türen öffnen und Formulare ausfüllen. -->
 
 Mit Ihrer RFID-Karte und dem Attractap-Touchdisplay können Sie die Nutzung einer Maschine starten oder beenden, eine Tür öffnen oder eine Aufsicht anfordern. Der Leser zeigt die ihm zugeordneten Maschinen und Türen sowie die für Sie verfügbaren Aktionen.
@@ -161,6 +162,33 @@ Nach der Abmeldung können Sie sich mit Ihrer Karte erneut anmelden. Eine laufen
 | Die Anmeldung mit Ihrer Karte klappt nicht | Versuchen Sie es erneut und lassen Sie die Karte am Leser, bis die Anmeldung abgeschlossen ist. Falls es weiterhin nicht klappt, bitten Sie Ihre Administration zu prüfen, ob die Karte Ihrem Konto zugeordnet ist. |
 | Start, Stop oder Türöffnung schlägt fehl   | Lesen Sie die Meldung und prüfen Sie vor einem erneuten Versuch den aktuellen Status der Ressource. Wenden Sie sich bei anhaltenden Problemen an einen Wartenden oder Ressourcenverwalter für diese Ressource.      |
 | Der Leser verliert die Verbindung          | Warten Sie, bis die Verbindung wiederhergestellt ist, und melden Sie sich erneut an. Ein Verbindungsabbruch beendet keine laufende Maschinennutzung.                                                                |
+
+### Netzwerk-Hinweis und Verbindungsstatus
+
+Solange die Verbindung zum Server gut ist, zeigt der Leser keinen Netzwerk-Hinweis. Ein Hinweis oben rechts erscheint nur bei einem Problem:
+
+| Hinweis   | Bedeutung                                                                                                                                                                                                      |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **! NET** | Die Verbindung ist eingeschränkt: Nachrichten kommen verspätet an, Pings sind langsam oder gehen verloren, oder das Senden ist fehlgeschlagen. Der Leser funktioniert weiter, reagiert aber eventuell langsam. |
+| **x NET** | Der Leser ist offline und erreicht den Server nicht. Er verbindet sich automatisch neu.                                                                                                                        |
+
+Für Details öffnen Sie das Wartungsmenü (den Griff am oberen Rand herunterziehen), tippen auf **Netzwerk** und geben die Geräte-PIN ein. Der Bildschirm **Netzwerkstatus** zeigt den aktuellen Verbindungszustand und aktualisiert sich jede Sekunde. Der Leser bleibt dabei verbunden, sodass Sie Änderungen der Verbindung direkt verfolgen können. Der Pfeil zurück führt zum vorherigen Bildschirm, oder zum Startbildschirm, wenn die Verbindung zwischendurch abgebrochen ist:
+
+| Wert                                   | Bedeutung                                                                                            |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Verbindungsqualität                    | **Gut**, **Eingeschränkt** oder **Offline**, dieselbe Einschätzung wie beim Hinweis.                 |
+| Zeit seit letzter Nachricht            | Wie lange der Leser nichts mehr vom Server empfangen oder sich zuletzt mit ihm verbunden hat.        |
+| Letzter Ping / Durchschnittlicher Ping | Antwortzeit des letzten Pings und der Durchschnitt der letzten Minute.                               |
+| Ping-Trend                             | Unterschied zwischen dem ältesten und dem neuesten Ping der letzten Minute; positiv heißt langsamer. |
+| Neuverbindungen (1 Min.)               | Wie oft die Verbindung in der letzten Minute neu aufgebaut wurde.                                    |
+| Sendewarteschlange                     | Nachrichten, die auf das Senden warten.                                                              |
+| Warteschlange voll (1 Min.)            | Wie oft eine Nachricht nicht eingereiht werden konnte, weil die Warteschlange voll war.              |
+| Sendefehler (1 Min.)                   | Nachrichten, die nicht gesendet werden konnten.                                                      |
+| Verbindungs-Timeouts (1 Min.)          | Wie oft der Server zu lange schwieg und der Leser die Verbindung trennte.                            |
+| Ping-Timeouts / Ping-Verlust           | Pings ohne Antwort, als Anzahl und als Anteil aller Pings der letzten Minute.                        |
+| Verpasste Heartbeats (1 Min.)          | Heartbeats, die der Leser nicht rechtzeitig senden konnte.                                           |
+
+**Nicht verfügbar** bedeutet, dass es keinen Messwert gibt: Die Pings zeigen es, bis nach dem Start des Lesers der erste Ping beantwortet wurde, Durchschnitt und Trend zusätzlich, wenn in der letzten Minute kein Ping beantwortet wurde.
 
 > [!NOTE]
 > Leser-Firmware und Server werden gemeinsam ausgeliefert. Der Server aktualisiert die Leser automatisch auf die mitgelieferte Firmware-Version (siehe [Firmware-Updates](attractap/firmware-updates.md)).

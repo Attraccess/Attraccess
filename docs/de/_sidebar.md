@@ -83,6 +83,7 @@
   - [Plugins installieren](plugins/installing-plugins.md)
   - [Plugins entwickeln](plugins/developing-plugins.md)
   - [Plugins auf SDK 2.0 umstellen](plugins/migrating-to-2.md)
+  - [Bluetooth-Transport für Plugins](plugins/ble-transport.md)
   - **Reservierungen**
     - [Überblick](plugins/reservations/overview.md)
     - [Reservierungen nutzen](plugins/reservations/using-reservations.md)
@@ -126,6 +127,7 @@
   - [Datenbank-Backend hinzufügen](developer/adding-a-database-backend.md)
   - [API-Log-Ziele](developer/logging.md)
   - [API-Referenz](developer/api-reference.md)
+  - [MCP-Server (KI-Clients)](developer/mcp.md)
   - [KI-Agenten (llms.txt & WebMCP)](developer/ai-agents.md)
   - [Mitwirken](developer/contributing.md)
 
@@ -134,6 +136,7 @@
   - [Anmeldung](end-user/login.md)
   - [Mein Konto](end-user/account.md)
   - [Ressourcen nutzen](end-user/using-resources.md)
+  - [Dashboard](end-user/dashboard.md)
   - [Mobile Nutzung (PWA)](end-user/mobile-pwa.md)
 
 - **FAQ & Hilfe**

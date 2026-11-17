@@ -29,8 +29,8 @@ export const WAGO_RUN_LEDS = {
   red: '/sys/devices/platform/led/leds/run-red/brightness',
 } as const;
 
-export /** Narrow ownership is reapplied to volatile sysfs files on every controller boot. */
-function codesysStopped(): string {
+/** Narrow ownership is reapplied to volatile sysfs files on every controller boot. */
+export function codesysStopped(): string {
   return `
 ${wagoCodesysClassificationShell()}
 codesys_state=$(wago_codesys_classify) || fail 'Cannot verify CODESYS stopped'
@@ -51,11 +51,11 @@ done
 `;
 }
 
-export /** Cleanup is containment, not restoration of vendor networking or old PLC state.
+/** Cleanup is containment, not restoration of vendor networking or old PLC state.
  * Legacy journals retain token/recorded-context integrity checks, but no longer
  * block solely because a vendor networking event cannot be rolled back.
  */
-function dockerRecoveryHelpers(): string {
+export function dockerRecoveryHelpers(): string {
   return `
 unset DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH
 export DOCKER_HOST=unix:///var/run/docker.sock
@@ -187,8 +187,8 @@ export function rootValue(testRoot: string): string {
   return quote(testRoot.replace(/\/$/, ''));
 }
 
-export /** A missing daemon is not evidence that its container/shim has stopped. */
-function runtimeContainment(): string {
+/** A missing daemon is not evidence that its container/shim has stopped. */
+export function runtimeContainment(): string {
   return `contain_runtime() {
   containment_commands=0
   docker update --restart=no attraccess-wago >/dev/null 2>&1 || containment_commands=1

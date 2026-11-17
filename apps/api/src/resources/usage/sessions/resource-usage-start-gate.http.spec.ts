@@ -86,7 +86,7 @@ describe('POST /resources/:id/usage/start through the pre-start gate', () => {
       5,
       expect.objectContaining({ id: 7 }),
       expect.objectContaining({ confirmedStepIds: ['k3J9vQ2mXc8LrT0aW5yZbQ'] }),
-      { origin: 'web' },
+      { origin: 'web', authenticationMethod: 'session' },
     );
     expect(startSession).toHaveBeenCalledTimes(1);
   });
@@ -98,6 +98,17 @@ describe('POST /resources/:id/usage/start through the pre-start gate', () => {
     expect(gateHttp).toHaveBeenCalledWith(5, expect.objectContaining({ id: 7 }), expect.anything(), {
       origin: 'api',
       apiTokenId: 31,
+      authenticationMethod: 'api-token',
+    });
+  });
+
+  it('maps an MCP OAuth client to origin api, not to the web', async () => {
+    principal = { authenticationMethod: 'mcp-oauth' };
+    gateHttp.mockResolvedValue(undefined);
+    await request(app.getHttpServer()).post('/resources/5/usage/start').send({});
+    expect(gateHttp).toHaveBeenCalledWith(5, expect.objectContaining({ id: 7 }), expect.anything(), {
+      origin: 'api',
+      authenticationMethod: 'mcp-oauth',
     });
   });
 

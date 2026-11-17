@@ -2,11 +2,12 @@ import { randomUUID } from 'crypto';
 import { existsSync } from 'fs';
 import { readFile, rename, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 export interface PendingNpmPluginAudit {
   operationId: string;
   actorId: number;
-  authenticationMethod?: 'session' | 'api-token';
+  authenticationMethod?: AuthenticationMethod;
   apiTokenId?: number;
   details: Record<string, string | number>;
   migrationOutcome: 'pending-restart' | 'succeeded' | 'failed' | 'not-applicable';

@@ -1,5 +1,9 @@
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
+/** How a principal authenticated. Extend this list (not a copy of it) when a new method is added. */
+export const AUTHENTICATION_METHODS = ['session', 'api-token', 'mcp-oauth'] as const;
+export type AuthenticationMethod = (typeof AUTHENTICATION_METHODS)[number];
+
 /** Historical identifiers deliberately have no foreign keys or cascade relations. */
 @Entity('audit_log')
 @Index('IDX_audit_log_at', ['at'])
@@ -31,7 +35,7 @@ export class AuditLog {
   actorId!: number | null;
 
   @Column({ type: 'varchar', nullable: true })
-  authenticationMethod!: 'session' | 'api-token' | null;
+  authenticationMethod!: AuthenticationMethod | null;
 
   @Column({ type: 'integer', nullable: true })
   apiTokenId!: number | null;

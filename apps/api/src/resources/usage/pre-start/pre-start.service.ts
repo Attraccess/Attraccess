@@ -13,6 +13,7 @@ import { ResourceUsageService } from '../sessions/resource-usage.service';
 import { StartBlockedException, StartConfirmationRequiredException } from './start-confirmation.errors';
 import { WebStartStepStore } from './web-start-step.store';
 import type { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 export interface PreStartInput {
   resourceId: number;
@@ -84,12 +85,13 @@ export class PreStartService {
     resourceId: number,
     user: User,
     dto: StartUsageSessionDto,
-    principal: { origin: 'web' | 'api'; apiTokenId?: number },
+    principal: { origin: 'web' | 'api'; apiTokenId?: number; authenticationMethod?: AuthenticationMethod },
   ): Promise<Record<string, string[]>> {
     const action = dto.forceTakeOver ? 'takeover' : 'start';
     const binding = {
       userId: user.id,
       apiTokenId: principal.apiTokenId,
+      authenticationMethod: principal.authenticationMethod,
       resourceId,
       action,
       projectId: dto.projectId,

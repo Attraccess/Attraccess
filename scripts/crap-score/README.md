@@ -8,7 +8,6 @@ scores identify functions that may benefit from tests or refactoring.
 pnpm crap-score                                  # nx run-many -t crap-score
 pnpm nx run frontend:crap-score                   # one project
 pnpm crap-score:affected --base=origin/main       # nx affected -t crap-score
-pnpm precommit                                    # affected lint, typecheck, test and crap-score
 pnpm precommit:all                                # every target in the workspace
 ```
 
@@ -35,16 +34,9 @@ so they remain available when the limit fails.
 
 Project selection is Nx's own. The PR and merge-queue workflow runs
 `nx affected -t crap-score` and uploads `crap-score-reports` for 14 days; the
-`precommit-check` gate blocks on it. `pnpm precommit` runs
-`nx affected --uncommitted -t lint,typecheck,test,crap-score`, excluding hardware
-and companion projects. Projects tagged `host:fhs` (the WAGO plugin, whose tests
-run device shell scripts against `/bin` and `/usr/bin` tools) are also excluded,
-with a notice, on hosts without that layout such as NixOS. CI runs all of them.
-
-Before running anything, the hook rejects unstaged or untracked JS/TS files and
-analysis configuration, including partially staged files, because Nx reads the
-worktree. This keeps a worktree-only fix from validating a different staged
-snapshot. Stage or discard those changes and retry.
+`precommit-check` gate blocks on it. The pre-commit hook does not run it; use
+`pnpm crap-score:affected --base=origin/main` before pushing when a change adds
+complex code.
 
 ## Scope
 

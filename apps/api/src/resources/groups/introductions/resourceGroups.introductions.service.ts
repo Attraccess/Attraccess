@@ -21,6 +21,7 @@ import { NotificationCategory } from '../../../notifications/notification-types'
 import { UpdateResourceGroupIntroductionDto } from './dtos/update.request.dto';
 
 import { ResourceGroupIntroductionChangedEvent } from './events/resource-group-introduction-changed.event';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 import {
   RESOURCE_INTRODUCTION_STORE,
@@ -112,7 +113,7 @@ export class ResourceGroupsIntroductionsService {
     data?: UpdateResourceGroupIntroductionDto,
     tutorUserId?: number,
     performedByUserId?: number | null,
-    authenticationMethod?: 'session' | 'api-token' | null,
+    authenticationMethod?: AuthenticationMethod | null,
     apiTokenId?: number | null,
   ): Promise<IntroductionHistoryRecord> {
     let existingIntroduction = await this.store.findOfGroupUser(groupId, userId);
@@ -185,7 +186,7 @@ export class ResourceGroupsIntroductionsService {
     options?: {
       tutorUserId?: number;
       performedByUserId?: number | null;
-      authenticationMethod?: 'session' | 'api-token' | null;
+      authenticationMethod?: AuthenticationMethod | null;
       apiTokenId?: number | null;
     },
   ): Promise<IntroductionHistoryRecord> {
@@ -207,7 +208,7 @@ export class ResourceGroupsIntroductionsService {
     data?: UpdateResourceGroupIntroductionDto,
     options?: {
       performedByUserId?: number | null;
-      authenticationMethod?: 'session' | 'api-token' | null;
+      authenticationMethod?: AuthenticationMethod | null;
       apiTokenId?: number | null;
     },
   ): Promise<IntroductionHistoryRecord> {

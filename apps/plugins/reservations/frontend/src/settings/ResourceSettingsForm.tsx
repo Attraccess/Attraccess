@@ -8,7 +8,8 @@ import { describeError } from '../lib/errors';
 import { useInvalidateReservations } from '../lib/queries';
 import type { ResourceSettings, ResourceSettingsValues, WhoCanBook } from '../lib/types';
 import { INTEGER_RANGES, validateSettingsForm } from '../lib/validation';
-import { NumberInput, SelectField } from '../shared/fields';
+import { NumberInput } from '../shared/NumberInput';
+import { SelectField } from '../shared/SelectField';
 import { BookableHoursEditor } from './BookableHoursEditor';
 
 type NumericField = keyof typeof INTEGER_RANGES;

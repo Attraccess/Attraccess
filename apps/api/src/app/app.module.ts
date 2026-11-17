@@ -36,6 +36,8 @@ import { VersionModule } from '../version/version.module';
 import { MessagingModule } from '../messaging/messaging.module';
 import { PushModule } from '../push/push.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { DashboardModule } from '../dashboard/dashboard.module';
+import { McpModule } from '../mcp/mcp.module';
 
 const logger = new Logger('AppModule');
 
@@ -111,7 +113,7 @@ const logger = new Logger('AppModule');
         return [
           {
             rootPath: resolvedFrontendPath,
-            exclude: ['/api/{*path}', '/docs/{*path}', '/cdn/{*path}'],
+            exclude: ['/api/{*path}', '/docs/{*path}', '/cdn/{*path}', '/.well-known/{*path}'],
           },
         ];
       },
@@ -131,6 +133,8 @@ const logger = new Logger('AppModule');
     MessagingModule,
     PushModule,
     NotificationsModule,
+    DashboardModule,
+    McpModule,
     LiveUpdatesModule,
   ],
   controllers: [AppController],

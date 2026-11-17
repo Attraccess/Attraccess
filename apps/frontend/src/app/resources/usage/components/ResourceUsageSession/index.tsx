@@ -12,8 +12,8 @@ import { StartSessionControls } from '../StartSessionControls';
 import {
   useAccessControlServiceResourceIntroducersGetNames,
   useResourcesServiceResourceUsageGetActiveSession,
-  useResourcesServiceResourceUsageGetActiveSessionKey,
-  useResourcesServiceResourceUsageCanControlKey,
+  UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
+  UseResourcesServiceResourceUsageCanControlKeyFn,
   UseResourcesServiceResourceUsageStartBlockedKeyFn,
   Resource,
   useResourcesServiceResourceUsageCanControl,
@@ -22,6 +22,8 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLiveUpdates } from '../../../../../utils/live-updates';
+import { SESSION_EVENTS } from '../../sessionEvents';
+import { mySessionsQueryKey } from '../../../../resourceOverview/activeUsageSessionsBanner/mySessionsQuery';
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { MaintenanceInProgressDisplay } from './maintenance';
@@ -29,12 +31,6 @@ import { FlatSection } from '../../../../../components/flatSection';
 import { RequestMaintenanceButton } from '../../../details/maintenance-management/request';
 import { InstantMaintenanceButton } from '../../../details/maintenance-management/instant';
 
-// ponytail: only these events affect session/control state; health and other events don't need a refetch.
-const SESSION_EVENTS = new Set([
-  'resource.usage.session_started',
-  'resource.usage.session_ended',
-  'resource.usage.session_taken_over',
-]);
 // A plugin's start-blocked answer may have changed (e.g. a booking began or ended). Only that one query depends on
 // it, so it must not refetch the session state of every viewer.
 const START_BLOCKED_CHANGED_EVENT = 'resource.start_blocked_changed';
@@ -62,10 +58,13 @@ export function ResourceUsageSession({
   }, [queryClient, resourceId]);
 
   const invalidateSessionQueries = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: [useResourcesServiceResourceUsageGetActiveSessionKey] });
-    queryClient.invalidateQueries({ queryKey: [useResourcesServiceResourceUsageCanControlKey] });
+    // Only this resource: the dashboard renders one of these per pinned resource.
+    queryClient.invalidateQueries({ queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId }) });
+    queryClient.invalidateQueries({ queryKey: UseResourcesServiceResourceUsageCanControlKeyFn({ resourceId }) });
+    // The dashboard's "My sessions" list; refetched only while it is shown.
+    queryClient.invalidateQueries({ queryKey: mySessionsQueryKey(), exact: true });
     invalidateStartBlocked();
-  }, [queryClient, invalidateStartBlocked]);
+  }, [queryClient, resourceId, invalidateStartBlocked]);
 
   useLiveUpdates({
     topic: 'resource',

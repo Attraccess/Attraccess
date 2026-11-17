@@ -40,6 +40,13 @@
     },
     "migrations": "dist/migrations.js",
     "styles": "frontend/style.css",
+    "dashboardPaths": [
+      "/reservations",
+      "/reservations/manage"
+    ],
+    "dashboardWidgets": [
+      "reservations-upcoming"
+    ],
     "permissions": [
       "DATABASE_ACCESS",
       "ACCESS_HOOKS",

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- partial socket and service mocks */
 import { Logger } from '@nestjs/common';
+import { crc32 } from 'zlib';
 import { WebSocket } from 'ws';
 import { registerAttractapGatewayFixture } from './websocket.gateway.attractap-gateway.test-fixture';
 import { createReaderSenders, READER_SEND_LIMITS } from './reader-socket-send';
@@ -306,6 +307,61 @@ describe('AttractapGateway card relay rules', () => {
     });
   });
 
+  describe('coredump upload (ATT-1144)', () => {
+    it('answers BEGIN and CHUNK without an ACK round trip, skips the activity write per chunk and drops the upload on disconnect', async () => {
+      const dump = Buffer.alloc(6000, 3);
+      const findCrashReportOfReader = jest.fn().mockResolvedValue({
+        id: 3,
+        attractapId: 7,
+        coredumpStatus: 'awaiting',
+        coredumpExpectedSize: dump.length,
+        coredumpExpectedCrc32: crc32(dump),
+      });
+      Object.assign(fixture.attractapService, { findCrashReportOfReader });
+      const socket = loggedInReader({ sendRaw: jest.fn().mockReturnValue(true) });
+      const raw = (reader: AuthenticatedWebSocket) =>
+        (reader.sendRaw as jest.Mock).mock.calls.map(([message]) => message.data);
+
+      await send(socket, AttractapEventType.READER_COREDUMP_BEGIN, {
+        reportId: 3,
+        size: dump.length,
+        crc32: crc32(dump),
+      });
+      expect(raw(socket)).toEqual([
+        {
+          type: AttractapEventType.READER_COREDUMP_BEGIN,
+          payload: { reportId: 3, chunkSize: 4096, nextOffset: 0 },
+        },
+      ]);
+      expect(findCrashReportOfReader).toHaveBeenCalledWith(3, 7);
+
+      fixture.attractapService.updateLastReaderConnection.mockClear();
+      await send(socket, AttractapEventType.READER_COREDUMP_CHUNK, {
+        reportId: 3,
+        offset: 0,
+        data: dump.subarray(0, 4096).toString('base64'),
+      });
+      expect(raw(socket).at(-1)).toEqual({
+        type: AttractapEventType.READER_COREDUMP_CHUNK,
+        payload: { reportId: 3, nextOffset: 4096 },
+      });
+      expect(fixture.attractapService.updateLastReaderConnection).not.toHaveBeenCalled();
+      expect(socket.sendMessage).not.toHaveBeenCalled();
+
+      await fixture.gateway.handleDisconnect(socket);
+      // The reader reconnects and continues where it was: the server no longer holds the partial upload.
+      const reconnected = loggedInReader({ id: 'reader-2', sendRaw: jest.fn().mockReturnValue(true) });
+      await send(reconnected, AttractapEventType.READER_COREDUMP_CHUNK, {
+        reportId: 3,
+        offset: 4096,
+        data: dump.subarray(4096).toString('base64'),
+      });
+      expect(raw(reconnected)).toEqual([
+        { type: AttractapEventType.READER_COREDUMP_CHUNK, payload: { reportId: 3, error: 'COREDUMP_NO_UPLOAD' } },
+      ]);
+    });
+  });
+
   describe('send limits of a paired reader (session transport)', () => {
     /** A session socket as ReaderSessionService.attach leaves it: queued bytes live in the session. */
     function sessionSenders(options: { queued?: () => number; refuse?: boolean } = {}) {
@@ -541,6 +597,9 @@ describe('AttractapGateway card relay rules', () => {
       AttractapEventType.READER_FIRMWARE_INFO,
       AttractapEventType.FIRMWARE_REQUEST_CHUNK,
       AttractapEventType.READER_CRASH_REPORT,
+      AttractapEventType.READER_COREDUMP_BEGIN,
+      AttractapEventType.READER_COREDUMP_CHUNK,
+      AttractapEventType.READER_COREDUMP_COMPLETE,
       AttractapEventType.READER_SESSION_ENDED,
     ]);
     const gatedEvents = () =>

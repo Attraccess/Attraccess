@@ -1,4 +1,5 @@
 const nx = require('@nx/eslint-plugin');
+const { fixupConfigRules } = require('@eslint/compat');
 const baseConfig = require('../../eslint.config.cjs');
 
 const reactCompilerRulesAsWarn = {
@@ -20,7 +21,8 @@ const reactCompilerRulesAsWarn = {
 
 module.exports = [
   ...baseConfig,
-  ...nx.configs['flat/react'],
+  // eslint-plugin-react, jsx-a11y and import still call context methods ESLint 10 removed.
+  ...fixupConfigRules(nx.configs['flat/react']),
   {
     // Vendored, Emscripten-generated output (see tools/vendor-openscad.mjs).
     // Downloaded verbatim and not authored here, so it is neither linted nor
@@ -58,4 +60,6 @@ module.exports = [
       'no-restricted-globals': 'off',
     },
   },
+  // ATT-1224: this project lints from its own folder, where the root config's workspace-relative globs never match.
+  baseConfig.noHookReturnTypeConfig(['src/**/*.{ts,tsx}']),
 ];

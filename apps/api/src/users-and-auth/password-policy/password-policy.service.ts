@@ -49,6 +49,7 @@ import { randomUUID } from 'node:crypto';
 import * as bcrypt from 'bcrypt';
 
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 export const POLICY_FIELDS: Array<keyof PasswordPolicyConfig> = [...PASSWORD_POLICY_FIELDS];
 
@@ -70,7 +71,7 @@ export interface ValidateOptions {
 export interface AuditContext {
   actorId: number | null;
   actorUsername: string | null;
-  authenticationMethod: 'session' | 'api-token';
+  authenticationMethod: AuthenticationMethod;
   apiTokenId: number | null;
   ip: string | null;
   userAgent: string | null;

@@ -7,6 +7,10 @@ import { describeValkeyError, logValkeyOutages } from './valkey-outage-logging';
 
 export const VALKEY_CLIENT = 'VALKEY_CLIENT';
 
+// ioredis 6 backs off exponentially up to 5 s. A request fails after maxRetriesPerRequest reconnect attempts, so
+// during an outage that left callers waiting about 20 s for the 503; keep the ioredis 5 delay (linear, at most 2 s).
+export const valkeyRetryDelay = (times: number): number => Math.min(times * 50, 2000);
+
 @Injectable()
 export class ValkeyClientService implements OnApplicationShutdown {
   public readonly client: Redis | null;
@@ -25,9 +29,11 @@ export class ValkeyClientService implements OnApplicationShutdown {
         lazyConnect: false,
         enableReadyCheck: true,
         maxRetriesPerRequest: 3,
+        retryStrategy: valkeyRetryDelay,
       });
     } catch (error) {
       // The URL error carries the whole URL, password included, in `input`; rethrow without it.
+      // eslint-disable-next-line preserve-caught-error -- attaching the cause would leak the password.
       throw new Error(
         `VALKEY_URL is not a valid URL (${describeValkeyError(error)}); percent-encode reserved characters in the password`,
       );

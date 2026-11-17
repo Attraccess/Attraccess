@@ -150,6 +150,8 @@ export enum PluginPermission {
   ACCESS_HOOKS = 'ACCESS_HOOKS',
   /** Send in-app, push and email notifications to users via notifications.dispatch(). */
   SEND_NOTIFICATIONS = 'SEND_NOTIFICATIONS',
+  /** Use the Bluetooth radio of administrator-approved Attractap readers through context.ble, limited to the plugin's own BLE profiles. */
+  BLE_TRANSPORT = 'BLE_TRANSPORT',
 }
 
 /**
@@ -173,6 +175,8 @@ export const PLUGIN_PERMISSION_DESCRIPTIONS: Record<PluginPermission, string> = 
     'Ask users for confirmation or block resource session starts through pre-start hooks.',
   [PluginPermission.SEND_NOTIFICATIONS]:
     'Send notifications to users (in-app, push and email) under plugin-declared notification categories.',
+  [PluginPermission.BLE_TRANSPORT]:
+    'Use the Bluetooth radio of Attractap readers that an administrator opened for plugins, limited to the BLE profiles this plugin registers.',
 };
 
 /**

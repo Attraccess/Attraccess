@@ -47,7 +47,11 @@ export function useInvalidateSessionHistory(resourceId: number) {
   };
 }
 
-export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSessionDisplayProps) {
+export interface OtherUserSessionDisplayProps {
+  resourceId: number;
+}
+
+export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayProps) {
   const { t } = useTranslations({ en, de });
   const { hasPermission, user } = useAuth();
   const { success, error: showError } = useToastMessage();
@@ -133,7 +137,7 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
 
   const runTakeover = useCallback(
     async (body: { notes?: string }) => {
-      let formSubmissions: FormSubmissionRequestDto[] = [];
+      let formSubmissions: FormSubmissionRequestDto[];
       try {
         formSubmissions = await requestForms('takeover');
       } catch (error) {
@@ -154,7 +158,7 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
       // started next.
       const usageId = activeSession?.id;
       if (usageId === undefined) return;
-      let formSubmissions: FormSubmissionRequestDto[] = [];
+      let formSubmissions: FormSubmissionRequestDto[];
       try {
         formSubmissions = await requestForms('end');
       } catch (error) {
@@ -195,57 +199,6 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
   const handleImmediateStopOtherUserSession = useCallback(() => {
     void runStopOtherSession({});
   }, [runStopOtherSession]);
-  return {
-    t,
-    user,
-    isTakeoverNotesModalOpen,
-    setIsTakeoverNotesModalOpen,
-    isStopOtherUserSessionNotesModalOpen,
-    setIsStopOtherUserSessionNotesModalOpen,
-    formsModal,
-    activeSession,
-    canTakeover,
-    canStopOtherUserSession,
-    startSession,
-    stopSession,
-    contactHolder,
-    handleContactHolder,
-    handleStopOtherUserSessionWithNotes,
-    handleTakeoverWithNotes,
-    handleImmediateTakeover,
-    handleOpenTakeoverModal,
-    handleOpenStopOtherUserSessionModal,
-    handleImmediateStopOtherUserSession,
-  } as const;
-}
-
-export interface OtherUserSessionDisplayProps {
-  resourceId: number;
-}
-
-export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayProps) {
-  const {
-    t,
-    user,
-    isTakeoverNotesModalOpen,
-    setIsTakeoverNotesModalOpen,
-    isStopOtherUserSessionNotesModalOpen,
-    setIsStopOtherUserSessionNotesModalOpen,
-    formsModal,
-    activeSession,
-    canTakeover,
-    canStopOtherUserSession,
-    startSession,
-    stopSession,
-    contactHolder,
-    handleContactHolder,
-    handleStopOtherUserSessionWithNotes,
-    handleTakeoverWithNotes,
-    handleImmediateTakeover,
-    handleOpenTakeoverModal,
-    handleOpenStopOtherUserSessionModal,
-    handleImmediateStopOtherUserSession,
-  } = useOtherUserSessionDisplayState({ resourceId });
 
   // Early return if no active session or it belongs to current user
   if (!activeSession || activeSession.userId === user?.id) {

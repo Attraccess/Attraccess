@@ -8,6 +8,7 @@ import type { PluginResourceAccessContext } from './plugin-resource-access';
 import type { PluginHostDataContext } from './plugin-host-data';
 import type { PluginPersistenceContext } from './plugin-persistence';
 import type { PluginLiveUpdatesContext } from './plugin-live-updates';
+import type { PluginBleContext } from './plugin-ble';
 import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscription } from './plugin.interface';
 /**
  * DI token under which the host registers its MqttServerHostProvider
@@ -143,6 +144,11 @@ export interface PluginContext {
   readonly audit?: PluginAuditContext;
   /** Reader UI helpers. Guarded getter: throws PluginPermissionError without READER_UI. */
   readonly readerUi?: PluginReaderUiApi;
+  /**
+   * BLE transport through administrator-approved Attractap readers. Guarded getter: throws PluginPermissionError
+   * without BLE_TRANSPORT. Optional so plugins still type-check against hosts predating it.
+   */
+  readonly ble?: PluginBleContext;
   /** This plugin's own manifest (name, version, directory, id). */
   readonly manifest: PluginManifestInfo;
 

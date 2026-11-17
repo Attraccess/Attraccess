@@ -1,4 +1,4 @@
-import { LabeledSwitch } from '@attraccess/plugins-frontend-ui';
+import { LabeledSwitch, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   NumberField,
   NumberFieldDecrementButton,
@@ -6,20 +6,29 @@ import {
   NumberFieldIncrementButton,
   NumberFieldInput,
 } from '@heroui/react';
+import { AuthRateLimitSettingsDto } from '@attraccess/react-query-client';
 import { SettingsRow } from '../../../components/SettingsRow';
-import { RATE_LIMIT_NUMBERS } from './SecuritySettingsForm';
-import { useSecuritySectionState } from './SecuritySettingsForm';
-type Props = Pick<
-  ReturnType<typeof useSecuritySectionState>,
-  'rateLimit' | 'loadFailed' | 't' | 'rateValue' | 'setRateDraft' | 'exponentialBackoff'
->;
-export function RateLimitSettings({ rateLimit, loadFailed, t, rateValue, setRateDraft, exponentialBackoff }: Props) {
+import { getRateLimitDraft, RATE_LIMIT_NUMBERS } from '../getRateLimitDraft';
+import { SecurityDrafts } from '../useSecurityDrafts';
+import en from '../en.json';
+import de from '../de.json';
+
+interface RateLimitSettingsProps extends Pick<SecurityDrafts, 'rateDraft' | 'setRateDraft'> {
+  /** The stored throttling settings; `undefined` once settled means the request failed. */
+  rateLimit: AuthRateLimitSettingsDto | undefined;
+}
+
+export function RateLimitSettings({ rateLimit, rateDraft, setRateDraft }: RateLimitSettingsProps) {
+  const { t } = useTranslations({ en, de });
+  const { value: rateValue, exponentialBackoff } = getRateLimitDraft(rateLimit, rateDraft);
   return (
     <div className="flex flex-col">
       {!rateLimit ? (
         // Settled with nothing usable. The other three groups are separate queries and stay
         // editable — only throttling is unreachable.
-        <div data-testid="rate-limit-load-failed">{loadFailed(t('rateLimit.loadFailed'))}</div>
+        <div data-testid="rate-limit-load-failed">
+          <StatusAlert status="danger">{t('rateLimit.loadFailed')}</StatusAlert>
+        </div>
       ) : (
         <>
           {RATE_LIMIT_NUMBERS.map((key) => (

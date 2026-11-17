@@ -1,9 +1,9 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { expect, it, vi } from 'vitest';
+import { expect, it } from 'vitest';
 // Register the shared API mocks before loading the component's feature modules.
-import { hoisted, makePlugin } from './index.test.hoisted';
+import { hoisted, makePlugin, renderWithQuery } from './index.test.hoisted';
 import { PluginsSection } from './index';
 
 import { describe } from 'vitest';
@@ -33,22 +33,19 @@ describe('plugin dependency confirmations', () => {
     description: 'Printer provider',
   };
   const openProvider = async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) =>
-        Promise.resolve({
-          ok: true,
-          json: async () =>
-            url.endsWith('/installed') || url.endsWith('/registries')
-              ? []
-              : url.includes('/marketplace/search')
-                ? { results: [provider], errors: [] }
-                : provider,
-        }),
-      ),
+    hoisted.apiMock.mockImplementation((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: async () =>
+          url.endsWith('/installed') || url.endsWith('/registries')
+            ? []
+            : url.includes('/marketplace/search')
+              ? { results: [provider], errors: [] }
+              : provider,
+      }),
     );
     const user = userEvent.setup();
-    const view = render(<PluginsSection />);
+    const view = renderWithQuery(<PluginsSection />);
     await user.click(screen.getByText('Install plugin'));
     await user.click(screen.getByText('Browse marketplace'));
     await user.click(await screen.findByText(provider.displayName));
@@ -150,14 +147,11 @@ describe('plugin dependency confirmations', () => {
   it('requires explicit approval of all dependants before removing a dependency', async () => {
     hoisted.plugins = [makePlugin({ name: core.name, id: 'core-id' })];
     hoisted.removalPlan = [core, provider];
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) =>
-        Promise.resolve({ ok: true, json: async () => (url.endsWith('/installed') ? [core] : []) }),
-      ),
+    hoisted.apiMock.mockImplementation((url: string) =>
+      Promise.resolve({ ok: true, json: async () => (url.endsWith('/installed') ? [core] : []) }),
     );
     const user = userEvent.setup();
-    const view = render(<PluginsSection />);
+    const view = renderWithQuery(<PluginsSection />);
     await waitFor(() => expect(screen.getByText(core.name)).toBeInTheDocument());
     await user.click(document.querySelector('[data-cy="plugins-list-delete-plugin-button-core-id"]') as HTMLElement);
     const dialog = await screen.findByRole('dialog');
@@ -178,6 +172,40 @@ describe('plugin dependency confirmations', () => {
   });
 });
 describe('plugin version management', () => {
+  it('reports a failed version load once per opening and not again for the cached failure', async () => {
+    hoisted.plugins = [makePlugin()];
+    hoisted.errorToast.mockClear();
+    const installed = { name: 'Cool Plugin', version: '1.2.3', registryId: 'npm', requestedSpec: 'latest' };
+    let versionsResponse: { ok: boolean; data: unknown } = { ok: false, data: null };
+    hoisted.apiMock.mockImplementation((url: string) => {
+      if (url.endsWith('/versions'))
+        return Promise.resolve({ ok: versionsResponse.ok, json: async () => versionsResponse.data });
+      return Promise.resolve({ ok: true, json: async () => (url.endsWith('/installed') ? [installed] : []) });
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<PluginsSection />);
+    const open = async () => user.click(await screen.findByRole('button', { name: 'Manage version' }));
+    const close = async () => {
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      await waitFor(() =>
+        expect(screen.queryByRole('heading', { name: 'Manage Cool Plugin version' })).not.toBeInTheDocument(),
+      );
+    };
+
+    await open();
+    await waitFor(() => expect(hoisted.errorToast).toHaveBeenCalledTimes(1));
+    await close();
+    await open();
+    await waitFor(() => expect(hoisted.errorToast).toHaveBeenCalledTimes(2));
+    await close();
+
+    versionsResponse = { ok: true, data: [] };
+    await open();
+    await screen.findByRole('textbox', { name: 'Requested version or channel' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(hoisted.errorToast).toHaveBeenCalledTimes(2);
+  });
+
   it('saves a version policy and requires fresh approvals when switching release candidates', async () => {
     hoisted.plugins = [makePlugin()];
     const installed = {
@@ -199,29 +227,25 @@ describe('plugin version management', () => {
       integrity: 'sha512-release',
       repository: 'https://example.test/releases',
     };
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((input: { url?: string } | string) => {
-        const url = typeof input === 'string' ? input : (input.url ?? '');
-        const data = url.endsWith('/installed')
-          ? [installed]
-          : url.endsWith('/versions')
-            ? [
-                candidate,
-                { ...candidate, version: '1.0.0', direction: 'older', semverImpact: 'minor', permissionAdditions: [] },
-                { ...candidate, version: '3.0.0', compatible: false, reason: 'Requires a newer host' },
-              ]
-            : [];
-        return Promise.resolve({ ok: true, json: async () => data });
-      }),
-    );
+    hoisted.apiMock.mockImplementation((url: string) => {
+      const data = url.endsWith('/installed')
+        ? [installed]
+        : url.endsWith('/versions')
+          ? [
+              candidate,
+              { ...candidate, version: '1.0.0', direction: 'older', semverImpact: 'minor', permissionAdditions: [] },
+              { ...candidate, version: '3.0.0', compatible: false, reason: 'Requires a newer host' },
+            ]
+          : [];
+      return Promise.resolve({ ok: true, json: async () => data });
+    });
     hoisted.updateInstalledPackagePolicyMock.mockResolvedValue({
       ...installed,
       requestedSpec: '^2.0.0',
       updateOverride: 'patch',
     });
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
     await user.click(await screen.findByRole('button', { name: 'Manage version' }));
     const spec = screen.getByRole('textbox', { name: 'Requested version or channel' });
     await user.clear(spec);
@@ -268,6 +292,44 @@ describe('plugin version management', () => {
     );
   });
 
+  it('keeps a saved version policy when the dialog opens again', async () => {
+    hoisted.plugins = [makePlugin()];
+    const installed = {
+      name: 'Cool Plugin',
+      version: '1.2.3',
+      registryId: 'npm',
+      requestedSpec: 'latest',
+      updateOverride: 'inherit',
+    };
+    hoisted.apiMock.mockImplementation((url: string) =>
+      Promise.resolve({ ok: true, json: async () => (url.endsWith('/installed') ? [installed] : []) }),
+    );
+    hoisted.updateInstalledPackagePolicyMock.mockResolvedValue({
+      ...installed,
+      requestedSpec: '^2.0.0',
+      updateOverride: 'patch',
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<PluginsSection />);
+    await user.click(await screen.findByRole('button', { name: 'Manage version' }));
+    const spec = screen.getByRole('textbox', { name: 'Requested version or channel' });
+    await user.clear(spec);
+    await user.type(spec, '^2.0.0');
+    await user.click(screen.getByRole('button', { name: /Plugin automatic update policy/ }));
+    await user.click(screen.getByRole('option', { name: 'Patch only' }));
+    await user.click(screen.getByRole('button', { name: 'Save version policy' }));
+    await waitFor(() => expect(hoisted.successToast).toHaveBeenCalledWith({ title: 'Plugin version policy saved' }));
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: 'Manage Cool Plugin version' })).not.toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole('button', { name: 'Manage version' }));
+
+    expect(await screen.findByRole('textbox', { name: 'Requested version or channel' })).toHaveValue('^2.0.0');
+    expect(screen.getByRole('button', { name: /Plugin automatic update policy/ })).toHaveTextContent('Patch only');
+  });
+
   it('requires approval of newly installed dependencies before switching versions', async () => {
     hoisted.plugins = [makePlugin()];
     const installed = { name: 'Cool Plugin', version: '1.2.3', registryId: 'npm', updateOverride: 'inherit' };
@@ -294,16 +356,12 @@ describe('plugin version management', () => {
       token: 'version-plan',
       plugins: [core, { ...core, name: 'Cool Plugin', displayName: 'Cool Plugin', version: '1.3.0' }],
     };
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((input: { url?: string } | string) => {
-        const url = typeof input === 'string' ? input : (input.url ?? '');
-        const data = url.endsWith('/installed') ? [installed] : url.endsWith('/versions') ? [candidate] : [];
-        return Promise.resolve({ ok: true, json: async () => data });
-      }),
-    );
+    hoisted.apiMock.mockImplementation((url: string) => {
+      const data = url.endsWith('/installed') ? [installed] : url.endsWith('/versions') ? [candidate] : [];
+      return Promise.resolve({ ok: true, json: async () => data });
+    });
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
     await user.click(await screen.findByRole('button', { name: 'Manage version' }));
     await user.click(await screen.findByRole('button', { name: '1.3.0 Newer' }));
 
@@ -329,8 +387,7 @@ describe('plugin version management', () => {
 
   it('opens installed package details from the original registry', async () => {
     hoisted.plugins = [makePlugin()];
-    const fetchMock = vi.fn((input: { url?: string } | string) => {
-      const url = typeof input === 'string' ? input : (input.url ?? '');
+    hoisted.apiMock.mockImplementation((url: string) => {
       const details = {
         name: 'Cool Plugin',
         version: '1.2.3',
@@ -352,13 +409,29 @@ describe('plugin version management', () => {
                 : [],
       });
     });
-    vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
-    render(<PluginsSection />);
+    renderWithQuery(<PluginsSection />);
     await user.click(await screen.findByRole('button', { name: 'Details' }));
     expect(await screen.findByText('Installed package details')).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/marketplace/Cool%20Plugin?registryId=private'), {
-      credentials: 'include',
+    expect(hoisted.apiMock).toHaveBeenCalledWith(
+      expect.stringContaining('/marketplace/Cool%20Plugin?registryId=private'),
+    );
+  });
+
+  it('reports a failed package load for installed package details without opening the marketplace', async () => {
+    hoisted.plugins = [makePlugin()];
+    hoisted.apiMock.mockImplementation((url: string) => {
+      if (url.includes('/marketplace/Cool%20Plugin')) return Promise.resolve({ ok: false });
+      const installed = [{ name: 'Cool Plugin', version: '1.2.3', registryId: 'private' }];
+      return Promise.resolve({ ok: true, json: async () => (url.endsWith('/installed') ? installed : []) });
     });
+    const user = userEvent.setup();
+    renderWithQuery(<PluginsSection />);
+    await user.click(await screen.findByRole('button', { name: 'Details' }));
+
+    await waitFor(() => expect(hoisted.errorToast).toHaveBeenCalledWith({ title: 'Could not load the marketplace.' }));
+    expect(hoisted.apiMock).toHaveBeenCalledWith('/api/plugins/marketplace/Cool%20Plugin?registryId=private');
+    expect(screen.queryByRole('heading', { name: 'Plugin marketplace' })).not.toBeInTheDocument();
+    expect(screen.queryByText('About this plugin')).not.toBeInTheDocument();
   });
 });

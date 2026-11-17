@@ -88,7 +88,7 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
 
   const runEndSession = useCallback(
     async (body: { notes?: string }) => {
-      let formSubmissions: FormSubmissionRequestDto[] = [];
+      let formSubmissions: FormSubmissionRequestDto[];
       try {
         formSubmissions = await requestForms('end');
       } catch (error) {

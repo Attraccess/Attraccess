@@ -1,161 +1,44 @@
-import {
-  Badge,
-  Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableContent,
-  TableHeader,
-  TableRow,
-  TableScrollContainer,
-} from '@heroui/react';
-import { Select } from '../../../../components/select/index';
-import { Button, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { readPreviewFromFile as readPreview } from './csv-preview';
+import { useCallback, useState } from 'react';
 import {
   CsvInviteUploadDto,
   useUsersServiceInviteUsersFromCsv,
   ApiError,
-  useRbacServiceListRoles,
   useUsersServiceFindManyKey,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
-
-export const PREVIEW_ROW_COUNT = 5;
-
-export type CsvRowError = {
-  row: number;
-  field?: string;
-  message: string;
-  value?: string;
-};
-
-export const CSV_ROW_ERROR_REASON_KEYS: Record<string, string> = {
-  DUPLICATE_IN_DB: 'DUPLICATE_IN_DB',
-  DUPLICATE_IN_CSV: 'DUPLICATE_IN_CSV',
-  REQUIRED: 'REQUIRED',
-  INVALID: 'INVALID',
-  'Row is empty': 'ROW_IS_EMPTY',
-  'Invalid username format': 'INVALID_USERNAME_FORMAT',
-  'Invalid username length': 'INVALID_USERNAME_LENGTH',
-  NO_VALID_ROWS_FOUND_IN_CSV: 'NO_VALID_ROWS_FOUND_IN_CSV',
-};
-
-// Row 0 errors refer to the file itself: REQUIRED there means a mapped column is missing from the header.
-const isMissingColumnError = (error: CsvRowError) => error.row === 0 && error.message === 'REQUIRED';
-
-/** Translation key for a row error reason, or undefined to show the API message unchanged. */
-export function getCsvRowErrorReasonKey(error: CsvRowError): string | undefined {
-  if (isMissingColumnError(error)) return 'errors.reasons.COLUMN_MISSING';
-  return Object.hasOwn(CSV_ROW_ERROR_REASON_KEYS, error.message)
-    ? `errors.reasons.${CSV_ROW_ERROR_REASON_KEYS[error.message]}`
-    : undefined;
-}
-
-/** Translation key for a row error field, or undefined to show the field (a CSV column name) unchanged. */
-export function getCsvRowErrorFieldKey(error: CsvRowError): string | undefined {
-  if (isMissingColumnError(error)) return undefined;
-  return error.field === 'email' || error.field === 'username' ? `inputs.fieldMapping.${error.field}` : undefined;
-}
+import type { CsvRowError } from './csvRowErrors';
+import { useCsvPreview } from './useCsvPreview';
+import { CsvColumnMapping, CsvFieldMapping } from './CsvFieldMapping';
+import { CsvPreviewTable } from './CsvPreviewTable';
+import { CsvRowErrorsTable } from './CsvRowErrorsTable';
 
 export interface Props {
   onSuccess?: () => void;
   onError?: (error: ApiError) => void;
 }
 
-export function useCsvInviteState({ onSuccess, onError }: Props) {
-  const readPreviewFromFile = readPreview;
-  const { t } = useTranslations({
-    en,
-    de,
-  });
+function pickCsvFile(onPicked: (file: File | null) => void) {
+  const file = document.createElement('input') as HTMLInputElement;
+  file.type = 'file';
+  file.accept = '.csv';
+  file.onchange = (e) => onPicked((e.target as HTMLInputElement).files?.[0] || null);
+  file.click();
+}
+
+export function CsvInvite({ onSuccess, onError }: Readonly<Props>) {
+  const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
-  const [previewRows, setPreviewRows] = useState<string[][]>([]);
-
-  const [emailKey, setEmailKey] = useState<string | undefined>(undefined);
-  const [usernameKey, setUsernameKey] = useState<string | undefined>(undefined);
-  const [roleKeyColumn, setRoleKeyColumn] = useState<string | undefined>(undefined);
-
-  const { data: availableRoles } = useRbacServiceListRoles();
-
-  const selectFile = useCallback(() => {
-    const file = document.createElement('input') as HTMLInputElement;
-    file.type = 'file';
-    file.accept = '.csv';
-    file.onchange = (e) => setSelectedFile((e.target as HTMLInputElement).files?.[0] || null);
-    file.click();
-  }, [setSelectedFile]);
-
-  useEffect(() => {
-    if (!selectedFile) {
-      setCsvHeaders([]);
-      setPreviewRows([]);
-      return;
-    }
-
-    let cancelled = false;
-
-    const loadPreview = async () => {
-      try {
-        const rows = await readPreviewFromFile(selectedFile, PREVIEW_ROW_COUNT);
-        if (cancelled) return;
-
-        const [headerRow = [], ...dataRows] = rows;
-        setCsvHeaders(headerRow);
-        setPreviewRows(dataRows);
-      } catch {
-        if (cancelled) return;
-        setCsvHeaders([]);
-        setPreviewRows([]);
-      }
-    };
-
-    loadPreview();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedFile, readPreviewFromFile]);
-
-  const previewUsers = useMemo(() => {
-    if (!csvHeaders.length && !previewRows.length) return [];
-
-    return previewRows.slice(0, PREVIEW_ROW_COUNT).map((columns, index) => {
-      const data: Record<string, string> = {};
-
-      csvHeaders.forEach((header, headerIndex) => {
-        const column = columns[headerIndex] ?? '';
-        data[header] = column;
-      });
-
-      return {
-        index: index + 1,
-        username: data[usernameKey ?? ''] ?? '',
-        email: data[emailKey ?? ''] ?? '',
-      };
-    });
-  }, [csvHeaders, previewRows, usernameKey, emailKey]);
-
+  const { csvHeaders, previewRows } = useCsvPreview(selectedFile);
+  const [mapping, setMapping] = useState<CsvColumnMapping>({});
   const [rowErrors, setRowErrors] = useState<CsvRowError[]>([]);
   const [ignoredRows, setIgnoredRows] = useState<number[]>([]);
-
-  const buildConfig = useCallback(
-    (rowsToIgnore?: number[]) => ({
-      emailKey: emailKey ?? '',
-      usernameKey: usernameKey ?? '',
-      ignoredRows: rowsToIgnore ?? ignoredRows,
-      ...(roleKeyColumn ? { roleKeyColumn } : {}),
-    }),
-    [emailKey, usernameKey, ignoredRows, roleKeyColumn],
-  );
 
   const { mutate: inviteUsers, isPending } = useUsersServiceInviteUsersFromCsv({
     onSuccess: () => {
@@ -172,20 +55,16 @@ export function useCsvInviteState({ onSuccess, onError }: Props) {
     },
     onError: (error) => {
       const apiError = error as ApiError;
-      const body = (apiError as ApiError)?.body as { errors?: CsvRowError[] };
+      const body = apiError?.body as { errors?: CsvRowError[] };
       setRowErrors(body?.errors ?? []);
       onError?.(apiError);
     },
   });
 
-  const validateReady = useCallback(
-    () => Boolean(selectedFile && emailKey && usernameKey),
-    [emailKey, selectedFile, usernameKey],
-  );
-
   const submit = useCallback(
     (options?: { ignoreFailed?: boolean }) => {
-      if (!validateReady()) {
+      const { emailKey, usernameKey, roleKeyColumn } = mapping;
+      if (!selectedFile || !emailKey || !usernameKey) {
         toast.error({
           title: t('errors.missingConfig.title'),
           description: t('errors.missingConfig.description'),
@@ -194,7 +73,7 @@ export function useCsvInviteState({ onSuccess, onError }: Props) {
       }
 
       const rowsToIgnore = options?.ignoreFailed
-        ? Array.from(new Set([...(ignoredRows ?? []), ...rowErrors.map((e) => e.row)]))
+        ? Array.from(new Set([...ignoredRows, ...rowErrors.map((e) => e.row)]))
         : ignoredRows;
 
       if (options?.ignoreFailed) {
@@ -202,156 +81,42 @@ export function useCsvInviteState({ onSuccess, onError }: Props) {
       }
 
       const formData: CsvInviteUploadDto = {
-        file: selectedFile as File,
-        config: buildConfig(rowsToIgnore),
+        file: selectedFile,
+        config: {
+          emailKey,
+          usernameKey,
+          ignoredRows: rowsToIgnore,
+          ...(roleKeyColumn ? { roleKeyColumn } : {}),
+        },
       };
 
       inviteUsers({
         formData,
       });
     },
-    [buildConfig, ignoredRows, inviteUsers, rowErrors, selectedFile, t, toast, validateReady],
+    [ignoredRows, inviteUsers, mapping, rowErrors, selectedFile, t, toast],
   );
-  return {
-    t,
-    selectedFile,
-    csvHeaders,
-    emailKey,
-    setEmailKey,
-    usernameKey,
-    setUsernameKey,
-    roleKeyColumn,
-    setRoleKeyColumn,
-    availableRoles,
-    selectFile,
-    previewUsers,
-    rowErrors,
-    isPending,
-    submit,
-  } as const;
-}
-
-export function CsvInvite({ onSuccess, onError }: Props) {
-  const {
-    t,
-    selectedFile,
-    csvHeaders,
-    emailKey,
-    setEmailKey,
-    usernameKey,
-    setUsernameKey,
-    roleKeyColumn,
-    setRoleKeyColumn,
-    availableRoles,
-    selectFile,
-    previewUsers,
-    rowErrors,
-    isPending,
-    submit,
-  } = useCsvInviteState({ onSuccess, onError });
-
-  const translateErrorField = (error: CsvRowError) => {
-    if (!error.field) return '-';
-    const fieldKey = getCsvRowErrorFieldKey(error);
-    return fieldKey ? t(fieldKey) : error.field;
-  };
-
-  const translateErrorReason = (error: CsvRowError) => {
-    const reasonKey = getCsvRowErrorReasonKey(error);
-    return reasonKey ? t(reasonKey) : error.message;
-  };
 
   return (
     <div className="flex flex-col gap-4">
-      <Button variant="secondary" onPress={selectFile}>
+      <Button variant="secondary" onPress={() => pickCsvFile(setSelectedFile)}>
         {selectedFile ? selectedFile.name : t('inputs.file')}
       </Button>
 
-      <Select
-        label={t('inputs.fieldMapping.email')}
-        value={emailKey ?? ''}
-        onChange={setEmailKey}
-        items={csvHeaders.map((header) => ({
-          label: header,
-          key: header,
-        }))}
-        isRequired
+      <CsvFieldMapping
+        csvHeaders={csvHeaders}
+        mapping={mapping}
+        onChange={(change) => setMapping((previous) => ({ ...previous, ...change }))}
       />
 
-      <Select
-        label={t('inputs.fieldMapping.username')}
-        value={usernameKey ?? ''}
-        onChange={setUsernameKey}
-        items={csvHeaders.map((header) => ({
-          label: header,
-          key: header,
-        }))}
-        isRequired
+      <CsvPreviewTable
+        csvHeaders={csvHeaders}
+        previewRows={previewRows}
+        usernameKey={mapping.usernameKey}
+        emailKey={mapping.emailKey}
       />
 
-      {csvHeaders.length > 0 && (availableRoles ?? []).length > 0 && (
-        <Select
-          label={t('inputs.fieldMapping.roleKeyColumn')}
-          value={roleKeyColumn ?? ''}
-          onChange={(v) => setRoleKeyColumn(v || undefined)}
-          items={[{ label: '—', key: '' }, ...csvHeaders.map((header) => ({ label: header, key: header }))]}
-        />
-      )}
-
-      <Table data-cy="csv-invite-table">
-        <TableScrollContainer>
-          <TableContent aria-label="csv-invite-table">
-            <TableHeader>
-              <TableColumn isRowHeader>{t('preview.columns.index')}</TableColumn>
-              <TableColumn>{t('preview.columns.username')}</TableColumn>
-              <TableColumn>{t('preview.columns.email')}</TableColumn>
-            </TableHeader>
-            <TableBody items={previewUsers} renderEmptyState={() => <EmptyState />}>
-              {(user) => (
-                <TableRow key={user.index} id={user.index}>
-                  <TableCell>#{user.index}</TableCell>
-                  <TableCell className="w-full">{user.username}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </TableContent>
-        </TableScrollContainer>
-      </Table>
-
-      {rowErrors.length > 0 && (
-        <div className="flex flex-col gap-2 border border-default-200 rounded-medium p-3">
-          <Badge.Anchor>
-            <h3 className="text-sm font-semibold">{t('errors.title')}</h3>
-            <Badge color="danger" variant="soft">
-              {rowErrors.length}
-            </Badge>
-          </Badge.Anchor>
-
-          <Table>
-            <TableScrollContainer>
-              <TableContent aria-label="csv-invite-errors">
-                <TableHeader>
-                  <TableColumn isRowHeader>{t('errors.columns.row')}</TableColumn>
-                  <TableColumn>{t('errors.columns.field')}</TableColumn>
-                  <TableColumn>{t('errors.columns.message')}</TableColumn>
-                  <TableColumn>{t('errors.columns.value')}</TableColumn>
-                </TableHeader>
-                <TableBody items={rowErrors}>
-                  {(error) => (
-                    <TableRow key={`${error.row}-${error.field ?? 'general'}`}>
-                      <TableCell>#{error.row}</TableCell>
-                      <TableCell>{translateErrorField(error)}</TableCell>
-                      <TableCell>{translateErrorReason(error)}</TableCell>
-                      <TableCell>{error.value ?? '-'}</TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </TableContent>
-            </TableScrollContainer>
-          </Table>
-        </div>
-      )}
+      {rowErrors.length > 0 && <CsvRowErrorsTable rowErrors={rowErrors} />}
 
       <div className="flex justify-end w-full gap-2">
         {rowErrors.length > 0 && (

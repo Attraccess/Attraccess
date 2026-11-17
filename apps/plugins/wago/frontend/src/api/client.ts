@@ -146,6 +146,19 @@ export interface ConfigurationRevision {
   reportedAt: string | null;
 }
 
+export interface ConfigurationValidationResult {
+  valid: boolean;
+  errors: ConfigurationValidationError[];
+}
+
+export type ConfigurationRevisionSnapshot = ConfigurationRevision & { snapshot: string };
+
+export interface ConfigurationRevisionPage {
+  revisions: ConfigurationRevision[];
+  offset: number;
+  limit: number;
+}
+
 export interface ConfigurationReview {
   draft: WagoConfigurationDraft;
   previous: (ConfigurationRevision & { snapshot: string }) | null;
@@ -331,9 +344,7 @@ export const listCommissioningSessions = (limit = 100, offset = 0, signal?: Abor
   api.request<CommissioningSession[]>(`/commissioning/sessions?limit=${limit}&offset=${offset}`, { signal });
 
 export const listConfigurationRevisions = (id: number, offset: number) =>
-  api.request<{ revisions: ConfigurationRevision[]; offset: number; limit: number }>(
-    `/controllers/${id}/configuration/revisions?offset=${offset}&limit=20`,
-  );
+  api.request<ConfigurationRevisionPage>(`/controllers/${id}/configuration/revisions?offset=${offset}&limit=20`);
 
 export const listControllers = () => api.request<WagoController[]>('/controllers');
 
@@ -430,7 +441,7 @@ export const setSettings = (defaultMqttServerId: number | null) =>
   api.request<WagoSettings>('/settings', { method: 'POST', body: { defaultMqttServerId } });
 
 export const validateConfiguration = (id: number, snapshot: WagoConfigurationSnapshot) =>
-  api.request<{ valid: boolean; errors: ConfigurationValidationError[] }>(`/controllers/${id}/configuration/validate`, {
+  api.request<ConfigurationValidationResult>(`/controllers/${id}/configuration/validate`, {
     method: 'POST',
     body: { snapshot },
   });

@@ -23,7 +23,7 @@ const sessionConfigFactory = (): SessionConfigType => {
       // eslint-disable-next-line no-console
       console.error('Failed to parse Session Environment Variables:', e);
     }
-    throw new Error('Invalid session environment configuration.');
+    throw new Error('Invalid session environment configuration.', { cause: e });
   }
 };
 

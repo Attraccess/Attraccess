@@ -118,7 +118,7 @@ export function loadFixture(fixturePath) {
     }
     return fixture;
   } catch (error) {
-    throw new Error(`Could not read fixture ${fixturePath}: ${error.message}`);
+    throw new Error(`Could not read fixture ${fixturePath}: ${error.message}`, { cause: error });
   }
 }
 

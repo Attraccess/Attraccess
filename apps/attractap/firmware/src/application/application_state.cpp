@@ -204,6 +204,15 @@ bool Application::processConnectionState()
       return true;
     }
 
+#ifdef HAS_LVGL_DISPLAY
+        // The network status shows the drop to whoever watches it; the init screen follows
+        // once it is closed.
+        if (Display::isActive(&Display::networkStatusScreen))
+        {
+            return true;
+        }
+#endif
+
         if (this->state == APPLICATION_STATE_INIT)
         {
             return true;

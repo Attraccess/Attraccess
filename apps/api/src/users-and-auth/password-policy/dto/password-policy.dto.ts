@@ -281,9 +281,10 @@ export class PreviewPasswordDto {
   @MaxLength(PREVIEW_PASSWORD_MAX)
   password!: string;
 
+  // No enumName: the first description given for a named enum becomes the shared component's description, and
+  // the required `role` path parameters reference that component.
   @ApiPropertyOptional({
     enum: PasswordPolicyRole,
-    enumName: 'PasswordPolicyRole',
     description: 'Evaluate against the effective policy for this role (uses global if omitted).',
   })
   @IsOptional()

@@ -78,7 +78,7 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
         );
         store = new SqliteSessionStore(source.getRepository(Session), hash);
       } else {
-        container = await new GenericContainer('valkey/valkey:8-alpine').withExposedPorts(6379).start();
+        container = await new GenericContainer('valkey/valkey:9-alpine').withExposedPorts(6379).start();
         client = new Redis(container.getMappedPort(6379), container.getHost());
         const users = {
           findSessionUser: async () =>

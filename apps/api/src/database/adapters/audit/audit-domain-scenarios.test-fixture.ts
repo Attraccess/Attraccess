@@ -12,14 +12,14 @@ export interface DomainScenario {
   subjectId: number;
   emit: (audit: AuditService) => Promise<unknown>;
 }
-export // The plugin-contributed domain stands in for any installed plugin: the host
+// The plugin-contributed domain stands in for any installed plugin: the host
 // enables it through the registry plus the plugin blocklist, never a core enum.
-const fixturePluginId = 'abcdefghijklmnopqrstu';
+export const fixturePluginId = 'abcdefghijklmnopqrstu';
 export const pluginDomain = 'demo';
-export // These examples exercise the public event projections, migrated storage, HTTP query
+// These examples exercise the public event projections, migrated storage, HTTP query
 // validation, authentication and settings together. Domain service tests additionally
 // verify that the corresponding business operations emit the events.
-const scenarios: DomainScenario[] = [
+export const scenarios: DomainScenario[] = [
   {
     domain: 'resource',
     action: 'maintenance_schedule.updated',

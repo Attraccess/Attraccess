@@ -18,8 +18,13 @@ import { AttractapService } from '../attractap.service';
 import { ATTRACTAP_CARD_STORE, type AttractapCardStore } from '../card-store.port';
 import { CardConversationFailure, CardConversationService } from './card-conversation.service';
 import { AuthenticatedWebSocket, CardDetection } from './websocket.types';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
-export type AuditPrincipal = { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number };
+export type AuditPrincipal = {
+  userId: number;
+  authenticationMethod: AuthenticationMethod;
+  apiTokenId?: number;
+};
 
 export type CardOutcome<T = unknown> = { ok: boolean; error?: string } & Partial<T>;
 

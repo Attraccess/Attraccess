@@ -242,6 +242,13 @@ it('keeps the delete dialog open on failure and names a generic failure only onc
   fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
   expect(await within(dialog).findByText('Broker refused')).toBeTruthy();
   expect(within(dialog).getByText('Deleting the user failed.')).toBeTruthy();
+
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+  fireEvent.click(screen.getByRole('button', { name: 'Delete user sensor' }));
+  const reopened = await screen.findByRole('alertdialog');
+  expect(within(reopened).queryByText('Broker refused')).toBeNull();
+  expect(within(reopened).queryByText('Deleting the user failed.')).toBeNull();
 });
 
 it('shows user-list failures and permits an explicit retry', async () => {

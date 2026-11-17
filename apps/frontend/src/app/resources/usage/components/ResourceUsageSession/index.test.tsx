@@ -77,17 +77,24 @@ vi.mock('@attraccess/react-query-client', async () => ({
     data: { canControl: canControl.value },
     isLoading: loading.canControl,
   }),
-  useResourcesServiceResourceUsageCanControlKey: 'canControl',
+  UseResourcesServiceResourceUsageCanControlKeyFn: ({ resourceId }: { resourceId: number }) => [
+    'canControl',
+    { resourceId },
+  ],
   UseResourcesServiceResourceUsageStartBlockedKeyFn: ({ resourceId }: { resourceId: number }) => [
     'startBlocked',
     { resourceId },
   ],
+  UseResourcesServiceGetAllResourcesKeyFn: (params: unknown) => ['allResources', params],
   useAccessControlServiceResourceIntroducersGetNames: () => ({ data: [], isLoading: loading.introducers }),
   useResourcesServiceResourceUsageGetActiveSession: () => ({
     data: parallel.value ?? { usage: activeSession.value },
     isLoading: loading.activeSession,
   }),
-  useResourcesServiceResourceUsageGetActiveSessionKey: 'activeSession',
+  UseResourcesServiceResourceUsageGetActiveSessionKeyFn: ({ resourceId }: { resourceId: number }) => [
+    'activeSession',
+    { resourceId },
+  ],
   useResourceMaintenancesServiceFindMaintenances: () => ({ data: { data: [] } }),
 }));
 
@@ -233,8 +240,16 @@ describe('ResourceUsageSession routing', () => {
       renderSession(SupervisionMode.INTRODUCTION_REQUIRED);
 
       liveUpdate.onUpdate?.({ eventType: 'resource.usage.session_ended', inUse: true, activeSessionCount: 1 });
-      expect(invalidateQueries).toHaveBeenCalledTimes(3);
+      expect(invalidateQueries).toHaveBeenCalledTimes(4);
       expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['startBlocked', { resourceId: 7 }] });
+      // Only this resource's queries: the dashboard shows many resources at once.
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['activeSession', { resourceId: 7 }] });
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['canControl', { resourceId: 7 }] });
+      // The dashboard's "My sessions" list, by its exact key.
+      expect(invalidateQueries).toHaveBeenCalledWith({
+        queryKey: ['allResources', { onlyInUseByMe: true, limit: 50, page: 1 }],
+        exact: true,
+      });
 
       invalidateQueries.mockClear();
       liveUpdate.onUpdate?.({ eventType: 'resource.health_changed', activeSessionCount: 1 });

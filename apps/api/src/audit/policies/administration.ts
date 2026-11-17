@@ -1,6 +1,8 @@
 import { createHash } from 'crypto';
 import { EmailTemplateType } from '@attraccess/application-models';
 import { valid, validRange } from 'semver';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
+import { isAuthenticationMethod } from './projection';
 
 /** URLs may carry credentials, query tokens or private paths: record the origin only. */
 export function safeAuditOrigin(value: string): string {
@@ -38,7 +40,7 @@ export interface AdministrationAuditInput {
   action: string;
   operationId?: string;
   actorId: number;
-  authenticationMethod?: 'session' | 'api-token';
+  authenticationMethod?: AuthenticationMethod;
   apiTokenId?: number;
   subjectType: string;
   subjectId: number;
@@ -52,6 +54,19 @@ export type PreviousAuditSettings = { enabled: boolean; domains: readonly string
 
 export const text: Check = (v) =>
   typeof v === 'string' && v.length <= 256 && Array.from(v).every((character) => character.charCodeAt(0) >= 32);
+
+/**
+ * A plugin manifest's name and version as `pluginName`/`pluginVersion` details, which label the audit target.
+ * Blank values are left out, as is anything `text` rejects (over 256 characters, characters below U+0020, not a
+ * string), so an odd manifest never makes the whole event drop.
+ */
+export function auditPluginIdentity(manifest: { name?: unknown; version?: unknown } | undefined) {
+  const usable = (value: unknown): value is string => typeof value === 'string' && value.trim() !== '' && text(value);
+  return {
+    ...(usable(manifest?.name) ? { pluginName: manifest.name } : {}),
+    ...(usable(manifest?.version) ? { pluginVersion: manifest.version } : {}),
+  };
+}
 
 export const flag: Check = (v) => v === 0 || v === 1;
 
@@ -234,10 +249,13 @@ rules['plugin.zip_uploaded'] = {
   subject: 'plugin-package',
   fields: { pluginName: text, pluginVersion: text, restartRequested: flag },
 };
-rules['plugin.zip_deleted'] = { subject: 'plugin-package', fields: { pluginId: identifier, restartRequested: flag } };
+rules['plugin.zip_deleted'] = {
+  subject: 'plugin-package',
+  fields: { pluginId: identifier, pluginName: text, pluginVersion: text, restartRequested: flag },
+};
 rules['plugin.retry_requested'] = {
   subject: 'plugin-package',
-  fields: { pluginId: identifier, restartRequested: flag },
+  fields: { pluginId: identifier, pluginName: text, pluginVersion: text, restartRequested: flag },
 };
 
 export const ADMINISTRATION_AUDIT_ACTIONS = Object.keys(rules) as AdministrationAuditAction[];
@@ -323,9 +341,9 @@ export function projectAdministrationAuditEvent(input: AdministrationAuditInput)
       return null;
     const method = input.authenticationMethod ?? 'session';
     if (
-      !['session', 'api-token'].includes(method) ||
+      !isAuthenticationMethod(method) ||
       (method === 'api-token' && !positive(input.apiTokenId)) ||
-      (method === 'session' && input.apiTokenId !== undefined) ||
+      (method !== 'api-token' && input.apiTokenId !== undefined) ||
       (input.outcome !== undefined && !['succeeded', 'failed'].includes(input.outcome))
     )
       return null;

@@ -25,6 +25,7 @@ import FirstTimeSetupPage from '../first-time-setup/index';
 import { KioskCompanionPage } from '../kiosk/companion/KioskCompanionPage';
 import { KioskLayout } from '../kiosk/layout/KioskLayout';
 import { KioskResourcePage } from '../kiosk/resources/KioskResourcePage';
+import { mcpOAuthRoutes } from '../mcp-oauth/routes';
 import { MessagesPage } from '../messaging/index';
 import { EditMqttServerPage, MqttServersPage } from '../mqtt/index';
 import usePluginState, { PluginManifestWithPlugin } from '../plugins/plugin.state';
@@ -66,7 +67,7 @@ import { SSOProviderFormPage } from '../sso/providers/SSOProviderFormPage';
 import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
 import { UserManagementDetailsPage } from '../user-management/details/index';
 import { UserManagementPage } from '../user-management/index';
-import { RootRedirect } from './RootRedirect';
+import { dashboardRoutes } from '../dashboard/routes';
 
 export function getRoutesOfPlugin(pluginManifest: PluginManifestWithPlugin): RouteConfig[] {
   const plugin = pluginManifest.plugin;
@@ -133,11 +134,7 @@ const coreRoutes: RouteConfig[] = [
     authRequired: false,
     noLayout: true,
   },
-  {
-    path: '/',
-    element: <RootRedirect />,
-    authRequired: true,
-  },
+  ...dashboardRoutes,
   {
     path: '/changelog',
     element: <ChangelogPage />,
@@ -591,10 +588,7 @@ const coreRoutes: RouteConfig[] = [
 export function useAllRoutes() {
   const { plugins: pluginManifests } = usePluginState();
 
-  const pluginRoutes = useMemo(
-    () => pluginManifests.flatMap((pluginManifest) => getRoutesOfPlugin(pluginManifest)),
-    [pluginManifests],
-  );
+  const pluginRoutes = useMemo(() => pluginManifests.flatMap(getRoutesOfPlugin), [pluginManifests]);
 
-  return useMemo(() => [...coreRoutes, ...pluginRoutes], [pluginRoutes]);
+  return useMemo(() => [...coreRoutes, ...mcpOAuthRoutes, ...pluginRoutes], [pluginRoutes]);
 }

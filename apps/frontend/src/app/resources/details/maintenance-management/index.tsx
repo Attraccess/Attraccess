@@ -31,7 +31,12 @@ import en from './en.json';
 import { ResourceMaintenanceUpsertModal } from './upsert/index';
 import { useNow } from '../../../../hooks/useNow';
 
-export function useMaintenanceManagementState(props: Props) {
+export interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
+  resourceId: number;
+  variant?: 'card' | 'flat';
+}
+
+export function MaintenanceManagement(props: Props) {
   const { resourceId, variant = 'card', className, ...htmlProps } = props;
 
   const { t } = useTranslations({
@@ -187,38 +192,6 @@ export function useMaintenanceManagementState(props: Props) {
       </TableScrollContainer>
     </Table>
   );
-  return {
-    resourceId,
-    variant,
-    className,
-    htmlProps,
-    t,
-    maintenanceWithStatus,
-    cardActions,
-    flatActions,
-    includePastSwitch,
-    tableContent,
-  } as const;
-}
-
-export interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
-  resourceId: number;
-  variant?: 'card' | 'flat';
-}
-
-export function MaintenanceManagement(props: Props) {
-  const {
-    resourceId,
-    variant,
-    className,
-    htmlProps,
-    t,
-    maintenanceWithStatus,
-    cardActions,
-    flatActions,
-    includePastSwitch,
-    tableContent,
-  } = useMaintenanceManagementState(props);
 
   if (variant === 'flat') {
     return (

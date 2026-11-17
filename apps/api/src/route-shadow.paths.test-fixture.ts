@@ -1,8 +1,8 @@
 import { readdirSync } from 'fs';
 import { join } from 'path';
-export // ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
 
-interface RouteDecl {
+export interface RouteDecl {
   method: string; // 'Get' | 'Post' | 'Put' | 'Patch' | 'Delete' | 'Sse'
   path: string; // normalised route path (no leading/trailing slash)
   lineNumber: number;
@@ -14,9 +14,9 @@ export interface ControllerInfo {
   routes: RouteDecl[];
   filePath: string;
 }
-export // ─── File discovery ───────────────────────────────────────────────────────────
+// ─── File discovery ───────────────────────────────────────────────────────────
 
-function walkDir(dir: string, suffix: string): string[] {
+export function walkDir(dir: string, suffix: string): string[] {
   const results: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory() && entry.name !== 'node_modules' && entry.name !== 'dist' && !entry.name.startsWith('.')) {
@@ -27,9 +27,9 @@ function walkDir(dir: string, suffix: string): string[] {
   }
   return results;
 }
-export // ─── Controller parsing ───────────────────────────────────────────────────────
+// ─── Controller parsing ───────────────────────────────────────────────────────
 
-const HTTP_METHODS = ['Get', 'Post', 'Put', 'Patch', 'Delete', 'Sse'];
+export const HTTP_METHODS = ['Get', 'Post', 'Put', 'Patch', 'Delete', 'Sse'];
 export function normalisePath(raw: string): string {
   return raw.replace(/^\/+|\/+$/g, '').trim();
 }
@@ -41,7 +41,7 @@ export function pathSegments(path: string): string[] {
 export function isParam(segment: string): boolean {
   return segment.startsWith(':') || segment === '*' || segment.startsWith('*');
 }
-export /**
+/**
  * Returns true when routeA (registered first) would intercept requests that
  * were meant for routeB (registered second).
  *
@@ -53,7 +53,7 @@ export /**
  *  - at least one position where A has :param and B has a static segment
  *    (otherwise they're the same or identical-static routes, not a shadow)
  */
-function shadows(a: RouteDecl, b: RouteDecl): boolean {
+export function shadows(a: RouteDecl, b: RouteDecl): boolean {
   if (a.method !== b.method) return false;
   const sa = a.segments;
   const sb = b.segments;
@@ -71,9 +71,9 @@ function shadows(a: RouteDecl, b: RouteDecl): boolean {
   }
   return paramVsStatic;
 }
-export // ─── Shadow detection ─────────────────────────────────────────────────────────
+// ─── Shadow detection ─────────────────────────────────────────────────────────
 
-interface ShadowReport {
+export interface ShadowReport {
   moduleFile: string;
   shadowingController: string;
   shadowingRoute: RouteDecl;

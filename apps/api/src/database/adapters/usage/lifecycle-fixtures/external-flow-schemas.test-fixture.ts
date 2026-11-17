@@ -11,8 +11,8 @@ import {
 } from '@attraccess/database-entities';
 import { ResourceUsageAction } from '@attraccess/application-models';
 import { EntitySchema } from 'typeorm';
-export // Real repositories and relations for the lifecycle boundary; peripheral domain tables are omitted.
-const schemas = [
+// Real repositories and relations for the lifecycle boundary; peripheral domain tables are omitted.
+export const schemas = [
   new EntitySchema<Resource>({
     name: 'Resource',
     target: Resource,

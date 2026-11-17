@@ -5,6 +5,7 @@ import {
   CompanionDevice,
   Conversation,
   ConversationParticipant,
+  DashboardPin,
   EmailTemplate,
   Message,
   NFCCard,
@@ -126,6 +127,13 @@ export async function migrationIdentityNotificationSeeds(dataSource: DataSource,
     userId: primaryUser.id,
     messagesEmailOnOffline: true,
     messagesPushEnabled: true,
+  }));
+
+  await ensureEntity(dataSource.getRepository(DashboardPin), () => ({
+    userId: primaryUser.id,
+    itemType: 'page' as const,
+    itemId: '/resources',
+    position: 0,
   }));
 
   await ensureEntity(pushSubscriptionRepo, () => ({

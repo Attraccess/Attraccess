@@ -43,16 +43,19 @@ vi.mock('@attraccess/react-query-client', () => ({
 function Location() {
   return <output>{useLocation().pathname}</output>;
 }
-function open() {
-  return render(
+function editorTree() {
+  return (
     <MemoryRouter initialEntries={['/resources/7/documentation']}>
       <Location />
       <Routes>
         <Route path="/resources/:id/documentation" element={<DocumentationEditor />} />
         <Route path="*" element={<div>Destination</div>} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+}
+function open() {
+  return render(editorTree());
 }
 function save() {
   fireEvent.click(screen.getAllByRole('button', { name: 'actions.save' })[0]);
@@ -158,4 +161,26 @@ it('loads existing URL documentation and disables editing while saving', () => {
   expect(screen.getByRole('textbox')).toBeDisabled();
   expect(screen.getByRole('radio', { name: 'documentationType.markdown' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'actions.cancel' })).toBeDisabled();
+});
+it('keeps an unsaved draft when a background refetch fails and the retry succeeds', () => {
+  // A failed refetch keeps the cached resource but shows the error view in place of the form; Retry
+  // then shows the form again. The operator's edit must still be in it.
+  state.resource = { name: 'Laser', documentationType: 'markdown', documentationMarkdown: '# Old' };
+  const view = open();
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: '# Unsaved edit' } });
+
+  state.error = true;
+  state.failure = new Error('Unavailable');
+  view.rerender(editorTree());
+  expect(screen.getByText('Unavailable')).toBeTruthy();
+  expect(screen.queryByRole('textbox')).toBeNull();
+
+  state.error = false;
+  state.failure = undefined;
+  state.loading = true;
+  view.rerender(editorTree());
+  state.loading = false;
+  view.rerender(editorTree());
+
+  expect(screen.getByRole('textbox')).toHaveValue('# Unsaved edit');
 });

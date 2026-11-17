@@ -9,8 +9,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import federation from '@originjs/vite-plugin-federation';
 import tailwindcssImport from '@tailwindcss/vite';
-import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { join } from 'node:path';
+import { workspaceAliases } from '../../../tools/vite/workspace-aliases';
 import { fileURLToPath } from 'node:url';
 
 // Vite bundles this config to CJS, which wraps the ESM default export.
@@ -47,12 +47,12 @@ export const HOST_SHARED = {
 export function createPluginFederationConfig({ name, dir }) {
   return defineConfig({
     root: join(dir, 'frontend'),
+    // In-repo plugins import `@attraccess/plugins-frontend-sdk` (for the API
+    // client, not just types) from the workspace source rather than the
+    // published package — resolve the workspace path aliases so that works.
+    resolve: { alias: workspaceAliases() },
     plugins: [
       react(),
-      // In-repo plugins import `@attraccess/plugins-frontend-sdk` (for the API
-      // client, not just types) from the workspace source rather than the
-      // published package — resolve the tsconfig path aliases so that works.
-      nxViteTsPaths(),
       // Compiles the plugin's own Tailwind utilities into a self-contained
       // style.css (see frontend/src/styles.css). The host injects it at plugin
       // load time via `main.frontend.styles` in plugin.json — plugins must not
@@ -71,7 +71,7 @@ export function createPluginFederationConfig({ name, dir }) {
       cssCodeSplit: false,
       // Emit remoteEntry.js at the output root, not under assets/.
       assetsDir: '',
-      rollupOptions: {
+      rolldownOptions: {
         // Un-hashed asset names so plugin.json can reference style.css statically.
         output: { assetFileNames: '[name][extname]' },
       },

@@ -37,7 +37,7 @@ export interface Props {
   isDisabled?: boolean;
 }
 
-export function useSummaryCardState(props: Props) {
+export function SummaryCard(props: Props) {
   const { className, transactionsPerPage = 5, userId: userIdFromProps, isDisabled } = props;
   const { t } = useTranslations({ en, de });
 
@@ -66,7 +66,7 @@ export function useSummaryCardState(props: Props) {
 
   const getDetailsCellContent = useCallback(
     (transaction: BillingTransaction, skipNested = false): string => {
-      let type = '';
+      let type: string;
       let details = {} as Record<string, unknown>;
 
       if (transaction.refundOfId) {
@@ -80,12 +80,10 @@ export function useSummaryCardState(props: Props) {
           } else {
             // Skip deeper recursion but still provide a human-friendly label
             if (originalTransaction.resourceUsageId) {
-              type = 'resourceUsage';
               const tmp = t('transactions.table.cells.details.resourceUsage', {
                 resourceUsage: originalTransaction.resourceUsage,
               }) as string;
               originalDetails = tmp;
-              type = '';
             } else if (originalTransaction.initiatorId) {
               const tmp = t('transactions.table.cells.details.manual', {
                 initiator: originalTransaction.initiator,
@@ -155,39 +153,6 @@ export function useSummaryCardState(props: Props) {
     setOpenedTransactionId(transactionId);
     setIsOpenDetails(true);
   }, []);
-  return {
-    className,
-    t,
-    configuration,
-    balance,
-    isLoadingBalance,
-    transactions,
-    getDetailsCellContent,
-    statusColor,
-    formatCredits,
-    openedTransactionId,
-    isOpenDetails,
-    setIsOpenDetails,
-    openDetails,
-  };
-}
-
-export function SummaryCard(props: Props) {
-  const {
-    className,
-    t,
-    configuration,
-    balance,
-    isLoadingBalance,
-    transactions,
-    getDetailsCellContent,
-    statusColor,
-    formatCredits,
-    openedTransactionId,
-    isOpenDetails,
-    setIsOpenDetails,
-    openDetails,
-  } = useSummaryCardState(props);
 
   if (!configuration) {
     return <Skeleton className="h-10 w-full" />;
