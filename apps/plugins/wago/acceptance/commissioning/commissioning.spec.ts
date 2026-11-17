@@ -34,7 +34,7 @@ describe('bundled runtime commissioning through real controllers and services (f
   const credential = { username: 'operator', password: 'fixture-password' };
   const attempt = { confirmInstall: true, temporarySsh: credential };
 
-  it('keeps browser fixture controls explicit and resets transport and database state', async () => {
+  it('keeps browser fixture controls explicit and resets transport and stored state', async () => {
     const server = fixture.app.getHttpServer();
     await request(server).get('/fixture/reset').expect(405);
     await request(server).post('/fixture/unknown').expect(404);

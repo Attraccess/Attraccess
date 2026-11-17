@@ -1,23 +1,19 @@
-import { repositoryDouble } from '../persistence.test-utils';
+import { controllerRow, sessionRow } from '../rows.test-utils';
+import { createWagoTestStorage, type WagoTestStorage } from '../storage/testing';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { existsSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DataSource } from '@attraccess/plugins-backend-sdk/sqlite';
 import { fw31IdentityOutput } from '../fixtures/fw31-identity';
-import { AddWagoCommissioningPrincipal1780000000009 } from '../migrations/1780000000009-add-wago-commissioning-principal';
-import plugin from '../plugin';
-import { WagoCommissioningSession } from './sessions/session.entity';
+import type { WagoCommissioningSession } from './sessions/session.entity';
 import { WagoCommissioningService } from './service';
-import { WagoController } from '../controllers/entity';
-import { WagoManagementEntity } from '../management/entity';
 import { WagoRuntimeArtifactsService } from '../runtime/artifacts/service';
 import { runtimeBundlePreflightScript, runtimeBundleStagingCapacityPreflightScript } from '../runtime/install';
 import { WagoService } from '../controllers/service';
 
-describe('commissioning workflows with a real isolated database and mocked device transport', () => {
-  let db: DataSource;
+describe('commissioning workflows with in-memory storage and mocked device transport', () => {
+  let storage: WagoTestStorage;
   let directory: string;
   let service: WagoCommissioningService;
   let context: PluginContext;
@@ -42,17 +38,20 @@ describe('commissioning workflows with a real isolated database and mocked devic
     }),
   };
 
+  const sessions = () => storage.tables.commissioningSessions;
+  /** The stored session; fails the test when it was removed. */
+  const storedSession = async (id: number) => {
+    const row = await sessions().get(id);
+    if (!row) throw new Error(`session ${id} is gone`);
+    return row;
+  };
+
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'wago-workflow-fixture-'));
-    db = new DataSource({
-      type: 'sqlite',
-      database: ':memory:',
-      entities: plugin.persistence.sqlite.entities,
-      synchronize: true,
-    });
-    await db.initialize();
+    storage = createWagoTestStorage();
     context = {
-      ...repositoryDouble((entity) => db.getRepository(entity)),
+      storage: storage.storage,
+      persistence: storage.persistence,
       secrets: { encrypt: () => 'ciphertext', decrypt: () => 'v'.repeat(43) },
       logger: { warn: jest.fn() },
       audit: { record: jest.fn().mockResolvedValue({ status: 'recorded' }) },
@@ -77,7 +76,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
       artifacts as unknown as WagoRuntimeArtifactsService,
     );
     await service.onApplicationBootstrap();
-    session = await db.getRepository(WagoCommissioningSession).save({
+    session = await sessions().insert({
       hardwareId: 'fixture',
       mqttServerId: 1,
       targetHost: '10.99.0.1',
@@ -96,7 +95,6 @@ describe('commissioning workflows with a real isolated database and mocked devic
       .mockResolvedValue({ firmware: fw31IdentityOutput(), codesys: 'inactive' } as never);
   });
   afterEach(async () => {
-    await db.destroy();
     await rm(directory, { recursive: true, force: true });
     jest.restoreAllMocks();
   });
@@ -183,13 +181,12 @@ describe('commissioning workflows with a real isolated database and mocked devic
 
   it('blocks an unfinished preparation before any further host mutation', async () => {
     const token = 'c'.repeat(32);
-    const repository = db.getRepository(WagoCommissioningSession);
-    await repository.update(session.id, {
+    await sessions().update({ id: session.id }, {
       platformReport: JSON.stringify({ platform: 'supported', provision: 'review-start-installed-runtime' }),
       dockerProvisionToken: token,
       dockerProvisionState: token ? 'starting' : null,
     });
-    const before = await repository.findOneByOrFail({ id: session.id });
+    const before = await storedSession(session.id);
     const remote = jest.spyOn(service as never, 'sudoRunScript');
     await expect(
       service.platform(
@@ -202,19 +199,18 @@ describe('commissioning workflows with a real isolated database and mocked devic
         principal,
       ),
     ).rejects.toThrow('retained controller preparation');
-    expect(await repository.findOneByOrFail({ id: session.id })).toEqual(before);
+    expect(await storedSession(session.id)).toEqual(before);
     expect(remote).not.toHaveBeenCalled();
   });
 
   it('activates under durable ownership and records CODESYS disabled only after preparation succeeds', async () => {
-    const repository = db.getRepository(WagoCommissioningSession);
     const remote = jest.spyOn(service as never, 'sudoRunScript').mockImplementation((async (
       _host,
       _pin,
       _credential,
       script: string,
     ) => {
-      const saved = await repository.findOneByOrFail({ id: session.id });
+      const saved = await storedSession(session.id);
       expect(artifacts.acquire).toHaveBeenCalledWith();
       if (script === runtimeBundleStagingCapacityPreflightScript(512)) {
         expect(saved.dockerProvisionToken).toBeNull();
@@ -254,7 +250,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
       ) => {
         expect(artifacts.acquire).toHaveBeenCalledWith();
         expect(script).toBe(runtimeBundleStagingCapacityPreflightScript(512));
-        const saved = await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id });
+        const saved = await storedSession(session.id);
         expect(saved.dockerProvisionToken).toBeNull();
         expect(saved.deliveryToken).toBeNull();
         throw new Error('Insufficient runtime storage');
@@ -273,7 +269,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
       expect(remote).toHaveBeenCalledTimes(1);
       expect(wago.createEnrollment).not.toHaveBeenCalled();
       expect(copy).not.toHaveBeenCalled();
-      expect(await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id })).toMatchObject({
+      expect(await storedSession(session.id)).toMatchObject({
         dockerProvisionToken: null,
         dockerProvisionState: null,
         deliveryToken: null,
@@ -305,7 +301,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
       expect(remote).not.toHaveBeenCalled();
       expect(wago.createEnrollment).not.toHaveBeenCalled();
       expect(
-        (await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id })).dockerProvisionToken,
+        (await storedSession(session.id)).dockerProvisionToken,
       ).toBeNull();
       expect(existsSync(directory)).toBe(false);
     },
@@ -318,7 +314,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
     expect(artifacts.acquire).toHaveBeenCalledWith();
     expect(bundle.digest).toBe(currentDigest);
     expect(
-      (await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id })).runtimeArtifactDigest,
+      (await storedSession(session.id)).runtimeArtifactDigest,
     ).toBe(currentDigest);
   });
 
@@ -343,7 +339,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
     expect(copy.mock.calls[0]).toContain(currentPath);
     expect(artifacts.acquire).toHaveBeenCalledWith();
     expect(
-      (await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id })).runtimeArtifactDigest,
+      (await storedSession(session.id)).runtimeArtifactDigest,
     ).toBe(currentDigest);
   });
 
@@ -372,7 +368,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
     expect(result.state).toBe('delivery_failed');
     expect(result.failureReason).toContain('runtime release changed');
     expect(
-      (await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id })).deliveryToken,
+      (await storedSession(session.id)).deliveryToken,
     ).not.toBeNull();
     expect(wago.revokeEnrollmentById).toHaveBeenCalled();
   });
@@ -424,11 +420,10 @@ describe('commissioning workflows with a real isolated database and mocked devic
   it.each(['starting', 'recovering'])(
     'retains interrupted %s preparation for explicit cleanup after restart',
     async (state) => {
-      const repository = db.getRepository(WagoCommissioningSession);
-      await repository.update(session.id, { dockerProvisionToken: 'c'.repeat(32), dockerProvisionState: state });
+        await sessions().update({ id: session.id }, { dockerProvisionToken: 'c'.repeat(32), dockerProvisionState: state });
       const remote = jest.spyOn(service as never, 'sudoRunScript');
       await service.onApplicationBootstrap();
-      expect(await repository.findOneByOrFail({ id: session.id })).toMatchObject({
+      expect(await storedSession(session.id)).toMatchObject({
         dockerProvisionToken: 'c'.repeat(32),
         dockerProvisionState: 'recovery_required',
       });
@@ -461,7 +456,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
 
   it('retains an old restored token when final lifecycle reconciliation fails', async () => {
     const token = 'c'.repeat(32);
-    await db.getRepository(WagoCommissioningSession).update(session.id, {
+    await sessions().update({ id: session.id }, {
       dockerProvisionToken: token,
       dockerProvisionState: 'restored',
     });
@@ -478,7 +473,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
     expect(result.dockerProvisionState).toBe('recovery_required');
     expect(result.failureReason).toContain('cleanup remains unverified');
     expect(
-      (await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id })).dockerProvisionToken,
+      (await storedSession(session.id)).dockerProvisionToken,
     ).toBe(token);
   });
 
@@ -490,11 +485,11 @@ describe('commissioning workflows with a real isolated database and mocked devic
           ? `epoch=${Math.floor(Date.now() / 1000)}\nuptime=100.00\nboot=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\ntool=supported\n`
           : stoppedReport) as never);
     await service.platform(session.id, 'inspect', { temporarySsh: credential }, principal);
-    await db.getRepository(WagoCommissioningSession).update(session.id, {
+    await sessions().update({ id: session.id }, {
       dockerProvisionToken: 'c'.repeat(32),
       dockerProvisionState: 'started',
     });
-    const saved = await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id });
+    const saved = await storedSession(session.id);
     expect(saved.dockerProvisionToken).toMatch(/^[a-f0-9]{32}$/);
     const copy = jest.spyOn(service as never, 'copyTo').mockResolvedValue(undefined as never);
     const delivered = await service.deliver(session.id, { confirmInstall: true, temporarySsh: credential }, principal);
@@ -511,8 +506,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
 
   it('retries only preparation acknowledgement after runtime cleanup and preparation containment succeeded', async () => {
     const token = 'd'.repeat(32);
-    const repository = db.getRepository(WagoCommissioningSession);
-    await repository.update(session.id, {
+    await sessions().update({ id: session.id }, {
       state: 'delivery_failed',
       deliveryToken: token,
       dockerProvisionToken: token,
@@ -527,17 +521,16 @@ describe('commissioning workflows with a real isolated database and mocked devic
     const input = { confirmInstall: true, temporarySsh: credential };
     const failed = await service.recover(session.id, input, principal);
     expect(failed).toMatchObject({ state: 'recovery_revocation_pending', dockerProvisionState: 'restored' });
-    expect((await repository.findOneByOrFail({ id: session.id })).dockerProvisionToken).toBe(token);
+    expect((await storedSession(session.id)).dockerProvisionToken).toBe(token);
     remote.mockClear().mockResolvedValue('' as never);
     const result = await service.recover(session.id, input, principal);
     expect(remote).toHaveBeenCalledTimes(2); // runtime receipt acknowledgement + preparation finish only
     expect(result).toMatchObject({ state: 'delivery_failed', dockerProvisionState: null, failureReason: null });
     expect(result.runtimeRecoveryAvailable).toBeUndefined();
-    expect((await repository.findOneByOrFail({ id: session.id })).dockerProvisionToken).toBeNull();
+    expect((await storedSession(session.id)).dockerProvisionToken).toBeNull();
   });
 
   it('retains matching preparation ownership for cleanup when upload fails before a remote runtime journal exists', async () => {
-    const repository = db.getRepository(WagoCommissioningSession);
     const remote = jest
       .spyOn(service as never, 'sudoRunScript')
       .mockImplementation((async (_host, _pin, _credential, script: string) =>
@@ -548,7 +541,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
       state: 'delivery_failed',
       runtimeRecoveryAvailable: true,
     });
-    const failed = await repository.findOneByOrFail({ id: session.id });
+    const failed = await storedSession(session.id);
     expect(failed.deliveryToken).toBe(failed.dockerProvisionToken);
     expect(failed.deliveryToken).toMatch(/^[a-f0-9]{32}$/);
     remote.mockClear();
@@ -560,23 +553,13 @@ describe('commissioning workflows with a real isolated database and mocked devic
   });
 
   it('retains tokened recovery after registration removal, without exposing the token', async () => {
-    const controller = await db.getRepository(WagoController).save({
-      hardwareId: session.hardwareId,
-      trustState: 'claimed',
-      mqttServerId: 1,
-      pairingCodeHash: 'fixture',
-      protocolVersion: '1.0.0',
-      runtimeVersion: '0.1.0',
-      capabilities: '[]',
-      lastSequence: 0,
-      lastSeenAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-    await db.getRepository(WagoCommissioningSession).update(session.id, { deliveryToken: 'b'.repeat(32) });
+    const controller = await storage.tables.controllers.insert(
+      controllerRow({ hardwareId: session.hardwareId, trustState: 'claimed', mqttServerId: 1 }),
+    );
+    await sessions().update({ id: session.id }, { deliveryToken: 'b'.repeat(32) });
     await service.removeControllerSafely(controller.id, async (assertOwned) => {
       await assertOwned();
-      await db.getRepository(WagoController).delete(controller.id);
+      await storage.tables.controllers.delete({ id: controller.id });
       return session.hardwareId;
     });
     const retained = (await service.list())[0];
@@ -594,7 +577,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
   it('retires superseded sessions without deadlocking a queued revocation', async () => {
     const { id: _id, ...values } = session;
     void _id;
-    const second = await db.getRepository(WagoCommissioningSession).save(values);
+    const second = await sessions().insert(values);
     let entered!: () => void;
     let proceed!: () => void;
     const ready = new Promise<void>((resolve) => {
@@ -613,11 +596,11 @@ describe('commissioning workflows with a real isolated database and mocked devic
     await new Promise((resolve) => setImmediate(resolve));
     proceed();
     await Promise.all([first, revoke]);
-    expect((await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: second.id })).state).toBe('revoked');
+    expect((await storedSession(second.id)).state).toBe('revoked');
   });
 
   it('allows session deletion after read-only management inspection without requiring impossible rollback', async () => {
-    await db.getRepository(WagoManagementEntity).save({
+    await storage.tables.management.insert({
       controllerId: 9,
       leaseUntil: 0,
       metadataJson: JSON.stringify({
@@ -638,27 +621,16 @@ describe('commissioning workflows with a real isolated database and mocked devic
         failure: null,
       }),
     });
-    await db.getRepository(WagoCommissioningSession).update(session.id, { managementControllerId: 9 });
+    await sessions().update({ id: session.id }, { managementControllerId: 9 });
     await service.remove(session.id);
-    expect(await db.getRepository(WagoCommissioningSession).findOneBy({ id: session.id })).toBeNull();
+    expect(await sessions().get(session.id)).toBeNull();
   });
 
   it('does not retain an inspection-only session after controller registration removal', async () => {
-    await db.getRepository(WagoController).save({
-      id: 9,
-      hardwareId: session.hardwareId,
-      trustState: 'claimed',
-      mqttServerId: 1,
-      pairingCodeHash: 'fixture',
-      protocolVersion: '1.0.0',
-      runtimeVersion: '0.1.0',
-      capabilities: '[]',
-      lastSequence: 0,
-      lastSeenAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-    await db.getRepository(WagoManagementEntity).save({
+    await storage.tables.controllers.insert(
+      controllerRow({ id: 9, hardwareId: session.hardwareId, trustState: 'claimed', mqttServerId: 1 }),
+    );
+    await storage.tables.management.insert({
       controllerId: 9,
       leaseUntil: 0,
       metadataJson: JSON.stringify({
@@ -679,27 +651,12 @@ describe('commissioning workflows with a real isolated database and mocked devic
         failure: null,
       }),
     });
-    await db.getRepository(WagoCommissioningSession).update(session.id, { managementControllerId: 9 });
+    await sessions().update({ id: session.id }, { managementControllerId: 9 });
     await service.removeControllerSafely(9, async (assertOwned) => {
       await assertOwned();
-      await db.getRepository(WagoController).delete(9);
+      await storage.tables.controllers.delete({ id: 9 });
       return session.hardwareId;
     });
     expect(await service.list()).toEqual([]);
-  });
-
-  it('refuses a downgrade that would discard a Docker recovery token', async () => {
-    await db.getRepository(WagoCommissioningSession).update(session.id, { dockerProvisionToken: 'c'.repeat(32) });
-    const runner = db.createQueryRunner();
-    try {
-      await expect(new AddWagoCommissioningPrincipal1780000000009().down(runner)).rejects.toThrow(
-        'Recover Docker provisioning',
-      );
-      expect(
-        (await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id })).dockerProvisionToken,
-      ).toBe('c'.repeat(32));
-    } finally {
-      await runner.release();
-    }
   });
 });

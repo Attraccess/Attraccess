@@ -369,9 +369,9 @@ describe('WagoCommissioningService security and lifecycle', () => {
           broker: { host: 'mock.invalid', port: 1883, useTls: false },
         });
         const persisted: string[] = [];
-        spied.commissioningSessions.update.mockImplementation(async (...call) => {
-          persisted.push(JSON.stringify(call[1]));
-          return storage.tables.commissioningSessions.update(...call);
+        spied.commissioningSessions.update.mockImplementation(async (where, patch, options) => {
+          persisted.push(JSON.stringify(patch));
+          return storage.tables.commissioningSessions.update(where, patch, options);
         });
         const result = await service.deliver(1, {
           confirmInstall: true,

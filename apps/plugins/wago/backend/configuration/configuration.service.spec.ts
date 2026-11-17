@@ -1,6 +1,7 @@
 import { configurationHash } from './model';
 import { hostDataWithFlows } from '../persistence.test-utils';
-import { WagoEnrollment } from '../controllers/enrollment.entity';
+import { revisionRow } from '../rows.test-utils';
+import type { WagoStorage } from '../storage';
 import { controller, createWagoServiceFixture } from '../wago-service.test-fixture';
 import { WagoService } from '../controllers/service';
 import { CHANNEL_ENABLED_CAPABILITY } from '../../shared/capabilities';
@@ -13,19 +14,37 @@ describe('WagoService configuration and commands', () => {
     services.splice(0).forEach((service) => service.onModuleDestroy());
   });
 
-  function createService(
-    controllers = [controller()],
-    enrollments: WagoEnrollment[] = [],
-    defaultMqttServerId: number | null = null,
-  ) {
+  function createService(controllers = [controller()], enrollments: never[] = [], defaultMqttServerId: number | null = null) {
     return createWagoServiceFixture(services, controllers, enrollments, defaultMqttServerId);
+  }
+
+  /** Replaces the first controller's stored revisions, as a controller that applied them would have left them. */
+  async function seedRevisions(tables: WagoStorage, revisions: Array<Record<string, unknown>>) {
+    await tables.configurationRevisions.delete({ controllerId: 1 });
+    for (const [index, revision] of revisions.entries())
+      await tables.configurationRevisions.insert(
+        revisionRow({ controllerId: 1, revision: index + 1, ...revision } as never),
+      );
+  }
+
+  /** Counts the writes (insert, update, upsert, delete) a table receives from here on. */
+  function writesTo(table: WagoStorage[keyof WagoStorage]) {
+    const spies = (['insert', 'update', 'upsert', 'delete'] as const).map((method) =>
+      jest.spyOn(table as never, method as never),
+    );
+    return () => spies.reduce((total, spy) => total + (spy as unknown as jest.Mock).mock.calls.length, 0);
+  }
+
+  async function seedDraft(tables: WagoStorage, draft: Record<string, unknown>) {
+    await tables.configurationDrafts.delete({ controllerId: 1 });
+    await tables.configurationDrafts.insert({ controllerId: 1, snapshot: '{}', updatedAt: 'now', ...draft } as never);
   }
 
   it.each(['pending', 'rejected', 'published', 'applied'])(
     'replays only published configuration when the latest revision is %s',
     async (state) => {
-      const { service, context, revisionRepository } = createService([{ ...controller(), trustState: 'claimed' }]);
-      revisionRepository.find.mockResolvedValue([{ revision: 1, state, snapshot: '{}' }]);
+      const { context, service, tables } = await createService([{ ...controller(), trustState: 'claimed' }]);
+      await seedRevisions(tables, [{ revision: 1, state, snapshot: '{}' }]);
       const image = `sha256:${'a'.repeat(64)}`;
       await service.setRuntimePolicy(1, image, image, 'boot-token');
       expect(context.mqtt.publish).toHaveBeenCalledTimes(['published', 'applied'].includes(state) ? 2 : 1);
@@ -36,10 +55,10 @@ describe('WagoService configuration and commands', () => {
     ['without', '["claim","heartbeat","configuration-v1"]', 1],
     ['with', `["claim","heartbeat","configuration-v1","${CHANNEL_ENABLED_CAPABILITY}"]`, 2],
   ])('replays disabled channels only to a runtime %s channel-enabled-v1', async (_name, capabilities, publishes) => {
-    const { service, context, revisionRepository } = createService([
+    const { context, service, tables } = await createService([
       { ...controller(), trustState: 'claimed', capabilities },
     ]);
-    revisionRepository.find.mockResolvedValue([
+    await seedRevisions(tables, [
       {
         revision: 4,
         state: 'applied',
@@ -61,8 +80,8 @@ describe('WagoService configuration and commands', () => {
 
   it('publishes a configured command without waiting when dispatch completion is selected', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
-    const { service, context, revisionRepository } = createService([claimed], [], 2);
-    revisionRepository.find.mockResolvedValue([
+    const { context, service, tables } = await createService([claimed], [], 2);
+    await seedRevisions(tables, [
       {
         controllerId: claimed.id,
         revision: 3,
@@ -93,7 +112,7 @@ describe('WagoService configuration and commands', () => {
   });
 
   it('rejects invalid persisted command policies', async () => {
-    const { service } = createService();
+    const { service } = await createService();
 
     await expect(
       service.validateCommandConfig({
@@ -111,7 +130,7 @@ describe('WagoService configuration and commands', () => {
   });
 
   it('rejects acknowledgement timeouts that exceed the supported maximum', async () => {
-    const { service } = createService();
+    const { service } = await createService();
 
     await expect(
       service.validateCommandConfig({
@@ -131,8 +150,8 @@ describe('WagoService configuration and commands', () => {
 
   it('binds numeric controller IDs when looking up channel references', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
-    const { service, context, revisionRepository } = createService([claimed]);
-    revisionRepository.find.mockResolvedValue([
+    const { context, service, tables } = await createService([claimed]);
+    await seedRevisions(tables, [
       {
         controllerId: claimed.id,
         revision: 3,
@@ -157,8 +176,8 @@ describe('WagoService configuration and commands', () => {
 
   it('consumes a pending acknowledgement rejection when command publication fails', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
-    const { service, context, revisionRepository } = createService([claimed], [], 2);
-    revisionRepository.find.mockResolvedValue([
+    const { context, service, tables } = await createService([claimed], [], 2);
+    await seedRevisions(tables, [
       {
         controllerId: claimed.id,
         revision: 3,
@@ -182,8 +201,8 @@ describe('WagoService configuration and commands', () => {
 
   it('propagates a controller acknowledgement rejection message', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
-    const { service, context, revisionRepository } = createService([claimed], [], 2);
-    revisionRepository.find.mockResolvedValue([
+    const { context, service, tables } = await createService([claimed], [], 2);
+    await seedRevisions(tables, [
       {
         controllerId: claimed.id,
         revision: 3,
@@ -218,8 +237,8 @@ describe('WagoService configuration and commands', () => {
 
   it('ignores null acknowledgements and rejects while publication is stalled', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
-    const { service, context, revisionRepository } = createService([claimed], [], 2);
-    revisionRepository.find.mockResolvedValue([
+    const { context, service, tables } = await createService([claimed], [], 2);
+    await seedRevisions(tables, [
       {
         controllerId: claimed.id,
         revision: 3,
@@ -256,13 +275,7 @@ describe('WagoService configuration and commands', () => {
 
   it('publishes a retained, content-addressed revision only after validation', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
-    const { service, draftRepository, revisionRepository, context } = createService([claimed]);
-    let draft: { controllerId: number; snapshot: string; reviewedHash: string | null; updatedAt: string } | null = null;
-    draftRepository.findOneBy.mockImplementation(async () => draft);
-    draftRepository.save.mockImplementation(async (value) => {
-      draft = value;
-      return value;
-    });
+    const { context, service, tables } = await createService([claimed]);
 
     await service.saveDraft(claimed.id, {
       version: 1,
@@ -291,14 +304,14 @@ describe('WagoService configuration and commands', () => {
       expect.stringContaining('"protocolVersion":1'),
       { qos: 1, retain: true },
     );
-    expect(revisionRepository.save).toHaveBeenCalledWith(expect.objectContaining({ revision: 1 }));
+    expect(await tables.configurationRevisions.find()).toMatchObject([{ revision: 1, state: 'published' }]);
   });
 
   it('rejects publication for a claimed runtime without the configuration contract', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const, capabilities: '["claim","heartbeat"]' };
-    const { service, draftRepository } = createService([claimed]);
+    const { service, tables } = await createService([claimed]);
     const snapshot = { version: 1, physicalPoints: [], logicalChannels: [] };
-    draftRepository.findOneBy.mockResolvedValue({
+    await seedDraft(tables, {
       controllerId: claimed.id,
       reviewedHash: configurationHash({ snapshot: JSON.stringify(snapshot), metadata: null }),
       snapshot: JSON.stringify(snapshot),
@@ -308,7 +321,7 @@ describe('WagoService configuration and commands', () => {
   });
 
   it('records structured controller rejection without changing the published snapshot', async () => {
-    const { service, revisionRepository } = createService([{ ...controller(), trustState: 'claimed' as const }]);
+    const { service, tables } = await createService([{ ...controller(), trustState: 'claimed' as const }]);
     const revision = {
       id: 1,
       controllerId: 1,
@@ -320,7 +333,7 @@ describe('WagoService configuration and commands', () => {
       publishedAt: '2026-01-01T00:00:00.000Z',
       reportedAt: null,
     };
-    revisionRepository.findOneBy.mockResolvedValue(revision);
+    await seedRevisions(tables, [revision]);
     const onConfigurationReported = (
       Reflect.get(service, 'onConfigurationReported') as (controllerId: number, payload: Buffer) => Promise<void>
     ).bind(service);
@@ -336,16 +349,18 @@ describe('WagoService configuration and commands', () => {
       ),
     );
 
-    expect(revisionRepository.save).toHaveBeenCalledWith(
-      expect.objectContaining({
-        state: 'rejected',
-        rejectionErrors: expect.stringContaining('unsupported_capability'),
-      }),
-    );
+    expect(await tables.configurationRevisions.findOne({ where: { revision: 2 } })).toMatchObject({
+      state: 'rejected',
+      rejectionErrors: expect.stringContaining('unsupported_capability'),
+      snapshot: '{}',
+    });
   });
 
   it('ignores oversized and over-nested configuration reports before parsing them', async () => {
-    const { service, revisionRepository } = createService([{ ...controller(), trustState: 'claimed' as const }]);
+    const { service, tables } = await createService([{ ...controller(), trustState: 'claimed' as const }]);
+    const reads = (['get', 'find', 'findOne'] as const).map((method) =>
+      jest.spyOn(tables.configurationRevisions, method),
+    );
     const report = { revision: 2, contentHash: 'a'.repeat(64), errors: [] };
     const onConfigurationReported = (
       Reflect.get(service, 'onConfigurationReported') as (controllerId: number, payload: Buffer) => Promise<void>
@@ -355,11 +370,11 @@ describe('WagoService configuration and commands', () => {
       1,
       Buffer.from(JSON.stringify({ ...report, nested: JSON.parse('{"a":'.repeat(8) + '1' + '}'.repeat(8)) })),
     );
-    expect(revisionRepository.findOneBy).not.toHaveBeenCalled();
+    for (const read of reads) expect(read).not.toHaveBeenCalled();
   });
 
   it.each(['applied', 'rejected'] as const)('ignores reports for a terminal %s revision state', async (state) => {
-    const { service, revisionRepository } = createService([{ ...controller(), trustState: 'claimed' as const }]);
+    const { service, tables } = await createService([{ ...controller(), trustState: 'claimed' as const }]);
     const revision = {
       id: 1,
       controllerId: 1,
@@ -371,7 +386,8 @@ describe('WagoService configuration and commands', () => {
       publishedAt: '2026-01-01T00:00:00.000Z',
       reportedAt: '2026-01-01T00:01:00.000Z',
     };
-    revisionRepository.findOneBy.mockResolvedValue(revision);
+    await seedRevisions(tables, [revision]);
+    const writes = writesTo(tables.configurationRevisions);
     const onConfigurationReported = (
       Reflect.get(service, 'onConfigurationReported') as (controllerId: number, payload: Buffer) => Promise<void>
     ).bind(service);
@@ -387,11 +403,12 @@ describe('WagoService configuration and commands', () => {
       ),
     );
 
-    expect(revisionRepository.save).not.toHaveBeenCalled();
+    expect(writes()).toBe(0);
+    expect(await tables.configurationRevisions.get(1)).toMatchObject({ state });
   });
 
   it('ignores controller rejections without field-level error details', async () => {
-    const { service, revisionRepository, context } = createService([
+    const { context, service, tables } = await createService([
       { ...controller(), trustState: 'claimed' as const },
     ]);
     const onConfigurationReported = (
@@ -403,12 +420,12 @@ describe('WagoService configuration and commands', () => {
       Buffer.from(JSON.stringify({ revision: 2, contentHash: 'a'.repeat(64), errors: [{ code: 'invalid' }] })),
     );
 
-    expect(revisionRepository.save).not.toHaveBeenCalled();
+    expect(await tables.configurationRevisions.count()).toBe(0);
     expect(context.logger.warn).toHaveBeenCalledWith('Ignoring malformed WAGO configuration report for controller 1');
   });
 
   it('serializes configuration reports with publication for the same controller', async () => {
-    const { service, revisionRepository } = createService([{ ...controller(), trustState: 'claimed' as const }]);
+    const { service, tables } = await createService([{ ...controller(), trustState: 'claimed' as const }]);
     const revision = {
       id: 1,
       controllerId: 1,
@@ -420,7 +437,8 @@ describe('WagoService configuration and commands', () => {
       publishedAt: '2026-01-01T00:00:00.000Z',
       reportedAt: null,
     };
-    revisionRepository.findOneBy.mockResolvedValue(revision);
+    await seedRevisions(tables, [revision]);
+    const writes = writesTo(tables.configurationRevisions);
     const withConfigurationLock = (
       Reflect.get(service, 'withConfigurationLock') as <T>(id: number, operation: () => Promise<T>) => Promise<T>
     ).bind(service);
@@ -435,16 +453,16 @@ describe('WagoService configuration and commands', () => {
     );
 
     await new Promise<void>((resolve) => setImmediate(resolve));
-    expect(revisionRepository.save).not.toHaveBeenCalled();
+    expect(writes()).toBe(0);
     releasePublish();
     await Promise.all([publish, report]);
-    expect(revisionRepository.save).toHaveBeenCalledWith(expect.objectContaining({ state: 'applied' }));
+    expect(await tables.configurationRevisions.get(1)).toMatchObject({ state: 'applied' });
   });
 
   it('routes configuration reports through independent bounded controller queues', async () => {
     const first = { ...controller(), trustState: 'claimed' as const };
     const second = { ...controller(), id: 2, hardwareId: 'cc100-02', trustState: 'claimed' as const };
-    const { service, context } = createService([first, second]);
+    const { context, service } = await createService([first, second]);
     let releaseFirst!: () => void;
     const onConfigurationReported = jest
       .spyOn(
@@ -481,7 +499,7 @@ describe('WagoService configuration and commands', () => {
 
   it('retains queued reports for each revision of a busy controller', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
-    const { service, context } = createService([claimed]);
+    const { context, service } = await createService([claimed]);
     let releaseFirst!: () => void;
     const processed: Buffer[] = [];
     jest
@@ -516,7 +534,7 @@ describe('WagoService configuration and commands', () => {
 
   it('bounds queued reports for a busy controller while retaining replacements', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
-    const { service, context } = createService([claimed]);
+    const { context, service } = await createService([claimed]);
     let releaseFirst!: () => void;
     const processed: Buffer[] = [];
     jest
@@ -563,7 +581,7 @@ describe('WagoService configuration and commands', () => {
 
   it('drops oversized and over-nested reports for a busy controller without decoding or queueing them', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
-    const { service, context } = createService([claimed]);
+    const { context, service } = await createService([claimed]);
     let releaseFirst!: () => void;
     const processed: Buffer[] = [];
     jest
@@ -615,20 +633,20 @@ describe('WagoService configuration and commands', () => {
 
   it('returns bounded revision metadata pages without snapshots', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
-    const { service, revisionRepository } = createService([claimed]);
+    const { service, tables } = await createService([claimed]);
+
+    const find = jest.spyOn(tables.configurationRevisions, 'find');
+    await seedRevisions(tables, [{ snapshot: '{"large":true}' }]);
 
     await expect(service.revisionsFor(claimed.id, 5, 200)).resolves.toEqual({ revisions: [], offset: 5, limit: 100 });
-    expect(revisionRepository.find).toHaveBeenCalledWith(
-      expect.objectContaining({
-        skip: 5,
-        take: 100,
-        select: expect.not.arrayContaining(['snapshot']),
-      }),
-    );
+    expect(find).toHaveBeenCalledWith(expect.objectContaining({ offset: 5, limit: 100 }));
+    const [page] = (await service.revisionsFor(claimed.id)).revisions;
+    expect(page).toMatchObject({ revision: 1, state: 'pending' });
+    expect(page).not.toHaveProperty('snapshot');
   });
 
   it('starts the editor from the last applied revision without creating a draft', async () => {
-    const { service, revisionRepository, draftRepository } = createService([
+    const { service, tables } = await createService([
       { ...controller(), trustState: 'claimed' },
     ]);
     const revision = {
@@ -636,18 +654,21 @@ describe('WagoService configuration and commands', () => {
       state: 'applied',
       snapshot: '{"version":1,"physicalPoints":[],"logicalChannels":[]}',
     };
-    revisionRepository.find.mockResolvedValue([revision]);
-    expect(await service.getConfigurationBaseline(1)).toBe(revision);
-    expect(revisionRepository.find).toHaveBeenCalledWith({
+    await seedRevisions(tables, [revision]);
+    const find = jest.spyOn(tables.configurationRevisions, 'find');
+    const writes = writesTo(tables.configurationDrafts);
+    expect(await service.getConfigurationBaseline(1)).toMatchObject(revision);
+    expect(find).toHaveBeenCalledWith({
       where: { controllerId: 1, state: 'applied' },
-      order: { revision: 'DESC' },
-      take: 1,
+      orderBy: [{ field: 'revision', direction: 'desc' }],
+      limit: 1,
     });
-    expect(draftRepository.save).not.toHaveBeenCalled();
+    expect(writes()).toBe(0);
+    expect(await tables.configurationDrafts.count()).toBe(0);
   });
 
   it('rejects stale editor saves inside the configuration lock, including metadata-only changes', async () => {
-    const { service, draftRepository } = createService([{ ...controller(), trustState: 'claimed' }]);
+    const { service, tables } = await createService([{ ...controller(), trustState: 'claimed' }]);
     const snapshot = { version: 1, physicalPoints: [], logicalChannels: [] };
     const previous = {
       controllerId: 1,
@@ -655,15 +676,16 @@ describe('WagoService configuration and commands', () => {
       updatedAt: 'same-timestamp',
       presetProvenance: '{"editor":{"names":{},"presets":[]}}',
     };
-    draftRepository.findOneBy.mockResolvedValue(previous);
+    await seedDraft(tables, previous);
+    const writes = writesTo(tables.configurationDrafts);
     await expect(service.saveDraft(1, snapshot, undefined, undefined, null)).rejects.toThrow('Saved draft changed');
     await expect(
       service.saveDraft(1, snapshot, undefined, undefined, { ...previous, presetProvenance: null }),
     ).rejects.toThrow('Saved draft changed');
-    expect(draftRepository.save).not.toHaveBeenCalled();
+    expect(writes()).toBe(0);
     expect(JSON.parse((await service.saveDraft(1, snapshot, undefined, undefined, previous)).snapshot)).toEqual(
       snapshot,
     );
-    expect(draftRepository.save).toHaveBeenCalledTimes(1);
+    expect(writes()).toBe(1);
   });
 });
