@@ -10,6 +10,7 @@ import { sqliteErrorClassifier } from './sqlite-errors';
 import { createSqlitePluginMigrationEngine } from './sqlite-plugin-migration-engine';
 import { createSqlitePluginPersistenceHost, sqliteHostTransactionScope } from './sqlite-plugin-persistence';
 import { readSqlitePermissionOwners } from './sqlite-permission-owners';
+import { openSqliteStartupSettings } from './sqlite-startup-settings';
 import { createSqliteTransfer } from './sqlite-transfer';
 import { createSqliteUnitOfWork } from './sqlite-unit-of-work';
 
@@ -49,6 +50,7 @@ export const sqliteBackend: TypeOrmDatabaseBackend = {
     createPersistenceHost: (getConnection) => createSqlitePluginPersistenceHost(getConnection, entityList),
     hostTransactionScope: sqliteHostTransactionScope,
     readPermissionOwners: () => readSqlitePermissionOwners(createDataSourceOptions()),
+    openStartupSettings: () => openSqliteStartupSettings(createDataSourceOptions()),
   },
   transfer: createSqliteTransfer(migrationTrack),
   onCompanionConnection: onResourceConnection,

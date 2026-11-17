@@ -31,5 +31,9 @@
     "READ_SETTINGS",
     "SEND_NOTIFICATIONS",
     "READER_UI"
-  ]
+  ],
+  "license": {
+    "required": true,
+    "modules": ["reservations"]
+  }
 }

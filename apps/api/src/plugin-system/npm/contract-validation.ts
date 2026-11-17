@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { PluginDependenciesSchema } from '../runtime/dependencies';
 import { PluginBackendNameSchema, dashboardPathsSchema, dashboardWidgetsSchema } from '../runtime/manifest-schema';
 import { PluginManifest, PluginManifestSchema } from '../plugin.manifest';
+import { PluginLicenseDeclarationSchema } from '../license/plugin-license';
 
 const entryPath = z
   .string()
@@ -39,6 +40,8 @@ const packageSchema = z
       dashboardWidgets: dashboardWidgetsSchema.optional(),
       permissions: z.array(z.nativeEnum(PluginPermission)).default([]),
       persistence: z.object({ backends: z.array(PluginBackendNameSchema).min(1) }).optional(),
+      // npm installs get a synthesized plugin.json, so the license requirement travels in package.json.
+      license: PluginLicenseDeclarationSchema.optional(),
       sdk: z
         .object({
           backend: z.string().optional(),
@@ -113,6 +116,7 @@ export function parseNpmPluginPackage(
     persistence: pkg.attraccess.persistence,
     permissions: pkg.attraccess.permissions,
     dependencies: pkg.attraccess.dependencies,
+    license: pkg.attraccess.license,
   });
   // Engine support at parse time: before any file move, state row or plugin code load (a replacement's migration
   // history check loads its migrations), exactly as a ZIP upload and discovery check it.

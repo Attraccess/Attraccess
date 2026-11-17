@@ -1,6 +1,7 @@
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 import { z } from 'zod';
 import { PluginDependenciesSchema } from './dependencies';
+import { PluginLicenseDeclarationSchema } from '../license/plugin-license';
 /**
  * Sidebar route paths a plugin offers for dashboard pinning: plain segments, never kiosk or the dashboard itself.
  * Case-insensitive, because the router matches paths regardless of case.
@@ -16,11 +17,9 @@ export const DASHBOARD_WIDGET_ID_PATTERN = /^(?=.{1,64}$)[a-z0-9]+(?:-[a-z0-9]+)
 
 /** Dashboard widget ids a plugin contributes through getDashboardWidgets(). */
 export const dashboardWidgetsSchema = z.array(
-  z
-    .string()
-    .regex(DASHBOARD_WIDGET_ID_PATTERN, {
-      message: 'must be a lowercase kebab-case widget id of at most 64 characters',
-    }),
+  z.string().regex(DASHBOARD_WIDGET_ID_PATTERN, {
+    message: 'must be a lowercase kebab-case widget id of at most 64 characters',
+  }),
 );
 
 export const mainSchema = z.object({
@@ -84,4 +83,5 @@ export const PluginManifestSchema = z.object({
     .array(z.nativeEnum(PluginPermission, { message: 'unknown plugin permission' }))
     .optional()
     .default([]),
+  license: PluginLicenseDeclarationSchema.optional(),
 });

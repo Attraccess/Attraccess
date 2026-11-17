@@ -1642,7 +1642,7 @@
   "getPlugins": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "d67ca9c1"
+    "shape": "8a7726c6"
   },
   "uploadPlugin": {
     "decision": "deny",

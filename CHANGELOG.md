@@ -1,3 +1,22 @@
+## 1.11.0-beta.2 (2026-11-17)
+
+### 🚀 Features
+
+- plugin BLE through Attractap readers: session protocol, notifications, cancellation (ATT-1033, ATT-1036) ([#2222](https://github.com/Attraccess/Attraccess/pull/2222))
+- **rbac:** plugin-declared permissions, Matter/Thread and RabbitMQ keys (ATT-1003) ([#2216](https://github.com/Attraccess/Attraccess/pull/2216))
+
+### 🩹 Fixes
+
+- **api:** answer absolute-form cdn directory requests with 404, not 500 ([#2230](https://github.com/Attraccess/Attraccess/pull/2230))
+- **api:** avoid SQLITE_BUSY deadlock from main reads in lifecycle transactions ([#2227](https://github.com/Attraccess/Attraccess/pull/2227))
+- **api:** return 404 for empty-authority request targets ([#2228](https://github.com/Attraccess/Attraccess/pull/2228))
+- **attractap-lab:** keep a Touch V1 on through its power-bank cutoff after flashing ([#2224](https://github.com/Attraccess/Attraccess/pull/2224))
+- **build:** copy package.json into the plugin frontend library builds ([#2229](https://github.com/Attraccess/Attraccess/pull/2229))
+
+### ❤️ Thank You
+
+- Jan Jaap @jappyjan
+
 ## 1.11.0-beta.1 (2026-11-17)
 
 ### 🚀 Features

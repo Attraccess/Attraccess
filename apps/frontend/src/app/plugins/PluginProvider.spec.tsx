@@ -355,6 +355,28 @@ describe('PluginProvider', () => {
     expect(hoisted.getRemoteMock).not.toHaveBeenCalled();
   });
 
+  it('neither loads the frontend of a license_missing plugin nor shows a toast for it', async () => {
+    hoisted.refetchMock.mockResolvedValue({
+      data: [
+        {
+          name: 'wago',
+          version: '1.0.0',
+          status: 'license_missing',
+          error: 'Requires license module: wago',
+          main: { frontend: { entryPoint: 'index.js' } },
+        },
+      ],
+    });
+
+    render(<PluginProvider />);
+
+    await waitFor(() => expect(hoisted.refetchMock).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(hoisted.getRemoteMock).not.toHaveBeenCalled();
+    expect(hoisted.toastWarningMock).not.toHaveBeenCalled();
+    expect(usePluginState.getState().plugins).toHaveLength(0);
+  });
+
   it('injects plugin routes that render and are navigable', async () => {
     primeManifest({
       routes: [

@@ -3,7 +3,12 @@ import { test } from 'node:test';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
-import { resolvePluginTestHostVersion, validatePackageContract, verifyPackedPlugin } from './verify-packed-plugin.mjs';
+import {
+  resolvePluginTestHostVersion,
+  validateLicenseFile,
+  validatePackageContract,
+  verifyPackedPlugin,
+} from './verify-packed-plugin.mjs';
 
 const fixture = () => ({
   name: '@example/plugin',
@@ -35,6 +40,12 @@ test('requires package identity, discoverability, and complete host metadata', (
     assert.throws(() => validatePackageContract(pkg, '1.2.0'), /required Attraccess metadata/);
   }
   assert.throws(() => validatePackageContract({ ...fixture(), version: 'latest' }, '1.2.0'), /strict semver/);
+});
+test('requires the file a SEE LICENSE IN license field points to', () => {
+  const pkg = { ...fixture(), license: 'SEE LICENSE IN LICENSE.md' };
+  assert.doesNotThrow(() => validateLicenseFile(pkg, ['package/package.json', 'package/LICENSE.md']));
+  assert.throws(() => validateLicenseFile(pkg, ['package/package.json']), /missing its license file LICENSE.md/);
+  assert.doesNotThrow(() => validateLicenseFile(fixture(), ['package/package.json']));
 });
 test('rejects incompatible host or SDK contracts for every declared entry', () => {
   for (const range of ['invalid', '^2.0.0']) {

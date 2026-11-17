@@ -18,6 +18,7 @@ import {
   MetricsSubsystem,
   AUTH_KEYS,
   AUTH_PARENT,
+  LICENSE_KEY_CHANGED_EVENT,
   MESSAGING_KEYS,
   MESSAGING_PARENT,
   MESSAGING_RATE_LIMIT_DEFAULTS,
@@ -188,11 +189,18 @@ export class SettingsService {
   }
 
   async updateSystemSettings(update: UpdateSystemSettingsDto): Promise<SystemSettingsDto> {
-    if (update.app) {
-      await this.updateAppSettings(update.app);
-    }
-    if (update.smtp) {
-      await this.updateSmtpSettings(update.smtp);
+    let licenseKeyStored = false;
+    try {
+      if (update.app) {
+        await this.updateAppSettings(update.app);
+        licenseKeyStored = Object.prototype.hasOwnProperty.call(update.app, 'licenseKey');
+      }
+      if (update.smtp) {
+        await this.updateSmtpSettings(update.smtp);
+      }
+    } finally {
+      // Only after every setting of this request is stored (or failed): the event may restart the server.
+      if (licenseKeyStored) this.eventEmitter?.emit(LICENSE_KEY_CHANGED_EVENT);
     }
     return this.getSystemSettings();
   }

@@ -74,11 +74,21 @@ export class PluginMigrationService {
       PluginService.setPluginLoadError(`${name}@${manifest.version}`, error);
     }
     const ready = new Set<string>();
+    // Plugins the license keeps out (and their dependents) run no migrations. PluginModule reports them.
+    const licenseBlocked = new Set<string>();
     for (const manifest of plugins) {
+      if (PluginService.getLicenseMissingReason(manifest)) {
+        licenseBlocked.add(manifest.name);
+        continue;
+      }
       if (PluginService.isPluginQuarantined(manifest)) continue;
       const failedDependency = manifest.dependencies?.find(
         (dependency) => dependency.required && !ready.has(dependency.name),
       );
+      if (failedDependency && licenseBlocked.has(failedDependency.name)) {
+        licenseBlocked.add(manifest.name);
+        continue;
+      }
       if (failedDependency) {
         PluginService.setPluginLoadError(
           `${manifest.name}@${manifest.version}`,

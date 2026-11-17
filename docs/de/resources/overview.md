@@ -38,4 +38,4 @@ Die Startseite von Attraccess zeigt alle verfügbaren Ressourcen in einer Übers
 - [Gruppen](resources/resource-groups.md) – Ressourcen organisieren
 - [Einweisungen](resources/introductions.md) – Zugang verwalten
 - [Wartung](resources/maintenance.md) – Wartungen planen
-- Mit installiertem Plugin Reservierungen können Mitglieder Ressourcen im Voraus buchen; siehe [Reservierungen](plugins/reservations/overview.md).
+- Mit installiertem Plugin Reservierungen (ein bezahltes Add-on mit dem Lizenzmodul `reservations`) können Mitglieder Ressourcen im Voraus buchen; siehe [Reservierungen](plugins/reservations/overview.md).

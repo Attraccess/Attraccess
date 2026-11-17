@@ -80,31 +80,29 @@ import { createPluginPersistenceHost } from '../database/adapters/plugins/plugin
 import { PLUGIN_HOST_CONNECTION } from './persistence/plugin-host-data.port';
 import type { PluginPersistenceHost } from './persistence/plugin-persistence-host.port';
 import { assertModulePersistenceSupportsBackend } from './runtime/plugin-compatibility';
+import { PluginLicenseWatcher } from './license/plugin-license-watcher.service';
 
 import { EncryptionService } from '../encryption/encryption.service';
 
 import { ResourceFlowsExecutorService } from '../resources/flows/execution/resource-flows-executor.service';
 
 import { createPluginAuditContext } from './runtime/audit-context';
-
 import { createPluginBleContext } from './ble/plugin-ble-context';
-
 import { PluginBleService } from './ble/plugin-ble.service';
-
 import { preparePluginNotifications } from './runtime/plugin-notifications';
 import { preparePluginPermissions } from './runtime/plugin-permissions';
 import {
   PLUGIN_START_BLOCKED_CHANGED_EVENT,
   type PluginStartBlockedChanged,
 } from './start-blocked/start-blocked.events';
-
 import {
   createHostDataContext,
   createHostNotificationsContext,
   createHostResourceAccessContext,
   PluginHostRefs,
 } from './runtime/host-contexts';
-
+import { LicenseService } from '../license/license.service';
+import { createPluginLicenseContext } from './runtime/plugin-license-context';
 import { arePluginsDisabled, setPluginsDisabled } from './plugins-disabled';
 
 function getImplementationClass(): typeof PluginModule {
@@ -173,6 +171,12 @@ export class PluginModule {
     const modulesByName = new Map<string, DynamicModule>();
     const active = new Set<string>();
     for (const manifest of ordered) {
+      // Not a failure: no quarantine, no boot-guard entry. The plugin loads after a restart once it is licensed.
+      const licenseMissing = PluginService.getLicenseMissingReason(manifest);
+      if (licenseMissing) {
+        getImplementationClass().logger.log(`Plugin ${manifest.name} is not loaded: ${licenseMissing}`);
+        continue;
+      }
       if (
         PluginService.isPluginQuarantined(manifest) ||
         // Matched by directory: a refused copy of the same plugin name (an old 1.x upload next to its 2.x build) must
@@ -237,6 +241,7 @@ export class PluginModule {
         PluginClassificationService,
         PluginLiveUpdatesService,
         PluginSystemEventsBridge,
+        PluginLicenseWatcher,
         PluginBleService,
         ReaderUiWiring,
       ],
@@ -492,6 +497,7 @@ export class PluginModule {
           decrypt: (ciphertext) => encryption.decryptForPlugin(manifest.id, ciphertext),
         };
       },
+      license: createPluginLicenseContext(() => getImplementationClass().hostRefs().get(LicenseService)),
       notifications: createHostNotificationsContext(manifest.name, getImplementationClass().hostRefs()),
       resourceAccess: createHostResourceAccessContext(getImplementationClass().hostRefs()),
       hostData: createHostDataContext(getImplementationClass().hostRefs()),

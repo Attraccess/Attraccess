@@ -8,6 +8,7 @@ import type { PluginResourceAccessContext } from './plugin-resource-access';
 import type { PluginHostDataContext } from './plugin-host-data';
 import type { PluginPersistenceContext } from './plugin-persistence';
 import type { PluginLiveUpdatesContext } from './plugin-live-updates';
+import type { PluginLicenseContext } from './plugin-license';
 import type { PluginBleContext } from './plugin-ble';
 import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscription } from './plugin.interface';
 /**
@@ -218,6 +219,12 @@ export interface PluginContext {
    * permission (ACCESS_RESOURCES, READ_USERS, READ_SETTINGS, DATABASE_ACCESS).
    */
   readonly hostData: PluginHostDataContext;
+
+  /**
+   * Query the license at runtime (see {@link PluginLicenseContext}). Needs no permission. Optional because hosts
+   * older than the plugin license support do not provide it; check before use when the plugin supports them.
+   */
+  readonly license?: PluginLicenseContext;
 }
 
 export { PluginBackendModule } from './plugin-backend-module';

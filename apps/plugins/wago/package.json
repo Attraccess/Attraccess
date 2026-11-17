@@ -8,7 +8,7 @@
     "wago",
     "cc100"
   ],
-  "license": "AGPL-3.0-only",
+  "license": "SEE LICENSE IN LICENSE.md",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Attraccess/Attraccess.git",
@@ -40,6 +40,12 @@
     },
     "migrations": "dist/migrations.js",
     "styles": "frontend/style.css",
+    "license": {
+      "required": true,
+      "modules": [
+        "wago"
+      ]
+    },
     "dashboardPaths": [
       "/wago"
     ],

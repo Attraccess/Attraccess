@@ -35,6 +35,7 @@ export async function verifyPackedPlugin(
     const extracted = join(unpacked, 'package');
     const pkg = JSON.parse(readFileSync(join(extracted, 'package.json'), 'utf8'));
     validatePackageContract(pkg, hostVersion);
+    validateLicenseFile(pkg, paths);
 
     for (const entry of Object.values(pkg.attraccess ?? {})) {
       if (typeof entry === 'string' && entry.includes('/') && !existsSync(join(extracted, entry))) {
@@ -78,6 +79,12 @@ export function resolvePluginTestHostVersion(workspaceVersion, releaseTarget) {
   if (!releaseTarget) return workspaceVersion;
   if (!semver.valid(releaseTarget)) throw new Error('Invalid plugin test release target');
   return semver.gt(releaseTarget, workspaceVersion) ? releaseTarget : workspaceVersion;
+}
+
+/** A `SEE LICENSE IN <file>` license field is only meaningful when the package ships that file. */
+export function validateLicenseFile(pkg, paths) {
+  const file = /^SEE LICENSE IN (.+)$/.exec(pkg.license ?? '')?.[1]?.trim();
+  if (file && !paths.includes(`package/${file}`)) throw new Error(`Packed plugin is missing its license file ${file}`);
 }
 
 export function validatePackageContract(pkg, hostVersion) {

@@ -9,6 +9,7 @@ import { SmtpSettingsService } from './smtp-settings.service';
 import {
   APP_PARENT,
   APP_KEYS,
+  LICENSE_KEY_CHANGED_EVENT,
   AUTH_PARENT,
   AUTH_KEYS,
   MESSAGING_PARENT,
@@ -129,6 +130,22 @@ describe('SettingsService', () => {
     for (const locale of [undefined, null, '', 'fr-FR', 'de-u-12', 'en-!!!']) {
       expect(await service.resolveLanguage(locale)).toBe(fallback);
     }
+  });
+
+  it('announces a license key change after every setting of the request is stored', async () => {
+    smtpSettings.getSettings.mockResolvedValue({});
+    const updateSmtp = jest.spyOn(service, 'updateSmtpSettings').mockResolvedValue(undefined);
+    await service.updateSystemSettings({ app: { licenseKey: 'key' }, smtp: { host: 'mail.test' } } as never);
+    expect(events.emit).toHaveBeenCalledWith(LICENSE_KEY_CHANGED_EVENT);
+    expect(updateSmtp.mock.invocationCallOrder[0]).toBeLessThan(events.emit.mock.invocationCallOrder[0]);
+
+    events.emit.mockClear();
+    await service.updateSystemSettings({ app: { licenseKey: null } });
+    expect(events.emit).toHaveBeenCalledWith(LICENSE_KEY_CHANGED_EVENT);
+
+    events.emit.mockClear();
+    await service.updateSystemSettings({ app: { url: 'https://workspace.test' } });
+    expect(events.emit).not.toHaveBeenCalledWith(LICENSE_KEY_CHANGED_EVENT);
   });
 
   it('announces only successfully persisted language changes', async () => {

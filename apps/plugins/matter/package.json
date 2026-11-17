@@ -2,7 +2,7 @@
   "name": "@attraccess/plugin-matter",
   "version": "0.4.0-alpha.0",
   "description": "Official Attraccess integration for Matter devices. Connects to the Matter sidecar; no device features yet.",
-  "license": "AGPL-3.0-only",
+  "license": "SEE LICENSE IN LICENSE.md",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Attraccess/Attraccess.git",

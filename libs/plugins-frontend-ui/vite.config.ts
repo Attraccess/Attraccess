@@ -30,7 +30,7 @@ export default defineConfig({
   plugins: [
     react(),
     babel({ presets: [reactCompilerPreset()] }),
-    copyAssets(['*.md']),
+    copyAssets(['*.md', 'package.json']),
     dts({ entryRoot: 'src', tsconfigPath: path.join(__dirname, 'tsconfig.lib.json') }),
   ],
   // Uncomment this if you are using workers.

@@ -1,7 +1,7 @@
 import { Button } from '@attraccess/plugins-frontend-ui';
 import type { InstalledNpmPluginDto, LoadedPluginManifest } from '@attraccess/react-query-client';
-import { Chip, TableCell, TableRow, Tooltip, TooltipContent } from '@heroui/react';
-import { AlertTriangle, CheckCircle2, Trash2 } from 'lucide-react';
+import { Chip, TableCell, TableRow, Tooltip, TooltipContent, TooltipTrigger } from '@heroui/react';
+import { AlertTriangle, CheckCircle2, KeyRound, Trash2 } from 'lucide-react';
 import { PluginClassificationBadge } from '../PluginClassificationBadge';
 import type { FailedPlugin, MarketplaceDetailRequest, VersionPlugin } from '../types';
 import { usePluginsTranslations } from '../usePluginsTranslations';
@@ -25,6 +25,16 @@ export function PluginRow({ plugin, installed, onShowError, onShowDetails, onMan
           <span>{plugin.name}</span>
           <PluginClassificationBadge classification={installed?.classification ?? 'community'} />
         </div>
+        {plugin.status === 'license_missing' ? (
+          <p className="mt-1 text-xs text-muted" data-cy={`plugins-list-license-missing-${plugin.id}`}>
+            {plugin.missingLicenseModules?.length
+              ? t('status.licenseMissingModules', {
+                  count: plugin.missingLicenseModules.length,
+                  modules: plugin.missingLicenseModules.join(', '),
+                })
+              : t('status.licenseMissingRequired')}
+          </p>
+        ) : null}
         {installed?.registryUrl ? <p className="mt-1 text-xs text-muted md:hidden">{installed.registryUrl}</p> : null}
       </TableCell>
       <TableCell>
@@ -71,6 +81,19 @@ export function PluginRow({ plugin, installed, onShowError, onShowDetails, onMan
               <TooltipContent>{t('status.errorTooltip')}</TooltipContent>
             </Tooltip>
           </button>
+        ) : plugin.status === 'license_missing' ? (
+          // An expected state, not a failure: the plugin needs a license the installation does not have.
+          <Tooltip>
+            <TooltipTrigger tabIndex={0}>
+              <Chip variant="soft" color="warning" data-cy={`plugins-list-status-${plugin.id}`}>
+                <span className="inline-flex items-center gap-1">
+                  <KeyRound size={14} />
+                  {t('status.licenseMissing')}
+                </span>
+              </Chip>
+            </TooltipTrigger>
+            <TooltipContent>{t('status.licenseMissingTooltip')}</TooltipContent>
+          </Tooltip>
         ) : plugin.status === 'loaded' ? (
           <Chip variant="soft" color="success" data-cy={`plugins-list-status-${plugin.id}`}>
             <span className="inline-flex items-center gap-1">

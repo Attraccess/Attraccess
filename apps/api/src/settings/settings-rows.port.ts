@@ -20,3 +20,11 @@ export interface SetupAccountStats {
   countAccounts(): Promise<number>;
   countVerifiedAccounts(): Promise<number>;
 }
+
+/**
+ * Settings rows on a short-lived connection of their own, for checks that run before the application connection
+ * exists (the startup license evaluation). The caller closes it.
+ */
+export interface StandaloneSettingsRows extends SettingsRows {
+  close(): Promise<void>;
+}

@@ -4,6 +4,7 @@ import type {
   PluginMigrationEngineConfig,
 } from '../../plugin-system/persistence/plugin-migration-engine.port';
 import type { PluginPersistenceHost } from '../../plugin-system/persistence/plugin-persistence-host.port';
+import type { StandaloneSettingsRows } from '../../settings/settings-rows.port';
 import type { PersistenceErrorClassifier } from '../persistence-errors';
 import type { DatabaseTransfer } from '../transfer-snapshot';
 import type { ScopedUnitOfWork, TransactionScope, UnitOfWork } from '../unit-of-work';
@@ -41,6 +42,12 @@ export interface DatabaseBackendPluginHooks {
    * the application connection opens. No database or no permission table yet: an empty map.
    */
   readPermissionOwners(): Promise<Map<string, string | null>>;
+  /**
+   * The settings rows on a short-lived connection, opened before the application connection (the startup license
+   * check decides which license-gated plugins load). Null when the database does not exist yet (a fresh install).
+   * The caller closes it.
+   */
+  openStartupSettings(): Promise<StandaloneSettingsRows | null>;
 }
 
 /**
