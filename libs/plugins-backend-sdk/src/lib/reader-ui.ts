@@ -336,7 +336,7 @@ export interface StartCapacityResult {
  * INSIDE the serialized start transaction, after its own capacity check. The host refuses the start with the plugin's
  * block reason when `occupiedSlots + heldSlots >= sessionLimit`, so simultaneous starts can never take a held slot.
  * Keep it to one indexed query on the manager of `ctx.scope`. Failure, timeout and an open breaker follow the per-resource failure
- * policy of the plugin, like `preStartHook`. Requires ACCESS_HOOKS and DATABASE_ACCESS (it is handed the host's
+ * policy of the plugin, like `preStartHook`. Requires ACCESS_HOOKS (it is handed the host's
  * transaction).
  */
 export type StartCapacityHook = (ctx: StartCapacityContext) => StartCapacityResult | Promise<StartCapacityResult>;

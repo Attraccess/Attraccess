@@ -13,7 +13,7 @@ import { PluginBleService } from './ble/plugin-ble.service';
 import { PluginService } from './plugin.service';
 
 /**
- * Removes an uploaded plugin: reverts its migrations, deletes its directory and clears its quarantine. It sits
+ * Removes an uploaded plugin: drops its tables, deletes its directory and clears its quarantine. It sits
  * above both PluginService and PluginMigrationService, because migrations find plugin bundles through PluginService.
  */
 @Injectable()
@@ -42,17 +42,16 @@ export class PluginUninstallService {
       throw new NotFoundException('Plugin not found');
     }
 
-    // Revert the plugin's database migrations (drops its tables/data) BEFORE the
-    // files are removed — the migration classes live in the plugin bundle and
-    // must still be on disk to run. A failure here is logged but never blocks the
-    // uninstall: the admin asked for the plugin to be gone.
-    // A refused plugin's code never runs, not even its down() migrations: its tables (if any) are left in place.
-    if (!PluginService.isPluginRefused(plugin) && PluginMigrationService.hasMigrations(plugin)) {
+    // Drop the plugin's tables and their bookkeeping BEFORE the files are removed — the storage declaration that
+    // names them lives in the plugin bundle and must still be on disk. A failure here is logged but never blocks
+    // the uninstall: the admin asked for the plugin to be gone.
+    // A refused plugin's code never runs, not even to find its tables: they (if any) are left in place.
+    if (!PluginService.isPluginRefused(plugin) && PluginMigrationService.hasStorage(plugin)) {
       try {
-        await PluginMigrationService.runDownMigrations(plugin);
+        await PluginMigrationService.dropStorage(plugin);
       } catch (error) {
         PluginUninstallService.logger.error(
-          `Failed to revert migrations for plugin ${plugin.name}; removing files anyway. Its tables may be orphaned.`,
+          `Failed to drop the storage of plugin ${plugin.name}; removing files anyway. Its tables may be orphaned.`,
           error as Error,
         );
       }

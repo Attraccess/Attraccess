@@ -130,8 +130,8 @@ export enum PluginPermission {
   ACCESS_RESOURCES = 'ACCESS_RESOURCES',
   /** Read application settings through `hostData.settings`. */
   READ_SETTINGS = 'READ_SETTINGS',
-  /** Use `persistence` (transactions, the engine subpath) and `hostData.flows`. */
-  DATABASE_ACCESS = 'DATABASE_ACCESS',
+  /** Use `storage` (the plugin's own declared tables) and `persistence` (transactions over them). */
+  PLUGIN_STORAGE = 'PLUGIN_STORAGE',
   /** Publish events on the shared event bus (events.emit / emitAsync). */
   EMIT_EVENTS = 'EMIT_EVENTS',
   /** Subscribe to events on the shared event bus (events.on / once / ...). */
@@ -163,7 +163,8 @@ export const PLUGIN_PERMISSION_DESCRIPTIONS: Record<PluginPermission, string> = 
   [PluginPermission.ACCESS_RESOURCES]:
     'Read and write resources from the database and query resource access, maintenance windows and active sessions.',
   [PluginPermission.READ_SETTINGS]: 'Read application settings from the database.',
-  [PluginPermission.DATABASE_ACCESS]: 'Access the raw database connection and any other entity repository.',
+  [PluginPermission.PLUGIN_STORAGE]:
+    "Keep data in the plugin's own tables (declared in the plugin, created and migrated by the host). No access to host tables.",
   [PluginPermission.EMIT_EVENTS]: 'Publish events on the shared application event bus.',
   [PluginPermission.LISTEN_EVENTS]: 'Subscribe to events on the shared application event bus.',
   [PluginPermission.RESOLVE_HOST_PROVIDERS]: 'Resolve arbitrary host services by injection token.',

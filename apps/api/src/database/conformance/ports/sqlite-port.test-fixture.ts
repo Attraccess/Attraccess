@@ -56,7 +56,7 @@ function connectPorts(source: DataSource): PortConnection {
   };
 }
 
-const openSqlite = (file: string) =>
+export const openSqlite = (file: string) =>
   sqliteBackend
     .createDataSource({
       type: 'sqlite',
@@ -70,7 +70,7 @@ const openSqlite = (file: string) =>
 let template: Promise<string> | undefined;
 
 /** Runs the released migration track once per test process; every database starts as a copy of that file. */
-function migratedTemplate(): Promise<string> {
+export function migratedTemplate(): Promise<string> {
   template ??= (async () => {
     const file = join(await mkdtemp(join(tmpdir(), 'port-conformance-template-')), 'template.sqlite');
     const source = await openSqlite(file);
