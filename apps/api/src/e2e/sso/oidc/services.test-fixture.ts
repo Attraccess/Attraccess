@@ -4,12 +4,9 @@ import { OidcTokenVerifier } from '../../../users-and-auth/auth/sso/oidc/oidc-to
 import { EncryptionService } from '../../../encryption/encryption.service';
 import {
   AuthenticationDetail,
-  Permission,
   ResourceUsage,
-  Role,
   Session,
   User,
-  UserRole,
 } from '@attraccess/database-entities';
 import { SSOProviderType } from '@attraccess/application-models';
 import type { ConfigService } from '@nestjs/config';
