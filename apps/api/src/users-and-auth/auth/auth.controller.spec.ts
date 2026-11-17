@@ -5,7 +5,7 @@ import { AuthController } from './auth.controller';
 import { Response } from 'express';
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { User } from '@attraccess/database-entities';
+import type { AuthenticatedSessionUser } from '@attraccess/application-models';
 
 const noStore = () => ({ setHeader: jest.fn() }) as unknown as Response;
 
@@ -17,7 +17,7 @@ describe('AuthController', () => {
   });
 
   it('should create a session for programmatic client', async () => {
-    const user: Partial<User> = {
+    const user: Partial<AuthenticatedSessionUser> = {
       id: 1,
       username: 'testuser',
     };
@@ -56,8 +56,103 @@ describe('AuthController', () => {
     expect(mockResponse.cookie).not.toHaveBeenCalled();
   });
 
+  it('never serializes the email, tokens or lockout state of the signed-in account', async () => {
+    const account = {
+      id: 1,
+      username: 'testuser',
+      email: 'secret@example.com',
+      locale: 'en',
+      dateTimeLocale: null,
+      isEmailVerified: true,
+      isDisabled: false,
+      externalIdentifier: null,
+      creditBalance: 0,
+      billingFactor: 100,
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      updatedAt: new Date('2026-01-02T00:00:00Z'),
+      deletedAt: null,
+      lastUsernameChangeAt: new Date(),
+      lockedUntil: new Date(),
+      failedLoginAttempts: 4,
+      firstFailedLoginAt: new Date(),
+      emailVerificationToken: 'verify-secret',
+      emailVerificationTokenExpiresAt: new Date(),
+      passwordResetToken: 'reset-secret',
+      passwordResetTokenExpiresAt: new Date(),
+      deleteAccountToken: 'delete-secret',
+      deleteAccountTokenExpiresAt: new Date(),
+      nfcKeySeedToken: 'nfc-secret',
+      password: 'bcrypt-hash-secret',
+    };
+    const request = {
+      user: account,
+      headers: { 'user-agent': 'curl' },
+      ip: '127.0.0.1',
+      connection: {},
+    } as unknown as AuthenticatedRequest;
+
+    const result = await fixture.authController.createSession(request, { setHeader: jest.fn() } as never, {
+      tokenLocation: 'body',
+    });
+
+    expect(Object.keys(result.user).sort()).toEqual(
+      [
+        'billingFactor',
+        'createdAt',
+        'creditBalance',
+        'dateTimeLocale',
+        'deletedAt',
+        'externalIdentifier',
+        'id',
+        'isDisabled',
+        'isEmailVerified',
+        'locale',
+        'updatedAt',
+        'username',
+      ].sort(),
+    );
+    const json = JSON.stringify(result);
+    for (const secret of [
+      'secret@example.com',
+      'verify-secret',
+      'reset-secret',
+      'delete-secret',
+      'nfc-secret',
+      'bcrypt-hash-secret',
+      'failedLoginAttempts',
+      'lockedUntil',
+    ]) {
+      expect(json).not.toContain(secret);
+    }
+  });
+
+  it('keeps the permissions and the way of authentication of a session principal in a refresh response', async () => {
+    const request = {
+      user: {
+        id: 1,
+        username: 'testuser',
+        email: 'secret@example.com',
+        effectivePermissions: new Set(['resources.read']),
+        authenticationMethod: 'session',
+      },
+      headers: { authorization: 'Bearer old-token' },
+      cookies: {},
+    } as unknown as AuthenticatedRequest;
+    fixture.sessionService.refreshSession.mockResolvedValue('new-token');
+
+    const result = await fixture.authController.refreshSession(request, noStore());
+
+    expect(result.authToken).toBe('new-token');
+    expect(result.user).toMatchObject({
+      id: 1,
+      effectivePermissions: ['resources.read'],
+      authenticationMethod: 'session',
+    });
+    expect(JSON.stringify(result)).not.toContain('secret@example.com');
+  });
+
   it('should create a session for web browser and set cookie', async () => {
-    const user: Partial<User> = {
+    const user: Partial<AuthenticatedSessionUser> = {
       id: 1,
       username: 'testuser',
     };

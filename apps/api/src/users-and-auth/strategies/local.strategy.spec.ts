@@ -4,7 +4,7 @@ import { Request } from 'express';
 import { LocalStrategy } from './local.strategy';
 import { AuthService } from '../auth/auth.service';
 import { TwoFactorService } from '../auth/two-factor.service';
-import { User } from '@attraccess/database-entities';
+import type { AuthenticatedSessionUser } from '@attraccess/application-models';
 import { AuthenticationType } from '@attraccess/application-models';
 
 describe('LocalStrategy', () => {
@@ -37,8 +37,10 @@ describe('LocalStrategy', () => {
   });
 
   it('should return a user if validation is successful', async () => {
-    const user: Partial<User> = { id: 1, username: 'testuser' }; // Mock user object
-    jest.spyOn(authService, 'getUserByLoginIdentifierAndAuthenticationDetails').mockResolvedValue(user as User);
+    const user: Partial<AuthenticatedSessionUser> = { id: 1, username: 'testuser' }; // Mock user object
+    jest
+      .spyOn(authService, 'getUserByLoginIdentifierAndAuthenticationDetails')
+      .mockResolvedValue(user as AuthenticatedSessionUser);
 
     const result = await localStrategy.validate({ body: {} } as Request, 'testuser', 'password2');
     expect(result).toEqual(user);
@@ -56,7 +58,7 @@ describe('LocalStrategy', () => {
   it.each(['TwoFactorRequired', 'TwoFactorInvalidCode'])(
     'propagates %s only after credentials pass',
     async (message) => {
-      const user = { id: 7 } as User;
+      const user = { id: 7 } as AuthenticatedSessionUser;
       jest.spyOn(authService, 'getUserByLoginIdentifierAndAuthenticationDetails').mockResolvedValue(user);
       jest.spyOn(twoFactorService, 'assertTwoFactorForLogin').mockRejectedValue(new UnauthorizedException(message));
       await expect(
@@ -70,7 +72,7 @@ describe('LocalStrategy', () => {
     },
   );
   it('returns the user after a valid code', async () => {
-    const user = { id: 7 } as User;
+    const user = { id: 7 } as AuthenticatedSessionUser;
     jest.spyOn(authService, 'getUserByLoginIdentifierAndAuthenticationDetails').mockResolvedValue(user);
     await expect(
       localStrategy.validate({ body: { twoFactorCode: '012345' } } as Request, 'user', 'password'),

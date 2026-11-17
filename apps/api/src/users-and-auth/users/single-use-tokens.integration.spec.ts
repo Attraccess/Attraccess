@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createMock } from '@golevelup/ts-jest';
 import { ForbiddenException } from '@nestjs/common';
 import {
@@ -10,7 +13,13 @@ import {
 } from '@attraccess/database-entities';
 import { AuthenticationType } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
+import { TypeOrmCredentialStore } from '../../database/adapters/auth/typeorm-credential.store';
+import { TypeOrmPasswordPolicyStore } from '../../database/adapters/auth/typeorm-password-policy.store';
+import { unitOfWorkFor } from '../../database/adapters/shared-unit-of-work';
+import { TransactionContextResolver } from '../../database/adapters/transaction-context';
 import * as migrations from '../../database/migrations';
+import { closeResourceTransactionConnection } from '../../database/sqlite/run-serialized-transaction';
+import { createDataSource } from '../../database/sqlite/sqlite-connection';
 import { EmailService } from '../../email/email.service';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { LicenseService } from '../../license/license.service';
@@ -32,6 +41,7 @@ const TOO_SHORT_PASSWORD = 'a1!';
 
 describe('single-use reset and verification tokens (integration)', () => {
   let source: DataSource;
+  let directory: string;
   let users: UsersService;
   let auth: AuthService;
   let passwords: UserPasswordService;
@@ -39,9 +49,11 @@ describe('single-use reset and verification tokens (integration)', () => {
   let userCount = 0;
 
   beforeAll(async () => {
-    source = await new DataSource({
+    // The unit of work commits on its own connection, so the database must be a file.
+    directory = await mkdtemp(join(tmpdir(), 'single-use-tokens-'));
+    source = await createDataSource({
       type: 'sqlite',
-      database: ':memory:',
+      database: join(directory, 'tokens.sqlite'),
       entities: Object.values(entities),
       migrations: Object.values(migrations),
     }).initialize();
@@ -65,19 +77,20 @@ describe('single-use reset and verification tokens (integration)', () => {
       rbac,
       undefined,
     );
-    auth = new AuthService(
-      emailService,
+    const unitOfWork = unitOfWorkFor(source);
+    const credentials = new TypeOrmCredentialStore(
       source.getRepository(AuthenticationDetail),
-      users,
-      tokenHash,
-      createMock<MetricsService>(),
+      new TransactionContextResolver(source, unitOfWork),
     );
     const passwordPolicy = new PasswordPolicyService(
-      source.getRepository(PasswordPolicy),
-      source.getRepository(PasswordPolicyOverride),
-      source.getRepository(PasswordHistory),
-      source.getRepository(AuthenticationDetail),
-      source,
+      new TypeOrmPasswordPolicyStore(
+        source.getRepository(PasswordPolicy),
+        source.getRepository(PasswordPolicyOverride),
+        source.getRepository(PasswordHistory),
+        unitOfWork,
+      ),
+      credentials,
+      unitOfWork,
       createMock<HibpClient>({ check: async () => ({ pwned: false, count: 0, available: true }) }),
       createMock<ZxcvbnService>({
         evaluate: () => ({ score: 4, guessesLog10: 12, crackTimesSeconds: {}, warning: '', suggestions: [] }),
@@ -85,6 +98,7 @@ describe('single-use reset and verification tokens (integration)', () => {
       rbac,
       { record: jest.fn() },
     );
+    auth = new AuthService(emailService, credentials, users, tokenHash, createMock<MetricsService>(), passwordPolicy);
     // Keep password history on so a rejected reset can be shown not to archive anything.
     await passwordPolicy.getPolicy();
     await passwordPolicy.updatePolicy({ historySize: 3, checkHIBP: false });
@@ -96,7 +110,9 @@ describe('single-use reset and verification tokens (integration)', () => {
   });
 
   afterAll(async () => {
+    if (source) await closeResourceTransactionConnection(source);
     if (source?.isInitialized) await source.destroy();
+    if (directory) await rm(directory, { recursive: true, force: true });
   });
 
   async function createLocalUser(): Promise<User> {

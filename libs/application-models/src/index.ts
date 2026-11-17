@@ -70,3 +70,6 @@ export * from './lib/resource-records';
 export * from './lib/project-record';
 export * from './lib/user-record';
 export * from './lib/rbac-record';
+export * from './lib/api-token';
+export * from './lib/authentication-credential';
+export * from './lib/password-policy-records';

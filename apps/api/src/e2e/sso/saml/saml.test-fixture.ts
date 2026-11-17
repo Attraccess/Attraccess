@@ -44,6 +44,10 @@ import { TokenHashService } from '../../../encryption/token-hash.service';
 import type { LicenseService } from '../../../license/license.service';
 import { MetricsService } from '../../../metrics/metrics.service';
 import { AuthService } from '../../../users-and-auth/auth/auth.service';
+import { PasswordPolicyService } from '../../../users-and-auth/password-policy/password-policy.service';
+import { unitOfWorkFor } from '../../../database/adapters/shared-unit-of-work';
+import { TransactionContextResolver } from '../../../database/adapters/transaction-context';
+import { TypeOrmCredentialStore } from '../../../database/adapters/auth/typeorm-credential.store';
 import { SsoAccountResolver } from '../../../users-and-auth/auth/sso/account-resolution/sso-account-resolver.service';
 import { SSOSamlStrategy } from '../../../users-and-auth/auth/sso/saml/saml.strategy';
 import type { SSOSamlRequest } from '../../../users-and-auth/auth/sso/saml/saml.types';
@@ -184,9 +188,16 @@ beforeAll(async () => {
     rbacService,
     { getDefaultLanguage: async () => 'en' } as SettingsService,
   );
-  authService = new AuthService(mockEmailService, authDetailRepo, usersService, tokenHashService, mockMetricsService);
+  authService = new AuthService(
+    mockEmailService,
+    new TypeOrmCredentialStore(authDetailRepo, new TransactionContextResolver(dataSource, unitOfWorkFor(dataSource))),
+    usersService,
+    tokenHashService,
+    mockMetricsService,
+    { getPolicy: async () => ({ historySize: 0 }) } as unknown as PasswordPolicyService,
+  );
 
-  const resolver = new SsoAccountResolver(usersService, authService, dataSource);
+  const resolver = new SsoAccountResolver(usersService, authService);
 
   mockModuleRef = {
     get: (token: unknown): unknown => {

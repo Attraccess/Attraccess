@@ -91,7 +91,6 @@ export class UserPasswordService {
       passwordResetTokenExpiresAt: null,
     });
 
-    await this.passwordPolicyService.archiveCurrentPasswordToHistory(user.id);
     await this.authService.changePassword(user, body.password);
   }
 
@@ -123,7 +122,6 @@ export class UserPasswordService {
       throw new PasswordPolicyViolationException(policyResult.errors);
     }
 
-    await this.passwordPolicyService.archiveCurrentPasswordToHistory(user.id);
     await this.authService.changePassword(user, body.password);
 
     this.logger.debug(`Password successfully updated for user ID: ${id}`);
