@@ -187,7 +187,7 @@ const slots = await heldSlots.find({ where: { resourceId: ctx.resourceId } }, { 
 
 Plugin tests do not need a database. Build the fake context with `createInMemoryPluginStorage()` from the SDK and set
 it as `storage` (and its transaction runner as `persistence`). It follows the contract of the record port: filters,
-compare-and-set, neutral errors and transaction scopes. See [Plugin Storage](plugins/plugin-storage.md#5-testing).
+compare-and-set, neutral errors and transaction scopes. See [Plugin Storage](plugins/plugin-storage.md#_5-testing).
 
 ## Bundling
 
