@@ -5,6 +5,7 @@ import type { MqttCredentialProvisioningProviderFactory } from './mqtt-credentia
 import type { PluginAuditDomainDeclaration } from './plugin-audit';
 import type { PluginFlowNodeDefinition } from './plugin-flow-node';
 import type { PluginEmailTemplate, PluginNotificationCategory } from './plugin-notifications';
+import type { PluginPermissionsDeclaration } from './plugin-permissions';
 import type { PreStartHook, ReaderUiProvider, SessionEndHook, StartBlockedQuery, StartCapacityHook } from './reader-ui';
 
 /**
@@ -80,4 +81,13 @@ export interface PluginBackendModule {
    * SEND_NOTIFICATIONS permission; without it the plugin is quarantined.
    */
   emailTemplates?: PluginEmailTemplate[];
+
+  /**
+   * Optional RBAC permission keys this plugin guards its routes and live topics with. The host validates them at
+   * load time (format, reserved core namespaces, collisions) and registers them in the permission catalog, so they
+   * appear in the role editor and the API-token picker. Declare them with {@link definePluginPermissions} to get
+   * typed keys for `@Auth`. A plugin that is uninstalled or fails to load keeps its keys and their grants, hidden
+   * and granting nothing until it loads again. Requires host 1.11.0-beta.1 or newer; older hosts ignore the field.
+   */
+  permissions?: PluginPermissionsDeclaration;
 }

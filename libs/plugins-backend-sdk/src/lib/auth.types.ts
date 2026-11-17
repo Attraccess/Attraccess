@@ -14,6 +14,8 @@ export interface AuthenticatedUser extends PluginUserModel, AuthenticatedUserExt
   jwtTokenId: string;
   authenticationMethod?: AuthenticationMethod;
   apiTokenId?: number;
+  /** API token or MCP grant only: the keys it was granted, before they were intersected with the owner's. */
+  permissionScope?: readonly string[];
   /**
    * Effective permissions for this user. Stored as a Set for O(1) has() lookups.
    * Note: A plain Set serializes as {} in JSON — spread to an array before including in any HTTP response.

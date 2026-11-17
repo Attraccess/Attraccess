@@ -15,7 +15,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { type Redis } from 'ioredis';
 import { VALKEY_CLIENT } from '../../valkey/valkey.module';
 import { describeValkeyError } from '../../valkey/valkey-outage-logging';
@@ -69,10 +69,63 @@ export class RbacService {
     }
   }
 
+  /**
+   * Also fires for invalidations published by other instances (usage-access-cache re-emits them locally), so a
+   * permission change or a plugin key changing availability elsewhere does not wait for the cache TTL here.
+   */
+  @OnEvent(UserPermissionsChangedEvent.EVENT_NAME)
+  onPermissionsChanged(event: UserPermissionsChangedEvent): void {
+    if (event.userId === undefined) this.permissionsCache.clear();
+    else this.permissionsCache.delete(event.userId);
+  }
+
+  /** Drops every cached permission set, here and on other instances (e.g. plugin keys changed availability). */
+  async invalidateAllPermissions(): Promise<void> {
+    this.permissionsCache.clear();
+    await this.permissionsChanged();
+  }
+
+  /**
+   * Keys of plugins that are not loaded. Their grants stay in role_permission and api_token_permission, but they are
+   * hidden from every catalog, grant nothing, and survive edits made by clients that cannot see them.
+   */
+  async getUnavailablePermissionKeys(): Promise<Set<string>> {
+    return new Set(await this.store.listUnavailablePermissionKeys());
+  }
+
+  /** The role with its grants of unavailable plugin keys left out, as clients see it. */
+  protected withoutUnavailable<T extends RoleRecord>(role: T, unavailable: Set<string>): T {
+    if (unavailable.size === 0 || !role.rolePermissions) return role;
+    return { ...role, rolePermissions: role.rolePermissions.filter((rp) => !unavailable.has(rp.permissionKey)) };
+  }
+
+  /**
+   * The keys an actor may grant or revoke: their effective permissions plus the unavailable plugin keys their own
+   * roles hold. Roles keep grants of unavailable keys and those apply again once the plugin loads, so the "cannot
+   * grant what you don't have" rule must cover them; otherwise anyone could hand out a dormant `matter.*` grant while
+   * Matter is not loaded. An API token or MCP grant adds only the dormant keys inside its own scope, which it keeps
+   * like role grants.
+   */
+  async getGrantCeiling(actor: {
+    id: number;
+    effectivePermissions?: Set<string>;
+    authenticationMethod?: string;
+    permissionScope?: readonly string[];
+  }): Promise<Set<string>> {
+    const ceiling = new Set(actor.effectivePermissions ?? []);
+    const scoped = actor.authenticationMethod === 'api-token' || actor.authenticationMethod === 'mcp-oauth';
+    const scope = new Set(actor.permissionScope ?? []);
+    for (const key of await this.store.dormantPermissionKeysOf(actor.id)) {
+      if (!scoped || scope.has(key)) ceiling.add(key);
+    }
+    return ceiling;
+  }
+
   async getEffectivePermissions(userId: number, bypassCache = false): Promise<Set<string>> {
     const entry = this.permissionsCache.get(userId);
     if (!bypassCache && entry && Date.now() - entry.ts < this.CACHE_TTL_MS) return new Set(entry.permissions);
 
+    // unavailable plugin keys grant nothing while their plugin is not loaded
     const permissions = new Set(await this.store.permissionKeysOf(userId));
     // FIFO eviction: drop the oldest entry when the cache is full
     if (this.permissionsCache.size >= this.MAX_CACHE_SIZE) {
@@ -146,7 +199,8 @@ export class RbacService {
       throw new NotFoundException(`Role ${roleId} not found`);
     }
 
-    // cannot-grant-what-you-don't-have: actor must hold every permission the role grants
+    // cannot-grant-what-you-don't-have: actor must hold every permission the role grants, dormant grants of
+    // unavailable plugin keys included (callers pass getGrantCeiling)
     const missing = this.permissionKeysOf(role).filter((k) => !actorPermissions.has(k));
     if (missing.length > 0) {
       throw new ForbiddenException('You cannot grant a role whose permissions exceed your own');
@@ -202,8 +256,12 @@ export class RbacService {
     await this.permissionsChanged(userId);
   }
 
-  async getRoles(): Promise<RoleRecord[]> {
-    return this.store.listRoles();
+  /** Ceiling checks pass `includeUnavailable`: they must see dormant grants of unavailable plugin keys. */
+  async getRoles(includeUnavailable = false): Promise<RoleRecord[]> {
+    const roles = await this.store.listRoles();
+    if (includeUnavailable) return roles;
+    const unavailable = await this.getUnavailablePermissionKeys();
+    return roles.map((role) => this.withoutUnavailable(role, unavailable));
   }
 
   async getRoleKey(roleId: number): Promise<string | null> {
@@ -211,9 +269,12 @@ export class RbacService {
   }
 
   async getRolesWithUsage(): Promise<RoleWithUserCount[]> {
-    return this.store.listRolesWithUserCounts();
+    const roles = await this.store.listRolesWithUserCounts();
+    const unavailable = await this.getUnavailablePermissionKeys();
+    return roles.map((role) => this.withoutUnavailable(role, unavailable));
   }
 
+  // only available keys can be granted; an unavailable plugin key is reported as unknown, like it looks to clients
   protected async resolvePermissionKeys(keys: string[]): Promise<string[]> {
     const unique = [...new Set(keys)];
     if (unique.length === 0) return [];
@@ -282,7 +343,13 @@ export class RbacService {
     const description = dto.description !== undefined ? dto.description.trim() : role.description;
 
     if (dto.permissionKeys !== undefined) {
-      const targetKeys = await this.resolvePermissionKeys(dto.permissionKeys);
+      // Grants of unavailable plugin keys are invisible to the editor, so a full-set update must keep them.
+      const hidden = await this.getUnavailablePermissionKeys();
+      const keptHidden = this.permissionKeysOf(role).filter((key) => hidden.has(key));
+      const targetKeys = [
+        ...(await this.resolvePermissionKeys(dto.permissionKeys.filter((key) => !keptHidden.includes(key)))),
+        ...keptHidden,
+      ];
       const currentKeys = new Set(this.permissionKeysOf(role));
       const added = targetKeys.filter((k) => !currentKeys.has(k));
       const removed = [...currentKeys].filter((k) => !targetKeys.includes(k));
@@ -314,7 +381,7 @@ export class RbacService {
 
     const updated = (await this.store.findRoleById(roleId)) as RoleRecord;
     await this.audit.record(roleAuditEvent('role_updated', updated, origin));
-    return updated;
+    return this.withoutUnavailable(updated, await this.getUnavailablePermissionKeys());
   }
 
   async deleteRole(

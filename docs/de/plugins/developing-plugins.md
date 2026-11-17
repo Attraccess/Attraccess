@@ -326,6 +326,172 @@ Einige Hinweise zur Grenze:
 > auf der Plugins-Seite jede angeforderte Berechtigung, bevor sie einem Plugin
 > vertrauen.
 
+### Plugin-eigene RBAC-Berechtigungen
+
+Die `permissions` im Manifest oben sind **Host-Fähigkeiten**, die Ihr Plugin-Code nutzen darf. RBAC-Berechtigungen
+sind etwas anderes: Sie legen fest, welche **Benutzer und API-Tokens** Ihre Routen aufrufen, Ihre Seiten öffnen und
+Ihre Live-Themen abonnieren dürfen. Ein Plugin kann eigene Schlüssel deklarieren, statt breite Kernschlüssel wie
+`system.plugins.manage` wiederzuverwenden. Der Host nimmt sie in den Berechtigungskatalog auf, sodass Administratoren
+sie im Rollen-Editor und in der Auswahl für API-Tokens sehen, gruppiert unter dem Namen des Plugins.
+
+Plugin-eigene Schlüssel brauchen den Host **1.11.0-beta.1** oder neuer. Ältere Hosts ignorieren das Feld, dort hätte
+niemand Ihre Schlüssel: Erhöhen Sie `attraccessVersion.min` (und den Peer-Bereich des SDK), sobald Sie sie verwenden.
+
+#### Schlüssel deklarieren
+
+Deklarieren Sie die Schlüssel einmal mit `definePluginPermissions` und exportieren Sie die Deklaration als
+`permissions` am Backend-Modul:
+
+```typescript
+// backend/permissions.ts
+import { definePluginPermissions } from '@attraccess/plugins-backend-sdk';
+
+export const ACME_PERMISSIONS = definePluginPermissions({
+  // Optionale Gruppenbezeichnung im Rollen-Editor; Standard ist der Plugin-Name aus dem Manifest.
+  category: { en: 'Acme widgets', de: 'Acme-Widgets' },
+  permissions: [
+    {
+      key: 'acme.widgets.read',
+      label: { en: 'View widgets', de: 'Widgets anzeigen' },
+      description: { en: 'View widgets and their status', de: 'Widgets und ihren Status anzeigen' },
+      defaultRoles: ['administrator', 'resource-manager'],
+    },
+    {
+      key: 'acme.widgets.manage',
+      label: { en: 'Manage widgets', de: 'Widgets verwalten' },
+      description: { en: 'Create, change and delete widgets', de: 'Widgets anlegen, ändern und löschen' },
+    },
+  ],
+});
+
+export const WIDGETS_READ = ACME_PERMISSIONS.keys['acme.widgets.read'];
+export const WIDGETS_MANAGE = ACME_PERMISSIONS.keys['acme.widgets.manage'];
+```
+
+```typescript
+// backend/plugin.ts
+const plugin: PluginBackendModule = {
+  permissions: ACME_PERMISSIONS,
+  register(context) {
+    /* … */
+  },
+};
+```
+
+Jeder Schlüssel braucht eine englische und eine deutsche Bezeichnung und Beschreibung; der Rollen-Editor zeigt sie in
+der Sprache des Benutzers.
+
+#### Format und Kollisionsregeln
+
+Der Host prüft die Deklaration beim Laden des Plugins:
+
+- Ein Schlüssel besteht aus kleingeschriebenen, durch Punkte getrennten Segmenten, mindestens zwei
+  (`PLUGIN_PERMISSION_KEY_PATTERN`, `^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$`), höchstens 100 Zeichen. Stellen Sie den
+  Namen Ihres Plugins voran.
+- Ein Schlüssel darf keinem Kernschlüssel entsprechen und nicht mit einem reservierten Kern-Namensraum beginnen
+  (`RESERVED_PERMISSION_NAMESPACES`): `resources.`, `users.`, `system.`, `billing.`.
+- Ein Plugin darf denselben Schlüssel nicht zweimal deklarieren.
+- Ein Schlüssel gehört dem Plugin, das ihn zuerst registriert hat. Deklariert ihn später ein anderes Plugin, wird es
+  abgelehnt, auch während der Besitzer deinstalliert ist.
+- `defaultRoles` darf nur Systemrollen nennen (`PLUGIN_PERMISSION_DEFAULT_ROLES`): `user`, `resource-manager`,
+  `user-manager`, `billing-manager`, `system-admin`, `administrator`.
+
+Ein Verstoß verhindert nur das Laden Ihres Plugins: Es wird mit einem Fehler unter Quarantäne gestellt, der Schlüssel
+und Regel nennt. Der Host und alle anderen Plugins laufen weiter.
+
+#### Standardrollen
+
+- `defaultRoles` werden **nur bei der ersten Registrierung** eines Schlüssels vergeben. Spätere Starts vergeben ihn
+  nicht erneut; entfernt ein Administrator den Schlüssel aus einer Rolle, bleibt er entfernt.
+- Die Rolle `administrator` hält immer jeden verfügbaren Plugin-Schlüssel, ob Sie sie aufführen oder nicht. Der Host
+  stellt das bei jedem Start sicher; so funktionieren die Schutzmechanismen für den letzten Administrator weiter.
+- Eigene Rollen erhalten Plugin-Schlüssel nie automatisch. Beschreiben Sie in der Dokumentation Ihres Plugins, welche
+  Schlüssel Administratoren ihren eigenen Rollen hinzufügen sollen.
+
+SSO-Benutzer erhalten Plugin-Schlüssel wie Kernschlüssel über Rollen: SSO ordnet Gruppen des Anbieters Rollen zu,
+nicht Berechtigungsschlüsseln.
+
+#### Wenn ein Plugin nicht verfügbar ist
+
+Wird ein Plugin deinstalliert (hochgeladenes ZIP oder npm-Paket), unter Quarantäne gestellt oder schlägt sein Laden
+fehl, oder deklariert eine neuere Version einen Schlüssel nicht mehr, werden seine Schlüssel **nicht verfügbar**:
+
+- Sie verschwinden aus dem Berechtigungskatalog, dem Rollen-Editor und der Auswahl für API-Tokens.
+- Sie gewähren nichts, auch nicht Rollen und API-Tokens, die sie halten.
+- Die Zuweisungen an Rollen und API-Tokens bleiben in der Datenbank. Speichern einer Rolle oder eines Tokens in der
+  Oberfläche behält die verborgenen Zuweisungen.
+- Lädt das Plugin wieder, kommen die Schlüssel mit allen Zuweisungen zurück.
+
+Das Deinstallieren eines hochgeladenen Plugins löscht dessen eigene Daten (seine Down-Migrationen laufen), behält
+aber seine Berechtigungszeilen und Zuweisungen. Ihre Migrationen dürfen nicht in die RBAC-Tabellen des Kerns
+(`permission`, `role_permission`, `api_token_permission`) schreiben; der Host verwaltet sie.
+
+#### Schlüssel verwenden
+
+Die Schlüssel aus `definePluginPermissions` sind typisiert, die Auth-Decorators nehmen sie ohne Casts an:
+
+```typescript
+import { Auth, AuthAny, SessionAuth } from '@attraccess/plugins-backend-sdk';
+
+@Controller('acme/widgets')
+export class WidgetsController {
+  @Get()
+  @Auth(WIDGETS_READ)
+  list() {}
+
+  @Post()
+  @Auth(WIDGETS_MANAGE)
+  create() {}
+
+  // Nur Sitzungen: API-Tokens werden abgelehnt, auch wenn sie den Schlüssel tragen.
+  @Get('secret-export')
+  @SessionAuth(WIDGETS_MANAGE)
+  exportSecret() {}
+}
+```
+
+Eine Route ohne den Schlüssel antwortet mit `403`, bevor Ihr Handler läuft. API-Tokens funktionieren wie bei
+Kernschlüsseln: Der Umfang eines Tokens darf nur Schlüssel enthalten, die sein Besitzer hält, und eine Anfrage erhält
+die Schlüssel, die sowohl im Umfang als auch in den aktuellen Berechtigungen des Besitzers stehen.
+`context.resourceAccess.hasPermission(principal, WIDGETS_READ)` nimmt die Schlüssel ebenfalls an.
+
+Live-Themen prüfen sie in `authorize`, das bei jedem Abonnement und jeder Verlängerung läuft. Live-Updates gibt es
+nur für Sitzungen, API-Tokens können nicht abonnieren:
+
+```typescript
+context.liveUpdates.register({
+  topic: 'widgets',
+  identifier: 'none',
+  authorize: (_subscription, user) => {
+    if (!user.effectivePermissions?.has(WIDGETS_READ)) throw new ForbiddenException();
+  },
+  source: () => widgets$,
+});
+```
+
+Im Frontend schützen Sie Routen mit den Schlüsseln als Zeichenketten. `authRequired` nimmt einen Schlüssel oder eine
+Liste im Sinne von „einer davon“, und ein Seitenleisten-Eintrag folgt seiner Route. Um Bedienelemente innerhalb einer
+Seite auszublenden, lesen Sie die Berechtigungen aus den Auth-Daten, die der Host an `onApiAuthStateChange` übergibt:
+
+```tsx
+import { hasPluginAuthPermission } from '@attraccess/plugins-frontend-sdk';
+
+getRoutes(): RouteConfig[] {
+  return [{ path: '/widgets', authRequired: ['acme.widgets.read', 'acme.widgets.manage'], element: <WidgetsPage /> }];
+}
+
+onApiAuthStateChange(authData: AttraccessFrontendPluginAuthData | null): void {
+  this.canManage = hasPluginAuthPermission(authData, 'acme.widgets.manage');
+}
+```
+
+Teilen beide Hälften Ihres Plugins die Schlüssel, legen Sie sie in ein Modul ohne SDK-Importe, damit das
+Frontend-Bundle nicht das Backend-SDK einbindet.
+
+Wer einen Plugin-Schlüssel hält, gilt für die Zwei-Faktor-Authentifizierung als **privilegiert**, wie bei jedem
+Schlüssel außerhalb von `resources.*`. Verlangt Ihre Installation 2FA für privilegierte Benutzer, müssen diese sie
+einrichten, sobald sie einen Plugin-Schlüssel erhalten.
+
 ## Reader-UI und Start-Hooks
 
 Plugins können kleine Widgets auf Attractap-Readern anzeigen und vor dem Start einer Sitzung eine Bestätigung

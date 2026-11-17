@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { SystemPermission } from '@attraccess/shared';
 import { hasRequiredPermissions } from './routeAccess';
 
-function holder(...granted: SystemPermission[]) {
-  return (permission: SystemPermission) => granted.includes(permission);
+function holder(...granted: string[]) {
+  return (permission: string) => granted.includes(permission);
 }
 
 describe('hasRequiredPermissions', () => {
@@ -30,5 +29,13 @@ describe('hasRequiredPermissions', () => {
   it('grants nobody access for an empty gate', () => {
     // "No permission opens this" must not read as "every permission opens this".
     expect(hasRequiredPermissions([], holder('system.settings.manage'))).toBe(false);
+  });
+
+  it('gates on plugin-declared keys like core keys', () => {
+    const gate = ['matter.devices.read', 'thread.network.read'];
+
+    expect(hasRequiredPermissions(gate, holder('thread.network.read'))).toBe(true);
+    expect(hasRequiredPermissions('matter.devices.read', holder('matter.devices.read'))).toBe(true);
+    expect(hasRequiredPermissions(gate, holder('system.plugins.manage'))).toBe(false);
   });
 });

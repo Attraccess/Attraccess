@@ -76,7 +76,7 @@ export class RbacController {
     const actor = request.user as AuthenticatedUser;
     await this.rbacService.deleteRole(
       id,
-      actor.effectivePermissions ?? new Set(),
+      await this.rbacService.getGrantCeiling(actor),
       auditOriginOf(request),
       reassignToRoleId,
     );

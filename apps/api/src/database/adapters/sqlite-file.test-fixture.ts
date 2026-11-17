@@ -43,6 +43,20 @@ export class SqliteFileFixture {
     return source;
   }
 
+  /**
+   * Takes the file's write lock on a plain, unguarded connection, as another process would, and returns its release.
+   * A guarded connection's transaction would not do: a statement of the flow that owns it runs inside it instead of
+   * waiting for the lock.
+   */
+  async holdWriteLock(): Promise<() => Promise<void>> {
+    const holder = await new DataSource({ type: 'sqlite', database: this.file }).initialize();
+    await holder.query('BEGIN IMMEDIATE');
+    return async () => {
+      await holder.query('ROLLBACK');
+      await holder.destroy();
+    };
+  }
+
   async close(): Promise<void> {
     for (const source of this.sources) {
       await closeResourceTransactionConnection(source);

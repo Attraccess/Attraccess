@@ -57,6 +57,12 @@ const toPermissionRecord = (permission: Permission): PermissionRecord => ({
   label: permission.label,
   description: permission.description,
   category: permission.category,
+  pluginName: permission.pluginName ?? null,
+  labelDe: permission.labelDe ?? null,
+  descriptionDe: permission.descriptionDe ?? null,
+  categoryLabel: permission.categoryLabel ?? null,
+  categoryLabelDe: permission.categoryLabelDe ?? null,
+  available: permission.available ?? true,
   createdAt: permission.createdAt,
   updatedAt: permission.updatedAt,
 });
@@ -72,12 +78,21 @@ export class TypeOrmRbacStore implements RbacStore {
     return this.tx.manager(context);
   }
 
-  async permissionKeysOf(userId: number): Promise<string[]> {
+  permissionKeysOf(userId: number): Promise<string[]> {
+    return this.rolePermissionKeysOf(userId, true);
+  }
+
+  dormantPermissionKeysOf(userId: number): Promise<string[]> {
+    return this.rolePermissionKeysOf(userId, false);
+  }
+
+  private async rolePermissionKeysOf(userId: number, available: boolean): Promise<string[]> {
     const rows = await this.source
       .getRepository(UserRole)
       .createQueryBuilder('ur')
       .innerJoin('ur.role', 'r')
       .innerJoin('r.rolePermissions', 'rp')
+      .innerJoin('rp.permission', 'p', 'p.available = :available', { available: available ? 1 : 0 })
       .select('rp.permissionKey', 'permissionKey')
       .distinct(true)
       .where('ur.userId = :userId', { userId })
@@ -94,6 +109,7 @@ export class TypeOrmRbacStore implements RbacStore {
       // details and sessions), so without this a deleted admin still counts as a permission
       // holder forever — e.g. as a supervisor who provably cannot supervise (ATT-867).
       .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
+      .innerJoin('permission', 'p', 'p.key = rp.permissionKey AND p.available = 1')
       .select('DISTINCT ur.userId', 'userId')
       .where('rp.permissionKey = :permKey', { permKey: permissionKey })
       .getRawMany<{ userId: number }>();
@@ -194,13 +210,15 @@ export class TypeOrmRbacStore implements RbacStore {
   }
 
   async countAdministratorEquivalentUsers(excludeRoleId?: number, context?: TransactionContext): Promise<number> {
-    // the permissions table itself is never modified by role CRUD, so the total always comes from the plain connection
-    const totalPermissions = await this.source.getRepository(Permission).count();
+    // the permissions table itself is never modified by role CRUD, so the total always comes from the plain connection.
+    // Only available keys count: an unloaded plugin's keys grant nothing, so they cannot make anyone less of an admin.
+    const totalPermissions = await this.source.getRepository(Permission).count({ where: { available: true } });
     if (totalPermissions === 0) return 0;
     const qb = this.manager(context)
       .createQueryBuilder(UserRole, 'ur')
       .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
       .innerJoin('role_permission', 'rp', 'rp.roleId = ur.roleId')
+      .innerJoin('permission', 'p', 'p.key = rp.permissionKey AND p.available = 1')
       .select('ur.userId', 'userId')
       .groupBy('ur.userId')
       .having('COUNT(DISTINCT rp.permissionKey) = :totalPermissions', { totalPermissions });
@@ -309,12 +327,21 @@ export class TypeOrmRbacStore implements RbacStore {
   }
 
   async listPermissions(): Promise<PermissionRecord[]> {
-    const rows = await this.source.getRepository(Permission).find({ order: { category: 'ASC', key: 'ASC' } });
+    const rows = await this.source
+      .getRepository(Permission)
+      .find({ where: { available: true }, order: { category: 'ASC', key: 'ASC' } });
     return rows.map(toPermissionRecord);
   }
 
+  async listUnavailablePermissionKeys(): Promise<string[]> {
+    const rows = await this.source
+      .getRepository(Permission)
+      .find({ where: { available: false }, select: { key: true } });
+    return rows.map((row) => row.key);
+  }
+
   async findKnownPermissionKeys(keys: string[]): Promise<string[]> {
-    const found = await this.source.getRepository(Permission).find({ where: { key: In(keys) } });
+    const found = await this.source.getRepository(Permission).find({ where: { key: In(keys), available: true } });
     return found.map((p) => p.key);
   }
 

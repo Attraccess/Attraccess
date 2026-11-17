@@ -23,6 +23,10 @@ const mockRbacService = {
   assignRoleByKey: jest.fn().mockResolvedValue(undefined),
   assignDefaultRoles: jest.fn().mockResolvedValue(undefined),
   getEffectivePermissions: jest.fn().mockResolvedValue(new Set()),
+  // no dormant grants: the ceiling is the effective set
+  getGrantCeiling: jest.fn(
+    async (actor: { effectivePermissions?: Set<string> }) => new Set(actor.effectivePermissions),
+  ),
   isLastAdministrator: jest.fn().mockResolvedValue(false),
 };
 

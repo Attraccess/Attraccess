@@ -19,6 +19,7 @@ const state = vi.hoisted(() => ({
     | null,
   throwGroups: false,
   canManageWago: true,
+  granted: [] as string[],
   logout: vi.fn(),
   logoutEverywhere: vi.fn(),
   logoutPending: false,
@@ -28,7 +29,10 @@ const state = vi.hoisted(() => ({
 vi.mock('../../../hooks/useAuth', () => ({
   useAuth: () => ({
     user: { id: 1, username: 'operator' },
-    hasPermission: (permission: string) => permission === 'resources.update' && state.canManageWago,
+    hasPermission: (permission: string) =>
+      (permission === 'resources.update' && state.canManageWago) || state.granted.includes(permission),
+    hasPermissionKey: (permission: string) =>
+      (permission === 'resources.update' && state.canManageWago) || state.granted.includes(permission),
     logout: state.logout,
     logoutEverywhere: state.logoutEverywhere,
     logoutEverywhereLabel: 'Logout everywhere',
@@ -60,6 +64,7 @@ vi.mock('../../plugins/plugin.state', () => ({
 vi.mock('../../routes/index', () => ({
   useAllRoutes: () => [
     { path: '/wago', authRequired: 'resources.update' },
+    { path: '/matter', authRequired: ['matter.devices.read', 'thread.network.read'] },
     { path: '/printers', authRequired: true },
     { path: '/printers/bambulab', authRequired: 'resources.update' },
     { path: '/devices/flows', authRequired: 'resources.update' },
@@ -94,6 +99,7 @@ beforeEach(() => {
   state.plugins = null;
   state.throwGroups = false;
   state.canManageWago = true;
+  state.granted = [];
   state.logout.mockClear();
   state.logoutEverywhere.mockClear();
   state.logoutPending = false;
@@ -165,6 +171,20 @@ describe('plugin sidebar placement', () => {
 
     expect(screen.queryByRole('button', { name: 'Devices' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'WAGO' })).not.toBeInTheDocument();
+  });
+
+  it('shows a plugin entry gated on plugin-declared keys only to holders of one of them', async () => {
+    state.items = [{ label: 'Matter', path: '/matter', group: 'devices' }];
+    state.canManageWago = false;
+    const view = renderSidebar();
+    expect(screen.queryByRole('button', { name: 'Devices' })).not.toBeInTheDocument();
+    view.unmount();
+
+    state.granted = ['thread.network.read'];
+    const user = userEvent.setup();
+    renderSidebar();
+    await user.click(screen.getByRole('button', { name: 'Devices' }));
+    expect(screen.getByRole('link', { name: 'Matter' })).toHaveAttribute('href', '/matter');
   });
 
   it('keeps entries with omitted or unknown groups at the root', () => {

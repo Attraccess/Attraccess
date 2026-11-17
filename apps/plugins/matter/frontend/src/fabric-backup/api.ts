@@ -1,4 +1,4 @@
-// REST access for the fabric & backup section (`/api/matter/*`, guarded by system.plugins.manage).
+// REST access for the fabric & backup section (`/api/matter/*`, guarded by the Matter keys, see backend/permissions.ts).
 import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
 
 export type SidecarFabricState = 'uninitialized' | 'initialized' | 'recovery_required' | 'unknown';

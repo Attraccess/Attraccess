@@ -9,6 +9,7 @@ import { createDataSource } from './sqlite-connection';
 import { sqliteErrorClassifier } from './sqlite-errors';
 import { createSqlitePluginMigrationEngine } from './sqlite-plugin-migration-engine';
 import { createSqlitePluginPersistenceHost, sqliteHostTransactionScope } from './sqlite-plugin-persistence';
+import { readSqlitePermissionOwners } from './sqlite-permission-owners';
 import { createSqliteTransfer } from './sqlite-transfer';
 import { createSqliteUnitOfWork } from './sqlite-unit-of-work';
 
@@ -47,6 +48,7 @@ export const sqliteBackend: TypeOrmDatabaseBackend = {
     // The application connection is opened with `entityList`, so plugin entities added to it are mapped.
     createPersistenceHost: (getConnection) => createSqlitePluginPersistenceHost(getConnection, entityList),
     hostTransactionScope: sqliteHostTransactionScope,
+    readPermissionOwners: () => readSqlitePermissionOwners(createDataSourceOptions()),
   },
   transfer: createSqliteTransfer(migrationTrack),
   onCompanionConnection: onResourceConnection,

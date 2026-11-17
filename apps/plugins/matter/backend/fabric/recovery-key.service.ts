@@ -1,10 +1,10 @@
-import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { MatterRecoveryKey } from '../backup/entities';
 import { InvalidRecoveryKeyError, formatRecoveryKey, generateRecoveryKey, recoveryKeyId } from '../backup/recovery-key';
-import { DeviceAuditService } from '../devices/audit.service';
+import { DeviceAuditService, type AuditBy } from '../devices/audit.service';
 import { PLUGIN_CONTEXT } from '../plugin-context';
 import { conflict } from './errors';
 
@@ -54,12 +54,12 @@ export class RecoveryKeyService {
   }
 
   /** Creates the first key. 409 when one exists: use `rotate`. */
-  async generate(principal: PluginAuditPrincipal | null): Promise<RecoveryKeyReveal> {
+  async generate(by: AuditBy): Promise<RecoveryKeyReveal> {
     if (await this.current()) throw conflict('recovery_key_exists', 'A recovery key already exists.');
     const { row, reveal } = await this.create();
     await this.audit.record(
       'matter.recovery_key_generated',
-      principal,
+      by,
       { type: 'matter.recovery_key', ref: row.id },
       {
         keyId: row.keyId,
@@ -68,7 +68,7 @@ export class RecoveryKeyService {
     return reveal;
   }
 
-  async acknowledge(keyId: string, principal: PluginAuditPrincipal | null): Promise<void> {
+  async acknowledge(keyId: string, by: AuditBy): Promise<void> {
     const row = await this.current();
     if (!row || row.keyId !== keyId) throw conflict('recovery_key_mismatch', 'That is not the current recovery key.');
     if (row.acknowledgedAt) return;
@@ -76,7 +76,7 @@ export class RecoveryKeyService {
     await this.repo.save(row);
     await this.audit.record(
       'matter.recovery_key_acknowledged',
-      principal,
+      by,
       { type: 'matter.recovery_key', ref: row.id },
       {
         keyId: row.keyId,
@@ -85,7 +85,7 @@ export class RecoveryKeyService {
   }
 
   /** Retires the current key and creates a new one. The old key stays (encrypted) so older backups can be read. */
-  async rotate(principal: PluginAuditPrincipal | null): Promise<RecoveryKeyReveal> {
+  async rotate(by: AuditBy): Promise<RecoveryKeyReveal> {
     const previous = await this.current();
     if (!previous) throw conflict('no_recovery_key', 'There is no recovery key to rotate.');
     const { row, reveal } = await sqlitePersistence(this.context)
@@ -96,7 +96,7 @@ export class RecoveryKeyService {
       });
     await this.audit.record(
       'matter.recovery_key_rotated',
-      principal,
+      by,
       { type: 'matter.recovery_key', ref: row.id },
       {
         keyId: row.keyId,
@@ -111,7 +111,7 @@ export class RecoveryKeyService {
    * on an installation that has none. It is off-host with them already, so it counts as acknowledged, and it is never
    * returned. Does nothing when a current key exists or the key is not the one with `keyId`.
    */
-  async adopt(key: Buffer, keyId: string, principal: PluginAuditPrincipal | null): Promise<boolean> {
+  async adopt(key: Buffer, keyId: string, by: AuditBy): Promise<boolean> {
     if (recoveryKeyId(key) !== keyId || (await this.current())) return false;
     const now = new Date().toISOString();
     const row = await this.repo.save({
@@ -124,7 +124,7 @@ export class RecoveryKeyService {
     });
     await this.audit.record(
       'matter.recovery_key_generated',
-      principal,
+      by,
       { type: 'matter.recovery_key', ref: row.id },
       { keyId, source: 'restore' },
     );

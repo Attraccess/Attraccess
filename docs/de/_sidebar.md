@@ -104,6 +104,7 @@
     - [Matter: Betriebsanleitung](plugins/matter/operator.md)
     - [Matter: Datenmodell und Lebenszyklus](plugins/matter/data-model.md)
     - [Matter: Backup und Wiederherstellung](plugins/matter/backup-restore.md)
+    - [Matter: Berechtigungen](plugins/matter/permissions.md)
   - **RabbitMQ**
     - [Überblick](plugins/rabbitmq/overview.md)
   - **Shelly**

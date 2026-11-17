@@ -4,6 +4,7 @@
 // ATT-1001: an authenticated, version-checked connection to the Matter sidecar, configured by an administrator
 // in the web UI. The sidecar being absent, restarting or incompatible never stops this plugin from loading; it
 // shows an explicit degraded state instead. ATT-998 adds fabric persistence and encrypted backup/restore.
+// ATT-1003 declares the plugin's own permission keys (./permissions).
 import type { PluginBackendModule, PluginContext } from '@attraccess/plugins-backend-sdk';
 import type { DynamicModule } from '@nestjs/common';
 import { MatterBackupController } from './backup/controller';
@@ -29,6 +30,7 @@ import { MatterFabricGuard } from './fabric/guard';
 import { hostMigrationReader } from './fabric/migration-reader';
 import { RecoveryKeyService } from './fabric/recovery-key.service';
 import { PLUGIN_MIGRATION_READER } from './fabric/tokens';
+import { MATTER_PERMISSIONS } from './permissions';
 import { PLUGIN_CONTEXT } from './plugin-context';
 
 class MatterPluginModule {}
@@ -37,6 +39,8 @@ const plugin: PluginBackendModule = {
   // Registered into the shared connection so `sqlitePersistence(context).getRepository(MatterConnection)` resolves.
   persistence: { sqlite: { entities: [MatterConnection, ...DEVICE_ENTITIES, ...BACKUP_ENTITIES] } },
   auditDomains: [MATTER_AUDIT_DOMAIN],
+  // ATT-1003: least-privilege Matter and Thread keys; every route requires one (see ./permissions).
+  permissions: MATTER_PERMISSIONS,
   register(context: PluginContext): DynamicModule {
     return {
       module: MatterPluginModule,

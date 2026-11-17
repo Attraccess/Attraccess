@@ -5,6 +5,7 @@ import {
   normalizeBleEndpointInput,
   normalizeBleEndpointUpdate,
   PluginBleError,
+  type PluginBleErrorCode,
   resolveBleScanDuration,
   resolveBleSessionOptions,
   validateBleEndpointId,
@@ -22,13 +23,20 @@ import {
   type PluginBleSessionOptions,
 } from '@attraccess/plugins-backend-sdk';
 import { BleSessionEngine, type BleSessionClock } from '@attraccess/plugins-backend-sdk/internal';
-import { Inject, Injectable, Logger, LoggerService, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger, LoggerService, OnModuleDestroy, Optional } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { OnEvent } from '@nestjs/event-emitter';
 import { randomUUID } from 'crypto';
 import { classifyPersistenceError, isUniqueViolation } from '../../database/persistence-errors';
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../../attractap/events';
-import { BLE_TRANSPORT_DRIVER, type BleTransportDriver } from './ble-transport-driver';
+import { bleStreamOutcome, type PluginBleMetrics } from '../../metrics/definitions/plugin-ble.metrics';
+import { PLUGIN_BLE_METRICS } from '../../metrics/definitions/tokens';
+import {
+  BLE_TRANSPORT_DRIVER,
+  bleAllowlist,
+  type BleReaderStatus,
+  type BleTransportDriver,
+} from './ble-transport-driver';
 import { getPluginBleProfile } from './plugin-ble-profile-registry';
 import { PLUGIN_BLE_STORE, type PluginBleStore } from './plugin-ble-store.port';
 
@@ -57,6 +65,9 @@ interface PendingOpen extends SessionScope {
 /** Host deadlines for driver calls that have no plugin-visible timeout of their own. */
 const READER_AVAILABILITY_DEADLINE_MS = 5_000;
 const SCAN_GRACE_MS = 5_000;
+
+/** Codes that mean a call was refused by the profile, the reader's allowlist or a payload bound. */
+const REJECTION_CODES = new Set(['OPERATION_NOT_ALLOWED', 'UNKNOWN_CHARACTERISTIC', 'PAYLOAD_TOO_LARGE']);
 
 const realClock: BleSessionClock = {
   now: () => Date.now(),
@@ -99,6 +110,7 @@ export class PluginBleService implements OnModuleDestroy {
   constructor(
     @Inject(PLUGIN_BLE_STORE) private readonly store: PluginBleStore,
     private readonly moduleRef: ModuleRef,
+    @Optional() @Inject(PLUGIN_BLE_METRICS) private readonly metrics?: PluginBleMetrics,
   ) {}
 
   async onModuleDestroy(): Promise<void> {
@@ -151,7 +163,9 @@ export class PluginBleService implements OnModuleDestroy {
       readers.map(async (reader) => ({
         readerId: reader.id,
         name: reader.name,
-        available: driver ? await this.isReaderAvailable(driver, reader.id).catch(() => false) : false,
+        available: driver
+          ? (await this.readerStatus(driver, reader.id).catch(() => null))?.status === 'available'
+          : false,
       })),
     );
   }
@@ -172,13 +186,34 @@ export class PluginBleService implements OnModuleDestroy {
       });
     }
     await this.requireReader(readerId);
+    const startedAt = this.clock.now();
+    const logScope = `reader=${readerId} plugin=${caller.pluginId} profile=${profile.id}`;
+    try {
+      const matches = await this.runScan(caller, readerId, profile, durationMs, filter, options?.signal);
+      this.recordOperation('scan', 'ok', this.clock.now() - startedAt, logScope, `results=${matches.length}`);
+      return matches;
+    } catch (error) {
+      const failure = error instanceof PluginBleError ? error : new PluginBleError('INTERNAL', 'scan failed');
+      this.recordOperation('scan', failure.code, this.clock.now() - startedAt, logScope, failure.detail);
+      throw error;
+    }
+  }
+
+  private async runScan(
+    caller: PluginBleCaller,
+    readerId: number,
+    profile: PluginBleProfile,
+    durationMs: number,
+    filter: NonNullable<PluginBleProfile['advertisement']>,
+    signal: AbortSignal | undefined,
+  ): Promise<PluginBleAdvertisement[]> {
     const driver = await this.requireAvailableDriver(readerId);
-    if (options?.signal?.aborted) throw new PluginBleError('CANCELLED', 'scan was cancelled', { operation: 'scan' });
+    if (signal?.aborted) throw new PluginBleError('CANCELLED', 'scan was cancelled', { operation: 'scan' });
 
     const startedAt = this.clock.now();
     const controller = new AbortController();
     const onAbort = () => controller.abort();
-    options?.signal?.addEventListener('abort', onAbort, { once: true });
+    signal?.addEventListener('abort', onAbort, { once: true });
     // Core owns the deadline: a transport that does not answer in time is aborted.
     let timedOut = false;
     const cancelDeadline = this.clock.setTimeout(() => {
@@ -196,6 +231,7 @@ export class PluginBleService implements OnModuleDestroy {
           },
           durationMs,
           signal: controller.signal,
+          context: { pluginId: caller.pluginId, profileId: profile.id },
         }),
         new Promise<never>((_, reject) =>
           controller.signal.addEventListener(
@@ -210,19 +246,21 @@ export class PluginBleService implements OnModuleDestroy {
           ),
         ),
       ]);
-      // The driver is not trusted to filter: core applies the profile filter again and skips malformed entries.
-      const matches: PluginBleAdvertisement[] = [];
+      // The driver is not trusted to filter: core applies the profile filter again, skips malformed entries and
+      // keeps one entry per address.
+      const matches = new Map<string, PluginBleAdvertisement>();
       for (const entry of Array.isArray(raw) ? raw : []) {
         const advertisement = this.tryNormalizeAdvertisement(entry);
-        if (advertisement && matchesBleAdvertisement(profile, advertisement)) matches.push(advertisement);
+        if (!advertisement || matches.has(advertisement.address)) continue;
+        if (matchesBleAdvertisement(profile, advertisement)) matches.set(advertisement.address, advertisement);
       }
       caller.logger.debug?.(
-        `ble scan reader=${readerId} profile=${profile.id} ok results=${matches.length} ${this.clock.now() - startedAt}ms`,
+        `ble scan reader=${readerId} profile=${profile.id} ok results=${matches.size} ${this.clock.now() - startedAt}ms`,
       );
-      return matches;
+      return [...matches.values()];
     } finally {
       cancelDeadline();
-      options?.signal?.removeEventListener('abort', onAbort);
+      signal?.removeEventListener('abort', onAbort);
     }
   }
 
@@ -286,12 +324,34 @@ export class PluginBleService implements OnModuleDestroy {
 
   // ------------------------------------------------------------ sessions
 
+  /** Opens a session and records the outcome as the `connect` operation, including refusals before the reader. */
   async openSession(
     caller: PluginBleCaller,
     endpointId: string,
     options?: PluginBleSessionOptions,
   ): Promise<PluginBleSession> {
+    const startedAt = this.clock.now();
+    // The plugin-supplied endpoint id is only logged once it resolved to an owned endpoint.
+    const trace = { scope: `plugin=${caller.pluginId}` };
+    try {
+      const session = await this.connectSession(caller, endpointId, options, trace);
+      this.recordOperation('connect', 'ok', this.clock.now() - startedAt, trace.scope);
+      return session;
+    } catch (error) {
+      const failure = error instanceof PluginBleError ? error : new PluginBleError('INTERNAL', 'openSession failed');
+      this.recordOperation('connect', failure.code, this.clock.now() - startedAt, trace.scope, failure.detail);
+      throw error;
+    }
+  }
+
+  private async connectSession(
+    caller: PluginBleCaller,
+    endpointId: string,
+    options: PluginBleSessionOptions | undefined,
+    trace: { scope: string },
+  ): Promise<PluginBleSession> {
     const endpoint = await this.findOwned(caller.pluginId, endpointId);
+    trace.scope = `reader=${endpoint.readerId} endpoint=${endpoint.id} plugin=${caller.pluginId}`;
     const profile = this.requireProfile(caller.pluginId, endpoint.profileId);
     const resolved = resolveBleSessionOptions(profile, options);
     if (options?.signal?.aborted)
@@ -312,8 +372,11 @@ export class PluginBleService implements OnModuleDestroy {
     if (this.sessions.has(endpoint.id)) {
       throw new PluginBleError('ENDPOINT_BUSY', 'The endpoint already has an open session', { detail: endpoint.id });
     }
+    const sessionId = randomUUID();
+    const logScope = `${trace.scope} profile=${profile.id} session=${sessionId}`;
+    trace.scope = logScope;
     const session: BleSessionEngine = new BleSessionEngine({
-      id: randomUUID(),
+      id: sessionId,
       endpointId: endpoint.id,
       profile,
       clock: this.clock,
@@ -324,15 +387,30 @@ export class PluginBleService implements OnModuleDestroy {
           addressType: endpoint.addressType,
           timeoutMs,
           signal,
+          sessionId: session.id,
+          leaseMs: resolved.leaseMs,
+          allowlist: bleAllowlist(profile),
+          context: { pluginId: caller.pluginId, profileId: profile.id, endpointId: endpoint.id },
         }),
       onClosed: () => {
         if (this.sessions.get(endpoint.id)?.session === session) this.sessions.delete(endpoint.id);
       },
-      log: (operation, outcome, durationMs) =>
-        caller.logger.debug?.(`ble ${operation} endpoint=${endpoint.id} ${outcome} ${durationMs}ms`),
+      log: (operation, outcome, durationMs, detail) => {
+        caller.logger.debug?.(`ble ${operation} endpoint=${endpoint.id} ${outcome} ${durationMs}ms`);
+        this.recordOperation(operation, outcome, durationMs, logScope, detail);
+      },
+      onRejected: (operation, error) => this.recordOperation(operation, error.code, 0, logScope, error.detail),
+      onStreamFailed: (errorCode, detail) => this.recordStreamFailure(errorCode, logScope, detail),
     });
     this.sessions.set(endpoint.id, { session, ...scope, address: endpoint.address });
+    this.metrics?.sessionsActive.inc();
+    void session.closed.then(({ reason }) => {
+      this.metrics?.sessionsActive.dec();
+      this.metrics?.sessionCloses.inc({ reason });
+      this.logger.log(`ble session closed ${logScope} reason=${reason}`);
+    });
     await session.open({ signal: options?.signal, ...resolved });
+    this.logger.log(`ble session open ${logScope} mtu=${session.mtu} leaseMs=${resolved.leaseMs}`);
     return session.handle;
   }
 
@@ -351,16 +429,37 @@ export class PluginBleService implements OnModuleDestroy {
     }
   }
 
-  private isReaderAvailable(driver: BleTransportDriver, readerId: number): Promise<boolean> {
-    return new Promise<boolean>((resolve, reject) => {
+  /** Operation outcome for logs and metrics; never payload bytes. `detail` is the safe diagnostic. */
+  private recordOperation(operation: string, outcome: string, durationMs: number, scope: string, detail?: string) {
+    const ok = outcome === 'ok';
+    const line = `ble op=${operation} ${scope} outcome=${outcome}${detail ? ` detail=${detail}` : ''} ${durationMs}ms`;
+    if (ok) this.logger.debug(line);
+    else this.logger.log(line);
+    if (!this.metrics) return;
+    this.metrics.operations.inc({ operation, outcome });
+    if (ok) this.metrics.operationDuration.observe({ operation }, durationMs / 1000);
+    if (REJECTION_CODES.has(outcome)) this.metrics.rejections.inc({ code: outcome });
+  }
+
+  /** A notification stream the session engine failed on the API side (queue overflow, profile bound). */
+  private recordStreamFailure(errorCode: PluginBleErrorCode, scope: string, detail?: string) {
+    const outcome = bleStreamOutcome(errorCode);
+    this.logger.log(
+      `ble notification stream failed ${scope} outcome=${outcome} code=${errorCode} detail=${detail ?? '-'}`,
+    );
+    this.metrics?.notifications.inc({ outcome });
+  }
+
+  private readerStatus(driver: BleTransportDriver, readerId: number): Promise<BleReaderStatus> {
+    return new Promise<BleReaderStatus>((resolve, reject) => {
       const cancel = this.clock.setTimeout(
         () => reject(new PluginBleError('TIMEOUT', 'The transport did not report reader availability in time')),
         READER_AVAILABILITY_DEADLINE_MS,
       );
       Promise.resolve()
-        .then(() => driver.isReaderAvailable(readerId))
+        .then(() => driver.readerStatus(readerId))
         .then(
-          (available) => (cancel(), resolve(Boolean(available))),
+          (status) => (cancel(), resolve(status ?? { status: 'offline' })),
           (error) => (cancel(), reject(error)),
         );
     });
@@ -410,8 +509,16 @@ export class PluginBleService implements OnModuleDestroy {
   private async requireAvailableDriver(readerId: number): Promise<BleTransportDriver> {
     const driver = this.driver();
     if (!driver) throw new PluginBleError('TRANSPORT_UNAVAILABLE', 'No BLE transport is available on this host');
-    if (!(await this.isReaderAvailable(driver, readerId))) {
-      throw new PluginBleError('READER_OFFLINE', `Reader ${readerId} cannot do BLE right now`);
+    const status = await this.readerStatus(driver, readerId);
+    if (status.status === 'unsupported') {
+      throw new PluginBleError('READER_UNSUPPORTED', `The firmware of reader ${readerId} cannot do plugin BLE`, {
+        detail: status.detail,
+      });
+    }
+    if (status.status !== 'available') {
+      throw new PluginBleError('READER_OFFLINE', `Reader ${readerId} cannot do BLE right now`, {
+        detail: status.detail,
+      });
     }
     return driver;
   }

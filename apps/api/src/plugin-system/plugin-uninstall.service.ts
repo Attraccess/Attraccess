@@ -65,7 +65,8 @@ export class PluginUninstallService {
       PluginUninstallService.logger.error(`Failed to delete BLE endpoints of plugin ${plugin.name}`, error as Error);
     }
 
-    // delete folder
+    // delete folder. The plugin's RBAC permission rows stay: deleting them would cascade to every role and
+    // API-token grant. The next boot marks them unavailable, and a reinstall brings them back with their grants.
     await rm(pluginFolder, { recursive: true });
     try {
       PluginService.clearPluginQuarantine(plugin.pluginDirectory);

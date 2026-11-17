@@ -33,7 +33,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   }),
 }));
 vi.mock('../../components/toastProvider', () => ({ useToastMessage: () => ({ error: state.toastError }) }));
-vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 7 }, hasPermission: () => true }) }));
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 7 }, hasPermission: () => true, hasPermissionKey: () => true }) }));
 vi.mock('./pinnablePagesContext', () => ({ usePinnablePages: () => state.pinnable }));
 vi.mock('./widgets/widgetsContext', () => ({ useDashboardWidgets: () => state.widgets }));
 vi.mock('../resources/usage/components/ResourceUsageSession', () => ({

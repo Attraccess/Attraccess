@@ -222,7 +222,14 @@ describe('MCP OAuth (real application)', () => {
         redirectHost: '127.0.0.1:8123',
         loopbackRedirect: true,
         registeredByOperator: false,
-        permissions: [expect.objectContaining({ key: 'users.roles.manage', category: 'users' })],
+        permissions: [
+          expect.objectContaining({
+            key: 'users.roles.manage',
+            category: 'users',
+            pluginName: null,
+            categoryLabel: null,
+          }),
+        ],
         unavailablePermissions: [],
         resource: RESOURCE,
       });

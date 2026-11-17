@@ -130,6 +130,7 @@ export class BillingService {
     const setAdditionalItemsFlowNodes = await this.resourceFlowsService.getNodes(
       resourceId,
       ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
+      context,
     );
     if (setAdditionalItemsFlowNodes.length > 0) {
       return true;

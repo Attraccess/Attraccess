@@ -6,6 +6,7 @@ import type {
   ResourceFlowNodeType,
 } from '@attraccess/application-models';
 import type { AuditEvent } from '../../audit/recorder/audit-event';
+import type { TransactionScope } from '../../database/unit-of-work';
 
 export const FLOW_GRAPH_STORE = Symbol.for('attraccess.flows.graph-store');
 
@@ -48,8 +49,12 @@ export interface FlowGraphStore {
   loadResourceCanvas(resourceId: number): Promise<FlowCanvas>;
   loadGlobalCanvas(flowId: number): Promise<FlowCanvas>;
 
-  /** The nodes of a resource's flow with the given type. */
-  findResourceNodes(resourceId: number, type: ResourceFlowNodeType): Promise<FlowNodeRecord[]>;
+  /** The nodes of a resource's flow with the given type; with `scope`, read inside that transaction. */
+  findResourceNodes(
+    resourceId: number,
+    type: ResourceFlowNodeType,
+    scope?: TransactionScope,
+  ): Promise<FlowNodeRecord[]>;
   findNodesForResources(resourceIds: number[], type: ResourceFlowNodeType): Promise<FlowNodeRecord[]>;
   /** The nodes of one global flow. */
   findGlobalFlowNodes(flowId: number): Promise<FlowNodeRecord[]>;

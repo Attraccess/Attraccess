@@ -43,18 +43,14 @@ describe('SqliteSessionStore across independent connections', () => {
       await storeA.createSession('h:busy', 7, undefined, inAnHour());
       const impatient = new SqliteSessionStore((await fixture.open(false, 100)).getRepository(Session), hash);
 
-      const writer = first.createQueryRunner();
-      await writer.connect();
-      await writer.startTransaction();
-      await writer.query('DELETE FROM sso_logout_state');
+      const release = await fixture.holdWriteLock();
       let failure: unknown;
       try {
         await impatient.revokeSession('busy').catch((error) => {
           failure = error;
         });
       } finally {
-        await writer.rollbackTransaction();
-        await writer.release();
+        await release();
       }
 
       expect(isDatabaseBusyError(failure)).toBe(true);

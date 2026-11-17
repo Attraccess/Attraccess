@@ -1,6 +1,7 @@
 import type { AttractapReader } from '@attraccess/application-models';
 import { ResourceFormAction } from '@attraccess/application-models';
 import type { CardConversation } from './card-conversation.service';
+import type { BleCapabilityState } from './handlers/ble/ble-wire';
 import type { CardSessionState, UiSlotsState, UiStepState } from './handlers/ui/ui-socket-state';
 import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
 
@@ -118,6 +119,35 @@ export enum AttractapEventType {
   UI_SCREEN_CLOSE = 'UI_SCREEN_CLOSE',
   UI_SCREEN_DISMISSED = 'UI_SCREEN_DISMISSED',
   UI_ACTION = 'UI_ACTION',
+
+  // Plugin BLE transport (ATT-1033/ATT-1036). Wire contract, protocol v1 (handlers/ble/ble-wire.ts): only on the
+  // paired reader link (session transport), never on a legacy token connection. Every payload carries `v`, every
+  // request a server-assigned `sessionId` and a per-connection `requestId`; bytes are base64. Never ACKed;
+  // correlation is by sessionId + requestId only. The reader announces capabilities.ble.
+  /** Server → reader: bounded scan with the profile's advertisement filter. Answered by BLE_SCAN_RESULT. */
+  BLE_SCAN = 'BLE_SCAN',
+  /** Server → reader: connect for a session, with address, deadlines and the profile allowlist the reader enforces. */
+  BLE_SESSION_OPEN = 'BLE_SESSION_OPEN',
+  /** Server → reader: read one allowlisted characteristic (`s`, `c`). BLE_RESULT carries the bytes as `value`. */
+  BLE_READ = 'BLE_READ',
+  /** `withoutResponse` writes are pipelined; their BLE_RESULT only frees the API's send window. */
+  BLE_WRITE = 'BLE_WRITE',
+  /** Notify or indicate; the reader writes the CCCD. Its `requestId` becomes the notifications' `subscriptionId`. */
+  BLE_SUBSCRIBE = 'BLE_SUBSCRIBE',
+  /** Server → reader: end the subscription of `s`, `c`; the reader clears the CCCD. Answered by BLE_RESULT. */
+  BLE_UNSUBSCRIBE = 'BLE_UNSUBSCRIBE',
+  /** Server → reader: abandon `requestId` (scan, connect or GATT operation). No answer of its own. */
+  BLE_CANCEL = 'BLE_CANCEL',
+  /** Server → reader: end the session and disconnect the peripheral. Answered by BLE_RESULT. */
+  BLE_SESSION_CLOSE = 'BLE_SESSION_CLOSE',
+  /** Reader → server: the one terminal answer to a request: `ok` with `value`/`mtu`, or `error { code, detail }`. */
+  BLE_RESULT = 'BLE_RESULT',
+  /** Reader → server: the answer to BLE_SCAN, deduplicated by address. */
+  BLE_SCAN_RESULT = 'BLE_SCAN_RESULT',
+  /** Reader → server: `subscriptionId`, gapless `seq` from 1, and `value` or a stream-ending `error`. */
+  BLE_NOTIFICATION = 'BLE_NOTIFICATION',
+  /** Reader → server: the reader ended the session itself (peripheral lost, lease, OTA), with `reason` and `detail`. */
+  BLE_SESSION_ENDED = 'BLE_SESSION_ENDED',
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -255,6 +285,11 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
     signingIn?: { readerId: number; attempt: symbol };
     /** The reader runs firmware that relays card APDUs (capabilities.cardRelay, 2.0.0+). Older readers get no card functions. */
     cardRelay?: boolean;
+    /**
+     * Plugin BLE support negotiated from capabilities.ble; undefined until READER_FIRMWARE_INFO arrived. Used only
+     * on the paired reader link (`transport` `session`).
+     */
+    ble?: BleCapabilityState;
     /**
      * The reader signed in with its legacy token but is not paired. Like firmware before 2.0.0 it gets
      * no functions, only the firmware update and the push to start pairing bound to its record.

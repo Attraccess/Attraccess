@@ -37,6 +37,8 @@ import { ResourceFlowNodeSchemaDto } from './dto/resource-flow-node-schemas-resp
 
 import { getNodeFlowScopes } from './schemas/node-flow-scopes';
 
+import type { TransactionScope } from '../../database/unit-of-work';
+
 export interface ValidationError {
   nodeId: string;
   nodeType: string;
@@ -166,8 +168,13 @@ export class ResourceFlowsService {
     });
   }
 
-  public async getNodes(resourceId: number, type: ResourceFlowNodeType): Promise<FlowNodeRecord[]> {
-    return await this.graph.findResourceNodes(resourceId, type);
+  /** With `scope`, the read joins that transaction (a lifecycle transaction must not read through the main connection). */
+  public async getNodes(
+    resourceId: number,
+    type: ResourceFlowNodeType,
+    scope?: TransactionScope,
+  ): Promise<FlowNodeRecord[]> {
+    return await this.graph.findResourceNodes(resourceId, type, scope);
   }
 
   public async getNodesForResources(

@@ -26,6 +26,12 @@ void API::updateSateInfo()
         this->crashUploader.onDisconnected();
     }
 
+    // BLE sessions belong to the authenticated connection: a closed socket or a channel switch (pairing, secure
+    // link: both drop the API state) ends them and disconnects the peripheral.
+    const bool bleLinkUp = this->loopIsEnabled && apiState.authenticated;
+    if (this->bleLinkUp && !bleLinkUp) this->bleProxy.linkLost();
+    this->bleLinkUp = bleLinkUp;
+
     if (!this->loopIsEnabled && apiState.authenticated)
     {
         // Offline the init screen shows; no plugin content may linger or start anything.
@@ -41,6 +47,17 @@ void API::setup()
     this->transport.setup();
     this->transport.setMessageCallbackRaw([this](const char *buf, size_t len)
                                           { this->processIncomingMessage(buf, len); });
+    BleProxy::Hooks bleHooks;
+    // Answers keep two queue slots free, notifications four: heartbeats and UI traffic always fit.
+    bleHooks.send = [this](const char *message, size_t length)
+    {
+        return this->transport.sendQueueHasRoom(IReaderTransport::BULK_ANSWER_RESERVE) &&
+               this->transport.sendMessage(message, length);
+    };
+    bleHooks.canSendNotification = [this]()
+    { return this->transport.sendQueueHasRoom(IReaderTransport::BULK_NOTIFICATION_RESERVE); };
+    bleHooks.otaActive = [this]() { return this->firmware.inProgress(); };
+    this->bleProxy.setup(std::move(bleHooks));
 #ifdef ESP_PLATFORM
     this->transport.setBinaryDataCallback([this](esp_websocket_event_data_t data)
                                           { this->firmware.onChunk(data); });
@@ -344,6 +361,8 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
             logger.error("Firmware update required event missing available firmware payload");
             return;
         }
+        // No BLE work during an OTA: the session ends now, new requests get READER_BUSY until the reboot.
+        this->bleProxy.otaStarted();
         this->firmware.begin(fw);
 #endif
     }
@@ -426,6 +445,15 @@ void API::processIncomingMessage(const char *buf, size_t len)
     {
         this->onCardConversationEnd(inboundDoc["data"].as<JsonObject>());
         return;
+    }
+    // BLE proxy requests carry their own requestId and answers; never ACKed (ATT-1033). Only the server that
+    // authenticated this reader on the paired session channel (mutual TLS) may drive its radio: not the legacy
+    // token or pairing channel, and not before READER_AUTHENTICATED. Others get READER_UNSUPPORTED.
+    if (strncmp(eventType, "BLE_", 4) == 0)
+    {
+        const bool trusted = this->transport.authenticatesReader() && State::getApiState().authenticated;
+        if (this->bleProxy.handleMessage(eventType, inboundDoc["data"]["payload"].as<JsonObjectConst>(), trusted))
+            return;
     }
     // Coredump upload replies (ATT-1144) pace the upload themselves (one chunk in flight, retried on a
     // timeout), so the server sends them without waiting for an ACK. Their errors are upload steps.

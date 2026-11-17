@@ -47,6 +47,7 @@ import { ReaderSessionService } from '../security/reader-session.service';
 import { AttractapSupervisionHandler } from './handlers/supervision/supervision.handler';
 import { AttractapMassIntroductionHandler } from './handlers/mass-introduction/mass-introduction.handler';
 import { AttractapUiHandler } from './handlers/ui/ui.handler';
+import { ReaderBleDriver } from './handlers/ble/reader-ble.driver';
 import { CardSessionService } from './handlers/ui/card-session.service';
 import { UiAuditService } from './handlers/ui/ui-audit.service';
 import { UiSlotService } from './handlers/ui/ui-slot.service';
@@ -174,6 +175,7 @@ export function gatewayProviders(
     { provide: ReaderActiveUsageService, useValue: { activeResourceIds: jest.fn(async () => new Set<number>()) } },
     AttractapUiHandler,
     ReaderStartGate,
+    ReaderBleDriver,
     ...security,
   ];
 }

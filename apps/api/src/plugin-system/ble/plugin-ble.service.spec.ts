@@ -1,6 +1,8 @@
 import type { AttractapReader } from '@attraccess/application-models';
+import { Logger } from '@nestjs/common';
 import { PluginBleError, type PluginBleContext } from '@attraccess/plugins-backend-sdk';
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../../attractap/events';
+import type { BleReaderStatus } from './ble-transport-driver';
 import { createHostBleHarness, type HostBleHarness } from './__test__/ble-host-harness.test-fixture';
 import { BleTestDriver } from './__test__/ble-test-driver.test-fixture';
 import { createPluginBleContext } from './plugin-ble-context';
@@ -89,14 +91,14 @@ describe('PluginBleService (host details)', () => {
 
   it('fails an open that was in flight when the reader was turned off', async () => {
     const created = await endpoint();
-    let release!: (available: boolean) => void;
+    let release!: (status: BleReaderStatus) => void;
     jest
-      .spyOn(harness.driver, 'isReaderAvailable')
-      .mockImplementationOnce(() => new Promise<boolean>((resolve) => (release = resolve)) as never);
+      .spyOn(harness.driver, 'readerStatus')
+      .mockImplementationOnce(() => new Promise<BleReaderStatus>((resolve) => (release = resolve)) as never);
     const opening = ble.openSession(created.id).catch((error: PluginBleError) => error);
     while (!release) await new Promise((resolve) => setImmediate(resolve));
     await harness.setReaderAccess(1, false);
-    release(true);
+    release({ status: 'available' });
     await expect(opening).resolves.toMatchObject({ code: 'READER_ACCESS_DENIED' });
     expect(harness.openSessions()).toHaveLength(0);
     expect(harness.transcript.map((entry) => entry.op)).not.toContain('connect');
@@ -104,14 +106,14 @@ describe('PluginBleService (host details)', () => {
 
   it('fails an open that was in flight when its endpoint was deleted', async () => {
     const created = await endpoint();
-    let release!: (available: boolean) => void;
+    let release!: (status: BleReaderStatus) => void;
     jest
-      .spyOn(harness.driver, 'isReaderAvailable')
-      .mockImplementationOnce(() => new Promise<boolean>((resolve) => (release = resolve)) as never);
+      .spyOn(harness.driver, 'readerStatus')
+      .mockImplementationOnce(() => new Promise<BleReaderStatus>((resolve) => (release = resolve)) as never);
     const opening = ble.openSession(created.id).catch((error: PluginBleError) => error);
     while (!release) await new Promise((resolve) => setImmediate(resolve));
     await ble.deleteEndpoint(created.id);
-    release(true);
+    release({ status: 'available' });
     await expect(opening).resolves.toMatchObject({ code: 'ENDPOINT_NOT_FOUND' });
     expect(harness.transcript.map((entry) => entry.op)).not.toContain('connect');
   });
@@ -197,6 +199,40 @@ describe('PluginBleService (host details)', () => {
     expect(JSON.stringify([(failure as PluginBleError).message, (failure as PluginBleError).detail])).not.toContain(
       'deadbeef',
     );
+  });
+
+  it('records every openSession outcome as the connect operation, refusals before the reader included', async () => {
+    const operations = { inc: jest.fn() };
+    Object.assign(harness.service, {
+      metrics: {
+        operations,
+        operationDuration: { observe: jest.fn() },
+        rejections: { inc: jest.fn() },
+        sessionsActive: { inc: jest.fn(), dec: jest.fn() },
+        sessionCloses: { inc: jest.fn() },
+      },
+    });
+    const lines: string[] = [];
+    jest.spyOn(Logger.prototype, 'log').mockImplementation((line) => void lines.push(String(line)));
+    jest.spyOn(Logger.prototype, 'debug').mockImplementation((line) => void lines.push(String(line)));
+    const created = await endpoint();
+
+    const session = await ble.openSession(created.id);
+    await expect(ble.openSession(created.id)).rejects.toMatchObject({ code: 'ENDPOINT_BUSY' });
+    await session.close();
+    await expect(ble.openSession('forged-endpoint-id')).rejects.toMatchObject({ code: 'ENDPOINT_NOT_FOUND' });
+
+    expect(operations.inc.mock.calls.map(([labels]) => labels)).toEqual([
+      { operation: 'connect', outcome: 'ok' },
+      { operation: 'connect', outcome: 'ENDPOINT_BUSY' },
+      { operation: 'connect', outcome: 'ENDPOINT_NOT_FOUND' },
+    ]);
+    const connects = lines.filter((line) => line.startsWith('ble op=connect'));
+    expect(connects).toHaveLength(3);
+    expect(connects[1]).toMatch(new RegExp(`reader=1 endpoint=${created.id} plugin=plugin-a outcome=ENDPOINT_BUSY`));
+    // A plugin-supplied id that resolved to nothing is not echoed into the logs.
+    expect(connects[2]).toMatch(/^ble op=connect plugin=plugin-a outcome=ENDPOINT_NOT_FOUND/);
+    expect(connects[2]).not.toContain('forged-endpoint-id');
   });
 
   it('turns a unique-index race into ENDPOINT_CONFLICT', async () => {

@@ -172,7 +172,7 @@ def reader_power(target):
 def power_on(target):
     """Turn the reader on if it is off and the lab can switch it.
 
-    A Touch V1 turns itself off about 30 s after its screen goes dark, as when
+    A Touch V1 turns itself off about 36 s after its screen goes dark, as when
     parked; a reader behind a power switch is off when someone left it off.
     Readers that are on, and places without switchable power, are left alone.
     """
@@ -248,17 +248,44 @@ def _switching(target, power):
 # A flash ends with a reset; give a reader that lost power time to show as off.
 RESET_SETTLE_SECONDS = 3.0
 
+# A Touch V1's power-bank chip cuts the power once its load has stayed low for
+# about 36 s, and a reader being flashed draws little. A flash that ends near
+# that time can be cut a few seconds after its reset, before the new image
+# lights the screen: in two nightly runs on 2026-11-16 the cut came after the
+# check RESET_SETTLE_SECONDS after the reset, so the reader's port never came
+# back. Once the image has lit the screen the chip keeps the power on.
+POWER_CUT_WATCH_SECONDS = 15.0
+# How often a flashed Touch V1 is checked during that watch.
+POWER_WATCH_INTERVAL_SECONDS = 1.0
 
-def power_on_after_reset(target):
+
+def power_on_after_reset(target, watch=False):
     """Switch a reader back on if it went off at a flash's reset.
 
     A Touch V1 switched on from parking runs the dark parking image, so its
-    power-bank chip cuts the power about 30 s later. A flash that ends after
-    that leaves the new image in place but the reader off; the button boots it.
+    power-bank chip cuts the power about 36 s later. A flash that ends near
+    that time leaves the new image in place but the reader off; the button
+    boots it. With ``watch``, a reader that can switch itself off (one on its
+    power button) is checked for POWER_CUT_WATCH_SECONDS after the reset and
+    switched on again whenever it is off. A reader behind a power switch does
+    not switch itself off, so it is checked once.
     """
-    if reader_power(target) is not None:
-        time.sleep(RESET_SETTLE_SECONDS)
+    power = reader_power(target)
+    if power is None:
+        return
+    deadline = time.monotonic()
+    if watch and _cuts_own_power(target, power):
+        deadline += POWER_CUT_WATCH_SECONDS
+    time.sleep(RESET_SETTLE_SECONDS)
+    power_on(target)
+    while (left := deadline - time.monotonic()) > 0:
+        time.sleep(min(POWER_WATCH_INTERVAL_SECONDS, left))
         power_on(target)
+
+
+def _cuts_own_power(target, power):
+    """Whether the reader's power-bank chip may switch it off (a Touch V1 on its button)."""
+    return place_power(target) != POWER_SWITCH and not isinstance(power, SwitchPowerDriver)
 
 
 def flash_reader(target, image, *, erase=False):
@@ -266,7 +293,8 @@ def flash_reader(target, image, *, erase=False):
 
     A slow upload can let a Touch V1 switch itself off during the flash (see
     power_on_after_reset). It is then switched on and flashed once more; the
-    image is already on the exporter, so the second attempt is quick.
+    image is already on the exporter, so the second attempt is quick. After
+    the flash, a Touch V1 is watched until the new image keeps it on.
     """
     flash = target.get_driver(ESPToolDriver, activate=False)
     for attempt in range(2):
@@ -284,7 +312,7 @@ def flash_reader(target, image, *, erase=False):
                 raise
         finally:
             target.deactivate(flash)
-    power_on_after_reset(target)
+    power_on_after_reset(target, watch=True)
 
 
 def smoke(target, image, output, *, log_seconds=15.0, max_log_bytes=1_048_576, expect=None, check_ui_selftest=False):

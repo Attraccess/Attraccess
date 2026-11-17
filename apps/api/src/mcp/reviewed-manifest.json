@@ -407,7 +407,7 @@
   "listPermissions": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "daaf5505"
+    "shape": "0a248860"
   },
   "updateRole": {
     "decision": "allow",
@@ -1962,7 +1962,7 @@
   "getMcpOAuthRequest": {
     "decision": "deny",
     "reason": "MCP OAuth endpoint: the consent decision belongs to the signed-in user in a browser, never to an MCP client.",
-    "shape": "81774ff0"
+    "shape": "eac2bcb6"
   },
   "approveMcpOAuthRequest": {
     "decision": "deny",

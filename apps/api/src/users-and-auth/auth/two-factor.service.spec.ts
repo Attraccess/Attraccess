@@ -5,7 +5,7 @@ import type { EncryptionService } from '../../encryption/encryption.service';
 import type { MetricsService } from '../../metrics/metrics.service';
 import type { TotpStore } from './credentials/credential-store.port';
 import { TwoFactorPolicy } from './two-factor.dto';
-import { TwoFactorService } from './two-factor.service';
+import { TwoFactorService, type TwoFactorUser } from './two-factor.service';
 jest.mock('otplib', () => ({
   verify: jest.fn(),
   generateSecret: jest.fn().mockReturnValue('TOTP-FIXTURE'),
@@ -147,5 +147,17 @@ describe('TwoFactorService enrollment and login', () => {
     const status = await service.getStatus(user);
     expect(JSON.stringify(status)).not.toContain('TOTP-FIXTURE');
     expect(status).toEqual({ enabled: true, required: false, policy: TwoFactorPolicy.OPTIONAL });
+  });
+
+  it.each([
+    [['resources.read', 'resources.update'], false],
+    // plugin-declared keys are outside resources.*, so their holders count as privileged (ATT-1003)
+    [['resources.read', 'matter.devices.read'], true],
+  ])('treats a user holding %j as privileged: %s', (permissions, privileged) => {
+    const holder = { ...user, effectivePermissions: new Set(permissions) } as unknown as TwoFactorUser;
+    const policyCheck = service as unknown as {
+      isPolicyRequiredForUser(policy: TwoFactorPolicy, user: TwoFactorUser): boolean;
+    };
+    expect(policyCheck.isPolicyRequiredForUser(TwoFactorPolicy.REQUIRED_FOR_PRIVILEGED, holder)).toBe(privileged);
   });
 });

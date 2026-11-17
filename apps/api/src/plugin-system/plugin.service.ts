@@ -411,7 +411,8 @@ export class PluginService {
       return [];
     }
 
-    const potentialPluginFolders = readdirSync(rootFolder);
+    // Sorted: readdir order differs between file systems, and the first plugin to declare a permission key owns it.
+    const potentialPluginFolders = readdirSync(rootFolder).sort();
     // npm packages are active only while their installation is tracked. A failed or
     // interrupted removal may leave files behind; loading them alongside an uploaded
     // copy of the same plugin would register its flow nodes and audit domains twice.

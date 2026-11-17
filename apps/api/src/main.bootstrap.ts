@@ -9,6 +9,8 @@ import { initializeProcessLogging, withLoggingLifecycle } from './logging/proces
 import { NpmPluginService } from './plugin-system/npm-plugin.service';
 import { PluginMigrationService } from './plugin-system/plugin-migration.service';
 import { PluginModule } from './plugin-system/plugin.module';
+import { loadRecordedPermissionOwners } from './plugin-system/runtime/permission-owners';
+import { setRecordedPermissionOwners } from './plugin-system/runtime/plugin-permissions';
 import { PluginService } from './plugin-system/plugin.service';
 import { SettingsService } from './settings/settings.service';
 import { createWsAdapter } from './common/text-frame-ws-adapter';
@@ -302,6 +304,12 @@ export async function bootstrap() {
     await PluginMigrationService.runPendingUpMigrationsForAllPlugins();
   } else if (skipDatabaseMigrations) {
     bootstrapLogger.log('Skipping plugin database migrations.');
+  }
+
+  // Plugin load rejects permission keys another plugin owns; ownership lives in the database, which is not open
+  // while PluginModule.forRoot() runs.
+  if (!earlyConfig.DISABLE_PLUGINS) {
+    setRecordedPermissionOwners(await loadRecordedPermissionOwners());
   }
 
   // Import AppModule only now, so PluginModule.forRoot() sees the configured PLUGIN_DIR.

@@ -92,6 +92,7 @@ import { createPluginBleContext } from './ble/plugin-ble-context';
 import { PluginBleService } from './ble/plugin-ble.service';
 
 import { preparePluginNotifications } from './runtime/plugin-notifications';
+import { preparePluginPermissions } from './runtime/plugin-permissions';
 import {
   PLUGIN_START_BLOCKED_CHANGED_EVENT,
   type PluginStartBlockedChanged,
@@ -318,13 +319,19 @@ export class PluginModule {
       (exported as PluginBackendModule)?.notificationCategories,
       (exported as PluginBackendModule)?.emailTemplates,
     );
-    const registerCategories = () => categories.register();
+    // RBAC keys are validated (shape, core and cross-plugin ownership) before anything is queued; a violation
+    // quarantines only this plugin. They are registered once the module was built.
+    const permissions = preparePluginPermissions(manifest.name, (exported as PluginBackendModule)?.permissions);
+    const registerDeclarations = () => {
+      categories.register();
+      permissions.register();
+    };
 
     if (typeof (exported as PluginBackendModule)?.register !== 'function') {
       this.logger.warn(
         `Plugin ${manifest.name} does not export a register(context) factory; loading its default export as a static module.`,
       );
-      registerCategories();
+      registerDeclarations();
       queueReaderUi();
       return exported as DynamicModule;
     }
@@ -335,7 +342,7 @@ export class PluginModule {
       MqttCredentialProvisioningService.register(credentialProvider(context));
       this.logger.log(`Registered MQTT credential provider from plugin ${manifest.name}.`);
     }
-    registerCategories();
+    registerDeclarations();
     queueReaderUi();
     return {
       ...pluginModule,
@@ -345,7 +352,7 @@ export class PluginModule {
           provide: `plugin-mqtt-cleanup:${manifest.id}`,
           useFactory: () => ({
             // Closing the bootstrap's throwaway app unregisters the categories, so each app registers them again.
-            onModuleInit: () => registerCategories(),
+            onModuleInit: () => registerDeclarations(),
             onModuleDestroy: () => {
               getImplementationClass().pluginMqtt().clearPlugin(manifest.id);
               getImplementationClass().pluginLiveUpdates().clearPlugin(manifest.id);

@@ -36,7 +36,10 @@ describe('API token revocation with SQLite', () => {
       new TypeOrmApiTokenStore(database.getRepository(ApiToken), unitOfWorkFor(database)),
       { findSessionUser: jest.fn() },
       { hashApiToken: (token: string) => `h:${token}` } as never,
-      { getEffectivePermissions: jest.fn().mockResolvedValue(new Set(['resources.read'])) } as never,
+      {
+        getEffectivePermissions: jest.fn().mockResolvedValue(new Set(['resources.read'])),
+        getUnavailablePermissionKeys: async () => new Set<string>(),
+      } as never,
     );
     await database.getRepository(ApiToken).save([
       { id: 1, userId: 1, name: 'Active', tokenHash: 'a', revokedAt: null },

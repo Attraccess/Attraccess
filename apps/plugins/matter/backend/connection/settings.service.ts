@@ -78,6 +78,17 @@ export class MatterSettingsService {
       const now = new Date().toISOString();
       const url = normalizeUrl(input.url) as string;
       const caCertificate = input.caCertificate === undefined ? (existing?.caCertificate ?? null) : input.caCertificate;
+      // The stored credential is only ever sent to the endpoint it was entered for. Otherwise anyone allowed to save
+      // the settings could point the URL (or the trusted CA) at their own server and capture the sidecar's token.
+      if (
+        existing &&
+        input.credential === undefined &&
+        (url !== existing.url || caCertificate !== existing.caCertificate)
+      ) {
+        throw new MissingCredentialError(
+          'credential: Enter the credential again when changing the URL or the CA certificate.',
+        );
+      }
       const credentialChanged = input.credential !== undefined;
       await repository.save({
         id: CONNECTION_ROW_ID,

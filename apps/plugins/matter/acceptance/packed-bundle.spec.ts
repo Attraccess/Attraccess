@@ -25,7 +25,7 @@ describe('Matter plugin packed bundle in the host', () => {
     expect(host.logs.filter((line) => line.startsWith('error'))).toEqual([]);
   });
 
-  it('still refuses non-admins', async () => {
+  it('still refuses users without the Matter keys', async () => {
     await request(host.app.getHttpServer())
       .get('/api/matter/connection/status')
       .set({ 'x-test-permissions': 'resources.update' })

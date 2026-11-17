@@ -1,3 +1,4 @@
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, Logger } from '@nestjs/common';
 import { LicenseError } from '../../license/license.service';
@@ -113,18 +114,19 @@ describe('CSV invitations', () => {
     return { service, users, auth, email, manager, events };
   };
   it('parses the config and sends invitations after the user creation transaction', async () => {
+    const actor = { id: 9 } as AuthenticatedUser;
     const { service, users, auth, email, manager, events } = setup();
     const result = await service.inviteUsersFromCsv(
       file('email,username,role\nalex@example.com,Alex,operator\n'),
       JSON.stringify(config),
       'de',
-      9,
+      actor,
     );
     expect(result).toEqual([{ id: 7, username: 'alex', email: 'alex@example.com' }]);
     expect(users.ensureLicenseForNewUsers).toHaveBeenCalledWith(1);
     expect(users.createMany).toHaveBeenCalledWith(
       [{ email: 'alex@example.com', username: 'alex', row: 1, roleKey: 'operator', locale: 'de' }],
-      { grantAllPermissionsToFirst: true, context: manager, actorId: 9 },
+      { grantAllPermissionsToFirst: true, context: manager, actor },
     );
     expect(auth.generateEmailVerificationToken).toHaveBeenCalledWith(result[0], manager);
     expect(email.sendUserInvitationEmail).toHaveBeenCalledWith(result[0], 'verification-token');

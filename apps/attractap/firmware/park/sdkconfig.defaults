@@ -3,3 +3,5 @@
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_80=y
 # CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240 is not set
 # CONFIG_SPIRAM is not set
+# No BLE on the parking image (the reader app enables it in ../sdkconfig.defaults).
+# CONFIG_BT_ENABLED is not set

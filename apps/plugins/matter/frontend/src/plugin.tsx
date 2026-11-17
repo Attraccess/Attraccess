@@ -10,7 +10,9 @@ import type {
   RouteConfig,
 } from '@attraccess/plugins-frontend-sdk';
 import type { PluginStore } from 'react-pluggable';
+import { MATTER_PAGE_PERMISSIONS } from '../../backend/permission-keys';
 import { MatterPage } from './MatterPage';
+import { setMatterAuthData } from './permissions';
 
 export default class MatterPlugin implements AttraccessFrontendPlugin {
   pluginStore!: PluginStore;
@@ -35,8 +37,8 @@ export default class MatterPlugin implements AttraccessFrontendPlugin {
     // Called when the plugin is uninstalled.
   }
 
-  onApiAuthStateChange(_authData: null | AttraccessFrontendPluginAuthData): void {
-    // no-op
+  onApiAuthStateChange(authData: null | AttraccessFrontendPluginAuthData): void {
+    setMatterAuthData(authData);
   }
 
   onApiEndpointChange(_endpoint: string): void {
@@ -44,8 +46,8 @@ export default class MatterPlugin implements AttraccessFrontendPlugin {
   }
 
   getRoutes(): RouteConfig[] {
-    // TODO(ATT-1003): replace system.plugins.manage with a dedicated Matter permission
-    return [{ path: '/matter', authRequired: 'system.plugins.manage', element: <MatterPage /> }];
+    // Any Matter or Thread read key opens the page; the sidebar entry follows the route.
+    return [{ path: '/matter', authRequired: [...MATTER_PAGE_PERMISSIONS], element: <MatterPage /> }];
   }
 
   getSidebarItems(): PluginSidebarItem[] {

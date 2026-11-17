@@ -128,7 +128,7 @@ export function PermissionPickerAutocomplete({
           <ListBox aria-label={label} renderEmptyState={() => <EmptyState>{emptyMessage}</EmptyState>}>
             {permissionsByCategory.map(({ category, permissions: categoryPermissions }) => (
               <ListBox.Section key={category} id={category}>
-                <Header>{permissionCategory(category)}</Header>
+                <Header>{permissionCategory(category, categoryPermissions[0])}</Header>
                 {categoryPermissions.map((permission) => (
                   <ListBox.Item
                     key={permission.key}

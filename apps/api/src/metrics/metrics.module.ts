@@ -18,6 +18,7 @@ import {
   FLOW_METRICS,
   OPERATING_METRICS,
   AUDIT_METRICS,
+  PLUGIN_BLE_METRICS,
 } from './definitions/tokens';
 import { createHttpMetrics } from './definitions/http.metrics';
 import { createWsMetrics } from './definitions/ws.metrics';
@@ -28,6 +29,7 @@ import { createSseMetrics } from './definitions/sse.metrics';
 import { createFlowMetrics } from './definitions/flow.metrics';
 import { createOperatingMetrics } from './definitions/operating.metrics';
 import { createAuditMetrics } from './definitions/audit.metrics';
+import { createPluginBleMetrics } from './definitions/plugin-ble.metrics';
 import { HttpMetricsInterceptor } from './instrumentation/http/http.interceptor';
 import { WsMetricsInterceptor } from './instrumentation/ws/ws.interceptor';
 import { CronTimer } from './instrumentation/cron/cron.helper';
@@ -57,6 +59,11 @@ const definitionProviders = [
   {
     provide: AUDIT_METRICS,
     useFactory: (m: MetricsService) => createAuditMetrics(m.registry),
+    inject: [MetricsService],
+  },
+  {
+    provide: PLUGIN_BLE_METRICS,
+    useFactory: (m: MetricsService) => createPluginBleMetrics(m.registry),
     inject: [MetricsService],
   },
 ];
@@ -105,6 +112,7 @@ const definitionProviders = [
     FLOW_METRICS,
     OPERATING_METRICS,
     AUDIT_METRICS,
+    PLUGIN_BLE_METRICS,
     METRICS_TOGGLE_INVALIDATOR,
   ],
 })

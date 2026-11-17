@@ -78,6 +78,8 @@ describe('secret hygiene in logs', () => {
     ...sources(join(ROOT, 'security')),
     ...sources(join(ROOT, 'websockets')),
     ...sources(join(ROOT, 'secure-boot')),
+    // Plugin BLE host: sessions, profiles and the reader driver carry device payloads.
+    ...sources(join(ROOT, '..', 'plugin-system', 'ble')),
     join(ROOT, 'pairing.controller.ts'),
   ];
 

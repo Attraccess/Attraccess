@@ -86,6 +86,23 @@ export const getPluginFunctionName = (pluginName: string, func: FRONTEND_FUNCTIO
 export interface AttraccessFrontendPluginAuthData {
   authToken: string;
   user: PluginUserModel;
+  /**
+   * The signed-in user's effective permission keys, core and plugin-declared. Hosts older than 1.11.0-beta.1 leave
+   * it out; read it through {@link hasPluginAuthPermission}.
+   */
+  effectivePermissions?: readonly string[];
+}
+
+/** Whether the signed-in user holds `permission`. False when signed out or when the host sends no permissions. */
+export function hasPluginAuthPermission(
+  authData: AttraccessFrontendPluginAuthData | null,
+  permission: string,
+): boolean {
+  // Older hosts send the permissions only on the user object.
+  const permissions =
+    authData?.effectivePermissions ??
+    (authData?.user as { effectivePermissions?: readonly string[] } | undefined)?.effectivePermissions;
+  return permissions?.includes(permission) ?? false;
 }
 
 export interface AttraccessFrontendPlugin extends IPlugin {

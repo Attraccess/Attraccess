@@ -65,6 +65,48 @@ export class PermissionDto {
   @ApiProperty({ description: 'Category grouping for this permission', example: 'resources' })
   category!: string;
 
+  @ApiProperty({
+    description: 'Name of the plugin that declared this permission; null for core permissions',
+    example: 'matter',
+    nullable: true,
+    type: String,
+  })
+  pluginName!: string | null;
+
+  @ApiProperty({
+    description: 'German label of a plugin permission; core permissions are translated by the frontend',
+    nullable: true,
+    type: String,
+  })
+  labelDe!: string | null;
+
+  @ApiProperty({
+    description: 'German description of a plugin permission; core permissions are translated by the frontend',
+    nullable: true,
+    type: String,
+  })
+  descriptionDe!: string | null;
+
+  @ApiProperty({
+    description: 'English label of the category group of a plugin permission',
+    nullable: true,
+    type: String,
+  })
+  categoryLabel!: string | null;
+
+  @ApiProperty({
+    description: 'German label of the category group of a plugin permission',
+    nullable: true,
+    type: String,
+  })
+  categoryLabelDe!: string | null;
+
+  @ApiProperty({
+    description: 'Whether the permission currently grants anything; false while its plugin is not loaded',
+    example: true,
+  })
+  available!: boolean;
+
   createdAt!: Date;
 
   updatedAt!: Date;
@@ -99,6 +141,12 @@ export function toPermissionDto(permission: PermissionRecord): PermissionDto {
     label: permission.label,
     description: permission.description,
     category: permission.category,
+    pluginName: permission.pluginName,
+    labelDe: permission.labelDe,
+    descriptionDe: permission.descriptionDe,
+    categoryLabel: permission.categoryLabel,
+    categoryLabelDe: permission.categoryLabelDe,
+    available: permission.available,
     createdAt: permission.createdAt,
     updatedAt: permission.updatedAt,
   };

@@ -1,3 +1,4 @@
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 jest.mock('crypto', () => {
   const actual = jest.requireActual('crypto');
   return { ...actual, randomBytes: jest.fn(actual.randomBytes) };
@@ -627,12 +628,12 @@ describe('UsersService', () => {
       fixture.store.seed({}, {}, {});
       const context = fakeTransactionScope();
       setRole(['resources.view']);
-      fixture.mockRbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.view']));
+      const actor = { id: 9, effectivePermissions: new Set(['resources.view']) } as AuthenticatedUser;
       const [member] = await fixture.service.createMany(
         [{ username: 'member', email: 'member@example.com', roleKey: 'viewer' }],
-        { context, grantAllPermissionsToFirst: true, actorId: 9 },
+        { context, grantAllPermissionsToFirst: true, actor },
       );
-      expect(fixture.mockRbacService.getEffectivePermissions).toHaveBeenCalledWith(9);
+      expect(fixture.mockRbacService.getGrantCeiling).toHaveBeenCalledWith(actor);
       expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(member.id, context);
       expect(fixture.mockRbacService.assignRoleByKey).toHaveBeenCalledWith(member.id, 'viewer', context);
       expect(fixture.mockRbacService.assignRoleByKey).not.toHaveBeenCalledWith(member.id, 'administrator', context);
@@ -640,10 +641,9 @@ describe('UsersService', () => {
     it('refuses an import role above the actor privilege ceiling', async () => {
       fixture.store.seed({});
       setRole(['users.update']);
-      fixture.mockRbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.view']));
       await expect(
         fixture.service.createMany([{ username: 'member', email: 'member@example.com', roleKey: 'admin' }], {
-          actorId: 9,
+          actor: { id: 9, effectivePermissions: new Set(['resources.view']) } as AuthenticatedUser,
         }),
       ).rejects.toThrow(ForbiddenException);
       expect(fixture.mockRbacService.assignRoleByKey).not.toHaveBeenCalled();

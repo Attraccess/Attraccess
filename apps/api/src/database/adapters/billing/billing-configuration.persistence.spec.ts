@@ -82,7 +82,8 @@ describe('billing configuration and credential stores on real SQLite', () => {
         main.unitOfWork.run(async (scope) => {
           await main.configuration.getOrCreateResourceConfiguration(resource.id, scope);
           expect(await main.configuration.findResourceConfiguration(resource.id, scope)).not.toBeNull();
-          expect(await main.configuration.findResourceConfiguration(resource.id)).toBeNull();
+          // A main-connection read of the flow that owns the transaction joins it instead of waiting for its lock.
+          expect(await main.configuration.findResourceConfiguration(resource.id)).not.toBeNull();
           throw new Error('abort');
         }),
       ).rejects.toThrow('abort');

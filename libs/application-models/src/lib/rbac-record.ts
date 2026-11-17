@@ -5,6 +5,15 @@ export interface PermissionRecord {
   label: string;
   description: string;
   category: string;
+  /** Name of the plugin that declared the permission; null for core permissions. */
+  pluginName: string | null;
+  /** German texts and category headings of a plugin permission; core permissions are translated by the frontend. */
+  labelDe: string | null;
+  descriptionDe: string | null;
+  categoryLabel: string | null;
+  categoryLabelDe: string | null;
+  /** False while the declaring plugin is not loaded: the key then grants nothing and is hidden from catalogs. */
+  available: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

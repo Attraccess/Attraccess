@@ -58,6 +58,12 @@ export const makePermission = (key: string): PermissionRecord => ({
   label: key,
   description: key,
   category: key.split('.')[0],
+  pluginName: null,
+  labelDe: null,
+  descriptionDe: null,
+  categoryLabel: null,
+  categoryLabelDe: null,
+  available: true,
   createdAt: new Date(),
   updatedAt: new Date(),
 });
@@ -85,6 +91,7 @@ export function registerRbacServiceFixture() {
   beforeEach(async () => {
     store = {
       permissionKeysOf: jest.fn().mockResolvedValue([]),
+      dormantPermissionKeysOf: jest.fn().mockResolvedValue([]),
       userIdsWithPermission: jest.fn().mockResolvedValue([]),
       findUserRoles: jest.fn().mockResolvedValue([]),
       userExists: jest.fn().mockResolvedValue(true),
@@ -102,6 +109,7 @@ export function registerRbacServiceFixture() {
       listRoles: jest.fn().mockResolvedValue([]),
       listRolesWithUserCounts: jest.fn().mockResolvedValue([]),
       listPermissions: jest.fn().mockResolvedValue([]),
+      listUnavailablePermissionKeys: jest.fn().mockResolvedValue([]),
       findKnownPermissionKeys: jest.fn().mockResolvedValue([]),
       roleKeyTaken: jest.fn().mockResolvedValue(false),
       createRole: jest.fn(),

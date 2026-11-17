@@ -1,0 +1,14 @@
+{
+  "name": "ble-lab-fixture",
+  "version": "0.1.0",
+  "main": {
+    "backend": {
+      "directory": "dist",
+      "entryPoint": "index.js"
+    }
+  },
+  "attraccessVersion": {
+    "min": "1.0.0-0"
+  },
+  "permissions": ["BLE_TRANSPORT"]
+}

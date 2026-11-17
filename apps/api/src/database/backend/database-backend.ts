@@ -36,6 +36,11 @@ export interface DatabaseBackendPluginHooks {
    * host's scope.
    */
   hostTransactionScope(unitOfWork: UnitOfWork, scope: TransactionScope): PluginTransactionScope;
+  /**
+   * Which plugin owns each registered permission key (null for core keys), read on a short-lived connection before
+   * the application connection opens. No database or no permission table yet: an empty map.
+   */
+  readPermissionOwners(): Promise<Map<string, string | null>>;
 }
 
 /**

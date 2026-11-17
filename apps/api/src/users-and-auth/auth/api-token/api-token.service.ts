@@ -23,7 +23,8 @@ export class ApiTokenService {
     limit: number,
   ): Promise<{ data: ApiTokenRecord[]; total: number; page: number; limit: number }> {
     const { data, total } = await this.tokens.listActive(userId, page, limit);
-    return { data, total, page, limit };
+    const hidden = await this.rbacService.getUnavailablePermissionKeys();
+    return { data: data.map((apiToken) => this.withoutHidden(apiToken, hidden)), total, page, limit };
   }
 
   async create(
@@ -49,16 +50,26 @@ export class ApiTokenService {
     tokenId: number,
     input: { name?: string; permissionKeys?: string[]; expiresAt?: Date | null },
   ): Promise<ApiTokenRecord> {
-    await this.findOwned(userId, tokenId);
-    if (input.permissionKeys) await this.assertAllowedPermissions(userId, input.permissionKeys);
+    const apiToken = await this.findOwned(userId, tokenId);
+    const hidden = await this.rbacService.getUnavailablePermissionKeys();
+    // The token UI cannot see grants of unavailable plugin keys, so a full-set update must keep them.
+    const keptHidden = apiToken.permissionKeys.filter((key) => hidden.has(key));
+    const permissionKeys = input.permissionKeys?.filter((key) => !keptHidden.includes(key));
+    if (permissionKeys) await this.assertAllowedPermissions(userId, permissionKeys);
     if (input.expiresAt !== null) this.assertExpiry(input.expiresAt);
     const updated = await this.tokens.update(tokenId, {
       name: input.name === undefined ? undefined : input.name.trim(),
-      permissionKeys: input.permissionKeys,
+      permissionKeys: permissionKeys === undefined ? undefined : [...new Set([...permissionKeys, ...keptHidden])],
       expiresAt: input.expiresAt,
     });
     if (!updated) throw new NotFoundException('ApiTokenNotFound');
-    return updated;
+    return this.withoutHidden(updated, hidden);
+  }
+
+  /** The token as its owner sees it: grants of unavailable plugin keys stay stored but are not listed. */
+  private withoutHidden(apiToken: ApiTokenRecord, hidden: Set<string>): ApiTokenRecord {
+    if (hidden.size === 0) return apiToken;
+    return { ...apiToken, permissionKeys: apiToken.permissionKeys.filter((key) => !hidden.has(key)) };
   }
 
   async revoke(userId: number, tokenId: number): Promise<void> {

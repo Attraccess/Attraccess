@@ -1,4 +1,5 @@
 # RabbitMQ
+
 <!-- llms-description: Das Plugin RabbitMQ ergänzt die Detailseite eines MQTT-Servers um Status-, Benutzer-, Verbindungs- und Statistik-Bereiche für RabbitMQ-Broker; Voraussetzungen und Berechtigungen. -->
 
 > [!NOTE]
@@ -20,17 +21,33 @@ Auf der Detailseite eines MQTT-Servers, den Attraccess als RabbitMQ-Broker erken
 
 Attraccess nutzt dafür die RabbitMQ-Management-API (Port `15672`, mit TLS `15671`, sofern kein Management-Port konfiguriert ist) mit Benutzername und Passwort des MQTT-Servers.
 
-| Bereich | Funktion | RabbitMQ-Benutzer-Tag | Attraccess-Berechtigung |
-|---------|----------|-----------------------|-------------------------|
-| **RabbitMQ** (Status) | Erreichbarkeit, Prüfung der Zugangsdaten, Versionen | `monitoring` | `resources.update` |
-| **RabbitMQ-Benutzer** | Benutzer und ihre Vhost-Berechtigungen anzeigen | `administrator` | `resources.update` |
-| **RabbitMQ-Benutzer** (ändern) | Benutzer anlegen, bearbeiten, löschen; Berechtigungen setzen oder entfernen | `administrator` | `system.settings.manage` |
-| **Verbindungen** | Aktive Client-Verbindungen (Aktualisierung alle 10 s) | `monitoring` | `resources.update` |
-| **Verbindungen** (schließen) | Verbindung zwangsweise trennen, optional mit Grund | `administrator` | `system.settings.manage` |
-| **Broker-Statistiken** | Überblick, Knoten und Queues (Aktualisierung alle 15 s) | `monitoring` | `resources.update` |
+| Bereich                        | Funktion                                                                    | RabbitMQ-Benutzer-Tag | Attraccess-Berechtigung  |
+| ------------------------------ | --------------------------------------------------------------------------- | --------------------- | ------------------------ |
+| **RabbitMQ** (Status)          | Erreichbarkeit, Prüfung der Zugangsdaten, Versionen                         | `monitoring`          | `rabbitmq.broker.read`   |
+| **RabbitMQ-Benutzer**          | Benutzer und ihre Vhost-Berechtigungen anzeigen                             | `administrator`       | `rabbitmq.broker.read`   |
+| **RabbitMQ-Benutzer** (ändern) | Benutzer anlegen, bearbeiten, löschen; Berechtigungen setzen oder entfernen | `administrator`       | `rabbitmq.broker.manage` |
+| **Verbindungen**               | Aktive Client-Verbindungen (Aktualisierung alle 10 s)                       | `monitoring`          | `rabbitmq.broker.read`   |
+| **Verbindungen** (schließen)   | Verbindung zwangsweise trennen, optional mit Grund                          | `administrator`       | `rabbitmq.broker.manage` |
+| **Broker-Statistiken**         | Überblick, Knoten und Queues (Aktualisierung alle 15 s)                     | `monitoring`          | `rabbitmq.broker.read`   |
 
 Hinweise:
 
 - Der am MQTT-Server konfigurierte Benutzer benötigt das Tag aus der Tabelle (`administrator` deckt alles ab, was `monitoring` kann). Fehlt es, zeigen die Bereiche eine Fehlermeldung, die die fehlende Berechtigung nennt.
-- Benutzer ohne `system.settings.manage` sehen nur die lesenden Bereiche; Schreibaktionen sind ausgeblendet und werden auch vom Server abgelehnt.
+- Benutzer ohne `rabbitmq.broker.manage` sehen nur die lesenden Bereiche; Schreibaktionen sind ausgeblendet und werden auch vom Server abgelehnt.
 - Live-MQTT-Nachrichten beobachten und senden gehört nicht zum RabbitMQ-Plugin. Das geht für jeden MQTT-Server und braucht nur `resources.update` -- siehe [MQTT-Nachrichten-Explorer](mqtt/message-explorer.md).
+
+### Attraccess-Berechtigungen
+
+Das RabbitMQ-Plugin deklariert eigene Berechtigungsschlüssel. Sie erscheinen im Rollen-Editor und in der Auswahl für
+API-Tokens in der Gruppe **RabbitMQ** (siehe [Berechtigungen](user-management/permissions.md#plugin-berechtigungen)).
+
+| Schlüssel                | Erlaubt                                                                            | Standardrollen                                      |
+| ------------------------ | ---------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `rabbitmq.broker.read`   | Die lesenden Bereiche: Status, Benutzer, Verbindungen, Broker-Statistiken          | `administrator`, `resource-manager`, `system-admin` |
+| `rabbitmq.broker.manage` | RabbitMQ-Benutzer und ihre Berechtigungen ändern, Verbindungen zwangsweise trennen | `administrator`, `system-admin`                     |
+
+Die Bereiche liegen auf der Detailseite des MQTT-Servers, die selbst `resources.update` erfordert.
+
+**Upgrade:** Vor dieser Version nutzten die Bereiche `resources.update` (anzeigen) und `system.settings.manage`
+(verwalten). Die Systemrollen behalten ihren Zugriff. Eigene Rollen, die sich für RabbitMQ auf diese Kernschlüssel
+verlassen haben, verlieren ihn, bis Sie ihnen `rabbitmq.broker.read` oder `rabbitmq.broker.manage` hinzufügen.

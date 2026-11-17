@@ -27,7 +27,7 @@ export class UserPermissionsService {
     actor: AuthenticatedUser,
     origin: AuditOrigin,
   ): Promise<UserRoleRecord> {
-    const result = await this.rbacService.assignRole(userId, roleId, actor.effectivePermissions ?? new Set());
+    const result = await this.rbacService.assignRole(userId, roleId, await this.rbacService.getGrantCeiling(actor));
     const user = await this.usersService.findOne({ id: userId });
     if (user) this.notifyPermissionsChanged(user, actor.id);
     await this.recordRoleChange('user_role_assigned', userId, roleId, origin);
@@ -35,7 +35,7 @@ export class UserPermissionsService {
   }
 
   async revokeRole(userId: number, roleId: number, actor: AuthenticatedUser, origin: AuditOrigin): Promise<void> {
-    await this.rbacService.revokeRole(userId, roleId, actor.effectivePermissions ?? new Set());
+    await this.rbacService.revokeRole(userId, roleId, await this.rbacService.getGrantCeiling(actor));
     const user = await this.usersService.findOne({ id: userId });
     if (!user) throw new UserNotFoundException(userId);
     this.notifyPermissionsChanged(user, actor.id);

@@ -255,19 +255,21 @@ describe('MatterBackupService', () => {
         'sizeBytes',
         'trigger',
       ]);
-      const { filename, file } = await h.backups.download(view.id);
+      const { filename, file } = await h.backups.download(view.id, ADMIN);
       expect(filename).toBe(
         `attraccess-matter-${view.createdAt.slice(0, 10)}-${view.id.slice(0, 8)}.attraccess-matter-backup`,
       );
       expect(createHash('sha256').update(file).digest('hex')).toBe(view.sha256);
-      await expect(h.backups.download('00000000-0000-4000-8000-000000000000')).rejects.toMatchObject({ status: 404 });
+      await expect(h.backups.download('00000000-0000-4000-8000-000000000000', ADMIN)).rejects.toMatchObject({
+        status: 404,
+      });
     });
 
     it('does not download a failed attempt', async () => {
       h.connection.insecureTransport = true;
       await codeOf(h.backups.backup('manual', ADMIN));
       const failed = (await stored()).find((row) => row.outcome === 'failed');
-      await expect(h.backups.download(failed?.id ?? '')).rejects.toMatchObject({ status: 404 });
+      await expect(h.backups.download(failed?.id ?? '', ADMIN)).rejects.toMatchObject({ status: 404 });
     });
   });
 });

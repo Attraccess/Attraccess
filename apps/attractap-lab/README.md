@@ -239,9 +239,13 @@ power.off()  # two presses, then waits for it to disappear
 Native `labgrid-client power on|off|cycle|get` uses the same driver. A reader
 already in the requested state is left alone, so `on()` is safe on any reader.
 A V1 switched on from parking runs the dark parking image, so it switches
-itself off again about 30 s later, which a slow flash can outlast.
+itself off again about 36 s later (measured in the lab), which a slow flash
+can outlast. A reader being flashed draws little too, so the cut can also come
+a few seconds after the flash's reset, before the new image lights the screen.
 `flash_reader` therefore flashes it once more if it went off mid-flash, and
-presses the button again if it is off after the reset.
+watches it for 15 s after the reset (`POWER_CUT_WATCH_SECONDS`), pressing the
+button again whenever it is off. Once the new image has lit the screen, the
+chip keeps the power on.
 
 ### USB power switch (Touch V2)
 
@@ -367,7 +371,29 @@ through `pnpm serve` and nx to the API) and exports `WIRETAP_FILE`
 (`hil-artifacts/wiretap.jsonl`, emptied at the start of each run). Against an
 API started by hand without the preload, the tests that need the wire
 (`test_z_matrix_extra.py`) skip. The file holds card APDUs in full: lab
-evidence only, never commit it.
+evidence only, never commit it. Plugin BLE bytes are the exception: for
+`BLE_*` messages the wiretap keeps the structure but replaces every byte field
+(`value`, advertisement `data`) with `{"redacted": true, "bytes": <length>}`,
+because they carry device credentials (a lock's user code and crypt token) and
+CI uploads `hil-artifacts/` as an artifact.
+
+One reader serves the whole run, so every test that uses it starts from an
+idle reader (`hil/reader_reset.py`, autouse fixtures in `hil/conftest.py`):
+before each test, and before a module's own fixtures, the run checks that the
+reader is connected and shows the signed-out resource list, and that no usage
+session is open. Only what it finds is cleaned up: open sessions are ended
+through the API, notices dismissed, armed enroll/reset/supervision/mass
+introduction screens cancelled, the user signed out, a revoked reader approved
+again, and as the last resort the reader is rebooted. A clean check costs
+about 0.2 s. Each cleanup is logged to `reader-resets.jsonl` with the test
+that left the state behind. If even a reboot fails, the later tests fail at
+setup at once instead of rebooting again.
+
+The end of the pytest output (section "HIL failure order and reader resets")
+names the first failure, lists the later ones in order, marks failures that
+repeat one shared fixture error, and shows the resets. On GitHub Actions the
+first failure is also an error annotation and the summary goes to the job
+summary.
 
 The tests in `test_nfc_cards.py` build on each other: one whose prerequisite
 (an enrolled card from an earlier test) is missing fails and names it, so
@@ -494,6 +520,32 @@ same marks in `ota-update.json`. `HIL_RAM_ITERATIONS` scales the loops (default
 
 `test_touch_controller_answers` (`test_hardware.py`) checks that the GT911 answers
 its polling (register reads grow, none fail).
+
+### Plugin Bluetooth (opt-in)
+
+`hil/test_ble.py` checks plugin BLE through the reader (ATT-1033, ATT-1036). It is not part of the CI matrix and
+skips unless `HIL_BLE=1`. With it, `run.sh` builds the lab fixture plugin (`ble-fixture-plugin/`, never shipped;
+it only uses `context.ble` and offers REST routes that run step scripts inside one session) into the plugin
+directory of the API it starts. Its routes require the `system.plugins.manage` permission (the suite calls them as
+the admin). The devices come from the environment:
+
+- `BLE_PERIPHERAL_ADDRESS`: the generic GATT test peripheral (`ble-test-peripheral/`, see its README) in range of
+  the reader, for example a second lab place flashed with it inside its own labgrid session for the duration of the
+  run. It prints its address at boot (`ready address=...`).
+- `SOLO_USER_CODE` (and optionally `SOLO_ADDRESS`, else the first lock the scan finds): a PS Locks SOLO BT in
+  factory `CRYPT_OFF` mode for the real-lock smoke. The
+  code is only ever passed through the environment. It stays out of the artifacts: `ble-solo.json` drops the step
+  values, the wiretap records only byte lengths for BLE, and the test fails if `wiretap.jsonl` contains the bytes
+  of the unlock write. Vendor names like this one belong in the lab only, never in core docs or code.
+- `HIL_BLE_LONG=1` adds the 10-minute transfer (at least 256 KiB of MTU-sized writes without response, each
+  acknowledged by a notification).
+
+```sh
+HIL_BLE=1 BLE_PERIPHERAL_ADDRESS=AA:BB:CC:DD:EE:FF apps/attractap-lab/hil/run.sh -k ble
+```
+
+Throughput, notification rates and the internal heap before and after the first BLE init land in `ble-*.json`
+in the artifacts directory.
 
 ### In CI
 

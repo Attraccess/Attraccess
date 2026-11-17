@@ -23,6 +23,7 @@ import { SettingsController } from '../settings/settings.controller';
 import { SettingsAdministrationService } from '../settings/settings-administration.service';
 import { AuditQueryService } from './audit-query.service';
 import { PluginAuditHost } from './plugin-audit-host';
+import { PLUGIN_AUDIT_SYSTEM_PRINCIPAL } from '@attraccess/plugins-backend-sdk';
 import { SettingsService } from '../settings/settings.service';
 import { ApiTokenService } from '../users-and-auth/auth/api-token/api-token.service';
 import { SessionService } from '../users-and-auth/auth/session.service';
@@ -427,6 +428,37 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
     expect(fixture.scenarioEntries(await fixture.source.getRepository(AuditLog).find())).toHaveLength(
       fixture.scenarios.length,
     );
+  });
+
+  it('stores a plugin system event with the system actor and drops a malformed system principal', async () => {
+    const host = new PluginAuditHost(fixture.audit);
+    const base = {
+      pluginId: fixture.fixturePluginId,
+      action: 'demo.publication',
+      outcome: 'succeeded' as const,
+      details: { revision: 3 },
+    };
+    await expect(
+      host.record({
+        ...base,
+        operationId: randomUUID(),
+        principal: PLUGIN_AUDIT_SYSTEM_PRINCIPAL,
+        subject: { type: 'demo.device', id: 9101 },
+      }),
+    ).resolves.toEqual({ status: 'recorded' });
+    await host.record({
+      ...base,
+      operationId: randomUUID(),
+      principal: { kind: 'system', userId: 42 } as never,
+      subject: { type: 'demo.device', id: 9102 },
+    });
+    const rows = await fixture.source.getRepository(AuditLog).find({ where: { domain: 'demo' } });
+    expect(rows.find((row) => row.subjectId === 9101)).toMatchObject({
+      actorId: null,
+      authenticationMethod: null,
+      apiTokenId: null,
+    });
+    expect(rows.find((row) => row.subjectId === 9102)).toBeUndefined();
   });
 
   it('keeps representative credential-bearing inputs out of stored and exported details', async () => {

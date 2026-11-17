@@ -33,6 +33,7 @@ import { AttractapMassIntroductionHandler } from './handlers/mass-introduction/m
 import { CardConversationService, CardConversationFailure } from './card-conversation.service';
 import { CardDetectedRouter } from './card-detected.router';
 import { AttractapUiHandler } from './handlers/ui/ui.handler';
+import { ReaderBleDriver } from './handlers/ble/reader-ble.driver';
 import { createReaderSenders } from './reader-socket-send';
 import { cleanupSocketState } from './websocket-disconnect-cleanup';
 import { buildEventHandlers, type EventHandlerDeps } from './websocket-event-handlers';
@@ -66,14 +67,18 @@ const ALLOWED_WHILE_PAIRING_REQUIRED = new Set<AttractapEventType>([
 ]);
 
 /**
- * Card relay events: a card conversation must not wait for the reader's lastConnection update. Coredump
- * chunks arrive dozens per upload; the BEGIN and COMPLETE around them record the activity.
+ * Card relay, coredump and BLE events: a card conversation must not wait for the lastConnection update, and coredump
+ * chunks and BLE traffic must not write it per chunk (a coredump's BEGIN and COMPLETE record the activity).
  */
 const SKIPS_ACTIVITY_WRITE = new Set<AttractapEventType>([
   AttractapEventType.CARD_DETECTED,
   AttractapEventType.CARD_APDU_RESPONSE,
   AttractapEventType.CARD_REMOVED,
   AttractapEventType.READER_COREDUMP_CHUNK,
+  AttractapEventType.BLE_RESULT,
+  AttractapEventType.BLE_SCAN_RESULT,
+  AttractapEventType.BLE_NOTIFICATION,
+  AttractapEventType.BLE_SESSION_ENDED,
 ]);
 
 @WebSocketGateway({
@@ -155,6 +160,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   @Inject(PairingService)
   protected pairingService: PairingService;
 
+  @Inject(ReaderBleDriver)
+  protected readerBleDriver: ReaderBleDriver;
+
   @Inject(ReaderSessionService)
   protected readerSessionService: ReaderSessionService;
 
@@ -219,6 +227,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     reason: CardConversationFailure,
   ) {
     if (!socket.state) return;
+    // Plugin BLE sessions and pending calls are bound to this connection's reader identity.
+    this.readerBleDriver.socketClosed(socket);
     this.onReaderSessionEnded(socket, reason);
     if (socket.state.supervisionFlow) this.supervisionHandler.cancelForSocket(socket);
     if (socket.state.massIntroductionFlow) this.massIntroductionHandler.cancelForSocket(socket, readerId);

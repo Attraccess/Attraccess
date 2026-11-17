@@ -124,7 +124,7 @@ export async function createHarness() {
     migrations: Object.values(migrations),
   }).initialize();
   await dataSource.runMigrations();
-  // The administrator that system-initiated audit entries are attributed to.
+  // A saved connection by user 1: system-initiated audit entries must never be attributed to that user.
   await dataSource.getRepository(MatterConnection).save({
     id: CONNECTION_ROW_ID,
     url: 'http://127.0.0.1:1',

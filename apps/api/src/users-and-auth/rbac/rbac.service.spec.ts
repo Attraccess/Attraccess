@@ -256,7 +256,7 @@ describe('RbacService', () => {
     const roles = [{ ...makeRole(), userCount: 3 }];
     fixture.store.listRolesWithUserCounts.mockResolvedValue(roles);
 
-    expect(await fixture.service.getRolesWithUsage()).toBe(roles);
+    expect(await fixture.service.getRolesWithUsage()).toEqual(roles);
     fixture.store.listPermissions.mockResolvedValue([makePermission('a.read')]);
     expect((await fixture.service.getPermissions()).map((p) => p.key)).toEqual(['a.read']);
   });

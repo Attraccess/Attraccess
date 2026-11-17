@@ -164,5 +164,5 @@ export async function bootHost(
   };
 }
 
-export const ADMIN = { 'x-test-permissions': 'system.plugins.manage' };
+export const ADMIN = { 'x-test-permissions': 'matter.devices.read,matter.devices.manage' };
 export const auditRows = (db: DataSource) => db.getRepository(AuditLog).find({ order: { id: 'ASC' } });

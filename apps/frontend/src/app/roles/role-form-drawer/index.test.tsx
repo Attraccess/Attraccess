@@ -25,7 +25,10 @@ vi.mock('../../../components/toastProvider', () => ({
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('../../../hooks/useAuth', () => ({
-  useAuth: () => ({ hasPermission: (key: string) => key === 'resources.view' }),
+  useAuth: () => ({
+    hasPermission: (key: string) => key === 'resources.view',
+    hasPermissionKey: (key: string) => key === 'resources.view',
+  }),
 }));
 vi.mock('../../../hooks/useRbacCatalogTranslations', () => ({
   useRbacCatalogTranslations: () => ({

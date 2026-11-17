@@ -14,9 +14,11 @@ import type { TransactionContext } from '../../database/transaction-context';
  * the role grants.
  */
 export interface RbacStore {
-  /** Every permission key granted to the user through any of their roles. */
+  /** Every available permission key granted to the user through any of their roles. */
   permissionKeysOf(userId: number): Promise<string[]>;
-  /** Ids of active (not deleted) users holding a role that grants the permission. */
+  /** The unavailable (plugin not loaded) permission keys the user's roles still grant. */
+  dormantPermissionKeysOf(userId: number): Promise<string[]>;
+  /** Ids of active (not deleted) users holding a role that grants the permission, while it is available. */
   userIdsWithPermission(permissionKey: string): Promise<number[]>;
   findUserRoles(userId: number): Promise<UserRoleRecord[]>;
   userExists(userId: number): Promise<boolean>;
@@ -37,7 +39,7 @@ export interface RbacStore {
   isLastAdministrator(userId: number, context?: TransactionContext): Promise<boolean>;
   /** Active users holding the role. */
   countActiveRoleHolders(roleId: number, context?: TransactionContext): Promise<number>;
-  /** Active users whose roles together grant every permission, ignoring the given role. */
+  /** Active users whose roles together grant every available permission, ignoring the given role. */
   countAdministratorEquivalentUsers(excludeRoleId?: number, context?: TransactionContext): Promise<number>;
   /**
    * Makes the user's SSO-sourced assignments of one provider match `targets`, in `scope`. A transient claim omission
@@ -53,8 +55,11 @@ export interface RbacStore {
 
   listRoles(): Promise<RoleRecord[]>;
   listRolesWithUserCounts(): Promise<RoleWithUserCount[]>;
+  /** The available permissions, by category and key. */
   listPermissions(): Promise<PermissionRecord[]>;
-  /** The subset of `keys` that are known permissions. */
+  /** Keys of plugin permissions whose plugin is not loaded. */
+  listUnavailablePermissionKeys(): Promise<string[]>;
+  /** The subset of `keys` that are known, available permissions. */
   findKnownPermissionKeys(keys: string[]): Promise<string[]>;
   roleKeyTaken(key: string): Promise<boolean>;
   /** Creates a custom role and its permission grants atomically. */

@@ -75,12 +75,7 @@ export class UserInvitationsController {
       throw new ForbiddenException('users.roles.manage is required to assign roles via CSV import');
     }
 
-    const invited = await this.invitationService.inviteUsersFromCsv(
-      file,
-      rawConfig,
-      request.user.locale,
-      request.user.id,
-    );
+    const invited = await this.invitationService.inviteUsersFromCsv(file, rawConfig, request.user.locale, request.user);
     return invited.map(toUserAccountDto);
   }
 }

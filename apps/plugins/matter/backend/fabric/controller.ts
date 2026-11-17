@@ -1,5 +1,6 @@
 import { Auth, type AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { BadRequestException, Body, Controller, Get, HttpCode, Inject, Post, Req } from '@nestjs/common';
+import { MATTER_OPERATIONS } from '../permissions';
 import type { z } from 'zod';
 import { principalOf } from '../connection/controller';
 import { validationMessages } from '../connection/validation';
@@ -17,8 +18,6 @@ export function parse<S extends z.ZodType>(schema: S, value: unknown): z.infer<S
  * Admin REST API for the controller fabric: status, creation, the recovery key and the recovery actions. Secrets are
  * returned only where documented: the recovery key, once, when it is generated.
  */
-// TODO(ATT-1003): replace system.plugins.manage with a dedicated Matter permission
-@Auth('system.plugins.manage')
 @Controller('matter')
 export class MatterFabricController {
   constructor(
@@ -26,23 +25,27 @@ export class MatterFabricController {
     @Inject(RecoveryKeyService) private readonly keys: RecoveryKeyService,
   ) {}
 
+  @Auth(...MATTER_OPERATIONS.fabricStatus)
   @Get('fabric')
   status(): Promise<FabricBackupStatus> {
     return this.fabric.status();
   }
 
+  @Auth(...MATTER_OPERATIONS.fabricCreate)
   @Post('fabric/create')
   @HttpCode(200)
   create(@Body() body: unknown, @Req() request: AuthenticatedRequest): Promise<CreateResult> {
     return this.fabric.create(parse(createFabricSchema, body).label, principalOf(request));
   }
 
+  @Auth(...MATTER_OPERATIONS.recoveryKeyGenerate)
   @Post('fabric/recovery-key')
   @HttpCode(200)
   generateKey(@Req() request: AuthenticatedRequest): Promise<RecoveryKeyReveal> {
     return this.fabric.generateRecoveryKey(principalOf(request));
   }
 
+  @Auth(...MATTER_OPERATIONS.recoveryKeyAcknowledge)
   @Post('fabric/recovery-key/acknowledge')
   @HttpCode(200)
   async acknowledge(@Body() body: unknown, @Req() request: AuthenticatedRequest): Promise<FabricBackupStatus> {
@@ -50,6 +53,7 @@ export class MatterFabricController {
     return this.fabric.status();
   }
 
+  @Auth(...MATTER_OPERATIONS.recoveryKeyRotate)
   @Post('fabric/recovery-key/rotate')
   @HttpCode(200)
   rotate(@Body() body: unknown, @Req() request: AuthenticatedRequest): Promise<RecoveryKeyReveal> {
@@ -57,6 +61,7 @@ export class MatterFabricController {
     return this.fabric.rotateRecoveryKey(principalOf(request));
   }
 
+  @Auth(...MATTER_OPERATIONS.recoveryAcceptSidecar)
   @Post('recovery/accept-sidecar')
   @HttpCode(200)
   acceptSidecar(@Body() body: unknown, @Req() request: AuthenticatedRequest): Promise<FabricBackupStatus> {
@@ -64,6 +69,7 @@ export class MatterFabricController {
     return this.fabric.acceptSidecar(principalOf(request));
   }
 
+  @Auth(...MATTER_OPERATIONS.recoveryStartNew)
   @Post('recovery/start-new')
   @HttpCode(200)
   startNew(@Body() body: unknown, @Req() request: AuthenticatedRequest): Promise<CreateResult> {

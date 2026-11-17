@@ -1,3 +1,4 @@
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { DateTimePreferences, getSupportedDeviceLanguage, validateDateTimeLocale } from '@attraccess/shared';
 import type { SSOProviderType, UserAccount, UserRecord } from '@attraccess/application-models';
 
@@ -223,7 +224,7 @@ export class UsersService {
 
   async createMany(
     users: Array<{ username: string; email: string; locale?: string; roleKey?: string }>,
-    options?: { grantAllPermissionsToFirst?: boolean; context?: TransactionContext; actorId?: number },
+    options?: { grantAllPermissionsToFirst?: boolean; context?: TransactionContext; actor?: AuthenticatedUser },
   ): Promise<UserRecord[]> {
     if (users.length === 0) {
       return [];
@@ -274,9 +275,7 @@ export class UsersService {
       // permissions exceed their own (mirrors the check in RbacService.assignRole).
       const anyHasRoleKey = normalized.some((n) => n.roleKey);
       const actorPermissions =
-        anyHasRoleKey && options?.actorId != null
-          ? await this.rbacService.getEffectivePermissions(options.actorId)
-          : null;
+        anyHasRoleKey && options?.actor ? await this.rbacService.getGrantCeiling(options.actor) : null;
 
       for (let i = 0; i < saved.length; i++) {
         const roleKey = normalized[i]?.roleKey;

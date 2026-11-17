@@ -178,11 +178,13 @@ describe('Matter plugin against the real sidecar', () => {
     await put({ url, credential: NEW_TOKEN }).expect(200);
     await until(async () => (await status()).reason === 'misconfigured');
     expect((await status()).lastError).toMatchObject({ code: 'tls' });
-    await put({ url, caCertificate: certificate.cert }).expect(200);
+    // A changed CA needs the credential again, so a stored token never goes to a newly trusted endpoint.
+    await put({ url, caCertificate: certificate.cert }).expect(400);
+    await put({ url, credential: NEW_TOKEN, caCertificate: certificate.cert }).expect(200);
     await until(async () => (await status()).state === 'connected');
     expect((await status()).insecureTransport).toBe(false);
     // Clearing the CA must drop it from the client too: the same certificate is untrusted again.
-    await put({ url, caCertificate: null }).expect(200);
+    await put({ url, credential: NEW_TOKEN, caCertificate: null }).expect(200);
     await until(async () => (await status()).reason === 'misconfigured');
     expect(await status()).toMatchObject({ state: 'degraded', lastError: { code: 'tls' } });
   });

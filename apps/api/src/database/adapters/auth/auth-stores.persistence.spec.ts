@@ -321,7 +321,8 @@ describe('auth persistence adapters on a real SQLite file', () => {
       await expect(
         unitOfWork.run(async (scope) => {
           await store.replaceLocalPassword(1, 'hash-2', { rememberPrevious: 3 }, scope);
-          expect(await storedHash(1)).toBe('hash-1');
+          // A main-connection read of the flow that owns the transaction joins it instead of waiting for its lock.
+          expect(await storedHash(1)).toBe('hash-2');
           throw new Error('rollback after the change');
         }),
       ).rejects.toThrow('rollback after the change');

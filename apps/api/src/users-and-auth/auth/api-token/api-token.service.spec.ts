@@ -27,13 +27,17 @@ describe('ApiTokenService', () => {
   } satisfies Record<keyof ApiTokenStore, jest.Mock>;
   const users = { findSessionUser: jest.fn() };
   const tokenHashService = { hashApiToken: jest.fn((token) => `hashed:${token}`) };
-  const rbacService = { getEffectivePermissions: jest.fn() };
+  const rbacService = {
+    getEffectivePermissions: jest.fn(),
+    getUnavailablePermissionKeys: jest.fn(async () => new Set<string>()),
+  };
   const service = new ApiTokenService(store, users, tokenHashService as never, rbacService as never);
 
   beforeEach(() => {
     jest.resetAllMocks();
     tokenHashService.hashApiToken.mockImplementation((token) => `hashed:${token}`);
     rbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.read']));
+    rbacService.getUnavailablePermissionKeys.mockResolvedValue(new Set());
     store.create.mockImplementation(async ({ userId, name, expiresAt, permissionKeys }) =>
       record({ userId, name, expiresAt, permissionKeys }),
     );

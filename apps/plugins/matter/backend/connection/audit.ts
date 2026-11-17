@@ -7,8 +7,8 @@ const FABRIC_ID = { fabricId: DECIMAL_ID_FIELD } as const;
 const NODE_ID = { nodeId: DECIMAL_ID_FIELD } as const;
 const DETACHED_REASONS = ['absent_from_sidecar', 'fabric_mismatch', 'fabric_absent'] as const;
 /**
- * Reconciliation entries: `system` when an automatic trigger ran it. The host has no system principal for plugins, so
- * those entries carry the administrator who last saved the connection settings as the actor.
+ * Reconciliation entries: `system` when an automatic trigger ran it. Those entries carry the system principal as the
+ * actor, never a user.
  */
 const INITIATOR = { initiator: { type: 'string', oneOf: ['system', 'administrator'] } } as const;
 const KEY_ID_FIELD = { keyId: { type: 'string', pattern: '[0-9a-f-]{16}' } } as const;
@@ -164,8 +164,8 @@ export const MATTER_AUDIT_DOMAIN: PluginAuditDomainDeclaration = {
       },
     },
     // Fabric persistence and encrypted backups (ATT-998). Fabric ID and key ID are public identifiers; recovery keys,
-    // backup contents and the sidecar's secrets never appear. A backup or restore by the plugin itself has no
-    // administrator and is attributed like the other system actions.
+    // backup contents and the sidecar's secrets never appear. A backup by the plugin itself is recorded with the
+    // system principal. A restore's entries share its validation ID as their operation ID.
     {
       action: 'matter.fabric_created',
       subjectTypes: ['matter.fabric'],
@@ -228,6 +228,9 @@ export const MATTER_AUDIT_DOMAIN: PluginAuditDomainDeclaration = {
       subjectTypes: ['matter.backup'],
       details: { ...BACKUP_REF, ...GENERATION },
     },
+    // The encrypted file left the installation (ATT-1003). Never its content.
+    { action: 'matter.backup_downloaded', subjectTypes: ['matter.backup'], details: { ...BACKUP_REF, ...GENERATION } },
+    { action: 'matter.restore_cancelled', subjectTypes: ['matter.backup'], details: BACKUP_REF },
     { action: 'matter.restore_failed', subjectTypes: ['matter.backup'], details: BACKUP_REF },
     { action: 'matter.restore_rolled_back', subjectTypes: ['matter.backup'], details: BACKUP_REF },
     {

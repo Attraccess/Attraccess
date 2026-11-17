@@ -78,8 +78,20 @@ export function describeBillingLedgerConformance(fixture: PortBackendFixture): v
           { context: scope },
         );
         expect(await main.ports.billingLedger.getBalance(userId, scope)).toBe(40);
-        expect(await main.ports.billingLedger.getBalance(userId)).toBe(0);
       });
+      expect(await balanceOf(userId)).toBe(40);
+
+      // Rolled back, the uncommitted transaction leaves the balance as it was.
+      await expect(
+        main.ports.unitOfWork.run(async (scope) => {
+          await main.ports.billingLedger.insertTransaction(
+            { userId, amount: 5, status: BillingTransactionStatus.Completed },
+            { context: scope },
+          );
+          expect(await main.ports.billingLedger.getBalance(userId, scope)).toBe(45);
+          throw new Error('abort');
+        }),
+      ).rejects.toThrow('abort');
       expect(await balanceOf(userId)).toBe(40);
     });
 

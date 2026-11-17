@@ -36,7 +36,8 @@ vi.mock('../../hooks/useRbacCatalogTranslations', () => ({
   useRbacCatalogTranslations: () => ({
     permissionLabel: (permission: { key: string }) => `label ${permission.key}`,
     permissionDescription: (permission: { key: string }) => `about ${permission.key}`,
-    permissionCategory: (category: string) => `category ${category}`,
+    permissionCategory: (category: string, permission?: { categoryLabel?: string | null }) =>
+      `category ${permission?.categoryLabel ?? category}`,
   }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
@@ -84,6 +85,27 @@ it('shows the client, the redirect host and the permissions grouped by category 
   expect(groups.map((node) => node.textContent)).toEqual(['category resources', 'category users', 'permissions.other']);
   expect(screen.getByText('label resources.read')).toBeTruthy();
   expect(screen.getByTitle('about users.roles.manage')).toBeTruthy();
+});
+
+it('lists plugin categories after the core ones under their plugin heading', () => {
+  const matter = {
+    key: 'matter.devices.read',
+    label: 'View Matter devices',
+    description: '',
+    category: 'plugin:matter',
+    pluginName: 'matter',
+    categoryLabel: 'Matter & Thread',
+  };
+  state.consent = { data: { ...view, permissions: [matter, ...view.permissions] }, isError: false };
+  render(<McpOAuthAuthorizePage />);
+  const groups = screen.getAllByText(/^category |^permissions.other$/);
+  expect(groups.map((node) => node.textContent)).toEqual([
+    'category resources',
+    'category users',
+    'category Matter & Thread',
+    'permissions.other',
+  ]);
+  expect(screen.queryByText('category plugin:matter')).toBeNull();
 });
 
 it('warns about a self-registered client and only notes an operator-registered one', () => {

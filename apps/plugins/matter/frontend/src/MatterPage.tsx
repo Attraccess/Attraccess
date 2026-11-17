@@ -3,14 +3,20 @@ import { Spinner } from '@heroui/react';
 import { CableIcon } from 'lucide-react';
 import { FabricBackupSection } from './fabric-backup/FabricBackupSection';
 import { useMatterTranslations } from './i18n';
+import { useMatterPermissions } from './permissions';
 import { SettingsForm } from './SettingsForm';
 import { StatusCard } from './StatusCard';
 import { useMatterPage } from './useMatterPage';
 
-// TODO(ATT-1003): the route is guarded by system.plugins.manage until Matter has its own permission (see plugin.tsx).
+/**
+ * The route opens with any Matter or Thread read key (see plugin.tsx). Status views need `matter.devices.read`; the
+ * settings form and the fabric, recovery, backup and restore actions need `matter.devices.manage` (together with
+ * `matter.devices.read`) and are hidden without it. Until the host has pushed the auth state, the page only loads.
+ */
 export function MatterPage() {
   const { t } = useMatterTranslations();
-  const { settings, settingsError, status, statusError, loading, save, remove } = useMatterPage();
+  const permissions = useMatterPermissions();
+  const { settings, settingsError, status, statusError, loading, save, remove } = useMatterPage(permissions);
 
   return (
     <div
@@ -26,7 +32,7 @@ export function MatterPage() {
       {loading && <Spinner />}
       {status?.insecureTransport && (
         <StatusAlert status="warning" title={t('page.insecure')} data-cy="matter-insecure-warning">
-          {t('page.insecureText')}
+          {t(permissions.canManage ? 'page.insecureText' : 'page.insecureTextReadOnly')}
         </StatusAlert>
       )}
       {statusError && !status && (
@@ -34,14 +40,19 @@ export function MatterPage() {
           {statusError}
         </StatusAlert>
       )}
-      {status && <StatusCard status={status} />}
+      {permissions.known && !permissions.canRead && (
+        <StatusAlert status="default" title={t('page.noDeviceAccess')} data-cy="matter-no-device-access">
+          {t('page.noDeviceAccessText')}
+        </StatusAlert>
+      )}
+      {status && <StatusCard status={status} canManage={permissions.canManage} />}
       {settingsError && !settings && (
         <StatusAlert status="danger" title={t('form.loadError')} data-cy="matter-settings-load-error">
           {settingsError}
         </StatusAlert>
       )}
-      <FabricBackupSection />
-      {settings && <SettingsForm settings={settings} onSave={save} onRemove={remove} />}
+      {permissions.canRead && <FabricBackupSection canManage={permissions.canManage} />}
+      {permissions.canManage && settings && <SettingsForm settings={settings} onSave={save} onRemove={remove} />}
     </div>
   );
 }

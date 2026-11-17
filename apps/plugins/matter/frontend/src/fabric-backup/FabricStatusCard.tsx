@@ -60,7 +60,10 @@ function RecoveryAlert({ status }: Readonly<{ status: FabricBackupStatus }>) {
   );
 }
 
-type CreateProps = Readonly<{ status: FabricBackupStatus; busy: boolean; creating: boolean } & Handlers>;
+/** `canManage`: holds `matter.devices.manage`; without it the create and restore actions are hidden. */
+type CreateProps = Readonly<
+  { status: FabricBackupStatus; busy: boolean; creating: boolean; canManage: boolean } & Handlers
+>;
 type Handlers = { onCreate: () => void; onRestore: () => void };
 
 /** Create the fabric, or restore one instead, on a connected sidecar without a fabric. */
@@ -114,7 +117,11 @@ export function FabricStatusCard(props: CreateProps) {
           </StatusAlert>
         )}
         {recovery.required && <RecoveryAlert status={status} />}
-        {uninitialized && <p data-cy="matter-fabric-uninitialized">{t('fabric.uninitializedText')}</p>}
+        {uninitialized && (
+          <p data-cy="matter-fabric-uninitialized">
+            {t(props.canManage ? 'fabric.uninitializedText' : 'fabric.uninitializedTextReadOnly')}
+          </p>
+        )}
         <dl className="mt:grid mt:grid-cols-1 mt:gap-3 mt:sm:grid-cols-2">
           <Field label={t('fabric.fabricId')}>{sidecar.fabricId ?? t('fabric.none')}</Field>
           <Field label={t('fabric.generationLabel')}>{sidecar.fabricGeneration ?? t('fabric.none')}</Field>
@@ -132,7 +139,7 @@ export function FabricStatusCard(props: CreateProps) {
             </dl>
           </div>
         )}
-        {uninitialized && actions.canCreateFabric && <CreateActions {...props} />}
+        {props.canManage && uninitialized && actions.canCreateFabric && <CreateActions {...props} />}
       </Card.Content>
     </Card>
   );

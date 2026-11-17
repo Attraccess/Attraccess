@@ -12,7 +12,7 @@ import {
   type GlobalFlowDraft,
   type GlobalFlowSummary,
 } from '../../../resources/flows/flow-graph.port';
-import { ScopedUnitOfWork, UNIT_OF_WORK } from '../../unit-of-work';
+import { ScopedUnitOfWork, TransactionScope, UNIT_OF_WORK } from '../../unit-of-work';
 import { toEdgeRecord, toFlowRecord, toNodeRecord } from './flow-mappers';
 
 type CanvasOwner = { resourceId: number } | { flowId: number };
@@ -60,8 +60,13 @@ export class TypeOrmFlowGraphStore implements FlowGraphStore {
     return this.loadCanvas(this.dataSource.manager, { flowId });
   }
 
-  async findResourceNodes(resourceId: number, type: ResourceFlowNodeType): Promise<FlowNodeRecord[]> {
-    return (await this.nodes.find({ where: { resourceId, type } })).map(toNodeRecord);
+  async findResourceNodes(
+    resourceId: number,
+    type: ResourceFlowNodeType,
+    scope?: TransactionScope,
+  ): Promise<FlowNodeRecord[]> {
+    const manager = scope ? this.unitOfWork.handleOf(scope) : this.dataSource.manager;
+    return (await manager.find(ResourceFlowNode, { where: { resourceId, type } })).map(toNodeRecord);
   }
 
   async findNodesForResources(resourceIds: number[], type: ResourceFlowNodeType): Promise<FlowNodeRecord[]> {
