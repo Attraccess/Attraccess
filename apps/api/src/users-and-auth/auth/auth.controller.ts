@@ -24,21 +24,7 @@ import { CookieConfigService } from '../../common/services/cookie-config.service
 import { auditOriginOf } from '../../audit/recorder/audit-event';
 import { ApprovedOriginsService } from '../../common/security/approved-origins.service';
 import { SessionPermissionSync } from './sso/session-permission-sync';
-import { UserDto, toUserDto } from '../users/dtos/user.dto';
-
-/**
- * The user of a session response: the public profile, plus what the session principal carries (permissions and how it
- * authenticated) when the request already went through the session strategy. Never the email, tokens or lockout state.
- */
-function toSessionUser(user: AuthenticatedRequest['user']): UserDto {
-  const principal = user as Partial<AuthenticatedRequest['user']>;
-  return {
-    ...toUserDto(user),
-    ...(principal.effectivePermissions ? { effectivePermissions: [...principal.effectivePermissions] } : {}),
-    ...(principal.authenticationMethod ? { authenticationMethod: principal.authenticationMethod } : {}),
-    ...(principal.apiTokenId ? { apiTokenId: principal.apiTokenId } : {}),
-  };
-}
+import { toSessionUser } from './session-user';
 
 @ApiTags('Authentication')
 @Controller('/auth')

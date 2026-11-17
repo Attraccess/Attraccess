@@ -1,4 +1,5 @@
 import { approvedOriginsFor, registerAuthControllerFixture } from './auth.controller.auth-controller.test-fixture';
+import { expectNoPrivateAccountFields, privateAccount } from './private-account.test-fixture';
 import { SsoLogoutService } from './sso/sso-logout.service';
 import { SessionPermissionSync } from './sso/session-permission-sync';
 import { AuthController } from './auth.controller';
@@ -56,75 +57,41 @@ describe('AuthController', () => {
     expect(mockResponse.cookie).not.toHaveBeenCalled();
   });
 
-  it('never serializes the email, tokens or lockout state of the signed-in account', async () => {
-    const account = {
-      id: 1,
-      username: 'testuser',
-      email: 'secret@example.com',
-      locale: 'en',
-      dateTimeLocale: null,
-      isEmailVerified: true,
-      isDisabled: false,
-      externalIdentifier: null,
-      creditBalance: 0,
-      billingFactor: 100,
-      createdAt: new Date('2026-01-01T00:00:00Z'),
-      updatedAt: new Date('2026-01-02T00:00:00Z'),
-      deletedAt: null,
-      lastUsernameChangeAt: new Date(),
-      lockedUntil: new Date(),
-      failedLoginAttempts: 4,
-      firstFailedLoginAt: new Date(),
-      emailVerificationToken: 'verify-secret',
-      emailVerificationTokenExpiresAt: new Date(),
-      passwordResetToken: 'reset-secret',
-      passwordResetTokenExpiresAt: new Date(),
-      deleteAccountToken: 'delete-secret',
-      deleteAccountTokenExpiresAt: new Date(),
-      nfcKeySeedToken: 'nfc-secret',
-      password: 'bcrypt-hash-secret',
-    };
-    const request = {
-      user: account,
-      headers: { 'user-agent': 'curl' },
-      ip: '127.0.0.1',
-      connection: {},
-    } as unknown as AuthenticatedRequest;
+  it.each(['body', 'cookie'] as const)(
+    'never serializes the email, tokens or lockout state of the signed-in account (token in %s)',
+    async (tokenLocation) => {
+      const request = {
+        user: privateAccount(),
+        headers: { 'user-agent': 'curl' },
+        ip: '127.0.0.1',
+        connection: {},
+      } as unknown as AuthenticatedRequest;
 
-    const result = await fixture.authController.createSession(request, { setHeader: jest.fn() } as never, {
-      tokenLocation: 'body',
-    });
+      const result = await fixture.authController.createSession(
+        request,
+        { setHeader: jest.fn(), cookie: jest.fn() } as never,
+        { tokenLocation },
+      );
 
-    expect(Object.keys(result.user).sort()).toEqual(
-      [
-        'billingFactor',
-        'createdAt',
-        'creditBalance',
-        'dateTimeLocale',
-        'deletedAt',
-        'externalIdentifier',
-        'id',
-        'isDisabled',
-        'isEmailVerified',
-        'locale',
-        'updatedAt',
-        'username',
-      ].sort(),
-    );
-    const json = JSON.stringify(result);
-    for (const secret of [
-      'secret@example.com',
-      'verify-secret',
-      'reset-secret',
-      'delete-secret',
-      'nfc-secret',
-      'bcrypt-hash-secret',
-      'failedLoginAttempts',
-      'lockedUntil',
-    ]) {
-      expect(json).not.toContain(secret);
-    }
-  });
+      expect(Object.keys(result.user).sort()).toEqual(
+        [
+          'billingFactor',
+          'createdAt',
+          'creditBalance',
+          'dateTimeLocale',
+          'deletedAt',
+          'externalIdentifier',
+          'id',
+          'isDisabled',
+          'isEmailVerified',
+          'locale',
+          'updatedAt',
+          'username',
+        ].sort(),
+      );
+      expectNoPrivateAccountFields(result);
+    },
+  );
 
   it('keeps the permissions and the way of authentication of a session principal in a refresh response', async () => {
     const request = {
