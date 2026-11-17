@@ -1,4 +1,4 @@
-import { DataSource } from 'typeorm';
+import { DataSource } from '@attraccess/plugins-backend-sdk/sqlite';
 import * as migrations from './migrations';
 
 it('preserves interrupted credential revocation metadata through a full-registry blocked downgrade', async () => {

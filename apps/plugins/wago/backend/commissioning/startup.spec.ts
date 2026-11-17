@@ -1,5 +1,6 @@
+import { repositoryDouble } from '../persistence.test-utils';
 import { Test, TestingModule } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
+import { DataSource } from '@attraccess/plugins-backend-sdk/sqlite';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,7 +16,7 @@ it('boots the commissioning plugin and empty artifact catalog without privileged
   const dataSource = new DataSource({
     type: 'sqlite',
     database: ':memory:',
-    entities: plugin.entities,
+    entities: plugin.persistence.sqlite.entities,
     synchronize: true,
   });
   const get = jest.fn(() => {
@@ -23,8 +24,7 @@ it('boots the commissioning plugin and empty artifact catalog without privileged
   });
   const registerLiveTopic = jest.fn((_topic: PluginLiveTopic) => () => undefined);
   const context = {
-    dataSource,
-    getRepository: (entity) => dataSource.getRepository(entity),
+    ...repositoryDouble((entity) => dataSource.getRepository(entity)),
     get,
     secrets: { encrypt: (value: string) => `fixture:${value}`, decrypt: (value: string) => value.slice(8) },
     mqtt: { subscribe: jest.fn().mockResolvedValue({ unsubscribe: jest.fn() }), publish: jest.fn() },

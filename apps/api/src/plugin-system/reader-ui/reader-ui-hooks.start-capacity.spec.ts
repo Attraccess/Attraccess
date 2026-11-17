@@ -1,4 +1,5 @@
 import type { StartCapacityHook } from '@attraccess/plugins-backend-sdk';
+import { createSqlitePluginPersistence, sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { ReaderUiHooksService, type StartCapacityRun } from './reader-ui-hooks.service';
 
 const reason = { code: 'RESERVED', title: 'Reserved', body: 'Held for a booking' };
@@ -43,7 +44,7 @@ describe('ReaderUiHooksService.runStartCapacity', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
-  it('passes the transaction manager, the limit, the occupied slots and only the plugin own step keys', async () => {
+  it('passes the host transaction scope, the limit, the occupied slots and only the plugin own step keys', async () => {
     const hook = jest.fn().mockResolvedValue({ heldSlots: 0 });
     const { service } = setup({ reservations: hook });
     await service.runStartCapacity(
@@ -57,7 +58,7 @@ describe('ReaderUiHooksService.runStartCapacity', () => {
     );
     expect(hook).toHaveBeenCalledWith(
       expect.objectContaining({
-        manager: { marker: 'manager' },
+        scope: expect.objectContaining({ isOpen: true }),
         sessionLimit: 3,
         occupiedSlots: 1,
         usersInSession: [11],
@@ -66,6 +67,15 @@ describe('ReaderUiHooksService.runStartCapacity', () => {
         userId: 7,
       }),
     );
+    // The plugin reads the host's own transaction through the engine subpath.
+    const [{ scope }] = hook.mock.calls[0];
+    const persistence = createSqlitePluginPersistence({
+      pluginName: 'reservations',
+      connection: () => {
+        throw new Error('unused');
+      },
+    });
+    expect(sqlitePersistence({ persistence }).managerOf(scope)).toEqual({ marker: 'manager' });
   });
 
   it('refuses with the plugin reason when occupied + held reaches the limit, and audits it after the fact', async () => {

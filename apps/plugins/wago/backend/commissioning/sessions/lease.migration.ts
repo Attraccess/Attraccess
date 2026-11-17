@@ -1,4 +1,4 @@
-import type { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk';
+import type { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk/sqlite';
 
 export class WagoCommissioningLease1780000000011 implements MigrationInterface {
   name = 'WagoCommissioningLease1780000000011';

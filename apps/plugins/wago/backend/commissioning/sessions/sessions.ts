@@ -1,3 +1,4 @@
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { NotFoundException, ConflictException } from '@nestjs/common';
 
 import { commissioningVerification } from './verification';
@@ -153,7 +154,7 @@ export abstract class WagoCommissioningSessions extends WagoCommissioningService
 
   async onApplicationBootstrap(): Promise<void> {
     // The host datasource is available only after plugin module construction completes.
-    this.sessions = this.context.getRepository(WagoCommissioningSession);
+    this.sessions = sqlitePersistence(this.context).getRepository(WagoCommissioningSession);
     this.managedRuntime?.registerRootProbe(async (host, fingerprint, password) => {
       try {
         return (

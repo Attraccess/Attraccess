@@ -1,4 +1,4 @@
-import { DataSource } from 'typeorm';
+import { DataSource } from '@attraccess/plugins-backend-sdk/sqlite';
 import { WagoCommissioningLease1780000000011 } from '../commissioning/sessions/lease.migration';
 import { DropWagoCommissioningLease1780010640000 } from './1780010640000-drop-wago-commissioning-lease';
 

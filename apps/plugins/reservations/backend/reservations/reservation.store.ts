@@ -1,6 +1,7 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { Inject, Injectable } from '@nestjs/common';
-import type { EntityManager } from 'typeorm';
+import type { EntityManager } from '@attraccess/plugins-backend-sdk/sqlite';
 import { PLUGIN_CONTEXT } from '../constants';
 import { NoticeEntity } from '../entities/notice.entity';
 import { REMINDER_FLAGS, ReminderFlag, ReservationEntity, ReservationStatus } from '../entities/reservation.entity';
@@ -28,7 +29,7 @@ export class ReservationStore {
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
 
   private get repo() {
-    return this.context.getRepository(ReservationEntity);
+    return sqlitePersistence(this.context).getRepository(ReservationEntity);
   }
 
   findById(id: number): Promise<ReservationEntity | null> {
@@ -210,7 +211,7 @@ export class ReservationStore {
   cancelFutureLive(resourceId: number, now: Date, changes: Partial<ReservationEntity>): Promise<ReservationEntity[]> {
     const where = 'resourceId = :resourceId AND status IN (:...statuses) AND startTime > :now';
     const parameters = { resourceId, statuses: ['pending', 'confirmed'], now };
-    return this.context.runSerialized(async (manager) => {
+    return sqlitePersistence(this.context).transaction(async (manager) => {
       const repo = manager.getRepository(ReservationEntity);
       const rows = await repo
         .createQueryBuilder('r')
@@ -292,7 +293,7 @@ export class ReservationStore {
     const where = `id = :id AND status IN (:...from)${options.notCheckedIn ? ' AND checkedInAt IS NULL' : ''}`;
     // Writes run in the host's serialized transaction queue: on SQLite a second writer would otherwise wait for, and
     // after the busy timeout fail with SQLITE_BUSY on, the lock another request (or a core write) holds.
-    const result = await this.context.runSerialized((manager) =>
+    const result = await sqlitePersistence(this.context).transaction((manager) =>
       manager
         .getRepository(ReservationEntity)
         .createQueryBuilder()
@@ -319,7 +320,7 @@ export class ReservationStore {
         .set({ [flag]: at })
         .where(`id = :id AND ${flag} IS NULL`, { id })
         .execute();
-    const result = await (manager ? claim(manager) : this.context.runSerialized(claim));
+    const result = await (manager ? claim(manager) : sqlitePersistence(this.context).transaction(claim));
     return (result.affected ?? 0) === 1;
   }
 
@@ -337,7 +338,7 @@ export class ReservationStore {
     const insert = (m: EntityManager) =>
       m.getRepository(NoticeEntity).insert({ reservationId, kind, refKey, sentAt: at });
     try {
-      await (manager ? insert(manager) : this.context.runSerialized(insert));
+      await (manager ? insert(manager) : sqlitePersistence(this.context).transaction(insert));
       return true;
     } catch (error) {
       if (/UNIQUE|constraint/i.test(String((error as { message?: string })?.message))) return false;
@@ -348,7 +349,7 @@ export class ReservationStore {
   /** Notices of the given kind already claimed for these reservations. */
   async findNotices(reservationIds: number[], kind: string): Promise<NoticeEntity[]> {
     if (reservationIds.length === 0) return [];
-    return this.context
+    return sqlitePersistence(this.context)
       .getRepository(NoticeEntity)
       .createQueryBuilder('n')
       .where('n.kind = :kind AND n.reservationId IN (:...reservationIds)', { kind, reservationIds })
@@ -357,7 +358,7 @@ export class ReservationStore {
 
   /** Release a notice claim (when the send failed and should be retried next tick). */
   async releaseNotice(reservationId: number, kind: string, refKey: string): Promise<void> {
-    await this.context.runSerialized((manager) =>
+    await sqlitePersistence(this.context).transaction((manager) =>
       manager
         .getRepository(NoticeEntity)
         .createQueryBuilder()

@@ -1,4 +1,5 @@
 import { configurationHash } from './model';
+import { hostDataWithFlows } from '../persistence.test-utils';
 import { WagoEnrollment } from '../controllers/enrollment.entity';
 import { controller, createWagoServiceFixture } from '../wago-service.test-fixture';
 import { WagoService } from '../controllers/service';
@@ -141,25 +142,17 @@ describe('WagoService configuration and commands', () => {
         }),
       },
     ]);
-    const query = {
-      select: jest.fn().mockReturnThis(),
-      leftJoin: jest.fn().mockReturnThis(),
-      addSelect: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      getMany: jest.fn().mockResolvedValue([]),
-    };
-    Object.assign(context, {
-      dataSource: {
-        getRepository: jest.fn().mockReturnValue({ createQueryBuilder: jest.fn().mockReturnValue(query) }),
-      },
-    });
+    const findNodes = jest.fn().mockResolvedValue([]);
+    Object.assign(context, { hostData: hostDataWithFlows(findNodes) });
 
     await service.commandSchema({ controllerId: claimed.id, channelId: 'pump' }, 2);
 
-    expect(query.andWhere).toHaveBeenCalledWith("node.data ->> 'controllerId' = :controllerId", {
-      controllerId: claimed.id,
-    });
+    expect(findNodes).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'plugin.wago.command',
+        dataEquals: { controllerId: claimed.id, channelId: 'pump' },
+      }),
+    );
   });
 
   it('consumes a pending acknowledgement rejection when command publication fails', async () => {

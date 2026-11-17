@@ -1,17 +1,12 @@
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Resource, User } from '@attraccess/database-entities';
-import {
-  PluginContext,
-  PluginPermission,
-  SystemEvent,
-  SystemEventPayload,
-} from '@attraccess/plugins-backend-sdk';
+import type { PluginResourceModel, PluginUserModel } from '@attraccess/application-models';
+import { PluginContext, PluginPermission, SystemEvent, SystemEventPayload } from '@attraccess/plugins-backend-sdk';
 import { PluginSandboxService } from './plugin-sandbox.service';
 import { PluginEventsService } from './plugin-events.service';
 
-function buildPayload(): { resource: Resource; user: User } {
-  return { resource: { id: 1, name: 'CNC' } as Resource, user: { id: 7 } as User };
+function buildPayload(): { resource: PluginResourceModel; user: PluginUserModel } {
+  return { resource: { id: 1, name: 'CNC' } as PluginResourceModel, user: { id: 7 } as PluginUserModel };
 }
 
 describe('PluginEventsService', () => {
@@ -45,6 +40,39 @@ describe('PluginEventsService', () => {
     expect(started).not.toHaveBeenCalled();
   });
 
+  it('hands plugins only the neutral fields of the user and the resource of a usage event', () => {
+    const handler = jest.fn();
+    service.onEvent(SystemEvent.RESOURCE_USAGE_STARTED, handler);
+
+    // The core emits full records; tokens and contact data must not reach plugin code.
+    service.emit(SystemEvent.RESOURCE_USAGE_STARTED, {
+      resource: {
+        id: 1,
+        name: 'CNC',
+        type: 'machine',
+        description: null,
+        allowTakeOver: false,
+        maxParallelSessions: 1,
+        supervisionMode: 'introduction_required',
+        documentationUrl: 'x',
+      },
+      user: {
+        id: 7,
+        username: 'ada',
+        locale: 'de',
+        isDisabled: false,
+        email: 'ada@example.test',
+        passwordResetToken: 'secret',
+      },
+    } as never);
+
+    const [payload] = handler.mock.calls[0];
+    expect(payload.user).toEqual({ id: 7, username: 'ada', locale: 'de', isDisabled: false });
+    expect(Object.keys(payload.resource).sort()).toEqual(
+      ['allowTakeOver', 'description', 'id', 'maxParallelSessions', 'name', 'supervisionMode', 'type'].sort(),
+    );
+  });
+
   it('detaches a handler when off() is called', () => {
     const handler = jest.fn();
     const subscription = service.onEvent(SystemEvent.RESOURCE_USAGE_STARTED, handler);
@@ -56,7 +84,9 @@ describe('PluginEventsService', () => {
   });
 
   it('isolates a throwing handler so emit never throws into the core flow', () => {
-    jest.spyOn((service as unknown as { logger: { error: () => void } }).logger, 'error').mockImplementation(() => undefined);
+    jest
+      .spyOn((service as unknown as { logger: { error: () => void } }).logger, 'error')
+      .mockImplementation(() => undefined);
     service.onEvent(SystemEvent.RESOURCE_USAGE_STARTED, () => {
       throw new Error('plugin blew up');
     });
@@ -69,9 +99,7 @@ function baseContext(events: EventEmitter2, name: string): PluginContext {
   return {
     manifest: { id: name, name, version: '1.0.0', pluginDirectory: name },
     events,
-    dataSource: {} as never,
     logger: new Logger(name),
-    getRepository: (() => ({})) as never,
     get: (() => ({})) as never,
     onEvent: () => ({ off: () => undefined }),
     emitEvent: () => undefined,
@@ -97,10 +125,11 @@ describe('Plugin event bus (typed emit/subscribe through the guarded context)', 
     const received: SystemEventPayload[SystemEvent.RESOURCE_USAGE_STARTED][] = [];
     plugin.events.on(SystemEvent.RESOURCE_USAGE_STARTED, (payload) => received.push(payload));
 
-    const payload = { resource: { id: 7 } as Resource, user: { id: 3 } as User };
+    const payload = { resource: { id: 7 } as PluginResourceModel, user: { id: 3 } as PluginUserModel };
     events.emit(SystemEvent.RESOURCE_USAGE_STARTED, payload);
 
     expect(received).toHaveLength(1);
+    // The bus delivers what was emitted on it; projection to the neutral model happens in PluginEventsService.
     expect(received[0]).toBe(payload);
   });
 

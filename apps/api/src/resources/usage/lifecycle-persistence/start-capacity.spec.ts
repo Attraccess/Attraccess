@@ -4,6 +4,7 @@ import type { StartCapacityContext, StartCapacityHook } from '@attraccess/plugin
 import { ConflictException } from '@nestjs/common';
 import { rm } from 'node:fs/promises';
 import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
+import { createSqlitePluginPersistence, sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { ReaderUiHooksService } from '../../../plugin-system/reader-ui/reader-ui-hooks.service';
 import { AlreadyHasActiveSessionError } from '../errors/already-has-active-session.error';
 import { ResourceFullError } from '../errors/resource-full.error';
@@ -162,8 +163,9 @@ describe('Start capacity hook', () => {
     let ownSessionsSeen = -1;
     installPluginHook(async (ctx) => {
       seen.push({ confirmedStepKeys: ctx.confirmedStepKeys, origin: ctx.origin, usersInSession: ctx.usersInSession });
-      inTransaction = ctx.manager.queryRunner?.isTransactionActive;
-      ownSessionsSeen = await ctx.manager.count(ResourceUsage, { where: { resourceId: 1 } });
+      const manager = managerOfHostScope(ctx.scope);
+      inTransaction = manager.queryRunner?.isTransactionActive;
+      ownSessionsSeen = await manager.count(ResourceUsage, { where: { resourceId: 1 } });
       return { heldSlots: 0 };
     });
     await scope.usage.startSession(1, scope.users[0], {});
@@ -213,3 +215,14 @@ describe('Start capacity hook', () => {
     expect(runStartCapacity).not.toHaveBeenCalled();
   });
 });
+
+/** What an SQLite plugin does with the scope of a capacity hook. */
+function managerOfHostScope(hostScope: StartCapacityContext['scope']) {
+  const persistence = createSqlitePluginPersistence({
+    pluginName: 'reservations',
+    connection: () => {
+      throw new Error('unused');
+    },
+  });
+  return sqlitePersistence({ persistence }).managerOf(hostScope);
+}

@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk';
+import { Column, Entity, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk/sqlite';
 
 export type WagoConfigurationRevisionState = 'pending' | 'published' | 'applied' | 'rejected';
 

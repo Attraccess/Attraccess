@@ -1,12 +1,10 @@
 import {
-  entities,
-  Flow,
-  Resource,
-  ResourceFlowNode,
-  ResourceType,
   type PluginContext,
+  type PluginFlowNodeQuery,
+  type PluginFlowNodeReference,
 } from '@attraccess/plugins-backend-sdk';
-import { DataSource } from 'typeorm';
+import { DataSource } from '@attraccess/plugins-backend-sdk/sqlite';
+import { flowNode, hostDataWithFlows, persistenceOver } from './persistence.test-utils';
 import { WagoCommandHandler } from './commands/handler';
 import { configurationFlowImpacts } from './configuration/flow-references';
 import type { WagoConfigurationSnapshot } from './configuration/model';
@@ -17,8 +15,23 @@ import { WagoDiagnosticsService } from './diagnostics/service';
 import { WagoDiagnosticsStore } from './diagnostics/store';
 import plugin from './plugin';
 
-// The same channel lookups as the unit specs, but against real SQL: NULL owner columns and the joined flow name.
-describe('global-flow references in a real database', () => {
+/** The host lookup semantics (ownership with NULL owners, data matches), over seeded nodes. */
+function matching(nodes: PluginFlowNodeReference[]) {
+  return (query: PluginFlowNodeQuery) =>
+    nodes.filter(
+      (node) =>
+        (query.type === undefined || node.type === query.type) &&
+        (query.typePrefix === undefined || node.type.startsWith(query.typePrefix)) &&
+        Object.entries(query.dataEquals ?? {}).every(([key, value]) => node.data[key] === value) &&
+        (query.resourceId === undefined || node.resourceId === query.resourceId) &&
+        (query.excludeResourceId === undefined || node.resourceId !== query.excludeResourceId) &&
+        (query.excludeFlowId === undefined || node.flowId !== query.excludeFlowId),
+    );
+}
+
+// The channel lookups against the plugin's real tables and a host lookup with the real owner semantics: NULL owner
+// columns and the joined flow name. The host lookup's SQL itself is covered by the host adapter's persistence spec.
+describe('global-flow references with a real plugin database', () => {
   let dataSource: DataSource;
   let resourceId: number;
   let flowId: number;
@@ -29,42 +42,35 @@ describe('global-flow references in a real database', () => {
       return this.references(1, 'lock', resource, flow);
     }
   }
+  let hostContext: PluginContext;
   const probe = () =>
-    new ReferenceProbe({ context: { dataSource } as unknown as PluginContext } as ConstructorParameters<
-      typeof WagoCommandHandler
-    >[0]);
+    new ReferenceProbe({ context: hostContext } as ConstructorParameters<typeof WagoCommandHandler>[0]);
 
-  const command = (id: string, owner: { resourceId: number } | { flowId: number }) =>
-    Object.assign(new ResourceFlowNode(), {
-      id,
-      type: 'plugin.wago.command',
-      position: { x: 0, y: 0 },
-      data: { controllerId: 1, channelId: 'lock' },
-      resourceId: null,
-      flowId: null,
-      ...owner,
-    });
+  const command = (
+    id: string,
+    owner: { resourceId: number; resourceName: string } | { flowId: number; flowName: string },
+  ) => flowNode({ id, type: 'plugin.wago.command', data: { controllerId: 1, channelId: 'lock' }, ...owner });
 
   beforeAll(async () => {
     dataSource = new DataSource({
       type: 'sqlite',
       database: ':memory:',
-      entities: [...Object.values(entities).filter((value) => typeof value === 'function'), ...plugin.entities],
+      entities: plugin.persistence.sqlite.entities,
       synchronize: true,
     });
     await dataSource.initialize();
-    resourceId = (
-      await dataSource.getRepository(Resource).save({ name: 'Lathe', type: ResourceType.Machine } as Resource)
-    ).id;
-    flowId = (await dataSource.getRepository(Flow).save({ name: 'Power off all' } as Flow)).id;
-    otherFlowId = (await dataSource.getRepository(Flow).save({ name: 'Night mode' } as Flow)).id;
-    await dataSource
-      .getRepository(ResourceFlowNode)
-      .save([
-        command('resource-node', { resourceId }),
-        command('global-node', { flowId }),
-        command('night-node', { flowId: otherFlowId }),
-      ]);
+    resourceId = 1;
+    flowId = 8;
+    otherFlowId = 9;
+    const nodes = [
+      command('resource-node', { resourceId, resourceName: 'Lathe' }),
+      command('global-node', { flowId, flowName: 'Power off all' }),
+      command('night-node', { flowId: otherFlowId, flowName: 'Night mode' }),
+    ];
+    hostContext = {
+      hostData: hostDataWithFlows(matching(nodes)),
+      persistence: persistenceOver(dataSource),
+    } as unknown as PluginContext;
   });
 
   afterAll(() => dataSource.destroy());
@@ -95,11 +101,7 @@ describe('global-flow references in a real database', () => {
       state: 'applied',
       publishedAt: now,
     });
-    const context = {
-      dataSource,
-      getRepository: (entity: Parameters<DataSource['getRepository']>[0]) => dataSource.getRepository(entity),
-    } as unknown as PluginContext;
-    const service = new WagoDiagnosticsService(context, {
+    const service = new WagoDiagnosticsService(hostContext, {
       diagnostics: new WagoDiagnosticsStore(),
     } as unknown as WagoService);
     const diagnostics = await service.getResource(resourceId);
@@ -136,7 +138,7 @@ describe('global-flow references in a real database', () => {
 
   it('lists global-flow nodes with their name in the publication impacts', async () => {
     const snapshot = { version: 1, physicalPoints: [], logicalChannels: [] } as unknown as WagoConfigurationSnapshot;
-    const [impact] = await configurationFlowImpacts({ dataSource } as unknown as PluginContext, 1, snapshot, snapshot);
+    const [impact] = await configurationFlowImpacts(hostContext, 1, snapshot, snapshot);
     expect(impact.references).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ nodeId: 'resource-node', resourceId, flowId: null, flowName: null }),

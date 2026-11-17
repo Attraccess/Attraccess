@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createMock } from '@golevelup/ts-jest';
-import type { PluginContext, PluginMqttMessage, Repository } from '@attraccess/plugins-backend-sdk';
+import type { PluginContext, PluginMqttMessage } from '@attraccess/plugins-backend-sdk';
+import type { Repository } from '@attraccess/plugins-backend-sdk/sqlite';
 import { WagoService } from './controllers/service';
 import { WagoController } from './controllers/entity';
 import { WagoEnrollment } from './controllers/enrollment.entity';

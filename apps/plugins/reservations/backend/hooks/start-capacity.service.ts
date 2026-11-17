@@ -1,5 +1,7 @@
-import type { StartCapacityContext, StartCapacityResult } from '@attraccess/plugins-backend-sdk';
+import type { PluginContext, StartCapacityContext, StartCapacityResult } from '@attraccess/plugins-backend-sdk';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { Inject, Injectable } from '@nestjs/common';
+import { PLUGIN_CONTEXT } from '../constants';
 import { heldBookings } from '../reservations/capacity';
 import { ReservationStore } from '../reservations/reservation.store';
 import { ResourceSettingsService } from '../settings/resource-settings.service';
@@ -8,7 +10,7 @@ import { hookDeadline, waitUntil } from './runtime';
 
 /**
  * The plugin's half of the host's atomic start check on machines with several slots. The host calls it inside its
- * serialized start transaction, so it reads only through the given manager: one indexed query for the running
+ * serialized start transaction, so it reads only through the manager of the given scope: one indexed query for the running
  * confirmed bookings (who is in session comes from the host, read in the same transaction). It answers how many slots
  * are held for people other than the starter; the host refuses the start when those plus the occupied slots fill the
  * machine.
@@ -16,6 +18,7 @@ import { hookDeadline, waitUntil } from './runtime';
 @Injectable()
 export class StartCapacityService {
   constructor(
+    @Inject(PLUGIN_CONTEXT) private readonly context: PluginContext,
     @Inject(ResourceSettingsService) private readonly settings: ResourceSettingsService,
     @Inject(ReservationStore) private readonly store: ReservationStore,
     @Inject(PreStartService) private readonly preStart: PreStartService,
@@ -27,7 +30,11 @@ export class StartCapacityService {
     }
     if (!this.settings.getCachedSettings(ctx.resourceId).enabled) return { heldSlots: 0 };
 
-    const running = await this.store.findRunningConfirmed(ctx.manager, ctx.resourceId, ctx.now);
+    const running = await this.store.findRunningConfirmed(
+      sqlitePersistence(this.context).managerOf(ctx.scope),
+      ctx.resourceId,
+      ctx.now,
+    );
     // The starter's own running booking is the slot they take; the host's normal limit still applies.
     if (running.length === 0 || running.some((r) => r.userId === ctx.userId)) return { heldSlots: 0 };
 

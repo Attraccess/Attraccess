@@ -65,3 +65,20 @@ export function assertPluginSupportsBackend(
     );
   }
 }
+
+/**
+ * A plugin backend module that declares storage code for specific engines must include the engine the host runs.
+ * A module without a declaration passes: it stores nothing through an engine subpath. Checked before entities are
+ * registered, so an incompatible plugin changes nothing.
+ */
+export function assertModulePersistenceSupportsBackend(
+  pluginName: string,
+  declared: readonly string[],
+  active: DatabaseType,
+): void {
+  if (declared.length === 0 || declared.includes(active)) return;
+  throw new PluginIncompatibleError(
+    `Plugin ${safeName(pluginName)} provides storage code for the database engines ${declared.join(', ')} but this ` +
+      `host runs ${active}. It was not started and no data was changed.`,
+  );
+}

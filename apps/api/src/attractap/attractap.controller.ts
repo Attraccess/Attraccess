@@ -1,4 +1,5 @@
-import { Attractap, Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Attractap } from '@attraccess/database-entities';
 
 import {
   Body,

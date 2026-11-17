@@ -24,6 +24,9 @@
     "index.d.ts",
     "lib"
   ],
+  "dependencies": {
+    "@attraccess/application-models": "1.11.0-beta.0"
+  },
   "peerDependencies": {
     "@attraccess/plugins-frontend-ui": "^1.11.0-0"
   }

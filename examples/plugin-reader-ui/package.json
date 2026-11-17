@@ -40,7 +40,7 @@
     }
   },
   "devDependencies": {
-    "@attraccess/plugins-backend-sdk": "^1.0.0",
+    "@attraccess/plugins-backend-sdk": "^2.0.0-0",
     "esbuild": "^0.28.0"
   }
 }

@@ -1,6 +1,7 @@
 import { ExecutionContext, INestApplication, UnauthorizedException, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { AuthenticatedRequest, DualAuthGuard, User } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, DualAuthGuard } from '@attraccess/plugins-backend-sdk';
+import { User } from '@attraccess/database-entities';
 import request from 'supertest';
 import { LicenseError } from '../../license/license.service';
 import { EmailService } from '../../email/email.service';

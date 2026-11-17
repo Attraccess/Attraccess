@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk';
+import { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk/sqlite';
 
 export class AddWagoRejectionAcknowledgement1780010630000 implements MigrationInterface {
   name = 'AddWagoRejectionAcknowledgement1780010630000';
@@ -13,7 +13,11 @@ export class AddWagoRejectionAcknowledgement1780010630000 implements MigrationIn
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query('ALTER TABLE "plugin_wago_configuration_revisions" DROP COLUMN "rejection_acknowledged_by"');
-    await queryRunner.query('ALTER TABLE "plugin_wago_configuration_revisions" DROP COLUMN "rejection_acknowledged_at"');
+    await queryRunner.query(
+      'ALTER TABLE "plugin_wago_configuration_revisions" DROP COLUMN "rejection_acknowledged_by"',
+    );
+    await queryRunner.query(
+      'ALTER TABLE "plugin_wago_configuration_revisions" DROP COLUMN "rejection_acknowledged_at"',
+    );
   }
 }

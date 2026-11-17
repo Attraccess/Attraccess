@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryColumn } from '@attraccess/plugins-backend-sdk';
+import { Column, Entity, PrimaryColumn } from '@attraccess/plugins-backend-sdk/sqlite';
 import type { WhoCanBook } from '../settings/settings.model';
 
 @Entity({ name: 'reservations_resource_settings' })

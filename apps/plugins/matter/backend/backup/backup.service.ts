@@ -8,7 +8,8 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { randomUUID, createHash } from 'node:crypto';
-import type { EntityManager } from 'typeorm';
+import type { EntityManager } from '@attraccess/plugins-backend-sdk/sqlite';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { MatterConnectionService } from '../connection/connection.service';
 import { DeviceAuditService } from '../devices/audit.service';
 import { MatterFabric } from '../devices/entities';
@@ -163,7 +164,7 @@ export class MatterBackupService {
   ) {}
 
   private get repo() {
-    return this.context.getRepository(MatterBackup);
+    return sqlitePersistence(this.context).getRepository(MatterBackup);
   }
 
   setNextScheduledAt(at: string | null): void {
@@ -323,7 +324,9 @@ export class MatterBackupService {
 
   /** Whether the snapshot is of the fabric the plugin recorded, and the record did not move meanwhile. */
   private async matchesRecord(header: SnapshotHeader, recorded: FabricFacts | null): Promise<boolean> {
-    const after = factsOfRow(await recordedFabricRow(this.context.getRepository(MatterFabric).manager));
+    const after = factsOfRow(
+      await recordedFabricRow(sqlitePersistence(this.context).getRepository(MatterFabric).manager),
+    );
     const consistent =
       recorded !== null &&
       header.fabricId === recorded.fabricId &&

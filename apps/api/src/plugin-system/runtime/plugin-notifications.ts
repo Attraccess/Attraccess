@@ -1,4 +1,3 @@
-import type { User } from '@attraccess/database-entities';
 import {
   PluginEmailTemplate,
   PluginNotificationCategory,
@@ -8,6 +7,7 @@ import {
   PluginPermissionError,
 } from '@attraccess/plugins-backend-sdk';
 import type { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
+import type { PluginNotificationRecipient } from '../persistence/plugin-host-data.port';
 import {
   getPluginNotificationCategory,
   pluginNotificationCategoryKey,
@@ -25,7 +25,7 @@ import {
 export interface PluginNotificationDeps {
   dispatcher: Pick<NotificationDispatchService, 'dispatch'>;
   email: Pick<PluginEmailService, 'sendPluginEmail' | 'sendPluginTemplate'>;
-  findUsers(userIds: number[]): Promise<User[]>;
+  findUsers(userIds: number[]): Promise<PluginNotificationRecipient[]>;
 }
 
 /** Plugin-facing notification dispatch, bound to one plugin's category namespace. */

@@ -1,11 +1,11 @@
-import { DataSource } from 'typeorm';
+import { DataSource } from '@attraccess/plugins-backend-sdk/sqlite';
 import { WagoManagementEntity } from './entity';
 import { WagoManagement1780000000010 } from './migration';
 import { RepositoryManagementStore } from './store';
 import type { ManagementRecord } from './model';
 
 // Entity decorators use the actual TypeORM copy, without loading unrelated host application services.
-jest.mock('@attraccess/plugins-backend-sdk', () => jest.requireActual('typeorm'));
+jest.mock('@attraccess/plugins-backend-sdk', () => jest.requireActual('@attraccess/plugins-backend-sdk/sqlite'));
 
 describe('persistent management repository and migration', () => {
   let database: DataSource;

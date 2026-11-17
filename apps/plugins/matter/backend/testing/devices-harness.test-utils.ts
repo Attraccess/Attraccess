@@ -2,7 +2,7 @@
 // context on top of it, and a scripted stand-in for the sidecar connection.
 import type { NodeListView, NodeView } from '../devices/sidecar-types';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
-import { DataSource, type EntityManager } from 'typeorm';
+import { createSqlitePluginPersistence, DataSource, type EntityManager } from '@attraccess/plugins-backend-sdk/sqlite';
 import { SidecarClientError, SidecarTimeoutError, SidecarUnavailableError } from '../client/errors';
 import type { ConnectionStatus } from '../client/connection';
 import { MatterConnectionService } from '../connection/connection.service';
@@ -142,12 +142,17 @@ export async function createHarness() {
     tail = next;
     return next;
   };
+  const persistence = createSqlitePluginPersistence({
+    pluginName: 'matter',
+    connection: () => dataSource,
+    entities: [MatterConnection, ...DEVICE_ENTITIES, ...BACKUP_ENTITIES],
+    runInTransaction: runSerialized,
+  });
   const context = {
     hostVersion: '2.0.0',
     manifest: { id: 'matter', name: 'matter', version: '0.4.0-alpha.0', pluginDirectory: 'matter' },
     logger: { debug: jest.fn(), warn: jest.fn(), error: jest.fn(), log: jest.fn() },
-    getRepository: (entity: never) => dataSource.getRepository(entity),
-    runSerialized,
+    persistence,
     audit: { record: audit },
     // A reversible stand-in for the host's encryption, visibly not plaintext.
     secrets: {

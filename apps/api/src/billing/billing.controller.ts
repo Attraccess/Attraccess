@@ -1,11 +1,6 @@
 import { AllowCrossSiteWrite } from '../common/security/cross-site-write.guard';
-import {
-  Auth,
-  AuthenticatedRequest,
-  BillingTransaction,
-  ResourceBillingConfiguration,
-  ResourceFlowNodeType,
-} from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest, ResourceFlowNodeType } from '@attraccess/plugins-backend-sdk';
+import { BillingTransaction, ResourceBillingConfiguration } from '@attraccess/database-entities';
 
 import {
   Body,

@@ -3,9 +3,8 @@ import 'reflect-metadata';
 import { EMPTY } from 'rxjs';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ModuleRef } from '@nestjs/core';
-import { DataSource } from 'typeorm';
-import { User } from '@attraccess/database-entities';
 import { PLUGIN_AUDIT_HOST_PROVIDER, PluginPermission, PluginPermissionError } from '@attraccess/plugins-backend-sdk';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { PluginModule } from './plugin.module';
 import { resolveAppVersion } from '../config/app.config';
 import { PluginLiveUpdatesService } from './plugin-live-updates.service';
@@ -26,6 +25,7 @@ import { PluginClassificationService } from './plugin-classification.service';
 import { SettingsModule } from './../settings/settings.module';
 import { LiveTopicsModule } from './../live-updates/live-topics.module';
 import { MqttModule } from './../mqtt/mqtt.module';
+import { PluginPersistenceModule } from '../database/adapters/plugins/plugin-persistence.module';
 import { MqttCredentialProvisioningService } from './../mqtt/mqtt-credential-provisioning.service';
 import * as readerUiWiring from './runtime/reader-ui-wiring';
 import { PluginSystemEventsBridge } from './plugin-system-events.bridge';
@@ -33,6 +33,9 @@ import {
   listPluginNotificationCategories,
   unregisterPluginNotificationCategories,
 } from '../notifications/plugin-notification-categories';
+
+/** The host modules every plugin module list starts with. */
+const HOST_IMPORTS = [SettingsModule, MqttModule, LiveTopicsModule, PluginPersistenceModule];
 
 describe('PluginModule', () => {
   const fixture = registerPluginModuleFixture();
@@ -56,11 +59,43 @@ describe('PluginModule', () => {
         );
         writeFileSync(
           join(fixture.root, 'entities/dist/index.js'),
-          'class Widget {} class WidgetModule {} module.exports = { default: { entities: [Widget, Widget], register: () => ({ module: WidgetModule }) } };',
+          'class Widget {} class WidgetModule {} module.exports = { default: { persistence: { sqlite: { entities: [Widget, Widget] } }, register: () => ({ module: WidgetModule }) } };',
         );
         PluginModule.forRoot();
         expect(registry.length).toBe(previous.length + (allowed ? 1 : 0));
         if (allowed) expect((registry.at(-1) as { name: string }).name).toBe('Widget');
+      } finally {
+        registry.splice(0, registry.length, ...previous);
+      }
+    });
+
+    it('refuses a plugin whose storage code does not support the active engine before registering anything', () => {
+      const registry = dataSourceConfig.entities as unknown[];
+      const previous = [...registry];
+      try {
+        mkdirSync(join(fixture.root, 'other-engine/dist'), { recursive: true });
+        writeFileSync(
+          join(fixture.root, 'other-engine/plugin.json'),
+          JSON.stringify({
+            name: 'other-engine',
+            version: '1.0.0',
+            main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+            permissions: [PluginPermission.DATABASE_ACCESS],
+            persistence: { backends: ['sqlite'] },
+            attraccessVersion: { min: '2.0.0-0' },
+          }),
+        );
+        writeFileSync(
+          join(fixture.root, 'other-engine/dist/index.js'),
+          'class Widget {} module.exports = { default: { persistence: { postgres: { entities: [Widget] } }, register: () => ({ module: class M {} }) } };',
+        );
+        const module = PluginModule.forRoot();
+        expect(registry).toEqual(previous);
+        expect(module.imports).toEqual(HOST_IMPORTS);
+        expect(PluginService.getPluginsWithLoadStatus().find(({ name }) => name === 'other-engine')).toMatchObject({
+          status: 'error',
+          error: expect.stringContaining('postgres'),
+        });
       } finally {
         registry.splice(0, registry.length, ...previous);
       }
@@ -88,7 +123,7 @@ describe('PluginModule', () => {
         );
         const module = PluginModule.forRoot();
         expect(registry).toEqual(previous);
-        expect(module.imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule]);
+        expect(module.imports).toEqual(HOST_IMPORTS);
         const errors = (PluginService as unknown as { pluginLoadErrors: Map<string, Error> }).pluginLoadErrors;
         expect(errors.get('legacy@1.0.0')?.message).toContain('migrating-to-2');
       } finally {
@@ -113,12 +148,12 @@ describe('PluginModule', () => {
       ]);
       expect(module.exports).toEqual([PluginEventsService]);
       expect(module.controllers).toEqual([PluginController]);
-      expect(module.imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule]);
+      expect(module.imports).toEqual(HOST_IMPORTS);
     });
 
     it('builds an empty import list when no plugins are present', () => {
       const module = PluginModule.forRoot();
-      expect(module.imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule]);
+      expect(module.imports).toEqual(HOST_IMPORTS);
       expect(module.controllers).toEqual([PluginController]);
     });
 
@@ -138,7 +173,7 @@ describe('PluginModule', () => {
       expect(discovered).toHaveLength(1);
 
       const module = PluginModule.forRoot();
-      expect(module.imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule]);
+      expect(module.imports).toEqual(HOST_IMPORTS);
       expect(PluginService.getManifestById(discovered[0].id)).toBeDefined();
     });
 
@@ -157,7 +192,7 @@ describe('PluginModule', () => {
       const [plugin] = PluginService.getPlugins();
       PluginService.quarantinePlugin(plugin, new Error('prior crash'));
 
-      expect(PluginModule.forRoot().imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule]);
+      expect(PluginModule.forRoot().imports).toEqual(HOST_IMPORTS);
       expect(PluginService.getPluginsWithLoadStatus()[0]).toMatchObject({ status: 'error', error: 'prior crash' });
     });
 
@@ -182,7 +217,7 @@ describe('PluginModule', () => {
       );
       const register = jest.spyOn(MqttCredentialProvisioningService, 'register');
 
-      expect(PluginModule.forRoot().imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule]);
+      expect(PluginModule.forRoot().imports).toEqual(HOST_IMPORTS);
       expect(register).not.toHaveBeenCalled();
     });
 
@@ -246,13 +281,13 @@ describe('PluginModule', () => {
       );
 
       const module = PluginModule.forRoot();
-      expect(module.imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule, expect.any(Object)]);
+      expect(module.imports).toEqual([...HOST_IMPORTS, expect.any(Object)]);
     });
   });
 
   describe('createPluginContext', () => {
     const events = new EventEmitter2();
-    const dataSource = { kind: 'host-datasource' } as unknown as DataSource;
+    const dataSource = { kind: 'host-datasource' };
     const moduleRef = { get: jest.fn((token: unknown) => ({ token })) } as unknown as ModuleRef;
 
     function build(permissions: PluginPermission[]) {
@@ -314,28 +349,36 @@ describe('PluginModule', () => {
       expect(moduleRef.get).toHaveBeenCalledWith(PluginLiveUpdatesService, { strict: false });
     });
 
-    it('hands back the live host DataSource when DATABASE_ACCESS is granted', () => {
-      expect(build([PluginPermission.DATABASE_ACCESS]).dataSource).toBe(dataSource);
-      expect(() => build([]).dataSource).toThrow(PluginPermissionError);
+    it('gates the persistence context behind DATABASE_ACCESS and names the active engine', () => {
+      const context = build([PluginPermission.DATABASE_ACCESS]);
+      expect(context.persistence.backend).toBe('sqlite');
+      expect(context.persistence.supports('sqlite')).toBe(true);
+      expect(() => build([]).persistence).toThrow(PluginPermissionError);
+      expect('dataSource' in context).toBe(false);
+      expect('getRepository' in context).toBe(false);
+      expect('runSerialized' in context).toBe(false);
     });
 
-    it('lets a plugin constructor retain a repository before the host DataSource is injected', async () => {
+    it('lets a plugin constructor retain a repository before the host connection is injected', async () => {
       class Widget {}
       const find = jest.fn(async () => [new Widget()]);
-      const repository = { find };
-      const host = { getRepository: jest.fn(() => repository) } as unknown as DataSource;
+      const host = { getRepository: jest.fn(() => ({ find })) };
       const internals = PluginModule as unknown as {
-        dataSourceRef: DataSource | null;
-        createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
+        connectionRef: object | null;
+        createPluginContext(
+          m: LoadedPluginManifest,
+          entities: unknown[],
+        ): import('@attraccess/plugins-backend-sdk').PluginContext;
       };
-      internals.dataSourceRef = null;
+      internals.connectionRef = null;
 
       const context = internals.createPluginContext(
         fixture.manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }),
+        [Widget],
       );
-      const retained = context.getRepository(Widget);
+      const retained = sqlitePersistence(context).getRepository(Widget);
       expect(host.getRepository).not.toHaveBeenCalled();
-      expect(() => retained.find()).toThrow(/accessed before bootstrap completed/);
+      expect(() => retained.find()).toThrow(/not available yet/);
 
       new PluginModule(host, events, moduleRef);
       await expect(retained.find()).resolves.toEqual([expect.any(Widget)]);
@@ -343,54 +386,46 @@ describe('PluginModule', () => {
       expect(find).toHaveBeenCalledTimes(1);
     });
 
-    it('rechecks entity metadata permissions before resolving a retained repository', async () => {
-      const find = jest.fn(async () => [new User()]);
-      const host = {
-        getMetadata: jest.fn(() => ({ target: User })),
-        getRepository: jest.fn(() => ({ find })),
-      } as unknown as DataSource;
-      const internals = PluginModule as unknown as {
-        resetHostReferences(): void;
-        createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
-      };
-      internals.resetHostReferences();
-
-      const denied = internals.createPluginContext(
-        fixture.manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }),
-      );
-      const retained = denied.getRepository('user');
+    it('serves repositories only for entities the plugin registered, never host tables', () => {
+      class Widget {}
+      class Other {}
+      const host = { getRepository: jest.fn(() => ({})) };
       new PluginModule(host, events, moduleRef);
+      const context = (
+        PluginModule as unknown as {
+          createPluginContext(
+            m: LoadedPluginManifest,
+            entities: unknown[],
+          ): import('@attraccess/plugins-backend-sdk').PluginContext;
+        }
+      ).createPluginContext(fixture.manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }), [Widget]);
+      const sqlite = sqlitePersistence(context);
 
-      expect(() => retained.find()).toThrow(/READ_USERS/);
-      expect(host.getRepository).not.toHaveBeenCalled();
-      expect(find).not.toHaveBeenCalled();
-
-      internals.resetHostReferences();
-      const allowed = internals.createPluginContext(
-        fixture.manifest({ permissions: [PluginPermission.DATABASE_ACCESS, PluginPermission.READ_USERS] }),
-      );
-      const permitted = allowed.getRepository('user');
-      new PluginModule(host, events, moduleRef);
-      await expect(permitted.find()).resolves.toEqual([expect.any(User)]);
-      expect(host.getRepository).toHaveBeenCalledWith('user');
+      expect(() => sqlite.getRepository(Widget)).not.toThrow();
+      expect(() => sqlite.getRepository(Other)).toThrow(/registered/);
+      expect(() => sqlite.getRepository('User')).toThrow(/registered/);
     });
 
     it('does not hand the second application a repository from the closed configuration application', async () => {
       class Widget {}
-      const first = { getRepository: jest.fn(() => ({ find: async () => ['closed'] })) } as unknown as DataSource;
+      const first = { getRepository: jest.fn(() => ({ find: async () => ['closed'] })) };
       const find = jest.fn(async () => ['live']);
-      const second = { getRepository: jest.fn(() => ({ find })) } as unknown as DataSource;
+      const second = { getRepository: jest.fn(() => ({ find })) };
       const internals = PluginModule as unknown as {
         resetHostReferences(): void;
-        createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
+        createPluginContext(
+          m: LoadedPluginManifest,
+          entities: unknown[],
+        ): import('@attraccess/plugins-backend-sdk').PluginContext;
       };
       new PluginModule(first, events, moduleRef);
       internals.resetHostReferences();
 
       const context = internals.createPluginContext(
         fixture.manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }),
+        [Widget],
       );
-      const retained = context.getRepository(Widget);
+      const retained = sqlitePersistence(context).getRepository(Widget);
       new PluginModule(second, events, moduleRef);
 
       await expect(retained.find()).resolves.toEqual(['live']);
@@ -423,30 +458,55 @@ describe('PluginModule', () => {
     });
   });
 
-  describe('runSerialized', () => {
-    it('runs the callback in a transaction of the host connection', async () => {
+  describe('persistence.transaction', () => {
+    type Internals = {
+      createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
+    };
+
+    it('runs the callback in a transaction of the host connection and hands the scope to the engine subpath', async () => {
       const transaction = jest.fn(async (work: (manager: unknown) => Promise<unknown>) => work('tx-manager'));
       const host = {
         manager: { connection: { options: { type: 'postgres' } }, transaction },
-      } as unknown as DataSource;
+      };
       new PluginModule(host, new EventEmitter2(), { get: jest.fn() } as unknown as ModuleRef);
-      const context = (
-        PluginModule as unknown as {
-          createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
-        }
-      ).createPluginContext(fixture.manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }));
+      const context = (PluginModule as unknown as Internals).createPluginContext(
+        fixture.manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }),
+      );
 
-      await expect(context.runSerialized(async (manager) => `ran:${String(manager)}`)).resolves.toBe('ran:tx-manager');
+      await expect(
+        context.persistence.transaction(async (scope) => `ran:${String(sqlitePersistence(context).managerOf(scope))}`),
+      ).resolves.toBe('ran:tx-manager');
       expect(transaction).toHaveBeenCalledTimes(1);
     });
 
+    it('runs post-commit work after the transaction and rejects a nested transaction', async () => {
+      const order: string[] = [];
+      const transaction = jest.fn(async (work: (manager: unknown) => Promise<unknown>) => {
+        const result = await work('tx-manager');
+        order.push('commit');
+        return result;
+      });
+      new PluginModule(
+        { manager: { connection: { options: { type: 'postgres' } }, transaction } },
+        new EventEmitter2(),
+        {
+          get: jest.fn(),
+        } as unknown as ModuleRef,
+      );
+      const context = (PluginModule as unknown as Internals).createPluginContext(
+        fixture.manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }),
+      );
+
+      await context.persistence.transaction(async (scope) => {
+        scope.afterCommit(() => void order.push('after'));
+        await expect(context.persistence.transaction(async () => 1)).rejects.toThrow(/inside a transaction callback/);
+      });
+      expect(order).toEqual(['commit', 'after']);
+    });
+
     it('is denied without DATABASE_ACCESS', () => {
-      const context = (
-        PluginModule as unknown as {
-          createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
-        }
-      ).createPluginContext(fixture.manifest({ permissions: [] }));
-      expect(() => context.runSerialized(async () => 1)).toThrow(PluginPermissionError);
+      const context = (PluginModule as unknown as Internals).createPluginContext(fixture.manifest({ permissions: [] }));
+      expect(() => context.persistence).toThrow(PluginPermissionError);
     });
   });
 
@@ -485,7 +545,7 @@ describe('PluginModule', () => {
         [PluginPermission.SEND_NOTIFICATIONS],
         `${categories}, register: () => ({ module: class M {} })`,
       );
-      const [pluginImport] = PluginModule.forRoot().imports.slice(3) as Array<{
+      const [pluginImport] = PluginModule.forRoot().imports.slice(HOST_IMPORTS.length) as Array<{
         providers: Array<{ provide: string; useFactory: () => { onModuleInit: () => void } }>;
       }>;
       const cleanup = pluginImport.providers.find((provider) =>
@@ -505,7 +565,7 @@ describe('PluginModule', () => {
     it('quarantines a plugin declaring categories without SEND_NOTIFICATIONS', () => {
       writePlugin('sneaky', [], `${categories}, register: () => ({ module: class M {} })`);
       const module = PluginModule.forRoot();
-      expect(module.imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule]);
+      expect(module.imports).toEqual(HOST_IMPORTS);
       expect(listPluginNotificationCategories().some((category) => category.pluginName === 'sneaky')).toBe(false);
     });
 
@@ -531,7 +591,7 @@ describe('PluginModule', () => {
       const queue = jest.spyOn(readerUiWiring, 'queueReaderUiContributions').mockImplementation(() => undefined);
       jest.spyOn(readerUiWiring, 'queueReaderUiLoadFailure').mockImplementation(() => undefined);
 
-      expect(PluginModule.forRoot().imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule]);
+      expect(PluginModule.forRoot().imports).toEqual(HOST_IMPORTS);
       expect(queue).not.toHaveBeenCalled();
       expect(listPluginNotificationCategories().some((category) => category.pluginName === 'broken-mail')).toBe(false);
     });

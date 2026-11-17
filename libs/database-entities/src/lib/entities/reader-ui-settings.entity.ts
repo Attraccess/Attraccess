@@ -1,4 +1,7 @@
 import { Column, CreateDateColumn, Entity, PrimaryColumn, PrimaryGeneratedColumn } from 'typeorm';
+import type { ReaderUiAlertKind } from '@attraccess/application-models';
+
+export type { ReaderUiAlertKind } from '@attraccess/application-models';
 
 /** Per-resource reader UI settings (ATT-1187). `noScreenPolicy` null means "use the plugin default". */
 @Entity('reader_ui_resource_settings')
@@ -35,8 +38,6 @@ export class ReaderUiReaderSettings {
   @Column({ type: 'boolean', default: true })
   widgetsEnabled!: boolean;
 }
-
-export type ReaderUiAlertKind = 'breaker-open' | 'load-failure' | 'crash-loop' | 'time-zone-conflict';
 
 /**
  * Host-owned admin alert: open circuit breaker, ACCESS_HOOKS load failure, reader crash-loop suspension or plugins

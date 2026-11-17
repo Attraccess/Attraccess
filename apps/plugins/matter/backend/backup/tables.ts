@@ -1,6 +1,6 @@
 // The plugin tables a backup carries and a restore replaces. The connection settings (which hold an encrypted
 // credential bound to this host) and the backup feature's own tables are deliberately not part of it.
-import type { EntityManager } from 'typeorm';
+import type { EntityManager } from '@attraccess/plugins-backend-sdk/sqlite';
 import {
   MatterCommand,
   MatterEndpoint,

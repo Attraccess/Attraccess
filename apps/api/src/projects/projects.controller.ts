@@ -22,7 +22,8 @@ import { ProjectUsageService } from './project-usage.service';
 
 import { ProjectsService } from './projects.service';
 
-import { Auth, AuthenticatedRequest, Project } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Project } from '@attraccess/database-entities';
 
 import { FileInterceptor } from '@nestjs/platform-express';
 

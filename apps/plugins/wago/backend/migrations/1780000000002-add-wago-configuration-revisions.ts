@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk';
+import { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk/sqlite';
 
 export class AddWagoConfigurationRevisions1780000000002 implements MigrationInterface {
   name = 'AddWagoConfigurationRevisions1780000000002';

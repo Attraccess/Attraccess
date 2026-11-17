@@ -1,3 +1,4 @@
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { WagoSettings } from './settings.entity';
 
 import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
@@ -252,11 +253,11 @@ export abstract class WagoRegistry extends WagoServiceState {
 
   async onApplicationBootstrap(): Promise<void> {
     // The host datasource is available only after plugin module construction completes.
-    this.controllers = this.context.getRepository(WagoController);
-    this.settings = this.context.getRepository(WagoSettings);
-    this.enrollments = this.context.getRepository(WagoEnrollment);
-    this.drafts = this.context.getRepository(WagoConfigurationDraft);
-    this.revisions = this.context.getRepository(WagoConfigurationRevision);
+    this.controllers = sqlitePersistence(this.context).getRepository(WagoController);
+    this.settings = sqlitePersistence(this.context).getRepository(WagoSettings);
+    this.enrollments = sqlitePersistence(this.context).getRepository(WagoEnrollment);
+    this.drafts = sqlitePersistence(this.context).getRepository(WagoConfigurationDraft);
+    this.revisions = sqlitePersistence(this.context).getRepository(WagoConfigurationRevision);
     const enrollments = await this.enrollments
       .createQueryBuilder('enrollment')
       .where('enrollment.consumedAt IS NULL')

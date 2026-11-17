@@ -1,3 +1,4 @@
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 
 import { randomBytes } from 'node:crypto';
@@ -62,7 +63,7 @@ export abstract class WagoCommissioningRecovery extends WagoCommissioningPlatfor
       let deviceOperations: WagoDeviceOperations | undefined;
       const owner = randomBytes(16).toString('hex');
       if (this.managedRuntime) {
-        deviceOperations = new WagoDeviceOperations(this.context.getRepository(WagoDeviceOperation));
+        deviceOperations = new WagoDeviceOperations(sqlitePersistence(this.context).getRepository(WagoDeviceOperation));
         if (!(await deviceOperations.acquire(key, owner, Date.now(), deadline + 60_000)))
           throw new ConflictException('Another controller operation is active. Retry after it finishes.');
       }
@@ -73,7 +74,9 @@ export abstract class WagoCommissioningRecovery extends WagoCommissioningPlatfor
       };
       try {
         const enrolled = session.hardwareId
-          ? await this.context.getRepository(WagoController).findOneBy({ hardwareId: session.hardwareId })
+          ? await sqlitePersistence(this.context)
+              .getRepository(WagoController)
+              .findOneBy({ hardwareId: session.hardwareId })
           : null;
         await this.managedRuntime?.assertNetworkSettled(enrolled?.id ?? null, session.hostKeyFingerprint ?? undefined);
         this.activeDeadlines.set(id, deadline);

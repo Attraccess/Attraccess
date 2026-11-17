@@ -1,4 +1,3 @@
-import { Resource, User } from '@attraccess/database-entities';
 import { SupervisionMode } from '@attraccess/application-models';
 import type {
   AuthenticatedUser,
@@ -12,6 +11,7 @@ import type { ResourceActivityVisibilityService } from '../../resources/usage/au
 import type { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
 import type { ResourceUsageService } from '../../resources/usage/sessions/resource-usage.service';
 import type { RbacService } from '../../users-and-auth/rbac/rbac.service';
+import type { PluginCoreLookupPort, PluginCoreUser } from '../persistence/plugin-host-data.port';
 
 const LOOKUP_CONCURRENCY = 20;
 const NO_START: PluginCanStartResult = { allowed: false, requiresSupervision: false, supervisionAllowed: false };
@@ -25,9 +25,9 @@ export interface ResourceAccessDeps {
   >;
   rbac: Pick<RbacService, 'getEffectivePermissions'>;
   visibility: Pick<ResourceActivityVisibilityService, 'resolve'>;
-  findUser(userId: number): Promise<User | null>;
-  findResource(resourceId: number): Promise<Pick<Resource, 'id' | 'supervisionMode'> | null>;
-  listResourceIds(): Promise<number[]>;
+  findUser: PluginCoreLookupPort['findUser'];
+  findResource: PluginCoreLookupPort['findResourceSupervision'];
+  listResourceIds: PluginCoreLookupPort['listResourceIds'];
 }
 
 /**
@@ -49,7 +49,7 @@ export function createResourceAccessContext(getDeps: () => ResourceAccessDeps): 
   };
 
   /** Loads the user and attaches the request scope, mirroring what core's auth strategy hands its services. */
-  const resolveUser = async (principal: PluginAccessPrincipal): Promise<User | AuthenticatedUser | null> => {
+  const resolveUser = async (principal: PluginAccessPrincipal): Promise<PluginCoreUser | AuthenticatedUser | null> => {
     const user = await getDeps().findUser(principalId(principal));
     if (!user) return null;
     const effectivePermissions = await scopedPermissions(principal);

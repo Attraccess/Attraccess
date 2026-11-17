@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryColumn } from '@attraccess/plugins-backend-sdk';
+import { Column, Entity, PrimaryColumn } from '@attraccess/plugins-backend-sdk/sqlite';
 
 /** New enrolments only. Never serialize this entity or its encrypted envelope. */
 @Entity({ name: 'plugin_wago_managed_access' })

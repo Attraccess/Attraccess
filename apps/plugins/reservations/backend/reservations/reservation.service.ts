@@ -1,4 +1,5 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { CAPACITY_REDUCED_REASON, Clock, PLUGIN_CONTEXT, RESERVATION_CLOCK, RESERVATION_NOTIFIER } from '../constants';
 import { ReservationEntity, ReservationStatus } from '../entities/reservation.entity';
@@ -185,7 +186,7 @@ export class ReservationService implements OnModuleDestroy {
       if (maintenance.length > 0) {
         throw new ReservationError('MAINTENANCE', 'The resource is in maintenance during this time');
       }
-      return this.context.runSerialized(async (manager) => {
+      return sqlitePersistence(this.context).transaction(async (manager) => {
         if (settings.maxActiveBookingsPerUser > 0) {
           const live = await this.store.countLiveForUser(manager, actor.userId, input.resourceId, now);
           if (live >= settings.maxActiveBookingsPerUser) {
@@ -199,7 +200,7 @@ export class ReservationService implements OnModuleDestroy {
         const overlapping = candidates.filter((other) => spansOverlap(span, blockedSpan(other)));
         // Read inside the serialized transaction (and under the resource mutex), so concurrent creates and a
         // concurrent limit change cannot exceed the limit.
-        const limit = await this.directory.getSessionLimit(input.resourceId, manager);
+        const limit = await this.directory.getSessionLimit(input.resourceId);
         if (limit <= 1) {
           if (overlapping.length > 0) throw new ReservationError('OVERLAP', 'The time is already reserved');
         } else {
@@ -533,7 +534,7 @@ export class ReservationService implements OnModuleDestroy {
 
   /** Holder started a session inside the check-in window. True when this call recorded the check-in. */
   async markCheckedIn(id: number, usageId: number, at: Date): Promise<boolean> {
-    const result = await this.context.runSerialized((manager) =>
+    const result = await sqlitePersistence(this.context).transaction((manager) =>
       manager
         .getRepository(ReservationEntity)
         .createQueryBuilder()

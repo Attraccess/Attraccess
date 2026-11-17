@@ -1,41 +1,33 @@
-import { In } from 'typeorm';
 import { ReaderUiSettingsService } from './reader-ui-settings.service';
+import { InMemoryReaderUiSettingsStore } from './reader-ui-stores.test-fixture';
 
 describe('ReaderUiSettingsService.widgetToggles', () => {
-  function setup(readerRow: unknown, offRows: unknown[]) {
-    const plugins = { find: jest.fn().mockResolvedValue(offRows) };
-    const readers = { findOne: jest.fn().mockResolvedValue(readerRow) };
-    const service = new ReaderUiSettingsService(
-      {} as never,
-      plugins as never,
-      readers as never,
-      {} as never,
-      {} as never,
-    );
-    return { service, plugins, readers };
+  function setup(readerEnabled: boolean | null, offRows: { resourceId: number; plugin: string }[]) {
+    const store = new InMemoryReaderUiSettingsStore();
+    if (readerEnabled !== null) store.readers.set(5, readerEnabled);
+    for (const row of offRows) {
+      store.plugins.push({ ...row, widgetsEnabled: false, hookFailurePolicy: 'fail-closed' });
+    }
+    const service = new ReaderUiSettingsService(store, {} as never, {} as never);
+    return { service, store };
   }
 
   it('loads the reader toggle and the switched-off (resource, plugin) pairs in two queries', async () => {
-    const { service, plugins, readers } = setup({ readerId: 5, widgetsEnabled: true }, [
-      { resourceId: 12, plugin: 'reservations', widgetsEnabled: false },
-    ]);
+    const { service, store } = setup(true, [{ resourceId: 12, plugin: 'reservations' }]);
     const toggles = await service.widgetToggles(5, [12, 13]);
     expect(toggles.readerEnabled).toBe(true);
     expect([...toggles.disabled]).toEqual(['12|reservations']);
-    expect(readers.findOne).toHaveBeenCalledTimes(1);
-    expect(plugins.find).toHaveBeenCalledTimes(1);
-    expect(plugins.find).toHaveBeenCalledWith({ where: { resourceId: In([12, 13]), widgetsEnabled: false } });
+    expect(store.calls).toEqual({ readerRead: 1, listDisabled: 1 });
   });
 
-  it('defaults to on and skips the plugin query without resources', async () => {
-    const { service, plugins } = setup(null, []);
+  it('defaults to on and finds no switched-off pair without resources', async () => {
+    const { service } = setup(null, []);
     const toggles = await service.widgetToggles(5, []);
     expect(toggles).toEqual({ readerEnabled: true, disabled: new Set() });
-    expect(plugins.find).not.toHaveBeenCalled();
   });
 
   it('reports a reader with widgets off', async () => {
-    const { service } = setup({ readerId: 5, widgetsEnabled: false }, []);
+    const { service } = setup(false, []);
     expect((await service.widgetToggles(5, [1])).readerEnabled).toBe(false);
   });
 });

@@ -12,7 +12,8 @@ import {
   ClassSerializerInterceptor,
   SerializeOptions,
 } from '@nestjs/common';
-import { Auth, AuthenticatedRequest, NFCCard } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { NFCCard } from '@attraccess/database-entities';
 import { ApiOperation, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { AttractapService } from './attractap.service';
 import { NfcCardSetActiveStateDto } from './dtos/rfid-card-set-active-state.dto';

@@ -31,6 +31,8 @@ const HOST_SHARED_EXTERNALS = [
   'class-validator',
   'class-transformer',
   '@attraccess/plugins-backend-sdk',
+  // The engine subpath re-exports the host's single TypeORM copy; the host serves it from its own bundle.
+  '@attraccess/plugins-backend-sdk/sqlite',
 ];
 
 // Optional native accelerators of `ws`. It requires them inside a try/catch and falls back to plain JavaScript, so

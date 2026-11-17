@@ -1,12 +1,11 @@
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import {
-  Column,
-  Entity,
   PLUGIN_CONTEXT,
-  PrimaryColumn,
   type PluginAuditPrincipal,
   type PluginContext,
   type PluginMqttSubscription,
 } from '@attraccess/plugins-backend-sdk';
+import { Column, Entity, PrimaryColumn } from '@attraccess/plugins-backend-sdk/sqlite';
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../../shared/clock';
@@ -184,7 +183,9 @@ export class WagoCredentialRotationService {
     retry = false,
   ) {
     await guard.assertOwned();
-    const controller = await this.context.getRepository(WagoController).findOneBy({ id: controllerId });
+    const controller = await sqlitePersistence(this.context)
+      .getRepository(WagoController)
+      .findOneBy({ id: controllerId });
     if (!controller) throw new NotFoundException('WAGO controller not found');
     assertRotationController(controller, retry);
     const [epochRow] = await this.repository.query(
@@ -297,6 +298,6 @@ export class WagoCredentialRotationService {
   }
 
   protected get repository() {
-    return this.context.getRepository(WagoCredentialRotationEntity);
+    return sqlitePersistence(this.context).getRepository(WagoCredentialRotationEntity);
   }
 }

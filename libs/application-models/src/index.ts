@@ -26,3 +26,5 @@ export * from './lib/ssoProvider';
 export * from './lib/ssoProvider-oidc';
 export * from './lib/usage-duration-unit';
 export * from './lib/user-role';
+export * from './lib/plugin-host-models';
+export * from './lib/reader-ui-alert';

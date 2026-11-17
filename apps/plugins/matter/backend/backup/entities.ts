@@ -1,5 +1,5 @@
 // Entities of the backup feature. The schema belongs to migrations/1793900002000-create-matter-backup.ts.
-import { Column, Entity, PrimaryColumn } from '@attraccess/plugins-backend-sdk';
+import { Column, Entity, PrimaryColumn } from '@attraccess/plugins-backend-sdk/sqlite';
 
 export type BackupTrigger = 'manual' | 'fabric_created' | 'restore' | 'daily' | 'fabric_changed' | 'pre_restore';
 export const BACKUP_TRIGGERS: readonly BackupTrigger[] = [

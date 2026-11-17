@@ -1,3 +1,4 @@
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 import { managedHostHelper } from './provisioning/helper';
@@ -116,7 +117,7 @@ export abstract class WagoManagedRuntimeEnrollment extends WagoManagedRuntimeSer
 
   async assertNetworkSettled(controllerId: number | null, fingerprint?: string): Promise<void> {
     if (controllerId === null && !fingerprint) return;
-    const change = await this.context
+    const change = await sqlitePersistence(this.context)
       .getRepository(WagoNetworkChange)
       .findOneBy(controllerId === null ? { fingerprint } : { controllerId });
     if (change && change.phase !== 'completed')
@@ -132,7 +133,7 @@ export abstract class WagoManagedRuntimeEnrollment extends WagoManagedRuntimeSer
 
   async assertRemovable(controllerId: number): Promise<void> {
     await this.assertUpdateSettled(controllerId);
-    if (await this.context.getRepository(WagoMqttCredentialRetirement).countBy({ controllerId }))
+    if (await sqlitePersistence(this.context).getRepository(WagoMqttCredentialRetirement).countBy({ controllerId }))
       throw new ConflictException('Retire previous broker credentials before removing this controller.');
     const access = await this.access.findOne({ where: { controllerId }, order: { sessionId: 'DESC' } });
     if (access && access.state !== 'retired')
@@ -368,11 +369,11 @@ export abstract class WagoManagedRuntimeEnrollment extends WagoManagedRuntimeSer
   }
 
   public onApplicationBootstrap(): void {
-    this.access = this.context.getRepository(WagoManagedAccess);
-    this.updates = this.context.getRepository(WagoRuntimeUpdateEntity);
-    this.sessions = this.context.getRepository(WagoCommissioningSession);
-    this.controllers = this.context.getRepository(WagoController);
-    this.operations = new WagoDeviceOperations(this.context.getRepository(WagoDeviceOperation));
+    this.access = sqlitePersistence(this.context).getRepository(WagoManagedAccess);
+    this.updates = sqlitePersistence(this.context).getRepository(WagoRuntimeUpdateEntity);
+    this.sessions = sqlitePersistence(this.context).getRepository(WagoCommissioningSession);
+    this.controllers = sqlitePersistence(this.context).getRepository(WagoController);
+    this.operations = new WagoDeviceOperations(sqlitePersistence(this.context).getRepository(WagoDeviceOperation));
     this.coordinator = new WagoRuntimeUpdateCoordinator(
       this.updateStore(),
       () => this.desired(),

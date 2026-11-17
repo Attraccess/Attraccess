@@ -1,4 +1,5 @@
 import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { SidecarClientConfig } from '../client/rest-client';
@@ -24,7 +25,7 @@ export class MatterSettingsService {
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
 
   private get repository() {
-    return this.context.getRepository(MatterConnection);
+    return sqlitePersistence(this.context).getRepository(MatterConnection);
   }
 
   async publicView(): Promise<PublicSettings> {

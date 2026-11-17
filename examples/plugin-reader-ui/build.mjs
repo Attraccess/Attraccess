@@ -8,7 +8,13 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, 'package');
 
 // Host-shared packages must never be bundled: they carry the DI identities of the host.
-const HOST_SHARED_EXTERNALS = ['@nestjs/common', '@nestjs/core', 'reflect-metadata', '@attraccess/plugins-backend-sdk'];
+const HOST_SHARED_EXTERNALS = [
+  '@nestjs/common',
+  '@nestjs/core',
+  'reflect-metadata',
+  '@attraccess/plugins-backend-sdk',
+  '@attraccess/plugins-backend-sdk/sqlite',
+];
 
 rmSync(PACKAGE, { recursive: true, force: true });
 mkdirSync(join(PACKAGE, 'dist'), { recursive: true });

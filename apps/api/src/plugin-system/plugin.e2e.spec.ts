@@ -3,7 +3,7 @@ import 'reflect-metadata';
 import { Global, INestApplication, Module } from '@nestjs/common';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
-import { Column, DataSource, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { PluginContext, PluginPermission, PluginPermissionError } from '@attraccess/plugins-backend-sdk';
 import { build } from 'esbuild';
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs';
@@ -16,8 +16,12 @@ import { LoadedPluginManifest } from './plugin.manifest';
 import { zipFileUpload } from './__test__/make-zip';
 import { MqttClientService } from '../mqtt/mqtt-client.service';
 import { MqttServerService } from '../mqtt/servers/mqtt-server.service';
+import { dataSourceConfig } from '../database/datasource';
 
 let hostDataSource: DataSource;
+/** The host's entity registry, restored after the test: loading the plugin registers its entity into it. */
+const registry = dataSourceConfig.entities as unknown[];
+const registryBefore = [...registry];
 
 @Global()
 @Module({
@@ -30,18 +34,9 @@ let hostDataSource: DataSource;
 })
 class HostModule {}
 
-@Entity()
-class PocNote {
-  @PrimaryGeneratedColumn()
-  id!: number;
-
-  @Column()
-  message!: string;
-}
-
 interface PocPongPayload {
   eventsInstanceMatch: boolean;
-  dataSourceInstanceMatch: boolean;
+  entityMetadataResolved: boolean;
   savedId: number;
   savedMessage: string;
   hostGreeting: string;
@@ -82,6 +77,8 @@ const SHARED = [
   '@attraccess/plugins-backend-sdk',
 ];
 
+const SHARED_WITH_SUBPATH = [...SHARED, '@attraccess/plugins-backend-sdk/sqlite'];
+
 const PLUGIN_JSON = {
   name: PLUGIN_NAME,
   version: '1.0.0',
@@ -110,7 +107,7 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
       format: 'cjs',
       target: 'es2021',
       outfile: ARTIFACT,
-      external: SHARED,
+      external: SHARED_WITH_SUBPATH,
       tsconfigRaw: { compilerOptions: { experimentalDecorators: true, emitDecoratorMetadata: true } },
       logLevel: 'silent',
     });
@@ -140,13 +137,22 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
     PluginService.configure({ PLUGIN_DIR: PLUGIN_PATH, RESTART_BY_EXIT: true });
     PluginModule.configure({ DISABLE_PLUGINS: false });
 
-    dataSource = new DataSource({ type: 'sqlite', database: ':memory:', synchronize: true, entities: [PocNote] });
+    // Loading the plugin registers its declared entity into the host's entity registry, before the connection opens.
+    const pluginModule = PluginModule.forRoot();
+    const pluginEntities = registry.filter((entity) => !registryBefore.includes(entity));
+    expect(pluginEntities.map((entity) => (entity as { name: string }).name)).toEqual(['PocNote']);
+    dataSource = new DataSource({
+      type: 'sqlite',
+      database: ':memory:',
+      synchronize: true,
+      entities: pluginEntities as never[],
+    });
     await dataSource.initialize();
     hostDataSource = dataSource;
     events = new EventEmitter2();
 
     const moduleRef = await Test.createTestingModule({
-      imports: [EventEmitterModule.forRoot(), HostModule, PluginModule.forRoot()],
+      imports: [EventEmitterModule.forRoot(), HostModule, pluginModule],
     })
       .overrideProvider(EventEmitter2)
       .useValue(events)
@@ -163,6 +169,7 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
   afterAll(async () => {
     if (app) await app.close();
     if (dataSource?.isInitialized) await dataSource.destroy();
+    registry.splice(0, registry.length, ...registryBefore);
     jest.restoreAllMocks();
     rmSync(CACHE_DIR, { recursive: true, force: true });
   });
@@ -187,7 +194,7 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
     events.emit(PING_EVENT, 'hello');
     const payload = await pong;
 
-    expect(payload.dataSourceInstanceMatch).toBe(true);
+    expect(payload.entityMetadataResolved).toBe(true);
     expect(payload.savedId).toBeGreaterThan(0);
     expect(payload.savedMessage).toBe(`${PLUGIN_NAME}:hello`);
     expect(payload.hostGreeting).toBe('hello from host');
@@ -208,8 +215,8 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
       PluginModule as unknown as { createPluginContext(m: LoadedPluginManifest): PluginContext }
     ).createPluginContext(manifest);
 
-    expect(() => ctx.dataSource).toThrow(PluginPermissionError);
-    expect(() => ctx.dataSource).toThrow(/DATABASE_ACCESS/);
+    expect(() => ctx.persistence).toThrow(PluginPermissionError);
+    expect(() => ctx.persistence).toThrow(/DATABASE_ACCESS/);
   });
 
   it('deletes the plugin and removes it from disk', async () => {

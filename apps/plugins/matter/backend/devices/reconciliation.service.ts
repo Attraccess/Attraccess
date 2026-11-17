@@ -1,7 +1,8 @@
 import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import type { EntityManager } from 'typeorm';
+import type { EntityManager } from '@attraccess/plugins-backend-sdk/sqlite';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { SidecarClientError } from '../client/errors';
 import type { SidecarConnection } from '../client/connection';
 import { MatterConnectionService } from '../connection/connection.service';
@@ -93,7 +94,9 @@ export class MatterReconciliationService {
   }
 
   async status(): Promise<ReconciliationStatusView> {
-    const row = await this.context.getRepository(MatterReconciliationStatus).findOneBy({ id: RECONCILIATION_ROW_ID });
+    const row = await sqlitePersistence(this.context)
+      .getRepository(MatterReconciliationStatus)
+      .findOneBy({ id: RECONCILIATION_ROW_ID });
     return viewOf(row);
   }
 
@@ -147,7 +150,7 @@ export class MatterReconciliationService {
       this.context.logger.warn?.('Matter reconciliation failed.');
       audits.length = 0;
     }
-    await this.context.runSerialized(async (manager) => {
+    await sqlitePersistence(this.context).transaction(async (manager) => {
       const repo = manager.getRepository(MatterReconciliationStatus);
       const previous = await repo.findOneBy({ id: RECONCILIATION_ROW_ID });
       await repo.save({
@@ -202,7 +205,7 @@ export class MatterReconciliationService {
 
     const summary = emptySummary();
     summary.nodesListed = list.nodes.length;
-    const blocked = await this.context.runSerialized(async (manager) => {
+    const blocked = await sqlitePersistence(this.context).transaction(async (manager) => {
       // A restore ran (or is running) since the inventory was read: it replaced the tables this list was meant for.
       // Recovery may also have been entered meanwhile.
       const reason = this.guard.epoch !== epoch ? 'restore_in_progress' : this.blocked(allowInRecovery);

@@ -1,6 +1,7 @@
 import { ExecutionContext, INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { AuthenticatedRequest, DualAuthGuard, NFCCard, User } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, DualAuthGuard } from '@attraccess/plugins-backend-sdk';
+import { NFCCard, User } from '@attraccess/database-entities';
 import request from 'supertest';
 import { AttractapController } from './attractap.controller';
 import { AttractapNfcCardsController } from './card.controller';

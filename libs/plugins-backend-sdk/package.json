@@ -15,6 +15,11 @@
       "types": "./src/index.d.ts",
       "import": "./src/index.js",
       "default": "./src/index.js"
+    },
+    "./sqlite": {
+      "types": "./src/sqlite.d.ts",
+      "import": "./src/sqlite.js",
+      "default": "./src/sqlite.js"
     }
   },
   "publishConfig": {
@@ -26,7 +31,6 @@
   ],
   "dependencies": {
     "tslib": "^2.8.1",
-    "@attraccess/database-entities": "1.11.0-beta.0",
     "@nestjs/common": "^11.1.0",
     "@nestjs/event-emitter": "^3.1.0",
     "rxjs": "^7.8.2",

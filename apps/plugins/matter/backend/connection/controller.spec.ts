@@ -1,4 +1,4 @@
-import type { AuthenticatedRequest, PluginContext } from '@attraccess/plugins-backend-sdk';
+import { PLUGIN_ENGINE_ACCESS, type AuthenticatedRequest, type PluginContext } from '@attraccess/plugins-backend-sdk';
 import { BadRequestException } from '@nestjs/common';
 import { COMPATIBILITY_TABLE } from '@attraccess/matter-contract';
 import { readFileSync } from 'node:fs';
@@ -11,6 +11,7 @@ import { CONNECTION_ROW_ID, MatterConnection } from './entity';
 import { MatterSettingsService } from './settings.service';
 
 type Row = MatterConnection;
+const SCOPE_HANDLE = Symbol.for('attraccess.plugin.persistence.sqlite.scopeHandle');
 
 function fakeContext(options: { audit?: boolean; hostVersion?: string | undefined } = {}) {
   let row: Row | null = null;
@@ -26,15 +27,26 @@ function fakeContext(options: { audit?: boolean; hostVersion?: string | undefine
       return { affected };
     },
   };
+  const manager = { getRepository: () => repository };
   const audit = jest.fn(async () => ({ status: 'recorded' as const }));
   const log = { debug: jest.fn(), warn: jest.fn(), error: jest.fn(), log: jest.fn() };
   const context = {
     hostVersion: 'hostVersion' in options ? options.hostVersion : HOST_VERSION,
     manifest: { id: 'matter', name: 'matter', version: entry.plugin, pluginDirectory: 'matter' },
     logger: log,
-    getRepository: () => repository,
     // Settings writes go through the host's serialized queue; its manager reaches the same row.
-    runSerialized: async <T>(fn: (manager: unknown) => Promise<T>) => fn({ getRepository: () => repository }),
+    persistence: {
+      backend: 'sqlite',
+      supports: (backend: string) => backend === 'sqlite',
+      transaction: async <T>(work: (scope: unknown) => Promise<T>) =>
+        work({ isOpen: true, afterCommit: () => undefined, [SCOPE_HANDLE]: manager }),
+      [PLUGIN_ENGINE_ACCESS]: {
+        backend: 'sqlite',
+        connection: () => ({ getRepository: () => repository }),
+        handleOf: () => manager,
+        ownsEntity: () => true,
+      },
+    },
     // A reversible stand-in for the host's encryption, visibly not plaintext.
     secrets: {
       encrypt: (text: string) => `enc:${Buffer.from(text).toString('base64')}`,

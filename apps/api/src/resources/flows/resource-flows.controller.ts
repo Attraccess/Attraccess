@@ -1,4 +1,5 @@
-import { Auth, AuthenticatedRequest, ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest, ResourceFlowNodeType } from '@attraccess/plugins-backend-sdk';
+import { ResourceFlowNode } from '@attraccess/database-entities';
 
 import { Body, Controller, Delete, Get, Logger, Param, ParseIntPipe, Post, Sse, Req, Put } from '@nestjs/common';
 

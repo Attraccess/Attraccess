@@ -1,4 +1,4 @@
-import type { EntityManager } from 'typeorm';
+import type { EntityManager } from '@attraccess/plugins-backend-sdk/sqlite';
 import { MatterCommand } from './entities';
 
 export const MAX_COMMAND_ROWS = 1_000;

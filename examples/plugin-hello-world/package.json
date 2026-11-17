@@ -27,8 +27,7 @@
     "@attraccess/plugins-backend-sdk": "^2.0.0-0",
     "@attraccess/plugins-frontend-sdk": "^2.0.0-0",
     "@nestjs/common": "^11.0.0",
-    "@nestjs/event-emitter": "^3.0.0",
-    "typeorm": "^0.3.0"
+    "@nestjs/event-emitter": "^3.0.0"
   },
   "attraccess": {
     "displayName": "Hello World",
@@ -47,8 +46,8 @@
     }
   },
   "devDependencies": {
-    "@attraccess/plugins-backend-sdk": "^1.0.0",
-    "@attraccess/plugins-frontend-sdk": "^1.0.0",
+    "@attraccess/plugins-backend-sdk": "^2.0.0-0",
+    "@attraccess/plugins-frontend-sdk": "^2.0.0-0",
     "@heroui/react": "^3.0.4",
     "@heroui/styles": "^3.0.0",
     "@tailwindcss/vite": "^4.0.0",

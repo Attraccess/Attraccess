@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Attractap } from '@attraccess/plugins-backend-sdk';
+import { Attractap } from '@attraccess/database-entities';
 
 export class UpdateReaderResponseDto {
   @ApiProperty({

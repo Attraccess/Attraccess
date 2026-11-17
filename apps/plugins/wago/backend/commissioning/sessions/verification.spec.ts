@@ -1,3 +1,4 @@
+import { repositoryDouble } from '../../persistence.test-utils';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import type { WagoCommissioningSession } from './session.entity';
 import { WagoController } from '../../controllers/entity';
@@ -18,12 +19,13 @@ describe('commissioning verification', () => {
 
   function context(currentController = controller, currentEnrollment = enrollment, currentRevision = revision) {
     return {
-      getRepository: (entity: unknown) =>
+      ...repositoryDouble((entity: unknown) =>
         entity === WagoController
           ? { findOneBy: async () => currentController }
           : entity === WagoEnrollment
             ? { findOneBy: async () => currentEnrollment }
             : { findOne: async () => currentRevision },
+      ),
     } as unknown as PluginContext;
   }
 

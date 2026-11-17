@@ -1,6 +1,7 @@
 import type { PreStartContext, ReaderUiContext, StartBlockedContext } from '@attraccess/plugins-backend-sdk';
 import { READER_UI_CAPABILITIES_NONE, SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { CAPACITY_REDUCED_REASON } from './constants';
+import { createHostTransactionScope } from '@attraccess/plugins-backend-sdk/sqlite';
 import { ReservationEntity } from './entities/reservation.entity';
 import { overrideStepKey, reservationStepKey } from './hooks/pre-start.service';
 import { ReservationError } from './reservations/errors';
@@ -405,7 +406,7 @@ describe('shared machine reservations', () => {
         resourceId: 1,
         userId,
         principal: userId,
-        manager: h.dataSource.manager,
+        scope: createHostTransactionScope(h.dataSource.manager),
         action: 'start',
         origin: 'web',
         sessionLimit: 2,

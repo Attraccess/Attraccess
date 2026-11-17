@@ -1,11 +1,7 @@
 import { ConflictException, Inject } from '@nestjs/common';
 
-import {
-  PluginContext,
-  PluginMqttSubscription,
-  Repository,
-  type PluginAuditPrincipal,
-} from '@attraccess/plugins-backend-sdk';
+import { PluginContext, PluginMqttSubscription, type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
+import { Repository } from '@attraccess/plugins-backend-sdk/sqlite';
 
 import { WagoController } from './entity';
 

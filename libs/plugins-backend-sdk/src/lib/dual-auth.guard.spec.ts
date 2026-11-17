@@ -1,16 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ExecutionContext, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { DualAuthGuard } from './dual-auth.guard';
-import { User } from '@attraccess/database-entities';
+import type { PluginUserModel } from '@attraccess/application-models';
 
 describe('DualAuthGuard', () => {
   let guard: DualAuthGuard;
 
-  const mockUser: User = {
+  const mockUser: PluginUserModel = {
     id: 1,
     username: 'testuser',
-    email: 'test@example.com',
-  } as User;
+    locale: 'en',
+    isDisabled: false,
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({

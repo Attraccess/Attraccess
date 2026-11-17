@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk';
+import { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk/sqlite';
 
 /**
  * ATT-998: fabric persistence and encrypted backups. Extends `plugin_matter_fabrics` with the identity the plugin

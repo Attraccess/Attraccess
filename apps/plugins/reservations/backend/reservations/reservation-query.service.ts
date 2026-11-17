@@ -1,4 +1,5 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { Inject, Injectable } from '@nestjs/common';
 import type { AvailabilityDto, ManagedReservationListDto, ReservationDto } from '../api/dto.response';
 import { Clock, PLUGIN_CONTEXT, RESERVATION_CLOCK } from '../constants';
@@ -223,7 +224,7 @@ export class ReservationQueryService {
   ): Promise<CanBookResult> {
     const result = await this.access.canBook(actor, resourceId, settings, isManager);
     if (!result.allowed || settings.maxActiveBookingsPerUser === 0) return result;
-    const manager = this.context.getRepository(ReservationEntity).manager;
+    const manager = sqlitePersistence(this.context).manager;
     const live = await this.store.countLiveForUser(manager, actor.userId, resourceId, this.clock());
     return live >= settings.maxActiveBookingsPerUser ? { allowed: false, reason: 'USER_BOOKING_LIMIT' } : result;
   }

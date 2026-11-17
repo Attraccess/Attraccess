@@ -21,8 +21,11 @@ import {
   resetPluginAuditRegistry,
 } from '../../../api/src/plugin-system/audit/audit-registry';
 import { createPluginAuditContext } from '../../../api/src/plugin-system/runtime/audit-context';
-import { createPluginRunSerialized } from '../../../api/src/plugin-system/runtime/plugin-serialized';
-import { closeResourceTransactionConnection } from '../../../api/src/database/sqlite/run-serialized-transaction';
+import { createSqlitePluginPersistence } from '@attraccess/plugins-backend-sdk/sqlite';
+import {
+  closeResourceTransactionConnection,
+  runSerializedTransaction,
+} from '../../../api/src/database/sqlite/run-serialized-transaction';
 import { createDataSource } from '../../../api/src/database/sqlite/sqlite-connection';
 import { SettingsStoreService } from '../../../api/src/settings/settings-store.service';
 import { Setting } from '@attraccess/database-entities';
@@ -88,7 +91,7 @@ export async function bootHost(
   const db = await createDataSource({
     type: 'sqlite',
     database: join(directory, 'host.sqlite'),
-    entities: [...Object.values(entities), ...(plugin.entities ?? [])],
+    entities: [...Object.values(entities), ...(plugin.persistence?.sqlite?.entities ?? [])],
     migrations: [...Object.values(coreMigrations), ...(Object.values(matterMigrations) as (new () => never)[])],
     synchronize: false,
   }).initialize();
@@ -107,9 +110,12 @@ export async function bootHost(
   const context = {
     hostVersion: 'hostVersion' in options ? options.hostVersion : HOST_VERSION,
     manifest: { id: PLUGIN_ID, name: 'matter', version: COMPATIBILITY_TABLE[0].plugin, pluginDirectory: 'matter' },
-    dataSource: db,
-    getRepository: (entity) => db.getRepository(entity),
-    runSerialized: createPluginRunSerialized(PLUGIN_ID, () => db.manager),
+    persistence: createSqlitePluginPersistence({
+      pluginName: 'matter',
+      connection: () => db,
+      entities: plugin.persistence?.sqlite?.entities ?? [],
+      runInTransaction: (work) => runSerializedTransaction(db.manager, work),
+    }),
     audit: createPluginAuditContext(PLUGIN_ID, () => new PluginAuditHost(audit)),
     events: new EventEmitter2(),
     logger: { log: sink('log'), debug: sink('debug'), warn: sink('warn'), error: sink('error') },

@@ -1,4 +1,5 @@
 import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { Inject, Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { MatterBackupService, type BackupOptions, type BackupsSummary } from '../backup/backup.service';
 import { MatterConnectionService } from '../connection/connection.service';
@@ -90,7 +91,7 @@ export class MatterFabricService implements OnModuleInit, OnModuleDestroy {
   }
 
   private get manager() {
-    return this.context.getRepository(MatterFabric).manager;
+    return sqlitePersistence(this.context).getRepository(MatterFabric).manager;
   }
 
   onModuleInit(): void {

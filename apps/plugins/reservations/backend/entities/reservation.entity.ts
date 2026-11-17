@@ -1,4 +1,4 @@
-import { Column, Entity, Index, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk';
+import { Column, Entity, Index, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk/sqlite';
 
 export const RESERVATION_STATUSES = [
   'pending',

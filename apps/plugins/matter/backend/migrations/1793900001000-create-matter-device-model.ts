@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk';
+import { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk/sqlite';
 
 /**
  * Creates the Matter device model: fabrics, nodes, endpoints, clusters, capabilities, current state, the bounded

@@ -1,4 +1,5 @@
 import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { Inject, Injectable } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import { Clock, PLUGIN_CONTEXT, RESERVATION_CLOCK } from '../constants';
@@ -77,12 +78,12 @@ export class IcalService {
   }
 
   private get repo() {
-    return this.context.getRepository(IcalFeedEntity);
+    return sqlitePersistence(this.context).getRepository(IcalFeedEntity);
   }
 
   /** Writes go through the host's serialized queue so concurrent requests never hit SQLITE_BUSY. */
   private save(feed: IcalFeedEntity): Promise<IcalFeedEntity> {
-    return this.context.runSerialized((manager) => manager.getRepository(IcalFeedEntity).save(feed));
+    return sqlitePersistence(this.context).transaction((manager) => manager.getRepository(IcalFeedEntity).save(feed));
   }
 
   private toDto(feed: IcalFeedEntity): IcalFeedDto {
@@ -186,8 +187,8 @@ export class IcalService {
     if (!(await this.visibility.isActiveAccount(feed.userId))) return null;
     const now = this.clock();
     if (!feed.lastUsedAt || now.getTime() - feed.lastUsedAt.getTime() > 60_000) {
-      await this.context
-        .runSerialized((manager) => manager.getRepository(IcalFeedEntity).update({ id: feed.id }, { lastUsedAt: now }))
+      await sqlitePersistence(this.context)
+        .transaction((manager) => manager.getRepository(IcalFeedEntity).update({ id: feed.id }, { lastUsedAt: now }))
         .catch(() => undefined);
     }
     return this.render(feed, now);

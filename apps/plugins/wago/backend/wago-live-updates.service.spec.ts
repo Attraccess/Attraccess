@@ -1,3 +1,4 @@
+import { repositoryDouble } from './persistence.test-utils';
 import type { AuthenticatedUser, PluginContext, PluginLiveTopic } from '@attraccess/plugins-backend-sdk';
 import { WagoLiveUpdatesService } from './wago-live-updates.service';
 import { WagoService } from './controllers/service';
@@ -17,7 +18,7 @@ describe('WAGO bundled status sources', () => {
           return () => undefined;
         },
       },
-      getRepository: () => ({ existsBy }),
+      ...repositoryDouble(() => ({ existsBy })),
     } as unknown as PluginContext;
     const get = jest.fn(async () => ({ connected: true }));
     const service = new WagoLiveUpdatesService(

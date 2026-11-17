@@ -1,4 +1,5 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import { flowNode, hostDataWithFlows } from '../persistence.test-utils';
 import { configurationFlowImpacts } from './flow-references';
 import type { WagoConfigurationSnapshot } from './model';
 
@@ -27,25 +28,21 @@ describe('configuration flow impacts', () => {
       },
     ],
   };
-  const query = {
-    select: jest.fn().mockReturnThis(),
-    leftJoin: jest.fn().mockReturnThis(),
-    addSelect: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    andWhere: jest.fn().mockReturnThis(),
-    getMany: jest.fn().mockResolvedValue([
-      {
-        id: 'guarded-command',
-        resourceId: 4,
-        type: 'plugin.wago.command',
-        data: { controllerId: 1, channelId: 'lock' },
-      },
-      { id: 'unrelated', resourceId: 5, type: 'plugin.wago.input', data: { controllerId: 1, channelId: 'other' } },
-    ]),
-  };
-  const context = {
-    dataSource: { getRepository: () => ({ createQueryBuilder: () => query }) },
-  } as unknown as PluginContext;
+  const findNodes = jest.fn().mockResolvedValue([
+    flowNode({
+      id: 'guarded-command',
+      resourceId: 4,
+      type: 'plugin.wago.command',
+      data: { controllerId: 1, channelId: 'lock' },
+    }),
+    flowNode({
+      id: 'unrelated',
+      resourceId: 5,
+      type: 'plugin.wago.input',
+      data: { controllerId: 1, channelId: 'other' },
+    }),
+  ]);
+  const context = { hostData: hostDataWithFlows(findNodes) } as unknown as PluginContext;
 
   it('includes actual flow references affected indirectly through a reassigned guard', async () => {
     const current = {
@@ -62,11 +59,11 @@ describe('configuration flow impacts', () => {
         ],
       }),
     ]);
-    expect(query.andWhere).toHaveBeenCalledWith("node.data ->> 'controllerId' = :controllerId", { controllerId: 1 });
+    expect(findNodes).toHaveBeenCalledWith({ typePrefix: 'plugin.wago.', dataEquals: { controllerId: 1 } });
   });
 
   it('warns about revision-pinned commands even when the snapshot is unchanged', async () => {
-    query.getMany.mockClear();
+    findNodes.mockClear();
     await expect(configurationFlowImpacts(context, 1, previous, previous)).resolves.toEqual([
       expect.objectContaining({
         channelId: 'lock',
@@ -76,19 +73,19 @@ describe('configuration flow impacts', () => {
         ],
       }),
     ]);
-    expect(query.getMany).toHaveBeenCalledTimes(1);
+    expect(findNodes).toHaveBeenCalledTimes(1);
   });
 
   it('reports global-flow nodes with their flow and no resource', async () => {
-    query.getMany.mockResolvedValueOnce([
-      {
+    findNodes.mockResolvedValueOnce([
+      flowNode({
         id: 'global-command',
         resourceId: null,
         flowId: 9,
-        flow: { id: 9, name: 'Power off all' },
+        flowName: 'Power off all',
         type: 'plugin.wago.command',
         data: { controllerId: 1, channelId: 'lock' },
-      },
+      }),
     ]);
     const impacts = await configurationFlowImpacts(context, 1, previous, previous);
     expect(impacts[0].references).toEqual([
@@ -100,7 +97,5 @@ describe('configuration flow impacts', () => {
         nodeType: 'plugin.wago.command',
       },
     ]);
-    expect(query.select).toHaveBeenCalledWith(expect.arrayContaining(['node.flowId']));
-    expect(query.leftJoin).toHaveBeenCalledWith('node.flow', 'flow');
   });
 });

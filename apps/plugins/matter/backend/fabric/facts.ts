@@ -1,6 +1,6 @@
 import type { OperationResponse } from '@attraccess/matter-contract';
 import { randomUUID } from 'node:crypto';
-import type { EntityManager } from 'typeorm';
+import type { EntityManager } from '@attraccess/plugins-backend-sdk/sqlite';
 import { MatterFabric } from '../devices/entities';
 
 export type SidecarFabric = OperationResponse<'fabric.get'>;

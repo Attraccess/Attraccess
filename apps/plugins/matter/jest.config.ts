@@ -9,6 +9,7 @@ export default {
   },
   moduleFileExtensions: ['ts', 'js', 'json'],
   moduleNameMapper: {
+    '^@attraccess/plugins-backend-sdk/sqlite$': '<rootDir>/../../../libs/plugins-backend-sdk/src/sqlite.ts',
     '^@attraccess/(.*)$': '<rootDir>/../../../libs/$1/src/index.ts',
   },
   // Unit coverage feeds the project's crap-score target.

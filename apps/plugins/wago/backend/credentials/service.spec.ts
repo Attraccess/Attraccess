@@ -1,9 +1,10 @@
+import { repositoryDouble } from '../persistence.test-utils';
 import type { PluginContext, PluginMqttMessage } from '@attraccess/plugins-backend-sdk';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DataSource } from 'typeorm';
+import { DataSource } from '@attraccess/plugins-backend-sdk/sqlite';
 import { MemoryDeviceAdapter } from '../../cc100-runtime/src/io/adapters';
 import type { RuntimeState } from '../../cc100-runtime/src/runtime';
 import { WagoRuntime } from '../../cc100-runtime/src/runtime';
@@ -74,7 +75,7 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
     await db.query('UPDATE plugin_wago_controllers SET credential_epoch = ? WHERE id = 1', [credentialEpoch]);
     const key = randomBytes(32);
     context = {
-      getRepository: (entity) => db.getRepository(entity),
+      ...repositoryDouble((entity) => db.getRepository(entity)),
       getMqttCredentialProvisioning: () => ({ rotate }),
       mqtt: {
         publish,

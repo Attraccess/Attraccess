@@ -1,4 +1,4 @@
-import type { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk';
+import type { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk/sqlite';
 
 export class WagoCredentialRotation1780010610000 implements MigrationInterface {
   name = 'WagoCredentialRotation1780010610000';

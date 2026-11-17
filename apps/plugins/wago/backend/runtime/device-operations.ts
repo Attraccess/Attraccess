@@ -1,4 +1,4 @@
-import type { Repository } from '@attraccess/plugins-backend-sdk';
+import type { Repository } from '@attraccess/plugins-backend-sdk/sqlite';
 import { WagoDeviceOperation } from './managed/access.entity';
 
 export class WagoDeviceOperations {

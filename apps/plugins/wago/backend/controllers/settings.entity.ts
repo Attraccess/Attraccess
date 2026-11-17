@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk';
+import { Column, Entity, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk/sqlite';
 
 @Entity({ name: 'plugin_wago_settings' })
 export class WagoSettings {

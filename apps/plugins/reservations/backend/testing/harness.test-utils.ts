@@ -2,7 +2,7 @@ import type { PluginAccessPrincipal, PluginAuditPrincipal, PluginContext } from 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DataSource, EntityManager } from 'typeorm';
+import { createSqlitePluginPersistence, DataSource, type EntityManager } from '@attraccess/plugins-backend-sdk/sqlite';
 import { GlobalSettingsEntity } from '../entities/global-settings.entity';
 import { IcalFeedEntity } from '../entities/ical-feed.entity';
 import { NoticeEntity } from '../entities/notice.entity';
@@ -91,7 +91,7 @@ export async function createHarness() {
 
   // Mirrors the host: concurrent callers run one at a time inside a transaction.
   let tail: Promise<unknown> = Promise.resolve();
-  const runSerialized = <T>(work: (manager: EntityManager) => Promise<T>): Promise<T> => {
+  const runInTransaction = <T>(work: (manager: EntityManager) => Promise<T>): Promise<T> => {
     const next = tail.catch(() => undefined).then(() => dataSource.transaction(work));
     tail = next;
     return next;
@@ -109,8 +109,13 @@ export async function createHarness() {
 
   const context = {
     audit,
-    dataSource,
     logger: console,
+    persistence: createSqlitePluginPersistence({
+      pluginName: 'reservations',
+      connection: () => dataSource,
+      entities: [ReservationEntity, ResourceSettingsEntity, GlobalSettingsEntity, IcalFeedEntity, NoticeEntity],
+      runInTransaction,
+    }),
     notifications: { dispatch },
     startBlocked: { invalidate: invalidateStartBlocked },
     readerUi: { invalidate: invalidateReaderUi },
@@ -124,8 +129,6 @@ export async function createHarness() {
           ),
       };
     },
-    runSerialized,
-    getRepository: (entity: never) => dataSource.getRepository(entity),
     resourceAccess: {
       // Core's rule for the current user's name; scripted per user and resource. Like core, a request scope without
       // resources.read (or update / access.manage) sees nobody's name.

@@ -1,4 +1,5 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { MatterFabric } from '../devices/entities';
 import * as pluginMigrations from '../migrations';
 import type { PluginMigrationReader } from './tokens';
@@ -8,7 +9,7 @@ export function hostMigrationReader(context: PluginContext): PluginMigrationRead
   return async () => {
     const table = `plugin_migrations_${context.manifest.name.replace(/[^a-zA-Z0-9_]/g, '_')}`;
     try {
-      const rows: { name: string }[] = await context
+      const rows: { name: string }[] = await sqlitePersistence(context)
         .getRepository(MatterFabric)
         .query(`SELECT "name" FROM "${table}" ORDER BY "timestamp" DESC, "id" DESC LIMIT 1`);
       return rows[0]?.name ?? (await sharedTableMigration(context));
@@ -23,7 +24,7 @@ export function hostMigrationReader(context: PluginContext): PluginMigrationRead
 async function sharedTableMigration(context: PluginContext): Promise<string | null> {
   const names = Object.values(pluginMigrations).map((migration) => (migration as { name: string }).name);
   try {
-    const rows: { name: string }[] = await context
+    const rows: { name: string }[] = await sqlitePersistence(context)
       .getRepository(MatterFabric)
       .query('SELECT "name" FROM "migrations" ORDER BY "timestamp" DESC');
     return rows.find((row) => names.includes(row.name))?.name ?? null;

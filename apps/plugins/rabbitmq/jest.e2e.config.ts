@@ -9,6 +9,7 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'js'],
   moduleNameMapper: {
+    '^@attraccess/plugins-backend-sdk/sqlite$': '<rootDir>/../../../libs/plugins-backend-sdk/src/sqlite.ts',
     '^@attraccess/(.*)$': '<rootDir>/../../../libs/$1/src/index.ts',
   },
   coverageDirectory: '../../../coverage/apps/plugins/rabbitmq-e2e',

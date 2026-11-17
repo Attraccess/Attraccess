@@ -1,4 +1,5 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PLUGIN_CONTEXT } from '../constants';
 import { ResourceSettingsEntity } from '../entities/resource-settings.entity';
@@ -87,7 +88,7 @@ export class ResourceSettingsService implements OnModuleInit {
   }
 
   private async loadAll(): Promise<void> {
-    const rows = await this.context.getRepository(ResourceSettingsEntity).find();
+    const rows = await sqlitePersistence(this.context).getRepository(ResourceSettingsEntity).find();
     this.cache.clear();
     for (const row of rows) this.cache.set(row.resourceId, fromEntity(row));
   }
@@ -107,7 +108,7 @@ export class ResourceSettingsService implements OnModuleInit {
 
   /** Authoritative read from the database (defaults when no row exists). */
   async get(resourceId: number): Promise<ResourceSettings> {
-    const row = await this.context.getRepository(ResourceSettingsEntity).findOneBy({ resourceId });
+    const row = await sqlitePersistence(this.context).getRepository(ResourceSettingsEntity).findOneBy({ resourceId });
     return row ? fromEntity(row) : defaultSettings(resourceId);
   }
 
@@ -131,7 +132,9 @@ export class ResourceSettingsService implements OnModuleInit {
       bookableHours: JSON.stringify(merged.bookableHours),
       updatedAt: new Date(),
     });
-    await this.context.runSerialized((manager) => manager.getRepository(ResourceSettingsEntity).save(entity));
+    await sqlitePersistence(this.context).transaction((manager) =>
+      manager.getRepository(ResourceSettingsEntity).save(entity),
+    );
     const after: ResourceSettings = { resourceId, ...merged };
     this.cache.set(resourceId, after);
     return { before, after };

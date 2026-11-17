@@ -31,6 +31,7 @@ const HOST_SHARED_EXTERNALS = [
   'typeorm',
   'reflect-metadata',
   '@attraccess/plugins-backend-sdk',
+  '@attraccess/plugins-backend-sdk/sqlite',
 ];
 
 rmSync(PACKAGE, { recursive: true, force: true });

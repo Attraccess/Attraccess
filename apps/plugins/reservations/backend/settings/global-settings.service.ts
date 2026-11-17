@@ -1,4 +1,5 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { Inject, Injectable } from '@nestjs/common';
 import { PLUGIN_CONTEXT } from '../constants';
 import { GlobalSettingsEntity } from '../entities/global-settings.entity';
@@ -17,7 +18,9 @@ export class GlobalSettingsService {
   /** The configured IANA timezone, or the server's when unset or no longer valid. Cached. */
   async getTimezone(): Promise<string> {
     if (this.cachedTimezone) return this.cachedTimezone;
-    const row = await this.context.getRepository(GlobalSettingsEntity).findOneBy({ key: TIMEZONE_KEY });
+    const row = await sqlitePersistence(this.context)
+      .getRepository(GlobalSettingsEntity)
+      .findOneBy({ key: TIMEZONE_KEY });
     this.cachedTimezone = row && isValidTimeZone(row.value) ? row.value : serverTimeZone();
     return this.cachedTimezone;
   }
@@ -34,7 +37,9 @@ export class GlobalSettingsService {
     const entity = new GlobalSettingsEntity();
     entity.key = TIMEZONE_KEY;
     entity.value = timezone;
-    await this.context.runSerialized((manager) => manager.getRepository(GlobalSettingsEntity).save(entity));
+    await sqlitePersistence(this.context).transaction((manager) =>
+      manager.getRepository(GlobalSettingsEntity).save(entity),
+    );
     this.cachedTimezone = timezone;
     return { timezone, before };
   }

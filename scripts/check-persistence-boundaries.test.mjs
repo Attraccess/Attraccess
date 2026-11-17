@@ -58,6 +58,14 @@ test('persistence implementation code is allowed, application code is checked', 
   assert.equal(isChecked('libs/plugins-backend-sdk/src/lib/plugin-context.ts'), true);
 });
 
+test('only the SDK engine subpath may name the engine; the SDK root stays checked', () => {
+  assert.equal(isChecked('libs/plugins-backend-sdk/src/sqlite.ts'), false);
+  assert.equal(isChecked('libs/plugins-backend-sdk/src/lib/sqlite/sqlite-persistence.ts'), false);
+  assert.equal(isChecked('libs/plugins-backend-sdk/src/index.ts'), true);
+  assert.equal(isChecked('libs/plugins-backend-sdk/src/lib/plugin-persistence.ts'), true);
+  assert.equal(isChecked('libs/plugins-backend-sdk/src/lib/sdk-sqlite.ts'), true);
+});
+
 test('the baseline only shrinks', () => {
   const file = 'apps/api/src/billing/billing.service.ts';
   assert.deepEqual(compareWithBaseline({ [file]: 2 }, { [file]: 2 }), []);

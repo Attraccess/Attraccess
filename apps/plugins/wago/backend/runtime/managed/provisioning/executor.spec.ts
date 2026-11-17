@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash, scryptSync } from 'node:crypto';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { DataSource } from 'typeorm';
+import { DataSource } from '@attraccess/plugins-backend-sdk/sqlite';
 import { fw31ShellFixture } from '../../../fixtures/fw31-shell-fixture';
 import { WagoManagedUpdates1780010650000 } from '../../../migrations/1780010650000-add-wago-managed-updates';
 import { BuildRuntimeArtifact } from '../../artifacts/build';
@@ -42,7 +42,7 @@ const artifact: BuildRuntimeArtifact = {
     },
   },
 };
-jest.mock('@attraccess/plugins-backend-sdk', () => jest.requireActual('typeorm'));
+jest.mock('@attraccess/plugins-backend-sdk', () => jest.requireActual('@attraccess/plugins-backend-sdk/sqlite'));
 
 jest.mock('../../../controllers/service', () => ({ WagoService: class {} }));
 

@@ -9,8 +9,8 @@
 // The plugin registers a NestJS module whose controller is mounted into the host
 // API and whose services share the host's TypeORM connection via a real
 // repository over an owned, namespaced entity (see device-registry.service.ts).
-// The `entities` export below tells the host to register that entity's metadata
-// into the shared DataSource so getRepository(ShellyDevice) resolves.
+// The `persistence.sqlite.entities` declaration below tells the host to register that entity's metadata
+// into the shared DataSource so sqlitePersistence(context).getRepository(ShellyDevice) resolves.
 import type { PluginBackendModule, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { DynamicModule } from '@nestjs/common';
 import { DeviceRegistryService } from './devices/registry/service';
@@ -34,7 +34,7 @@ class ShellyPluginModule {}
 const plugin: PluginBackendModule = {
   // Host registers these into the shared DataSource at load time (gated on
   // DATABASE_ACCESS) so the registry service can use a real repository.
-  entities: [ShellyDevice],
+  persistence: { sqlite: { entities: [ShellyDevice] } },
   register(context: PluginContext): DynamicModule {
     return {
       module: ShellyPluginModule,
