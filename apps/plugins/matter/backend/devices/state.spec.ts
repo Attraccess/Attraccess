@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { CommandOutcomePayload, DeviceStatePayload } from '@attraccess/matter-contract';
-import { MatterCommand, MatterEndpoint, MatterEndpointState } from './entities';
+import { MATTER_STORAGE } from '../plugin-storage/tables';
 import { MAX_COMMAND_ROWS } from './commands';
 import { ADMIN, createHarness, inventory, node, type Harness } from '../testing/devices-harness.test-utils';
 
@@ -13,7 +13,7 @@ describe('Matter endpoint state', () => {
   beforeEach(async () => {
     h = await createHarness();
     await h.reconcile(inventory('1', [node('5')]));
-    endpointRef = (await h.dataSource.getRepository(MatterEndpoint).findOneByOrFail({ endpointId: 1 })).id;
+    endpointRef = (await h.one('endpoints', { endpointId: 1 })).id;
     h.audit.mockClear();
   });
   afterEach(() => h.close());
@@ -131,7 +131,7 @@ describe('Matter endpoint state', () => {
     await request(true, 1_000, requestId);
     await h.state.ingestOutcome(outcome(requestId, 'failed', { failureCode: 'busy', acceptedAt: null }), at(2_000));
     expect(await entry()).toMatchObject({ command: { state: 'failed' }, confirmed: false });
-    expect((await h.dataSource.getRepository(MatterCommand).findOneByOrFail({ requestId })).failureCode).toBe('busy');
+    expect((await h.one('commands', { requestId })).failureCode).toBe('busy');
   });
 
   it('does not turn a failed command into a confirmed one when an equal report arrives later', async () => {
@@ -147,7 +147,7 @@ describe('Matter endpoint state', () => {
     await request(true, 1_000, requestId);
     await h.state.ingestOutcome(outcome(requestId, 'accepted'), at(2_100));
     await h.state.ingestReport(report(true, 4_000), at(4_100));
-    expect(await h.dataSource.getRepository(MatterCommand).findOneByOrFail({ requestId })).toMatchObject({
+    expect(await h.one('commands', { requestId })).toMatchObject({
       outcome: 'reported',
       reportedAt: at(4_000),
     });
@@ -221,7 +221,7 @@ describe('Matter endpoint state', () => {
   });
 
   it('ignores events for unknown, removed and archived endpoints and clusters, and counts them', async () => {
-    const states = () => h.dataSource.getRepository(MatterEndpointState).count();
+    const states = () => h.tables.endpointState.count();
     await h.state.ingestReport({ ...report(true, 0), endpointId: 9 }, at(0));
     await h.state.ingestReport({ ...report(true, 0), nodeId: '99' }, at(0));
     await h.state.ingestReport({ ...report(true, 0), clusterId: 0xfff1_0001 }, at(0));
@@ -243,15 +243,12 @@ describe('Matter endpoint state', () => {
 
   it('keeps one row per state key under a flood of reports, with no history and no audit entries', async () => {
     for (let i = 0; i < 300; i += 1) await h.state.ingestReport(report(i % 2 === 0, i * 10), at(i * 10 + 5));
-    expect(await h.dataSource.getRepository(MatterEndpointState).count()).toBe(1);
+    expect(await h.tables.endpointState.count()).toBe(1);
     expect(h.state.stats.applied).toBe(300);
     expect(await entry()).toMatchObject({ reported: { value: false, observedAt: at(2_990) } });
-    expect(await h.dataSource.getRepository(MatterCommand).count()).toBe(0);
+    expect(await h.tables.commands.count()).toBe(0);
     expect(h.audit).not.toHaveBeenCalled();
-    const tables = await h.dataSource.query(
-      `SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'plugin_matter_%'`,
-    );
-    expect(tables.map((t: { name: string }) => t.name)).not.toEqual(
+    expect(Object.values(MATTER_STORAGE.tables).map((table) => table.physicalName)).not.toEqual(
       expect.arrayContaining([expect.stringMatching(/history|event|log/)]),
     );
   });
@@ -260,7 +257,7 @@ describe('Matter endpoint state', () => {
     const requestId = randomUUID();
     await request(true, 1_000, requestId);
     await request(false, 2_000, requestId);
-    expect(await h.dataSource.getRepository(MatterCommand).count()).toBe(1);
+    expect(await h.tables.commands.count()).toBe(1);
     expect((await entry()).requested.value).toBe(true);
   });
 
@@ -356,7 +353,7 @@ describe('Matter endpoint state', () => {
   it('ignores an oversized value', async () => {
     await h.state.ingestReport(report({ blob: 'x'.repeat(5_000) }, 0), at(0));
     expect(h.state.stats.oversizedValue).toBe(1);
-    expect(await h.dataSource.getRepository(MatterEndpointState).count()).toBe(0);
+    expect(await h.tables.endpointState.count()).toBe(0);
   });
 
   it('applies an event that names a fabric only to the node of that fabric', async () => {
@@ -379,10 +376,10 @@ describe('Matter endpoint state', () => {
   it('stays idempotent for a recorded request id when its state row is gone', async () => {
     const requestId = randomUUID();
     await request(true, 1_000, requestId);
-    await h.dataSource.getRepository(MatterEndpointState).clear();
+    await h.clear('endpointState');
     await expect(request(false, 2_000, requestId)).resolves.toMatchObject({ command: { state: 'none' } });
-    expect(await h.dataSource.getRepository(MatterCommand).count()).toBe(1);
-    expect(await h.dataSource.getRepository(MatterEndpointState).count()).toBe(0);
+    expect(await h.tables.commands.count()).toBe(1);
+    expect(await h.tables.endpointState.count()).toBe(0);
   });
 
   it('applies a batch of events in order, in one transaction', async () => {
@@ -400,9 +397,9 @@ describe('Matter endpoint state', () => {
 
   describe('command log bound', () => {
     it('prunes to the newest 1,000 rows', async () => {
-      const repo = h.dataSource.getRepository(MatterCommand);
+      const repo = h.tables.commands;
       const recent = Date.now() - 60_000;
-      await repo.insert(
+      await repo.insertMany(
         Array.from({ length: MAX_COMMAND_ROWS + 20 }, (_unused, i) => ({
           requestId: randomUUID(),
           endpointRef,
@@ -419,14 +416,14 @@ describe('Matter endpoint state', () => {
         })),
       );
       await request(true, 0);
-      const rows = await repo.find({ order: { requestedAt: 'ASC' } });
+      const rows = await repo.find({ orderBy: [{ field: 'requestedAt' }] });
       expect(rows).toHaveLength(MAX_COMMAND_ROWS);
       // The oldest ones went; the newest stayed.
       expect(rows[rows.length - 1].requestedAt).toBe(new Date(recent + MAX_COMMAND_ROWS + 19).toISOString());
     });
 
     it('keeps rows younger than 30 days and never prunes below the bound', async () => {
-      const repo = h.dataSource.getRepository(MatterCommand);
+      const repo = h.tables.commands;
       const row = (days: number) => ({
         requestId: randomUUID(),
         endpointRef,
@@ -443,7 +440,7 @@ describe('Matter endpoint state', () => {
       });
       const young = row(29);
       const old = row(31);
-      await repo.insert([young, old]);
+      await repo.insertMany([young, old]);
       const requestId = randomUUID();
       await request(true, 0, requestId);
       const kept = (await repo.find()).map((r) => r.requestId);
@@ -452,7 +449,7 @@ describe('Matter endpoint state', () => {
     });
 
     it('prunes rows older than 30 days, and reconciliation prunes too', async () => {
-      const repo = h.dataSource.getRepository(MatterCommand);
+      const repo = h.tables.commands;
       await repo.insert({
         requestId: randomUUID(),
         endpointRef,

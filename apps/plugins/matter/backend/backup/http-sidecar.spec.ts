@@ -9,6 +9,7 @@ import { DeviceAuditService } from '../devices/audit.service';
 import { MatterReconciliationService } from '../devices/reconciliation.service';
 import { MatterFabricGuard } from '../fabric/guard';
 import { MatterFabricService } from '../fabric/fabric.service';
+import { storageSchemaReader } from '../fabric/migration-reader';
 import { RecoveryKeyService } from '../fabric/recovery-key.service';
 import { FakeFabricBackend } from '../testing/fake-fabric.test-utils';
 import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar.test-utils';
@@ -43,10 +44,7 @@ describe('backup and restore over the HTTP client', () => {
     const guard = new MatterFabricGuard();
     const audit = new DeviceAuditService(h.context);
     const keys = new RecoveryKeyService(h.context, audit);
-    const reader = async () =>
-      (
-        (await h.dataSource.query('SELECT name FROM migrations ORDER BY timestamp DESC LIMIT 1')) as { name: string }[]
-      )[0]?.name ?? null;
+    const reader = storageSchemaReader();
     const reconciliation = new MatterReconciliationService(h.context, connection, audit, guard);
     backups = new MatterBackupService(h.context, connection, keys, audit, guard, reader);
     fabric = new MatterFabricService(h.context, connection, guard, keys, backups, audit, reconciliation);

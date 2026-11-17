@@ -5,7 +5,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHarness, inventory, node, type Harness } from '../testing/devices-harness.test-utils';
 import { MatterDevicesController } from './controller';
-import { MatterEndpoint } from './entities';
 
 const request = { user: { id: 7, authenticationMethod: 'session' } } as unknown as AuthenticatedRequest;
 
@@ -57,7 +56,7 @@ describe('Matter devices controller', () => {
   it('serves the endpoint state with source, times, freshness, quality and correlation', async () => {
     h.sidecar.list = inventory('1', [node('5')]);
     await controller.trigger(request);
-    const endpoint = await h.dataSource.getRepository(MatterEndpoint).findOneByOrFail({ endpointId: 1 });
+    const endpoint = await h.one('endpoints', { endpointId: 1 });
     await h.state.ingestReport({
       nodeId: '5',
       endpointId: 1,

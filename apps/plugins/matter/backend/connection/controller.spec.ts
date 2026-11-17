@@ -1,4 +1,8 @@
-import { PLUGIN_ENGINE_ACCESS, type AuthenticatedRequest, type PluginContext } from '@attraccess/plugins-backend-sdk';
+import {
+  createInMemoryPluginStorage,
+  type AuthenticatedRequest,
+  type PluginContext,
+} from '@attraccess/plugins-backend-sdk';
 import { BadRequestException } from '@nestjs/common';
 import { COMPATIBILITY_TABLE } from '@attraccess/matter-contract';
 import { readFileSync } from 'node:fs';
@@ -7,46 +11,23 @@ import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar
 import { selfSignedCertificate } from '../testing/certs';
 import { MatterConnectionController } from './controller';
 import { MatterConnectionService } from './connection.service';
-import { CONNECTION_ROW_ID, MatterConnection } from './entity';
+import { matterStorage } from '../plugin-storage/access';
+import { MATTER_STORAGE } from '../plugin-storage/tables';
+import { CONNECTION_ROW_ID, type MatterConnection } from './entity';
 import { MatterSettingsService } from './settings.service';
 
 type Row = MatterConnection;
-const SCOPE_HANDLE = Symbol.for('attraccess.plugin.persistence.sqlite.scopeHandle');
 
 function fakeContext(options: { audit?: boolean; hostVersion?: string | undefined } = {}) {
-  let row: Row | null = null;
-  const repository = {
-    findOneBy: async () => (row ? { ...row } : null),
-    save: async (value: Row) => {
-      row = { ...value };
-      return value;
-    },
-    delete: async () => {
-      const affected = row ? 1 : 0;
-      row = null;
-      return { affected };
-    },
-  };
-  const manager = { getRepository: () => repository };
+  const fake = createInMemoryPluginStorage(MATTER_STORAGE);
   const audit = jest.fn(async () => ({ status: 'recorded' as const }));
   const log = { debug: jest.fn(), warn: jest.fn(), error: jest.fn(), log: jest.fn() };
   const context = {
     hostVersion: 'hostVersion' in options ? options.hostVersion : HOST_VERSION,
     manifest: { id: 'matter', name: 'matter', version: entry.plugin, pluginDirectory: 'matter' },
     logger: log,
-    // Settings writes go through the host's serialized queue; its manager reaches the same row.
-    persistence: {
-      backend: 'sqlite',
-      supports: (backend: string) => backend === 'sqlite',
-      transaction: async <T>(work: (scope: unknown) => Promise<T>) =>
-        work({ isOpen: true, afterCommit: () => undefined, [SCOPE_HANDLE]: manager }),
-      [PLUGIN_ENGINE_ACCESS]: {
-        backend: 'sqlite',
-        connection: () => ({ getRepository: () => repository }),
-        handleOf: () => manager,
-        ownsEntity: () => true,
-      },
-    },
+    storage: fake.storage,
+    persistence: fake.persistence,
     // A reversible stand-in for the host's encryption, visibly not plaintext.
     secrets: {
       encrypt: (text: string) => `enc:${Buffer.from(text).toString('base64')}`,
@@ -54,7 +35,17 @@ function fakeContext(options: { audit?: boolean; hostVersion?: string | undefine
     },
     ...(options.audit === false ? {} : { audit: { record: audit } }),
   } as unknown as PluginContext;
-  return { context, audit, log, getRow: () => row, setRow: (next: Row | null) => (row = next) };
+  const { connection } = matterStorage(context).tables;
+  return {
+    context,
+    audit,
+    log,
+    getRow: (): Promise<Row | null> => connection.get(CONNECTION_ROW_ID),
+    setRow: async (next: Row | null) => {
+      await connection.delete({ id: CONNECTION_ROW_ID });
+      if (next) await connection.insert(next);
+    },
+  };
 }
 
 const request = (extra: Record<string, unknown> = {}) =>
@@ -107,7 +98,7 @@ describe('Matter connection settings API', () => {
     const saved = await harness.controller.put({ url: `${fake.url}/`, credential: TOKEN }, request());
     expect(saved).toMatchObject({ url: fake.url, credentialConfigured: true, caCertificate: null });
     expect(JSON.stringify(saved)).not.toContain(TOKEN);
-    const stored = harness.getRow() as Row;
+    const stored = (await harness.getRow()) as Row;
     expect(stored.encryptedCredential).not.toContain(TOKEN);
     expect(stored).toMatchObject({ id: CONNECTION_ROW_ID, updatedBy: 7 });
     await until(() => harness.controller.status().state === 'connected');
@@ -120,18 +111,18 @@ describe('Matter connection settings API', () => {
     service = harness.service;
     const { cert } = await selfSignedCertificate();
     await harness.controller.put({ url: 'http://127.0.0.1:1', credential: TOKEN, caCertificate: cert }, request());
-    const first = harness.getRow() as Row;
+    const first = (await harness.getRow()) as Row;
     // The same URL in another spelling, and the CA omitted (kept) or sent unchanged.
     await harness.controller.put({ url: 'HTTP://127.0.0.1:1/' }, request());
     await harness.controller.put({ url: 'http://127.0.0.1:1', caCertificate: cert }, request());
-    expect(harness.getRow()).toMatchObject({
+    expect(await harness.getRow()).toMatchObject({
       url: 'http://127.0.0.1:1',
       encryptedCredential: first.encryptedCredential,
       caCertificate: cert,
       credentialUpdatedAt: first.credentialUpdatedAt,
     });
     await harness.controller.put({ url: 'http://127.0.0.1:2', credential: TOKEN, caCertificate: null }, request());
-    expect(harness.getRow()).toMatchObject({ url: 'http://127.0.0.1:2', caCertificate: null });
+    expect(await harness.getRow()).toMatchObject({ url: 'http://127.0.0.1:2', caCertificate: null });
   });
 
   it.each([
@@ -147,7 +138,7 @@ describe('Matter connection settings API', () => {
       const { cert } = await selfSignedCertificate();
       const other = (await selfSignedCertificate()).cert;
       await harness.controller.put({ url: 'http://127.0.0.1:1', credential: TOKEN, caCertificate: cert }, request());
-      const before = { ...(harness.getRow() as Row) };
+      const before = { ...((await harness.getRow()) as Row) };
       harness.audit.mockClear();
       const body = change.caCertificate === 'other' ? { ...change, caCertificate: other } : change;
       const failure = await harness.controller.put(body, request()).catch((error) => error);
@@ -155,7 +146,7 @@ describe('Matter connection settings API', () => {
       expect(failure.getResponse()).toMatchObject({
         message: ['credential: Enter the credential again when changing the URL or the CA certificate.'],
       });
-      expect(harness.getRow()).toEqual(before);
+      expect(await harness.getRow()).toEqual(before);
       expect(harness.audit).not.toHaveBeenCalled();
       // With the credential entered again, the same change is saved.
       await expect(harness.controller.put({ ...body, credential: TOKEN }, request())).resolves.toBeDefined();
@@ -173,7 +164,7 @@ describe('Matter connection settings API', () => {
       .catch((error) => error);
     expect(failure).toBeInstanceOf(BadRequestException);
     expect(JSON.stringify(failure.getResponse())).not.toContain('not-a-valid token');
-    expect(harness.getRow()).toBeNull();
+    expect(await harness.getRow()).toBeNull();
   });
 
   it('removes the configuration, stops the client and reports not_configured', async () => {
@@ -184,7 +175,7 @@ describe('Matter connection settings API', () => {
     await until(() => harness.controller.status().state === 'connected');
     await harness.controller.remove(request());
     expect(harness.controller.status().state).toBe('not_configured');
-    expect(harness.getRow()).toBeNull();
+    expect(await harness.getRow()).toBeNull();
     await until(() => fake?.sockets.size === 0);
   });
 
@@ -244,7 +235,7 @@ describe('Matter connection settings API', () => {
   it('loads saved settings on startup without waiting for the sidecar', async () => {
     const harness = await setup();
     service = harness.service;
-    harness.setRow({
+    await harness.setRow({
       id: 1,
       url: 'http://127.0.0.1:1',
       encryptedCredential: harness.context.secrets.encrypt(TOKEN),
@@ -262,7 +253,7 @@ describe('Matter connection settings API', () => {
   it('reports an undecryptable stored credential as misconfigured instead of failing to load', async () => {
     const harness = await setup();
     service = harness.service;
-    harness.setRow({
+    await harness.setRow({
       id: 1,
       url: 'http://127.0.0.1:1',
       encryptedCredential: 'enc:%%%',
