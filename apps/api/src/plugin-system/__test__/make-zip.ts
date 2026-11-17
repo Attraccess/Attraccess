@@ -1,17 +1,22 @@
 import { crc32 } from 'zlib';
 
-export type ZipFiles = Record<string, string | Buffer>;
+/** A Unix `mode` (e.g. `0o120777` for a symlink) is stored in the entry's external attributes. */
+export type ZipFiles = Record<string, string | Buffer | { data: string | Buffer; mode: number }>;
 
 interface ZipEntry {
   name: string;
   data: Buffer;
+  mode?: number;
 }
 
+const toBuffer = (content: string | Buffer) => (Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8'));
+
 export function makeZip(files: ZipFiles): Buffer {
-  const entries: ZipEntry[] = Object.entries(files).map(([name, content]) => ({
-    name,
-    data: Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8'),
-  }));
+  const entries: ZipEntry[] = Object.entries(files).map(([name, content]) =>
+    typeof content === 'string' || Buffer.isBuffer(content)
+      ? { name, data: toBuffer(content) }
+      : { name, data: toBuffer(content.data), mode: content.mode },
+  );
 
   const locals: Buffer[] = [];
   const centrals: Buffer[] = [];
@@ -38,7 +43,8 @@ export function makeZip(files: ZipFiles): Buffer {
 
     const centralHeader = Buffer.alloc(46);
     centralHeader.writeUInt32LE(0x02014b50, 0);
-    centralHeader.writeUInt16LE(20, 4);
+    // "Version made by" 3 = Unix, so readers take the external attributes as st_mode.
+    centralHeader.writeUInt16LE(entry.mode === undefined ? 20 : (3 << 8) | 20, 4);
     centralHeader.writeUInt16LE(20, 6);
     centralHeader.writeUInt16LE(0, 8);
     centralHeader.writeUInt16LE(0, 10);
@@ -52,7 +58,7 @@ export function makeZip(files: ZipFiles): Buffer {
     centralHeader.writeUInt16LE(0, 32);
     centralHeader.writeUInt16LE(0, 34);
     centralHeader.writeUInt16LE(0, 36);
-    centralHeader.writeUInt32LE(0, 38);
+    centralHeader.writeUInt32LE(((entry.mode ?? 0) << 16) >>> 0, 38);
     centralHeader.writeUInt32LE(offset, 42);
     centrals.push(centralHeader, nameBuf);
 

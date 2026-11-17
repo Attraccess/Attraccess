@@ -45,6 +45,22 @@ describe('PluginService.uploadPlugin staging cleanup', () => {
       'File could not be extracted, it must be a valid zip file',
     ],
     [
+      'a zip-slip entry',
+      () => zipFileUpload({ 'plugin.json': JSON.stringify(fixture.VALID_MANIFEST), '../../escaped.js': 'pwned' }),
+      BadRequestException,
+      'File could not be extracted',
+    ],
+    [
+      'a symlink entry',
+      () =>
+        zipFileUpload({
+          'plugin.json': JSON.stringify(fixture.VALID_MANIFEST),
+          'dist/index.js': { data: '/etc/passwd', mode: 0o120777 },
+        }),
+      BadRequestException,
+      'File could not be extracted: Unsafe zip entry "dist/index.js": only regular files and folders are allowed',
+    ],
+    [
       'a reserved name',
       () => validZip('.hidden'),
       BadRequestException,
