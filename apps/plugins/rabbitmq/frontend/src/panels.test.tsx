@@ -261,7 +261,8 @@ it('renders overview, nodes and queues and tolerates missing fields', async () =
   useTranslationState.setState({ language: 'de' });
   render(<RabbitmqStatsPanel mqttServerId={6} />);
   expect(await screen.findByText('1,5 /s')).toBeTruthy();
-  expect(screen.getByText('1,0 MiB / 4,0 MiB')).toBeTruthy();
+  // The nodes table renders its rows after the overview; under CI load that can take a moment.
+  expect(await screen.findByText('1,0 MiB / 4,0 MiB')).toBeTruthy();
   expect(screen.getByText('Alarm aktiv')).toBeTruthy();
 });
 
