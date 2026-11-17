@@ -334,8 +334,8 @@ Ihre Live-Themen abonnieren dürfen. Ein Plugin kann eigene Schlüssel deklarier
 `system.plugins.manage` wiederzuverwenden. Der Host nimmt sie in den Berechtigungskatalog auf, sodass Administratoren
 sie im Rollen-Editor und in der Auswahl für API-Tokens sehen, gruppiert unter dem Namen des Plugins.
 
-Plugin-eigene Schlüssel brauchen den Host **1.11.0-beta.1** oder neuer. Ältere Hosts ignorieren das Feld, dort hätte
-niemand Ihre Schlüssel: Erhöhen Sie `attraccessVersion.min` (und den Peer-Bereich des SDK), sobald Sie sie verwenden.
+Jeder Host, der Plugins mit SDK 2 lädt, unterstützt plugin-eigene Schlüssel. Das `attraccessVersion.min` von `2.0.0-0`,
+das SDK 2 verlangt, deckt sie also schon ab.
 
 #### Schlüssel deklarieren
 

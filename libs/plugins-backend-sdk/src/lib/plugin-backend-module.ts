@@ -87,7 +87,7 @@ export interface PluginBackendModule {
    * load time (format, reserved core namespaces, collisions) and registers them in the permission catalog, so they
    * appear in the role editor and the API-token picker. Declare them with {@link definePluginPermissions} to get
    * typed keys for `@Auth`. A plugin that is uninstalled or fails to load keeps its keys and their grants, hidden
-   * and granting nothing until it loads again. Requires host 1.11.0-beta.1 or newer; older hosts ignore the field.
+   * and granting nothing until it loads again.
    */
   permissions?: PluginPermissionsDeclaration;
 }

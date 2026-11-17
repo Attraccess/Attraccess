@@ -232,8 +232,8 @@ your live topics. A plugin can declare its own keys instead of reusing broad cor
 `system.plugins.manage`. The host adds them to the permission catalog, so administrators see them in the role editor
 and the API-token picker, grouped under the plugin's name.
 
-Plugin-declared keys need host **1.11.0-beta.1** or newer. Older hosts ignore the field, so nobody would hold your
-keys there: raise `attraccessVersion.min` (and the SDK peer range) when you start using them.
+Every host that loads SDK 2 plugins supports plugin-declared keys, so the `attraccessVersion.min` of `2.0.0-0` that
+SDK 2 requires already covers them.
 
 #### Declaring keys
 
