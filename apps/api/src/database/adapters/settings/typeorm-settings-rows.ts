@@ -12,7 +12,7 @@ export class TypeOrmSettingsRows implements SettingsRows {
     private readonly handles: TransactionHandles,
   ) {}
 
-  /** For tests that bring their own database: no unit of work, a raw transaction handle is still accepted. */
+  /** For tests that bring their own database: no unit of work, so only reads without a transaction scope work. */
   static forRepository(settings: Repository<Setting>): TypeOrmSettingsRows {
     return new TypeOrmSettingsRows(settings, new TransactionHandles(undefined as never));
   }
