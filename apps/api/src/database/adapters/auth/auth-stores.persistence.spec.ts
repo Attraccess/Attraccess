@@ -199,14 +199,31 @@ describe('auth persistence adapters on a real SQLite file', () => {
       ).toBeNull();
     });
 
-    it('lets a revocation on one connection win over a use recorded from another', async () => {
+    it('keeps a consistent state when a revocation and a use race from two connections', async () => {
       const storeA = tokenStoreOn(first);
       const storeB = tokenStoreOn(second);
-      const token = await issue(storeA);
+      const tokens = await Promise.all(Array.from({ length: 12 }, () => issue(storeA)));
+      const revokedAt = new Date();
+      const usedAt = new Date(revokedAt.getTime() + 1);
 
-      await storeA.revoke(token.id, new Date());
+      const outcomes = await Promise.all(
+        tokens.map(async (token) => {
+          const [, used] = await Promise.all([
+            storeA.revoke(token.id, revokedAt),
+            storeB.touchLastUsed(token.id, usedAt),
+          ]);
+          return { id: token.id, used };
+        }),
+      );
 
-      expect(await storeB.touchLastUsed(token.id, new Date())).toBe(false);
+      for (const { id, used } of outcomes) {
+        const row = await first.getRepository(ApiToken).findOneByOrFail({ id });
+        // The revocation always lands; a use is recorded only if it committed before it, never half of either.
+        expect(row.revokedAt?.getTime()).toBe(revokedAt.getTime());
+        expect(row.lastUsedAt?.getTime() ?? null).toBe(used ? usedAt.getTime() : null);
+        // Once revoked, no later use is accepted.
+        expect(await storeB.touchLastUsed(id, new Date())).toBe(false);
+      }
     });
   });
 

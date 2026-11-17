@@ -35,12 +35,25 @@ function constraintKind(error: unknown): PersistenceErrorKind | undefined {
   return undefined;
 }
 
+/**
+ * A failed statement (it carries the driver's error in `driverError`) whose driver message names SQLITE_READONLY,
+ * for drivers that report the condition without the code. Read for classification only, never logged.
+ */
+function readOnlyByMessage(error: unknown): boolean {
+  const failure = error as { driverError?: { message?: unknown }; message?: unknown } | null;
+  if (!failure || typeof failure !== 'object' || !('driverError' in failure)) return false;
+  const message = failure.driverError?.message ?? failure.message;
+  return typeof message === 'string' && message.includes('SQLITE_READONLY');
+}
+
 /** Interprets SQLite driver errors as neutral persistence error categories. */
 export const sqliteErrorClassifier: PersistenceErrorClassifier = {
   classify(error: unknown): PersistenceErrorKind | undefined {
     const code = sqliteErrorCode(error);
-    if (!code) return undefined;
+    if (!code) return readOnlyByMessage(error) ? 'read-only' : undefined;
     if (code === 'SQLITE_BUSY') return 'busy';
+    // SQLITE_READONLY and its extended codes (SQLITE_READONLY_DBMOVED, ...).
+    if (code.startsWith('SQLITE_READONLY')) return 'read-only';
     if (UNIQUE_CODES.has(code)) return 'unique-violation';
     if (code === 'SQLITE_CONSTRAINT_FOREIGNKEY') return 'foreign-key-violation';
     if (code === 'SQLITE_BUSY_SNAPSHOT') return 'conflict';

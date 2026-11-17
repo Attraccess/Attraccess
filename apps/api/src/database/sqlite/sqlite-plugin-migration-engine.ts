@@ -4,13 +4,9 @@ import { DataSource, DataSourceOptions, MigrationExecutor } from 'typeorm';
 import type {
   PluginMigrationClassRef,
   PluginMigrationEngine,
-} from '../../../plugin-system/persistence/plugin-migration-engine.port';
-import { dataSourceConfig, databaseBackend } from '../../datasource';
-import { SQLITE_BUSY_TIMEOUT_MS } from '../../sqlite/sqlite-connection';
-import type { DatabaseType } from '../../backend/database-backend';
-
-/** Connection options a test hands in to point the engine at its own database file. */
-export type PluginMigrationEngineConfig = Partial<DataSourceOptions>;
+  PluginMigrationEngineConfig,
+} from '../../plugin-system/persistence/plugin-migration-engine.port';
+import { createDataSource, SQLITE_BUSY_TIMEOUT_MS } from './sqlite-connection';
 
 function quoteIdentifier(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
@@ -22,17 +18,17 @@ function quoteIdentifier(name: string): string {
  * it is idle (uninstall). SQLite serialises writers per file, so the connection waits a little for a transient lock.
  */
 class SqlitePluginMigrationEngine implements PluginMigrationEngine {
-  constructor(private readonly override: PluginMigrationEngineConfig | null) {}
+  constructor(private readonly base: () => DataSourceOptions) {}
 
   private open(tableName: string, migrations: PluginMigrationClassRef[]): DataSource {
-    const base = (this.override ?? dataSourceConfig) as DataSourceOptions;
+    const base = this.base();
     const databaseFile = (base as { database?: unknown }).database;
     if (typeof databaseFile === 'string') {
       // The host normally creates the storage dir, but plugin up-migrations may run before the host connection
       // opens on a fresh install.
       mkdirSync(dirname(databaseFile), { recursive: true });
     }
-    return databaseBackend.createDataSource({
+    return createDataSource({
       ...base,
       entities: [],
       synchronize: false,
@@ -82,13 +78,10 @@ class SqlitePluginMigrationEngine implements PluginMigrationEngine {
   }
 }
 
-const ENGINES: Record<DatabaseType, (config: PluginMigrationEngineConfig | null) => PluginMigrationEngine> = {
-  sqlite: (config) => new SqlitePluginMigrationEngine(config),
-};
-
-/**
- * The plugin migration engine of the active database backend. `config` redirects the connection (tests only).
- */
-export function createPluginMigrationEngine(config: PluginMigrationEngineConfig | null = null): PluginMigrationEngine {
-  return ENGINES[databaseBackend.type](config);
+/** The SQLite plugin migration engine. `config` (tests only) replaces the application's connection options. */
+export function createSqlitePluginMigrationEngine(
+  config: PluginMigrationEngineConfig | null,
+  applicationOptions: () => DataSourceOptions,
+): PluginMigrationEngine {
+  return new SqlitePluginMigrationEngine(() => (config as DataSourceOptions | null) ?? applicationOptions());
 }

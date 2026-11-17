@@ -88,25 +88,58 @@ export function describePersistenceConformance(fixture: BackendFixture): void {
       expect(a.classify(rejected.reason)).toBe('unique-violation');
     });
 
-    it('retries a transient failure a bounded number of times and runs the external effect once', async () => {
+    /** The engine's real busy error: a write that waited past its lock timeout for another connection's lock. */
+    async function busyErrorOf(): Promise<unknown> {
+      const release = await database.induceBusy();
+      try {
+        const impatient = await database.connect({ lockTimeoutMs: 50 });
+        return await impatient.unitOfWork
+          .run((scope) => impatient.addToBalance(scope, 2, 1))
+          .then(
+            () => undefined,
+            (error: unknown) => error,
+          );
+      } finally {
+        await release();
+      }
+    }
+
+    it("reports a write that waited out another connection's lock as busy", async () => {
+      const error = await busyErrorOf();
+      expect(error).toBeDefined();
+      expect(a.classify(error)).toBe('busy');
+      expect(await b.balance(2)).toBe(0);
+    });
+
+    it('retries a busy database with backoff until the lock is released and runs the effect once', async () => {
+      const release = await database.induceBusy();
+      const impatient = await database.connect({ lockTimeoutMs: 50 });
       const effect = jest.fn();
-      let attempts = 0;
+      const failures: unknown[] = [];
       await runWithRetry(
-        a.unitOfWork,
+        impatient.unitOfWork,
         async (scope) => {
-          attempts++;
-          await a.addToBalance(scope, 1, 1);
           scope.afterCommit(effect);
-          if (attempts < 3) throw Object.assign(new Error('transient'), { code: 'SQLITE_BUSY' });
+          await impatient.addToBalance(scope, 1, 1);
         },
-        { isTransient: (error) => (error as { code?: string }).code === 'SQLITE_BUSY' },
+        {
+          attempts: 5,
+          baseDelayMs: 10,
+          isTransient: (error) => {
+            failures.push(impatient.classify(error));
+            // The lock holder finishes while the writer backs off.
+            if (failures.length === 1) void release();
+            return impatient.classify(error) === 'busy';
+          },
+        },
       );
-      expect(attempts).toBe(3);
+      expect(failures[0]).toBe('busy');
       expect(effect).toHaveBeenCalledTimes(1);
       expect(await b.balance(1)).toBe(1);
     });
 
-    it('gives up after the attempt bound and never runs the effect of a failed attempt', async () => {
+    it('never runs the effect of a failed attempt, and gives up after the attempt bound', async () => {
+      const busy = await busyErrorOf();
       const effect = jest.fn();
       let attempts = 0;
       await expect(
@@ -115,13 +148,33 @@ export function describePersistenceConformance(fixture: BackendFixture): void {
           async (scope) => {
             attempts++;
             scope.afterCommit(effect);
-            throw Object.assign(new Error('transient'), { code: 'SQLITE_BUSY' });
+            await a.addToBalance(scope, 1, 1);
+            throw busy;
           },
-          { attempts: 4, isTransient: () => true },
+          { attempts: 4, baseDelayMs: 1, isTransient: (error) => a.classify(error) === 'busy' },
         ),
-      ).rejects.toThrow('transient');
+      ).rejects.toBe(busy);
       expect(attempts).toBe(4);
       expect(effect).not.toHaveBeenCalled();
+      expect(await b.balance(1)).toBe(0);
+    });
+
+    it('runs the effects of the committed attempt exactly once across retries', async () => {
+      const busy = await busyErrorOf();
+      const effects: number[] = [];
+      let attempts = 0;
+      await runWithRetry(
+        a.unitOfWork,
+        async (scope) => {
+          const attempt = ++attempts;
+          scope.afterCommit(() => void effects.push(attempt));
+          await a.addToBalance(scope, 1, 1);
+          if (attempt < 3) throw busy;
+        },
+        { baseDelayMs: 1, isTransient: (error) => a.classify(error) === 'busy' },
+      );
+      expect(effects).toEqual([3]);
+      expect(await b.balance(1)).toBe(1);
     });
 
     it('does not retry a failure that is not transient', async () => {

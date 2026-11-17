@@ -1,12 +1,13 @@
 import type { AuditEntryDraft } from '@attraccess/application-models';
 import { AuditLog } from '@attraccess/database-entities';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { copyFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import { AuditTransaction, DurableAppendControl } from '../../../audit/audit-persistence.port';
 import { createSqliteUnitOfWork } from '../../sqlite/sqlite-unit-of-work';
-import { TransactionScopeError } from '../../unit-of-work';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
+import { TransactionScope, TransactionScopeError } from '../../unit-of-work';
 import { AUDIT_BUSY_RETRIES, SqliteAuditStore } from './sqlite-audit-store';
 
 const draft = (subjectId: number, details: AuditEntryDraft['details'] = {}): AuditEntryDraft => ({
@@ -34,6 +35,19 @@ function transactionOf(from: SqliteAuditStore, ref: object) {
 const open: DurableAppendControl = { refusal: () => undefined, isStopping: () => false };
 
 describe('SqliteAuditStore on independent connections', () => {
+  // The released schema, built once by the migration track and copied for every test.
+  let template: { directory: string; file: string };
+  beforeAll(async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'audit-store-template-'));
+    const file = join(directory, 'template.sqlite');
+    const migrated = await createTestDataSource({ location: file, migrationsRun: true });
+    await closeTestDataSource(migrated);
+    template = { directory, file };
+  });
+  afterAll(async () => {
+    await rm(template.directory, { recursive: true, force: true });
+  });
+
   let directory: string;
   let main: DataSource;
   let observer: DataSource;
@@ -42,18 +56,15 @@ describe('SqliteAuditStore on independent connections', () => {
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'audit-store-'));
     const database = join(directory, 'audit.sqlite');
+    await copyFile(template.file, database);
     main = await new DataSource({
       type: 'sqlite',
       database,
       entities: [AuditLog],
       synchronize: false,
     }).initialize();
-    await main.query(
-      `CREATE TABLE audit_log (id integer PRIMARY KEY AUTOINCREMENT NOT NULL, at datetime NOT NULL, domain varchar NOT NULL,
-        pluginId varchar, action varchar NOT NULL, operationId varchar NOT NULL, actorId integer, authenticationMethod varchar,
-        apiTokenId integer, outcome varchar NOT NULL, subjectType varchar NOT NULL, subjectId integer, ipAddress varchar,
-        userAgent varchar, details text NOT NULL)`,
-    );
+    // Rows the migrations seeded are not part of these cases.
+    await main.query('DELETE FROM audit_log');
     await main.query('CREATE TABLE business_change (id integer PRIMARY KEY)');
     // A third connection: what a reader (or a restarted process) sees on stable storage.
     observer = await new DataSource({ type: 'sqlite', database, entities: [AuditLog] }).initialize();
@@ -190,6 +201,16 @@ describe('SqliteAuditStore on independent connections', () => {
       expect((await stored()).map((row) => row.subjectId)).toEqual([40]);
     });
 
+    it('writes durably for a scope that already closed instead of dropping the event', async () => {
+      const unitOfWork = createSqliteUnitOfWork(main);
+      const scoped = new SqliteAuditStore(main, unitOfWork);
+      let closed: TransactionScope | undefined;
+      await unitOfWork.run(async (scope) => {
+        closed = scope;
+      });
+      expect(scoped.activeTransaction(closed as TransactionScope)).toBeUndefined();
+    });
+
     it('rejects a unit of work scope when no unit of work is wired', async () => {
       const unitOfWork = createSqliteUnitOfWork(main);
       await unitOfWork.run(async (scope) => {
@@ -259,7 +280,7 @@ describe('SqliteAuditStore on independent connections', () => {
     });
 
     it('hydrates legacy password-policy details from the overflow table', async () => {
-      await main.query('CREATE TABLE password_policy_audit_overflow (legacyAuditId integer, metadata text)');
+      // The overflow table comes from the migration track.
       await main.query('INSERT INTO password_policy_audit_overflow VALUES (5, \'{"minLength":12}\')');
       await store.appendDurably(draft(1, { legacyAuditId: 5 }), open);
       const { entries } = await store.findEntries({ notBefore: new Date(0) }, 5);

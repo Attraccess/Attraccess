@@ -1,11 +1,16 @@
-import type { DataSource, DataSourceOptions } from 'typeorm';
+import type { PluginTransactionScope } from '@attraccess/plugins-backend-sdk';
+import type {
+  PluginMigrationEngine,
+  PluginMigrationEngineConfig,
+} from '../../plugin-system/persistence/plugin-migration-engine.port';
+import type { PluginPersistenceHost } from '../../plugin-system/persistence/plugin-persistence-host.port';
 import type { PersistenceErrorClassifier } from '../persistence-errors';
 import type { DatabaseTransfer } from '../transfer-snapshot';
+import type { ScopedUnitOfWork } from '../unit-of-work';
+import type { DatabaseType } from './database-type';
 
-/** Backends the application can run on. A new backend is added here, in resolveDatabaseBackend and in its adapter. */
-export const SUPPORTED_DATABASE_TYPES = ['sqlite'] as const;
-export type DatabaseType = (typeof SUPPORTED_DATABASE_TYPES)[number];
-export const DEFAULT_DATABASE_TYPE: DatabaseType = 'sqlite';
+export { DEFAULT_DATABASE_TYPE, SUPPORTED_DATABASE_TYPES } from './database-type';
+export type { DatabaseType } from './database-type';
 
 /**
  * One ordered, released migration history of one backend. The migrations table keeps its name per track so a
@@ -20,24 +25,46 @@ export interface MigrationTrack {
   readonly migrations: readonly unknown[];
 }
 
+/** What the plugin runtime needs from a backend: plugin schema migrations, plugin persistence, host transactions. */
+export interface DatabaseBackendPluginHooks {
+  /** The engine that runs a plugin's own migrations. `config` redirects its connection (tests only). */
+  createMigrationEngine(config: PluginMigrationEngineConfig | null): PluginMigrationEngine;
+  /** The plugin persistence host. `getConnection` resolves the host connection lazily. */
+  createPersistenceHost(getConnection: () => unknown): PluginPersistenceHost;
+  /** The read-only scope plugin hooks receive for a transaction the host opened itself. */
+  hostTransactionScope(transaction: object): PluginTransactionScope;
+}
+
 /**
  * The single composition seam between the application and one database engine: configuration, connection,
- * schema (entities and migrations), error interpretation and shutdown. Feature code never talks to a backend
- * directly; it receives ports that an adapter built on this backend implements.
+ * schema (entities and migrations), transactions, error interpretation, plugin support and shutdown. Adding a backend
+ * means adding one object of this type to the registry (resolve-database-backend.ts). Feature code never talks to a
+ * backend directly; it receives ports that an adapter built on this backend implements.
+ *
+ * The type parameters are the engine's connection, connection options and transaction handle; this file stays
+ * engine-neutral, the registry fixes them for the ORM in use.
  */
-export interface DatabaseBackend {
+export interface DatabaseBackend<TSource = unknown, TOptions = unknown, THandle = unknown> {
   readonly type: DatabaseType;
-  /** TypeORM options for the application connection (entities, migration track, connection location). */
-  createDataSourceOptions(): DataSourceOptions;
+  /** Options for the application connection (entities, migration track, connection location). */
+  createDataSourceOptions(): TOptions;
   /** The entity classes of this backend's schema. Plugins append their own at load time. */
   readonly entities: unknown[];
   /** Core migration track. A second track for another engine is a separate MigrationTrack on that backend. */
   readonly migrationTrack: MigrationTrack;
   /** Opens a connection with the engine's connection rules (busy handling, flow ownership, PRAGMAs). */
-  createDataSource(options: DataSourceOptions): DataSource;
+  createDataSource(options: TOptions): TSource;
+  /** The unit of work of a connection, with the engine's transaction rules (for SQLite: one writer at a time). */
+  createUnitOfWork(source: TSource): ScopedUnitOfWork<THandle>;
   readonly errors: PersistenceErrorClassifier;
   /** Neutral export and import of the whole database for backup, restore and engine transfer. */
-  readonly transfer: DatabaseTransfer;
-  /** Releases connections the backend opened beside the given application DataSource. */
-  shutdown(source: DataSource): Promise<void>;
+  readonly transfer: DatabaseTransfer<TSource>;
+  readonly plugins: DatabaseBackendPluginHooks;
+  /**
+   * Applies `hook` to every connection the backend opens beside the application connection (SQLite: the serialized
+   * write connection), now and when it opens later. Query instrumentation uses it to cover all statements.
+   */
+  onCompanionConnection(source: TSource, hook: (connection: TSource) => void): void;
+  /** Releases connections the backend opened beside the given application connection. */
+  shutdown(source: TSource): Promise<void>;
 }

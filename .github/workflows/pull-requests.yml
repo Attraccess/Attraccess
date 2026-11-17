@@ -238,12 +238,10 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
+      # Runs every test target, api:test-conformance included: the backend-parameterised persistence contract
+      # (ATT-1146) on real SQLite files with independent connections. api:test leaves those specs to it.
       - name: Test all core projects
         run: node scripts/ci-test-projects.mjs --group=core
-      # The backend-parameterised persistence contract (ATT-1146), run on real SQLite files with independent
-      # connections. ATT-584 adds a PostgreSQL fixture to the same suite.
-      - name: Persistence conformance (real database)
-        run: pnpm nx run api:test-conformance --skip-nx-cache
 
   browser-e2e:
     runs-on: ubuntu-latest

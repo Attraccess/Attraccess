@@ -1,4 +1,4 @@
-import { ScopedUnitOfWork, TransactionDriver, TransactionScopeError } from './unit-of-work';
+import { retryDelayMs, runWithRetry, ScopedUnitOfWork, TransactionDriver, TransactionScopeError } from './unit-of-work';
 
 /** A fake engine: records commit/rollback and hands out a numbered handle. */
 function fakeDriver() {
@@ -108,5 +108,83 @@ describe('ScopedUnitOfWork (engine independent contract)', () => {
       }),
     ).rejects.toThrow('x');
     expect(leaked.isOpen).toBe(false);
+  });
+});
+
+describe('runWithRetry', () => {
+  const transient = Object.assign(new Error('busy'), { transient: true });
+  const isTransient = (error: unknown) => (error as { transient?: boolean }).transient === true;
+
+  it('waits a jittered, exponentially growing and capped delay between attempts', async () => {
+    const { driver } = fakeDriver();
+    const waits: number[] = [];
+    let attempts = 0;
+    await expect(
+      runWithRetry(
+        new ScopedUnitOfWork(driver),
+        async () => {
+          attempts++;
+          throw transient;
+        },
+        {
+          attempts: 5,
+          isTransient,
+          baseDelayMs: 40,
+          maxDelayMs: 100,
+          random: () => 0.5,
+          sleep: async (ms) => void waits.push(ms),
+        },
+      ),
+    ).rejects.toBe(transient);
+    expect(attempts).toBe(5);
+    // Bounds 40, 80, 100 (capped), 100; half of each with the fixed random number. No wait after the last attempt.
+    expect(waits).toEqual([20, 40, 50, 50]);
+  });
+
+  it('keeps every delay below its bound and never negative', () => {
+    expect(retryDelayMs(1, { random: () => 0 })).toBe(0);
+    expect(retryDelayMs(1, { random: () => 0.999 })).toBeLessThan(50);
+    expect(retryDelayMs(30, { random: () => 0.999 })).toBeLessThan(1000);
+  });
+
+  it('never runs more than ten attempts', async () => {
+    const { driver } = fakeDriver();
+    let attempts = 0;
+    const work = async () => {
+      attempts++;
+      throw transient;
+    };
+    await expect(
+      runWithRetry(new ScopedUnitOfWork(driver), work, { attempts: 1000, isTransient, sleep: async () => undefined }),
+    ).rejects.toBe(transient);
+    expect(attempts).toBe(10);
+  });
+
+  it('refuses to run inside an open unit of work, where a retry would join the failed transaction', async () => {
+    const { driver, log } = fakeDriver();
+    const uow = new ScopedUnitOfWork(driver);
+    const inner = jest.fn();
+    await uow.run(async (scope) => {
+      scope.afterCommit(() => void log.push('outer effect'));
+      await expect(runWithRetry(uow, inner)).rejects.toThrow(TransactionScopeError);
+    });
+    expect(inner).not.toHaveBeenCalled();
+    expect(log).toEqual(['begin 1', 'commit 1', 'outer effect']);
+  });
+
+  it('runs the post-commit work of the committed attempt only', async () => {
+    const { driver } = fakeDriver();
+    const effects: number[] = [];
+    let attempts = 0;
+    await runWithRetry(
+      new ScopedUnitOfWork(driver),
+      async (scope) => {
+        const attempt = ++attempts;
+        scope.afterCommit(() => void effects.push(attempt));
+        if (attempt < 3) throw transient;
+      },
+      { isTransient, sleep: async () => undefined },
+    );
+    expect(effects).toEqual([3]);
   });
 });

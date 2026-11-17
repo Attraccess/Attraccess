@@ -174,7 +174,7 @@
       ],
       "dependsOn": ["test-scripts"],
       "options": {
-        "testMatch": "\"**/*.spec.ts\" \"!**/*.e2e.spec.ts\" \"!**/*.real-api.spec.ts\" \"!**/*.alerting.spec.ts\" \"!**/*.browser.spec.ts\"",
+        "testMatch": "\"**/*.spec.ts\" \"!**/*.e2e.spec.ts\" \"!**/*.real-api.spec.ts\" \"!**/*.alerting.spec.ts\" \"!**/*.browser.spec.ts\" \"!**/database/conformance/**\"",
         "passWithNoTests": true
       }
     },

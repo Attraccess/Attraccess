@@ -6,6 +6,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DB_METRICS } from '../../../metrics/definitions/tokens';
 import { DbMetrics } from '../../../metrics/definitions/db.metrics';
 import { MetricsToggleService } from '../../../metrics/settings/metrics-toggle.service';
+import { resolveDatabaseBackend } from '../../backend';
 
 type DbMethod = 'select' | 'insert' | 'update' | 'delete' | 'other';
 
@@ -36,6 +37,9 @@ export class DbMetricsInstrumentation implements OnModuleInit {
 
   onModuleInit(): void {
     this.install(this.dataSource);
+    // Unit-of-work transactions run on a connection the backend opens beside this one (SQLite: the serialized
+    // write connection); their statements are timed too.
+    resolveDatabaseBackend().onCompanionConnection(this.dataSource, (connection) => this.install(connection));
   }
 
   install(dataSource: DataSource): void {

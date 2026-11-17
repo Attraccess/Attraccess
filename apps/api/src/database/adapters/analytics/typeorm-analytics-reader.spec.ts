@@ -27,7 +27,7 @@ describe('TypeOrmAnalyticsReader export queries', () => {
           startNotes: 'Starting session',
           endNotes: 'Ending session',
           usageInMinutes: 120,
-          user: { id: 1, name: 'User 1' },
+          user: { id: 1, username: 'User 1' },
           resource: { id: 1, name: 'Resource 1' },
         },
       ];
