@@ -1,8 +1,6 @@
 import { UnauthorizedException } from '@nestjs/common';
-import { User } from '@attraccess/database-entities';
+import type { UserRecord } from '@attraccess/application-models';
 import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
-import { DataSource } from 'typeorm';
-import { UsersService } from '../../../users/users.service';
 import { AuthService } from '../../auth.service';
 import { AccountLinkingRequiredException } from '../oidc/exceptions/account-linking-required.exception';
 import { SsoAccountResolver, SsoProvisioningHook } from './sso-account-resolver.service';
@@ -22,27 +20,26 @@ describe('SsoAccountResolver', () => {
     bound = null,
     byEmail = null,
     hook,
-  }: { bound?: number | null; byEmail?: Partial<User> | null; hook?: SsoProvisioningHook } = {}) {
+  }: { bound?: number | null; byEmail?: Partial<UserRecord> | null; hook?: SsoProvisioningHook } = {}) {
     const users = {
       findOne: jest.fn(async (query: Record<string, unknown>) =>
-        'id' in query ? ({ id: query.id } as User) : (byEmail as User | null),
+        'id' in query ? ({ id: query.id } as UserRecord) : (byEmail as UserRecord | null),
       ),
-      createOne: jest.fn(async () => ({ id: 77 }) as User),
+      createOne: jest.fn(async () => ({ id: 77 }) as UserRecord),
       buildUsernameFromSSOClaim: jest.fn((value: string) => `built:${value}`),
       recordCreatedUser: jest.fn(),
+      withTransaction: jest.fn((work: (m: unknown) => unknown) => work(manager)),
     };
     const auth = {
       findUserIdBySSO: jest.fn().mockResolvedValue(bound),
       addAuthenticationDetails: jest.fn().mockResolvedValue({}),
     };
-    const dataSource = { transaction: jest.fn((work: (m: unknown) => unknown) => work(manager)) };
     const resolver = new SsoAccountResolver(
-      users as unknown as UsersService,
+      users as unknown as UserRecordsService,
       auth as unknown as AuthService,
-      dataSource as unknown as DataSource,
       hook,
     );
-    return { users, auth, dataSource, resolver };
+    return { users, auth, resolver };
   }
 
   it('returns the user bound to (type, provider, subject) without touching email or creation', async () => {
@@ -72,9 +69,9 @@ describe('SsoAccountResolver', () => {
   );
 
   it('creates the user and its binding in one transaction when nothing matches', async () => {
-    const { resolver, users, auth, dataSource } = setup();
+    const { resolver, users, auth } = setup();
     await expect(resolver.resolveSsoUser(input)).resolves.toEqual({ user: { id: 77 }, created: true });
-    expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+    expect(users.withTransaction).toHaveBeenCalledTimes(1);
     expect(users.buildUsernameFromSSOClaim).toHaveBeenCalledWith('Some Name', 'user@example.com');
     expect(users.createOne).toHaveBeenCalledWith(
       { username: 'built:Some Name', email: 'user@example.com', externalIdentifier: null, isEmailVerified: true },

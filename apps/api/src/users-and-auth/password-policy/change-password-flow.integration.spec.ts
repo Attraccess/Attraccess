@@ -36,16 +36,16 @@ describe('Password policy on remaining endpoints (integration)', () => {
       expect(changePassword).not.toHaveBeenCalled();
     });
 
-    it('archives current hash to history before changing when historySize > 0', async () => {
+    it('leaves archiving the replaced hash to the change itself, which does it atomically', async () => {
       const currentHash = await bcrypt.hash('Previous-Tr0ub4dor-9!Hum', 4);
-      const { passwordService, historyRepo, changePassword } = await fixture.buildController({
+      const { passwordService, policyStore, changePassword } = await fixture.buildController({
         policy: { historySize: 2 },
         zxcvbnScore: 4,
         currentPasswordHash: currentHash,
       });
       await passwordService.setUserPassword(42, { password: fixture.STRONG_PASSWORD }, { id: 42 } as never);
-      expect(historyRepo.save).toHaveBeenCalledWith(expect.objectContaining({ userId: 42, passwordHash: currentHash }));
-      expect(changePassword).toHaveBeenCalled();
+      expect(policyStore.recordHistory).not.toHaveBeenCalled();
+      expect(changePassword).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }), fixture.STRONG_PASSWORD);
     });
   });
 

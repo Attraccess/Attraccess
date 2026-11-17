@@ -1,12 +1,11 @@
-import { AuthenticationDetail } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { EmailService } from '../../email/email.service';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
+import { PasswordPolicyService } from '../password-policy/password-policy.service';
 import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
+import { CREDENTIAL_STORE, type CredentialStore } from './credentials/credential-store.port';
 import { SSOService } from './sso/sso.service';
 
 jest.mock('bcrypt', () => ({
@@ -18,15 +17,32 @@ const mockMetricsService = {
   authLoginTotal: { inc: jest.fn() },
 };
 
-const AuthenticationDetailRepository = getRepositoryToken(AuthenticationDetail);
+export type MockedCredentialStore = { [Method in keyof CredentialStore]: jest.Mock };
+
 export function registerAuthServiceFixture() {
   let authService: AuthService;
 
-  let authenticationDetailRepository: Repository<AuthenticationDetail>;
+  let credentials: MockedCredentialStore;
 
   let usersService: UsersService;
 
+  let emailService: { sendVerificationEmail: jest.Mock; sendPasswordChangedEmail: jest.Mock };
+
+  let passwordPolicy: { getPolicy: jest.Mock };
+
   beforeEach(async () => {
+    credentials = {
+      findUserIdBySso: jest.fn(),
+      findSso: jest.fn(),
+      updateSsoSubject: jest.fn(),
+      findLocalPasswordHash: jest.fn(),
+      add: jest.fn(async (userId, credential) => ({ id: 1, userId, type: credential.type })),
+      replaceLocalPassword: jest.fn(),
+      removeLocalPassword: jest.fn(),
+      remove: jest.fn(),
+    };
+    emailService = { sendVerificationEmail: jest.fn(), sendPasswordChangedEmail: jest.fn() };
+    passwordPolicy = { getPolicy: jest.fn().mockResolvedValue({ historySize: 0 }) };
     const module: TestingModule = await Test.createTestingModule({
       imports: [],
       providers: [
@@ -40,22 +56,8 @@ export function registerAuthServiceFixture() {
             isSSOUser: jest.fn().mockResolvedValue(false),
           },
         },
-        {
-          provide: AuthenticationDetailRepository,
-          useValue: {
-            findOne: jest.fn(),
-            count: jest.fn(),
-            save: jest.fn(async (value) => value),
-            update: jest.fn(),
-          },
-        },
-
-        {
-          provide: EmailService,
-          useValue: {
-            sendVerificationEmail: jest.fn(),
-          },
-        },
+        { provide: CREDENTIAL_STORE, useValue: credentials },
+        { provide: EmailService, useValue: emailService },
         {
           provide: SSOService,
           useValue: {
@@ -72,11 +74,11 @@ export function registerAuthServiceFixture() {
           provide: MetricsService,
           useValue: mockMetricsService,
         },
+        { provide: PasswordPolicyService, useValue: passwordPolicy },
       ],
     }).compile();
 
     authService = module.get<AuthService>(AuthService);
-    authenticationDetailRepository = module.get<typeof authenticationDetailRepository>(AuthenticationDetailRepository);
     usersService = module.get<UsersService>(UsersService);
 
     // Reset all mocks before each test
@@ -89,11 +91,17 @@ export function registerAuthServiceFixture() {
     get authService() {
       return authService;
     },
-    get authenticationDetailRepository() {
-      return authenticationDetailRepository;
+    get credentials() {
+      return credentials;
     },
     get usersService() {
       return usersService;
+    },
+    get emailService() {
+      return emailService;
+    },
+    get passwordPolicy() {
+      return passwordPolicy;
     },
   };
 }

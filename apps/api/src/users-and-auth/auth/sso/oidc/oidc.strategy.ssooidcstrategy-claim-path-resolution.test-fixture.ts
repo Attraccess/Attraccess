@@ -7,7 +7,6 @@ import { UsersService } from '../../../users/users.service';
 import { AuthService } from '../../auth.service';
 import { SSOService } from '../sso.service';
 import { SsoAccountResolver } from '../account-resolution/sso-account-resolver.service';
-import { DataSource } from 'typeorm';
 import { OidcCookieStateStore } from './oidc-cookie-state-store';
 import { SSOOIDCStrategy } from './oidc.strategy';
 
@@ -36,11 +35,10 @@ export function registerSsooidcstrategyClaimPathResolutionFixture() {
     ssoAuditMock?: Partial<AuditRecorder>,
     metricsServiceMock?: Partial<MetricsService>,
   ) {
-    const dataSource = { transaction: (work: (manager: unknown) => unknown) => work({}) } as unknown as DataSource;
+    const withTransaction = (work: (manager: unknown) => unknown) => work({});
     const resolver = new SsoAccountResolver(
-      { recordCreatedUser: jest.fn(), ...usersServiceMock } as UsersService,
+      { recordCreatedUser: jest.fn(), withTransaction, ...usersServiceMock } as UsersService,
       authServiceMock as AuthService,
-      dataSource,
     );
     const moduleRef = {
       get: jest.fn((token: unknown) => {

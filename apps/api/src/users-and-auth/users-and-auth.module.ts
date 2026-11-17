@@ -54,15 +54,7 @@ import { RbacModule } from './rbac/rbac.module';
 
 // Constants and Entities
 
-import {
-  ApiToken,
-  ApiTokenPermission,
-  AuthenticationDetail,
-  Permission,
-  ResourceUsage,
-  Setting,
-  User,
-} from '@attraccess/database-entities';
+import { Setting, User } from '@attraccess/database-entities';
 
 import { APP_INTERCEPTOR, ModuleRef } from '@nestjs/core';
 
@@ -141,6 +133,8 @@ import {
   DATABASE_SESSION_STORE,
   SessionsPersistenceModule,
 } from '../database/adapters/sessions/sessions-persistence.module';
+import { AuthPersistenceModule } from '../database/adapters/auth/auth-persistence.module';
+import { SettingsPersistenceModule } from '../database/adapters/settings/settings-persistence.module';
 import { SsoPersistenceModule } from '../database/adapters/sso/sso-persistence.module';
 import { PasskeysPersistenceModule } from '../database/adapters/passkeys/passkeys-persistence.module';
 import { RateLimitingPersistenceModule } from '../database/adapters/rate-limiting/rate-limiting-persistence.module';
@@ -168,15 +162,10 @@ export const sessionStoreProvider = {
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      User,
-      AuthenticationDetail,
-      ResourceUsage,
-      Setting,
-      ApiToken,
-      ApiTokenPermission,
-      Permission,
-    ]),
+    // Still read by the user core (UsersService, UserAccounts, UserDirectory, SignupDomainService).
+    TypeOrmModule.forFeature([User, Setting]),
+    AuthPersistenceModule,
+    SettingsPersistenceModule,
     SessionsPersistenceModule,
     SsoPersistenceModule,
     PasskeysPersistenceModule,

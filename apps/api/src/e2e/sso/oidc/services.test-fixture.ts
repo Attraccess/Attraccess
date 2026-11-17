@@ -20,6 +20,10 @@ import { TokenHashService } from '../../../encryption/token-hash.service';
 import type { LicenseService } from '../../../license/license.service';
 import { MetricsService } from '../../../metrics/metrics.service';
 import { AuthService } from '../../../users-and-auth/auth/auth.service';
+import { PasswordPolicyService } from '../../../users-and-auth/password-policy/password-policy.service';
+import { unitOfWorkFor } from '../../../database/adapters/shared-unit-of-work';
+import { TransactionContextResolver } from '../../../database/adapters/transaction-context';
+import { TypeOrmCredentialStore } from '../../../database/adapters/auth/typeorm-credential.store';
 import { SsoAccountResolver } from '../../../users-and-auth/auth/sso/account-resolution/sso-account-resolver.service';
 import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 import { UsersService } from '../../../users-and-auth/users/users.service';
@@ -82,15 +86,16 @@ export function createOidcTestServices(dataSource: DataSource) {
   );
   const authService = new AuthService(
     mockEmailService,
-    authDetailRepo,
+    new TypeOrmCredentialStore(authDetailRepo, new TransactionContextResolver(dataSource, unitOfWorkFor(dataSource))),
     usersService,
     tokenHashService,
     mockMetricsService,
+    { getPolicy: async () => ({ historySize: 0 }) } as unknown as PasswordPolicyService,
   );
 
   const verifier = new OidcTokenVerifier();
   const encryption = new EncryptionService(mockConfigService);
-  const resolver = new SsoAccountResolver(usersService, authService, dataSource);
+  const resolver = new SsoAccountResolver(usersService, authService);
   const mockModuleRef = {
     get: (token: unknown): unknown => {
       if (token === SsoAccountResolver) return resolver;
