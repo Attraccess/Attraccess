@@ -63,7 +63,9 @@ export function parseManifestLicense(pluginName: string, license: unknown): Plug
   if (license === undefined) return undefined;
   const parsed = PluginLicenseDeclarationSchema.safeParse(license);
   if (parsed.success) return parsed.data;
-  const detail = parsed.error.issues.map((issue) => `${issue.path.join('.') || 'license'}: ${issue.message}`).join('; ');
+  const detail = parsed.error.issues
+    .map((issue) => `${issue.path.join('.') || 'license'}: ${issue.message}`)
+    .join('; ');
   throw new Error(`Plugin ${pluginName} declares an invalid license block (${detail})`);
 }
 
