@@ -41,3 +41,4 @@ export * from './lib/csv-export-template-record';
 export * from './lib/resource-actor-user';
 export * from './lib/resource-maintenance-records';
 export * from './lib/resource-health-records';
+export * from './lib/resource-form-records';

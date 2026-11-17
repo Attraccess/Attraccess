@@ -1,11 +1,11 @@
-import { Form, FormField, FormSubmission, Resource } from '@attraccess/database-entities';
-import { ResourceFormAction } from '@attraccess/application-models';
+import {
+  ResourceFormAction,
+  type FormFieldRecord,
+  type FormRecord,
+  type UsageFormSubmissionDraft,
+} from '@attraccess/application-models';
 
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
-
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { Repository, EntityManager } from 'typeorm';
+import { Inject, Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 
 import {
   FormFieldResponseDto,
@@ -22,30 +22,21 @@ import { parseFieldOptions, parseFieldValue } from './forms.validation';
 
 import { MissingFormSubmissionException } from './errors/missingFormSubmission.exception';
 
+import { RESOURCE_FORM_STORE, type FormFieldInput, type ResourceFormStore } from './forms-store.port';
+
+import type { ResourcePersistenceContext } from '../resource-persistence-context';
+
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 
 @Injectable()
 export class ResourceFormsService {
-  constructor(
-    @InjectRepository(Form)
-    protected readonly formRepository: Repository<Form>,
-    @InjectRepository(FormField)
-    protected readonly formFieldRepository: Repository<FormField>,
-    @InjectRepository(FormSubmission)
-    protected readonly formSubmissionRepository: Repository<FormSubmission>,
-    @InjectRepository(Resource)
-    protected readonly resourceRepository: Repository<Resource>,
-  ) {}
+  constructor(@Inject(RESOURCE_FORM_STORE) protected readonly store: ResourceFormStore) {}
 
   protected readonly logger = new Logger(ResourceFormsService.name);
 
   async findAll(resourceId: number): Promise<FormResponseDto[]> {
     await this.ensureResourceExists(resourceId);
-    const forms = await this.formRepository.find({
-      where: { resourceId },
-      relations: ['fields'],
-      order: { name: 'ASC', createdAt: 'ASC' },
-    });
+    const forms = await this.store.listForResource(resourceId);
     return forms.map((form) => this.mapFormResponse(form));
   }
 
@@ -88,35 +79,19 @@ export class ResourceFormsService {
   protected async getFormsByAction(
     resourceId: number,
     action: ResourceFormAction,
-    manager?: EntityManager,
-  ): Promise<Form[]> {
-    const column = this.getActionColumn(action);
-    const repo = manager ? manager.getRepository(Form) : this.formRepository;
-    const forms = await repo.find({
-      where: { resourceId, [column]: true },
-      relations: ['fields'],
-      order: { createdAt: 'ASC' },
-    });
-    return forms.map((form) => {
-      form.fields = (form.fields ?? []).sort((a, b) => a.position - b.position);
-      return form;
-    });
+    manager?: ResourcePersistenceContext,
+  ): Promise<FormRecord[]> {
+    this.assertSupportedAction(action);
+    return this.store.findRequiredForAction(resourceId, action, manager);
   }
 
-  protected getActionColumn(action: ResourceFormAction): keyof Form {
-    switch (action) {
-      case ResourceFormAction.START:
-        return 'isRequiredOnResourceUsageStart';
-      case ResourceFormAction.TAKEOVER:
-        return 'isRequiredOnResourceUsageTakeOver';
-      case ResourceFormAction.END:
-        return 'isRequiredOnResourceUsageEnd';
-      default:
-        throw new BadRequestException(`Unsupported form action: ${action}`);
+  protected assertSupportedAction(action: ResourceFormAction): void {
+    if (![ResourceFormAction.START, ResourceFormAction.TAKEOVER, ResourceFormAction.END].includes(action)) {
+      throw new BadRequestException(`Unsupported form action: ${action}`);
     }
   }
 
-  protected buildFieldPayload(field: CreateFormFieldDto | UpdateFormFieldDto) {
+  protected buildFieldPayload(field: CreateFormFieldDto | UpdateFormFieldDto): FormFieldInput {
     return {
       name: field.name,
       type: field.type,
@@ -127,7 +102,7 @@ export class ResourceFormsService {
     };
   }
 
-  protected mapFieldResponse(field: FormField): FormFieldResponseDto {
+  protected mapFieldResponse(field: FormFieldRecord): FormFieldResponseDto {
     const fieldDto = new FormFieldResponseDto();
     fieldDto.id = field.id;
     fieldDto.name = field.name;
@@ -139,7 +114,7 @@ export class ResourceFormsService {
     return fieldDto;
   }
 
-  protected mapFormResponse(form: Form): FormResponseDto {
+  protected mapFormResponse(form: FormRecord): FormResponseDto {
     const response = new FormResponseDto();
     response.id = form.id;
     response.createdAt = form.createdAt;
@@ -193,25 +168,16 @@ export class ResourceFormsService {
     return { valid: errors.length === 0, errors };
   }
 
-  async saveRequiredSubmissions(options: {
+  /** Validate and snapshot answers before external lifecycle effects, without publishing submissions. */
+  async prepareRequiredSubmissions(options: {
     resourceId: number;
     action: ResourceFormAction;
     submissions: FormSubmissionRequestDto[] | undefined;
     userId: number;
     resourceUsageId: number;
-    manager: EntityManager;
-  }): Promise<FormSubmission[]> {
-    const submissions = await this.prepareRequiredSubmissions(options);
-    const repository = options.manager.getRepository(FormSubmission);
-    const saved: FormSubmission[] = [];
-    for (const submission of submissions) saved.push(await repository.save(submission));
-    return saved;
-  }
-
-  /** Validate and snapshot answers before external lifecycle effects, without publishing submissions. */
-  async prepareRequiredSubmissions(
-    options: Parameters<ResourceFormsService['saveRequiredSubmissions']>[0],
-  ): Promise<FormSubmission[]> {
+    /** The transaction of the lifecycle step the forms are validated in. */
+    manager?: ResourcePersistenceContext;
+  }): Promise<UsageFormSubmissionDraft[]> {
     const forms = await this.getFormsByAction(options.resourceId, options.action, options.manager);
 
     if (!forms.length) {
@@ -223,7 +189,7 @@ export class ResourceFormsService {
       return [];
     }
 
-    const submissionEntities: FormSubmission[] = [];
+    const drafts: UsageFormSubmissionDraft[] = [];
 
     for (const form of forms) {
       const submissionsForForm = options.submissions?.filter((item) => item.formId === form.id) ?? [];
@@ -240,7 +206,7 @@ export class ResourceFormsService {
 
       const data = this.buildSubmissionData(form, submission);
 
-      const submissionEntity = Object.assign(new FormSubmission(), {
+      drafts.push({
         formId: form.id,
         form,
         resourceUsageId: options.resourceUsageId,
@@ -248,15 +214,13 @@ export class ResourceFormsService {
         data,
         action: options.action,
       });
-
-      submissionEntities.push(submissionEntity);
     }
 
-    return submissionEntities;
+    return drafts;
   }
 
-  protected buildSubmissionData(form: Form, submission: FormSubmissionRequestDto) {
-    const data: Record<string, { value: string; fieldDefinition: FormField }> = {};
+  protected buildSubmissionData(form: FormRecord, submission: FormSubmissionRequestDto) {
+    const data: Record<string, { value: string; fieldDefinition: FormFieldRecord }> = {};
 
     const unknownField = submission.answers.find(
       (answer) => !form.fields?.some((field) => field.id === answer.fieldId),
@@ -279,7 +243,7 @@ export class ResourceFormsService {
     return data;
   }
 
-  protected validateFieldAnswer(form: Form, field: FormField, rawValue: unknown): string | undefined {
+  protected validateFieldAnswer(form: FormRecord, field: FormFieldRecord, rawValue: unknown): string | undefined {
     if (field.type === 'boolean' && field.isRequired) {
       const boolValue = rawValue === true || rawValue === 'true';
       if (!boolValue) {
@@ -300,31 +264,11 @@ export class ResourceFormsService {
   async create(resourceId: number, dto: CreateFormDto): Promise<FormResponseDto> {
     await this.ensureResourceExists(resourceId);
 
-    const form = await this.formRepository.manager.transaction(async (manager) => {
-      const formRepo = manager.getRepository(Form);
-      const fieldRepo = manager.getRepository(FormField);
-
-      const newForm = formRepo.create({
-        resourceId,
-        name: dto.name,
-        isRequiredOnResourceUsageStart: dto.isRequiredOnResourceUsageStart,
-        isRequiredOnResourceUsageTakeOver: dto.isRequiredOnResourceUsageTakeOver,
-        isRequiredOnResourceUsageEnd: dto.isRequiredOnResourceUsageEnd,
-      });
-      const savedForm = await formRepo.save(newForm);
-
-      if (dto.fields?.length) {
-        const fieldEntities = dto.fields.map((field) =>
-          fieldRepo.create({
-            ...this.buildFieldPayload(field),
-            formId: savedForm.id,
-          }),
-        );
-        await fieldRepo.save(fieldEntities);
-      }
-
-      return this.getFormOrThrow(resourceId, savedForm.id, manager);
-    });
+    const form = await this.store.createForm(
+      resourceId,
+      dto,
+      (dto.fields ?? []).map((field) => this.buildFieldPayload(field)),
+    );
 
     return this.mapFormResponse(form);
   }
@@ -332,86 +276,43 @@ export class ResourceFormsService {
   async update(resourceId: number, formId: number, dto: UpdateFormDto): Promise<FormResponseDto> {
     await this.ensureResourceExists(resourceId);
 
-    const form = await this.formRepository.manager.transaction(async (manager) => {
-      await this.getFormOrThrow(resourceId, formId, manager);
+    const incomingFieldIds = (dto.fields ?? []).map((field) => field.id).filter((id): id is number => !!id);
+    if (incomingFieldIds.length) {
+      this.logger.debug(`Updating ${incomingFieldIds.length} existing form fields for form #${formId}`);
+    }
 
-      const formRepo = manager.getRepository(Form);
-      const fieldRepo = manager.getRepository(FormField);
+    const result = await this.store.updateForm(
+      resourceId,
+      formId,
+      dto,
+      (dto.fields ?? []).map((field) => ({ ...this.buildFieldPayload(field), id: field.id })),
+    );
+    if (result.status === 'form-missing') {
+      throw new NotFoundException(`Form #${formId} not found for resource #${resourceId}`);
+    }
+    if (result.status === 'field-missing') {
+      throw new NotFoundException(`Form field #${result.fieldId} not found on this form`);
+    }
 
-      await formRepo.update(
-        { id: formId, resourceId },
-        {
-          name: dto.name,
-          isRequiredOnResourceUsageStart: dto.isRequiredOnResourceUsageStart,
-          isRequiredOnResourceUsageTakeOver: dto.isRequiredOnResourceUsageTakeOver,
-          isRequiredOnResourceUsageEnd: dto.isRequiredOnResourceUsageEnd,
-        },
-      );
-
-      const incomingFieldIds = (dto.fields ?? []).map((field) => field.id).filter((id): id is number => !!id);
-      if (incomingFieldIds.length) {
-        this.logger.debug(`Updating ${incomingFieldIds.length} existing form fields for form #${formId}`);
-      }
-
-      const existingFields = await fieldRepo.find({ where: { formId } });
-      const existingFieldIds = existingFields.map((field) => field.id);
-      const idsToDelete = existingFieldIds.filter((id) => !incomingFieldIds.includes(id));
-
-      if (idsToDelete.length) {
-        await fieldRepo.delete(idsToDelete);
-      }
-
-      for (const field of dto.fields ?? []) {
-        if (field.id) {
-          const fieldExists = existingFields.find((existing) => existing.id === field.id);
-          if (!fieldExists) {
-            throw new NotFoundException(`Form field #${field.id} not found on this form`);
-          }
-          await fieldRepo.update(field.id, this.buildFieldPayload(field));
-        } else {
-          await fieldRepo.insert({
-            ...this.buildFieldPayload(field),
-            formId,
-          });
-        }
-      }
-
-      return this.getFormOrThrow(resourceId, formId, manager);
-    });
-
-    return this.mapFormResponse(form);
+    return this.mapFormResponse(result.form);
   }
 
   async delete(resourceId: number, formId: number): Promise<void> {
     await this.ensureResourceExists(resourceId);
 
-    await this.formRepository.manager.transaction(async (manager) => {
-      await this.getFormOrThrow(resourceId, formId, manager);
-
-      const submissionRepo = manager.getRepository(FormSubmission);
-      const fieldRepo = manager.getRepository(FormField);
-      const formRepo = manager.getRepository(Form);
-
-      await submissionRepo.delete({ formId });
-      await fieldRepo.delete({ formId });
-      await formRepo.delete({ id: formId, resourceId });
-    });
+    if (!(await this.store.deleteForm(resourceId, formId))) {
+      throw new NotFoundException(`Form #${formId} not found for resource #${resourceId}`);
+    }
   }
 
-  protected async ensureResourceExists(resourceId: number): Promise<Resource> {
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
-    if (!resource) {
+  protected async ensureResourceExists(resourceId: number): Promise<void> {
+    if (!(await this.store.resourceExists(resourceId))) {
       throw new ResourceNotFoundException(resourceId);
     }
-    return resource;
   }
 
-  protected async getFormOrThrow(resourceId: number, formId: number, manager?: EntityManager): Promise<Form> {
-    const repo = manager ? manager.getRepository(Form) : this.formRepository;
-    const form = await repo.findOne({
-      where: { id: formId, resourceId },
-      relations: ['fields'],
-    });
+  protected async getFormOrThrow(resourceId: number, formId: number): Promise<FormRecord> {
+    const form = await this.store.findForm(resourceId, formId);
 
     if (!form) {
       throw new NotFoundException(`Form #${formId} not found for resource #${resourceId}`);
