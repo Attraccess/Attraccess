@@ -58,7 +58,7 @@ export function preparePluginPermissions(pluginName: string, declaration: unknow
     // the checks and another to the registry.
     validated = validatePluginPermissionsDeclaration(structuredClone(declaration));
   } catch (error) {
-    throw new Error(`Plugin ${pluginName} declares invalid permissions: ${(error as Error).message}`);
+    throw new Error(`Plugin ${pluginName} declares invalid permissions: ${(error as Error).message}`, { cause: error });
   }
   const category = validated.category ?? { en: pluginName, de: pluginName };
   const entries: DeclaredPluginPermission[] = validated.permissions.map((permission) => {
