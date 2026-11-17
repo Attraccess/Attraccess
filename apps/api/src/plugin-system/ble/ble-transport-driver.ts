@@ -5,6 +5,7 @@ import type {
   PluginBleProfile,
 } from '@attraccess/plugins-backend-sdk';
 import type { BleSessionLink } from '@attraccess/plugins-backend-sdk/internal';
+import type { ModuleRef } from '@nestjs/core';
 
 /**
  * Host-internal reader transport (ATT-1033: `ReaderBleDriver` over the reader websocket). It is deliberately NOT
@@ -15,6 +16,15 @@ import type { BleSessionLink } from '@attraccess/plugins-backend-sdk/internal';
  * driver under the same key: only host code that imports this file can register the transport.
  */
 export const BLE_TRANSPORT_DRIVER = Symbol('attraccess.host.bleTransportDriver');
+
+/** The registered transport, or undefined on a host without one. */
+export function resolveBleTransportDriver(moduleRef: ModuleRef): BleTransportDriver | undefined {
+  try {
+    return moduleRef.get<BleTransportDriver>(BLE_TRANSPORT_DRIVER, { strict: false }) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * A connected peripheral behind one reader. The session engine calls it one operation at a time, but after a
@@ -70,6 +80,36 @@ export interface BleCallContext {
   endpointId?: string;
 }
 
+/** One filter of a reader's advertisement watch set. `id` is chosen by the host, unique per reader (u16). */
+export interface BleWatchFilter {
+  id: number;
+  serviceUuids: string[];
+  manufacturerIds: number[];
+  namePrefix?: string;
+}
+
+/** One advertisement a watching reader reported: the ids of the filters it matched (reader-side, unverified). */
+export interface BleWatchDriverEvent extends PluginBleAdvertisement {
+  filterIds: number[];
+  changed: boolean;
+  receivedAt: Date;
+}
+
+/**
+ * The watch state of a reader. `watching`: the set went to the reader; `excluded` filters did not, because the
+ * reader cannot take them (`too-many-filters`, `filter-too-large`). `offline`/`unsupported` as in `BleReaderStatus`.
+ */
+export type BleWatchState =
+  | { status: 'watching'; excluded?: Array<{ id: number; detail: string }> }
+  | { status: 'offline'; detail?: string }
+  | { status: 'unsupported'; detail: string };
+
+/** Where a driver reports a reader's watch state and its events. */
+export interface BleWatchListener {
+  onWatchState(readerId: number, state: BleWatchState): void;
+  onWatchEvents(readerId: number, events: BleWatchDriverEvent[]): void;
+}
+
 /** Every call gets a host deadline; `connect` and `scan` also get an abort signal they must honour. */
 export interface BleTransportDriver {
   /** Must answer quickly (host deadline 5 s). */
@@ -94,4 +134,16 @@ export interface BleTransportDriver {
     allowlist: BleAllowlistEntry[];
     context: BleCallContext;
   }): Promise<BleDriverLink>;
+  /**
+   * Replaces the advertisement watch set of a reader (`filters: []` stops it). The driver keeps the set, pushes it
+   * again whenever the reader (re)connects, and reports through `listener`: the reader's state whenever it changes
+   * (at least once per call, possibly synchronously) and the events it reports. Independent of scans and sessions.
+   * Optional: a driver without it makes every reader `unsupported` (`no-watch-transport`).
+   */
+  setWatch?(request: {
+    readerId: number;
+    filters: BleWatchFilter[];
+    keepaliveMs: number;
+    listener: BleWatchListener;
+  }): void;
 }

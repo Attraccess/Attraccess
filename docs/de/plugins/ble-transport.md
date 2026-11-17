@@ -1,6 +1,6 @@
 # Bluetooth-Transport für Plugins
 
-<!-- llms-description: Beschreibt den BLE-Transportvertrag, über den Backend-Plugins mit Bluetooth-Geräten über Attractap-Reader sprechen: Profile, Endpunkte, Sitzungen, Fehler, Grenzwerte und Tests mit dem Fake. -->
+<!-- llms-description: Der BLE-Transportvertrag für Backend-Plugins auf Attractap-Readern: Profile, Endpunkte, Sitzungen, Advertisement-Beobachtungen, Fehler, Grenzwerte und Tests mit dem Fake. -->
 
 Backend-Plugins mit der Berechtigung `BLE_TRANSPORT` können über Attractap-Reader mit Bluetooth-Low-Energy-Geräten (BLE) sprechen. Der Transport ist bewusst **keine** rohe GATT-Schnittstelle: Jede Operation läuft über ein Profil, das Ihr Plugin registriert hat, und einen Endpunkt, den Ihr Plugin besitzt. Der Kern setzt die Grenzen durch; Ihr Plugin liefert die herstellerspezifische Semantik.
 
@@ -106,6 +106,43 @@ const advertisements = await ble.scan(readers[0].readerId, 'door-lock', {
 Ein Reader erledigt **eine BLE-Aufgabe zur Zeit**: einen Scan oder eine Sitzung, für alle Plugins zusammen. Ein `scan` oder `openSession`, während ein anderer Scan oder eine andere Sitzung den Reader nutzt, endet sofort mit `READER_BUSY` (wiederholbar). Es gibt keine Warteschlange. Ein Scan liefert höchstens 32 Advertisements, nach Adresse dedupliziert (auf dem Reader und noch einmal im Host).
 
 `scan` hat eine Frist im Host: Antwortet der Transport nicht innerhalb von `durationMs` plus 5 s, endet der Scan mit `TIMEOUT`. Advertisements, die der Reader fehlerhaft meldet, werden übersprungen; sie lassen den Scan nicht scheitern.
+
+## Advertisement-Beobachtung
+
+Ein Scan ist eine kurze, exklusive Aufgabe. Um Geräte fortlaufend zu verfolgen, zum Beispiel einen Zustand, den ein Gerät in seine Advertising-Daten schreibt, nutzen Sie eine **Advertisement-Beobachtung** (`watch`): Die Reader scannen passiv mit dem Advertisement-Filter Ihres Profils und melden ein Gerät, sobald sich seine Advertising-Nutzdaten ändern, ohne Sitzung und neben Scans und Sitzungen anderer Plugins.
+
+```ts
+if (ble.watch) {
+  const watch = await ble.watch(
+    'sensor',
+    async (event) => {
+      // { readerId: 3, address: 'AA:BB:CC:DD:EE:01', addressType: 'public', rssi: -61, name: 'dev-1A2B',
+      //   serviceUuids: [...], manufacturerData: [{ companyId: 0xffff, data: Uint8Array }],
+      //   changed: true, receivedAt: Date }
+      if (event.changed) await handleState(event);
+    },
+    {
+      readerIds: [3, 4], // optional; Standard: alle für Plugins freigegebenen Reader, auch später freigegebene
+      signal, // Abbrechen schließt die Beobachtung
+      onReaderStatus: ({ readerId, status, detail }) => log(readerId, status, detail),
+    },
+  );
+  // später: await watch.close();
+}
+```
+
+- **Funktionserkennung.** `watch` ist in `PluginBleContext` optional: Ältere Hosts haben es nicht. Prüfen Sie `if (ble.watch)` und weichen Sie auf regelmäßige `scan`-Aufrufe aus.
+- **Profil.** Das Profil braucht einen `advertisement`-Filter, sonst endet `watch` mit `INVALID_PROFILE`. Ein unbekanntes Profil (oder das eines anderen Plugins) endet mit `PROFILE_NOT_REGISTERED`.
+- **Ereignisse.** Der Handler bekommt jedes Advertisement eines passenden Geräts auf den beobachteten Readern. `changed` ist `true`, wenn sich die Nutzdaten (Herstellerdaten, Name oder Service-UUIDs, nicht der RSSI) von den zuletzt für die Adresse gemeldeten unterscheiden oder der Reader die Adresse zum ersten Mal meldet. Bleiben die Nutzdaten gleich, meldet der Reader das Gerät trotzdem alle 30 s (`PLUGIN_BLE_WATCH_LIMITS.keepaliveMs`) mit `changed: false`, sodass Sie sehen, dass es noch in der Nähe ist. `receivedAt` ist der Empfangszeitpunkt auf dem Server.
+- **Serieller Handler.** Der Handler verarbeitet ein Ereignis nach dem anderen. Während er läuft, warten bis zu 64 Ereignisse (`maxQueuedEvents`); darüber hinaus wird das älteste wartende Ereignis verworfen. Halten Sie den Handler kurz und geben Sie längere Arbeit ab. Ein Handler, der eine Ausnahme wirft, wird protokolliert, und die Beobachtung läuft weiter.
+- **Reader.** `watch.readers()` liefert den Status jedes Readers der Beobachtung, und `onReaderStatus` wird (seriell) bei jeder Änderung aufgerufen, beginnend mit dem ersten Status jedes Readers:
+  - `watching`: Der Reader beobachtet.
+  - `offline`: Der Reader ist nicht verbunden. Kommt er zurück, setzt die Beobachtung von selbst fort.
+  - `access-denied`: Der Reader ist nicht (mehr) für Plugins freigegeben. Er beginnt zu beobachten, sobald ein Administrator ihn freigibt.
+  - `unsupported`: Der Reader kann nicht beobachten, mit einem `detail`: `no-watch-capability` (seine Firmware hat keine Advertisement-Beobachtung; aktualisieren Sie sie), `no-ble-capability` und die anderen Details von `READER_UNSUPPORTED`, `too-many-filters` (der Reader beobachtet bereits so viele verschiedene Filter, wie er kann, für alle Plugins zusammen), `filter-too-large` (der Filter überschreitet die Scanfilter-Grenzen des Readers) oder `no-transport`.
+- **Grenzen.** Ein Plugin kann 8 Beobachtungen halten (`PLUGIN_BLE_WATCH_LIMITS.maxWatchesPerPlugin`); eine weitere endet mit `READER_BUSY` (Detail `watch-limit`, wiederholbar, sobald Sie eine geschlossen haben). Beobachtungen mit gleichem Filter teilen sich einen Filter auf dem Reader.
+- **Trennung.** Ein Plugin bekommt nur Geräte, die zum Filter seines eigenen Profils passen. Der Host prüft jedes Ereignis noch einmal gegen das Profil, egal, was der Reader als passend gemeldet hat.
+- **Ende.** `close()` ist idempotent; `closed` liefert `closed`, `cancelled` (das Signal wurde abgebrochen) oder `shutdown` (Ihr Plugin-Modul wurde zerstört). Wartende Ereignisse werden verworfen.
 
 ## Endpunkte
 
@@ -221,6 +258,8 @@ Jeder Fehler ist ein `PluginBleError` mit stabilem `code`, einem `retryable`-Fla
 | Nutzdaten pro Characteristic                  | -            | 1..512 Bytes, im Profil festgelegt                           |
 | ATT-MTU (`session.mtu`)                       | ausgehandelt | 23..517                                                      |
 | Endpunkt-Bezeichnung                          | -            | 100 Zeichen                                                  |
+| Advertisement-Beobachtungen pro Plugin        | -            | 8 (`PLUGIN_BLE_WATCH_LIMITS.maxWatchesPerPlugin`)            |
+| Wartende Ereignisse pro Beobachtung           | -            | 64; darüber hinaus wird das älteste verworfen                |
 
 Werte über einer Grenze werden mit `INVALID_ARGUMENT` abgelehnt (in einem Profil mit `INVALID_PROFILE`); sie werden nie stillschweigend gekürzt. Die Konstanten sind als `PLUGIN_BLE_LIMITS` exportiert.
 
@@ -232,6 +271,8 @@ Echte Reader setzen zusätzlich diese Grenzen:
 | Characteristics pro Profil               | 16 (mehr enden mit `READER_UNSUPPORTED`, Detail `allowlist-too-large:<n>`)                                                                |
 | Wartende Anfragen pro Reader             | 16, der kleinere Wert aus der Host-Grenze (32) und der Grenze, die die Firmware meldet; mehr enden mit `READER_BUSY`, Detail `queue-full` |
 | Benachrichtigungspuffer auf dem Reader   | 64 Benachrichtigungen oder 32 KiB pro Sitzung                                                                                             |
+| Filter der Advertisement-Beobachtung     | 8 verschiedene Filter pro Reader, für alle Plugins zusammen (wie die Firmware meldet); weitere melden `unsupported`, `too-many-filters`   |
+| Ereignisse der Advertisement-Beobachtung | höchstens 20 pro Sekunde und Reader (wie die Firmware meldet); der Host verwirft Ereignisse weit über der gemeldeten Rate                 |
 
 Ein beworbener Name ist höchstens 31 Bytes lang; ein längeres Namenspräfix passt deshalb nie.
 
@@ -274,14 +315,14 @@ Ihr Plugin sollte:
 
 Der Host räumt für Sie auf:
 
-| Ereignis                                                                                                                                                    | Was passiert                                                                      |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Ihr Plugin-Modul wird zerstört                                                                                                                              | Seine Sitzungen schließen mit `shutdown`. Endpunkte bleiben.                      |
-| Ein Administrator schaltet **Bluetooth-Nutzung durch Plugins erlauben** am Reader aus                                                                       | Seine Sitzungen schließen mit `reader-access-revoked`. Endpunkte bleiben.         |
-| Ein Reader wird gelöscht                                                                                                                                    | Sitzungen schließen mit `reader-access-revoked`; seine Endpunkte werden gelöscht. |
-| Ein Endpunkt wird gelöscht oder sein Reader, seine Adresse oder sein Adresstyp ändert sich (eine reine Änderung der Bezeichnung lässt die Sitzung bestehen) | Seine Sitzung schließt mit `endpoint-deleted`.                                    |
-| Ein Lease läuft ab                                                                                                                                          | Die Sitzung schließt mit `lease-expired`.                                         |
-| Ihr Plugin wird deinstalliert                                                                                                                               | Seine Endpunkte werden gelöscht.                                                  |
+| Ereignis                                                                                                                                                    | Was passiert                                                                                                            |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Ihr Plugin-Modul wird zerstört                                                                                                                              | Seine Sitzungen und Beobachtungen schließen mit `shutdown`. Endpunkte bleiben.                                          |
+| Ein Administrator schaltet **Bluetooth-Nutzung durch Plugins erlauben** am Reader aus                                                                       | Seine Sitzungen schließen mit `reader-access-revoked`. Endpunkte bleiben. Beobachtungen melden ihn als `access-denied`. |
+| Ein Reader wird gelöscht                                                                                                                                    | Sitzungen schließen mit `reader-access-revoked`; seine Endpunkte werden gelöscht.                                       |
+| Ein Endpunkt wird gelöscht oder sein Reader, seine Adresse oder sein Adresstyp ändert sich (eine reine Änderung der Bezeichnung lässt die Sitzung bestehen) | Seine Sitzung schließt mit `endpoint-deleted`.                                                                          |
+| Ein Lease läuft ab                                                                                                                                          | Die Sitzung schließt mit `lease-expired`.                                                                               |
+| Ihr Plugin wird deinstalliert                                                                                                                               | Seine Endpunkte werden gelöscht.                                                                                        |
 
 Jedes Schließen bricht wartende Operationen und Abonnements ab, weist den Transport zum Trennen an und beendet jedes wartende Promise genau einmal.
 
@@ -350,27 +391,50 @@ it('entsperrt und wartet auf die Bestätigung', async () => {
 
 Bedienfläche des Fake-Hosts:
 
-| Eigenschaft/Methode                                 | Zweck                                                                                                                                                                                                        |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `contextFor(pluginId)`                              | Ein `PluginBleContext` für ein Plugin.                                                                                                                                                                       |
-| `addReader(reader)`, `setReaderAccess(id, allowed)` | Reader (`readerId`, `name`, `allowPluginBle?`, `available?`) und die Administrator-Freigabe (Standard aus).                                                                                                  |
-| `removeReader(id)`                                  | Löscht einen Reader: Sitzungen schließen mit `reader-access-revoked`, seine Endpunkte werden gelöscht.                                                                                                       |
-| `setReaderAvailable(id, available)`                 | `false`: Scans und Sitzungen am Reader scheitern mit `READER_OFFLINE`.                                                                                                                                       |
-| `setTransportAvailable(available)`                  | `false`: ein Host ohne Transport (`TRANSPORT_UNAVAILABLE`).                                                                                                                                                  |
-| `setReaderSupported(id, supported, detail?)`        | `false`: Reader-Firmware ohne Plugin-BLE; Scans und Sitzungen scheitern mit `READER_UNSUPPORTED` und `detail` (Standard `no-ble-capability`).                                                                |
-| `setMtu(mtu)`                                       | Die ATT-MTU künftig geöffneter Verbindungen (Standard 247, auch als `createFakeBleHost({ mtu })`).                                                                                                           |
-| `addPeripheral(peripheral)`                         | Ein Gerät: `readerId` oder `readerIds`, `address`, `addressType`, `advertisement`, `characteristics`. Characteristics werden über ihre UUID angegeben und nehmen `value`, `onRead`, `onWrite` und `delayMs`. |
-| `notify(address, uuid, bytes)`                      | Das Gerät sendet eine Benachrichtigung.                                                                                                                                                                      |
-| `disconnect(address)`                               | Das Gerät trennt die Verbindung: Sitzungen schließen mit `disconnected`.                                                                                                                                     |
-| `failNext(op, code, { detail })`                    | Das nächste `scan`, `connect`, `read`, `write`, `subscribe`, `unsubscribe` oder `disconnect` schlägt fehl.                                                                                                   |
-| `advance(ms)`                                       | Bewegt die manuelle Uhr: löst Timeouts und Lease-Ablauf aus. Es werden keine echten Timer genutzt.                                                                                                           |
-| `transcript`, `openSessions()`                      | Jedes validierte Primitiv, das den Transport erreichte, der Reihe nach, und die offenen Sitzungen.                                                                                                           |
-| `createFakeBleHost({ ready })`, `setReady(ready)`   | Simuliert Aufrufe vor dem Host-Start (`NOT_READY`).                                                                                                                                                          |
-| `createFakeBleHost({ startTime })`                  | Startzeit der Fake-Uhr in ms seit 1970 (Standard 2026-01-01T00:00:00Z).                                                                                                                                      |
-| `shutdownPlugin(pluginId)`                          | Das Plugin-Modul wird zerstört: Seine Sitzungen schließen mit `shutdown`.                                                                                                                                    |
-| `uninstallPlugin(pluginId)`                         | Das Plugin wird deinstalliert: Seine Sitzungen schließen, seine Endpunkte werden gelöscht.                                                                                                                   |
+| Eigenschaft/Methode                                 | Zweck                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `contextFor(pluginId)`                              | Ein `PluginBleContext` für ein Plugin.                                                                                                                                                                                                                                                                                                                |
+| `addReader(reader)`, `setReaderAccess(id, allowed)` | Reader (`readerId`, `name`, `allowPluginBle?`, `available?`) und die Administrator-Freigabe (Standard aus).                                                                                                                                                                                                                                           |
+| `removeReader(id)`                                  | Löscht einen Reader: Sitzungen schließen mit `reader-access-revoked`, seine Endpunkte werden gelöscht.                                                                                                                                                                                                                                                |
+| `setReaderAvailable(id, available)`                 | `false`: Scans und Sitzungen am Reader scheitern mit `READER_OFFLINE`.                                                                                                                                                                                                                                                                                |
+| `setTransportAvailable(available)`                  | `false`: ein Host ohne Transport (`TRANSPORT_UNAVAILABLE`).                                                                                                                                                                                                                                                                                           |
+| `setReaderSupported(id, supported, detail?)`        | `false`: Reader-Firmware ohne Plugin-BLE; Scans und Sitzungen scheitern mit `READER_UNSUPPORTED` und `detail` (Standard `no-ble-capability`).                                                                                                                                                                                                         |
+| `setMtu(mtu)`                                       | Die ATT-MTU künftig geöffneter Verbindungen (Standard 247, auch als `createFakeBleHost({ mtu })`).                                                                                                                                                                                                                                                    |
+| `addPeripheral(peripheral)`                         | Ein Gerät: `readerId` oder `readerIds`, `address`, `addressType`, `advertisement`, `characteristics`. Characteristics werden über ihre UUID angegeben und nehmen `value`, `onRead`, `onWrite` und `delayMs`.                                                                                                                                          |
+| `notify(address, uuid, bytes)`                      | Das Gerät sendet eine Benachrichtigung.                                                                                                                                                                                                                                                                                                               |
+| `disconnect(address)`                               | Das Gerät trennt die Verbindung: Sitzungen schließen mit `disconnected`.                                                                                                                                                                                                                                                                              |
+| `failNext(op, code, { detail })`                    | Das nächste `scan`, `connect`, `read`, `write`, `subscribe`, `unsubscribe` oder `disconnect` schlägt fehl.                                                                                                                                                                                                                                            |
+| `advance(ms)`                                       | Bewegt die manuelle Uhr: löst Timeouts und Lease-Ablauf aus. Es werden keine echten Timer genutzt.                                                                                                                                                                                                                                                    |
+| `transcript`, `openSessions()`                      | Jedes validierte Primitiv, das den Transport erreichte, der Reihe nach, und die offenen Sitzungen.                                                                                                                                                                                                                                                    |
+| `createFakeBleHost({ ready })`, `setReady(ready)`   | Simuliert Aufrufe vor dem Host-Start (`NOT_READY`).                                                                                                                                                                                                                                                                                                   |
+| `createFakeBleHost({ startTime })`                  | Startzeit der Fake-Uhr in ms seit 1970 (Standard 2026-01-01T00:00:00Z).                                                                                                                                                                                                                                                                               |
+| `shutdownPlugin(pluginId)`                          | Das Plugin-Modul wird zerstört: Seine Sitzungen und Beobachtungen schließen mit `shutdown`.                                                                                                                                                                                                                                                           |
+| `uninstallPlugin(pluginId)`                         | Das Plugin wird deinstalliert: Seine Sitzungen und Beobachtungen schließen, seine Endpunkte werden gelöscht.                                                                                                                                                                                                                                          |
+| `advertise(readerId, advertisement, { changed? })`  | Der Reader sieht ein Advertisement (`address`, `addressType?`, `name?`, `rssi?`, `serviceUuids?`, `manufacturerData?`): Beobachtungen mit passendem Profil bekommen ein Ereignis. `changed` ist standardmäßig, ob sich die Nutzdaten von den zuletzt für die Adresse gemeldeten unterscheiden; mit `false` simulieren Sie eine Lebenszeichen-Meldung. |
+| `setReaderWatchSupported(id, supported, detail?)`   | `false`: Reader-Firmware ohne Advertisement-Beobachtung; Beobachtungen melden den Reader als `unsupported` mit `detail` (Standard `no-watch-capability`).                                                                                                                                                                                             |
+| `openWatches()`                                     | Die offenen Beobachtungen (`id`, `pluginId`, `profileId`).                                                                                                                                                                                                                                                                                            |
 
 Um einen Timeout zu testen, geben Sie einer Characteristic ein `delayMs`, das länger als der Timeout ist, starten den Aufruf und rufen dann `await host.advance(timeoutMs)` auf.
+
+Um eine Advertisement-Beobachtung zu testen, starten Sie sie und lassen dann einen Reader ein Gerät melden. `setReaderAccess`, `setReaderAvailable` und `setReaderSupported` ändern den Reader-Status offener Beobachtungen wie auf einem echten Host:
+
+```ts
+const events: PluginBleWatchEvent[] = [];
+const watch = await ble.watch!('sensor', (event) => void events.push(event));
+await host.advertise(1, {
+  address: 'AA:BB:CC:00:00:01',
+  name: 'dev-1',
+  manufacturerData: [{ companyId: 0xffff, data: Uint8Array.of(1) }],
+});
+await host.advertise(1, {
+  address: 'AA:BB:CC:00:00:01',
+  name: 'dev-1',
+  manufacturerData: [{ companyId: 0xffff, data: Uint8Array.of(1) }],
+});
+expect(events.map((event) => event.changed)).toEqual([true, false]);
+host.setReaderAvailable(1, false);
+expect(watch.readers()).toEqual([{ readerId: 1, status: 'offline' }]);
+```
 
 ## Der Fake und echte Reader
 

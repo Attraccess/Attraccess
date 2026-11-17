@@ -10,7 +10,22 @@ export interface PluginBleMetrics {
   sessionCloses: Counter<'reason'>;
   rejections: Counter<'code'>;
   notifications: Counter<'outcome'>;
+  watchesActive: Gauge;
+  watchEventsReceived: Counter;
+  watchEventsRouted: Counter;
+  watchEventsDropped: Counter<'reason'>;
 }
+
+/** Why an advertisement watch event did not reach a plugin. */
+export type PluginBleWatchDropReason =
+  | 'malformed'
+  | 'batch-too-large'
+  | 'rate-limit'
+  | 'stale-connection'
+  | 'access-denied'
+  | 'no-watch'
+  | 'filter-mismatch'
+  | 'queue-full';
 
 export type PluginBleNotificationOutcome = 'delivered' | 'overflow' | 'oversized' | 'malformed';
 
@@ -56,6 +71,27 @@ export function createPluginBleMetrics(registry: Registry): PluginBleMetrics {
       name: 'attraccess_plugin_ble_notifications_total',
       help: 'Plugin BLE notifications by outcome: delivered, overflow, oversized or malformed',
       labelNames: ['outcome'],
+      registers: [registry],
+    }),
+    watchesActive: new Gauge({
+      name: 'attraccess_plugin_ble_watches_active',
+      help: 'Open plugin BLE advertisement watches',
+      registers: [registry],
+    }),
+    watchEventsReceived: new Counter({
+      name: 'attraccess_plugin_ble_watch_events_received_total',
+      help: 'Advertisement watch events the API accepted from readers',
+      registers: [registry],
+    }),
+    watchEventsRouted: new Counter({
+      name: 'attraccess_plugin_ble_watch_events_routed_total',
+      help: 'Advertisement watch events handed to plugin watches (one event can reach several watches)',
+      registers: [registry],
+    }),
+    watchEventsDropped: new Counter({
+      name: 'attraccess_plugin_ble_watch_events_dropped_total',
+      help: 'Advertisement watch events dropped by reason (malformed, limits, access, no matching watch, full queue)',
+      labelNames: ['reason'],
       registers: [registry],
     }),
   };

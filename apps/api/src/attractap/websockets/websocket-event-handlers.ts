@@ -63,7 +63,10 @@ export function buildEventHandlers(d: EventHandlerDeps): Record<AttractapEventTy
     [AttractapEventType.READER_FIRMWARE_INFO]: (socket, eventData) => {
       // The reader is back on this connection: plugin BLE work on an older, half-open one of it is gone.
       d.readerBleDriver.readerConnected(socket);
-      return d.firmwareHandler.handleFirmwareInfo(socket, eventData);
+      const handled = d.firmwareHandler.handleFirmwareInfo(socket, eventData);
+      // capabilities.ble is stored before the handler's first await: the watch set goes to the new connection now.
+      d.readerBleDriver.readerAnnounced(socket);
+      return handled;
     },
     [AttractapEventType.READER_CRASH_REPORT]: (socket, eventData) =>
       d.crashReportHandler.handleCrashReport(socket, eventData),
@@ -173,6 +176,9 @@ export function buildEventHandlers(d: EventHandlerDeps): Record<AttractapEventTy
     [AttractapEventType.BLE_SCAN_RESULT]: (socket, eventData) => d.readerBleDriver.handleMessage(socket, eventData),
     [AttractapEventType.BLE_NOTIFICATION]: (socket, eventData) => d.readerBleDriver.handleMessage(socket, eventData),
     [AttractapEventType.BLE_SESSION_ENDED]: (socket, eventData) => d.readerBleDriver.handleMessage(socket, eventData),
+    [AttractapEventType.BLE_WATCH_STATE]: (socket, eventData) => d.readerBleDriver.handleMessage(socket, eventData),
+    [AttractapEventType.BLE_WATCH_EVENT]: (socket, eventData) => d.readerBleDriver.handleMessage(socket, eventData),
+    [AttractapEventType.BLE_WATCH_SET]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
     [AttractapEventType.BLE_SCAN]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
     [AttractapEventType.BLE_SESSION_OPEN]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
     [AttractapEventType.BLE_READ]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
