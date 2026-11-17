@@ -18,6 +18,7 @@
 #include "ble_capability.hpp"
 #include "ble_core.hpp"
 #include "ble_radio_nimble.hpp"
+#include "ble_room_waiter.hpp"
 
 namespace
 {
@@ -28,8 +29,8 @@ namespace
     constexpr TickType_t EVENT_POST_TIMEOUT = pdMS_TO_TICKS(200);
     constexpr uint32_t TASK_STACK = 6144;
     constexpr UBaseType_t TASK_PRIORITY = 3;
-    // While work is pending (deadlines, a websocket that does not take answers yet) the task polls this often;
-    // otherwise it sleeps until a request or a radio event wakes it.
+    // While work is pending (deadlines, controller buffers) the task polls this often as a fallback; requests, radio
+    // events and a freed websocket send slot (while it waits for one) wake it at once. Without work it sleeps.
     constexpr TickType_t POLL_WAIT = pdMS_TO_TICKS(20);
     constexpr uint32_t PSRAM_CAPS = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
 
@@ -61,6 +62,7 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
             ConnectFailed,
             Disconnected,
             OpDone,
+            LinkChanged,
         } kind;
         ble::Address address;
         int8_t rssi = 0;
@@ -70,6 +72,8 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
         uint32_t token = 0;
         ble::Error error;
         ble::Bytes data;
+        ble::LinkState link;
+        const char *what = "";
         // The radio's link epoch when NimBLE reported it: link events of an earlier link never reach a newer session.
         uint32_t epoch = 0;
     };
@@ -77,6 +81,7 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
     Hooks hooks;
     Logger logger{"BleProxy"};
     ble::NotificationBuffer notifications;
+    ble::RoomWaiter room;
     ble::NimbleRadio radio{*this};
     ble::BleProxyCore core{radio, *this, notifications};
     QueueHandle_t commands = nullptr;
@@ -88,8 +93,14 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
     bool loggedInit = false;
 
     // --- IBleSink (proxy task) ----------------------------------------------------------------------------
-    bool send(const std::string &message) override { return hooks.send && hooks.send(message.data(), message.size()); }
-    bool canSendNotification() override { return !hooks.canSendNotification || hooks.canSendNotification(); }
+    bool send(const std::string &message) override
+    {
+        return hooks.send && room.attempt([&] { return hooks.send(message.data(), message.size()); });
+    }
+    bool canSendNotification() override
+    {
+        return !hooks.canSendNotification || room.attempt([&] { return hooks.canSendNotification(); });
+    }
     void log(ble::LogLevel level, const char *line) override
     {
         switch (level)
@@ -106,7 +117,8 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
     {
         if (xQueueSend(events, &event, wait) != pdTRUE)
         {
-            if (event->kind != RadioEvent::Kind::Advertisement) logger.error("BLE event queue full, radio event lost");
+            if (event->kind != RadioEvent::Kind::Advertisement && event->kind != RadioEvent::Kind::LinkChanged)
+                logger.error("BLE event queue full, radio event lost");
             delete event;
             return;
         }
@@ -175,6 +187,16 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
         notifications.push(service, characteristic, data, length);
         xTaskNotifyGive(task);
     }
+    void radioLinkChanged(const ble::LinkState &link, const char *what, int status) override
+    {
+        RadioEvent *event = make(RadioEvent::Kind::LinkChanged);
+        if (!event) return;
+        event->link = link;
+        event->what = what;
+        event->reason = status;
+        // Diagnostics only: never hold up NimBLE for one.
+        post(event, 0);
+    }
 
     // --- proxy task ----------------------------------------------------------------------------------------
     static void entry(void *arg) { static_cast<Impl *>(arg)->run(); }
@@ -210,6 +232,14 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
         case RadioEvent::Kind::OpDone:
             core.onOpDone(event.token, event.error, std::move(event.data), now);
             break;
+        case RadioEvent::Kind::LinkChanged:
+        {
+            char line[96];
+            ble::formatLink(line, sizeof line, event.link);
+            if (event.reason) logger.warnf("ble link %s status=%d %s", event.what, event.reason, line);
+            else logger.infof("ble link %s %s", event.what, line);
+            break;
+        }
         }
     }
 
@@ -338,6 +368,12 @@ void BleProxy::otaStarted()
     xTaskNotifyGive(impl->task);
 }
 
+void BleProxy::sendSlotFreed()
+{
+    if (!impl || !impl->task) return;
+    if (impl->room.slotFreed()) xTaskNotifyGive(impl->task);
+}
+
 void BleProxy::fillCapability(JsonObject capabilities, char *scratch, size_t size)
 {
     ble::fillCapability(capabilities, scratch, size);
@@ -354,6 +390,7 @@ bool BleProxy::handleMessage(const char *type, JsonObjectConst payload, bool tru
 }
 void BleProxy::linkLost() {}
 void BleProxy::otaStarted() {}
+void BleProxy::sendSlotFreed() {}
 void BleProxy::fillCapability(JsonObject capabilities, char *scratch, size_t size)
 {
     (void)capabilities, (void)scratch, (void)size;

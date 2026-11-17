@@ -39,6 +39,7 @@ void Websocket::setSubprotocol(const std::string &) {}
 bool Websocket::sendBinary(const uint8_t *, size_t) { return true; }
 void Websocket::setRawBinaryCallback(std::function<bool(const uint8_t *, size_t)>) {}
 void Websocket::setConnectionCallback(std::function<void(bool)>) {}
+void Websocket::setSendSlotFreedCallback(std::function<void()>) {}
 bool Websocket::sendQueueHasRoom(size_t) const { return true; }
 void Websocket::lockWsClient() { xSemaphoreTake(ws_client_mutex, portMAX_DELAY); }
 void Websocket::unlockWsClient() { xSemaphoreGive(ws_client_mutex); }

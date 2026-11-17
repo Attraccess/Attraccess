@@ -53,6 +53,9 @@ public:
     // counts only a deeper backlog as degraded.
     static constexpr size_t BULK_ANSWER_RESERVE = 2;
     static constexpr size_t BULK_NOTIFICATION_RESERVE = 4;
+    // Called on the send task whenever a message left the send queue (a slot is free again), so a bulk sender
+    // that ran out of room resumes at once instead of polling. Must not block.
+    virtual void setSendSlotFreedCallback(std::function<void()> callback) { (void)callback; }
 
     // --- Reader identity ------------------------------------------------------------------------
     // An admin asked a token-signed-in reader to pair (READER_START_PAIRING), or the reader has no

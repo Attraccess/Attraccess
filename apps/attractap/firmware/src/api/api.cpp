@@ -58,6 +58,8 @@ void API::setup()
     { return this->transport.sendQueueHasRoom(IReaderTransport::BULK_NOTIFICATION_RESERVE); };
     bleHooks.otaActive = [this]() { return this->firmware.inProgress(); };
     this->bleProxy.setup(std::move(bleHooks));
+    // A freed send slot wakes the BLE proxy at once when it waits for room (bulk transfers), never otherwise.
+    this->transport.setSendSlotFreedCallback([this]() { this->bleProxy.sendSlotFreed(); });
 #ifdef ESP_PLATFORM
     this->transport.setBinaryDataCallback([this](esp_websocket_event_data_t data)
                                           { this->firmware.onChunk(data); });

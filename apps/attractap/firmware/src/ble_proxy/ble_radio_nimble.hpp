@@ -12,6 +12,7 @@
 #include <mutex>
 
 #include "ble_core.hpp"
+#include "ble_link.hpp"
 
 // NimBLE types (host/ble_gap.h, host/ble_gatt.h), declared here so only the .cpp includes NimBLE.
 struct ble_gap_event;
@@ -36,6 +37,8 @@ namespace ble
         virtual void radioOpDone(uint32_t token, const Error &error, Bytes &&value) = 0;
         virtual void radioNotification(const Uuid &service, const Uuid &characteristic, const uint8_t *data,
                                        size_t length) = 0;
+        // The link's negotiated parameters changed (`what`), or a request for them failed (`status` != 0).
+        virtual void radioLinkChanged(const LinkState &state, const char *what, int status) = 0;
     };
 
     class NimbleRadio : public IBleRadio
@@ -102,6 +105,7 @@ namespace ble
         bool hasPendingFailure = false;
         Error pendingFailure;
         uint16_t mtu = MIN_MTU;
+        LinkState link;
         Address peer;
         PsVector<AllowEntry> allowlist;
         PsVector<Service> services;
@@ -113,6 +117,8 @@ namespace ble
         std::atomic<uint32_t> epoch{0};
 
         void terminate();
+        void tuneLink();
+        void reportLink(const char *what, int status);
         void abandonConnect();
         void failConnect(const Error &error);
         void startDiscovery();

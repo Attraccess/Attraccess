@@ -363,6 +363,7 @@ namespace ble
             return;
         case IBleRadio::Start::Retry:
             current.retry = true;
+            session.writeRetries++;
             return;
         case IBleRadio::Start::Done:
             finishCurrent(Error(), nullptr, now);

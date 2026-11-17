@@ -166,6 +166,10 @@ namespace ble
             bool announceEnd = false;
             const char *endReason = "";
             char endDetail[sizeof(Error::detail)] = "";
+            // Throughput diagnostics, logged when the session ends: write attempts NimBLE refused for lack of
+            // buffers, and answers that had to wait for room in the websocket send queue.
+            uint32_t writeRetries = 0;
+            uint32_t answersQueued = 0;
         };
 
         struct Scan

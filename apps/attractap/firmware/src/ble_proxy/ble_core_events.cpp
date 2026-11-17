@@ -188,8 +188,9 @@ namespace ble
         session.releaseDeadline = now + RELEASE_DEADLINE_MS;
         char id[9];
         shortId(session.id, id);
-        logf(LogLevel::Info, "ble session=%s ended reason=%s detail=%s after %ums", id, reason, pending.detail,
-             static_cast<unsigned>(now - session.openedMs));
+        logf(LogLevel::Info, "ble session=%s ended reason=%s detail=%s after %ums retries=%u queued=%u", id, reason,
+             pending.detail, static_cast<unsigned>(now - session.openedMs), static_cast<unsigned>(session.writeRetries),
+             static_cast<unsigned>(session.answersQueued));
         if (radioDown)
         {
             finishRelease();
@@ -381,6 +382,7 @@ namespace ble
         // for a lost answer until its own timeout, and a lost session end would leave it holding the reader.
         // acceptsRequests() keeps the outbox bounded.
         if (outbox.empty() && sink.send(message)) return;
+        if (currentOwner == Owner::Session) session.answersQueued++;
         outbox.push_back(std::move(message));
     }
 

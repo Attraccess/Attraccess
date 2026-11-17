@@ -105,6 +105,8 @@ namespace bletest
             return true;
         }
         bool canSendNotification() override { return room; }
+        std::vector<std::string> logs;
+        void log(LogLevel, const char *line) override { logs.emplace_back(line); }
 
         std::vector<JsonObjectConst> ofType(const char *type) const
         {
@@ -222,4 +224,6 @@ namespace bletest
 
     // ble_proxy_edge_test.cpp: bounds, edges and regressions found in review.
     void runEdgeTests();
+    // ble_link_test.cpp: the requested link and the send-slot wakeup.
+    void runLinkTests();
 }

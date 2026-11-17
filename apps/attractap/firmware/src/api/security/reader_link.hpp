@@ -68,6 +68,10 @@ public:
     bool sendMessage(const char *message, size_t length) override;
     // Session frames go out through the same WebSocket queue.
     bool sendQueueHasRoom(size_t reserve) const override { return socket.sendQueueHasRoom(reserve); }
+    void setSendSlotFreedCallback(std::function<void()> callback) override
+    {
+        socket.setSendSlotFreedCallback(std::move(callback));
+    }
     bool sendHeartbeat(const char *message, size_t length) override;
     void setMessageCallbackRaw(std::function<void(const char *, size_t)> callback) override;
     void enableConnectionAttempts() override;

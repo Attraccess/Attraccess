@@ -47,6 +47,8 @@ public:
     void linkLost();
     // A reader OTA starts. Any task.
     void otaStarted();
+    // The websocket send queue freed a slot. Send task; wakes the proxy task only while it waits for room.
+    void sendSlotFreed();
     // Adds `capabilities.ble` to READER_FIRMWARE_INFO (nothing on builds without the proxy). `scratch` must
     // outlive the serialization (ble::CAPABILITY_SCRATCH bytes).
     void fillCapability(JsonObject capabilities, char *scratch, size_t size);

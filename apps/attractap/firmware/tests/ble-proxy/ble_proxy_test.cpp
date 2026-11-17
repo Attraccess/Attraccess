@@ -587,5 +587,6 @@ int main()
     errorMapping();
     capabilityFitsTheFirmwareInfo();
     runEdgeTests();
+    runLinkTests();
     std::puts("PASS ble proxy");
 }
