@@ -38,8 +38,20 @@ describe('/cdn serve-static', () => {
     mkdirSync(join(storageRoot, 'cdn', 'resources', '1'), { recursive: true });
     writeFileSync(join(storageRoot, 'cdn', 'resources', '1', 'image.txt'), 'image');
     writeFileSync(join(storageRoot, 'attraccess.sqlite'), SECRET);
+    mkdirSync(join(storageRoot, 'docs'));
+    writeFileSync(join(storageRoot, 'docs', 'index.html'), 'docs');
 
-    @Module({ imports: [ServeStaticModule.forRoot(cdnServeStaticOptions(join(storageRoot, 'cdn'), '/cdn'))] })
+    // /docs is mounted as in AppModule: it keeps directory indexes, so only the host-less guard
+    // stops a host-less target from reaching send without a path.
+    @Module({
+      imports: [
+        ServeStaticModule.forRoot(cdnServeStaticOptions(join(storageRoot, 'cdn'), '/cdn'), {
+          rootPath: join(storageRoot, 'docs'),
+          serveRoot: '/docs',
+          renderPath: '/__docs_noop__',
+        }),
+      ],
+    })
     class CdnModule {}
 
     // NestFactory, not Test.createTestingModule: serve-static picks its loader from the
@@ -67,6 +79,10 @@ describe('/cdn serve-static', () => {
     '/cdn/resources/1/image.txt?next=file:///x',
   ])('still serves %s', async (path) => {
     await expect(rawGet(path)).resolves.toEqual({ status: 200, body: 'image' });
+  });
+
+  it('still serves the docs index', async () => {
+    await expect(rawGet('http://localhost/docs/')).resolves.toEqual({ status: 200, body: 'docs' });
   });
 
   it.each([
@@ -98,6 +114,7 @@ describe('/cdn serve-static', () => {
     'http:///cdn/',
     'HTTP:///cdn',
     'HTTP:///cdn/',
+    'HTTP:///cdn/resources/1/',
     'Http:///cdn/',
     'https:///cdn',
     'https:///cdn/',
@@ -110,6 +127,10 @@ describe('/cdn serve-static', () => {
     'http://u:p@/cdn/',
     'http://@:80/cdn/',
     'http://a@b@/cdn/',
+    'http:///docs',
+    'http:///docs/',
+    'HTTP://:80/docs/',
+    'http://u@/docs/',
   ])('answers %s from the router, not the index fallback', async (path) => {
     const res = await rawGet(path);
 
