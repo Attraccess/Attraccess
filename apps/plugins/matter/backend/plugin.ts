@@ -8,18 +8,15 @@
 import type { PluginBackendModule, PluginContext } from '@attraccess/plugins-backend-sdk';
 import type { DynamicModule } from '@nestjs/common';
 import { MatterBackupController } from './backup/controller';
-import { BACKUP_ENTITIES } from './backup/entities';
 import { MatterBackupService } from './backup/backup.service';
 import { MatterRestoreService } from './backup/restore.service';
 import { MatterBackupSchedulerService } from './backup/scheduler.service';
 import { MATTER_AUDIT_DOMAIN } from './connection/audit';
 import { MatterConnectionController } from './connection/controller';
 import { MatterConnectionService } from './connection/connection.service';
-import { MatterConnection } from './connection/entity';
 import { MatterSettingsService } from './connection/settings.service';
 import { DeviceAuditService } from './devices/audit.service';
 import { MatterDevicesController } from './devices/controller';
-import { DEVICE_ENTITIES } from './devices/entities';
 import { MatterIngestionService } from './devices/ingestion.service';
 import { MatterLifecycleService } from './devices/lifecycle.service';
 import { MatterReconciliationService } from './devices/reconciliation.service';
@@ -27,17 +24,18 @@ import { MatterStateService } from './devices/state.service';
 import { MatterFabricController } from './fabric/controller';
 import { MatterFabricService } from './fabric/fabric.service';
 import { MatterFabricGuard } from './fabric/guard';
-import { hostMigrationReader } from './fabric/migration-reader';
+import { storageSchemaReader } from './fabric/migration-reader';
 import { RecoveryKeyService } from './fabric/recovery-key.service';
 import { PLUGIN_MIGRATION_READER } from './fabric/tokens';
 import { MATTER_PERMISSIONS } from './permissions';
 import { PLUGIN_CONTEXT } from './plugin-context';
+import { MATTER_STORAGE } from './plugin-storage/tables';
 
 class MatterPluginModule {}
 
 const plugin: PluginBackendModule = {
-  // Registered into the shared connection so `sqlitePersistence(context).getRepository(MatterConnection)` resolves.
-  persistence: { sqlite: { entities: [MatterConnection, ...DEVICE_ENTITIES, ...BACKUP_ENTITIES] } },
+  // The plugin's own tables: declared in ./plugin-storage/tables, created, adopted and migrated by the host.
+  storage: MATTER_STORAGE,
   auditDomains: [MATTER_AUDIT_DOMAIN],
   // ATT-1003: least-privilege Matter and Thread keys; every route requires one (see ./permissions).
   permissions: MATTER_PERMISSIONS,
@@ -60,7 +58,7 @@ const plugin: PluginBackendModule = {
         MatterLifecycleService,
         MatterIngestionService,
         // ATT-998: fabric persistence, encrypted backups and restore.
-        { provide: PLUGIN_MIGRATION_READER, useValue: hostMigrationReader(context) },
+        { provide: PLUGIN_MIGRATION_READER, useValue: storageSchemaReader() },
         MatterFabricGuard,
         RecoveryKeyService,
         MatterBackupService,

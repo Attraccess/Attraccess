@@ -32,18 +32,12 @@
     "host": "^2.0.0-0",
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
-    "persistence": {
-      "backends": [
-        "sqlite"
-      ]
-    },
-    "migrations": "dist/migrations.js",
     "styles": "frontend/style.css",
     "dashboardPaths": [
       "/matter"
     ],
     "permissions": [
-      "DATABASE_ACCESS",
+      "PLUGIN_STORAGE",
       "MANAGE_SECRETS"
     ],
     "sdk": {
