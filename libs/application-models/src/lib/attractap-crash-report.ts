@@ -1,3 +1,9 @@
+/**
+ * Upload state of a report's coredump: awaiting while a chunked upload is owed, stored once the whole dump
+ * was verified and saved, rejected when the server refused the announced dump.
+ */
+export type AttractapCoredumpStatus = 'awaiting' | 'stored' | 'rejected';
+
 export interface AttractapCrashReportRecord {
   id: number;
   attractapId: number;
@@ -12,6 +18,11 @@ export interface AttractapCrashReportRecord {
   coredumpSize: number | null;
   /** Only filled by the read that asks for the coredump, and on the report that was just stored. */
   coredump: Uint8Array | null;
+  coredumpStatus: AttractapCoredumpStatus | null;
+  /** Size the reader announced for a chunked upload (or for a refused dump). */
+  coredumpExpectedSize: number | null;
+  /** Unsigned CRC-32 the reader announced; internal, never part of a response. */
+  coredumpExpectedCrc32: number | null;
   coredumpBuildId: string | null;
   symbolicationStatus: string | null;
   symbolizedBacktrace: string | null;

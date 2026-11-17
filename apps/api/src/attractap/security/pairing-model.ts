@@ -1,7 +1,7 @@
 import { webcrypto } from 'crypto';
 import type { WebSocket } from 'ws';
 import type { DerivedCode, LiteColour } from './pairing-protocol';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
 
 const MAX_FIRMWARE_FIELD = 64;
 

@@ -2,7 +2,7 @@ import type { AttractapReader } from '@attraccess/application-models';
 import { ResourceFormAction } from '@attraccess/application-models';
 import type { CardConversation } from './card-conversation.service';
 import type { CardSessionState, UiSlotsState, UiStepState } from './handlers/ui/ui-socket-state';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
 
 export interface AttractapMessageBaseData<TPayload = unknown> {
   auth?: {

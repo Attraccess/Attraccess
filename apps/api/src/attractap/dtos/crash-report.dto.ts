@@ -1,4 +1,4 @@
-import type { CoredumpStatus } from '@attraccess/database-entities';
+import type { AttractapCoredumpStatus as CoredumpStatus } from '@attraccess/application-models';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class AttractapCrashReportDto {

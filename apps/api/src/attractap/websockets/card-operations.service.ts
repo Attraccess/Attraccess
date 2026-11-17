@@ -18,7 +18,7 @@ import { AttractapService } from '../attractap.service';
 import { ATTRACTAP_CARD_STORE, type AttractapCardStore } from '../card-store.port';
 import { CardConversationFailure, CardConversationService } from './card-conversation.service';
 import { AuthenticatedWebSocket, CardDetection } from './websocket.types';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
 
 export type AuditPrincipal = {
   userId: number;

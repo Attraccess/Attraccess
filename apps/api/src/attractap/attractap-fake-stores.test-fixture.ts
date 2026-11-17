@@ -61,6 +61,7 @@ export function makeReader(overrides: Partial<AttractapReader> = {}): AttractapR
     lastConnection: new Date(0),
     firstConnection: new Date(0),
     ledBrightness: 255,
+    allowPluginBle: false,
     firmware: structuredClone(FIRMWARE),
     ...overrides,
   };
@@ -114,6 +115,7 @@ export class FakeReaderStore implements AttractapReaderStore {
     if (!reader) return;
     if (edit.name !== undefined) reader.name = edit.name;
     if (edit.ledBrightness !== undefined) reader.ledBrightness = edit.ledBrightness;
+    if (edit.allowPluginBle !== undefined) reader.allowPluginBle = edit.allowPluginBle;
     if (edit.firmware) reader.firmware = edit.firmware;
     if (edit.resourceIds)
       reader.resources = edit.resourceIds.map((rid) => this.resources.get(rid) ?? makeResource(rid));
@@ -220,6 +222,30 @@ export class FakeCrashReportStore implements AttractapCrashReportStore {
     } as AttractapCrashReportRecord;
     this.reports.push(stored);
     return { ...stored };
+  }
+  async findOfReader(reportId: number, readerId: number) {
+    const found = this.reports.find((r) => r.id === reportId && r.attractapId === readerId);
+    return found ? { ...found, coredump: null } : null;
+  }
+  async findAwaiting(readerId: number, expected: { size: number; crc32: number }) {
+    const found = [...this.reports]
+      .reverse()
+      .find(
+        (r) =>
+          r.attractapId === readerId &&
+          r.coredumpStatus === 'awaiting' &&
+          r.coredumpExpectedSize === expected.size &&
+          r.coredumpExpectedCrc32 === expected.crc32,
+      );
+    return found ? { ...found, coredump: null } : null;
+  }
+  storedCoredumps: Array<{ id: number; attractapId: number; coredump: Uint8Array }> = [];
+  /** What storeAwaitedCoredump answers; the real store answers false once the report no longer awaits. */
+  storeAwaitedResult = true;
+  async storeAwaitedCoredump(report: { id: number; attractapId: number }, coredump: Uint8Array) {
+    if (!this.storeAwaitedResult) return false;
+    this.storedCoredumps.push({ id: report.id, attractapId: report.attractapId, coredump });
+    return true;
   }
   async updateSymbolication(reportId: number, result: AttractapCrashSymbolication) {
     this.symbolications.push({ id: reportId, result });

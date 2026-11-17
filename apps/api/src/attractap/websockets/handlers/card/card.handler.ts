@@ -39,7 +39,7 @@ import { AttractapSupervisionHandler } from '../supervision/supervision.handler'
 import { CardSessionService } from '../ui/card-session.service';
 import { CARD_WRITE_START_ERRORS, assertReaderRelaysCards } from './card-write-errors';
 import { assertReaderPaired } from '../../../reader-pairing';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
 
 export { CARD_WRITE_START_ERRORS } from './card-write-errors';
 
