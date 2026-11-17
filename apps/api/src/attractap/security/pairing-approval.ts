@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Logger, NotFoundException, Inject } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Attractap } from '@attraccess/database-entities';
+import type { AttractapReader } from '@attraccess/application-models';
 import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 import { AttractapService } from '../attractap.service';
 import { BootstrapGrants } from './bootstrap-grants';
@@ -101,9 +101,9 @@ export class PairingApproval {
     const holder = await this.registry.findPairedReaderByFingerprint(fingerprint);
     if (holder !== null && holder !== targetId) throw new ConflictException('PairingKeyInUse');
 
-    let created: Attractap | null = null;
+    let created: AttractapReader | null = null;
     try {
-      let reader: Attractap | null;
+      let reader: AttractapReader | null;
       if (targetId) {
         reader = await this.attractap.findReaderById(targetId);
       } else {
@@ -197,7 +197,7 @@ export class PairingApproval {
    * Before the commit: removes a record created for this approval. The request ends, unless the key
    * turned out to be in use (the admin may still approve it as a takeover of that record).
    */
-  private async rollBack(request: PairingRequest, created: Attractap | null, error: Error): Promise<void> {
+  private async rollBack(request: PairingRequest, created: AttractapReader | null, error: Error): Promise<void> {
     const conflict = error instanceof ConflictException ? error.message : null;
     if (conflict !== 'PairingReaderGone' && conflict !== 'PairingKeyInUse') {
       this.logger.error(`Completing pairing failed: ${error.message}`);

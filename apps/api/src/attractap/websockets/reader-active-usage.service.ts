@@ -1,8 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { ResourceUsage } from '@attraccess/database-entities';
-import { In, Repository } from 'typeorm';
-import { activeUsageWhere } from '../../resources/usage/sessions/active-usage';
+import { Inject, Injectable } from '@nestjs/common';
+import { ATTRACTAP_RESOURCE_READS, type AttractapResourceReads } from '../reader-resource-reads.port';
 
 /**
  * Read-only view of which resources have an active usage, for the reader UI slots. It lives outside
@@ -10,9 +7,7 @@ import { activeUsageWhere } from '../../resources/usage/sessions/active-usage';
  */
 @Injectable()
 export class ReaderActiveUsageService {
-  private readonly logger = new Logger(ReaderActiveUsageService.name);
-
-  constructor(@InjectRepository(ResourceUsage) private readonly usages: Repository<ResourceUsage>) {}
+  constructor(@Inject(ATTRACTAP_RESOURCE_READS) private readonly resourceReads: AttractapResourceReads) {}
 
   /**
    * The given resources that have at least one active usage session (the sessions the reader's resource list
@@ -20,16 +15,6 @@ export class ReaderActiveUsageService {
    * counts as idle: the slots still sync, with the plugin text in the details body.
    */
   async activeResourceIds(resourceIds: number[]): Promise<Set<number>> {
-    if (resourceIds.length === 0) return new Set();
-    try {
-      const rows = await this.usages.find({
-        where: { resourceId: In(resourceIds), ...activeUsageWhere() },
-        select: { resourceId: true },
-      });
-      return new Set(rows.map((row) => row.resourceId));
-    } catch (error) {
-      this.logger.warn(`Could not read active usages for resources ${resourceIds.join(',')}: ${String(error)}`);
-      return new Set();
-    }
+    return await this.resourceReads.findResourceIdsWithActiveUsage(resourceIds);
   }
 }

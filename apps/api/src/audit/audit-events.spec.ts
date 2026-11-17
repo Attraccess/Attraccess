@@ -5,7 +5,7 @@ import { SettingsController } from '../settings/settings.controller';
 import { SettingsAdministrationService } from '../settings/settings-administration.service';
 import { SettingsService } from '../settings/settings.service';
 import { AuditQueryDto } from './dto/audit-query.dto';
-import { setupAuditDatabase } from './audit.test-fixture';
+import { setupAuditDatabase } from '../database/adapters/audit/audit.test-fixture';
 describe('durable audit SQLite', () => {
   const fixture = setupAuditDatabase();
   it.each([{ enabled: false }, { domains: ['resource'] }])(

@@ -1,3 +1,4 @@
+import { createSqliteAuditService } from '../database/adapters/audit/sqlite-audit-service.test-fixture';
 import { AuditLog, entities, Resource, Setting, User } from '@attraccess/database-entities';
 import { ResourceType } from '@attraccess/application-models';
 import { randomUUID } from 'node:crypto';
@@ -6,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import * as migrations from '../database/migrations';
-import { createTestAuditMetrics } from './audit.test-fixture';
+import { createTestAuditMetrics } from '../database/adapters/audit/audit.test-fixture';
 import { registerPluginAuditDomains, resetPluginAuditRegistry } from '../plugin-system/audit/audit-registry';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { AuditController } from './audit.controller';
@@ -46,9 +47,9 @@ describe('persisted audit names', () => {
     }).initialize();
     await source.runMigrations();
     const store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(source.getRepository(Setting)), null);
-    service = new AuditService(source, store, createTestAuditMetrics());
+    service = createSqliteAuditService(source, store, createTestAuditMetrics());
     await service.onModuleInit();
-    controller = new AuditController(new AuditQueryService(service, source, store));
+    controller = new AuditController(new AuditQueryService(service, store));
     await source.getRepository(User).insert({
       id: 7,
       username: 'Current admin',

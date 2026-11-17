@@ -1,5 +1,4 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Attractap } from '@attraccess/database-entities';
 import { createHash, KeyObject, randomBytes } from 'crypto';
 import { mkdir, readFile, rename, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
@@ -7,6 +6,7 @@ import { resolveStorageRoot } from '../../config/storage-path';
 import { AttractapSecureImage } from '../dtos/firmware.dto';
 import { AttractapFirmwareService } from '../firmware.service';
 import { SecureBootKeyService } from './secure-boot-key.service';
+import type { SecureBootReaderDigests } from './secure-boot-key-store.port';
 import { secureBootKeyDigest, signSecureBootImage, verifySecureBootImage } from './secure-boot-signer';
 
 export type SecureImageKind = 'app' | 'bootloader';
@@ -61,7 +61,7 @@ export class SecureImageService {
     firmwareName: string,
     variantName: string,
     kind: SecureImageKind,
-    reader: Pick<Attractap, 'secureBootDigest0' | 'secureBootDigest1' | 'secureBootSignerDigest'>,
+    reader: SecureBootReaderDigests,
     reportedSecureVersion: number,
   ): Promise<SignedSecureImage> {
     const source = this.firmware.getSecureImageSource(firmwareName, variantName);

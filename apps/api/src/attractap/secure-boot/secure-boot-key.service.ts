@@ -1,10 +1,9 @@
 import { BadRequestException, ConflictException, Inject, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Attractap, AttractapSecureBootKey, type SecureBootKeyRole } from '@attraccess/database-entities';
+import type { AttractapSecureBootKeyRecord, AttractapSecureBootKeyRole } from '@attraccess/application-models';
 import { Mutex } from 'async-mutex';
 import { createPrivateKey, createPublicKey, generateKeyPair, KeyObject } from 'crypto';
-import { EntityManager, IsNull, Not, Raw, Repository } from 'typeorm';
 import { promisify } from 'util';
+import { UNIT_OF_WORK, type TransactionScope, type UnitOfWork } from '../../database/unit-of-work';
 import { EncryptionService } from '../../encryption/encryption.service';
 import type { AttractapAuditAction } from '../../audit/policies/attractap';
 import { AUDIT_RECORDER, AuditActor, AuditDetails, AuditRecorder } from '../../audit/recorder/audit-event';
@@ -14,6 +13,11 @@ import {
   SECURE_BOOT_RSA_KEY_BITS,
   secureBootKeyDigest,
 } from './secure-boot-signer';
+import {
+  ATTRACTAP_SECURE_BOOT_KEY_STORE,
+  type AttractapSecureBootKeyStore,
+  type SecureBootReaderDigests,
+} from './secure-boot-key-store.port';
 
 export const MIN_PASSPHRASE_LENGTH = 12;
 /** OpenSSL reads PEM passphrases into a 1 KiB buffer; a longer one would produce a file nothing can open. */
@@ -49,7 +53,7 @@ const generateRsaKeyPair = promisify(generateKeyPair);
 /** Encrypted PKCS#8 (what this server writes) or legacy encrypted PKCS#1; a plain PEM proves no passphrase. */
 const ENCRYPTED_PEM = /-----BEGIN ENCRYPTED PRIVATE KEY-----|Proc-Type:\s*4,ENCRYPTED/;
 
-function info(key: AttractapSecureBootKey): SecureBootKeyInfo {
+function info(key: AttractapSecureBootKeyRecord): SecureBootKeyInfo {
   return { digest: key.digest, fingerprint: key.fingerprint, restoredAt: key.restoredAt };
 }
 
@@ -59,8 +63,8 @@ const INSTALLATION_SUBJECT_ID = 1;
 @Injectable()
 export class SecureBootKeyService {
   constructor(
-    @InjectRepository(AttractapSecureBootKey) private readonly keys: Repository<AttractapSecureBootKey>,
-    @InjectRepository(Attractap) private readonly readers: Repository<Attractap>,
+    @Inject(ATTRACTAP_SECURE_BOOT_KEY_STORE) private readonly keys: AttractapSecureBootKeyStore,
+    @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
     private readonly encryption: EncryptionService,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
@@ -69,7 +73,7 @@ export class SecureBootKeyService {
     actor: AuditActor,
     action: Extract<AttractapAuditAction, `reader.${string}`>,
     details: AuditDetails,
-    manager?: EntityManager,
+    scope?: TransactionScope,
   ): Promise<void> {
     await this.audit.record(
       {
@@ -79,7 +83,7 @@ export class SecureBootKeyService {
         subject: { type: 'attractap.installation', id: INSTALLATION_SUBJECT_ID },
         details,
       },
-      manager,
+      scope,
     );
   }
 
@@ -91,19 +95,16 @@ export class SecureBootKeyService {
    */
   private readonly mutex = new Mutex();
 
-  private async latest(role: SecureBootKeyRole): Promise<AttractapSecureBootKey | null> {
-    return await this.keys.findOne({ where: { role }, order: { id: 'DESC' } });
+  private async latest(role: AttractapSecureBootKeyRole): Promise<AttractapSecureBootKeyRecord | null> {
+    return await this.keys.latest(role);
   }
 
   /** Readers with any digest burned, or with the given one (eFuse reports may spell hex in upper case). */
   private async burnedReaderCount(digest?: string): Promise<number> {
-    const value = digest
-      ? Raw((column) => `LOWER(${column}) = :digest`, { digest: digest.toLowerCase() })
-      : Not(IsNull());
-    return await this.readers.count({ where: [{ secureBootDigest0: value }, { secureBootDigest1: value }] });
+    return await this.keys.countReadersWithBurnedDigest(digest);
   }
 
-  private holdsPrivateKey(row: AttractapSecureBootKey): boolean {
+  private holdsPrivateKey(row: AttractapSecureBootKeyRecord): boolean {
     try {
       this.privateKeyOf(row);
       return true;
@@ -112,7 +113,7 @@ export class SecureBootKeyService {
     }
   }
 
-  private async isRestoreAllowed(signing: AttractapSecureBootKey | null): Promise<boolean> {
+  private async isRestoreAllowed(signing: AttractapSecureBootKeyRecord | null): Promise<boolean> {
     return !signing || !this.holdsPrivateKey(signing) || (await this.burnedReaderCount(signing.digest)) === 0;
   }
 
@@ -150,12 +151,12 @@ export class SecureBootKeyService {
       throw new ConflictException('Keys cannot be regenerated while readers have digests burned with them');
     }
     const [signingKey, recoveryKey] = await Promise.all([this.generate(), this.generate()]);
-    return await this.keys.manager.transaction(async (manager) => {
-      await manager.getRepository(AttractapSecureBootKey).clear();
-      const signing = await this.store(manager, 'signing', signingKey, null);
-      const recovery = await this.store(manager, 'recovery', recoveryKey, null);
+    return await this.unitOfWork.run(async (scope) => {
+      await this.keys.remove(scope);
+      const signing = await this.store(scope, 'signing', signingKey, null);
+      const recovery = await this.store(scope, 'recovery', recoveryKey, null);
       const fingerprints = { signingFingerprint: signing.fingerprint, recoveryFingerprint: recovery.fingerprint };
-      await this.record(actor, 'reader.secure_keys_created', fingerprints, manager);
+      await this.record(actor, 'reader.secure_keys_created', fingerprints, scope);
       return fingerprints;
     });
   }
@@ -165,23 +166,25 @@ export class SecureBootKeyService {
     return privateKey;
   }
 
-  private async store(manager: EntityManager, role: SecureBootKeyRole, privateKey: KeyObject, restoredAt: Date | null) {
+  private async store(
+    scope: TransactionScope,
+    role: AttractapSecureBootKeyRole,
+    privateKey: KeyObject,
+    restoredAt: Date | null,
+  ) {
     const publicKey = createPublicKey(privateKey);
-    const repository = manager.getRepository(AttractapSecureBootKey);
-    return await repository.save(
-      repository.create({
-        role,
-        publicKeyPem: publicKey.export({ type: 'spki', format: 'pem' }) as string,
-        digest: secureBootKeyDigest(publicKey),
-        fingerprint: publicKeyFingerprint(publicKey),
-        privateKeyEncrypted: this.encryption.encrypt(privateKey.export({ type: 'pkcs8', format: 'pem' }) as string),
-        verifiedAt: null,
-        restoredAt,
-      }),
-    );
+    return await this.keys.insert(scope, {
+      role,
+      publicKeyPem: publicKey.export({ type: 'spki', format: 'pem' }) as string,
+      digest: secureBootKeyDigest(publicKey),
+      fingerprint: publicKeyFingerprint(publicKey),
+      privateKeyEncrypted: this.encryption.encrypt(privateKey.export({ type: 'pkcs8', format: 'pem' }) as string),
+      verifiedAt: null,
+      restoredAt,
+    });
   }
 
-  private privateKeyOf(row: AttractapSecureBootKey): KeyObject {
+  private privateKeyOf(row: AttractapSecureBootKeyRecord): KeyObject {
     if (!row.privateKeyEncrypted) throw new ConflictException('The private key is no longer held by the server');
     let pem: string;
     try {
@@ -258,7 +261,7 @@ export class SecureBootKeyService {
     if (publicKeyFingerprint(uploaded) !== recovery.fingerprint) {
       throw new BadRequestException('This file is not the recovery key of this installation');
     }
-    await this.keys.update(recovery.id, { privateKeyEncrypted: null, verifiedAt: new Date() });
+    await this.keys.markRecoveryVerified(recovery.id, new Date());
     await this.record(actor, 'reader.recovery_key_verified', { recoveryFingerprint: recovery.fingerprint });
     return { fingerprint: recovery.fingerprint };
   }
@@ -302,7 +305,7 @@ export class SecureBootKeyService {
     if (current && (await this.burnedReaderCount(current.digest)) > 0 && !(await this.burnedReaderCount(digest))) {
       throw new ConflictException('Readers are secured with the current signing key; restore a key they trust');
     }
-    const existing = await this.keys.findOne({ where: { digest } });
+    const existing = await this.keys.findByDigest(digest);
     if (existing?.role === 'signing' && this.holdsPrivateKey(existing)) {
       throw new ConflictException('This key is already the signing key of this installation');
     }
@@ -319,14 +322,13 @@ export class SecureBootKeyService {
     const kept =
       latestRecovery && (latestRecovery.verifiedAt || this.holdsPrivateKey(latestRecovery)) ? latestRecovery : null;
     const recoveryKey = kept ?? (await this.generate());
-    return await this.keys.manager.transaction(async (manager) => {
-      const repository = manager.getRepository(AttractapSecureBootKey);
+    return await this.unitOfWork.run(async (scope) => {
       const fresh = recoveryKey instanceof KeyObject;
-      await (fresh ? repository.clear() : repository.delete({ role: 'signing' }));
-      const signing = await this.store(manager, 'signing', key, restoredAt);
-      const recovery = fresh ? await this.store(manager, 'recovery', recoveryKey, restoredAt) : recoveryKey;
+      await (fresh ? this.keys.remove(scope) : this.keys.remove(scope, 'signing'));
+      const signing = await this.store(scope, 'signing', key, restoredAt);
+      const recovery = fresh ? await this.store(scope, 'recovery', recoveryKey, restoredAt) : recoveryKey;
       const fingerprints = { signingFingerprint: signing.fingerprint, recoveryFingerprint: recovery.fingerprint };
-      await this.record(actor, 'reader.secure_keys_restored', { ...fingerprints, source }, manager);
+      await this.record(actor, 'reader.secure_keys_restored', { ...fingerprints, source }, scope);
       return fingerprints;
     });
   }
@@ -336,15 +338,13 @@ export class SecureBootKeyService {
    * it, otherwise any held private key whose digest the reader has burned. Null shows as "No signing
    * key for this reader".
    */
-  async signingKeyForReader(
-    reader: Pick<Attractap, 'secureBootDigest0' | 'secureBootDigest1' | 'secureBootSignerDigest'>,
-  ): Promise<KeyObject | null> {
+  async signingKeyForReader(reader: SecureBootReaderDigests): Promise<KeyObject | null> {
     const digests = [reader.secureBootDigest0, reader.secureBootDigest1]
       .filter((d): d is string => Boolean(d))
       .map((d) => d.toLowerCase());
     if (!digests.length) return null;
     const preferred = reader.secureBootSignerDigest?.toLowerCase();
-    const candidates = await this.keys.find({ where: { privateKeyEncrypted: Not(IsNull()) }, order: { id: 'DESC' } });
+    const candidates = await this.keys.listWithPrivateKey();
     const burned = candidates.filter((row) => digests.includes(row.digest));
     const match = burned.find((row) => row.digest === preferred) ?? burned[0];
     return match ? this.privateKeyOf(match) : null;

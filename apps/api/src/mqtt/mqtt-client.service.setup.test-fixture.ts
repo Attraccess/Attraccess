@@ -1,7 +1,6 @@
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { MqttClientService } from './mqtt-client.service';
-import { MqttServer } from '@attraccess/database-entities';
+import { MQTT_SERVER_STORE } from './mqtt-server-store.port';
 import * as mqtt from 'mqtt';
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -13,9 +12,8 @@ import { MqttClientServicePrivate } from './mqtt-client.service.spec.mqtt-client
 
 export async function resetTestFixture(scope: MqttClientServiceTestScope) {
   scope.mockRepository = {
-    findOne: jest.fn(),
-    findOneBy: jest.fn().mockResolvedValue(scope.mockServer),
-    update: jest.fn(),
+    findServer: jest.fn().mockResolvedValue(scope.mockServer),
+    storeEncryptedPassword: jest.fn(),
   };
 
   scope.mockEventEmitter = {
@@ -33,7 +31,7 @@ export async function resetTestFixture(scope: MqttClientServiceTestScope) {
     providers: [
       MqttClientService,
       {
-        provide: getRepositoryToken(MqttServer),
+        provide: MQTT_SERVER_STORE,
         useValue: scope.mockRepository,
       },
       {

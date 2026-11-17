@@ -142,7 +142,7 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
       defaultPublishRetain: false,
     };
     const mqtt = new MqttClientService(
-      { findOneBy: async () => server, update: async () => undefined } as never,
+      { findServer: async () => server, storeEncryptedPassword: async () => undefined } as never,
       events,
       { isEncrypted: () => false, encrypt: (value: string) => value, decrypt: (value: string) => value } as never,
       { mqttServersHealthy: { set: () => undefined } } as never,

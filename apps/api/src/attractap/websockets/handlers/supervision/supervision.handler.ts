@@ -1,4 +1,3 @@
-import { Resource, User } from '@attraccess/database-entities';
 import { SupervisionMode } from '@attraccess/application-models';
 
 import {
@@ -11,10 +10,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { Repository } from 'typeorm';
-
 import { SupervisionService, ReaderSupervisionCallbacks } from '../../../../resources/supervision/supervision.service';
 
 import { ResourceUsageService } from '../../../../resources/usage/sessions/resource-usage.service';
@@ -22,6 +17,8 @@ import { ResourceUsageService } from '../../../../resources/usage/sessions/resou
 import { UsersService } from '../../../../users-and-auth/users/users.service';
 
 import { AttractapService } from '../../../attractap.service';
+import { asCoreUser, type CoreUser } from '../../../core-user';
+import { ATTRACTAP_RESOURCE_READS, type AttractapResourceReads } from '../../../reader-resource-reads.port';
 import { assertReaderPaired } from '../../../reader-pairing';
 
 import { CardOperationsService } from '../../card-operations.service';
@@ -53,8 +50,8 @@ export class AttractapSupervisionHandler implements OnModuleInit {
   @Inject(SupervisionService)
   protected supervisionService: SupervisionService;
 
-  @InjectRepository(Resource)
-  protected resourceRepository: Repository<Resource>;
+  @Inject(ATTRACTAP_RESOURCE_READS)
+  protected resourceReads: AttractapResourceReads;
 
   /**
    * Registers this handler as the service's reader-arming port. A registration hook rather than an
@@ -130,7 +127,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
     socket.state.supervisionFlow = { ...flow, approvedSupervisorUserId: nfcCard.user.id };
 
     if (flow.webInitiated) {
-      await this.approveWebRequest(socket, socket.state.supervisionFlow, nfcCard.user);
+      await this.approveWebRequest(socket, socket.state.supervisionFlow, asCoreUser(nfcCard.user));
       return;
     }
     await reply({ username: nfcCard.user.username });
@@ -143,7 +140,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
   private async approveWebRequest(
     socket: AuthenticatedWebSocket,
     flow: NonNullable<AuthenticatedWebSocket['state']['supervisionFlow']>,
-    supervisor: User,
+    supervisor: CoreUser,
   ) {
     const fail = async (error: string) => {
       // Tear the server-side request down alongside the socket state — the two belong together (see
@@ -191,7 +188,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
       return;
     }
 
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    const resource = await this.resourceReads.findResource(resourceId);
     if (!resource) {
       await socket.sendMessage(
         new AttractapEvent(AttractapEventType.SUPERVISION_REQUEST, { error: 'RESOURCE_NOT_FOUND' }),
@@ -290,7 +287,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
   protected async armReader(params: {
     readerId: number;
     resourceId: number;
-    requester: User;
+    requester: CoreUser;
     requestId: string;
   }): Promise<ReaderSupervisionCallbacks> {
     const { readerId, resourceId, requester, requestId } = params;

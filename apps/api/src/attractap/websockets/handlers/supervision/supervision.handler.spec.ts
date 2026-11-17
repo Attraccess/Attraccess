@@ -228,7 +228,7 @@ describe('AttractapSupervisionHandler', () => {
 
     it('refuses a resource that does not allow supervised sessions', async () => {
       const socket = tappedSocket();
-      fixture.resourceRepository.findOne.mockResolvedValue({
+      fixture.resourceReads.findResource.mockResolvedValue({
         id: fixture.RESOURCE_ID,
         supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED,
       });

@@ -1,14 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
-import type { Repository } from 'typeorm';
-import type { CompanionDevice } from '@attraccess/database-entities';
 import { CompanionService } from './companion.service';
+import { FakeCompanionDeviceStore } from './fake-companion-device.store';
 
-jest.mock('@nestjs/typeorm', () => ({
-  InjectRepository: () => jest.fn(),
-}));
-jest.mock('@attraccess/database-entities', () => ({
-  CompanionDevice: class CompanionDevice {},
-}));
 jest.mock('bcrypt', () => ({
   genSalt: jest.fn(),
   hash: jest.fn(),
@@ -38,18 +31,21 @@ const MANIFEST = {
   ],
 };
 
-const mockRepo = {} as Repository<CompanionDevice>;
+let store: FakeCompanionDeviceStore;
 
 function makeService(hasManifest = true): CompanionService {
   fs.existsSync.mockReturnValue(hasManifest);
   if (hasManifest) {
     fs.readFileSync.mockReturnValue(JSON.stringify(MANIFEST));
   }
-  return new CompanionService(mockRepo);
+  return new CompanionService(store);
 }
 
 describe('CompanionService', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    store = new FakeCompanionDeviceStore();
+  });
 
   describe('getManifest', () => {
     it('returns manifest when companions.json exists', () => {
@@ -102,6 +98,47 @@ describe('CompanionService', () => {
     it('throws NotFoundException when no manifest is loaded', () => {
       const svc = makeService(false);
       expect(() => svc.getBinaryStream('linux', 'x64')).toThrow(NotFoundException);
+    });
+  });
+
+  describe('device management', () => {
+    const bcrypt = jest.requireMock('bcrypt') as { genSalt: jest.Mock; hash: jest.Mock; compare: jest.Mock };
+
+    it('registers a device with a hashed token and returns the plain token once', async () => {
+      bcrypt.genSalt.mockResolvedValue('salt');
+      bcrypt.hash.mockResolvedValue('hashed');
+      const svc = makeService(false);
+
+      const { device, token } = await svc.createDevice();
+
+      expect(token).toHaveLength(64);
+      expect(device.tokenHash).toBe('hashed');
+      expect(device.name).toHaveLength(4);
+      expect(await svc.findById(device.id)).toMatchObject({ id: device.id, tokenHash: 'hashed' });
+    });
+
+    it('verifies tokens against the stored hash', async () => {
+      bcrypt.compare.mockResolvedValue(true);
+      const svc = makeService(false);
+      const device = await store.registerDevice({ name: 'abcd', tokenHash: 'h' });
+      await expect(svc.verifyToken(device, 'tok')).resolves.toBe(true);
+      expect(bcrypt.compare).toHaveBeenCalledWith('tok', 'h');
+    });
+
+    it('records the connection with the reported app version', async () => {
+      const svc = makeService(false);
+      const device = await store.registerDevice({ name: 'abcd', tokenHash: 'h' });
+      await svc.touchLastConnection(device, '2.0.0');
+      expect((await svc.findById(device.id))?.appVersion).toBe('2.0.0');
+    });
+
+    it('renames, lists and deletes devices', async () => {
+      const svc = makeService(false);
+      const device = await store.registerDevice({ name: 'abcd', tokenHash: 'h' });
+      expect((await svc.updateName(device.id, 'Desk PC')).name).toBe('Desk PC');
+      expect(await svc.findAll()).toHaveLength(1);
+      await svc.delete(device.id);
+      expect(await svc.findById(device.id)).toBeNull();
     });
   });
 });

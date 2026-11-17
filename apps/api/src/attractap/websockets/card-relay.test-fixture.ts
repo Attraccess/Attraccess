@@ -97,30 +97,28 @@ export function createServices() {
     deleteNFCCard: jest.fn(async (id: number) => {
       const index = cards.findIndex((card) => card.id === id);
       if (index >= 0) cards.splice(index, 1);
-      return { affected: index >= 0 ? 1 : 0 };
+      return index >= 0;
     }),
     generateCardKey: AttractapService.prototype.generateCardKey,
   };
-  const pendingRepository: any = {
-    findOne: jest.fn(async ({ where }: any) =>
-      pending.find((change) => Object.entries(where).every(([key, value]) => change[key] === value)),
+  const cardStore: any = {
+    findPendingEnroll: jest.fn(
+      async (uid: string) => pending.find((c) => c.uid === uid && c.kind === 'enroll') ?? null,
     ),
-    find: jest.fn(async ({ where }: any) =>
-      pending.filter((change) => Object.entries(where).every(([key, value]) => change[key] === value)),
-    ),
-    save: jest.fn(async (change: any) => {
+    listPendingEnrolls: jest.fn(async (uid: string) => pending.filter((c) => c.uid === uid && c.kind === 'enroll')),
+    listPendingResets: jest.fn(async (uid: string) => pending.filter((c) => c.uid === uid && c.kind === 'reset')),
+    savePending: jest.fn(async (change: any) => {
       const saved = { id: nextId++, ...change };
       pending.push(saved);
       return saved;
     }),
-    delete: jest.fn(async (criteria: any) => {
-      const ids = Array.isArray(criteria) ? criteria : typeof criteria === 'number' ? [criteria] : null;
-      for (let i = pending.length - 1; i >= 0; i--) {
-        const hit = ids
-          ? ids.includes(pending[i].id)
-          : Object.entries(criteria).every(([key, value]) => pending[i][key] === value);
-        if (hit) pending.splice(i, 1);
-      }
+    deletePendingById: jest.fn(async (ids: number | number[]) => {
+      const list = Array.isArray(ids) ? ids : [ids];
+      for (let i = pending.length - 1; i >= 0; i--) if (list.includes(pending[i].id)) pending.splice(i, 1);
+    }),
+    deletePendingByUid: jest.fn(async (uid: string, kind: string) => {
+      for (let i = pending.length - 1; i >= 0; i--)
+        if (pending[i].uid === uid && pending[i].kind === kind) pending.splice(i, 1);
     }),
   };
   const user = { id: 5, username: 'alice' };
@@ -128,7 +126,7 @@ export function createServices() {
   const operations = Object.assign(new CardOperationsService(), {
     attractapService,
     conversations,
-    pendingRepository,
+    cardStore,
     encryption: {
       encrypt: (v: string) => `encrypted:${v}`,
       decryptIfEncrypted: (v: string) => v.replace('encrypted:', ''),

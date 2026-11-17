@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CompanionGatewayService } from './companion-gateway.service';
-import { CompanionDevice, ResourceFlowNode } from '@attraccess/database-entities';
+import { COMPANION_DEVICE_STORE } from './companion-device.port';
+import { FakeCompanionDeviceStore } from './fake-companion-device.store';
 import { CompanionEventType, CompanionSocket } from './companion.types';
 
 function makeSocket(deviceId: number | null, overrides: Partial<CompanionSocket> = {}): CompanionSocket {
@@ -15,27 +15,18 @@ function makeSocket(deviceId: number | null, overrides: Partial<CompanionSocket>
   } as unknown as CompanionSocket;
 }
 
-const mockDeviceRepo = { findOne: jest.fn(), update: jest.fn() };
-const mockFlowNodeRepo = {
-  createQueryBuilder: jest.fn().mockReturnValue({
-    innerJoinAndSelect: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    getMany: jest.fn().mockResolvedValue([]),
-  }),
-};
-
 describe('CompanionGatewayService', () => {
   let service: CompanionGatewayService;
+  let store: FakeCompanionDeviceStore;
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    store = new FakeCompanionDeviceStore();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CompanionGatewayService,
-        { provide: getRepositoryToken(CompanionDevice), useValue: mockDeviceRepo },
-        { provide: getRepositoryToken(ResourceFlowNode), useValue: mockFlowNodeRepo },
+        { provide: COMPANION_DEVICE_STORE, useValue: store },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
-
       ],
     }).compile();
 
@@ -54,10 +45,11 @@ describe('CompanionGatewayService', () => {
     });
 
     it('persists locked=true even when device not connected', async () => {
-      const result = await service.sendLockCommand(999);
+      const device = await store.registerDevice({ name: 'abcd', tokenHash: 'h' });
+      const result = await service.sendLockCommand(device.id);
 
       expect(result).toBe(false);
-      expect(mockDeviceRepo.update).toHaveBeenCalledWith(999, { locked: true });
+      expect((await store.findDevice(device.id))?.locked).toBe(true);
     });
   });
 
@@ -73,10 +65,12 @@ describe('CompanionGatewayService', () => {
     });
 
     it('persists locked=false even when device not connected', async () => {
-      const result = await service.sendUnlockCommand(999);
+      const device = await store.registerDevice({ name: 'abcd', tokenHash: 'h' });
+      await store.setLocked(device.id, true);
+      const result = await service.sendUnlockCommand(device.id);
 
       expect(result).toBe(false);
-      expect(mockDeviceRepo.update).toHaveBeenCalledWith(999, { locked: false });
+      expect((await store.findDevice(device.id))?.locked).toBe(false);
     });
   });
 
@@ -102,24 +96,15 @@ describe('CompanionGatewayService', () => {
   });
 
   describe('getResourcesForDevice', () => {
-    it('returns deduplicated resources matching deviceId in node data', async () => {
-      const mockNodes = [
-        { type: 'output.companion.lock-pc', data: { deviceId: 10 }, resource: { id: 42, name: '3D Printer' } },
-        { type: 'output.companion.unlock-pc', data: { deviceId: 10 }, resource: { id: 42, name: '3D Printer' } },
-        { type: 'output.companion.lock-pc', data: { deviceId: 10 }, resource: { id: 43, name: 'Laser' } },
-        { type: 'output.companion.lock-pc', data: { deviceId: 99 }, resource: { id: 44, name: 'Other' } },
-      ];
-
-      const qb = {
-        innerJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue(mockNodes),
-      };
-      mockFlowNodeRepo.createQueryBuilder.mockReturnValue(qb);
+    it('returns the resources the store reports for the device', async () => {
+      store.controlledResources.set(10, [
+        { id: 42, name: '3D Printer' },
+        { id: 43, name: 'Laser' },
+      ]);
 
       const resources = await service.getResourcesForDevice(10);
-      expect(resources).toHaveLength(2);
-      expect(resources.map((r) => r.id).sort()).toEqual([42, 43]);
+      expect(resources.map((r) => r.id)).toEqual([42, 43]);
+      expect(await service.getResourcesForDevice(99)).toEqual([]);
     });
   });
 });

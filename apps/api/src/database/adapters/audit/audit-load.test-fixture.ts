@@ -1,15 +1,16 @@
+import { createSqliteAuditService } from './sqlite-audit-service.test-fixture';
 import { AuditLog, Resource, Setting, User } from '@attraccess/database-entities';
 import { ResourceType, SupervisionMode } from '@attraccess/application-models';
 import { rm } from 'node:fs/promises';
-import { closeResourceTransactionConnection } from '../database/sqlite/run-serialized-transaction';
-import { AuditMetrics } from '../metrics/definitions/audit.metrics';
-import { resetTestFixture } from '../resources/usage/lifecycle-persistence/fixtures/setup.test-fixture';
-import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../resources/usage/lifecycle-persistence/fixtures/state.test-fixture';
-import { SettingsStoreService } from '../settings/settings-store.service';
-import { usageInternals } from '../resources/usage/sessions/fixtures/compose.test-fixture';
-import { AuditService } from './audit.service';
+import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-transaction';
+import { AuditMetrics } from '../../../metrics/definitions/audit.metrics';
+import { resetTestFixture } from '../../../resources/usage/lifecycle-persistence/fixtures/setup.test-fixture';
+import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../../../resources/usage/lifecycle-persistence/fixtures/state.test-fixture';
+import { SettingsStoreService } from '../../../settings/settings-store.service';
+import { usageInternals } from '../../../resources/usage/sessions/fixtures/compose.test-fixture';
+import { AuditService } from '../../../audit/audit.service';
 import { createTestAuditMetrics } from './audit.test-fixture';
-import { TypeOrmSettingsRows } from '../database/adapters/settings/typeorm-settings-rows';
+import { TypeOrmSettingsRows } from '../settings/typeorm-settings-rows';
 
 /** A machine with the person who starts sessions on it and the person who takes it over. */
 export interface LoadMachine {
@@ -37,7 +38,7 @@ export function setupAuditLoadFixture(machineCount: number) {
     await resetTestFixture(scope);
     metrics = createTestAuditMetrics();
     // No stored audit settings: the defaults record the resource and administration domains.
-    audit = new AuditService(
+    audit = createSqliteAuditService(
       scope.source,
       new SettingsStoreService(TypeOrmSettingsRows.forRepository(scope.source.getRepository(Setting)), null),
       metrics,

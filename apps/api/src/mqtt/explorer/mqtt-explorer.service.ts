@@ -1,11 +1,10 @@
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { hasControlCharacter } from '@attraccess/shared';
-import { MqttServer } from '@attraccess/database-entities';
+import type { MqttServerRecord } from '@attraccess/application-models';
+import { MQTT_SERVER_STORE, type MqttServerStore } from '../mqtt-server-store.port';
 import { HttpException, HttpStatus, Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
 import { finalize, Observable, share } from 'rxjs';
-import { In, Repository } from 'typeorm';
 import { AUDIT_RECORDER, auditActorOf, AuditRecorder } from '../../audit/recorder/audit-event';
 import { MqttClientService } from '../mqtt-client.service';
 import { MqttServerChangedEvent } from '../mqtt-server-changed.event';
@@ -76,22 +75,19 @@ export class MqttExplorerService {
   private readonly recentSubscribeAudits = new ExpiringKeys(SUBSCRIBE_AUDIT_WINDOW_MS, MAX_REMEMBERED_KEYS);
 
   constructor(
-    @InjectRepository(MqttServer) private readonly servers: Repository<MqttServer>,
+    @Inject(MQTT_SERVER_STORE) private readonly servers: MqttServerStore,
     private readonly connections: MqttExplorerConnectionsService,
     private readonly mqttClient: MqttClientService,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
 
-  findServer(mqttServerId: number): Promise<MqttServer | null> {
-    return this.servers.findOneBy({ id: mqttServerId });
+  findServer(mqttServerId: number): Promise<MqttServerRecord | null> {
+    return this.servers.findServer(mqttServerId);
   }
 
   /** The ids among `mqttServerIds` that exist, in one query. */
   async existingServerIds(mqttServerIds: readonly number[]): Promise<Set<number>> {
-    const ids = [...new Set(mqttServerIds)];
-    if (ids.length === 0) return new Set();
-    const servers = await this.servers.find({ where: { id: In(ids) }, select: { id: true } });
-    return new Set(servers.map((server) => server.id));
+    return this.servers.findExistingServerIds(mqttServerIds);
   }
 
   /**
@@ -179,7 +175,7 @@ export class MqttExplorerService {
   private async record(
     user: AuthenticatedUser,
     action: 'mqtt_server.message_subscribe' | 'mqtt_server.message_publish',
-    server: MqttServer,
+    server: MqttServerRecord,
     details: Record<string, string | number>,
   ): Promise<void> {
     const fields: Record<string, string | number> = { serverName: server.name, ...details };

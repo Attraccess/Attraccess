@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { MqttServer } from '@attraccess/database-entities';
+import type { MqttServerRecord } from '@attraccess/application-models';
 import { MqttServerService } from './servers/mqtt-server.service';
 import { MqttServerHostProviderService } from './mqtt-server-host.provider';
 
@@ -9,7 +9,7 @@ describe('MqttServerHostProviderService', () => {
   }
 
   it('maps the server (with its already-decrypted password) to a connection config', async () => {
-    const server: Partial<MqttServer> = {
+    const server: Partial<MqttServerRecord> = {
       id: 42,
       name: 'Workshop',
       host: 'mqtt.example.com',

@@ -1,7 +1,7 @@
 import { AuditLog, Resource, ResourceUsage } from '@attraccess/database-entities';
 import { setTimeout as delay } from 'node:timers/promises';
-import { LoadMachine, setupAuditLoadFixture } from './audit-load.test-fixture';
-import { droppedRecords } from './audit.test-fixture';
+import { LoadMachine, setupAuditLoadFixture } from '../database/adapters/audit/audit-load.test-fixture';
+import { droppedRecords } from '../database/adapters/audit/audit.test-fixture';
 
 const MACHINES = 6;
 const CYCLES_PER_MACHINE = 10;

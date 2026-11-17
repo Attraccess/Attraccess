@@ -5,6 +5,7 @@ import { MqttServer } from '@attraccess/database-entities';
 import { MqttServerManagementPort1783800000000 } from '../../database/migrations/1783800000000-mqtt-server-management-port';
 import type { EncryptionService } from '../../encryption/encryption.service';
 import type { MetricsService } from '../../metrics/metrics.service';
+import { TypeOrmMqttServerStore } from '../../database/adapters/mqtt/typeorm-mqtt-server.store';
 import { MqttServerService } from './mqtt-server.service';
 
 const ACTOR = { id: 1, authenticationMethod: 'session' as const };
@@ -72,7 +73,7 @@ describe('MQTT managementPort migration, persistence and service', () => {
     }
     repository = dataSource.getRepository(MqttServer);
     service = new MqttServerService(
-      repository,
+      new TypeOrmMqttServerStore(repository),
       encryption as unknown as EncryptionService,
       metrics as unknown as MetricsService,
       { emit: jest.fn() } as never,

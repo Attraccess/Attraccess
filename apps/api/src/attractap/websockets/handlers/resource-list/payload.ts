@@ -1,4 +1,3 @@
-import { ResourceUsage } from '@attraccess/database-entities';
 import {
   ResourceFlowNodeType,
   ResourceHealthStatus,
@@ -23,7 +22,16 @@ interface ResourceListServiceResourceListPayloadContext {
   rbacService: ResourceListService['rbacService'];
   logger: ResourceListService['logger'];
 }
-function toReaderSession(session: ResourceUsage, offsetMinutes: (at: Date) => number) {
+/** What the reader's session list reads of a running usage session. */
+interface ReaderSessionSource {
+  id: number;
+  userId: number;
+  startTime: Date;
+  user: { username: string };
+  supervisorUser?: { username: string } | null;
+}
+
+function toReaderSession(session: ReaderSessionSource, offsetMinutes: (at: Date) => number) {
   return {
     id: session.id,
     user: {
@@ -45,9 +53,9 @@ export const MAX_LISTED_READER_SESSIONS = 16;
 
 /** The card holder's own session first, then the others earliest first, capped for the reader's memory. */
 function listedReaderSessions(
-  sessions: ResourceUsage[],
+  sessions: ReaderSessionSource[],
   offsetMinutes: (at: Date) => number,
-  own?: ResourceUsage,
+  own?: ReaderSessionSource,
 ): ReaderSession[] {
   const ordered = own ? [own, ...sessions.filter((session) => session !== own)] : sessions;
   return ordered.slice(0, MAX_LISTED_READER_SESSIONS).map((session) => toReaderSession(session, offsetMinutes));

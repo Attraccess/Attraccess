@@ -1,12 +1,12 @@
+import { auditConnectionOf } from '../database/adapters/audit/sqlite-audit-service.test-fixture';
 import { billingTransactionAuditEvent } from './policies/billing';
 import { Logger } from '@nestjs/common';
-import { DataSource } from 'typeorm';
 import {
   closeResourceTransactionConnection,
   runSerializedTransaction,
 } from '../database/sqlite/run-serialized-transaction';
 import { AuditTransactionAbortedError } from './persistence/audit-storage';
-import { droppedRecords, setupAuditDatabase } from './audit.test-fixture';
+import { droppedRecords, setupAuditDatabase } from '../database/adapters/audit/audit.test-fixture';
 
 describe('durable audit SQLite', () => {
   const fixture = setupAuditDatabase();
@@ -196,7 +196,7 @@ describe('durable audit SQLite', () => {
     });
 
     it('writes without the audit queue, even while the audit connection is saturated', async () => {
-      const storage = (fixture.service as unknown as { storage: DataSource }).storage;
+      const storage = auditConnectionOf(fixture.service);
       const insert = jest.spyOn(storage, 'getRepository');
       await fixture.source.transaction(async (manager) => {
         expect(await fixture.service.record(billingTransactionAuditEvent(billing(8)), manager)).toEqual({

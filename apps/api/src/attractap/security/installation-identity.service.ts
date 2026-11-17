@@ -1,10 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { AttractapInstallation } from '@attraccess/database-entities';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { AttractapInstallationRecord } from '@attraccess/application-models';
 import { Mutex } from 'async-mutex';
 import { randomUUID } from 'crypto';
-import { Repository } from 'typeorm';
 import { EncryptionService } from '../../encryption/encryption.service';
+import { ATTRACTAP_INSTALLATION_STORE, type AttractapInstallationStore } from './installation-store.port';
 import {
   INSTALLATION_URI_PREFIX,
   READER_CERT_VALIDITY_MS,
@@ -18,7 +17,6 @@ import {
   x509,
 } from './pki';
 
-const SINGLETON_ID = 1;
 const RENEW_BEFORE_MS = 30 * 24 * 60 * 60 * 1000;
 
 export interface ServerTlsMaterial {
@@ -53,8 +51,8 @@ export class InstallationIdentityService {
   private loaded: LoadedIdentity | null = null;
 
   public constructor(
-    @InjectRepository(AttractapInstallation)
-    private readonly repository: Repository<AttractapInstallation>,
+    @Inject(ATTRACTAP_INSTALLATION_STORE)
+    private readonly store: AttractapInstallationStore,
     private readonly encryption: EncryptionService,
   ) {}
 
@@ -98,7 +96,8 @@ export class InstallationIdentityService {
   }
 
   private async loadCaKey(): Promise<CryptoKey> {
-    const row = await this.repository.findOneByOrFail({ id: SINGLETON_ID });
+    const row = await this.store.find();
+    if (!row) throw new Error('The attractap installation identity does not exist yet');
     return await importPrivateKeyPem(this.encryption.decrypt(row.caPrivateKeyEncrypted));
   }
 
@@ -108,7 +107,7 @@ export class InstallationIdentityService {
     return await this.mutex.runExclusive(async () => {
       if (this.loaded && this.loaded.serverNotAfter.getTime() - Date.now() > RENEW_BEFORE_MS) return this.loaded;
 
-      let row = await this.repository.findOneBy({ id: SINGLETON_ID });
+      let row = await this.store.find();
       if (!row) {
         row = await this.createInstallation();
       } else if (row.serverCertificateNotAfter.getTime() - Date.now() <= RENEW_BEFORE_MS) {
@@ -141,32 +140,31 @@ export class InstallationIdentityService {
     return { cert, keyPem: await exportPrivateKeyPem(keys.privateKey) };
   }
 
-  private async createInstallation(): Promise<AttractapInstallation> {
+  private async createInstallation(): Promise<AttractapInstallationRecord> {
     const installationId = randomUUID();
     const ca = await createCaCertificate(installationId);
     const server = await this.issueServerLeaf(installationId, ca.cert, ca.keys.privateKey);
     this.logger.log(`Created attractap installation identity ${installationId}`);
-    return await this.repository.save(
-      this.repository.create({
-        id: SINGLETON_ID,
-        installationId,
-        caCertificatePem: ca.cert.toString('pem'),
-        caPrivateKeyEncrypted: this.encryption.encrypt(await exportPrivateKeyPem(ca.keys.privateKey)),
-        serverCertificatePem: server.cert.toString('pem'),
-        serverPrivateKeyEncrypted: this.encryption.encrypt(server.keyPem),
-        serverCertificateNotAfter: server.cert.notAfter,
-      }),
-    );
+    return await this.store.save({
+      installationId,
+      caCertificatePem: ca.cert.toString('pem'),
+      caPrivateKeyEncrypted: this.encryption.encrypt(await exportPrivateKeyPem(ca.keys.privateKey)),
+      serverCertificatePem: server.cert.toString('pem'),
+      serverPrivateKeyEncrypted: this.encryption.encrypt(server.keyPem),
+      serverCertificateNotAfter: server.cert.notAfter,
+    });
   }
 
-  private async renewServerCertificate(row: AttractapInstallation): Promise<AttractapInstallation> {
+  private async renewServerCertificate(row: AttractapInstallationRecord): Promise<AttractapInstallationRecord> {
     const caCert = new x509.X509Certificate(row.caCertificatePem);
     const caKey = await importPrivateKeyPem(this.encryption.decrypt(row.caPrivateKeyEncrypted));
     const server = await this.issueServerLeaf(row.installationId, caCert, caKey);
     this.logger.log('Renewed attractap server certificate');
-    row.serverCertificatePem = server.cert.toString('pem');
-    row.serverPrivateKeyEncrypted = this.encryption.encrypt(server.keyPem);
-    row.serverCertificateNotAfter = server.cert.notAfter;
-    return await this.repository.save(row);
+    return await this.store.save({
+      ...row,
+      serverCertificatePem: server.cert.toString('pem'),
+      serverPrivateKeyEncrypted: this.encryption.encrypt(server.keyPem),
+      serverCertificateNotAfter: server.cert.notAfter,
+    });
   }
 }
