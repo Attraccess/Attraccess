@@ -7,7 +7,9 @@ import { ScopedUnitOfWork, TransactionScope, UNIT_OF_WORK, UnitOfWork } from '..
 /**
  * Adapter-side interpretation of a {@link TransactionContext}. A scope of the SQLite unit of work resolves to its
  * transaction's EntityManager, an EntityManager of a not yet migrated caller passes through unchanged, and no context
- * resolves to the manager of the running unit of work, or to the application connection for plain reads.
+ * resolves to the manager of the unit of work still open in this async flow, or to the application connection for
+ * plain reads. A continuation that outlives its unit of work (post-commit work started inside it) still sees the
+ * closed scope as current; it reads through the application connection instead of failing on the closed scope.
  */
 @Injectable()
 export class EntityManagerResolver {
@@ -24,7 +26,7 @@ export class EntityManagerResolver {
     if (context instanceof EntityManager) return context;
     if (context) return this.uow.handleOf(context as TransactionScope);
     const current = this.uow.current();
-    return current ? this.uow.handleOf(current) : this.source.manager;
+    return current?.isOpen ? this.uow.handleOf(current) : this.source.manager;
   }
 
   /**

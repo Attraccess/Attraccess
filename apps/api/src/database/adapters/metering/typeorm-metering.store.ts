@@ -43,13 +43,11 @@ import {
 } from '../../../resources/metering/metering-store.port';
 import { sessionLimitOf } from '../../../resources/usage/sessions/active-usage';
 import type { TransactionContext } from '../../transaction-context';
-import { sqliteErrorClassifier } from '../../sqlite/sqlite-errors';
+import { isUniqueViolation } from '../../persistence-errors';
 import { segmentsOfUsage, usageBoundarySince } from './metering-queries';
 import { toAttempt, toMeter, toOperation, toSegment, toSession, toUsage } from './metering-mappers';
 import { EntityManagerResolver } from '../entity-manager-resolver';
 import { findActiveUsages } from '../usage/active-usage-queries';
-
-const isUniqueViolation = (error: unknown): boolean => sqliteErrorClassifier.classify(error) === 'unique-violation';
 
 /** TypeORM implementation of the metering port. Every write joins the caller's transaction when it has one. */
 @Injectable()
