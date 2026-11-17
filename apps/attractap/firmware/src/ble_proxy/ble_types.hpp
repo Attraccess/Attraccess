@@ -41,6 +41,8 @@ namespace ble
     constexpr size_t MAX_FILTER_MANUFACTURERS = 8;
     constexpr size_t MAX_NAME_PREFIX = 64;
     constexpr uint32_t MAX_OP_TIMEOUT_MS = 60000;
+    // An operation without `timeoutMs` gets the API's default.
+    constexpr uint32_t DEFAULT_OP_TIMEOUT_MS = 10000;
     constexpr uint32_t MAX_CONNECT_TIMEOUT_MS = 60000;
     constexpr uint32_t MAX_LEASE_MS = 900000;
     // The reader's own deadlines run a little behind the API's, so the API normally decides first.

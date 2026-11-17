@@ -36,6 +36,13 @@ namespace ble
             return true;
         }
 
+        bool readTimeout(JsonVariantConst value, uint32_t &out)
+        {
+            if (!value.isNull()) return readUint(value, 1, MAX_OP_TIMEOUT_MS, out);
+            out = DEFAULT_OP_TIMEOUT_MS;
+            return true;
+        }
+
         bool readSessionId(JsonVariantConst value, char out[MAX_SESSION_ID_LENGTH + 1])
         {
             const char *text = value.as<const char *>();
@@ -55,7 +62,7 @@ namespace ble
         {
             return parseUuid(payload["s"].as<const char *>(), command.service) &&
                    parseUuid(payload["c"].as<const char *>(), command.characteristic) &&
-                   readUint(payload["timeoutMs"], 1, MAX_OP_TIMEOUT_MS, command.timeoutMs);
+                   readTimeout(payload["timeoutMs"], command.timeoutMs);
         }
 
         bool readBool(JsonVariantConst value, bool &out)

@@ -218,6 +218,8 @@ export class FakeBleReaderFirmware {
     if (!session || session.sessionId !== payload.sessionId || !session.link) {
       return this.fail(payload, 'SESSION_CLOSED', 'unknown-session');
     }
+    // Firmware 2.4.0 as first built required the deadline on every operation; the API must always send it.
+    if (typeof payload.timeoutMs !== 'number') return this.fail(payload, 'INVALID_ARGUMENT', 'malformed');
     const entry = session.allowlist.find((candidate) => candidate.s === payload.s && candidate.c === payload.c);
     if (!entry) return this.fail(payload, 'UNKNOWN_CHARACTERISTIC', 'not-in-allowlist');
     const controller = new AbortController();

@@ -32,9 +32,18 @@ namespace ble
         }
         if (!target)
         {
-            if (scan.candidates.size() >= MAX_SCAN_CANDIDATES) return;
-            scan.candidates.emplace_back();
-            target = &scan.candidates.back();
+            if (scan.candidates.size() >= MAX_SCAN_CANDIDATES)
+            {
+                // A crowded band fills the list: make room by dropping a device its own data already rules out.
+                target = evictableCandidate();
+                if (!target) return;
+                *target = Advertisement();
+            }
+            else
+            {
+                scan.candidates.emplace_back();
+                target = &scan.candidates.back();
+            }
             target->address = address;
         }
         if (hasRssi)
@@ -43,6 +52,32 @@ namespace ble
             target->hasRssi = true;
         }
         mergeAdvertisingData(data, length, *target);
+    }
+
+    Advertisement *BleProxyCore::evictableCandidate()
+    {
+        // Judged on services and manufacturers only: a name may still come with the scan response.
+        const Command &filter = scan.command;
+        for (Advertisement &candidate : scan.candidates)
+        {
+            if (!filter.filterServices.empty() && !candidate.serviceUuids.empty())
+            {
+                bool any = false;
+                for (const Uuid &uuid : candidate.serviceUuids)
+                    any = any || std::find(filter.filterServices.begin(), filter.filterServices.end(), uuid) !=
+                                     filter.filterServices.end();
+                if (!any) return &candidate;
+            }
+            if (!filter.filterManufacturers.empty() && !candidate.manufacturers.empty())
+            {
+                bool any = false;
+                for (const auto &m : candidate.manufacturers)
+                    any = any || std::find(filter.filterManufacturers.begin(), filter.filterManufacturers.end(),
+                                           m.companyId) != filter.filterManufacturers.end();
+                if (!any) return &candidate;
+            }
+        }
+        return nullptr;
     }
 
     void BleProxyCore::onScanComplete(uint32_t now)
@@ -313,7 +348,10 @@ namespace ble
         if (!command.requestId) return;
         char id[9];
         shortId(command.sessionId, id);
-        logf(!error.ok() && error.code != Code::Cancelled, "ble %s session=%s req=%u %s%s%s %ums", opName(command.type),
+        // The API closes every cancelled open again (the cancel may have raced the connect): not an error.
+        const bool expected = error.code == Code::Cancelled ||
+                              (command.type == CommandType::Close && error.code == Code::SessionClosed);
+        logf(!error.ok() && !expected, "ble %s session=%s req=%u %s%s%s %ums", opName(command.type),
              id, static_cast<unsigned>(command.requestId), error.ok() ? "ok" : codeName(error.code),
              error.detail[0] ? " " : "", error.detail, static_cast<unsigned>(now ? now - command.receivedMs : 0));
         if (command.type == CommandType::Scan)

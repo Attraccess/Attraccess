@@ -188,7 +188,8 @@ namespace ble
     {
         struct ble_gap_disc_params params = {};
         params.passive = 0; // names often come with the scan response only
-        params.filter_duplicates = 1;
+        // Repeated reports: an advertisement lost to a full event queue comes again. The core deduplicates.
+        params.filter_duplicates = 0;
         const int rc = ble_gap_disc(ownAddressType, static_cast<int32_t>(durationMs), &params, gapTrampoline, this);
         if (rc != 0) return mapGattStatus(rc);
         return Error();

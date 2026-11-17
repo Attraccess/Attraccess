@@ -279,6 +279,17 @@ namespace
         expect(parseCommand("BLE_CANCEL", cancel.as<JsonObjectConst>(), c, e) && c.requestId == 0 && c.targetRequestId == 9,
                "a cancel names its target and gets no answer of its own");
         expect(isRequestType("BLE_SESSION_OPEN") && !isRequestType("BLE_RESULT"), "only server requests are handled");
+
+        // Found on hardware: an unsubscribe the API sent without a deadline was refused as malformed.
+        JsonDocument noDeadline;
+        deserializeJson(noDeadline, "{\"v\":1,\"sessionId\":\"sess-1\",\"requestId\":10,"
+                                    "\"s\":\"0000fff0-0000-1000-8000-00805f9b34fb\","
+                                    "\"c\":\"0000fff2-0000-1000-8000-00805f9b34fb\"}");
+        Command unsubscribe;
+        Error unsubscribeError;
+        expect(parseCommand("BLE_UNSUBSCRIBE", noDeadline.as<JsonObjectConst>(), unsubscribe, unsubscribeError) &&
+                   unsubscribe.timeoutMs == DEFAULT_OP_TIMEOUT_MS,
+               "an operation without timeoutMs gets the default deadline");
     }
 
     // ------------------------------------------------------------------------------------------- ownership
@@ -676,6 +687,26 @@ namespace
                "manufacturer data keeps its company id");
     }
 
+    // Found on hardware: in a crowded band the candidate list filled with other devices before the wanted one.
+    void crowdedBandKeepsRoomForMatches()
+    {
+        Fixture f;
+        f.request("BLE_SCAN", scanPayload(1));
+        const uint8_t other[] = {3, 0x03, 0x0f, 0x18}; // battery service only: ruled out by the filter
+        for (unsigned i = 0; i < MAX_SCAN_CANDIDATES + 10; i++)
+        {
+            char text[18];
+            std::snprintf(text, sizeof text, "10:00:00:00:%02X:%02X", (i >> 8) & 0xff, i & 0xff);
+            f.core.onAdvertisement(address(text), -80, true, other, sizeof other);
+        }
+        const uint8_t named[] = {3, 0x03, 0xf0, 0xff, 5, 0x09, 'D', 'e', 'm', 'o'};
+        f.core.onAdvertisement(address("AA:BB:CC:DD:EE:09"), -60, true, named, sizeof named);
+        f.core.onScanComplete(f.now);
+        JsonArrayConst ads = f.sink.answer(1)["advertisements"].as<JsonArrayConst>();
+        expect(ads.size() == 1 && std::strcmp(ads[0]["address"] | "", "AA:BB:CC:DD:EE:09") == 0,
+               "a matching device still gets a slot when the list is full of devices the filter rules out");
+    }
+
     void advertisingParserSurvivesGarbage()
     {
         Advertisement ad;
@@ -760,6 +791,7 @@ int main()
     linkLossEndsEverythingSilently();
     otaRefusesAndEnds();
     scanDeduplicatesFiltersAndBounds();
+    crowdedBandKeepsRoomForMatches();
     advertisingParserSurvivesGarbage();
     errorMapping();
     capabilityFitsTheFirmwareInfo();

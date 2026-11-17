@@ -227,6 +227,7 @@ Die Reader-Firmware (2.4.0 oder neuer) meldet Plugin-Bluetooth beim Verbinden an
 - **Fristen am Reader.** Der Reader hält eigene Fristen für den Lease (Ihr Lease plus 10 s) und für Operationen. Schweigt der Server oder verliert der Reader die Verbindung zum Server, trennt der Reader das Gerät selbst.
 - **Benachrichtigungen** puffert der Reader (32 Benachrichtigungen oder 16 KiB pro Sitzung) und leitet sie in Reihenfolge mit einer Sequenznummer weiter. Ein voller Puffer am Reader beendet den Stream mit `NOTIFICATION_OVERFLOW`, eine Lücke oder ein Duplikat mit `INTERNAL` (Detail `malformed-notification`). Nichts geht stillschweigend verloren.
 - **Diagnose.** Funkfehler werden auf die Codes oben abgebildet; `detail` enthält den Rohgrund als sicheren Text, zum Beispiel `nimble:rc=13`, `hci:0x3e`, `att:0x0a` oder `reason:0x08`.
+- **Latenz.** Jede Operation, auf die Sie warten, läuft vom Server zum Reader und zurück, über WLAN typischerweise 0,2 bis 0,3 s. Ein Protokoll, das nach jedem Stück auf eine Bestätigung wartet, ist durch diesen Roundtrip begrenzt (gemessen: etwa 1,8 KiB/s mit 512-Byte-Stücken). Schicken Sie große Datenmengen als Schreiben ohne Antwort im Pipelining oder in größeren Fenstern zwischen den Bestätigungen.
 - **Firmware-Updates.** Startet ein Reader ein Firmware-Update, beendet er seine BLE-Sitzung (`disconnected`) und lehnt neue BLE-Arbeit bis zum Neustart mit `READER_BUSY` (Detail `ota`) ab.
 
 ## Pflichten beim Aufräumen

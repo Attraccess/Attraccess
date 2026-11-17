@@ -1,4 +1,4 @@
-import { PluginBleError } from '@attraccess/plugins-backend-sdk';
+import { PLUGIN_BLE_LIMITS, PluginBleError } from '@attraccess/plugins-backend-sdk';
 import type {
   BleAllowlistEntry,
   BleCallContext,
@@ -7,6 +7,9 @@ import type {
 import { AttractapEventType } from '../../websocket.types';
 import type { ReaderBleChannel, ReaderBleChannelDeps, WirePayload } from './reader-ble-channel';
 import { bleWireError, decodeBleBytes, encodeBleBytes } from './ble-wire';
+
+/** Every request carries its deadline; a call without one (unsubscribe) gets the default. */
+const opTimeout = (timeoutMs: number | undefined) => timeoutMs ?? PLUGIN_BLE_LIMITS.opTimeoutDefaultMs;
 
 /** Writes without response the API sends ahead of the reader's results. */
 export const BLE_WRITE_WINDOW = 8;
@@ -53,7 +56,7 @@ export class ReaderBleLink implements BleDriverLink {
   async read(request: Parameters<BleDriverLink['read']>[0]): Promise<Uint8Array> {
     const payload = await this.call(
       AttractapEventType.BLE_READ,
-      { s: request.serviceUuid, c: request.characteristicUuid, timeoutMs: request.timeoutMs },
+      { s: request.serviceUuid, c: request.characteristicUuid, timeoutMs: opTimeout(request.timeoutMs) },
       'read',
       request,
     );
@@ -75,7 +78,7 @@ export class ReaderBleLink implements BleDriverLink {
       c: request.characteristicUuid,
       value: encodeBleBytes(request.value),
       withoutResponse: request.withoutResponse,
-      timeoutMs: request.timeoutMs,
+      timeoutMs: opTimeout(request.timeoutMs),
     };
     if (!request.withoutResponse) {
       await this.call(AttractapEventType.BLE_WRITE, payload, 'write', request);
@@ -88,7 +91,7 @@ export class ReaderBleLink implements BleDriverLink {
     try {
       this.throwIfUnusable('write');
       ({ result } = this.channel.request(AttractapEventType.BLE_WRITE, this.sessionId, payload, 'write', {
-        timeoutMs: request.timeoutMs,
+        timeoutMs: opTimeout(request.timeoutMs),
       }));
     } catch (error) {
       this.freeSlot();
@@ -112,10 +115,10 @@ export class ReaderBleLink implements BleDriverLink {
         s: request.serviceUuid,
         c: request.characteristicUuid,
         indicate: request.indicate,
-        timeoutMs: request.timeoutMs,
+        timeoutMs: opTimeout(request.timeoutMs),
       },
       'subscribe',
-      { signal: request.signal, timeoutMs: request.timeoutMs },
+      { signal: request.signal, timeoutMs: opTimeout(request.timeoutMs) },
     );
     // Registered before the answer: the reader may notify right after it wrote the CCCD.
     this.dropSubscriptionOf(request.characteristicUuid);
@@ -140,7 +143,7 @@ export class ReaderBleLink implements BleDriverLink {
     if (this.state !== 'open') return;
     await this.call(
       AttractapEventType.BLE_UNSUBSCRIBE,
-      { s: request.serviceUuid, c: request.characteristicUuid, timeoutMs: request.timeoutMs },
+      { s: request.serviceUuid, c: request.characteristicUuid, timeoutMs: opTimeout(request.timeoutMs) },
       'unsubscribe',
       request,
     );
@@ -247,7 +250,7 @@ export class ReaderBleLink implements BleDriverLink {
     this.throwIfUnusable(operation);
     return this.channel.request(type, this.sessionId, payload, operation, {
       signal: request.signal,
-      timeoutMs: request.timeoutMs,
+      timeoutMs: opTimeout(request.timeoutMs),
     }).result;
   }
 

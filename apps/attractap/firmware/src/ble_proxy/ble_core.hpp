@@ -189,6 +189,8 @@ namespace ble
         void startCurrent(uint32_t now);
         void finishCurrent(const Error &error, const Bytes *value, uint32_t now);
         void finishScan(const Error &error, uint32_t now);
+        // A candidate whose services or manufacturers already fail the filter; null when there is none.
+        Advertisement *evictableCandidate();
         // Ends the session: answers what is outstanding with `pending` (when `announce`), stops the radio and
         // releases the owner once the controller is done.
         void endSession(const char *reason, const Error &pending, bool announce, bool radioDown, uint32_t now);

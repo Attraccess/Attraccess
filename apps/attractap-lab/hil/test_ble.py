@@ -31,9 +31,14 @@ needs_peripheral = pytest.mark.skipif(not PERIPHERAL, reason="set BLE_PERIPHERAL
 
 
 @pytest.fixture(scope="session")
-def ble(api, admin, reader):
-    """The fixture plugin's REST surface, on a reader an administrator opened for plugins."""
-    status, body = api.call("PATCH", f"/attractap/readers/{reader['id']}", {"allowPluginBle": True}, token=admin)
+def ble(api, admin, reader, resource):
+    """The fixture plugin's REST surface, on a reader an administrator opened for plugins.
+
+    The reader update takes the whole editable state, so it keeps the name and the resource the suite connected.
+    """
+    status, body = api.call("PATCH", f"/attractap/readers/{reader['id']}",
+                            {"name": "Lab Reader", "connectedResourceIds": [resource], "allowPluginBle": True},
+                            token=admin)
     assert status == 200, body
 
     def call(path, body=None, timeout=900):

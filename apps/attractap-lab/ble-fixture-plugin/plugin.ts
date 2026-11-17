@@ -189,7 +189,7 @@ const STEPS = new Map<string, (state: ScriptState, step: Step) => Promise<StepRe
 
 async function runStep(state: ScriptState, step: Step): Promise<StepResult> {
   const handler = STEPS.get(step.op);
-  if (!handler) return { ok: false, code: 'UNKNOWN_STEP', detail: step.op };
+  if (typeof handler !== 'function') return { ok: false, code: 'UNKNOWN_STEP', detail: String(step.op) };
   return handler(state, step).catch(failure);
 }
 
