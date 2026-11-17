@@ -66,6 +66,8 @@ public:
     void setup() override;
     void loop() override;
     bool sendMessage(const char *message, size_t length) override;
+    // Session frames go out through the same WebSocket queue.
+    bool sendQueueHasRoom(size_t reserve) const override { return socket.sendQueueHasRoom(reserve); }
     bool sendHeartbeat(const char *message, size_t length) override;
     void setMessageCallbackRaw(std::function<void(const char *, size_t)> callback) override;
     void enableConnectionAttempts() override;

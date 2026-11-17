@@ -47,6 +47,7 @@ export function defineBleContractSessionSuite(name: string, create: BleContractF
           'closed',
           'endpointId',
           'id',
+          'mtu',
           'read',
           'subscribe',
           'unsubscribe',

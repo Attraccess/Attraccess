@@ -13,6 +13,7 @@ import type { ResourceListService } from './handlers/resource-list/resource-list
 import type { AttractapSessionHandler } from './handlers/session/session.handler';
 import type { AttractapSupervisionHandler } from './handlers/supervision/supervision.handler';
 import type { AttractapUiHandler } from './handlers/ui/ui.handler';
+import type { ReaderBleDriver } from './handlers/ble/reader-ble.driver';
 import { AttractapEventType, type AttractapEvent, type AuthenticatedWebSocket } from './websocket.types';
 
 export type AttractapEventHandler = (socket: AuthenticatedWebSocket, eventData: AttractapEvent['data']) => unknown;
@@ -34,6 +35,7 @@ export interface EventHandlerDeps {
   uiHandler: AttractapUiHandler;
   cardConversations: CardConversationService;
   cardDetectedRouter: CardDetectedRouter;
+  readerBleDriver: ReaderBleDriver;
   /** Tells a reader on firmware before 2.0.0 that the server offers it no card functions. */
   requireFirmwareUpdate(
     socket: AuthenticatedWebSocket,
@@ -58,8 +60,11 @@ export function buildEventHandlers(d: EventHandlerDeps): Record<AttractapEventTy
       d.resetReaderConnectionState(socket, socket.readerId, 'READER_SESSION_ENDED');
       return d.authHandler.handleAuthentication(socket, eventData);
     },
-    [AttractapEventType.READER_FIRMWARE_INFO]: (socket, eventData) =>
-      d.firmwareHandler.handleFirmwareInfo(socket, eventData),
+    [AttractapEventType.READER_FIRMWARE_INFO]: (socket, eventData) => {
+      // The reader is back on this connection: plugin BLE work on an older, half-open one of it is gone.
+      d.readerBleDriver.readerConnected(socket);
+      return d.firmwareHandler.handleFirmwareInfo(socket, eventData);
+    },
     [AttractapEventType.READER_CRASH_REPORT]: (socket, eventData) =>
       d.crashReportHandler.handleCrashReport(socket, eventData),
     [AttractapEventType.READER_COREDUMP_BEGIN]: (socket, eventData) =>
@@ -163,5 +168,18 @@ export function buildEventHandlers(d: EventHandlerDeps): Record<AttractapEventTy
     [AttractapEventType.UI_SCREEN_CLOSE]: () => undefined,
     [AttractapEventType.UI_SCREEN_DISMISSED]: () => undefined,
     [AttractapEventType.UI_ACTION]: () => undefined,
+    // Plugin BLE (ATT-1033/ATT-1036): answers of the reader go to the driver, requests are server-only.
+    [AttractapEventType.BLE_RESULT]: (socket, eventData) => d.readerBleDriver.handleMessage(socket, eventData),
+    [AttractapEventType.BLE_SCAN_RESULT]: (socket, eventData) => d.readerBleDriver.handleMessage(socket, eventData),
+    [AttractapEventType.BLE_NOTIFICATION]: (socket, eventData) => d.readerBleDriver.handleMessage(socket, eventData),
+    [AttractapEventType.BLE_SESSION_ENDED]: (socket, eventData) => d.readerBleDriver.handleMessage(socket, eventData),
+    [AttractapEventType.BLE_SCAN]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
+    [AttractapEventType.BLE_SESSION_OPEN]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
+    [AttractapEventType.BLE_READ]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
+    [AttractapEventType.BLE_WRITE]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
+    [AttractapEventType.BLE_SUBSCRIBE]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
+    [AttractapEventType.BLE_UNSUBSCRIBE]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
+    [AttractapEventType.BLE_CANCEL]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
+    [AttractapEventType.BLE_SESSION_CLOSE]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
   };
 }

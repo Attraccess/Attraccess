@@ -275,6 +275,40 @@ describe('AttractapFirmwareHandler', () => {
       expect(fixture.socket.state.cardRelay).toBe(expected);
     });
 
+    it.each([
+      [
+        'a v1 BLE capability',
+        {
+          version: 1,
+          operations: [
+            'scan',
+            'connect',
+            'read',
+            'write',
+            'writeWithoutResponse',
+            'subscribe',
+            'unsubscribe',
+            'cancel',
+          ],
+          maxMtu: 517,
+          maxPendingRequests: 16,
+        },
+        { supported: true, capability: { version: 1, maxMtu: 517, maxPendingRequests: 16 } },
+      ],
+      ['no BLE capability', undefined, { supported: false, detail: 'no-ble-capability' }],
+      ['another protocol version', { version: 2, operations: [] }, { supported: false, detail: 'protocol-version:2' }],
+    ])('stores capabilities.ble from FIRMWARE_INFO on the socket: %s', async (_name, ble, expected) => {
+      fixture.mockFirmwareService.getFirmwareDefinition.mockResolvedValue(null);
+      // A reconnecting reader that downgraded must not keep a previous connection's capability.
+      fixture.socket.state.ble = { supported: false, detail: 'stale' };
+
+      await fixture.handler.handleFirmwareInfo(fixture.socket, {
+        payload: { name: 'attractap', variant: 'touch', version: '2.5.0', capabilities: { cardRelay: true, ble } },
+      } as AttractapEvent['data']);
+
+      expect(fixture.socket.state.ble).toMatchObject(expected);
+    });
+
     describe('a reader that is not paired', () => {
       const info = { name: 'attractap', variant: 'touch', version: '2.0.0', capabilities: { cardRelay: true } };
 

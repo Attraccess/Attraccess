@@ -48,6 +48,7 @@ public:
     bool sendBinary(const uint8_t *data, size_t length) override;
     void setRawBinaryCallback(std::function<bool(const uint8_t *, size_t)> callback) override;
     void setConnectionCallback(std::function<void(bool connected)> callback) override;
+    bool sendQueueHasRoom(size_t reserve) const override;
 
 private:
     friend struct WebsocketPongProbeTest;

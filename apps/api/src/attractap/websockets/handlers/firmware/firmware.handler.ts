@@ -9,6 +9,7 @@ import { validateReaderUiCapabilities } from '../../../../resources/forms/reader
 import { promptPairing } from '../../../reader-pairing';
 import { PairingService } from '../../../security/pairing.service';
 import { AttractapUiHandler } from '../ui/ui.handler';
+import { parseBleCapability } from '../ble/ble-wire';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
 
 @Injectable()
@@ -86,6 +87,8 @@ export class AttractapFirmwareHandler {
     // Only readers that relay card APDUs (firmware 2.0.0+) get card functions. Set before the
     // database write so a card tapped right after connecting is not refused.
     socket.state.cardRelay = data.payload?.capabilities?.cardRelay === true;
+    // Plugin BLE (protocol v1): older or incompatible firmware makes plugins see READER_UNSUPPORTED.
+    socket.state.ble = parseBleCapability(data.payload?.capabilities?.ble);
     await this.attractapService.updateReaderFirmware(socket.readerId, this.withValidatedUi(data.payload));
     // Initial full slot sync and crash-loop protection, in the background: it must not stop or delay the OTA check.
     // A reader that is not paired shows nothing from the server.

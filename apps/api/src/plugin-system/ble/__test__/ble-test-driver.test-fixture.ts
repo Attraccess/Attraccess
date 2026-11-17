@@ -1,4 +1,5 @@
 import {
+  FAKE_BLE_DEFAULT_MTU,
   normalizeBleAddress,
   normalizeBleUuid,
   PluginBleError,
@@ -10,7 +11,7 @@ import {
   type PluginBleAdvertisement,
   type PluginBleErrorCode,
 } from '@attraccess/plugins-backend-sdk';
-import type { BleDriverLink, BleTransportDriver } from '../ble-transport-driver';
+import type { BleDriverLink, BleReaderStatus, BleTransportDriver } from '../ble-transport-driver';
 
 /** Deterministic clock shared by the test driver and the service under test. */
 export class ManualClock {
@@ -69,6 +70,8 @@ interface Peripheral {
 export class BleTestDriver implements BleTransportDriver {
   readonly transcript: FakeBleTranscriptEntry[] = [];
   readonly available = new Map<number, boolean>();
+  /** Readers whose firmware cannot do plugin BLE, with the detail the driver reports. */
+  readonly unsupported = new Map<number, string>();
   private readonly peripherals = new Map<string, Peripheral>();
   private readonly failures = new Map<FakeBleOperation, PluginBleError[]>();
   private readonly syncFailures = new Map<FakeBleOperation, Error[]>();
@@ -78,6 +81,8 @@ export class BleTestDriver implements BleTransportDriver {
   connectDelayMs = 0;
   /** `false` simulates a transport that ignores the abort signal, so its link arrives after the host gave up. */
   connectHonoursAbort = true;
+  /** ATT MTU of the next links. */
+  mtu = FAKE_BLE_DEFAULT_MTU;
 
   constructor(private readonly clock: ManualClock) {}
 
@@ -139,8 +144,10 @@ export class BleTestDriver implements BleTransportDriver {
     return this.links.size;
   }
 
-  isReaderAvailable(readerId: number): boolean {
-    return this.available.get(readerId) ?? true;
+  readerStatus(readerId: number): BleReaderStatus {
+    if (!(this.available.get(readerId) ?? true)) return { status: 'offline' };
+    const detail = this.unsupported.get(readerId);
+    return detail === undefined ? { status: 'available' } : { status: 'unsupported', detail };
   }
 
   private record(entry: FakeBleTranscriptEntry): void {
@@ -199,6 +206,7 @@ export class BleTestDriver implements BleTransportDriver {
       if (spec.delayMs) await this.sleep(spec.delayMs, signal);
     };
     const link: BleDriverLink = {
+      mtu: this.mtu,
       read: async ({ serviceUuid, characteristicUuid, signal }) => {
         this.record({ op: 'read', readerId, address, serviceUuid, characteristicUuid });
         const spec = characteristic(characteristicUuid);

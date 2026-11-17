@@ -161,6 +161,14 @@ fi
 
 API_PORT="${API_PORT:-$(python3 -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1])')}"
 export STORAGE_ROOT="$WORK/storage"
+if [[ "${HIL_BLE:-}" == 1 ]]; then
+  # Plugin BLE tests (test_ble.py, opt-in): the lab fixture plugin talks to devices through context.ble.
+  fixture="$STORAGE_ROOT/plugins/ble-lab-fixture"
+  mkdir -p "$fixture"
+  (cd "$ROOT" && node apps/plugins/scripts/esbuild-backend.mjs --entry apps/attractap-lab/ble-fixture-plugin/plugin.ts \
+    --outfile "$fixture/dist/index.js" >"$WORK/ble-fixture-build.log")
+  cp "$ROOT/apps/attractap-lab/ble-fixture-plugin/plugin.json" "$fixture/"
+fi
 ARTIFACTS="$(cd "$HERE/.." && pwd)/hil-artifacts"
 mkdir -p "$ARTIFACTS"
 export WIRETAP_FILE="$ARTIFACTS/wiretap.jsonl"
@@ -219,6 +227,8 @@ GRPC_ENABLE_FORK_SUPPORT=0 PYTHONPATH="$HERE/../src:$HERE" LAB_PYTHON="$LAB_PYTH
   API_URL="http://127.0.0.1:$API_PORT" API_DB="$STORAGE_ROOT/attraccess.sqlite" \
   API_HOST="${API_HOST:-}" API_PORT="$API_PORT" READER_API_PORT="$READER_API_PORT" \
   API_RELAY_SSH="${API_RELAY_SSH:-}" WIRETAP_FILE="$WIRETAP_FILE" API_LOG="$WORK/api.log" \
+  HIL_BLE="${HIL_BLE:-}" HIL_BLE_LONG="${HIL_BLE_LONG:-}" BLE_PERIPHERAL_ADDRESS="${BLE_PERIPHERAL_ADDRESS:-}" \
+  SOLO_ADDRESS="${SOLO_ADDRESS:-}" SOLO_USER_CODE="${SOLO_USER_CODE:-}" \
   labgrid-client -x "$COORDINATOR" -p "$PLACE" session \
     --purpose "${HIL_PURPOSE:-Attractap HIL: NFC emulator tests}" --wait-timeout "${HIL_WAIT_TIMEOUT:-1800}" -- \
     bash "$HERE/run.sh" --in-session "$@"

@@ -7,6 +7,7 @@
 #include "../display/ui/ui_step.hpp"
 
 #include "api_types.hpp"
+#include "../ble_proxy/ble_proxy.hpp"
 
 #include <functional>
 #include <atomic>
@@ -40,7 +41,7 @@ protected:
     std::function<void(const ProjectsOfUserResponse &)> projectsOfUserResponseCallback;
     static constexpr size_t JSON_INBUF = 4608;
     static constexpr size_t JSON_OUTBUF_SMALL = 256;
-    static constexpr size_t JSON_OUTBUF_AUTH = 1024;
+    static constexpr size_t JSON_OUTBUF_AUTH = 1536;
     uint32_t resourceListMessageCounter = 0;
     uint32_t resourceListRevision = 0;
     uint32_t nextRequestId = 0;
@@ -230,6 +231,10 @@ public:
 private:
     Logger logger;
     IReaderTransport &transport;
+    // Plugin BLE proxy (ATT-1033): BLE_* requests skip the ACK path like CARD_APDU.
+    BleProxy bleProxy;
+    // The authenticated connection BLE work is bound to; when it goes, BLE work ends.
+    bool bleLinkUp = false;
 
     void dispatchIncomingEvent(const char *eventType, uint32_t requestId);
     void updateSateInfo();
