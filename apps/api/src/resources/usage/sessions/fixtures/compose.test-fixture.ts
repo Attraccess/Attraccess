@@ -10,16 +10,16 @@ import { UsageSessionNotifications } from '../usage-session-notifications';
 import { UsageSessionRecords } from '../usage-session-records';
 import { UsageSessionStartPreparation } from '../usage-session-start-preparation';
 import { UsageSessionStarts } from '../usage-session-starts';
-import { usagePersistenceFor } from './persistence.test-fixture';
+import { usagePersistenceFor } from '../../../../database/adapters/usage/sqlite-usage-persistence.test-fixture';
 
 /**
  * Builds ResourceUsageService and its collaborators without Nest, taking the dependencies in the order the
  * service's constructor took them before it was split into collaborators.
  */
 export function composeResourceUsageService(
-  resourceRepository: unknown,
+  _resourceRepository: unknown,
   resourceUsageRepository: unknown,
-  userRepository: unknown,
+  _userRepository: unknown,
   resourceIntroductionService: unknown,
   resourceIntroducersService: unknown,
   resourceGroupsIntroductionsService: unknown,
@@ -40,11 +40,7 @@ export function composeResourceUsageService(
   valkeyClient: unknown,
   metering?: unknown,
 ): ResourceUsageService {
-  const { unitOfWork, handles, store } = usagePersistenceFor({
-    resource: resourceRepository,
-    usage: resourceUsageRepository,
-    user: userRepository,
-  });
+  const { unitOfWork, handles, store } = usagePersistenceFor({ usage: resourceUsageRepository });
   const turns = new SessionChangeTurns(store, valkeyClient as never);
   const rules = new UsageAccessRules(
     resourceIntroductionService as never,
