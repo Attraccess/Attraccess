@@ -51,3 +51,5 @@ export * from './lib/attractap-reader';
 export * from './lib/attractap-secure-boot';
 export * from './lib/plugin-host-models';
 export * from './lib/reader-ui-alert';
+export * from './lib/resource-form-records';
+export * from './lib/resource-introducer-records';
