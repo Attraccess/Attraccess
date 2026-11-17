@@ -1,4 +1,3 @@
-import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 import { managedHostHelper } from './provisioning/helper';
@@ -19,11 +18,11 @@ import {
 
 import { ConflictException, NotFoundException } from '@nestjs/common';
 
-import { WagoNetworkChange, WagoMqttCredentialRetirement } from '../../network/entity';
-
 import { type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
 
-import { WagoManagedAccess, WagoRuntimeUpdateEntity, WagoDeviceOperation } from './access.entity';
+import { WagoManagedAccess } from './access.entity';
+
+import { openWagoStorage } from '../../storage';
 
 import { generateManagementKey, restoreManagementKey } from '../../management/key';
 
@@ -62,7 +61,7 @@ export abstract class WagoManagedRuntimeEnrollment extends WagoManagedRuntimeSer
   async networkManagement(controllerId: number, targetHost: string, signal: AbortSignal) {
     const access = await this.required(controllerId);
     const credentials = this.credentials(access);
-    const session = await this.sessions.findOneBy({ id: access.sessionId });
+    const session = await this.sessions.get(access.sessionId);
     if (
       !session ||
       session.state !== 'completed' ||
@@ -117,25 +116,25 @@ export abstract class WagoManagedRuntimeEnrollment extends WagoManagedRuntimeSer
 
   async assertNetworkSettled(controllerId: number | null, fingerprint?: string): Promise<void> {
     if (controllerId === null && !fingerprint) return;
-    const change = await sqlitePersistence(this.context)
-      .getRepository(WagoNetworkChange)
-      .findOneBy(controllerId === null ? { fingerprint } : { controllerId });
+    const change = await this.storage.networkChanges.findOne({
+      where: controllerId === null ? { fingerprint } : { controllerId },
+    });
     if (change && change.phase !== 'completed')
       throw new ConflictException('Finish the pending MQTT/address change before another controller operation.');
   }
 
   protected async assertUpdateSettled(controllerId: number): Promise<void> {
     await this.assertNetworkSettled(controllerId);
-    const row = await this.updates.findOneBy({ controllerId });
+    const row = await this.updates.get(controllerId);
     const update = row?.metadata ? (JSON.parse(row.metadata) as RuntimeUpdateRecord) : null;
     if (update?.token) throw new ConflictException('Finish runtime update recovery before removing this controller');
   }
 
   async assertRemovable(controllerId: number): Promise<void> {
     await this.assertUpdateSettled(controllerId);
-    if (await sqlitePersistence(this.context).getRepository(WagoMqttCredentialRetirement).countBy({ controllerId }))
+    if (await this.storage.mqttCredentialRetirements.count({ controllerId }))
       throw new ConflictException('Retire previous broker credentials before removing this controller.');
-    const access = await this.access.findOne({ where: { controllerId }, order: { sessionId: 'DESC' } });
+    const access = await this.latestAccess(controllerId);
     if (access && access.state !== 'retired')
       throw new ConflictException('Restore bootstrap SSH and retire managed access before removing this controller');
   }
@@ -164,15 +163,15 @@ export abstract class WagoManagedRuntimeEnrollment extends WagoManagedRuntimeSer
 
   protected async publicStatus(access: WagoManagedAccess | null, requestedControllerId?: number) {
     access = await this.revalidatedAccess(access);
-    const row = access?.controllerId ? await this.updates.findOneBy({ controllerId: access.controllerId }) : null;
+    const row = access?.controllerId ? await this.updates.get(access.controllerId) : null;
     const controllerId = requestedControllerId ?? access?.controllerId;
-    const controller = controllerId ? await this.controllers.findOneBy({ id: controllerId }) : null;
+    const controller = controllerId ? await this.controllers.get(controllerId) : null;
     const desired = controller ? await this.artifacts.current().catch(() => null) : null;
     const managementSetup =
       access?.state === 'verified' ? await this.managementSetup(access, controller, controllerId) : undefined;
     const managementFailure =
       access && ['verified', 'recovery_required'].includes(access.state)
-        ? (await this.sessions.findOneBy({ id: access.sessionId }))?.failureReason
+        ? (await this.sessions.get(access.sessionId))?.failureReason
         : null;
     return {
       ...(managementFailure ? { managementFailure } : {}),
@@ -197,7 +196,7 @@ export abstract class WagoManagedRuntimeEnrollment extends WagoManagedRuntimeSer
       return access;
     } catch {
       await this.setActiveState(access.sessionId, 'recovery_required').catch(() => undefined);
-      return this.access.findOneBy({ sessionId: access.sessionId });
+      return this.access.get(access.sessionId);
     }
   }
 
@@ -211,8 +210,7 @@ export abstract class WagoManagedRuntimeEnrollment extends WagoManagedRuntimeSer
       this.enrolmentProgress.get(controllerId ?? 0) ?? {
         state: 'waiting' as const,
         reason: controller
-          ? ((await this.enrolmentWaitReason(controller, await this.sessions.findOneBy({ id: access.sessionId }))) ??
-            'scheduled')
+          ? ((await this.enrolmentWaitReason(controller, await this.sessions.get(access.sessionId))) ?? 'scheduled')
           : 'connection',
       }
     );
@@ -248,12 +246,11 @@ export abstract class WagoManagedRuntimeEnrollment extends WagoManagedRuntimeSer
   }
 
   async sessionStatus(sessionId: number) {
-    return this.publicStatus(await this.access.findOneBy({ sessionId }));
+    return this.publicStatus(await this.access.get(sessionId));
   }
 
   async status(controllerId: number) {
-    const access = await this.access.findOne({ where: { controllerId }, order: { sessionId: 'DESC' } });
-    return this.publicStatus(access, controllerId);
+    return this.publicStatus(await this.latestAccess(controllerId), controllerId);
   }
 
   /** Called inside the commissioning device lease, with fresh bootstrap credentials.
@@ -294,20 +291,18 @@ export abstract class WagoManagedRuntimeEnrollment extends WagoManagedRuntimeSer
         this.context.secrets.decrypt(encryptedCredentials) !== plaintext
       )
         throw new ConflictException('Managed credential encryption failed.');
-      await this.access.save(
-        this.access.create({
-          sessionId: session.id,
-          controllerId: null,
-          host: session.targetHost,
-          fingerprint: session.hostKeyFingerprint,
-          token: credentials.token,
-          state: 'pending',
-          encryptedCredentials,
-          keyFingerprint: key.fingerprint,
-        }),
-      );
+      await this.access.insert({
+        sessionId: session.id,
+        controllerId: null,
+        host: session.targetHost,
+        fingerprint: session.hostKeyFingerprint,
+        token: credentials.token,
+        state: 'pending',
+        encryptedCredentials,
+        keyFingerprint: key.fingerprint,
+      });
       key.privateKey = '';
-      // Verify the persisted envelope, rather than the ORM save result, before
+      // Verify the persisted envelope, rather than the insert result, before
       // replacing any remote password or key. Storage failures leave SSH intact.
       access = await this.loadSession(session.id);
       if (!access) throw new ConflictException('Managed credential storage verification failed.');
@@ -353,7 +348,7 @@ export abstract class WagoManagedRuntimeEnrollment extends WagoManagedRuntimeSer
     if (!access) return;
     if (access.state !== 'verified' || (access.controllerId !== null && access.controllerId !== controllerId))
       throw new ConflictException('Managed enrolment is not verified for this controller');
-    await this.access.update(sessionId, { controllerId });
+    await this.access.update({ sessionId }, { controllerId });
   }
 
   registerRetirementProbe(probe: RootProbe): void {
@@ -369,11 +364,8 @@ export abstract class WagoManagedRuntimeEnrollment extends WagoManagedRuntimeSer
   }
 
   public onApplicationBootstrap(): void {
-    this.access = sqlitePersistence(this.context).getRepository(WagoManagedAccess);
-    this.updates = sqlitePersistence(this.context).getRepository(WagoRuntimeUpdateEntity);
-    this.sessions = sqlitePersistence(this.context).getRepository(WagoCommissioningSession);
-    this.controllers = sqlitePersistence(this.context).getRepository(WagoController);
-    this.operations = new WagoDeviceOperations(sqlitePersistence(this.context).getRepository(WagoDeviceOperation));
+    this.storage = openWagoStorage(this.context);
+    this.operations = new WagoDeviceOperations(this.storage.deviceOperations);
     this.coordinator = new WagoRuntimeUpdateCoordinator(
       this.updateStore(),
       () => this.desired(),

@@ -82,22 +82,16 @@ export abstract class WagoManagedRuntimeAccess extends WagoManagedRuntimeEnrollm
   }
 
   protected async required(controllerId: number): Promise<WagoManagedAccess> {
-    const row = await this.access
-      .createQueryBuilder('access')
-      .addSelect('access.encryptedCredentials')
-      .where('access.controllerId = :controllerId AND access.state = :state', { controllerId, state: 'managed' })
-      .orderBy('access.sessionId', 'DESC')
-      .getOne();
+    const row = await this.access.findOne({
+      where: { controllerId, state: 'managed' },
+      orderBy: [{ field: 'sessionId', direction: 'desc' }],
+    });
     if (!row) throw new RuntimeUpdateError('management_required');
     return row;
   }
 
   protected loadSession(sessionId: number): Promise<WagoManagedAccess | null> {
-    return this.access
-      .createQueryBuilder('access')
-      .addSelect('access.encryptedCredentials')
-      .where('access.sessionId = :sessionId', { sessionId })
-      .getOne();
+    return this.access.get(sessionId);
   }
 
   protected async desired(): Promise<BuildRuntimeArtifact> {
@@ -128,16 +122,8 @@ export abstract class WagoManagedRuntimeAccess extends WagoManagedRuntimeEnrollm
     sessionId: number,
     state: 'verified' | 'managed' | 'recovery_required',
   ): Promise<void> {
-    const result = await this.access
-      .createQueryBuilder()
-      .update()
-      .set({ state })
-      .where('session_id = :sessionId AND state NOT IN (:...retired)', {
-        sessionId,
-        retired: ['retiring', 'retired'],
-      })
-      .execute();
-    if (result.affected !== 1) throw new ConflictException('Managed access is being retired');
+    const affected = await this.access.update({ sessionId, state: { notIn: ['retiring', 'retired'] } }, { state });
+    if (affected !== 1) throw new ConflictException('Managed access is being retired');
   }
 
   async retryAccess(sessionId: number): Promise<void> {
@@ -197,7 +183,7 @@ export abstract class WagoManagedRuntimeAccess extends WagoManagedRuntimeEnrollm
       attempted = true;
       // Retire automatic access durably before restoring bootstrap policy. A
       // restarted reconciler must not immediately harden it again during recovery.
-      await this.access.update(sessionId, { state: 'retiring' });
+      await this.access.update({ sessionId }, { state: 'retiring' });
       const password = this.credentials(access).recoveryPassword;
       // An interrupted key removal may have succeeded. Verify its durable remote
       // result through restored pinned root access before trying the old key again.
@@ -221,7 +207,7 @@ export abstract class WagoManagedRuntimeAccess extends WagoManagedRuntimeEnrollm
       if (!(await this.retirementProbe(access.host, access.fingerprint, password)))
         throw new ConflictException('Managed key retirement is unverified; retry administrator recovery');
       await this.operations.assertOwned(access.fingerprint, owner);
-      await this.access.update(sessionId, { state: 'retired' });
+      await this.access.update({ sessionId }, { state: 'retired' });
       await this.securityAudit(sessionId, 'security_recover', principal, operationId, 'succeeded');
     } catch (error) {
       if (attempted)
@@ -256,6 +242,6 @@ export abstract class WagoManagedRuntimeAccess extends WagoManagedRuntimeEnrollm
   }
 
   async hasAccess(sessionId: number): Promise<boolean> {
-    return !!(await this.access.findOneBy({ sessionId }));
+    return !!(await this.access.get(sessionId));
   }
 }

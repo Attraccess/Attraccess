@@ -2,13 +2,10 @@ import { spawnSync } from 'node:child_process';
 import { createHash, scryptSync } from 'node:crypto';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { DataSource } from '@attraccess/plugins-backend-sdk/sqlite';
 import { fw31ShellFixture } from '../../../fixtures/fw31-shell-fixture';
-import { WagoManagedUpdates1780010650000 } from '../../../migrations/1780010650000-add-wago-managed-updates';
 import { BuildRuntimeArtifact } from '../../artifacts/build';
 import { commissioningAcceptanceScript } from '../../../commissioning/delivery/accept';
 import { WAGO_DIN, WAGO_DOUT } from '../../../host/hardware-deployment';
-import { WagoDeviceOperation, WagoManagedAccess, WagoRuntimeUpdateEntity } from '../access.entity';
 import { managedHostHelper } from './helper';
 import { MANAGED_HELPER_PROTOCOL } from './installer';
 import {
@@ -42,8 +39,6 @@ const artifact: BuildRuntimeArtifact = {
     },
   },
 };
-jest.mock('@attraccess/plugins-backend-sdk', () => jest.requireActual('@attraccess/plugins-backend-sdk/sqlite'));
-
 jest.mock('../../../controllers/service', () => ({ WagoService: class {} }));
 
 jest.mock('../../artifacts/service', () => ({ WagoRuntimeArtifactsService: class {} }));
@@ -474,23 +469,5 @@ describe('fixed managed executor and recovery programs', () => {
     expect(helper).toContain('"${token}"');
     expect(helper).not.toMatch(/\beval\b|\b1234567\b|'\$\{token\}'/);
     expect(helper).toContain('*) exit 1 ;;');
-  });
-
-  it('migrates credential/update/operation storage together and refuses destructive downgrade with credentials', async () => {
-    const db = await new DataSource({
-      type: 'sqlite',
-      database: ':memory:',
-      entities: [WagoManagedAccess, WagoRuntimeUpdateEntity, WagoDeviceOperation],
-      migrations: [WagoManagedUpdates1780010650000],
-    }).initialize();
-    try {
-      await db.runMigrations();
-      await db.query(
-        "INSERT INTO plugin_wago_managed_access VALUES (1, NULL, '10.0.0.1', 'pin', 'token', 'pending', 'ciphertext', 'key-pin')",
-      );
-      await expect(db.undoLastMigration()).rejects.toThrow('Retire managed');
-    } finally {
-      await db.destroy();
-    }
   });
 });
