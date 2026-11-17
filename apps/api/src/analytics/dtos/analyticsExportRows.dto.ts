@@ -1,5 +1,6 @@
 import { BillingTransactionStatus, ResourceUsageAction } from '@attraccess/application-models';
 import { ApiProperty, getSchemaPath } from '@nestjs/swagger';
+import { BillingTransactionItemDto } from '../../billing/dto/billing-transaction.dto';
 import { FormSubmissionSchemaDto } from './formSubmissionSchema.dto';
 
 /*
@@ -227,8 +228,8 @@ export class BillingTransactionExportRowDto {
 
   @ApiProperty({
     description: 'The custom items of the billing transaction',
-    type: 'array',
-    items: { $ref: getSchemaPath('BillingTransactionItem') },
+    type: () => BillingTransactionItemDto,
+    isArray: true,
   })
   items?: object[];
 
