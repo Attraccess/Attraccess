@@ -12,7 +12,7 @@
   "homepage": "https://attraccess.org",
   "scripts": {
     "build": "node build.mjs",
-    "pack-test": "pnpm --dir=../.. exec nx run plugins-backend-sdk:build && npm run build && node ../../apps/plugins/scripts/verify-packed-plugin.mjs package package.json dist/index.js frontend/remoteEntry.js frontend/style.css"
+    "pack-test": "pnpm --dir=../.. exec nx run plugins-backend-sdk:build && npm run build && ATTRACCESS_PLUGIN_TEST_HOST_VERSION=2.0.0 node ../../apps/plugins/scripts/verify-packed-plugin.mjs package package.json dist/index.js frontend/remoteEntry.js frontend/style.css"
   },
   "keywords": [
     "attraccess-plugin",
