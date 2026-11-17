@@ -169,6 +169,9 @@ export class SqliteAuditStore implements AuditStore {
     if (!ref) return undefined;
     let manager: EntityManager;
     if (isTransactionScope(ref)) {
+      // A scope that already committed or rolled back has no transaction left to join: the record is written
+      // durably, as for a native handle whose transaction is no longer active.
+      if (!ref.isOpen) return undefined;
       if (!(this.unitOfWork instanceof ScopedUnitOfWork))
         throw new TransactionScopeError('No unit of work is available to resolve the transaction scope');
       manager = this.unitOfWork.handleOf(ref) as EntityManager;
