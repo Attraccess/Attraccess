@@ -855,6 +855,9 @@ importers:
       crap-score:
         specifier: 1.2.1
         version: 1.2.1(patch_hash=a11d8103444adc51146e0530d7acd5e806f2e83ef290877c3c9bf18ac2647262)(@nestjs/platform-express@12.5.1)(@nestjs/websockets@12.5.1)(@types/node@26.6.6)(class-transformer@0.5.1)(class-validator@0.15.1)(supports-color@8.1.1)(typescript@7.0.2(patch_hash=fce7f0c87c92a81d33e044239497e3c1c78d2bf2400d5511ab8711f7f94cc084))
+      css.escape:
+        specifier: ^1.5.1
+        version: 1.5.1
       electron:
         specifier: ^45.3.3
         version: 45.3.3(supports-color@8.1.1)

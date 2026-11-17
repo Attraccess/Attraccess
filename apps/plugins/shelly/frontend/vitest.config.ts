@@ -18,6 +18,7 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    setupFiles: [fileURLToPath(new URL('../../scripts/css-escape.test-setup.ts', import.meta.url))],
     include: ['src/**/*.spec.tsx'],
     coverage: {
       // Unit coverage feeds the project's crap-score target.

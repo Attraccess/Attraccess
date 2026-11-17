@@ -233,6 +233,7 @@
     "buffer": "^6.0.3",
     "core-js": "^3.51.0",
     "crap-score": "1.2.1",
+    "css.escape": "^1.5.1",
     "electron": "^45.3.3",
     "electron-builder": "^26.18.0",
     "esbuild": "^0.28.2",
