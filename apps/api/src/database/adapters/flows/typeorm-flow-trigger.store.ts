@@ -151,7 +151,8 @@ export class TypeOrmFlowTriggerStore implements FlowTriggerStore {
   async findResource(resourceId: number, context?: TransactionContext): Promise<FlowResourceRecord | null> {
     const resource = await this.manager(context)
       .getRepository(Resource)
-      .findOne({ where: { id: resourceId } });
+      // Only the columns a flow reads: a trigger runs often and must not load the documentation markdown.
+      .findOne({ select: { id: true, name: true, type: true, metadata: true }, where: { id: resourceId } });
     return resource ? toFlowResourceRecord(resource) : null;
   }
 }

@@ -103,10 +103,12 @@ describe('RBAC persistence adapter on a real SQLite file', () => {
       await query("INSERT INTO user_role (userId, roleId, source) VALUES (10, 2, 'manual')");
 
       const [assignment] = await stack.store.findUserRoles(10);
-      const role = await stack.store.findRoleByKey('member');
+      const role = await stack.store.findRoleByKey('member', undefined, { withPermissions: true });
 
       expect(assignment).toMatchObject({ userId: 10, roleId: 2, source: 'manual', role: { key: 'member' } });
       expect(role?.rolePermissions?.map((rp) => rp.permissionKey)).toEqual(['a.read']);
+      // Without the option only the role row is read, as assigning a role by key needs.
+      expect(await stack.store.findRoleByKey('member')).not.toHaveProperty('rolePermissions');
       expect(await stack.store.roleKeyOf(3)).toBe('custom');
       expect(await stack.store.roleKeyOf(99)).toBeNull();
       const withUsage = await stack.store.listRolesWithUserCounts();

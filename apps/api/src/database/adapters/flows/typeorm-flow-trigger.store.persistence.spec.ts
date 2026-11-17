@@ -210,4 +210,12 @@ describe('TypeOrmFlowTriggerStore (SQLite)', () => {
     expect((await store.findResource(drillId))?.metadata).toBeNull();
     expect(await store.findResource(999_999)).toBeNull();
   });
+
+  it('reads only the columns a run uses, not the documentation', async () => {
+    const findOne = jest.spyOn(source.manager.getRepository(Resource), 'findOne');
+    await store.findResource(laserId);
+    expect(findOne).toHaveBeenCalledWith(
+      expect.objectContaining({ select: { id: true, name: true, type: true, metadata: true } }),
+    );
+  });
 });
