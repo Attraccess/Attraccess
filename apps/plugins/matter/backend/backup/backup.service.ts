@@ -393,14 +393,16 @@ export class MatterBackupService {
 
   async summary(): Promise<BackupsSummary> {
     const stored = await this.list();
-    // The newest attempt of any outcome: the newest stored backup, or a failed attempt that is newer.
+    // The newest attempt of any outcome: the newest stored backup, or a failed attempt that is newer. Ids are random,
+    // so equal timestamps cannot be ordered: a tie counts the failed attempt as the later one (it is recorded
+    // after the backup it refused to extend).
     const failed = await this.storage.tables.backups.findOne({
       where: { outcome: 'failed' },
       orderBy: [{ field: 'createdAt', direction: 'desc' }],
     });
     const newest = stored[0];
     const last =
-      newest && (!failed || newest.createdAt >= failed.createdAt)
+      newest && (!failed || newest.createdAt > failed.createdAt)
         ? { createdAt: newest.createdAt, outcome: newest.outcome, trigger: newest.trigger, reason: null }
         : failed;
     return {
