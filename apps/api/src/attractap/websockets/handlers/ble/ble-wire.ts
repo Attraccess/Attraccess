@@ -7,9 +7,10 @@ import {
 } from '@attraccess/plugins-backend-sdk';
 
 /**
- * Plugin BLE reader protocol, version 1 (ATT-1033/ATT-1036). JSON EVENT messages on the reader channel (legacy
- * token channel and paired reader link alike), without the generic ACK. Bytes travel as base64. Every message
- * carries `v`; every request a server-assigned `sessionId` and a per-connection `requestId`.
+ * Plugin BLE reader protocol, version 1 (ATT-1033/ATT-1036). JSON EVENT messages on the paired reader link (the
+ * session transport) only, without the generic ACK; a reader signed in with its legacy token gets no BLE. Bytes
+ * travel as base64. Every message carries `v`; every request a server-assigned `sessionId` and a per-connection
+ * `requestId`.
  */
 export const BLE_PROTOCOL_VERSION = 1;
 
@@ -25,8 +26,13 @@ export const BLE_REQUIRED_OPERATIONS = [
   'cancel',
 ] as const;
 
-/** Legacy token readers parse text frames up to this size in one piece. */
+/** The reader parses each message in one fixed buffer: a BLE request never exceeds this size. */
 export const BLE_MAX_SERVER_FRAME_BYTES = 4096;
+/**
+ * Requests in flight per reader connection, abandoned ones included: a reader cannot grow this without bound. A
+ * reader that announces a smaller `maxPendingRequests` gets that.
+ */
+export const BLE_MAX_PENDING_REQUESTS = 32;
 /** Advertisement data is at most 31 bytes per packet (advertisement + scan response). */
 const MAX_MANUFACTURER_DATA_BYTES = 62;
 const MAX_DETAIL_LENGTH = 64;
@@ -41,6 +47,8 @@ export interface BleReaderCapability {
   maxScanMs: number;
   maxScanResults: number;
   maxAllowlistEntries: number;
+  /** GATT requests the reader queues per session; the API keeps at most this many in flight. */
+  maxPendingRequests: number;
 }
 
 /** `undefined` on the socket: firmware info not received yet. */
@@ -75,6 +83,7 @@ export function parseBleCapability(raw: unknown): BleCapabilityState {
       maxScanMs: boundedInt(ble.maxScanMs, 1, PLUGIN_BLE_LIMITS.scanMaxMs, PLUGIN_BLE_LIMITS.scanMaxMs),
       maxScanResults: boundedInt(ble.maxScanResults, 1, 32, 32),
       maxAllowlistEntries: boundedInt(ble.maxAllowlistEntries, 1, 64, 16),
+      maxPendingRequests: boundedInt(ble.maxPendingRequests, 1, BLE_MAX_PENDING_REQUESTS, BLE_MAX_PENDING_REQUESTS),
     },
   };
 }
@@ -99,16 +108,31 @@ export function base64LengthFor(bytes: number): number {
 
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 
+/** Reader-supplied bytes: decoded, or why not (`malformed`: missing or not base64; `oversized`: above the bound). */
+export type BleDecodedBytes = { bytes: Uint8Array } | { error: 'malformed' | 'oversized' };
+
 /**
  * Decodes reader-supplied base64. The length is checked before decoding, so a reader cannot make the API allocate
- * more than `maxBytes`. Returns null for anything malformed or too long.
+ * more than `maxBytes`.
  */
-export function decodeBleBytes(value: unknown, maxBytes: number): Uint8Array | null {
-  if (typeof value !== 'string' || value.length % 4 !== 0) return null;
-  if (value.length > base64LengthFor(maxBytes) || !BASE64.test(value)) return null;
+export function readBleBytes(value: unknown, maxBytes: number): BleDecodedBytes {
+  if (typeof value !== 'string') return { error: 'malformed' };
+  if (value.length > base64LengthFor(maxBytes)) return { error: 'oversized' };
+  if (value.length % 4 !== 0 || !BASE64.test(value)) return { error: 'malformed' };
   const bytes = Buffer.from(value, 'base64');
-  if (bytes.length > maxBytes) return null;
-  return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.length);
+  if (bytes.length > maxBytes) return { error: 'oversized' };
+  return { bytes: new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.length) };
+}
+
+/** `readBleBytes` for callers that only skip what they cannot use: null for anything malformed or too long. */
+export function decodeBleBytes(value: unknown, maxBytes: number): Uint8Array | null {
+  const decoded = readBleBytes(value, maxBytes);
+  return 'bytes' in decoded ? decoded.bytes : null;
+}
+
+/** A reader-supplied number for a log line: an integer, or `invalid`. Never the reader's raw text. */
+export function loggableInt(value: unknown): string {
+  return typeof value === 'number' && Number.isSafeInteger(value) ? String(value) : 'invalid';
 }
 
 export function encodeBleBytes(value: Uint8Array): string {

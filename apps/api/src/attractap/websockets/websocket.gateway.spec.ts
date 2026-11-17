@@ -4,7 +4,6 @@ import { LicenseModuleType } from '../../license/license.service';
 import { PAIRING_SUBPROTOCOL } from '../security/session-framing';
 import { makeStringLVGLReady, sanitizeForLVGL } from './websocket-lvgl';
 import { registerAttractapGatewayFixture } from './websocket.gateway.attractap-gateway.test-fixture';
-import { makeStringLVGLReady, sanitizeForLVGL } from './websocket-lvgl';
 import { ReaderTimeZoneService } from './reader-time-zone.service';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
 
@@ -362,6 +361,15 @@ describe('AttractapGateway', () => {
         AttractapEventType.CARD_AUTHENTICATION_DATA,
         AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO,
         AttractapEventType.RESOURCE_USAGE_FORM_REQUEST,
+        // Plugin BLE requests travel only from the server to the reader.
+        AttractapEventType.BLE_SCAN,
+        AttractapEventType.BLE_SESSION_OPEN,
+        AttractapEventType.BLE_READ,
+        AttractapEventType.BLE_WRITE,
+        AttractapEventType.BLE_SUBSCRIBE,
+        AttractapEventType.BLE_UNSUBSCRIBE,
+        AttractapEventType.BLE_CANCEL,
+        AttractapEventType.BLE_SESSION_CLOSE,
       ];
 
       for (const type of serverOnlyEvents) {

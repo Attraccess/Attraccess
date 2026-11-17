@@ -3,6 +3,7 @@ import {
   PluginBleCallOptions,
   PluginBleCloseReason,
   PluginBleError,
+  PluginBleErrorCode,
   PluginBleNotificationStream,
   PluginBleProfile,
   PluginBleSession,
@@ -78,10 +79,18 @@ export interface BleSessionEngineDeps {
   connect(signal: AbortSignal, timeoutMs: number): Promise<BleSessionLink>;
   /** Called once the session has fully closed (after the link disconnected or its deadline passed). */
   onClosed(engine: BleSessionEngine): void;
-  /** Debug logging of operation, outcome and duration. Never receives payload bytes. */
-  log?(operation: string, outcome: string, durationMs: number): void;
+  /**
+   * Logging of operation, outcome, duration and, for a failure, its safe `detail` (e.g. `att:0x0a`). Never receives
+   * payload bytes.
+   */
+  log?(operation: string, outcome: string, durationMs: number, detail?: string): void;
   /** A call the engine refused before it reached the link (validation, bounds, closed session). */
   onRejected?(operation: string, error: PluginBleError): void;
+  /**
+   * The engine failed a notification stream itself: its queue overflowed (`NOTIFICATION_OVERFLOW`) or a notification
+   * broke the profile bound. Failures the link reported through `onError` are the link's to count.
+   */
+  onStreamFailed?(errorCode: PluginBleErrorCode, detail?: string): void;
 }
 
 /** How long a close waits for the link to disconnect before the session counts as closed anyway. */
@@ -450,10 +459,19 @@ export class BleSessionEngine {
 
   private deliver(key: string, stream: BleNotificationStream, target: Target, bytes: Uint8Array): void {
     if (!this.owns(key, stream)) return;
+    const wasEnded = stream.ended;
     try {
       stream.push(checkBleInboundPayload(target.characteristic, 'notification', bytes));
     } catch (error) {
       stream.end(toBleError(error, 'subscribe'));
+    }
+    const failure = stream.failure;
+    if (!wasEnded && failure) {
+      try {
+        this.deps.onStreamFailed?.(failure.code, failure.detail);
+      } catch {
+        // Reporting never changes the outcome of a stream.
+      }
     }
     this.dropIfEnded(key, stream, target);
   }
@@ -518,9 +536,9 @@ export class BleSessionEngine {
       const op: ActiveOperation = {
         settled: false,
         controller: new AbortController(),
-        fail: (error) => settle(() => reject(error), error.code),
+        fail: (error) => settle(() => reject(error), error.code, error.detail),
       };
-      const settle = (complete: () => void, outcome: string) => {
+      const settle = (complete: () => void, outcome: string, detail?: string) => {
         if (op.settled) return;
         op.settled = true;
         cancelTimer?.();
@@ -529,7 +547,7 @@ export class BleSessionEngine {
         finished();
         complete();
         try {
-          this.deps.log?.(operation, outcome, this.deps.clock.now() - startedAt);
+          this.deps.log?.(operation, outcome, this.deps.clock.now() - startedAt, detail);
         } catch {
           // Logging never changes the outcome of an operation.
         }

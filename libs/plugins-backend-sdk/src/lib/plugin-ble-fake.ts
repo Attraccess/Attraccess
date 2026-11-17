@@ -97,7 +97,7 @@ export interface FakeBleHostOptions {
   ready?: boolean;
   /** Wall-clock start of the fake clock (ms since 1970). Default 2026-01-01T00:00:00Z. */
   startTime?: number;
-  /** ATT MTU every new connection negotiates (23..517). Default 247. */
+  /** ATT MTU every new connection negotiates, clamped to 23..517. Default 247. */
   mtu?: number;
 }
 
@@ -119,7 +119,7 @@ export interface FakeBleHost {
   notify(address: string, uuid: string, bytes: Uint8Array): void;
   /** The peripheral drops the link: sessions to it close with `disconnected`. */
   disconnect(address: string): Promise<void>;
-  /** ATT MTU for connections opened from now on (23..517). */
+  /** ATT MTU for connections opened from now on, clamped to 23..517. */
   setMtu(mtu: number): void;
   /** Makes the next occurrence of `op` fail with `code`. */
   failNext(op: FakeBleOperation, code: PluginBleErrorCode, options?: { detail?: string }): void;

@@ -1,4 +1,5 @@
 import { PLUGIN_BLE_LIMITS, PluginBleError } from '@attraccess/plugins-backend-sdk';
+import { bleStreamOutcome } from '../../../../metrics/definitions/plugin-ble.metrics';
 import type {
   BleAllowlistEntry,
   BleCallContext,
@@ -6,7 +7,7 @@ import type {
 } from '../../../../plugin-system/ble/ble-transport-driver';
 import { AttractapEventType } from '../../websocket.types';
 import type { ReaderBleChannel, ReaderBleChannelDeps, WirePayload } from './reader-ble-channel';
-import { bleWireError, decodeBleBytes, encodeBleBytes } from './ble-wire';
+import { bleWireError, encodeBleBytes, readBleBytes } from './ble-wire';
 
 /** Every request carries its deadline; a call without one (unsubscribe) gets the default. */
 const opTimeout = (timeoutMs: number | undefined) => timeoutMs ?? PLUGIN_BLE_LIMITS.opTimeoutDefaultMs;
@@ -14,9 +15,16 @@ const opTimeout = (timeoutMs: number | undefined) => timeoutMs ?? PLUGIN_BLE_LIM
 /** Writes without response the API sends ahead of the reader's results. */
 export const BLE_WRITE_WINDOW = 8;
 
+/** A characteristic UUID may appear in several services: the reader and the API key characteristics by both. */
+const characteristicKey = (ref: { serviceUuid: string; characteristicUuid: string }) =>
+  `${ref.serviceUuid}/${ref.characteristicUuid}`;
+
+type StreamOutcome = ReturnType<typeof bleStreamOutcome>;
+
 interface Subscription {
   id: number;
-  characteristicUuid: string;
+  /** `characteristicKey` of the subscribed characteristic. */
+  key: string;
   nextSeq: number;
   maxBytes: number;
   onNotification(value: Uint8Array): void;
@@ -43,7 +51,7 @@ export class ReaderBleLink implements BleDriverLink {
     request: { allowlist: BleAllowlistEntry[]; context: BleCallContext; readerId: number },
     private readonly deps: ReaderBleChannelDeps,
   ) {
-    for (const entry of request.allowlist) this.allowlist.set(entry.characteristicUuid, entry);
+    for (const entry of request.allowlist) this.allowlist.set(characteristicKey(entry), entry);
     const { pluginId, endpointId, profileId } = request.context;
     this.scope = `reader=${request.readerId} endpoint=${endpointId} plugin=${pluginId} profile=${profileId} session=${sessionId}`;
   }
@@ -60,16 +68,20 @@ export class ReaderBleLink implements BleDriverLink {
       'read',
       request,
     );
-    const max = this.allowlist.get(request.characteristicUuid)?.maxReadBytes ?? 0;
-    const value = decodeBleBytes(payload.value ?? '', max);
-    if (!value) {
-      this.deps.metrics?.rejections.inc({ code: 'PAYLOAD_TOO_LARGE' });
-      throw new PluginBleError('PAYLOAD_TOO_LARGE', 'The reader returned a malformed or oversized read result', {
+    const max = this.allowlist.get(characteristicKey(request))?.maxReadBytes ?? 0;
+    const value = readBleBytes(payload.value, max);
+    if ('bytes' in value) return value.bytes;
+    // Counted as a rejection by the session's operation log, like every PAYLOAD_TOO_LARGE.
+    if (value.error === 'oversized') {
+      throw new PluginBleError('PAYLOAD_TOO_LARGE', 'The reader returned a read result above the bound', {
         operation: 'read',
-        detail: 'malformed-result',
+        detail: 'max-read',
       });
     }
-    return value;
+    throw new PluginBleError('INTERNAL', 'The reader returned a malformed read result', {
+      operation: 'read',
+      detail: 'malformed-result',
+    });
   }
 
   async write(request: Parameters<BleDriverLink['write']>[0]): Promise<void> {
@@ -121,12 +133,13 @@ export class ReaderBleLink implements BleDriverLink {
       { signal: request.signal, timeoutMs: opTimeout(request.timeoutMs) },
     );
     // Registered before the answer: the reader may notify right after it wrote the CCCD.
-    this.dropSubscriptionOf(request.characteristicUuid);
+    const key = characteristicKey(request);
+    this.dropSubscriptionOf(key);
     this.subscriptions.set(call.requestId, {
       id: call.requestId,
-      characteristicUuid: request.characteristicUuid,
+      key,
       nextSeq: 1,
-      maxBytes: this.allowlist.get(request.characteristicUuid)?.maxNotificationBytes ?? 0,
+      maxBytes: this.allowlist.get(key)?.maxNotificationBytes ?? 0,
       onNotification: request.onNotification,
       onError: request.onError,
     });
@@ -138,15 +151,21 @@ export class ReaderBleLink implements BleDriverLink {
     }
   }
 
+  /**
+   * Also called by the session engine outside the plugin's operations (a failed stream is torn down), so it never
+   * reports, or consumes, the failure of a pipelined write: that belongs to the plugin's next call.
+   */
   async unsubscribe(request: Parameters<BleDriverLink['unsubscribe']>[0]): Promise<void> {
-    this.dropSubscriptionOf(request.characteristicUuid);
+    this.dropSubscriptionOf(characteristicKey(request));
     if (this.state !== 'open') return;
-    await this.call(
+    const timeoutMs = opTimeout(request.timeoutMs);
+    await this.channel.request(
       AttractapEventType.BLE_UNSUBSCRIBE,
-      { s: request.serviceUuid, c: request.characteristicUuid, timeoutMs: opTimeout(request.timeoutMs) },
+      this.sessionId,
+      { s: request.serviceUuid, c: request.characteristicUuid, timeoutMs },
       'unsubscribe',
-      request,
-    );
+      { timeoutMs },
+    ).result;
   }
 
   async disconnect(): Promise<void> {
@@ -156,10 +175,10 @@ export class ReaderBleLink implements BleDriverLink {
     this.subscriptions.clear();
     const deferred = this.deferredError;
     if (deferred) {
+      // Nobody called again after the failure: the log is the only place it shows up.
       const outcome = deferred.code;
-      const diagnostic = deferred.detail ?? '-';
       this.deps.logger.log(
-        `ble pipelined write failed before close ${this.scope} outcome=${outcome} detail=${diagnostic}`,
+        `ble pipelined write failed before close ${this.scope} outcome=${outcome} detail=${deferred.detail ?? '-'}`,
       );
     }
     await this.channel.closeOnReader(this.sessionId);
@@ -193,39 +212,45 @@ export class ReaderBleLink implements BleDriverLink {
       this.deps.logger.debug?.(`ble dropped notification ${this.scope}: no such subscription`);
       return;
     }
+    // A missing, non-integer or out-of-order seq: the stream can no longer be trusted to be complete.
     if (payload.seq !== subscription.nextSeq) {
       return this.failSubscription(subscription, 'malformed', 'INTERNAL', 'malformed-notification');
     }
     subscription.nextSeq++;
     if (payload.error !== undefined) {
       const error = bleWireError(payload.error, 'subscribe');
-      const outcome = error.code === 'NOTIFICATION_OVERFLOW' ? 'overflow' : 'oversized';
-      return this.failSubscription(subscription, outcome, error.code, error.detail);
+      return this.failSubscription(subscription, bleStreamOutcome(error.code), error.code, error.detail);
     }
-    const value = decodeBleBytes(payload.value, subscription.maxBytes);
-    if (!value) return this.failSubscription(subscription, 'oversized', 'PAYLOAD_TOO_LARGE', 'notification');
-    this.deps.metrics?.notifications.inc({ outcome: 'delivered' });
-    subscription.onNotification(value);
+    const value = readBleBytes(payload.value, subscription.maxBytes);
+    if ('bytes' in value) {
+      this.deps.metrics?.notifications.inc({ outcome: 'delivered' });
+      return subscription.onNotification(value.bytes);
+    }
+    if (value.error === 'oversized') {
+      return this.failSubscription(subscription, 'oversized', 'PAYLOAD_TOO_LARGE', 'max-notification');
+    }
+    this.failSubscription(subscription, 'malformed', 'INTERNAL', 'malformed-notification');
   }
 
   private failSubscription(
     subscription: Subscription,
-    outcome: 'overflow' | 'oversized' | 'malformed',
-    code: PluginBleError['code'],
+    outcome: StreamOutcome,
+    errorCode: PluginBleError['code'],
     detail?: string,
   ): void {
     this.subscriptions.delete(subscription.id);
     this.deps.metrics?.notifications.inc({ outcome });
-    const failure = code;
-    this.deps.logger.log(`ble notification stream failed ${this.scope} outcome=${failure} detail=${detail ?? outcome}`);
+    this.deps.logger.log(
+      `ble notification stream failed ${this.scope} outcome=${outcome} code=${errorCode} detail=${detail ?? '-'}`,
+    );
     subscription.onError?.(
-      new PluginBleError(code, `The notification stream failed (${outcome})`, { operation: 'subscribe', detail }),
+      new PluginBleError(errorCode, `The notification stream failed (${outcome})`, { operation: 'subscribe', detail }),
     );
   }
 
-  private dropSubscriptionOf(characteristicUuid: string): void {
+  private dropSubscriptionOf(key: string): void {
     for (const [id, subscription] of this.subscriptions) {
-      if (subscription.characteristicUuid === characteristicUuid) this.subscriptions.delete(id);
+      if (subscription.key === key) this.subscriptions.delete(id);
     }
   }
 

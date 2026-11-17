@@ -14,6 +14,12 @@ export interface PluginBleMetrics {
 
 export type PluginBleNotificationOutcome = 'delivered' | 'overflow' | 'oversized' | 'malformed';
 
+/** How a failed notification stream is counted: by its error code, whichever side failed it. */
+export function bleStreamOutcome(errorCode: string): Exclude<PluginBleNotificationOutcome, 'delivered'> {
+  if (errorCode === 'NOTIFICATION_OVERFLOW') return 'overflow';
+  return errorCode === 'PAYLOAD_TOO_LARGE' ? 'oversized' : 'malformed';
+}
+
 export function createPluginBleMetrics(registry: Registry): PluginBleMetrics {
   return {
     operations: new Counter({
@@ -24,7 +30,7 @@ export function createPluginBleMetrics(registry: Registry): PluginBleMetrics {
     }),
     operationDuration: new Histogram({
       name: 'attraccess_plugin_ble_operation_duration_seconds',
-      help: 'Duration of plugin BLE operations, including the reader round trip',
+      help: 'Duration of successful plugin BLE operations, including the reader round trip',
       labelNames: ['operation'],
       buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60],
       registers: [registry],

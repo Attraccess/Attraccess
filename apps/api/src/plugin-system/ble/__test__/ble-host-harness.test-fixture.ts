@@ -33,10 +33,9 @@ export interface HostBleHarness extends FakeBleHost {
   /** `reader-websocket` only: the real reader driver and the fake reader connection of each reader. */
   readerDriver?: ReaderBleDriver;
   readers: Map<number, { socket: AuthenticatedWebSocket; firmware: FakeBleReaderFirmware }>;
-  /** `reader-websocket` only: the reader drops its websocket and reconnects on a new one. */
   /**
-   * The reader connects again. `halfOpen`: the old socket stays open, as a TCP connection does after a reader reset
-   * until the heartbeat times out.
+   * `reader-websocket` only: the reader connects again on a new websocket. `halfOpen`: the old socket stays open, as
+   * a TCP connection does after a reader reset until the heartbeat times out.
    */
   reconnectReader(readerId: number, options?: { halfOpen?: boolean }): void;
   clock: ManualClock;

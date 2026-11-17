@@ -60,6 +60,11 @@ export class BleNotificationStream {
     return this.terminal !== null;
   }
 
+  /** What ended the stream, once it has ended. */
+  get failure(): PluginBleError | null {
+    return this.terminal;
+  }
+
   private take(
     options: { timeoutMs?: number; signal?: AbortSignal },
     useTimeout: boolean,

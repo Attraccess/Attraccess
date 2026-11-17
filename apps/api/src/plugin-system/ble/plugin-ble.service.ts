@@ -5,6 +5,7 @@ import {
   normalizeBleEndpointInput,
   normalizeBleEndpointUpdate,
   PluginBleError,
+  type PluginBleErrorCode,
   resolveBleScanDuration,
   resolveBleSessionOptions,
   validateBleEndpointId,
@@ -28,11 +29,11 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { randomUUID } from 'crypto';
 import { DataSource } from 'typeorm';
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../../attractap/events';
-import type { PluginBleMetrics } from '../../metrics/definitions/plugin-ble.metrics';
+import { bleStreamOutcome, type PluginBleMetrics } from '../../metrics/definitions/plugin-ble.metrics';
 import { PLUGIN_BLE_METRICS } from '../../metrics/definitions/tokens';
 import {
   BLE_TRANSPORT_DRIVER,
-  type BleAllowlistEntry,
+  bleAllowlist,
   type BleReaderStatus,
   type BleTransportDriver,
 } from './ble-transport-driver';
@@ -66,20 +67,6 @@ const SCAN_GRACE_MS = 5_000;
 
 /** Codes that mean a call was refused by the profile, the reader's allowlist or a payload bound. */
 const REJECTION_CODES = new Set(['OPERATION_NOT_ALLOWED', 'UNKNOWN_CHARACTERISTIC', 'PAYLOAD_TOO_LARGE']);
-
-/** The profile as the reader firmware enforces it: every characteristic with its operations and bounds. */
-export function bleAllowlist(profile: PluginBleProfile): BleAllowlistEntry[] {
-  return profile.services.flatMap((service) =>
-    service.characteristics.map((characteristic) => ({
-      serviceUuid: service.uuid,
-      characteristicUuid: characteristic.uuid,
-      operations: characteristic.operations,
-      maxReadBytes: characteristic.maxReadBytes ?? 0,
-      maxWriteBytes: characteristic.maxWriteBytes ?? 0,
-      maxNotificationBytes: characteristic.maxNotificationBytes ?? 0,
-    })),
-  );
-}
 
 const realClock: BleSessionClock = {
   now: () => Date.now(),
@@ -268,16 +255,18 @@ export class PluginBleService implements OnModuleDestroy {
           ),
         ),
       ]);
-      // The driver is not trusted to filter: core applies the profile filter again and skips malformed entries.
-      const matches: PluginBleAdvertisement[] = [];
+      // The driver is not trusted to filter: core applies the profile filter again, skips malformed entries and
+      // keeps one entry per address.
+      const matches = new Map<string, PluginBleAdvertisement>();
       for (const entry of Array.isArray(raw) ? raw : []) {
         const advertisement = this.tryNormalizeAdvertisement(entry);
-        if (advertisement && matchesBleAdvertisement(profile, advertisement)) matches.push(advertisement);
+        if (!advertisement || matches.has(advertisement.address)) continue;
+        if (matchesBleAdvertisement(profile, advertisement)) matches.set(advertisement.address, advertisement);
       }
       caller.logger.debug?.(
-        `ble scan reader=${readerId} profile=${profile.id} ok results=${matches.length} ${this.clock.now() - startedAt}ms`,
+        `ble scan reader=${readerId} profile=${profile.id} ok results=${matches.size} ${this.clock.now() - startedAt}ms`,
       );
-      return matches;
+      return [...matches.values()];
     } finally {
       cancelDeadline();
       signal?.removeEventListener('abort', onAbort);
@@ -414,11 +403,12 @@ export class PluginBleService implements OnModuleDestroy {
       onClosed: () => {
         if (this.sessions.get(endpoint.id)?.session === session) this.sessions.delete(endpoint.id);
       },
-      log: (operation, outcome, durationMs) => {
+      log: (operation, outcome, durationMs, detail) => {
         caller.logger.debug?.(`ble ${operation} endpoint=${endpoint.id} ${outcome} ${durationMs}ms`);
-        this.recordOperation(operation, outcome, durationMs, logScope);
+        this.recordOperation(operation, outcome, durationMs, logScope, detail);
       },
       onRejected: (operation, error) => this.recordOperation(operation, error.code, 0, logScope, error.detail),
+      onStreamFailed: (errorCode, detail) => this.recordStreamFailure(errorCode, logScope, detail),
     });
     this.sessions.set(endpoint.id, { session, ...scope, address: endpoint.address });
     this.metrics?.sessionsActive.inc();
@@ -461,6 +451,15 @@ export class PluginBleService implements OnModuleDestroy {
     this.metrics.operations.inc({ operation, outcome });
     if (ok) this.metrics.operationDuration.observe({ operation }, durationMs / 1000);
     if (REJECTION_CODES.has(outcome)) this.metrics.rejections.inc({ code: outcome });
+  }
+
+  /** A notification stream the session engine failed on the API side (queue overflow, profile bound). */
+  private recordStreamFailure(errorCode: PluginBleErrorCode, scope: string, detail?: string) {
+    const outcome = bleStreamOutcome(errorCode);
+    this.logger.log(
+      `ble notification stream failed ${scope} outcome=${outcome} code=${errorCode} detail=${detail ?? '-'}`,
+    );
+    this.metrics?.notifications.inc({ outcome });
   }
 
   private readerStatus(driver: BleTransportDriver, readerId: number): Promise<BleReaderStatus> {

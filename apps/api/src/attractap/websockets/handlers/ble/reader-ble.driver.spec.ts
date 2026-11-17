@@ -1,99 +1,21 @@
 import type { PluginBleContext, PluginBleSession } from '@attraccess/plugins-backend-sdk';
-import { Registry } from 'prom-client';
-import { createPluginBleMetrics } from '../../../../metrics/definitions/plugin-ble.metrics';
-import {
-  createHostBleHarness,
-  type HostBleHarness,
-} from '../../../../plugin-system/ble/__test__/ble-host-harness.test-fixture';
-import { AttractapEventType, type AttractapEvent } from '../../websocket.types';
-import { decodeBleBytes, parseBleCapability } from './ble-wire';
-import {
-  BLE_CONNECT_REPORT_MARGIN_MS,
-  BLE_MAX_PENDING_REQUESTS,
-  BLE_WRITE_WINDOW,
-  type ReaderBleChannel,
-} from './reader-ble-channel';
-
-const SERVICE = 'fff0';
-const ADDRESS = 'AA:BB:CC:DD:EE:01';
-const OTHER = 'AA:BB:CC:DD:EE:02';
-const capture = <T>(promise: Promise<T>) =>
-  promise.then(
-    (value) => ({ ok: true as const, value }),
-    (error: { code?: string; detail?: string }) => ({ ok: false as const, error }),
-  );
-
-const PROFILE = {
-  id: 'demo',
-  advertisement: { serviceUuids: [SERVICE] },
-  services: [
-    {
-      uuid: SERVICE,
-      characteristics: [
-        {
-          key: 'info',
-          uuid: 'fff1',
-          operations: ['read' as const, 'write' as const],
-          maxReadBytes: 16,
-          maxWriteBytes: 8,
-        },
-        { key: 'events', uuid: 'fff2', operations: ['notify' as const], maxNotificationBytes: 8 },
-        { key: 'bulk', uuid: 'fff3', operations: ['writeWithoutResponse' as const], maxWriteBytes: 512 },
-        { key: 'slow', uuid: 'fff4', operations: ['read' as const], maxReadBytes: 4 },
-      ],
-    },
-  ],
-  limits: { maxSessionMs: 900_000, maxNotificationQueue: 4 },
-};
+import type { HostBleHarness } from '../../../../plugin-system/ble/__test__/ble-host-harness.test-fixture';
+import { AttractapEventType } from '../../websocket.types';
+import { decodeBleBytes, parseBleCapability, readBleBytes } from './ble-wire';
+import { BLE_CONNECT_REPORT_MARGIN_MS, BLE_WRITE_WINDOW } from './reader-ble-channel';
+import { FAKE_READER_BLE_CAPABILITY } from './__test__/fake-ble-reader.test-fixture';
+import { ADDRESS, capture, OTHER, PROFILE, useReaderBleSpec } from './__test__/reader-ble-spec.test-fixture';
 
 describe('ReaderBleDriver (plugin BLE over the reader websocket)', () => {
+  const spec = useReaderBleSpec();
+  const { present, reader, driver, firmware, socket, sent, fromReader, endpoint, flush, until } = spec;
   let harness: HostBleHarness;
   let ble: PluginBleContext;
   let other: PluginBleContext;
 
-  /** The value, or a test failure: fixtures that must exist. */
-  const present = <T>(value: T | undefined | null): T => {
-    if (value === undefined || value === null) throw new Error('expected a value');
-    return value;
-  };
-  const reader = (readerId = 1) => present(harness.readers.get(readerId));
-  const driver = () => present(harness.readerDriver);
-  const firmware = (readerId = 1) => reader(readerId).firmware;
-  const socket = (readerId = 1) => reader(readerId).socket;
-  const sent = (type: AttractapEventType, readerId = 1) =>
-    firmware(readerId).received.filter((message) => message.type === type);
-  /** A message the reader (firmware) sends, injected as if it arrived on `target`'s socket. */
-  const fromReader = (target: ReturnType<typeof socket>, type: AttractapEventType, payload: Record<string, unknown>) =>
-    driver().handleMessage(target, { type, payload } as AttractapEvent['data']);
-  const endpoint = (address = ADDRESS, ctx = ble) =>
-    ctx.createEndpoint({ readerId: 1, address, addressType: 'public', profileId: PROFILE.id });
-  const flush = () => harness.advance(0);
-  /** Waits through real I/O (the endpoint lookups run on SQLite) until `condition` holds. */
-  const until = async (condition: () => boolean) => {
-    const deadline = Date.now() + 10_000;
-    while (!condition() && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 5));
-    expect(condition()).toBe(true);
-  };
-
-  beforeEach(async () => {
-    harness = await createHostBleHarness({ transport: 'reader-websocket' });
-    ble = harness.contextFor('plugin-a');
-    other = harness.contextFor('plugin-b');
-    await harness.addReader({ readerId: 1, name: 'Workshop', allowPluginBle: true });
-    for (const address of [ADDRESS, OTHER]) {
-      harness.addPeripheral({
-        readerId: 1,
-        address,
-        addressType: 'public',
-        advertisement: { name: 'Demo', serviceUuids: [SERVICE] },
-        characteristics: { fff1: { value: Uint8Array.of(1, 2, 3) }, fff2: {}, fff3: {}, fff4: { delayMs: 20_000 } },
-      });
-    }
-    ble.registerProfile(PROFILE);
-    other.registerProfile(PROFILE);
+  beforeEach(() => {
+    ({ harness, ble, other } = spec);
   });
-
-  afterEach(() => harness.dispose());
 
   describe('capability negotiation', () => {
     it.each([
@@ -129,6 +51,21 @@ describe('ReaderBleDriver (plugin BLE over the reader websocket)', () => {
       });
     });
 
+    it.each([
+      ['a legacy token connection', { transport: 'legacy' as const, pairingRequired: false }],
+      ['a connection of unknown transport', { transport: undefined, pairingRequired: false }],
+      ['a session that has not signed in yet', { transport: 'session' as const, pairingRequired: undefined }],
+    ])('offers no BLE on %s, even with a BLE capable firmware', async (_name, connection) => {
+      socket().transport = connection.transport;
+      socket().state.pairingRequired = connection.pairingRequired;
+      await expect(ble.scan(1, PROFILE.id)).rejects.toMatchObject({
+        code: 'READER_OFFLINE',
+        detail: 'pairing-required',
+      });
+      expect((await ble.listReaders())[0].available).toBe(false);
+      expect(firmware().received).toEqual([]);
+    });
+
     it('clamps announced limits and refuses profiles larger than the reader allowlist', async () => {
       socket().state.ble = parseBleCapability({
         version: 1,
@@ -137,6 +74,8 @@ describe('ReaderBleDriver (plugin BLE over the reader websocket)', () => {
         maxAllowlistEntries: 2,
       });
       expect(socket().state.ble).toMatchObject({ capability: { maxMtu: 517, maxAllowlistEntries: 2 } });
+      // Older firmware does not announce its queue: the API's own cap applies.
+      expect(socket().state.ble).toMatchObject({ capability: { maxPendingRequests: 32 } });
       const created = await endpoint();
       await expect(ble.openSession(created.id)).rejects.toMatchObject({
         code: 'READER_UNSUPPORTED',
@@ -249,6 +188,61 @@ describe('ReaderBleDriver (plugin BLE over the reader websocket)', () => {
       driver().socketClosed(stale);
       await expect(again.read('info')).resolves.toEqual(Uint8Array.of(1, 2, 3));
       await again.close();
+    });
+
+    it('ignores answers, notifications and ends on a half-open stale socket, before and after it closes', async () => {
+      const created = await endpoint();
+      const stale = socket();
+      harness.reconnectReader(1, { halfOpen: true });
+      driver().readerConnected(socket());
+      expect(stale.readyState).toBe(1);
+      const session = await ble.openSession(created.id);
+      const stream = await session.subscribe('events');
+      const [subscribe] = sent(AttractapEventType.BLE_SUBSCRIBE);
+      firmware().silent = true;
+      let settled = false;
+      const pending = capture(session.read('info')).finally(() => (settled = true));
+      await flush();
+      const [read] = sent(AttractapEventType.BLE_READ);
+      const ids = { v: 1, sessionId: session.id };
+      const injectOnStale = () => {
+        fromReader(stale, AttractapEventType.BLE_RESULT, {
+          ...ids,
+          requestId: read.payload.requestId,
+          ok: true,
+          value: 'AQ==',
+        });
+        fromReader(stale, AttractapEventType.BLE_NOTIFICATION, {
+          ...ids,
+          subscriptionId: subscribe.payload.requestId,
+          seq: 1,
+          value: 'Ag==',
+        });
+        fromReader(stale, AttractapEventType.BLE_SESSION_ENDED, { ...ids, reason: 'disconnected' });
+      };
+      injectOnStale();
+      await flush();
+      expect(settled).toBe(false);
+      expect(harness.openSessions()).toHaveLength(1);
+      // The stale socket finally closes (heartbeat timeout); late frames before that are ignored just the same.
+      (stale as unknown as { readyState: number }).readyState = 3;
+      driver().socketClosed(stale);
+      injectOnStale();
+      await flush();
+      expect(settled).toBe(false);
+      expect(harness.openSessions()).toHaveLength(1);
+      firmware().silent = false;
+      spec.answer(read, { ok: true, value: 'BwgJ' });
+      await expect(pending).resolves.toEqual({ ok: true, value: Uint8Array.of(7, 8, 9) });
+      // seq 1 of the subscription is still unused: the stale notification never reached it.
+      fromReader(socket(), AttractapEventType.BLE_NOTIFICATION, {
+        ...ids,
+        subscriptionId: subscribe.payload.requestId,
+        seq: 1,
+        value: 'Aw==',
+      });
+      expect((await stream.next()).value).toEqual(Uint8Array.of(3));
+      await session.close();
     });
 
     it('never lets a stale socket complete, reject or close work of the reconnected reader (ATT-1031)', async () => {
@@ -408,7 +402,10 @@ describe('ReaderBleDriver (plugin BLE over the reader websocket)', () => {
         ...payload,
       });
 
+    let registry: ReturnType<typeof spec.withMetrics>['registry'];
+
     beforeEach(async () => {
+      ({ registry } = spec.withMetrics());
       session = await ble.openSession((await endpoint()).id);
     });
 
@@ -432,15 +429,50 @@ describe('ReaderBleDriver (plugin BLE over the reader websocket)', () => {
     });
 
     it.each([
-      [{ seq: 1, error: { code: 'NOTIFICATION_OVERFLOW', detail: 'queue' } }, 'NOTIFICATION_OVERFLOW'],
-      [{ seq: 1, error: { code: 'PAYLOAD_TOO_LARGE' } }, 'PAYLOAD_TOO_LARGE'],
-      [{ seq: 1, value: 'AAAAAAAAAAAA' }, 'PAYLOAD_TOO_LARGE'],
-      [{ seq: 1, value: 'not base64!' }, 'PAYLOAD_TOO_LARGE'],
-      [{ seq: 3, value: 'AQ==' }, 'INTERNAL'],
-    ])('fails the stream, never drops silently: %j', async (payload, code) => {
+      // Reported by the reader.
+      [
+        { seq: 1, error: { code: 'NOTIFICATION_OVERFLOW', detail: 'queue' } },
+        'NOTIFICATION_OVERFLOW',
+        'queue',
+        'overflow',
+      ],
+      [
+        { seq: 1, error: { code: 'PAYLOAD_TOO_LARGE', detail: 'max-notification' } },
+        'PAYLOAD_TOO_LARGE',
+        'max-notification',
+        'oversized',
+      ],
+      [{ seq: 1, error: { code: 'GATT_ERROR', detail: 'att:0x0e' } }, 'GATT_ERROR', 'att:0x0e', 'malformed'],
+      // Found by the API.
+      [{ seq: 1, value: 'AAAAAAAAAAAA' }, 'PAYLOAD_TOO_LARGE', 'max-notification', 'oversized'],
+      [{ seq: 1, value: 'A'.repeat(4096) }, 'PAYLOAD_TOO_LARGE', 'max-notification', 'oversized'],
+      [{ seq: 1, value: 'not base64!' }, 'INTERNAL', 'malformed-notification', 'malformed'],
+      [{ seq: 1, value: 42 }, 'INTERNAL', 'malformed-notification', 'malformed'],
+      [{ seq: 1 }, 'INTERNAL', 'malformed-notification', 'malformed'],
+      [{ seq: 3, value: 'AQ==' }, 'INTERNAL', 'malformed-notification', 'malformed'],
+      [{ value: 'AQ==' }, 'INTERNAL', 'malformed-notification', 'malformed'],
+      [{ seq: 1.5, value: 'AQ==' }, 'INTERNAL', 'malformed-notification', 'malformed'],
+      [{ seq: '1', value: 'AQ==' }, 'INTERNAL', 'malformed-notification', 'malformed'],
+      [{ seq: 0, value: 'AQ==' }, 'INTERNAL', 'malformed-notification', 'malformed'],
+    ])('fails the stream, never drops silently: %j', async (payload, code, detail, outcome) => {
       const stream = await subscribe();
       notify(payload);
-      await expect(stream.next()).rejects.toMatchObject({ code });
+      await expect(stream.next()).rejects.toMatchObject({ code, detail });
+      const text = await registry.metrics();
+      expect(text).toContain(`attraccess_plugin_ble_notifications_total{outcome="${outcome}"} 1`);
+      expect(text).not.toContain('outcome="delivered"');
+      await session.close();
+    });
+
+    it('ignores notifications and session ends with an unknown protocol version', async () => {
+      const stream = await subscribe();
+      notify({ v: 2, seq: 1, value: 'CQ==' });
+      fromReader(socket(), AttractapEventType.BLE_SESSION_ENDED, { v: 2, sessionId: session.id, reason: 'ota' });
+      await flush();
+      expect(harness.openSessions()).toHaveLength(1);
+      // seq 1 was not used up by the ignored message.
+      notify({ seq: 1, value: 'AQ==' });
+      expect((await stream.next()).value).toEqual(Uint8Array.of(1));
       await session.close();
     });
 
@@ -556,28 +588,59 @@ describe('ReaderBleDriver (plugin BLE over the reader websocket)', () => {
         ok: true,
         value: 'A'.repeat(4096),
       });
-      await expect(reading).resolves.toMatchObject({ ok: false, error: { code: 'PAYLOAD_TOO_LARGE' } });
+      await expect(reading).resolves.toMatchObject({
+        ok: false,
+        error: { code: 'PAYLOAD_TOO_LARGE', detail: 'max-read' },
+      });
       firmware().silent = false;
+      await session.close();
+    });
+
+    it.each([
+      ['not base64', { value: 'not base64!' }],
+      ['not a string', { value: 7 }],
+      ['missing', {}],
+    ])('fails a read whose value is %s with INTERNAL malformed-result', async (_name, result) => {
+      const session = await ble.openSession((await endpoint()).id);
+      firmware().silent = true;
+      const reading = capture(session.read('info'));
+      await flush();
+      spec.answer(sent(AttractapEventType.BLE_READ)[0], { ok: true, ...result });
+      await expect(reading).resolves.toMatchObject({
+        ok: false,
+        error: { code: 'INTERNAL', detail: 'malformed-result' },
+      });
+      firmware().silent = false;
+      await expect(session.read('info')).resolves.toEqual(Uint8Array.of(1, 2, 3));
       await session.close();
     });
   });
 
   describe('bounds', () => {
-    it('length-checks base64 before decoding', () => {
+    it('length-checks base64 before decoding and tells malformed from oversized', () => {
       expect(decodeBleBytes('AQID', 3)).toEqual(Uint8Array.of(1, 2, 3));
       expect(decodeBleBytes('AQIDBA==', 3)).toBeNull();
       expect(decodeBleBytes('A'.repeat(1_000_000), 512)).toBeNull();
       expect(decodeBleBytes('AQI', 3)).toBeNull();
       expect(decodeBleBytes(42, 3)).toBeNull();
+      expect(readBleBytes('', 3)).toEqual({ bytes: new Uint8Array(0) });
+      expect(readBleBytes('AQIDBA==', 3)).toEqual({ error: 'oversized' });
+      expect(readBleBytes('AQIDBA==', 4)).toEqual({ bytes: Uint8Array.of(1, 2, 3, 4) });
+      expect(readBleBytes('AAAAAA==', 3)).toEqual({ error: 'oversized' });
+      expect(readBleBytes('A'.repeat(1_000_000), 512)).toEqual({ error: 'oversized' });
+      expect(readBleBytes('AQI', 3)).toEqual({ error: 'malformed' });
+      expect(readBleBytes('AQ!D', 3)).toEqual({ error: 'malformed' });
+      expect(readBleBytes(42, 3)).toEqual({ error: 'malformed' });
+      expect(readBleBytes(undefined, 3)).toEqual({ error: 'malformed' });
     });
 
-    it('caps the requests waiting for one reader connection', async () => {
+    it('caps the requests waiting for one reader connection at what the reader announced', async () => {
+      const cap = FAKE_READER_BLE_CAPABILITY.maxPendingRequests;
       const session = await ble.openSession((await endpoint()).id);
       firmware().silent = true;
-      const channels = (driver() as unknown as { channels: WeakMap<object, ReaderBleChannel> }).channels;
-      const channel = present(channels.get(socket()));
+      const channel = spec.channel();
       const results: Array<Promise<unknown>> = [];
-      for (let i = channel.pendingCount; i < BLE_MAX_PENDING_REQUESTS; i++) {
+      for (let i = channel.pendingCount; i < cap; i++) {
         results.push(
           channel.request(AttractapEventType.BLE_READ, session.id, {}, 'read').result.catch(() => undefined),
         );
@@ -640,44 +703,75 @@ describe('ReaderBleDriver (plugin BLE over the reader websocket)', () => {
   });
 
   describe('cleanup', () => {
-    it('is idempotent across close, reader end and socket loss in any order', async () => {
-      for (const order of [
-        ['close', 'ended', 'socket'],
-        ['close', 'socket', 'ended'],
-        ['ended', 'close', 'socket'],
-        ['ended', 'socket', 'close'],
-        ['socket', 'close', 'ended'],
-        ['socket', 'ended', 'close'],
-      ]) {
-        const session = await ble.openSession((await ble.listEndpoints()).at(0)?.id ?? (await endpoint()).id);
+    type Step = 'close' | 'ended' | 'socket';
+    /** What the first cause decides: the pending call's error and the close reason. */
+    const decidedBy: Record<Step, { error: Record<string, string>; reason: string; closesSent: number }> = {
+      close: { error: { code: 'SESSION_CLOSED' }, reason: 'closed', closesSent: 1 },
+      ended: { error: { code: 'DISCONNECTED' }, reason: 'disconnected', closesSent: 0 },
+      socket: { error: { code: 'DISCONNECTED', detail: 'reader-link-lost' }, reason: 'disconnected', closesSent: 0 },
+    };
+
+    const orders: Step[][] = [
+      ['close', 'ended', 'socket'],
+      ['close', 'socket', 'ended'],
+      ['ended', 'close', 'socket'],
+      ['ended', 'socket', 'close'],
+      ['socket', 'close', 'ended'],
+      ['socket', 'ended', 'close'],
+      ['close', 'ended'],
+      ['close', 'socket'],
+      ['ended', 'socket'],
+      ['socket', 'ended'],
+      ['close'],
+      ['ended'],
+      ['socket'],
+    ];
+
+    it.each(orders.map((order) => [order.join(' > '), order] as const))(
+      'is idempotent, and the first cause decides the outcome: %s',
+      async (_name, order) => {
+        const { metrics } = spec.withMetrics();
+        const decrements = jest.spyOn(metrics.sessionsActive, 'dec');
+        const closes = jest.spyOn(metrics.sessionCloses, 'inc');
+        const session = await ble.openSession((await endpoint()).id);
         const pending = capture(session.read('slow'));
         await flush();
         const target = socket();
+        const firmwares = new Set([firmware()]);
         for (const step of order) {
           if (step === 'close') void session.close();
-          if (step === 'ended')
-            fromReader(target, AttractapEventType.BLE_SESSION_ENDED, {
-              v: 1,
-              sessionId: session.id,
-              reason: 'disconnected',
-            });
+          if (step === 'ended') {
+            // The peripheral drops: the reader reports the end; a duplicate on the old socket changes nothing.
+            await harness.disconnect(ADDRESS);
+            fromReader(target, AttractapEventType.BLE_SESSION_ENDED, { v: 1, sessionId: session.id, reason: 'gone' });
+          }
           if (step === 'socket') harness.reconnectReader(1);
+          firmwares.add(firmware());
+          // Never past an operation deadline: every cause settles on its own.
           await flush();
         }
-        await harness.advance(20_000);
-        await expect(pending).resolves.toMatchObject({ ok: false });
-        await expect(session.closed).resolves.toMatchObject({ reason: expect.any(String) });
+        const expected = decidedBy[order[0]];
+        await expect(pending).resolves.toMatchObject({ ok: false, error: expected.error });
+        await expect(session.closed).resolves.toEqual({ reason: expected.reason });
+        const closeRequests = [...firmwares].flatMap((candidate) =>
+          candidate.received.filter(
+            (message) =>
+              message.type === AttractapEventType.BLE_SESSION_CLOSE && message.payload.sessionId === session.id,
+          ),
+        );
+        expect(closeRequests).toHaveLength(expected.closesSent);
         expect(harness.openSessions()).toEqual([]);
-      }
-      expect(harness.driver.liveLinks).toBe(0);
-    });
+        expect(harness.driver.liveLinks).toBe(0);
+        expect(decrements).toHaveBeenCalledTimes(1);
+        expect(closes).toHaveBeenCalledTimes(1);
+        expect(closes).toHaveBeenCalledWith({ reason: expected.reason });
+      },
+    );
   });
 
   describe('metrics', () => {
     it('counts notifications by outcome without reader or session labels', async () => {
-      const registry = new Registry();
-      const metrics = createPluginBleMetrics(registry);
-      (harness.readerDriver as unknown as { metrics: unknown }).metrics = metrics;
+      const { registry } = spec.withMetrics();
       const session = await ble.openSession((await endpoint()).id);
       const stream = await session.subscribe('events');
       harness.notify(ADDRESS, 'fff2', Uint8Array.of(1));

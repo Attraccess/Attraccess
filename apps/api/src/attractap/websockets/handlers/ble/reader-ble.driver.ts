@@ -11,7 +11,7 @@ import type {
 } from '../../../../plugin-system/ble/ble-transport-driver';
 import { WebsocketService } from '../../websocket.service';
 import { AttractapEventType, type AttractapEvent, type AuthenticatedWebSocket } from '../../websocket.types';
-import { BLE_PROTOCOL_VERSION } from './ble-wire';
+import { BLE_PROTOCOL_VERSION, loggableInt } from './ble-wire';
 import { ReaderBleChannel } from './reader-ble-channel';
 
 const realClock: BleSessionClock = {
@@ -43,7 +43,10 @@ export class ReaderBleDriver implements BleTransportDriver {
   readerStatus(readerId: number): BleReaderStatus {
     const socket = this.currentSocket(readerId);
     if (!socket) return { status: 'offline' };
-    if (socket.state.pairingRequired) return { status: 'offline', detail: 'pairing-required' };
+    // BLE only travels on the paired reader link: a reader on its legacy token connection must pair first.
+    if (socket.transport !== 'session' || socket.state.pairingRequired !== false) {
+      return { status: 'offline', detail: 'pairing-required' };
+    }
     const ble = socket.state.ble;
     if (!ble) return { status: 'offline', detail: 'firmware-info-pending' };
     if ('detail' in ble) return { status: 'unsupported', detail: ble.detail };
@@ -65,13 +68,15 @@ export class ReaderBleDriver implements BleTransportDriver {
     const version = payload.v;
     if (version !== BLE_PROTOCOL_VERSION) {
       this.logger.warn(
-        `Ignoring ${eventData.type} with unsupported protocol version ${String(version)} from reader ${socket.readerId}`,
+        `ble ignored message type=${eventData.type} reader=${socket.readerId} v=${loggableInt(version)}: unsupported protocol version`,
       );
       return;
     }
     const channel = this.channels.get(socket);
     if (!channel) {
-      this.logger.debug(`Dropping ${eventData.type} from client ${socket.id}: no BLE work on this connection`);
+      this.logger.debug(
+        `ble dropped message type=${eventData.type} reader=${socket.readerId} client=${socket.id}: no BLE work on this connection`,
+      );
       return;
     }
     switch (eventData.type) {

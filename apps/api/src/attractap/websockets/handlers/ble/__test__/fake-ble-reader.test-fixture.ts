@@ -15,6 +15,7 @@ export const FAKE_READER_BLE_CAPABILITY = {
   maxScanMs: 15_000,
   maxScanResults: 32,
   maxAllowlistEntries: 16,
+  maxPendingRequests: 16,
 };
 
 type Payload = Record<string, unknown>;
@@ -35,8 +36,8 @@ interface Session {
   link: BleDriverLink | null;
   /** Operations run one at a time, like the firmware's BLE task. */
   tail: Promise<unknown>;
-  /** Per subscription (the BLE_SUBSCRIBE requestId): its characteristic and the last `seq` sent. */
-  subscriptions: Map<number, { c: string; seq: number }>;
+  /** Per subscription (the BLE_SUBSCRIBE requestId): its service, characteristic and the last `seq` sent. */
+  subscriptions: Map<number, { s: string; c: string; seq: number }>;
 }
 
 /**
@@ -232,7 +233,7 @@ export class FakeBleReaderFirmware {
         case AttractapEventType.BLE_READ: {
           if (!(entry.ops & 1)) throw new PluginBleError('OPERATION_NOT_ALLOWED', 'no', { detail: 'read' });
           const value = await link.read(ref);
-          if (value.length > entry.r) throw new PluginBleError('PAYLOAD_TOO_LARGE', 'read', { detail: 'read' });
+          if (value.length > entry.r) throw new PluginBleError('PAYLOAD_TOO_LARGE', 'read', { detail: 'max-read' });
           return { value: encodeBleBytes(value) };
         }
         case AttractapEventType.BLE_WRITE: {
@@ -252,7 +253,7 @@ export class FakeBleReaderFirmware {
           if (!(entry.ops & (payload.indicate ? 16 : 8))) {
             throw new PluginBleError('OPERATION_NOT_ALLOWED', 'no', { detail: 'subscribe' });
           }
-          session.subscriptions.set(requestId, { c: entry.c, seq: 0 });
+          session.subscriptions.set(requestId, { s: entry.s, c: entry.c, seq: 0 });
           await link.subscribe({
             ...ref,
             indicate: payload.indicate === true,
@@ -262,7 +263,7 @@ export class FakeBleReaderFirmware {
         }
         case AttractapEventType.BLE_UNSUBSCRIBE:
           for (const [id, subscription] of session.subscriptions) {
-            if (subscription.c === entry.c) session.subscriptions.delete(id);
+            if (subscription.s === entry.s && subscription.c === entry.c) session.subscriptions.delete(id);
           }
           await link.unsubscribe({ serviceUuid: entry.s, characteristicUuid: entry.c });
           return {};
@@ -293,7 +294,7 @@ export class FakeBleReaderFirmware {
       session.subscriptions.delete(subscriptionId);
       return this.answer(
         AttractapEventType.BLE_NOTIFICATION,
-        { ...base, error: { code: 'PAYLOAD_TOO_LARGE', detail: 'notification' } },
+        { ...base, error: { code: 'PAYLOAD_TOO_LARGE', detail: 'max-notification' } },
         true,
       );
     }
@@ -314,7 +315,9 @@ export function createFakeReaderSocket(options: {
     id: options.id,
     readerId: options.readerId,
     readyState: 1,
-    state: { ble: parseBleCapability(options.capability ?? FAKE_READER_BLE_CAPABILITY) },
+    // A paired reader: plugin BLE only travels on the session transport.
+    transport: 'session',
+    state: { pairingRequired: false, ble: parseBleCapability(options.capability ?? FAKE_READER_BLE_CAPABILITY) },
   } as unknown as AuthenticatedWebSocket;
   const firmware = new FakeBleReaderFirmware(options.readerId, options.radio, (type, payload, sync) => {
     const eventData = { type, payload } as AttractapEvent['data'];

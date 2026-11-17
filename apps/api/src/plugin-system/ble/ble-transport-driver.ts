@@ -1,4 +1,9 @@
-import type { PluginBleAdvertisement, PluginBleAddressType, PluginBleOperation } from '@attraccess/plugins-backend-sdk';
+import type {
+  PluginBleAdvertisement,
+  PluginBleAddressType,
+  PluginBleOperation,
+  PluginBleProfile,
+} from '@attraccess/plugins-backend-sdk';
 import type { BleSessionLink } from '@attraccess/plugins-backend-sdk/internal';
 
 /**
@@ -42,6 +47,20 @@ export interface BleAllowlistEntry {
   maxReadBytes: number;
   maxWriteBytes: number;
   maxNotificationBytes: number;
+}
+
+/** The profile as the reader firmware enforces it: every characteristic with its operations and bounds. */
+export function bleAllowlist(profile: PluginBleProfile): BleAllowlistEntry[] {
+  return profile.services.flatMap((service) =>
+    service.characteristics.map((characteristic) => ({
+      serviceUuid: service.uuid,
+      characteristicUuid: characteristic.uuid,
+      operations: characteristic.operations,
+      maxReadBytes: characteristic.maxReadBytes ?? 0,
+      maxWriteBytes: characteristic.maxWriteBytes ?? 0,
+      maxNotificationBytes: characteristic.maxNotificationBytes ?? 0,
+    })),
+  );
 }
 
 /** Who a call belongs to, for logs only. Never sent to the reader. */

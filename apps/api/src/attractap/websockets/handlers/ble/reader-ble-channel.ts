@@ -10,20 +10,26 @@ import type {
 } from '../../../../plugin-system/ble/ble-transport-driver';
 import { AttractapEvent, AttractapEventType, type AuthenticatedWebSocket } from '../../websocket.types';
 import {
+  BLE_MAX_PENDING_REQUESTS,
   BLE_MAX_SERVER_FRAME_BYTES,
   BLE_PROTOCOL_VERSION,
   bleWireError,
   decodeBleAdvertisement,
   encodeBleOperations,
+  loggableInt,
   safeBleDetail,
   type BleReaderCapability,
 } from './ble-wire';
 import { ReaderBleLink } from './reader-ble-link';
 
+export { BLE_MAX_PENDING_REQUESTS } from './ble-wire';
 export { BLE_WRITE_WINDOW } from './reader-ble-link';
 
-/** Requests in flight per reader connection, abandoned ones included: a reader cannot grow this without bound. */
-export const BLE_MAX_PENDING_REQUESTS = 32;
+/**
+ * Session closes may go beyond the request cap by this many: a cap full of abandoned requests must never keep the
+ * API from telling the reader to let go of the peripheral.
+ */
+export const BLE_CLOSE_RESERVE = 4;
 /** How long a request may wait for the reader beyond its own timeout before the API gives up on it. */
 const REQUEST_GRACE_MS = 5_000;
 /** Close and cancellation answers the API waits for before it frees the reader on its side anyway. */
@@ -114,11 +120,13 @@ export class ReaderBleChannel {
       onAbandoned?: () => void;
       /** The entry is gone: the reader answered, the deadline passed or the socket closed. */
       onDone?: () => void;
+      /** A session close: it may use the reserve above the request cap. */
+      close?: boolean;
     } = {},
   ): { requestId: number; result: Promise<WirePayload> } {
     if (this.closed) throw linkLost(operation);
     if (options.signal?.aborted) throw new PluginBleError('CANCELLED', `${operation} was cancelled`, { operation });
-    if (this.pending.size >= BLE_MAX_PENDING_REQUESTS) {
+    if (this.pending.size >= this.maxPending() + (options.close ? BLE_CLOSE_RESERVE : 0)) {
       throw new PluginBleError('READER_BUSY', 'Too many BLE requests are waiting for the reader', {
         operation,
         detail: 'queue-full',
@@ -177,6 +185,12 @@ export class ReaderBleChannel {
     return { requestId, result };
   }
 
+  /** The API's cap, or the smaller one the reader announced. */
+  private maxPending(): number {
+    const announced = this.deps.capability()?.maxPendingRequests ?? BLE_MAX_PENDING_REQUESTS;
+    return Math.min(BLE_MAX_PENDING_REQUESTS, announced);
+  }
+
   private remove(entry: PendingRequest): void {
     if (this.pending.get(entry.requestId) !== entry) return;
     this.pending.delete(entry.requestId);
@@ -205,10 +219,11 @@ export class ReaderBleChannel {
 
   /** The reader's terminal answer (BLE_RESULT / BLE_SCAN_RESULT). Stale or unknown answers are dropped. */
   handleResult(payload: WirePayload): void {
-    const entry = typeof payload.requestId === 'number' ? this.pending.get(payload.requestId) : undefined;
+    const requestId = payload.requestId;
+    const entry = typeof requestId === 'number' ? this.pending.get(requestId) : undefined;
     if (!entry || entry.sessionId !== payload.sessionId) {
       this.deps.logger.debug?.(
-        `ble dropped result reader=${this.readerId} request=${String(payload.requestId)}: unknown or stale`,
+        `ble dropped result reader=${this.readerId} request=${loggableInt(requestId)}: unknown or stale`,
       );
       return;
     }
@@ -310,12 +325,16 @@ export class ReaderBleChannel {
     }
     const payload = await call.result;
     const raw = Array.isArray(payload.advertisements) ? payload.advertisements : [];
-    const advertisements: PluginBleAdvertisement[] = [];
-    for (const entry of raw.slice(0, capability.maxScanResults)) {
+    // One entry per address (the first), deduplicated before the cap so repeats cannot crowd out other devices.
+    const advertisements = new Map<string, PluginBleAdvertisement>();
+    for (const entry of raw) {
+      if (advertisements.size >= capability.maxScanResults) break;
       const advertisement = decodeBleAdvertisement(entry);
-      if (advertisement) advertisements.push(advertisement);
+      if (advertisement && !advertisements.has(advertisement.address)) {
+        advertisements.set(advertisement.address, advertisement);
+      }
     }
-    return advertisements;
+    return [...advertisements.values()];
   }
 
   // ------------------------------------------------------------- connect
@@ -377,6 +396,7 @@ export class ReaderBleChannel {
     try {
       call = this.request(AttractapEventType.BLE_SESSION_CLOSE, sessionId, {}, 'close', {
         deadlineMs: CLOSE_DEADLINE_MS,
+        close: true,
       });
     } catch {
       this.release(sessionId, 'closed');
