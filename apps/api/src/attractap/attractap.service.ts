@@ -27,9 +27,13 @@ import { AttractapFirmwareService } from './firmware.service';
 
 import { AttractapCrashReportDto } from './dtos/crash-report.dto';
 
+import { toCrashReportDto } from './dtos/crash-report.mapper';
+
 import { ReaderCrashReportPayload } from './websockets/websocket.types';
 
 import { randomBytes } from 'crypto';
+
+import { Semaphore } from 'async-mutex';
 
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from './events';
 
@@ -53,6 +57,12 @@ import * as en from './rfid-card-notification.en.json';
 
 export const t = createTranslator({ en, de });
 
+/**
+ * Coredumps symbolicated at once. Each run spawns esp-coredump and gdb; after a rollout many readers upload
+ * their stranded dumps together, and the rest wait their turn.
+ */
+export const SYMBOLICATION_CONCURRENCY = 2;
+
 @Injectable()
 export class AttractapService {
   public constructor(
@@ -74,14 +84,26 @@ export class AttractapService {
 
   protected readonly logger = new Logger(AttractapService.name);
 
+  protected readonly symbolicationSlots = new Semaphore(SYMBOLICATION_CONCURRENCY);
+
+  /**
+   * Stores a crash report. A legacy reader sends its dump inline; a newer one announces `expectedCoredump`
+   * and uploads it in chunks afterwards (ATT-1144), so the report waits for it (`coredumpStatus: awaiting`).
+   * A dump the server refused is recorded as `rejected` (with its announced size, if valid) so admins know
+   * the reader still holds one.
+   */
   public async createCrashReport(
     readerId: number,
     payload: ReaderCrashReportPayload,
+    expectedCoredump: { size: number; crc32: number } | null = null,
+    rejectedCoredump: { size: number | null } | null = null,
   ): Promise<AttractapCrashReportRecord> {
     const coredump =
       typeof payload.coredumpBase64 === 'string' && payload.coredumpBase64.length > 0
         ? Buffer.from(payload.coredumpBase64, 'base64')
         : null;
+    const awaiting = !coredump && expectedCoredump !== null;
+    const rejected = !coredump && !awaiting && rejectedCoredump !== null;
 
     const report = await this.crashReportStore.create({
       attractapId: readerId,
@@ -95,6 +117,9 @@ export class AttractapService {
       firmwareVersion: payload.firmwareVersion ?? null,
       coredumpSize: coredump ? coredump.length : null,
       coredump,
+      coredumpStatus: coredump ? 'stored' : awaiting ? 'awaiting' : rejected ? 'rejected' : null,
+      coredumpExpectedSize: awaiting ? expectedCoredump.size : rejected ? rejectedCoredump.size : null,
+      coredumpExpectedCrc32: awaiting ? expectedCoredump.crc32 : null,
       symbolicationStatus: coredump ? 'pending' : null,
     });
 
@@ -106,6 +131,35 @@ export class AttractapService {
     return report;
   }
 
+  /** The report a reader uploads a coredump to; null unless that reader owns it. */
+  public async findCrashReportOfReader(reportId: number, readerId: number): Promise<AttractapCrashReportRecord | null> {
+    return this.crashReportStore.findOfReader(reportId, readerId);
+  }
+
+  /**
+   * The newest report of the reader that still awaits exactly this dump: metadata the reader sent again
+   * because the acknowledgement got lost.
+   */
+  public async findAwaitingCrashReport(
+    readerId: number,
+    expectedCoredump: { size: number; crc32: number },
+  ): Promise<AttractapCrashReportRecord | null> {
+    return this.crashReportStore.findAwaiting(readerId, expectedCoredump);
+  }
+
+  /**
+   * Saves a verified chunked upload to its waiting report and symbolicates it like an inline dump.
+   * False when the report no longer waits for a dump (already stored, or deleted meanwhile).
+   */
+  public async storeUploadedCoredump(report: AttractapCrashReportRecord, coredump: Buffer): Promise<boolean> {
+    if (!(await this.crashReportStore.storeAwaitedCoredump(report, coredump))) return false;
+    report.coredumpSize = coredump.length;
+    report.coredumpStatus = 'stored';
+    report.symbolicationStatus = 'pending';
+    await this.symbolicateCrashReport(report, report.attractapId, coredump);
+    return true;
+  }
+
   protected async symbolicateCrashReport(
     report: AttractapCrashReportRecord,
     readerId: number,
@@ -115,9 +169,9 @@ export class AttractapService {
       const reader = await this.readerStore.findById(readerId);
       // No explicit buildId: the symbolication service extracts the truncated app ELF
       // SHA256 from the coredump itself and matches it against published firmware ELFs.
-      const result = await this.coredumpSymbolicationService.symbolicate(coredump, {
-        variant: reader?.firmware?.variant ?? null,
-      });
+      const result = await this.symbolicationSlots.runExclusive(() =>
+        this.coredumpSymbolicationService.symbolicate(coredump, { variant: reader?.firmware?.variant ?? null }),
+      );
       await this.crashReportStore.updateSymbolication(report.id, {
         coredumpBuildId: result.buildId,
         symbolicationStatus: result.status,
@@ -150,55 +204,10 @@ export class AttractapService {
         : null;
 
     return reports.map((report) =>
-      this.toCrashReportDto(report, currentReaderFirmwareVersion, latestServerFirmwareVersion),
+      toCrashReportDto(report, currentReaderFirmwareVersion, latestServerFirmwareVersion, (buildId) =>
+        this.firmwareService.hasSymbolForBuildId(buildId),
+      ),
     );
-  }
-
-  protected toCrashReportDto(
-    report: AttractapCrashReportRecord,
-    currentReaderFirmwareVersion: string | null,
-    latestServerFirmwareVersion: string | null,
-  ): AttractapCrashReportDto {
-    const firmwareMatchesCurrentReader = this.compareNullableVersions(
-      report.firmwareVersion,
-      currentReaderFirmwareVersion,
-    );
-    const firmwareMatchesLatestServer = this.compareNullableVersions(
-      report.firmwareVersion,
-      latestServerFirmwareVersion,
-    );
-
-    return {
-      id: report.id,
-      attractapId: report.attractapId,
-      resetReason: report.resetReason,
-      rebootReason: report.rebootReason,
-      heapFreeBytes: report.heapFreeBytes,
-      largestFreeBlockBytes: report.largestFreeBlockBytes,
-      uptimeBeforeResetMs: report.uptimeBeforeResetMs,
-      wsState: report.wsState,
-      wifiState: report.wifiState,
-      firmwareVersion: report.firmwareVersion,
-      currentReaderFirmwareVersion,
-      latestServerFirmwareVersion,
-      firmwareMatchesCurrentReader,
-      firmwareMatchesLatestServer,
-      coredumpSize: report.coredumpSize,
-      coredumpBuildId: report.coredumpBuildId,
-      coredumpBuildIdKnown: report.coredumpBuildId
-        ? this.firmwareService.hasSymbolForBuildId(report.coredumpBuildId)
-        : null,
-      symbolicationStatus: report.symbolicationStatus,
-      symbolizedBacktrace: report.symbolizedBacktrace,
-      createdAt: report.createdAt,
-    };
-  }
-
-  protected compareNullableVersions(left: string | null, right: string | null): boolean | null {
-    if (!left || !right) {
-      return null;
-    }
-    return left === right;
   }
 
   public async getCrashReportCoredump(
@@ -255,6 +264,7 @@ export class AttractapService {
       connectedResourceIds?: number[];
       firmware?: AttractapFirmwareInfo;
       ledBrightness?: number;
+      allowPluginBle?: boolean;
     },
     emitEvent = true,
   ): Promise<AttractapReaderWithResources> {
@@ -272,6 +282,10 @@ export class AttractapService {
 
     if (updateData.ledBrightness !== undefined) {
       edit.ledBrightness = updateData.ledBrightness;
+    }
+
+    if (updateData.allowPluginBle !== undefined) {
+      edit.allowPluginBle = updateData.allowPluginBle;
     }
 
     const firmware = updateData.firmware ?? reader.firmware;

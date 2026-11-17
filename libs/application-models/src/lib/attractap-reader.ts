@@ -67,6 +67,8 @@ export interface AttractapReader {
   lastConnection: Date;
   firstConnection: Date;
   ledBrightness: number;
+  /** Whether backend plugins with the BLE_TRANSPORT permission may use this reader's Bluetooth radio. */
+  allowPluginBle: boolean;
   firmware: AttractapFirmwareInfo;
 }
 
@@ -87,6 +89,7 @@ export interface AttractapCredentialSnapshot {
 export interface AttractapReaderEdit {
   name?: string;
   ledBrightness?: number;
+  allowPluginBle?: boolean;
   firmware?: AttractapFirmwareInfo;
   /** Replaces the linked resources. */
   resourceIds?: number[];

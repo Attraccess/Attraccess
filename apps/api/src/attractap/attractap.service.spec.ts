@@ -1,5 +1,6 @@
 import type { AttractapNfcCard } from '@attraccess/application-models';
-import { AttractapService } from './attractap.service';
+import { AttractapService, SYMBOLICATION_CONCURRENCY } from './attractap.service';
+import { ReaderUpdatedEvent } from './events';
 import { EncryptionService } from '../encryption/encryption.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { CoredumpSymbolicationService } from './coredump-symbolication.service';
@@ -285,5 +286,133 @@ describe('AttractapService reader maintenance and crash reports', () => {
       filename: 'reader-4-crash-7.coredump',
       coredump: Buffer.from('dump'),
     });
+  });
+  it('persists the plugin BLE opt-in only when it is given', async () => {
+    const { service, readers } = setup();
+    await service.updateReader(4, { name: 'Kept' }, false);
+    expect(readers.edits[readers.edits.length - 1].edit).not.toHaveProperty('allowPluginBle');
+    const enabled = await service.updateReader(4, { allowPluginBle: true }, false);
+    expect(enabled.allowPluginBle).toBe(true);
+    expect(readers.edits[readers.edits.length - 1].edit).toMatchObject({ allowPluginBle: true });
+    const disabled = await service.updateReader(4, { allowPluginBle: false }, false);
+    expect(disabled.allowPluginBle).toBe(false);
+  });
+  it('keeps the plugin BLE opt-in when other reader fields change', async () => {
+    const { service, readers, reader, events } = setup();
+    reader.allowPluginBle = true;
+    const renamed = await service.updateReader(4, { name: 'Renamed' });
+    expect(renamed.allowPluginBle).toBe(true);
+    expect(events.emit).toHaveBeenLastCalledWith(
+      ReaderUpdatedEvent.EVENT_NAME,
+      expect.objectContaining({ reader: expect.objectContaining({ allowPluginBle: true }) }),
+    );
+    await service.updateReader(4, { ledBrightness: 5, connectedResourceIds: [1] });
+    expect(readers.edits.every(({ edit }) => !('allowPluginBle' in edit))).toBe(true);
+    await service.updateReaderFirmware(4, { ...reader.firmware, version: '2.0' });
+    expect(reader.allowPluginBle).toBe(true);
+  });
+  it('marks a report as awaiting the announced chunked coredump', async () => {
+    const { service, reports, symbolication } = setup();
+    const report = await service.createCrashReport(4, { resetReason: 'PANIC', coredumpSize: 43776 } as never, {
+      size: 43776,
+      crc32: 0xdeadbeef,
+    });
+    expect(report).toMatchObject({
+      coredumpStatus: 'awaiting',
+      coredumpExpectedSize: 43776,
+      coredumpExpectedCrc32: 0xdeadbeef,
+      coredumpSize: null,
+      symbolicationStatus: null,
+    });
+    expect(reports.reports[0].coredump).toBeNull();
+    expect(symbolication.symbolicate).not.toHaveBeenCalled();
+  });
+  it('records a refused coredump as rejected with its announced size', async () => {
+    const { service, symbolication } = setup();
+    const report = await service.createCrashReport(4, { resetReason: 'PANIC', coredumpSize: 140000 } as never, null, {
+      size: 140000,
+    });
+    expect(report).toMatchObject({
+      coredumpStatus: 'rejected',
+      coredumpExpectedSize: 140000,
+      coredumpExpectedCrc32: null,
+      coredumpSize: null,
+    });
+    expect(symbolication.symbolicate).not.toHaveBeenCalled();
+  });
+  it('keeps an inline coredump stored even when a size is announced as well', async () => {
+    const { service } = setup();
+    const report = await service.createCrashReport(
+      4,
+      { resetReason: 'PANIC', coredumpBase64: Buffer.from('dump').toString('base64') } as never,
+      { size: 4, crc32: 1 },
+    );
+    expect(report).toMatchObject({ coredumpStatus: 'stored', coredumpSize: 4, coredumpExpectedSize: null });
+  });
+  it('stores a verified chunked coredump only on a report that awaits one, then symbolicates it', async () => {
+    const { service, reports, symbolication } = setup();
+    const dump = Buffer.alloc(43776, 7);
+    const report = { id: 7, attractapId: 4, coredumpStatus: 'awaiting' } as never;
+    expect(await service.storeUploadedCoredump(report, dump)).toBe(true);
+    expect(reports.storedCoredumps).toEqual([{ id: 7, attractapId: 4, coredump: dump }]);
+    expect(symbolication.symbolicate).toHaveBeenCalledWith(dump, { variant: 'standard' });
+    expect(report).toMatchObject({ coredumpStatus: 'stored', coredumpSize: 43776, symbolicationStatus: 'completed' });
+
+    reports.storeAwaitedResult = false;
+    symbolication.symbolicate.mockClear();
+    expect(await service.storeUploadedCoredump({ id: 8, attractapId: 4 } as never, dump)).toBe(false);
+    expect(symbolication.symbolicate).not.toHaveBeenCalled();
+  });
+  it('finds a crash report only for the reader that owns it', async () => {
+    const { service } = setup();
+    await service.createCrashReport(4, { resetReason: 'PANIC' } as never);
+    expect(await service.findCrashReportOfReader(7, 5)).toBeNull();
+    expect(await service.findCrashReportOfReader(7, 4)).toMatchObject({ id: 7, attractapId: 4 });
+  });
+  it('finds the newest report of the reader that still awaits exactly the announced dump', async () => {
+    const { service, reports } = setup();
+    const announced = { size: 43776, crc32: 0xdeadbeef };
+    await service.createCrashReport(4, { resetReason: 'PANIC' } as never, announced);
+    reports.reports.push({ ...reports.reports[0], id: 9 });
+    expect((await service.findAwaitingCrashReport(4, announced))?.id).toBe(9);
+    expect(await service.findAwaitingCrashReport(4, { ...announced, crc32: 1 })).toBeNull();
+    expect(await service.findAwaitingCrashReport(5, announced)).toBeNull();
+  });
+  it(`symbolicates at most ${SYMBOLICATION_CONCURRENCY} coredumps at once, inline and uploaded alike`, async () => {
+    const { service, reports, symbolication } = setup();
+    const running: Array<() => void> = [];
+    symbolication.symbolicate.mockImplementation(
+      () =>
+        new Promise((resolve) => running.push(() => resolve({ buildId: 'build', status: 'success', backtrace: 'bt' }))),
+    );
+    const settle = () => new Promise(setImmediate);
+    const dump = Buffer.from('dump');
+
+    const done = [
+      service.createCrashReport(4, { resetReason: 'PANIC', coredumpBase64: dump.toString('base64') } as never),
+      service.storeUploadedCoredump({ id: 8, attractapId: 4 } as never, dump),
+      service.storeUploadedCoredump({ id: 9, attractapId: 4 } as never, dump),
+    ];
+    await settle();
+    expect(symbolication.symbolicate).toHaveBeenCalledTimes(2);
+
+    running.shift()?.();
+    await settle();
+    expect(symbolication.symbolicate).toHaveBeenCalledTimes(3);
+    running.splice(0).forEach((finish) => finish());
+    await Promise.all(done);
+    expect(reports.symbolications).toContainEqual({
+      id: 9,
+      result: expect.objectContaining({ symbolicationStatus: 'success' }),
+    });
+  });
+  it('frees the symbolication slot when symbolication fails', async () => {
+    const { service, symbolication } = setup();
+    symbolication.symbolicate.mockRejectedValue(new Error('gdb crashed'));
+    jest.spyOn(service['logger'], 'error').mockImplementation(() => undefined);
+    for (const id of [1, 2, 3]) {
+      await service.storeUploadedCoredump({ id, attractapId: 4 } as never, Buffer.from('dump'));
+    }
+    expect(symbolication.symbolicate).toHaveBeenCalledTimes(3);
   });
 });

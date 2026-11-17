@@ -75,6 +75,7 @@ export class TypeOrmAttractapReaderStore implements AttractapReaderStore {
     const changes: Partial<Attractap> & { id: number } = { id };
     if (edit.name !== undefined) changes.name = edit.name;
     if (edit.ledBrightness !== undefined) changes.ledBrightness = edit.ledBrightness;
+    if (edit.allowPluginBle !== undefined) changes.allowPluginBle = edit.allowPluginBle;
     if (edit.firmware) changes.firmware = firmwareColumns(edit.firmware);
     if (edit.resourceIds) changes.resources = edit.resourceIds.map((resourceId) => ({ id: resourceId }) as Resource);
     await this.readers.save(changes);

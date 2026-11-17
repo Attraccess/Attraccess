@@ -169,6 +169,9 @@ describe('Attractap persistence adapters on SQLite', () => {
         firmwareVersion: '1.0',
         coredumpSize: 4,
         coredump: Buffer.from('dump'),
+        coredumpStatus: 'stored',
+        coredumpExpectedSize: null,
+        coredumpExpectedCrc32: null,
         symbolicationStatus: 'pending',
       });
       await store.updateSymbolication(report.id, {
@@ -181,6 +184,80 @@ describe('Attractap persistence adapters on SQLite', () => {
       expect(listed).toMatchObject({ coredumpBuildId: 'abc', symbolicationStatus: 'success', coredump: null });
       expect(Buffer.from(await store.findCoredump(readerId, report.id)).toString()).toBe('dump');
       expect(await store.findCoredump(readerId + 1, report.id)).toBeNull();
+    });
+
+    describe('chunked coredump upload', () => {
+      const announced = { size: 43776, crc32: 0xdeadbeef };
+      const awaiting = (attractapId: number) => ({
+        attractapId,
+        resetReason: 'PANIC',
+        rebootReason: null,
+        heapFreeBytes: null,
+        largestFreeBlockBytes: null,
+        uptimeBeforeResetMs: null,
+        wsState: null,
+        wifiState: null,
+        firmwareVersion: null,
+        coredumpSize: null,
+        coredump: null,
+        coredumpStatus: 'awaiting' as const,
+        coredumpExpectedSize: announced.size,
+        coredumpExpectedCrc32: announced.crc32,
+        symbolicationStatus: null,
+      });
+      const newReader = async () =>
+        (await source.getRepository(Attractap).save({ name: 'r', apiTokenHash: 'h' } as Attractap)).id;
+
+      it('keeps an unsigned CRC-32 above 2^31 and finds the awaiting report by it', async () => {
+        const readerId = await newReader();
+        const store = new TypeOrmAttractapCrashReportStore(source.getRepository(AttractapCrashReport));
+        const created = await store.create(awaiting(readerId));
+        expect(created).toMatchObject({
+          coredumpStatus: 'awaiting',
+          coredumpExpectedSize: 43776,
+          coredumpExpectedCrc32: 0xdeadbeef,
+        });
+
+        expect((await store.findAwaiting(readerId, announced))?.id).toBe(created.id);
+        expect(await store.findAwaiting(readerId, { ...announced, crc32: 0x5eadbeef })).toBeNull();
+        expect(await store.findAwaiting(readerId + 1000, announced)).toBeNull();
+      });
+
+      it('returns the newest awaiting report for the same announcement', async () => {
+        const readerId = await newReader();
+        const store = new TypeOrmAttractapCrashReportStore(source.getRepository(AttractapCrashReport));
+        await store.create(awaiting(readerId));
+        const newest = await store.create(awaiting(readerId));
+        expect((await store.findAwaiting(readerId, announced))?.id).toBe(newest.id);
+      });
+
+      it('finds a report only for the reader that owns it', async () => {
+        const readerId = await newReader();
+        const store = new TypeOrmAttractapCrashReportStore(source.getRepository(AttractapCrashReport));
+        const created = await store.create(awaiting(readerId));
+        expect((await store.findOfReader(created.id, readerId))?.id).toBe(created.id);
+        expect(await store.findOfReader(created.id, readerId + 1000)).toBeNull();
+      });
+
+      it('stores an uploaded dump only while its report awaits one', async () => {
+        const readerId = await newReader();
+        const store = new TypeOrmAttractapCrashReportStore(source.getRepository(AttractapCrashReport));
+        const created = await store.create(awaiting(readerId));
+        const dump = Buffer.alloc(announced.size, 7);
+
+        expect(await store.storeAwaitedCoredump(created, dump)).toBe(true);
+        expect(await store.storeAwaitedCoredump(created, Buffer.alloc(10))).toBe(false);
+        expect(await store.storeAwaitedCoredump({ id: created.id, attractapId: readerId + 1000 }, dump)).toBe(false);
+
+        expect(Buffer.from(await store.findCoredump(readerId, created.id)).equals(dump)).toBe(true);
+        expect(await store.findOfReader(created.id, readerId)).toMatchObject({
+          coredumpStatus: 'stored',
+          coredumpSize: announced.size,
+          symbolicationStatus: 'pending',
+        });
+        // A stored report is no longer the target of repeated metadata.
+        expect(await store.findAwaiting(readerId, announced)).toBeNull();
+      });
     });
   });
 

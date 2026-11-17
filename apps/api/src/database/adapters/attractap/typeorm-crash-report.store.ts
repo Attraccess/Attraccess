@@ -22,6 +22,40 @@ export class TypeOrmAttractapCrashReportStore implements AttractapCrashReportSto
     return toCrashReport(saved as AttractapCrashReport);
   }
 
+  async findOfReader(reportId: number, readerId: number): Promise<AttractapCrashReportRecord | null> {
+    const report = await this.reports.findOne({ where: { id: reportId, attractapId: readerId } });
+    return report ? toCrashReport(report) : null;
+  }
+
+  async findAwaiting(
+    readerId: number,
+    expected: { size: number; crc32: number },
+  ): Promise<AttractapCrashReportRecord | null> {
+    const report = await this.reports.findOne({
+      where: {
+        attractapId: readerId,
+        coredumpStatus: 'awaiting',
+        coredumpExpectedSize: expected.size,
+        coredumpExpectedCrc32: expected.crc32,
+      },
+      order: { createdAt: 'DESC', id: 'DESC' },
+    });
+    return report ? toCrashReport(report) : null;
+  }
+
+  async storeAwaitedCoredump(report: { id: number; attractapId: number }, coredump: Uint8Array): Promise<boolean> {
+    const result = await this.reports.update(
+      { id: report.id, attractapId: report.attractapId, coredumpStatus: 'awaiting' },
+      {
+        coredump: Buffer.from(coredump),
+        coredumpSize: coredump.length,
+        coredumpStatus: 'stored',
+        symbolicationStatus: 'pending',
+      },
+    );
+    return !!result.affected;
+  }
+
   async updateSymbolication(reportId: number, result: AttractapCrashSymbolication): Promise<void> {
     await this.reports.update(reportId, {
       ...(result.coredumpBuildId !== undefined ? { coredumpBuildId: result.coredumpBuildId } : {}),

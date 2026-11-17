@@ -85,6 +85,7 @@ export function toReader(reader: Attractap): AttractapReader {
     lastConnection: reader.lastConnection,
     firstConnection: reader.firstConnection,
     ledBrightness: reader.ledBrightness,
+    allowPluginBle: reader.allowPluginBle,
     firmware: toFirmwareInfo(reader.firmware),
   };
 }
@@ -147,6 +148,9 @@ export function toCrashReport(report: AttractapCrashReport): AttractapCrashRepor
     firmwareVersion: report.firmwareVersion,
     coredumpSize: report.coredumpSize,
     coredump: report.coredump ?? null,
+    coredumpStatus: report.coredumpStatus ?? null,
+    coredumpExpectedSize: report.coredumpExpectedSize ?? null,
+    coredumpExpectedCrc32: report.coredumpExpectedCrc32 ?? null,
     coredumpBuildId: report.coredumpBuildId,
     symbolicationStatus: report.symbolicationStatus,
     symbolizedBacktrace: report.symbolizedBacktrace,

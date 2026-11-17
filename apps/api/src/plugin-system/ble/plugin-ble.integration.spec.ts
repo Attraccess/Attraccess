@@ -163,9 +163,9 @@ describe('plugin BLE through the plugin module', () => {
     writePlugin('alpha');
     const loaded = () => PluginService.getPluginsWithLoadStatus().find((plugin) => plugin.name === 'alpha');
 
-    expect(PluginModule.forRoot().imports).toHaveLength(4);
+    expect(PluginModule.forRoot().imports).toHaveLength(5);
     PluginModule.resetHostReferences();
-    expect(PluginModule.forRoot().imports).toHaveLength(4);
+    expect(PluginModule.forRoot().imports).toHaveLength(5);
     expect(loaded()?.status).not.toBe('error');
   });
 
@@ -188,7 +188,7 @@ describe('plugin BLE through the plugin module', () => {
       `module.exports = { default: { register: (context) => { ${service(1)} ${service(2)} return { module: class M {} }; } } };`,
     );
 
-    expect(PluginModule.forRoot().imports).toHaveLength(3);
+    expect(PluginModule.forRoot().imports).toHaveLength(4);
     expect(PluginService.getPluginsWithLoadStatus().find((plugin) => plugin.name === 'clash')?.status).toBe('error');
   });
 

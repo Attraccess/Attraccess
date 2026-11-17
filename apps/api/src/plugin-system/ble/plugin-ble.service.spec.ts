@@ -1,4 +1,4 @@
-import { Attractap } from '@attraccess/database-entities';
+import type { AttractapReader } from '@attraccess/application-models';
 import { PluginBleError, type PluginBleContext } from '@attraccess/plugins-backend-sdk';
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../../attractap/events';
 import { createHostBleHarness, type HostBleHarness } from './__test__/ble-host-harness.test-fixture';
@@ -74,12 +74,12 @@ describe('PluginBleService (host details)', () => {
   it('only closes sessions when a reader update turns the opt-in off', async () => {
     const created = await endpoint();
     const session = await ble.openSession(created.id);
-    await harness.service.onReaderUpdated(new ReaderUpdatedEvent({ id: 1, allowPluginBle: true } as Attractap));
+    await harness.service.onReaderUpdated(new ReaderUpdatedEvent({ id: 1, allowPluginBle: true } as AttractapReader));
     expect(harness.openSessions()).toHaveLength(1);
-    await harness.service.onReaderUpdated(new ReaderUpdatedEvent({ id: 2, allowPluginBle: false } as Attractap));
+    await harness.service.onReaderUpdated(new ReaderUpdatedEvent({ id: 2, allowPluginBle: false } as AttractapReader));
     expect(harness.openSessions()).toHaveLength(1);
     // The event bus is shared with plugins: a forged event cannot revoke while the database still says yes.
-    await harness.service.onReaderUpdated(new ReaderUpdatedEvent({ id: 1, allowPluginBle: false } as Attractap));
+    await harness.service.onReaderUpdated(new ReaderUpdatedEvent({ id: 1, allowPluginBle: false } as AttractapReader));
     expect(harness.openSessions()).toHaveLength(1);
     await harness.service.onReaderDeleted(new ReaderDeletedEvent(1));
     expect(harness.openSessions()).toHaveLength(1);

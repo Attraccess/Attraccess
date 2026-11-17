@@ -1,4 +1,4 @@
-import { AttractapCrashReport } from '@attraccess/database-entities';
+import type { AttractapCrashReportRecord } from '@attraccess/application-models';
 import { AttractapCrashReportDto } from './crash-report.dto';
 
 function compareNullableVersions(left: string | null, right: string | null): boolean | null {
@@ -10,7 +10,7 @@ function compareNullableVersions(left: string | null, right: string | null): boo
 
 /** The admin view of a crash report; the coredump itself is only downloadable on its own. */
 export function toCrashReportDto(
-  report: AttractapCrashReport,
+  report: AttractapCrashReportRecord,
   currentReaderFirmwareVersion: string | null,
   latestServerFirmwareVersion: string | null,
   hasSymbolForBuildId: (buildId: string) => boolean,
