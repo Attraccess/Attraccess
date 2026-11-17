@@ -4,17 +4,19 @@ import {
   Body,
   Delete,
   Get,
+  Header,
   NotFoundException,
   Param,
   Post,
   Req,
+  Res,
   StreamableFile,
   UploadedFile,
   UseInterceptors,
   Query,
 } from '@nestjs/common';
 
-import { ApiTags, ApiConsumes, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiConsumes, ApiOperation, ApiParam, ApiResponse, ApiQuery } from '@nestjs/swagger';
 
 import { auditActorOf } from '../audit/recorder/audit-event';
 
@@ -30,9 +32,9 @@ import { randomUUID } from 'crypto';
 
 import { FileInterceptor } from '@nestjs/platform-express';
 
-import { createReadStream, existsSync } from 'fs';
-
-import { join } from 'path';
+import { createReadStream } from 'fs';
+import { finished } from 'stream';
+import { Response } from 'express';
 
 import { FileUpload } from '../common/types/file-upload.types';
 
@@ -45,6 +47,13 @@ import { UploadPluginDto } from './dto/uploadPlugin.dto';
 import { LoadedPluginManifest } from './plugin.manifest';
 
 import { arePluginsDisabled } from './plugins-disabled';
+
+import {
+  frontendAssetSegments,
+  isMissingFrontendAsset,
+  openFrontendAsset,
+  sanitizedPathPrefix,
+} from './frontend-asset-path';
 import {
   AddPluginRegistryDto,
   RemoveInstalledPluginDto,
@@ -319,12 +328,19 @@ export class PluginController {
   // Also add support for loading the index.js file
   @Get(':pluginName/frontend/module-federation/*filePath')
   @ApiOperation({ summary: 'Get any frontend plugin file', operationId: 'getFrontendPluginFile' })
+  @ApiParam({ name: 'filePath', type: String })
+  @Header('X-Content-Type-Options', 'nosniff')
   @ApiResponse({
     status: 200,
     description: 'The requested frontend plugin file',
     type: String,
   })
-  getFrontendPluginFile(@Param('pluginName') pluginName: string, @Param('filePath') filePath?: string) {
+  getFrontendPluginFile(
+    @Param('pluginName') pluginName: string,
+    // keep the union: a plain `string` lets the global ValidationPipe comma-join the segments
+    @Param('filePath') filePath: string | string[] | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const plugins = PluginService.getPlugins();
     const plugin = plugins.find((plugin) => plugin.name === pluginName);
     if (!plugin) {
@@ -334,23 +350,35 @@ export class PluginController {
       throw new NotFoundException(`Plugin ${pluginName} has no frontend assets`);
     }
 
-    const fileName = join(...filePath.split(','));
+    const segments = frontendAssetSegments(filePath);
+    const opened = openFrontendAsset(
+      PluginService.PLUGIN_PATH,
+      plugin.pluginDirectory,
+      plugin.main.frontend.directory,
+      segments,
+    );
 
-    // Path should point to the requested file in the plugin directory
-    const pluginDir = join(PluginService.PLUGIN_PATH, plugin.main.frontend.directory);
-    const fullFilePath = join(pluginDir, fileName);
-
-    if (!existsSync(fullFilePath)) {
-      this.logger.warn(`Frontend file ${fullFilePath} not found for plugin ${pluginName}`);
-      throw new NotFoundException(`Frontend file ${fileName} not found for plugin ${pluginName}`);
+    if ('reason' in opened) {
+      // never echo the requested or resolved path: every rejection looks like a plain missing file
+      const detail = `frontend file for plugin ${pluginName} (${opened.reason}): ${sanitizedPathPrefix(segments)}`;
+      if (isMissingFrontendAsset(opened.reason)) {
+        this.logger.debug(`Missing ${detail}`);
+      } else {
+        this.logger.warn(`Refused ${detail}`);
+      }
+      throw new NotFoundException(`Frontend file not found for plugin ${pluginName}`);
     }
 
-    this.logger.log(`Serving frontend file ${fileName} for plugin ${pluginName} from ${fullFilePath}`);
+    this.logger.debug(`Serving frontend file for plugin ${pluginName}`);
 
-    // stream the file — browsers enforce strict MIME checking for stylesheets
-    const fileStream = createReadStream(fullFilePath);
+    // stream the already opened file: a failed open inside the stream would answer with its absolute path.
+    // Browsers enforce strict MIME checking for stylesheets.
+    const fileStream = createReadStream('', { fd: opened.fd });
+    // Nest pipes the stream into the response; a client that disconnects early, even before
+    // this handler runs, would leave it paused with the file open
+    finished(res, () => fileStream.destroy());
     return new StreamableFile(fileStream, {
-      type: fileName.endsWith('.css') ? 'text/css' : 'application/javascript',
+      type: segments[segments.length - 1].endsWith('.css') ? 'text/css' : 'application/javascript',
     });
   }
 
