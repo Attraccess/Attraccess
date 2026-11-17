@@ -13,17 +13,21 @@ import { BadRequestException } from '@nestjs/common';
 
 import { EntityManager } from 'typeorm';
 
+import type { TransactionScope } from '../../unit-of-work';
+
+import { unitOfWorkFor } from '../shared-unit-of-work';
+
 import { rm } from 'node:fs/promises';
 
-import { MeteringReadyExecutor, MeteringReport, MeteringReportExecutor } from '../../flows/node-executors';
+import { MeteringReadyExecutor, MeteringReport, MeteringReportExecutor } from '../../../resources/flows/node-executors';
 
-import { MeterFlowConversions1790300000000 } from '../../../database/migrations/1790300000000-meter-flow-conversions';
+import { MeterFlowConversions1790300000000 } from '../../migrations/1790300000000-meter-flow-conversions';
 
-import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
+import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-transaction';
 
 import { inheritTestScope } from '../../../test-utils/inherit-test-scope';
 
-import { compileFlowTemplate } from '../../flows/execution/flow-template';
+import { compileFlowTemplate } from '../../../resources/flows/execution/flow-template';
 
 import { resetTestFixture } from './fixtures/setup.test-fixture';
 
@@ -198,7 +202,8 @@ describe('Flow-defined metering', () => {
     it('removes the metering session of a start whose flow effects fail', async () => {
       await usageLifecycleScope.seedMeter();
       // Ordinary flow errors are logged and swallowed by the usage service; an external-effect failure aborts.
-      const { ExternalEffectFailureError } = await import('../../flows/errors/external-effect-failure.error');
+      const { ExternalEffectFailureError } =
+        await import('../../../resources/flows/errors/external-effect-failure.error');
       usageLifecycleScope.startEffects = async () => {
         throw new ExternalEffectFailureError('relay refused', new Error('cause'));
       };
@@ -828,11 +833,13 @@ describe('Flow-defined metering', () => {
           );
           return (startTransaction as (...a: unknown[]) => Promise<unknown>).apply(this, wrapped);
         } as never);
-        reconciliationScope.parentScope.audit.record.mockImplementation(
-          async (_event: unknown, manager?: EntityManager) => {
-            auditedInOpenTransaction.push(manager?.queryRunner?.isTransactionActive === true);
-          },
-        );
+        // The settlement hands the audit recorder its unit-of-work scope; the transaction behind it must be open.
+        const auditedHandles: EntityManager[] = [];
+        reconciliationScope.parentScope.audit.record.mockImplementation(async (_event: unknown, scopeRef: object) => {
+          const manager = unitOfWorkFor(reconciliationScope.parentScope.source).handleOf(scopeRef as TransactionScope);
+          auditedHandles.push(manager);
+          auditedInOpenTransaction.push(manager.queryRunner?.isTransactionActive === true);
+        });
 
         try {
           await reconciliationScope.parentScope.metering.retrySettlement(1, session.id, 1);
@@ -859,9 +866,9 @@ describe('Flow-defined metering', () => {
           }),
           expect.anything(),
         );
-        // Written with the settlement transaction's own manager while that transaction is still open.
-
-        expect(transactionManagers).toContain(reconciliationScope.parentScope.audit.record.mock.calls[0][1]);
+        // Written in the settlement transaction's own scope while that transaction is still open.
+        expect(auditedHandles).toHaveLength(1);
+        expect(transactionManagers).toContain(auditedHandles[0]);
         expect(auditedInOpenTransaction).toEqual([true]);
         expect(reconciliationScope.parentScope.liveNotifications.notifyTransactionUpdate).toHaveBeenCalledWith(
           corrections[0].id,

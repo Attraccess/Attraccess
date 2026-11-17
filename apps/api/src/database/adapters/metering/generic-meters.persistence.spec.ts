@@ -12,23 +12,32 @@ import { EmailTemplateType, ResourceMeteringSessionStatus } from '@attraccess/ap
 
 import Handlebars from 'handlebars';
 
+import type { DataSource } from 'typeorm';
+
 import { rm } from 'node:fs/promises';
 
-import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
+import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-transaction';
 
 import { readDefaultTemplateBody, SHIPPED_TRANSLATIONS } from '../../../email-template/email-defaults';
 
 import { EmailService } from '../../../email/email.service';
 
-import { MeteringReadings } from '../metering-readings';
+import { TypeOrmMeteringStore } from './typeorm-metering.store';
 
-import { resetTestFixture } from './fixtures/setup.test-fixture';
+import { MeteringReadings } from '../../../resources/metering/metering-readings';
+
+import { createMeteringPersistence, resetTestFixture } from './fixtures/setup.test-fixture';
 
 import { createFlowDefinedMeteringFixture } from './fixtures/flow-defined-meters.test-fixture';
 
 import { createGenericMetersFixture } from './fixtures/generic-meters.test-fixture';
 
 import { createUsageLifecycleFixture } from './fixtures/usage-lifecycle.test-fixture';
+
+const readingsOn = (source: DataSource) => {
+  const { store, unitOfWork } = createMeteringPersistence(source);
+  return [store, unitOfWork, new Map<string, Date>()] as const;
+};
 
 // This SQLite suite runs multiple settlements per case; coverage on CI exceeds Jest's five-second default.
 jest.setTimeout(30_000);
@@ -192,11 +201,12 @@ describe('Flow-defined metering', () => {
     it('loads one flow snapshot for all meters in a status poll', async () => {
       await genericMetersScope.seedMeter();
       await genericMetersScope.metering.createMeter(1, 'Heartbeats');
-      const nodes = jest.spyOn(genericMetersScope.source.getRepository(ResourceFlowNode), 'find');
-      const edges = jest.spyOn(genericMetersScope.source.getRepository(ResourceFlowEdge), 'find');
+      const snapshots = jest.spyOn(TypeOrmMeteringStore.prototype, 'findDefinitionFlow');
+      const nodes = jest.spyOn(genericMetersScope.source.manager, 'find');
       expect((await genericMetersScope.metering.getStatus(1)).meters).toHaveLength(2);
-      expect(nodes).toHaveBeenCalledTimes(1);
-      expect(edges).toHaveBeenCalledTimes(1);
+      expect(snapshots).toHaveBeenCalledTimes(1);
+      expect(nodes.mock.calls.filter(([entity]) => entity === ResourceFlowNode)).toHaveLength(1);
+      expect(nodes.mock.calls.filter(([entity]) => entity === ResourceFlowEdge)).toHaveLength(1);
     });
 
     it('allows resource usage when a tracking-only start fails', async () => {
@@ -323,7 +333,7 @@ describe('Flow-defined metering', () => {
       expect(await genericMetersScope.source.getRepository(ResourceUsageLifecycleAttempt).count()).toBe(0);
       if (ended) await genericMetersScope.usage.endSession(1, genericMetersScope.users[0], {} as never);
       await expect(
-        new MeteringReadings(genericMetersScope.source.manager, new Map()).complete('outstanding-idle', {
+        new MeteringReadings(...readingsOn(genericMetersScope.source)).complete('outstanding-idle', {
           kind: 'reading',
           value: '105',
         }),
@@ -417,7 +427,7 @@ describe('Flow-defined metering', () => {
         requestedAt: new Date(),
       });
       await expect(
-        new MeteringReadings(genericMetersScope.source.manager, new Map()).complete('queued-lifetime-poll', {
+        new MeteringReadings(...readingsOn(genericMetersScope.source)).complete('queued-lifetime-poll', {
           kind: 'reading',
           mode: 'increment',
           value: '5',

@@ -15,7 +15,7 @@ import { rm } from 'node:fs/promises';
 
 import { IsNull, Not } from 'typeorm';
 
-import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
+import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-transaction';
 
 import { resetTestFixture } from './fixtures/setup.test-fixture';
 
