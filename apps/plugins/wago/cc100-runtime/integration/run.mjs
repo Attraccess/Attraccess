@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, writeFile, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, writeFile, rm, symlink } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -19,6 +19,25 @@ function argument(name) {
 function backendSource(sourceRoot, currentPath, legacyPath) {
   const current = join(sourceRoot, 'apps/plugins/wago/backend', currentPath);
   return existsSync(current) ? current : join(sourceRoot, 'apps/plugins/wago/backend', legacyPath);
+}
+// Plugin SDK 2.0 removed the TypeORM decorators from the SDK root (they moved to `/sqlite`). A base revision that still
+// imports them from the root cannot load against the SDK of the revision under test, so the "main" service falls back
+// to the current service until the base revision is on SDK 2.0 too. The simulator itself does not use the SDK.
+async function usesLegacySdkPersistence(directory) {
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      if (await usesLegacySdkPersistence(path)) return true;
+    } else if (
+      path.endsWith('.ts') &&
+      /import\s*\{[^}]*\b(?:PrimaryGeneratedColumn|Entity)\b[^}]*\}\s*from\s*'@attraccess\/plugins-backend-sdk'/.test(
+        await readFile(path, 'utf8'),
+      )
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 async function snapshot(ref, label, directories) {
   const commit = execFileSync('git', ['rev-parse', '--verify', `${ref}^{commit}`], {
@@ -52,6 +71,12 @@ try {
   ];
   const flowRoot = argument('flow-ref') ? await snapshot(argument('flow-ref'), 'flow', [backend, ...contracts]) : root;
   const mainRoot = await snapshot(argument('main-ref') ?? 'origin/main', 'main', [runtime, backend, ...contracts]);
+  const mainServiceRoot = (await usesLegacySdkPersistence(join(mainRoot, backend))) ? root : mainRoot;
+  if (mainServiceRoot === root) {
+    process.stdout.write(
+      'The main revision predates the plugin SDK 2.0 persistence API: using the current service as "main".\n',
+    );
+  }
   const runtimeRoot = argument('runtime-ref')
     ? await snapshot(argument('runtime-ref'), 'runtime', [runtime, backend, ...contracts])
     : root;
@@ -124,7 +149,7 @@ try {
       WAGO_INTEGRATION_TEMP: temporary,
       WAGO_INTEGRATION_FLOW_SOURCE: backendSource(flowRoot, 'flow/service.ts', 'wago-flow.service.ts'),
       WAGO_INTEGRATION_PROTOCOL_SOURCE: backendSource(flowRoot, 'protocol/index.ts', 'protocol.ts'),
-      WAGO_INTEGRATION_MAIN_SOURCE: backendSource(mainRoot, 'controllers/service.ts', 'wago.service.ts'),
+      WAGO_INTEGRATION_MAIN_SOURCE: backendSource(mainServiceRoot, 'controllers/service.ts', 'wago.service.ts'),
       WAGO_INTEGRATION_LIFECYCLE_ONLY: process.argv.includes('--lifecycle-only') ? '1' : '0',
     },
   );

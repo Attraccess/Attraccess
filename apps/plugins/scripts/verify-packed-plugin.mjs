@@ -59,7 +59,7 @@ export async function verifyPackedPlugin(
     const modules = join(extracted, 'node_modules', '@attraccess');
     mkdirSync(modules, { recursive: true });
     cpSync(join(workspace, 'dist/libs/plugins-backend-sdk'), join(modules, 'plugins-backend-sdk'), { recursive: true });
-    for (const library of ['database-entities', 'shared'])
+    for (const library of ['application-models', 'database-entities', 'shared'])
       symlinkSync(join(workspace, 'dist/libs', library), join(modules, library), 'dir');
     process.env.NODE_PATH = join(workspace, 'node_modules');
     Module._initPaths();

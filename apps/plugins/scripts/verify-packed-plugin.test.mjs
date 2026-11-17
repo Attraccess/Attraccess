@@ -84,6 +84,7 @@ test('verifies actual packed entries and removes archives after success or failu
     for (const directory of [
       'plugin/frontend',
       'dist/libs/plugins-backend-sdk',
+      'dist/libs/application-models',
       'dist/libs/database-entities',
       'dist/libs/shared',
       'node_modules',
