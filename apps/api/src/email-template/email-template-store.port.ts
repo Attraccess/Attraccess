@@ -1,7 +1,8 @@
 import type { EmailTemplateRecord, EmailTemplateTranslationRecord } from '@attraccess/application-models';
+import type { TransactionScope } from '../database/unit-of-work';
 
-/** The transaction a read joins; a unit-of-work scope (an open object for callers that still pass a raw handle). */
-export type EmailTemplateReadContext = object;
+/** The unit of work a read joins. */
+export type EmailTemplateReadContext = TransactionScope;
 
 export interface EmailTemplateContent {
   subject?: string;

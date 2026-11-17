@@ -10,6 +10,7 @@ import {
 import { ResourceFlowNodeType, ResourceType, ResourceUsageAction } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
 import { TypeOrmFlowTriggerStore } from './typeorm-flow-trigger.store';
+import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 
 // The trigger lookups run against a real SQLite schema, so "disabled flows never run" is not only checked on fakes.
 describe('TypeOrmFlowTriggerStore (SQLite)', () => {
@@ -115,7 +116,7 @@ describe('TypeOrmFlowTriggerStore (SQLite)', () => {
           resourceId: drillId,
           flowId: null,
         });
-        expect(ids(await store.findTriggerNodes(type, manager))).toContain('uncommitted');
+        expect(ids(await store.findTriggerNodes(type, legacyEngineTransactionScope(manager)))).toContain('uncommitted');
         expect(ids(await store.findTriggerNodes(type))).not.toContain('uncommitted');
         throw new Error('roll back');
       })

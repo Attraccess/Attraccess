@@ -3,6 +3,7 @@ import { entities, Resource, ResourceGroup, User } from '@attraccess/database-en
 import { IntroductionHistoryAction, ResourceType } from '@attraccess/application-models';
 import { TypeOrmResourceIntroductionStore } from './resource-introduction-store.adapter';
 import { TypeOrmMassIntroductionTargetStore, TypeOrmRetrainingStore } from './retraining-store.adapter';
+import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 
 describe('introduction stores on real SQLite', () => {
   let source: DataSource;
@@ -53,7 +54,9 @@ describe('introduction stores on real SQLite', () => {
     await expect(
       source.transaction(async (manager) => {
         // A read with the caller's transaction sees the state of that connection.
-        expect((await store.lastHistoryItem(created.id, manager))?.action).toBe(IntroductionHistoryAction.REVOKE);
+        expect((await store.lastHistoryItem(created.id, legacyEngineTransactionScope(manager)))?.action).toBe(
+          IntroductionHistoryAction.REVOKE,
+        );
         throw new Error('roll back');
       }),
     ).rejects.toThrow('roll back');

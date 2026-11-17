@@ -5,6 +5,7 @@ import type {
   AuditSubjectNameKind,
 } from '@attraccess/application-models';
 import type { SettingsStoreService } from '../settings/settings-store.service';
+import type { TransactionScope } from '../database/unit-of-work';
 
 /** DI token of the audit persistence port; the persistence adapter provides it. */
 export const AUDIT_STORE = Symbol.for('attraccess.audit.store');
@@ -70,9 +71,9 @@ export interface AuditStore extends AuditEntryReader {
   readonly isOpen: boolean;
   /**
    * The active transaction behind a caller's scope, or undefined when the caller has none (the record is then
-   * written durably). A TransactionScope of the unit of work and an adapter's native transaction handle both work.
+   * written durably).
    */
-  activeTransaction(ref: object | undefined): AuditTransaction | undefined;
+  activeTransaction(ref: TransactionScope | undefined): AuditTransaction | undefined;
   /** Never rejects, except with AuditTransactionAbortedError. A failed insert leaves the caller's work intact. */
   appendInTransaction(transaction: AuditTransaction, entry: AuditEntryDraft): Promise<AuditAppendResult>;
   /** Never rejects. */

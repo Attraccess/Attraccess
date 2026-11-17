@@ -38,6 +38,7 @@ import { createGenericMetersFixture } from './fixtures/generic-meters.test-fixtu
 import { createUsageLifecycleFixture } from './fixtures/usage-lifecycle.test-fixture';
 
 import type { Handler } from './fixtures/report-handler.test-fixture';
+import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 
 // This SQLite suite runs multiple settlements per case; coverage on CI exceeds Jest's five-second default.
 jest.setTimeout(30_000);
@@ -423,7 +424,7 @@ describe('Flow-defined metering', () => {
         .getRepository(ResourceMeteringOperation)
         .findOneByOrFail({ kind: 'final' });
       await usageLifecycleScope.source.transaction((manager) =>
-        usageLifecycleScope.metering.settleInTransaction(manager, ended.id, {
+        usageLifecycleScope.metering.settleInTransaction(legacyEngineTransactionScope(manager), ended.id, {
           status: 'collected',
           meters: { [finalOperation.sessionId ?? 'missing']: { status: 'ready', operationId: finalOperation.id } },
         }),

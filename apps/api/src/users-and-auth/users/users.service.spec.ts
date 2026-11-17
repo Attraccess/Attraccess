@@ -10,6 +10,7 @@ import { UserNotFoundException } from './../../exceptions/user.notFound.exceptio
 import { SSOUsernameChangeForbiddenException } from './errors/ssoUsernameChangeForbidden.exception';
 import { UserHasActiveUsageSessionsException } from './accounts/user-accounts';
 import { randomBytes } from 'crypto';
+import { fakeTransactionScope } from '../../database/fake-transaction-scope.test-fixture';
 
 describe('UsersService', () => {
   const fixture = registerUsersServiceFixture();
@@ -89,7 +90,7 @@ describe('UsersService', () => {
 
     it('joins the caller transaction and leaves the metrics to the caller', async () => {
       fixture.store.seed({ username: 'first', email: 'first@example.com' });
-      const context = {};
+      const context = fakeTransactionScope();
 
       const result = await fixture.service.createOne(
         { username: 'test', email: 'test@example.com', externalIdentifier: null },
@@ -178,7 +179,7 @@ describe('UsersService', () => {
     it('passes the caller transaction to the store', async () => {
       const [user] = fixture.store.seed({});
       const spy = jest.spyOn(fixture.store, 'updateUser');
-      const context = {};
+      const context = fakeTransactionScope();
 
       await fixture.service.updateOne(user.id, { externalIdentifier: 'a' }, context);
 
@@ -590,7 +591,7 @@ describe('UsersService', () => {
       );
 
     it('bootstraps one administrator and assigns defaults to remaining normalized users', async () => {
-      const context = {};
+      const context = fakeTransactionScope();
       const users = await fixture.service.createMany(
         [
           { username: ' FIRST ', email: ' First@Example.COM ', locale: ' de ' },
@@ -624,7 +625,7 @@ describe('UsersService', () => {
     });
     it('assigns allowed explicit roles alongside defaults without another administrator', async () => {
       fixture.store.seed({}, {}, {});
-      const context = {};
+      const context = fakeTransactionScope();
       setRole(['resources.view']);
       fixture.mockRbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.view']));
       const [member] = await fixture.service.createMany(
@@ -649,7 +650,7 @@ describe('UsersService', () => {
     });
     it('rejects an unknown role and an empty email', async () => {
       setRole(null);
-      const context = {};
+      const context = fakeTransactionScope();
       await expect(
         fixture.service.createMany([{ username: 'member', email: 'member@example.com', roleKey: 'missing' }], {
           context,

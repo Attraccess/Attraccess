@@ -154,7 +154,7 @@ export class TypeOrmFlowGraphStore implements FlowGraphStore {
       ]);
 
       const event = audit(previous);
-      if (event) await this.audit.record(event, manager);
+      if (event) await this.audit.record(event, scope);
 
       return { previous, saved: { nodes: savedNodes.map(toNodeRecord), edges: savedEdges.map(toEdgeRecord) } };
     });
@@ -205,7 +205,7 @@ export class TypeOrmFlowGraphStore implements FlowGraphStore {
       const deleted = await manager.delete(Flow, { id: flowId });
       // A concurrent delete got there first and recorded it.
       if (!deleted.affected) return false;
-      await this.audit.record(audit(canvas), manager);
+      await this.audit.record(audit(canvas), scope);
       return true;
     });
   }

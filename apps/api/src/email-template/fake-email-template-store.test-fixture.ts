@@ -1,5 +1,9 @@
 import type { EmailTemplateRecord, EmailTemplateTranslationRecord } from '@attraccess/application-models';
 import type { EmailTemplateStore } from './email-template-store.port';
+import type { TransactionScope } from '../database/unit-of-work';
+
+/** The transaction the fake hands to `alsoInTransaction`, so a spec can assert what joined it. */
+export const FAKE_TEMPLATE_TRANSACTION: TransactionScope = { isOpen: true, afterCommit: () => undefined };
 
 /** In-memory EmailTemplateStore with call recording, for unit tests of code that only needs the port. */
 export class FakeEmailTemplateStore implements EmailTemplateStore {
@@ -74,14 +78,14 @@ export class FakeEmailTemplateStore implements EmailTemplateStore {
     type: string,
     locale: string,
     entries: Array<{ key: string; value: string }>,
-    alsoInTransaction?: (context: object) => Promise<void>,
+    alsoInTransaction?: (context: TransactionScope) => Promise<void>,
   ) {
     this.record('replaceTranslations', type, locale, entries);
     this.translations = this.translations.filter((t) => !(t.templateType === type && t.locale === locale));
     for (const { key, value } of entries) {
       this.translations.push({ templateType: type as never, locale, key, value });
     }
-    await alsoInTransaction?.({ fake: 'transaction' });
+    await alsoInTransaction?.(FAKE_TEMPLATE_TRANSACTION);
   }
 
   async deleteTranslations(type: string, locale: string) {

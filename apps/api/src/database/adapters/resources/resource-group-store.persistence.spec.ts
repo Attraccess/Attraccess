@@ -3,6 +3,7 @@ import { entities, Resource, User } from '@attraccess/database-entities';
 import { IntroductionHistoryAction, ResourceIntroducerType, ResourceType } from '@attraccess/application-models';
 import { TypeOrmResourceGroupIntroducerStore, TypeOrmResourceGroupStore } from './resource-group-store.adapter';
 import { TypeOrmResourceIntroductionStore } from './resource-introduction-store.adapter';
+import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 
 describe('resource group stores on real SQLite', () => {
   let source: DataSource;
@@ -70,7 +71,7 @@ describe('resource group stores on real SQLite', () => {
     expect((await groups.findById(group.id, true))?.resources).toEqual([{ id: resourceId }]);
     expect((await groups.groupsOfResource(resourceId)).map((item) => item.id)).toEqual([group.id]);
     await source.transaction(async (manager) => {
-      expect(await groups.groupsOfResource(resourceId, manager)).toHaveLength(1);
+      expect(await groups.groupsOfResource(resourceId, legacyEngineTransactionScope(manager))).toHaveLength(1);
     });
 
     await groups.removeResource(group.id, resourceId);

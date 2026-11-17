@@ -110,12 +110,8 @@ export interface AuditRecordOptions {
   previousAuditSettings?: PreviousAuditSettings;
 }
 
-/**
- * The caller's transaction. Pass the `TransactionScope` of the unit of work the business write runs in. Callers that
- * still run their own engine transaction may pass that transaction's native handle (opaque here; the audit
- * persistence adapter interprets it).
- */
-export type AuditTransactionRef = TransactionScope | object;
+/** The caller's transaction: the `TransactionScope` of the unit of work the business write runs in. */
+export type AuditTransactionRef = TransactionScope;
 
 /**
  * Records one audit event. Never rejects, except with AuditTransactionAbortedError when the database discarded the

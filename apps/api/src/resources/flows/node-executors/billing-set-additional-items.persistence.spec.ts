@@ -15,6 +15,7 @@ import { ResourceUsageService } from '../../usage/sessions/resource-usage.servic
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { BillingSetAdditionalItemsExecutor } from './billing-set-additional-items.executor';
 import { NodeExecutionContext } from './node-executor.interface';
+import { legacyEngineTransactionScope } from '../../../database/adapters/common/legacy-engine-transaction';
 
 const schemas = [
   new EntitySchema<ResourceUsage>({
@@ -116,7 +117,8 @@ describe('Additional billing items around finalization', () => {
 
   it('keeps item writes inside the caller-owned transaction and rejects completed bills there too', async () => {
     await expect(
-      source.transaction(async (transactionManager) => {
+      source.transaction(async (manager) => {
+        const transactionManager = legacyEngineTransactionScope(manager);
         await executor.execute(node, { id: 1, quantity: 2 }, { ...ctx, transactionManager });
         throw new Error('caller rolled back');
       }),
@@ -125,8 +127,12 @@ describe('Additional billing items around finalization', () => {
     await source.getRepository(BillingTransaction).update(1, { status: BillingTransactionStatus.Completed });
 
     await expect(
-      source.transaction((transactionManager) =>
-        executor.execute(node, { id: 1, quantity: 2 }, { ...ctx, transactionManager }),
+      source.transaction((manager) =>
+        executor.execute(
+          node,
+          { id: 1, quantity: 2 },
+          { ...ctx, transactionManager: legacyEngineTransactionScope(manager) },
+        ),
       ),
     ).rejects.toBeInstanceOf(NoUsageSessionError);
     expect(await source.getRepository(BillingTransactionItem).count()).toBe(0);

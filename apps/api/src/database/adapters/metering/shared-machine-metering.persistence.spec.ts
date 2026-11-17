@@ -20,6 +20,7 @@ import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-
 import { resetTestFixture } from './fixtures/setup.test-fixture';
 
 import { createFlowDefinedMeteringFixture } from './fixtures/flow-defined-meters.test-fixture';
+import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 
 // This SQLite suite runs multiple settlements per case; coverage on CI exceeds Jest's five-second default.
 jest.setTimeout(30_000);
@@ -388,7 +389,7 @@ describe('Metering on a shared machine', () => {
       const b = await start(1);
       await meterSessions().delete({ usageId: b.id });
 
-      await scope.metering.discardCandidate(scope.source.manager, b.id);
+      await scope.metering.discardCandidate(legacyEngineTransactionScope(scope.source.manager), b.id);
 
       const open = (await segments()).find((segment) => segment.status === 'open');
       expect(open?.participants.map((participant) => participant.usageId)).toEqual([a.id]);

@@ -24,6 +24,7 @@ import { TypeOrmMessageNotificationStore } from './messaging/typeorm-message-not
 import { TypeOrmNotificationPreferenceStore } from './notifications/typeorm-notification-preference-store';
 import { TypeOrmPushSubscriptionStore } from './push/typeorm-push-subscription-store';
 import { TypeOrmSettingsRows, TypeOrmSetupAccountStats } from './settings/typeorm-settings-rows';
+import { legacyEngineTransactionScope } from './common/legacy-engine-transaction';
 
 /** The area adapters against a real SQLite database with the application's schema. */
 describe('area persistence adapters (real SQLite)', () => {
@@ -66,7 +67,7 @@ describe('area persistence adapters (real SQLite)', () => {
     it('reads through the transaction it is given and sees its uncommitted write', async () => {
       await source.transaction(async (manager) => {
         await manager.getRepository(Setting).insert({ parent: 'audit', key: 'enabled', value: 'true' });
-        expect(await rows().findValue('audit', 'enabled', manager)).toBe('true');
+        expect(await rows().findValue('audit', 'enabled', legacyEngineTransactionScope(manager))).toBe('true');
       });
     });
 

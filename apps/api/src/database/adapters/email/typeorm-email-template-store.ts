@@ -9,6 +9,7 @@ import {
   EmailTemplateReadContext,
   EmailTemplateStore,
 } from '../../../email-template/email-template-store.port';
+import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 import { TransactionHandles } from '../common/transaction-handles';
 
 const asType = (type: string) => type as EmailTemplateType;
@@ -133,7 +134,7 @@ export class TypeOrmEmailTemplateStore implements EmailTemplateStore {
       if (rows.length > 0) {
         await manager.insert(EmailTemplateTranslation, rows);
       }
-      await alsoInTransaction?.(manager);
+      await alsoInTransaction?.(legacyEngineTransactionScope(manager));
     });
   }
 

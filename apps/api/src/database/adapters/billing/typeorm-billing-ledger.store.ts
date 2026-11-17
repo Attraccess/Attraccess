@@ -104,7 +104,7 @@ export class TypeOrmBillingLedgerStore implements BillingLedgerStore {
     const saved = await manager.getRepository(BillingTransaction).save({ ...input });
     if (options.audit) {
       // Inside a caller's transaction the audit row commits or rolls back with the transaction it describes.
-      await this.audit.record(options.audit(saved.id), options.context ? manager : undefined);
+      await this.audit.record(options.audit(saved.id), options.context);
     }
     return toTransactionRecord(saved as BillingTransaction);
   }
@@ -113,7 +113,7 @@ export class TypeOrmBillingLedgerStore implements BillingLedgerStore {
     input: SettleUsageChargeInput,
     context?: BillingTransactionContext,
   ): Promise<BillingTransactionRecord> {
-    return this.contexts.run(context, async (manager) => {
+    return this.contexts.run(context, async (manager, scope) => {
       let settled: BillingTransactionRecord;
       if (input.existing) {
         await manager.update(BillingTransaction, input.existing.id, {
@@ -130,7 +130,7 @@ export class TypeOrmBillingLedgerStore implements BillingLedgerStore {
         } as Partial<BillingTransaction>);
         settled = toTransactionRecord(saved);
       }
-      await this.audit.record(input.audit(settled.id), manager);
+      await this.audit.record(input.audit(settled.id), scope);
       for (const item of input.items) {
         await manager.save(BillingTransactionItem, { billingTransactionId: settled.id, ...item });
       }

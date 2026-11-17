@@ -18,7 +18,8 @@ import {
   Setting,
   User,
 } from '@attraccess/database-entities';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource } from 'typeorm';
+import type { TransactionScope } from '../../unit-of-work';
 import { toProjectInvitationDto } from '../../../projects/dto/project.dto';
 import { ProjectsService } from '../../../projects/projects.service';
 import { resolveDatabaseBackend } from '../../backend';
@@ -204,8 +205,8 @@ describe('project persistence adapters on a real SQLite file', () => {
       const { id } = await projects.create({ ownerId: 1, name: 'Audited', description: null });
       const auditedInOpenTransaction: boolean[] = [];
       const audit = {
-        record: jest.fn(async (_event: unknown, manager?: EntityManager) => {
-          auditedInOpenTransaction.push(manager?.queryRunner?.isTransactionActive === true);
+        record: jest.fn(async (_event: unknown, scope?: TransactionScope) => {
+          auditedInOpenTransaction.push(scope ? uow.handleOf(scope).queryRunner?.isTransactionActive === true : false);
         }),
       };
       const metrics = { projectsTotal: { inc: jest.fn(), dec: jest.fn() } };

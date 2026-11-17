@@ -1,5 +1,6 @@
 import { MaintenanceScheduleRecord, ResourceMaintenanceScheduleTriggerType } from '@attraccess/application-models';
 import { Test, TestingModule } from '@nestjs/testing';
+import type { TransactionScope } from '../../database/unit-of-work';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { MetricsService } from '../../metrics/metrics.service';
 import { ResourceOperatingAttributionService } from '../operating-intervals/resource-operating-attribution.service';
@@ -48,7 +49,7 @@ export function registerMaintenanceScheduleEvaluatorServiceFixture() {
 
   const baselineDate = new Date('2025-01-01T00:00:00.000Z');
 
-  const fakeView = (context: object | undefined): Mocked<MaintenanceEvaluationView> => ({
+  const fakeView = (context: TransactionScope | undefined): Mocked<MaintenanceEvaluationView> => ({
     context,
     enabledSchedules: jest.fn().mockResolvedValue([]),
     baselineDate: jest.fn().mockResolvedValue(baselineDate),
@@ -59,7 +60,7 @@ export function registerMaintenanceScheduleEvaluatorServiceFixture() {
 
   beforeEach(async () => {
     operatingAttribution = { getDurationsForWindows: jest.fn().mockResolvedValue(new Map()) };
-    view = fakeView({ transaction: true });
+    view = fakeView({ isOpen: true, afterCommit: jest.fn() });
     currentView = fakeView(undefined);
     store = {
       snapshotReads: false,

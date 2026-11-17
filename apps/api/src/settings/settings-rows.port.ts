@@ -1,10 +1,7 @@
 import type { TransactionScope } from '../database/unit-of-work';
 
-/**
- * The transaction a setting is read through. A unit-of-work scope; audit still passes its own transaction handle
- * until it uses the unit of work, hence the open `object`.
- */
-export type SettingsReadContext = TransactionScope | object;
+/** The unit of work a setting is read through. */
+export type SettingsReadContext = TransactionScope;
 
 /** Persistence of the key/value settings rows and of the account counts the first-time setup status needs. */
 export const SETTINGS_ROWS = Symbol.for('attraccess.settings.rows');

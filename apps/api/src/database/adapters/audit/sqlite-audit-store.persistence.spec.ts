@@ -3,11 +3,12 @@ import { AuditLog } from '@attraccess/database-entities';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { AuditTransaction, DurableAppendControl } from '../../../audit/audit-persistence.port';
 import { createSqliteUnitOfWork } from '../../sqlite/sqlite-unit-of-work';
-import { TransactionScopeError } from '../../unit-of-work';
+import { TransactionScopeError, type TransactionScope } from '../../unit-of-work';
 import { AUDIT_BUSY_RETRIES, SqliteAuditStore } from './sqlite-audit-store';
+import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 
 const draft = (subjectId: number, details: AuditEntryDraft['details'] = {}): AuditEntryDraft => ({
   domain: 'resource',
@@ -25,8 +26,11 @@ const draft = (subjectId: number, details: AuditEntryDraft['details'] = {}): Aud
   details,
 });
 
-function transactionOf(from: SqliteAuditStore, ref: object) {
-  const transaction = from.activeTransaction(ref);
+/** The audit transaction behind a unit-of-work scope, or behind a transaction the spec opened itself. */
+function transactionOf(from: SqliteAuditStore, ref: TransactionScope | EntityManager) {
+  const transaction = from.activeTransaction(
+    ref instanceof EntityManager ? legacyEngineTransactionScope(ref) : (ref as TransactionScope),
+  );
   if (!transaction) throw new Error('No active transaction');
   return transaction;
 }
@@ -152,7 +156,7 @@ describe('SqliteAuditStore on independent connections', () => {
   describe('in the caller transaction', () => {
     it('commits and rolls back with the caller, and does not use the durable connection', async () => {
       await main.transaction(async (manager) => {
-        const transaction = store.activeTransaction(manager);
+        const transaction = store.activeTransaction(legacyEngineTransactionScope(manager));
         expect(transaction).toBeDefined();
         expect(await store.appendInTransaction(transaction as AuditTransaction, draft(10))).toEqual({
           status: 'stored',
@@ -199,7 +203,7 @@ describe('SqliteAuditStore on independent connections', () => {
 
     it('has no transaction to join without an active one', async () => {
       expect(store.activeTransaction(undefined)).toBeUndefined();
-      expect(store.activeTransaction(main.manager)).toBeUndefined();
+      expect(store.activeTransaction(legacyEngineTransactionScope(main.manager))).toBeUndefined();
     });
 
     it('leaves the caller transaction intact when only the audit insert fails', async () => {

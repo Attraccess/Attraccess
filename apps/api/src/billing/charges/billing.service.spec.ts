@@ -3,6 +3,7 @@ import { billingTransactionAuditEvent } from '../../audit/policies/billing';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { InsufficientBalanceError } from '../errors/insufficient-balance.error';
 import { billableUsage, createBillingServiceFixture } from './fixtures/billing-service.test-fixture';
+import { fakeTransactionScope } from '../../database/fake-transaction-scope.test-fixture';
 
 describe('BillingService', () => {
   let f: ReturnType<typeof createBillingServiceFixture>;
@@ -45,7 +46,7 @@ describe('BillingService', () => {
 
     it('passes a caller transaction on when reading the balance', async () => {
       f.ledgerStore.balances.set(1, 42);
-      const context = {};
+      const context = fakeTransactionScope();
 
       await f.service.getBalance(1, context);
 
@@ -180,7 +181,7 @@ describe('BillingService', () => {
       });
       f.configurationStore.configure(205, { creditsPerUsage: 99, creditsPerMinute: 99, creditsPerOperatingMinute: 99 });
 
-      const transaction = await f.service.chargeForResourceUsage(usage, {});
+      const transaction = await f.service.chargeForResourceUsage(usage, fakeTransactionScope());
 
       expect(transaction?.amount).toBe(-contract.expectedCharge);
       expect(transaction?.items).toContainEqual(
@@ -206,7 +207,7 @@ describe('BillingService', () => {
           billingFactor: factor,
         });
 
-        const transaction = await f.service.chargeForResourceUsage(usage, {});
+        const transaction = await f.service.chargeForResourceUsage(usage, fakeTransactionScope());
 
         expect(transaction?.amount).toBe(-amount);
         expect(transaction?.items).toContainEqual(
@@ -237,7 +238,7 @@ describe('BillingService', () => {
           operatingDurationCreditsPerMinute: 7,
         });
 
-        const transaction = await f.service.chargeForResourceUsage(usage, {});
+        const transaction = await f.service.chargeForResourceUsage(usage, fakeTransactionScope());
 
         expect(transaction?.amount).toBe(-roundedMinutes * 10);
         expect(transaction?.items).toContainEqual(
@@ -258,7 +259,7 @@ describe('BillingService', () => {
       ['a charge of zero credits', billableUsage({ endTime: new Date('2026-09-20T09:10:00Z') })],
       ['a session that has not ended', billableUsage({ endTime: null })],
     ])('creates no transaction for %s', async (_name, usage) => {
-      await expect(f.service.chargeForResourceUsage(usage, {})).resolves.toBeUndefined();
+      await expect(f.service.chargeForResourceUsage(usage, fakeTransactionScope())).resolves.toBeUndefined();
 
       expect(f.ledgerStore.transactions).toHaveLength(0);
       expect(f.audit.record).not.toHaveBeenCalled();
@@ -272,7 +273,7 @@ describe('BillingService', () => {
         sessionDurationCreditsPerMinute: null,
         creditsPerUsage: null,
       });
-      const callerTransaction = {};
+      const callerTransaction = fakeTransactionScope();
 
       const transaction = await f.service.chargeForResourceUsage(usage, callerTransaction);
 
@@ -363,7 +364,7 @@ describe('BillingService', () => {
       await expect(f.service.chargeForResourceUsage(billableUsage())).rejects.toThrow(
         'Billing transaction already exists for this resource usage',
       );
-      await expect(f.service.chargeForResourceUsage(billableUsage(), {})).rejects.toThrow(
+      await expect(f.service.chargeForResourceUsage(billableUsage(), fakeTransactionScope())).rejects.toThrow(
         'Billing transaction already exists for this resource usage',
       );
 
@@ -384,7 +385,7 @@ describe('BillingService', () => {
           billingFactor: factor,
         });
 
-        const transaction = await f.service.chargeForResourceUsage(usage, {});
+        const transaction = await f.service.chargeForResourceUsage(usage, fakeTransactionScope());
 
         expect(transaction?.amount).toBeCloseTo(amount);
         expect(transaction?.items).toContainEqual(
@@ -396,7 +397,7 @@ describe('BillingService', () => {
     it('does not create a BILLING_FACTOR item at 100%', async () => {
       const transaction = await f.service.chargeForResourceUsage(
         billableUsage({ endTime: new Date('2026-09-20T09:04:00.000Z'), sessionDurationCreditsPerMinute: 10 }),
-        {},
+        fakeTransactionScope(),
       );
 
       expect(transaction?.amount).toBe(-40);
@@ -432,7 +433,7 @@ describe('BillingService', () => {
         sessionDurationCreditsPerMinute: 5,
       });
 
-      const transaction = await f.service.chargeForResourceUsage(usage, {});
+      const transaction = await f.service.chargeForResourceUsage(usage, fakeTransactionScope());
 
       // 2 minutes * 5 + existing items 7 * 2 = 24
       expect(transaction).toMatchObject({ id: pending.id, amount: -24, status: BillingTransactionStatus.Completed });

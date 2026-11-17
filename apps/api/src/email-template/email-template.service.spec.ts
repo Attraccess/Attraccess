@@ -3,7 +3,7 @@ import { EmailTemplateService } from './email-template.service';
 import { EmailTemplateType } from '@attraccess/application-models';
 import { MjmlService } from './mjml.service';
 import { readDefaultTemplateBody } from './email-defaults';
-import { FakeEmailTemplateStore } from './fake-email-template-store.test-fixture';
+import { FAKE_TEMPLATE_TRANSACTION, FakeEmailTemplateStore } from './fake-email-template-store.test-fixture';
 
 const ACTOR = { id: 1, authenticationMethod: 'session' as const };
 const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
@@ -93,7 +93,7 @@ describe('EmailTemplateService — translation CRUD', () => {
       ]);
       expect(audit.record).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'email_template.translations_set' }),
-        { fake: 'transaction' },
+        FAKE_TEMPLATE_TRANSACTION,
       );
     });
 

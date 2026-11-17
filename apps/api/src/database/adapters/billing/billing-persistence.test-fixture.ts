@@ -69,9 +69,10 @@ export async function createBillingDatabase() {
     const audited: BillingConnection['audited'] = [];
     // Stands in for the audit store: when handed a transaction it writes a row that must commit or roll back with it.
     const audit: AuditRecorder = {
-      record: async (event, manager) => {
-        audited.push({ operationId: event.operationId, inTransaction: Boolean(manager) });
-        await (manager ?? source.manager)
+      record: async (event, scope) => {
+        audited.push({ operationId: event.operationId, inTransaction: Boolean(scope) });
+        await contexts
+          .manager(scope)
           .getRepository(Setting)
           .insert({ parent: 'audit-probe', key: `${event.operationId}-${audited.length}`, value: event.action });
         return {} as never;

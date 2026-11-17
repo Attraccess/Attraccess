@@ -8,11 +8,8 @@ import type {
 import type { TransactionScope } from '../../database/unit-of-work';
 import type { AuditEvent } from '../../audit/recorder/audit-event';
 
-/**
- * A transaction the caller already owns. New code passes the `TransactionScope` of its unit of work. The engine
- * handle of callers that are not migrated yet is accepted unchanged and recognised by the adapter.
- */
-export type BillingTransactionContext = TransactionScope | object;
+/** The unit of work the caller already runs in; billing writes join it. */
+export type BillingTransactionContext = TransactionScope;
 
 export const BILLING_LEDGER_STORE = Symbol.for('attraccess.billing.ledger-store');
 

@@ -2,6 +2,7 @@ import { registerResourceHealthServiceFixture } from './resource-health.service.
 import { NotFoundException } from '@nestjs/common';
 import { ResourceHealthSource, ResourceHealthStatus, type ResourceHealthRecord } from '@attraccess/application-models';
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
+import { fakeTransactionScope } from '../../database/fake-transaction-scope.test-fixture';
 
 describe('ResourceHealthService', () => {
   const fixture = registerResourceHealthServiceFixture();
@@ -203,7 +204,7 @@ describe('ResourceHealthService', () => {
     });
 
     it('asks the store through the given transaction context', async () => {
-      const context = {};
+      const context = fakeTransactionScope();
       fixture.store.hasUnhealthyEntry.mockResolvedValueOnce(true);
       expect(await fixture.service.isResourceUnhealthy(1, context)).toBe(true);
       expect(fixture.store.hasUnhealthyEntry).toHaveBeenCalledWith(1, context);

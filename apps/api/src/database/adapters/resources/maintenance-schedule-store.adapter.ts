@@ -15,6 +15,7 @@ import {
   type ResourceType,
 } from '@attraccess/application-models';
 import { AUDIT_RECORDER, type AuditEvent, type AuditRecorder } from '../../../audit/recorder/audit-event';
+import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 import type {
   MaintenanceScheduleConfigs,
   MaintenanceSchedulePatch,
@@ -98,7 +99,7 @@ export class TypeOrmMaintenanceScheduleStore implements MaintenanceScheduleStore
         .update({ maintenanceSchedule: { id: scheduleId } }, { maintenanceSchedule: null });
       await this.removeConfigs(manager, scheduleId);
       await manager.getRepository(ResourceMaintenanceSchedule).delete({ id: scheduleId });
-      await this.audit.record(auditEvent, manager);
+      await this.audit.record(auditEvent, legacyEngineTransactionScope(manager));
     });
   }
 

@@ -15,6 +15,7 @@ import type {
   SsoProviderStore,
 } from '../../../users-and-auth/auth/sso/providers/sso-provider.port';
 import type { AuditEvent } from '../../../audit/recorder/audit-event';
+import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 
 const relationOf = (type: SSOProviderType) =>
   type === SSOProviderType.OIDC ? ('oidcConfiguration' as const) : ('samlConfiguration' as const);
@@ -88,7 +89,7 @@ export class TypeOrmSsoProviderStore implements SsoProviderStore {
       const loaded = await this.load(manager, provider.id);
       if (!loaded) throw new Error('Provider not found after create');
       const record = toRecord(loaded);
-      await this.audit.record(audit(record), manager);
+      await this.audit.record(audit(record), legacyEngineTransactionScope(manager));
       return record;
     });
   }
@@ -117,7 +118,7 @@ export class TypeOrmSsoProviderStore implements SsoProviderStore {
       if (!updated) return null;
       const record = toRecord(updated);
       const event = audit(record);
-      if (event) await this.audit.record(event, manager);
+      if (event) await this.audit.record(event, legacyEngineTransactionScope(manager));
       return record;
     });
   }
@@ -136,7 +137,7 @@ export class TypeOrmSsoProviderStore implements SsoProviderStore {
         await manager.getRepository(SSOProviderSAMLConfiguration).delete(current.samlConfiguration.id);
       }
       await manager.getRepository(SSOProvider).delete(id);
-      await this.audit.record(audit(toRecord(current)), manager);
+      await this.audit.record(audit(toRecord(current)), legacyEngineTransactionScope(manager));
     });
   }
 
