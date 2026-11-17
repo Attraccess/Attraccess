@@ -11,7 +11,7 @@ import {
   ResourceUsageExportRow,
 } from '../../../analytics/analytics-reader.port';
 import { DateRangeValue } from '../../../analytics/dtos/dateRangeValue';
-import { toBillingTransactionExportRow, toResourceUsageExportRow } from './export-row-dtos';
+import { toBillingTransactionExportRow, toResourceUsageExportRow } from './export-rows';
 
 @Injectable()
 export class TypeOrmAnalyticsReader implements AnalyticsReader {
@@ -41,8 +41,7 @@ export class TypeOrmAnalyticsReader implements AnalyticsReader {
       skip: (page - 1) * limit,
       take: limit,
     });
-    // The export row classes are the response schema; the port sees them as plain rows.
-    return { rows: usages.map(toResourceUsageExportRow) as unknown as ResourceUsageExportRow[], total };
+    return { rows: usages.map(toResourceUsageExportRow), total };
   }
 
   async findBillingTransactionsInRange(
@@ -64,8 +63,7 @@ export class TypeOrmAnalyticsReader implements AnalyticsReader {
       skip: (page - 1) * limit,
       take: limit,
     });
-    const rows = transactions.map((transaction) => toBillingTransactionExportRow(transaction, includeEmail));
-    return { rows: rows as unknown as BillingTransactionExportRow[], total };
+    return { rows: transactions.map((transaction) => toBillingTransactionExportRow(transaction, includeEmail)), total };
   }
 
   async findResourcesActiveInRange(

@@ -1,24 +1,12 @@
 import type { ResourceUsageAction } from '@attraccess/application-models';
+import type { BillingTransactionExportRowDto, ResourceUsageExportRowDto } from './dtos/analyticsExportRows.dto';
 import type { DateRangeValue } from './dtos/dateRangeValue';
 
-/**
- * One usage session of the export, as the JSON of the export endpoint carries it: the session with its user,
- * resource and supervisor, and the flat email fields the export adds. The adapter owns the exact shape.
- */
-export interface ResourceUsageExportRow {
-  id: number;
-  userEmail: string | null;
-  supervisorEmail: string | null;
-  [field: string]: unknown;
-}
+/** One usage session of the export with its user, resource and supervisor, and the export's flat email fields. */
+export type ResourceUsageExportRow = ResourceUsageExportRowDto;
 
 /** One billing transaction of the export with its parties, usage and items, plus the gated email fields. */
-export interface BillingTransactionExportRow {
-  id: number;
-  userEmail: string | null;
-  initiatorEmail: string | null;
-  [field: string]: unknown;
-}
+export type BillingTransactionExportRow = BillingTransactionExportRowDto;
 
 export interface ResourceHoursRangeParams {
   start: Date;
