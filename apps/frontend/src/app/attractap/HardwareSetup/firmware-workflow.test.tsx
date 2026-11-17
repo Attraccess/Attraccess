@@ -7,6 +7,7 @@ import { FirmwareSelector } from './FirmwareSelector';
 const state = vi.hoisted(() => ({
   binary: undefined as Blob | undefined,
   loading: false,
+  error: false,
   firmwares: undefined as AttractapFirmware[] | undefined,
   connect: vi.fn(),
   flash: vi.fn(),
@@ -18,7 +19,7 @@ vi.mock('@attraccess/react-query-client', () => ({
     state.query(params);
     return { data: state.binary, isLoading: state.loading };
   },
-  useAttractapServiceGetFirmwares: () => ({ data: state.firmwares, isLoading: state.loading }),
+  useAttractapServiceGetFirmwares: () => ({ data: state.firmwares, isLoading: state.loading, isError: state.error }),
 }));
 vi.mock('../../../utils/esp-tools', () => ({
   ESPTools: { getInstance: () => ({ connectToDevice: state.connect, flashFirmware: state.flash }) },
@@ -45,6 +46,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.binary = new Blob(['firmware']);
   state.loading = false;
+  state.error = false;
   state.firmwares = undefined;
   state.connect.mockResolvedValue({ success: true });
   state.flash.mockResolvedValue({ success: true });
@@ -68,6 +70,27 @@ it('groups production and demo firmware and returns the selected metadata', asyn
   fireEvent.click(await screen.findByRole('button', { name: /Demo reader/ }));
   expect(select).toHaveBeenLastCalledWith(demo);
 });
+it('explains an empty firmware list instead of rendering a blank panel', () => {
+  state.firmwares = [];
+  render(
+    <MemoryRouter>
+      <FirmwareSelector onSelect={vi.fn()} />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText('No firmware is available on this server.')).toBeTruthy();
+});
+
+it('reports a failed firmware request instead of claiming there is no firmware', () => {
+  state.error = true;
+  render(
+    <MemoryRouter>
+      <FirmwareSelector onSelect={vi.fn()} />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText(/Could not load the firmware list/)).toBeTruthy();
+  expect(screen.queryByText('No firmware is available on this server.')).toBeNull();
+});
+
 it('shows download loading and does not flash a missing binary', () => {
   state.loading = true;
   const view = render(<FirmwareFlasher firmware={firmware} onCompleted={vi.fn()} />);
