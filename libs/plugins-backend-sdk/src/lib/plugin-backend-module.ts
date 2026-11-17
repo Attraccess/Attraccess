@@ -1,6 +1,6 @@
 import type { PluginContext } from './plugin-context';
 import { DynamicModule } from '@nestjs/common';
-import type { PluginEntityClass } from './entity';
+import type { PluginPersistenceDeclaration } from './plugin-persistence';
 import type { MqttCredentialProvisioningProviderFactory } from './mqtt-credential-provisioning';
 import type { PluginAuditDomainDeclaration } from './plugin-audit';
 import type { PluginFlowNodeDefinition } from './plugin-flow-node';
@@ -15,14 +15,14 @@ export interface PluginBackendModule {
   register(context: PluginContext): DynamicModule;
 
   /**
-   * Optional TypeORM entity classes this plugin owns. The host registers their
-   * metadata into the shared DataSource at load time so the plugin can query
-   * them through {@link PluginContext.getRepository}. The schema itself is owned
-   * by the plugin's migrations (the host runs with `synchronize: false`), so an
-   * entity here describes an existing table rather than creating one. Requires
-   * the DATABASE_ACCESS permission. See `docs/en/plugins/database-migrations.md`.
+   * Optional engine capability declaration: the engines this plugin provides storage code for, with the entity
+   * classes per engine (`persistence: { sqlite: { entities: [Widget] } }`). The host registers an engine's entities
+   * into its shared connection at load time, so the plugin can query them through that engine's subpath
+   * (`sqlitePersistence(context).getRepository(Widget)`). The schema itself is owned by the plugin's migrations, so
+   * an entity describes an existing table. Requires the DATABASE_ACCESS permission. A plugin whose declaration does
+   * not include the engine the host runs is not loaded. See `docs/en/plugins/database-migrations.md`.
    */
-  entities?: PluginEntityClass[];
+  persistence?: PluginPersistenceDeclaration;
 
   /**
    * Optional custom flow node types this plugin contributes. The host registers

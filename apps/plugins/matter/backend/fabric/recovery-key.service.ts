@@ -1,4 +1,5 @@
 import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { MatterRecoveryKey } from '../backup/entities';
@@ -35,7 +36,7 @@ export class RecoveryKeyService {
   ) {}
 
   private get repo() {
-    return this.context.getRepository(MatterRecoveryKey);
+    return sqlitePersistence(this.context).getRepository(MatterRecoveryKey);
   }
 
   current(): Promise<MatterRecoveryKey | null> {
@@ -87,10 +88,12 @@ export class RecoveryKeyService {
   async rotate(principal: PluginAuditPrincipal | null): Promise<RecoveryKeyReveal> {
     const previous = await this.current();
     if (!previous) throw conflict('no_recovery_key', 'There is no recovery key to rotate.');
-    const { row, reveal } = await this.context.getRepository(MatterRecoveryKey).manager.transaction(async (manager) => {
-      await manager.update(MatterRecoveryKey, { id: previous.id }, { retiredAt: new Date().toISOString() });
-      return this.create(manager);
-    });
+    const { row, reveal } = await sqlitePersistence(this.context)
+      .getRepository(MatterRecoveryKey)
+      .manager.transaction(async (manager) => {
+        await manager.update(MatterRecoveryKey, { id: previous.id }, { retiredAt: new Date().toISOString() });
+        return this.create(manager);
+      });
     await this.audit.record(
       'matter.recovery_key_rotated',
       principal,

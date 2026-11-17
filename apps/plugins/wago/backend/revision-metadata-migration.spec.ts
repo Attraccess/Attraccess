@@ -1,4 +1,4 @@
-import { DataSource } from 'typeorm';
+import { DataSource } from '@attraccess/plugins-backend-sdk/sqlite';
 import { AddWagoRevisionEditorMetadata1780010580000 } from './migrations/1780010580000-add-wago-revision-editor-metadata';
 
 it('adds nullable revision metadata without changing existing history and can roll back', async () => {

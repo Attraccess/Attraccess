@@ -1,3 +1,4 @@
+import { flowNode, hostDataWithFlows, repositoryDouble } from '../persistence.test-utils';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { configurationHash } from '../configuration/model';
 import { WagoDiagnosticsStore } from './store';
@@ -88,40 +89,37 @@ describe('controller diagnostics', () => {
   {
     it('keeps healthy resource controllers available when another applied snapshot is corrupt', async () => {
       const nodes = [
-        { id: 'broken', resourceId: 1, type: 'plugin.wago.command', data: { controllerId: 1, channelId: 'io' } },
-        { id: 'healthy', resourceId: 1, type: 'plugin.wago.command', data: { controllerId: 2, channelId: 'io' } },
+        flowNode({
+          id: 'broken',
+          resourceId: 1,
+          type: 'plugin.wago.command',
+          data: { controllerId: 1, channelId: 'io' },
+        }),
+        flowNode({
+          id: 'healthy',
+          resourceId: 1,
+          type: 'plugin.wago.command',
+          data: { controllerId: 2, channelId: 'io' },
+        }),
       ];
       const query = (result: unknown[]) => {
         const builder = {
           select: jest.fn(),
-          leftJoin: jest.fn(),
-          addSelect: jest.fn(),
           distinctOn: jest.fn(),
           where: jest.fn(),
           andWhere: jest.fn(),
           orderBy: jest.fn(),
           addOrderBy: jest.fn(),
-          take: jest.fn(),
           getMany: jest.fn().mockResolvedValue(result),
         };
-        for (const method of [
-          'select',
-          'leftJoin',
-          'addSelect',
-          'distinctOn',
-          'where',
-          'andWhere',
-          'orderBy',
-          'addOrderBy',
-          'take',
-        ] as const)
+        for (const method of ['select', 'distinctOn', 'where', 'andWhere', 'orderBy', 'addOrderBy'] as const)
           builder[method].mockReturnValue(builder);
         return builder;
       };
-      const conflictQuery = query([]);
-      const resourceQueries = [query(nodes), conflictQuery];
+      // The first host flow lookup lists the resource's own nodes, the second the conflicting ones.
+      const findNodes = jest.fn().mockResolvedValueOnce(nodes).mockResolvedValueOnce([]);
       const context = {
-        getRepository: (entity: unknown) => {
+        ...repositoryDouble((entity: unknown) => {
           if (entity === WagoController)
             return {
               createQueryBuilder: () =>
@@ -147,8 +145,8 @@ describe('controller diagnostics', () => {
                 ]),
             };
           throw new Error('unexpected repository');
-        },
-        dataSource: { getRepository: () => ({ createQueryBuilder: () => resourceQueries.shift() }) },
+        }),
+        hostData: hostDataWithFlows(findNodes),
       } as unknown as PluginContext;
       const service = new WagoDiagnosticsService(context, {} as WagoService);
 
@@ -158,8 +156,10 @@ describe('controller diagnostics', () => {
           { controllerId: 2, unavailable: false, references: [{ nodeId: 'healthy' }] },
         ],
       });
-      expect(conflictQuery.where).toHaveBeenCalledWith("node.data ->> 'controllerId' IN (:...controllerIds)", {
-        controllerIds: [1, 2],
+      expect(findNodes).toHaveBeenLastCalledWith({
+        type: 'plugin.wago.command',
+        dataIn: { controllerId: [1, 2], channelId: ['io'] },
+        limit: 1001,
       });
     });
   }
@@ -366,16 +366,10 @@ describe('controller diagnostics', () => {
       ],
     };
     const revision = { revision: 2, state: 'applied', snapshot: JSON.stringify(snapshot), contentHash: 'a'.repeat(64) };
-    const query = {
-      leftJoin: jest.fn().mockReturnThis(),
-      addSelect: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      take: jest.fn().mockReturnThis(),
-      getMany: jest.fn().mockResolvedValue([]),
-    };
+    // The host flow lookup; tests steer its answer through `query.getMany`.
+    const query = { getMany: jest.fn().mockResolvedValue([]) };
     const context = {
-      getRepository: (entity: unknown) =>
+      ...repositoryDouble((entity: unknown) =>
         entity === WagoController
           ? {
               findOneBy: async () =>
@@ -394,7 +388,8 @@ describe('controller diagnostics', () => {
           : entity === WagoConfigurationDraft
             ? { findOneBy: async () => draft }
             : { findOne: async ({ where }: { where: { state?: string } }) => (where.state ? revision : latest) },
-      dataSource: { getRepository: () => ({ createQueryBuilder: () => query }) },
+      ),
+      hostData: hostDataWithFlows(() => query.getMany()),
     } as unknown as PluginContext;
     const diagnostics = new WagoDiagnosticsStore();
     const latest = { ...revision };
@@ -442,12 +437,12 @@ describe('controller diagnostics', () => {
     latest.state = 'rejected';
     latest.snapshot = JSON.stringify({ version: 1, physicalPoints: [], logicalChannels: [] });
     query.getMany.mockResolvedValue([
-      {
+      flowNode({
         id: 'node',
         resourceId: 1,
         type: 'plugin.wago.command',
         data: { channelId: 'io', expectedConfigurationRevision: 2 },
-      },
+      }),
     ]);
     const result = await service.get(1);
     expect(result.references[0].invalid).toBe(false);

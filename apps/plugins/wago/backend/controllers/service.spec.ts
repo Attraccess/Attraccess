@@ -1,3 +1,4 @@
+import { persistenceFaking } from '../persistence.test-utils';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { WagoController } from './entity';
 import { WagoEnrollment } from './enrollment.entity';
@@ -281,10 +282,11 @@ describe('WagoService connection monitoring', () => {
   });
 
   it('resolves repositories only after the host module initializes', async () => {
-    const context = { getRepository: jest.fn() } as unknown as PluginContext;
+    const getRepository = jest.fn();
+    const context = { persistence: persistenceFaking(getRepository) } as unknown as PluginContext;
     new WagoService(context);
 
-    expect(context.getRepository).not.toHaveBeenCalled();
+    expect(getRepository).not.toHaveBeenCalled();
   });
 
   it('retries MQTT subscriptions instead of failing module startup', async () => {

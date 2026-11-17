@@ -34,8 +34,8 @@ import { PLUGIN_CONTEXT } from './plugin-context';
 class MatterPluginModule {}
 
 const plugin: PluginBackendModule = {
-  // Registered into the shared DataSource so `context.getRepository(MatterConnection)` resolves.
-  entities: [MatterConnection, ...DEVICE_ENTITIES, ...BACKUP_ENTITIES],
+  // Registered into the shared connection so `sqlitePersistence(context).getRepository(MatterConnection)` resolves.
+  persistence: { sqlite: { entities: [MatterConnection, ...DEVICE_ENTITIES, ...BACKUP_ENTITIES] } },
   auditDomains: [MATTER_AUDIT_DOMAIN],
   register(context: PluginContext): DynamicModule {
     return {

@@ -7,13 +7,13 @@
 // alters it. Column names/types therefore mirror the migration exactly.
 //
 // The host registers this class into the shared DataSource (declared via the
-// `entities` export in plugin.ts) so `context.getRepository(ShellyDevice)`
-// resolves. Decorators are imported from the SDK, which re-exports the host's
+// `persistence.sqlite.entities` in plugin.ts) so `sqlitePersistence(context).getRepository(ShellyDevice)`
+// resolves. Decorators are imported from the SDK's sqlite subpath, which re-exports the host's
 // single TypeORM copy — never add a `typeorm` dependency to the plugin.
 //
 // NOTE: the bundler (esbuild) does not emit decorator *type* metadata, so every
 // column declares an explicit `type`.
-import { Column, Entity, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk';
+import { Column, Entity, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk/sqlite';
 import type { AuthState } from '../types';
 
 // Namespaced so the plugin's table never collides with a host table.

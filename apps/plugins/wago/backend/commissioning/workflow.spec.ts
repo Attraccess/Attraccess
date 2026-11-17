@@ -1,9 +1,10 @@
+import { repositoryDouble } from '../persistence.test-utils';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { existsSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DataSource } from 'typeorm';
+import { DataSource } from '@attraccess/plugins-backend-sdk/sqlite';
 import { fw31IdentityOutput } from '../fixtures/fw31-identity';
 import { AddWagoCommissioningPrincipal1780000000009 } from '../migrations/1780000000009-add-wago-commissioning-principal';
 import plugin from '../plugin';
@@ -43,10 +44,15 @@ describe('commissioning workflows with a real isolated database and mocked devic
 
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'wago-workflow-fixture-'));
-    db = new DataSource({ type: 'sqlite', database: ':memory:', entities: plugin.entities, synchronize: true });
+    db = new DataSource({
+      type: 'sqlite',
+      database: ':memory:',
+      entities: plugin.persistence.sqlite.entities,
+      synchronize: true,
+    });
     await db.initialize();
     context = {
-      getRepository: (entity) => db.getRepository(entity),
+      ...repositoryDouble((entity) => db.getRepository(entity)),
       secrets: { encrypt: () => 'ciphertext', decrypt: () => 'v'.repeat(43) },
       logger: { warn: jest.fn() },
       audit: { record: jest.fn().mockResolvedValue({ status: 'recorded' }) },

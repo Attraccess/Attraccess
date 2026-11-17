@@ -1,4 +1,4 @@
-import { Column, Entity, Index, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk';
+import { Column, Entity, Index, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk/sqlite';
 
 @Entity({ name: 'reservations_ical_feed' })
 @Index('IDX_reservations_ical_feed_user', ['userId'])

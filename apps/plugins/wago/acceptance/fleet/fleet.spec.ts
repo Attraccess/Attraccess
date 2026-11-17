@@ -1,3 +1,4 @@
+import { persistenceOver } from '../../backend/persistence.test-utils';
 /* eslint-disable @nx/enforce-module-boundaries -- Acceptance deliberately connects the standalone runtime, plugin and real host graph executor. */
 import { randomUUID } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -37,7 +38,7 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
     state.database = new DataSource({
       type: 'sqlite',
       database: ':memory:',
-      entities: plugin.entities,
+      entities: plugin.persistence.sqlite.entities,
       synchronize: true,
     });
     await state.database.initialize();
@@ -83,7 +84,7 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
     );
     await state.observer.subscribeAsync(`${base}/#`, { qos: 1 });
     const context = {
-      getRepository: (entity) => state.database.getRepository(entity),
+      persistence: persistenceOver(state.database),
       get: (service) => {
         if (service === WagoService) return state.backend;
         throw new Error(`Unexpected service lookup: ${service.name}`);

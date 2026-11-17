@@ -1,3 +1,4 @@
+import { persistenceFaking } from '../../backend/persistence.test-utils';
 import { createServer, type Server } from 'node:net';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
@@ -166,12 +167,12 @@ export class SimulatorFixture {
     });
     this.repositories.set(WagoSettings, repository([{ id: 1, defaultMqttServerId: 1, operationalPrefix: prefix }]));
     this.context = {
-      getRepository: (entity: { name: string }) => {
+      persistence: persistenceFaking(((entity: { name: string }) => {
         const existing = [...this.repositories.keys()].find((key: { name: string }) => key.name === entity.name);
         if (existing) return this.repositories.get(existing);
         if (!this.repositories.has(entity)) this.repositories.set(entity, repository());
         return this.repositories.get(entity);
-      },
+      }) as never),
       getMqttServerConfig: async () => ({ host: '127.0.0.1', port: address.port, useTls: false }),
       getMqttCredentialProvisioning: () => ({
         provision: async (request) => {

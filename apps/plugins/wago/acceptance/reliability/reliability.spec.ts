@@ -1,3 +1,4 @@
+import { hostDataWithFlows, persistenceOver } from '../../backend/persistence.test-utils';
 /**
  * Reliability harness. The real WagoService and WagoFlowService run on the host's real MqttClientService and
  * PluginMqttService against a runner-owned RabbitMQ 4 broker. The host's server record (QoS 0 defaults),
@@ -159,17 +160,9 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
         if (/dropping new messages/.test(message)) hostQueueOverflows += 1;
       },
     };
-    const flowQuery = {
-      select: () => flowQuery,
-      leftJoin: () => flowQuery,
-      addSelect: () => flowQuery,
-      where: () => flowQuery,
-      andWhere: () => flowQuery,
-      getMany: async () => [],
-    };
     const context = {
-      getRepository: (entity: never) => database.getRepository(entity),
-      dataSource: { getRepository: () => ({ createQueryBuilder: () => flowQuery }) },
+      persistence: persistenceOver(database),
+      hostData: hostDataWithFlows(() => []),
       logger,
       flows: { trigger: async () => undefined },
       audit: { record: async () => ({ status: 'recorded' }) },
@@ -260,7 +253,7 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
     const database = await new DataSource({
       type: 'sqlite',
       database: file,
-      entities: plugin.entities,
+      entities: plugin.persistence.sqlite.entities,
       synchronize: true,
     }).initialize();
     const columns = await database.query('PRAGMA table_info(plugin_wago_controllers)');

@@ -1,4 +1,4 @@
-import { DataSource } from 'typeorm';
+import { DataSource } from '@attraccess/plugins-backend-sdk/sqlite';
 import * as migrations from './migrations';
 import { CreateMatterConnection1793900000000 } from './migrations/1793900000000-create-matter-connection';
 import { CreateMatterDeviceModel1793900001000 } from './migrations/1793900001000-create-matter-device-model';

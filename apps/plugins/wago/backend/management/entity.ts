@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryColumn } from '@attraccess/plugins-backend-sdk';
+import { Column, Entity, PrimaryColumn } from '@attraccess/plugins-backend-sdk/sqlite';
 
 /** Coordinator registers this entity and WagoManagement1780000000010. Never return it from an API. */
 @Entity({ name: 'plugin_wago_management' })

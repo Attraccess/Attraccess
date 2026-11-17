@@ -1,9 +1,11 @@
+import { persistenceOver } from '../../backend/persistence.test-utils';
+import { createPluginHostData } from '../../../../api/src/database/adapters/plugins/plugin-host-data.adapter';
 import { AuditLog, Setting, entities } from '@attraccess/database-entities';
 import httpRequest from 'supertest';
-import { AuditService } from '../../../../api/src/audit/audit.service';
 import { AuditQueryService } from '../../../../api/src/audit/audit-query.service';
 import { PluginAuditHost } from '../../../../api/src/audit/plugin-audit-host';
-import { createTestAuditMetrics } from '../../../../api/src/audit/audit.test-fixture';
+import { createTestAuditMetrics } from '../../../../api/src/database/adapters/audit/audit.test-fixture';
+import { createSqliteAuditService } from '../../../../api/src/database/adapters/audit/sqlite-audit-service.test-fixture';
 import { SettingsStoreService } from '../../../../api/src/settings/settings-store.service';
 import { WagoCommissioningSession } from '../../backend/commissioning/sessions/session.entity';
 import { WagoCommissioningService } from '../../backend/commissioning/service';
@@ -47,7 +49,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     const schema = await new DataSource({
       type: 'sqlite',
       database: join(state.schemaDirectory, 'schema.sqlite'),
-      entities: [...Object.values(entities), ...plugin.entities],
+      entities: [...Object.values(entities), ...plugin.persistence.sqlite.entities],
       migrations: [...Object.values(coreMigrations), ...Object.values(wagoMigrations)],
       synchronize: false,
     }).initialize();
@@ -70,10 +72,10 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     state.db = await new DataSource({
       type: 'sqlite',
       database: join(state.directory, 'fixture.sqlite'),
-      entities: [...Object.values(entities), ...plugin.entities],
+      entities: [...Object.values(entities), ...plugin.persistence.sqlite.entities],
       synchronize: false,
     }).initialize();
-    state.audit = new AuditService(
+    state.audit = createSqliteAuditService(
       state.db,
       new SettingsStoreService(TypeOrmSettingsRows.forRepository(state.db.getRepository(Setting)), null),
       createTestAuditMetrics(),
@@ -91,8 +93,8 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     );
     state.context = {
       manifest: { id: pluginId, name: 'wago-fixture', version: '1.0.0', pluginDirectory: state.directory },
-      dataSource: state.db,
-      getRepository: (entity) => state.db.getRepository(entity),
+      persistence: persistenceOver(state.db),
+      hostData: createPluginHostData(() => state.db),
       // The SDK host provider, mapping onto the current audit service's recorder port.
       audit: createPluginAuditContext(pluginId, () => new PluginAuditHost(state.audit)),
       mqtt: state.mqtt,
@@ -115,7 +117,6 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
           throw new Error('Unexpected fixture resource access query');
         },
       }),
-      runSerialized: (fn) => state.db.transaction((manager) => fn(manager)),
       secrets: {
         encrypt: (value) => encryption.encryptForPlugin(pluginId, value),
         decrypt: (value) => encryption.decryptForPlugin(pluginId, value),
@@ -340,7 +341,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     await state.audit.onModuleDestroy();
     await state.db.destroy();
     await state.db.initialize();
-    state.audit = new AuditService(
+    state.audit = createSqliteAuditService(
       state.db,
       new SettingsStoreService(TypeOrmSettingsRows.forRepository(state.db.getRepository(Setting)), null),
       createTestAuditMetrics(),
@@ -419,7 +420,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     await state.audit.onModuleDestroy();
     await state.db.destroy();
     await state.db.initialize();
-    state.audit = new AuditService(
+    state.audit = createSqliteAuditService(
       state.db,
       new SettingsStoreService(TypeOrmSettingsRows.forRepository(state.db.getRepository(Setting)), null),
       createTestAuditMetrics(),
@@ -428,7 +429,6 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     expect(await state.db.getRepository(AuditLog).find({ order: { id: 'ASC' } })).toEqual(before);
     const query = new AuditQueryService(
       state.audit,
-      state.db,
       new SettingsStoreService(TypeOrmSettingsRows.forRepository(state.db.getRepository(Setting)), null),
     );
     expect((await query.list({ limit: 100 })).items).toHaveLength(4);

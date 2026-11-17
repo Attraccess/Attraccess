@@ -31,6 +31,9 @@ const allowedPaths = [
   /\.(?:persistence|integration|e2e)\.spec\.ts$/,
   /^apps\/api\/src\/(?:e2e|test|__test__|test-utils)\//,
   /^apps\/plugins\/[^/]+\/acceptance\//,
+  // The plugin SDK's explicit engine subpath (`@attraccess/plugins-backend-sdk/sqlite`): the only SDK code that may
+  // name the engine. The SDK root stays neutral and is checked.
+  /^libs\/plugins-backend-sdk\/src\/(?:sqlite\.ts|lib\/sqlite\/)/,
 ];
 // Code that may never carry a baseline entry.
 const zeroTolerance = [/^libs\/application-models\//, /^apps\/frontend\//, /^libs\/(?:ui|shared|env|api-client)\//];

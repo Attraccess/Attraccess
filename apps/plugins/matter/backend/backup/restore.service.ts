@@ -1,4 +1,5 @@
 import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import {
   Inject,
   Injectable,
@@ -127,7 +128,12 @@ export class MatterRestoreService implements OnModuleDestroy {
     const file = await this.load(source);
     if (!file) throw new NotFoundException({ code: 'not_found', message: 'There is no such backup.' });
     const opened = await this.open(file, recoveryKey, audited, refuse);
-    if (!tablesAreAcceptable(this.context.getRepository(MatterFabricEntity).manager, opened.body.tables)) {
+    if (
+      !tablesAreAcceptable(
+        sqlitePersistence(this.context).getRepository(MatterFabricEntity).manager,
+        opened.body.tables,
+      )
+    ) {
       return refuse('incompatible_schema');
     }
 

@@ -17,6 +17,7 @@ const hostShared = new Set([
   'typeorm',
   'reflect-metadata',
   '@attraccess/plugins-backend-sdk',
+  '@attraccess/plugins-backend-sdk/sqlite',
 ]);
 // ws loads these inside a try/catch and falls back to plain JavaScript.
 const optionalNative = new Set(['bufferutil', 'utf-8-validate']);
@@ -36,6 +37,7 @@ describe('Matter plugin bundle', () => {
     expect(bundle).not.toMatch(/apps\/api|database-entities|@attraccess\/shared/);
     expect([...new Set(requiredModules(bundle).filter((name) => name.startsWith('@attraccess/')))]).toEqual([
       '@attraccess/plugins-backend-sdk',
+      '@attraccess/plugins-backend-sdk/sqlite',
     ]);
   });
 
@@ -74,7 +76,9 @@ describe('Matter plugin bundle', () => {
     }
     const expectUsable = (plugin: ReturnType<typeof loadWith>['plugin']) => {
       expect(plugin.register({}).controllers).toHaveLength(4);
-      expect((plugin as unknown as { entities: unknown[] }).entities).toHaveLength(11);
+      expect(
+        (plugin as unknown as { persistence: { sqlite: { entities: unknown[] } } }).persistence.sqlite.entities,
+      ).toHaveLength(11);
       expect((plugin as unknown as { auditDomains: { domain: string }[] }).auditDomains[0].domain).toBe('matter');
     };
 

@@ -1,3 +1,4 @@
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { auditCommissioning, commissioningPrincipal, CommissioningPrincipal } from '../audit';
 
 import { ConflictException, NotFoundException } from '@nestjs/common';
@@ -103,7 +104,7 @@ export abstract class WagoCommissioningOwnership extends WagoCommissioningRecove
     id: number,
     remove: (assertOwned: () => Promise<void>) => Promise<string>,
   ): Promise<void> {
-    const controller = await this.context.getRepository(WagoController).findOneBy({ id });
+    const controller = await sqlitePersistence(this.context).getRepository(WagoController).findOneBy({ id });
     if (!controller) throw new NotFoundException('controller not found');
     const sessions = await this.sessions.find({ where: { hardwareId: controller.hardwareId }, order: { id: 'DESC' } });
     if (!sessions.length) {
@@ -154,7 +155,7 @@ export abstract class WagoCommissioningOwnership extends WagoCommissioningRecove
     operation: (assertOwned: () => Promise<void>, guard: CommissioningOperationGuard) => Promise<T>,
     requireCommissioningSession = false,
   ): Promise<T> {
-    const controller = await this.context.getRepository(WagoController).findOneBy({ id });
+    const controller = await sqlitePersistence(this.context).getRepository(WagoController).findOneBy({ id });
     if (!controller) throw new NotFoundException('controller not found');
     const sessions = await this.sessions.find({ where: { hardwareId: controller.hardwareId }, order: { id: 'DESC' } });
     if (!sessions.length) {

@@ -1,5 +1,5 @@
 import { supervisionModesFrom } from '../../resources/usage/authorization/supervision-modes.test-fixture';
-import { ResourceMaintenance, ResourceUsage, User } from '@attraccess/database-entities';
+import type { PluginCoreUser } from '../persistence/plugin-host-data.port';
 import { SupervisionMode } from '@attraccess/application-models';
 import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
 import { createResourceUsageServiceFixture } from '../../resources/usage/sessions/fixtures/service.test-fixture';
@@ -14,7 +14,7 @@ import { createResourceAccessContext, ResourceAccessDeps } from './resource-acce
  */
 describe('plugin resourceAccess', () => {
   const scope = createResourceUsageServiceFixture();
-  const user = { id: 5 } as User;
+  const user = { id: 5 } as PluginCoreUser;
   const resources = new Map<number, { id: number; supervisionMode: SupervisionMode }>();
   let permissions: Set<string>;
   let maintainerOf: Set<number>;
@@ -344,14 +344,14 @@ describe('plugin resourceAccess', () => {
           startTime: new Date('2029-12-31T00:00:00Z'),
           endTime: null,
           reason: 'open',
-        } as ResourceMaintenance,
+        } as never,
         {
           id: 2,
           resourceId: 1,
           startTime: new Date('2030-01-01T10:00:00Z'),
           endTime: new Date('2030-01-01T12:00:00Z'),
           reason: undefined,
-        } as ResourceMaintenance,
+        } as never,
       ]);
       await expect(access.getMaintenanceWindows(1, from, to)).resolves.toEqual([
         { maintenanceId: 1, resourceId: 1, startTime: new Date('2029-12-31T00:00:00Z'), endTime: null, reason: 'open' },
@@ -370,7 +370,7 @@ describe('plugin resourceAccess', () => {
       const startTime = new Date('2030-01-01T10:00:00Z');
       jest
         .spyOn(scope.service, 'getActiveSessionsForResource')
-        .mockResolvedValue([{ id: 8, userId: 5, startTime, resourceId: 1 } as ResourceUsage]);
+        .mockResolvedValue([{ id: 8, userId: 5, startTime, resourceId: 1 } as never]);
       await expect(access.getActiveSessions(1)).resolves.toEqual([{ usageId: 8, userId: 5, startTime }]);
     });
   });

@@ -3,6 +3,10 @@ import { CardSessionService } from '../../attractap/websockets/handlers/ui/card-
 import { UiAuditService } from '../../attractap/websockets/handlers/ui/ui-audit.service';
 import { UiStepService } from '../../attractap/websockets/handlers/ui/ui-step.service';
 import { ReaderStartGate } from '../../attractap/websockets/handlers/session/reader-start-gate.service';
+import {
+  InMemoryReaderUiAlertStore,
+  InMemoryReaderUiSettingsStore,
+} from '../../plugin-system/reader-ui/reader-ui-stores.test-fixture';
 import { ReaderUiAlertsService } from '../../plugin-system/reader-ui/reader-ui-alerts.service';
 import { ReaderUiHooksService } from '../../plugin-system/reader-ui/reader-ui-hooks.service';
 import { ReaderUiSettingsService } from '../../plugin-system/reader-ui/reader-ui-settings.service';
@@ -141,25 +145,14 @@ async function hookEvents(audit: any) {
 }
 
 async function adminEvents(audit: any) {
-  const rows: any[] = [];
-  const repository = {
-    find: jest.fn(async () => []),
-    findOne: jest.fn(async ({ where }: any) => rows.find((row) => row.id === where.id && !row.clearedAt) ?? null),
-    create: (x: any) => ({ clearedAt: null, clearedByUserId: null, plugin: null, readerId: null, ...x }),
-    save: jest.fn(async (x: any) => {
-      if (!x.id) rows.push(Object.assign(x, { id: rows.length + 1 }));
-      return x;
-    }),
-  };
-  const alerts = new ReaderUiAlertsService(repository as never, audit, {
+  const alertStore = new InMemoryReaderUiAlertStore();
+  const alerts = new ReaderUiAlertsService(alertStore, audit, {
     readerUiOpenAlerts: { set: jest.fn() },
   } as never);
-  repository.findOne.mockResolvedValueOnce(null);
   const alert = await alerts.raise('breaker-open', 'Hooks keep failing', { plugin: PLUGIN });
   await alerts.clear(alert.id, { id: 9, authenticationMethod: 'api-token', apiTokenId: 4 });
 
-  const store = () => ({ findOne: jest.fn(async () => null), find: jest.fn(async () => []), save: jest.fn() });
-  const settings = new ReaderUiSettingsService(store() as never, store() as never, store() as never, audit, {
+  const settings = new ReaderUiSettingsService(new InMemoryReaderUiSettingsStore(), audit, {
     pluginNames: () => [PLUGIN],
   } as never);
   await settings.setResource(

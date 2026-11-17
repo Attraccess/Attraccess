@@ -1,6 +1,6 @@
 import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { ConflictException, Inject, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { In, type EntityManager } from 'typeorm';
+import { In, type EntityManager, sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { SidecarClientError } from '../client/errors';
 import { MatterConnectionService } from '../connection/connection.service';
 import { PLUGIN_CONTEXT } from '../plugin-context';
@@ -44,7 +44,7 @@ export class MatterLifecycleService {
   ) {}
 
   private get nodes() {
-    return this.context.getRepository(MatterNode);
+    return sqlitePersistence(this.context).getRepository(MatterNode);
   }
 
   // --- reads -----------------------------------------------------------------------------------------------------
@@ -82,7 +82,7 @@ export class MatterLifecycleService {
   }
 
   async getEndpoint(id: string): Promise<MatterEndpoint> {
-    const endpoint = await this.context.getRepository(MatterEndpoint).findOneBy({ id });
+    const endpoint = await sqlitePersistence(this.context).getRepository(MatterEndpoint).findOneBy({ id });
     if (!endpoint) throw new NotFoundException('Unknown Matter endpoint.');
     return endpoint;
   }
@@ -90,7 +90,7 @@ export class MatterLifecycleService {
   // --- actions ---------------------------------------------------------------------------------------------------
 
   async claim(id: string, input: { displayName?: string }, actor: Actor): Promise<MatterNode> {
-    const node = await this.context.runSerialized(async (manager) => {
+    const node = await sqlitePersistence(this.context).transaction(async (manager) => {
       const node = await this.require(manager, id);
       this.expect(node, ['unclaimed'], 'claimed');
       const now = new Date().toISOString();
@@ -119,7 +119,7 @@ export class MatterLifecycleService {
     input: { sourceNodeId: string; confirmIdentityMismatch?: boolean },
     actor: Actor,
   ): Promise<MatterNode> {
-    const { target, source, mismatch } = await this.context.runSerialized(async (manager) => {
+    const { target, source, mismatch } = await sqlitePersistence(this.context).transaction(async (manager) => {
       const target = await this.require(manager, id);
       this.expect(target, ['detached'], 'relinked');
       const source = await manager.findOneBy(MatterNode, { id: input.sourceNodeId });
@@ -174,7 +174,7 @@ export class MatterLifecycleService {
     if (!fabric) throw new ConflictException('The node has no fabric record.');
     // Sidecar I/O stays outside the serialized transaction.
     const view = await this.readFromSidecar(fabric, before.nodeId);
-    const { node, reattached } = await this.context.runSerialized(async (manager) => {
+    const { node, reattached } = await sqlitePersistence(this.context).transaction(async (manager) => {
       const node = await this.require(manager, id);
       this.expect(node, ['unclaimed', 'claimed', 'detached'], 'repaired');
       if (node.fabricRef !== fabric.id || node.nodeId !== before.nodeId) {
@@ -207,7 +207,7 @@ export class MatterLifecycleService {
 
   async archive(id: string, actor: Actor): Promise<MatterNode> {
     let previousState: 'detached' | 'unclaimed' = 'detached';
-    const node = await this.context.runSerialized(async (manager) => {
+    const node = await sqlitePersistence(this.context).transaction(async (manager) => {
       const node = await this.require(manager, id);
       this.expect(node, ['detached', 'unclaimed'], 'archived');
       previousState = node.lifecycleState as 'detached' | 'unclaimed';
@@ -229,7 +229,7 @@ export class MatterLifecycleService {
    * by a fabric mismatch keeps that reason, so only repair or relink bring it back.
    */
   async restore(id: string, actor: Actor): Promise<MatterNode> {
-    const node = await this.context.runSerialized(async (manager) => {
+    const node = await sqlitePersistence(this.context).transaction(async (manager) => {
       const node = await this.require(manager, id);
       this.expect(node, ['archived'], 'restored');
       const now = new Date().toISOString();
@@ -256,7 +256,7 @@ export class MatterLifecycleService {
    */
   async forceRemove(id: string, actor: Actor): Promise<MatterNode> {
     let previousState: 'unclaimed' | 'claimed' | 'detached' | 'archived' = 'detached';
-    const node = await this.context.runSerialized(async (manager) => {
+    const node = await sqlitePersistence(this.context).transaction(async (manager) => {
       const node = await this.require(manager, id);
       this.expect(node, ['unclaimed', 'claimed', 'detached', 'archived'], 'force-removed');
       previousState = node.lifecycleState as typeof previousState;
@@ -279,7 +279,7 @@ export class MatterLifecycleService {
   // --- metadata --------------------------------------------------------------------------------------------------
 
   async updateNode(id: string, input: MetadataInput, actor: Actor): Promise<MatterNode> {
-    const { node, flags } = await this.context.runSerialized(async (manager) => {
+    const { node, flags } = await sqlitePersistence(this.context).transaction(async (manager) => {
       const node = await this.require(manager, id);
       if (node.lifecycleState === 'removed') throw new ConflictException('A removed node cannot be edited.');
       const flags = applyMetadata(node, input);
@@ -303,7 +303,7 @@ export class MatterLifecycleService {
   }
 
   async updateEndpoint(id: string, input: MetadataInput, actor: Actor): Promise<MatterEndpoint> {
-    const { endpoint, flags } = await this.context.runSerialized(async (manager) => {
+    const { endpoint, flags } = await sqlitePersistence(this.context).transaction(async (manager) => {
       const endpoint = await manager.findOneBy(MatterEndpoint, { id });
       if (!endpoint) throw new NotFoundException('Unknown Matter endpoint.');
       if (endpoint.removedAt !== null) throw new ConflictException('A removed endpoint cannot be edited.');

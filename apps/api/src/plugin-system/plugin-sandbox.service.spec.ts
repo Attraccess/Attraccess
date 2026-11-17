@@ -1,39 +1,25 @@
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Resource, Setting, User } from '@attraccess/database-entities';
-import { PluginContext, PluginPermission, PluginPermissionError, SystemEvent } from '@attraccess/plugins-backend-sdk';
+import {
+  PLUGIN_ENGINE_ACCESS,
+  PluginContext,
+  PluginPermission,
+  PluginPermissionError,
+  SystemEvent,
+} from '@attraccess/plugins-backend-sdk';
 import { PluginSandboxService } from './plugin-sandbox.service';
 
 function buildBaseContext(events: EventEmitter2): PluginContext {
-  const dataSource = {
-    getMetadata: (entity: unknown) => {
-      const aliases: Array<{ keys: unknown[]; target: unknown }> = [
-        { keys: [User, 'user', 'User'], target: User },
-        { keys: [Resource, 'resource', 'Resource'], target: Resource },
-        { keys: [Setting, 'setting', 'Setting'], target: Setting },
-      ];
-      const named = entity as { name?: string };
-      for (const alias of aliases) {
-        if (alias.keys.includes(entity) || (named && alias.keys.includes(named.name))) {
-          return { target: alias.target };
-        }
-      }
-      throw new Error('No metadata found');
-    },
-  } as never;
-
   return {
     manifest: { id: 'test-id', name: 'test-plugin', version: '1.0.0', pluginDirectory: 'test-plugin' },
     events,
-    dataSource,
     logger: new Logger('test-plugin'),
     mqtt: {
       subscribe: () => Promise.resolve({ unsubscribe: () => undefined }),
       publish: () => Promise.resolve(),
       refreshConnection: () => Promise.resolve(),
     },
-    getRepository: (entity) => ({ entity } as never),
-    get: (token) => ({ token } as never),
+    get: (token) => ({ token }) as never,
     onEvent: () => ({ off: () => undefined }),
     emitEvent: () => undefined,
     getMqttServerConfig: (serverId) =>
@@ -67,7 +53,31 @@ function buildBaseContext(events: EventEmitter2): PluginContext {
       getMaintenanceWindows: jest.fn(async () => []),
       getActiveSessions: jest.fn(async () => []),
     },
-    runSerialized: jest.fn(async (fn) => fn({} as never)),
+    persistence: {
+      backend: 'sqlite',
+      supports: (backend) => backend === 'sqlite',
+      transaction: jest.fn(async (work) => work({ isOpen: true, afterCommit: () => undefined })),
+      [PLUGIN_ENGINE_ACCESS]: { backend: 'sqlite', connection: () => ({}), handleOf: () => ({}) },
+    },
+    hostData: {
+      resources: {
+        get: jest.fn(async () => null),
+        getNames: jest.fn(async () => new Map()),
+        filterVisible: jest.fn(async () => []),
+        filterRequiringSupervision: jest.fn(async () => []),
+        listIdsInGroups: jest.fn(async () => []),
+        countUnhealthyEntries: jest.fn(async () => 0),
+        listIntroducerUserIds: jest.fn(async () => []),
+      },
+      users: {
+        getUsernames: jest.fn(async () => new Map()),
+        getLocales: jest.fn(async () => new Map()),
+        isActive: jest.fn(async () => true),
+        listIdsWithAnyPermission: jest.fn(async () => []),
+      },
+      settings: { getApp: jest.fn(async () => 'https://example.test') },
+      flows: { findNodes: jest.fn(async () => []) },
+    },
   };
 }
 
@@ -89,7 +99,7 @@ describe('PluginSandboxService', () => {
 
     it('throws on an unknown permission', () => {
       expect(() => PluginSandboxService.validateDeclaredPermissions('p', ['NOT_A_PERMISSION'])).toThrow(
-        /unknown permission "NOT_A_PERMISSION"/
+        /unknown permission "NOT_A_PERMISSION"/,
       );
     });
 
@@ -141,7 +151,7 @@ describe('PluginSandboxService', () => {
         PluginPermission.LISTEN_EVENTS,
       ]);
       expect(() => (ctx.events as unknown as { removeAllListeners: () => void }).removeAllListeners()).toThrow(
-        /does not expose/
+        /does not expose/,
       );
       expect(() => (ctx.events as unknown as { listenTo: () => void }).listenTo()).toThrow(/does not expose/);
       expect(() => (ctx.events as unknown as { eventNames: () => void }).eventNames()).toThrow(/does not expose/);
@@ -175,52 +185,49 @@ describe('PluginSandboxService', () => {
 
     it('throws when emitting a SystemEvent without EMIT_EVENTS', () => {
       const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), []);
-      expect(() => ctx.emitEvent(SystemEvent.RESOURCE_USAGE_ENDED, { resource: {} as never, user: {} as never })).toThrow(
-        /EMIT_EVENTS/
-      );
+      expect(() =>
+        ctx.emitEvent(SystemEvent.RESOURCE_USAGE_ENDED, { resource: {} as never, user: {} as never }),
+      ).toThrow(/EMIT_EVENTS/);
     });
 
     it('allows emitting a SystemEvent with EMIT_EVENTS', () => {
       const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), [PluginPermission.EMIT_EVENTS]);
       expect(() =>
-        ctx.emitEvent(SystemEvent.RESOURCE_USAGE_ENDED, { resource: {} as never, user: {} as never })
+        ctx.emitEvent(SystemEvent.RESOURCE_USAGE_ENDED, { resource: {} as never, user: {} as never }),
       ).not.toThrow();
     });
 
-    it('throws when accessing dataSource without DATABASE_ACCESS', () => {
+    it('throws when accessing the persistence context without DATABASE_ACCESS', () => {
       const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), []);
-      expect(() => ctx.dataSource).toThrow(/DATABASE_ACCESS/);
-    });
-
-    it('gates getRepository per entity (class reference)', () => {
-      const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), [PluginPermission.READ_USERS]);
-      expect(() => ctx.getRepository(User)).not.toThrow();
-      expect(() => ctx.getRepository(Resource)).toThrow(/ACCESS_RESOURCES/);
-      expect(() => ctx.getRepository(Setting)).toThrow(/READ_SETTINGS/);
-    });
-
-    it('resolves entity permission from TypeORM metadata for string table names', () => {
-      const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), [PluginPermission.DATABASE_ACCESS]);
-      // 'user' is the table name; the guard must still require READ_USERS, not fall back to DATABASE_ACCESS.
-      expect(() => ctx.getRepository('user')).toThrow(/READ_USERS/);
-      expect(() => ctx.getRepository('resource')).toThrow(/ACCESS_RESOURCES/);
-    });
-
-    it('resolves entity permission from metadata for a spoofed entity object', () => {
-      const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), [PluginPermission.DATABASE_ACCESS]);
-      const spoofed = { name: 'User', options: { name: 'Decoy' } } as never;
-      expect(() => ctx.getRepository(spoofed)).toThrow(/READ_USERS/);
-    });
-
-    it('falls back to DATABASE_ACCESS for unmapped entities', () => {
+      expect(() => ctx.persistence).toThrow(/DATABASE_ACCESS/);
       const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [
         PluginPermission.DATABASE_ACCESS,
       ]);
-      class SomeOtherEntity {}
-      expect(() => granted.getRepository(SomeOtherEntity)).not.toThrow();
+      expect(granted.persistence.backend).toBe('sqlite');
+    });
 
-      const denied = PluginSandboxService.createGuardedContext(buildBaseContext(events), []);
-      expect(() => denied.getRepository(SomeOtherEntity)).toThrow(/DATABASE_ACCESS/);
+    it('exposes no connection, repository or host entity surface on the guarded context', () => {
+      const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), Object.values(PluginPermission));
+      for (const removed of ['dataSource', 'getRepository', 'runSerialized']) expect(removed in ctx).toBe(false);
+    });
+
+    it.each([
+      ['resources', 'get', [1], PluginPermission.ACCESS_RESOURCES],
+      ['resources', 'filterVisible', [1, [2]], PluginPermission.ACCESS_RESOURCES],
+      ['users', 'getUsernames', [[1]], PluginPermission.READ_USERS],
+      ['users', 'isActive', [1], PluginPermission.READ_USERS],
+      ['settings', 'getApp', ['backend_url'], PluginPermission.READ_SETTINGS],
+      ['flows', 'findNodes', [{ typePrefix: 'plugin.x.' }], PluginPermission.DATABASE_ACCESS],
+    ] as const)('gates hostData.%s.%s behind its permission', async (group, method, args, permission) => {
+      const call = (ctx: PluginContext) =>
+        (ctx.hostData[group] as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>)[method](...args);
+      const denied = PluginSandboxService.createGuardedContext(
+        buildBaseContext(events),
+        Object.values(PluginPermission).filter((candidate) => candidate !== permission),
+      );
+      expect(() => call(denied)).toThrow(new RegExp(permission));
+      const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [permission]);
+      await expect(call(granted)).resolves.not.toThrow();
     });
 
     it('gates get() behind RESOLVE_HOST_PROVIDERS', () => {
@@ -275,7 +282,9 @@ describe('PluginSandboxService', () => {
       expect(() => denied.mqtt.subscribe(1, 'sensors/+', () => undefined)).toThrow(PluginPermissionError);
       expect(() => denied.mqtt.publish(1, 'sensors/kitchen', 'on')).toThrow(PluginPermissionError);
 
-      const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [PluginPermission.ACCESS_MQTT_SERVERS]);
+      const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [
+        PluginPermission.ACCESS_MQTT_SERVERS,
+      ]);
       await expect(granted.mqtt.subscribe(1, 'sensors/+', () => undefined)).resolves.toEqual({
         unsubscribe: expect.any(Function),
       });
@@ -325,20 +334,13 @@ describe('PluginSandboxService', () => {
       await expect(granted.resourceAccess.canStart(1, 2)).resolves.toMatchObject({ allowed: true });
     });
 
-    it('gates runSerialized() behind DATABASE_ACCESS', async () => {
-      const base = buildBaseContext(events);
-      const denied = PluginSandboxService.createGuardedContext(base, []);
-      expect(() => denied.runSerialized(async () => 1)).toThrow(/DATABASE_ACCESS/);
-
-      const granted = PluginSandboxService.createGuardedContext(base, [PluginPermission.DATABASE_ACCESS]);
-      await expect(granted.runSerialized(async () => 42)).resolves.toBe(42);
-    });
-
     it('gates host-managed secret encryption behind MANAGE_SECRETS', () => {
       const denied = PluginSandboxService.createGuardedContext(buildBaseContext(events), []);
       expect(() => denied.secrets.encrypt('secret')).toThrow(/MANAGE_SECRETS/);
 
-      const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [PluginPermission.MANAGE_SECRETS]);
+      const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [
+        PluginPermission.MANAGE_SECRETS,
+      ]);
       expect(granted.secrets.decrypt(granted.secrets.encrypt('secret'))).toBe('secret');
     });
 

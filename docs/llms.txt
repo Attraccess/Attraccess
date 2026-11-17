@@ -90,8 +90,8 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Overview](https://docs.attraccess.org/en/plugins/overview.md): Introduces the plugin system that extends Attraccess with frontend pages and backend endpoints, plugin management and SDKs.
 - [Installing Plugins](https://docs.attraccess.org/en/plugins/installing-plugins.md): How to upload, enable, disable and remove plugins in the web interface, with troubleshooting.
 - [Developing Plugins](https://docs.attraccess.org/en/plugins/developing-plugins.md): Developer guide to building Attraccess plugins: anatomy, SDKs, backend plugins, dependencies and reader UI integration.
-- [Migrating Plugins to SDK 2.0](https://docs.attraccess.org/en/plugins/migrating-to-2.md): What plugin developers must change for Attraccess 2.0: the minimum host version, the declared database engines and how the host refuses older plugins.
-- [Database Migrations](https://docs.attraccess.org/en/plugins/database-migrations.md): How a plugin ships TypeORM migrations for its own tables: declaring, writing and bundling the migrations entry.
+- [Migrating Plugins to SDK 2.0](https://docs.attraccess.org/en/plugins/migrating-to-2.md): What plugin developers must change for Attraccess 2.0: the minimum host version, declared database engines, the new persistence API with before/after code and the refusal of older plugins.
+- [Database Migrations](https://docs.attraccess.org/en/plugins/database-migrations.md): How a plugin ships SQL migrations for its own tables through the SDK sqlite subpath: declaring, writing and bundling the migrations entry, rollback semantics and the engine gate.
 
 ## English: Reservations
 - [Overview](https://docs.attraccess.org/en/plugins/reservations/overview.md): The Reservations plugin lets members book a resource for a time window; overview, prerequisites and links to member, administrator and API pages.
@@ -239,7 +239,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Überblick](https://docs.attraccess.org/de/plugins/overview.md): Stellt das Plugin-System vor, das Attraccess um Frontend-Seiten und Backend-Endpunkte erweitert, mit Verwaltung und SDKs.
 - [Plugins installieren](https://docs.attraccess.org/de/plugins/installing-plugins.md): Plugins über die Weboberfläche hochladen, aktivieren, deaktivieren und entfernen, mit Fehlerbehebung.
 - [Plugins entwickeln](https://docs.attraccess.org/de/plugins/developing-plugins.md): Entwicklerleitfaden für Attraccess-Plugins: SDKs, Frontend- und Backend-Plugins, Abhängigkeiten, Reader-UI und Start-Hooks.
-- [Plugins auf SDK 2.0 umstellen](https://docs.attraccess.org/de/plugins/migrating-to-2.md): Was Plugin-Entwickler für Attraccess 2.0 ändern müssen: die Mindest-Host-Version, die deklarierten Datenbank-Engines und wie der Host ältere Plugins verweigert.
+- [Plugins auf SDK 2.0 umstellen](https://docs.attraccess.org/de/plugins/migrating-to-2.md): Was Plugin-Entwickler für Attraccess 2.0 ändern müssen: die Mindest-Host-Version, deklarierte Engines, die neue Persistenz-API mit Vorher-Nachher-Code und die Ablehnung älterer Plugins.
 
 ## Deutsch: Reservierungen
 - [Überblick](https://docs.attraccess.org/de/plugins/reservations/overview.md): Das Plugin Reservierungen lässt Mitglieder eine Ressource für ein Zeitfenster buchen; Überblick, Voraussetzungen und Links zu Mitglieder-, Administrations- und API-Seiten.

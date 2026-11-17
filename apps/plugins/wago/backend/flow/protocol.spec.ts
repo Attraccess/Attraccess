@@ -1,3 +1,4 @@
+import { repositoryDouble } from '../persistence.test-utils';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { encodeMeasurement } from '../../measurement-contract';
 import { parseOperationalMessage } from '../protocol/index';
@@ -43,17 +44,19 @@ describe('WagoFlowService canonical protocol and freshness', () => {
         .mockResolvedValue({ id: 1, defaultMqttServerId: 2, operationalPrefix: 'attraccess/wago' } as WagoSettings),
     };
     const context = {
-      getRepository: jest.fn((entity) =>
-        entity === WagoController
-          ? controllerRepository
-          : entity === WagoConfigurationRevision
-            ? revisionRepository
-            : settingsRepository,
+      ...repositoryDouble(
+        jest.fn((entity) =>
+          entity === WagoController
+            ? controllerRepository
+            : entity === WagoConfigurationRevision
+              ? revisionRepository
+              : settingsRepository,
+        ),
       ),
       logger: { warn: jest.fn() },
       flows: { trigger },
       mqtt: { subscribe: jest.fn().mockResolvedValue({ unsubscribe: jest.fn() }) },
-    } as unknown as PluginContext;
+    } as unknown as PluginContext & { getRepository: jest.Mock };
     return {
       service: new WagoFlowService(context),
       trigger,

@@ -1,6 +1,7 @@
+import { repositoryDouble } from '../persistence.test-utils';
 import { createHash } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
-import { DataSource } from 'typeorm';
+import { DataSource } from '@attraccess/plugins-backend-sdk/sqlite';
 import type { PluginContext, PluginMqttMessage } from '@attraccess/plugins-backend-sdk';
 import { WagoNetworkChangeService } from './service';
 import { WagoNetworkChange, WagoMqttCredentialRetirement } from './entity';
@@ -79,7 +80,7 @@ export async function resetTestFixture(scope: NetworkChangeFixture) {
   });
   scope.audit = jest.fn(async () => ({ status: 'recorded' }));
   scope.context = {
-    getRepository: (entity: never) => scope.db.getRepository(entity),
+    ...repositoryDouble((entity: never) => scope.db.getRepository(entity)),
     secrets: {
       encrypt: (s: string) => Buffer.from(s).toString('base64'),
       decrypt: (s: string) => Buffer.from(s, 'base64').toString(),

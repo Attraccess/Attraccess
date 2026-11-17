@@ -43,7 +43,11 @@ import { SettingsAdminService } from './settings/settings-admin.service';
 class ReservationsPluginModule {}
 
 const plugin: PluginBackendModule = {
-  entities: [ReservationEntity, ResourceSettingsEntity, GlobalSettingsEntity, IcalFeedEntity, NoticeEntity],
+  persistence: {
+    sqlite: {
+      entities: [ReservationEntity, ResourceSettingsEntity, GlobalSettingsEntity, IcalFeedEntity, NoticeEntity],
+    },
+  },
   auditDomains: [RESERVATIONS_AUDIT_DOMAIN],
   notificationCategories: [...NOTIFICATION_CATEGORIES],
   emailTemplates: EMAIL_TEMPLATES,

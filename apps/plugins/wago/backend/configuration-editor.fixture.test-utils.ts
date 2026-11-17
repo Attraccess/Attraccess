@@ -2,6 +2,7 @@ import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import type { WagoConfigurationSnapshot } from './configuration/model';
 import type { WagoConfigurationDraft } from './configuration/draft.entity';
 import type { WagoConfigurationRevision } from './configuration/revision.entity';
+import { hostDataWithFlows } from './persistence.test-utils';
 import { WagoService } from './controllers/service';
 import { CHANNEL_ENABLED_CAPABILITY } from '../shared/capabilities';
 
@@ -49,20 +50,14 @@ export function fixture({ capabilities = FIXTURE_CAPABILITIES }: { capabilities?
       async () => undefined,
     ),
   };
-  const flowQuery = {
-    select: jest.fn().mockReturnThis(),
-    leftJoin: jest.fn().mockReturnThis(),
-    addSelect: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    andWhere: jest.fn().mockReturnThis(),
-    getMany: jest.fn().mockResolvedValue([]),
-  };
+  // The host flow lookup; specs steer its answer through `flowQuery.getMany`.
+  const flowQuery = { getMany: jest.fn().mockResolvedValue([]) };
   const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
   const service = new WagoService({
     mqtt,
     audit,
     logger: { warn: jest.fn() },
-    dataSource: { getRepository: () => ({ createQueryBuilder: () => flowQuery }) },
+    hostData: hostDataWithFlows(() => flowQuery.getMany()),
   } as unknown as PluginContext);
   Object.assign(service, {
     controllers: {

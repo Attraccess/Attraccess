@@ -1,4 +1,6 @@
-import type { PluginContext, Repository } from '@attraccess/plugins-backend-sdk';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
+import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { Repository } from '@attraccess/plugins-backend-sdk/sqlite';
 import { WagoManagementEntity } from './entity';
 import type { ManagementRecord, ManagementStore, PinnedManagementSsh } from './model';
 import { WagoManagementProvider } from './provider';
@@ -56,11 +58,11 @@ export class RepositoryManagementStore implements ManagementStore {
  * Register entity/migration separately. This factory performs no network calls or device discovery.
  */
 export function createWagoManagementService(
-  context: Pick<PluginContext, 'getRepository' | 'secrets'>,
+  context: Pick<PluginContext, 'persistence' | 'secrets'>,
   ssh: PinnedManagementSsh,
 ): WagoManagementService {
   return new WagoManagementService(
-    new RepositoryManagementStore(context.getRepository(WagoManagementEntity)),
+    new RepositoryManagementStore(sqlitePersistence(context).getRepository(WagoManagementEntity)),
     context.secrets,
     new WagoManagementProvider(ssh),
   );

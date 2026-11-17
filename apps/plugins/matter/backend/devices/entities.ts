@@ -5,7 +5,7 @@
 // are decimal strings and timestamps are ISO-8601 strings, like in `plugin_matter_connection`. There is deliberately
 // no column that relates a Matter record to an Attraccess resource: those links live in flow node configuration and
 // reference the stable `id` UUIDs below.
-import { Column, Entity, PrimaryColumn } from '@attraccess/plugins-backend-sdk';
+import { Column, Entity, PrimaryColumn } from '@attraccess/plugins-backend-sdk/sqlite';
 
 export type FabricStatus = 'active' | 'absent';
 export type LifecycleState = 'unclaimed' | 'claimed' | 'detached' | 'archived' | 'removed';

@@ -13,7 +13,7 @@ import {
   type StartBlockedState,
   type StartCapacityResult,
 } from '@attraccess/plugins-backend-sdk';
-import type { EntityManager } from 'typeorm';
+import { pluginScopeOfHostTransaction } from '../../database/adapters/plugins/plugin-transaction-scope';
 import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 import type { AppConfigType } from '../../config/app.config';
 import {
@@ -53,8 +53,11 @@ export interface StartCapacityRun {
   occupiedSlots: number;
   /** The users behind `occupiedSlots`. */
   usersInSession: number[];
-  /** The host's serialized start transaction; handed to the plugin. */
-  manager: EntityManager;
+  /**
+   * The host's serialized start transaction (the engine's transaction handle); handed to the plugin as a
+   * transaction scope.
+   */
+  manager: object;
   /** plugin -> stepKeys confirmed in this start attempt. */
   satisfied: Map<string, Set<string>>;
 }
@@ -216,7 +219,7 @@ export class ReaderUiHooksService {
             resourceId: run.resourceId,
             userId: run.userId,
             principal: run.principal,
-            manager: run.manager,
+            scope: pluginScopeOfHostTransaction(run.manager),
             action: run.action,
             origin: run.origin,
             sessionLimit: run.sessionLimit,

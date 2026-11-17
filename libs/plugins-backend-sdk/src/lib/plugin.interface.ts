@@ -1,4 +1,4 @@
-import { Resource, User } from '@attraccess/database-entities';
+import type { PluginResourceModel, PluginUserModel } from '@attraccess/application-models';
 import { ResourceHealthStatus } from '@attraccess/application-models';
 
 export enum SystemEvent {
@@ -87,8 +87,8 @@ export interface ResourceUsageSessionEndedPayload {
 }
 
 export type SystemEventPayload = {
-  [SystemEvent.RESOURCE_USAGE_STARTED]: { resource: Resource; user: User };
-  [SystemEvent.RESOURCE_USAGE_ENDED]: { resource: Resource; user: User };
+  [SystemEvent.RESOURCE_USAGE_STARTED]: { resource: PluginResourceModel; user: PluginUserModel };
+  [SystemEvent.RESOURCE_USAGE_ENDED]: { resource: PluginResourceModel; user: PluginUserModel };
   [SystemEvent.MAINTENANCE_CHANGED]: MaintenanceChangedPayload;
   [SystemEvent.RESOURCE_HEALTH_CHANGED]: ResourceHealthChangedPayload;
   [SystemEvent.RESOURCE_USAGE_SESSION_STARTED]: ResourceUsageSessionStartedPayload;
@@ -124,13 +124,13 @@ export interface SystemEventSubscription {
  * undeclared access. Each value gates exactly one seam of the PluginContext.
  */
 export enum PluginPermission {
-  /** Read the User repository via getRepository(User). */
+  /** Read user data through `hostData.users`. */
   READ_USERS = 'READ_USERS',
-  /** Read/write the Resource repository via getRepository(Resource). */
+  /** Read resources through `hostData.resources` and `resourceAccess`. */
   ACCESS_RESOURCES = 'ACCESS_RESOURCES',
-  /** Read the Setting repository via getRepository(Setting). */
+  /** Read application settings through `hostData.settings`. */
   READ_SETTINGS = 'READ_SETTINGS',
-  /** Access any other repository and the raw dataSource. */
+  /** Use `persistence` (transactions, the engine subpath) and `hostData.flows`. */
   DATABASE_ACCESS = 'DATABASE_ACCESS',
   /** Publish events on the shared event bus (events.emit / emitAsync). */
   EMIT_EVENTS = 'EMIT_EVENTS',

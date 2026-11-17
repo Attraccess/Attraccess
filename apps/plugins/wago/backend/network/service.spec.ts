@@ -1,5 +1,5 @@
 import type { PluginContext, PluginMqttMessage } from '@attraccess/plugins-backend-sdk';
-import { DataSource } from 'typeorm';
+import { DataSource } from '@attraccess/plugins-backend-sdk/sqlite';
 import { WagoNetworkChangeService, networkChangeInput } from './service';
 import { WagoDeviceOperation, WagoManagedAccess } from '../runtime/managed/access.entity';
 import { WagoManagedRuntimeService } from '../runtime/managed/service';
@@ -17,7 +17,7 @@ import { resetTestFixture } from './setup.test-fixture';
 import { RuntimeUpdateError } from '../runtime/update/coordinator';
 import { WagoService } from '../controllers/service';
 
-jest.mock('@attraccess/plugins-backend-sdk', () => jest.requireActual('typeorm'));
+jest.mock('@attraccess/plugins-backend-sdk', () => jest.requireActual('@attraccess/plugins-backend-sdk/sqlite'));
 jest.mock('../controllers/service', () => ({ WagoService: class {} }));
 jest.mock('../runtime/artifacts/service', () => ({ WagoRuntimeArtifactsService: class {} }));
 jest.mock('../commissioning/readiness/readiness', () => ({ WagoCommissioningReadiness: class {} }));

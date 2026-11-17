@@ -1,5 +1,6 @@
 import { AuditLog } from '@attraccess/database-entities';
 import { DualAuthGuard } from '@attraccess/plugins-backend-sdk';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { Test } from '@nestjs/testing';
 import type { Database } from 'sqlite3';
 import request from 'supertest';
@@ -110,7 +111,8 @@ describe('Matter plugin composed with the host', () => {
       await new Promise<void>((resolve, reject) => reading.get((error) => (error ? reject(error) : resolve())));
       let locked!: () => void;
       const lockHeld = new Promise<void>((resolve) => (locked = resolve));
-      const writing = host.context.runSerialized(async (manager) => {
+      const writing = host.context.persistence.transaction(async (scope) => {
+        const manager = sqlitePersistence(host.context).managerOf(scope);
         await manager.query("UPDATE migrations SET name = name WHERE name = ''");
         locked();
         await new Promise((resolve) => setTimeout(resolve, 200));

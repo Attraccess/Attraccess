@@ -1,3 +1,4 @@
+import { repositoryDouble } from '../../persistence.test-utils';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { createHash, X509Certificate } from 'node:crypto';
 import { rootCertificates } from 'node:tls';
@@ -44,7 +45,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
       claim: jest.fn(),
     };
     const context = {
-      getRepository: jest.fn().mockReturnValue(repository),
+      ...repositoryDouble(jest.fn().mockReturnValue(repository)),
       getMqttServerConfig: jest.fn().mockResolvedValue({ host: 'mock.invalid', port: 8883, useTls: true }),
       getMqttCredentialProvisioning: jest
         .fn()
@@ -564,8 +565,8 @@ describe('WagoCommissioningService security and lifecycle', () => {
     it('defers repository access until plugin module initialization', async () => {
       const repository = { find: jest.fn().mockResolvedValue([]) };
       const context = {
-        getRepository: jest.fn().mockReturnValue(repository),
-      } as unknown as PluginContext;
+        ...repositoryDouble(jest.fn().mockReturnValue(repository)),
+      } as unknown as PluginContext & { getRepository: jest.Mock };
 
       const service = new WagoCommissioningService(context, {
         registerCommissioningDiscoveryHandler: jest.fn(),
@@ -593,7 +594,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
         findOneBy: jest.fn().mockResolvedValue(session),
         save: jest.fn().mockImplementation(async (value) => value),
       };
-      const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
+      const context = { ...repositoryDouble(jest.fn().mockReturnValue(repository)) } as unknown as PluginContext;
       let releaseDelivery!: () => void;
       const delivery = new Promise<void>((resolve) => (releaseDelivery = resolve));
       const wago = { revokeEnrollmentById: jest.fn().mockResolvedValue(undefined) } as unknown as WagoService;
@@ -629,7 +630,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
             { id: 1, controllerName: 'Boiler room', pairingCode: '482931' } as WagoCommissioningSession,
           ]),
       };
-      const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
+      const context = { ...repositoryDouble(jest.fn().mockReturnValue(repository)) } as unknown as PluginContext;
       const service = new WagoCommissioningService(context, {
         registerCommissioningDiscoveryHandler: jest.fn(),
       } as unknown as WagoService);
@@ -658,7 +659,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
         findOneBy: jest.fn().mockResolvedValue(session),
         save: jest.fn().mockImplementation(async (value) => value),
       };
-      const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
+      const context = { ...repositoryDouble(jest.fn().mockReturnValue(repository)) } as unknown as PluginContext;
       const service = new WagoCommissioningService(context, {
         registerCommissioningDiscoveryHandler: jest.fn(),
       } as unknown as WagoService);
@@ -676,7 +677,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
     it('rejects direct delivery before the scanned host key is confirmed', async () => {
       const session = { id: 1, state: 'awaiting_identity_confirmation' } as WagoCommissioningSession;
       const repository = { findOneBy: jest.fn().mockResolvedValue(session) };
-      const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
+      const context = { ...repositoryDouble(jest.fn().mockReturnValue(repository)) } as unknown as PluginContext;
       const service = new WagoCommissioningService(context, {
         registerCommissioningDiscoveryHandler: jest.fn(),
       } as unknown as WagoService);
@@ -693,7 +694,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
         findOneBy: jest.fn().mockResolvedValue(session),
         delete: jest.fn(),
       };
-      const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
+      const context = { ...repositoryDouble(jest.fn().mockReturnValue(repository)) } as unknown as PluginContext;
       const wago = {
         registerCommissioningDiscoveryHandler: jest.fn(),
         revokeEnrollmentById: jest.fn().mockResolvedValue(undefined),
@@ -753,7 +754,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
       claim: jest.fn().mockResolvedValue(undefined),
     } as unknown as WagoService;
     const context = {
-      getRepository: jest.fn().mockReturnValue(repository),
+      ...repositoryDouble(jest.fn().mockReturnValue(repository)),
       secrets: secrets,
     } as unknown as PluginContext;
     const service = new WagoCommissioningService(context, wago);

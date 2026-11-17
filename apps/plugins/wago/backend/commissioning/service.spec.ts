@@ -1,3 +1,4 @@
+import { repositoryDouble } from '../persistence.test-utils';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
@@ -436,7 +437,7 @@ describe('WagoCommissioningService transport and diagnostics', () => {
       claim: jest.fn(),
     };
     const context = {
-      getRepository: jest.fn().mockReturnValue(repository),
+      ...repositoryDouble(jest.fn().mockReturnValue(repository)),
       getMqttServerConfig: jest.fn().mockResolvedValue({ host: 'mock.invalid', port: 8883, useTls: true }),
       getMqttCredentialProvisioning: jest
         .fn()
@@ -629,7 +630,7 @@ describe('WagoCommissioningService transport and diagnostics', () => {
       find: jest.fn().mockResolvedValue([]),
     };
     const context = {
-      getRepository: jest.fn().mockReturnValue(repository),
+      ...repositoryDouble(jest.fn().mockReturnValue(repository)),
       getMqttServerConfig: jest.fn().mockResolvedValue({}),
       secrets: secrets,
     } as unknown as PluginContext;

@@ -1,5 +1,5 @@
 // The related resource is documented with its public schema; it is not billing data.
-import { Resource } from '@attraccess/plugins-backend-sdk';
+import { Resource } from '@attraccess/database-entities';
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
 
 class ResourceBillingConfigurationItemDto {

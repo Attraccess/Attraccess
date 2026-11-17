@@ -13,5 +13,11 @@
     "esModuleInterop": true,
     "types": ["jest", "node"]
   },
-  "include": ["backend/**/*.ts", "acceptance/**/*.ts", "jest.config.ts", "jest.acceptance.config.ts"]
+  "include": [
+    "backend/**/*.ts",
+    "acceptance/**/*.ts",
+    "jest.config.ts",
+    "jest.acceptance.config.ts",
+    "../../api/src/database/adapters/plugins/authenticated-user.augmentation.ts"
+  ]
 }

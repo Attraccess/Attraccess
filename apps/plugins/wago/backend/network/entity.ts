@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryColumn } from '@attraccess/plugins-backend-sdk';
+import { Column, Entity, PrimaryColumn } from '@attraccess/plugins-backend-sdk/sqlite';
 
 export type WagoNetworkChangePhase = 'connecting' | 'provisioning' | 'applying' | 'verifying' | 'saving' | 'completed';
 

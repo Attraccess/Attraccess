@@ -1,4 +1,4 @@
-import type { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk';
+import type { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk/sqlite';
 
 /** Retain the historical create migration for fresh databases, then remove its table. */
 export class DropWagoCommissioningLease1780010640000 implements MigrationInterface {

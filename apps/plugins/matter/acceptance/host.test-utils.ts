@@ -13,7 +13,8 @@ import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import { AuditService } from '../../../api/src/audit/audit.service';
 import { PluginAuditHost } from '../../../api/src/audit/plugin-audit-host';
-import { createTestAuditMetrics } from '../../../api/src/audit/audit.test-fixture';
+import { createTestAuditMetrics } from '../../../api/src/database/adapters/audit/audit.test-fixture';
+import { createSqliteAuditService } from '../../../api/src/database/adapters/audit/sqlite-audit-service.test-fixture';
 import * as coreMigrations from '../../../api/src/database/migrations';
 import { EncryptionService } from '../../../api/src/encryption/encryption.service';
 import {
@@ -21,8 +22,11 @@ import {
   resetPluginAuditRegistry,
 } from '../../../api/src/plugin-system/audit/audit-registry';
 import { createPluginAuditContext } from '../../../api/src/plugin-system/runtime/audit-context';
-import { createPluginRunSerialized } from '../../../api/src/plugin-system/runtime/plugin-serialized';
-import { closeResourceTransactionConnection } from '../../../api/src/database/sqlite/run-serialized-transaction';
+import { createSqlitePluginPersistence } from '@attraccess/plugins-backend-sdk/sqlite';
+import {
+  closeResourceTransactionConnection,
+  runSerializedTransaction,
+} from '../../../api/src/database/sqlite/run-serialized-transaction';
 import { createDataSource } from '../../../api/src/database/sqlite/sqlite-connection';
 import { SettingsStoreService } from '../../../api/src/settings/settings-store.service';
 import { Setting } from '@attraccess/database-entities';
@@ -89,12 +93,12 @@ export async function bootHost(
   const db = await createDataSource({
     type: 'sqlite',
     database: join(directory, 'host.sqlite'),
-    entities: [...Object.values(entities), ...(plugin.entities ?? [])],
+    entities: [...Object.values(entities), ...(plugin.persistence?.sqlite?.entities ?? [])],
     migrations: [...Object.values(coreMigrations), ...(Object.values(matterMigrations) as (new () => never)[])],
     synchronize: false,
   }).initialize();
   await db.runMigrations();
-  const audit = new AuditService(
+  const audit = createSqliteAuditService(
     db,
     new SettingsStoreService(TypeOrmSettingsRows.forRepository(db.getRepository(Setting)), null),
     createTestAuditMetrics(),
@@ -108,9 +112,12 @@ export async function bootHost(
   const context = {
     hostVersion: 'hostVersion' in options ? options.hostVersion : HOST_VERSION,
     manifest: { id: PLUGIN_ID, name: 'matter', version: COMPATIBILITY_TABLE[0].plugin, pluginDirectory: 'matter' },
-    dataSource: db,
-    getRepository: (entity) => db.getRepository(entity),
-    runSerialized: createPluginRunSerialized(PLUGIN_ID, () => db.manager),
+    persistence: createSqlitePluginPersistence({
+      pluginName: 'matter',
+      connection: () => db,
+      entities: plugin.persistence?.sqlite?.entities ?? [],
+      runInTransaction: (work) => runSerializedTransaction(db.manager, work),
+    }),
     audit: createPluginAuditContext(PLUGIN_ID, () => new PluginAuditHost(audit)),
     events: new EventEmitter2(),
     logger: { log: sink('log'), debug: sink('debug'), warn: sink('warn'), error: sink('error') },

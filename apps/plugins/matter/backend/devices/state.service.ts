@@ -2,7 +2,8 @@ import type { CommandOutcomePayload, DeviceStatePayload } from '@attraccess/matt
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import type { EntityManager } from 'typeorm';
+import type { EntityManager } from '@attraccess/plugins-backend-sdk/sqlite';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { PLUGIN_CONTEXT } from '../plugin-context';
 import { pruneCommands } from './commands';
 import { MatterCommand, MatterEndpoint, MatterEndpointState, MatterFabric, MatterNode } from './entities';
@@ -82,7 +83,7 @@ export class MatterStateService {
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
 
   private get states() {
-    return this.context.getRepository(MatterEndpointState);
+    return sqlitePersistence(this.context).getRepository(MatterEndpointState);
   }
 
   // --- reads ---------------------------------------------------------------------------------------------------
@@ -96,7 +97,7 @@ export class MatterStateService {
 
   /** Records that a command was requested for a state key. Sets `requested`; the command stays unconfirmed. */
   async recordRequest(input: RecordRequestInput, now: string = new Date().toISOString()): Promise<StateEntryView> {
-    return this.context.runSerialized(async (manager) => {
+    return sqlitePersistence(this.context).transaction(async (manager) => {
       const states = manager.getRepository(MatterEndpointState);
       const current = await states.findOneBy({ endpointRef: input.endpointRef, stateKey: input.stateKey });
       if (await manager.findOneBy(MatterCommand, { requestId: input.requestId })) {
@@ -132,7 +133,7 @@ export class MatterStateService {
 
   /** A physical command timed out: the effect is unknown. It becomes `uncertain` and is never retried here. */
   async recordTimeout(requestId: string, now: string = new Date().toISOString()): Promise<void> {
-    await this.context.runSerialized((manager) =>
+    await sqlitePersistence(this.context).transaction((manager) =>
       this.applyOutcomeFor(
         manager,
         requestId,
@@ -152,7 +153,7 @@ export class MatterStateService {
    */
   async ingest(events: readonly StateEvent[], receivedAt: string = new Date().toISOString()): Promise<void> {
     if (events.length === 0) return;
-    await this.context.runSerialized(async (manager) => {
+    await sqlitePersistence(this.context).transaction(async (manager) => {
       for (const event of events) {
         const at = event.receivedAt ?? receivedAt;
         await manager.query('SAVEPOINT matter_event');

@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { SelectQueryBuilder } from 'typeorm';
+import { SelectQueryBuilder } from '@attraccess/plugins-backend-sdk/sqlite';
 import { ReservationEntity } from '../entities/reservation.entity';
 import { ReservationError } from './errors';
 import { Harness, at, createHarness, principal } from '../testing/harness.test-utils';

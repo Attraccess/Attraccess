@@ -1,3 +1,4 @@
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import {
   type PluginAuditPrincipal,
   type PluginContext,
@@ -68,11 +69,11 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
   async apply(controllerId: number, body: unknown, principal: PluginAuditPrincipal, retry = false) {
     if (this.destroyed) throw new ConflictException('Controller operation has stopped. Retry the request.');
     const input = retry ? null : networkChangeInput(body);
-    const access = await this.context
+    const access = await sqlitePersistence(this.context)
       .getRepository(WagoManagedAccess)
       .findOne({ where: { controllerId, state: 'managed' }, order: { sessionId: 'DESC' } });
     if (!access) throw new ConflictException('Automatic SSH management is required for this operation.');
-    const operations = new WagoDeviceOperations(this.context.getRepository(WagoDeviceOperation));
+    const operations = new WagoDeviceOperations(sqlitePersistence(this.context).getRepository(WagoDeviceOperation));
     const owner = randomBytes(16).toString('hex'),
       now = Date.now();
     if (!(await operations.acquire(access.fingerprint, owner, now, now + OPERATION_MS + 60_000)))
@@ -88,7 +89,7 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
     let audited = false;
     const lifecycle = new WagoAudit(this.context).begin(principal, controllerId, 'network_change');
     try {
-      const controller = await this.context
+      const controller = await sqlitePersistence(this.context)
         .getRepository(WagoController)
         .findOneBy({ id: controllerId, trustState: 'claimed' });
       if (!controller?.mqttServerId || !controller.credentialEpoch)
@@ -141,8 +142,12 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
 
   /** Network changes must not race credential rotation or runtime update recovery. */
   protected async assertNoPendingRecovery(controllerId: number): Promise<void> {
-    const rotation = await this.context.getRepository(WagoCredentialRotationEntity).findOneBy({ controllerId });
-    const update = await this.context.getRepository(WagoRuntimeUpdateEntity).findOneBy({ controllerId });
+    const rotation = await sqlitePersistence(this.context)
+      .getRepository(WagoCredentialRotationEntity)
+      .findOneBy({ controllerId });
+    const update = await sqlitePersistence(this.context)
+      .getRepository(WagoRuntimeUpdateEntity)
+      .findOneBy({ controllerId });
     if ((rotation && rotation.phase !== 'completed') || (update?.metadata && JSON.parse(update.metadata).token))
       throw new ConflictException(
         'Finish credential rotation or runtime update recovery before changing MQTT/address settings.',
@@ -473,19 +478,24 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
   }
 
   async status(controllerId: number) {
-    const controller = await this.context.getRepository(WagoController).findOneBy({ id: controllerId });
+    const controller = await sqlitePersistence(this.context)
+      .getRepository(WagoController)
+      .findOneBy({ id: controllerId });
     if (!controller) throw new NotFoundException('WAGO controller not found');
-    const access = await this.context
+    const access = await sqlitePersistence(this.context)
       .getRepository(WagoManagedAccess)
       .findOne({ where: { controllerId }, order: { sessionId: 'DESC' } });
     const row = await this.repository.findOneBy({ controllerId });
     const lease =
-      row && (await this.context.getRepository(WagoDeviceOperation).findOneBy({ fingerprint: row.fingerprint }));
+      row &&
+      (await sqlitePersistence(this.context)
+        .getRepository(WagoDeviceOperation)
+        .findOneBy({ fingerprint: row.fingerprint }));
     return {
       available: access?.state === 'managed',
       targetHost: access?.host ?? null,
       mqttServerId: controller.mqttServerId,
-      pendingCredentialRetirements: await this.context
+      pendingCredentialRetirements: await sqlitePersistence(this.context)
         .getRepository(WagoMqttCredentialRetirement)
         .countBy({ controllerId }),
       operation: row
@@ -501,11 +511,11 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
   }
 
   async retirePreviousCredentials(controllerId: number, principal: PluginAuditPrincipal) {
-    const access = await this.context
+    const access = await sqlitePersistence(this.context)
       .getRepository(WagoManagedAccess)
       .findOne({ where: { controllerId }, order: { sessionId: 'DESC' } });
     if (!access) throw new ConflictException('Controller management identity is unavailable.');
-    const operations = new WagoDeviceOperations(this.context.getRepository(WagoDeviceOperation)),
+    const operations = new WagoDeviceOperations(sqlitePersistence(this.context).getRepository(WagoDeviceOperation)),
       owner = randomBytes(16).toString('hex');
     if (!(await operations.acquire(access.fingerprint, owner, Date.now(), Date.now() + 120_000)))
       throw new ConflictException('Controller is busy');
@@ -515,10 +525,12 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
       await this.managed.assertNetworkSettled(controllerId);
       await lifecycle.attempt();
       audited = true;
-      const controller = await this.context.getRepository(WagoController).findOneByOrFail({ id: controllerId });
+      const controller = await sqlitePersistence(this.context)
+        .getRepository(WagoController)
+        .findOneByOrFail({ id: controllerId });
       const current = controller.mqttServerId && (await this.context.getMqttServerConfig(controller.mqttServerId));
       if (!current) throw new Error();
-      const repository = this.context.getRepository(WagoMqttCredentialRetirement);
+      const repository = sqlitePersistence(this.context).getRepository(WagoMqttCredentialRetirement);
       for (const row of await repository.findBy({ controllerId })) {
         const previous = await this.context.getMqttServerConfig(row.mqttServerId);
         if (!previous) throw new Error();
@@ -581,6 +593,6 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
   }
 
   protected get repository() {
-    return this.context.getRepository(WagoNetworkChange);
+    return sqlitePersistence(this.context).getRepository(WagoNetworkChange);
   }
 }

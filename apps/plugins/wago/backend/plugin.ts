@@ -41,21 +41,25 @@ function services(context: PluginContext) {
 }
 
 const plugin: PluginBackendModule = {
-  entities: [
-    WagoController,
-    WagoSettings,
-    WagoEnrollment,
-    WagoConfigurationDraft,
-    WagoConfigurationRevision,
-    WagoCredentialRotationEntity,
-    WagoCommissioningSession,
-    WagoManagementEntity,
-    WagoManagedAccess,
-    WagoRuntimeUpdateEntity,
-    WagoDeviceOperation,
-    WagoNetworkChange,
-    WagoMqttCredentialRetirement,
-  ],
+  persistence: {
+    sqlite: {
+      entities: [
+        WagoController,
+        WagoSettings,
+        WagoEnrollment,
+        WagoConfigurationDraft,
+        WagoConfigurationRevision,
+        WagoCredentialRotationEntity,
+        WagoCommissioningSession,
+        WagoManagementEntity,
+        WagoManagedAccess,
+        WagoRuntimeUpdateEntity,
+        WagoDeviceOperation,
+        WagoNetworkChange,
+        WagoMqttCredentialRetirement,
+      ],
+    },
+  },
   flowNodes: (context) => [
     createWagoCommandNode(() => services(context).command),
     ...createWagoStateNodes(() => services(context).state),

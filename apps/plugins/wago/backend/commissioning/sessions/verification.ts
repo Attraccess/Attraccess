@@ -1,3 +1,4 @@
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import type { WagoCommissioningSession } from './session.entity';
 import { WagoController } from '../../controllers/entity';
@@ -10,19 +11,21 @@ export async function commissioningVerification(
   session: WagoCommissioningSession,
   runtime?: CommissioningRuntimeState,
 ) {
-  const controller = await context.getRepository(WagoController).findOneBy({
+  const controller = await sqlitePersistence(context).getRepository(WagoController).findOneBy({
     hardwareId: session.hardwareId,
     mqttServerId: session.mqttServerId,
   });
   const enrollment =
     session.enrollmentId === null
       ? null
-      : await context.getRepository(WagoEnrollment).findOneBy({ id: session.enrollmentId });
+      : await sqlitePersistence(context).getRepository(WagoEnrollment).findOneBy({ id: session.enrollmentId });
   const revision = controller
-    ? await context.getRepository(WagoConfigurationRevision).findOne({
-        where: { controllerId: controller.id },
-        order: { revision: 'DESC' },
-      })
+    ? await sqlitePersistence(context)
+        .getRepository(WagoConfigurationRevision)
+        .findOne({
+          where: { controllerId: controller.id },
+          order: { revision: 'DESC' },
+        })
     : null;
   const heartbeat = controller?.lastHeartbeatAt ? Date.parse(controller.lastHeartbeatAt) : NaN;
   const permanentConnection = Boolean(

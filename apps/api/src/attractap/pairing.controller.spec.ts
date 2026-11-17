@@ -1,6 +1,7 @@
 import { ExecutionContext, INestApplication, UnauthorizedException, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { AuthenticatedRequest, DualAuthGuard, User } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, DualAuthGuard } from '@attraccess/plugins-backend-sdk';
+import { User } from '@attraccess/database-entities';
 import request from 'supertest';
 import { LicenseGuard } from '../license/license.guard';
 import { EnrollmentRateLimitedException } from '../device-enrollment/enrollment-rate-limited.exception';
@@ -138,7 +139,10 @@ describe('AttractapPairingController authorization and throttling', () => {
     });
     pairing.approve.mockRejectedValue(new EnrollmentRateLimitedException(42));
     const headers = { 'x-test-user': '1', 'x-test-permissions': 'resources.update' };
-    const resolved = await call('post', '/attractap/pairings/resolve').set(headers).send({ code: 'AAAAAA' }).expect(429);
+    const resolved = await call('post', '/attractap/pairings/resolve')
+      .set(headers)
+      .send({ code: 'AAAAAA' })
+      .expect(429);
     expect(resolved.body).toMatchObject({ message: 'EnrollmentRateLimited', retryAfterSeconds: 42 });
     await call('post', '/attractap/pairings/p1/approve').set(headers).send({ code: 'AAAAAA', mode: 'new' }).expect(429);
   });

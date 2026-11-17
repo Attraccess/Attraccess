@@ -1,5 +1,6 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { WagoController } from './controllers/entity';
+import { hostDataWithFlows, persistenceFaking } from './persistence.test-utils';
 import { WagoEnrollment } from './controllers/enrollment.entity';
 import { WagoService } from './controllers/service';
 import { WagoSettings } from './controllers/settings.entity';
@@ -82,17 +83,10 @@ export function createWagoServiceFixture(
   };
   settingsRepository.createQueryBuilder.mockReturnValue(settingsQuery);
   const subscriptions: Array<{ unsubscribe: jest.Mock }> = [];
-  const flowQuery = {
-    select: jest.fn().mockReturnThis(),
-    leftJoin: jest.fn().mockReturnThis(),
-    addSelect: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    andWhere: jest.fn().mockReturnThis(),
-    getMany: jest.fn().mockResolvedValue([]),
-  };
+  const findNodes = jest.fn().mockResolvedValue([]);
   const context = {
-    dataSource: { getRepository: () => ({ createQueryBuilder: () => flowQuery }) },
-    getRepository: jest.fn((entity) => {
+    hostData: hostDataWithFlows(findNodes),
+    persistence: persistenceFaking((entity) => {
       if (entity === WagoController) return controllerRepository;
       if (entity === WagoEnrollment) return enrollmentRepository;
       if (entity === WagoSettings) return settingsRepository;

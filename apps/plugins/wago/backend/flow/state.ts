@@ -1,4 +1,6 @@
-import { type PluginMqttSubscription, type PluginContext, type Repository } from '@attraccess/plugins-backend-sdk';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
+import { type PluginMqttSubscription, type PluginContext } from '@attraccess/plugins-backend-sdk';
+import { type Repository } from '@attraccess/plugins-backend-sdk/sqlite';
 
 import { Inject } from '@nestjs/common';
 
@@ -61,15 +63,15 @@ export abstract class WagoFlowServiceState {
 
   // Plugin registration precedes the host datasource; resolve repositories only when used.
   protected get controllers(): Repository<WagoController> {
-    return this.context.getRepository(WagoController);
+    return sqlitePersistence(this.context).getRepository(WagoController);
   }
 
   protected get revisions(): Repository<WagoConfigurationRevision> {
-    return this.context.getRepository(WagoConfigurationRevision);
+    return sqlitePersistence(this.context).getRepository(WagoConfigurationRevision);
   }
 
   protected get settings(): Repository<WagoSettings> {
-    return this.context.getRepository(WagoSettings);
+    return sqlitePersistence(this.context).getRepository(WagoSettings);
   }
 
   abstract onModuleInit(): Promise<void>;

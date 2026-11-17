@@ -1,6 +1,7 @@
 import { Inject } from '@nestjs/common';
 
-import { PluginContext, Repository, type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
+import { PluginContext, type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
+import { Repository } from '@attraccess/plugins-backend-sdk/sqlite';
 
 import { WagoManagedAccess, WagoRuntimeUpdateEntity } from './access.entity';
 

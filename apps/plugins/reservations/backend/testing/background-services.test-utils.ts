@@ -70,7 +70,7 @@ export function createBackgroundServices(h: Harness) {
     events: newEvents(),
     newEvents,
     preStart,
-    startCapacity: new StartCapacityService(h.settings, h.store, preStart),
+    startCapacity: new StartCapacityService(h.context, h.settings, h.store, preStart),
     sessionEnd: new SessionEndService(h.settings, h.globalSettings, h.store, h.reservations, decisions, h.clock),
     readerUi: new ReaderUiService(h.settings, h.globalSettings, h.store, h.access, h.directory, h.clock),
     /** Creates a confirmed booking directly through the service. */

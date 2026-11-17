@@ -1,5 +1,6 @@
+import { repositoryDouble } from '../../persistence.test-utils';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { DataSource } from 'typeorm';
+import { DataSource } from '@attraccess/plugins-backend-sdk/sqlite';
 import { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { WagoManagedRuntimeService } from './service';
 import { WagoManagedAccess, WagoRuntimeUpdateEntity, WagoDeviceOperation } from './access.entity';
@@ -53,7 +54,7 @@ export async function resetTestFixture(scope: ManagedRuntimeFixture) {
   });
   scope.audit = jest.fn(async () => ({ status: 'recorded' }));
   scope.context = {
-    getRepository: (entity: never) => scope.db.getRepository(entity),
+    ...repositoryDouble((entity: never) => scope.db.getRepository(entity)),
     secrets: { encrypt: scope.encrypt, decrypt: scope.decrypt },
     audit: { record: scope.audit },
     logger: { warn: jest.fn() },

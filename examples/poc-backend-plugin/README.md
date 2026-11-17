@@ -11,8 +11,9 @@ This package reproduces the real-world scenario:
 - It is **not** part of the api's TypeScript program or Nx build. It has its own
   `package.json`, its own `tsconfig.json`, and its own bundler invocation
   (`build.mjs`, esbuild).
-- It declares `@nestjs/*` and `typeorm` as **`peerDependencies`** and
-  **externalizes** them at build time. They are never bundled into the artifact.
+- It declares `@nestjs/*` as **`peerDependencies`** and **externalizes** them, together with the SDK and its
+  `/sqlite` engine subpath, at build time. They are never bundled into the artifact. It has no `typeorm`
+  dependency of its own: entity decorators come from `@attraccess/plugins-backend-sdk/sqlite`.
 - It ships a single CommonJS artifact (`dist/index.js`) loaded by the host via
   the same `createRequire(...)` path the production loader uses
   (`apps/api/src/plugin-system/plugin.module.ts`).
@@ -26,9 +27,9 @@ Anything the host hands you or expects to share **by class identity** must be a
 | --- | --- | --- |
 | `@nestjs/common`, `@nestjs/core` | external (peer) | DI metadata + decorators must come from the host copy |
 | `@nestjs/event-emitter`, `eventemitter2` | external (peer) | `EventEmitter2` must be the *same class* as the host bus |
-| `typeorm` | external (peer) | `DataSource`/`Repository` identity, single connection |
+| `typeorm` | external (host copy) | entity metadata and repository identity, single connection; reached only through the SDK `/sqlite` subpath |
 | `reflect-metadata` | external (peer) | one metadata registry per process |
-| `@attraccess/plugins-backend-sdk` | may be bundled | runtime surface is a single `Symbol.for()`, identity-safe across copies |
+| `@attraccess/plugins-backend-sdk`, `@attraccess/plugins-backend-sdk/sqlite` | external (served by the host) | the host hands its own instance to the plugin loader |
 
 Bundling any of the externalized packages breaks token identity even though the
 code still *looks* correct — see the negative case in
@@ -39,10 +40,15 @@ code still *looks* correct — see the negative case in
 Besides the raw `context.events` bus (used here for the ping/pong PoC), the
 plugin also demonstrates the **typed** event API:
 `context.onEvent(SystemEvent.RESOURCE_USAGE_STARTED, ...)` with a
-compile-time-checked payload. `SystemEvent` is imported as a **type only** so the
-artifact keeps zero runtime dependency on the SDK; the enum value is supplied as
-a string-literal cast. The subscription requires the `LISTEN_EVENTS` permission
+compile-time-checked payload. `SystemEvent` is imported as a **type only**; the
+enum value is supplied as a string-literal cast. The subscription requires the `LISTEN_EVENTS` permission
 declared in `plugin.json`.
+
+## Persistence
+
+The plugin declares `persistence.backends: ["sqlite"]` in `plugin.json` and `persistence: { sqlite: { entities } }`
+on its backend module. It stores notes through `sqlitePersistence(context).getRepository(PocNote)` from
+`@attraccess/plugins-backend-sdk/sqlite`; the root of the SDK knows no database engine.
 
 ## Build
 

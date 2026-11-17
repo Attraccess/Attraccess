@@ -1,3 +1,4 @@
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 
 import { tmpdir } from 'node:os';
@@ -172,7 +173,7 @@ export abstract class WagoCommissioningPlatform extends WagoCommissioningSession
         )
           throw new ConflictException('Confirm controller identity and finish delivery before management changes.');
         if (!session.managementControllerId) {
-          const controller = await this.context
+          const controller = await sqlitePersistence(this.context)
             .getRepository(WagoController)
             .findOneBy({ hardwareId: session.hardwareId, mqttServerId: session.mqttServerId });
           if (!controller) throw new ConflictException('Wait for controller enrollment before management inspection.');
@@ -420,7 +421,7 @@ export abstract class WagoCommissioningPlatform extends WagoCommissioningSession
       const page = await this.sessions.find({ order: { id: 'ASC' }, take: 100, skip });
       for (const session of page) {
         if (session.state !== 'awaiting_discovery' || session.enrollmentId === null) continue;
-        const controller = await this.context.getRepository(WagoController).findOneBy({
+        const controller = await sqlitePersistence(this.context).getRepository(WagoController).findOneBy({
           hardwareId: session.hardwareId,
           mqttServerId: session.mqttServerId,
           enrollmentId: session.enrollmentId,

@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { Test } from '@nestjs/testing';
+import { PluginPersistenceModule } from '../database/adapters/plugins/plugin-persistence.module';
 import { PluginModule } from './plugin.module';
 import { PluginService } from './plugin.service';
 import { PluginMigrationService } from './plugin-migration.service';
@@ -35,7 +36,12 @@ describe('plugin dependency activation', () => {
     );
     writeFileSync(
       join(root, name, 'dist', 'fixture.json'),
-      JSON.stringify({ name, fail, loadOrderPath: join(root, '.load-order'), initOrderPath: join(root, '.init-order') }),
+      JSON.stringify({
+        name,
+        fail,
+        loadOrderPath: join(root, '.load-order'),
+        initOrderPath: join(root, '.init-order'),
+      }),
     );
     writeFileSync(
       join(root, name, 'dist', 'index.js'),
@@ -69,7 +75,9 @@ describe('plugin dependency activation', () => {
     fixture('a-provider', ['z-core']);
     fixture('z-core');
     const plugins = PluginModule.forRoot();
-    const builder = Test.createTestingModule({ imports: plugins.imports.slice(2) });
+    const builder = Test.createTestingModule({
+      imports: plugins.imports.slice(2).filter((module) => module !== PluginPersistenceModule),
+    });
     for (const plugin of PluginService.getPlugins())
       builder.overrideProvider(`plugin-mqtt-cleanup:${plugin.id}`).useValue({ onModuleDestroy: () => undefined });
     const app = await builder.compile();

@@ -3,7 +3,7 @@
 // and locations never. Nothing is deleted; vanished endpoints and clusters get `removed_at`.
 import type { NodeView } from './sidecar-types';
 import { randomUUID } from 'node:crypto';
-import type { EntityManager } from 'typeorm';
+import type { EntityManager } from '@attraccess/plugins-backend-sdk/sqlite';
 import {
   MatterEndpoint,
   MatterEndpointCapability,

@@ -5,12 +5,13 @@
 // before this service initialises and reverts on uninstall.
 //
 // CRUD goes through a real TypeORM repository over the shared connection. The
-// host registers the `ShellyDevice` entity (declared via the `entities` export
-// in plugin.ts) into its DataSource at load time, so `context.getRepository`
+// host registers the `ShellyDevice` entity (declared via the `persistence.sqlite.entities`
+// declaration in plugin.ts) into its connection at load time, so `sqlitePersistence(context).getRepository`
 // resolves the entity's metadata — no hand-written SQL or snake_case row mapping.
 // Requires the `DATABASE_ACCESS` permission (declared in plugin.json).
 import { Inject, Injectable } from '@nestjs/common';
-import type { PluginContext, Repository } from '@attraccess/plugins-backend-sdk';
+import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import { sqlitePersistence, type Repository } from '@attraccess/plugins-backend-sdk/sqlite';
 import { ShellyDevice } from './device.entity';
 import type { AuthState } from '../types';
 
@@ -36,13 +37,13 @@ export class DeviceRegistryService {
 
   // Resolve the repository lazily, not in the constructor: plugin providers are
   // instantiated during the host's DI pass, before the host DataSource ref is
-  // wired up (PluginContext.getRepository throws "Host DataSource is not
+  // wired up (the repository accessor throws "Host DataSource is not
   // available yet" until bootstrap completes). The first query happens on an
   // HTTP request, well after bootstrap, so resolving on demand is safe; cache it
   // once resolved.
   private get devices(): Repository<ShellyDevice> {
     if (this.repository === null) {
-      this.repository = this.context.getRepository(ShellyDevice);
+      this.repository = sqlitePersistence(this.context).getRepository(ShellyDevice);
     }
     return this.repository;
   }

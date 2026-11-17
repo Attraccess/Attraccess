@@ -1,4 +1,5 @@
 import * as pluginsBackendSdk from '@attraccess/plugins-backend-sdk';
+import * as pluginsBackendSdkSqlite from '@attraccess/plugins-backend-sdk/sqlite';
 import { readFileSync } from 'fs';
 import { createRequire, Module as NodeModuleClass } from 'module';
 import { dirname, isAbsolute } from 'path';
@@ -17,6 +18,9 @@ import { runInThisContext } from 'vm';
 // decorator identity).
 const HOST_BUNDLED_MODULES: Record<string, unknown> = {
   '@attraccess/plugins-backend-sdk': pluginsBackendSdk,
+  // The SDK's engine subpath. It re-exports the host's single TypeORM copy, so decorator metadata and the
+  // persistence seam it shares with the root stay the host's own objects.
+  '@attraccess/plugins-backend-sdk/sqlite': pluginsBackendSdkSqlite,
 };
 
 // Loads a plugin's CommonJS entry so that its *externalized* host-shared packages

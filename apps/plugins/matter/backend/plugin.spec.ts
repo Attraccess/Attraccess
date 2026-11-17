@@ -23,7 +23,9 @@ describe('matter plugin backend', () => {
       MatterBackupController,
     ]);
     expect(module.providers).toHaveLength(15);
-    expect(plugin.entities).toEqual([MatterConnection, ...DEVICE_ENTITIES, ...BACKUP_ENTITIES]);
+    expect(plugin.persistence).toEqual({
+      sqlite: { entities: [MatterConnection, ...DEVICE_ENTITIES, ...BACKUP_ENTITIES] },
+    });
     expect(plugin.auditDomains).toEqual([MATTER_AUDIT_DOMAIN]);
   });
 

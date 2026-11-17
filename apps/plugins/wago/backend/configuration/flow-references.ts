@@ -1,4 +1,4 @@
-import { ResourceFlowNode, type PluginContext } from '@attraccess/plugins-backend-sdk';
+import { type PluginContext } from '@attraccess/plugins-backend-sdk';
 import type { WagoConfigurationSnapshot } from './model';
 import { configurationImpacts } from './editor';
 
@@ -21,15 +21,10 @@ export async function configurationFlowImpacts(
       impacts.push({ channelId: channel.id, message: 'An input used by this channel as a guard or feedback changed.' });
     }
   }
-  const nodes = await context.dataSource
-    .getRepository(ResourceFlowNode)
-    .createQueryBuilder('node')
-    .select(['node.id', 'node.resourceId', 'node.flowId', 'node.type', 'node.data'])
-    .leftJoin('node.flow', 'flow')
-    .addSelect(['flow.id', 'flow.name'])
-    .where('node.type LIKE :type', { type: 'plugin.wago.%' })
-    .andWhere("node.data ->> 'controllerId' = :controllerId", { controllerId })
-    .getMany();
+  const nodes = await context.hostData.flows.findNodes({
+    typePrefix: 'plugin.wago.',
+    dataEquals: { controllerId },
+  });
   // Commands pin the applied revision, even when their channel is unchanged.
   for (const node of nodes) {
     const channelId = node.data?.channelId;
@@ -48,7 +43,7 @@ export async function configurationFlowImpacts(
       .map((node) => ({
         resourceId: node.resourceId ?? null,
         flowId: node.flowId ?? null,
-        flowName: node.flowId != null ? (node.flow?.name ?? null) : null,
+        flowName: node.flowId != null ? node.flowName : null,
         nodeId: node.id,
         nodeType: node.type,
       })),

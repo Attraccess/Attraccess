@@ -1,3 +1,4 @@
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { WagoCommissioningSession } from './session.entity';
 
 import { CommissioningSessionResponse } from '../model';
@@ -135,7 +136,7 @@ export abstract class WagoCommissioningProgress extends WagoCommissioningTranspo
               const controller =
                 session.enrollmentId === null
                   ? null
-                  : await this.context.getRepository(WagoController).findOneBy({
+                  : await sqlitePersistence(this.context).getRepository(WagoController).findOneBy({
                       hardwareId: session.hardwareId,
                       mqttServerId: session.mqttServerId,
                       enrollmentId: session.enrollmentId,

@@ -1,6 +1,6 @@
 import { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { createHash } from 'node:crypto';
-import { DataSource } from 'typeorm';
+import { DataSource } from '@attraccess/plugins-backend-sdk/sqlite';
 import { BuildRuntimeArtifact } from '../../artifacts/build';
 import { WagoCommissioningReadiness } from '../../../commissioning/readiness/readiness';
 import { WagoCommissioningSession } from '../../../commissioning/sessions/session.entity';
@@ -40,7 +40,7 @@ const artifact: BuildRuntimeArtifact = {
 
 const principal = { userId: 7, authenticationMethod: 'session' as const };
 
-jest.mock('@attraccess/plugins-backend-sdk', () => jest.requireActual('typeorm'));
+jest.mock('@attraccess/plugins-backend-sdk', () => jest.requireActual('@attraccess/plugins-backend-sdk/sqlite'));
 
 jest.mock('../../../controllers/service', () => ({ WagoService: class {} }));
 

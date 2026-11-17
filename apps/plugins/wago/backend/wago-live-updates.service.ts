@@ -1,3 +1,4 @@
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { ForbiddenException, Inject, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { createSharedLiveSampler, type AuthenticatedUser, type PluginContext } from '@attraccess/plugins-backend-sdk';
 import { WagoService } from './controllers/service';
@@ -44,8 +45,8 @@ export class WagoLiveUpdatesService implements OnModuleInit {
           if (!Number.isSafeInteger(id) || !Number.isSafeInteger(offset)) throw new NotFoundException();
           const exists =
             kind === 'session'
-              ? await this.context.getRepository(WagoCommissioningSession).existsBy({ id })
-              : await this.context.getRepository(WagoController).existsBy({ id });
+              ? await sqlitePersistence(this.context).getRepository(WagoCommissioningSession).existsBy({ id })
+              : await sqlitePersistence(this.context).getRepository(WagoController).existsBy({ id });
           if (!exists) throw new NotFoundException();
         },
         source: ({ identifier }) =>

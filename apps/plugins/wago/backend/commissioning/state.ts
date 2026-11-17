@@ -2,7 +2,8 @@ import { Inject, Optional } from '@nestjs/common';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { PLUGIN_CONTEXT, PluginContext, Repository } from '@attraccess/plugins-backend-sdk';
+import { PLUGIN_CONTEXT, PluginContext } from '@attraccess/plugins-backend-sdk';
+import { Repository } from '@attraccess/plugins-backend-sdk/sqlite';
 
 import { WagoCommissioningSession } from './sessions/session.entity';
 

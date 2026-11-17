@@ -1,4 +1,4 @@
-import type { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk';
+import type { MigrationInterface, QueryRunner } from '@attraccess/plugins-backend-sdk/sqlite';
 
 /** Dedicated ATT-1057 migration ID. Export from migrations.ts during coordinator integration. */
 export class WagoManagement1780000000010 implements MigrationInterface {

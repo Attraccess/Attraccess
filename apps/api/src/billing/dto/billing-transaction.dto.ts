@@ -1,6 +1,6 @@
 import { BillingTransactionStatus } from '@attraccess/application-models';
 // The related user and usage are documented with their public schemas; they are not billing data.
-import { ResourceUsage, User } from '@attraccess/plugins-backend-sdk';
+import { ResourceUsage, User } from '@attraccess/database-entities';
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
 
 /** Schema names stay `BillingTransaction*` so the published API description does not change. */

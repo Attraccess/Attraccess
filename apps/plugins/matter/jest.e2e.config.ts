@@ -18,6 +18,7 @@ export default {
   transformIgnorePatterns: ['/node_modules/(?!(\\.pnpm/@(noble|scure)|@(noble|scure)))'],
   moduleFileExtensions: ['ts', 'js', 'json'],
   moduleNameMapper: {
+    '^@attraccess/plugins-backend-sdk/sqlite$': '<rootDir>/../../../libs/plugins-backend-sdk/src/sqlite.ts',
     '^@attraccess/(.*)$': '<rootDir>/../../../libs/$1/src/index.ts',
   },
   testTimeout: 60000,

@@ -72,15 +72,15 @@ keyword and an `attraccess` object:
 }
 ```
 
-| Field                                        | Required     | Notes                                                                                                  |
-| -------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------ |
-| `name`                                       | yes          | Immutable npm package identifier.                                                                      |
-| `version`                                    | yes          | Your plugin's semantic version.                                                                        |
-| `attraccess.backend` / `attraccess.frontend` | at least one | Relative package entry point.                                                                          |
-| `attraccess.styles`                          | no           | Stylesheet alongside the frontend entry point.                                                         |
-| `attraccess.migrations`                      | no           | Module exporting TypeORM migration classes. See [Database Migrations](plugins/database-migrations.md). |
-| `attraccess.host`                            | yes          | Compatible Attraccess host semver range.                                                               |
-| `attraccess.permissions`                     | no           | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`.      |
+| Field                                        | Required     | Notes                                                                                              |
+| -------------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------- |
+| `name`                                       | yes          | Immutable npm package identifier.                                                                  |
+| `version`                                    | yes          | Your plugin's semantic version.                                                                    |
+| `attraccess.backend` / `attraccess.frontend` | at least one | Relative package entry point.                                                                      |
+| `attraccess.styles`                          | no           | Stylesheet alongside the frontend entry point.                                                     |
+| `attraccess.migrations`                      | no           | Module exporting SQL migration classes. See [Database Migrations](plugins/database-migrations.md). |
+| `attraccess.host`                            | yes          | Compatible Attraccess host semver range.                                                           |
+| `attraccess.permissions`                     | no           | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`.  |
 
 ## Dependencies on other Attraccess plugins
 
@@ -116,18 +116,13 @@ import { Controller, DynamicModule, Get, Inject, Injectable, OnModuleInit } from
 
 // The host hands each plugin its PluginContext under this token. Recreate it
 // locally (do not import the value) so the artifact has no runtime dependency on
-// the SDK: Symbol.for() resolves against the process-global registry, so this is
-// the exact same symbol the host uses.
+// the SDK root: Symbol.for() resolves against the process-global registry, so
+// this is the exact same symbol the host uses.
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 
 // SystemEvent is imported as a TYPE only (erased at build time); supply the enum
 // value as a string-literal cast to keep the artifact SDK-free at runtime.
 const RESOURCE_USAGE_STARTED = 'RESOURCE_USAGE_STARTED' as SystemEvent;
-
-interface UserRow {
-  id: number;
-  username: string;
-}
 
 @Injectable()
 class HelloWorldService implements OnModuleInit {
@@ -141,12 +136,10 @@ class HelloWorldService implements OnModuleInit {
   }
 
   async greetUsers(): Promise<string[]> {
-    // Injected repository over the shared connection. Addressing the entity by
-    // NAME ('User') means we don't import the entity class; the host resolves it
-    // and gates the call behind READ_USERS.
-    const users = this.context.getRepository<UserRow>('User');
-    const rows = await users.find({ take: 5 });
-    return rows.map((row) => `Hello, ${row.username}!`);
+    // Host data is read through context.hostData as neutral values, never as
+    // entities. The users group is gated behind READ_USERS.
+    const names = await this.context.hostData.users.getUsernames([1, 2, 3, 4, 5]);
+    return [...names.values()].map((username) => `Hello, ${username}!`);
   }
 }
 
@@ -184,8 +177,8 @@ export default plugin;
 | `context.manifest`                                        | Your plugin's name, version, id, directory.                                                                                                                       | none                     |
 | `context.hostVersion`                                     | Version of the running Attraccess host (the one plugin compatibility is checked against). Optional: hosts older than 1.11.0 do not set it, so handle `undefined`. | none                     |
 | `context.logger`                                          | Logger prefixed with your plugin name.                                                                                                                            | none                     |
-| `context.getRepository(entity)`                           | TypeORM repository over the shared connection.                                                                                                                    | per-entity (see below)   |
-| `context.dataSource`                                      | The raw shared TypeORM `DataSource`.                                                                                                                              | `DATABASE_ACCESS`        |
+| `context.persistence`                                     | Backend-neutral persistence: the active engine, atomic transactions with a post-commit hook and the seam to the engine subpath. See [Persistence](#persistence).  | `DATABASE_ACCESS`        |
+| `context.hostData`                                        | Read-only lookups of host data (resources, users, settings, flow nodes) as neutral models. See [Host data](#host-data).                                           | per group (see below)    |
 | `context.onEvent(event, handler)`                         | Subscribe to a typed `SystemEvent`.                                                                                                                               | `LISTEN_EVENTS`          |
 | `context.emitEvent(event, payload)`                       | Emit a typed `SystemEvent`.                                                                                                                                       | `EMIT_EVENTS`            |
 | `context.events`                                          | The raw shared event bus (restricted surface).                                                                                                                    | per-method               |
@@ -196,12 +189,13 @@ export default plugin;
 | `context.notifications.dispatch(request)`                 | Notify users under a category your plugin declared. See [Notifications](#notifications).                                                                          | `SEND_NOTIFICATIONS`     |
 | `context.startBlocked.invalidate({ resourceId })`         | Tell open resource pages that your `startBlockedQuery` answer changed. See [Start-blocked state](#start-blocked-state).                                           | `ACCESS_HOOKS`           |
 | `context.resourceAccess`                                  | Read-only authorization, maintenance and session queries. See [Resource access](#resource-access-queries).                                                        | `ACCESS_RESOURCES`       |
-| `context.runSerialized(fn)`                               | Run database work in one serialized transaction. See [Serialized transactions](#serialized-transactions).                                                         | `DATABASE_ACCESS`        |
 
 > [!IMPORTANT]
-> Resolve services and repositories through `context`, never by re-initialising
-> TypeORM or instantiating a second `EventEmitter`. The whole point is that you
-> share the host's single database connection and event bus.
+> Resolve services and persistence through `context`, never by opening your own
+> database connection or instantiating a second `EventEmitter`. The whole point
+> is that you share the host's single database connection and event bus. The SDK
+> root knows no database engine: no TypeORM, no `DataSource`, no `Repository`,
+> no host entity classes.
 
 ### Backend plugin permissions
 
@@ -213,10 +207,10 @@ naming the missing permission.
 
 | Permission               | Grants access to                                                                                                                                                                                                                                                        |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `READ_USERS`             | `context.getRepository('User')` — read user accounts.                                                                                                                                                                                                                   |
-| `ACCESS_RESOURCES`       | `context.getRepository('Resource')` — read and write resources — and the read-only `context.resourceAccess` queries. See [Resource access](#resource-access-queries).                                                                                                   |
-| `READ_SETTINGS`          | `context.getRepository('Setting')` — read application settings.                                                                                                                                                                                                         |
-| `DATABASE_ACCESS`        | `context.dataSource`, `context.getRepository(...)` for any other entity and `context.runSerialized(...)`.                                                                                                                                                               |
+| `READ_USERS`             | `context.hostData.users` — read user names, languages, account state and role-based permission holders.                                                                                                                                                                 |
+| `ACCESS_RESOURCES`       | `context.hostData.resources` — read resources — and the read-only `context.resourceAccess` queries. See [Resource access](#resource-access-queries).                                                                                                                    |
+| `READ_SETTINGS`          | `context.hostData.settings` — read application settings.                                                                                                                                                                                                                |
+| `DATABASE_ACCESS`        | `context.persistence` (the engine, transactions and the engine subpath for your own tables) and `context.hostData.flows`.                                                                                                                                               |
 | `EMIT_EVENTS`            | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`.                                                                                                                                                                                             |
 | `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                                                                                                                                                                                 |
 | `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                                                                                                                                                                                        |
@@ -248,10 +242,10 @@ also removed automatically when the plugin module is destroyed.
 
 A few notes on the boundary:
 
-- `DATABASE_ACCESS` is the broad grant: it covers the raw `dataSource` and a
-  repository for **any** entity, so it implicitly includes what `READ_USERS`,
-  `ACCESS_RESOURCES` and `READ_SETTINGS` grant. Prefer the narrow per-entity
-  permissions when you only need one of those tables.
+- `DATABASE_ACCESS` covers your **own** storage and the flow node lookups. It does
+  not include `READ_USERS`, `ACCESS_RESOURCES` or `READ_SETTINGS`: each
+  `hostData` group checks its own permission when a method is called. There is no
+  way to read arbitrary host tables.
 - The event bus is exposed as a **restricted** surface. Only `emit`/`emitAsync`
   (under `EMIT_EVENTS`) and the listener methods `on`, `once`, `addListener`,
   `prependListener`, `prependOnceListener`, `many`, `prependMany`, `onAny`,
@@ -443,32 +437,116 @@ resources yield negative answers (`false`, all-false, `[]`) rather than errors.
 | `getMaintenanceWindows(resourceId, from, to)`   | Windows overlapping `[from, to)` as `{ maintenanceId, resourceId, startTime, endTime \| null, reason \| null }`. Open-ended maintenance counts until it is finished.                                                                                                                                                                                                                                                                                                             |
 | `getActiveSessions(resourceId)`                 | Running sessions `{ usageId, userId, startTime }`, earliest first.                                                                                                                                                                                                                                                                                                                                                                                                               |
 
+### Persistence
+
+`context.persistence` (permission `DATABASE_ACCESS`) is the backend-neutral
+persistence capability. It never exposes a connection, repository or query API.
+
+| Member                          | Purpose                                                                                                                                                                |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `persistence.backend`           | The engine the host runs (`'sqlite'` today).                                                                                                                           |
+| `persistence.supports(backend)` | Whether the host runs the given engine. Use it to pick between engine-specific code paths.                                                                             |
+| `persistence.transaction(work)` | Runs `work(scope)` in one atomic transaction. It commits when `work` resolves and rolls back when it throws. `scope.afterCommit(callback)` runs only after the commit. |
+
+A plugin that stores data declares the engines it supports twice: in
+`persistence.backends` of `plugin.json` (see [Migrating Plugins to SDK 2.0](plugins/migrating-to-2.md)) and on
+its backend module:
+
+```ts
+const plugin: PluginBackendModule = {
+  persistence: { sqlite: { entities: [Booking] } },
+  register(context) {
+    /* ... */
+  },
+};
+```
+
+The host registers the entities of the **active** engine into its shared connection when the plugin loads; the schema
+is owned by your [migrations](plugins/database-migrations.md). A plugin whose declaration or manifest does not
+include the engine the host runs is refused before anything of it is registered, migrated or started, and no data
+changes.
+
+#### The sqlite engine subpath
+
+Everything that is specific to SQLite lives behind `@attraccess/plugins-backend-sdk/sqlite`: the TypeORM entity and
+migration decorators and helpers (`Entity`, `Column`, `PrimaryColumn`, `PrimaryGeneratedColumn`, `CreateDateColumn`,
+`UpdateDateColumn`, `Index`, `Unique`, `Check`, `In`, `IsNull`, `Not`, `Brackets`, `Table`, `TableColumn`,
+`TableForeignKey`, `TableIndex`, `DataSource`, `SelectQueryBuilder` and the types `Repository`, `EntityManager`,
+`EntityTarget`, `ObjectLiteral`, `FindOptionsWhere`, `MigrationInterface`, `QueryRunner`) and `sqlitePersistence(context)`.
+You take no `typeorm` dependency of your own: the subpath re-exports the host's single copy.
+
+```ts
+import { Column, Entity, PrimaryGeneratedColumn, sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
+
+@Entity({ name: 'plugin_bookings' })
+class Booking {
+  @PrimaryGeneratedColumn() id!: number;
+  @Column({ type: 'varchar' }) slot!: string;
+}
+
+const sqlite = sqlitePersistence(context);
+const bookings = sqlite.getRepository(Booking); // a repository retained during bootstrap resolves on first use
+```
+
+| `sqlitePersistence(context)` member | Purpose                                                                                                             |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `getRepository(entity)`             | Repository of an entity **your plugin registered** in `persistence.sqlite.entities`. Host tables are not reachable. |
+| `manager`                           | The host's shared `EntityManager`, for reads outside a transaction.                                                 |
+| `transaction(work)`                 | `persistence.transaction` with the SQLite manager passed along: `work(manager, scope)`.                             |
+| `managerOf(scope)`                  | The SQLite transaction behind a scope, for example the `scope` of a start capacity hook.                            |
+
+`sqlitePersistence(context)` only works while the host runs SQLite. With another engine it throws a
+`PluginPersistenceBackendError` that names the required and the active engine, so engine-specific plugin code fails
+clearly instead of misbehaving. Entity classes need an explicit column `type` when your bundler does not emit
+decorator metadata (esbuild does not).
+
+### Host data
+
+`context.hostData` answers read-only questions about host data with neutral models and plain values, never entities or
+query handles. Each group checks its own permission when a method is called.
+
+| Group                | Permission         | Methods                                                                                                                                                                                                                              |
+| -------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `hostData.resources` | `ACCESS_RESOURCES` | `get(id)` (a `PluginResourceModel` or `null`), `getNames(ids)`, `filterVisible(userId, ids, { seeAll? })`, `filterRequiringSupervision(ids)`, `listIdsInGroups(groupIds)`, `countUnhealthyEntries(id)`, `listIntroducerUserIds(id)`. |
+| `hostData.users`     | `READ_USERS`       | `getUsernames(ids)`, `getLocales(ids)`, `isActive(id)` (exists, not deleted, not disabled), `listIdsWithAnyPermission(keys)`.                                                                                                        |
+| `hostData.settings`  | `READ_SETTINGS`    | `getApp(key)`: the trimmed value of an application setting, or `null`.                                                                                                                                                               |
+| `hostData.flows`     | `DATABASE_ACCESS`  | `findNodes(query)`: flow nodes by `type`, `typePrefix`, `dataEquals`, `dataIn`, `resourceId`, `excludeResourceId`, `excludeFlowId`, `orderById` and `limit`, as `{ id, type, resourceId, resourceName, flowId, flowName, data }`.    |
+
+`PluginUserModel` (`id`, `username`, `locale`, `isDisabled`) and `PluginResourceModel` (`id`, `name`, `type`,
+`description`, `allowTakeOver`, `maxParallelSessions`, `supervisionMode`) come from `@attraccess/application-models` and
+are re-exported by the SDK root. They are also the payload of the `RESOURCE_USAGE_STARTED` and `RESOURCE_USAGE_ENDED`
+events and the user of `AuthenticatedRequest`: tokens, contact data and other account fields never reach plugin code.
+
 ### Serialized transactions
 
-`context.runSerialized(fn)` (permission `DATABASE_ACCESS`) runs `fn(manager)` in
+`persistence.transaction(work)` (permission `DATABASE_ACCESS`) runs `work(scope)` in
 a transaction that the host executes one at a time on SQLite. The transaction
-commits when `fn` resolves and rolls back when it throws, which makes
+commits when `work` resolves and rolls back when it throws, which makes
 check-then-write sequences such as overlap checks race-free:
 
 ```ts
-await context.runSerialized(async (manager) => {
+const sqlite = sqlitePersistence(context);
+await sqlite.transaction(async (manager, scope) => {
   const clash = await manager.getRepository(Booking).count({ where: {/* overlapping window */} });
   if (clash > 0) throw new ConflictException('OVERLAP');
   await manager.getRepository(Booking).save(newBooking);
+  // Runs only after the commit, never on rollback. Failing callbacks are logged and do not undo the commit.
+  scope.afterCommit(() => context.mqtt.publish(1, 'bookings/created', '{}'));
 });
 ```
 
 The queue is shared with every core session start and end, so:
 
-- keep `fn` short and limited to database work through the given `manager`; do
-  no HTTP, MQTT, email or other non-database I/O inside it;
-- do not nest calls. A `runSerialized` started inside `fn` would wait for `fn`
+- keep `work` short and limited to database work through the given `manager`; do
+  no HTTP, MQTT, email or other non-database I/O inside it. Register such effects
+  with `scope.afterCommit`;
+- do not nest calls. A transaction started inside `work` would wait for `work`
   itself, so the host rejects it with an error instead of hanging. Pass the
-  `manager` down to helpers instead, and do not await core operations that write
-  through the same queue (such as starting or ending a session) inside `fn`;
-- read and write only through `manager` inside `fn`, not through
-  `context.getRepository(...)` or `context.dataSource`. Their connection waits
-  for the lock `fn` holds: a write there fails with `SQLITE_BUSY` after about
+  `manager` or `scope` down to helpers instead, and do not await core operations that write
+  through the same queue (such as starting or ending a session) inside `work`;
+- read and write only through `manager` inside `work`, not through
+  `sqlite.getRepository(...)` or `sqlite.manager`. Their connection waits
+  for the lock `work` holds: a write there fails with `SQLITE_BUSY` after about
   5 seconds, and it stalls other queries on that connection meanwhile.
 
 Serialization is per host process. Plugins that need exclusion across several API
@@ -519,10 +597,11 @@ connection. For dependency-injection identities to line up, your build must use
 the _same_ copies of those packages the host already loaded — it must **not**
 bundle its own. Split dependencies into two groups:
 
-| Dependency                                                                                                                                                           | How to declare it                                  | Why                                                                                                                                                  |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata`, `@nestjs/swagger`, `class-validator`, `class-transformer` | `peerDependencies`, **externalized** at build time | They carry the DI identities, the shared event bus and the single DB connection. A bundled copy is a _different_ type and silently fails to connect. |
-| `@attraccess/plugins-backend-sdk` and your own code                                                                                                                  | bundle normally                                    | Safe — the SDK's runtime surface is `Symbol.for()`, identity-safe across copies.                                                                     |
+| Dependency                                                                                                                                                | How to declare it                                  | Why                                                                                                                                                                                                           |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `reflect-metadata`, `@nestjs/swagger`, `class-validator`, `class-transformer` | `peerDependencies`, **externalized** at build time | They carry the DI identities and the shared event bus. A bundled copy is a _different_ type and silently fails to connect.                                                                                    |
+| `@attraccess/plugins-backend-sdk` and `@attraccess/plugins-backend-sdk/sqlite`                                                                            | **externalized** at build time                     | The host serves its own instances to the plugin loader. The `/sqlite` subpath re-exports the host's single TypeORM copy, so entity metadata and the shared connection line up. Do not add `typeorm` yourself. |
+| Your own code                                                                                                                                             | bundle normally                                    | -                                                                                                                                                                                                             |
 
 Ship a **CommonJS** entry point (`index.js`), not an ES module. A minimal
 [esbuild](https://esbuild.github.io/) build that follows the rule:
@@ -532,9 +611,9 @@ esbuild backend/plugin.ts \
   --bundle --platform=node --format=cjs --outfile=dist/index.js \
   --external:@nestjs/common --external:@nestjs/core \
   --external:@nestjs/event-emitter --external:eventemitter2 \
-  --external:typeorm --external:reflect-metadata \
+  --external:reflect-metadata \
   --external:@nestjs/swagger --external:class-validator --external:class-transformer \
-  --external:@attraccess/plugins-backend-sdk
+  --external:@attraccess/plugins-backend-sdk --external:@attraccess/plugins-backend-sdk/sqlite
 ```
 
 > [!WARNING]
@@ -770,8 +849,9 @@ simultaneous starts could both pass and take the same slot.
 
 ```ts
 const startCapacityHook: StartCapacityHook = async (ctx) => {
-  // ctx.manager is the host's start transaction: only read through it
-  const held = await countSlotsHeldForOthers(ctx.manager, ctx.resourceId, ctx.userId, ctx.now); // your own query
+  // ctx.scope is the host's start transaction: only read through it
+  const manager = sqlitePersistence(context).managerOf(ctx.scope);
+  const held = await countSlotsHeldForOthers(manager, ctx.resourceId, ctx.userId, ctx.now); // your own query
   if (!held) return { heldSlots: 0 };
   return {
     heldSlots: held,
@@ -796,8 +876,9 @@ const startCapacityHook: StartCapacityHook = async (ctx) => {
   `occupiedSlots + heldSlots >= sessionLimit`, so simultaneous starts can never take a held slot.
 - **Always return a `reason` when your held slots can fill the machine.** Without one core refuses with its generic
   "unavailable" text and audits an invalid result.
-- **Only read through `ctx.manager`, never nest `runSerialized`.** `ctx.manager` is core's transactional
-  `EntityManager`: never write through it. The start transaction is already serialized; starting another one inside
+- **Only read through `ctx.scope`, never nest `persistence.transaction`.** `ctx.scope` is a `PluginTransactionScope`
+  of core's start transaction (SQLite: `sqlitePersistence(context).managerOf(ctx.scope)`): never write through it and
+  never call `scope.afterCommit` on it. The start transaction is already serialized; starting another one inside
   the hook makes it wait for itself. Keep the hook to one indexed query.
 - **Failures.** A failure, a timeout and an open circuit breaker follow the per-resource, per-plugin failure policy
   (fail open or fail closed, see [Failures and trust](#failures-and-trust)) and are audited.

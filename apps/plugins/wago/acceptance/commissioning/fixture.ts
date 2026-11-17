@@ -1,3 +1,4 @@
+import { persistenceOver } from '../../backend/persistence.test-utils';
 import 'reflect-metadata';
 import { createCipheriv, createDecipheriv, generateKeyPairSync, randomBytes } from 'node:crypto';
 import { WagoManagementEntity } from '../../backend/management/entity';
@@ -46,7 +47,7 @@ export async function commissioningFixture() {
   const database = new DataSource({
     type: 'sqlite',
     database: ':memory:',
-    entities: plugin.entities,
+    entities: plugin.persistence.sqlite.entities,
     synchronize: true,
   });
   let app: INestApplication | undefined;
@@ -128,7 +129,7 @@ export async function commissioningFixture() {
       },
     };
     const context = {
-      getRepository: ((entity) => database.getRepository(entity)) as PluginContext['getRepository'],
+      persistence: persistenceOver(database),
       secrets,
       logger: { warn: jest.fn() },
       // Audit persistence belongs to the separate audit acceptance owner.

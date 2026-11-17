@@ -1,4 +1,5 @@
 import type { PluginAuditPrincipal, PluginAuditReceipt, PluginContext } from '@attraccess/plugins-backend-sdk';
+import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { MatterConnection, CONNECTION_ROW_ID } from '../connection/entity';
@@ -38,7 +39,9 @@ export class DeviceAuditService {
   async actorFor(principal: PluginAuditPrincipal | null): Promise<AuditActor | null> {
     if (principal) return { principal, system: false };
     try {
-      const row = await this.context.getRepository(MatterConnection).findOneBy({ id: CONNECTION_ROW_ID });
+      const row = await sqlitePersistence(this.context)
+        .getRepository(MatterConnection)
+        .findOneBy({ id: CONNECTION_ROW_ID });
       if (row?.updatedBy)
         return { principal: { userId: row.updatedBy, authenticationMethod: 'session' }, system: true };
     } catch {
