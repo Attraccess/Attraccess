@@ -61,8 +61,8 @@ describe('plugin license gate', () => {
       expect(manifest.license).toEqual({ required: true, modules: [name] });
       expect(pkg.attraccess.license).toEqual(manifest.license);
       expect(pkg.license).toBe('SEE LICENSE IN LICENSE.md');
-      // Hosts before 1.11.0-beta.1 ignore the license block, so they must not install the plugin.
-      expect(semver.gte(manifest.attraccessVersion.min, '1.11.0-beta.1')).toBe(true);
+      // 1.11.0-beta.1 shipped without license enforcement and ignores the license block, so it must not install the plugin.
+      expect(semver.gte(manifest.attraccessVersion.min, '1.11.0-beta.2')).toBe(true);
       expect(pkg.attraccess.host).toBe(`^${manifest.attraccessVersion.min}`);
       expect(readFileSync(join(__dirname, '../../../../plugins', name, 'LICENSE.md'), 'utf8')).toContain(`\`${name}\``);
     });

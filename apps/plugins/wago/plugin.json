@@ -11,7 +11,7 @@
       "dashboardPaths": ["/wago"]
     }
   },
-  "attraccessVersion": { "min": "1.11.0-beta.1" },
+  "attraccessVersion": { "min": "1.11.0-beta.2" },
   "license": { "required": true, "modules": ["wago"] },
   "permissions": ["DATABASE_ACCESS", "ACCESS_MQTT_SERVERS", "TRIGGER_FLOWS", "MANAGE_SECRETS"]
 }
