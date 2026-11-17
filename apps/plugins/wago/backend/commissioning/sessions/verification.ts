@@ -1,31 +1,23 @@
-import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import type { WagoCommissioningSession } from './session.entity';
-import { WagoController } from '../../controllers/entity';
-import { WagoEnrollment } from '../../controllers/enrollment.entity';
-import { WagoConfigurationRevision } from '../../configuration/revision.entity';
+import { openWagoStorage } from '../../storage';
 import type { CommissioningRuntimeState } from '../readiness/readiness';
 
 export async function commissioningVerification(
-  context: PluginContext,
+  context: Pick<PluginContext, 'storage'>,
   session: WagoCommissioningSession,
   runtime?: CommissioningRuntimeState,
 ) {
-  const controller = await sqlitePersistence(context).getRepository(WagoController).findOneBy({
-    hardwareId: session.hardwareId,
-    mqttServerId: session.mqttServerId,
+  const tables = openWagoStorage(context);
+  const controller = await tables.controllers.findOne({
+    where: { hardwareId: session.hardwareId, mqttServerId: session.mqttServerId },
   });
-  const enrollment =
-    session.enrollmentId === null
-      ? null
-      : await sqlitePersistence(context).getRepository(WagoEnrollment).findOneBy({ id: session.enrollmentId });
+  const enrollment = session.enrollmentId === null ? null : await tables.enrollments.get(session.enrollmentId);
   const revision = controller
-    ? await sqlitePersistence(context)
-        .getRepository(WagoConfigurationRevision)
-        .findOne({
-          where: { controllerId: controller.id },
-          order: { revision: 'DESC' },
-        })
+    ? await tables.configurationRevisions.findOne({
+        where: { controllerId: controller.id },
+        orderBy: [{ field: 'revision', direction: 'desc' }],
+      })
     : null;
   const heartbeat = controller?.lastHeartbeatAt ? Date.parse(controller.lastHeartbeatAt) : NaN;
   const permanentConnection = Boolean(

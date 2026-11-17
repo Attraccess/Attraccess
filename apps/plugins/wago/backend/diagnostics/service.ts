@@ -1,4 +1,3 @@
-import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { Auth, type PluginContext, type PluginFlowNodeReference } from '@attraccess/plugins-backend-sdk';
 import { Controller, Get, Inject, Injectable, NotFoundException, Param, ParseIntPipe } from '@nestjs/common';
 import type { WagoDiagnostics } from '../../diagnostics-types';
@@ -8,7 +7,7 @@ import { freshness } from './store';
 import { safeValidationSummaries } from './validation';
 import { WagoConfigurationDraft } from '../configuration/draft.entity';
 import { WagoConfigurationRevision } from '../configuration/revision.entity';
-import { WagoController } from '../controllers/entity';
+import { openWagoStorage } from '../storage';
 import { WagoService } from '../controllers/service';
 import { channelEnabled, MAX_CONFIGURATION_ITEMS } from '../../shared/configuration-limits';
 import { MAX_CHANNELS } from './store';
@@ -159,18 +158,19 @@ export class WagoDiagnosticsService {
   ) {}
 
   async get(controllerId: number): Promise<WagoDiagnostics> {
-    const controller = await sqlitePersistence(this.context)
-      .getRepository(WagoController)
-      .findOneBy({ id: controllerId });
+    const tables = openWagoStorage(this.context);
+    const controller = await tables.controllers.get(controllerId);
     if (!controller) throw new NotFoundException('WAGO controller not found');
     const [draft, latest, applied, nodes] = await Promise.all([
-      sqlitePersistence(this.context).getRepository(WagoConfigurationDraft).findOneBy({ controllerId }),
-      sqlitePersistence(this.context)
-        .getRepository(WagoConfigurationRevision)
-        .findOne({ where: { controllerId }, order: { revision: 'DESC' } }),
-      sqlitePersistence(this.context)
-        .getRepository(WagoConfigurationRevision)
-        .findOne({ where: { controllerId, state: 'applied' }, order: { revision: 'DESC' } }),
+      tables.configurationDrafts.findOne({ where: { controllerId } }),
+      tables.configurationRevisions.findOne({
+        where: { controllerId },
+        orderBy: [{ field: 'revision', direction: 'desc' }],
+      }),
+      tables.configurationRevisions.findOne({
+        where: { controllerId, state: 'applied' },
+        orderBy: [{ field: 'revision', direction: 'desc' }],
+      }),
       this.context.hostData.flows.findNodes({
         typePrefix: 'plugin.wago.',
         dataEquals: { controllerId },
@@ -339,25 +339,17 @@ export class WagoDiagnosticsService {
       ),
     ];
     const controllerIdsForQuery = selectedControllerIds;
-    const [controllers, appliedRevisions, conflictNodes] = await Promise.all([
-      sqlitePersistence(this.context)
-        .getRepository(WagoController)
-        .createQueryBuilder('controller')
-        .select(['controller.id', 'controller.name', 'controller.hardwareId'])
-        .where('controller.id IN (:...controllerIds)', { controllerIds: selectedControllerIds })
-        .getMany(),
-      sqlitePersistence(this.context)
-        .getRepository(WagoConfigurationRevision)
-        .createQueryBuilder('revision')
-        .select(['revision.controllerId', 'revision.revision', 'revision.snapshot'])
-        .where('revision.controllerId IN (:...controllerIds)', { controllerIds: selectedControllerIds })
-        .andWhere('revision.state = :state', { state: 'applied' })
-        .andWhere(
-          'revision.revision = (SELECT MAX(applied.revision) FROM plugin_wago_configuration_revisions applied WHERE applied.controller_id = revision.controller_id AND applied.state = :state)',
-        )
-        .orderBy('revision.controllerId', 'ASC')
-        .addOrderBy('revision.revision', 'DESC')
-        .getMany(),
+    const tables = openWagoStorage(this.context);
+    const [controllers, appliedRows, conflictNodes] = await Promise.all([
+      tables.controllers.find({ where: { id: { in: selectedControllerIds } } }),
+      // Newest first, so the first row of each controller is its latest applied revision.
+      tables.configurationRevisions.find({
+        where: { controllerId: { in: selectedControllerIds }, state: 'applied' },
+        orderBy: [
+          { field: 'controllerId', direction: 'asc' },
+          { field: 'revision', direction: 'desc' },
+        ],
+      }),
       localChannelIds.length
         ? this.context.hostData.flows.findNodes({
             type: 'plugin.wago.command',
@@ -367,7 +359,9 @@ export class WagoDiagnosticsService {
         : Promise.resolve([]),
     ]);
     const controllersById = new Map(controllers.map((controller) => [controller.id, controller]));
-    const appliedByControllerId = new Map(appliedRevisions.map((revision) => [revision.controllerId, revision]));
+    const appliedByControllerId = new Map<number, (typeof appliedRows)[number]>();
+    for (const revision of appliedRows)
+      if (!appliedByControllerId.has(revision.controllerId)) appliedByControllerId.set(revision.controllerId, revision);
     const referencesTruncated = conflictNodes.length > 1000;
     const conflictNodesByControllerId = new Map<number, DiagnosticNode[]>();
     for (const node of conflictNodes.slice(0, 1000)) {

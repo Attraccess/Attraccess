@@ -1,11 +1,11 @@
-import { flowNode, hostDataWithFlows, repositoryDouble } from '../persistence.test-utils';
+import { flowNode, hostDataWithFlows } from '../persistence.test-utils';
+import { controllerRow, revisionRow } from '../rows.test-utils';
+import { spyOnWagoStorage } from '../storage-spy.test-utils';
+import { createWagoTestStorage } from '../storage/testing';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { configurationHash } from '../configuration/model';
 import { WagoDiagnosticsStore } from './store';
 import { diagnosticReferences, WagoDiagnosticsService } from './service';
-import { WagoConfigurationDraft } from '../configuration/draft.entity';
-import { WagoConfigurationRevision } from '../configuration/revision.entity';
-import { WagoController } from '../controllers/entity';
 import { WagoService } from '../controllers/service';
 
 describe('diagnostic references', () => {
@@ -85,6 +85,18 @@ describe('diagnostic references', () => {
   });
 });
 
+/** A WagoService over in-memory storage holding one claimed controller; counts the controller table's writes. */
+async function heartbeatService(controller: Record<string, unknown> = {}) {
+  const storage = createWagoTestStorage();
+  await storage.tables.controllers.insert(
+    controllerRow({ id: 1, hardwareId: 'cc100', trustState: 'claimed', capabilities: '[]', ...controller }),
+  );
+  const spy = spyOnWagoStorage(storage);
+  const service = new WagoService({ logger: { warn: jest.fn() }, ...spy.context } as unknown as PluginContext);
+  Reflect.set(service, 'controllers', spy.spied.controllers);
+  return { service, storage, writes: () => spy.writes('controllers') };
+}
+
 describe('controller diagnostics', () => {
   {
     it('keeps healthy resource controllers available when another applied snapshot is corrupt', async () => {
@@ -102,50 +114,29 @@ describe('controller diagnostics', () => {
           data: { controllerId: 2, channelId: 'io' },
         }),
       ];
-      const query = (result: unknown[]) => {
-        const builder = {
-          select: jest.fn(),
-          distinctOn: jest.fn(),
-          where: jest.fn(),
-          andWhere: jest.fn(),
-          orderBy: jest.fn(),
-          addOrderBy: jest.fn(),
-          getMany: jest.fn().mockResolvedValue(result),
-        };
-        for (const method of ['select', 'distinctOn', 'where', 'andWhere', 'orderBy', 'addOrderBy'] as const)
-          builder[method].mockReturnValue(builder);
-        return builder;
-      };
       // The first host flow lookup lists the resource's own nodes, the second the conflicting ones.
       const findNodes = jest.fn().mockResolvedValueOnce(nodes).mockResolvedValueOnce([]);
-      const context = {
-        ...repositoryDouble((entity: unknown) => {
-          if (entity === WagoController)
-            return {
-              createQueryBuilder: () =>
-                query([
-                  { id: 1, hardwareId: 'broken' },
-                  { id: 2, hardwareId: 'healthy' },
-                ]),
-            };
-          if (entity === WagoConfigurationRevision)
-            return {
-              createQueryBuilder: () =>
-                query([
-                  { controllerId: 1, revision: 1, snapshot: '{' },
-                  {
-                    controllerId: 2,
-                    revision: 1,
-                    snapshot: JSON.stringify({
-                      version: 1,
-                      physicalPoints: [],
-                      logicalChannels: [{ id: 'io', capabilities: [] }],
-                    }),
-                  },
-                ]),
-            };
-          throw new Error('unexpected repository');
+      const storage = createWagoTestStorage();
+      await storage.tables.controllers.insertMany([
+        controllerRow({ id: 1, hardwareId: 'broken' }),
+        controllerRow({ id: 2, hardwareId: 'healthy' }),
+      ]);
+      await storage.tables.configurationRevisions.insertMany([
+        revisionRow({ controllerId: 1, revision: 1, state: 'applied', snapshot: '{' }),
+        revisionRow({
+          controllerId: 2,
+          revision: 1,
+          state: 'applied',
+          snapshot: JSON.stringify({
+            version: 1,
+            physicalPoints: [],
+            logicalChannels: [{ id: 'io', capabilities: [] }],
+          }),
         }),
+      ]);
+      const context = {
+        storage: storage.storage,
+        persistence: storage.persistence,
         hostData: hostDataWithFlows(findNodes),
       } as unknown as PluginContext;
       const service = new WagoDiagnosticsService(context, {} as WagoService);
@@ -167,16 +158,7 @@ describe('controller diagnostics', () => {
     it('checkpoints heartbeat persistence while keeping permanent connectivity current', async () => {
       jest.useFakeTimers().setSystemTime(new Date('2026-09-05T12:00:00Z'));
       try {
-        const controller = {
-          id: 1,
-          hardwareId: 'cc100',
-          trustState: 'claimed',
-          lastSequence: 0,
-          lastHeartbeatAt: null,
-        };
-        const save = jest.fn().mockResolvedValue(controller);
-        const service = new WagoService({ logger: { warn: jest.fn() } } as unknown as PluginContext);
-        Reflect.set(service, 'controllers', { findOneBy: async () => controller, save });
+        const { service, writes } = await heartbeatService();
         const heartbeat = Reflect.get(service, 'onHeartbeat').bind(service) as (
           id: string,
           payload: Buffer,
@@ -192,11 +174,11 @@ describe('controller diagnostics', () => {
         await heartbeat('cc100', payload);
         jest.advanceTimersByTime(10_000);
         await heartbeat('cc100', payload);
-        expect(save).toHaveBeenCalledTimes(1);
+        expect(writes()).toBe(1);
         expect(service.diagnostics.read(1).heartbeatAt).toBe('2026-09-05T12:00:10.000Z');
         jest.advanceTimersByTime(21_000);
         await heartbeat('cc100', payload);
-        expect(save).toHaveBeenCalledTimes(2);
+        expect(writes()).toBe(2);
       } finally {
         jest.useRealTimers();
       }
@@ -206,12 +188,7 @@ describe('controller diagnostics', () => {
     it('preserves legacy sequence watermarks and metadata changes inside the checkpoint window', async () => {
       jest.useFakeTimers().setSystemTime(new Date('2026-09-05T12:00:00Z'));
       try {
-        let stored = { id: 1, hardwareId: 'cc100', trustState: 'claimed', lastSequence: 0, lastHeartbeatAt: null };
-        const save = jest.fn(async (value) => {
-          stored = { ...stored, ...value };
-        });
-        const service = new WagoService({ logger: { warn: jest.fn() } } as unknown as PluginContext);
-        Reflect.set(service, 'controllers', { findOneBy: async () => ({ ...stored }), save });
+        const { service, storage, writes } = await heartbeatService();
         const send = (sequence: number, runtimeVersion = '0.1.0') =>
           Reflect.get(service, 'onHeartbeat').call(
             service,
@@ -232,10 +209,10 @@ describe('controller diagnostics', () => {
         jest.advanceTimersByTime(1_000);
         await send(150);
         expect(service.diagnostics.read(1).heartbeatAt).toBe('2026-09-05T12:00:10.000Z');
-        expect(save).toHaveBeenCalledTimes(1);
+        expect(writes()).toBe(1);
         await send(201, '0.2.0');
-        expect(save).toHaveBeenCalledTimes(2);
-        expect(stored).toMatchObject({ lastSequence: 201, runtimeVersion: '0.2.0' });
+        expect(writes()).toBe(2);
+        expect(await storage.tables.controllers.get(1)).toMatchObject({ lastSequence: 201, runtimeVersion: '0.2.0' });
       } finally {
         jest.useRealTimers();
       }
@@ -245,20 +222,7 @@ describe('controller diagnostics', () => {
   it('persists stale canonical source time and keeps it stale after API restart', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-09-05T12:00:00Z'));
     try {
-      let stored = {
-        id: 1,
-        hardwareId: 'cc100',
-        trustState: 'claimed',
-        capabilities: '[]',
-        lastSequence: 0,
-        lastHeartbeatAt: null,
-      };
-      const save = jest.fn(async (value) => {
-        stored = { ...stored, ...value };
-      });
-      const context = { logger: { warn: jest.fn() } } as unknown as PluginContext;
-      const service = new WagoService(context);
-      Reflect.set(service, 'controllers', { findOneBy: async () => ({ ...stored }), save });
+      const { service, storage, writes } = await heartbeatService();
       const envelope = { streamId: '00000000-0000-4000-8000-000000000001', sequence: 1 };
       service.diagnostics.ingest(
         1,
@@ -294,9 +258,10 @@ describe('controller diagnostics', () => {
       await send(1);
       jest.advanceTimersByTime(10_000);
       await send(2);
-      expect(save).toHaveBeenCalledTimes(1);
-      expect(stored.lastHeartbeatAt).toBe('2026-09-05T11:58:00.000Z');
-      const restarted = setup(false, stored);
+      expect(writes()).toBe(1);
+      const stored = await storage.tables.controllers.get(1);
+      expect(stored?.lastHeartbeatAt).toBe('2026-09-05T11:58:00.000Z');
+      const restarted = await setup(false, { lastHeartbeatAt: stored?.lastHeartbeatAt });
       expect((await restarted.service.get(1)).connectivity).toBe('stale');
       expect((await restarted.service.get(1)).heartbeatFreshness).toBe('stale');
     } finally {
@@ -310,16 +275,7 @@ describe('controller diagnostics', () => {
       async (skew) => {
         jest.useFakeTimers().setSystemTime(new Date('2026-09-05T12:00:00Z'));
         try {
-          const controller = {
-            id: 1,
-            hardwareId: 'cc100',
-            trustState: 'claimed',
-            lastSequence: 0,
-            lastHeartbeatAt: null,
-          };
-          const save = jest.fn().mockResolvedValue(controller);
-          const service = new WagoService({ logger: { warn: jest.fn() } } as unknown as PluginContext);
-          Reflect.set(service, 'controllers', { findOneBy: async () => controller, save });
+          const { service, storage, writes } = await heartbeatService();
           const heartbeat = Reflect.get(service, 'onHeartbeat').bind(service) as (
             id: string,
             payload: Buffer,
@@ -340,11 +296,13 @@ describe('controller diagnostics', () => {
             ),
           );
           if (skew <= 5000) {
-            expect(save).toHaveBeenCalledTimes(1);
-            expect(controller.lastHeartbeatAt).toBe(new Date(Date.now() + skew).toISOString());
+            expect(writes()).toBe(1);
+            expect((await storage.tables.controllers.get(1))?.lastHeartbeatAt).toBe(
+              new Date(Date.now() + skew).toISOString(),
+            );
           } else {
-            expect(save).not.toHaveBeenCalled();
-            expect(controller.lastHeartbeatAt).toBeNull();
+            expect(writes()).toBe(0);
+            expect((await storage.tables.controllers.get(1))?.lastHeartbeatAt).toBeNull();
           }
         } finally {
           jest.useRealTimers();
@@ -352,72 +310,83 @@ describe('controller diagnostics', () => {
       },
     );
   }
-  function setup(missing = false, controllerOverrides = {}, draft: unknown = null) {
-    const snapshot = {
-      version: 1,
-      physicalPoints: [],
-      logicalChannels: [
-        {
-          id: 'io',
-          profile: 'generic-monitored-input',
-          capabilities: ['input', 'output', 'measurement'],
-          disconnectPolicy: { mode: 'immediate' },
-        },
-      ],
-    };
-    const revision = { revision: 2, state: 'applied', snapshot: JSON.stringify(snapshot), contentHash: 'a'.repeat(64) };
+  const baseSnapshot = {
+    version: 1,
+    physicalPoints: [],
+    logicalChannels: [
+      {
+        id: 'io',
+        profile: 'generic-monitored-input',
+        capabilities: ['input', 'output', 'measurement'],
+        disconnectPolicy: { mode: 'immediate' },
+      },
+    ],
+  };
+  async function setup(missing = false, controllerOverrides = {}, draft: Record<string, unknown> | null = null) {
+    const snapshot = baseSnapshot;
+    const storage = createWagoTestStorage();
+    if (!missing)
+      await storage.tables.controllers.insert(
+        controllerRow({
+          id: 1,
+          trustState: 'claimed',
+          hardwareId: 'cc100',
+          capabilities: '[]',
+          pairingCodeHash: 'SECRET',
+          ...controllerOverrides,
+        }),
+      );
+    if (draft)
+      await storage.tables.configurationDrafts.insert({
+        controllerId: 1,
+        snapshot: '{}',
+        updatedAt: '2026-09-05T12:00:00.000Z',
+        ...draft,
+      } as never);
+    await storage.tables.configurationRevisions.insert(
+      revisionRow({
+        controllerId: 1,
+        revision: 2,
+        state: 'applied',
+        snapshot: JSON.stringify(snapshot),
+        contentHash: 'a'.repeat(64),
+      }),
+    );
     // The host flow lookup; tests steer its answer through `query.getMany`.
     const query = { getMany: jest.fn().mockResolvedValue([]) };
     const context = {
-      ...repositoryDouble((entity: unknown) =>
-        entity === WagoController
-          ? {
-              findOneBy: async () =>
-                missing
-                  ? null
-                  : {
-                      id: 1,
-                      trustState: 'claimed',
-                      hardwareId: 'cc100',
-                      capabilities: '[]',
-                      lastHeartbeatAt: null,
-                      pairingCodeHash: 'SECRET',
-                      ...controllerOverrides,
-                    },
-            }
-          : entity === WagoConfigurationDraft
-            ? { findOneBy: async () => draft }
-            : { findOne: async ({ where }: { where: { state?: string } }) => (where.state ? revision : latest) },
-      ),
+      storage: storage.storage,
+      persistence: storage.persistence,
       hostData: hostDataWithFlows(() => query.getMany()),
     } as unknown as PluginContext;
     const diagnostics = new WagoDiagnosticsStore();
-    const latest = { ...revision };
     return {
       service: new WagoDiagnosticsService(context, { diagnostics } as WagoService),
       diagnostics,
-      latest,
-      revision,
+      /** Rewrites the applied revision, which is also the latest until a newer one is published. */
+      updateRevision: (patch: Record<string, unknown>) =>
+        storage.tables.configurationRevisions.update({ controllerId: 1, revision: 2 }, patch as never),
+      /** Publishes a newer revision after the applied one. */
+      publishRevision: (patch: Record<string, unknown>) =>
+        storage.tables.configurationRevisions.insert(
+          revisionRow({ controllerId: 1, revision: 3, snapshot: JSON.stringify(snapshot), ...patch }),
+        ),
       query,
       snapshot,
     };
   }
 
   it('reports metadata-only saved draft changes without replacing applied channel projection', async () => {
-    const draft = {
-      snapshot: '{}',
-      presetProvenance: JSON.stringify({ editor: { names: { io: 'Renamed' }, presets: [] } }),
-    };
-    const { service, latest, snapshot } = setup(false, {}, draft);
-    draft.snapshot = latest.snapshot;
-    latest.contentHash = configurationHash(snapshot);
+    const presetProvenance = JSON.stringify({ editor: { names: { io: 'Renamed' }, presets: [] } });
+    const { service, updateRevision, snapshot } = await setup(false, {}, { snapshot: JSON.stringify(baseSnapshot), presetProvenance });
+    await updateRevision({ contentHash: configurationHash(snapshot) });
     expect((await service.get(1)).configuration.draftChanged).toBe(true);
-    Object.assign(latest, { presetProvenance: draft.presetProvenance });
+    await updateRevision({ presetProvenance });
     expect((await service.get(1)).configuration.draftChanged).toBe(false);
   });
 
   it('keeps the applied mapping current after a rejected publication', async () => {
-    const { service, latest, query, diagnostics } = setup();
+    const { service, publishRevision, query, diagnostics } = await setup();
     diagnostics.ingest(
       1,
       'state',
@@ -433,9 +402,10 @@ describe('controller diagnostics', () => {
         }),
       ),
     );
-    latest.revision = 3;
-    latest.state = 'rejected';
-    latest.snapshot = JSON.stringify({ version: 1, physicalPoints: [], logicalChannels: [] });
+    await publishRevision({
+      state: 'rejected',
+      snapshot: JSON.stringify({ version: 1, physicalPoints: [], logicalChannels: [] }),
+    });
     query.getMany.mockResolvedValue([
       flowNode({
         id: 'node',
@@ -453,7 +423,7 @@ describe('controller diagnostics', () => {
   });
 
   it('only projects rejection summaries matching both latest revision and hash', async () => {
-    const { service, diagnostics } = setup();
+    const { service, diagnostics } = await setup();
     const report = (revision: number, contentHash: string) =>
       diagnostics.ingest(
         1,
@@ -469,15 +439,16 @@ describe('controller diagnostics', () => {
   });
 
   it('does not synthesize samples or faults for prototype-named channel IDs', async () => {
-    const { service, latest, revision, snapshot, diagnostics } = setup();
-    latest.snapshot = JSON.stringify({
-      ...snapshot,
-      logicalChannels: ['toString', 'prototype', '__proto__', 'constructor'].map((id) => ({
-        ...snapshot.logicalChannels[0],
-        id,
-      })),
+    const { service, updateRevision, snapshot, diagnostics } = await setup();
+    await updateRevision({
+      snapshot: JSON.stringify({
+        ...snapshot,
+        logicalChannels: ['toString', 'prototype', '__proto__', 'constructor'].map((id) => ({
+          ...snapshot.logicalChannels[0],
+          id,
+        })),
+      }),
     });
-    revision.snapshot = latest.snapshot;
     const empty = await service.get(1);
     expect(
       empty.channels.every(
@@ -498,11 +469,11 @@ describe('controller diagnostics', () => {
   });
 
   it('returns missing controller as not found', async () => {
-    await expect(setup(true).service.get(1)).rejects.toThrow('WAGO controller not found');
+    await expect((await setup(true)).service.get(1)).rejects.toThrow('WAGO controller not found');
   });
 
   it('shows heartbeat-only liveness without inventing connected channel state', async () => {
-    const { service, diagnostics } = setup();
+    const { service, diagnostics } = await setup();
     diagnostics.ingest(
       1,
       'heartbeat',
@@ -521,7 +492,7 @@ describe('controller diagnostics', () => {
   });
 
   it('keeps hardware readiness unknown even when applied; surfaces faults and mismatches', async () => {
-    const { service, diagnostics } = setup();
+    const { service, diagnostics } = await setup();
     diagnostics.ingest(1, 'state', Buffer.from(JSON.stringify({ revision: 1, connected: true })));
     diagnostics.ingest(
       1,
@@ -537,7 +508,7 @@ describe('controller diagnostics', () => {
   });
 
   it('gates canonical channel current status on connection, source state, revisions and faults', async () => {
-    const { service, diagnostics } = setup();
+    const { service, diagnostics } = await setup();
     const streamId = '00000000-0000-4000-8000-000000000001';
     const send = (kind: string, sequence: number, extra: Record<string, unknown>) =>
       diagnostics.ingest(
@@ -599,13 +570,13 @@ describe('controller diagnostics', () => {
   });
 
   it('lists disabled channels separately, without samples, and before the 256-channel cut', async () => {
-    const { service, latest, revision, snapshot, diagnostics } = setup();
+    const { service, updateRevision, snapshot, diagnostics } = await setup();
     const channel = { ...snapshot.logicalChannels[0], capabilities: ['measurement'] };
     const channels = [
       ...Array.from({ length: 300 }, (_, index) => ({ ...channel, id: `off-${index}`, enabled: false })),
       ...Array.from({ length: 256 }, (_, index) => ({ ...channel, id: `on-${index}` })),
     ];
-    revision.snapshot = latest.snapshot = JSON.stringify({ ...snapshot, logicalChannels: channels });
+    await updateRevision({ snapshot: JSON.stringify({ ...snapshot, logicalChannels: channels }) });
     // A stray sample for a disabled channel, e.g. from before it was disabled, is never shown.
     diagnostics.ingest(1, 'measurements', Buffer.from(JSON.stringify({ channelId: 'off-0', value: 1, unit: 'watt' })));
     const result = await service.get(1);
@@ -625,7 +596,7 @@ describe('controller diagnostics', () => {
   it('keeps an on-change measurement current across a 30 s keepalive gap', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-09-05T12:00:00Z'));
     try {
-      const { service, diagnostics } = setup();
+      const { service, diagnostics } = await setup();
       const streamId = '00000000-0000-4000-8000-000000000001';
       const sequences: Record<string, number> = {};
       const send = (kind: string, extra: Record<string, unknown>) =>
@@ -663,7 +634,7 @@ describe('controller diagnostics', () => {
   });
 
   it('never calls legacy samples current even with an applied revision and recent heartbeat', async () => {
-    const { service, diagnostics } = setup();
+    const { service, diagnostics } = await setup();
     diagnostics.ingest(1, 'heartbeat', Buffer.from('{}'));
     diagnostics.ingest(
       1,
