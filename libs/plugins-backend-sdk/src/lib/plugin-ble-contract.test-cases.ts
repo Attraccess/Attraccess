@@ -276,6 +276,15 @@ export function defineBleContractSuite(name: string, create: BleContractFactory)
         const session = await a.openSession(created.id);
         await session.close();
       });
+
+      it('reports no-ble-capability for a reader without plugin BLE support when no detail is given', async () => {
+        host.setReaderSupported(1, false);
+        await expect(a.scan(1, PROFILE.id)).rejects.toMatchObject({
+          code: 'READER_UNSUPPORTED',
+          retryable: false,
+          detail: 'no-ble-capability',
+        });
+      });
     });
 
     describe('endpoints and ownership', () => {
@@ -651,7 +660,23 @@ export function defineBleContractSuite(name: string, create: BleContractFactory)
         });
         const standard = await a.openSession(created.id);
         expect(standard.mtu).toBe(247);
+        await standard.write('bulk', new Uint8Array(244), { withoutResponse: true });
+        await expect(standard.write('bulk', new Uint8Array(245), { withoutResponse: true })).rejects.toMatchObject({
+          code: 'PAYLOAD_TOO_LARGE',
+          detail: 'exceeds-mtu',
+        });
         await standard.close();
+
+        // The smallest ATT MTU leaves 20 bytes per write without response.
+        host.setMtu(23);
+        const minimal = await a.openSession(created.id);
+        expect(minimal.mtu).toBe(23);
+        await minimal.write('bulk', new Uint8Array(20), { withoutResponse: true });
+        await expect(minimal.write('bulk', new Uint8Array(21), { withoutResponse: true })).rejects.toMatchObject({
+          code: 'PAYLOAD_TOO_LARGE',
+          detail: 'exceeds-mtu',
+        });
+        await minimal.close();
 
         host.setMtu(100);
         const session = await a.openSession(created.id);

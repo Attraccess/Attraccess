@@ -615,8 +615,11 @@ describe('ReaderBleDriver (plugin BLE over the reader websocket)', () => {
     it('is idempotent across close, reader end and socket loss in any order', async () => {
       for (const order of [
         ['close', 'ended', 'socket'],
+        ['close', 'socket', 'ended'],
         ['ended', 'close', 'socket'],
+        ['ended', 'socket', 'close'],
         ['socket', 'close', 'ended'],
+        ['socket', 'ended', 'close'],
       ]) {
         const session = await ble.openSession((await ble.listEndpoints()).at(0)?.id ?? (await endpoint()).id);
         const pending = capture(session.read('slow'));
