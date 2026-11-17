@@ -6,6 +6,7 @@ import { useReservationsTranslations } from '../i18n';
 import { useIsManagerAnywhere, useMyReservations, usePluginTimezone } from '../lib/queries';
 import { useFormatters } from '../lib/useFormatters';
 import { StatusChip } from '../shared/StatusChip';
+import type { Reservation } from '../lib/types';
 
 /** How many bookings each tile size lists. The tile has a fixed height, so it shows a fixed number instead of growing. */
 const MAX_RESERVATIONS: Record<DashboardWidgetSize, number> = { small: 1, medium: 3, large: 7 };
@@ -40,8 +41,6 @@ function useRelativeStart(timezone: string | null) {
       : relative.format(Math.round(delta / HOUR), 'hour');
   };
 }
-
-type Reservation = NonNullable<ReturnType<typeof useMyReservations>['data']>[number];
 
 function NextReservation({ reservation, start }: Readonly<{ reservation: Reservation; start: string }>) {
   const { t } = useReservationsTranslations();
