@@ -1,31 +1,12 @@
-import { Injectable, Module, OnModuleDestroy } from '@nestjs/common';
-import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
-import { EntityManagerResolver } from './adapters/entity-manager-resolver';
-import { resolveDatabaseBackend } from './backend';
-import { unitOfWorkFor } from './adapters/shared-unit-of-work';
-import { UNIT_OF_WORK } from './unit-of-work';
+import { Module } from '@nestjs/common';
+import { PersistenceCoreModule } from './adapters/common/persistence-core.module';
 
-@Injectable()
-class ResourceTransactionConnectionLifecycle implements OnModuleDestroy {
-  constructor(@InjectDataSource() private readonly source: DataSource) {}
-
-  async onModuleDestroy(): Promise<void> {
-    await resolveDatabaseBackend().shutdown(this.source);
-  }
-}
-
-/** The lifecycle connection's teardown, and the one unit of work every adapter of this process shares. */
+/**
+ * The one unit of work every adapter of this process shares, and the lifecycle connection's teardown. Provided once
+ * by the global PersistenceCoreModule; this module only re-exports it for the modules that name it.
+ */
 @Module({
-  providers: [
-    ResourceTransactionConnectionLifecycle,
-    {
-      provide: UNIT_OF_WORK,
-      inject: [DataSource],
-      useFactory: (source: DataSource) => unitOfWorkFor(source),
-    },
-    EntityManagerResolver,
-  ],
-  exports: [UNIT_OF_WORK, EntityManagerResolver],
+  imports: [PersistenceCoreModule],
+  exports: [PersistenceCoreModule],
 })
 export class ResourceTransactionsModule {}
