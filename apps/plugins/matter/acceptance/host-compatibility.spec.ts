@@ -8,9 +8,15 @@ import { parseNpmPluginPackage } from '../../../api/src/plugin-system/npm/contra
 const read = (path: string) => JSON.parse(readFileSync(join(__dirname, path), 'utf8'));
 const matterPackage = read('../package.json');
 // A second plugin that supports every 1.x host, standing in for "other plugins".
+const rabbitmqPackage = read('../../rabbitmq/package.json');
 const otherPlugin = {
-  ...read('../../rabbitmq/package.json'),
-  attraccess: { ...read('../../rabbitmq/package.json').attraccess, host: '^1.0.0' },
+  ...rabbitmqPackage,
+  peerDependencies: {
+    ...rabbitmqPackage.peerDependencies,
+    '@attraccess/plugins-backend-sdk': '^1.0.0',
+    '@attraccess/plugins-frontend-sdk': '^1.0.0',
+  },
+  attraccess: { ...rabbitmqPackage.attraccess, host: '^1.0.0', sdk: { backend: '^1.0.0', frontend: '^1.0.0' } },
 };
 
 describe('Matter plugin host compatibility', () => {

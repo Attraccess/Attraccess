@@ -36,13 +36,19 @@ describe('Matter plugin composed with the host', () => {
     await api().get('/api/unrelated').expect(200);
   });
 
-  it('is admin-only: other users get 403 on every route', async () => {
-    const other = { 'x-test-permissions': 'resources.update' };
+  it('needs the Matter keys: other users get 403 on every route, read-only users only see the status', async () => {
+    const other = { 'x-test-permissions': 'resources.update,thread.network.read' };
     await api().get('/api/matter/connection').set(other).expect(403);
     await api().put('/api/matter/connection').set(other).send({}).expect(403);
     await api().delete('/api/matter/connection').set(other).expect(403);
     await api().get('/api/matter/connection/status').set(other).expect(403);
     await api().get('/api/matter/connection/status').expect(403);
+    const reader = { 'x-test-permissions': 'matter.devices.read' };
+    await api().get('/api/matter/connection/status').set(reader).expect(200);
+    await api().get('/api/matter/fabric').set(reader).expect(200);
+    await api().get('/api/matter/connection').set(reader).expect(403);
+    await api().put('/api/matter/connection').set(reader).send({}).expect(403);
+    await api().post('/api/matter/fabric/create').set(reader).send({}).expect(403);
   });
 
   it('stores the token encrypted, never returns it and audits the change without secrets', async () => {

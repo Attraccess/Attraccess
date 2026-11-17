@@ -629,6 +629,7 @@ def test_janitor_parks_places_added_after_it_started(tmp_path):
 
 def test_flash_reader_keeps_a_reader_with_a_power_button_on(tmp_path, monkeypatch):
     monkeypatch.setattr(workflow, "RESET_SETTLE_SECONDS", 0)
+    monkeypatch.setattr(workflow, "POWER_CUT_WATCH_SECONDS", 0)
     events = []
     power = FakePower(events)
     flash = FakeFlash(espefuse_output(), events)
@@ -666,6 +667,68 @@ def test_flash_reader_keeps_a_reader_with_a_power_button_on(tmp_path, monkeypatc
     flash.flash = broken
     with pytest.raises(subprocess.CalledProcessError):
         flash_reader(FakeTarget(FakeConsole([]), flash, power), tmp_path / "reader.bin")
+
+
+class FakeClock:
+    """workflow.time on a fake clock; ``at`` maps a time to what happens then."""
+
+    def __init__(self):
+        self.now = 0.0
+        self.at = {}
+
+    def monotonic(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.now += seconds
+        for when in sorted(t for t in self.at if t <= self.now):
+            self.at.pop(when)()
+
+
+def test_flash_reader_presses_again_when_the_power_bank_cuts_after_the_reset(tmp_path, monkeypatch):
+    # Nightly runs of 2026-11-16: the V1 went off 36 s after the press, a few
+    # seconds after the reset that ended a 30 s flash and after the check
+    # RESET_SETTLE_SECONDS later, so the reader's port never came back.
+    clock = FakeClock()
+    monkeypatch.setattr(workflow, "time", clock)
+    events = []
+    power = FakePower(events)
+    flash = FakeFlash(espefuse_output(), events)
+
+    def flashing(image):
+        events.append(("flash", Path(image).name))
+        clock.sleep(30)
+
+    def cut():
+        events.append("cut")
+        power.powered = False
+
+    flash.flash = flashing
+    clock.at[36.0] = cut
+    flash_reader(FakeTarget(FakeConsole([]), flash, power), tmp_path / "reader.bin")
+    assert power.powered
+    assert [e for e in events if e in ("power-on", "cut")] == ["power-on", "cut", "power-on"]
+    # Watched from the reset on, and no longer than that.
+    assert clock.now == 30 + workflow.POWER_CUT_WATCH_SECONDS
+
+    # A reader that stays on is watched as long, without presses.
+    events.clear()
+    clock.now = 0.0
+    power.powered = False
+    flash_reader(FakeTarget(FakeConsole([]), flash, power), tmp_path / "reader.bin")
+    assert events.count("power-on") == 1
+    assert clock.now == 30 + workflow.POWER_CUT_WATCH_SECONDS
+
+
+def test_flash_reader_does_not_watch_a_reader_behind_a_power_switch(tmp_path, monkeypatch):
+    clock = FakeClock()
+    monkeypatch.setattr(workflow, "time", clock)
+    events = []
+    target = FakeTarget(FakeConsole([]), FakeFlash(espefuse_output(), events), FakeSwitch(events),
+                        tags={"power": "switch"})
+    flash_reader(target, tmp_path / "reader.bin")
+    assert clock.now == workflow.RESET_SETTLE_SECONDS
+    assert "power-on" not in events
 
 
 def test_janitor_parks_again_when_variant_or_profile_changes(tmp_path):

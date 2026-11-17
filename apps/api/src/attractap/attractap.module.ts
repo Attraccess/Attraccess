@@ -85,6 +85,9 @@ import { UiStepService } from './websockets/handlers/ui/ui-step.service';
 import { ReaderStartGate } from './websockets/handlers/session/reader-start-gate.service';
 import { ReaderUiAdminController } from './reader-ui-admin.controller';
 
+import { ReaderBleDriver } from './websockets/handlers/ble/reader-ble.driver';
+import { BLE_TRANSPORT_DRIVER } from '../plugin-system/ble/ble-transport-driver';
+
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
@@ -163,6 +166,9 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
     ReaderActiveUsageService,
     AttractapUiHandler,
     ReaderStartGate,
+    ReaderBleDriver,
+    // Plugin BLE through readers: PluginBleService looks the transport up under this host-only token.
+    { provide: BLE_TRANSPORT_DRIVER, useExisting: ReaderBleDriver },
   ],
   controllers: [
     AttractapController,

@@ -8,7 +8,8 @@ int xSemaphoreGive(SemaphoreHandle_t mutex) { mutex->locked = false; return 1; }
 static int64_t nowUs = 0;
 int64_t esp_timer_get_time() { return nowUs; }
 void vTaskDelay(TickType_t) {}
-UBaseType_t uxQueueMessagesWaiting(QueueHandle_t) { return 0; }
+static UBaseType_t txDepth = 0;
+UBaseType_t uxQueueMessagesWaiting(QueueHandle_t) { return txDepth; }
 static State::NetworkQualityState published;
 void State::setNetworkQualityState(const NetworkQualityState &state) { published = state; }
 
@@ -30,6 +31,7 @@ void Websocket::setSubprotocol(const std::string &) {}
 bool Websocket::sendBinary(const uint8_t *, size_t) { return true; }
 void Websocket::setRawBinaryCallback(std::function<bool(const uint8_t *, size_t)>) {}
 void Websocket::setConnectionCallback(std::function<void(bool)>) {}
+bool Websocket::sendQueueHasRoom(size_t) const { return true; }
 static void require(bool condition, const char *message)
 {
     if (!condition) throw std::runtime_error(message);
@@ -80,6 +82,18 @@ struct WebsocketNetworkQualityTest
         ws.pendingPongProbeTime = 0;
         publishAt(ws, 170000);
         require(published.hasCompletedPongProbe, "finished probe not counted");
+
+        // A BLE burst fills the send queue up to its answer reserve on a healthy link: not degraded. Past it, the
+        // link does not keep up.
+        int queue = 0;
+        ws.tx_queue = &queue;
+        txDepth = Websocket::TX_QUEUE_DEPTH - IReaderTransport::BULK_ANSWER_RESERVE;
+        publishAt(ws, 170000);
+        require(published.quality == State::NETWORK_QUALITY_GOOD && published.txQueueDepth == txDepth,
+                "a send queue the BLE proxy filled to its reserve flagged the network degraded");
+        txDepth++;
+        publishAt(ws, 170000);
+        require(published.quality == State::NETWORK_QUALITY_DEGRADED, "a backlog past the BLE reserve not flagged");
     }
 };
 int main()

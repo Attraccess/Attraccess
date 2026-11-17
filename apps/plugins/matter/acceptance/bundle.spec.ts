@@ -1,3 +1,7 @@
+import {
+  validatePluginPermissionsDeclaration,
+  type PluginPermissionsDeclaration,
+} from '@attraccess/plugins-backend-sdk';
 import { readFileSync } from 'node:fs';
 import { builtinModules } from 'node:module';
 import { join } from 'node:path';
@@ -86,6 +90,21 @@ describe('Matter plugin bundle', () => {
       });
       expect(requested).toContain('bufferutil');
       expectUsable(plugin);
+    });
+
+    it('declares exactly the six Matter and Thread keys, in a declaration the SDK accepts', () => {
+      const { plugin } = loadWith(() => ({}));
+      const declaration = (plugin as unknown as { permissions: PluginPermissionsDeclaration }).permissions;
+      expect(validatePluginPermissionsDeclaration(declaration)).toBe(declaration);
+      expect(declaration.category).toEqual({ en: 'Matter & Thread', de: 'Matter & Thread' });
+      expect(declaration.permissions.map((permission) => permission.key).sort()).toEqual([
+        'matter.devices.command-direct',
+        'matter.devices.commission',
+        'matter.devices.manage',
+        'matter.devices.read',
+        'thread.network.manage',
+        'thread.network.read',
+      ]);
     });
 
     it('with the optional native modules installed', () => {

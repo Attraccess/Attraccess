@@ -10,11 +10,13 @@ type Props = Readonly<{
   generating: boolean;
   onGenerateKey: () => void;
   onRotate: () => void;
+  /** Holds `matter.devices.manage`: without it generate and rotate are hidden. */
+  canManage: boolean;
   formatDateTime: (value: string | null) => React.ReactNode;
 }>;
 
 /** The recovery key's ID and state (never the key itself), with generate or rotate. */
-export function KeyCard({ status, busy, generating, onGenerateKey, onRotate, formatDateTime }: Props) {
+export function KeyCard({ status, busy, generating, onGenerateKey, onRotate, canManage, formatDateTime }: Props) {
   const { t } = useMatterTranslations();
   const { sidecar, recovery, recoveryKey } = status;
   const initialized = sidecar.reachable && sidecar.state === 'initialized';
@@ -32,15 +34,15 @@ export function KeyCard({ status, busy, generating, onGenerateKey, onRotate, for
           </dl>
         ) : (
           <StatusAlert status="warning" title={t('fabric.key.missing')} data-cy="matter-key-missing">
-            {t('fabric.key.missingText')}
+            {t(canManage ? 'fabric.key.missingText' : 'fabric.key.missingTextReadOnly')}
           </StatusAlert>
         )}
         {recoveryKey.present && !recoveryKey.acknowledged && (
           <StatusAlert status="warning" title={t('fabric.key.unacknowledged')} data-cy="matter-key-unacknowledged">
-            {t('fabric.key.unacknowledgedText')}
+            {t(canManage ? 'fabric.key.unacknowledgedText' : 'fabric.key.unacknowledgedTextReadOnly')}
           </StatusAlert>
         )}
-        {!recovery.required && (
+        {canManage && !recovery.required && (
           <div>
             {recoveryKey.present ? (
               <Button

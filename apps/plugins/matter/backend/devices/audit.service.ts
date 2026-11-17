@@ -1,7 +1,12 @@
-import type { PluginAuditPrincipal, PluginAuditReceipt, PluginContext } from '@attraccess/plugins-backend-sdk';
+import {
+  PLUGIN_AUDIT_SYSTEM_PRINCIPAL,
+  type PluginAuditActor,
+  type PluginAuditPrincipal,
+  type PluginAuditReceipt,
+  type PluginContext,
+} from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { MatterConnection, CONNECTION_ROW_ID } from '../connection/entity';
 import { PLUGIN_CONTEXT } from '../plugin-context';
 
 export type DeviceAuditSubject = {
@@ -19,52 +24,67 @@ export function auditSubjectId(ref: string): number {
   return Number.isSafeInteger(value) && value > 0 ? value : 1;
 }
 
-/** Who an entry is attributed to, and whether the action was a system decision (such as reconciliation). */
-export type AuditActor = { principal: PluginAuditPrincipal; system: boolean };
+/**
+ * Who an entry is attributed to, whether the action was a system decision (such as reconciliation), and the operation
+ * ID its entries share: the entries of one reconciliation run, or of one restore from its check to its outcome.
+ */
+export type AuditActor = { principal: PluginAuditActor; system: boolean; operationId: string };
 
 /**
- * Records the device model's audit entries. A missing or failing audit sink never fails the operation. Telemetry is
- * never audited: only lifecycle decisions and metadata edits.
+ * A user principal, a prepared actor, or null for an action the plugin started itself. Pass the prepared actor on to
+ * the steps of one operation, so their entries share its operation ID.
+ */
+export type AuditBy = PluginAuditPrincipal | AuditActor | null;
+
+/** The user behind `by`, or null for the system. */
+export function auditUserId(by: AuditBy): number | null {
+  if (by === null) return null;
+  if (!isActor(by)) return by.userId;
+  return by.system ? null : (by.principal as PluginAuditPrincipal).userId;
+}
+
+/** Whether `by` is the plugin itself rather than a user. */
+export const isSystemAudit = (by: AuditBy): boolean => auditUserId(by) === null;
+
+/**
+ * Records the device model's audit entries. A missing or failing audit sink never fails the operation. Telemetry and
+ * state changes the plugin only observed are never audited: only lifecycle decisions and metadata edits.
  */
 @Injectable()
 export class DeviceAuditService {
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
 
   /**
-   * The actor for a run. `principal: null` is a system-initiated action such as reconciliation. The host accepts only
-   * real user IDs, so those are attributed to the administrator who last saved the connection settings, and their
-   * details say `initiator: 'system'`. Returns null (entries are skipped) when there is no such administrator.
+   * The actor for an operation. `principal: null` is a system-initiated action such as reconciliation: it is recorded
+   * with the system principal, never with a user's. Pass `operationId` to tie the entries to an existing operation.
    */
-  async actorFor(principal: PluginAuditPrincipal | null): Promise<AuditActor | null> {
-    if (principal) return { principal, system: false };
-    try {
-      const row = await this.context.getRepository(MatterConnection).findOneBy({ id: CONNECTION_ROW_ID });
-      if (row?.updatedBy)
-        return { principal: { userId: row.updatedBy, authenticationMethod: 'session' }, system: true };
-    } catch {
-      // Reported below like a missing administrator.
-    }
-    this.context.logger.warn?.('Matter audit entries were skipped: no administrator to attribute a system action to.');
-    return null;
+  actorFor(principal: PluginAuditPrincipal | null, operationId: string = randomUUID()): AuditActor {
+    return principal
+      ? { principal, system: false, operationId }
+      : { principal: PLUGIN_AUDIT_SYSTEM_PRINCIPAL, system: true, operationId };
+  }
+
+  /** `by` as an actor: a prepared actor as it is, otherwise a new one with an operation ID of its own. */
+  actorOf(by: AuditBy): AuditActor {
+    return isActor(by) ? by : this.actorFor(by);
   }
 
   async record(
     action: string,
-    principal: PluginAuditPrincipal | AuditActor | null,
+    by: AuditBy,
     subject: DeviceAuditSubject,
     details: Record<string, string | number | boolean> = {},
     outcome: AuditOutcome = 'succeeded',
   ): Promise<void> {
     const audit = this.context.audit;
     if (!audit) return;
-    const actor = isActor(principal) ? principal : await this.actorFor(principal);
-    if (!actor) return;
+    const actor = this.actorOf(by);
     try {
       // The host retries a busy database itself. Otherwise `unavailable` means auditing (or the domain) is switched off
       // or the host is shutting down, where a retry would only delay the action.
       const receipt: PluginAuditReceipt = await audit.record({
         action,
-        operationId: randomUUID(),
+        operationId: actor.operationId,
         principal: actor.principal,
         outcome,
         subject: { type: subject.type, id: auditSubjectId(subject.ref) },
@@ -79,5 +99,4 @@ export class DeviceAuditService {
   }
 }
 
-const isActor = (value: PluginAuditPrincipal | AuditActor | null): value is AuditActor =>
-  value !== null && 'principal' in value;
+const isActor = (value: AuditBy): value is AuditActor => value !== null && 'principal' in value;

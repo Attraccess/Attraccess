@@ -18,11 +18,11 @@ describe('Matter devices controller', () => {
   });
   afterEach(() => h.close());
 
-  it('is guarded by the plugin management permission on the class, with the ATT-1003 marker', () => {
+  it('guards every route with its key from the Matter permission map', () => {
     const source = readFileSync(join(__dirname, 'controller.ts'), 'utf8');
-    expect(source).toContain("@Auth('system.plugins.manage')");
-    expect(source.match(/@Auth\(/g)).toHaveLength(1);
-    expect(source).toContain('TODO(ATT-1003)');
+    expect(source.match(/@Auth\(\.\.\.MATTER_OPERATIONS\./g)).toHaveLength(
+      source.match(/@(Get|Post|Patch)\(/g)?.length ?? -1,
+    );
     expect(source).toContain("@Controller('matter')");
   });
 

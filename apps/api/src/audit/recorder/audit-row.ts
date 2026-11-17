@@ -277,7 +277,11 @@ function pluginRow(event: AuditEvent & { operationId: string }): AuditRow | null
   const snapshot = projectPluginAuditEvent({
     action: event.action,
     operationId: event.operationId,
-    principal: { userId: id, authenticationMethod, ...(apiTokenId === undefined ? {} : { apiTokenId }) },
+    // The system actor (no user, no authentication) is the SDK's system principal.
+    principal:
+      id === null && authenticationMethod === null
+        ? { kind: 'system' }
+        : { userId: id, authenticationMethod, ...(apiTokenId === undefined ? {} : { apiTokenId }) },
     outcome: event.outcome ?? 'succeeded',
     subject: event.subject,
     details: event.details,

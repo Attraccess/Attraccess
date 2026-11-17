@@ -6,7 +6,12 @@ import { parseRecoveryKey, recoveryKeyId } from '../backup/recovery-key';
 import { SidecarUnavailableError } from '../client/errors';
 import { auditSubjectId } from '../devices/audit.service';
 
-type AuditCall = { action: string; subject: { type: string; id: number }; details: Record<string, unknown> };
+type AuditCall = {
+  action: string;
+  operationId: string;
+  subject: { type: string; id: number };
+  details: Record<string, unknown>;
+};
 const callsOf = (h: FabricHarness, action: string) =>
   h.audit.mock.calls.map((call) => (call as unknown as [AuditCall])[0]).filter((entry) => entry.action === action);
 
@@ -59,6 +64,23 @@ describe('MatterFabricService', () => {
       );
       // The sidecar's label is passed on.
       expect(h.connection.bodies['fabric.create']).toEqual({ label: 'Home' });
+    });
+
+    it('gives the key, the fabric and the first backup of one create the same operation ID', async () => {
+      await h.fabric.create('Home', ADMIN);
+      const entries = h.audit.mock.calls.map((call) => (call as unknown as [AuditCall])[0]);
+      expect(entries.map((entry) => entry.action)).toEqual([
+        'matter.recovery_key_generated',
+        'matter.fabric_created',
+        'matter.backup_succeeded',
+      ]);
+      expect(new Set(entries.map((entry) => entry.operationId)).size).toBe(1);
+      // A second operation gets an ID of its own.
+      h.audit.mockClear();
+      await h.fabric.rotateRecoveryKey(ADMIN);
+      const rotation = h.audit.mock.calls.map((call) => (call as unknown as [AuditCall])[0].operationId);
+      expect(new Set(rotation).size).toBe(1);
+      expect(rotation[0]).not.toBe(entries[0].operationId);
     });
 
     it('stores the key only encrypted and never returns it again', async () => {

@@ -24,6 +24,7 @@ vi.mock('../hooks/useAuth', () => ({
     isTwoFactorStatusLoading: state.twoFactorLoading,
     user: state.authenticated ? { id: 1 } : null,
     hasPermission: () => true,
+    hasPermissionKey: () => true,
   }),
 }));
 vi.mock('../utils/live-updates', () => ({

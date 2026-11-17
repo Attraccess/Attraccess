@@ -377,6 +377,8 @@ describe('client helpers', () => {
     expect(expectedSidecarVersion(entry.plugin)).toBe(entry.sidecar);
     expect(expectedSidecarVersion('9.9.9')).toBeUndefined();
     expect(isHostSupported(entry.plugin, '1.11.0')).toBe(true);
+    expect(isHostSupported(entry.plugin, '1.11.0-beta.1')).toBe(true);
+    // Development builds report the last released version until the next release, so every 1.11.0 prerelease counts.
     expect(isHostSupported(entry.plugin, '1.11.0-beta.0')).toBe(true);
     expect(isHostSupported(entry.plugin, '1.10.0')).toBe(false);
     expect(isHostSupported('9.9.9', '1.11.0')).toBe(false);

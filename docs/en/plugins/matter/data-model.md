@@ -7,7 +7,7 @@
 
 > **Uninstalling the Matter plugin deletes all Matter data in Attraccess.** The host runs every plugin down-migration on uninstall, which drops all `plugin_matter_*` tables: the device records, your names, descriptions and locations, and the connection settings. The Matter fabric in the sidecar is **not** touched, so after a reinstall the previously commissioned nodes reappear as **Unclaimed** and have to be claimed again. Flow nodes that referenced the old records lose their references. This is the one exception to "Matter data is never silently dropped". Disabling and upgrading the plugin keep all data (see [Disable, upgrade and uninstall](#disable-upgrade-and-uninstall)).
 
-This page describes how Attraccess records Matter devices, what the stored state means, and which administrator actions exist. It builds on the [architecture](plugins/matter/architecture.md). There is no device UI yet: the data is available to administrators (permission `system.plugins.manage`) through the REST endpoints listed [below](#rest-endpoints), and later features (device pages, flow nodes, commands) build on it.
+This page describes how Attraccess records Matter devices, what the stored state means, and which administrator actions exist. It builds on the [architecture](plugins/matter/architecture.md). There is no device UI yet: the data is available to users with `matter.devices.read` through the REST endpoints listed [below](#rest-endpoints), and later features (device pages, flow nodes, commands) build on it.
 
 ## Terminology
 
@@ -116,7 +116,7 @@ If the Attraccess database is **older** than the sidecar, the nodes it does not 
 
 ## Actions
 
-All actions need `system.plugins.manage`, validate their input, are audited and answer `409` for a transition that is not allowed and `404` for an unknown ID.
+All actions need `matter.devices.manage`, validate their input, are audited and answer `409` for a transition that is not allowed and `404` for an unknown ID.
 
 | Action       | From                                      | Does                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | ------------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -191,7 +191,7 @@ Export what you need before you uninstall, and plan to claim your nodes again af
 
 ## REST endpoints
 
-All endpoints are under `/api/matter/…` and need `system.plugins.manage` (a dedicated Matter permission follows in [ATT-1003](https://linear.app/attraccess/issue/ATT-1003)). None of them sends a command to a device.
+All endpoints are under `/api/matter/…`. Reading needs `matter.devices.read`, every change needs `matter.devices.manage` (see [Permissions](plugins/matter/permissions.md)). None of them sends a command to a device.
 
 | Endpoint                                                                                 | Purpose                                                                 |
 | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -206,4 +206,4 @@ All endpoints are under `/api/matter/…` and need `system.plugins.manage` (a de
 
 The audit domain `matter` records `matter.node_quarantined`, `matter.node_detached`, `matter.node_reattached`, `matter.node_claimed`, `matter.node_relinked`, `matter.node_repaired`, `matter.node_archived`, `matter.node_restored`, `matter.node_force_removed`, `matter.node_metadata_updated`, `matter.endpoint_metadata_updated` and `matter.fabric_mismatch_detected`. They appear in the audit log UI with readable names, for example "Matter node quarantined". An entry's subject shows a number derived from the plugin UUID; the full UUID is in the entry's details (`nodeRef`, `endpointRef`, `fabricRef`). Entries carry only IDs, enums and flags, never device free text or secrets. The details of `matter.node_detached` and `matter.node_reattached` include `fabricId` and `nodeId`. Telemetry is never audited.
 
-Reconciliation entries (`matter.node_quarantined`, `matter.node_detached`, `matter.node_reattached`, `matter.fabric_mismatch_detected`) carry `initiator`: `system` when an automatic trigger ran the reconciliation, `administrator` for a manual `POST /matter/reconciliation`. The host has no system principal for plugins, so automatic entries name the administrator who last saved the connection settings as the actor. If nobody has saved them yet, automatic entries are skipped and a warning is logged.
+Reconciliation entries (`matter.node_quarantined`, `matter.node_detached`, `matter.node_reattached`, `matter.fabric_mismatch_detected`) carry `initiator`: `system` when an automatic trigger ran the reconciliation, `administrator` for a manual `POST /matter/reconciliation`. Automatic entries show **System or anonymous** as the actor; manual ones name the user who started them.

@@ -10,8 +10,9 @@ export interface ProjectedPluginAuditEvent {
   action: string;
   operationId: string;
   outcome: 'attempted' | 'succeeded' | 'failed';
-  actorId: number;
-  authenticationMethod: AuthenticationMethod;
+  /** null with authenticationMethod null: a system event (the SDK's `{ kind: 'system' }` principal). */
+  actorId: number | null;
+  authenticationMethod: AuthenticationMethod | null;
   apiTokenId?: number;
   subjectType: string;
   subjectId: number;
@@ -40,6 +41,10 @@ function matchesField(field: CompiledPluginAuditField, value: unknown): boolean 
 function pluginPrincipal(
   value: unknown,
 ): Pick<ProjectedPluginAuditEvent, 'actorId' | 'authenticationMethod' | 'apiTokenId'> | null {
+  const system = dataFields(value, ['kind']);
+  if (system && Object.keys(system).length === 1 && system.kind === 'system') {
+    return { actorId: null, authenticationMethod: null };
+  }
   const principal = dataFields(value, ['userId', 'authenticationMethod', 'apiTokenId']);
   if (!principal || !positive(principal.userId)) return null;
   const method = principal.authenticationMethod;

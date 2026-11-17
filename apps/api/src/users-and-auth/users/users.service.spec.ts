@@ -1,3 +1,4 @@
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 jest.mock('crypto', () => {
   const actual = jest.requireActual('crypto');
   return { ...actual, randomBytes: jest.fn(actual.randomBytes) };
@@ -334,9 +335,7 @@ describe('UsersService', () => {
 
       expect(fixture.userRepository.findAndCount).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.arrayContaining([
-            expect.objectContaining({ email: ILike('%ärger@example.com%') }),
-          ]),
+          where: expect.arrayContaining([expect.objectContaining({ email: ILike('%ärger@example.com%') })]),
         }),
       );
     });
@@ -929,24 +928,23 @@ describe('UsersService', () => {
     });
     it('assigns allowed explicit roles alongside defaults without another administrator', async () => {
       const { manager } = managerForImport(3);
-      fixture.mockRbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.view']));
+      const actor = { id: 9, effectivePermissions: new Set(['resources.view']) } as AuthenticatedUser;
       await fixture.service.createMany([{ username: 'member', email: 'member@example.com', roleKey: 'viewer' }], {
         manager,
         grantAllPermissionsToFirst: true,
-        actorId: 9,
+        actor,
       });
-      expect(fixture.mockRbacService.getEffectivePermissions).toHaveBeenCalledWith(9);
+      expect(fixture.mockRbacService.getGrantCeiling).toHaveBeenCalledWith(actor);
       expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(1, manager);
       expect(fixture.mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'viewer', manager);
       expect(fixture.mockRbacService.assignRoleByKey).not.toHaveBeenCalledWith(1, 'administrator', manager);
     });
     it('refuses an import role above the actor privilege ceiling', async () => {
       const { manager } = managerForImport(1, ['users.update']);
-      fixture.mockRbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.view']));
       await expect(
         fixture.service.createMany([{ username: 'member', email: 'member@example.com', roleKey: 'admin' }], {
           manager,
-          actorId: 9,
+          actor: { id: 9, effectivePermissions: new Set(['resources.view']) } as AuthenticatedUser,
         }),
       ).rejects.toThrow(ForbiddenException);
       expect(fixture.mockRbacService.assignRoleByKey).not.toHaveBeenCalled();

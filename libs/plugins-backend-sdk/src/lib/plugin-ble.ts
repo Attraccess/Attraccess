@@ -87,6 +87,9 @@ export const PLUGIN_BLE_LIMITS = {
   notificationQueueMax: 256,
   payloadMaxBytes: 512,
   labelMaxLength: 100,
+  /** Smallest ATT MTU (BLE core spec); a link that reports none counts as this. */
+  mtuMin: 23,
+  mtuMax: 517,
 } as const;
 
 export const PLUGIN_BLE_OPERATIONS = ['read', 'write', 'writeWithoutResponse', 'notify', 'indicate'] as const;
@@ -267,6 +270,12 @@ export interface PluginBleNotificationStream extends AsyncIterable<PluginBleNoti
 export interface PluginBleSession {
   readonly id: string;
   readonly endpointId: string;
+  /**
+   * Negotiated ATT MTU of the connection (23..517). A write without response carries at most `mtu - 3` bytes;
+   * larger ones reject with `PAYLOAD_TOO_LARGE` (detail `exceeds-mtu`). Writes with response may use the long-write
+   * procedure up to the profile bound.
+   */
+  readonly mtu: number;
   read(key: string, options?: PluginBleCallOptions): Promise<Uint8Array>;
   write(key: string, value: Uint8Array, options?: PluginBleWriteOptions): Promise<void>;
   subscribe(key: string, options?: { signal?: AbortSignal }): Promise<PluginBleNotificationStream>;

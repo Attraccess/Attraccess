@@ -1,4 +1,8 @@
-import type { PluginAuditDomainDeclaration, PluginAuditEvent } from '@attraccess/plugins-backend-sdk';
+import {
+  PLUGIN_AUDIT_SYSTEM_PRINCIPAL,
+  type PluginAuditDomainDeclaration,
+  type PluginAuditEvent,
+} from '@attraccess/plugins-backend-sdk';
 import { randomUUID } from 'node:crypto';
 import { registerPluginAuditDomains, resetPluginAuditRegistry } from '../plugin-system/audit/audit-registry';
 import { projectPluginAuditEvent } from './policies/plugins';
@@ -91,6 +95,22 @@ describe('plugin audit projection', () => {
         principal: { userId: 42, authenticationMethod: 'session', apiTokenId: 19 },
       }),
     ).toBeNull();
+  });
+
+  it('projects the system principal to a null actor and rejects malformed system principals', () => {
+    expect(projectPluginAuditEvent({ ...event(), principal: PLUGIN_AUDIT_SYSTEM_PRINCIPAL })).toMatchObject({
+      actorId: null,
+      authenticationMethod: null,
+    });
+    expect(projectPluginAuditEvent({ ...event(), principal: { kind: 'system' } })).not.toHaveProperty('apiTokenId');
+    for (const principal of [
+      { kind: 'system', userId: 42 },
+      { kind: 'user' },
+      { kind: 'System' },
+      { userId: null, authenticationMethod: null },
+    ]) {
+      expect(projectPluginAuditEvent({ ...event(), principal: principal as never })).toBeNull();
+    }
   });
 
   it('rejects events for unregistered domains and undeclared actions', () => {

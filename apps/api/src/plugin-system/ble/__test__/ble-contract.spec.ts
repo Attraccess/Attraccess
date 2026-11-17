@@ -23,7 +23,14 @@ const hostService: BleContractFactory = async (options) => {
   return { host: harness, dispose: () => harness.dispose() };
 };
 
+const readerWebsocket: BleContractFactory = async (options) => {
+  const harness = await createHostBleHarness({ ...options, transport: 'reader-websocket' });
+  return { host: harness, dispose: () => harness.dispose() };
+};
+
 for (const define of [defineBleContractSuite, defineBleContractSessionSuite]) {
   define('SDK fake transport', fake);
   define('host service with a test driver', hostService);
+  // The real reader driver, protocol v1 over a fake reader socket: what plugins get on real readers.
+  define('host service with the reader websocket driver', readerWebsocket);
 }

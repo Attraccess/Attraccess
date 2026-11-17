@@ -324,6 +324,166 @@ naming the missing permission.
 | `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` — send in-app, push and email notifications under categories the plugin declares, and declare editable email templates. See [Notifications](#notifications).                                                                      |
 | `BLE_TRANSPORT`          | `context.ble` — use the Bluetooth radio of Attractap readers an administrator opened for plugins, limited to the BLE profiles your plugin registers. See [Bluetooth Transport for Plugins](plugins/ble-transport.md).                                                   |
 
+### Plugin-declared RBAC permissions
+
+The manifest `permissions` above are **host capabilities** your plugin code may use. RBAC permission keys are a
+different thing: they decide which **users and API tokens** may call your routes, open your pages and subscribe to
+your live topics. A plugin can declare its own keys instead of reusing broad core keys such as
+`system.plugins.manage`. The host adds them to the permission catalog, so administrators see them in the role editor
+and the API-token picker, grouped under the plugin's name.
+
+Plugin-declared keys need host **1.11.0-beta.1** or newer. Older hosts ignore the field, so nobody would hold your
+keys there: raise `attraccessVersion.min` (and the SDK peer range) when you start using them.
+
+#### Declaring keys
+
+Declare the keys once with `definePluginPermissions` and export the declaration as `permissions` on the backend
+module:
+
+```typescript
+// backend/permissions.ts
+import { definePluginPermissions } from '@attraccess/plugins-backend-sdk';
+
+export const ACME_PERMISSIONS = definePluginPermissions({
+  // Optional group label in the role editor; defaults to the plugin name from the manifest.
+  category: { en: 'Acme widgets', de: 'Acme-Widgets' },
+  permissions: [
+    {
+      key: 'acme.widgets.read',
+      label: { en: 'View widgets', de: 'Widgets anzeigen' },
+      description: { en: 'View widgets and their status', de: 'Widgets und ihren Status anzeigen' },
+      defaultRoles: ['administrator', 'resource-manager'],
+    },
+    {
+      key: 'acme.widgets.manage',
+      label: { en: 'Manage widgets', de: 'Widgets verwalten' },
+      description: { en: 'Create, change and delete widgets', de: 'Widgets anlegen, ändern und löschen' },
+    },
+  ],
+});
+
+export const WIDGETS_READ = ACME_PERMISSIONS.keys['acme.widgets.read'];
+export const WIDGETS_MANAGE = ACME_PERMISSIONS.keys['acme.widgets.manage'];
+```
+
+```typescript
+// backend/plugin.ts
+const plugin: PluginBackendModule = {
+  permissions: ACME_PERMISSIONS,
+  register(context) {
+    /* … */
+  },
+};
+```
+
+Every key needs an English and a German label and description; the role editor shows them in the user's language.
+
+#### Key format and collision rules
+
+The host validates the declaration when it loads the plugin:
+
+- A key is lowercase dotted segments with at least two segments (`PLUGIN_PERMISSION_KEY_PATTERN`,
+  `^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$`), at most 100 characters. Prefix keys with your plugin's name.
+- A key must not equal a core key and must not start with a reserved core namespace
+  (`RESERVED_PERMISSION_NAMESPACES`): `resources.`, `users.`, `system.`, `billing.`.
+- A plugin must not declare the same key twice.
+- A key belongs to the first plugin that registered it. Another plugin declaring it later is rejected, even while
+  the owner is uninstalled.
+- `defaultRoles` may name system roles only (`PLUGIN_PERMISSION_DEFAULT_ROLES`): `user`, `resource-manager`,
+  `user-manager`, `billing-manager`, `system-admin`, `administrator`.
+
+A violation fails only your plugin's load: it is quarantined with an error naming the key and the rule, and the host
+and every other plugin keep running.
+
+#### Default roles
+
+- `defaultRoles` are granted **only when the key is registered for the first time**. Later boots never add the grant
+  again, so an administrator who removes a key from a role keeps it removed.
+- The `administrator` role always holds every available plugin key, whether you list it or not. The host re-asserts
+  this on every boot, which keeps the "last administrator" safeguards working.
+- Custom roles never receive plugin keys automatically. Tell administrators in your plugin's documentation which
+  keys to add to their custom roles.
+
+Plugin keys reach SSO users through roles, like core keys: SSO maps provider groups to roles, not to permission keys.
+
+#### When a plugin is unavailable
+
+When a plugin is uninstalled (uploaded ZIP or npm package), quarantined or fails to load, or a newer version no
+longer declares a key, its keys become **unavailable**:
+
+- They disappear from the permission catalog, the role editor and the API-token picker.
+- They grant nothing, even to roles and API tokens that hold them.
+- The role and API-token grants stay in the database. Saving a role or a token in the UI keeps the hidden grants.
+- When the plugin loads again, the keys and all their grants come back.
+
+Uninstalling an uploaded plugin deletes the plugin's own data (its down-migrations run) but keeps its permission
+rows and grants. Your migrations must not write to the core RBAC tables (`permission`, `role_permission`,
+`api_token_permission`); the host manages them.
+
+#### Using the keys
+
+The keys from `definePluginPermissions` are typed, so the auth decorators accept them without casts:
+
+```typescript
+import { Auth, AuthAny, SessionAuth } from '@attraccess/plugins-backend-sdk';
+
+@Controller('acme/widgets')
+export class WidgetsController {
+  @Get()
+  @Auth(WIDGETS_READ)
+  list() {}
+
+  @Post()
+  @Auth(WIDGETS_MANAGE)
+  create() {}
+
+  // Session only: API tokens are refused even when they carry the key.
+  @Get('secret-export')
+  @SessionAuth(WIDGETS_MANAGE)
+  exportSecret() {}
+}
+```
+
+A route without the key answers `403` before your handler runs. API tokens work as for core keys: a token's scope
+may only contain keys its owner holds, and a request gets the keys in both the scope and the owner's current
+permissions. `context.resourceAccess.hasPermission(principal, WIDGETS_READ)` accepts the keys as well.
+
+Live topics check them in `authorize`, which runs on every subscription and every lease renewal. Live updates are
+session-only, so API tokens cannot subscribe:
+
+```typescript
+context.liveUpdates.register({
+  topic: 'widgets',
+  identifier: 'none',
+  authorize: (_subscription, user) => {
+    if (!user.effectivePermissions?.has(WIDGETS_READ)) throw new ForbiddenException();
+  },
+  source: () => widgets$,
+});
+```
+
+In the frontend, gate routes with the plain key strings. `authRequired` takes one key or an array meaning "any of
+these", and a sidebar entry follows its route. To hide controls inside a page, read the user's permissions from the
+auth data the host passes to `onApiAuthStateChange`:
+
+```tsx
+import { hasPluginAuthPermission } from '@attraccess/plugins-frontend-sdk';
+
+getRoutes(): RouteConfig[] {
+  return [{ path: '/widgets', authRequired: ['acme.widgets.read', 'acme.widgets.manage'], element: <WidgetsPage /> }];
+}
+
+onApiAuthStateChange(authData: AttraccessFrontendPluginAuthData | null): void {
+  this.canManage = hasPluginAuthPermission(authData, 'acme.widgets.manage');
+}
+```
+
+Keep the key strings in a module without SDK imports if both halves of your plugin share it, so the frontend bundle
+does not pull in the backend SDK.
+
+Holders of any plugin key count as **privileged** for two-factor authentication, like every key outside
+`resources.*`. If your deployment requires 2FA for privileged users, granting a plugin key requires them to enroll.
+
 ### MQTT subscriptions
 
 Use `context.mqtt` rather than creating your own MQTT client. The host manages
@@ -1628,7 +1788,7 @@ so they share the workspace toolchain, caching and CI.
   SDK libraries, other Nx inputs) changed since then. A plugin that was never published, or has no recorded commit,
   is always published. Changes merged in a failed run are therefore picked up by the next green one, and an older
   run finishing late never moves a tag backwards.
-  - **Nightly** (main, after all build, test and hardware gates pass) publishes the `package.json` version
+  - **Nightly** (main, once a night after all build, test and hardware gates pass) publishes the `package.json` version
     without its prerelease suffix plus `-nightly.<run>.<attempt>` (e.g. `0.2.0-nightly.1180.1`) under `next`, in
     the same gated outcome as the `nightly-<sha>` image.
   - **Release** publishes the `package.json` version without its prerelease suffix (`0.2.0-alpha.0` becomes

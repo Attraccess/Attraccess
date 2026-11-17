@@ -1,3 +1,5 @@
+import type { PermissionKey } from './plugin-permissions';
+
 /** Result of {@link PluginResourceAccessContext.canStart}. */
 export interface PluginCanStartResult {
   /** The user may start a session on their own right now (introduction valid, no mandatory supervision). */
@@ -79,7 +81,7 @@ export interface PluginResourceAccessContext {
   canSeeUsageAttribution(principal: PluginAccessPrincipal, resourceId: number): Promise<boolean>;
 
   /** Whether the user holds the RBAC permission (e.g. `resources.update`), limited to a request's scope. */
-  hasPermission(principal: PluginAccessPrincipal, permission: string): Promise<boolean>;
+  hasPermission(principal: PluginAccessPrincipal, permission: PermissionKey): Promise<boolean>;
 
   /**
    * Ids of resources the user is introduced to in the sense of canStart's introduction rule:

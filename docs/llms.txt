@@ -29,7 +29,7 @@ The documentation pages are plain Markdown files. English pages live under https
 ## English: User Management
 - [Overview](https://docs.attraccess.org/en/user-management/overview.md): Overview of user management: creating accounts, assigning permissions and configuring login methods as an administrator.
 - [Creating Users](https://docs.attraccess.org/en/user-management/creating-users.md): The ways users get an account: self-registration, SSO registration, project invitations and creation by an administrator.
-- [Permissions](https://docs.attraccess.org/en/user-management/permissions.md): Explains the role-based permission model, default roles, permission keys, assigning roles and SSO-managed roles.
+- [Permissions](https://docs.attraccess.org/en/user-management/permissions.md): Explains the role-based permission model, default roles, permission keys, plugin-declared permissions, assigning roles and SSO-managed roles.
 - [SSO Overview](https://docs.attraccess.org/en/user-management/sso-overview.md): Overview of Single Sign-On with OIDC and SAML: prerequisites, providers, auto-discovery, permission mapping and account linking.
 - [OIDC Setup](https://docs.attraccess.org/en/user-management/sso-oidc.md): How to create and configure an OpenID Connect SSO provider, including the callback URL and testing the login.
 - [SAML Setup](https://docs.attraccess.org/en/user-management/sso-saml.md): How to create and configure a SAML SSO provider, including service provider metadata and testing the login.
@@ -114,6 +114,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Matter: Operator Guide](https://docs.attraccess.org/en/plugins/matter/operator.md): Operator guide for the Matter sidecar: build and start, configuration, connecting Attraccess, topologies and credential rotation.
 - [Matter: Data Model and Lifecycle](https://docs.attraccess.org/en/plugins/matter/data-model.md): Matter device data model: terminology, nodes, endpoints, lifecycle, state semantics, reconciliation, admin actions and data retention.
 - [Matter: Backup and Recovery](https://docs.attraccess.org/en/plugins/matter/backup-restore.md): Matter fabric backup and recovery: what a backup contains, automatic and manual backups, the recovery key, restore and disaster recovery, degraded states and safety guarantees.
+- [Matter: Permissions](https://docs.attraccess.org/en/plugins/matter/permissions.md): Matter and Thread permission keys, their default roles, which key each Matter operation needs, the direct-command confirmation rule, audit behaviour and upgrade notes.
 
 ## English: RabbitMQ
 - [Overview](https://docs.attraccess.org/en/plugins/rabbitmq/overview.md): The RabbitMQ plugin adds status, user, connection and statistics panels for RabbitMQ brokers to an MQTT server's detail page; prerequisites and permissions.
@@ -178,7 +179,7 @@ The documentation pages are plain Markdown files. English pages live under https
 ## Deutsch: Benutzerverwaltung
 - [Überblick](https://docs.attraccess.org/de/user-management/overview.md): Überblick über die Benutzerverwaltung: Konten anlegen, Berechtigungen vergeben und Anmeldemethoden als Administrator konfigurieren.
 - [Benutzer anlegen](https://docs.attraccess.org/de/user-management/creating-users.md): Die Wege zu einem Benutzerkonto: Selbstregistrierung, SSO-Registrierung, Projekteinladungen und Anlegen durch einen Administrator.
-- [Berechtigungen](https://docs.attraccess.org/de/user-management/permissions.md): Erklärt die vier Systemberechtigungen, wie Administratoren sie vergeben, SSO-verwaltete Berechtigungen und Zugriff auf fremde RFID-Karten.
+- [Berechtigungen](https://docs.attraccess.org/de/user-management/permissions.md): Erklärt das rollenbasierte Berechtigungsmodell, Standardrollen, Berechtigungsschlüssel, Plugin-Berechtigungen, die Vergabe von Rollen und SSO-verwaltete Rollen.
 - [SSO Überblick](https://docs.attraccess.org/de/user-management/sso-overview.md): Überblick über Single Sign-On mit OIDC und SAML: Voraussetzungen, Anbieter, automatische Erkennung, Berechtigungszuordnung und Kontoverknüpfung.
 - [OIDC einrichten](https://docs.attraccess.org/de/user-management/sso-oidc.md): So legen Sie einen OpenID-Connect-SSO-Anbieter an und konfigurieren ihn, inklusive Callback-URL und Test der Anmeldung.
 - [SAML einrichten](https://docs.attraccess.org/de/user-management/sso-saml.md): So legen Sie einen SAML-SSO-Anbieter an und konfigurieren ihn, inklusive Service-Provider-Metadaten und Test der Anmeldung.
@@ -261,6 +262,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Matter: Betriebsanleitung](https://docs.attraccess.org/de/plugins/matter/operator.md): Betriebsanleitung für den Matter-Sidecar: Bauen und starten, Konfiguration, Anbindung an Attraccess, Topologien und Token-Rotation.
 - [Matter: Datenmodell und Lebenszyklus](https://docs.attraccess.org/de/plugins/matter/data-model.md): Matter-Gerätedatenmodell: Begriffe, Nodes, Endpoints, Lebenszyklus, Zustandssemantik, Abgleich, Admin-Aktionen und Datenaufbewahrung.
 - [Matter: Backup und Wiederherstellung](https://docs.attraccess.org/de/plugins/matter/backup-restore.md): Backup und Wiederherstellung der Matter-Fabric: Inhalt, automatische und manuelle Backups, Wiederherstellungsschlüssel, Restore, Disaster Recovery, degradierte Zustände und Garantien.
+- [Matter: Berechtigungen](https://docs.attraccess.org/de/plugins/matter/permissions.md): Matter- und Thread-Berechtigungsschlüssel mit Standardrollen, welcher Schlüssel für welche Aktion nötig ist, Bestätigungsregel für direkte Befehle, Audit und Upgrade-Hinweise.
 
 ## Deutsch: RabbitMQ
 - [Überblick](https://docs.attraccess.org/de/plugins/rabbitmq/overview.md): Das Plugin RabbitMQ ergänzt die Detailseite eines MQTT-Servers um Status-, Benutzer-, Verbindungs- und Statistik-Bereiche für RabbitMQ-Broker; Voraussetzungen und Berechtigungen.

@@ -1,4 +1,5 @@
 # RabbitMQ
+
 <!-- llms-description: The RabbitMQ plugin adds status, user, connection and statistics panels for RabbitMQ brokers to an MQTT server's detail page; prerequisites and permissions. -->
 
 > [!NOTE]
@@ -20,17 +21,33 @@ On the detail page of an MQTT server that Attraccess detects as a RabbitMQ broke
 
 Attraccess talks to the RabbitMQ management API (port `15672`, or `15671` with TLS, unless you configured a management port) using the MQTT server's username and password.
 
-| Panel | What it offers | RabbitMQ user tag | Attraccess permission |
-|-------|----------------|-------------------|-----------------------|
-| **RabbitMQ** (status) | Reachability, credentials check, versions | `monitoring` | `resources.update` |
-| **RabbitMQ users** | List users and their vhost permissions | `administrator` | `resources.update` |
-| **RabbitMQ users** (change) | Create, edit, delete users; set or clear permissions | `administrator` | `system.settings.manage` |
-| **Connections** | Live client connections (refreshes every 10 s) | `monitoring` | `resources.update` |
-| **Connections** (close) | Force-close a connection, with an optional reason | `administrator` | `system.settings.manage` |
-| **Broker statistics** | Overview, nodes and queues (refreshes every 15 s) | `monitoring` | `resources.update` |
+| Panel                       | What it offers                                       | RabbitMQ user tag | Attraccess permission    |
+| --------------------------- | ---------------------------------------------------- | ----------------- | ------------------------ |
+| **RabbitMQ** (status)       | Reachability, credentials check, versions            | `monitoring`      | `rabbitmq.broker.read`   |
+| **RabbitMQ users**          | List users and their vhost permissions               | `administrator`   | `rabbitmq.broker.read`   |
+| **RabbitMQ users** (change) | Create, edit, delete users; set or clear permissions | `administrator`   | `rabbitmq.broker.manage` |
+| **Connections**             | Live client connections (refreshes every 10 s)       | `monitoring`      | `rabbitmq.broker.read`   |
+| **Connections** (close)     | Force-close a connection, with an optional reason    | `administrator`   | `rabbitmq.broker.manage` |
+| **Broker statistics**       | Overview, nodes and queues (refreshes every 15 s)    | `monitoring`      | `rabbitmq.broker.read`   |
 
 Notes:
 
 - The user configured on the MQTT server needs the RabbitMQ tag from the table (`administrator` also covers everything `monitoring` can do). Without it the panels show an error that names the missing privilege.
-- Users without `system.settings.manage` only see the read-only panels; write actions are hidden and are also refused by the server.
+- Users without `rabbitmq.broker.manage` only see the read-only panels; write actions are hidden and are also refused by the server.
 - Watching and publishing live MQTT messages is not part of the RabbitMQ plugin. It is available for every MQTT server and needs only `resources.update` -- see [MQTT Message Explorer](devices/mqtt/message-explorer.md).
+
+### Attraccess permissions
+
+The RabbitMQ plugin declares its own permission keys. They appear in the role editor and the API-token picker in the
+**RabbitMQ** group (see [Permissions](user-management/permissions.md#plugin-permissions)).
+
+| Key                      | Allows                                                                   | Default roles                                       |
+| ------------------------ | ------------------------------------------------------------------------ | --------------------------------------------------- |
+| `rabbitmq.broker.read`   | The read-only panels: status, users, connections, broker statistics      | `administrator`, `resource-manager`, `system-admin` |
+| `rabbitmq.broker.manage` | Changing RabbitMQ users and their permissions, force-closing connections | `administrator`, `system-admin`                     |
+
+The panels sit on the MQTT server detail page, which itself needs `resources.update`.
+
+**Upgrading:** before this release the panels used `resources.update` (view) and `system.settings.manage` (manage).
+The system roles keep their access. Custom roles that relied on those core keys for RabbitMQ lose it until you add
+`rabbitmq.broker.read` or `rabbitmq.broker.manage` to them.

@@ -42,7 +42,14 @@ describe('API token revocation with SQLite', () => {
       entities: [tokenSchema, permissionSchema],
       synchronize: true,
     }).initialize();
-    service = new ApiTokenService(database.getRepository(ApiToken), {} as never, {} as never, {} as never);
+    service = new ApiTokenService(
+      database.getRepository(ApiToken),
+      {} as never,
+      {} as never,
+      {
+        getUnavailablePermissionKeys: async () => new Set<string>(),
+      } as never,
+    );
     await database.getRepository(ApiToken).save([
       { id: 1, userId: 1, name: 'Active', revokedAt: null },
       { id: 2, userId: 1, name: 'Revoked', revokedAt: new Date() },

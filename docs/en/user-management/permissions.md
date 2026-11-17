@@ -1,5 +1,6 @@
 # Permissions
-<!-- llms-description: Explains the role-based permission model, default roles, permission keys, assigning roles and SSO-managed roles. -->
+
+<!-- llms-description: Explains the role-based permission model, default roles, permission keys, plugin-declared permissions, assigning roles and SSO-managed roles. -->
 
 Attraccess uses a **role-based access control (RBAC)** model. Permissions are not assigned to users directly — instead, users are assigned **roles**, and each role grants a set of granular permissions.
 
@@ -15,36 +16,68 @@ A user's effective permissions are the union of all permissions granted by their
 
 These system-managed roles come pre-installed and cannot be deleted:
 
-| Role | Key | Permissions granted |
-|------|-----|---------------------|
-| **User** | `user` | `resources.read` — granted to every user by default |
-| **Resource Manager** | `resource-manager` | Create, update, delete resources; manage resource access and maintenance |
-| **User Manager** | `user-manager` | Read, create, update, delete users; manage role assignments |
-| **System Administrator** | `system-admin` | Manage system settings, SSO providers, and plugins |
-| **Billing Manager** | `billing-manager` | Read and manage billing configuration and transactions |
-| **Owner** | `owner` | All permissions |
+| Role                     | Key                | Permissions granted                                                      |
+| ------------------------ | ------------------ | ------------------------------------------------------------------------ |
+| **User**                 | `user`             | `resources.read` — granted to every user by default                      |
+| **Resource Manager**     | `resource-manager` | Create, update, delete resources; manage resource access and maintenance |
+| **User Manager**         | `user-manager`     | Read, create, update, delete users; manage role assignments              |
+| **System Administrator** | `system-admin`     | Manage system settings, SSO providers, and plugins                       |
+| **Billing Manager**      | `billing-manager`  | Read and manage billing configuration and transactions                   |
+| **Administrator**        | `administrator`    | All permissions, including every available plugin permission             |
 
 ## Permission Keys
 
-| Category | Key | Description |
-|----------|-----|-------------|
-| resources | `resources.read` | View resource information |
-| resources | `resources.create` | Create new resources |
-| resources | `resources.update` | Update existing resources |
-| resources | `resources.delete` | Delete resources |
-| resources | `resources.access.manage` | Manage who can access resources (introductions) |
-| resources | `resources.maintenance.manage` | Manage resource maintenance schedules and requests |
-| users | `users.read` | View user information |
-| users | `users.create` | Create users |
-| users | `users.update` | Update user accounts |
-| users | `users.delete` | Delete users |
-| users | `users.roles.manage` | Assign and revoke roles for users |
-| users | `users.rfid-cards.manage` | View, enroll, activate, deactivate, and delete RFID cards for any user |
-| system | `system.settings.manage` | Change system configuration |
-| system | `system.sso.manage` | Manage SSO provider configuration |
-| system | `system.plugins.manage` | Install and configure plugins |
-| billing | `billing.read` | View billing information |
-| billing | `billing.manage` | Manage billing configuration and transactions |
+| Category  | Key                            | Description                                                            |
+| --------- | ------------------------------ | ---------------------------------------------------------------------- |
+| resources | `resources.read`               | View resource information                                              |
+| resources | `resources.create`             | Create new resources                                                   |
+| resources | `resources.update`             | Update existing resources                                              |
+| resources | `resources.delete`             | Delete resources                                                       |
+| resources | `resources.access.manage`      | Manage who can access resources (introductions)                        |
+| resources | `resources.maintenance.manage` | Manage resource maintenance schedules and requests                     |
+| resources | `resources.reports.export`     | Export resource session and operating duration reports                 |
+| users     | `users.read`                   | View user information                                                  |
+| users     | `users.create`                 | Create users                                                           |
+| users     | `users.update`                 | Update user accounts                                                   |
+| users     | `users.delete`                 | Delete users                                                           |
+| users     | `users.roles.manage`           | Assign and revoke roles for users                                      |
+| users     | `users.api-tokens.manage`      | Create, view, update and revoke personal API tokens                    |
+| users     | `users.rfid-cards.manage`      | View, enroll, activate, deactivate, and delete RFID cards for any user |
+| system    | `system.settings.manage`       | Change system configuration                                            |
+| system    | `system.audit.read`            | Read the audit log                                                     |
+| system    | `system.sso.manage`            | Manage SSO provider configuration                                      |
+| system    | `system.plugins.manage`        | Install and configure plugins                                          |
+| billing   | `billing.read`                 | View billing information                                               |
+| billing   | `billing.manage`               | Manage billing configuration and transactions                          |
+
+## Plugin Permissions
+
+Plugins can declare their own permission keys, for example `matter.devices.read` for the Matter plugin or
+`rabbitmq.broker.manage` for the RabbitMQ plugin. They appear in the role editor and the API-token picker in a
+separate group per plugin, after the core categories, labelled in your language. You grant them through roles like
+core keys; SSO users receive them through their mapped roles.
+
+- **Administrator** always holds every plugin key.
+- When a plugin is installed for the first time, it may grant its keys to some system roles (for example
+  **Resource Manager**). This happens only once: if you later remove such a key from a role, it stays removed.
+- Custom roles never receive plugin keys automatically. Add them to a custom role yourself.
+
+Which keys a plugin declares and what they allow is documented with the plugin, for example
+[Matter permissions](plugins/matter/permissions.md).
+
+### When a plugin is uninstalled or fails to load
+
+When a plugin is uninstalled, quarantined or fails to load, or a newer version drops a key, its keys are
+**unavailable**: they are hidden from the role editor and the API-token picker and grant nothing. Roles and API
+tokens keep their grants, and editing a role or a token does not remove the hidden ones. When the plugin is loaded
+again, its keys and all grants come back. Uninstalling an uploaded plugin deletes the plugin's data, but not its
+permissions and grants.
+
+### Two-factor authentication
+
+Every key outside `resources.*` marks its holder as a **privileged** user for two-factor authentication. Plugin keys
+are no exception: if your two-factor policy applies to privileged users, granting a plugin key (for example a Matter
+key to a Resource Manager) requires that user to set up two-factor authentication.
 
 ## Assigning Roles
 

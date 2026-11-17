@@ -7,7 +7,7 @@
 
 > **Das Deinstallieren des Matter-Plugins löscht alle Matter-Daten in Attraccess.** Beim Deinstallieren führt der Host alle Down-Migrationen des Plugins aus. Dabei werden alle Tabellen `plugin_matter_*` gelöscht: die Geräteeinträge, Ihre Namen, Beschreibungen und Standorte sowie die Verbindungseinstellungen. Die Matter-Fabric im Sidecar bleibt **unberührt**. Nach einer Neuinstallation erscheinen die bereits in Betrieb genommenen Nodes daher als **Nicht übernommen** und müssen erneut übernommen werden. Flow-Nodes, die auf die alten Einträge verwiesen, verlieren ihre Verweise. Das ist die einzige Ausnahme von „Matter-Daten werden nie stillschweigend gelöscht“. Beim Deaktivieren und Aktualisieren des Plugins bleiben alle Daten erhalten (siehe [Deaktivieren, Aktualisieren und Deinstallieren](#deaktivieren-aktualisieren-und-deinstallieren)).
 
-Diese Seite beschreibt, wie Attraccess Matter-Geräte speichert, was der gespeicherte Zustand bedeutet und welche Administrator-Aktionen es gibt. Sie baut auf der [Architektur](plugins/matter/architecture.md) auf. Es gibt noch keine Geräte-Oberfläche: Die Daten stehen Administratoren (Berechtigung `system.plugins.manage`) über die [unten](#rest-endpunkte) aufgeführten REST-Endpunkte zur Verfügung. Spätere Funktionen (Geräteseiten, Flow-Nodes, Befehle) bauen darauf auf.
+Diese Seite beschreibt, wie Attraccess Matter-Geräte speichert, was der gespeicherte Zustand bedeutet und welche Administrator-Aktionen es gibt. Sie baut auf der [Architektur](plugins/matter/architecture.md) auf. Es gibt noch keine Geräte-Oberfläche: Die Daten stehen Benutzern mit `matter.devices.read` über die [unten](#rest-endpunkte) aufgeführten REST-Endpunkte zur Verfügung. Spätere Funktionen (Geräteseiten, Flow-Nodes, Befehle) bauen darauf auf.
 
 ## Begriffe
 
@@ -116,7 +116,7 @@ Ist die Attraccess-Datenbank **älter** als der Sidecar, werden die ihr unbekann
 
 ## Aktionen
 
-Alle Aktionen brauchen `system.plugins.manage`, validieren ihre Eingabe, werden im Audit-Log festgehalten und antworten mit `409` bei einem nicht erlaubten Übergang und mit `404` bei einer unbekannten ID.
+Alle Aktionen brauchen `matter.devices.manage`, validieren ihre Eingabe, werden im Audit-Log festgehalten und antworten mit `409` bei einem nicht erlaubten Übergang und mit `404` bei einer unbekannten ID.
 
 | Aktion                         | Von                                     | Wirkung                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ------------------------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -191,7 +191,7 @@ Sichern Sie vor dem Deinstallieren, was Sie brauchen, und planen Sie ein, die No
 
 ## REST-Endpunkte
 
-Alle Endpunkte liegen unter `/api/matter/…` und brauchen `system.plugins.manage` (eine eigene Matter-Berechtigung folgt in [ATT-1003](https://linear.app/attraccess/issue/ATT-1003)). Keiner sendet einen Befehl an ein Gerät.
+Alle Endpunkte liegen unter `/api/matter/…`. Lesen braucht `matter.devices.read`, jede Änderung `matter.devices.manage` (siehe [Berechtigungen](plugins/matter/permissions.md)). Keiner sendet einen Befehl an ein Gerät.
 
 | Endpunkt                                                                                 | Zweck                                                                              |
 | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -206,4 +206,4 @@ Alle Endpunkte liegen unter `/api/matter/…` und brauchen `system.plugins.manag
 
 Die Audit-Domäne `matter` erfasst `matter.node_quarantined`, `matter.node_detached`, `matter.node_reattached`, `matter.node_claimed`, `matter.node_relinked`, `matter.node_repaired`, `matter.node_archived`, `matter.node_restored`, `matter.node_force_removed`, `matter.node_metadata_updated`, `matter.endpoint_metadata_updated` und `matter.fabric_mismatch_detected`. In der Oberfläche des Audit-Logs erscheinen sie mit lesbaren Namen, etwa „Matter node quarantined“. Der Gegenstand eines Eintrags zeigt eine aus der Plugin-UUID abgeleitete Zahl; die vollständige UUID steht in den Details des Eintrags (`nodeRef`, `endpointRef`, `fabricRef`). Die Einträge enthalten nur IDs, Aufzählungswerte und Kennzeichen, nie freien Text von Geräten oder Geheimnisse. Die Details von `matter.node_detached` und `matter.node_reattached` enthalten `fabricId` und `nodeId`. Telemetrie wird nie auditiert.
 
-Einträge des Abgleichs (`matter.node_quarantined`, `matter.node_detached`, `matter.node_reattached`, `matter.fabric_mismatch_detected`) tragen `initiator`: `system`, wenn ein automatischer Auslöser den Abgleich gestartet hat, `administrator` bei einem manuellen `POST /matter/reconciliation`. Der Host kennt für Plugins keinen System-Akteur, deshalb nennen automatische Einträge den Administrator als Akteur, der zuletzt die Verbindungseinstellungen gespeichert hat. Hat das noch niemand getan, werden automatische Einträge übersprungen und eine Warnung wird protokolliert.
+Einträge des Abgleichs (`matter.node_quarantined`, `matter.node_detached`, `matter.node_reattached`, `matter.fabric_mismatch_detected`) tragen `initiator`: `system`, wenn ein automatischer Auslöser den Abgleich gestartet hat, `administrator` bei einem manuellen `POST /matter/reconciliation`. Automatische Einträge zeigen **System oder anonym** als Akteur, manuelle nennen den Benutzer, der sie gestartet hat.

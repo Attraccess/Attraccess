@@ -1,4 +1,4 @@
-import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { EntityManager } from 'typeorm';
@@ -7,7 +7,7 @@ import type { SidecarConnection } from '../client/connection';
 import { MatterConnectionService } from '../connection/connection.service';
 import { MatterFabricGuard } from '../fabric/guard';
 import { PLUGIN_CONTEXT } from '../plugin-context';
-import { DeviceAuditService, type AuditActor, type DeviceAuditSubject } from './audit.service';
+import { DeviceAuditService, type AuditActor, type AuditBy, type DeviceAuditSubject } from './audit.service';
 import { pruneCommands } from './commands';
 import {
   MatterFabric,
@@ -77,7 +77,7 @@ export class MatterReconciliationService {
   private current: Promise<ReconciliationStatusView> | undefined;
   private queued: Promise<ReconciliationStatusView> | undefined;
   /** The administrator of the newest manual trigger that joined the queued run; null when only automatic ones did. */
-  private queuedPrincipal: PluginAuditPrincipal | null = null;
+  private queuedPrincipal: AuditBy = null;
   /** Whether a trigger that joined the queued run allowed it to run in recovery. */
   private queuedAllowInRecovery = false;
 
@@ -101,17 +101,14 @@ export class MatterReconciliationService {
    * Starts a run. A trigger that arrives during a run does not start a second one in parallel: all of them coalesce
    * into one follow-up run that starts when the current one ends.
    */
-  request(
-    principal: PluginAuditPrincipal | null = null,
-    options: ReconciliationOptions = {},
-  ): Promise<ReconciliationStatusView> {
+  request(by: AuditBy = null, options: ReconciliationOptions = {}): Promise<ReconciliationStatusView> {
     if (!this.current) {
-      this.current = this.execute(principal, options).finally(() => {
+      this.current = this.execute(by, options).finally(() => {
         this.current = undefined;
       });
       return this.current;
     }
-    if (principal) this.queuedPrincipal = principal;
+    if (by) this.queuedPrincipal = by;
     // The run a recovery choice asked for must not lose its permission by joining the queue.
     if (options.allowInRecovery) this.queuedAllowInRecovery = true;
     this.queued ??= this.current
@@ -127,10 +124,7 @@ export class MatterReconciliationService {
     return this.queued;
   }
 
-  private async execute(
-    principal: PluginAuditPrincipal | null,
-    options: ReconciliationOptions,
-  ): Promise<ReconciliationStatusView> {
+  private async execute(by: AuditBy, options: ReconciliationOptions): Promise<ReconciliationStatusView> {
     const startedAt = new Date().toISOString();
     let result: ReconciliationResult;
     let summary: ReconciliationSummary = emptySummary();
@@ -161,12 +155,11 @@ export class MatterReconciliationService {
       });
     });
     // After the commit and never inside it: the audit store is a separate database.
-    const actor: AuditActor | null = audits.length > 0 ? await this.audit.actorFor(principal) : null;
-    if (actor) {
-      const initiator = actor.system ? 'system' : 'administrator';
-      for (const entry of audits) {
-        await this.audit.record(entry.action, actor, entry.subject, { ...entry.details, initiator });
-      }
+    // One operation ID for the run's entries; an automatic run is recorded as the system, never as a user.
+    const actor: AuditActor = this.audit.actorOf(by);
+    const initiator = actor.system ? 'system' : 'administrator';
+    for (const entry of audits) {
+      await this.audit.record(entry.action, actor, entry.subject, { ...entry.details, initiator });
     }
     return this.status();
   }

@@ -133,10 +133,10 @@ test('nightly publishes plugins and the image from one gate and never moves nigh
   const gated = Object.keys(jobs).filter((name) => name !== 'publish-gate' && !publishers.includes(name));
   assert.deepEqual([...jobs['publish-gate'].needs].sort(), gated.sort());
   assert.ok(gated.includes('attractap-lab-hil'));
-  // failed or cancelled blocks, skipped (HIL variable off) does not
+  // failed or cancelled blocks, skipped (HIL variable off) does not; a commit that already passed publishes nothing
   assert.equal(
     jobs['publish-gate'].if,
-    "always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')",
+    "always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.changes.outputs.changed == 'true'",
   );
 
   const steps = jobs['publish-plugins'].steps;
@@ -286,4 +286,19 @@ test('ESP-IDF projects are scope:hardware, so toolchain-free CI runs skip them',
       (step) => step.run === 'pnpm nx run attractap-nfc-emulator:test',
     ),
   );
+});
+
+test('the lab readers run once a night, while every push to main still fills the Nx cache', () => {
+  const nightly = workflow('docker-nightly-latest');
+  assert.deepEqual(Object.keys(nightly.on).sort(), ['schedule', 'workflow_dispatch']);
+  assert.deepEqual(nightly.jobs['attractap-lab-hil'].needs, ['changes']);
+  assert.equal(nightly.jobs['attractap-lab-hil'].if, "needs.changes.outputs.changed == 'true'");
+
+  const cache = workflow('main-nx-cache');
+  assert.deepEqual(cache.on, { push: { branches: ['main'] } });
+  for (const [name, job] of Object.entries(cache.jobs)) {
+    assert.equal(job.uses, undefined, `${name}: no reusable workflows (lab, firmware, companion) on every push`);
+    assert.ok(!JSON.stringify(job).includes('publish'), `${name} must not publish`);
+  }
+  assert.deepEqual(Object.keys(cache.jobs).sort(), ['build', 'lint', 'test', 'typecheck']);
 });

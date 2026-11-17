@@ -3,7 +3,10 @@
     "title": "Matter",
     "subtitle": "Connection to the Matter sidecar.",
     "insecure": "Insecure connection",
-    "insecureText": "The sidecar is reached over plain http on a non-loopback address. The token travels unencrypted. Use https, or keep the sidecar on the same host."
+    "insecureText": "The sidecar is reached over plain http on a non-loopback address. The token travels unencrypted. Use https, or keep the sidecar on the same host.",
+    "insecureTextReadOnly": "The sidecar is reached over plain http on a non-loopback address. The token travels unencrypted. Ask an administrator to check the connection settings.",
+    "noDeviceAccess": "Matter devices are hidden",
+    "noDeviceAccessText": "Your permissions do not include viewing Matter devices. Ask an administrator for \"View Matter devices\" to see the connection, fabric and backup status."
   },
   "status": {
     "title": "Connection status",
@@ -33,13 +36,19 @@
   },
   "hint": {
     "not_configured": "Enter the sidecar URL and token below to connect.",
+    "not_configuredReadOnly": "The Matter sidecar is not set up yet. An administrator needs to connect it.",
     "connecting": "Connecting to the Matter sidecar…",
     "connected": "The plugin is connected to the Matter sidecar.",
     "unavailable": "The sidecar cannot be reached. Check that it is running and that the URL, port and firewall are correct. Attraccess retries automatically.",
+    "unavailableReadOnly": "The sidecar cannot be reached. Attraccess retries automatically. If this persists, ask an administrator to check the sidecar and the connection settings.",
     "unauthorized": "The sidecar rejected the token. Check the token (also after a rotation) and enter it again.",
+    "unauthorizedReadOnly": "The sidecar rejected the token. An administrator needs to enter a valid token.",
     "incompatible": "The versions do not match. Upgrade or downgrade Attraccess, the Matter plugin or the sidecar to the supported combination shown below.",
+    "incompatibleReadOnly": "The versions do not match the supported combination shown below. Ask an administrator to upgrade or downgrade Attraccess, the Matter plugin or the sidecar.",
     "misconfigured": "The URL, the CA certificate or the TLS setup is invalid. Check the URL and path prefix, and that the CA matches the sidecar certificate.",
-    "hostVersion": "This Attraccess version does not report its version. Upgrade Attraccess to {{attraccess}} or newer."
+    "misconfiguredReadOnly": "The URL, the CA certificate or the TLS setup is invalid. Ask an administrator to check the connection settings.",
+    "hostVersion": "This Attraccess version does not report its version. Upgrade Attraccess to {{attraccess}} or newer.",
+    "hostVersionReadOnly": "This Attraccess version does not report its version. Ask an administrator to upgrade Attraccess to {{attraccess}} or newer."
   },
   "form": {
     "title": "Connection settings",
@@ -48,6 +57,7 @@
     "urlDescription": "Use https for anything but the same host. A path prefix for a reverse proxy is allowed.",
     "credential": "Token",
     "credentialDescription": "The shared service token configured on the sidecar. It is never shown again after saving.",
+    "credentialReenter": "You changed the URL or the CA certificate, so enter the token again. A stored token is only sent to the endpoint it was entered for.",
     "credentialConfigured": "Configured (last changed {{time}})",
     "replace": "Replace",
     "cancelReplace": "Keep current token",
@@ -144,6 +154,7 @@
       "sidecar_recovery_required": "The sidecar reports that it needs recovery."
     },
     "uninitializedText": "The sidecar has no fabric yet. Create it to start commissioning devices.",
+    "uninitializedTextReadOnly": "The sidecar has no fabric yet. An administrator needs to create it before devices can be commissioned.",
     "create": "Create fabric",
     "createHint": "Creates the Matter fabric on the sidecar, a recovery key and the first backup.",
     "restoreInstead": "Do you already have a backup of a Matter fabric, for example after reinstalling? Restore it instead of creating a new fabric, so devices stay controllable.",
@@ -179,10 +190,12 @@
       "done": "Done",
       "missing": "No recovery key",
       "missingText": "Backups are encrypted with a recovery key. Generate one to enable backups.",
+      "missingTextReadOnly": "Backups are encrypted with a recovery key. Until an administrator generates one, no backups are made.",
       "generate": "Generate recovery key",
       "generateError": "The recovery key could not be generated",
       "unacknowledged": "Recovery key not confirmed",
       "unacknowledgedText": "A recovery key was generated, but you did not confirm that you stored it. It cannot be shown again. Rotate it to get a new one.",
+      "unacknowledgedTextReadOnly": "A recovery key was generated, but nobody confirmed that it was stored. An administrator needs to rotate it.",
       "rotate": "Rotate recovery key",
       "rotateTitle": "Rotate the recovery key?",
       "rotateText": "A new key encrypts future backups. Existing backups still need the old key, so keep it until they are replaced. The new key is shown once.",

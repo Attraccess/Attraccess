@@ -222,10 +222,8 @@ export class ResourceFlowsService {
     });
   }
 
-  public async getNodes(resourceId: number, type: ResourceFlowNodeType): Promise<ResourceFlowNode[]> {
-    return await this.flowNodeRepository.find({
-      where: { resourceId, type },
-    });
+  public async getNodes(resourceId: number, type: ResourceFlowNodeType, manager = this.flowNodeRepository.manager) {
+    return await manager.find(ResourceFlowNode, { where: { resourceId, type } });
   }
 
   public async getNodesForResources(

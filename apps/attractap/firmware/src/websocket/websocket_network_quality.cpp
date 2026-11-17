@@ -76,7 +76,9 @@ void Websocket::publishNetworkQuality()
                (completedPongProbes >= 3 && pongProbeLossPercent >= this->PONG_PROBE_LOSS_DEGRADED_PERCENT) ||
                missedHeartbeats > 0 ||
               averagePongRttMs >= this->PONG_RTT_DEGRADED_AFTER_MS ||
-              txDepth >= (TX_QUEUE_DEPTH / 2))
+              // The BLE proxy fills the queue up to its answer reserve even on a healthy link (bursts of
+              // pipelined writes); only a backlog past that means the link does not keep up.
+              txDepth > TX_QUEUE_DEPTH - BULK_ANSWER_RESERVE)
     {
         quality = State::NETWORK_QUALITY_DEGRADED;
     }

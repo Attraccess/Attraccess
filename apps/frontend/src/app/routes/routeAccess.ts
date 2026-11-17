@@ -1,5 +1,3 @@
-import type { SystemPermission } from '@attraccess/shared';
-
 /**
  * Resolves a route's permission gate for an already-logged-in user.
  *
@@ -16,9 +14,9 @@ import type { SystemPermission } from '@attraccess/shared';
  */
 export function hasRequiredPermissions(
   authRequired: string | string[],
-  hasPermission: (permission: SystemPermission) => boolean,
+  hasPermission: (permission: string) => boolean,
 ): boolean {
-  const requiredPermissions = (Array.isArray(authRequired) ? authRequired : [authRequired]) as SystemPermission[];
+  const requiredPermissions = Array.isArray(authRequired) ? authRequired : [authRequired];
 
   return requiredPermissions.some((permission) => hasPermission(permission));
 }

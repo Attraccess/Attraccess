@@ -53,7 +53,9 @@ vi.mock('../../../components/permissionPicker', () => ({
   ),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useRbacServiceListPermissions: () => ({ data: [{ key: 'resources.view' }, { key: 'users.delete' }] }),
+  useRbacServiceListPermissions: () => ({
+    data: [{ key: 'resources.view' }, { key: 'users.delete' }, { key: 'matter.devices.read', pluginName: 'matter' }],
+  }),
   useApiTokensServiceListApiTokens: (params: unknown) => {
     state.query(params);
     return {
@@ -206,4 +208,16 @@ it('shows token permissions and dates and handles revocation outcomes', async ()
   fireEvent.click(screen.getByRole('button', { name: 'actions.revoke:Other' }));
   await waitFor(() => expect(state.toast).toHaveBeenCalledWith({ title: 'errors.revokeFailed', type: 'error' }));
   expect(state.refetch).toHaveBeenCalledOnce();
+});
+it('offers plugin permission keys the owner holds and scopes a token to them', async () => {
+  render(<ApiTokensCard availablePermissions={['matter.devices.read']} />);
+  expect(screen.queryByRole('button', { name: 'resources.view' })).toBeNull();
+  fireEvent.change(screen.getByLabelText('nameLabel'), { target: { value: 'Matter export' } });
+  fireEvent.click(screen.getByRole('button', { name: 'matter.devices.read' }));
+  fireEvent.click(screen.getByRole('button', { name: 'actions.create' }));
+  await waitFor(() =>
+    expect(state.create).toHaveBeenCalledWith({
+      requestBody: { name: 'Matter export', permissionKeys: ['matter.devices.read'], expiresAt: undefined },
+    }),
+  );
 });
