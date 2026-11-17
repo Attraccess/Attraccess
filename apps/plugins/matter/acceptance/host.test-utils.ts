@@ -25,7 +25,7 @@ import {
 import { createPluginAuditContext } from '../../../api/src/plugin-system/runtime/audit-context';
 import { MatterConnectionService } from '../backend/connection/connection.service';
 import sourcePlugin from '../backend/plugin';
-import { matterStorage } from '../backend/storage/access';
+import { matterStorage } from '../backend/plugin-storage/access';
 
 export const PLUGIN_ID = 'MatterAcceptance21chr';
 export const HOST_VERSION = '2.0.0';
