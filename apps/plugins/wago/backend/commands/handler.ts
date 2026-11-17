@@ -1,13 +1,10 @@
-import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
-import type { Repository } from '@attraccess/plugins-backend-sdk/sqlite';
 import { randomUUID } from 'node:crypto';
 import { outputBehavior, supportsOutputAction } from '../../channel-behavior';
 import { type WagoConfigurationSnapshot } from '../configuration/model';
 import { commandTopic, parseControllerJson } from '../protocol/index';
-import { WagoConfigurationDraft } from '../configuration/draft.entity';
 import { WagoConfigurationRevision } from '../configuration/revision.entity';
-import { WagoController } from '../controllers/entity';
+import { wagoTables, type WagoControllerRow, type WagoTables } from '../domain-storage';
 import { wagoFlowPreview } from '../flow/preview';
 
 export const DEFAULT_COMMAND_TIMEOUT_SECONDS = 30;
@@ -29,8 +26,8 @@ export function positiveInteger(value: unknown): number | undefined {
 
 export type Dependencies = {
   context: PluginContext;
-  controllers: () => Repository<WagoController>;
-  claimedController: (id: number) => Promise<WagoController>;
+  controllers: () => WagoTables['controllers'];
+  claimedController: (id: number) => Promise<WagoControllerRow>;
   getSettings: () => Promise<{ operationalPrefix: string }>;
   appliedRevision: (controllerId: number) => Promise<WagoConfigurationRevision | null>;
   onCommand?: (controllerId: number, channelId: string, id: string) => void;
@@ -333,7 +330,7 @@ export class WagoCommandHandler {
     if ('errors' in parsed) return parsed.errors;
     const { controllerId, channelId, action, expectedConfigurationRevision } = parsed.value;
     const controller = await this.cached(validationContext, `wago-controller:${controllerId}`, () =>
-      this.dependencies.controllers().findOneBy({ id: controllerId }),
+      this.dependencies.controllers().get(controllerId),
     );
     if (!controller || controller.trustState !== 'claimed')
       return [{ field: 'controllerId', message: 'Select a claimed WAGO controller.' }];
@@ -380,7 +377,7 @@ export class WagoCommandHandler {
         ? []
         : await this.dependencies.controllers().find({
             where: { trustState: 'claimed', ...(previewOnly ? { id: controllerId } : {}) },
-            order: { name: 'ASC' },
+            orderBy: [{ field: 'name', direction: 'asc' }],
           });
     const revision = controllerId ? await this.dependencies.appliedRevision(controllerId) : null;
     const snapshot = revision ? (JSON.parse(revision.snapshot) as WagoConfigurationSnapshot) : null;
@@ -520,9 +517,7 @@ export class WagoCommandHandler {
     if (controllerId) {
       const draft = appliedOnly
         ? null
-        : await sqlitePersistence(this.dependencies.context)
-            .getRepository(WagoConfigurationDraft)
-            .findOneBy({ controllerId });
+        : await wagoTables(this.dependencies.context).configurationDrafts.findOne({ where: { controllerId } });
       try {
         const storedNames = JSON.parse(revision?.presetProvenance ?? draft?.presetProvenance ?? 'null')?.editor?.names;
         if (storedNames && typeof storedNames === 'object' && !Array.isArray(storedNames)) names = storedNames;

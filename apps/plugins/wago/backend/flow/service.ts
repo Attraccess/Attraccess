@@ -22,7 +22,7 @@ import { type WagoConfigurationSnapshot } from '../configuration/model';
 
 import { WagoConfigurationRevision } from '../configuration/revision.entity';
 
-import { WagoController } from '../controllers/entity';
+import { type WagoControllerRow } from '../domain-storage';
 
 import { type WagoOperationalMessage, parseOperationalMessage } from '../protocol/index';
 
@@ -184,23 +184,31 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
 
   protected async loadLatestAppliedRevisions(controllerIds: number[]): Promise<WagoConfigurationRevision[]> {
     if (!controllerIds.length) return [];
-    return this.revisions
-      .createQueryBuilder('revision')
-      .innerJoin(
-        (query) =>
-          query
-            .subQuery()
-            .select('latest.controllerId', 'controllerId')
-            .addSelect('MAX(latest.revision)', 'revision')
-            .from(WagoConfigurationRevision, 'latest')
-            .where('latest.controllerId IN (:...controllerIds)', { controllerIds })
-            .andWhere('latest.state = :state', { state: 'applied' })
-            .groupBy('latest.controllerId'),
-        'latest',
-        'latest.controllerId = revision.controllerId AND latest.revision = revision.revision',
-      )
-      .where('revision.state = :state', { state: 'applied' })
-      .getMany();
+    // The record port has no group-wise maximum: look up each controller's newest applied revision number
+    // (an indexed aggregate that moves no snapshots), then read exactly those rows with one filter.
+    const latest: Array<{ controllerId: number; revision: number }> = [];
+    for (let start = 0; start < controllerIds.length; start += 50) {
+      const found = await Promise.all(
+        controllerIds.slice(start, start + 50).map(async (controllerId) => ({
+          controllerId,
+          revision: (await this.revisions.aggregate('revision', { controllerId, state: 'applied' })).max as number | null,
+        })),
+      );
+      for (const entry of found) if (entry.revision !== null) latest.push({ ...entry, revision: entry.revision });
+    }
+    const rows: WagoConfigurationRevision[] = [];
+    for (let start = 0; start < latest.length; start += 50)
+      rows.push(
+        ...(await this.revisions.find({
+          where: {
+            and: [
+              { state: 'applied' },
+              { or: latest.slice(start, start + 50).map(({ controllerId, revision }) => ({ controllerId, revision })) },
+            ],
+          },
+        })),
+      );
+    return rows;
   }
 
   protected async channels(controllerId: number): Promise<WagoConfigurationSnapshot['logicalChannels']> {
@@ -208,8 +216,8 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
     if (cached) return cached;
     const [revision] = await this.revisions.find({
       where: { controllerId, state: 'applied' },
-      order: { revision: 'DESC' },
-      take: 1,
+      orderBy: [{ field: 'revision', direction: 'desc' }],
+      limit: 1,
     });
     if (!revision) {
       this.channelCache.set(controllerId, []);
@@ -219,7 +227,7 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
     return this.cacheChannels(revision);
   }
 
-  protected store(controller: WagoController, channelId: string, event: WagoOperationalMessage, value: unknown): void {
+  protected store(controller: WagoControllerRow, channelId: string, event: WagoOperationalMessage, value: unknown): void {
     const state: CachedState = {
       controllerId: controller.id,
       hardwareId: controller.hardwareId,
@@ -255,7 +263,7 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
   }
 
   protected applyState(
-    controller: WagoController,
+    controller: WagoControllerRow,
     event: Extract<WagoOperationalMessage, { category: 'state' }>,
     eventTime: number,
     stream: OperationalStream,
@@ -299,7 +307,7 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
   }
 
   protected admitEvent(
-    controller: WagoController,
+    controller: WagoControllerRow,
     event: WagoOperationalMessage,
     eventTime: number,
   ): OperationalStream | undefined {

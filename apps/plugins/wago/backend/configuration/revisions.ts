@@ -1,4 +1,4 @@
-import { WagoConfigurationRevision } from './revision.entity';
+import type { WagoConfigurationRevision } from './revision.entity';
 
 import { type WagoAuditLifecycle, WagoAudit } from '../audit/index';
 
@@ -6,17 +6,18 @@ import { NotFoundException, ConflictException, BadRequestException } from '@nest
 
 import { configurationFlowImpacts } from './flow-references';
 
-import { type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
+import { PluginStorageUniqueViolation, type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
 
 import { configurationHash, configurationDiff, canonicalSnapshot, type ConfigurationValidationError } from './model';
 
 import { validateEditorSnapshot, editorMetadata, type ConfigurationEditorMetadata } from './editor';
 
-import { WagoConfigurationDraft } from './draft.entity';
+import type { WagoConfigurationDraft, WagoConfigurationDraftInput } from './draft.entity';
 
 import { compatibilityError } from '../protocol/index';
 
-import { WagoController } from '../controllers/entity';
+import type { WagoControllerRow } from '../domain-storage';
+import { wagoTransaction } from '../domain-storage';
 
 import { WagoDrafts } from './drafts';
 
@@ -24,7 +25,7 @@ import { runtimeSupportErrors, requireRuntimeSupport } from './channel-enabled';
 
 export abstract class WagoRevisions extends WagoDrafts {
   protected async latestRevision(controllerId: number): Promise<WagoConfigurationRevision | null> {
-    const [revision] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
+    const [revision] = await this.revisions.find({ where: { controllerId }, orderBy: [{ field: 'revision', direction: 'desc' }], limit: 1 });
     return revision ?? null;
   }
 
@@ -49,12 +50,12 @@ export abstract class WagoRevisions extends WagoDrafts {
     force = false,
     reviewedHash?: string,
     principal?: PluginAuditPrincipal,
-    preparedDraft?: WagoConfigurationDraft,
+    preparedDraft?: WagoConfigurationDraftInput,
     onAllocated?: (revision: number) => void,
   ): Promise<WagoConfigurationRevision> {
     const controller = await this.claimedController(controllerId);
     this.requireConfigurationCompatibility(controller);
-    const draft = preparedDraft ?? (await this.drafts.findOneBy({ controllerId }));
+    const draft = preparedDraft ?? (await this.drafts.findOne({ where: { controllerId } }));
     if (!draft) throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
     const validation = validateEditorSnapshot(JSON.parse(draft.snapshot));
     if (validation.length)
@@ -85,30 +86,43 @@ export abstract class WagoRevisions extends WagoDrafts {
       ? new WagoAudit(this.context).begin(principal, controllerId, force ? 'forced_publication' : 'publication')
       : undefined;
     const persist = async () => {
-      if (preparedDraft) await this.drafts.save(preparedDraft);
-      if (
-        previous?.state === 'pending' &&
-        previous.contentHash === contentHash &&
-        (previous.presetProvenance ?? null) === (draft.presetProvenance ?? null)
-      )
-        return dispatch(previous);
-      const revision = this.revisions.create({
-        controllerId,
-        revision: (previous?.revision ?? 0) + 1,
-        snapshot: draft.snapshot,
-        presetProvenance: draft.presetProvenance ?? null,
-        contentHash,
-        state: 'pending',
-        rejectionErrors: null,
-        publishedAt: new Date().toISOString(),
-        reportedAt: null,
+      // The draft and the new revision are stored together; the dispatch to the controller follows the commit.
+      const stored = await wagoTransaction(this.context, async (scope) => {
+        if (preparedDraft) await this.storeDraft(preparedDraft, scope);
+        if (
+          previous?.state === 'pending' &&
+          previous.contentHash === contentHash &&
+          (previous.presetProvenance ?? null) === (draft.presetProvenance ?? null)
+        )
+          return previous;
+        try {
+          return await this.revisions.insert(
+            {
+              controllerId,
+              revision: (previous?.revision ?? 0) + 1,
+              snapshot: draft.snapshot,
+              presetProvenance: draft.presetProvenance ?? null,
+              contentHash,
+              state: 'pending',
+              rejectionErrors: null,
+              publishedAt: new Date().toISOString(),
+              reportedAt: null,
+            },
+            { scope },
+          );
+        } catch (error) {
+          // Another writer allocated this revision number first.
+          if (error instanceof PluginStorageUniqueViolation)
+            throw new ConflictException('configuration changed while publishing; review it again');
+          throw error;
+        }
       });
-      return dispatch(await this.revisions.save(revision));
+      return dispatch(stored);
     };
     return this.auditRevision(lifecycle, persist, () => allocatedRevision);
   }
 
-  protected requireConfigurationCompatibility(controller: WagoController): void {
+  protected requireConfigurationCompatibility(controller: WagoControllerRow): void {
     const incompatibility = compatibilityError({
       protocolVersion: controller.protocolVersion,
       capabilities: JSON.parse(controller.capabilities) as string[],
@@ -125,7 +139,7 @@ export abstract class WagoRevisions extends WagoDrafts {
     metadataDiff: ReturnType<typeof configurationDiff>;
   }> {
     await this.claimedController(controllerId);
-    const draft = await this.drafts.findOneBy({ controllerId });
+    const draft = await this.drafts.findOne({ where: { controllerId } });
     if (!draft) throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
     const previous = await this.latestRevision(controllerId);
     const impacts = await configurationFlowImpacts(
@@ -135,7 +149,7 @@ export abstract class WagoRevisions extends WagoDrafts {
       JSON.parse(draft.snapshot),
     );
     draft.reviewedHash = this.reviewIdentity(draft, previous, impacts);
-    await this.drafts.save(draft);
+    await this.drafts.update({ id: draft.id }, { reviewedHash: draft.reviewedHash });
     const diff = configurationDiff(previous ? JSON.parse(previous.snapshot) : null, JSON.parse(draft.snapshot));
     const metadataDiff = configurationDiff(
       this.metadataFromProvenance(previous?.presetProvenance),
@@ -166,21 +180,19 @@ export abstract class WagoRevisions extends WagoDrafts {
       }
     }
     const serialized = canonicalSnapshot(snapshot);
-    const existing = await this.drafts.findOneBy({ controllerId });
-    const draft =
-      existing ??
-      this.drafts.create({
-        controllerId,
-        snapshot: serialized,
-        reviewedHash: null,
-        presetProvenance: null,
-        updatedAt: '',
-      });
+    const existing = await this.drafts.findOne({ where: { controllerId } });
+    const draft: WagoConfigurationDraftInput = existing ?? {
+      controllerId,
+      snapshot: serialized,
+      reviewedHash: null,
+      presetProvenance: null,
+      updatedAt: '',
+    };
     draft.snapshot = serialized;
     if (provenance !== undefined) draft.presetProvenance = provenance;
     draft.reviewedHash = null;
     draft.updatedAt = new Date().toISOString();
-    return this.drafts.save(draft);
+    return this.storeDraft(draft);
   }
 
   protected metadataFromProvenance(provenance: string | null | undefined): ConfigurationEditorMetadata {
@@ -192,14 +204,14 @@ export abstract class WagoRevisions extends WagoDrafts {
     }
   }
 
-  protected draftIdentity(draft: WagoConfigurationDraft | null): string {
+  protected draftIdentity(draft: WagoConfigurationDraftInput | null): string {
     return configurationHash({
       draft: draft ? { snapshot: draft.snapshot, metadata: draft.presetProvenance ?? null } : null,
     });
   }
 
   protected rollbackIdentity(
-    draft: WagoConfigurationDraft | null,
+    draft: WagoConfigurationDraftInput | null,
     current: WagoConfigurationRevision | null,
     source: WagoConfigurationRevision,
     impacts: Awaited<ReturnType<typeof configurationFlowImpacts>>,
@@ -213,7 +225,7 @@ export abstract class WagoRevisions extends WagoDrafts {
   }
 
   protected reviewIdentity(
-    draft: WagoConfigurationDraft,
+    draft: WagoConfigurationDraftInput,
     current: WagoConfigurationRevision | null,
     impacts: Awaited<ReturnType<typeof configurationFlowImpacts>>,
   ): string {
@@ -253,10 +265,10 @@ export abstract class WagoRevisions extends WagoDrafts {
   }> {
     return this.withConfigurationLock(controllerId, async () => {
       const controller = await this.claimedController(controllerId);
-      const selected = await this.revisions.findOneBy({ controllerId, revision });
+      const selected = await this.revisions.findOne({ where: { controllerId, revision } });
       if (!selected) throw new NotFoundException(`WAGO configuration revision ${revision} not found`);
-      const [current] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
-      const draft = await this.drafts.findOneBy({ controllerId });
+      const [current] = await this.revisions.find({ where: { controllerId }, orderBy: [{ field: 'revision', direction: 'desc' }], limit: 1 });
+      const draft = await this.drafts.findOne({ where: { controllerId } });
       const snapshot = JSON.parse(selected.snapshot);
       const impacts = await configurationFlowImpacts(
         this.context,
@@ -288,7 +300,7 @@ export abstract class WagoRevisions extends WagoDrafts {
   ): Promise<WagoConfigurationRevision> {
     return this.withConfigurationLock(controllerId, async () => {
       await this.claimedController(controllerId);
-      const rejected = await this.revisions.findOneBy({ controllerId, revision });
+      const rejected = await this.revisions.findOne({ where: { controllerId, revision } });
       if (!rejected) throw new NotFoundException(`WAGO configuration revision ${revision} not found`);
       if (
         rejected.state !== 'rejected' ||
@@ -304,11 +316,14 @@ export abstract class WagoRevisions extends WagoDrafts {
         'rejection_acknowledgement',
         { revision },
         async () => {
-          return this.revisions.save({
-            ...rejected,
-            rejectionAcknowledgedAt: new Date().toISOString(),
-            rejectionAcknowledgedBy: principal.userId,
-          });
+          const acknowledged = { rejectionAcknowledgedAt: new Date().toISOString(), rejectionAcknowledgedBy: principal.userId };
+          // Compare-and-set: an acknowledgement that raced this one, or a re-report, wins.
+          const changed = await this.revisions.update(
+            { id: rejected.id, state: 'rejected', reportedAt: rejected.reportedAt, rejectionAcknowledgedAt: null },
+            acknowledged,
+          );
+          if (!changed) throw new ConflictException('rejection changed; refresh and review it before acknowledging');
+          return { ...rejected, ...acknowledged };
         },
       );
     });
@@ -326,10 +341,10 @@ export abstract class WagoRevisions extends WagoDrafts {
     return this.withConfigurationLock(controllerId, async () => {
       const controller = await this.claimedController(controllerId);
       this.requireConfigurationCompatibility(controller);
-      const source = await this.revisions.findOneBy({ controllerId, revision });
+      const source = await this.revisions.findOne({ where: { controllerId, revision } });
       if (!source) throw new NotFoundException(`WAGO configuration revision ${revision} not found`);
       const current = await this.latestRevision(controllerId);
-      const draft = await this.drafts.findOneBy({ controllerId });
+      const draft = await this.drafts.findOne({ where: { controllerId } });
       const snapshot = JSON.parse(source.snapshot);
       const errors = validateEditorSnapshot(snapshot);
       if (errors.length) throw new ConflictException({ message: 'rollback configuration is invalid', errors });
@@ -369,7 +384,7 @@ export abstract class WagoRevisions extends WagoDrafts {
             snapshot,
           ),
         );
-        const replacement = this.drafts.create({
+        const replacement: WagoConfigurationDraftInput = {
           ...draft,
           controllerId,
           snapshot: canonicalSnapshot(snapshot),
@@ -383,7 +398,7 @@ export abstract class WagoRevisions extends WagoDrafts {
           }),
           reviewedHash: null,
           updatedAt: new Date().toISOString(),
-        });
+        };
         const approvedHash = this.reviewIdentity(replacement, current, approvedImpacts);
         replacement.reviewedHash = approvedHash;
         // Publication validates the prepared replacement before persisting either
