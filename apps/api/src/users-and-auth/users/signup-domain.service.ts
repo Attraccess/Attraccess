@@ -1,41 +1,28 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Setting } from '@attraccess/database-entities';
+import { Inject, Injectable } from '@nestjs/common';
+import { SETTINGS_ROWS, type SettingsRows } from '../../settings/settings-rows.port';
 import { ForbiddenSignupDomainException } from './errors/forbiddenSignupDomain.exception';
+
+const SETTING_PARENT = 'auth';
+const SETTING_KEY = 'local_signup_domain_whitelist';
 
 /**
  * Owns the local-signup domain whitelist setting and the derived signup checks.
  */
 @Injectable()
 export class SignupDomainService {
-  constructor(
-    @InjectRepository(Setting)
-    private readonly settingRepository: Repository<Setting>,
-  ) {}
+  constructor(@Inject(SETTINGS_ROWS) private readonly settings: SettingsRows) {}
 
   public async getWhitelist(): Promise<string[]> {
-    const localSignupDomainWhitelist = await this.settingRepository.findOne({
-      where: {
-        parent: 'auth',
-        key: 'local_signup_domain_whitelist',
-      },
-    });
+    const stored = await this.settings.findValue(SETTING_PARENT, SETTING_KEY);
 
-    return (localSignupDomainWhitelist?.value ?? '*')
+    return (stored ?? '*')
       .split(',')
       .map((domain) => domain.trim().toLowerCase())
       .filter((domain) => domain !== '');
   }
 
   public async setWhitelist(domains: string[]): Promise<void> {
-    await this.settingRepository.update(
-      {
-        parent: 'auth',
-        key: 'local_signup_domain_whitelist',
-      },
-      { value: domains.join(',') },
-    );
+    await this.settings.upsertValue(SETTING_PARENT, SETTING_KEY, domains.join(','));
   }
 
   public async isLocalSignupEnabled(): Promise<boolean> {

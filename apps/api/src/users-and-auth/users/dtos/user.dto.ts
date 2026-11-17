@@ -1,6 +1,6 @@
 import { AuthenticationType, SSOProviderType, UserRoleSource, type UserProfile } from '@attraccess/application-models';
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
-import type { UserRoleRecord } from '@attraccess/application-models';
+import type { AccountCredentialRecord, UserAccount, UserRoleRecord } from '@attraccess/application-models';
 import { RoleDto, toRoleDto } from '../../rbac/dtos/role.dto';
 
 /** The authentication detail schema of the API; secrets (password hash, TOTP secret) are not part of it. */
@@ -144,6 +144,28 @@ export function toUserDto(user: UserProfile): UserDto {
     externalIdentifier: user.externalIdentifier,
     creditBalance: user.creditBalance,
     billingFactor: user.billingFactor,
+  };
+}
+
+function toAuthenticationDetailDto(detail: AccountCredentialRecord): AuthenticationDetailDto {
+  return {
+    id: detail.id,
+    userId: detail.userId,
+    type: detail.type,
+    providerType: detail.providerType,
+    providerId: detail.providerId,
+    ssoSubject: detail.ssoSubject,
+  };
+}
+
+/** Maps a user with the relations that were loaded. Email, tokens and lockout state are never mapped. */
+export function toUserAccountDto(account: UserAccount): UserDto {
+  return {
+    ...toUserDto(account),
+    ...(account.authenticationDetails
+      ? { authenticationDetails: account.authenticationDetails.map(toAuthenticationDetailDto) }
+      : {}),
+    ...(account.userRoles ? { userRoles: account.userRoles.map(toUserRoleDto) } : {}),
   };
 }
 

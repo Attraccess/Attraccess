@@ -1,7 +1,6 @@
 import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
-import { Setting } from '@attraccess/database-entities';
+import { SETTINGS_ROWS } from '../../settings/settings-rows.port';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { EmailService } from '../../email/email.service';
 import { AuthService } from '../auth/auth.service';
 import { PasswordPolicyService } from '../password-policy/password-policy.service';
@@ -20,7 +19,7 @@ export function registerUserRegistrationServiceFixture() {
 
   let emailService: EmailService;
 
-  let settingRepository: { findOne: jest.Mock; update: jest.Mock };
+  let settingsRows: { findValue: jest.Mock; upsertValue: jest.Mock; remove: jest.Mock };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -30,8 +29,8 @@ export function registerUserRegistrationServiceFixture() {
         // Real SignupDomainService so the domain-whitelist check is genuinely exercised
         SignupDomainService,
         {
-          provide: getRepositoryToken(Setting),
-          useValue: { findOne: jest.fn(), update: jest.fn() },
+          provide: SETTINGS_ROWS,
+          useValue: { findValue: jest.fn(), upsertValue: jest.fn(), remove: jest.fn() },
         },
         {
           provide: UsersService,
@@ -40,7 +39,7 @@ export function registerUserRegistrationServiceFixture() {
             findMany: jest.fn(),
             createOne: jest.fn(),
             deleteOne: jest.fn(),
-            withTransaction: jest.fn(async (handler) => handler({})),
+            withTransaction: jest.fn(async (handler) => handler({ isOpen: true, afterCommit: jest.fn() })),
             recordCreatedUser: jest.fn(),
             rollbackFailedRegistration: jest.fn(),
             releaseFirstTimeSetupAdminIdentifiers: jest.fn(),
@@ -74,7 +73,7 @@ export function registerUserRegistrationServiceFixture() {
     usersService = module.get<UsersService>(UsersService);
     authService = module.get<AuthService>(AuthService);
     emailService = module.get<EmailService>(EmailService);
-    settingRepository = module.get(getRepositoryToken(Setting));
+    settingsRows = module.get(SETTINGS_ROWS);
   });
   return {
     get audit() {
@@ -92,8 +91,8 @@ export function registerUserRegistrationServiceFixture() {
     get emailService() {
       return emailService;
     },
-    get settingRepository() {
-      return settingRepository;
+    get settingsRows() {
+      return settingsRows;
     },
   };
 }

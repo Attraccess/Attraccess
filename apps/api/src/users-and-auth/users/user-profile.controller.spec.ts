@@ -1,9 +1,10 @@
-import { User } from '@attraccess/database-entities';
 import { RequestMethod } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { instanceToPlain } from 'class-transformer';
 import { AUTH_RATE_LIMIT_METADATA, AUTH_RATE_LIMIT_OPTIONS_METADATA } from '../rate-limiting/rate-limit.decorator';
 import { UserProfileController } from './user-profile.controller';
+import { toUserAccountDto } from './dtos/user.dto';
+import { aUserRecord } from './fakes/in-memory-user-store.test-fixture';
 
 describe('UserProfileController', () => {
   it('accepts account deletion confirmation via POST only', () => {
@@ -63,8 +64,6 @@ describe('UserProfileController', () => {
         deleteAccountToken: 'secret',
       },
     } as never);
-    const adminUser = Object.assign(new User(), { email: 'other@example.com' });
-
     expect(instanceToPlain(currentUser)).toMatchObject({ email: 'me@example.com', dateTimeLocale: 'en-GB' });
     expect(Object.keys(currentUser).sort()).toEqual([
       'billingFactor',
@@ -81,6 +80,7 @@ describe('UserProfileController', () => {
       'updatedAt',
       'username',
     ]);
-    expect(instanceToPlain(adminUser)).not.toHaveProperty('email');
+    // another user's record never maps its email
+    expect(toUserAccountDto(aUserRecord({ email: 'other@example.com' }))).not.toHaveProperty('email');
   });
 });

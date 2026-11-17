@@ -1,16 +1,16 @@
-import { User } from '@attraccess/database-entities';
 import { ApiProperty } from '@nestjs/swagger';
+import { UserDto } from '../users/dtos/user.dto';
 
 export class CreateSessionResponse {
   @ApiProperty({
-    type: User,
+    type: UserDto,
     description: 'The user that has been logged in',
     example: {
       id: 1,
       username: 'testuser',
     },
   })
-  user: User;
+  user: UserDto;
 
   @ApiProperty({
     type: String,

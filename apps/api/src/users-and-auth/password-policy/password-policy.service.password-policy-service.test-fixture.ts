@@ -1,20 +1,20 @@
 import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import {
-  AuthenticationDetail,
-  PasswordHistory,
-  PasswordPolicy,
-  PasswordPolicyOverride,
-} from '@attraccess/database-entities';
-import { PasswordPolicyRole } from '@attraccess/application-models';
+  PASSWORD_POLICY_FIELDS,
+  PasswordPolicyRole,
+  type PasswordPolicyOverrideRecord,
+  type PasswordPolicyValues,
+} from '@attraccess/application-models';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { UNIT_OF_WORK, type TransactionScope, type UnitOfWork } from '../../database/unit-of-work';
+import { CREDENTIAL_STORE } from '../auth/credentials/credential-store.port';
 import { RbacService } from '../rbac/rbac.service';
 import { HibpClient } from './hibp.client';
+import { PASSWORD_POLICY_STORE, type PasswordPolicyOverrideValues } from './password-policy-store.port';
 import { PasswordPolicyService, type AuditContext } from './password-policy.service';
 import { ZxcvbnService } from './zxcvbn.service';
 
-const buildOverride = (overrides: Partial<PasswordPolicyOverride>): PasswordPolicyOverride => ({
+const buildOverride = (overrides: Partial<PasswordPolicyOverrideRecord> = {}): PasswordPolicyOverrideRecord => ({
   role: PasswordPolicyRole.ADMIN,
   minLength: null,
   maxLength: null,
@@ -28,14 +28,10 @@ const buildOverride = (overrides: Partial<PasswordPolicyOverride>): PasswordPoli
   minZxcvbnScore: null,
   historySize: null,
   rotationDays: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  version: 1,
   ...overrides,
 });
 
-const buildRow = (overrides: Partial<PasswordPolicy> = {}): PasswordPolicy => ({
-  id: 1,
+const buildRow = (overrides: Partial<PasswordPolicyValues> = {}): PasswordPolicyValues => ({
   minLength: 12,
   maxLength: 128,
   allowAllUnicode: true,
@@ -48,11 +44,21 @@ const buildRow = (overrides: Partial<PasswordPolicy> = {}): PasswordPolicy => ({
   minZxcvbnScore: 3,
   historySize: 0,
   rotationDays: 0,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  version: 1,
   ...overrides,
 });
+
+/** The rows the in-memory policy store holds. Tests set them directly. */
+export interface PolicyStoreState {
+  policy: PasswordPolicyValues | null;
+  overrides: PasswordPolicyOverrideRecord[];
+}
+
+/** A unit of work whose scope is a plain object; every run hands out the same scope. */
+export function createFakeUnitOfWork(): UnitOfWork & { scope: TransactionScope } {
+  const scope: TransactionScope = { isOpen: true, afterCommit: jest.fn() };
+  return { scope, current: () => undefined, run: async (work) => work(scope) };
+}
+
 export function registerPasswordPolicyServiceFixture() {
   let service: PasswordPolicyService;
 
@@ -68,80 +74,67 @@ export function registerPasswordPolicyServiceFixture() {
     requestId: 'fixture-request',
   };
 
-  let repo: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; update: jest.Mock };
+  let state: PolicyStoreState;
 
-  let overrideRepo: {
-    find: jest.Mock;
-    findOne: jest.Mock;
-    create: jest.Mock;
-    save: jest.Mock;
-    merge: jest.Mock;
-    delete: jest.Mock;
+  let store: {
+    findPolicy: jest.Mock;
+    seedPolicy: jest.Mock;
+    savePolicy: jest.Mock;
+    listOverrides: jest.Mock;
+    findOverride: jest.Mock;
+    saveOverride: jest.Mock;
+    deleteOverride: jest.Mock;
+    recentHistoryHashes: jest.Mock;
+    recordHistory: jest.Mock;
   };
 
-  let historyRepo: {
-    find: jest.Mock;
-    save: jest.Mock;
-    create: jest.Mock;
-    createQueryBuilder: jest.Mock;
-  };
+  let credentials: { findLocalPasswordHash: jest.Mock };
 
-  let authDetailRepo: { findOne: jest.Mock };
+  let unitOfWork: ReturnType<typeof createFakeUnitOfWork>;
 
   let hibp: { check: jest.Mock };
 
   let zxcvbn: { evaluate: jest.Mock };
 
-  let dataSource: { transaction: jest.Mock };
-
-  let manager: { getRepository: (entity: unknown) => unknown };
-
   let rbacService: { getEffectivePermissions: jest.Mock };
 
   beforeEach(async () => {
     identityAudit.record.mockReset();
-    repo = {
-      findOne: jest.fn(async () => buildRow()),
-      create: jest.fn((row) => row),
-      save: jest.fn(async (row) => row),
-      update: jest.fn(async () => ({ affected: 1 })),
+    state = { policy: buildRow(), overrides: [] };
+    store = {
+      findPolicy: jest.fn(async () => (state.policy ? { ...state.policy } : null)),
+      seedPolicy: jest.fn(async (values: PasswordPolicyValues) => {
+        state.policy = { ...values };
+      }),
+      savePolicy: jest.fn(async (changes: Partial<PasswordPolicyValues>) => {
+        if (!state.policy) return null;
+        state.policy = { ...state.policy, ...changes };
+        return { ...state.policy };
+      }),
+      listOverrides: jest.fn(async () => state.overrides.map((override) => ({ ...override }))),
+      findOverride: jest.fn(async (role: PasswordPolicyRole) => {
+        const found = state.overrides.find((override) => override.role === role);
+        return found ? { ...found } : null;
+      }),
+      saveOverride: jest.fn(async (role: PasswordPolicyRole, values: PasswordPolicyOverrideValues) => {
+        const existing = state.overrides.find((override) => override.role === role);
+        const saved = { ...(existing ?? buildOverride({ role })), ...values } as PasswordPolicyOverrideRecord;
+        state.overrides = [...state.overrides.filter((override) => override.role !== role), saved];
+        return { ...saved };
+      }),
+      deleteOverride: jest.fn(async (role: PasswordPolicyRole) => {
+        const before = state.overrides.length;
+        state.overrides = state.overrides.filter((override) => override.role !== role);
+        return state.overrides.length < before;
+      }),
+      recentHistoryHashes: jest.fn(async () => [] as string[]),
+      recordHistory: jest.fn(async () => undefined),
     };
-    overrideRepo = {
-      find: jest.fn(async () => []),
-      findOne: jest.fn(async () => null),
-      create: jest.fn((row) => row),
-      save: jest.fn(async (row) => row),
-      merge: jest.fn((target, source) => Object.assign(target, source)),
-      delete: jest.fn(async () => ({ affected: 1 })),
-      remove: jest.fn(async (row) => row),
-    } as never;
-    const deleteBuilder = {
-      delete: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      execute: jest.fn(async () => ({ affected: 0 })),
-    };
-    historyRepo = {
-      find: jest.fn(async () => []),
-      save: jest.fn(async (row) => row),
-      create: jest.fn((row) => row),
-      createQueryBuilder: jest.fn(() => deleteBuilder),
-    };
-    authDetailRepo = { findOne: jest.fn(async () => null) };
+    credentials = { findLocalPasswordHash: jest.fn(async () => null) };
+    unitOfWork = createFakeUnitOfWork();
     hibp = { check: jest.fn(async () => ({ pwned: false, count: 0, available: true })) };
     zxcvbn = {
       evaluate: jest.fn(() => ({ score: 4, guessesLog10: 12, crackTimesSeconds: {}, warning: '', suggestions: [] })),
-    };
-    const repoByEntity = new Map<unknown, unknown>([
-      [PasswordPolicy, repo],
-      [PasswordPolicyOverride, overrideRepo],
-    ]);
-    const fakeManager = {
-      getRepository: (entity: unknown) => repoByEntity.get(entity) ?? {},
-    };
-    manager = fakeManager;
-    dataSource = {
-      transaction: jest.fn(async (cb: (mgr: typeof fakeManager) => Promise<unknown>) => cb(fakeManager)),
     };
     rbacService = { getEffectivePermissions: jest.fn(async () => new Set<string>()) };
 
@@ -149,11 +142,9 @@ export function registerPasswordPolicyServiceFixture() {
       providers: [
         PasswordPolicyService,
         { provide: AUDIT_RECORDER, useValue: identityAudit },
-        { provide: getRepositoryToken(PasswordPolicy), useValue: repo },
-        { provide: getRepositoryToken(PasswordPolicyOverride), useValue: overrideRepo },
-        { provide: getRepositoryToken(PasswordHistory), useValue: historyRepo },
-        { provide: getRepositoryToken(AuthenticationDetail), useValue: authDetailRepo },
-        { provide: DataSource, useValue: dataSource },
+        { provide: PASSWORD_POLICY_STORE, useValue: store },
+        { provide: CREDENTIAL_STORE, useValue: credentials },
+        { provide: UNIT_OF_WORK, useValue: unitOfWork },
         { provide: HibpClient, useValue: hibp },
         { provide: ZxcvbnService, useValue: zxcvbn },
         { provide: RbacService, useValue: rbacService },
@@ -168,30 +159,30 @@ export function registerPasswordPolicyServiceFixture() {
     get buildRow() {
       return buildRow;
     },
+    get fields() {
+      return PASSWORD_POLICY_FIELDS;
+    },
     get service() {
       return service;
     },
     get identityAudit() {
       return identityAudit;
     },
-    /** The manager the transaction mock hands its callback. */
-    get manager() {
-      return manager;
+    /** The scope the unit of work hands its callback; audit rows are written with it. */
+    get scope() {
+      return unitOfWork.scope;
     },
     get audit() {
       return audit;
     },
-    get repo() {
-      return repo;
+    get state() {
+      return state;
     },
-    get overrideRepo() {
-      return overrideRepo;
+    get store() {
+      return store;
     },
-    get historyRepo() {
-      return historyRepo;
-    },
-    get authDetailRepo() {
-      return authDetailRepo;
+    get credentials() {
+      return credentials;
     },
     get hibp() {
       return hibp;

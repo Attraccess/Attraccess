@@ -8,8 +8,6 @@ import { Module } from '@nestjs/common';
 
 import { PassportModule } from '@nestjs/passport';
 
-import { TypeOrmModule } from '@nestjs/typeorm';
-
 // Services and Controllers
 import { AuthController } from './auth/auth.controller';
 
@@ -53,16 +51,6 @@ import { RbacController } from './rbac/rbac.controller';
 import { RbacModule } from './rbac/rbac.module';
 
 // Constants and Entities
-
-import {
-  ApiToken,
-  ApiTokenPermission,
-  AuthenticationDetail,
-  Permission,
-  ResourceUsage,
-  Setting,
-  User,
-} from '@attraccess/database-entities';
 
 import { APP_INTERCEPTOR, ModuleRef } from '@nestjs/core';
 
@@ -141,6 +129,9 @@ import {
   DATABASE_SESSION_STORE,
   SessionsPersistenceModule,
 } from '../database/adapters/sessions/sessions-persistence.module';
+import { UsersPersistenceModule } from '../database/adapters/users/users-persistence.module';
+import { AuthPersistenceModule } from '../database/adapters/auth/auth-persistence.module';
+import { SettingsPersistenceModule } from '../database/adapters/settings/settings-persistence.module';
 import { SsoPersistenceModule } from '../database/adapters/sso/sso-persistence.module';
 import { PasskeysPersistenceModule } from '../database/adapters/passkeys/passkeys-persistence.module';
 import { RateLimitingPersistenceModule } from '../database/adapters/rate-limiting/rate-limiting-persistence.module';
@@ -168,15 +159,9 @@ export const sessionStoreProvider = {
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      User,
-      AuthenticationDetail,
-      ResourceUsage,
-      Setting,
-      ApiToken,
-      ApiTokenPermission,
-      Permission,
-    ]),
+    UsersPersistenceModule,
+    AuthPersistenceModule,
+    SettingsPersistenceModule,
     SessionsPersistenceModule,
     SsoPersistenceModule,
     PasskeysPersistenceModule,
