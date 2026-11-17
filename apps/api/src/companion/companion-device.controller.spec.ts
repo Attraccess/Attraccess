@@ -1,5 +1,5 @@
-import { NotFoundException } from '@nestjs/common';
-import { CompanionController } from './companion.controller';
+import { BadRequestException, NotFoundException, ValidationPipe } from '@nestjs/common';
+import { CompanionController, RenameCompanionDeviceDto } from './companion.controller';
 import { CompanionService } from './companion.service';
 import type { CompanionGateway } from './companion.gateway';
 import { CompanionGatewayService } from './companion-gateway.service';
@@ -26,6 +26,15 @@ describe('CompanionController device endpoints', () => {
       gateway as unknown as CompanionGateway,
       gatewayService as unknown as CompanionGatewayService,
     );
+  });
+
+  it('keeps the name through the global whitelisting pipe and rejects a missing or empty name', async () => {
+    const pipe = new ValidationPipe({ whitelist: true, transform: true });
+    const meta = { type: 'body' as const, metatype: RenameCompanionDeviceDto };
+
+    await expect(pipe.transform({ name: 'Desk PC' }, meta)).resolves.toMatchObject({ name: 'Desk PC' });
+    await expect(pipe.transform({}, meta)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(pipe.transform({ name: '' }, meta)).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('never returns the token hash when listing, reading or renaming', async () => {

@@ -13,7 +13,8 @@ import {
   Res,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiParam, ApiProperty, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { Response } from 'express';
 import { CompanionService } from './companion.service';
@@ -23,7 +24,12 @@ import { CompanionDeviceDetailDto, CompanionDeviceDto, toCompanionDeviceDto } fr
 import { CompanionManifestDto } from './dtos/companion.dto';
 import { MetricsService } from '../metrics/metrics.service';
 
-class RenameCompanionDeviceDto {
+/** Needs validators: the global ValidationPipe whitelists, so an undecorated `name` is stripped and the update is empty. */
+export class RenameCompanionDeviceDto {
+  @ApiProperty({ description: 'The new display name of the device' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
   name!: string;
 }
 
