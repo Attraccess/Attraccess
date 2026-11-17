@@ -9,7 +9,7 @@ export interface PermissionRecord {
   updatedAt: Date;
 }
 
-export interface RolePermissionRecord {
+interface RolePermissionRecord {
   id: number;
   roleId: number;
   permissionKey: string;

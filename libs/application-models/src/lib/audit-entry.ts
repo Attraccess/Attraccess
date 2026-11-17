@@ -6,7 +6,7 @@ export type AuthenticationMethod = (typeof AUTHENTICATION_METHODS)[number];
 
 export type AuditAuthenticationMethod = AuthenticationMethod;
 
-export type AuditEntryDetails = Record<string, string | number | boolean | null>;
+type AuditEntryDetails = Record<string, string | number | boolean | null>;
 
 /** One audit record before storage: everything but the identity and timestamp the store assigns. */
 export interface AuditEntryDraft {

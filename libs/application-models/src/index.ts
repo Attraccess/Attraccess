@@ -2,7 +2,6 @@ export * from './lib/authentication-type';
 export * from './lib/billing-transaction';
 export * from './lib/csv-export-template';
 export * from './lib/documentation-type';
-export * from './lib/email-layout';
 export * from './lib/email-template';
 export * from './lib/form';
 export * from './lib/message';

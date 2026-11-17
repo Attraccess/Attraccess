@@ -33,14 +33,14 @@ export interface ResourceMaintenanceRequestRecord {
   resultingMaintenance?: ResourceMaintenanceRecord | null;
 }
 
-export interface MaintenanceDurationConfigRecord {
+interface MaintenanceDurationConfigRecord {
   id: number;
   scheduleId: number;
   duration: number;
   unit: UsageDurationUnit;
 }
 
-export interface MaintenanceUsageCountConfigRecord {
+interface MaintenanceUsageCountConfigRecord {
   id: number;
   scheduleId: number;
   thresholdSessions: number;
