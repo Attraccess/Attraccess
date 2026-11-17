@@ -56,14 +56,21 @@ siehe [Persistenz-Garantien](developer/persistence-guarantees.md).
 
 `node scripts/check-persistence-boundaries.mjs` (Teil von `pnpm lint:files`, das die CI bei jedem Pull Request und in
 der Merge Queue ausführt) schlägt fehl, wenn Code außerhalb der Persistenz-Implementierung `typeorm`,
-`@nestjs/typeorm`, `sqlite3`, `better-sqlite3`, `@attraccess/database-entities` oder Adapter-Interna importiert. Erfasst
-werden statische Imports, reine Typ-Imports, Re-Exports, dynamisches `import()`, `require()`, `import x = require()`
-und `import('x')`-Typen.
+`@nestjs/typeorm`, `sqlite3`, `better-sqlite3`, `@attraccess/database-entities` (samt Unterpfaden) oder
+Adapter-Interna importiert. Erfasst werden statische Imports, reine Typ-Imports, Re-Exports, dynamisches `import()`,
+`require()`, `import x = require()` und `import('x')`-Typen.
+
+Adapter-Interna sind `apps/api/src/database/adapters/**`, `apps/api/src/database/sqlite/**` und
+`libs/database-entities`. Nur Nest-Kompositionsdateien (`*.module.ts`) und Tests dürfen sie importieren; Anwendungs-,
+Domänen- und Transportcode erreicht die Persistenz also nur über Ports. Die neutralen Nahtdateien in
+`apps/api/src/database` (`unit-of-work.ts`, `persistence-errors.ts`, `backend/database-backend.ts`) werden wie
+Anwendungscode geprüft. Den Engine-Unterpfad `@attraccess/plugins-backend-sdk/sqlite` darf im Host nur der
+Plugin-Modullader verwenden.
 
 Bestehende Nutzer stehen je Datei in `scripts/persistence-boundaries.baseline.json`. Die Baseline kann nur schrumpfen:
 ein neuer Verstoß schlägt fehl, ebenso eine Datei, die ihren Eintrag nicht mehr braucht, bis er mit
 `node scripts/check-persistence-boundaries.mjs --update` gesenkt wird. Frontend und neutrale Bibliotheken dürfen nie
-eingetragen werden. Erlaubte Orte: `libs/database-entities`, `apps/api/src/database` (Adapter liegen in `database/adapters/<Bereich>`), Migrationsordner und Echt-Engine-Tests (`*.persistence.spec.ts`, `*.integration.spec.ts`, `*.e2e.spec.ts`, `apps/api/src/{e2e,test,__test__,test-utils}`, Plugin-`acceptance/`). Unit-Specs mit gefälschten Repositories bleiben geprüft.
+eingetragen werden. Erlaubte Orte: `libs/database-entities`, die Engine- und Adapterordner unter `apps/api/src/database`, Migrationsordner und Echt-Engine-Tests (`*.persistence.spec.ts`, `*.integration.spec.ts`, `*.e2e.spec.ts`, `apps/api/src/{e2e,test,__test__,test-utils}`, Plugin-`acceptance/`). Unit-Specs mit gefälschten Repositories bleiben geprüft.
 
 ## Zuständigkeit je Funktionsbereich
 
@@ -109,13 +116,22 @@ einem klaren Fehler verweigert (siehe [Plugins auf SDK 2.0 umstellen](plugins/mi
 Das sind akzeptierte Grenzen dieser Änderung, keine versteckte Arbeit:
 
 - Echt-Engine-Tests und -Fixtures dürfen das ORM nutzen (siehe erlaubte Orte oben).
-- Einige Kollaborateure nehmen neben einem `TransactionScope` (`TransactionContext`) noch einen rohen `EntityManager`
-  an, solange ihre Aufrufer umziehen, etwa der Audit-Recorder. Adapter entpacken beide Formen.
-- Drei kleine Helfer entpacken einen Scope für Adapter (`TransactionHandles`, `TransactionContextResolver`,
-  `EntityManagerResolver`). Sie teilen eine Unit of Work je Verbindung (`unitOfWorkFor`) und lassen sich zu einem vereinen.
+- Ports nehmen nur einen `TransactionScope`. Vier Adapter öffnen noch eine eigene ORM-Transaktion (SSO-Provider-Store,
+  Wartungsplan-Store, E-Mail-Vorlagen-Store, Wartungs-Snapshot-Leser) und reichen sie als `LegacyEngineTransactionScope`
+  (`adapters/common/legacy-engine-transaction.ts`) an Kollaborateure weiter; kein Port nennt diesen Typ. Ziehen diese
+  Adapter auf die Unit of Work um, entfällt er.
+- Adapter entpacken einen Scope mit einigen kleinen Helfern (`TransactionHandles`, `TransactionContextResolver`,
+  `EntityManagerResolver`, `managerFor`). Alle lösen über die eine globale Unit of Work auf und lassen sich vereinen.
+- Die eingebauten Plugins nutzen den Unterpfad `@attraccess/plugins-backend-sdk/sqlite` direkt in ihren Services und
+  deklarieren nur `sqlite`. Für eine andere Engine braucht es zuerst plugin-eigene Stores, hinter die dieser Code zieht.
+- Der Transaktions-Manager des Unterpfads `/sqlite` erreicht jede Tabelle der Verbindung, wie `dataSource` in 1.x. Er
+  bleibt an die Berechtigung `DATABASE_ACCESS` gebunden; die neutrale SDK-Wurzel bietet keinen solchen Zugriff.
+- Die Engine-Deklaration in `plugin.json` wird vor Installation, Migration und Laden geprüft. Die Deklaration am
+  Backend-Modul ist erst bekannt, wenn dessen Code läuft; sie wird beim Laden geprüft, also nach den Migrationen, die
+  die `plugin.json`-Deklaration erlaubt hat.
+- Einige Lifecycle-Test-Fixtures bauen ältere Schemas absichtlich mit `synchronize`, um Upgrades und Wiederherstellung
+  aus einem Schema vor den Integritätsmigrationen zu testen.
 - Swagger-Schemas, die geheime oder nie befüllte Felder dokumentierten, sind jetzt korrekt (siehe unten).
-- Nach dem Abzweigen dieses Branches in `main` gelandeter Code (etwa die MCP-OAuth-Tabellen) liegt noch nicht hinter
-  Ports. Die Grenzprüfung lässt die CI daran fehlschlagen, bis er umgezogen ist.
 
 ## Vertragstreue
 
@@ -136,6 +152,13 @@ Gegenüber dem Vertrag vor dieser Änderung ist AsyncAPI identisch, und der HTTP
 - Als Akteure eingebettete Benutzer (Einweiser, Einweisungen, Wartung) nutzen `ResourceActorUserDto` statt des vollen
   `User`-Schemas.
 - Einige Eigenschaften wechseln zwischen `type: object` und `allOf`/`$ref` mit demselben referenzierten Schema.
+
+Zwei undokumentierte Antwortdetails haben sich ebenfalls geändert; Swagger hat sie nie beschrieben, und kein Client
+liest sie:
+
+- `PATCH` eines Attractap-Lesers bettet die Abrechnungskonfigurationen, Einweiser und Einweiser-Benutzer seiner
+  Ressourcen nicht mehr ein.
+- Antworten auf erteilte Einweisungen enthalten keine `{ id }`-Platzhalter ihrer Relationen mehr.
 
 ### Vertrag zweier Commits vergleichen
 

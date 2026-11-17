@@ -1,4 +1,5 @@
 # Plugins installieren
+
 <!-- llms-description: Plugins über die Weboberfläche hochladen, aktivieren, deaktivieren und entfernen, mit Fehlerbehebung. -->
 
 Plugins werden durch Hochladen ueber die Attraccess-Weboberflaeche installiert. Diese Seite erklaert, wie Sie Plugins hochladen, aktivieren und verwalten.
@@ -68,6 +69,14 @@ Plugins koennen ein- oder ausgeschaltet werden, ohne sie zu entfernen:
 
 > [!WARNING]
 > Das Entfernen eines Plugins loescht es dauerhaft aus dem System. Sie muessen die Plugin-Datei erneut hochladen, wenn Sie es wieder verwenden moechten.
+
+## Upgrade auf Attraccess 2.0
+
+Attraccess 2.0 hat das Plugin-SDK geändert. Für 1.x gebaute Plugins werden nicht geladen: Sie bleiben mit einem Fehler
+in der Plugin-Liste, der das Plugin nennt und auf die [Umstellungsanleitung](plugins/migrating-to-2.md) verweist, und
+ihre Daten bleiben unverändert. Installieren Sie vor oder direkt nach dem Upgrade den 2.0-Build jedes Plugins (Upload
+oder Marktplatz) oder löschen Sie das alte Plugin aus der Liste. Das Löschen eines abgelehnten Plugins entfernt seine
+Dateien, ohne seinen Code auszuführen.
 
 ## Fehlerbehebung
 

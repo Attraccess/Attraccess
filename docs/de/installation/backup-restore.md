@@ -64,6 +64,8 @@ Die SQLite-Datenbank enthält die Kerndaten **und die Tabellen aller Plugins** s
   erstellt wurde, oder eine neuere. Neuere Versionen aktualisieren die Datenbank beim Start; eine ältere Version kann
   eine von einer neueren migrierte Datenbank nicht öffnen.
 - Guthaben, Preis-Snapshots und Zählerwerte liegen als exakte Werte vor und kommen unverändert zurück.
+- Ein 1.x-Backup behält unter Attraccess 2.0 oder neuer die Daten seiner Plugins, die 1.x-Plugins werden aber abgelehnt,
+  bis ihre 2.0-Builds installiert sind (siehe [Plugins installieren](plugins/installing-plugins.md#upgrade-auf-attraccess-20)).
 
 Dieselben Anforderungen (stabile Bezeichner, Zeitstempel, exakte Werte, Plugin-Daten und Migrationsstand) bilden den
 [Export-/Import-Vertrag](developer/adding-a-database-backend.md) für andere Datenbank-Engines.

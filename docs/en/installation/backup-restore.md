@@ -64,6 +64,8 @@ The SQLite database holds the core data **and the tables of all plugins** togeth
   or a newer one. Newer versions upgrade the database on start; an older version cannot open a database that a newer
   one has migrated.
 - Balances, price snapshots and meter values are stored as exact values and come back unchanged.
+- Restoring a 1.x backup on Attraccess 2.0 or later keeps the data of its plugins, but 1.x plugins are refused until
+  their 2.0 builds are installed (see [Installing Plugins](plugins/installing-plugins.md#upgrading-to-attraccess-20)).
 
 The same requirements (stable identifiers, timestamps, exact values, plugin data and migration state) define the
 [export and import contract](developer/adding-a-database-backend.md) for other database engines.

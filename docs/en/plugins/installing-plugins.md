@@ -1,4 +1,5 @@
 # Installing Plugins
+
 <!-- llms-description: How to upload, enable, disable and remove plugins in the web interface, with troubleshooting. -->
 
 Plugins are installed by uploading them through the Attraccess web interface. This page explains how to upload, enable and manage plugins.
@@ -68,6 +69,13 @@ Plugins can be toggled on or off without removing them:
 
 > [!WARNING]
 > Removing a plugin permanently deletes it from the system. You will need to re-upload the plugin file if you want to use it again.
+
+## Upgrading to Attraccess 2.0
+
+Attraccess 2.0 changed the plugin SDK. Plugins built for 1.x are not loaded: they stay in the plugin list with an error
+that names the plugin and links the [migration guide](plugins/migrating-to-2.md), and their data is left untouched.
+Before or right after upgrading, install the 2.0 build of each plugin (upload or marketplace), or delete the old plugin
+from the list. Deleting a refused plugin removes its files without running its code.
 
 ## Troubleshooting
 
