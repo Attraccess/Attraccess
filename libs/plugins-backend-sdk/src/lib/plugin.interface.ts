@@ -152,6 +152,8 @@ export enum PluginPermission {
   SEND_NOTIFICATIONS = 'SEND_NOTIFICATIONS',
   /** Use the Bluetooth radio of administrator-approved Attractap readers through context.ble, limited to the plugin's own BLE profiles. */
   BLE_TRANSPORT = 'BLE_TRANSPORT',
+  /** Authenticate NFC cards held to the plugin's own devices through context.cards. The plugin never sees card keys. */
+  CARD_AUTHENTICATION = 'CARD_AUTHENTICATION',
 }
 
 /**
@@ -178,6 +180,8 @@ export const PLUGIN_PERMISSION_DESCRIPTIONS: Record<PluginPermission, string> = 
     'Send notifications to users (in-app, push and email) under plugin-declared notification categories.',
   [PluginPermission.BLE_TRANSPORT]:
     'Use the Bluetooth radio of Attractap readers that an administrator opened for plugins, limited to the BLE profiles this plugin registers.',
+  [PluginPermission.CARD_AUTHENTICATION]:
+    "Authenticate NFC cards held to the plugin's own devices with the Attraccess card keys. The plugin receives the card and its owner, never the keys.",
 };
 
 /**

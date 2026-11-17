@@ -85,6 +85,7 @@
   - [Plugins auf SDK 2.0 umstellen](plugins/migrating-to-2.md)
   - [Bluetooth-Transport für Plugins](plugins/ble-transport.md)
   - [Plugin-Speicher](plugins/plugin-storage.md)
+  - [Kartenauthentifizierung für Plugins](plugins/card-authentication.md)
   - **Reservierungen**
     - [Überblick](plugins/reservations/overview.md)
     - [Reservierungen nutzen](plugins/reservations/using-reservations.md)

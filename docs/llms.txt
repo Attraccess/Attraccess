@@ -93,6 +93,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Migrating Plugins to SDK 2.0](https://docs.attraccess.org/en/plugins/migrating-to-2.md): Migrating plugins to Attraccess 2.0: no database access, host ports instead of host entities, declared tables with neutral migrations and the record port, a porting guide and the refusal rules.
 - [Bluetooth Transport for Plugins](https://docs.attraccess.org/en/plugins/ble-transport.md): Describes the BLE transport contract that backend plugins use to talk to Bluetooth devices through Attractap readers: profiles, endpoints, sessions, errors, limits and testing with the fake.
 - [Plugin Storage](https://docs.attraccess.org/en/plugins/plugin-storage.md): How a plugin keeps data of its own without database access: declaring tables, shipping neutral migrations, using the record port context.storage, transactions, errors and test fakes.
+- [Card Authentication for Plugins](https://docs.attraccess.org/en/plugins/card-authentication.md): How backend plugins with CARD_AUTHENTICATION let Attraccess authenticate an NFC card on their own device over a card channel: limits, failure reasons, BLE example.
 
 ## English: Reservations
 - [Overview](https://docs.attraccess.org/en/plugins/reservations/overview.md): The Reservations plugin lets members book a resource for a time window; overview, prerequisites and links to member, administrator and API pages.
@@ -246,6 +247,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Plugins auf SDK 2.0 umstellen](https://docs.attraccess.org/de/plugins/migrating-to-2.md): Plugins auf Attraccess 2.0 umstellen: kein Datenbankzugriff, Host-Ports statt Host-Entitäten, deklarierte Tabellen mit neutralen Migrationen und Record-Port, Portierungsanleitung und Ablehnungsregeln.
 - [Bluetooth-Transport für Plugins](https://docs.attraccess.org/de/plugins/ble-transport.md): Beschreibt den BLE-Transportvertrag, über den Backend-Plugins mit Bluetooth-Geräten über Attractap-Reader sprechen: Profile, Endpunkte, Sitzungen, Fehler, Grenzwerte und Tests mit dem Fake.
 - [Plugin-Speicher](https://docs.attraccess.org/de/plugins/plugin-storage.md): Wie ein Plugin eigene Daten ohne Datenbankzugriff hält: Tabellen deklarieren, neutrale Migrationen mitliefern, den Record-Port context.storage nutzen, Transaktionen, Fehler und Test-Fakes.
+- [Kartenauthentifizierung für Plugins](https://docs.attraccess.org/de/plugins/card-authentication.md): Wie Backend-Plugins mit CARD_AUTHENTICATION eine NFC-Karte an ihrem Gerät über einen Kartenkanal authentifizieren lassen: Grenzwerte, Fehlergründe, BLE-Beispiel.
 
 ## Deutsch: Reservierungen
 - [Überblick](https://docs.attraccess.org/de/plugins/reservations/overview.md): Das Plugin Reservierungen lässt Mitglieder eine Ressource für ein Zeitfenster buchen; Überblick, Voraussetzungen und Links zu Mitglieder-, Administrations- und API-Seiten.

@@ -5,8 +5,9 @@ import {
   type PluginBleSession,
 } from '@attraccess/plugins-backend-sdk';
 import type { LoggerService } from '@nestjs/common';
+import type { ModuleRef } from '@nestjs/core';
 import { registerPluginBleProfile } from './plugin-ble-profile-registry';
-import type { PluginBleCaller, PluginBleService } from './plugin-ble.service';
+import { PluginBleService, type PluginBleCaller } from './plugin-ble.service';
 
 /**
  * `context.ble` for one plugin. `registerProfile` is synchronous and needs no host singleton, so it works from
@@ -64,4 +65,21 @@ export function createPluginBleContext(
       }
     },
   };
+}
+
+/**
+ * The plugin module is destroyed (disable, uninstall, restart, shutdown): its BLE sessions close with `shutdown`.
+ * A plugin that never got host refs has none. A failure is logged, never blocking the unload.
+ */
+export async function closePluginBleSessions(
+  moduleRef: ModuleRef | null,
+  pluginId: string,
+  logger: LoggerService,
+): Promise<void> {
+  if (!moduleRef) return;
+  try {
+    await moduleRef.get(PluginBleService, { strict: false }).closePluginSessions(pluginId, 'shutdown');
+  } catch (error) {
+    logger.warn(`Closing BLE sessions of plugin ${pluginId} failed: ${(error as Error).message}`);
+  }
 }

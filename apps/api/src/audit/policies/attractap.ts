@@ -16,8 +16,9 @@ export interface AttractapAuditInput {
 export const attractapDetails = {
   'reader.registered': new Set(['source']),
   'reader.deregistered': new Set(['source']),
-  'card.linked': new Set(['readerId', 'source']),
-  'card.unlinked': new Set(['readerId', 'source']),
+  // A card check on a plugin's own device names the plugin instead of a reader.
+  'card.linked': new Set(['readerId', 'pluginId', 'source']),
+  'card.unlinked': new Set(['readerId', 'pluginId', 'source']),
   'reader.crash_reported': new Set(['source', 'resetReason', 'hasCoredump']),
   'reader.enrolled': new Set(['method']),
   'reader.pairing_confirmed': new Set(['mode', 'method']),
@@ -145,6 +146,8 @@ const detailValidators: Record<string, (value: DetailValue) => boolean> = {
     'admin-api',
     'reader-enrollment',
     'reader-reset',
+    'reader-recovery',
+    'plugin-recovery',
     'signing-backup',
     'recovery-file',
   ),
@@ -153,6 +156,7 @@ const detailValidators: Record<string, (value: DetailValue) => boolean> = {
   resetReason: (value) => attractapResetReasons.has(value as string),
   hasCoredump: (value) => typeof value === 'boolean',
   readerId: positive,
+  pluginId: (value) => typeof value === 'string' && /^[a-zA-Z0-9_-]{21}$/.test(value),
   count: positive,
   mode: oneOf('new', 'pair', 'takeover'),
   method: oneOf('code', 'led-pattern', 'flasher'),

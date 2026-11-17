@@ -162,6 +162,26 @@ describe('AuditRecorder', () => {
       expect(projectAuditRow({ ...samples.attractap, subject: { type: 'attractap.card', id: 3 } })).toBeNull();
     });
 
+    it('keeps card records of an interrupted enrollment or reset that a card check finished', () => {
+      const card = { ...samples.attractap, subject: { type: 'attractap.card', id: 3 } };
+      const pluginId = 'N8Y8XC2lgb9uirCpv4UlA';
+      for (const [action, details] of [
+        ['attractap.card.linked', { source: 'reader-recovery' }],
+        ['attractap.card.linked', { source: 'plugin-recovery', pluginId }],
+        ['attractap.card.unlinked', { readerId: 31, source: 'reader-recovery' }],
+        ['attractap.card.unlinked', { pluginId, source: 'plugin-recovery' }],
+      ] as const) {
+        expect(projectAuditRow({ ...card, action, details } as never)).toMatchObject({ details });
+      }
+      expect(
+        projectAuditRow({
+          ...card,
+          action: 'attractap.card.linked',
+          details: { source: 'plugin-recovery', pluginId: 'not a plugin id' },
+        } as never),
+      ).toBeNull();
+    });
+
     it('rejects a non-success outcome for domains that record successful changes only', () => {
       expect(projectAuditRow({ ...samples.resource, outcome: 'failed' })).toBeNull();
       expect(projectAuditRow({ ...samples.identity, outcome: 'failed' })).toMatchObject({ outcome: 'failed' });
