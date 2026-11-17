@@ -59,7 +59,9 @@ export class AttractapSupervisionHandler implements OnModuleInit {
    * closing a cycle (this handler already injects the service).
    */
   public onModuleInit(): void {
-    this.supervisionService.setReaderArmer({ arm: (params) => this.armReader(params) });
+    this.supervisionService.setReaderArmer({
+      arm: (params) => this.armReader({ ...params, requester: params.requester as unknown as CoreUser }),
+    });
   }
 
   /** Reader aborted (cancel button / its own 30s timeout). Tear down the pending web request. */

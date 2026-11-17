@@ -65,3 +65,5 @@ export * from './lib/resource-flow-node/metering-schemas';
 export * from './lib/resource-flow-node/schema-registry';
 export * from './lib/flow-records';
 export * from './lib/metering-records';
+export * from './lib/resource-introduction-records';
+export * from './lib/resource-records';

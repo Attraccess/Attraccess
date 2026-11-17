@@ -5,6 +5,7 @@ import { Observable } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ResourceUsage } from '@attraccess/database-entities';
+import type { UsageSession } from '@attraccess/application-models';
 import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper';
 import { SupervisionService } from './supervision.service';
 import { SupervisionLiveService } from './supervision-live.service';
@@ -43,7 +44,7 @@ export class SupervisionController {
     @Body() dto: RequestSupervisedSessionDto,
     @Req() req: AuthenticatedRequest,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<ResourceUsage> {
+  ): Promise<UsageSession> {
     const controller = new AbortController();
     const onClose = () => {
       if (!res.writableEnded) controller.abort();
@@ -93,7 +94,7 @@ export class SupervisionController {
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
   @ApiResponse({ status: 403, description: 'You are not the requested supervisor for this session.' })
   @ApiResponse({ status: 404, description: 'The request was not found or has already expired.' })
-  approveRequest(@Param('requestId') requestId: string, @Req() req: AuthenticatedRequest): Promise<ResourceUsage> {
+  approveRequest(@Param('requestId') requestId: string, @Req() req: AuthenticatedRequest): Promise<UsageSession> {
     return this.supervisionService.approve(
       requestId,
       req.user,

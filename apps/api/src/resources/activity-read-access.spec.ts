@@ -7,7 +7,6 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { firstValueFrom, of, Subject } from 'rxjs';
 import supertest from 'supertest';
 import { Resource, ResourceUsage } from '@attraccess/database-entities';
@@ -33,6 +32,7 @@ import { supervisionModesFrom } from './usage/authorization/supervision-modes.te
 import { ResourceActivityVisibilityService } from './usage/authorization/resource-activity-visibility.service';
 import { PreStartService } from './usage/pre-start/pre-start.service';
 import { SessionEndNotifier } from './usage/pre-start/session-end-notifier.service';
+import { RESOURCE_STORE } from './resource-store.port';
 import { ResourceLiveTopicsProvider } from './resource-live-topics.provider';
 import { LiveTopicsService } from '../live-updates/live-topics.service';
 import { FlowLogRecorderService } from './flows/logs/flow-log-recorder.service';
@@ -204,11 +204,8 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
         { provide: ResourceEventsService, useValue: eventsService },
         { provide: SseInstrumentation, useValue: { wrap: (_name: string, source: unknown) => source } },
         { provide: SettingsService, useValue: { getResourceActivityVisibility: jest.fn(async () => mode) } },
-        {
-          provide: getRepositoryToken(Resource),
-          useValue: { find: supervisionFind },
-        },
         { provide: USAGE_SESSION_STORE, useValue: supervisionModesFrom(supervisionFind) },
+        { provide: RESOURCE_STORE, useValue: { existingIds: jest.fn(async (ids: number[]) => ids) } },
         { provide: LiveTopicsService, useValue: { register: jest.fn() } },
         { provide: FlowLogRecorderService, useValue: {} },
         { provide: PreStartService, useValue: { gateHttp: jest.fn() } },

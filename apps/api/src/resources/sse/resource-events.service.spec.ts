@@ -1,4 +1,4 @@
-import { FindOperator, Repository } from 'typeorm';
+import { FindOperator } from 'typeorm';
 import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
 import { ResourceHealthStatus, ResourceType, ResourceUsageAction } from '@attraccess/application-models';
 import { ResourceEventsService } from './resource-events.service';
@@ -37,17 +37,21 @@ const matches = (usage: ResourceUsage, where: Record<string, unknown>) =>
 const createService = (options: { resource?: Partial<Resource>; usages?: ResourceUsage[] } = {}) => {
   const resource = { id: 1, type: ResourceType.Machine, maxParallelSessions: 1, ...options.resource };
   const usages = options.usages ?? [];
-  const resourceRepository = { findOne: jest.fn(async () => resource) };
-  const usageRepository = {
-    count: jest.fn(
-      async ({ where }: { where: Record<string, unknown> }) => usages.filter((usage) => matches(usage, where)).length,
+  const store = {
+    existingIds: jest.fn(async (ids: number[]) => ids.filter((id) => id === resource.id)),
+    findCapacity: jest.fn(async () => resource),
+    countActiveSessions: jest.fn(
+      async (resourceId: number) =>
+        usages.filter((usage) => matches(usage, { resourceId, ...activeUsageWhere() })).length,
     ),
   };
-  const service = new ResourceEventsService(
-    resourceRepository as unknown as Repository<Resource>,
-    usageRepository as unknown as Repository<ResourceUsage>,
-  );
-  return { service, resourceRepository, usageRepository };
+  const service = new ResourceEventsService(store as never);
+  // The capacity read and the session count, under the names the tests below use.
+  return {
+    service,
+    resourceRepository: { findOne: store.findCapacity },
+    usageRepository: { count: store.countActiveSessions },
+  };
 };
 
 const startedEvent = (overrides: Partial<ResourceUsage> = {}) =>
@@ -150,7 +154,7 @@ describe('slot state reads', () => {
     const callback = jest.fn();
     const sub = (await service.subscribeResource(1)).subscribe(callback);
     await flush();
-    expect(usageRepository.count).toHaveBeenCalledWith({ where: { resourceId: 1, ...activeUsageWhere() } });
+    expect(usageRepository.count).toHaveBeenCalledWith(1);
     expect(callback).toHaveBeenCalledWith({
       data: expect.objectContaining({ inUse: true, activeSessionCount: 1, maxParallelSessions: 5 }),
     });

@@ -1,12 +1,11 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Resource, ResourceGroup } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { ResourceIntroductionsService } from '../introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { ResourceGroupsIntroductionsService } from '../groups/introductions/resourceGroups.introductions.service';
 import { ResourceGroupsIntroducersService } from '../groups/introducers/resourceGroups.introducers.service';
+import { MASS_INTRODUCTION_TARGET_STORE } from './mass-introduction-target-store.port';
 import { MassIntroductionLiveService } from './mass-introduction-live.service';
 import { MassIntroductionService } from './mass-introduction.service';
 import { MassIntroductionReaderPort } from './mass-introduction.types';
@@ -76,16 +75,13 @@ describe('MassIntroductionService', () => {
         { provide: ResourceGroupsIntroducersService, useValue: groupIntroducers },
         { provide: MassIntroductionLiveService, useValue: live },
         {
-          provide: getRepositoryToken(Resource),
+          provide: MASS_INTRODUCTION_TARGET_STORE,
           useValue: {
-            findOne: jest.fn(({ where }) => Promise.resolve({ id: where.id, name: 'Laser' })),
+            findResourceName: jest.fn((id: number) => Promise.resolve({ id, name: 'Laser' })),
+            findGroupName: jest.fn((id: number) => Promise.resolve({ id, name: 'Wood shop' })),
             // Resources of a group (group 3 holds resources 5 and 6).
-            find: jest.fn(() => Promise.resolve([{ id: 5 }, { id: 6 }])),
+            resourceIdsOfGroup: jest.fn(() => Promise.resolve([5, 6])),
           },
-        },
-        {
-          provide: getRepositoryToken(ResourceGroup),
-          useValue: { findOne: jest.fn(({ where }) => Promise.resolve({ id: where.id, name: 'Wood shop' })) },
         },
       ],
     }).compile();
