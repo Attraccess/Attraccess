@@ -31,6 +31,7 @@ import { McpToolRegistry } from './mcp/mcp-tool-registry';
 import type { OpenApiDocument } from './mcp/openapi-tools';
 import { MCP_UNPREFIXED_ROUTES } from './mcp/mcp-routes';
 import { join } from 'path';
+import { rejectEmptyAuthorityTargets } from './app/empty-authority-target';
 
 /** SAML state may carry authentication context. HTTPS is required even when
  * the configured application URL is missing, HTTP, or later changed. Express
@@ -95,6 +96,10 @@ export function configureBootstrapApi(app: NestExpressApplication, appConfig: Ap
 }
 
 export function configureBootstrapHttp(app: NestExpressApplication, appConfig: AppConfigType, bootstrapLogger: Logger) {
+  // Registered before the body parser and the static mounts (which only attach while the app
+  // initialises), so a host-less target is answered before anything reads or serves it.
+  app.use(rejectEmptyAuthorityTargets);
+
   // Plugin configurations can include large device profiles and a previous
   // draft for conflict detection, exceeding Express's default 100 KiB limit.
   app.useBodyParser('json', { limit: '10mb' });

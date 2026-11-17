@@ -11,6 +11,7 @@ import { AddressInfo } from 'net';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { cdnServeStaticOptions } from './cdn-serve-static';
+import { rejectEmptyAuthorityTargets } from './empty-authority-target';
 
 const SECRET = 'SECRET-2d81c6a0-outside-the-cdn-root';
 
@@ -37,13 +38,27 @@ describe('/cdn serve-static', () => {
     mkdirSync(join(storageRoot, 'cdn', 'resources', '1'), { recursive: true });
     writeFileSync(join(storageRoot, 'cdn', 'resources', '1', 'image.txt'), 'image');
     writeFileSync(join(storageRoot, 'attraccess.sqlite'), SECRET);
+    mkdirSync(join(storageRoot, 'docs'));
+    writeFileSync(join(storageRoot, 'docs', 'index.html'), 'docs');
 
-    @Module({ imports: [ServeStaticModule.forRoot(cdnServeStaticOptions(join(storageRoot, 'cdn'), '/cdn'))] })
+    // /docs is mounted as in AppModule: it keeps directory indexes, so only the host-less guard
+    // stops a host-less target from reaching send without a path.
+    @Module({
+      imports: [
+        ServeStaticModule.forRoot(cdnServeStaticOptions(join(storageRoot, 'cdn'), '/cdn'), {
+          rootPath: join(storageRoot, 'docs'),
+          serveRoot: '/docs',
+          renderPath: '/__docs_noop__',
+        }),
+      ],
+    })
     class CdnModule {}
 
     // NestFactory, not Test.createTestingModule: serve-static picks its loader from the
     // HTTP adapter while the module compiles, and a testing module has none yet.
     app = await NestFactory.create(CdnModule, { logger: false });
+    // As in configureBootstrapHttp: registered before the mount attaches while the app initialises.
+    app.use(rejectEmptyAuthorityTargets);
     await app.listen(0, '127.0.0.1');
     port = (app.getHttpServer().address() as AddressInfo).port;
   }, 30_000);
@@ -55,6 +70,19 @@ describe('/cdn serve-static', () => {
 
   it('serves a file inside the CDN root', async () => {
     await expect(rawGet('/cdn/resources/1/image.txt')).resolves.toEqual({ status: 200, body: 'image' });
+  });
+
+  // The host-less guard must not catch a target that names a host, nor a scheme further along the URL.
+  it.each([
+    'http://localhost/cdn/resources/1/image.txt',
+    'HTTP://u@localhost:1/cdn/resources/1/image.txt',
+    '/cdn/resources/1/image.txt?next=file:///x',
+  ])('still serves %s', async (path) => {
+    await expect(rawGet(path)).resolves.toEqual({ status: 200, body: 'image' });
+  });
+
+  it('still serves the docs index', async () => {
+    await expect(rawGet('http://localhost/docs/')).resolves.toEqual({ status: 200, body: 'docs' });
   });
 
   it.each([
@@ -82,9 +110,27 @@ describe('/cdn serve-static', () => {
     'http://localhost/cdn/missing.png',
     'http://localhost:1/cdn/',
     'http:///cdn/missing.png',
+    'http:///cdn',
     'http:///cdn/',
+    'HTTP:///cdn',
     'HTTP:///cdn/',
     'HTTP:///cdn/resources/1/',
+    'Http:///cdn/',
+    'https:///cdn',
+    'https:///cdn/',
+    'HTTPS:///cdn/',
+    'hTtPs:///cdn/missing.png',
+    'http:///cdn/?x=1',
+    'http://:80/cdn/',
+    'http://:/cdn/',
+    'http://@/cdn/',
+    'http://u:p@/cdn/',
+    'http://@:80/cdn/',
+    'http://a@b@/cdn/',
+    'http:///docs',
+    'http:///docs/',
+    'HTTP://:80/docs/',
+    'http://u@/docs/',
   ])('answers %s from the router, not the index fallback', async (path) => {
     const res = await rawGet(path);
 
