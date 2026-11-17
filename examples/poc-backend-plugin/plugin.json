@@ -10,6 +10,5 @@
   "attraccessVersion": {
     "min": "2.0.0-0"
   },
-  "persistence": { "backends": ["sqlite"] },
-  "permissions": ["LISTEN_EVENTS", "DATABASE_ACCESS"]
+  "permissions": ["LISTEN_EVENTS", "PLUGIN_STORAGE"]
 }

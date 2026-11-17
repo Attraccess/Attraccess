@@ -20,18 +20,15 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, 'package');
 
 // Host-shared packages must NEVER be bundled into the backend artifact: they
-// carry the dependency-injection identities, the shared event bus and the
-// single database connection. A bundled copy is treated as a *different* type
-// and silently fails to connect. The SDK itself is safe to bundle.
+// carry the dependency-injection identities and the shared event bus. A bundled
+// copy is treated as a *different* type and silently fails to connect. The SDK itself is safe to bundle.
 const HOST_SHARED_EXTERNALS = [
   '@nestjs/common',
   '@nestjs/core',
   '@nestjs/event-emitter',
   'eventemitter2',
-  'typeorm',
   'reflect-metadata',
   '@attraccess/plugins-backend-sdk',
-  '@attraccess/plugins-backend-sdk/sqlite',
 ];
 
 rmSync(PACKAGE, { recursive: true, force: true });

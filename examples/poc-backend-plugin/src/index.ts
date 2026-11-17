@@ -1,7 +1,7 @@
 // Standalone example backend plugin built OUTSIDE the api app to prove ATT-454
 // real-world dynamic loading: separate package, own bundler, externalized peers.
 import type { PluginBackendModule, PluginContext, SystemEvent } from '@attraccess/plugins-backend-sdk';
-import { Column, Entity, PrimaryGeneratedColumn, sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
+import { definePluginStorage, f, step, table } from '@attraccess/plugins-backend-sdk';
 import { DynamicModule, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
@@ -29,23 +29,26 @@ const RESOURCE_USAGE_STARTED = 'RESOURCE_USAGE_STARTED' as SystemEvent;
  */
 export interface PocPongPayload {
   eventsInstanceMatch: boolean;
-  /** True when the host connection resolved this plugin's entity metadata: one TypeORM copy is shared. */
+  /** True when the record port served the plugin's declared `notes` table (the row came back with its generated key). */
   entityMetadataResolved: boolean;
   savedId: number;
   savedMessage: string;
   hostGreeting: string;
 }
 
-/** The plugin's own table. The host registers it from `persistence.sqlite.entities`; the schema is the plugin's. */
-@Entity({ name: 'poc_note' })
-class PocNote {
-  @PrimaryGeneratedColumn()
-  id!: number;
+/**
+ * The plugin's own storage: one declared table plus a neutral migration. The host creates the table in the plugin's
+ * namespace and migrates it; the plugin has no database access and reads and writes through `context.storage`.
+ */
+const notes = table({
+  id: f.id(),
+  message: f.string(),
+});
 
-  // esbuild does not emit decorator metadata, so the column type is explicit.
-  @Column({ type: 'varchar' })
-  message!: string;
-}
+const pocStorage = definePluginStorage({
+  tables: { notes },
+  migrations: [{ version: 1, name: 'create-notes', steps: [step.createTable('notes', notes)] }],
+});
 
 @Injectable()
 class PocPluginService implements OnModuleInit {
@@ -61,15 +64,15 @@ class PocPluginService implements OnModuleInit {
   }
 
   private async handlePing(message: string): Promise<void> {
-    const repository = sqlitePersistence(this.context).getRepository(PocNote);
-    const saved = await repository.save({ message: `${this.context.manifest.name}:${message}` });
+    const { notes } = this.context.storage.open(pocStorage);
+    const saved = await notes.insert({ message: `${this.context.manifest.name}:${message}` });
     const host = this.context.get<{ greet(): string }>('POC_HOST_GREETER');
 
     const payload: PocPongPayload = {
       eventsInstanceMatch: this.context.events instanceof EventEmitter2,
-      entityMetadataResolved: repository.metadata.tableName === 'poc_note',
-      savedId: Number(saved.id),
-      savedMessage: String(saved.message),
+      entityMetadataResolved: typeof saved.id === 'number',
+      savedId: saved.id,
+      savedMessage: saved.message,
       hostGreeting: host.greet(),
     };
     this.context.events.emit(POC_PONG_EVENT, payload);
@@ -79,7 +82,7 @@ class PocPluginService implements OnModuleInit {
 class PocBackendPluginModule {}
 
 const plugin: PluginBackendModule = {
-  persistence: { sqlite: { entities: [PocNote] } },
+  storage: pocStorage,
   register(context: PluginContext): DynamicModule {
     return {
       module: PocBackendPluginModule,

@@ -13,7 +13,6 @@ const HOST_SHARED_EXTERNALS = [
   '@nestjs/core',
   'reflect-metadata',
   '@attraccess/plugins-backend-sdk',
-  '@attraccess/plugins-backend-sdk/sqlite',
 ];
 
 rmSync(PACKAGE, { recursive: true, force: true });

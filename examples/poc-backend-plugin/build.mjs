@@ -11,10 +11,8 @@ const HOST_SHARED_EXTERNALS = [
   '@nestjs/core',
   '@nestjs/event-emitter',
   'eventemitter2',
-  'typeorm',
   'reflect-metadata',
   '@attraccess/plugins-backend-sdk',
-  '@attraccess/plugins-backend-sdk/sqlite',
 ];
 
 await build({
