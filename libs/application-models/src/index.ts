@@ -42,3 +42,4 @@ export * from './lib/resource-actor-user';
 export * from './lib/resource-maintenance-records';
 export * from './lib/resource-health-records';
 export * from './lib/resource-form-records';
+export * from './lib/resource-introducer-records';
