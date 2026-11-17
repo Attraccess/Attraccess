@@ -191,7 +191,7 @@ overrides:
   sockjs>uuid: ^11.1.1
   '@cyclonedx/cdxgen>body-parser': ^2.4.0
   glob@>=9.0.0 <14.0.2: ^14.0.2
-  minimatch@>=7.0.0 <11.0.1: ^11.0.1
+  minimatch@>=7.0.0 <11.0.1: 10.2.6
   '@hey-api/json-schema-ref-parser>js-yaml': ^4.3.2
   '@angular-devkit/core>picomatch': 4.0.7
 
@@ -201,6 +201,7 @@ patchedDependencies:
   '@peculiar/x509@3.1.0': 2f1181883a42b80639772a1a59f4bee29806e5d14053503a6355502848658cb8
   '@swc-node/register@1.12.1': db85c72433985313803083663189cdafe497bccdceb91884a425cbfb2db1635f
   crap-score@1.2.1: a11d8103444adc51146e0530d7acd5e806f2e83ef290877c3c9bf18ac2647262
+  minimatch@10.2.6: f590f2f357c0aedfdb09ff5a468b9a6cbcb901786e13773cc3f6276b47859628
   nestjs-asyncapi@2.0.1: 10aa759540a7c9c16ead7e61683cf5aa893d85c01f11f85f47960a461726d384
   picomatch@2.3.2: e662ac00569116ba1c32f46c976da1b72e185b1e0f58ff7c1cad19ed422bb7ab
   picomatch@4.0.7: d0ee47c0e434bd675537365d9760c6d13b98b62c3048bae58d7575dd9179dc67
@@ -11606,6 +11607,10 @@ packages:
   minimalistic-assert@1.0.1:
     resolution: {integrity: sha512-UtJcAD4yEaGtjPezWuO9wC4nwUnVH/8/Im3yEHQP4b67cXlD/Qr9hdITCU1xDbSEXg2XKNaP8jsReV7vQd00/A==}
 
+  minimatch@10.2.6:
+    resolution: {integrity: sha512-vpLQEs+VLCr1nU0BXS07maYoFwlDAH0gngQuuttxIwutDFEMHq2blX+8vpgxDdK3J1PwjCJiep77OitTZ4Ll1A==}
+    engines: {node: 18 || 20 || >=22}
+
   minimatch@11.0.3:
     resolution: {integrity: sha512-iny/40PEGkNJQ5/Pv6z3nm6FbRAby32GeZRjCUJk2WnNDbgPSTcdI+DDvLqsgBdD4cD5sMtMheqPPnehCCa8Nw==}
     engines: {node: 18 || 20 || >=22}
@@ -17528,7 +17533,7 @@ snapshots:
       debug: 4.4.3(supports-color@8.1.1)
       dir-compare: 4.2.0
       fs-extra: 11.4.1
-      minimatch: 11.0.8
+      minimatch: 10.2.6(patch_hash=f590f2f357c0aedfdb09ff5a468b9a6cbcb901786e13773cc3f6276b47859628)
       plist: 3.1.0
     transitivePeerDependencies:
       - supports-color
@@ -19016,7 +19021,7 @@ snapshots:
       '@npmcli/name-from-folder': 4.0.0
       '@npmcli/package-json': 7.0.5
       glob: 14.0.6
-      minimatch: 11.0.8
+      minimatch: 10.2.6(patch_hash=f590f2f357c0aedfdb09ff5a468b9a6cbcb901786e13773cc3f6276b47859628)
 
   '@npmcli/name-from-folder@4.0.0': {}
 
@@ -19037,7 +19042,7 @@ snapshots:
   '@nx/devkit@24.0.6(nx@24.0.6(@swc-node/register@1.12.1(patch_hash=db85c72433985313803083663189cdafe497bccdceb91884a425cbfb2db1635f)(@swc/core@1.16.22(@swc/helpers@0.5.24))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@7.0.2(patch_hash=fce7f0c87c92a81d33e044239497e3c1c78d2bf2400d5511ab8711f7f94cc084)))(@swc/core@1.16.22(@swc/helpers@0.5.24)))':
     dependencies:
       ejs: 5.0.1
-      minimatch: 11.0.8
+      minimatch: 10.2.6(patch_hash=f590f2f357c0aedfdb09ff5a468b9a6cbcb901786e13773cc3f6276b47859628)
       nx: 24.0.6(@swc-node/register@1.12.1(patch_hash=db85c72433985313803083663189cdafe497bccdceb91884a425cbfb2db1635f)(@swc/core@1.16.22(@swc/helpers@0.5.24))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@7.0.2(patch_hash=fce7f0c87c92a81d33e044239497e3c1c78d2bf2400d5511ab8711f7f94cc084)))(@swc/core@1.16.22(@swc/helpers@0.5.24))
       semver: 7.8.6
       tslib: 2.9.1
@@ -19126,7 +19131,7 @@ snapshots:
       jest-config: 30.5.2(@types/node@26.6.6)(babel-plugin-macros@3.1.0)(supports-color@8.1.1)(ts-node@10.9.2(@swc/core@1.16.22(@swc/helpers@0.5.24))(@types/node@26.6.6)(typescript@7.0.2(patch_hash=fce7f0c87c92a81d33e044239497e3c1c78d2bf2400d5511ab8711f7f94cc084)))
       jest-resolve: 30.5.1
       jsonc-parser: 3.3.1
-      minimatch: 11.0.8
+      minimatch: 10.2.6(patch_hash=f590f2f357c0aedfdb09ff5a468b9a6cbcb901786e13773cc3f6276b47859628)
       picomatch: 4.0.7(patch_hash=d0ee47c0e434bd675537365d9760c6d13b98b62c3048bae58d7575dd9179dc67)
       resolve.exports: 2.0.3
       semver: 7.8.6
@@ -19322,7 +19327,7 @@ snapshots:
       '@nx/js': 24.0.6(@babel/traverse@7.29.8(supports-color@8.1.1))(@swc-node/register@1.12.1(patch_hash=db85c72433985313803083663189cdafe497bccdceb91884a425cbfb2db1635f)(@swc/core@1.16.22(@swc/helpers@0.5.24))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@7.0.2(patch_hash=fce7f0c87c92a81d33e044239497e3c1c78d2bf2400d5511ab8711f7f94cc084)))(@swc/cli@0.8.2(@swc/core@1.16.22(@swc/helpers@0.5.24))(supports-color@8.1.1))(@swc/core@1.16.22(@swc/helpers@0.5.24))(nx@24.0.6(@swc-node/register@1.12.1(patch_hash=db85c72433985313803083663189cdafe497bccdceb91884a425cbfb2db1635f)(@swc/core@1.16.22(@swc/helpers@0.5.24))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@7.0.2(patch_hash=fce7f0c87c92a81d33e044239497e3c1c78d2bf2400d5511ab8711f7f94cc084)))(@swc/core@1.16.22(@swc/helpers@0.5.24)))(supports-color@8.1.1)(verdaccio@7.1.0(bare-buffer@3.7.2)(supports-color@8.1.1)(typanion@3.14.0))
       '@nx/web': 24.0.6(9b1cde3356e59144d76633b8f9189697)
       '@phenomnomnominal/tsquery': 6.2.0(typescript@7.0.2(patch_hash=fce7f0c87c92a81d33e044239497e3c1c78d2bf2400d5511ab8711f7f94cc084))
-      minimatch: 11.0.8
+      minimatch: 10.2.6(patch_hash=f590f2f357c0aedfdb09ff5a468b9a6cbcb901786e13773cc3f6276b47859628)
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
       semver: 7.8.6
@@ -21214,7 +21219,7 @@ snapshots:
       '@swc/counter': 0.1.3
       '@xhmikosr/bin-wrapper': 14.5.2(supports-color@8.1.1)
       commander: 8.3.0
-      minimatch: 11.0.8
+      minimatch: 10.2.6(patch_hash=f590f2f357c0aedfdb09ff5a468b9a6cbcb901786e13773cc3f6276b47859628)
       piscina: 4.9.4
       semver: 7.8.6
       slash: 3.0.0
@@ -21438,7 +21443,7 @@ snapshots:
 
   '@ts-morph/common@0.29.0':
     dependencies:
-      minimatch: 11.0.8
+      minimatch: 10.2.6(patch_hash=f590f2f357c0aedfdb09ff5a468b9a6cbcb901786e13773cc3f6276b47859628)
       path-browserify: 1.0.1
       tinyglobby: 0.2.17
 
@@ -22058,7 +22063,7 @@ snapshots:
       debug: 4.4.3(supports-color@8.1.1)
       globby: 11.1.0
       is-glob: 4.0.3
-      minimatch: 11.0.8
+      minimatch: 10.2.6(patch_hash=f590f2f357c0aedfdb09ff5a468b9a6cbcb901786e13773cc3f6276b47859628)
       semver: 7.8.6
       ts-api-utils: 1.4.3(typescript@7.0.2(patch_hash=fce7f0c87c92a81d33e044239497e3c1c78d2bf2400d5511ab8711f7f94cc084))
     optionalDependencies:
@@ -22073,7 +22078,7 @@ snapshots:
       '@typescript-eslint/types': 8.72.2
       '@typescript-eslint/visitor-keys': 8.72.2
       debug: 4.4.3(supports-color@8.1.1)
-      minimatch: 11.0.8
+      minimatch: 10.2.6(patch_hash=f590f2f357c0aedfdb09ff5a468b9a6cbcb901786e13773cc3f6276b47859628)
       semver: 7.8.6
       tinyglobby: 0.2.17
       ts-api-utils: 2.5.0(patch_hash=6e0258a87801309a898a6f073bf6c87272373f88f9077c9d5c1c33b0935349f3)(typescript@7.0.2(patch_hash=fce7f0c87c92a81d33e044239497e3c1c78d2bf2400d5511ab8711f7f94cc084))
@@ -23054,7 +23059,7 @@ snapshots:
       js-yaml: 4.3.2
       json5: 2.2.3
       lazy-val: 1.0.5
-      minimatch: 11.0.8
+      minimatch: 10.2.6(patch_hash=f590f2f357c0aedfdb09ff5a468b9a6cbcb901786e13773cc3f6276b47859628)
       pkijs: 3.4.3
       plist: 3.1.0
       proper-lockfile: 4.1.2
@@ -24988,7 +24993,7 @@ snapshots:
     dependencies:
       '@one-ini/wasm': 0.2.1
       commander: 14.0.3
-      minimatch: 11.0.8
+      minimatch: 10.2.6(patch_hash=f590f2f357c0aedfdb09ff5a468b9a6cbcb901786e13773cc3f6276b47859628)
       semver: 7.8.6
 
   edn-data@1.2.2: {}
@@ -28329,6 +28334,10 @@ snapshots:
 
   minimalistic-assert@1.0.1: {}
 
+  minimatch@10.2.6(patch_hash=f590f2f357c0aedfdb09ff5a468b9a6cbcb901786e13773cc3f6276b47859628):
+    dependencies:
+      brace-expansion: 5.0.13
+
   minimatch@11.0.3:
     dependencies:
       '@isaacs/nonrecursive-glob-match': 1.1.0
@@ -28436,7 +28445,7 @@ snapshots:
       chokidar: 4.0.3
       glob: 14.0.6
       lodash: 4.18.1
-      minimatch: 11.0.8
+      minimatch: 10.2.6(patch_hash=f590f2f357c0aedfdb09ff5a468b9a6cbcb901786e13773cc3f6276b47859628)
       mjml-core: 5.4.1(svgo@4.1.0)(terser@5.51.2)(typescript@7.0.2(patch_hash=fce7f0c87c92a81d33e044239497e3c1c78d2bf2400d5511ab8711f7f94cc084))
       mjml-parser-xml: 5.4.1
       mjml-preset-core: 5.4.1(svgo@4.1.0)(terser@5.51.2)(typescript@7.0.2(patch_hash=fce7f0c87c92a81d33e044239497e3c1c78d2bf2400d5511ab8711f7f94cc084))
@@ -29200,7 +29209,7 @@ snapshots:
       lines-and-columns: 2.0.3
       log-symbols: 4.1.0
       mimic-fn: 2.1.0
-      minimatch: 11.0.8
+      minimatch: 10.2.6(patch_hash=f590f2f357c0aedfdb09ff5a468b9a6cbcb901786e13773cc3f6276b47859628)
       minimist: 1.2.8
       npm-run-path: 4.0.1
       once: 1.4.0
@@ -31783,7 +31792,7 @@ snapshots:
     dependencies:
       '@istanbuljs/schema': 0.1.6
       glob: 14.0.6
-      minimatch: 11.0.8
+      minimatch: 10.2.6(patch_hash=f590f2f357c0aedfdb09ff5a468b9a6cbcb901786e13773cc3f6276b47859628)
 
   testcontainers@12.2.1(bare-buffer@3.7.2)(supports-color@8.1.1):
     dependencies:

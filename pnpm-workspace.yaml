@@ -37,10 +37,12 @@ overrides:
   'sockjs>uuid': ^11.1.1
   # @cyclonedx/cdxgen 12.9.2 (latest) pins body-parser 2.3.0 for its optional server mode.
   '@cyclonedx/cdxgen>body-parser': ^2.4.0
-  # glob 9-14.0.1 and minimatch 7-11.0.0 have advisories; js-beautify, test-exclude, mjml-cli, editorconfig, @swc/cli,
-  # workbox-build, cdxgen and nx (all latest) still ask for them. Same CJS/ESM exports up to glob 14 and minimatch 11.
+  # glob 9-14.0.1 has an advisory; js-beautify, test-exclude, mjml-cli, @swc/cli, workbox-build and cdxgen (all latest)
+  # still ask for older majors. glob kept the same CJS/ESM exports up to 14.
   'glob@>=9.0.0 <14.0.2': ^14.0.2
-  'minimatch@>=7.0.0 <11.0.1': ^11.0.1
+  # minimatch 11 (the only fixed release) dropped makeRe/AST, which nx, eslint and @angular-devkit still call: one
+  # patched 10.x instead (see patchedDependencies and auditConfig).
+  'minimatch@>=7.0.0 <11.0.1': 10.2.6
   # @hey-api/json-schema-ref-parser 1.4.4 (latest, via codegen 3) pins js-yaml 4.2.0.
   '@hey-api/json-schema-ref-parser>js-yaml': ^4.3.2
   # One picomatch 4 to patch (see patchedDependencies); @angular-devkit/core pins 4.0.4.
@@ -85,6 +87,8 @@ patchedDependencies:
   # nestjs-asyncapi@2.0.1: requires @asyncapi/generator only when rendering HTML, so the override above can drop it.
   # @7nohe/openapi-react-query-codegen@3.2.1: mutation hooks resolve to the response body like its query hooks do,
   #   instead of { data, request, response } behind an `as unknown as Promise<TData>` cast.
+  # minimatch@10.2.6: backports the GHSA-g3hv-75wg-m249 fix (isaacs/minimatch@77a0f5c); its only fixed release is
+  #   minimatch 11, which nx/eslint cannot use. scripts/minimatch-patch.test.mjs checks every locked 7-10 copy is patched.
   # picomatch@4.0.7 / picomatch@2.3.2: backport the GHSA-fc5q-39xc-vjpf ReDoS fix (micromatch/picomatch#237 for v4,
   #   #246 for v2) until picomatch releases it; scripts/picomatch-patch.test.mjs checks every locked copy is patched.
   ts-api-utils@2.5.0: patches/ts-api-utils@2.5.0.patch
@@ -97,8 +101,12 @@ patchedDependencies:
   picomatch@4.0.7: patches/picomatch@4.0.7.patch
   picomatch@2.3.2: patches/picomatch@2.3.2.patch
   '@7nohe/openapi-react-query-codegen@3.2.1': patches/@7nohe__openapi-react-query-codegen@3.2.1.patch
+  minimatch@10.2.6: patches/minimatch@10.2.6.patch
 
 auditConfig:
   ignoreGhsas:
     # picomatch <=4.0.7 extglob ReDoS: no release yet; patched; remove when picomatch ships a fix.
     - GHSA-fc5q-39xc-vjpf
+    # minimatch <11.0.1 globparts amplification: fixed only in minimatch 11, which removed makeRe/AST that nx, eslint
+    # and @angular-devkit still call; 10.2.6 patched; remove when they support minimatch 11.
+    - GHSA-g3hv-75wg-m249
