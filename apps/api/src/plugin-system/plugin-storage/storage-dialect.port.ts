@@ -41,7 +41,11 @@ export interface PluginStorageExecutor {
  * committed state. Errors from `work` pass through unchanged so the caller can map them.
  */
 export interface PluginStorageSessions {
-  run<T>(access: 'read' | 'write', scope: PluginTransactionScope | undefined, work: (executor: PluginStorageExecutor) => Promise<T>): Promise<T>;
+  run<T>(
+    access: 'read' | 'write',
+    scope: PluginTransactionScope | undefined,
+    work: (executor: PluginStorageExecutor) => Promise<T>,
+  ): Promise<T>;
 }
 
 /** Turns the resolved migration steps into the engine's DDL. Pure: it only builds statements. */
@@ -68,5 +72,8 @@ export interface PluginStorageMigrationSession {
 
 export interface PluginStorageMigrationDriver {
   /** Runs `work` in one transaction on a connection of its own; commits when it resolves, rolls back when it throws. */
-  transaction<T>(storage: CompiledPluginStorage, work: (session: PluginStorageMigrationSession) => Promise<T>): Promise<T>;
+  transaction<T>(
+    storage: CompiledPluginStorage,
+    work: (session: PluginStorageMigrationSession) => Promise<T>,
+  ): Promise<T>;
 }

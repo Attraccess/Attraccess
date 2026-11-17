@@ -59,12 +59,17 @@ function createTable(table: CompiledTable): string[] {
   }
   for (const fk of table.foreignKeys) {
     const own = fk.fields.map((name) => quote((table.fields.get(name) as CompiledField).column));
-    const action = fk.onDelete ? ` ON DELETE ${fk.onDelete === 'set-null' ? 'SET NULL' : fk.onDelete.toUpperCase()}` : '';
+    const action = fk.onDelete
+      ? ` ON DELETE ${fk.onDelete === 'set-null' ? 'SET NULL' : fk.onDelete.toUpperCase()}`
+      : '';
     parts.push(
       `FOREIGN KEY (${own.join(', ')}) REFERENCES ${quote(fk.referencesPhysical)} (${fk.referencedFields.map(quote).join(', ')})${action}`,
     );
   }
-  return [`CREATE TABLE ${quote(table.physical)} (${parts.join(', ')})`, ...table.indexes.map((index) => createIndex(table, index))];
+  return [
+    `CREATE TABLE ${quote(table.physical)} (${parts.join(', ')})`,
+    ...table.indexes.map((index) => createIndex(table, index)),
+  ];
 }
 
 function createIndex(table: CompiledTable, index: CompiledTable['indexes'][number]): string {

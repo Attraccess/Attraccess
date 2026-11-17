@@ -50,7 +50,11 @@ describe('plugin SDK 2.0 compatibility gate', () => {
       ['the DATABASE_ACCESS permission', { permissions: ['DATABASE_ACCESS'] }, /DATABASE_ACCESS permission/],
       ['the PLUGIN_ENGINE_ACCESS permission', { permissions: ['PLUGIN_ENGINE_ACCESS'] }, /PLUGIN_ENGINE_ACCESS/],
       ['persistence.backends', { persistence: { backends: ['sqlite'] } }, /persistence\.backends/],
-      ['a legacy migrations entry', { main: { migrations: { directory: 'd', entryPoint: 'm.js' } } }, /migrations entry/],
+      [
+        'a legacy migrations entry',
+        { main: { migrations: { directory: 'd', entryPoint: 'm.js' } } },
+        /migrations entry/,
+      ],
     ])('refuses %s, naming the plugin and linking the guide', (_label, extra, reason) => {
       const run = () => assertManifestCompatible({ ...manifest, ...extra });
       expect(run).toThrow(PluginIncompatibleError);
@@ -70,7 +74,7 @@ describe('plugin SDK 2.0 compatibility gate', () => {
       ['require("typeorm")', 'typeorm'],
       ["const { DataSource } = require('typeorm/data-source');", 'typeorm'],
       ["import { Repository } from '@nestjs/typeorm';", '@nestjs/typeorm'],
-      ["module.exports = require(`sqlite3`);", 'sqlite3'],
+      ['module.exports = require(`sqlite3`);', 'sqlite3'],
       ["import x from 'better-sqlite3'", 'better-sqlite3'],
       ["require('pg')", 'pg'],
       ["require('pg/lib/client')", 'pg'],

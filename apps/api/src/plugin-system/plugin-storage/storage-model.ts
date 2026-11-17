@@ -57,7 +57,12 @@ export type ResolvedStep =
   | { readonly op: 'dropTable'; readonly table: CompiledTable }
   | { readonly op: 'addColumn'; readonly table: CompiledTable; readonly field: CompiledField }
   | { readonly op: 'dropColumn'; readonly table: CompiledTable; readonly field: CompiledField }
-  | { readonly op: 'renameColumn'; readonly table: CompiledTable; readonly from: CompiledField; readonly to: CompiledField }
+  | {
+      readonly op: 'renameColumn';
+      readonly table: CompiledTable;
+      readonly from: CompiledField;
+      readonly to: CompiledField;
+    }
   | { readonly op: 'addIndex'; readonly table: CompiledTable; readonly index: CompiledIndex }
   | { readonly op: 'dropIndex'; readonly table: CompiledTable; readonly index: CompiledIndex };
 

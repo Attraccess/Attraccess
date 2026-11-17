@@ -29,12 +29,16 @@ export function describePluginStorageTransactions(fixture: StorageBackendFixture
 
     /** The committed names, as another process reads them (never the uncommitted writes of a running transaction). */
     const committed = async (prefix: string) =>
-      (await harness.db.committed(`SELECT name FROM plugin_conformance_plugin_items WHERE name LIKE '${prefix}%' ORDER BY name`)).map(
-        (row) => String(row.name),
-      );
+      (
+        await harness.db.committed(
+          `SELECT name FROM plugin_conformance_plugin_items WHERE name LIKE '${prefix}%' ORDER BY name`,
+        )
+      ).map((row) => String(row.name));
 
     const names = async (side: { items: { find(q: object): Promise<Array<{ name: string }>> } }, prefix: string) =>
-      (await side.items.find({ where: { name: { startsWith: prefix } }, orderBy: [{ field: 'name' }] })).map((row) => row.name);
+      (await side.items.find({ where: { name: { startsWith: prefix } }, orderBy: [{ field: 'name' }] })).map(
+        (row) => row.name,
+      );
 
     it('commits so that an independent connection sees it, and runs after-commit work then', async () => {
       const writer = await harness.open();
@@ -83,7 +87,9 @@ export function describePluginStorageTransactions(fixture: StorageBackendFixture
       await side.items.insert({ name: 'tx-unique' });
       await side.persistence.transaction(async (scope) => {
         await side.items.insert({ name: 'tx-unique-b' }, { scope });
-        await expect(side.items.insert({ name: 'tx-unique' }, { scope })).rejects.toBeInstanceOf(PluginStorageUniqueViolation);
+        await expect(side.items.insert({ name: 'tx-unique' }, { scope })).rejects.toBeInstanceOf(
+          PluginStorageUniqueViolation,
+        );
         await side.items.insert({ name: 'tx-unique-c' }, { scope });
       });
       expect(await names(side, 'tx-unique')).toEqual(['tx-unique', 'tx-unique-b', 'tx-unique-c']);
@@ -134,7 +140,9 @@ export function describePluginStorageTransactions(fixture: StorageBackendFixture
         const side = await harness.open();
         const outer = side.persistence.transaction(async (scope) => {
           await side.items.insert({ name: 'nest-outer' }, { scope });
-          await side.persistence.transaction(async (inner) => void (await side.items.insert({ name: 'nest-inner' }, { scope: inner })));
+          await side.persistence.transaction(
+            async (inner) => void (await side.items.insert({ name: 'nest-inner' }, { scope: inner })),
+          );
         });
         await expect(withoutDeadlock(outer)).rejects.toThrow(NESTED);
         expect(await names(side, 'nest-')).toEqual([]);
@@ -186,7 +194,9 @@ export function describePluginStorageTransactions(fixture: StorageBackendFixture
           await side.items.insert({ name: 'uow-kept' }, { scope: hostScope });
           // The plugin reads what the same unit wrote, and cannot defer work onto the host's transaction.
           expect(await side.items.count({ name: 'uow-kept' }, { scope: hostScope })).toBe(1);
-          expect(await side.connection.hostData.resources.get(resourceId, hostScope)).toMatchObject({ name: 'uow-resource' });
+          expect(await side.connection.hostData.resources.get(resourceId, hostScope)).toMatchObject({
+            name: 'uow-resource',
+          });
           expect(() => hostScope.afterCommit(() => undefined)).toThrow(/owned by the host/);
           expect(await committed('uow-')).toEqual([]);
         });

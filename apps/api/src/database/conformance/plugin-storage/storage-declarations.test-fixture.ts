@@ -104,5 +104,7 @@ export const adoptingV3 = definePluginStorage({
 /** A second plugin: its names must never meet the first one's. */
 export const otherStorage = definePluginStorage({
   tables: { things: table({ id: f.id(), name: f.string() }) },
-  migrations: [{ version: 1, name: 'baseline', steps: [step.createTable('things', table({ id: f.id(), name: f.string() }))] }],
+  migrations: [
+    { version: 1, name: 'baseline', steps: [step.createTable('things', table({ id: f.id(), name: f.string() }))] },
+  ],
 });

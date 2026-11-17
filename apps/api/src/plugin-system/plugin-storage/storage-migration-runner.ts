@@ -1,7 +1,4 @@
-import type {
-  PluginMigrationEngine,
-  PluginStorageMigrationPlan,
-} from '../persistence/plugin-migration-engine.port';
+import type { PluginMigrationEngine, PluginStorageMigrationPlan } from '../persistence/plugin-migration-engine.port';
 import type { PluginStorageDdl, PluginStorageMigrationDriver } from './storage-dialect.port';
 import {
   type CompiledPluginStorage,
@@ -54,11 +51,15 @@ export function planStorageMigration(
   const known = new Set(storage.legacyMigrations);
   const unknown = names.filter((name) => !known.has(name));
   if (unknown.length > 0) {
-    throw refuse(`the 1.x migrations ${unknown.join(', ')} are applied but this release does not know them. Update the plugin.`);
+    throw refuse(
+      `the 1.x migrations ${unknown.join(', ')} are applied but this release does not know them. Update the plugin.`,
+    );
   }
   const missing = storage.legacyMigrations.filter((name) => !names.includes(name));
   if (missing.length > 0) {
-    throw refuse(`the 1.x migrations ${missing.join(', ')} are not applied (partial history). ${INSTALL_FIRST_RELEASE}`);
+    throw refuse(
+      `the 1.x migrations ${missing.join(', ')} are not applied (partial history). ${INSTALL_FIRST_RELEASE}`,
+    );
   }
   return { pending: versions.filter((version) => version > 1), adopt: true };
 }

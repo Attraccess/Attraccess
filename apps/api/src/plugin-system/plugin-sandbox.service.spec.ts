@@ -1,11 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import {
-  PluginContext,
-  PluginPermission,
-  PluginPermissionError,
-  SystemEvent,
-} from '@attraccess/plugins-backend-sdk';
+import { PluginContext, PluginPermission, PluginPermissionError, SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { DataSource, EntityManager } from 'typeorm';
 import { PluginSandboxService } from './plugin-sandbox.service';
 
@@ -216,7 +211,10 @@ describe('PluginSandboxService', () => {
     it.each([DataSource, EntityManager, 'DataSource', 'UserRepository'])(
       'never resolves a database handle through context.get (%p), whatever the permission',
       (token) => {
-        const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), Object.values(PluginPermission));
+        const ctx = PluginSandboxService.createGuardedContext(
+          buildBaseContext(events),
+          Object.values(PluginPermission),
+        );
         expect(() => ctx.get(token as never)).toThrow(/database handle/);
       },
     );

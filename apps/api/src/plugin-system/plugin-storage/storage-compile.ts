@@ -88,7 +88,13 @@ export function physicalTableName(naming: StorageNaming, logical: string, explic
   return name;
 }
 
-function indexName(naming: StorageNaming, table: string, fields: readonly string[], unique: boolean, given: unknown): string {
+function indexName(
+  naming: StorageNaming,
+  table: string,
+  fields: readonly string[],
+  unique: boolean,
+  given: unknown,
+): string {
   if (given !== undefined) {
     if (typeof given !== 'string' || !IDENTIFIER.test(given) || !given.toLowerCase().includes(naming.namespace)) {
       fail(naming, `index name "${String(given)}" must match ${IDENTIFIER.source} and contain "${naming.namespace}"`);
@@ -117,7 +123,8 @@ export function compileField(naming: StorageNaming, tableLabel: string, name: st
   const column = decl.column === undefined ? name : decl.column;
   if (typeof column !== 'string' || !FIELD_NAME.test(column)) fail(naming, `column of field ${where} is not allowed`);
   const generated = decl.generated === true;
-  if (generated && type !== 'integer' && type !== 'uuid') fail(naming, `generated field ${where} must be an integer or uuid`);
+  if (generated && type !== 'integer' && type !== 'uuid')
+    fail(naming, `generated field ${where} must be an integer or uuid`);
   const field: CompiledField = {
     name,
     column: column as string,
@@ -148,7 +155,8 @@ function checkOptions(naming: StorageNaming, where: string, field: CompiledField
       (precision as number) <= MAX_DECIMAL_PRECISION &&
       (scale as number) >= 0 &&
       (scale as number) <= (precision as number);
-    if (!valid) fail(naming, `decimal ${where} needs 1 <= precision <= ${MAX_DECIMAL_PRECISION} and 0 <= scale <= precision`);
+    if (!valid)
+      fail(naming, `decimal ${where} needs 1 <= precision <= ${MAX_DECIMAL_PRECISION} and 0 <= scale <= precision`);
   } else if (field.precision !== undefined || field.scale !== undefined) {
     fail(naming, `precision and scale of ${where} apply to decimal fields only`);
   }
@@ -206,7 +214,10 @@ export function compileTable(
     if (field?.nullable) fail(naming, `primary key field "${logical}.${key}" cannot be nullable`);
   }
   const generated = [...fields.values()].filter((field) => field.generated);
-  if (generated.length > 1 || (generated.length === 1 && (primaryKey.length !== 1 || primaryKey[0] !== generated[0].name))) {
+  if (
+    generated.length > 1 ||
+    (generated.length === 1 && (primaryKey.length !== 1 || primaryKey[0] !== generated[0].name))
+  ) {
     fail(naming, `table "${logical}": a generated field must be the whole primary key`);
   }
 
@@ -235,7 +246,8 @@ function compileIndex(
 ): CompiledIndex {
   if (!isRecord(index)) return fail(naming, `an index of "${logical}" is malformed`);
   const list = readStringList(naming, `an index of "${logical}"`, index.fields);
-  for (const name of list) if (!fields.has(name)) fail(naming, `an index of "${logical}" names the unknown field "${name}"`);
+  for (const name of list)
+    if (!fields.has(name)) fail(naming, `an index of "${logical}" names the unknown field "${name}"`);
   const unique = index.unique === true;
   return { name: indexName(naming, physical, list, unique, index.name), fields: list, unique };
 }
@@ -250,12 +262,16 @@ function compileForeignKey(
   if (!isRecord(fk)) return fail(naming, `a foreign key of "${logical}" is malformed`);
   const own = readStringList(naming, `a foreign key of "${logical}"`, fk.fields);
   const referenced = readStringList(naming, `a foreign key of "${logical}"`, fk.referencedFields);
-  for (const name of own) if (!fields.has(name)) fail(naming, `a foreign key of "${logical}" names the unknown field "${name}"`);
+  for (const name of own)
+    if (!fields.has(name)) fail(naming, `a foreign key of "${logical}" names the unknown field "${name}"`);
   if (own.length !== referenced.length) fail(naming, `a foreign key of "${logical}" pairs unequal field lists`);
   const references = fk.references;
   const physical = typeof references === 'string' ? physicalOf(references) : undefined;
   if (!physical) {
-    return fail(naming, `a foreign key of "${logical}" references "${String(references)}", which is not a table of this plugin`);
+    return fail(
+      naming,
+      `a foreign key of "${logical}" references "${String(references)}", which is not a table of this plugin`,
+    );
   }
   if (fk.onDelete !== undefined && !['cascade', 'restrict', 'set-null'].includes(fk.onDelete)) {
     fail(naming, `a foreign key of "${logical}" has an unknown onDelete`);

@@ -83,7 +83,9 @@ describe('PluginMigrationService', () => {
   const tableExists = async (table: string) =>
     (await query(`SELECT name FROM sqlite_master WHERE type='table' AND name = '${table}'`)).length > 0;
   const versions = async () =>
-    (await query<{ version: number; source: string }>('SELECT version, source FROM plugin_storage_migrations_widgets ORDER BY version'));
+    await query<{ version: number; source: string }>(
+      'SELECT version, source FROM plugin_storage_migrations_widgets ORDER BY version',
+    );
 
   it('knows which plugins can have storage and loads the declaration from the backend bundle', () => {
     writePlugin(root, 'widgets', 'widgets', bundle(WIDGETS_V1));
@@ -214,18 +216,19 @@ describe('PluginMigrationService', () => {
         adoption: { legacyMigrations: ['CreateWidgets1', 'AddLabel2'] },
       })`;
       writePlugin(root, 'widgets', 'widgets', bundle(adopting));
-      await query(`CREATE TABLE "plugin_migrations_widgets" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "timestamp" bigint NOT NULL, "name" varchar NOT NULL)`);
+      await query(
+        `CREATE TABLE "plugin_migrations_widgets" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "timestamp" bigint NOT NULL, "name" varchar NOT NULL)`,
+      );
       await query(`INSERT INTO "plugin_migrations_widgets" ("timestamp", "name") VALUES (1, 'CreateWidgets1')`);
 
-      await expect(PluginMigrationService.assertReplacementMigrationHistory(rediscover('widgets'), root)).rejects.toThrow(
-        /Install the last 1\.x release of the plugin first/,
-      );
+      await expect(
+        PluginMigrationService.assertReplacementMigrationHistory(rediscover('widgets'), root),
+      ).rejects.toThrow(/Install the last 1\.x release of the plugin first/);
       await expect(PluginMigrationService.runUpMigrations(rediscover('widgets'))).rejects.toThrow(/partial history/);
 
-      expect((await query(`SELECT name FROM sqlite_master WHERE type='table' ORDER BY name`)).map((row) => row.name)).toEqual([
-        'plugin_migrations_widgets',
-        'sqlite_sequence',
-      ]);
+      expect(
+        (await query(`SELECT name FROM sqlite_master WHERE type='table' ORDER BY name`)).map((row) => row.name),
+      ).toEqual(['plugin_migrations_widgets', 'sqlite_sequence']);
     });
   });
 });

@@ -196,17 +196,19 @@ describe('plugin host data adapter on a real database', () => {
 
     it('reads a resource inside the transaction of a scope it is given, and refuses a closed scope', async () => {
       let kept: PluginTransactionScope | undefined;
-      await source.transaction(async (manager) => {
-        await manager.getRepository(Resource).update(ids.printer, { maxParallelSessions: 5 });
-        kept = createTransactionScope(
-          manager,
-          () => manager.queryRunner?.isTransactionActive ?? true,
-          () => undefined,
-        );
-        // The uncommitted change is only visible inside the transaction.
-        expect(await hostData().resources.get(ids.printer, kept)).toMatchObject({ maxParallelSessions: 5 });
-        throw new Error('roll back');
-      }).catch(() => undefined);
+      await source
+        .transaction(async (manager) => {
+          await manager.getRepository(Resource).update(ids.printer, { maxParallelSessions: 5 });
+          kept = createTransactionScope(
+            manager,
+            () => manager.queryRunner?.isTransactionActive ?? true,
+            () => undefined,
+          );
+          // The uncommitted change is only visible inside the transaction.
+          expect(await hostData().resources.get(ids.printer, kept)).toMatchObject({ maxParallelSessions: 5 });
+          throw new Error('roll back');
+        })
+        .catch(() => undefined);
 
       expect(await hostData().resources.get(ids.printer)).toMatchObject({ maxParallelSessions: 3 });
       await expect(hostData().resources.get(ids.printer, kept)).rejects.toThrow('The transaction scope is closed');

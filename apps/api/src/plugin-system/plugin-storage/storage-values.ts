@@ -51,7 +51,8 @@ export function normalizeDecimal(field: CompiledField, label: string | undefined
   const [, sign, whole, fraction = ''] = match;
   if (fraction.length > scale) invalid(field, label, `at most ${scale} fraction digits (no silent rounding)`);
   const integerDigits = whole.replace(/^0+(?=\d)/, '');
-  if (integerDigits !== '0' && integerDigits.length > precision - scale) invalid(field, label, `at most ${precision - scale} integer digits`);
+  if (integerDigits !== '0' && integerDigits.length > precision - scale)
+    invalid(field, label, `at most ${precision - scale} integer digits`);
   const text = `${integerDigits}${scale > 0 ? `.${fraction.padEnd(scale, '0')}` : ''}`;
   return sign && /[1-9]/.test(text) ? `-${text}` : text;
 }
@@ -75,9 +76,13 @@ export function normalizeValue(field: CompiledField, value: unknown, label?: str
     case 'text':
       return typeof value === 'string' ? value : invalid(field, label, 'expected a string');
     case 'integer':
-      return typeof value === 'number' && Number.isSafeInteger(value) ? value : invalid(field, label, 'expected a safe integer');
+      return typeof value === 'number' && Number.isSafeInteger(value)
+        ? value
+        : invalid(field, label, 'expected a safe integer');
     case 'decimal':
-      return typeof value === 'string' ? normalizeDecimal(field, label, value) : invalid(field, label, 'expected a decimal string');
+      return typeof value === 'string'
+        ? normalizeDecimal(field, label, value)
+        : invalid(field, label, 'expected a decimal string');
     case 'boolean':
       return typeof value === 'boolean' ? value : invalid(field, label, 'expected a boolean');
     case 'timestamp':

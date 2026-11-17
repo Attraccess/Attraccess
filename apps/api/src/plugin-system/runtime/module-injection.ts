@@ -1,4 +1,4 @@
-import type { DynamicModule, Provider } from '@nestjs/common';
+import type { DynamicModule, Provider, Type } from '@nestjs/common';
 import { isDatabaseToken } from './database-tokens';
 
 /**
@@ -47,7 +47,7 @@ function providerTokens(provider: Provider): unknown[] {
   return [...injected, custom.useExisting, ...classTokens(custom.useClass)];
 }
 
-function check(pluginName: string, module: DynamicModule | Function, depth: number): void {
+function check(pluginName: string, module: DynamicModule | Type<unknown>, depth: number): void {
   if (depth > MAX_DEPTH) return;
   const moduleName = typeof module === 'function' ? module.name : module.module?.name;
   if (moduleName && TYPEORM_MODULES.has(moduleName)) {
@@ -64,7 +64,7 @@ function check(pluginName: string, module: DynamicModule | Function, depth: numb
   }
   for (const imported of module.imports ?? []) {
     if (imported && (typeof imported === 'function' || typeof imported === 'object')) {
-      check(pluginName, imported as DynamicModule, depth + 1);
+      check(pluginName, imported as DynamicModule | Type<unknown>, depth + 1);
     }
   }
 }

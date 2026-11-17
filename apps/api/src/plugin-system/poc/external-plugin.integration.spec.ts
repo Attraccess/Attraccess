@@ -12,7 +12,10 @@ import {
   SystemEventPayload,
 } from '@attraccess/plugins-backend-sdk';
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
-import { createSqlitePluginMigrationEngine, createSqlitePluginPersistenceHost } from '../../database/sqlite/plugin-storage/sqlite-plugin-storage';
+import {
+  createSqlitePluginMigrationEngine,
+  createSqlitePluginPersistenceHost,
+} from '../../database/sqlite/plugin-storage/sqlite-plugin-storage';
 import { loadPluginEntryExports } from '../runtime/module-loader';
 import { compileModuleStorage } from '../plugin-storage/storage-loader';
 import { PluginEventsService } from '../plugin-events.service';
@@ -79,9 +82,15 @@ async function bootAndPing(artifactPath: string): Promise<PocPongPayload> {
   // The host creates the declared tables before the plugin runs, then serves them through the record port.
   const directory = mkdtempSync(join(tmpdir(), 'poc-plugin-'));
   const database = join(directory, 'host.sqlite');
-  const compiled = compileModuleStorage({ name: 'poc-backend-plugin', permissions: [PluginPermission.PLUGIN_STORAGE] }, plugin);
+  const compiled = compileModuleStorage(
+    { name: 'poc-backend-plugin', permissions: [PluginPermission.PLUGIN_STORAGE] },
+    plugin,
+  );
   expect(compiled?.ownedTables).toEqual(['plugin_poc_backend_plugin_notes']);
-  await createSqlitePluginMigrationEngine({ type: 'sqlite', database }, () => ({ type: 'sqlite', database })).migrate(compiled!);
+  if (!compiled) throw new Error('the poc plugin declares storage');
+  await createSqlitePluginMigrationEngine({ type: 'sqlite', database }, () => ({ type: 'sqlite', database })).migrate(
+    compiled,
+  );
   const dataSource = await new DataSource({ type: 'sqlite', database, entities: [] }).initialize();
   const contexts = createSqlitePluginPersistenceHost(() => dataSource).createContexts('poc-backend-plugin', compiled);
 

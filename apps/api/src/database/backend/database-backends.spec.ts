@@ -49,7 +49,11 @@ describe('the supported database engines', () => {
       const host = backend.plugins.createPersistenceHost(() => undefined);
       expect(typeof host.createContexts).toBe('function');
       expect(backend.plugins.createMigrationEngine(null)).toEqual(
-        expect.objectContaining({ migrate: expect.any(Function), assess: expect.any(Function), dropAll: expect.any(Function) }),
+        expect.objectContaining({
+          migrate: expect.any(Function),
+          assess: expect.any(Function),
+          dropAll: expect.any(Function),
+        }),
       );
       expect(backend.plugins.coreTableNames().size).toBeGreaterThan(10);
     }

@@ -100,7 +100,11 @@ describe('PluginModule', () => {
       const taken = `, { physicalName: 'plugin_collide_things' }`;
       writeStoragePlugin('collide', [PluginPermission.PLUGIN_STORAGE], storagePlugin('things'));
       writeStoragePlugin('intruder', [PluginPermission.PLUGIN_STORAGE], storagePlugin('things', taken));
-      writeStoragePlugin('user-table', [PluginPermission.PLUGIN_STORAGE], storagePlugin('things', `, { physicalName: 'user' }`));
+      writeStoragePlugin(
+        'user-table',
+        [PluginPermission.PLUGIN_STORAGE],
+        storagePlugin('things', `, { physicalName: 'user' }`),
+      );
 
       PluginModule.forRoot();
 

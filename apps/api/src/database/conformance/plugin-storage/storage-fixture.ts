@@ -1,4 +1,8 @@
-import type { PluginPersistenceContext, PluginStorageContext, PluginTransactionScope } from '@attraccess/plugins-backend-sdk';
+import type {
+  PluginPersistenceContext,
+  PluginStorageContext,
+  PluginTransactionScope,
+} from '@attraccess/plugins-backend-sdk';
 import type { PluginMigrationEngine } from '../../../plugin-system/persistence/plugin-migration-engine.port';
 import type { CompiledPluginStorage } from '../../../plugin-system/plugin-storage/storage-model';
 import type { PluginHostDataPort } from '../../../plugin-system/persistence/plugin-host-data.port';

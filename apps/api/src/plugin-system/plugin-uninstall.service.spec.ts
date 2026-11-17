@@ -67,9 +67,7 @@ describe('PluginUninstallService', () => {
 
   it('still removes the plugin when dropping its storage fails', async () => {
     const plugin = writeDeletablePlugin(true);
-    const runDown = jest
-      .spyOn(PluginMigrationService, 'dropStorage')
-      .mockRejectedValue(new Error('drop failed'));
+    const runDown = jest.spyOn(PluginMigrationService, 'dropStorage').mockRejectedValue(new Error('drop failed'));
 
     await uninstaller().deletePlugin(plugin.id, true);
 

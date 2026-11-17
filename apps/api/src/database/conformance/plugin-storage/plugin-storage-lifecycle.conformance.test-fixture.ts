@@ -1,11 +1,9 @@
+import { PluginStorageInvalid, definePluginStorage, f, step, table } from '@attraccess/plugins-backend-sdk';
 import {
-  PluginStorageInvalid,
-  definePluginStorage,
-  f,
-  step,
-  table,
-} from '@attraccess/plugins-backend-sdk';
-import { PluginStorageDeclarationError, PluginStorageMigrationFailed, PluginStorageMigrationRefused } from '../../../plugin-system/plugin-storage/storage-model';
+  PluginStorageDeclarationError,
+  PluginStorageMigrationFailed,
+  PluginStorageMigrationRefused,
+} from '../../../plugin-system/plugin-storage/storage-model';
 import { compilePluginStorage } from '../../../plugin-system/plugin-storage/storage-schema';
 import { claimStorageNames, releaseStorageNames } from '../../../plugin-system/plugin-storage/storage-registry';
 import {
@@ -18,7 +16,8 @@ import {
   storageV2,
   storageV3,
 } from './storage-declarations.test-fixture';
-import type { StorageBackendFixture, StorageDatabase } from './storage-fixture';
+import type { StorageBackendFixture, StorageConnection, StorageDatabase } from './storage-fixture';
+import type { CompiledPluginStorage } from '../../../plugin-system/plugin-storage/storage-model';
 
 const ITEMS = 'plugin_conformance_plugin_items';
 const NOTES = 'plugin_conformance_plugin_notes';
@@ -48,6 +47,14 @@ async function seedLegacy(db: StorageDatabase, applied: readonly string[] = LEGA
     `INSERT INTO "${ITEMS}" ("name", "qty", "price", "active", "created", "due", "meta", "status") ` +
       `VALUES ('adopted-row', 7, 1250, 0, '2026-03-02 09:00:00.123', '2026-03-02', '{"a":[1,2]}', 'open')`,
   );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ItemsApi = { items: Record<string, (...args: any[]) => Promise<any>> };
+
+/** The `items` table of the conformance plugin as a connection serves it. */
+function openItems(side: StorageConnection, compiled: CompiledPluginStorage, definition: unknown): ItemsApi {
+  return side.contexts(PLUGIN, compiled).storage.open(definition as never) as never as ItemsApi;
 }
 
 /**
@@ -91,7 +98,10 @@ export function describePluginStorageLifecycle(fixture: StorageBackendFixture): 
         expect(await db.indexes(ITEMS)).toEqual(['IDX_conformance_plugin_name', 'IDX_conformance_plugin_status']);
         const v2 = side.contexts(PLUGIN, compile(storageV2)).storage.open(storageV2) as never as { items: any }; // eslint-disable-line @typescript-eslint/no-explicit-any
         // The data step of version 2 ran on the existing row, with the schema of version 2.
-        expect(await v2.items.findOne({ where: { name: 'before-upgrade' } })).toMatchObject({ note: 'backfilled', price: '9.99' });
+        expect(await v2.items.findOne({ where: { name: 'before-upgrade' } })).toMatchObject({
+          note: 'backfilled',
+          price: '9.99',
+        });
 
         await db.engine.migrate(compile(storageV3));
         const names = await columnNames(ITEMS);
@@ -121,7 +131,12 @@ export function describePluginStorageLifecycle(fixture: StorageBackendFixture): 
                 ...(storageV1.migrations[0].steps ?? []),
                 ...(stepSet === 'ddl' ? [step.createTable('notes2', table({ id: f.id() }))] : []),
               ],
-              data: stepSet === 'data' ? async () => { throw new Error('constraint exploded'); } : undefined,
+              data:
+                stepSet === 'data'
+                  ? async () => {
+                      throw new Error('constraint exploded');
+                    }
+                  : undefined,
             },
           ],
         });
@@ -141,11 +156,18 @@ export function describePluginStorageLifecycle(fixture: StorageBackendFixture): 
           tables: storageV2.tables,
           migrations: [
             ...storageV2.migrations.slice(0, 1),
-            { ...storageV2.migrations[1], data: async () => { throw new Error('backfill failed'); } },
+            {
+              ...storageV2.migrations[1],
+              data: async () => {
+                throw new Error('backfill failed');
+              },
+            },
           ],
         });
 
-        await expect(db.engine.migrate(compile(broken))).rejects.toThrow(/Migration 2 of plugin "conformance-plugin" failed/);
+        await expect(db.engine.migrate(compile(broken))).rejects.toThrow(
+          /Migration 2 of plugin "conformance-plugin" failed/,
+        );
 
         expect(await db.snapshot()).toBe(before);
         expect(await db.engine.assess(compile(storageV1))).toEqual({ pending: [], adopt: false });
@@ -161,14 +183,16 @@ export function describePluginStorageLifecycle(fixture: StorageBackendFixture): 
       it('refuses a database that is newer than the release, changing nothing', async () => {
         await db.engine.migrate(compile(storageV3));
         const before = await db.snapshot();
-        await expect(db.engine.migrate(compile(storageV1))).rejects.toThrow(/database is at version 3 but this release only knows up to version 1/);
+        await expect(db.engine.migrate(compile(storageV1))).rejects.toThrow(
+          /database is at version 3 but this release only knows up to version 1/,
+        );
         await expect(db.engine.assess(compile(storageV1))).rejects.toBeInstanceOf(PluginStorageMigrationRefused);
         expect(await db.snapshot()).toBe(before);
       });
     });
 
     describe('uninstall', () => {
-      it('drops the plugin tables, its history and its legacy history, and no other plugin\'s', async () => {
+      it("drops the plugin tables, its history and its legacy history, and no other plugin's", async () => {
         await seedLegacy(db);
         await db.engine.migrate(compile(adoptingV3));
         await db.engine.migrate(compile(otherStorage, 'other-plugin'));
@@ -206,7 +230,7 @@ export function describePluginStorageLifecycle(fixture: StorageBackendFixture): 
         // Nothing but the version table was added.
         expect((await db.snapshot()).startsWith(before.split('\n')[0])).toBe(true);
         const side = await db.connect();
-        const { items } = side.contexts(PLUGIN, compile(adoptingV1)).storage.open(adoptingV1) as never as { items: any }; // eslint-disable-line @typescript-eslint/no-explicit-any
+        const { items } = openItems(side, compile(adoptingV1), adoptingV1);
         expect(await items.findOne({ where: { name: 'adopted-row' } })).toMatchObject({
           qty: 7,
           price: '12.50',
@@ -228,19 +252,31 @@ export function describePluginStorageLifecycle(fixture: StorageBackendFixture): 
         expect(await db.engine.migrate(compile(adoptingV3))).toEqual({ pending: [2, 3], adopt: true });
 
         const side = await db.connect();
-        const { items } = side.contexts(PLUGIN, compile(adoptingV3)).storage.open(adoptingV3) as never as { items: any }; // eslint-disable-line @typescript-eslint/no-explicit-any
+        const { items } = openItems(side, compile(adoptingV3), adoptingV3);
         expect(await items.findOne({ where: { name: 'adopted-row' } })).toMatchObject({ note: 'backfilled', qty: 7 });
       });
 
       it('treats an empty legacy history like a fresh install', async () => {
-        await db.execute(`CREATE TABLE "${LEGACY}" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "timestamp" bigint NOT NULL, "name" varchar NOT NULL)`);
+        await db.execute(
+          `CREATE TABLE "${LEGACY}" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "timestamp" bigint NOT NULL, "name" varchar NOT NULL)`,
+        );
         expect(await db.engine.migrate(compile(adoptingV1))).toEqual({ pending: [1], adopt: false });
         expect(await db.tables()).toContain(ITEMS);
       });
 
       it.each([
-        ['only some of the 1.x migrations applied', LEGACY_MIGRATIONS.slice(0, 1), adoptingV1, /Install the last 1\.x release of the plugin first/],
-        ['1.x migrations this release does not know', [...LEGACY_MIGRATIONS, 'SomethingNewer1800000000000'], adoptingV1, /does not know them/],
+        [
+          'only some of the 1.x migrations applied',
+          LEGACY_MIGRATIONS.slice(0, 1),
+          adoptingV1,
+          /Install the last 1\.x release of the plugin first/,
+        ],
+        [
+          '1.x migrations this release does not know',
+          [...LEGACY_MIGRATIONS, 'SomethingNewer1800000000000'],
+          adoptingV1,
+          /does not know them/,
+        ],
         ['a release that declares no adoption', LEGACY_MIGRATIONS, storageV1, /declares no adoption/],
       ])('refuses a database with %s, changing nothing', async (_label, applied, definition, reason) => {
         await seedLegacy(db, applied);
@@ -262,7 +298,18 @@ export function describePluginStorageLifecycle(fixture: StorageBackendFixture): 
         const adopted = compile(
           definePluginStorage({
             tables: { legacy: table({ id: f.id() }, { physicalName: 'conformance_plugin_legacy_table' }) },
-            migrations: [{ version: 1, name: 'b', steps: [step.createTable('legacy', table({ id: f.id() }, { physicalName: 'conformance_plugin_legacy_table' }))] }],
+            migrations: [
+              {
+                version: 1,
+                name: 'b',
+                steps: [
+                  step.createTable(
+                    'legacy',
+                    table({ id: f.id() }, { physicalName: 'conformance_plugin_legacy_table' }),
+                  ),
+                ],
+              },
+            ],
           }),
         );
         expect(adopted.tables.get('legacy')?.physical).toBe('conformance_plugin_legacy_table');
@@ -271,13 +318,19 @@ export function describePluginStorageLifecycle(fixture: StorageBackendFixture): 
       const declare = (tableOptions: object, extra: object = {}) =>
         definePluginStorage({
           tables: { t: table({ id: f.id(), name: f.string() }, tableOptions) },
-          migrations: [{ version: 1, name: 'b', steps: [step.createTable('t', table({ id: f.id(), name: f.string() }, tableOptions))] }],
+          migrations: [
+            {
+              version: 1,
+              name: 'b',
+              steps: [step.createTable('t', table({ id: f.id(), name: f.string() }, tableOptions))],
+            },
+          ],
           ...extra,
         });
 
       it.each([
         ['a core table of the host', () => [...db.coreTables()][0]],
-        ['another plugin\'s namespace', () => 'plugin_other_plugin_things'],
+        ["another plugin's namespace", () => 'plugin_other_plugin_things'],
         ['a name outside any namespace', () => 'accounts'],
         ['an identifier that is no identifier', () => 'conformance_plugin_x"; DROP TABLE y; --'],
         ['the host migration bookkeeping', () => 'plugin_migrations_conformance_plugin'],
@@ -293,7 +346,9 @@ export function describePluginStorageLifecycle(fixture: StorageBackendFixture): 
         const bad = (fields_: object) =>
           definePluginStorage({
             tables: { t: table({ id: f.id(), ...fields_ } as never) },
-            migrations: [{ version: 1, name: 'b', steps: [step.createTable('t', table({ id: f.id(), ...fields_ } as never))] }],
+            migrations: [
+              { version: 1, name: 'b', steps: [step.createTable('t', table({ id: f.id(), ...fields_ } as never))] },
+            ],
           });
         expect(() => compile(bad(fields))).toThrow(PluginStorageDeclarationError);
       });
@@ -301,19 +356,44 @@ export function describePluginStorageLifecycle(fixture: StorageBackendFixture): 
       it('refuses migrations that do not produce the declared tables, or leave gaps in the versions', () => {
         const t = table({ id: f.id() });
         expect(() => compile(definePluginStorage({ tables: { t }, migrations: [] }))).toThrow(/no migration/);
-        expect(() => compile(definePluginStorage({ tables: { t }, migrations: [{ version: 2, name: 'b', steps: [step.createTable('t', t)] }] }))).toThrow(/version 1/);
         expect(() =>
-          compile(definePluginStorage({ tables: { t: table({ id: f.id(), extra: f.text() }) }, migrations: [{ version: 1, name: 'b', steps: [step.createTable('t', t)] }] })),
+          compile(
+            definePluginStorage({
+              tables: { t },
+              migrations: [{ version: 2, name: 'b', steps: [step.createTable('t', t)] }],
+            }),
+          ),
+        ).toThrow(/version 1/);
+        expect(() =>
+          compile(
+            definePluginStorage({
+              tables: { t: table({ id: f.id(), extra: f.text() }) },
+              migrations: [{ version: 1, name: 'b', steps: [step.createTable('t', t)] }],
+            }),
+          ),
         ).toThrow(/do not produce the declared layout/);
         expect(() =>
-          compile(definePluginStorage({ tables: {}, migrations: [{ version: 1, name: 'b', steps: [step.createTable('t', t)] }] })),
+          compile(
+            definePluginStorage({
+              tables: {},
+              migrations: [{ version: 1, name: 'b', steps: [step.createTable('t', t)] }],
+            }),
+          ),
         ).toThrow(/not declared in tables/);
       });
 
       it('refuses foreign keys to tables of another plugin or to the host', () => {
-        const child = table({ id: f.id(), ref: f.integer() }, { foreignKeys: [{ fields: ['ref'], references: 'user', referencedFields: ['id'] }] });
+        const child = table(
+          { id: f.id(), ref: f.integer() },
+          { foreignKeys: [{ fields: ['ref'], references: 'user', referencedFields: ['id'] }] },
+        );
         expect(() =>
-          compile(definePluginStorage({ tables: { child }, migrations: [{ version: 1, name: 'b', steps: [step.createTable('child', child)] }] })),
+          compile(
+            definePluginStorage({
+              tables: { child },
+              migrations: [{ version: 1, name: 'b', steps: [step.createTable('child', child)] }],
+            }),
+          ),
         ).toThrow(/not a table of this plugin/);
       });
 
@@ -322,8 +402,20 @@ export function describePluginStorageLifecycle(fixture: StorageBackendFixture): 
           claimStorageNames(compile(storageV1, 'conformance-plugin'));
           claimStorageNames(compile(otherStorage, 'other-plugin'));
           // `plugin_a_b_things` is derived for plugin "a" (table "b_things") and for plugin "a-b" (table "things").
-          const first = compile(definePluginStorage({ tables: { b_things: table({ id: f.id() }) }, migrations: [{ version: 1, name: 'b', steps: [step.createTable('b_things', table({ id: f.id() }))] }] }), 'a');
-          const clash = compile(definePluginStorage({ tables: { things: table({ id: f.id() }) }, migrations: [{ version: 1, name: 'b', steps: [step.createTable('things', table({ id: f.id() }))] }] }), 'a-b');
+          const first = compile(
+            definePluginStorage({
+              tables: { b_things: table({ id: f.id() }) },
+              migrations: [{ version: 1, name: 'b', steps: [step.createTable('b_things', table({ id: f.id() }))] }],
+            }),
+            'a',
+          );
+          const clash = compile(
+            definePluginStorage({
+              tables: { things: table({ id: f.id() }) },
+              migrations: [{ version: 1, name: 'b', steps: [step.createTable('things', table({ id: f.id() }))] }],
+            }),
+            'a-b',
+          );
           claimStorageNames(first);
           expect(() => claimStorageNames(clash)).toThrow(/already belongs to plugin "a"/);
         } finally {
@@ -345,16 +437,15 @@ export function describePluginStorageLifecycle(fixture: StorageBackendFixture): 
           compile(
             definePluginStorage({
               tables: { items: table({ id: f.id(), name: f.string() }) },
-              migrations: [{ version: 1, name: 'b', steps: [step.createTable('items', table({ id: f.id(), name: f.string() }))] }],
+              migrations: [
+                { version: 1, name: 'b', steps: [step.createTable('items', table({ id: f.id(), name: f.string() }))] },
+              ],
             }),
             plugin,
           );
         const [a, b] = [same('plug-a'), same('plug-b')];
         await db.engine.migrate(a);
         await db.engine.migrate(b);
-        const side = await db.connect();
-        const definition = a.definition as Parameters<typeof compilePluginStorage>[1];
-        void definition;
         expect(await db.tables()).toEqual(expect.arrayContaining(['plugin_plug_a_items', 'plugin_plug_b_items']));
       });
     });
