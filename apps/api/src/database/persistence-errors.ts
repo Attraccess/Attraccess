@@ -12,7 +12,9 @@ export type PersistenceErrorKind =
   /** A unique or primary key constraint rejected the write. */
   | 'unique-violation'
   /** A foreign key constraint rejected the write. */
-  | 'foreign-key-violation';
+  | 'foreign-key-violation'
+  /** The database refused to write: its storage is read-only (for example wrong file ownership after an upgrade). */
+  | 'read-only';
 
 export interface PersistenceErrorClassifier {
   /** The neutral category of a driver error, or undefined when the adapter does not recognise it. */
@@ -52,6 +54,7 @@ export function persistenceErrorCode(error: unknown): string | undefined {
 export const isDatabaseBusyError = (error: unknown): boolean => classifyPersistenceError(error) === 'busy';
 export const isUniqueViolation = (error: unknown): boolean => classifyPersistenceError(error) === 'unique-violation';
 export const isWriteConflict = (error: unknown): boolean => classifyPersistenceError(error) === 'conflict';
+export const isReadOnlyDatabaseError = (error: unknown): boolean => classifyPersistenceError(error) === 'read-only';
 
 /** The 503 for a request whose database work gave up waiting. Warns at most once a minute, so bursts do not flood. */
 export function databaseBusyException(): ServiceUnavailableException {

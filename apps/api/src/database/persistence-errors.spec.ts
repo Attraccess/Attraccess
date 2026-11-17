@@ -1,6 +1,7 @@
 import {
   classifyPersistenceError,
   isDatabaseBusyError,
+  isReadOnlyDatabaseError,
   isUniqueViolation,
   persistenceErrorCode,
   registerPersistenceErrorClassifier,
@@ -25,6 +26,14 @@ describe('persistence error categories', () => {
       'foreign-key-violation',
     );
     expect(classifyPersistenceError(generic('SQLITE_CONSTRAINT: NOT NULL constraint failed: t.k'))).toBeUndefined();
+  });
+
+  it("classifies a read-only database by code, extended code or the failed statement's driver message", () => {
+    expect(classifyPersistenceError({ code: 'SQLITE_READONLY' })).toBe('read-only');
+    expect(isReadOnlyDatabaseError({ driverError: { code: 'SQLITE_READONLY_DBMOVED' } })).toBe(true);
+    expect(isReadOnlyDatabaseError({ driverError: { message: 'SQLITE_READONLY: attempt to write' } })).toBe(true);
+    // Only a failed statement (driverError) is read by message; any other error mentioning the code is not.
+    expect(isReadOnlyDatabaseError(new Error('SQLITE_READONLY in an unrelated message'))).toBe(false);
   });
 
   it('does not treat unrelated errors as database errors and exposes only a safe code', () => {
