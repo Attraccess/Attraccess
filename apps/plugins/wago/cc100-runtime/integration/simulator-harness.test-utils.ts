@@ -1,4 +1,3 @@
-import { persistenceFaking } from '../../backend/persistence.test-utils';
 import { createServer, type Server } from 'node:net';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
@@ -7,15 +6,14 @@ import { join } from 'node:path';
 import { connect, type MqttClient } from 'mqtt';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 
-import { WagoSettings } from '../../backend/controllers/settings.entity';
 import { WagoService } from '../../backend/controllers/service';
+import { wagoStorage } from '../../backend/storage';
+import { createWagoTestStorage, type WagoTestStorage } from '../../backend/storage/testing';
 
 import { temporary } from './simulator-fixtures.test-utils';
 import { createBroker } from './simulator-fixtures.test-utils';
 
 import { prefix } from './simulator-fixtures.test-utils';
-
-import { repository } from './simulator-fixtures.test-utils';
 
 export class SimulatorFixture {
   broker!: ReturnType<typeof createBroker>;
@@ -42,7 +40,8 @@ export class SimulatorFixture {
 
   readonly identities = new Map<string, { password: string; publish: string[]; subscribe: string[] }>();
 
-  readonly repositories = new Map<unknown, ReturnType<typeof repository>>();
+  /** The in-memory record port behind `context.storage`; assert and seed through `storage.tables`. */
+  storage!: WagoTestStorage;
 
   readonly matches = (pattern: string, topic: string) => {
     const parts = topic.split('/');
@@ -125,7 +124,6 @@ export class SimulatorFixture {
     this.connections = [];
     this.disconnectOnRevoke = false;
     this.onPublishReceived = () => undefined;
-    this.repositories.clear();
     this.identities.clear();
     this.broker = createBroker();
     this.broker.authenticate = (client, username, password, done) => {
@@ -165,14 +163,14 @@ export class SimulatorFixture {
       this.mqtt.once('connect', () => resolve());
       this.mqtt.once('error', reject);
     });
-    this.repositories.set(WagoSettings, repository([{ id: 1, defaultMqttServerId: 1, operationalPrefix: prefix }]));
+    this.storage = createWagoTestStorage();
+    await this.storage.tables.settings.insert({ id: 1, defaultMqttServerId: 1, operationalPrefix: prefix });
     this.context = {
-      persistence: persistenceFaking(((entity: { name: string }) => {
-        const existing = [...this.repositories.keys()].find((key: { name: string }) => key.name === entity.name);
-        if (existing) return this.repositories.get(existing);
-        if (!this.repositories.has(entity)) this.repositories.set(entity, repository());
-        return this.repositories.get(entity);
-      }) as never),
+      // The "main" service may come from a staged git snapshot, whose `wagoStorage` is another module instance than
+      // the one the in-memory port was built from. The host opens a plugin's registered definition only, so every
+      // open here answers with this fixture's definition.
+      storage: { ...this.storage.storage, open: () => this.storage.storage.open(wagoStorage) },
+      persistence: this.storage.persistence,
       getMqttServerConfig: async () => ({ host: '127.0.0.1', port: address.port, useTls: false }),
       getMqttCredentialProvisioning: () => ({
         provision: async (request) => {
