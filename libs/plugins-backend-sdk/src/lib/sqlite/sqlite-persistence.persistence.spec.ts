@@ -162,6 +162,28 @@ describe('SQLite plugin persistence on a real database', () => {
     });
   });
 
+  it('rejects a host scope once the host transaction ended', async () => {
+    let kept: PluginTransactionScope | undefined;
+    await source.transaction(async (manager) => {
+      kept = createHostTransactionScope(manager);
+      expect(kept.isOpen).toBe(true);
+    });
+
+    expect(kept?.isOpen).toBe(false);
+    expect(() => sqlitePersistence({ persistence }).managerOf(kept as PluginTransactionScope)).toThrow(
+      'The transaction scope is closed',
+    );
+  });
+
+  it('follows the open signal the host passes', async () => {
+
+    let open = true;
+    const scope = createHostTransactionScope(source.manager, () => open);
+    expect(sqlitePersistence({ persistence }).managerOf(scope)).toBe(source.manager);
+    open = false;
+    expect(() => sqlitePersistence({ persistence }).managerOf(scope)).toThrow('The transaction scope is closed');
+  });
+
   it('runs on the supplied write path, so the host can serialize plugin transactions with its own', async () => {
     let calls = 0;
     const runInTransaction = <T>(work: (manager: DataSource['manager']) => Promise<T>): Promise<T> => {

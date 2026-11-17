@@ -75,15 +75,16 @@ export interface PluginPersistenceContext {
   supports(backend: PluginPersistenceBackend): boolean;
 
   /**
-   * Runs `work` in one atomic transaction: it commits when `work` resolves and rolls back when it throws. On SQLite
-   * concurrent callers (core lifecycle writes included) run one at a time, so check-then-write sequences such as
-   * overlap checks are race-free.
+   * Runs `work` in one atomic, isolated transaction: it commits when `work` resolves and rolls back when it throws.
+   * Concurrent transactions (core writes included) never see each other's uncommitted writes, and a check-then-write
+   * sequence inside one transaction (an overlap check, then the insert) cannot be raced by another transaction: the
+   * engine either orders the transactions or fails one of them with an error, which rolls it back. How an engine
+   * achieves this (for example SQLite runs transactions one at a time) is described by its engine subpath.
    *
-   * The queue is shared with every core session start and end, so keep `work` short and limited to database work:
-   * no HTTP, MQTT, email or other I/O inside. Register such effects with `scope.afterCommit`; they run only after
-   * the commit. Do not nest calls: a transaction started inside `work` would wait for `work` itself, so the host
-   * rejects it with an error and the scope is passed down instead. Core services that write through the same
-   * queue (session start and end) must not be awaited inside `work` either.
+   * Keep `work` short and limited to database work: no HTTP, MQTT, email or other I/O inside. Register such effects
+   * with `scope.afterCommit`; they run only after the commit. Do not nest calls: the host rejects a transaction
+   * started inside `work` with an error; pass the scope down instead. Do not await core services that write (session
+   * start and end) inside `work` either.
    */
   transaction<T>(work: (scope: PluginTransactionScope) => Promise<T>): Promise<T>;
 

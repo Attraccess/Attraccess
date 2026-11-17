@@ -1,4 +1,5 @@
 import type { PluginResourceModel } from '@attraccess/application-models';
+import type { PluginTransactionScope } from './plugin-persistence';
 
 /**
  * Read-only host data a plugin may look up. It replaces direct access to host tables: every answer is a neutral
@@ -8,7 +9,11 @@ import type { PluginResourceModel } from '@attraccess/application-models';
 
 /** Resource lookups. Requires ACCESS_RESOURCES. Unknown and deleted resources are skipped. */
 export interface PluginResourceDirectory {
-  get(resourceId: number): Promise<PluginResourceModel | null>;
+  /**
+   * The resource, or null. With `scope` (an open scope of `context.persistence.transaction`) the read runs inside that
+   * transaction, so a value the plugin decides on cannot change before it commits.
+   */
+  get(resourceId: number, scope?: PluginTransactionScope): Promise<PluginResourceModel | null>;
   /** Names of the existing resources among `resourceIds`. */
   getNames(resourceIds: number[]): Promise<Map<number, string>>;
   /**
