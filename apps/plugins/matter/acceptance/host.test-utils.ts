@@ -11,7 +11,6 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
-import { AuditService } from '../../../api/src/audit/audit.service';
 import { PluginAuditHost } from '../../../api/src/audit/plugin-audit-host';
 import { createTestAuditMetrics } from '../../../api/src/database/adapters/audit/audit.test-fixture';
 import { createSqliteAuditService } from '../../../api/src/database/adapters/audit/sqlite-audit-service.test-fixture';
