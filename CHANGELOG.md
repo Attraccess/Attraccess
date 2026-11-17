@@ -1,3 +1,44 @@
+## 1.11.0-beta.1 (2026-11-17)
+
+### 🚀 Features
+
+- mount the private cesentry repository as an optional submodule (ATT-1252) ([#2191](https://github.com/Attraccess/Attraccess/pull/2191))
+- personal dashboard with pinned pages and resources (ATT-893) ([#2205](https://github.com/Attraccess/Attraccess/pull/2205))
+- **api:** expose the REST API as an MCP server with OAuth (ATT-920) ([#1888](https://github.com/Attraccess/Attraccess/pull/1888))
+- **attractap:** network status screen in the maintenance drawer (ATT-1273) ([#2206](https://github.com/Attraccess/Attraccess/pull/2206))
+- **attractap:** upload coredumps larger than 32 KiB in chunks (ATT-1144) ([#2211](https://github.com/Attraccess/Attraccess/pull/2211))
+- **billing:** bill shared machines per person (ATT-1191) ([#2193](https://github.com/Attraccess/Attraccess/pull/2193))
+- **plugins:** define the plugin BLE transport contract (ATT-1032) ([#2215](https://github.com/Attraccess/Attraccess/pull/2215))
+- **reservations:** book one slot per reservation on shared machines (ATT-1197) ([#2195](https://github.com/Attraccess/Attraccess/pull/2195))
+
+### 🩹 Fixes
+
+- stop SQLITE_BUSY on Matter settings saves and stabilize test infrastructure ([#2202](https://github.com/Attraccess/Attraccess/pull/2202))
+- **api:** report upstream discovery statuses and certificate errors as 502 (ATT-1243) ([#2185](https://github.com/Attraccess/Attraccess/pull/2185))
+- **api:** classify all Node certificate verification codes (ATT-1243) ([#2200](https://github.com/Attraccess/Attraccess/pull/2200))
+- **api:** make password reset and verification links single-use (ATT-1237) ([#2184](https://github.com/Attraccess/Attraccess/pull/2184))
+- **api:** keep the Valkey password out of the shared client's logs (ATT-1242) ([#2186](https://github.com/Attraccess/Attraccess/pull/2186))
+- **api:** stop main-connection SQLite writes failing with SQLITE_BUSY (ATT-1257) ([#2204](https://github.com/Attraccess/Attraccess/pull/2204))
+- **api:** return 403 when invites exceed the license user limit (ATT-1247) ([#2189](https://github.com/Attraccess/Attraccess/pull/2189))
+- **api:** start and keep serving when Valkey is configured but unreachable (ATT-1244) ([#2190](https://github.com/Attraccess/Attraccess/pull/2190))
+- **api:** give resend-verification-email its own audit action and rate-limit scope (ATT-1260) ([#2210](https://github.com/Attraccess/Attraccess/pull/2210))
+- **api:** remove the staging folder after a plugin ZIP upload (ATT-1262) ([#2218](https://github.com/Attraccess/Attraccess/pull/2218))
+- **api:** isolate concurrent transactions on the main SQLite connection (ATT-1269) ([#2213](https://github.com/Attraccess/Attraccess/pull/2213))
+- **api:** show plugin name for deleted/retried plugin archives in audit log (ATT-1263) ([#2209](https://github.com/Attraccess/Attraccess/pull/2209))
+- **attractap-lab:** power-cycle button-powered readers before quarantine (ATT-1265) ([#2201](https://github.com/Attraccess/Attraccess/pull/2201))
+- **deps:** combine dependency updates (Node 26, pnpm 12, Nx 24, Nest 12, …) ([#2207](https://github.com/Attraccess/Attraccess/pull/2207))
+- **frontend:** show a discovery-specific error when OIDC auto-discovery fails (ATT-1245) ([#2194](https://github.com/Attraccess/Attraccess/pull/2194))
+- **frontend:** keep long-press paste working and replace the install pop-up (ATT-1150) ([#2217](https://github.com/Attraccess/Attraccess/pull/2217))
+- **frontend:** keep auth CTAs reachable on small phones, incl. verify-email (ATT-1281) ([#2055](https://github.com/Attraccess/Attraccess/pull/2055))
+- **mcp:** QA and code review fixes for the MCP server and OAuth (ATT-920) ([#2214](https://github.com/Attraccess/Attraccess/pull/2214))
+- **release:** publish libraries with an explicit dist-tag and rebuilt dist ([#2199](https://github.com/Attraccess/Attraccess/pull/2199))
+- **release:** retry the release push when main moves during Create Release (ATT-1266) ([#2203](https://github.com/Attraccess/Attraccess/pull/2203))
+
+### ❤️ Thank You
+
+- Giesela-Bot @Giesela-Bot
+- Jan Jaap @jappyjan
+
 ## 1.11.0-beta.0 (2026-11-14)
 
 ### 🚀 Features
