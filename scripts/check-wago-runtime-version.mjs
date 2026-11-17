@@ -65,18 +65,22 @@ export function isBuildCandidate(path) {
 // Targets that only check the code (tests, lint, typecheck, CRAP score) never build, package or deploy what ships, so
 // their configuration, e.g. a test target's cache inputs, can change without a runtime release.
 const checkOnlyTarget = /^(?:test|lint|typecheck|crap-score)(?:-|$)/;
+// The plugin's `build` target only assembles the npm package: it copies package.json, plugin.json and LICENSE.md next
+// to the bundles built by build-backend and build-frontend. It never builds the CC100 runtime (build-runtime and
+// build-cc100-runtime do, and stay gated), so changing which files it copies cannot change the runtime.
+const npmPackageTarget = 'build';
 
 function runtimeProjectConfig(text) {
   const config = JSON.parse(text);
   const targets = Object.fromEntries(
-    Object.entries(config.targets ?? {}).filter(([name]) => !checkOnlyTarget.test(name)),
+    Object.entries(config.targets ?? {}).filter(([name]) => !checkOnlyTarget.test(name) && name !== npmPackageTarget),
   );
   return JSON.stringify({ ...config, targets });
 }
 
 /**
  * Whether a change to the plugin's project.json (null: the file does not exist on that side) can change what ships:
- * anything except check-only targets counts. A file that does not parse counts as a runtime change.
+ * anything except check-only targets and the npm package assembly target counts. A file that does not parse counts as a runtime change.
  */
 export function projectConfigAffectsRuntime(before, after) {
   if (before === null || after === null) return before !== after;
