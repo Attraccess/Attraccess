@@ -40,6 +40,8 @@ describe('FileStorageService', () => {
 
     // Mock path.join to return predictable paths
     (path.join as jest.Mock).mockImplementation((...args) => args.join('/'));
+    // containment checks need real resolution of `..` segments
+    (path.resolve as jest.Mock).mockImplementation(jest.requireActual('path').posix.resolve);
     // Mock path.extname to return the file extension
     (path.extname as jest.Mock).mockImplementation((filename) => {
       const parts = filename.split('.');
@@ -187,6 +189,29 @@ describe('FileStorageService', () => {
       (fs.access as jest.Mock).mockRejectedValueOnce(new Error('ENOENT'));
 
       await expect(service.getFilePath('resources/123', 'nonexistent.jpg')).rejects.toThrow('FileNotFoundError');
+    });
+  });
+
+  describe('containment', () => {
+    it.each([
+      ['a parent filename', 'resources/123', '../../../attraccess.sqlite'],
+      ['an absolute filename', 'resources/123', '/etc/passwd'],
+      ['a parent subdirectory', '../outside', 'image.jpg'],
+      ['the storage root itself', '.', '.'],
+      ['a sibling sharing the root as a prefix', '../path-evil', 'image.jpg'],
+    ])('refuses %s', async (_label, subDirectory, filename) => {
+      await expect(service.getFilePath(subDirectory, filename)).rejects.toThrow('FileNotFoundError');
+      await expect(service.deleteFile(subDirectory, filename)).rejects.toThrow('FileNotFoundError');
+      expect(fs.access).not.toHaveBeenCalled();
+      expect(fs.unlink).not.toHaveBeenCalled();
+    });
+
+    it('refuses to save into a subdirectory outside the storage root', async () => {
+      const file = { originalname: 'a.jpg', mimetype: 'image/jpeg', size: 1, buffer: Buffer.from('x') } as FileUpload;
+
+      await expect(service.saveFile(file, '../../outside')).rejects.toThrow('FileNotFoundError');
+      expect(fs.mkdir).not.toHaveBeenCalled();
+      expect(fs.writeFile).not.toHaveBeenCalled();
     });
   });
 
