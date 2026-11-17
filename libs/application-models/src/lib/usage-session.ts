@@ -1,5 +1,6 @@
 import { ResourceFormAction } from './form';
 import { ResourceType } from './resource-type';
+import { AutoIntroductionTarget, SupervisionMode } from './resource-supervision';
 import { ResourceUsageAction } from './resourceUsage-type';
 
 /**
@@ -28,6 +29,12 @@ export interface UsageSessionResource {
   type: ResourceType;
   maxParallelSessions?: number | null;
   allowTakeOver?: boolean;
+  supervisionMode?: SupervisionMode;
+  separateUnlockAndUnlatch?: boolean | null;
+  supervisedUsagesUntilIntroduction?: number | null;
+  autoIntroductionTarget?: AutoIntroductionTarget | null;
+  autoIntroductionGroupId?: number | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 /** The rate snapshot of one meter, taken when a session starts. */

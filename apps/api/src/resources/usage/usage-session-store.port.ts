@@ -4,7 +4,9 @@ import type {
   UsageLifecycleAttempt,
   UsageMeterRate,
   UsageSession,
+  UsageSessionResource,
 } from '@attraccess/application-models';
+import type { SupervisionMode } from '@attraccess/application-models';
 import type { ResourceUsageAction } from '@attraccess/application-models';
 import type { TransactionContext } from '../../database/transaction-context';
 
@@ -91,6 +93,15 @@ export interface UsageSessionStore {
   /** The usage ids of the machine's sessions that a stop attempt is ending right now. */
   findSessionIdsBeingEnded(resourceId: number, context?: TransactionContext): Promise<Set<number>>;
   findMeterRates(resourceId: number, context?: TransactionContext): Promise<UsageMeterRate[]>;
+
+  /** The resource a usage action targets, or null. */
+  findResource(resourceId: number, context?: TransactionContext): Promise<UsageSessionResource | null>;
+  /** The supervision mode of each of the resources that exist. */
+  findSupervisionModes(resourceIds: number[]): Promise<Map<number, SupervisionMode | undefined>>;
+  userExists(userId: number, context?: TransactionContext): Promise<boolean>;
+  findGroupResourceIds(groupId: number): Promise<number[]>;
+  /** The user's ended supervised sessions across the resources. */
+  countCompletedSupervisedSessions(resourceIds: number[], userId: number): Promise<number>;
 
   /** Whether another lifecycle operation blocks this one (any on an exclusive machine, a takeover on a shared one). */
   isLifecycleBlocked(resourceId: number, sharedMachine: boolean, context?: TransactionContext): Promise<boolean>;

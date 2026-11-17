@@ -1,3 +1,4 @@
+import { supervisionModesFrom } from '../authorization/supervision-modes.test-fixture';
 import { NotFoundException } from '@nestjs/common';
 import { ResourceUsage } from '@attraccess/database-entities';
 import { SupervisionMode } from '@attraccess/application-models';
@@ -73,7 +74,11 @@ describe('who reads other people’s sessions', () => {
     };
     controller = new ResourceUsageController(
       scope.service,
-      new ResourceActivityVisibilityService(settings as never, resources as unknown as never, scope.service),
+      new ResourceActivityVisibilityService(
+        settings as never,
+        supervisionModesFrom(resources.find) as never,
+        scope.service,
+      ),
       {} as never,
       {} as never,
     );

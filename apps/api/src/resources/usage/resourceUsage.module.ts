@@ -3,8 +3,7 @@ import { ResourceUsageController } from './sessions/resource-usage.controller';
 import { ResourceUsageService } from './sessions/resource-usage.service';
 import { ResourceActivityVisibilityService } from './authorization/resource-activity-visibility.service';
 import { SettingsModule } from '../../settings/settings.module';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { Resource, ResourceIntroducer, ResourceUsage, User } from '@attraccess/database-entities';
+import { HealthPersistenceModule } from '../../database/adapters/resources/health-persistence.module';
 import { RbacModule } from '../../users-and-auth/rbac/rbac.module';
 import { ResourceUsageNoteNotificationListener } from './notifications/notes.listener';
 import { ResourceSessionNotificationListener } from './notifications/session.listener';
@@ -35,7 +34,7 @@ import { ResourceUsageFlowsBridge } from './sessions/resource-usage-flows.bridge
   imports: [
     ResourceTransactionsModule,
     UsagePersistenceModule,
-    TypeOrmModule.forFeature([ResourceUsage, Resource, ResourceIntroducer, User]),
+    HealthPersistenceModule,
     RbacModule,
     SettingsModule,
     NotificationsModule,

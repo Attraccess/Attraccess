@@ -1,3 +1,4 @@
+import { supervisionModesFrom } from './supervision-modes.test-fixture';
 import { Resource, ResourceUsage } from '@attraccess/database-entities';
 import { SupervisionMode } from '@attraccess/application-models';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
@@ -40,7 +41,11 @@ function setup(mode: ResourceActivityVisibility) {
     canControllResource: jest.fn(async (id: number) => controllable.has(id)),
     getActiveSession: jest.fn(async (id: number) => activeSessions.get(id) ?? null),
   };
-  const service = new ResourceActivityVisibilityService(settings as never, resources as never, usage as never);
+  const service = new ResourceActivityVisibilityService(
+    settings as never,
+    supervisionModesFrom(resources.find) as never,
+    usage as never,
+  );
   const user = (persona: Persona, id = 10) => {
     controllable.clear();
     if (persona.canControl) controllable.add(MACHINE).add(SUPERVISED_MACHINE);

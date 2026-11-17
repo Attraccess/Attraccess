@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type User } from '@attraccess/database-entities';
+import type { UsageSessionUser as User } from '@attraccess/application-models';
 import type { PreStartOrigin } from '@attraccess/plugins-backend-sdk';
 import { hookPrincipal } from './hook-principal';
 import type { ReaderUiLanguage } from '../../../plugin-system/reader-ui/host-texts';

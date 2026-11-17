@@ -1,7 +1,7 @@
 import { ResourceMeteringSession, ResourceUsage } from '@attraccess/database-entities';
 import { ResourceMeteringSessionStatus } from '@attraccess/application-models';
 import { inheritTestScope } from '../../../../test-utils/inherit-test-scope';
-import type { FlowDefinedMeteringTestScope } from '../flow-defined-meters.spec';
+import type { FlowDefinedMeteringTestScope } from '../flow-defined-meters.persistence.spec';
 
 export function createGenericMetersFixture(parentScope: FlowDefinedMeteringTestScope) {
   async function seedLegacyMeterUsages(newestHasMeter: boolean) {
