@@ -1,22 +1,9 @@
 import type { DataSource } from 'typeorm';
+import { auditEntriesOn, ledgerOn, utc } from './older-state-ports.test-fixture';
+import { rows, type OlderState } from './older-state.test-fixture';
+import { openWorkRelease } from './older-states-open-work.test-fixture';
 
-/**
- * Representative older released states of a deployment. Each one is built by migrating a fresh database only up to
- * `timestamp` (so the schema is exactly what that release created), writing data with plain SQL in the columns that
- * release knew, and, after the remaining migrations ran, checking that this data survived with identical values.
- * Nothing here edits a released migration.
- */
-export interface OlderState {
-  readonly name: string;
-  /** Class timestamp of the last migration this release had applied. */
-  readonly timestamp: number;
-  seed(source: DataSource): Promise<void>;
-  /** Runs against the fully migrated database. */
-  verify(source: DataSource): Promise<void>;
-}
-
-const rows = <T = Record<string, unknown>>(source: DataSource, sql: string, params: unknown[] = []): Promise<T[]> =>
-  source.query(sql, params);
+export type { OlderState } from './older-state.test-fixture';
 
 async function roleKeysOf(source: DataSource, userId: number): Promise<string[]> {
   const found = await rows<{ key: string }>(
@@ -152,6 +139,20 @@ const billingRelease: OlderState = {
     expect(total).toBe(900);
     await source.query("INSERT INTO billing_transaction (userId, amount, status) VALUES (2, -50, 'completed')");
     expect(await rows(source, 'SELECT creditBalance FROM "user" WHERE id = 2')).toEqual([{ creditBalance: 200 }]);
+
+    // The same rows through the billing ledger the application reads them with.
+    const ledger = ledgerOn(source);
+    expect([await ledger.getBalance(1), await ledger.getBalance(2)]).toEqual([900, 200]);
+    const charge = await ledger.findTransactionWithItems(2);
+    expect(charge).toMatchObject({ userId: 1, amount: -100, status: 'completed', resourceUsageId: 1 });
+    expect(charge?.createdAt).toBeInstanceOf(Date);
+    expect(charge?.items?.map(({ name, unitPrice, quantity }) => ({ name, unitPrice, quantity }))).toEqual([
+      { name: 'Usage', unitPrice: 10, quantity: 1 },
+      { name: 'Duration', unitPrice: 2, quantity: 45 },
+    ]);
+    expect((await ledger.listPendingTransactions()).map(({ id, amount }) => ({ id, amount }))).toEqual([
+      { id: 3, amount: 500 },
+    ]);
   },
 };
 
@@ -243,6 +244,14 @@ const auditAndSnapshotsRelease: OlderState = {
         details: '{}',
       },
     ]);
+
+    // The audit reads of the application: dates as Date, JSON details parsed, newest first.
+    const entries = await auditEntriesOn(source);
+    expect(entries.map(({ id, at, actorId, outcome, details }) => ({ id, at, actorId, outcome, details }))).toEqual([
+      { id: 2, at: utc('2026-02-03 12:00:00'), actorId: 2, outcome: 'failure', details: {} },
+      { id: 1, at: utc('2026-02-02 09:00:01'), actorId: 1, outcome: 'success', details: { usageId: 1, credits: 202 } },
+    ]);
+    expect(await ledgerOn(source).getBalance(1)).toBe(298);
   },
 };
 
@@ -344,5 +353,6 @@ export const olderStates: readonly OlderState[] = [
   earlyRelease,
   billingRelease,
   auditAndSnapshotsRelease,
+  openWorkRelease,
   meterRelease,
 ];
