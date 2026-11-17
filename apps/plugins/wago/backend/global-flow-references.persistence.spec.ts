@@ -3,17 +3,14 @@ import {
   type PluginFlowNodeQuery,
   type PluginFlowNodeReference,
 } from '@attraccess/plugins-backend-sdk';
-import { DataSource } from '@attraccess/plugins-backend-sdk/sqlite';
-import { flowNode, hostDataWithFlows, persistenceOver } from './persistence.test-utils';
+import { flowNode, hostDataWithFlows } from './persistence.test-utils';
 import { WagoCommandHandler } from './commands/handler';
 import { configurationFlowImpacts } from './configuration/flow-references';
 import type { WagoConfigurationSnapshot } from './configuration/model';
-import { WagoConfigurationRevision } from './configuration/revision.entity';
-import { WagoController } from './controllers/entity';
 import type { WagoService } from './controllers/service';
 import { WagoDiagnosticsService } from './diagnostics/service';
 import { WagoDiagnosticsStore } from './diagnostics/store';
-import plugin from './plugin';
+import { createWagoTestStorage, type WagoTestStorage } from './storage/testing';
 
 /** The host lookup semantics (ownership with NULL owners, data matches), over seeded nodes. */
 function matching(nodes: PluginFlowNodeReference[]) {
@@ -29,10 +26,10 @@ function matching(nodes: PluginFlowNodeReference[]) {
     );
 }
 
-// The channel lookups against the plugin's real tables and a host lookup with the real owner semantics: NULL owner
-// columns and the joined flow name. The host lookup's SQL itself is covered by the host adapter's persistence spec.
-describe('global-flow references with a real plugin database', () => {
-  let dataSource: DataSource;
+// The channel lookups against the plugin's tables (in-memory storage) and a host lookup with the real owner semantics:
+// NULL owner columns and the joined flow name. The host lookup's SQL itself is covered by the host adapter's persistence spec.
+describe('global-flow references over the plugin storage', () => {
+  let test: WagoTestStorage;
   let resourceId: number;
   let flowId: number;
   let otherFlowId: number;
@@ -52,13 +49,7 @@ describe('global-flow references with a real plugin database', () => {
   ) => flowNode({ id, type: 'plugin.wago.command', data: { controllerId: 1, channelId: 'lock' }, ...owner });
 
   beforeAll(async () => {
-    dataSource = new DataSource({
-      type: 'sqlite',
-      database: ':memory:',
-      entities: plugin.persistence.sqlite.entities,
-      synchronize: true,
-    });
-    await dataSource.initialize();
+    test = createWagoTestStorage();
     resourceId = 1;
     flowId = 8;
     otherFlowId = 9;
@@ -69,15 +60,14 @@ describe('global-flow references with a real plugin database', () => {
     ];
     hostContext = {
       hostData: hostDataWithFlows(matching(nodes)),
-      persistence: persistenceOver(dataSource),
+      storage: test.storage,
+      persistence: test.persistence,
     } as unknown as PluginContext;
   });
 
-  afterAll(() => dataSource.destroy());
-
   it('names the global flows that share a channel in the resource diagnostics', async () => {
     const now = new Date().toISOString();
-    const controller = await dataSource.getRepository(WagoController).save({
+    const controller = await test.tables.controllers.insert({
       hardwareId: 'db-fixture',
       trustState: 'claimed',
       name: 'Workshop',
@@ -93,7 +83,7 @@ describe('global-flow references with a real plugin database', () => {
       updatedAt: now,
     });
     expect(controller.id).toBe(1);
-    await dataSource.getRepository(WagoConfigurationRevision).save({
+    await test.tables.configurationRevisions.insert({
       controllerId: controller.id,
       revision: 1,
       contentHash: 'a'.repeat(64),
