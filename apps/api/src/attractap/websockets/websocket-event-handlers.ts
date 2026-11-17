@@ -60,8 +60,11 @@ export function buildEventHandlers(d: EventHandlerDeps): Record<AttractapEventTy
       d.resetReaderConnectionState(socket, socket.readerId, 'READER_SESSION_ENDED');
       return d.authHandler.handleAuthentication(socket, eventData);
     },
-    [AttractapEventType.READER_FIRMWARE_INFO]: (socket, eventData) =>
-      d.firmwareHandler.handleFirmwareInfo(socket, eventData),
+    [AttractapEventType.READER_FIRMWARE_INFO]: (socket, eventData) => {
+      // The reader is back on this connection: plugin BLE work on an older, half-open one of it is gone.
+      d.readerBleDriver.readerConnected(socket);
+      return d.firmwareHandler.handleFirmwareInfo(socket, eventData);
+    },
     [AttractapEventType.READER_CRASH_REPORT]: (socket, eventData) =>
       d.crashReportHandler.handleCrashReport(socket, eventData),
     [AttractapEventType.READER_COREDUMP_BEGIN]: (socket, eventData) =>

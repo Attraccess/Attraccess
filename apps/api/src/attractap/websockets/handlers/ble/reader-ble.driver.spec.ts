@@ -223,6 +223,34 @@ describe('ReaderBleDriver (plugin BLE over the reader websocket)', () => {
       await again.close();
     });
 
+    it('releases the work of a half-open socket as soon as the reader announces itself on a new one', async () => {
+      const created = await endpoint();
+      const session = await ble.openSession(created.id);
+      const stream = await session.subscribe('events');
+      const waiting = capture(stream.next({ timeoutMs: 60_000 }));
+      const pending = capture(session.read('slow'));
+      await flush();
+      const stale = socket();
+      // A reader reset: the old TCP connection does not close until the heartbeat times out.
+      harness.reconnectReader(1, { halfOpen: true });
+      expect(socket()).not.toBe(stale);
+      expect(stale.readyState).toBe(1);
+      driver().readerConnected(socket());
+      await expect(pending).resolves.toMatchObject({
+        ok: false,
+        error: { code: 'DISCONNECTED', detail: 'reader-link-lost' },
+      });
+      await expect(waiting).resolves.toMatchObject({ ok: false, error: { code: 'DISCONNECTED' } });
+      await expect(session.closed).resolves.toEqual({ reason: 'disconnected' });
+      // The endpoint and the reader are free on the new connection at once.
+      const again = await ble.openSession(created.id);
+      await expect(again.read('info')).resolves.toEqual(Uint8Array.of(1, 2, 3));
+      // The old socket closing late does not touch the new session.
+      driver().socketClosed(stale);
+      await expect(again.read('info')).resolves.toEqual(Uint8Array.of(1, 2, 3));
+      await again.close();
+    });
+
     it('never lets a stale socket complete, reject or close work of the reconnected reader (ATT-1031)', async () => {
       const first = await ble.openSession((await endpoint()).id);
       const staleSocket = socket();

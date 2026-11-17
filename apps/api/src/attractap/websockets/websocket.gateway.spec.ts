@@ -340,6 +340,17 @@ describe('AttractapGateway', () => {
       expect(refresh).toHaveBeenCalledWith(socket, { requestId: 880 });
     });
 
+    it('releases plugin BLE work of older connections when a reader announces its firmware', async () => {
+      const socket = fixture.createMockSocket({ readerId: 7 });
+      const released = jest.spyOn(fixture.gateway['readerBleDriver'], 'readerConnected');
+      jest.spyOn(fixture.gateway['firmwareHandler'], 'handleFirmwareInfo').mockResolvedValue(undefined);
+      await fixture.gateway.onClientEvent(
+        { type: AttractapEventType.READER_FIRMWARE_INFO, payload: { name: 'attractap', version: '2.5.0' } },
+        socket,
+      );
+      expect(released).toHaveBeenCalledWith(socket);
+    });
+
     it('rejects server-only event types from clients', async () => {
       const socket = fixture.createMockSocket({ id: 'ev-1', readerId: 1 });
 

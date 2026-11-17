@@ -99,6 +99,18 @@ export class ReaderBleDriver implements BleTransportDriver {
     channel.close();
   }
 
+  /**
+   * The reader announced itself (READER_FIRMWARE_INFO) on `socket`. A reader holds one connection and ends its BLE
+   * session whenever it loses it, so BLE work on any older connection of the same reader is gone, even when that
+   * socket did not close yet (a half-open TCP connection after a reset closes only on the heartbeat timeout).
+   */
+  readerConnected(socket: AuthenticatedWebSocket): void {
+    if (socket.readerId === null) return;
+    for (const other of this.websocketService.sockets.values()) {
+      if (other !== socket && other.readerId === socket.readerId && this.channels.has(other)) this.socketClosed(other);
+    }
+  }
+
   /** The newest open connection of the reader: a stale one that did not close yet is never used for new work. */
   private currentSocket(readerId: number): AuthenticatedWebSocket | undefined {
     let current: AuthenticatedWebSocket | undefined;
