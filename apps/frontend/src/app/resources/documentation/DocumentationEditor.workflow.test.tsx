@@ -26,16 +26,16 @@ vi.mock('../../../components/toastProvider', () => ({
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('@attraccess/react-query-client', () => ({
   DocumentationType: { MARKDOWN: 'markdown', URL: 'url' },
-  UseResourcesServiceGetOneResourceByIdKeyFn: ({ id }: { id: number }) => ['resource', id],
-  useResourcesServiceGetAllResourcesKey: 'resources',
-  useResourcesServiceGetOneResourceById: () => ({
+  UseGetOneResourceByIdKeyFn: ({ path: { id } }: { path: { id: number } }) => ['resource', id],
+  useGetAllResourcesKey: 'resources',
+  useGetOneResourceById: () => ({
     data: state.resource,
     isLoading: state.loading,
     isError: state.error,
     error: state.failure,
     refetch: state.refetch,
   }),
-  useResourcesServiceUpdateOneResource: (options: typeof state.options) => {
+  useUpdateOneResource: (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
     return { mutate: state.mutate, isPending: state.pending };
   },
@@ -109,8 +109,8 @@ it('validates URL content and saves only the selected documentation format', () 
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'https://example.test/manual' } });
   fireEvent.submit(document.querySelector('form')!);
   expect(state.mutate).toHaveBeenCalledWith({
-    id: 7,
-    formData: {
+    path: { id: 7 },
+    body: {
       documentationType: 'url',
       documentationMarkdown: undefined,
       documentationUrl: 'https://example.test/manual',
@@ -137,8 +137,8 @@ it('validates markdown, previews its rendered content and retains the draft afte
   expect(screen.getByRole('heading', { name: 'Safety instructions' })).toBeTruthy();
   save();
   expect(state.mutate).toHaveBeenCalledWith({
-    id: 7,
-    formData: {
+    path: { id: 7 },
+    body: {
       documentationType: 'markdown',
       documentationMarkdown: '# Safety instructions',
       documentationUrl: undefined,

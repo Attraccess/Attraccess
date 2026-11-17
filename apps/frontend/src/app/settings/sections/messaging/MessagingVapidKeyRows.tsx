@@ -3,10 +3,7 @@ import { RefreshCwIcon } from 'lucide-react';
 import { Dispatch, SetStateAction } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  UsePushServicePushGetVapidConfigKeyFn,
-  usePushServicePushReplaceVapidKeys,
-} from '@attraccess/react-query-client';
+import { UsePushGetVapidConfigKeyFn, usePushReplaceVapidKeys } from '@attraccess/react-query-client';
 import { SettingsRow } from '../../components/SettingsRow';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { EMPTY_VAPID_KEY_DRAFT, VapidKeyDraft } from './vapidKeyDraft';
@@ -35,9 +32,9 @@ export function MessagingVapidKeyRows({ subscriptionCount, draft, onDraftChange 
   const { confirmStep, customPublicKey, customPrivateKey, pendingOverride } = draft;
   const update = (patch: Partial<VapidKeyDraft>) => onDraftChange((current) => ({ ...current, ...patch }));
 
-  const { mutate: replaceKeys, isPending: isReplacing } = usePushServicePushReplaceVapidKeys({
+  const { mutate: replaceKeys, isPending: isReplacing } = usePushReplaceVapidKeys(undefined, {
     onSuccess(data) {
-      queryClient.invalidateQueries({ queryKey: UsePushServicePushGetVapidConfigKeyFn() });
+      queryClient.invalidateQueries({ queryKey: UsePushGetVapidConfigKeyFn() });
       onDraftChange(EMPTY_VAPID_KEY_DRAFT);
       toast.success({
         title: t('keysReplaced.title'),
@@ -119,7 +116,7 @@ export function MessagingVapidKeyRows({ subscriptionCount, draft, onDraftChange 
         closeLabel={t('confirmFinal.cancel')}
         action={{
           label: t('confirmFinal.confirm'),
-          onPress: () => replaceKeys({ requestBody: pendingOverride ?? {} }),
+          onPress: () => replaceKeys({ body: pendingOverride ?? {} }),
           isPending: isReplacing,
         }}
       >

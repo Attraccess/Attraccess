@@ -2,10 +2,10 @@ import { Alert, AlertContent, AlertDescription, AlertTitle } from '@heroui/react
 import { CheckCircleIcon } from 'lucide-react';
 import {
   ResourceHealthStateDto,
-  useResourceHealthServiceClearResourceHealthEntry,
-  useResourceHealthServiceGetResourceHealth,
-  useResourceHealthServiceGetResourceHealthKey,
-  useResourceMaintenancesServiceCanManageMaintenance,
+  useClearResourceHealthEntry,
+  useGetResourceHealth,
+  useGetResourceHealthKey,
+  useCanManageMaintenance,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
@@ -24,17 +24,17 @@ export function ResourceHealthWarning({ resourceId }: Props) {
   const queryClient = useQueryClient();
   const { success, error: showError } = useToastMessage();
 
-  const { data: summary } = useResourceHealthServiceGetResourceHealth({ resourceId }, undefined, {
+  const { data: summary } = useGetResourceHealth({ path: { resourceId } }, undefined, {
     refetchInterval: 5000,
   });
 
-  const { data: maintenancePermissions } = useResourceMaintenancesServiceCanManageMaintenance({ resourceId });
+  const { data: maintenancePermissions } = useCanManageMaintenance({ path: { resourceId } });
   const canManage = maintenancePermissions?.canManage === true;
 
-  const clearEntry = useResourceHealthServiceClearResourceHealthEntry({
+  const clearEntry = useClearResourceHealthEntry(undefined, {
     onSuccess: () => {
       success({ title: t('actions.markHealthySuccess') });
-      queryClient.invalidateQueries({ queryKey: [useResourceHealthServiceGetResourceHealthKey] });
+      queryClient.invalidateQueries({ queryKey: [useGetResourceHealthKey] });
     },
     onError: () => {
       showError({ title: t('actions.markHealthyError') });
@@ -43,7 +43,7 @@ export function ResourceHealthWarning({ resourceId }: Props) {
 
   const handleClear = useCallback(
     (entryId: number) => {
-      clearEntry.mutate({ resourceId, entryId });
+      clearEntry.mutate({ path: { resourceId, entryId } });
     },
     [clearEntry, resourceId],
   );

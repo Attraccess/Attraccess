@@ -74,8 +74,8 @@ vi.mock('../../routes/index', () => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useLicenseServiceGetLicenseInformation: () => ({ data: { modules: [] } }),
-  useMessagingServiceMessagingGetUnreadCount: () => ({ data: { total: 0 } }),
+  useGetLicenseInformation: () => ({ data: { modules: [] } }),
+  useMessagingGetUnreadCount: () => ({ data: { total: 0 } }),
 }));
 
 function CurrentPath() {

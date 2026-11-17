@@ -9,7 +9,7 @@ import {
   Skeleton,
 } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useUsersServiceIsLocalSignupEnabled } from '@attraccess/react-query-client';
+import { useIsLocalSignupEnabled } from '@attraccess/react-query-client';
 import { LoginFormHeader } from './LoginFormHeader';
 import { LoginFormContent } from './LoginFormContent';
 import en from './loginForm.en.json';
@@ -21,7 +21,7 @@ export interface LoginFormProps {
 }
 
 export function LoginForm(props: LoginFormProps) {
-  const { data: isLocalSignupEnabled, isLoading } = useUsersServiceIsLocalSignupEnabled();
+  const { data: isLocalSignupEnabled, isLoading } = useIsLocalSignupEnabled();
 
   const { t } = useTranslations({ en, de });
 

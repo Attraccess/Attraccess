@@ -1,5 +1,5 @@
 import type { MarketplacePluginDto } from '@attraccess/react-query-client';
-import { usePluginsServicePluginControllerMarketplacePackage } from '@attraccess/react-query-client';
+import { usePluginControllerMarketplacePackage } from '@attraccess/react-query-client';
 import { useEffect, useEffectEvent, useState } from 'react';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import type { MarketplaceDetailRequest } from '../types';
@@ -16,8 +16,8 @@ export function useMarketplaceBrowserState() {
   const [request, setRequest] = useState<MarketplaceDetailRequest | null>(null);
   const [plugin, setPlugin] = useState<MarketplacePluginDto | null>(null);
 
-  const detail = usePluginsServicePluginControllerMarketplacePackage(
-    { packageName: request?.name ?? '', registryId: request?.registryId },
+  const detail = usePluginControllerMarketplacePackage(
+    { path: { packageName: request?.name ?? '' }, query: { registryId: request?.registryId } },
     undefined,
     { enabled: request !== null, retry: false, refetchOnWindowFocus: false },
   );

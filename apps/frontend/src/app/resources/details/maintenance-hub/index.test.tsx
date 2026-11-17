@@ -27,10 +27,10 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useResourcesServiceGetOneResourceById: () => ({ data: state.resource, isLoading: state.loading, error: state.error }),
-  useResourceMaintenancesServiceCanManageMaintenance: () => ({ data: { canManage: state.allowed } }),
-  useResourceMaintenanceSchedulesServiceFindMaintenanceSchedules: () => ({ data: [] }),
-  useResourceMaintenancesServiceFindMaintenances: () => ({ data: { data: state.maintenances } }),
+  useGetOneResourceById: () => ({ data: state.resource, isLoading: state.loading, error: state.error }),
+  useCanManageMaintenance: () => ({ data: { canManage: state.allowed } }),
+  useFindMaintenanceSchedules: () => ({ data: [] }),
+  useFindMaintenances: () => ({ data: { data: state.maintenances } }),
 }));
 vi.mock('../../../../hooks/useNow', () => ({ useNow: () => new Date('2026-09-01T12:00:00Z') }));
 vi.mock('./stat-strip', () => ({ StatStrip: () => null }));

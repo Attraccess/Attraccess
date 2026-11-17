@@ -3,9 +3,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
-  ResourcesService,
-  useResourcesServiceResourceUsageEndSession,
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
+  useResourceUsageEndSession,
+  UseResourceUsageGetActiveSessionKeyFn,
+  resourceUsageGetActiveSession,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../hooks/useAuth';
 import { getTranslationKeyForApiError } from '../../../utils/apiError';
@@ -24,21 +24,23 @@ export function useEndOwnSession() {
   const invalidateActiveSession = useCallback(
     (resourceId: number) =>
       queryClient.invalidateQueries({
-        queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId }),
+        queryKey: UseResourceUsageGetActiveSessionKeyFn({ path: { resourceId } }),
       }),
     [queryClient],
   );
-  const { mutateAsync: endSession } = useResourcesServiceResourceUsageEndSession({
+  const { mutateAsync: endSession } = useResourceUsageEndSession(undefined, {
     onSuccess: (data) => invalidateActiveSession(data.resourceId),
   });
 
   return useCallback(
     async (resourceId: number) => {
       if (!user) throw new Error('Not signed in');
-      const active = await ResourcesService.resourceUsageGetActiveSession({ resourceId });
+      const active = await resourceUsageGetActiveSession({ path: { resourceId }, throwOnError: true }).then(
+        ({ data }) => data,
+      );
       const ownSession = active.usages.find((usage) => usage.userId === user.id);
       if (ownSession) {
-        await endSession({ resourceId, requestBody: { usageId: ownSession.id } });
+        await endSession({ path: { resourceId }, body: { usageId: ownSession.id } });
       } else {
         await invalidateActiveSession(resourceId);
       }

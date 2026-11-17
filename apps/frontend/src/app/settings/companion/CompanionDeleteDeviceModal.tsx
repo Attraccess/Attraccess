@@ -2,8 +2,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { DeleteConfirmationModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   CompanionDevice,
-  UseCompanionDevicesServiceListCompanionDevicesKeyFn,
-  useCompanionDevicesServiceDeleteCompanionDevice,
+  UseListCompanionDevicesKeyFn,
+  useDeleteCompanionDevice,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './en.json';
@@ -19,9 +19,9 @@ export function CompanionDeleteDeviceModal({ device, onClose }: CompanionDeleteD
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { mutate: deleteDevice, isPending: isDeleting } = useCompanionDevicesServiceDeleteCompanionDevice({
+  const { mutate: deleteDevice, isPending: isDeleting } = useDeleteCompanionDevice(undefined, {
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: UseCompanionDevicesServiceListCompanionDevicesKeyFn() });
+      queryClient.invalidateQueries({ queryKey: UseListCompanionDevicesKeyFn() });
       onClose();
       toast.success({ title: t('devices.delete.success') });
     },
@@ -36,7 +36,7 @@ export function CompanionDeleteDeviceModal({ device, onClose }: CompanionDeleteD
       onClose={onClose}
       onConfirm={() => {
         if (!device) return;
-        deleteDevice({ id: device.id });
+        deleteDevice({ path: { id: device.id } });
       }}
       itemName={device?.name ?? ''}
       isDeleting={isDeleting}

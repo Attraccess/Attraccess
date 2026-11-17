@@ -4,13 +4,6 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import {
-  AttractapService,
-  BillingService,
-  MessagingService,
-  ResourcesService,
-  UsersService,
-} from '@attraccess/react-query-client';
 import type { DashboardWidgetSize } from '@attraccess/plugins-frontend-sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BalanceWidget } from './BalanceWidget';
@@ -22,6 +15,12 @@ import { ReadersWidget } from './ReadersWidget';
 import { ResourcesInUseWidget } from './ResourcesInUseWidget';
 import { ResourcesWidget } from './ResourcesWidget';
 import { UnverifiedUsersChip, UsersWidget } from './UsersWidget';
+import * as sdk from '@attraccess/react-query-client/sdk';
+import { sdkResult } from '../../../test-utils/sdk-mock';
+
+vi.mock('@attraccess/react-query-client/sdk', async (importOriginal) =>
+  (await import('../../../test-utils/sdk-mock')).spyOnSdk(await importOriginal<object>()),
+);
 
 const state = vi.hoisted(() => ({
   permissions: new Set<string>(),
@@ -99,8 +98,8 @@ describe('MessagesWidget', () => {
   });
   const listConversations = (count: number) =>
     vi
-      .spyOn(MessagingService, 'messagingListConversations')
-      .mockResolvedValue(ids(count).map((id) => conversation(id, id === 2 ? 4 : 0)) as never);
+      .mocked(sdk.messagingListConversations)
+      .mockResolvedValue(sdkResult(ids(count).map((id) => conversation(id, id === 2 ? 4 : 0))));
 
   it.each([
     ['medium', 3],
@@ -117,7 +116,7 @@ describe('MessagesWidget', () => {
 
   it('shows the unread count and the latest sender on a small tile', async () => {
     listConversations(2);
-    vi.spyOn(MessagingService, 'messagingGetUnreadCount').mockResolvedValue({ total: 12 } as never);
+    vi.mocked(sdk.messagingGetUnreadCount).mockResolvedValue(sdkResult({ total: 12 }));
     const { container } = renderWidget(<MessagesWidget {...at('small')} />);
 
     expect(await screen.findByText('Latest from user1')).toBeInTheDocument();
@@ -129,15 +128,15 @@ describe('MessagesWidget', () => {
 
   it('names who last wrote to the user, not whom the user last replied to', async () => {
     const replied = { ...conversation(1), lastMessage: { ...conversation(1).lastMessage, senderId: 7 } };
-    vi.spyOn(MessagingService, 'messagingListConversations').mockResolvedValue([replied, conversation(2)] as never);
-    vi.spyOn(MessagingService, 'messagingGetUnreadCount').mockResolvedValue({ total: 1 } as never);
+    vi.mocked(sdk.messagingListConversations).mockResolvedValue(sdkResult([replied, conversation(2)]));
+    vi.mocked(sdk.messagingGetUnreadCount).mockResolvedValue(sdkResult({ total: 1 }));
     renderWidget(<MessagesWidget {...at('small')} />);
 
     expect(await screen.findByText('Latest from user2')).toBeInTheDocument();
   });
 
   it('shows the empty and the error state', async () => {
-    const list = vi.spyOn(MessagingService, 'messagingListConversations').mockResolvedValue([] as never);
+    const list = vi.mocked(sdk.messagingListConversations).mockResolvedValue(sdkResult([]));
     const { unmount } = renderWidget(<MessagesWidget {...at('medium')} />);
     expect(await screen.findByText('No conversations yet.')).toBeInTheDocument();
     unmount();
@@ -148,13 +147,13 @@ describe('MessagesWidget', () => {
   });
 
   it('shows the total unread count in its header, except on a small tile', async () => {
-    vi.spyOn(MessagingService, 'messagingGetUnreadCount').mockResolvedValue({ total: 120 } as never);
+    vi.mocked(sdk.messagingGetUnreadCount).mockResolvedValue(sdkResult({ total: 120 }));
     const { unmount } = renderWidget(<MessagesUnreadChip {...at('medium')} />);
     expect((await screen.findByText('120 unread')).parentElement).toHaveTextContent(/^99\+/);
     unmount();
 
     const { container } = renderWidget(<MessagesUnreadChip {...at('small')} />);
-    await waitFor(() => expect(MessagingService.messagingGetUnreadCount).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(sdk.messagingGetUnreadCount).toHaveBeenCalledTimes(2));
     expect(container).toBeEmptyDOMElement();
   });
 });
@@ -162,18 +161,22 @@ describe('MessagesWidget', () => {
 describe('MySessionsWidget', () => {
   const resources = (count: number) => ids(count).map((id) => ({ id, name: `Machine ${id}` }));
   function runSessions(count: number) {
-    vi.spyOn(ResourcesService, 'getAllResources').mockResolvedValue({
-      data: resources(count),
-      total: count,
-    } as never);
-    vi.spyOn(ResourcesService, 'resourceUsageGetActiveSession').mockImplementation((({
-      resourceId,
+    vi.mocked(sdk.getAllResources).mockResolvedValue(
+      sdkResult({
+        data: resources(count),
+        total: count,
+      }),
+    );
+    vi.mocked(sdk.resourceUsageGetActiveSession).mockImplementation((({
+      path: { resourceId },
     }: {
-      resourceId: number;
+      path: { resourceId: number };
     }) =>
-      Promise.resolve({
-        usages: [{ id: 30 + resourceId, userId: 7, startTime: `2026-11-16T08:0${resourceId % 10}:00.000Z` }],
-      })) as never);
+      Promise.resolve(
+        sdkResult({
+          usages: [{ id: 30 + resourceId, userId: 7, startTime: `2026-11-16T08:0${resourceId % 10}:00.000Z` }],
+        }),
+      )) as never);
   }
   const rows = (container: HTMLElement) => container.querySelectorAll('[data-cy="dashboard-my-sessions-row"]');
   const more = (container: HTMLElement) => container.querySelector('[data-cy="dashboard-widget-more"]');
@@ -212,7 +215,7 @@ describe('MySessionsWidget', () => {
 
   it('lists running sessions and stops one after confirmation', async () => {
     runSessions(1);
-    const end = vi.spyOn(ResourcesService, 'resourceUsageEndSession').mockResolvedValue({ resourceId: 1 } as never);
+    const end = vi.mocked(sdk.resourceUsageEndSession).mockResolvedValue(sdkResult({ resourceId: 1 }));
     renderWidget(<MySessionsWidget {...at('medium')} />);
 
     expect(await screen.findByRole('link', { name: 'Machine 1' })).toHaveAttribute('href', '/resources/1');
@@ -221,13 +224,15 @@ describe('MySessionsWidget', () => {
     const dialog = await screen.findByRole('alertdialog', { name: 'Stop your session?' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Stop' }));
 
-    await waitFor(() => expect(end).toHaveBeenCalledWith({ resourceId: 1, requestBody: { usageId: 31 } }));
+    await waitFor(() =>
+      expect(end).toHaveBeenCalledWith(expect.objectContaining({ path: { resourceId: 1 }, body: { usageId: 31 } })),
+    );
     expect(state.toastSuccess).toHaveBeenCalledWith({ title: 'Your session at Machine 1 was stopped.' });
   });
 
   it('tells the user when the session could not be stopped', async () => {
     runSessions(1);
-    vi.spyOn(ResourcesService, 'resourceUsageEndSession').mockRejectedValue(new Error('offline') as never);
+    vi.mocked(sdk.resourceUsageEndSession).mockRejectedValue(new Error('offline') as never);
     renderWidget(<MySessionsWidget {...at('medium')} />);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Stop Machine 1' }));
@@ -245,7 +250,7 @@ describe('MySessionsWidget', () => {
   });
 
   it('points to the resources when no session runs', async () => {
-    vi.spyOn(ResourcesService, 'getAllResources').mockResolvedValue({ data: [], total: 0 } as never);
+    vi.mocked(sdk.getAllResources).mockResolvedValue(sdkResult({ data: [], total: 0 }));
     renderWidget(<MySessionsWidget {...at('medium')} />);
     expect(await screen.findByText('No running sessions')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Browse resources' })).toHaveAttribute('href', '/resources');
@@ -254,32 +259,34 @@ describe('MySessionsWidget', () => {
 
 describe('ResourcesWidget', () => {
   it('shows live matches after a pause in typing, each linking to its resource', async () => {
-    const list = vi.spyOn(ResourcesService, 'getAllResources').mockResolvedValue({
-      data: [
-        { id: 4, name: 'Laser cutter' },
-        { id: 9, name: 'Laser engraver' },
-      ],
-      total: 2,
-    } as never);
+    const list = vi.mocked(sdk.getAllResources).mockResolvedValue(
+      sdkResult({
+        data: [
+          { id: 4, name: 'Laser cutter' },
+          { id: 9, name: 'Laser engraver' },
+        ],
+        total: 2,
+      }),
+    );
     renderWidget(<ResourcesWidget {...at('large')} />);
 
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search resources' }), 'Laser');
     expect(await screen.findByRole('link', { name: 'Laser cutter' })).toHaveAttribute('href', '/resources/4');
     expect(screen.getByText('Status 9')).toBeInTheDocument();
-    expect(list).toHaveBeenCalledWith({ search: 'Laser', limit: 7 });
+    expect(list).toHaveBeenCalledWith(expect.objectContaining({ query: { search: 'Laser', limit: 7 } }));
     expect(list).not.toHaveBeenCalledWith(expect.objectContaining({ search: 'L' }));
   });
 
   it('says so when nothing matches', async () => {
-    vi.spyOn(ResourcesService, 'getAllResources').mockResolvedValue({ data: [], total: 0 } as never);
+    vi.mocked(sdk.getAllResources).mockResolvedValue(sdkResult({ data: [], total: 0 }));
     renderWidget(<ResourcesWidget {...at('medium')} />);
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search resources' }), 'zz');
     expect(await screen.findByText('No resources match.')).toBeInTheDocument();
-    expect(ResourcesService.getAllResources).toHaveBeenCalledWith({ search: 'zz', limit: 3 });
+    expect(sdk.getAllResources).toHaveBeenCalledWith(expect.objectContaining({ query: { search: 'zz', limit: 3 } }));
   });
 
   it('opens the resource overview with the term on Enter', async () => {
-    vi.spyOn(ResourcesService, 'getAllResources').mockResolvedValue({ data: [], total: 0 } as never);
+    vi.mocked(sdk.getAllResources).mockResolvedValue(sdkResult({ data: [], total: 0 }));
     renderWidget(<ResourcesWidget {...at('medium')} />);
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search resources' }), 'Laser cutter{Enter}');
     expect(await screen.findByRole('status', { name: 'Current URL' })).toHaveTextContent('/resources?q=Laser%20cutter');
@@ -301,28 +308,30 @@ describe('ResourcesInUseWidget', () => {
   const inUse = (count: number) => ids(count).map((id) => ({ id, name: `Machine ${id}` }));
 
   it('counts the resources in use on a small tile', async () => {
-    vi.spyOn(ResourcesService, 'getAllResourcesInUse').mockResolvedValue(inUse(4) as never);
+    vi.mocked(sdk.getAllResourcesInUse).mockResolvedValue(sdkResult(inUse(4)));
     const { container } = renderWidget(<ResourcesInUseWidget {...at('small')} />);
     await waitFor(() => expect(container.querySelector('[data-cy="dashboard-in-use-count"]')).toHaveTextContent('4'));
     expect(screen.getByText('in use')).toBeInTheDocument();
   });
 
   it('lists who uses what, naming a user only when the API shares one', async () => {
-    vi.spyOn(ResourcesService, 'getAllResourcesInUse').mockResolvedValue(inUse(5) as never);
-    vi.spyOn(ResourcesService, 'resourceUsageGetActiveSession').mockImplementation((({
-      resourceId,
+    vi.mocked(sdk.getAllResourcesInUse).mockResolvedValue(sdkResult(inUse(5)));
+    vi.mocked(sdk.resourceUsageGetActiveSession).mockImplementation((({
+      path: { resourceId },
     }: {
-      resourceId: number;
+      path: { resourceId: number };
     }) =>
-      Promise.resolve({
-        usages: [
-          {
-            id: resourceId,
-            startTime: `2026-11-16T08:0${resourceId}:00.000Z`,
-            ...(resourceId === 1 ? { user: { id: 3, username: 'ada' } } : {}),
-          },
-        ],
-      })) as never);
+      Promise.resolve(
+        sdkResult({
+          usages: [
+            {
+              id: resourceId,
+              startTime: `2026-11-16T08:0${resourceId}:00.000Z`,
+              ...(resourceId === 1 ? { user: { id: 3, username: 'ada' } } : {}),
+            },
+          ],
+        }),
+      )) as never);
     const { container } = renderWidget(<ResourcesInUseWidget {...at('medium')} />);
 
     expect(await screen.findByRole('link', { name: 'Machine 1' })).toHaveAttribute('href', '/resources/1');
@@ -335,7 +344,7 @@ describe('ResourcesInUseWidget', () => {
   });
 
   it('says so when nothing is in use', async () => {
-    vi.spyOn(ResourcesService, 'getAllResourcesInUse').mockResolvedValue([] as never);
+    vi.mocked(sdk.getAllResourcesInUse).mockResolvedValue(sdkResult([]));
     renderWidget(<ResourcesInUseWidget {...at('medium')} />);
     expect(await screen.findByText('Nothing is in use right now.')).toBeInTheDocument();
   });
@@ -343,19 +352,21 @@ describe('ResourcesInUseWidget', () => {
 
 describe('UsersWidget', () => {
   it('shows live matches linking to each user', async () => {
-    const find = vi.spyOn(UsersService, 'findMany').mockResolvedValue({
-      data: [{ id: 12, username: 'ada' }],
-      total: 1,
-    } as never);
+    const find = vi.mocked(sdk.findMany).mockResolvedValue(
+      sdkResult({
+        data: [{ id: 12, username: 'ada' }],
+        total: 1,
+      }),
+    );
     renderWidget(<UsersWidget {...at('medium')} />);
 
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search users' }), 'ada');
     expect(await screen.findByRole('link', { name: 'ada' })).toHaveAttribute('href', '/users/12');
-    expect(find).toHaveBeenCalledWith({ search: 'ada', limit: 3 });
+    expect(find).toHaveBeenCalledWith(expect.objectContaining({ query: { search: 'ada', limit: 3 } }));
   });
 
   it('opens the user list with the term on Enter', async () => {
-    vi.spyOn(UsersService, 'findMany').mockResolvedValue({ data: [], total: 0 } as never);
+    vi.mocked(sdk.findMany).mockResolvedValue(sdkResult({ data: [], total: 0 }));
     renderWidget(<UsersWidget {...at('medium')} />);
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search users' }), 'ada{Enter}');
     expect(await screen.findByRole('status', { name: 'Current URL' })).toHaveTextContent('/users?q=ada');
@@ -373,13 +384,15 @@ describe('UsersWidget', () => {
   });
 
   it('links the unverified users only while there are any', async () => {
-    const find = vi.spyOn(UsersService, 'findMany').mockResolvedValue({ data: [], total: 0 } as never);
+    const find = vi.mocked(sdk.findMany).mockResolvedValue(sdkResult({ data: [], total: 0 }));
     const { container, unmount } = renderWidget(<UnverifiedUsersChip isEditing={false} />);
-    await waitFor(() => expect(find).toHaveBeenCalledWith({ emailVerified: false, limit: 1 }));
+    await waitFor(() =>
+      expect(find).toHaveBeenCalledWith(expect.objectContaining({ query: { emailVerified: false, limit: 1 } })),
+    );
     expect(container).toBeEmptyDOMElement();
     unmount();
 
-    find.mockResolvedValue({ data: [{ id: 1 }], total: 4 } as never);
+    find.mockResolvedValue(sdkResult({ data: [{ id: 1 }], total: 4 }));
     const { unmount: unmountLink } = renderWidget(<UnverifiedUsersChip isEditing={false} />);
     expect(await screen.findByRole('link', { name: '4 unverified' })).toHaveAttribute(
       'href',
@@ -396,17 +409,17 @@ describe('UsersWidget', () => {
 
 describe('BalanceWidget', () => {
   const configure = (value: number) => {
-    vi.spyOn(BillingService, 'getBillingConfiguration').mockResolvedValue({ currency: 'EUR', minorUnit: 2 } as never);
-    return vi.spyOn(BillingService, 'getBillingBalance').mockResolvedValue({ value } as never);
+    vi.mocked(sdk.getBillingConfiguration).mockResolvedValue(sdkResult({ currency: 'EUR', minorUnit: 2 }));
+    return vi.mocked(sdk.getBillingBalance).mockResolvedValue(sdkResult({ value }));
   };
 
   it('shows the own balance in the configured currency on a small tile', async () => {
     const balance = configure(1250);
-    const transactions = vi.spyOn(BillingService, 'getBillingTransactions');
+    const transactions = vi.mocked(sdk.getBillingTransactions);
     const { container } = renderWidget(<BalanceWidget {...at('small')} />);
 
     expect(await screen.findByText(/EUR/)).toHaveTextContent(/12[.,]5 EUR/);
-    expect(balance).toHaveBeenCalledWith({ userId: 7 });
+    expect(balance).toHaveBeenCalledWith(expect.objectContaining({ path: { userId: 7 } }));
     expect(container.querySelector('[data-cy="dashboard-balance-value"]')).not.toHaveClass('text-danger');
     expect(transactions).not.toHaveBeenCalled();
   });
@@ -420,33 +433,35 @@ describe('BalanceWidget', () => {
 
   it('adds the last three transactions on a medium tile', async () => {
     configure(1250);
-    const transactions = vi.spyOn(BillingService, 'getBillingTransactions').mockResolvedValue({
-      data: [
-        {
-          id: 1,
-          amount: -200,
-          createdAt: '2026-11-16T08:00:00.000Z',
-          resourceUsageId: 5,
-          resourceUsage: { resource: { name: 'Lathe' } },
-        },
-        { id: 2, amount: 1000, createdAt: '2026-11-15T08:00:00.000Z', externalReference: 'sumup-1' },
-        { id: 3, amount: -50, createdAt: '2026-11-14T08:00:00.000Z', initiatorId: 2 },
-        { id: 4, amount: 5, createdAt: '2026-11-13T08:00:00.000Z' },
-      ],
-      total: 4,
-    } as never);
+    const transactions = vi.mocked(sdk.getBillingTransactions).mockResolvedValue(
+      sdkResult({
+        data: [
+          {
+            id: 1,
+            amount: -200,
+            createdAt: '2026-11-16T08:00:00.000Z',
+            resourceUsageId: 5,
+            resourceUsage: { resource: { name: 'Lathe' } },
+          },
+          { id: 2, amount: 1000, createdAt: '2026-11-15T08:00:00.000Z', externalReference: 'sumup-1' },
+          { id: 3, amount: -50, createdAt: '2026-11-14T08:00:00.000Z', initiatorId: 2 },
+          { id: 4, amount: 5, createdAt: '2026-11-13T08:00:00.000Z' },
+        ],
+        total: 4,
+      }),
+    );
     const { container } = renderWidget(<BalanceWidget {...at('medium')} />);
 
     expect(await screen.findByText('Usage of Lathe')).toBeInTheDocument();
-    expect(transactions).toHaveBeenCalledWith({ userId: 7, limit: 3 });
+    expect(transactions).toHaveBeenCalledWith(expect.objectContaining({ path: { userId: 7 }, query: { limit: 3 } }));
     expect(screen.getByText('Top-up')).toBeInTheDocument();
     expect(screen.getByText('Manual transaction')).toBeInTheDocument();
     expect(container.querySelectorAll('[data-cy="dashboard-balance-transaction"]')).toHaveLength(3);
   });
 
   it('shows an error when the balance cannot be loaded', async () => {
-    vi.spyOn(BillingService, 'getBillingConfiguration').mockResolvedValue({ currency: 'EUR', minorUnit: 2 } as never);
-    vi.spyOn(BillingService, 'getBillingBalance').mockRejectedValue(new Error('offline') as never);
+    vi.mocked(sdk.getBillingConfiguration).mockResolvedValue(sdkResult({ currency: 'EUR', minorUnit: 2 }));
+    vi.mocked(sdk.getBillingBalance).mockRejectedValue(new Error('offline') as never);
     renderWidget(<BalanceWidget {...at('small')} />);
     expect(await screen.findByText('This widget could not be loaded.')).toBeInTheDocument();
   });
@@ -457,9 +472,9 @@ describe('ReadersWidget', () => {
   const offline = (container: HTMLElement) => container.querySelector('[data-cy="dashboard-readers-offline"]');
 
   it('says so when no reader is paired yet instead of reporting all connected', async () => {
-    vi.spyOn(AttractapService, 'getReaders').mockResolvedValue([
-      { id: 3, name: 'New reader', pairingState: 'unpaired', lastConnection: hoursAgo(90) },
-    ] as never);
+    vi.mocked(sdk.getReaders).mockResolvedValue(
+      sdkResult([{ id: 3, name: 'New reader', pairingState: 'unpaired', lastConnection: hoursAgo(90) }]),
+    );
     const { container } = renderWidget(<ReadersWidget {...at('small')} />);
 
     expect(await screen.findByText('No paired readers yet')).toBeInTheDocument();
@@ -467,11 +482,13 @@ describe('ReadersWidget', () => {
   });
 
   it('counts stale of paired readers like the readers page, in the warning colour', async () => {
-    vi.spyOn(AttractapService, 'getReaders').mockResolvedValue([
-      { id: 1, name: 'Door', pairingState: 'paired', lastConnection: hoursAgo(1) },
-      { id: 2, name: 'Lathe reader', pairingState: 'paired', lastConnection: hoursAgo(30) },
-      { id: 3, name: 'New reader', pairingState: 'unpaired', lastConnection: hoursAgo(90) },
-    ] as never);
+    vi.mocked(sdk.getReaders).mockResolvedValue(
+      sdkResult([
+        { id: 1, name: 'Door', pairingState: 'paired', lastConnection: hoursAgo(1) },
+        { id: 2, name: 'Lathe reader', pairingState: 'paired', lastConnection: hoursAgo(30) },
+        { id: 3, name: 'New reader', pairingState: 'unpaired', lastConnection: hoursAgo(90) },
+      ]),
+    );
     const { container } = renderWidget(<ReadersWidget {...at('small')} />);
 
     await waitFor(() => expect(offline(container)).toHaveTextContent('1/2'));
@@ -480,13 +497,15 @@ describe('ReadersWidget', () => {
   });
 
   it('lists up to three stale readers on a medium tile, linking to their diagnostics', async () => {
-    vi.spyOn(AttractapService, 'getReaders').mockResolvedValue(
-      ids(4).map((id) => ({
-        id,
-        name: `Reader ${id}`,
-        pairingState: 'paired',
-        lastConnection: hoursAgo(24 + id),
-      })) as never,
+    vi.mocked(sdk.getReaders).mockResolvedValue(
+      sdkResult(
+        ids(4).map((id) => ({
+          id,
+          name: `Reader ${id}`,
+          pairingState: 'paired',
+          lastConnection: hoursAgo(24 + id),
+        })) as never,
+      ),
     );
     renderWidget(<ReadersWidget {...at('medium')} />);
 
@@ -498,9 +517,9 @@ describe('ReadersWidget', () => {
   });
 
   it('shows the success colour and says so when every reader connected lately', async () => {
-    vi.spyOn(AttractapService, 'getReaders').mockResolvedValue([
-      { id: 1, name: 'Door', pairingState: 'paired', lastConnection: hoursAgo(1) },
-    ] as never);
+    vi.mocked(sdk.getReaders).mockResolvedValue(
+      sdkResult([{ id: 1, name: 'Door', pairingState: 'paired', lastConnection: hoursAgo(1) }]),
+    );
     const { container } = renderWidget(<ReadersWidget {...at('medium')} />);
     expect(await screen.findByText('All readers connected')).toBeInTheDocument();
     expect(offline(container)).toHaveTextContent('0/1');

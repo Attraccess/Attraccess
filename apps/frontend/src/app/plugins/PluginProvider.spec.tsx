@@ -23,7 +23,7 @@ vi.mock('virtual:__federation__', () => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  usePluginsServiceGetPlugins: () => ({ refetch: hoisted.refetchMock }),
+  useGetPlugins: () => ({ refetch: hoisted.refetchMock }),
 }));
 
 vi.mock('../../hooks/useAuth', () => ({

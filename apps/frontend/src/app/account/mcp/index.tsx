@@ -1,7 +1,7 @@
 import { InputGroup, Label, Link, TextField } from '@heroui/react';
 import { Copy } from 'lucide-react';
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useMcpServiceGetMcpConnectionInfo } from '@attraccess/react-query-client';
+import { useGetMcpConnectionInfo } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './en.json';
 import de from './de.json';
@@ -16,7 +16,7 @@ export interface McpConnectionInfo {
  * loading, when the request fails, or when the user could use neither OAuth nor an API token.
  */
 export function useMcpConnection(canUseApiTokens: boolean): McpConnectionInfo | undefined {
-  const { data } = useMcpServiceGetMcpConnectionInfo<McpConnectionInfo>(undefined, {
+  const { data } = useGetMcpConnectionInfo<McpConnectionInfo>({}, undefined, {
     retry: false,
     staleTime: Infinity,
   });

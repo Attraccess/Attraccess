@@ -1,10 +1,7 @@
 import { Separator, Spinner } from '@heroui/react';
 import { Users } from 'lucide-react';
 import { useTranslations, AttraccessUser } from '@attraccess/plugins-frontend-ui';
-import {
-  useAccessControlServiceResourceIntroducersGetNames,
-  ResourceIntroducerType,
-} from '@attraccess/react-query-client';
+import { useResourceIntroducersGetNames, ResourceIntroducerType } from '@attraccess/react-query-client';
 
 import de from './de.json';
 import en from './en.json';
@@ -33,11 +30,9 @@ export function ResourceIntroducersList({
   const { t } = useTranslations({ en, de });
 
   // The names list is open to everyone who may view resources, so a not-yet-introduced user can see who to ask.
-  const { data: allIntroducers, isLoading } = useAccessControlServiceResourceIntroducersGetNames(
-    { resourceId },
-    undefined,
-    { refetchInterval: 10000 },
-  );
+  const { data: allIntroducers, isLoading } = useResourceIntroducersGetNames({ path: { resourceId } }, undefined, {
+    refetchInterval: 10000,
+  });
   const introducers = type ? allIntroducers?.filter((introducer) => introducer.role === type) : allIntroducers;
 
   if (isLoading) {

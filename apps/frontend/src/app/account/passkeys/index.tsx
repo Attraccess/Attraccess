@@ -18,10 +18,11 @@ import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/brow
 import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/browser';
 import { Button, DateTimeDisplay, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  PasskeysService,
-  usePasskeysServiceDeletePasskey,
-  usePasskeysServiceListPasskeys,
+  useDeletePasskey,
+  useListPasskeys,
   type Passkey,
+  verifyPasskeyRegistration,
+  getPasskeyRegistrationOptions,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './en.json';
@@ -30,28 +31,29 @@ import de from './de.json';
 export function PasskeysCard() {
   const { t } = useTranslations({ en, de });
   const { showToast } = useToastMessage();
-  const { data: passkeys, isLoading, refetch } = usePasskeysServiceListPasskeys();
+  const { data: passkeys, isLoading, refetch } = useListPasskeys();
 
   const [name, setName] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
 
-  const { mutateAsync: deletePasskey, isPending: isDeleting } = usePasskeysServiceDeletePasskey();
+  const { mutateAsync: deletePasskey, isPending: isDeleting } = useDeletePasskey();
 
   const handleRegister = useCallback(async () => {
     setIsRegistering(true);
 
     try {
-      const { options } = await PasskeysService.getPasskeyRegistrationOptions();
+      const { options } = await getPasskeyRegistrationOptions({ throwOnError: true }).then(({ data }) => data);
       const response = await startRegistration({
         optionsJSON: options as unknown as PublicKeyCredentialCreationOptionsJSON,
       });
 
-      await PasskeysService.verifyPasskeyRegistration({
-        requestBody: {
+      await verifyPasskeyRegistration({
+        body: {
           response: response as unknown as Record<string, unknown>,
           name: name.trim() || undefined,
         },
-      });
+        throwOnError: true,
+      }).then(({ data }) => data);
 
       setName('');
       await refetch();
@@ -71,7 +73,7 @@ export function PasskeysCard() {
   const handleDelete = useCallback(
     async (passkey: Passkey) => {
       try {
-        await deletePasskey({ id: passkey.id });
+        await deletePasskey({ path: { id: passkey.id } });
         await refetch();
         showToast({ title: t('success.deleted'), type: 'success' });
       } catch (error) {

@@ -4,8 +4,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   MetricsTogglesDto,
-  UseSettingsServiceGetMetricsSettingsKeyFn,
-  useSettingsServiceUpdateMetricsSettings,
+  UseGetMetricsSettingsKeyFn,
+  useUpdateMetricsSettings,
 } from '@attraccess/react-query-client';
 import { SettingsRow } from '../../components/SettingsRow';
 import { useToastMessage } from '../../../../components/toastProvider';
@@ -21,9 +21,9 @@ export function MonitoringToggleRows({ toggles }: { toggles: MetricsTogglesDto |
   const queryClient = useQueryClient();
   const [pendingToggle, setPendingToggle] = useState<keyof MetricsTogglesDto | null>(null);
 
-  const { mutate: updateToggle, isPending: isUpdatingToggles } = useSettingsServiceUpdateMetricsSettings({
+  const { mutate: updateToggle, isPending: isUpdatingToggles } = useUpdateMetricsSettings(undefined, {
     onSuccess() {
-      queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetMetricsSettingsKeyFn() });
+      queryClient.invalidateQueries({ queryKey: UseGetMetricsSettingsKeyFn() });
       toast.success({ title: t('toggles.savedTitle'), description: t('toggles.savedDescription') });
       setPendingToggle(null);
     },
@@ -62,7 +62,7 @@ export function MonitoringToggleRows({ toggles }: { toggles: MetricsTogglesDto |
             isDisabled={isUpdatingToggles && pendingToggle !== null}
             onChange={(value) => {
               setPendingToggle(subsystem);
-              updateToggle({ requestBody: { toggles: { [subsystem]: value } } });
+              updateToggle({ body: { toggles: { [subsystem]: value } } });
             }}
           />
         </SettingsRow>

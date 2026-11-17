@@ -6,13 +6,13 @@ import { UnauthorizedLayout } from './unauthorized-layout/layout';
 import { SSOLogin } from './ssoLogin';
 import { PasskeyLogin } from './passkeyLogin';
 import { PasswordResetForm } from './password-reset/passwordResetForm';
-import { useSettingsServiceGetFirstTimeSetupStatus } from '@attraccess/react-query-client';
+import { useGetFirstTimeSetupStatus } from '@attraccess/react-query-client';
 
 export const Unauthorized = memo(function UnauthorizedComponent() {
   const [formToShow, setFormToShow] = useState<'login' | 'register' | 'forgotPassword'>('login');
   const navigate = useNavigate();
 
-  const { data: setupStatus, isLoading: isCheckingSetup } = useSettingsServiceGetFirstTimeSetupStatus();
+  const { data: setupStatus, isLoading: isCheckingSetup } = useGetFirstTimeSetupStatus();
 
   useEffect(() => {
     if (!isCheckingSetup && setupStatus?.available) {

@@ -6,8 +6,8 @@ import {
   ApiError,
   FormSubmissionRequestDto,
   ResourceUsage,
-  useMessagingServiceMessagingContactResourceHolder,
-  useResourcesServiceResourceUsageEndSession,
+  useMessagingContactResourceHolder,
+  useResourceUsageEndSession,
 } from '@attraccess/react-query-client';
 import { SessionStatusCard } from '../SessionStatusCard';
 import { SessionNotesModal, SessionModalMode } from '../SessionNotesModal';
@@ -47,7 +47,7 @@ export function ParallelSessionsDisplay({
   const [contactingUserId, setContactingUserId] = useState<number | null>(null);
   const { canEndSession } = useCanEndOtherSessions(resourceId);
 
-  const endSession = useResourcesServiceResourceUsageEndSession({
+  const endSession = useResourceUsageEndSession(undefined, {
     onSuccess: () => {
       clearFormsDraft();
       setUsageToEnd(null);
@@ -59,7 +59,7 @@ export function ParallelSessionsDisplay({
     },
   });
 
-  const contactHolder = useMessagingServiceMessagingContactResourceHolder({
+  const contactHolder = useMessagingContactResourceHolder(undefined, {
     onSuccess: ({ conversationId }) => {
       navigate(`/messages?conversation=${conversationId}&resourceRef=${resourceId}`);
     },
@@ -81,7 +81,7 @@ export function ParallelSessionsDisplay({
         }
         throw error;
       }
-      endSession.mutate({ resourceId, requestBody: { usageId: usageToEnd.id, notes, formSubmissions } });
+      endSession.mutate({ path: { resourceId }, body: { usageId: usageToEnd.id, notes, formSubmissions } });
     },
     [endSession, requestForms, resourceId, usageToEnd],
   );
@@ -135,7 +135,7 @@ export function ParallelSessionsDisplay({
                           isDisabled={contactHolder.isPending}
                           onPress={() => {
                             setContactingUserId(usage.userId ?? null);
-                            contactHolder.mutate({ resourceId, userId: usage.userId });
+                            contactHolder.mutate({ path: { resourceId }, query: { userId: usage.userId } });
                           }}
                         >
                           <MessageCircle className="w-3.5 h-3.5" />

@@ -5,7 +5,7 @@ import { UsageNotesDrawer } from './drawer';
 vi.mock('../../../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 1 } }) }));
 vi.mock('@attraccess/react-query-client', async (original) => ({
   ...(await original<typeof import('@attraccess/react-query-client')>()),
-  useProjectsServiceFindManyProjects: () => ({
+  useFindManyProjects: () => ({
     data: {
       data: [
         { id: 7, name: 'Workshop' },

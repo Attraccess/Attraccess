@@ -2,7 +2,7 @@ import { Button, Card, Chip, Spinner } from '@heroui/react';
 import { PlusIcon } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useResourceFormsServiceResourceFormsList } from '@attraccess/react-query-client';
+import { useResourceFormsList } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
 import { DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
@@ -17,7 +17,7 @@ export function FormListPage() {
     data: forms,
     isLoading,
     isFetched,
-  } = useResourceFormsServiceResourceFormsList({ resourceId }, undefined, {
+  } = useResourceFormsList({ path: { resourceId } }, undefined, {
     enabled: Number.isFinite(resourceId),
   });
 

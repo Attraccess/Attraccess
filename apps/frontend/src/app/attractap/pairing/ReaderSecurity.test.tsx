@@ -19,17 +19,17 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }) }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useAttractapServiceGetPairings: () => ({ data: mocks.pairings.current }),
-  useAttractapServiceGetReaderCredentialHistory: () => ({ data: mocks.history.current }),
-  useAttractapServiceRevokeReader: (options: { onSuccess?: () => void }) => {
+  useGetPairings: () => ({ data: mocks.pairings.current }),
+  useGetReaderCredentialHistory: () => ({ data: mocks.history.current }),
+  useRevokeReader: (_mutationKey: unknown, options: { onSuccess?: () => void }) => {
     mocks.revokeOptions.current = options;
     return { mutate: mocks.revoke, isPending: false };
   },
-  useAttractapServiceGetReadersKey: 'readers',
-  useAttractapServiceGetReadersToPairKey: 'readers-to-pair',
-  useAttractapServiceGetReaderCredentialHistoryKey: 'history',
-  UseAttractapServiceGetReaderByIdKeyFn: () => ['reader'],
-  useUsersServiceGetOneUserById: ({ id }: { id: number }) => ({ data: { id, username: `user-${id}` } }),
+  useGetReadersKey: 'readers',
+  useGetReadersToPairKey: 'readers-to-pair',
+  useGetReaderCredentialHistoryKey: 'history',
+  UseGetReaderByIdKeyFn: () => ['reader'],
+  useGetOneUserById: ({ path: { id } }: { path: { id: number } }) => ({ data: { id, username: `user-${id}` } }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -90,7 +90,7 @@ describe('ReaderSecurity', () => {
     expect(mocks.revoke).not.toHaveBeenCalled();
 
     await user.click(within(dialog).getByRole('button', { name: 'security.revoke' }));
-    expect(mocks.revoke).toHaveBeenCalledWith({ readerId: 7 });
+    expect(mocks.revoke).toHaveBeenCalledWith({ path: { readerId: 7 } });
 
     act(() => mocks.revokeOptions.current?.onSuccess?.());
     expect(mocks.toast.success).toHaveBeenCalledWith({ title: 'security.revoked' });

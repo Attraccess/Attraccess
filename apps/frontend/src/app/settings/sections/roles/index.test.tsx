@@ -22,8 +22,8 @@ const hoisted = vi.hoisted(() => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useRbacServiceListPermissions: hoisted.listPermissions,
-  useRbacServiceListRoles: () => ({
+  useListPermissions: hoisted.listPermissions,
+  useListRoles: () => ({
     data: hoisted.rolesLoading ? undefined : hoisted.roles,
     isLoading: hoisted.rolesLoading,
   }),

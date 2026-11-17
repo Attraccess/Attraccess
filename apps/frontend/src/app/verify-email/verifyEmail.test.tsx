@@ -49,7 +49,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useUsersServiceVerifyEmail: (options: { onSuccess?: () => void; onError?: (e: unknown) => void }) => {
+  useVerifyEmail: (_mutationKey: unknown, options: { onSuccess?: () => void; onError?: (e: unknown) => void }) => {
     verifyOnSuccess = options?.onSuccess;
     verifyOnError = options?.onError;
     const mutation = useMutation({
@@ -58,12 +58,15 @@ vi.mock('@attraccess/react-query-client', () => ({
     });
     return mutationMode.reactive ? mutation : { mutate: verifyMutateMock, isPending: pending.verify };
   },
-  useUsersServiceResendVerificationEmail: (options: { onSuccess?: () => void; onError?: (e: unknown) => void }) => {
+  useResendVerificationEmail: (
+    _mutationKey: unknown,
+    options: { onSuccess?: () => void; onError?: (e: unknown) => void },
+  ) => {
     resendOnSuccess = options?.onSuccess;
     resendOnError = options?.onError;
     return { mutate: resendMutateMock, isPending: pending.resend };
   },
-  useUsersServiceGetCurrentKey: 'useUsersServiceGetCurrentKey',
+  useGetCurrentKey: 'useGetCurrentKey',
   ApiError: class ApiError extends Error {},
 }));
 
@@ -121,18 +124,14 @@ describe('VerifyEmail', () => {
     await user.click(retry);
     await waitFor(() => expect(retry).toBeEnabled());
     expect(verifyMutateMock).toHaveBeenCalledTimes(2);
-    expect(verifyMutateMock).toHaveBeenLastCalledWith({
-      requestBody: { token: 'expired', email: 'test@example.com' },
-    });
+    expect(verifyMutateMock).toHaveBeenLastCalledWith({ body: { token: 'expired', email: 'test@example.com' } });
   });
 
   it('calls verifyEmail mutation with token and email from URL params', async () => {
     renderWithRoute('/verify-email?email=test%40example.com&token=abc123');
 
     await waitFor(() =>
-      expect(verifyMutateMock).toHaveBeenCalledWith({
-        requestBody: { token: 'abc123', email: 'test@example.com' },
-      }),
+      expect(verifyMutateMock).toHaveBeenCalledWith({ body: { token: 'abc123', email: 'test@example.com' } }),
     );
   });
 
@@ -188,9 +187,7 @@ describe('VerifyEmail', () => {
 
     await user.click(screen.getByRole('button', { name: 'Verify email again' }));
     expect(verifyMutateMock).toHaveBeenCalledTimes(2);
-    expect(verifyMutateMock).toHaveBeenLastCalledWith({
-      requestBody: { token: 'expired', email: 'test@example.com' },
-    });
+    expect(verifyMutateMock).toHaveBeenLastCalledWith({ body: { token: 'expired', email: 'test@example.com' } });
   });
 
   it('shows the German success action after successful verification', async () => {
@@ -244,9 +241,7 @@ describe('VerifyEmail', () => {
 
     await user.click(screen.getByTestId('resend-verification-button'));
 
-    expect(resendMutateMock).toHaveBeenCalledWith({
-      requestBody: { email: 'test@example.com' },
-    });
+    expect(resendMutateMock).toHaveBeenCalledWith({ body: { email: 'test@example.com' } });
   });
 
   it('shows success alert after resend succeeds', async () => {
@@ -340,7 +335,7 @@ describe('VerifyEmail', () => {
     await user.clear(input);
     await user.type(input, 'replacement@example.com');
     await user.click(resend);
-    expect(resendMutateMock).toHaveBeenCalledWith({ requestBody: { email: 'replacement@example.com' } });
+    expect(resendMutateMock).toHaveBeenCalledWith({ body: { email: 'replacement@example.com' } });
   });
 
   it('disables resend button when email format is invalid', async () => {
@@ -365,9 +360,7 @@ describe('VerifyEmail', () => {
 
     await user.click(screen.getByTestId('resend-verification-button'));
 
-    expect(resendMutateMock).toHaveBeenCalledWith({
-      requestBody: { email: 'spaced@example.com' },
-    });
+    expect(resendMutateMock).toHaveBeenCalledWith({ body: { email: 'spaced@example.com' } });
   });
 
   it('hides resend form and shows success alert after resend succeeds (replaces form)', async () => {
@@ -410,9 +403,7 @@ describe('VerifyEmail', () => {
 
     expect(await screen.findByText('Loading...')).toBeInTheDocument();
     await waitFor(() =>
-      expect(verifyMutateMock).toHaveBeenCalledWith({
-        requestBody: { token: 'abc123', email: 'test@example.com' },
-      }),
+      expect(verifyMutateMock).toHaveBeenCalledWith({ body: { token: 'abc123', email: 'test@example.com' } }),
     );
   });
 });

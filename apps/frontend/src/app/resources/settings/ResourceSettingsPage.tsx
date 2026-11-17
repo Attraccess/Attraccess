@@ -3,10 +3,10 @@ import { Button, Spinner } from '@heroui/react';
 import { FolderIcon, Gauge, ListChecks, Settings2Icon, StethoscopeIcon, WorkflowIcon, WrenchIcon } from 'lucide-react';
 import {
   ResourceType,
-  UseResourcesServiceGetOneResourceByIdKeyFn,
-  useResourcesServiceGetAllResourcesKey,
-  useResourcesServiceGetOneResourceById,
-  useResourcesServiceUpdateOneResource,
+  UseGetOneResourceByIdKeyFn,
+  useGetAllResourcesKey,
+  useGetOneResourceById,
+  useUpdateOneResource,
   Resource,
   SupervisionMode,
   UpdateResourceDto,
@@ -62,7 +62,7 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
   const { t } = useTranslations({ en: { ...editorEn, ...en }, de: { ...editorDe, ...de } });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
-  const { data: resource, isLoading, error } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  const { data: resource, isLoading, error } = useGetOneResourceById({ path: { id: resourceId } });
   const [formData, setFormData] = useState<FormData | null>(null);
   const [selectedImage, setSelectedImage] = useState<File | null>();
   const [deleteImage, setDeleteImage] = useState(false);
@@ -80,15 +80,15 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
     setDirty(true);
   }, []);
 
-  const updateResource = useResourcesServiceUpdateOneResource({
+  const updateResource = useUpdateOneResource(undefined, {
     onSuccess: (updated) => {
       toast.success({
         title: t('update.success.toast.title'),
         description: t('update.success.toast.description', { name: updated.name }),
       });
-      queryClient.setQueryData(UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId }), updated);
-      queryClient.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
-      queryClient.invalidateQueries({ queryKey: UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId }) });
+      queryClient.setQueryData(UseGetOneResourceByIdKeyFn({ path: { id: resourceId } }), updated);
+      queryClient.invalidateQueries({ queryKey: [useGetAllResourcesKey] });
+      queryClient.invalidateQueries({ queryKey: UseGetOneResourceByIdKeyFn({ path: { id: resourceId } }) });
       if (editRevision.current === submittedRevision.current) {
         setFormData(fromResource(updated));
         setSelectedImage(undefined);
@@ -111,8 +111,8 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
     }
     submittedRevision.current = editRevision.current;
     updateResource.mutate({
-      id: resourceId,
-      formData: { ...formData, name: formData.name.trim(), image: selectedImage ?? undefined, deleteImage },
+      path: { id: resourceId },
+      body: { ...formData, name: formData.name.trim(), image: selectedImage ?? undefined, deleteImage },
     });
   };
 

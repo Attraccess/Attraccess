@@ -18,7 +18,7 @@ import { LicenseStep } from './steps/LicenseStep';
 import { VerifyEmailStep } from './steps/VerifyEmailStep';
 import en from './en.json';
 import de from './de.json';
-import { useSettingsServiceGetFirstTimeSetupStatus } from '@attraccess/react-query-client';
+import { useGetFirstTimeSetupStatus } from '@attraccess/react-query-client';
 
 const WIZARD_STEPS = ['step-1', 'step-2', 'step-3', 'step-4', 'step-5'] as const;
 type WizardStepKey = (typeof WIZARD_STEPS)[number];
@@ -31,7 +31,7 @@ export function FirstTimeSetupPage() {
   const hasSeenSetupAvailable = useRef(false);
   const [localCompleted, setLocalCompleted] = useState({ url: false, license: false });
 
-  const { data: setupStatus, isLoading: isCheckingSetup } = useSettingsServiceGetFirstTimeSetupStatus();
+  const { data: setupStatus, isLoading: isCheckingSetup } = useGetFirstTimeSetupStatus();
 
   if (setupStatus?.available) {
     hasSeenSetupAvailable.current = true;

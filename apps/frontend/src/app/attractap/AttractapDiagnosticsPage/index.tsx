@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom';
 import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useAttractapServiceGetReaderById } from '@attraccess/react-query-client';
+import { useGetReaderById } from '@attraccess/react-query-client';
 import { DEFAULT_RETRIES } from '../../../api/queryClient';
 import { AttractapDiagnostics } from '../AttractapEditor/diagnostics/index';
 import { NotFound } from '../../not-found';
@@ -18,7 +18,7 @@ export function AttractapDiagnosticsPage() {
   const { readerId } = useParams<{ readerId: string }>();
   const id = readerId ? Number(readerId) : undefined;
 
-  const { data: reader, error } = useAttractapServiceGetReaderById({ readerId: id as number }, undefined, {
+  const { data: reader, error } = useGetReaderById({ path: { readerId: id as number } }, undefined, {
     enabled: id !== undefined,
     retry: retryReaderLookup,
   });

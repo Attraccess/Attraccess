@@ -13,9 +13,9 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 
 // The embedded UserSearch picker fetches users through the generated client;
 // mock the hook so the test drives the real picker UI without a network layer.
-const mocks = vi.hoisted(() => ({ useUsersServiceFindManyInfinite: vi.fn() }));
+const mocks = vi.hoisted(() => ({ useFindManyInfinite: vi.fn() }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useUsersServiceFindManyInfinite: mocks.useUsersServiceFindManyInfinite,
+  useFindManyInfinite: mocks.useFindManyInfinite,
 }));
 
 // The tabs and the mass introduction are covered by IntroductionTabs.test.tsx; render the individual tab only.
@@ -64,7 +64,7 @@ describe('AddPersonDrawer', () => {
   });
 
   beforeEach(() => {
-    mocks.useUsersServiceFindManyInfinite.mockReturnValue({
+    mocks.useFindManyInfinite.mockReturnValue({
       data: { pages: [{ data: [{ id: 1, username: 'alan' }], total: 1, page: 1, limit: 50 }] },
       fetchNextPage: vi.fn(),
       hasNextPage: false,

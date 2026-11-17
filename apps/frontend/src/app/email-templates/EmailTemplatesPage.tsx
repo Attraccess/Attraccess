@@ -1,4 +1,4 @@
-import { useEmailTemplatesServiceEmailTemplateControllerFindAll } from '@attraccess/react-query-client';
+import { useEmailTemplateControllerFindAll } from '@attraccess/react-query-client';
 import {
   Table,
   TableScrollContainer,
@@ -25,7 +25,7 @@ export function EmailTemplatesPage() {
   // The Email settings section — these editors are sub-routes of it and navigate to its siblings.
   const basePath = '/settings/email';
 
-  const { data: emailTemplates } = useEmailTemplatesServiceEmailTemplateControllerFindAll();
+  const { data: emailTemplates } = useEmailTemplateControllerFindAll();
 
   const openEditor = useCallback(
     (type: string) => {

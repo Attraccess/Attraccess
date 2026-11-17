@@ -14,9 +14,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useAuthenticationServiceGetAllSsoProviders: () => ({ data: [{ id: 7, name: 'Company', type: 'OIDC' }] }),
-  useAuthenticationServiceGetAllSsoProvidersKey: 'sso-providers',
-  useAuthenticationServiceDeleteOneSsoProvider: () => ({ mutateAsync: mocks.mutateAsync, isPending: false }),
+  useGetAllSsoProviders: () => ({ data: [{ id: 7, name: 'Company', type: 'OIDC' }] }),
+  useGetAllSsoProvidersKey: 'sso-providers',
+  useDeleteOneSsoProvider: () => ({ mutateAsync: mocks.mutateAsync, isPending: false }),
 }));
 vi.mock('../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: mocks.success, error: mocks.error }),
@@ -51,7 +51,7 @@ describe('SSOProvidersList', () => {
 
     await userEvent.click(screen.getByText('Delete row'));
     await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
-    expect(mocks.mutateAsync).toHaveBeenCalledWith({ id: 7 });
+    expect(mocks.mutateAsync).toHaveBeenCalledWith({ path: { id: 7 } });
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(mocks.success).toHaveBeenCalled();
   });

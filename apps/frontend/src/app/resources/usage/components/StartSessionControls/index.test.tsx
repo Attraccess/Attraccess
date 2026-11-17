@@ -5,34 +5,33 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@attraccess/react-query-client';
 import { StartSessionControls } from './index';
 
-const { startMutate, supervisionMode, resourceType, startBlocked, requestForms, toastError, bothCallbacks } = vi.hoisted(
-  () => ({
-  bothCallbacks: (options: unknown, callbacks: unknown, variables: unknown) => {
-    // Mirrors TanStack: the hook-level callbacks run first, then the per-call ones.
-    type Callbacks = {
-      onSuccess?: (data: unknown, v: unknown) => void;
-      onError?: (error: unknown, v: unknown) => void;
-    };
-    const [hook, call] = [options as Callbacks | undefined, callbacks as Callbacks | undefined];
-    return {
-      onSuccess: (data: unknown, _variables?: unknown) => {
-        hook?.onSuccess?.(data, variables);
-        call?.onSuccess?.(data, variables);
-      },
-      onError: (error: unknown) => {
-        hook?.onError?.(error, variables);
-        call?.onError?.(error, variables);
-      },
-    };
-  },
-  startMutate: vi.fn(),
-  toastError: vi.fn(),
-  requestForms: vi.fn().mockResolvedValue([]),
-  supervisionMode: { value: 'introduction_required' },
-  resourceType: { value: 'machine' },
-  startBlocked: { value: { blocked: false } as Record<string, unknown> },
-  }),
-);
+const { startMutate, supervisionMode, resourceType, startBlocked, requestForms, toastError, bothCallbacks } =
+  vi.hoisted(() => ({
+    bothCallbacks: (options: unknown, callbacks: unknown, variables: unknown) => {
+      // Mirrors TanStack: the hook-level callbacks run first, then the per-call ones.
+      type Callbacks = {
+        onSuccess?: (data: unknown, v: unknown) => void;
+        onError?: (error: unknown, v: unknown) => void;
+      };
+      const [hook, call] = [options as Callbacks | undefined, callbacks as Callbacks | undefined];
+      return {
+        onSuccess: (data: unknown, _variables?: unknown) => {
+          hook?.onSuccess?.(data, variables);
+          call?.onSuccess?.(data, variables);
+        },
+        onError: (error: unknown) => {
+          hook?.onError?.(error, variables);
+          call?.onError?.(error, variables);
+        },
+      };
+    },
+    startMutate: vi.fn(),
+    toastError: vi.fn(),
+    requestForms: vi.fn().mockResolvedValue([]),
+    supervisionMode: { value: 'introduction_required' },
+    resourceType: { value: 'machine' },
+    startBlocked: { value: { blocked: false } as Record<string, unknown> },
+  }));
 
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -73,27 +72,27 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
     SUPERVISION_ALLOWED: 'supervision_allowed',
     SUPERVISION_REQUIRED: 'supervision_required',
   },
-  useResourcesServiceGetOneResourceById: () => ({
+  useGetOneResourceById: () => ({
     data: { id: 1, type: resourceType.value, supervisionMode: supervisionMode.value },
   }),
   // The real StartBlockedGate renders; only its query answer is faked.
-  useResourcesServiceResourceUsageStartBlocked: () => ({
+  useResourceUsageStartBlocked: () => ({
     data: startBlocked.value,
     isPending: false,
     isError: false,
     refetch: vi.fn(),
   }),
   // The shared start hook passes onSuccess/onError at hook level and plugin handling per call.
-  useResourcesServiceResourceUsageStartSession: (options: unknown) => ({
+  useResourceUsageStartSession: (_mutationKey: unknown, options: unknown) => ({
     mutate: (variables: unknown, callbacks: unknown) =>
       startMutate(variables, bothCallbacks(options, callbacks, variables)),
     isPending: false,
   }),
-  useResourcesServiceUnlockDoor: () => ({ mutate: vi.fn(), isPending: false }),
-  useResourcesServiceLockDoor: () => ({ mutate: vi.fn(), isPending: false }),
-  useResourcesServiceUnlatchDoor: () => ({ mutate: vi.fn(), isPending: false }),
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn: () => ['activeSession'],
-  UseResourcesServiceResourceUsageGetHistoryKeyFn: () => ['history'],
+  useUnlockDoor: () => ({ mutate: vi.fn(), isPending: false }),
+  useLockDoor: () => ({ mutate: vi.fn(), isPending: false }),
+  useUnlatchDoor: () => ({ mutate: vi.fn(), isPending: false }),
+  UseResourceUsageGetActiveSessionKeyFn: () => ['activeSession'],
+  UseResourceUsageGetHistoryKeyFn: () => ['history'],
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -176,7 +175,7 @@ it.each([
   expect(startMutate).toHaveBeenCalledTimes(retry ? 2 : 1);
   if (retry)
     expect(startMutate).toHaveBeenLastCalledWith(
-      { resourceId: 1, requestBody: { projectId: undefined, formSubmissions: submissions } },
+      { path: { resourceId: 1 }, body: { projectId: undefined, formSubmissions: submissions } },
       expect.any(Object),
     );
 });
@@ -230,7 +229,7 @@ it('asks for a plugin confirmation on 409 CONFIRMATION_REQUIRED and retries with
 
   await userEvent.click(document.querySelector('[data-cy="start-confirmation-confirm"]') as HTMLElement);
   expect(startMutate).toHaveBeenCalledTimes(2);
-  expect(startMutate.mock.calls[1][0].requestBody).toMatchObject({ confirmedStepIds: ['step-1'] });
+  expect(startMutate.mock.calls[1][0].body).toMatchObject({ confirmedStepIds: ['step-1'] });
 });
 
 it('shows the plugin reason on 403 START_BLOCKED instead of a generic error', async () => {

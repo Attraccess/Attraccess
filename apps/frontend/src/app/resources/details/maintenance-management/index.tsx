@@ -24,7 +24,7 @@ import {
 import { MarkDoneModal } from './mark-done/index';
 import { CheckCircleIcon, ConstructionIcon, CogIcon, ExternalLinkIcon, PlusIcon } from 'lucide-react';
 import { FlatSection } from '../../../../components/flatSection';
-import { ResourceMaintenance, useResourceMaintenancesServiceFindMaintenances } from '@attraccess/react-query-client';
+import { ResourceMaintenance, useFindMaintenances } from '@attraccess/react-query-client';
 import { useNavigate } from 'react-router-dom';
 import de from './de.json';
 import en from './en.json';
@@ -48,13 +48,8 @@ export function MaintenanceManagement(props: Props) {
 
   const [includePast, setIncludePast] = useState(false);
 
-  const { data: maintenances } = useResourceMaintenancesServiceFindMaintenances(
-    {
-      resourceId,
-      includePast,
-      includeActive: true,
-      includeUpcoming: true,
-    },
+  const { data: maintenances } = useFindMaintenances(
+    { path: { resourceId }, query: { includePast, includeActive: true, includeUpcoming: true } },
     undefined,
     {
       refetchInterval: 10000,

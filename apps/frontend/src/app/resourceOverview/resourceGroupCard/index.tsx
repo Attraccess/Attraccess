@@ -1,7 +1,7 @@
 import {
-  useAccessControlServiceResourceGroupIntroducersIsIntroducer,
-  useResourcesServiceGetAllResources,
-  useResourcesServiceResourceGroupsGetOne,
+  useResourceGroupIntroducersIsIntroducer,
+  useGetAllResources,
+  useResourceGroupsGetOne,
 } from '@attraccess/react-query-client';
 import { Button, Card, CardProps, Skeleton } from '@heroui/react';
 import { ResourceListItem } from '../../../components/ResourceListItem';
@@ -33,8 +33,8 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
 
-  const { data: group, status: fetchStatusGroup } = useResourcesServiceResourceGroupsGetOne(
-    { id: groupId as number },
+  const { data: group, status: fetchStatusGroup } = useResourceGroupsGetOne(
+    { path: { id: groupId as number } },
     undefined,
     {
       enabled: typeof groupId === 'number',
@@ -45,13 +45,15 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
     data: resources,
     status: fetchStatus,
     isFetched: isFetchedResources,
-  } = useResourcesServiceGetAllResources({
-    groupId: groupId === 'none' ? -1 : (groupId as number),
-    search: debouncedSearchValue?.trim() || undefined,
-    onlyInUseByMe: filter?.onlyInUseByMe,
-    onlyWithPermissions: filter?.onlyWithPermissions,
-    page,
-    limit: perPage,
+  } = useGetAllResources({
+    query: {
+      groupId: groupId === 'none' ? -1 : (groupId as number),
+      search: debouncedSearchValue?.trim() || undefined,
+      onlyInUseByMe: filter?.onlyInUseByMe,
+      onlyWithPermissions: filter?.onlyWithPermissions,
+      page,
+      limit: perPage,
+    },
   });
 
   const totalPages = useMemo(() => {
@@ -64,11 +66,8 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
 
   const canUpdateResources = hasPermission('resources.update');
 
-  const { data: introductionStatus } = useAccessControlServiceResourceGroupIntroducersIsIntroducer(
-    {
-      groupId: groupId as number,
-      userId: user?.id as number,
-    },
+  const { data: introductionStatus } = useResourceGroupIntroducersIsIntroducer(
+    { path: { groupId: groupId as number, userId: user?.id as number } },
     undefined,
     {
       enabled: !!groupId && !!user?.id && groupId !== 'none',

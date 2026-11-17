@@ -16,12 +16,12 @@ import en from './en.json';
 import de from './de.json';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  UseBillingServiceGetBillingBalanceKeyFn,
-  useBillingServiceGetBillingConfiguration,
-  useBillingServiceGetBillingTransaction,
-  UseBillingServiceGetBillingTransactionKeyFn,
-  useBillingServiceGetBillingTransactionsKey,
-  useBillingServiceRefundTransaction,
+  UseGetBillingBalanceKeyFn,
+  useGetBillingConfiguration,
+  useGetBillingTransaction,
+  UseGetBillingTransactionKeyFn,
+  useGetBillingTransactionsKey,
+  useRefundTransaction,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
@@ -53,7 +53,7 @@ export function RefundModal(props: Props) {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { data: transaction } = useBillingServiceGetBillingTransaction({ transactionId });
+  const { data: transaction } = useGetBillingTransaction({ path: { transactionId } });
 
   const [amount, setAmount] = useState(0);
 
@@ -67,12 +67,12 @@ export function RefundModal(props: Props) {
     setAmount(Math.abs(transaction.amount));
   }, [transaction]);
 
-  const { mutate: refundTransaction, isPending: isRefunding } = useBillingServiceRefundTransaction({
+  const { mutate: refundTransaction, isPending: isRefunding } = useRefundTransaction(undefined, {
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [useBillingServiceGetBillingTransactionsKey] });
-      queryClient.invalidateQueries({ queryKey: UseBillingServiceGetBillingTransactionKeyFn({ transactionId }) });
+      queryClient.invalidateQueries({ queryKey: [useGetBillingTransactionsKey] });
+      queryClient.invalidateQueries({ queryKey: UseGetBillingTransactionKeyFn({ path: { transactionId } }) });
       queryClient.invalidateQueries({
-        queryKey: UseBillingServiceGetBillingBalanceKeyFn({ userId: transaction?.userId ?? 0 }),
+        queryKey: UseGetBillingBalanceKeyFn({ path: { userId: transaction?.userId ?? 0 } }),
       });
       close();
     },
@@ -87,10 +87,10 @@ export function RefundModal(props: Props) {
   });
 
   const onSubmit = useCallback(() => {
-    refundTransaction({ requestBody: { amount }, transactionId });
+    refundTransaction({ path: { transactionId }, body: { amount } });
   }, [refundTransaction, amount, transactionId]);
 
-  const { data: configuration } = useBillingServiceGetBillingConfiguration();
+  const { data: configuration } = useGetBillingConfiguration();
 
   if (!hasPermission('billing.manage')) {
     return null;

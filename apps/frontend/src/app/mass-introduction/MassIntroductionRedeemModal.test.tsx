@@ -17,7 +17,7 @@ type MutationOptions = { onSuccess: (data: unknown) => void; onError: (error: un
 
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/react-query-client')>()),
-  useAccessControlServiceMassIntroductionRedeem: (options: MutationOptions) => ({
+  useMassIntroductionRedeem: (_mutationKey: unknown, options: MutationOptions) => ({
     isPending: state.isPending,
     mutate: (variables: unknown) => {
       state.redeem(variables);
@@ -93,7 +93,7 @@ describe('MassIntroductionRedeemModal', () => {
     typeCode('042917');
 
     expect(state.redeem).toHaveBeenCalledTimes(1);
-    expect(state.redeem).toHaveBeenCalledWith({ requestBody: { publicId: 'pub-1', code: '042917' } });
+    expect(state.redeem).toHaveBeenCalledWith({ body: { publicId: 'pub-1', code: '042917' } });
     expect(await screen.findByRole('alertdialog', { name: 'Introduction complete' })).toBeInTheDocument();
     expect(screen.getByText("You've been introduced to Laser Cutter.")).toBeInTheDocument();
     expect(invalidate).toHaveBeenCalled();

@@ -1,10 +1,10 @@
 import { Alert, AlertContent, AlertDescription, AlertTitle, Link } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  useResourceMeteringServiceGetResourceMeteringStatus,
-  UseResourceMeteringServiceGetResourceMeteringStatusKeyFn,
-  useResourceMeteringServiceRetryResourceMeteringSettlement,
-  useResourceMeteringServiceWaiveResourceMeteringSettlement,
+  useGetResourceMeteringStatus,
+  UseGetResourceMeteringStatusKeyFn,
+  useRetryResourceMeteringSettlement,
+  useWaiveResourceMeteringSettlement,
 } from '@attraccess/react-query-client';
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
@@ -17,7 +17,7 @@ import en from './en.json';
 /** Metering status is only readable with billing.manage, so nothing is requested or shown otherwise. */
 function useMeteringStatus(resourceId: number, enabled: boolean) {
   const { hasPermission } = useAuth();
-  return useResourceMeteringServiceGetResourceMeteringStatus({ resourceId }, undefined, {
+  return useGetResourceMeteringStatus({ path: { resourceId } }, undefined, {
     enabled: enabled && hasPermission('billing.manage'),
     refetchInterval: 15_000,
   });
@@ -38,7 +38,9 @@ export function MeterSetupNotice({ resourceId }: { resourceId: number }) {
     ) ?? [];
   if (!hasPermission('billing.manage') || !incomplete.length) return null;
   // Sessions can still start when the only problem is a meter that cannot be split between them.
-  const sharingOnly = incomplete.every((meter) => problemsOf(meter).every((problem) => problem === 'shared-needs-collect'));
+  const sharingOnly = incomplete.every((meter) =>
+    problemsOf(meter).every((problem) => problem === 'shared-needs-collect'),
+  );
 
   return (
     <Alert status="warning" data-cy="meter-setup-notice">
@@ -72,11 +74,11 @@ export function EnergySettlementNotices({ resourceId }: { resourceId: number }) 
 
   const refresh = () =>
     queryClient.invalidateQueries({
-      queryKey: UseResourceMeteringServiceGetResourceMeteringStatusKeyFn({ resourceId }),
+      queryKey: UseGetResourceMeteringStatusKeyFn({ path: { resourceId } }),
     });
   const onError = (error: Error) => toast.apiError({ error, t, tExists, baseTranslationKey: 'api' });
 
-  const retry = useResourceMeteringServiceRetryResourceMeteringSettlement({
+  const retry = useRetryResourceMeteringSettlement(undefined, {
     onSuccess: () => {
       toast.success({ title: t('unsettled.retried.title'), description: t('unsettled.retried.description') });
       refresh();
@@ -86,7 +88,7 @@ export function EnergySettlementNotices({ resourceId }: { resourceId: number }) 
       refresh();
     },
   });
-  const waive = useResourceMeteringServiceWaiveResourceMeteringSettlement({
+  const waive = useWaiveResourceMeteringSettlement(undefined, {
     onSuccess: () => {
       toast.success({ title: t('unsettled.waived.title'), description: t('unsettled.waived.description') });
       refresh();
@@ -121,7 +123,7 @@ export function EnergySettlementNotices({ resourceId }: { resourceId: number }) 
                     size="sm"
                     variant="primary"
                     isPending={retry.isPending}
-                    onPress={() => retry.mutate({ resourceId, sessionId: session.sessionId })}
+                    onPress={() => retry.mutate({ path: { resourceId, sessionId: session.sessionId } })}
                   >
                     {t('unsettled.retry')}
                   </Button>
@@ -130,7 +132,7 @@ export function EnergySettlementNotices({ resourceId }: { resourceId: number }) 
                   size="sm"
                   variant="secondary"
                   isPending={waive.isPending}
-                  onPress={() => waive.mutate({ resourceId, sessionId: session.sessionId })}
+                  onPress={() => waive.mutate({ path: { resourceId, sessionId: session.sessionId } })}
                 >
                   {t('unsettled.waive')}
                 </Button>

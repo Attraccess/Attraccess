@@ -36,16 +36,16 @@ vi.mock('./transactionProcessingStatus', () => ({
   }) => <button onClick={onProcessingComplete}>Complete transaction {transactionId}</button>,
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useBillingServiceGetBillingConfiguration: () => ({ data: state.configuration }),
-  useBillingServiceGetSumUpConfiguration: () => ({
+  useGetBillingConfiguration: () => ({ data: state.configuration }),
+  useGetSumUpConfiguration: () => ({
     data: { enabled: state.enabled },
     isLoading: state.loading,
     isError: state.error,
   }),
-  useBillingServiceGetSumUpReaders: () => ({ data: state.readers }),
-  useBillingServiceGetBillingBalance: () => ({ data: { value: state.balance } }),
-  useBillingServiceGetBillingTransactionsKey: 'transactions',
-  useBillingServiceTopUpWithSumUpReader: (callbacks: typeof state.callbacks) => {
+  useGetSumUpReaders: () => ({ data: state.readers }),
+  useGetBillingBalance: () => ({ data: { value: state.balance } }),
+  useGetBillingTransactionsKey: 'transactions',
+  useTopUpWithSumUpReader: (_mutationKey: unknown, callbacks: typeof state.callbacks) => {
     state.callbacks = callbacks;
     return { mutate: state.mutate, isPending: false };
   },
@@ -65,7 +65,7 @@ it('tops up the desired amount plus existing debt in currency minor units', () =
   const complete = vi.fn();
   render(<BillingDashboardTopupCard desiredAmount={10} onProcessingComplete={complete} />);
   fireEvent.click(screen.getByRole('button', { name: 'actions.topUp' }));
-  expect(state.mutate).toHaveBeenCalledWith({ requestBody: { amount: 1300, readerId: 'reader-1' } });
+  expect(state.mutate).toHaveBeenCalledWith({ body: { amount: 1300, readerId: 'reader-1' } });
   act(() => state.callbacks.onSuccess({ id: 19 }));
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['transactions'] });
   fireEvent.click(screen.getByRole('button', { name: 'Complete transaction 19' }));
@@ -75,7 +75,7 @@ it('tops up the desired amount plus existing debt in currency minor units', () =
 it('uses the default amount and reports mutation errors without starting transaction tracking', () => {
   render(<BillingDashboardTopupCard />);
   fireEvent.click(screen.getByRole('button', { name: 'actions.topUp' }));
-  expect(state.mutate).toHaveBeenCalledWith({ requestBody: { amount: 1000, readerId: 'reader-1' } });
+  expect(state.mutate).toHaveBeenCalledWith({ body: { amount: 1000, readerId: 'reader-1' } });
   const error = new Error('Reader offline');
   act(() => state.callbacks.onError(error));
   expect(state.toast).toHaveBeenCalledWith(expect.objectContaining({ error, baseTranslationKey: 'api' }));

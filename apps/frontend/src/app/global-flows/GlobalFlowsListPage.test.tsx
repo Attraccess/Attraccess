@@ -24,10 +24,10 @@ vi.mock('../../hooks/useAuth', () => ({
 
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/react-query-client')>()),
-  useGlobalFlowsServiceListGlobalFlows: () => ({ data: state.flows, isLoading: false, isError: false }),
-  useGlobalFlowsServiceUpdateGlobalFlow: () => ({ mutate: state.update, isPending: false }),
-  useGlobalFlowsServiceDeleteGlobalFlow: () => ({ mutate: state.remove, isPending: false }),
-  useGlobalFlowsServiceCreateGlobalFlow: (options: { onSuccess: (flow: { id: number }) => void }) => ({
+  useListGlobalFlows: () => ({ data: state.flows, isLoading: false, isError: false }),
+  useUpdateGlobalFlow: () => ({ mutate: state.update, isPending: false }),
+  useDeleteGlobalFlow: () => ({ mutate: state.remove, isPending: false }),
+  useCreateGlobalFlow: (_mutationKey: unknown, options: { onSuccess: (flow: { id: number }) => void }) => ({
     mutate: (variables: unknown) => {
       state.create(variables);
       options.onSuccess({ id: 42 });
@@ -78,10 +78,10 @@ describe('GlobalFlowsListPage', () => {
     renderPage();
 
     await user.click(within(screen.getByRole('row', { name: /Power off all/ })).getByRole('switch'));
-    expect(state.update).toHaveBeenCalledWith({ flowId: 1, requestBody: { enabled: false } });
+    expect(state.update).toHaveBeenCalledWith({ path: { flowId: 1 }, body: { enabled: false } });
 
     await user.click(within(screen.getByRole('row', { name: /Notify/ })).getByRole('switch'));
-    expect(state.update).toHaveBeenCalledWith({ flowId: 2, requestBody: { enabled: true } });
+    expect(state.update).toHaveBeenCalledWith({ path: { flowId: 2 }, body: { enabled: true } });
   });
 
   it('names each switch by the state it shows', () => {
@@ -121,7 +121,7 @@ describe('GlobalFlowsListPage', () => {
     expect(within(dialog).getByText(/Delete the flow "Power off all"/)).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
-    expect(state.remove).toHaveBeenCalledWith({ flowId: 1 });
+    expect(state.remove).toHaveBeenCalledWith({ path: { flowId: 1 } });
   });
 
   it('creates a flow from the modal and opens its editor', async () => {
@@ -137,7 +137,7 @@ describe('GlobalFlowsListPage', () => {
     await user.type(within(dialog).getByRole('textbox', { name: 'Description' }), 'Turn lights off');
     await user.click(submit);
 
-    expect(state.create).toHaveBeenCalledWith({ requestBody: { name: 'Lights', description: 'Turn lights off' } });
+    expect(state.create).toHaveBeenCalledWith({ body: { name: 'Lights', description: 'Turn lights off' } });
     expect(state.navigate).toHaveBeenCalledWith('/devices/flows/42');
   });
 
@@ -149,7 +149,7 @@ describe('GlobalFlowsListPage', () => {
     const dialog = await screen.findByRole('dialog');
     await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Lights{Enter}');
 
-    expect(state.create).toHaveBeenCalledWith({ requestBody: { name: 'Lights', description: undefined } });
+    expect(state.create).toHaveBeenCalledWith({ body: { name: 'Lights', description: undefined } });
   });
 
   it('starts every opening of the create modal empty, even after a cancelled attempt', async () => {
@@ -195,8 +195,8 @@ describe('GlobalFlowsListPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     expect(state.update).toHaveBeenCalledWith({
-      flowId: 1,
-      requestBody: { name: 'Power off everything', description: null },
+      path: { flowId: 1 },
+      body: { name: 'Power off everything', description: null },
     });
     expect(state.create).not.toHaveBeenCalled();
   });

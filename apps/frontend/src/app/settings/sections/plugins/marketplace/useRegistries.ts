@@ -1,4 +1,4 @@
-import { usePluginsServicePluginControllerListRegistries } from '@attraccess/react-query-client';
+import { usePluginControllerListRegistries } from '@attraccess/react-query-client';
 
 /**
  * The configured plugin registries, loaded once per visit of the plugins section: opening the marketplace or returning
@@ -7,7 +7,7 @@ import { usePluginsServicePluginControllerListRegistries } from '@attraccess/rea
  * the list again.
  */
 export function useRegistries() {
-  return usePluginsServicePluginControllerListRegistries(undefined, {
+  return usePluginControllerListRegistries({}, undefined, {
     staleTime: Infinity,
     gcTime: 0,
     // An errored query without data would otherwise load again whenever another component starts reading it.

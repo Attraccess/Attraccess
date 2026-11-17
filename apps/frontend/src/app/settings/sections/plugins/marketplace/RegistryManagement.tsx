@@ -1,9 +1,9 @@
 import { Button } from '@attraccess/plugins-frontend-ui';
 import {
-  UsePluginsServicePluginControllerListRegistriesKeyFn,
-  usePluginsServicePluginControllerAddRegistry,
-  usePluginsServicePluginControllerRemoveRegistry,
-  usePluginsServicePluginControllerTestRegistry,
+  UsePluginControllerListRegistriesKeyFn,
+  usePluginControllerAddRegistry,
+  usePluginControllerRemoveRegistry,
+  usePluginControllerTestRegistry,
 } from '@attraccess/react-query-client';
 import { Input, TextField } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -24,22 +24,20 @@ export function RegistryManagement({ form, onFormChange, onRegistryRemoved }: Pr
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   const { data: registries = [], refetch: refetchRegistries } = useRegistries();
-  const { mutateAsync: addPluginRegistry } = usePluginsServicePluginControllerAddRegistry();
-  const { mutateAsync: testPluginRegistry } = usePluginsServicePluginControllerTestRegistry();
-  const { mutateAsync: removePluginRegistry } = usePluginsServicePluginControllerRemoveRegistry();
+  const { mutateAsync: addPluginRegistry } = usePluginControllerAddRegistry();
+  const { mutateAsync: testPluginRegistry } = usePluginControllerTestRegistry();
+  const { mutateAsync: removePluginRegistry } = usePluginControllerRemoveRegistry();
 
   // A load that is still in flight predates the change, so it is cancelled and its late response ignored.
   const reloadRegistries = async () => {
-    await queryClient.cancelQueries({ queryKey: UsePluginsServicePluginControllerListRegistriesKeyFn() });
+    await queryClient.cancelQueries({ queryKey: UsePluginControllerListRegistriesKeyFn() });
     await refetchRegistries({ throwOnError: true });
   };
 
   const addRegistry = async () => {
     onFormChange((current) => ({ ...current, isSaving: true }));
     try {
-      await addPluginRegistry({
-        requestBody: { name: form.name, url: form.url, token: form.token || undefined },
-      });
+      await addPluginRegistry({ body: { name: form.name, url: form.url, token: form.token || undefined } });
       onFormChange((current) => ({ ...current, name: '', url: '', token: '' }));
       await reloadRegistries();
       toast.success({ title: t('marketplace.registryAdded') });
@@ -54,7 +52,7 @@ export function RegistryManagement({ form, onFormChange, onRegistryRemoved }: Pr
     const request = Symbol(registryId);
     onFormChange((current) => ({ ...current, test: { registryId, request } }));
     try {
-      await testPluginRegistry({ registryId });
+      await testPluginRegistry({ path: { registryId } });
       toast.success({ title: t('marketplace.registryTestSuccess') });
     } catch {
       toast.error({ title: t('marketplace.registryTestError') });
@@ -65,7 +63,7 @@ export function RegistryManagement({ form, onFormChange, onRegistryRemoved }: Pr
 
   const removeRegistry = async (registryId: string) => {
     try {
-      await removePluginRegistry({ registryId });
+      await removePluginRegistry({ path: { registryId } });
       onRegistryRemoved(registryId);
       await reloadRegistries();
     } catch {

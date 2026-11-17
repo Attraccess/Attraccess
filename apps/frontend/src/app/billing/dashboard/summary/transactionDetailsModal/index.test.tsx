@@ -9,8 +9,8 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useBillingServiceGetBillingTransaction: () => ({ data: state.transaction }),
-  useBillingServiceGetBillingConfiguration: () => ({ data: state.configuration }),
+  useGetBillingTransaction: () => ({ data: state.transaction }),
+  useGetBillingConfiguration: () => ({ data: state.configuration }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),

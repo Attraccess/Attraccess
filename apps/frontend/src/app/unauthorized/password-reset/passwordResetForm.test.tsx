@@ -28,7 +28,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useUsersServiceRequestPasswordReset: () => ({ mutate: requestResetMock, isPending: state.pending }),
+  useRequestPasswordReset: () => ({ mutate: requestResetMock, isPending: state.pending }),
 }));
 
 describe('PasswordResetForm labels', () => {
@@ -54,7 +54,7 @@ describe('PasswordResetForm labels', () => {
     const user = userEvent.setup();
     await user.type(screen.getByLabelText(expectedLabels.email), 'maker@example.com');
     await user.click(screen.getByRole('button', { name: expectedLabels.submit }));
-    expect(requestResetMock).toHaveBeenCalledWith({ requestBody: { email: 'maker@example.com' } });
+    expect(requestResetMock).toHaveBeenCalledWith({ body: { email: 'maker@example.com' } });
     await user.click(screen.getByRole('button', { name: expectedLabels.back }));
     expect(goBackMock).toHaveBeenCalledTimes(1);
   });

@@ -1,8 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import {
-  UseResourceFormsServiceResourceFormsGetOneKeyFn,
-  UseResourceFormsServiceResourceFormsListKeyFn,
-} from '@attraccess/react-query-client';
+import { UseResourceFormsGetOneKeyFn, UseResourceFormsListKeyFn } from '@attraccess/react-query-client';
 import { EditableForm, serializeFieldOptions } from '../types';
 
 export const EMPTY_FORM: EditableForm = {
@@ -33,11 +30,11 @@ export function buildRequestBody(form: EditableForm) {
 
 export async function invalidateFormQueries(resourceId: number, queryClient: QueryClient, formId?: number) {
   await queryClient.invalidateQueries({
-    queryKey: UseResourceFormsServiceResourceFormsListKeyFn({ resourceId }),
+    queryKey: UseResourceFormsListKeyFn({ path: { resourceId } }),
   });
   if (formId) {
     await queryClient.invalidateQueries({
-      queryKey: UseResourceFormsServiceResourceFormsGetOneKeyFn({ resourceId, formId }),
+      queryKey: UseResourceFormsGetOneKeyFn({ path: { resourceId, formId } }),
     });
   }
 }

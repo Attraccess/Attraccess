@@ -6,8 +6,8 @@ import {
   ApiError,
   SmtpServiceType,
   SystemSettingsDto,
-  UseSettingsServiceGetSystemSettingsKeyFn,
-  useSettingsServiceUpdateSystemSettings,
+  UseGetSystemSettingsKeyFn,
+  useUpdateSystemSettings,
 } from '@attraccess/react-query-client';
 import { SettingsRow } from '../../components/SettingsRow';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
@@ -116,11 +116,11 @@ export function EmailSmtpForm({
   // typing is a change.
   const pass = (draft.pass as string | undefined) ?? '';
 
-  const { mutate: saveSettings, isPending: isSaving } = useSettingsServiceUpdateSystemSettings({
+  const { mutate: saveSettings, isPending: isSaving } = useUpdateSystemSettings(undefined, {
     onSuccess(data) {
       toast.success({ title: t('success.title'), description: t('success.description') });
       // Prime from the response and release the draft in the same tick — see GeneralSection.
-      queryClient.setQueryData(UseSettingsServiceGetSystemSettingsKeyFn(), data);
+      queryClient.setQueryData(UseGetSystemSettingsKeyFn(), data);
       setDraft({});
     },
     onError(error: Error) {
@@ -144,7 +144,7 @@ export function EmailSmtpForm({
     if (hasError) return;
 
     saveSettings({
-      requestBody: {
+      body: {
         smtp: {
           service,
           host: host.trim(),

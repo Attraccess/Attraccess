@@ -2,7 +2,7 @@ import { Alert, AlertContent, AlertDescription, AlertTitle } from '@heroui/react
 import { AlertTriangleIcon, CheckCircle2Icon, ShieldCheckIcon } from 'lucide-react';
 import { formatDurationMs } from '@attraccess/shared';
 import { AlertStatusIcon, Button, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useResourcesServiceResourceOperatingDiagnosticsVerifyTimeline } from '@attraccess/react-query-client';
+import { useResourceOperatingDiagnosticsVerifyTimeline } from '@attraccess/react-query-client';
 import { useState } from 'react';
 import { FlatSection } from '../../../../components/flatSection';
 import type { DiagnosticsRange } from './diagnosticsRange';
@@ -23,7 +23,7 @@ export function VerificationSection({ resourceId, range }: Readonly<Verification
     data: verification,
     isFetching: isVerifying,
     refetch: runVerification,
-  } = useResourcesServiceResourceOperatingDiagnosticsVerifyTimeline({ resourceId, ...range }, undefined, {
+  } = useResourceOperatingDiagnosticsVerifyTimeline({ path: { resourceId }, ...range }, undefined, {
     enabled: verificationRequested,
   });
 

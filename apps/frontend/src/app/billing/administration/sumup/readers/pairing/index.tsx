@@ -13,7 +13,7 @@ import {
   useOverlayState,
 } from '@heroui/react';
 import { useCallback, useRef, useState } from 'react';
-import { useBillingServiceGetSumUpReadersKey, useBillingServicePairSumUpReader } from '@attraccess/react-query-client';
+import { useGetSumUpReadersKey, usePairSumUpReader } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../../global-translations/api-errors.de.json';
@@ -39,13 +39,13 @@ export function SumUpReadersPairing(props: Props) {
   const queryClient = useQueryClient();
 
   const { isOpen, open, setOpen, close } = useOverlayState();
-  const { mutate: pairReader, isPending: isPairingReader } = useBillingServicePairSumUpReader({
+  const { mutate: pairReader, isPending: isPairingReader } = usePairSumUpReader(undefined, {
     onSuccess: () => {
       toast.success({
         title: t('success.toast.title'),
         description: t('success.toast.description'),
       });
-      queryClient.invalidateQueries({ queryKey: [useBillingServiceGetSumUpReadersKey] });
+      queryClient.invalidateQueries({ queryKey: [useGetSumUpReadersKey] });
       close();
     },
     onError: (error: Error) => {
@@ -68,7 +68,7 @@ export function SumUpReadersPairing(props: Props) {
     }
 
     pairReader({
-      requestBody: {
+      body: {
         pairingCode,
         name,
       },

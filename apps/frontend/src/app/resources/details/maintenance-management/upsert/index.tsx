@@ -24,10 +24,7 @@ import { MaintenanceReasonDisplay } from '../../../../../components/MaintenanceR
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { parseAbsolute, type DateValue, type ZonedDateTime, toZoned } from '@internationalized/date';
 import { CalendarIcon } from 'lucide-react';
-import {
-  useResourceMaintenancesServiceCreateMaintenance,
-  useResourceMaintenancesServiceFindMaintenancesKey,
-} from '@attraccess/react-query-client';
+import { useCreateMaintenance, useFindMaintenancesKey } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNow } from '../../../../../hooks/useNow';
 
@@ -86,7 +83,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
 
   const onSaveSuccess = useCallback(() => {
     queryClient.invalidateQueries({
-      queryKey: [useResourceMaintenancesServiceFindMaintenancesKey],
+      queryKey: [useFindMaintenancesKey],
     });
     close();
   }, [queryClient, close]);
@@ -95,7 +92,7 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
     mutate: createMaintenanceMutation,
     isPending: isCreating,
     error,
-  } = useResourceMaintenancesServiceCreateMaintenance({
+  } = useCreateMaintenance(undefined, {
     onSuccess: onSaveSuccess,
   });
 
@@ -108,8 +105,8 @@ export function ResourceMaintenanceUpsertModal(props: Props) {
     if (!startTimeStr) return;
 
     createMaintenanceMutation({
-      resourceId,
-      requestBody: {
+      path: { resourceId },
+      body: {
         startTime: startTimeStr,
         endTime: endTimeStr ?? undefined,
         reason,

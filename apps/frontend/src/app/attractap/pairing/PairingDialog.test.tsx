@@ -49,27 +49,27 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }) }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useAttractapServiceGetPairing: (_params: unknown, _key: unknown, options: unknown) => {
+  useGetPairing: (_params: unknown, _key: unknown, options: unknown) => {
     mocks.pairingOptions.current = options;
     return { data: mocks.pairing.current, isError: false, refetch: mocks.refetch };
   },
-  useAttractapServiceGetPairings: () => ({ data: mocks.pairings.current }),
-  useAttractapServiceGetReaders: () => ({ data: mocks.readers.current }),
-  useAttractapServiceGetReadersToPair: () => ({ data: mocks.readersToPair.current }),
-  useAttractapServiceApprovePairing: (options: Record<string, (value: unknown) => unknown>) => {
+  useGetPairings: () => ({ data: mocks.pairings.current }),
+  useGetReaders: () => ({ data: mocks.readers.current }),
+  useGetReadersToPair: () => ({ data: mocks.readersToPair.current }),
+  useApprovePairing: (_mutationKey: unknown, options: Record<string, (value: unknown) => unknown>) => {
     mocks.approveOptions.current = options;
     return { mutate: mocks.approve, isPending: false };
   },
-  useAttractapServiceCancelPairing: () => ({ mutate: mocks.cancel, isPending: false }),
-  useAttractapServiceResolvePairing: (options: Record<string, (value: unknown) => unknown>) => {
+  useCancelPairing: () => ({ mutate: mocks.cancel, isPending: false }),
+  useResolvePairing: (_mutationKey: unknown, options: Record<string, (value: unknown) => unknown>) => {
     mocks.resolveOptions.current = options;
     return { mutate: mocks.resolve, isPending: false };
   },
-  useAttractapServiceGetReadersKey: 'readers',
-  useAttractapServiceGetReadersToPairKey: 'readers-to-pair',
-  useAttractapServiceGetReaderByIdKey: 'reader-by-id',
-  useAttractapServiceGetReaderCredentialHistoryKey: 'history',
-  useAttractapServiceGetPairingsKey: 'pairings',
+  useGetReadersKey: 'readers',
+  useGetReadersToPairKey: 'readers-to-pair',
+  useGetReaderByIdKey: 'reader-by-id',
+  useGetReaderCredentialHistoryKey: 'history',
+  useGetPairingsKey: 'pairings',
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => {
   const en = (await import('./en.json')).default;
@@ -148,7 +148,7 @@ describe('PairingDialog', () => {
     it('ends the waiting request on the server before closing', async () => {
       const { onClose } = open({ pairingId: 'p1' });
       await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      expect(mocks.cancel).toHaveBeenCalledWith({ pairingId: 'p1' });
+      expect(mocks.cancel).toHaveBeenCalledWith({ path: { pairingId: 'p1' } });
       expect(onClose).toHaveBeenCalled();
     });
 
@@ -212,10 +212,7 @@ describe('PairingDialog', () => {
       type('k7p 3xq');
       expect(approveButton()).toBeEnabled();
       await userEvent.click(approveButton());
-      expect(mocks.approve).toHaveBeenCalledWith({
-        pairingId: 'p1',
-        requestBody: { mode: 'new', code: 'K7P3XQ' },
-      });
+      expect(mocks.approve).toHaveBeenCalledWith({ path: { pairingId: 'p1' }, body: { mode: 'new', code: 'K7P3XQ' } });
     });
 
     it('pairs a token reader with its own record and skips the question what the reader is', async () => {
@@ -224,10 +221,7 @@ describe('PairingDialog', () => {
       expect(screen.queryByText('What is this reader?')).toBeNull();
       type('K7P-3XQ');
       await userEvent.click(approveButton());
-      expect(mocks.approve).toHaveBeenCalledWith({
-        pairingId: 'p1',
-        requestBody: { mode: 'pair', code: 'K7P3XQ' },
-      });
+      expect(mocks.approve).toHaveBeenCalledWith({ path: { pairingId: 'p1' }, body: { mode: 'pair', code: 'K7P3XQ' } });
     });
 
     it('asks whether the reader is new or takes over one, and offers the name only for a new reader', () => {
@@ -242,21 +236,21 @@ describe('PairingDialog', () => {
       type('K7P3XQ');
       await userEvent.click(approveButton());
       expect(mocks.approve).toHaveBeenCalledWith({
-        pairingId: 'p1',
-        requestBody: { mode: 'new', name: 'Laser', code: 'K7P3XQ' },
+        path: { pairingId: 'p1' },
+        body: { mode: 'new', name: 'Laser', code: 'K7P3XQ' },
       });
     });
 
     it('takes over the preset reader', async () => {
       mocks.pairings.current = [];
       open({ presetCode: 'K7P-3XQ', presetTargetReaderId: 7 });
-      expect(mocks.resolve).toHaveBeenCalledWith({ requestBody: { code: 'K7P3XQ' } });
+      expect(mocks.resolve).toHaveBeenCalledWith({ body: { code: 'K7P3XQ' } });
       act(() => mocks.resolveOptions.current?.onSuccess?.(waiting()));
       expect(screen.getByText(/Reader found for code K7P-3XQ/)).toBeInTheDocument();
       await userEvent.click(approveButton());
       expect(mocks.approve).toHaveBeenCalledWith({
-        pairingId: 'p1',
-        requestBody: { mode: 'takeover', targetReaderId: 7, code: 'K7P3XQ' },
+        path: { pairingId: 'p1' },
+        body: { mode: 'takeover', targetReaderId: 7, code: 'K7P3XQ' },
       });
     });
 
@@ -363,7 +357,7 @@ describe('PairingDialog', () => {
       open({ pairingId: 'p1' });
       await userEvent.click(approveButton());
       expect(mocks.refetch).toHaveBeenCalled();
-      expect(mocks.approve).toHaveBeenCalledWith({ pairingId: 'p1', requestBody: { mode: 'new', round: 3 } });
+      expect(mocks.approve).toHaveBeenCalledWith({ path: { pairingId: 'p1' }, body: { mode: 'new', round: 3 } });
     });
 
     it('does not approve a pattern that rotated after the admin looked at it', async () => {
@@ -409,8 +403,8 @@ describe('PairingDialog', () => {
       await userEvent.click(document.querySelector('[data-cy="attractap-pairing-pick-p1"]') as HTMLElement);
       await userEvent.click(approveButton());
       expect(mocks.approve).toHaveBeenCalledWith({
-        pairingId: 'p1',
-        requestBody: { mode: 'takeover', targetReaderId: 7, round: 1 },
+        path: { pairingId: 'p1' },
+        body: { mode: 'takeover', targetReaderId: 7, round: 1 },
       });
     });
   });
@@ -442,7 +436,7 @@ describe('PairingDialog', () => {
       mocks.pairing.current = undefined;
       open({ presetCode: 'k7p3xq' });
       expect(mocks.resolve).toHaveBeenCalledTimes(1);
-      expect(mocks.resolve).toHaveBeenCalledWith({ requestBody: { code: 'K7P3XQ' } });
+      expect(mocks.resolve).toHaveBeenCalledWith({ body: { code: 'K7P3XQ' } });
     });
 
     it('marks an approval from the web flasher', async () => {
@@ -452,8 +446,8 @@ describe('PairingDialog', () => {
       act(() => mocks.resolveOptions.current?.onSuccess?.(waiting()));
       await userEvent.click(approveButton());
       expect(mocks.approve).toHaveBeenCalledWith({
-        pairingId: 'p1',
-        requestBody: { mode: 'new', code: 'K7P3XQ', via: 'flasher' },
+        path: { pairingId: 'p1' },
+        body: { mode: 'new', code: 'K7P3XQ', via: 'flasher' },
       });
     });
 
@@ -605,8 +599,8 @@ describe('PairingDialog', () => {
       type('MNP-4RS');
       await userEvent.click(approveButton());
       expect(mocks.approve).toHaveBeenLastCalledWith({
-        pairingId: 'p1',
-        requestBody: { mode: 'new', code: 'MNP4RS' },
+        path: { pairingId: 'p1' },
+        body: { mode: 'new', code: 'MNP4RS' },
       });
     });
 
@@ -618,8 +612,8 @@ describe('PairingDialog', () => {
       expect(screen.getByText(/Reader found for code MNP-4RS/)).toBeInTheDocument();
       await userEvent.click(approveButton());
       expect(mocks.approve).toHaveBeenLastCalledWith({
-        pairingId: 'p1',
-        requestBody: { mode: 'new', code: 'MNP4RS', via: 'flasher' },
+        path: { pairingId: 'p1' },
+        body: { mode: 'new', code: 'MNP4RS', via: 'flasher' },
       });
       expect(mocks.resolve).toHaveBeenCalledTimes(1);
     });
@@ -645,13 +639,13 @@ describe('PairingDialog', () => {
       const input = screen.getByRole('textbox', { name: /code on the reader/i });
       await userEvent.type(input, 'k7p3xq{enter}{enter}');
       expect(mocks.resolve).toHaveBeenCalledTimes(1);
-      expect(mocks.resolve).toHaveBeenCalledWith({ requestBody: { code: 'K7P3XQ' } });
+      expect(mocks.resolve).toHaveBeenCalledWith({ body: { code: 'K7P3XQ' } });
     });
 
     it('approves when the reader is known', async () => {
       open({ pairingId: 'p1' });
       await userEvent.type(screen.getByRole('textbox', { name: /code on the reader/i }), 'K7P3XQ{enter}');
-      expect(mocks.approve).toHaveBeenCalledWith({ pairingId: 'p1', requestBody: { mode: 'new', code: 'K7P3XQ' } });
+      expect(mocks.approve).toHaveBeenCalledWith({ path: { pairingId: 'p1' }, body: { mode: 'new', code: 'K7P3XQ' } });
     });
 
     it('does nothing without a valid code', async () => {

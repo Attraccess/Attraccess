@@ -1,6 +1,6 @@
 import {
-  useAccessControlServiceResourceGroupIntroductionsGetHistory,
-  useAccessControlServiceResourceIntroductionsGetHistory,
+  useResourceGroupIntroductionsGetHistory,
+  useResourceIntroductionsGetHistory,
 } from '@attraccess/react-query-client';
 import { IntroductionHistoryModal } from '../../../components/IntroductionsManagement/history';
 import { PeopleTarget } from './types';
@@ -16,14 +16,14 @@ export function HistoryModalLoader(props: Readonly<HistoryModalLoaderProps>) {
   const { target, userId, isOpen, onClose } = props;
   const isResource = target.type === 'resource';
 
-  const { data: resourceHistory, isLoading: isResourceLoading } = useAccessControlServiceResourceIntroductionsGetHistory(
-    { resourceId: target.id, userId },
+  const { data: resourceHistory, isLoading: isResourceLoading } = useResourceIntroductionsGetHistory(
+    { path: { resourceId: target.id, userId } },
     undefined,
     { enabled: isOpen && !!userId && isResource },
   );
 
-  const { data: groupHistory, isLoading: isGroupLoading } = useAccessControlServiceResourceGroupIntroductionsGetHistory(
-    { groupId: target.id, userId },
+  const { data: groupHistory, isLoading: isGroupLoading } = useResourceGroupIntroductionsGetHistory(
+    { path: { groupId: target.id, userId } },
     undefined,
     { enabled: isOpen && !!userId && !isResource },
   );

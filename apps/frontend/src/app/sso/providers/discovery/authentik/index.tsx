@@ -17,7 +17,7 @@ import en from './en.json';
 import discoveryDe from '../de.json';
 import discoveryEn from '../en.json';
 import { getDiscoveryErrorMessage } from '../discoveryError';
-import { useAuthenticationServiceDiscoverAuthentikOidc } from '@attraccess/react-query-client';
+import { useDiscoverAuthentikOidc } from '@attraccess/react-query-client';
 
 interface Props {
   onDiscovery: (settings: OpenIDConfiguration) => void;
@@ -37,8 +37,8 @@ export function AuthentikDiscoveryDialog(props: Props) {
   });
 
   const toast = useToastMessage();
-  const { refetch: discoverAuthentik } = useAuthenticationServiceDiscoverAuthentikOidc<OpenIDConfiguration>(
-    { applicationName, host },
+  const { refetch: discoverAuthentik } = useDiscoverAuthentikOidc<OpenIDConfiguration>(
+    { query: { applicationName, host } },
     undefined,
     // Discovery runs once per click: retrying a 4xx/502 only delays the error toast (a timeout by ~30 s).
     { enabled: false, retry: false },

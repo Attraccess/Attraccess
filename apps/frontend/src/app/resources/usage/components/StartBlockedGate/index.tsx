@@ -1,7 +1,7 @@
 import { ReactNode, useEffect } from 'react';
 import { Alert, AlertContent, AlertDescription, AlertTitle, Skeleton } from '@heroui/react';
 import { AlertStatusIcon } from '@attraccess/plugins-frontend-ui';
-import { useResourcesServiceResourceUsageStartBlocked } from '@attraccess/react-query-client';
+import { useResourceUsageStartBlocked } from '@attraccess/react-query-client';
 
 /** Safety net next to the live events: also asks again now and then, e.g. when a booking starts while nobody sends an event. */
 export const START_BLOCKED_POLL_MS = 30_000;
@@ -22,16 +22,12 @@ interface StartBlockedGateProps {
  * The plugin's reason text already names the end time in the plugin's timezone, so the gate does not add its own.
  */
 export function StartBlockedGate({ resourceId, children }: Readonly<StartBlockedGateProps>) {
-  const { data, isPending, isError, refetch } = useResourcesServiceResourceUsageStartBlocked(
-    { resourceId },
-    undefined,
-    {
-      refetchInterval: START_BLOCKED_POLL_MS,
-      // The server treats a failing plugin as "not blocked" and checks every start anyway, so an error before the first
-      // answer should show the start controls right away instead of keeping the skeleton up through several retries.
-      retry: false,
-    },
-  );
+  const { data, isPending, isError, refetch } = useResourceUsageStartBlocked({ path: { resourceId } }, undefined, {
+    refetchInterval: START_BLOCKED_POLL_MS,
+    // The server treats a failing plugin as "not blocked" and checks every start anyway, so an error before the first
+    // answer should show the start controls right away instead of keeping the skeleton up through several retries.
+    retry: false,
+  });
 
   const untilMs = data?.blocked && data.until ? new Date(data.until).getTime() : null;
   useEffect(() => {

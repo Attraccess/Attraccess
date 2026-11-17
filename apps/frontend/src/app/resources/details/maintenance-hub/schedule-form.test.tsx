@@ -18,12 +18,12 @@ vi.mock('@tanstack/react-query', async (importOriginal) => ({
 }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/react-query-client')>()),
-  useResourceMaintenanceSchedulesServiceGetMaintenanceSchedule: () => ({ data: state.existing }),
-  useResourceMaintenanceSchedulesServiceCreateMaintenanceSchedule: (options: { onSuccess: () => void }) => {
+  useGetMaintenanceSchedule: () => ({ data: state.existing }),
+  useCreateMaintenanceSchedule: (_mutationKey: unknown, options: { onSuccess: () => void }) => {
     state.onSuccess = options.onSuccess;
     return { mutate: create, error: state.error };
   },
-  useResourceMaintenanceSchedulesServiceUpdateMaintenanceSchedule: () => ({ mutate: update }),
+  useUpdateMaintenanceSchedule: () => ({ mutate: update }),
 }));
 vi.mock('../operating-readiness', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../operating-readiness')>()),
@@ -58,7 +58,7 @@ describe('operating-duration maintenance schedule form', () => {
     expect(screen.queryByText('Tracking not configured')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ requestBody: expect.objectContaining({ durationBasis: 'SESSION_DURATION' }) }),
+      expect.objectContaining({ body: expect.objectContaining({ durationBasis: 'SESSION_DURATION' }) }),
     );
   });
 
@@ -73,7 +73,7 @@ describe('operating-duration maintenance schedule form', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
-        requestBody: expect.objectContaining({ durationBasis: 'ATTRIBUTABLE_OPERATING_DURATION', enabled: true }),
+        body: expect.objectContaining({ durationBasis: 'ATTRIBUTABLE_OPERATING_DURATION', enabled: true }),
       }),
     );
   });
@@ -88,8 +88,8 @@ it.each(['USAGE_COUNT', 'TIME_INTERVAL'] as const)('saves %s schedules with thei
   if (type === 'TIME_INTERVAL') await userEvent.selectOptions(screen.getByLabelText('Unit'), 'DAYS');
   await userEvent.click(screen.getByRole('button', { name: 'Save' }));
   expect(create).toHaveBeenCalledWith({
-    resourceId: 42,
-    requestBody: {
+    path: { resourceId: 42 },
+    body: {
       name: undefined,
       triggerType: type,
       enabled: true,
@@ -116,9 +116,8 @@ it('loads an existing schedule and updates it while retaining its trigger config
   expect(screen.getByLabelText('Duration')).toHaveValue(2);
   await userEvent.click(screen.getByRole('button', { name: 'Save' }));
   expect(update).toHaveBeenCalledWith({
-    resourceId: 42,
-    scheduleId: 5,
-    requestBody: {
+    path: { resourceId: 42, scheduleId: 5 },
+    body: {
       name: 'Daily check',
       triggerType: 'TIME_INTERVAL',
       enabled: false,

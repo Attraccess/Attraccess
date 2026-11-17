@@ -2,12 +2,12 @@ import { HTMLAttributes, useState, useEffect, useCallback } from 'react';
 import { Form, Input, Label, Spinner, TextArea, TextField } from '@heroui/react';
 import { Save, Edit3, Trash2Icon } from 'lucide-react';
 import {
-  useAccessControlServiceResourceIntroductionsGetPeopleKey,
-  useResourcesServiceResourceGroupsGetOne,
-  useResourcesServiceResourceGroupsUpdateOne,
-  UseResourcesServiceResourceGroupsGetOneKeyFn,
-  useResourcesServiceResourceGroupsDeleteOne,
-  UseResourcesServiceResourceGroupsGetManyKeyFn,
+  useResourceIntroductionsGetPeopleKey,
+  useResourceGroupsGetOne,
+  useResourceGroupsUpdateOne,
+  UseResourceGroupsGetOneKeyFn,
+  useResourceGroupsDeleteOne,
+  UseResourceGroupsGetManyKeyFn,
 } from '@attraccess/react-query-client';
 import { Button, DeleteConfirmationModal, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -33,17 +33,17 @@ export function GroupDetailsForm(
   const [isHidden, setIsHidden] = useState(false);
   const navigate = useNavigate();
 
-  const { data: group, isLoading, error } = useResourcesServiceResourceGroupsGetOne({ id: groupId });
+  const { data: group, isLoading, error } = useResourceGroupsGetOne({ path: { id: groupId } });
 
-  const { mutateAsync: updateGroup, isPending: isUpdating } = useResourcesServiceResourceGroupsUpdateOne({
+  const { mutateAsync: updateGroup, isPending: isUpdating } = useResourceGroupsUpdateOne(undefined, {
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [useAccessControlServiceResourceIntroductionsGetPeopleKey] });
+      queryClient.invalidateQueries({ queryKey: [useResourceIntroductionsGetPeopleKey] });
       success({
         title: t('operations.update.success.title'),
         description: t('operations.update.success.description'),
       });
       queryClient.invalidateQueries({
-        queryKey: UseResourcesServiceResourceGroupsGetOneKeyFn({ id: groupId }),
+        queryKey: UseResourceGroupsGetOneKeyFn({ path: { id: groupId } }),
       });
     },
     onError: (err: Error) => {
@@ -67,20 +67,20 @@ export function GroupDetailsForm(
     if (!name.trim()) return;
 
     await updateGroup({
-      id: groupId,
-      requestBody: { name: name.trim(), description: description.trim() || undefined, isHidden },
+      path: { id: groupId },
+      body: { name: name.trim(), description: description.trim() || undefined, isHidden },
     });
   };
 
-  const { isPending: isDeleting, mutate: deleteGroupMutation } = useResourcesServiceResourceGroupsDeleteOne({
+  const { isPending: isDeleting, mutate: deleteGroupMutation } = useResourceGroupsDeleteOne(undefined, {
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [useAccessControlServiceResourceIntroductionsGetPeopleKey] });
+      queryClient.invalidateQueries({ queryKey: [useResourceIntroductionsGetPeopleKey] });
       success({
         title: t('operations.delete.success.title'),
         description: t('operations.delete.success.description'),
       });
       queryClient.invalidateQueries({
-        queryKey: UseResourcesServiceResourceGroupsGetManyKeyFn(),
+        queryKey: UseResourceGroupsGetManyKeyFn(),
       });
       navigate('/');
     },
@@ -93,9 +93,7 @@ export function GroupDetailsForm(
   });
 
   const handleDelete = useCallback(() => {
-    deleteGroupMutation({
-      groupId,
-    });
+    deleteGroupMutation({ path: { groupId } });
   }, [deleteGroupMutation, groupId]);
 
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);

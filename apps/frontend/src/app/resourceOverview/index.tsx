@@ -1,8 +1,9 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
 import {
-  useResourcesServiceResourceGroupsGetMany,
-  ResourcesService,
-  UseResourcesServiceGetAllResourcesKeyFn,
+  useResourceGroupsGetMany,
+  UseGetAllResourcesKeyFn,
+  resourceGroupsResourcesExist,
+  getAllResources,
 } from '@attraccess/react-query-client';
 import { Toolbar } from './toolbar/toolbar';
 import { ResourceGroupCard } from './resourceGroupCard';
@@ -41,7 +42,7 @@ function persistFilter(filter: PersistedFilterProps, value: boolean) {
 
 export function ResourceOverview() {
   const [createOpen, setCreateOpen] = useState(false);
-  const { data: groups } = useResourcesServiceResourceGroupsGetMany();
+  const { data: groups } = useResourceGroupsGetMany();
 
   // The dashboard's resource search opens this page with `?q=`. The term only fills the search field; the field is
   // local state, so `q` leaves the URL, where it would bring back a search the user has since cleared.
@@ -106,8 +107,8 @@ export function ResourceOverview() {
         limit: 10,
       };
       return {
-        queryKey: UseResourcesServiceGetAllResourcesKeyFn(params),
-        queryFn: () => ResourcesService.getAllResources(params),
+        queryKey: UseGetAllResourcesKeyFn({ query: params }),
+        queryFn: () => getAllResources({ query: params, throwOnError: true }).then(({ data }) => data),
         enabled: groups !== undefined,
       };
     }),
@@ -117,8 +118,8 @@ export function ResourceOverview() {
   // One server-side visibility check replaces per-group unfiltered probes.
   // Keep it under the resource-list prefix so resource mutations invalidate it.
   const { data: unfilteredResources } = useQuery({
-    queryKey: UseResourcesServiceGetAllResourcesKeyFn({}, ['visible-existence', groupIds]),
-    queryFn: () => ResourcesService.resourceGroupsResourcesExist(),
+    queryKey: UseGetAllResourcesKeyFn({}, ['visible-existence', groupIds]),
+    queryFn: () => resourceGroupsResourcesExist({ throwOnError: true }).then(({ data }) => data),
     enabled: noMatchingResources,
   });
   const hasResources = unfilteredResources?.hasResources ?? false;

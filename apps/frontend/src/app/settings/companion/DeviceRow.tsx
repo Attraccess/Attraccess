@@ -3,7 +3,7 @@ import { PencilIcon, Trash2Icon } from 'lucide-react';
 import { ReactNode } from 'react';
 import { lt, valid } from 'semver';
 import { Button, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { CompanionDevice, useCompanionDevicesServiceGetCompanionDevice } from '@attraccess/react-query-client';
+import { CompanionDevice, useGetCompanionDevice } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
 
@@ -24,7 +24,7 @@ function isOutdated(deviceVersion: string, latestVersion: string): boolean {
 export function DeviceRow({ device, latestVersion, onRenameStart, onDeleteStart }: DeviceRowProps) {
   const { t } = useTranslations({ en, de });
   const formatDateTime = useDateTimeFormatter();
-  const { data } = useCompanionDevicesServiceGetCompanionDevice({ id: device.id }, undefined, {
+  const { data } = useGetCompanionDevice({ path: { id: device.id } }, undefined, {
     refetchInterval: 30000,
   });
   const fetchedDevice = data as DeviceWithConnected | undefined;

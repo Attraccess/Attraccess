@@ -25,18 +25,20 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   }))()),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
-vi.mock('../context/index', () => ({ useFlowContext: () => ({ liveLogs: state.live, owner: { kind: 'resource', resourceId: 7 } }) }));
+vi.mock('../context/index', () => ({
+  useFlowContext: () => ({ liveLogs: state.live, owner: { kind: 'resource', resourceId: 7 } }),
+}));
 vi.mock('@attraccess/react-query-client', () => ({
-  useGlobalFlowsServiceGetGlobalFlowCanvas: () => ({ data: undefined }),
-  useGlobalFlowsServiceGetGlobalFlowNodeSchemas: () => ({ data: undefined }),
-  useGlobalFlowsServiceGetGlobalFlowLogRecordingStatus: () => ({ data: undefined }),
-  useGlobalFlowsServiceGetGlobalFlowLogRecordingStatusKey: 'global-recording',
-  useGlobalFlowsServiceGetGlobalFlowLogs: () => ({ data: undefined }),
-  useGlobalFlowsServiceStartGlobalFlowLogRecording: () => ({ mutate: vi.fn() }),
-  useGlobalFlowsServiceStopGlobalFlowLogRecording: () => ({ mutate: vi.fn() }),
-  useResourceFlowsServiceGetNodeSchemas: () => ({ data: undefined }),
-  useResourceFlowsServiceGetFlowLogRecordingStatusKey: 'recording',
-  useResourceFlowsServiceGetResourceFlow: () => ({
+  useGetGlobalFlowCanvas: () => ({ data: undefined }),
+  useGetGlobalFlowNodeSchemas: () => ({ data: undefined }),
+  useGetGlobalFlowLogRecordingStatus: () => ({ data: undefined }),
+  useGetGlobalFlowLogRecordingStatusKey: 'global-recording',
+  useGetGlobalFlowLogs: () => ({ data: undefined }),
+  useStartGlobalFlowLogRecording: () => ({ mutate: vi.fn() }),
+  useStopGlobalFlowLogRecording: () => ({ mutate: vi.fn() }),
+  useGetNodeSchemas: () => ({ data: undefined }),
+  useGetFlowLogRecordingStatusKey: 'recording',
+  useGetResourceFlow: () => ({
     data: {
       nodes: [
         { id: 'trigger', type: 'timer' },
@@ -44,13 +46,13 @@ vi.mock('@attraccess/react-query-client', () => ({
       ],
     },
   }),
-  useResourceFlowsServiceGetFlowLogRecordingStatus: () => ({ data: state.recording }),
-  useResourceFlowsServiceGetResourceFlowLogs: () => ({ data: { logs: state.logs } }),
-  useResourceFlowsServiceStartFlowLogRecording: (options: typeof state.startOptions) => {
+  useGetFlowLogRecordingStatus: () => ({ data: state.recording }),
+  useGetResourceFlowLogs: () => ({ data: { logs: state.logs } }),
+  useStartFlowLogRecording: (_mutationKey: unknown, options: typeof state.startOptions) => {
     state.startOptions = options;
     return { mutate: state.start };
   },
-  useResourceFlowsServiceStopFlowLogRecording: (options: typeof state.stopOptions) => {
+  useStopFlowLogRecording: (_mutationKey: unknown, options: typeof state.stopOptions) => {
     state.stopOptions = options;
     return { mutate: state.stop };
   },
@@ -102,7 +104,7 @@ it('starts a recording using the selected duration and refreshes its status', as
   fireEvent.click(screen.getByRole('button', { name: /recording.duration$/ }));
   fireEvent.click(await screen.findByRole('option', { name: 'duration.h1' }));
   fireEvent.click(screen.getByRole('button', { name: 'recording.start' }));
-  expect(state.start).toHaveBeenCalledWith({ resourceId: 7, requestBody: { durationMinutes: 60 } });
+  expect(state.start).toHaveBeenCalledWith({ path: { resourceId: 7 }, body: { durationMinutes: 60 } });
   act(() => state.startOptions.onSuccess());
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['recording'] });
 });
@@ -112,7 +114,7 @@ it('shows the remaining recording duration and stops recording', async () => {
   expect(screen.getByText('recording.active:1:02:03')).toBeTruthy();
   expect(screen.getByText('recording.waiting')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'recording.stop' }));
-  expect(state.stop).toHaveBeenCalledWith({ resourceId: 7 });
+  expect(state.stop).toHaveBeenCalledWith({ path: { resourceId: 7 } });
   act(() => state.stopOptions.onSuccess());
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['recording'] });
 });

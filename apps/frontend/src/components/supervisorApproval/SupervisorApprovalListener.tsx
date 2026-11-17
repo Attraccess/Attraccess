@@ -2,10 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   SupervisionRequestDto,
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
-  useResourcesServiceSupervisionApproveRequest,
-  useResourcesServiceSupervisionListPendingRequests,
-  useResourcesServiceSupervisionRejectRequest,
+  UseResourceUsageGetActiveSessionKeyFn,
+  useSupervisionApproveRequest,
+  useSupervisionListPendingRequests,
+  useSupervisionRejectRequest,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../hooks/useAuth';
 import { useLiveUpdates } from '../../utils/live-updates';
@@ -31,7 +31,7 @@ export function SupervisorApprovalListener() {
   const [requests, setRequests] = useState<SupervisionRequestDto[]>([]);
 
   // Seed from any requests already awaiting this supervisor (e.g. after reconnect).
-  const { data: pending } = useResourcesServiceSupervisionListPendingRequests(undefined, {
+  const { data: pending } = useSupervisionListPendingRequests({}, undefined, {
     enabled: !!user,
     refetchOnWindowFocus: true,
   });
@@ -87,14 +87,14 @@ export function SupervisorApprovalListener() {
   const invalidateActiveSession = useCallback(
     (resourceId: number) => {
       queryClient.invalidateQueries({
-        queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId }),
+        queryKey: UseResourceUsageGetActiveSessionKeyFn({ path: { resourceId } }),
       });
     },
     [queryClient],
   );
 
-  const { mutate: approveRequest, isPending: isApproving } = useResourcesServiceSupervisionApproveRequest();
-  const { mutate: rejectRequest, isPending: isRejecting } = useResourcesServiceSupervisionRejectRequest();
+  const { mutate: approveRequest, isPending: isApproving } = useSupervisionApproveRequest();
+  const { mutate: rejectRequest, isPending: isRejecting } = useSupervisionRejectRequest();
 
   const activeRequest = requests[0];
 
@@ -104,7 +104,7 @@ export function SupervisorApprovalListener() {
     }
     const { id, resourceId } = activeRequest;
     approveRequest(
-      { requestId: id },
+      { path: { requestId: id } },
       {
         onSuccess: () => {
           invalidateActiveSession(resourceId);
@@ -125,7 +125,7 @@ export function SupervisorApprovalListener() {
     }
     const { id } = activeRequest;
     rejectRequest(
-      { requestId: id },
+      { path: { requestId: id } },
       {
         onSettled: () => removeRequest(id),
       },

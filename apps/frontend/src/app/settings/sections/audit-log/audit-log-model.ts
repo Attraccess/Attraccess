@@ -2,13 +2,16 @@ import {
   AuditEntryDto,
   AuditControllerListData,
   AuditPageDto,
-  $AuditQueryDto,
-  $AuditSettingsDto,
+  AuditQueryDtoSchema,
+  AuditSettingsDtoSchema,
   AuditMetaDto,
   AuditSettingsDto,
 } from '@attraccess/react-query-client';
 
 export type AuditDomain = AuditSettingsDto['domains'][number];
+
+/** Query parameters of the audit list endpoint. */
+export type AuditListQuery = NonNullable<AuditControllerListData['query']>;
 
 export type AuditFilters = {
   domain: string;
@@ -63,9 +66,9 @@ export function togglePluginDomain(disabled: string[], domain: string, selected:
 }
 
 /** Audit domains owned by the core app. Plugin domains arrive through the audit meta endpoint. */
-export const coreAuditDomains = $AuditSettingsDto.properties.domains.items.enum;
+export const coreAuditDomains = AuditSettingsDtoSchema.properties.domains.items.enum;
 
-export const eventPrefix = new RegExp($AuditQueryDto.properties.eventPrefix.pattern);
+export const eventPrefix = new RegExp(AuditQueryDtoSchema.properties.eventPrefix.pattern);
 
 export const emptyFilters: AuditFilters = {
   domain: '',
@@ -78,7 +81,7 @@ export const emptyFilters: AuditFilters = {
   to: '',
 };
 
-export const subjectTypePattern = new RegExp($AuditQueryDto.properties.subjectType.pattern);
+export const subjectTypePattern = new RegExp(AuditQueryDtoSchema.properties.subjectType.pattern);
 
 export function csvCell(value: unknown): string {
   const text =
@@ -185,8 +188,8 @@ export function displayValue(value: unknown): string {
 }
 
 export async function exportAuditEntries(
-  request: AuditControllerListData,
-  loadPage: (request: AuditControllerListData) => Promise<AuditPageDto>,
+  request: AuditListQuery,
+  loadPage: (request: AuditListQuery) => Promise<AuditPageDto>,
 ): Promise<AuditEntryDto[]> {
   const entries: AuditEntryDto[] = [];
   let beforeId: number | undefined;
@@ -208,8 +211,8 @@ export async function exportAuditEntries(
 export function filterRequest(
   filters: AuditFilters,
   subjectTypes?: readonly string[],
-): { request: AuditControllerListData; error?: never } | { error: string; request?: never } {
-  const request: AuditControllerListData = {};
+): { request: AuditListQuery; error?: never } | { error: string; request?: never } {
+  const request: AuditListQuery = {};
   for (const key of ['actorId', 'subjectId'] as const) {
     if (!filters[key].trim()) continue;
     const value = Number(filters[key]);
@@ -224,7 +227,7 @@ export function filterRequest(
   }
   if (request.from && request.to && request.from > request.to) return { error: 'invalidRange' };
   const prefix = filters.eventPrefix.trim();
-  if (prefix && (prefix.length > $AuditQueryDto.properties.eventPrefix.maxLength || !eventPrefix.test(prefix)))
+  if (prefix && (prefix.length > AuditQueryDtoSchema.properties.eventPrefix.maxLength || !eventPrefix.test(prefix)))
     return { error: 'invalidEventPrefix' };
   if (prefix) request.eventPrefix = prefix;
   const subjectType = filters.subjectType.trim();

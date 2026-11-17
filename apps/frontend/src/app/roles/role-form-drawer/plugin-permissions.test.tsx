@@ -23,8 +23,8 @@ const plugin = (pluginName: string, key: string, label: string, labelDe: string,
 });
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useRbacServiceListRolesKey: 'roles',
-  useRbacServiceListPermissions: () => ({
+  useListRolesKey: 'roles',
+  useListPermissions: () => ({
     data: [
       plugin('rabbitmq', 'rabbitmq.broker.read', 'View broker', 'Broker ansehen', 'RabbitMQ (DE)'),
       plugin('matter', 'matter.devices.read', 'View Matter devices', 'Matter-Geräte ansehen', 'Matter (DE)'),
@@ -32,8 +32,8 @@ vi.mock('@attraccess/react-query-client', () => ({
       { key: 'resources.read', label: 'Read Resources', description: '', category: 'resources', pluginName: null },
     ],
   }),
-  useRbacServiceCreateRole: () => ({ mutate: vi.fn() }),
-  useRbacServiceUpdateRole: () => ({ mutate: vi.fn() }),
+  useCreateRole: () => ({ mutate: vi.fn() }),
+  useUpdateRole: () => ({ mutate: vi.fn() }),
 }));
 
 const originalLanguage = useTranslationState.getState().language;

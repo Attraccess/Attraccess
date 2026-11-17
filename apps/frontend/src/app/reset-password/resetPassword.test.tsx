@@ -30,12 +30,12 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 vi.mock('react-router-dom', () => ({ useNavigate: () => navigateMock }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useUsersServiceChangePasswordViaResetToken: () => ({
+  useChangePasswordViaResetToken: () => ({
     mutate: vi.fn(),
     isPending: state.pending,
     isSuccess: state.success,
   }),
-  usePasswordPolicyServiceGetPublicPasswordPolicy: () => ({ data: undefined }),
+  useGetPublicPasswordPolicy: () => ({ data: undefined }),
 }));
 vi.mock('../../components/toastProvider', () => ({ useToastMessage: () => ({ error: vi.fn(), success: vi.fn() }) }));
 

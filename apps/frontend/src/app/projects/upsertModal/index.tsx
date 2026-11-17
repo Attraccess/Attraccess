@@ -18,11 +18,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ApiError,
   Project,
-  useProjectsServiceCreateProject,
-  useProjectsServiceFindManyProjectsKey,
-  useProjectsServiceFindOneProject,
-  UseProjectsServiceFindOneProjectKeyFn,
-  useProjectsServiceUpdateProject,
+  useCreateProject,
+  useFindManyProjectsKey,
+  useFindOneProject,
+  UseFindOneProjectKeyFn,
+  useUpdateProject,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
@@ -52,7 +52,7 @@ export function UpsertProjectModal(props: Props) {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { data: existingProject } = useProjectsServiceFindOneProject({ id: projectId as number }, undefined, {
+  const { data: existingProject } = useFindOneProject({ path: { id: projectId as number } }, undefined, {
     enabled: !!projectId,
   });
 
@@ -65,10 +65,10 @@ export function UpsertProjectModal(props: Props) {
           : t('actions.update.success.description', { name: project.name }),
       });
       queryClient.invalidateQueries({
-        queryKey: [useProjectsServiceFindManyProjectsKey],
+        queryKey: [useFindManyProjectsKey],
       });
       queryClient.invalidateQueries({
-        queryKey: UseProjectsServiceFindOneProjectKeyFn({ id: project.id }),
+        queryKey: UseFindOneProjectKeyFn({ path: { id: project.id } }),
       });
       close();
     },
@@ -87,14 +87,14 @@ export function UpsertProjectModal(props: Props) {
     [t, tExists, toast],
   );
 
-  const { mutate: createProject, isPending: isCreating } = useProjectsServiceCreateProject({
+  const { mutate: createProject, isPending: isCreating } = useCreateProject(undefined, {
     onSuccess: (project) => {
       onSaveSuccess(project, true);
     },
     onError: (error) => onSaveError(error as ApiError),
   });
 
-  const { mutate: updateProject, isPending: isUpdating } = useProjectsServiceUpdateProject({
+  const { mutate: updateProject, isPending: isUpdating } = useUpdateProject(undefined, {
     onSuccess: (project) => {
       onSaveSuccess(project, false);
     },
@@ -123,8 +123,8 @@ export function UpsertProjectModal(props: Props) {
 
     if (projectId) {
       updateProject({
-        id: projectId,
-        formData: {
+        path: { id: projectId },
+        body: {
           name,
           description,
           logo: logo ?? undefined,
@@ -133,7 +133,7 @@ export function UpsertProjectModal(props: Props) {
       });
     } else {
       createProject({
-        formData: {
+        body: {
           name,
           description,
           logo: logo ?? undefined,

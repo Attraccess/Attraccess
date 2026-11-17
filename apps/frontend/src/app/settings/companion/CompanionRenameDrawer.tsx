@@ -4,8 +4,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   CompanionDevice,
-  UseCompanionDevicesServiceListCompanionDevicesKeyFn,
-  useCompanionDevicesServiceRenameCompanionDevice,
+  UseListCompanionDevicesKeyFn,
+  useRenameCompanionDevice,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './en.json';
@@ -28,9 +28,9 @@ export function CompanionRenameDrawer({ device, onClose }: CompanionRenameDrawer
     if (device) setRenameValue(device.name);
   }
 
-  const { mutate: rename, isPending: isRenamePending } = useCompanionDevicesServiceRenameCompanionDevice({
+  const { mutate: rename, isPending: isRenamePending } = useRenameCompanionDevice(undefined, {
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: UseCompanionDevicesServiceListCompanionDevicesKeyFn() });
+      queryClient.invalidateQueries({ queryKey: UseListCompanionDevicesKeyFn() });
       onClose();
       toast.success({ title: t('devices.rename.success') });
     },
@@ -41,7 +41,7 @@ export function CompanionRenameDrawer({ device, onClose }: CompanionRenameDrawer
 
   const handleRenameSave = () => {
     if (!device || !renameValue.trim()) return;
-    rename({ id: device.id, requestBody: { name: renameValue.trim() } });
+    rename({ path: { id: device.id }, body: { name: renameValue.trim() } });
   };
 
   return (

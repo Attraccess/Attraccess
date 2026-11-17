@@ -15,10 +15,10 @@ import {
 import { Button, StandardModal } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
-  useGlobalFlowsServiceCreateGlobalFlow,
-  UseGlobalFlowsServiceGetGlobalFlowKeyFn,
-  useGlobalFlowsServiceListGlobalFlowsKey,
-  useGlobalFlowsServiceUpdateGlobalFlow,
+  useCreateGlobalFlow,
+  UseGetGlobalFlowKeyFn,
+  useListGlobalFlowsKey,
+  useUpdateGlobalFlow,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
 import { useGlobalFlowsTranslations } from './useGlobalFlowsTranslations';
@@ -56,18 +56,18 @@ export function GlobalFlowDetailsModal({
   const onError = (error: unknown) =>
     toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' });
 
-  const create = useGlobalFlowsServiceCreateGlobalFlow({
+  const create = useCreateGlobalFlow(undefined, {
     onSuccess: (created) => {
-      void queryClient.invalidateQueries({ queryKey: [useGlobalFlowsServiceListGlobalFlowsKey] });
+      void queryClient.invalidateQueries({ queryKey: [useListGlobalFlowsKey] });
       onOpenChange(false);
       navigate(`/devices/flows/${created.id}`);
     },
     onError,
   });
-  const update = useGlobalFlowsServiceUpdateGlobalFlow({
+  const update = useUpdateGlobalFlow(undefined, {
     onSuccess: (updated) => {
-      void queryClient.invalidateQueries({ queryKey: [useGlobalFlowsServiceListGlobalFlowsKey] });
-      void queryClient.invalidateQueries({ queryKey: UseGlobalFlowsServiceGetGlobalFlowKeyFn({ flowId: updated.id }) });
+      void queryClient.invalidateQueries({ queryKey: [useListGlobalFlowsKey] });
+      void queryClient.invalidateQueries({ queryKey: UseGetGlobalFlowKeyFn({ path: { flowId: updated.id } }) });
       onOpenChange(false);
     },
     onError,
@@ -81,9 +81,9 @@ export function GlobalFlowDetailsModal({
     const details = { name: name.trim(), description: description.trim() ? description.trim() : undefined };
     if (flow) {
       // An emptied description has to be sent as null, otherwise the old text would stay.
-      update.mutate({ flowId: flow.id, requestBody: { ...details, description: details.description ?? null } });
+      update.mutate({ path: { flowId: flow.id }, body: { ...details, description: details.description ?? null } });
     } else {
-      create.mutate({ requestBody: details });
+      create.mutate({ body: details });
     }
   };
 

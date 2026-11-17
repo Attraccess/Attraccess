@@ -22,11 +22,7 @@ import { Select } from '../../../../components/select/index';
 import { ResourceTabKey, useResourceTabs } from './useResourceTabs';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useToastMessage } from '../../../../components/toastProvider';
-import {
-  useResourcesServiceDeleteOneResource,
-  useResourcesServiceGetOneResourceById,
-  useResourcesServiceGetAllResourcesKey,
-} from '@attraccess/react-query-client';
+import { useDeleteOneResource, useGetOneResourceById, useGetAllResourcesKey } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { DeleteConfirmationModal, PageAction, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQrCodeAction } from '../useQrCodeAction';
@@ -71,9 +67,9 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
     data: resource,
     isLoading: isLoadingResource,
     error: resourceError,
-  } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  } = useGetOneResourceById({ path: { id: resourceId } });
 
-  const deleteResource = useResourcesServiceDeleteOneResource();
+  const deleteResource = useDeleteOneResource();
 
   const qrOpenRef = useRef<() => void>(() => undefined);
 
@@ -91,12 +87,12 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
   const handleDelete = async () => {
     if (!canDeleteResources) return;
     try {
-      await deleteResource.mutateAsync({ id: resourceId });
+      await deleteResource.mutateAsync({ path: { id: resourceId } });
       success({
         title: 'Resource deleted',
         description: `${resource?.name} has been successfully deleted`,
       });
-      queryClient.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
+      queryClient.invalidateQueries({ queryKey: [useGetAllResourcesKey] });
       navigate('/resources');
     } catch (err) {
       showError({

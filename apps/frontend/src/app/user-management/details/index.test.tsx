@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { SSOProviderType } from '@attraccess/react-query-client';
+import { SsoProviderType } from '@attraccess/react-query-client';
 import { UserManagementDetailsPage } from './index';
 const state = vi.hoisted(() => ({
   user: undefined as Record<string, unknown> | undefined,
@@ -31,13 +31,13 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useUsersServiceGetOneUserById: () => ({ data: state.user }),
-  useLicenseServiceGetLicenseInformation: () => ({ data: { modules: ['sso', 'attractap'] } }),
-  useAuthenticationServiceGetAllSsoProviders: () => ({ data: state.providers }),
-  useRbacServiceListRoles: () => ({ data: state.roles, isLoading: state.loading }),
-  useRbacServiceListPermissions: () => ({ data: state.permissions }),
-  useUsersServiceGetUserRoleAssignments: () => ({ data: state.assignments }),
-  useUsersServiceDeleteUser: (options: typeof state.options) => {
+  useGetOneUserById: () => ({ data: state.user }),
+  useGetLicenseInformation: () => ({ data: { modules: ['sso', 'attractap'] } }),
+  useGetAllSsoProviders: () => ({ data: state.providers }),
+  useListRoles: () => ({ data: state.roles, isLoading: state.loading }),
+  useListPermissions: () => ({ data: state.permissions }),
+  useGetUserRoleAssignments: () => ({ data: state.assignments }),
+  useDeleteUser: (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
     return { mutate: state.remove, isPending: false };
   },
@@ -168,9 +168,9 @@ it('summarizes linked OIDC and SAML permission mappings, tolerating missing prov
     id: 7,
     username: 'Ada',
     authenticationDetails: [
-      { providerId: 1, providerType: SSOProviderType.OIDC, ssoSubject: 'subject-1' },
-      { providerId: 2, providerType: SSOProviderType.SAML, ssoSubject: 'subject-2' },
-      { providerId: 99, providerType: SSOProviderType.OIDC },
+      { providerId: 1, providerType: SsoProviderType.OIDC, ssoSubject: 'subject-1' },
+      { providerId: 2, providerType: SsoProviderType.SAML, ssoSubject: 'subject-2' },
+      { providerId: 99, providerType: SsoProviderType.OIDC },
       { ssoSubject: 'orphan' },
       { providerId: 1 },
       { type: 'password' },
@@ -187,7 +187,7 @@ it('confirms deletion and returns to the list after success', async () => {
   show();
   fireEvent.click(screen.getByRole('button', { name: 'delete.actions.open' }));
   fireEvent.click(await screen.findByRole('button', { name: 'delete.actions.confirm' }));
-  expect(state.remove).toHaveBeenCalledWith({ id: 7 });
+  expect(state.remove).toHaveBeenCalledWith({ path: { id: 7 } });
   act(() => state.options.onSuccess());
   expect(state.success).toHaveBeenCalledWith(expect.objectContaining({ title: 'delete.success.title' }));
   expect(screen.getByText('User list')).toBeTruthy();

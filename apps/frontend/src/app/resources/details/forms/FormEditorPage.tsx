@@ -5,11 +5,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ApiError,
-  useResourceFormsServiceResourceFormsCreate,
-  useResourceFormsServiceResourceFormsDelete,
-  useResourceFormsServiceResourceFormsGetOne,
-  useResourceFormsServiceResourceFormsUpdate,
-  useResourcesServiceGetOneResourceById,
+  useResourceFormsCreate,
+  useResourceFormsDelete,
+  useResourceFormsGetOne,
+  useResourceFormsUpdate,
+  useGetOneResourceById,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { FormPreview } from './components/FormPreview';
@@ -29,9 +29,9 @@ export function FormEditorPage() {
   const toast = useToastMessage();
   const { t, tExists } = useTranslations({ en, de });
 
-  const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
-  const { data: formResponse, isLoading: isLoadingForm } = useResourceFormsServiceResourceFormsGetOne(
-    { resourceId, formId: Number(formId) },
+  const { data: resource } = useGetOneResourceById({ path: { id: resourceId } });
+  const { data: formResponse, isLoading: isLoadingForm } = useResourceFormsGetOne(
+    { path: { resourceId, formId: Number(formId) } },
     undefined,
     { enabled: !isCreateMode && Number.isFinite(resourceId) },
   );
@@ -61,7 +61,7 @@ export function FormEditorPage() {
     [resourceId, formId, formResponse?.id],
   );
 
-  const createForm = useResourceFormsServiceResourceFormsCreate({
+  const createForm = useResourceFormsCreate(undefined, {
     onSuccess: async (data) => {
       toast.success({ title: t('editor.createSuccess') });
       await invalidateFormQueries(resourceId, queryClient, data.id);
@@ -72,7 +72,7 @@ export function FormEditorPage() {
     },
   });
 
-  const updateForm = useResourceFormsServiceResourceFormsUpdate({
+  const updateForm = useResourceFormsUpdate(undefined, {
     onSuccess: async () => {
       toast.success({ title: t('editor.updateSuccess') });
       await invalidateFormQueries(resourceId, queryClient, mutationVariables.formId);
@@ -82,7 +82,7 @@ export function FormEditorPage() {
     },
   });
 
-  const deleteForm = useResourceFormsServiceResourceFormsDelete({
+  const deleteForm = useResourceFormsDelete(undefined, {
     onSuccess: async () => {
       toast.success({ title: t('editor.deleteSuccess') });
       await invalidateFormQueries(resourceId, queryClient, mutationVariables.formId);
@@ -119,19 +119,15 @@ export function FormEditorPage() {
 
     const payload = buildRequestBody(form);
     if (isCreateMode) {
-      await createForm.mutateAsync({ resourceId, requestBody: payload });
+      await createForm.mutateAsync({ path: { resourceId }, body: payload });
       return;
     }
 
-    await updateForm.mutateAsync({
-      resourceId,
-      formId: mutationVariables.formId,
-      requestBody: payload,
-    });
+    await updateForm.mutateAsync({ path: { resourceId, formId: mutationVariables.formId }, body: payload });
   };
 
   const handleDelete = async () => {
-    await deleteForm.mutateAsync({ resourceId, formId: mutationVariables.formId });
+    await deleteForm.mutateAsync({ path: { resourceId, formId: mutationVariables.formId } });
     setDeleteModalOpen(false);
   };
 

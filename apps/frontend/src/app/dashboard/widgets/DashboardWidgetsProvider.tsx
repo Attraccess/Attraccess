@@ -1,7 +1,7 @@
 import { PropsWithChildren, useEffect, useMemo, useRef, useState } from 'react';
 import { PuzzleIcon } from 'lucide-react';
 import { useTranslations, useTranslationState } from '@attraccess/plugins-frontend-ui';
-import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
+import { useGetLicenseInformation } from '@attraccess/react-query-client';
 import type { DashboardWidgetSize, PluginDashboardWidget } from '@attraccess/plugins-frontend-sdk';
 import { useAuth } from '../../../hooks/useAuth';
 import usePluginState from '../../plugins/plugin.state';
@@ -112,7 +112,7 @@ function useComputedDashboardWidgets(): DashboardWidgets {
   const { t } = useTranslations({ en, de });
   const { isAuthenticated } = useAuth();
   // The provider also wraps the logged-out pages of the layout, where the license cannot be read.
-  const { data: license } = useLicenseServiceGetLicenseInformation(undefined, { enabled: isAuthenticated });
+  const { data: license } = useGetLicenseInformation({}, undefined, { enabled: isAuthenticated });
   const arePluginsInitialized = usePluginState((state) => state.isInitialized);
   const canOpen = useCanOpenPage();
   const pluginWidgets = usePluginWidgets();

@@ -17,14 +17,14 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => ({ showToast: state.toast }) }));
 vi.mock('react-qrcode-logo', () => ({ QRCode: ({ value }: { value: string }) => <output>{value}</output> }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useTwoFactorAuthenticationServiceGetTwoFactorStatus: () => ({
+  useGetTwoFactorStatus: () => ({
     data: state.status,
     isLoading: state.loading,
     refetch: state.refetch,
   }),
-  useTwoFactorAuthenticationServiceSetupTwoFactor: () => ({ mutateAsync: state.start }),
-  useTwoFactorAuthenticationServiceVerifyTwoFactor: () => ({ mutateAsync: state.verify }),
-  useTwoFactorAuthenticationServiceDisableTwoFactor: () => ({ mutateAsync: state.disable }),
+  useSetupTwoFactor: () => ({ mutateAsync: state.start }),
+  useVerifyTwoFactor: () => ({ mutateAsync: state.verify }),
+  useDisableTwoFactor: () => ({ mutateAsync: state.disable }),
 }));
 beforeEach(() => {
   vi.clearAllMocks();
@@ -46,7 +46,7 @@ it('shows policy requirements and completes verified enrollment', async () => {
   expect(screen.getByRole('button', { name: 'setup.verifyButton' })).toBeDisabled();
   fireEvent.change(screen.getByLabelText('setup.codeLabel'), { target: { value: '123456' } });
   fireEvent.click(screen.getByRole('button', { name: 'setup.verifyButton' }));
-  await waitFor(() => expect(state.verify).toHaveBeenCalledWith({ requestBody: { code: '123456' } }));
+  await waitFor(() => expect(state.verify).toHaveBeenCalledWith({ body: { code: '123456' } }));
   await waitFor(() => expect(state.toast).toHaveBeenCalledWith({ title: 'success.enabled', type: 'success' }));
   expect(state.refetch).toHaveBeenCalledOnce();
   expect(screen.queryByDisplayValue('TESTSECRET')).toBeNull();
@@ -86,7 +86,7 @@ it('requires a code to disable, preserves it on failure and clears it after succ
   expect(screen.getByLabelText('disable.codeLabel')).toHaveValue('123456');
   fireEvent.click(screen.getByRole('button', { name: 'disable.button' }));
   await waitFor(() => expect(state.toast).toHaveBeenCalledWith({ title: 'success.disabled', type: 'success' }));
-  expect(state.disable).toHaveBeenLastCalledWith({ requestBody: { code: '123456' } });
+  expect(state.disable).toHaveBeenLastCalledWith({ body: { code: '123456' } });
   expect(screen.getByLabelText('disable.codeLabel')).toHaveValue('');
 });
 it('does not show enrollment actions before status has loaded', () => {

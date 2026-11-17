@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Button, ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowUpCircle, ExternalLink, X } from 'lucide-react';
-import { useSystemServiceGetUpdateStatus } from '@attraccess/react-query-client';
+import { useGetUpdateStatus } from '@attraccess/react-query-client';
 import { UPDATE_CHECK_CACHE_TTL_MS } from '@attraccess/shared';
 import { useAuth } from '../../hooks/useAuth';
 import { Markdown } from '../markdown';
@@ -25,7 +25,7 @@ export function UpdateNotificationBanner() {
   const canSeeBanner = hasPermission('system.settings.manage');
   const updateDocsPath = buildUpdateDocsPath(language);
 
-  const { data: updateStatus } = useSystemServiceGetUpdateStatus({}, undefined, {
+  const { data: updateStatus } = useGetUpdateStatus({}, undefined, {
     enabled: canSeeBanner,
     staleTime: UPDATE_CHECK_CACHE_TTL_MS,
     refetchInterval: UPDATE_CHECK_CACHE_TTL_MS,

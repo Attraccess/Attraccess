@@ -1,7 +1,7 @@
 import {
   CsvExportType,
   ResourceHoursSummaryRowDto,
-  useAnalyticsServiceGetResourceHoursSummaryInDateRangeInfinite,
+  useGetResourceHoursSummaryInDateRangeInfinite,
 } from '@attraccess/react-query-client';
 import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useEffect, useMemo, useState } from 'react';
@@ -75,8 +75,8 @@ export function useResourceHoursSummaryColumns(rows: ResourceHoursSummaryRow[]) 
 export function ResourceHoursSummaryExport({ start, end }: ExportProps) {
   const [fetchAll, setFetchAll] = useState(false);
   const { data, status, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } =
-    useAnalyticsServiceGetResourceHoursSummaryInDateRangeInfinite(
-      { start: start.toISOString(), end: end.toISOString() },
+    useGetResourceHoursSummaryInDateRangeInfinite(
+      { query: { start: start.toISOString(), end: end.toISOString() } },
       undefined,
       EXPORT_QUERY_OPTIONS,
     );

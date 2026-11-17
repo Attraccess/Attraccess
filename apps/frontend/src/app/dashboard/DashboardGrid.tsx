@@ -57,7 +57,7 @@ export function usePinReorder(pins: DashboardPin[]) {
     const before = reordered[to + 1];
     mutate(
       {
-        requestBody: {
+        body: {
           kind: DashboardPinOperationKind.MOVE,
           item: itemOf(reordered[to]),
           ...(before ? { before: itemOf(before) } : {}),
@@ -86,7 +86,7 @@ export function usePinResize(pins: DashboardPin[]) {
     void cancelPinsFetch();
     setPins(pins.map((candidate) => (pinKey(candidate) === pinKey(pin) ? { ...candidate, size } : candidate)));
     mutate(
-      { requestBody: { kind: DashboardPinOperationKind.RESIZE, item: itemOf(pin), size } },
+      { body: { kind: DashboardPinOperationKind.RESIZE, item: itemOf(pin), size } },
       { onError: () => toast.error({ title: t('resizeError') }) },
     );
   };
@@ -142,7 +142,7 @@ export function DashboardGrid({
   const remove = (pin: DashboardPin, index: number) => {
     onRemoved?.(index);
     mutate(
-      { requestBody: { kind: DashboardPinOperationKind.REMOVE, item: itemOf(pin) } },
+      { body: { kind: DashboardPinOperationKind.REMOVE, item: itemOf(pin) } },
       { onError: () => toast.error({ title: t('pin.saveError') }) },
     );
   };
@@ -164,7 +164,12 @@ export function DashboardGrid({
 
   const renderCard = (pin: DashboardPin, index: number) => {
     const id = pinKey(pin);
-    const props = { id, isEditing, onRemove: () => remove(pin, index), onResize: (size: TileSize) => resize(pin, size) };
+    const props = {
+      id,
+      isEditing,
+      onRemove: () => remove(pin, index),
+      onResize: (size: TileSize) => resize(pin, size),
+    };
     if (pin.itemType === DashboardPinItemType.RESOURCE) {
       return <ResourcePinCard key={id} {...props} size={resolveTileSize(pin.size, RESOURCE_TILE_SIZES)} pin={pin} />;
     }

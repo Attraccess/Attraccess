@@ -12,7 +12,7 @@ import { ResourceOverviewTab } from './ResourceOverviewTab';
 
 vi.mock('../meters/MetersCard', () => ({ MetersCard: () => null }));
 vi.mock('react-router-dom', () => ({ useParams: () => ({ id: '11' }) }));
-vi.mock('@attraccess/react-query-client', () => ({ useResourcesServiceGetOneResourceById: () => ({ data: {} }) }));
+vi.mock('@attraccess/react-query-client', () => ({ useGetOneResourceById: () => ({ data: {} }) }));
 vi.mock('../../usage/resourceUsageSession', () => ({ ResourceUsageSession: () => null }));
 vi.mock('../resourceBillingInfo', () => ({ ResourceBillingInfo: () => null }));
 vi.mock('./RecentSessionsCard', () => ({ RecentSessionsCard: () => null }));

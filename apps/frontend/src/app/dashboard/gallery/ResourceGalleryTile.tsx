@@ -2,11 +2,7 @@ import { Key, useState } from 'react';
 import { keepPreviousData } from '@tanstack/react-query';
 import { ComboBox, Input, Label, ListBox } from '@heroui/react';
 import { useDebounce, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  DashboardPinItemType,
-  PaginatedResourceResponseDto,
-  useResourcesServiceGetAllResources,
-} from '@attraccess/react-query-client';
+import { DashboardPinItemType, PaginatedResourceResponseDto, useGetAllResources } from '@attraccess/react-query-client';
 import { DashboardPinItem } from '../pins';
 import { RESOURCE_TILE_SIZES, TileSize } from '../sizes';
 import { AddButton, GalleryTile, ResourcePreview } from './GalleryTile';
@@ -21,8 +17,8 @@ const SEARCH_LIMIT = 20;
  */
 function useResourceSearch(term: string) {
   const search = useDebounce(term.trim(), 300);
-  const { data, isFetching } = useResourcesServiceGetAllResources<PaginatedResourceResponseDto>(
-    { search: search || undefined, limit: SEARCH_LIMIT },
+  const { data, isFetching } = useGetAllResources<PaginatedResourceResponseDto>(
+    { query: { search: search || undefined, limit: SEARCH_LIMIT } },
     undefined,
     { placeholderData: keepPreviousData },
   );

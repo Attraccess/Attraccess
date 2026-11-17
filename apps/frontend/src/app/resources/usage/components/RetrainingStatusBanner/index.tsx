@@ -1,6 +1,6 @@
 import { Alert, AlertContent, AlertDescription, AlertTitle } from '@heroui/react';
 import { AlertStatusIcon, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useResourcesServiceResourceRetrainingGetStatus } from '@attraccess/react-query-client';
+import { useResourceRetrainingGetStatus } from '@attraccess/react-query-client';
 import en from './translations/en.json';
 import de from './translations/de.json';
 
@@ -11,7 +11,7 @@ interface RetrainingStatusBannerProps {
 export function RetrainingStatusBanner({ resourceId }: Readonly<RetrainingStatusBannerProps>) {
   const { t } = useTranslations({ en, de });
 
-  const { data: status } = useResourcesServiceResourceRetrainingGetStatus({ resourceId }, undefined, {
+  const { data: status } = useResourceRetrainingGetStatus({ path: { resourceId } }, undefined, {
     refetchInterval: 30000,
   });
 

@@ -25,8 +25,8 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useLicenseServiceGetLicenseInformation: () => ({ data: state.license }),
-  useMessagingServiceMessagingGetUnreadCount: () => ({ data: { total: 4 } }),
+  useGetLicenseInformation: () => ({ data: state.license }),
+  useMessagingGetUnreadCount: () => ({ data: { total: 4 } }),
 }));
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ isAuthenticated: true }) }));
 vi.mock('../layout/sidebar/useShowNavItem', () => ({

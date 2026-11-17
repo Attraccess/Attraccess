@@ -5,15 +5,15 @@ import { ResourceGroupUpsertModal } from '../../resource-groups/upsertModal/reso
 import { GroupsToolbar } from './GroupsToolbar';
 import { ResourceGroupsTable } from './ResourceGroupsTable';
 import {
-  UseAccessControlServiceResourceIntroductionsGetPeopleKeyFn,
+  UseResourceIntroductionsGetPeopleKeyFn,
   Resource,
   ResourceGroup,
-  useResourcesServiceGetAllResourcesKey,
-  useResourcesServiceGetOneResourceById,
-  UseResourcesServiceGetOneResourceByIdKeyFn,
-  useResourcesServiceResourceGroupsAddResource,
-  useResourcesServiceResourceGroupsGetMany,
-  useResourcesServiceResourceGroupsRemoveResource,
+  useGetAllResourcesKey,
+  useGetOneResourceById,
+  UseGetOneResourceByIdKeyFn,
+  useResourceGroupsAddResource,
+  useResourceGroupsGetMany,
+  useResourceGroupsRemoveResource,
 } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';
@@ -32,8 +32,8 @@ export function ManageResourceGroups({ resourceId, hideHeader, ...rest }: Readon
   const queryClient = useQueryClient();
   const toast = useToastMessage();
 
-  const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
-  const { data: groups } = useResourcesServiceResourceGroupsGetMany();
+  const { data: resource } = useGetOneResourceById({ path: { id: resourceId } });
+  const { data: groups } = useResourceGroupsGetMany();
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<GroupFilter>('all');
@@ -48,11 +48,11 @@ export function ManageResourceGroups({ resourceId, hideHeader, ...rest }: Readon
 
   const invalidateAll = useCallback(() => {
     queryClient.invalidateQueries({
-      queryKey: UseAccessControlServiceResourceIntroductionsGetPeopleKeyFn({ resourceId }),
+      queryKey: UseResourceIntroductionsGetPeopleKeyFn({ path: { resourceId } }),
     });
-    queryClient.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
+    queryClient.invalidateQueries({ queryKey: [useGetAllResourcesKey] });
     queryClient.invalidateQueries({
-      queryKey: UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId }),
+      queryKey: UseGetOneResourceByIdKeyFn({ path: { id: resourceId } }),
     });
   }, [queryClient, resourceId]);
 
@@ -65,15 +65,15 @@ export function ManageResourceGroups({ resourceId, hideHeader, ...rest }: Readon
     });
   }, []);
 
-  const { mutateAsync: addResourceToGroup } = useResourcesServiceResourceGroupsAddResource();
-  const { mutateAsync: removeResourceFromGroup } = useResourcesServiceResourceGroupsRemoveResource();
+  const { mutateAsync: addResourceToGroup } = useResourceGroupsAddResource();
+  const { mutateAsync: removeResourceFromGroup } = useResourceGroupsRemoveResource();
 
   const handleToggle = useCallback(
     async (group: ResourceGroup) => {
       const wasAssigned = assignedIds.has(group.id);
       markPending(group.id, true);
 
-      const resourceKey = UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId });
+      const resourceKey = UseGetOneResourceByIdKeyFn({ path: { id: resourceId } });
       const previous = queryClient.getQueryData<Resource>(resourceKey);
       if (previous) {
         const nextGroups = wasAssigned
@@ -84,9 +84,9 @@ export function ManageResourceGroups({ resourceId, hideHeader, ...rest }: Readon
 
       try {
         if (wasAssigned) {
-          await removeResourceFromGroup({ groupId: group.id, resourceId });
+          await removeResourceFromGroup({ path: { groupId: group.id, resourceId } });
         } else {
-          await addResourceToGroup({ groupId: group.id, resourceId });
+          await addResourceToGroup({ path: { groupId: group.id, resourceId } });
         }
         invalidateAll();
       } catch {

@@ -1,4 +1,4 @@
-import { useAuditServiceAuditControllerList } from '@attraccess/react-query-client';
+import { useAuditControllerList } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../hooks/useAuth';
 import { AuditFilters, filterRequest } from './audit-log-model';
 import { useAuditLogMeta } from './useAuditLogMeta';
@@ -14,5 +14,5 @@ export function useAuditLogActivity({
   const meta = useAuditLogMeta();
   const parsed = filterRequest(applied, meta.data?.subjectTypes);
   const request = { ...parsed.request, beforeId: cursors.at(-1), limit: 50 };
-  return useAuditServiceAuditControllerList(request, undefined, { enabled: hasPermission('system.audit.read') });
+  return useAuditControllerList({ query: request }, undefined, { enabled: hasPermission('system.audit.read') });
 }

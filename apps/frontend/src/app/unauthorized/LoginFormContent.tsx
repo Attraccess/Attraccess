@@ -3,7 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import { AlertContent, AlertDescription, AlertTitle, Input, Label, TextField, Alert } from '@heroui/react';
 import { OneTimeCodeInput } from '../../components/OneTimeCodeInput/index';
 import { Button, PasswordInput, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { ApiError, useUsersServiceResendVerificationEmail } from '@attraccess/react-query-client';
+import { ApiError, useResendVerificationEmail } from '@attraccess/react-query-client';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -55,7 +55,7 @@ export function LoginFormContent(props: Readonly<{ onForgotPassword: () => void 
     setResendEmail('');
   }, [error]);
 
-  const resendVerification = useUsersServiceResendVerificationEmail({
+  const resendVerification = useResendVerificationEmail(undefined, {
     onSuccess: () => {
       setResendError(null);
       setResendSuccess(true);
@@ -273,7 +273,7 @@ export function LoginFormContent(props: Readonly<{ onForgotPassword: () => void 
               if (!isValidEmail(trimmed)) {
                 return;
               }
-              resendVerification.mutate({ requestBody: { email: trimmed } });
+              resendVerification.mutate({ body: { email: trimmed } });
             }}
             isPending={resendVerification.isPending}
             isDisabled={!isValidEmail(resendEmail.trim()) || resendVerification.isPending}

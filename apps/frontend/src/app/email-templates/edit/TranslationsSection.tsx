@@ -88,7 +88,7 @@ export function TranslationsSection({ templateType, liveContent }: Readonly<Tran
       Object.entries(valuesFor(selectedLocale)).filter(([, v]) => v.trim() !== ''),
     );
     try {
-      await saveMutation.mutateAsync({ requestBody: { locale: selectedLocale, translations }, type: templateType });
+      await saveMutation.mutateAsync({ path: { type: templateType }, body: { locale: selectedLocale, translations } });
       toast.success({ title: t('translations.saved') });
     } catch {
       toast.error({ title: t('translations.saveFailed') });
@@ -99,7 +99,7 @@ export function TranslationsSection({ templateType, liveContent }: Readonly<Tran
     if (!deleteTarget) return;
     try {
       if (existingLocales.includes(deleteTarget)) {
-        await deleteMutation.mutateAsync({ locale: deleteTarget, type: templateType });
+        await deleteMutation.mutateAsync({ path: { locale: deleteTarget, type: templateType } });
       }
       setAddedLocales((prev) => prev.filter((l) => l !== deleteTarget));
       setEditedByLocale((prev) => {

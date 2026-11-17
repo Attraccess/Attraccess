@@ -2,7 +2,7 @@
 // FEATURE: Messaging inbox page
 import { ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMessagingServiceMessagingContactUser } from '@attraccess/react-query-client';
+import { useMessagingContactUser } from '@attraccess/react-query-client';
 import { AttraccessUserActionsProvider, type UserIdentity } from '@attraccess/plugins-frontend-ui';
 
 interface AttraccessUserActionsBridgeProps {
@@ -12,11 +12,18 @@ interface AttraccessUserActionsBridgeProps {
 export function AttraccessUserActionsBridge({ children }: Readonly<AttraccessUserActionsBridgeProps>) {
   const navigate = useNavigate();
 
-  const { mutate: contactUser } = useMessagingServiceMessagingContactUser({
+  const { mutate: contactUser } = useMessagingContactUser(undefined, {
     onSuccess: (result) => navigate(`/messages?conversation=${result.conversationId}`),
   });
 
-  const onStartDirectMessage = useCallback((user: UserIdentity) => contactUser({ userId: user.id }), [contactUser]);
+  const onStartDirectMessage = useCallback(
+    (user: UserIdentity) => contactUser({ path: { userId: user.id } }),
+    [contactUser],
+  );
 
-  return <AttraccessUserActionsProvider onStartDirectMessage={onStartDirectMessage}>{children}</AttraccessUserActionsProvider>;
+  return (
+    <AttraccessUserActionsProvider onStartDirectMessage={onStartDirectMessage}>
+      {children}
+    </AttraccessUserActionsProvider>
+  );
 }

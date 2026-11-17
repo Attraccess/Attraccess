@@ -27,8 +27,8 @@ vi.mock('../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: state.success, apiError: state.apiError }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useMcpServiceGetMcpConnectionInfo: () => ({ data: state.mcp }),
-  useUsersServiceRequestDeleteAccount: (options: typeof state.options) => {
+  useGetMcpConnectionInfo: () => ({ data: state.mcp }),
+  useRequestDeleteAccount: (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
     return { mutate: state.request };
   },

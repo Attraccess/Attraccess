@@ -15,13 +15,13 @@ const state = vi.hoisted(() => ({
   setLanguage: vi.fn(),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useEmailLayoutServiceEmailLayoutControllerFindGlobal: () => ({
+  useEmailLayoutControllerFindGlobal: () => ({
     data: state.body ? { body: state.body } : undefined,
     isError: state.error,
     refetch: state.refetch,
   }),
-  useEmailLayoutServiceEmailLayoutControllerUpdate: () => ({ mutate: state.update }),
-  useEmailLayoutServiceEmailLayoutControllerResetToDefault: () => ({ mutate: state.reset }),
+  useEmailLayoutControllerUpdate: () => ({ mutate: state.update }),
+  useEmailLayoutControllerResetToDefault: () => ({ mutate: state.reset }),
 }));
 vi.mock('@attraccess/ui', () => ({ useAppTheme: () => ({ resolvedTheme: 'dark' }) }));
 vi.mock('../../components/toastProvider', () => ({
@@ -104,7 +104,7 @@ it('preserves the placeholder and applies styles to the saved full document', as
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   expect(state.update).toHaveBeenCalledWith(
     {
-      requestBody: {
+      body: {
         body: '<mjml><mj-head><mj-title>New brand</mj-title></mj-head><mj-body>{{content}}</mj-body></mjml>',
       },
     },

@@ -12,7 +12,7 @@ vi.mock('../../operatingDuration', () => ({
 }));
 vi.mock('../../../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: () => canConfigure() }) }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourcesServiceResourceOperatingDiagnosticsGetDataQuality: (...args: unknown[]) => getDataQuality(...args),
+  useResourceOperatingDiagnosticsGetDataQuality: (...args: unknown[]) => getDataQuality(...args),
 }));
 
 describe('OperatingDurationCard', () => {
@@ -63,7 +63,7 @@ describe('OperatingDurationCard', () => {
     expect(screen.getByText('Operating data unavailable')).toBeInTheDocument();
     expect(screen.queryByText('Tracking not configured')).not.toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
-    expect(getDataQuality).toHaveBeenCalledWith({ resourceId: 11 }, undefined, { enabled: false });
+    expect(getDataQuality).toHaveBeenCalledWith({ path: { resourceId: 11 } }, undefined, { enabled: false });
   });
 
   it('retains provisional live values and removes the missing data explanation', () => {
@@ -81,7 +81,7 @@ describe('OperatingDurationCard', () => {
     });
     render(<OperatingDurationCard resourceId={11} />);
     expect(screen.getByText('Live values are provisional.')).toBeInTheDocument();
-    expect(getDataQuality).toHaveBeenCalledWith({ resourceId: 11 }, undefined, { enabled: false });
+    expect(getDataQuality).toHaveBeenCalledWith({ path: { resourceId: 11 } }, undefined, { enabled: false });
     expect(screen.getByText('0:00:30')).toBeInTheDocument();
     expect(screen.getByText('Machine hours with a session')).toBeInTheDocument();
     expect(screen.getByText('0:01:00')).toBeInTheDocument();

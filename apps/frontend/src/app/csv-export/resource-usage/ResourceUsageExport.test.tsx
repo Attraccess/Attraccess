@@ -14,7 +14,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   AnalyticsService: {
     getResourceOperatingDurations: () => Object.assign(Promise.resolve({}), { cancel: vi.fn() }),
   },
-  useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite: () => ({
+  useGetResourceUsageHoursInDateRangeInfinite: () => ({
     data: { pages: [{ data: state.rows }] },
     status: 'success',
     fetchNextPage: vi.fn(),

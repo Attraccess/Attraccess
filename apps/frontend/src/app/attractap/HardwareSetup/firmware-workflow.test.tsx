@@ -14,11 +14,11 @@ const state = vi.hoisted(() => ({
   query: vi.fn(),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useAttractapServiceGetFirmwareBinary: (params: unknown) => {
+  useGetFirmwareBinary: (params: unknown) => {
     state.query(params);
     return { data: state.binary, isLoading: state.loading };
   },
-  useAttractapServiceGetFirmwares: () => ({ data: state.firmwares, isLoading: state.loading }),
+  useGetFirmwares: () => ({ data: state.firmwares, isLoading: state.loading }),
 }));
 vi.mock('../../../utils/esp-tools', () => ({
   ESPTools: { getInstance: () => ({ connectToDevice: state.connect, flashFirmware: state.flash }) },
@@ -78,7 +78,9 @@ it('shows download loading and does not flash a missing binary', () => {
   render(<FirmwareFlasher firmware={firmware} onCompleted={vi.fn()} />);
   fireEvent.click(screen.getByRole('button', { name: 'Install Now' }));
   expect(state.connect).not.toHaveBeenCalled();
-  expect(state.query).toHaveBeenCalledWith({ firmwareName: 'reader', variantName: 'standard', filename: 'reader.bin' });
+  expect(state.query).toHaveBeenCalledWith({
+    path: { firmwareName: 'reader', variantName: 'standard', filename: 'reader.bin' },
+  });
 });
 it('passes flash settings and terminal callbacks, reporting completion at 100 percent', async () => {
   const completed = vi.fn();
@@ -163,7 +165,7 @@ it('flashes only the plain image of a firmware that also ships unsigned secure-p
 
   expect(state.query).toHaveBeenCalled();
   for (const [params] of state.query.mock.calls) {
-    expect(params).toEqual({ firmwareName: 'reader', variantName: 'standard', filename: 'reader.bin' });
+    expect(params).toEqual({ path: { firmwareName: 'reader', variantName: 'standard', filename: 'reader.bin' } });
   }
   expect(state.flash).toHaveBeenCalledWith(expect.objectContaining({ firmware: state.binary }));
   expect(JSON.stringify([state.query.mock.calls, state.flash.mock.calls])).not.toMatch(/secure-(app|bootloader)/);

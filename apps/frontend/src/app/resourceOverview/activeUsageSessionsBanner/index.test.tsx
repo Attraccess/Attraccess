@@ -29,17 +29,20 @@ vi.mock('../../../utils/apiError', () => ({
   getTranslationKeyForApiError: () => ({ key: 'api.denied', errorMessage: 'Denied' }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourcesServiceGetAllResourcesKey: 'resources',
-  ResourcesService: { resourceUsageGetActiveSession: state.getActive },
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn: ({ resourceId }: { resourceId: number }) => [
+  useGetAllResourcesKey: 'resources',
+  UseGetAllResourcesKeyFn: (params: unknown) => ['resources', params],
+  resourceUsageGetActiveSession: async ({ path }: { path: { resourceId: number } }) => ({
+    data: await state.getActive(path),
+  }),
+  UseResourceUsageGetActiveSessionKeyFn: ({ path: { resourceId } }: { path: { resourceId: number } }) => [
     'active',
     resourceId,
   ],
-  useResourcesServiceGetAllResources: ({ limit }: { limit: number }) =>
+  useGetAllResources: ({ query: { limit } }: { query: { limit: number } }) =>
     limit === 1
       ? { data: { total: state.total }, isLoading: state.loading, refetch: state.refetch }
       : { data: { data: state.resources }, isLoading: state.listLoading },
-  useResourcesServiceResourceUsageEndSession: ({ onSuccess }: { onSuccess: typeof state.onSuccess }) => {
+  useResourceUsageEndSession: (_mutationKey: unknown, { onSuccess }: { onSuccess: typeof state.onSuccess }) => {
     state.onSuccess = onSuccess;
     return { mutateAsync: state.end };
   },
@@ -53,7 +56,7 @@ beforeEach(() => {
     { id: 1, name: 'Lathe' },
     { id: 2, name: 'Saw' },
   ];
-  state.end.mockImplementation(async ({ resourceId }: { resourceId: number }) => {
+  state.end.mockImplementation(async ({ path: { resourceId } }: { path: { resourceId: number } }) => {
     state.onSuccess?.({ resourceId });
   });
   // Each resource holds my session (user 1, usage id = resource id * 10) next to someone else's.
@@ -95,15 +98,15 @@ it('ends all sessions and invalidates both resource and active-session caches', 
   fireEvent.click(screen.getByRole('button', { name: 'endAll' }));
   fireEvent.click(await screen.findByRole('button', { name: 'modal.confirm' }));
   await screen.findByText('modal.completedTitle');
-  expect(state.end).toHaveBeenCalledWith({ resourceId: 1, requestBody: { usageId: 10 } });
-  expect(state.end).toHaveBeenCalledWith({ resourceId: 2, requestBody: { usageId: 20 } });
+  expect(state.end).toHaveBeenCalledWith({ path: { resourceId: 1 }, body: { usageId: 10 } });
+  expect(state.end).toHaveBeenCalledWith({ path: { resourceId: 2 }, body: { usageId: 20 } });
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['active', 1] });
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['resources'] });
   expect(state.refetch).toHaveBeenCalledOnce();
   expect(state.success).toHaveBeenCalledWith({ title: 'endedAll.success' });
 });
 it('keeps partial failures visible alongside successful resources', async () => {
-  state.end.mockImplementation(async ({ resourceId }: { resourceId: number }) => {
+  state.end.mockImplementation(async ({ path: { resourceId } }: { path: { resourceId: number } }) => {
     if (resourceId === 2) throw new Error('Denied');
     state.onSuccess?.({ resourceId });
   });
@@ -125,7 +128,7 @@ it('treats a resource where I no longer have a session as done without ending an
   fireEvent.click(screen.getByRole('button', { name: 'endAll' }));
   fireEvent.click(await screen.findByRole('button', { name: 'modal.confirm' }));
   await screen.findByText('modal.completedTitle');
-  expect(state.end).toHaveBeenCalledExactlyOnceWith({ resourceId: 1, requestBody: { usageId: 10 } });
+  expect(state.end).toHaveBeenCalledExactlyOnceWith({ path: { resourceId: 1 }, body: { usageId: 10 } });
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['active', 2] });
   expect(state.success).toHaveBeenCalledWith({ title: 'endedAll.success' });
 });

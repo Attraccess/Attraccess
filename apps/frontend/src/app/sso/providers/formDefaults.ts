@@ -1,4 +1,4 @@
-import { CreateSSOProviderDto, SSOProviderType } from '@attraccess/react-query-client';
+import { CreateSsoProviderDtoWritable, SsoProviderType } from '@attraccess/react-query-client';
 
 export const getDefaultOidcConfiguration = () => ({
   issuer: '',
@@ -32,17 +32,17 @@ export const getDefaultSamlConfiguration = () => ({
   spSigningPrivateKey: '',
 });
 
-export const defaultProviderValues: CreateSSOProviderDto = {
+export const defaultProviderValues: CreateSsoProviderDtoWritable = {
   name: '',
-  type: SSOProviderType.OIDC,
+  type: SsoProviderType.OIDC,
   oidcConfiguration: getDefaultOidcConfiguration(),
   samlConfiguration: getDefaultSamlConfiguration(),
 };
 
-export const ensureOidcConfiguration = (config?: CreateSSOProviderDto['oidcConfiguration']) =>
+export const ensureOidcConfiguration = (config?: CreateSsoProviderDtoWritable['oidcConfiguration']) =>
   config ?? getDefaultOidcConfiguration();
 
-export const ensureSamlConfiguration = (config?: CreateSSOProviderDto['samlConfiguration']) =>
+export const ensureSamlConfiguration = (config?: CreateSsoProviderDtoWritable['samlConfiguration']) =>
   config ?? getDefaultSamlConfiguration();
 
 export const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

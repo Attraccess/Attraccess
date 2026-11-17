@@ -1,14 +1,14 @@
 import { Spinner } from '@heroui/react';
 import { Button, StatusAlert, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  useAttractapServiceCheckRecoveryKey,
-  useAttractapServiceCreateSecureBootKeys,
-  useAttractapServiceDownloadRecoveryKey,
-  useAttractapServiceDownloadSigningKeyBackup,
-  useAttractapServiceGetSecureBootKeys,
-  useAttractapServiceGetSecureBootKeysKey,
-  useAttractapServiceRestoreSecureBootKeys,
-  useLicenseServiceGetLicenseInformation,
+  useCheckRecoveryKey,
+  useCreateSecureBootKeys,
+  useDownloadRecoveryKey,
+  useDownloadSigningKeyBackup,
+  useGetSecureBootKeys,
+  useGetSecureBootKeysKey,
+  useRestoreSecureBootKeys,
+  useGetLicenseInformation,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -32,36 +32,36 @@ export function ReaderSecuritySection() {
   const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
-  const { data: license } = useLicenseServiceGetLicenseInformation();
-  const { data: keys, isLoading, isError, refetch } = useAttractapServiceGetSecureBootKeys();
+  const { data: license } = useGetLicenseInformation();
+  const { data: keys, isLoading, isError, refetch } = useGetSecureBootKeys();
   const [dialog, setDialog] = useState<KeyDialog>(null);
   const once = useSingleFlight();
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: [useAttractapServiceGetSecureBootKeysKey] });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: [useGetSecureBootKeysKey] });
   const done = (title: string) => {
     toast.success({ title });
     setDialog(null);
     void refresh();
   };
 
-  const create = useAttractapServiceCreateSecureBootKeys({
+  const create = useCreateSecureBootKeys(undefined, {
     onSuccess: () => done(t('toast.created')),
     onError: (error) => toast.error({ title: t('error'), description: apiErrorMessage(error) }),
   });
-  const downloadRecovery = useAttractapServiceDownloadRecoveryKey({
+  const downloadRecovery = useDownloadRecoveryKey(undefined, {
     onSuccess: (file) => {
       triggerDownload(file.pem, 'attraccess-recovery-key.pem', 'application/x-pem-file');
       done(t('toast.recoveryDownloaded'));
     },
   });
-  const downloadBackup = useAttractapServiceDownloadSigningKeyBackup({
+  const downloadBackup = useDownloadSigningKeyBackup(undefined, {
     onSuccess: (file) => {
       triggerDownload(file.pem, 'attraccess-signing-key-backup.pem', 'application/x-pem-file');
       done(t('toast.backupDownloaded'));
     },
   });
-  const check = useAttractapServiceCheckRecoveryKey({ onSuccess: () => done(t('toast.recoveryVerified')) });
-  const restore = useAttractapServiceRestoreSecureBootKeys({ onSuccess: () => done(t('toast.restored')) });
+  const check = useCheckRecoveryKey(undefined, { onSuccess: () => done(t('toast.recoveryVerified')) });
+  const restore = useRestoreSecureBootKeys(undefined, { onSuccess: () => done(t('toast.restored')) });
 
   // A dialog opens clean: an error from an earlier attempt must not greet the next one.
   const openDialog = (next: KeyDialog) => {
@@ -125,7 +125,7 @@ export function ReaderSecuritySection() {
         isPending={downloadRecovery.isPending}
         error={downloadRecovery.error}
         onClose={() => setDialog(null)}
-        onSubmit={(passphrase) => once(() => downloadRecovery.mutateAsync({ requestBody: { passphrase } }))}
+        onSubmit={(passphrase) => once(() => downloadRecovery.mutateAsync({ body: { passphrase } }))}
       />
       <PassphraseDialog
         key={`backup-${dialog === 'backup'}`}
@@ -134,7 +134,7 @@ export function ReaderSecuritySection() {
         isPending={downloadBackup.isPending}
         error={downloadBackup.error}
         onClose={() => setDialog(null)}
-        onSubmit={(passphrase) => once(() => downloadBackup.mutateAsync({ requestBody: { passphrase } }))}
+        onSubmit={(passphrase) => once(() => downloadBackup.mutateAsync({ body: { passphrase } }))}
       />
       <KeyFileDialog
         key={`check-${dialog === 'check'}`}
@@ -143,7 +143,7 @@ export function ReaderSecuritySection() {
         isPending={check.isPending}
         error={check.error}
         onClose={() => setDialog(null)}
-        onSubmit={({ pem, passphrase }) => once(() => check.mutateAsync({ requestBody: { pem, passphrase } }))}
+        onSubmit={({ pem, passphrase }) => once(() => check.mutateAsync({ body: { pem, passphrase } }))}
       />
       <KeyFileDialog
         key={`restore-${dialog === 'restore'}`}
@@ -153,7 +153,7 @@ export function ReaderSecuritySection() {
         isPending={restore.isPending}
         error={restore.error}
         onClose={() => setDialog(null)}
-        onSubmit={(requestBody) => once(() => restore.mutateAsync({ requestBody }))}
+        onSubmit={(requestBody) => once(() => restore.mutateAsync({ body: requestBody }))}
       />
       <StatusDialog
         isOpen={dialog === 'regenerate'}

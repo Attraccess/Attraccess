@@ -3,9 +3,9 @@ import { TlsSection } from './TlsSection';
 import { Select } from '../../../components/select/index';
 import {
   MqttServer,
-  useMqttServiceMqttServersCreateOne,
+  useMqttServersCreateOne,
   CreateMqttServerDto,
-  useMqttServiceMqttServersGetAllKey,
+  useMqttServersGetAllKey,
 } from '@attraccess/react-query-client';
 import { Button, LabeledSwitch, PasswordInput, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { MqttManagementPort, parseManagementPort } from './managementPort';
@@ -44,14 +44,14 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerFormProps>
     defaultSubscribeQos: 0,
   });
 
-  const createMqttServer = useMqttServiceMqttServersCreateOne({
+  const createMqttServer = useMqttServersCreateOne(undefined, {
     onSuccess: (server) => {
       toast.success({
         title: t('serverCreated'),
         description: t('serverCreatedDesc'),
       });
       queryClient.invalidateQueries({
-        queryKey: [useMqttServiceMqttServersGetAllKey],
+        queryKey: [useMqttServersGetAllKey],
       });
       onSuccess?.(server);
     },
@@ -67,7 +67,7 @@ export function CreateMqttServerForm(props?: Readonly<CreateMqttServerFormProps>
     e.preventDefault();
     if (managementPort === undefined) return;
     const requestBody: CreateMqttServerDto & MqttManagementPort = { ...formValues, managementPort };
-    createMqttServer.mutate({ requestBody });
+    createMqttServer.mutate({ body: requestBody });
   };
 
   const qosOptions = [0, 1, 2] as const;

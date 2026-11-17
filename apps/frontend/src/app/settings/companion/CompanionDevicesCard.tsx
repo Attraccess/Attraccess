@@ -9,11 +9,7 @@ import {
   TableScrollContainer,
 } from '@heroui/react';
 import { EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  CompanionDevice,
-  useCompanionDevicesServiceListCompanionDevices,
-  useCompanionServiceGetCompanionVersions,
-} from '@attraccess/react-query-client';
+import { CompanionDevice, useListCompanionDevices, useGetCompanionVersions } from '@attraccess/react-query-client';
 import { DeviceRow } from './DeviceRow';
 import en from './en.json';
 import de from './de.json';
@@ -25,10 +21,10 @@ interface CompanionDevicesCardProps {
 
 export function CompanionDevicesCard({ onRenameStart, onDeleteStart }: CompanionDevicesCardProps) {
   const { t } = useTranslations({ en, de });
-  const { data: devices, isLoading: devicesLoading } = useCompanionDevicesServiceListCompanionDevices(undefined, {
+  const { data: devices, isLoading: devicesLoading } = useListCompanionDevices({}, undefined, {
     refetchInterval: 30000,
   });
-  const { data: manifest } = useCompanionServiceGetCompanionVersions();
+  const { data: manifest } = useGetCompanionVersions();
   return (
     <Card>
       <Card.Header className="flex flex-col items-start gap-1">

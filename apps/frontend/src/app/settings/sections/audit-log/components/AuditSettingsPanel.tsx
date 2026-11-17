@@ -4,10 +4,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { LabeledSwitch, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   AuditSettingsDto,
-  UseAuditServiceAuditControllerListKeyFn,
-  UseSettingsServiceSettingsControllerGetAuditSettingsKeyFn,
-  useSettingsServiceSettingsControllerGetAuditSettings,
-  useSettingsServiceSettingsControllerUpdateAuditSettings,
+  UseAuditControllerListKeyFn,
+  UseSettingsControllerGetAuditSettingsKeyFn,
+  useSettingsControllerGetAuditSettings,
+  useSettingsControllerUpdateAuditSettings,
 } from '@attraccess/react-query-client';
 import { SettingsSaveBar } from '../../../components/SettingsSaveBar';
 import { coreAuditDomains, pluginDomains, toggleDomain, togglePluginDomain } from '../audit-log-model';
@@ -22,16 +22,16 @@ export function AuditSettingsPanel() {
   const domainLabel = useAuditDomainLabel();
   const meta = useAuditLogMeta();
   const pluginDomainEntries = pluginDomains(meta.data);
-  const settings = useSettingsServiceSettingsControllerGetAuditSettings();
+  const settings = useSettingsControllerGetAuditSettings();
   const [draft, setDraft] = useState<AuditSettingsDto>();
   const [saved, setSaved] = useState(false);
   const currentSettings = draft ?? settings.data;
-  const saveSettings = useSettingsServiceSettingsControllerUpdateAuditSettings({
+  const saveSettings = useSettingsControllerUpdateAuditSettings(undefined, {
     onSuccess: (next) => {
-      client.setQueryData(UseSettingsServiceSettingsControllerGetAuditSettingsKeyFn(), next);
+      client.setQueryData(UseSettingsControllerGetAuditSettingsKeyFn(), next);
       setDraft(undefined);
       setSaved(true);
-      void client.invalidateQueries({ queryKey: UseAuditServiceAuditControllerListKeyFn() });
+      void client.invalidateQueries({ queryKey: UseAuditControllerListKeyFn() });
     },
   });
   const editSettings = (next: AuditSettingsDto) => {
@@ -130,7 +130,7 @@ export function AuditSettingsPanel() {
                 currentSettings.retention_days < 1 ||
                 currentSettings.retention_days > 3650
               }
-              onSave={() => saveSettings.mutate({ requestBody: currentSettings })}
+              onSave={() => saveSettings.mutate({ body: currentSettings })}
               onDiscard={() => {
                 setDraft(undefined);
                 saveSettings.reset();

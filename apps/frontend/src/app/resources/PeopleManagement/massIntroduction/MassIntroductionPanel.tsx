@@ -22,8 +22,8 @@ import {
   MassIntroductionReaderDto,
   MassIntroductionReaderState,
   MassIntroductionSessionDto,
-  useAttractapServiceGetResourceAttractaps,
-  useAttractapServiceGetResourceGroupAttractaps,
+  useGetResourceAttractaps,
+  useGetResourceGroupAttractaps,
 } from '@attraccess/react-query-client';
 import { AttractapSelect } from '../../../attractap/AttractapSelect';
 import { massIntroductionUrl } from '../../../mass-introduction/MassIntroductionRedeemModal';
@@ -92,10 +92,10 @@ function SetupStep({ target, setup, onSetupChange }: Readonly<SetupStepProps>) {
   const { t } = useTranslations({ en, de });
   // Only readers linked to the resource (or a resource of the group) may show the scan screen.
   const isResource = target.type === 'resource';
-  const resourceReaders = useAttractapServiceGetResourceAttractaps({ resourceId: target.id }, undefined, {
+  const resourceReaders = useGetResourceAttractaps({ path: { resourceId: target.id } }, undefined, {
     enabled: setup.useReader && isResource,
   });
-  const groupReaders = useAttractapServiceGetResourceGroupAttractaps({ groupId: target.id }, undefined, {
+  const groupReaders = useGetResourceGroupAttractaps({ path: { groupId: target.id } }, undefined, {
     enabled: setup.useReader && !isResource,
   });
   const linkedReaderIds = (isResource ? resourceReaders : groupReaders).data?.map((reader) => reader.id);

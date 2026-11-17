@@ -19,7 +19,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourcesServiceGetOneResourceById: () => ({
+  useGetOneResourceById: () => ({
     data: hoisted.resource,
     isLoading: false,
     isError: false,

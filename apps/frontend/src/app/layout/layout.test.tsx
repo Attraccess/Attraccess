@@ -17,8 +17,8 @@ vi.mock('../../hooks/useAuth', () => ({
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useBillingServiceGetBillingTransactionsKey: 'transactions',
-  UseBillingServiceGetBillingBalanceKeyFn: ({ userId }: { userId: number }) => ['balance', userId],
+  useGetBillingTransactionsKey: 'transactions',
+  UseGetBillingBalanceKeyFn: ({ path: { userId } }: { path: { userId: number } }) => ['balance', userId],
 }));
 vi.mock('../billing/dashboard/summary/live-updates', () => ({
   useLiveTransactionUpdates: (options: typeof state.live) => {

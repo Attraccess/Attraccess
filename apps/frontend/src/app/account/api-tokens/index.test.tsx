@@ -53,10 +53,10 @@ vi.mock('../../../components/permissionPicker', () => ({
   ),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useRbacServiceListPermissions: () => ({
+  useListPermissions: () => ({
     data: [{ key: 'resources.view' }, { key: 'users.delete' }, { key: 'matter.devices.read', pluginName: 'matter' }],
   }),
-  useApiTokensServiceListApiTokens: (params: unknown) => {
+  useListApiTokens: (params: unknown) => {
     state.query(params);
     return {
       data: { data: state.tokens, total: state.total },
@@ -65,8 +65,8 @@ vi.mock('@attraccess/react-query-client', () => ({
       refetch: state.refetch,
     };
   },
-  useApiTokensServiceCreateApiToken: () => ({ mutateAsync: state.create }),
-  useApiTokensServiceRevokeApiToken: () => ({ mutateAsync: state.revoke }),
+  useCreateApiToken: () => ({ mutateAsync: state.create }),
+  useRevokeApiToken: () => ({ mutateAsync: state.revoke }),
 }));
 beforeEach(() => {
   vi.clearAllMocks();
@@ -105,7 +105,7 @@ it('creates a scoped token, exposes its secret once and copies it', async () => 
   fireEvent.click(screen.getByRole('button', { name: 'actions.create' }));
   expect(await screen.findByDisplayValue('secret-token')).toBeTruthy();
   expect(state.create).toHaveBeenCalledWith({
-    requestBody: { name: 'Integration', permissionKeys: ['resources.view'], expiresAt: undefined },
+    body: { name: 'Integration', permissionKeys: ['resources.view'], expiresAt: undefined },
   });
   expect(state.refetch).toHaveBeenCalledOnce();
   expect(screen.getByLabelText('nameLabel')).toHaveValue('');
@@ -132,7 +132,7 @@ it('keeps form input after creation fails', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'actions.create' }));
   await waitFor(() => expect(state.toast).toHaveBeenCalledWith({ title: 'errors.createFailed', type: 'error' }));
   expect(state.create).toHaveBeenCalledWith({
-    requestBody: {
+    body: {
       name: 'Integration',
       permissionKeys: ['resources.view'],
       expiresAt: new Date('2027-01-01T00:00:00').toISOString(),
@@ -172,7 +172,7 @@ it('blocks token creation with incomplete expiry segments and allows completion 
   await user.click(create);
   await waitFor(() =>
     expect(state.create).toHaveBeenCalledWith({
-      requestBody: {
+      body: {
         name: 'Integration',
         permissionKeys: ['resources.view'],
         expiresAt: new Date('2026-11-24T00:00:00').toISOString(),
@@ -186,7 +186,7 @@ it('blocks token creation with incomplete expiry segments and allows completion 
   await user.click(create);
   await waitFor(() =>
     expect(state.create).toHaveBeenLastCalledWith({
-      requestBody: { name: 'Integration', permissionKeys: ['resources.view'], expiresAt: undefined },
+      body: { name: 'Integration', permissionKeys: ['resources.view'], expiresAt: undefined },
     }),
   );
 });
@@ -202,7 +202,7 @@ it('shows token permissions and dates and handles revocation outcomes', async ()
   expect(screen.getByText('2026-09-01')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'actions.revoke:Integration' }));
   await waitFor(() => expect(state.toast).toHaveBeenCalledWith({ title: 'success.revoked', type: 'success' }));
-  expect(state.revoke).toHaveBeenCalledWith({ id: 1 });
+  expect(state.revoke).toHaveBeenCalledWith({ path: { id: 1 } });
   expect(state.refetch).toHaveBeenCalledOnce();
   state.revoke.mockRejectedValue(new Error('Unavailable'));
   fireEvent.click(screen.getByRole('button', { name: 'actions.revoke:Other' }));
@@ -217,7 +217,7 @@ it('offers plugin permission keys the owner holds and scopes a token to them', a
   fireEvent.click(screen.getByRole('button', { name: 'actions.create' }));
   await waitFor(() =>
     expect(state.create).toHaveBeenCalledWith({
-      requestBody: { name: 'Matter export', permissionKeys: ['matter.devices.read'], expiresAt: undefined },
+      body: { name: 'Matter export', permissionKeys: ['matter.devices.read'], expiresAt: undefined },
     }),
   );
 });

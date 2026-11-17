@@ -3,9 +3,9 @@ import en from './en.json';
 import de from './de.json';
 import {
   Currency,
-  useBillingServiceGetBillingConfiguration,
-  useBillingServiceGetBillingConfigurationKey,
-  useBillingServiceSetBillingConfiguration,
+  useGetBillingConfiguration,
+  useGetBillingConfigurationKey,
+  useSetBillingConfiguration,
 } from '@attraccess/react-query-client';
 import { Form } from '@heroui/react';
 import { ComponentPropsWithoutRef, useCallback, useEffect, useRef, useState } from 'react';
@@ -32,8 +32,8 @@ export function CurrencyCard(props: Omit<ComponentPropsWithoutRef<'section'>, 'c
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { data: configuration } = useBillingServiceGetBillingConfiguration();
-  const { mutate: setConfiguration, isPending: isPendingSetConfiguration } = useBillingServiceSetBillingConfiguration({
+  const { data: configuration } = useGetBillingConfiguration();
+  const { mutate: setConfiguration, isPending: isPendingSetConfiguration } = useSetBillingConfiguration(undefined, {
     onError: (error: Error) => {
       toast.apiError({
         error,
@@ -49,7 +49,7 @@ export function CurrencyCard(props: Omit<ComponentPropsWithoutRef<'section'>, 'c
       });
 
       queryClient.invalidateQueries({
-        queryKey: [useBillingServiceGetBillingConfigurationKey],
+        queryKey: [useGetBillingConfigurationKey],
       });
     },
   });
@@ -68,7 +68,7 @@ export function CurrencyCard(props: Omit<ComponentPropsWithoutRef<'section'>, 'c
     }
 
     setConfiguration({
-      requestBody: {
+      body: {
         currency,
       },
     });

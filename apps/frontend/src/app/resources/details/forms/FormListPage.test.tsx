@@ -19,7 +19,7 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock('react-router-dom', () => ({ useParams: () => ({ id: state.id }), useNavigate: () => state.navigate }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourceFormsServiceResourceFormsList: (...args: unknown[]) => {
+  useResourceFormsList: (...args: unknown[]) => {
     state.query(...args);
     return { data: state.forms, isLoading: state.loading, isFetched: state.fetched };
   },
@@ -34,7 +34,7 @@ beforeEach(() => {
 afterEach(cleanup);
 it('scopes the query and navigates to create a form from the empty state', () => {
   render(<FormListPage />);
-  expect(state.query).toHaveBeenCalledWith({ resourceId: 7 }, undefined, { enabled: true });
+  expect(state.query).toHaveBeenCalledWith({ path: { resourceId: 7 } }, undefined, { enabled: true });
   expect(screen.getByText(/No forms yet/)).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Create form' }));
   expect(state.navigate).toHaveBeenCalledWith('/resources/7/forms/new');
@@ -71,7 +71,7 @@ it('does not show an empty result while loading and disables invalid resource qu
   state.loading = true;
   state.fetched = false;
   const { container } = render(<FormListPage />);
-  expect(state.query).toHaveBeenCalledWith({ resourceId: NaN }, undefined, { enabled: false });
+  expect(state.query).toHaveBeenCalledWith({ path: { resourceId: NaN } }, undefined, { enabled: false });
   expect(screen.queryByText(/No forms yet/)).toBeNull();
   expect(container.querySelector('.spinner')).toBeTruthy();
 });

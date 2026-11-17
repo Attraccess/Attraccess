@@ -44,14 +44,14 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useUsersServiceInviteUser: (options?: { onSuccess?: () => void }) => ({
+  useInviteUser: (_mutationKey: unknown, options?: { onSuccess?: () => void }) => ({
     mutate: (payload: unknown) => {
       mutateMock(payload);
       options?.onSuccess?.();
     },
     isPending: false,
   }),
-  useUsersServiceFindManyKey: 'useUsersServiceFindManyKey',
+  useFindManyKey: 'useFindManyKey',
   ApiError: class ApiError extends Error {},
 }));
 
@@ -106,7 +106,7 @@ describe('InviteUserModal', () => {
     await user.click(screen.getByRole('button', { name: 'Invite' }));
 
     expect(mutateMock).toHaveBeenCalledWith({
-      requestBody: {
+      body: {
         username: 'Jane_Doe',
         email: 'test@example.com',
       },

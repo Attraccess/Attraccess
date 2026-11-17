@@ -11,10 +11,10 @@ const state = vi.hoisted(() => ({
 
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useAttractapServiceGetReaderById: () => ({ data: state.reader }),
-  useAttractapServiceGetReadersKey: 'readers',
-  UseAttractapServiceGetReaderByIdKeyFn: () => ['reader'],
-  useAttractapServiceUpdateReader: () => ({ mutate: state.mutate, isPending: false }),
+  useGetReaderById: () => ({ data: state.reader }),
+  useGetReadersKey: 'readers',
+  UseGetReaderByIdKeyFn: () => ['reader'],
+  useUpdateReader: () => ({ mutate: state.mutate, isPending: false }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -90,8 +90,8 @@ describe('AttractapEditor plugin Bluetooth opt-in', () => {
     fireEvent.click(screen.getByRole('switch', { name: 'allowPluginBle' }));
     fireEvent.click(screen.getByRole('button', { name: 'save' }));
     expect(state.mutate).toHaveBeenCalledWith({
-      readerId: 1,
-      requestBody: expect.objectContaining({ name: 'Door', allowPluginBle: true }),
+      path: { readerId: 1 },
+      body: expect.objectContaining({ name: 'Door', allowPluginBle: true }),
     });
   });
 
@@ -101,8 +101,8 @@ describe('AttractapEditor plugin Bluetooth opt-in', () => {
     fireEvent.change(screen.getByPlaceholderText('enterReaderName'), { target: { value: 'Front door' } });
     fireEvent.click(screen.getByRole('button', { name: 'save' }));
     expect(state.mutate).toHaveBeenCalledTimes(1);
-    const [{ requestBody }] = state.mutate.mock.calls[0];
-    expect(requestBody).toEqual(expect.objectContaining({ name: 'Front door' }));
-    expect(requestBody).not.toHaveProperty('allowPluginBle');
+    const [{ body }] = state.mutate.mock.calls[0];
+    expect(body).toEqual(expect.objectContaining({ name: 'Front door' }));
+    expect(body).not.toHaveProperty('allowPluginBle');
   });
 });

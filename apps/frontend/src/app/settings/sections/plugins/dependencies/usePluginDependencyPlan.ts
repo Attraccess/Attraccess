@@ -1,4 +1,4 @@
-import { usePluginsServicePluginControllerDependencyPlan } from '@attraccess/react-query-client';
+import { usePluginControllerDependencyPlan } from '@attraccess/react-query-client';
 
 interface DependencyPlanRequest {
   packageName: string;
@@ -16,8 +16,11 @@ export function usePluginDependencyPlan(
   request: DependencyPlanRequest | undefined,
   { reuseResolvedPlan }: Options = {},
 ) {
-  return usePluginsServicePluginControllerDependencyPlan(
-    { packageName: request?.packageName ?? '', spec: request?.spec, registryId: request?.registryId },
+  return usePluginControllerDependencyPlan(
+    {
+      path: { packageName: request?.packageName ?? '' },
+      query: { spec: request?.spec, registryId: request?.registryId },
+    },
     undefined,
     { enabled: request !== undefined, staleTime: reuseResolvedPlan ? Infinity : 0, retry: false },
   );

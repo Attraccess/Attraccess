@@ -35,8 +35,8 @@ vi.mock('@tanstack/react-query', () => ({
   }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useUsersServiceGetCurrentKey: 'current-user',
-  useUsersServiceConfirmDeleteAccount: (options: typeof state.options) => {
+  useGetCurrentKey: 'current-user',
+  useConfirmDeleteAccount: (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
     return { mutate: state.mutate, isPending: state.pending };
   },
@@ -105,7 +105,7 @@ it('sends one request with the link parameters on confirm', () => {
   mount();
   press('confirm.action');
   expect(state.mutate).toHaveBeenCalledExactlyOnceWith({
-    requestBody: { token: 'one-use-token', email: 'user@example.com' },
+    body: { token: 'one-use-token', email: 'user@example.com' },
   });
 });
 
@@ -159,9 +159,7 @@ it.each([
   expect(screen.getByText(message)).toBeTruthy();
   press('error.tryAgain');
   expect(state.mutate).toHaveBeenCalledTimes(2);
-  expect(state.mutate).toHaveBeenLastCalledWith({
-    requestBody: { token: 'one-use-token', email: 'user@example.com' },
-  });
+  expect(state.mutate).toHaveBeenLastCalledWith({ body: { token: 'one-use-token', email: 'user@example.com' } });
   act(() => state.options.onSuccess());
   expect(screen.getByText('success.title')).toBeTruthy();
 });

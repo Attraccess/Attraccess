@@ -13,7 +13,7 @@ import {
   NodeTypes,
   NodeProps,
 } from '@xyflow/react';
-import { ResourceFlowLog, useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
+import { ResourceFlowLog, useGetOneResourceById } from '@attraccess/react-query-client';
 import { useLiveLogs } from '../liveLogs';
 import { FlowOwner, useFlowNodeSchemasQuery } from '../flowOwner';
 import { AttraccessNode } from '../node/index';
@@ -31,8 +31,8 @@ export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [validationErrors, setValidationErrorsState] = useState<Record<string, string>>({});
-  const { data: resource } = useResourcesServiceGetOneResourceById(
-    { id: owner.kind === 'resource' ? owner.resourceId : 0 },
+  const { data: resource } = useGetOneResourceById(
+    { path: { id: owner.kind === 'resource' ? owner.resourceId : 0 } },
     undefined,
     { enabled: owner.kind === 'resource' },
   );

@@ -50,10 +50,10 @@ vi.mock('../../utils/live-updates', () => ({ resumeLiveUpdates: vi.fn(), stopLiv
 vi.mock('@attraccess/react-query-client', async () => {
   const { useMutation } = await import('@tanstack/react-query');
   return {
-    UseUsersServiceGetCurrentKeyFn: () => ['current-user'],
-    useAuthenticationServiceCreateSession: (options: { onSuccess?: () => void }) => {
+    UseGetCurrentKeyFn: () => ['current-user'],
+    useCreateSession: (_mutationKey: unknown, options: { onSuccess?: () => void }) => {
       const mutation = useMutation({
-        mutationFn: (data: { requestBody: unknown }) => loginMock(data.requestBody),
+        mutationFn: (data: { body: unknown }) => loginMock(data.body),
         onSuccess: options.onSuccess,
       });
       return { ...mutation, isPending: mutation.isPending || pending.login, error: mutation.error ?? loginError };
@@ -65,14 +65,14 @@ vi.mock('@attraccess/react-query-client', async () => {
         this.body = body;
       }
     },
-    useUsersServiceIsLocalSignupEnabled: () => ({
+    useIsLocalSignupEnabled: () => ({
       data: { value: signup.enabled },
       isLoading: false,
     }),
-    useUsersServiceResendVerificationEmail: (options: {
-      onSuccess?: () => void;
-      onError?: (error: unknown) => void;
-    }) => {
+    useResendVerificationEmail: (
+      _mutationKey: unknown,
+      options: { onSuccess?: () => void; onError?: (error: unknown) => void },
+    ) => {
       resendOnSuccess = options?.onSuccess;
       resendOnError = options?.onError;
       return { mutate: resendMutateMock, isPending: pending.resend };
@@ -242,9 +242,7 @@ describe('LoginForm – resend verification email', () => {
     await user.type(input, 'test@example.com');
     await user.click(screen.getByTestId('resend-verification-button'));
 
-    expect(resendMutateMock).toHaveBeenCalledWith({
-      requestBody: { email: 'test@example.com' },
-    });
+    expect(resendMutateMock).toHaveBeenCalledWith({ body: { email: 'test@example.com' } });
   });
 
   it('resend button is disabled when email is empty', () => {
@@ -283,9 +281,7 @@ describe('LoginForm – resend verification email', () => {
     await user.type(input, '  test@example.com  ');
     await user.click(screen.getByTestId('resend-verification-button'));
 
-    expect(resendMutateMock).toHaveBeenCalledWith({
-      requestBody: { email: 'test@example.com' },
-    });
+    expect(resendMutateMock).toHaveBeenCalledWith({ body: { email: 'test@example.com' } });
   });
 
   it('renders the resend error alert when the mutation fails', async () => {

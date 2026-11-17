@@ -6,9 +6,9 @@ import { Link } from 'react-router-dom';
 import { SendIcon, BoxIcon, XIcon } from 'lucide-react';
 import {
   MessageReferenceType,
-  useMessagingServiceMessagingListMessages,
-  useMessagingServiceMessagingSendMessage,
-  useResourcesServiceGetOneResourceById,
+  useMessagingListMessages,
+  useMessagingSendMessage,
+  useGetOneResourceById,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -40,18 +40,16 @@ export function MessageThread(props: Props) {
     setAttachedResourceId(pendingResourceId);
   }, [pendingResourceId, conversationId]);
 
-  const { data: attachedResource } = useResourcesServiceGetOneResourceById(
-    { id: attachedResourceId as number },
-    undefined,
-    { enabled: !!attachedResourceId },
-  );
+  const { data: attachedResource } = useGetOneResourceById({ path: { id: attachedResourceId as number } }, undefined, {
+    enabled: !!attachedResourceId,
+  });
 
-  const { data, isLoading } = useMessagingServiceMessagingListMessages({ id: conversationId, page: 1, limit });
+  const { data, isLoading } = useMessagingListMessages({ path: { id: conversationId }, query: { page: 1, limit } });
 
   const messages = useMemo(() => (data ? [...data.data].reverse() : []), [data]);
   const hasOlder = data ? data.total > data.data.length : false;
 
-  const { mutate: sendMessage, isPending: isSending } = useMessagingServiceMessagingSendMessage({
+  const { mutate: sendMessage, isPending: isSending } = useMessagingSendMessage(undefined, {
     onSuccess: (created) => {
       setDraft('');
       setAttachedResourceId(undefined);
@@ -65,8 +63,8 @@ export function MessageThread(props: Props) {
       return;
     }
     sendMessage({
-      id: conversationId,
-      requestBody: attachedResourceId
+      path: { id: conversationId },
+      body: attachedResourceId
         ? { content, referenceType: MessageReferenceType.RESOURCE, referenceId: attachedResourceId }
         : { content },
     });

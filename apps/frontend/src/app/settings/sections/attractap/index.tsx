@@ -5,10 +5,10 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
   CardWriterSettingsDto,
-  useAttractapServiceGetCardWriterSettings,
-  UseAttractapServiceGetCardWriterSettingsKeyFn,
-  useAttractapServiceGetReaders,
-  useAttractapServiceUpdateCardWriterSettings,
+  useGetCardWriterSettings,
+  UseGetCardWriterSettingsKeyFn,
+  useGetReaders,
+  useUpdateCardWriterSettings,
 } from '@attraccess/react-query-client';
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsRow } from '../../components/SettingsRow';
@@ -34,8 +34,8 @@ export function AttractapSection() {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { data: settings, isLoading } = useAttractapServiceGetCardWriterSettings();
-  const { data: allReaders, isLoading: readersLoading } = useAttractapServiceGetReaders();
+  const { data: settings, isLoading } = useGetCardWriterSettings();
+  const { data: allReaders, isLoading: readersLoading } = useGetReaders();
   const readers = allReaders ? pairedReadersOnly(allReaders) : undefined;
 
   // A key absent from the draft means "untouched": the field then shows the server's value, so a
@@ -48,10 +48,10 @@ export function AttractapSection() {
   const savedReaderIds = existingOnly(settings?.readerIds ?? []);
   const readerIds = draft.readerIds ?? savedReaderIds;
 
-  const { mutate: save, isPending: isSaving } = useAttractapServiceUpdateCardWriterSettings({
+  const { mutate: save, isPending: isSaving } = useUpdateCardWriterSettings(undefined, {
     onSuccess(data) {
       toast.success({ title: t('success.title'), description: t('success.description') });
-      queryClient.setQueryData(UseAttractapServiceGetCardWriterSettingsKeyFn(), data);
+      queryClient.setQueryData(UseGetCardWriterSettingsKeyFn(), data);
       setDraft({});
     },
     onError(error: Error) {
@@ -138,7 +138,7 @@ export function AttractapSection() {
         isDirty={isDirty}
         isSaving={isSaving}
         isSaveDisabled={isSaveDisabled}
-        onSave={() => save({ requestBody: { mode, readerIds: mode === 'selected' ? readerIds : savedReaderIds } })}
+        onSave={() => save({ body: { mode, readerIds: mode === 'selected' ? readerIds : savedReaderIds } })}
         onDiscard={() => setDraft({})}
       />
     </SettingsSection>

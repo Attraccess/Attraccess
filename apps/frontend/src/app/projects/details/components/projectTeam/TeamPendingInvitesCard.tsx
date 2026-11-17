@@ -3,12 +3,12 @@ import { Card, Chip, Skeleton } from '@heroui/react';
 import {
   ApiError,
   ProjectInvitation,
-  ProjectsServiceCancelProjectInvitationMutationResult,
-  ProjectsServiceResendProjectInvitationMutationResult,
-  UseProjectsServiceListProjectInvitationsKeyFn,
-  useProjectsServiceCancelProjectInvitation,
-  useProjectsServiceListProjectInvitations,
-  useProjectsServiceResendProjectInvitation,
+  CancelProjectInvitationMutationResult,
+  ResendProjectInvitationMutationResult,
+  UseListProjectInvitationsKeyFn,
+  useCancelProjectInvitation,
+  useListProjectInvitations,
+  useResendProjectInvitation,
 } from '@attraccess/react-query-client';
 import { AttraccessUser, Button, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { RefreshCcwIcon, XIcon } from 'lucide-react';
@@ -36,7 +36,7 @@ export function TeamPendingInvitesCard(props: Readonly<TeamPendingInvitesCardPro
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
   });
 
-  const { data: invitations, isLoading } = useProjectsServiceListProjectInvitations({ id: projectId }, undefined, {
+  const { data: invitations, isLoading } = useListProjectInvitations({ path: { id: projectId } }, undefined, {
     enabled: isOwner,
   });
 
@@ -47,37 +47,37 @@ export function TeamPendingInvitesCard(props: Readonly<TeamPendingInvitesCardPro
 
   const invalidateInvitations = useCallback(async () => {
     await queryClient.invalidateQueries({
-      queryKey: UseProjectsServiceListProjectInvitationsKeyFn({ id: projectId }),
+      queryKey: UseListProjectInvitationsKeyFn({ path: { id: projectId } }),
     });
   }, [projectId, queryClient]);
 
-  const { mutateAsync: resendInvitation } = useProjectsServiceResendProjectInvitation<
-    ProjectsServiceResendProjectInvitationMutationResult,
-    ApiError
-  >({
-    onSuccess: () => {
-      toast.success({ title: t('success.resend') });
-      invalidateInvitations();
+  const { mutateAsync: resendInvitation } = useResendProjectInvitation<ResendProjectInvitationMutationResult, ApiError>(
+    undefined,
+    {
+      onSuccess: () => {
+        toast.success({ title: t('success.resend') });
+        invalidateInvitations();
+      },
+      onError: (error) => {
+        toast.apiError({ error, t, tExists, baseTranslationKey: 'api' });
+      },
+      onSettled: () => setResendingId(null),
     },
-    onError: (error) => {
-      toast.apiError({ error, t, tExists, baseTranslationKey: 'api' });
-    },
-    onSettled: () => setResendingId(null),
-  });
+  );
 
-  const { mutateAsync: cancelInvitation } = useProjectsServiceCancelProjectInvitation<
-    ProjectsServiceCancelProjectInvitationMutationResult,
-    ApiError
-  >({
-    onSuccess: () => {
-      toast.success({ title: t('success.cancel') });
-      invalidateInvitations();
+  const { mutateAsync: cancelInvitation } = useCancelProjectInvitation<CancelProjectInvitationMutationResult, ApiError>(
+    undefined,
+    {
+      onSuccess: () => {
+        toast.success({ title: t('success.cancel') });
+        invalidateInvitations();
+      },
+      onError: (error) => {
+        toast.apiError({ error, t, tExists, baseTranslationKey: 'api' });
+      },
+      onSettled: () => setCancellingId(null),
     },
-    onError: (error) => {
-      toast.apiError({ error, t, tExists, baseTranslationKey: 'api' });
-    },
-    onSettled: () => setCancellingId(null),
-  });
+  );
 
   if (!isOwner) {
     return null;
@@ -105,11 +105,11 @@ export function TeamPendingInvitesCard(props: Readonly<TeamPendingInvitesCardPro
         isLoadingCancel={cancellingId === invitation.id}
         onResend={async () => {
           setResendingId(invitation.id);
-          await resendInvitation({ id: projectId, invitationId: invitation.id });
+          await resendInvitation({ path: { id: projectId, invitationId: invitation.id } });
         }}
         onCancel={async () => {
           setCancellingId(invitation.id);
-          await cancelInvitation({ id: projectId, invitationId: invitation.id });
+          await cancelInvitation({ path: { id: projectId, invitationId: invitation.id } });
         }}
       />
     ));

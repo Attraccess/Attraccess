@@ -14,7 +14,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   useTranslations: () => ({ t: (key: string, values?: { name?: string }) => `${key}${values?.name ?? ''}` }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useAttractapServiceGetReaderById: (_params: unknown, _key: unknown, options: unknown) => {
+  useGetReaderById: (_params: unknown, _key: unknown, options: unknown) => {
     state.options = options;
     return { data: state.reader, error: state.error, isError: state.error !== null };
   },

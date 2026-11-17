@@ -9,7 +9,7 @@ import {
   Tabs,
   useOverlayState,
 } from '@heroui/react';
-import { ApiError, useUsersServiceFindManyKey, useUsersServiceInviteUser } from '@attraccess/react-query-client';
+import { ApiError, useFindManyKey, useInviteUser } from '@attraccess/react-query-client';
 import { CsvInvite } from './csv-invite/index';
 import { USERNAME_RULES, useUsernameValidation } from '../../../components/UsernameInput/index';
 import { SingleInviteForm } from './SingleInviteForm';
@@ -79,14 +79,14 @@ export function InviteUserModal({ children }: Readonly<Props>) {
       baseTranslationKey: 'api',
     });
 
-  const { mutate: inviteUser, isPending } = useUsersServiceInviteUser({
+  const { mutate: inviteUser, isPending } = useInviteUser(undefined, {
     onSuccess: () => {
       toast.success({
         title: t('success.title'),
         description: t('success.description'),
       });
       queryClient.invalidateQueries({
-        queryKey: [useUsersServiceFindManyKey],
+        queryKey: [useFindManyKey],
       });
       resetSingleInviteForm();
       close();
@@ -108,7 +108,7 @@ export function InviteUserModal({ children }: Readonly<Props>) {
     }
 
     inviteUser({
-      requestBody: {
+      body: {
         username: trimmedUsername,
         email: trimmedEmail,
       },

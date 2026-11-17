@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@heroui/react';
 import { DownloadIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { AuditService } from '@attraccess/react-query-client';
+import { auditControllerList } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
 import { auditCsv, exportAuditEntries, filterRequest } from '../audit-log-model';
 import { AuditLogFilterState } from '../useAuditLogFilterState';
@@ -28,7 +28,7 @@ export function AuditLogExportButton({ filterState, onExportError }: AuditLogExp
     onExportError(false);
     try {
       const entries = await exportAuditEntries(parsed.request ?? {}, (query) =>
-        AuditService.auditControllerList(query),
+        auditControllerList({ query, throwOnError: true }).then(({ data }) => data),
       );
       const url = URL.createObjectURL(new Blob([auditCsv(entries)], { type: 'text/csv;charset=utf-8' }));
       const link = document.createElement('a');

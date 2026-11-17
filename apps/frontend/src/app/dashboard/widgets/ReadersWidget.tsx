@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link } from '@heroui/react';
 import type { DashboardWidgetRenderProps } from '@attraccess/plugins-frontend-sdk';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useAttractapServiceGetReaders } from '@attraccess/react-query-client';
+import { useGetReaders } from '@attraccess/react-query-client';
 import { useNow } from '../../../hooks/useNow';
 import { pairedReadersOnly } from '../../attractap/cardWriting';
 import { isReaderStale } from '../../attractap/readerStaleness';
@@ -20,7 +20,7 @@ export function ReadersWidget({ size }: Readonly<DashboardWidgetRenderProps>) {
   const { t } = useTranslations({ en, de });
   const formatDateTime = useDateTimeFormatter();
   const now = useNow();
-  const { data: readers, isPending, isError } = useAttractapServiceGetReaders();
+  const { data: readers, isPending, isError } = useGetReaders();
 
   const { paired, stale } = useMemo(() => {
     const pairedReaders = pairedReadersOnly(readers);

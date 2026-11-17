@@ -27,8 +27,8 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
   };
   return {
     ApiError,
-    useAuthenticationServiceDiscoverAuthentikOidc: discovery,
-    useAuthenticationServiceDiscoverKeycloakOidc: discovery,
+    useDiscoverAuthentikOidc: discovery,
+    useDiscoverKeycloakOidc: discovery,
   };
 });
 const serverMessage = 'Discovery URL could not be reached: https://idp.example.test (ECONNREFUSED)';
@@ -61,10 +61,14 @@ describe.each([
     fireEvent.click(screen.getByRole('button', { name: 'discover' }));
     expect(state.refetch).not.toHaveBeenCalled();
     fill();
-    expect(state.query).toHaveBeenLastCalledWith({ host: 'https://idp.example.test', [field]: 'workshop' }, undefined, {
-      enabled: false,
-      retry: false,
-    });
+    expect(state.query).toHaveBeenLastCalledWith(
+      { query: { host: 'https://idp.example.test', [field]: 'workshop' } },
+      undefined,
+      {
+        enabled: false,
+        retry: false,
+      },
+    );
     fireEvent.click(screen.getByRole('button', { name: 'discover' }));
     await waitFor(() => expect(state.discovered).toHaveBeenCalledWith({ issuer: 'https://idp.example.test' }));
     expect(state.refetch).toHaveBeenCalledWith({ throwOnError: true });
@@ -87,7 +91,9 @@ describe.each([
     await open();
     fill();
     fireEvent.click(screen.getByRole('button', { name: 'discover' }));
-    await waitFor(() => expect(state.error).toHaveBeenCalledWith({ title: 'error.title', description, duration: 10000 }));
+    await waitFor(() =>
+      expect(state.error).toHaveBeenCalledWith({ title: 'error.title', description, duration: 10000 }),
+    );
     expect(state.discovered).not.toHaveBeenCalled();
     expect(state.success).not.toHaveBeenCalled();
     expect(screen.getByLabelText('host')).toHaveValue('https://idp.example.test');

@@ -29,10 +29,10 @@ import {
 } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
-  useGlobalFlowsServiceDeleteGlobalFlow,
-  useGlobalFlowsServiceListGlobalFlows,
-  useGlobalFlowsServiceListGlobalFlowsKey,
-  useGlobalFlowsServiceUpdateGlobalFlow,
+  useDeleteGlobalFlow,
+  useListGlobalFlows,
+  useListGlobalFlowsKey,
+  useUpdateGlobalFlow,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../hooks/useAuth';
 import { useToastMessage } from '../../components/toastProvider';
@@ -58,9 +58,9 @@ export function GlobalFlowsListPage() {
   const [flowToEdit, setFlowToEdit] = useState<ListedFlow | null>(null);
   const editModal = useOverlayState();
 
-  const { data: flows, isLoading, isError } = useGlobalFlowsServiceListGlobalFlows();
+  const { data: flows, isLoading, isError } = useListGlobalFlows();
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: [useGlobalFlowsServiceListGlobalFlowsKey] });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: [useListGlobalFlowsKey] });
   const onError = (error: unknown) =>
     toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' });
 
@@ -73,16 +73,16 @@ export function GlobalFlowsListPage() {
       else next.delete(flowId);
       return next;
     });
-  const update = useGlobalFlowsServiceUpdateGlobalFlow({
+  const update = useUpdateGlobalFlow(undefined, {
     onSuccess: refresh,
     onError,
-    onSettled: (_data, _error, variables) => markSaving(variables.flowId, false),
+    onSettled: (_data, _error, variables) => markSaving(variables.path.flowId, false),
   });
   const setEnabled = (flowId: number, enabled: boolean) => {
     markSaving(flowId, true);
-    update.mutate({ flowId, requestBody: { enabled } });
+    update.mutate({ path: { flowId }, body: { enabled } });
   };
-  const remove = useGlobalFlowsServiceDeleteGlobalFlow({
+  const remove = useDeleteGlobalFlow(undefined, {
     onSuccess: () => {
       void refresh();
       toast.success({ title: t('list.deleted') });
@@ -222,7 +222,7 @@ export function GlobalFlowsListPage() {
         closeLabel={t('list.cancel')}
         action={{
           label: t('list.deleteAction'),
-          onPress: () => flowToDelete && remove.mutate({ flowId: flowToDelete.id }),
+          onPress: () => flowToDelete && remove.mutate({ path: { flowId: flowToDelete.id } }),
           isPending: remove.isPending,
           'data-cy': 'global-flows-delete-confirm',
         }}

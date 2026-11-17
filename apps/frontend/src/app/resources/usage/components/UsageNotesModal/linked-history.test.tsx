@@ -44,15 +44,15 @@ vi.mock('../../../operatingDuration', () => ({
 vi.mock('../../../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 1 } }) }));
 vi.mock('@attraccess/react-query-client', async (original) => ({
   ...(await original<typeof import('@attraccess/react-query-client')>()),
-  useResourcesServiceResourceUsageGetSession: (...args: unknown[]) => {
+  useResourceUsageGetSession: (...args: unknown[]) => {
     state.fetchSession(...args);
     return { data: state.session, error: state.error, refetch: state.retry };
   },
-  useBillingServiceGetUsageBillingTransaction: (...args: unknown[]) => {
+  useGetUsageBillingTransaction: (...args: unknown[]) => {
     state.fetchBilling(...args);
     return { data: { transactionId: state.transactionId }, error: state.billingError, refetch: state.retryBilling };
   },
-  useBillingServiceGetBillingTransaction: () => ({
+  useGetBillingTransaction: () => ({
     data: {
       id: 7,
       createdAt: '2026-09-01',
@@ -63,7 +63,7 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
       resourceUsage: { id: 8, resourceId: 2 },
     },
   }),
-  useBillingServiceGetBillingConfiguration: () => ({ data: { minorUnit: 2 } }),
+  useGetBillingConfiguration: () => ({ data: { minorUnit: 2 } }),
 }));
 vi.mock('../../../../billing/dashboard/summary/transactionDetailsModal/refund', () => ({ RefundModal: () => null }));
 beforeEach(() => {
@@ -115,7 +115,7 @@ it('omits billing actions for sessions without a transaction or owned by another
   state.transactionId = 7;
   view.rerender(<UsageNotesModal isOpen resourceId={2} usageId={8} onClose={vi.fn()} />);
   expect(screen.queryByRole('button', { name: 'Open billing overview' })).toBeNull();
-  expect(state.fetchBilling).toHaveBeenLastCalledWith({ usageId: 8 }, undefined, { enabled: false });
+  expect(state.fetchBilling).toHaveBeenLastCalledWith({ path: { usageId: 8 } }, undefined, { enabled: false });
 });
 
 it('fetches usage details by ID only while open and shows a retryable error', () => {
@@ -123,7 +123,7 @@ it('fetches usage details by ID only while open and shows a retryable error', ()
   expect(state.fetchSession).not.toHaveBeenCalled();
   state.session = undefined;
   view.rerender(<UsageNotesModal isOpen resourceId={2} usageId={8} onClose={vi.fn()} />);
-  expect(state.fetchSession).toHaveBeenCalledWith({ resourceId: 2, usageId: 8 });
+  expect(state.fetchSession).toHaveBeenCalledWith({ path: { resourceId: 2, usageId: 8 } });
   expect(document.querySelector('.spinner')).toBeTruthy();
   state.error = new Error('Unavailable');
   view.rerender(<UsageNotesModal isOpen resourceId={2} usageId={8} onClose={vi.fn()} />);

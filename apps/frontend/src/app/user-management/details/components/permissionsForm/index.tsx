@@ -2,14 +2,14 @@ import { Separator } from '@heroui/react';
 import { SsoAssignmentBadges } from './SsoAssignmentBadges';
 import { Button, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  SSOProvider,
+  SsoProvider,
   UserRole,
   ApiError,
-  useRbacServiceListRoles,
-  useUsersServiceGetUserRoleAssignments,
-  useUsersServiceAssignRoleToUser,
-  useUsersServiceRevokeRoleFromUser,
-  useUsersServiceGetUserRoleAssignmentsKey,
+  useListRoles,
+  useGetUserRoleAssignments,
+  useAssignRoleToUser,
+  useRevokeRoleFromUser,
+  useGetUserRoleAssignmentsKey,
   User,
 } from '@attraccess/react-query-client';
 import { useEffect, useState } from 'react';
@@ -28,7 +28,7 @@ export interface UserPermissionFormProps {
   user: User;
   ssoManagedProviders?: string[];
   ssoManagedPermissionKeys?: Set<string>;
-  providersById?: Map<number, SSOProvider>;
+  providersById?: Map<number, SsoProvider>;
   roleIdToAssign?: number;
 }
 
@@ -54,11 +54,11 @@ export function UserPermissionForm({
   };
   const ssoProvidersLabel = isSsoManaged ? (ssoManagedProviders ?? []).join(', ') : t('ssoManaged.providerFallback');
 
-  const { data: allRoles, isLoading: isLoadingRoles } = useRbacServiceListRoles();
-  const { data: userRoles, isLoading: isLoadingUserRoles } = useUsersServiceGetUserRoleAssignments({ id: user.id });
+  const { data: allRoles, isLoading: isLoadingRoles } = useListRoles();
+  const { data: userRoles, isLoading: isLoadingUserRoles } = useGetUserRoleAssignments({ path: { id: user.id } });
 
-  const { mutateAsync: assignRole, isPending: isAssigning } = useUsersServiceAssignRoleToUser();
-  const { mutateAsync: revokeRole, isPending: isRevoking } = useUsersServiceRevokeRoleFromUser();
+  const { mutateAsync: assignRole, isPending: isAssigning } = useAssignRoleToUser();
+  const { mutateAsync: revokeRole, isPending: isRevoking } = useRevokeRoleFromUser();
   const isSaving = isAssigning || isRevoking;
 
   const manageableRoles = (allRoles ?? []).filter((r) => !NON_MANAGEABLE_ROLE_KEYS.includes(r.key));
@@ -124,12 +124,12 @@ export function UserPermissionForm({
     });
 
     const results = await Promise.allSettled([
-      ...toAssign.map((roleId) => assignRole({ id: user.id, requestBody: { roleId } })),
-      ...toRevoke.map((roleId) => revokeRole({ id: user.id, roleId })),
+      ...toAssign.map((roleId) => assignRole({ path: { id: user.id }, body: { roleId } })),
+      ...toRevoke.map((roleId) => revokeRole({ path: { id: user.id, roleId } })),
     ]);
 
     // Always refetch so the UI reflects the true server state, even on partial failure.
-    await queryClient.invalidateQueries({ queryKey: [useUsersServiceGetUserRoleAssignmentsKey] });
+    await queryClient.invalidateQueries({ queryKey: [useGetUserRoleAssignmentsKey] });
 
     const failures = results.filter((r) => r.status === 'rejected');
     if (failures.length > 0) {

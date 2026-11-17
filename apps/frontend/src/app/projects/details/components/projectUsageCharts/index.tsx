@@ -26,7 +26,7 @@ import {
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { useMemo, useCallback, useEffect, useState } from 'react';
 import { EmptyState, useDateTimeFormatter, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useProjectsServiceGetProjectUsageStats } from '@attraccess/react-query-client';
+import { useGetProjectUsageStats } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
 import { HOURS_FORMAT, MINUTES_PER_HOUR } from '../hours';
@@ -62,7 +62,7 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
   const formatNumber = useNumberFormatter();
   const formatHours = useNumberFormatter(HOURS_FORMAT);
   const formatDate = useDateTimeFormatter({ showTime: false });
-  const { data, isLoading } = useProjectsServiceGetProjectUsageStats({ id: projectId });
+  const { data, isLoading } = useGetProjectUsageStats({ path: { id: projectId } });
   const [canRenderCharts, setCanRenderCharts] = useState(false);
 
   useEffect(() => {

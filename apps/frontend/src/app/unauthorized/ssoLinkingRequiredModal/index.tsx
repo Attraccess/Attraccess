@@ -16,11 +16,7 @@ import {
   useUrlQuery,
 } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
-import {
-  ApiError,
-  useAuthenticationServiceLinkUserToExternalAccount,
-  SSOProviderType,
-} from '@attraccess/react-query-client';
+import { ApiError, useLinkUserToExternalAccount, SsoProviderType } from '@attraccess/react-query-client';
 
 import de from './de.json';
 import en from './en.json';
@@ -63,7 +59,7 @@ export function SSOLinkingRequiredModal(props: Props) {
     let parsedPayload: {
       email?: string;
       providerId?: number;
-      providerType?: SSOProviderType;
+      providerType?: SsoProviderType;
     } | null = null;
 
     if (rawLinkToken) {
@@ -103,12 +99,12 @@ export function SSOLinkingRequiredModal(props: Props) {
 
   const callbackURL = useCallbackURL(
     tokenPayload?.providerId ?? -1,
-    (tokenPayload?.providerType as SSOProviderType) ?? SSOProviderType.OIDC,
+    (tokenPayload?.providerType as SsoProviderType) ?? SsoProviderType.OIDC,
     cleanHref,
   );
   const canRestartSso = typeof tokenPayload?.providerId === 'number';
 
-  const { mutate: linkMutation, isPending: linkingIsLoading } = useAuthenticationServiceLinkUserToExternalAccount({
+  const { mutate: linkMutation, isPending: linkingIsLoading } = useLinkUserToExternalAccount(undefined, {
     onSettled: () => {
       requestInFlight.current = false;
     },
@@ -158,7 +154,7 @@ export function SSOLinkingRequiredModal(props: Props) {
     requestInFlight.current = true;
 
     linkMutation({
-      requestBody: {
+      body: {
         linkToken,
         password,
       },

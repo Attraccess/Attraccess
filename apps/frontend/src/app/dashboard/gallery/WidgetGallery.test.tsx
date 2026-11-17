@@ -4,17 +4,18 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
-import {
-  DashboardPinDto,
-  DashboardPinItemType,
-  DashboardService,
-  ResourcesService,
-} from '@attraccess/react-query-client';
+import { DashboardPinDto, DashboardPinItemType } from '@attraccess/react-query-client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PinnablePages } from '../pinnablePagesContext';
 import { DashboardWidget, DashboardWidgets } from '../widgets/widgetsContext';
 import { groupGalleryEntries, matchesSearch, normalizeSearchText } from './galleryEntries';
 import { WidgetGallery } from './WidgetGallery';
+import * as sdk from '@attraccess/react-query-client/sdk';
+import { sdkResult } from '../../../test-utils/sdk-mock';
+
+vi.mock('@attraccess/react-query-client/sdk', async (importOriginal) =>
+  (await import('../../../test-utils/sdk-mock')).spyOnSdk(await importOriginal<object>()),
+);
 
 const state = vi.hoisted(() => ({
   pinnable: null as unknown as PinnablePages,
@@ -103,13 +104,15 @@ beforeEach(() => {
     isReady: true,
   };
   state.toastError.mockReset();
-  vi.spyOn(ResourcesService, 'getAllResources').mockResolvedValue({
-    data: [
-      { id: 5, name: 'Lathe' },
-      { id: 6, name: 'Laser cutter' },
-    ],
-    total: 2,
-  } as never);
+  vi.mocked(sdk.getAllResources).mockResolvedValue(
+    sdkResult({
+      data: [
+        { id: 5, name: 'Lathe' },
+        { id: 6, name: 'Laser cutter' },
+      ],
+      total: 2,
+    }),
+  );
 });
 
 afterEach(() => {
@@ -210,8 +213,8 @@ describe('WidgetGallery', () => {
 
   it('adds an item with the chosen size, keeps the gallery open and focus on the entry', async () => {
     const add = vi
-      .spyOn(DashboardService, 'dashboardUpdatePins')
-      .mockResolvedValue([pin(DashboardPinItemType.WIDGET, 'billing-balance')] as never);
+      .mocked(sdk.dashboardUpdatePins)
+      .mockResolvedValue(sdkResult([pin(DashboardPinItemType.WIDGET, 'billing-balance')]));
     const { rerender } = renderGallery();
     const entry = await waitFor(() => entryNamed('Balance'));
 
@@ -219,9 +222,11 @@ describe('WidgetGallery', () => {
     const button = within(entry).getByRole('button', { name: 'Add Balance widget' });
     await userEvent.click(button);
 
-    expect(add).toHaveBeenCalledWith({
-      requestBody: { kind: 'add', item: { itemType: 'widget', itemId: 'billing-balance' }, size: 'medium' },
-    });
+    expect(add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: { kind: 'add', item: { itemType: 'widget', itemId: 'billing-balance' }, size: 'medium' },
+      }),
+    );
     // The dashboard passes the updated pins back in.
     rerender(
       <QueryClientProvider client={client}>
@@ -251,7 +256,7 @@ describe('WidgetGallery', () => {
   });
 
   it('pins the resource chosen in the Resource entry, with pinned resources disabled', async () => {
-    const add = vi.spyOn(DashboardService, 'dashboardUpdatePins').mockResolvedValue([] as never);
+    const add = vi.mocked(sdk.dashboardUpdatePins).mockResolvedValue(sdkResult([]));
     renderGallery([pin(DashboardPinItemType.RESOURCE, '5')]);
     const entry = await waitFor(() => entryNamed('Resource'));
     const addButton = within(entry).getByRole('button', { name: 'Add the chosen resource' });
@@ -264,25 +269,29 @@ describe('WidgetGallery', () => {
     await userEvent.click(within(entry).getByRole('radio', { name: 'Small' }));
     await userEvent.click(addButton);
 
-    expect(add).toHaveBeenCalledWith({
-      requestBody: { kind: 'add', item: { itemType: 'resource', itemId: '6' }, size: 'small' },
-    });
+    expect(add).toHaveBeenCalledWith(
+      expect.objectContaining({ body: { kind: 'add', item: { itemType: 'resource', itemId: '6' }, size: 'small' } }),
+    );
   });
 
   it('searches resources as the user types and keeps the list open while results load', async () => {
-    const search = vi.spyOn(ResourcesService, 'getAllResources').mockImplementation(((params?: { search?: string }) => {
+    const search = vi.mocked(sdk.getAllResources).mockImplementation(((options?: { query?: { search?: string } }) => {
       const resources = [
         { id: 5, name: 'Lathe' },
         { id: 6, name: 'Laser cutter' },
-      ].filter((resource) => resource.name.toLowerCase().includes((params?.search ?? '').toLowerCase()));
-      return Promise.resolve({ data: resources, total: resources.length });
+      ].filter((resource) => resource.name.toLowerCase().includes((options?.query?.search ?? '').toLowerCase()));
+      return Promise.resolve(sdkResult({ data: resources, total: resources.length }));
     }) as never);
     renderGallery();
     const entry = await waitFor(() => entryNamed('Resource'));
 
     await userEvent.type(within(entry).getByRole('combobox', { name: 'Choose resource' }), 'Las');
 
-    await waitFor(() => expect(search).toHaveBeenCalledWith(expect.objectContaining({ search: 'Las' })));
+    await waitFor(() =>
+      expect(search).toHaveBeenCalledWith(
+        expect.objectContaining({ query: expect.objectContaining({ search: 'Las' }) }),
+      ),
+    );
     expect(await screen.findByRole('option', { name: 'Laser cutter' })).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole('option', { name: 'Lathe' })).toBeNull());
   });
@@ -294,7 +303,7 @@ describe('WidgetGallery', () => {
   });
 
   it('tells the user when an addition could not be saved', async () => {
-    vi.spyOn(DashboardService, 'dashboardUpdatePins').mockRejectedValue(new Error('offline') as never);
+    vi.mocked(sdk.dashboardUpdatePins).mockRejectedValue(new Error('offline') as never);
     renderGallery();
     await userEvent.click(await screen.findByRole('button', { name: 'Add Settings shortcut' }));
     await waitFor(() =>

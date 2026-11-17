@@ -18,12 +18,12 @@ import {
 import { FlatSection } from '../../../components/flatSection';
 import {
   ApiError,
-  SSOProvider,
-  SSOProviderType,
+  SsoProvider,
+  SsoProviderType,
   User,
-  useLicenseServiceGetLicenseInformation,
-  useUsersServiceDeleteUser,
-  useUsersServiceGetOneUserById,
+  useGetLicenseInformation,
+  useDeleteUser,
+  useGetOneUserById,
 } from '@attraccess/react-query-client';
 import { Button, PageHeader, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useMemo } from 'react';
@@ -46,12 +46,12 @@ export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign
   const { isOpen, open, setOpen } = useOverlayState();
   const { user: me, hasPermission } = useAuth();
 
-  const { data: user } = useUsersServiceGetOneUserById({ id });
-  const { data: license } = useLicenseServiceGetLicenseInformation();
+  const { data: user } = useGetOneUserById({ path: { id } });
+  const { data: license } = useGetLicenseInformation();
   const ssoProviders = useSsoProviders();
 
   const providersById = useMemo(
-    () => new Map((ssoProviders ?? []).map((provider: SSOProvider) => [provider.id, provider])),
+    () => new Map((ssoProviders ?? []).map((provider: SsoProvider) => [provider.id, provider])),
     [ssoProviders],
   );
   type AuthenticationDetailSummary = {
@@ -89,9 +89,9 @@ export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign
       }
 
       const roleMappings =
-        detail.providerType === SSOProviderType.OIDC
+        detail.providerType === SsoProviderType.OIDC
           ? provider.oidcConfiguration?.roleMappings
-          : detail.providerType === SSOProviderType.SAML
+          : detail.providerType === SsoProviderType.SAML
             ? provider.samlConfiguration?.roleMappings
             : undefined;
 
@@ -117,9 +117,9 @@ export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign
       }
 
       const roleMappings =
-        detail.providerType === SSOProviderType.OIDC
+        detail.providerType === SsoProviderType.OIDC
           ? provider.oidcConfiguration?.roleMappings
-          : detail.providerType === SSOProviderType.SAML
+          : detail.providerType === SsoProviderType.SAML
             ? provider.samlConfiguration?.roleMappings
             : undefined;
 
@@ -130,7 +130,7 @@ export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign
   }, [providersById, ssoDetails]);
 
   const isSelf = !!me && !!user && me.id === user.id;
-  const { mutate: deleteUser, isPending: isDeleting } = useUsersServiceDeleteUser({
+  const { mutate: deleteUser, isPending: isDeleting } = useDeleteUser(undefined, {
     onSuccess: () => {
       toast.success({
         title: t('delete.success.title'),
@@ -290,7 +290,7 @@ export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign
         closeLabel={t('delete.actions.cancel')}
         action={{
           label: t('delete.actions.confirm'),
-          onPress: () => user && deleteUser({ id: user.id }),
+          onPress: () => user && deleteUser({ path: { id: user.id } }),
           isPending: isDeleting,
           'data-cy': 'admin-delete-user-confirm-button',
         }}

@@ -2,9 +2,9 @@ import { useTranslations, useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useEffect, useRef } from 'react';
 import { QrCodeAction } from './qrcode/action';
 import {
-  useResourcesServiceResourceUsageEndSession,
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
-  UseResourcesServiceResourceUsageGetHistoryKeyFn,
+  useResourceUsageEndSession,
+  UseResourceUsageGetActiveSessionKeyFn,
+  UseResourceUsageGetHistoryKeyFn,
   ApiError,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -43,12 +43,12 @@ export function useQrCodeAction(props: Props) {
   const { start: startResourceMutate, dialog: confirmationDialog } = useStartSessionWithConfirmation(resourceId, {
     onSuccess: (requestBody) => {
       queryClient.invalidateQueries({
-        queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId }),
+        queryKey: UseResourceUsageGetActiveSessionKeyFn({ path: { resourceId } }),
       });
 
       queryClient.invalidateQueries({
         predicate: (query) => {
-          const baseHistoryKey = UseResourcesServiceResourceUsageGetHistoryKeyFn({ resourceId });
+          const baseHistoryKey = UseResourceUsageGetHistoryKeyFn({ path: { resourceId } });
           return (
             query.queryKey[0] === baseHistoryKey[0] &&
             query.queryKey.length > 1 &&
@@ -76,11 +76,11 @@ export function useQrCodeAction(props: Props) {
     },
   });
 
-  const { mutate: endResourceMutate } = useResourcesServiceResourceUsageEndSession({
+  const { mutate: endResourceMutate } = useResourceUsageEndSession(undefined, {
     onSuccess: () => {
       queryClient.invalidateQueries({
         predicate: (query) => {
-          const baseHistoryKey = UseResourcesServiceResourceUsageGetHistoryKeyFn({ resourceId });
+          const baseHistoryKey = UseResourceUsageGetHistoryKeyFn({ path: { resourceId } });
           return (
             query.queryKey[0] === baseHistoryKey[0] &&
             query.queryKey.length > 1 &&
@@ -90,7 +90,7 @@ export function useQrCodeAction(props: Props) {
       });
 
       queryClient.resetQueries({
-        queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId }),
+        queryKey: UseResourceUsageGetActiveSessionKeyFn({ path: { resourceId } }),
       });
 
       toast.success({
@@ -120,8 +120,8 @@ export function useQrCodeAction(props: Props) {
 
   const stopResource = useCallback(() => {
     endResourceMutate({
-      resourceId,
-      requestBody: {
+      path: { resourceId },
+      body: {
         notes: '-- by QR-Code --',
       },
     });

@@ -17,8 +17,12 @@ const state = vi.hoisted(() => ({
   callbacks: undefined as
     | {
         onSuccess: (usage: unknown) => void;
-        onError: (error: Error, variables: { usageId: number }) => void;
-        onSettled: (data: unknown, error: unknown, variables?: { usageId: number }) => void;
+        onError: (error: Error, variables: { path: { resourceId: number; usageId: number } }) => void;
+        onSettled: (
+          data: unknown,
+          error: unknown,
+          variables?: { path: { resourceId: number; usageId: number } },
+        ) => void;
       }
     | undefined,
 }));
@@ -30,15 +34,15 @@ vi.mock('@attraccess/react-query-client', () => ({
     DOOR_UNLOCK: 'door.unlock',
     DOOR_UNLATCH: 'door.unlatch',
   },
-  useResourcesServiceResourceUsageGetHistory: (...args: unknown[]) => {
+  useResourceUsageGetHistory: (...args: unknown[]) => {
     state.query(...args);
     return { data: { total: 12, data: state.rows }, error: state.error };
   },
-  useResourcesServiceGetOneResourceById: () => ({ data: { id: 7, type: state.type } }),
-  UseResourcesServiceResourceUsageGetHistoryKeyFn: (input: unknown) => ['history', input],
-  UseResourcesServiceResourceUsageGetSessionKeyFn: (input: unknown) => ['session', input],
-  useProjectsServiceGetProjectUsageHistoryKey: 'project-history',
-  useResourcesServiceResourceUsageUpdateSessionProject: (callbacks: typeof state.callbacks) => {
+  useGetOneResourceById: () => ({ data: { id: 7, type: state.type } }),
+  UseResourceUsageGetHistoryKeyFn: (input: unknown) => ['history', input],
+  UseResourceUsageGetSessionKeyFn: (input: unknown) => ['session', input],
+  useGetProjectUsageHistoryKey: 'project-history',
+  useResourceUsageUpdateSessionProject: (_mutationKey: unknown, callbacks: typeof state.callbacks) => {
     state.callbacks = callbacks;
     return { mutate: state.update };
   },
@@ -124,8 +128,8 @@ it('accepts refreshed project assignments after a failed table edit', () => {
   act(() => result.current.handleProjectChange(session, 5));
   expect(result.current.resolveProjectId(session)).toBe(5);
   act(() => {
-    state.callbacks?.onError(new Error('Offline'), { usageId: 11 });
-    state.callbacks?.onSettled(undefined, undefined, { usageId: 11 });
+    state.callbacks?.onError(new Error('Offline'), { path: { resourceId: 7, usageId: 11 } });
+    state.callbacks?.onSettled(undefined, undefined, { path: { resourceId: 7, usageId: 11 } });
   });
   expect(result.current.resolveProjectId(session)).toBe(4);
   // A successful edit from the independently loaded drawer refreshes the history data.
@@ -143,29 +147,29 @@ it('optimistically updates projects, rolls back failures and refreshes matching 
   fireEvent.change(project, { target: { value: '4' } });
   expect(state.update).not.toHaveBeenCalled();
   fireEvent.change(project, { target: { value: '5' } });
-  expect(state.update).toHaveBeenCalledWith({ resourceId: 7, usageId: 11, requestBody: { projectId: 5 } });
+  expect(state.update).toHaveBeenCalledWith({ path: { resourceId: 7, usageId: 11 }, body: { projectId: 5 } });
   expect(project).toHaveValue('5');
   expect(project).toBeDisabled();
   act(() => {
-    state.callbacks?.onError(new Error('Offline'), { usageId: 11 });
-    state.callbacks?.onSettled(undefined, undefined, { usageId: 11 });
+    state.callbacks?.onError(new Error('Offline'), { path: { resourceId: 7, usageId: 11 } });
+    state.callbacks?.onSettled(undefined, undefined, { path: { resourceId: 7, usageId: 11 } });
   });
   expect(project).toHaveValue('4');
   expect(project).toBeEnabled();
   expect(state.toastError).toHaveBeenCalledWith({ title: 'Project update failed' });
   fireEvent.change(project, { target: { value: '' } });
-  expect(state.update).toHaveBeenLastCalledWith({ resourceId: 7, usageId: 11, requestBody: { projectId: null } });
+  expect(state.update).toHaveBeenLastCalledWith({ path: { resourceId: 7, usageId: 11 }, body: { projectId: null } });
   await act(async () => {
     state.rows[0] = { ...(state.rows[0] as Record<string, unknown>), project: null };
     await state.callbacks?.onSuccess({ id: 11, project: null });
-    state.callbacks?.onSettled(undefined, undefined, { usageId: 11 });
+    state.callbacks?.onSettled(undefined, undefined, { path: { resourceId: 7, usageId: 11 } });
   });
   expect(project).toHaveValue('');
   expect(state.success).toHaveBeenCalledWith({ title: 'Project updated' });
   const predicate = state.invalidate.mock.calls[0][0].predicate;
-  expect(predicate({ queryKey: ['history', { resourceId: 7, page: 2 }] })).toBe(true);
-  expect(predicate({ queryKey: ['history', { resourceId: 8 }] })).toBe(false);
-  expect(predicate({ queryKey: ['other', { resourceId: 7 }] })).toBe(false);
+  expect(predicate({ queryKey: ['history', { path: { resourceId: 7 }, query: { page: 2 } }] })).toBe(true);
+  expect(predicate({ queryKey: ['history', { path: { resourceId: 8 } }] })).toBe(false);
+  expect(predicate({ queryKey: ['other', { path: { resourceId: 7 } }] })).toBe(false);
   expect(predicate({ queryKey: ['history'] })).toBe(false);
   act(() => state.callbacks?.onSettled(undefined, undefined));
 });
@@ -175,17 +179,29 @@ it('filters users, paginates and opens session notes from the real history table
       <ResourceUsageHistory resourceId={7} hideHeader />
     </MemoryRouter>,
   );
-  expect(state.query).toHaveBeenCalledWith({ resourceId: 7, page: 1, limit: 5, userId: 3 }, undefined, {
-    enabled: true,
-  });
+  expect(state.query).toHaveBeenCalledWith(
+    { path: { resourceId: 7 }, query: { page: 1, limit: 5, userId: 3 } },
+    undefined,
+    {
+      enabled: true,
+    },
+  );
   fireEvent.click(screen.getByRole('switch'));
-  expect(state.query).toHaveBeenLastCalledWith({ resourceId: 7, page: 1, limit: 5, userId: undefined }, undefined, {
-    enabled: true,
-  });
+  expect(state.query).toHaveBeenLastCalledWith(
+    { path: { resourceId: 7 }, query: { page: 1, limit: 5, userId: undefined } },
+    undefined,
+    {
+      enabled: true,
+    },
+  );
   fireEvent.click(screen.getByRole('button', { name: '2' }));
-  expect(state.query).toHaveBeenLastCalledWith({ resourceId: 7, page: 2, limit: 5, userId: undefined }, undefined, {
-    enabled: true,
-  });
+  expect(state.query).toHaveBeenLastCalledWith(
+    { path: { resourceId: 7 }, query: { page: 2, limit: 5, userId: undefined } },
+    undefined,
+    {
+      enabled: true,
+    },
+  );
   expect(screen.queryByText('Locked')).toBeNull();
   expect(screen.getByText('Other project')).toBeInTheDocument();
   const row = screen.getByRole('combobox').closest('tr')!;

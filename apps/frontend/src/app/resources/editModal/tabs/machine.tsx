@@ -11,9 +11,9 @@ import {
   TextField,
 } from '@heroui/react';
 import {
-  useResourceFlowsServiceGetNodeSchemas,
-  useResourceFlowsServiceGetSharedMachineFlowWarnings,
-  useResourcesServiceResourceUsageGetActiveSession,
+  useGetNodeSchemas,
+  useGetSharedMachineFlowWarnings,
+  useResourceUsageGetActiveSession,
 } from '@attraccess/react-query-client';
 import { AlertStatusIcon, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import nodeTranslationsDe from '../../details/flows/node/de.json';
@@ -31,7 +31,7 @@ function useFlowNodeTitle(resourceId: number | undefined, enabled: boolean) {
     en: { nodes: nodeTranslationsEn.nodes },
     de: { nodes: nodeTranslationsDe.nodes },
   });
-  const { data: nodeSchemas } = useResourceFlowsServiceGetNodeSchemas({ resourceId: resourceId as number }, undefined, {
+  const { data: nodeSchemas } = useGetNodeSchemas({ path: { resourceId: resourceId as number } }, undefined, {
     enabled: !!resourceId && enabled,
   });
   return useCallback(
@@ -52,14 +52,14 @@ export function MachineTab(props: EditorTabProps) {
   // Lets the field be emptied while typing; the stored value is always a valid number
   const [draft, setDraft] = useState<string | null>(null);
 
-  const { data: activeSessions } = useResourcesServiceResourceUsageGetActiveSession(
-    { resourceId: resource?.id as number },
+  const { data: activeSessions } = useResourceUsageGetActiveSession(
+    { path: { resourceId: resource?.id as number } },
     undefined,
     { enabled: !!resource?.id },
   );
   const isShared = maxParallelSessions > 1;
-  const { data: flowWarnings, isError: flowWarningsFailed } = useResourceFlowsServiceGetSharedMachineFlowWarnings(
-    { resourceId: resource?.id as number },
+  const { data: flowWarnings, isError: flowWarningsFailed } = useGetSharedMachineFlowWarnings(
+    { path: { resourceId: resource?.id as number } },
     undefined,
     { enabled: !!resource?.id && isShared },
   );
