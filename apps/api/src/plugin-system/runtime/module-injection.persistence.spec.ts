@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { Inject, Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { PLUGIN_HOST_CONNECTION } from '../persistence/plugin-host-data.port';
-import { isDatabaseToken } from '../../database/adapters/plugins/database-tokens';
+import { isDatabaseToken } from './database-tokens';
 import { assertModuleHasNoDatabaseInjection } from './module-injection';
 
 describe('plugins and the database', () => {
