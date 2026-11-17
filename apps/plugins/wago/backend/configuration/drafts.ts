@@ -271,7 +271,10 @@ export abstract class WagoDrafts extends WagoRegistry {
   }
 
   /** Stores the draft: one per controller, created on first save. */
-  protected storeDraft(draft: WagoConfigurationDraftInput, scope?: PluginTransactionScope): Promise<WagoConfigurationDraft> {
+  protected storeDraft(
+    draft: WagoConfigurationDraftInput,
+    scope?: PluginTransactionScope,
+  ): Promise<WagoConfigurationDraft> {
     return this.drafts.upsert(draft, {
       conflictOn: ['controllerId'],
       update: ['snapshot', 'reviewedHash', 'presetProvenance', 'updatedAt'],

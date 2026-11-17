@@ -378,7 +378,11 @@ describe('controller diagnostics', () => {
 
   it('reports metadata-only saved draft changes without replacing applied channel projection', async () => {
     const presetProvenance = JSON.stringify({ editor: { names: { io: 'Renamed' }, presets: [] } });
-    const { service, updateRevision, snapshot } = await setup(false, {}, { snapshot: JSON.stringify(baseSnapshot), presetProvenance });
+    const { service, updateRevision, snapshot } = await setup(
+      false,
+      {},
+      { snapshot: JSON.stringify(baseSnapshot), presetProvenance },
+    );
     await updateRevision({ contentHash: configurationHash(snapshot) });
     expect((await service.get(1)).configuration.draftChanged).toBe(true);
     await updateRevision({ presetProvenance });

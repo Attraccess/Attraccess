@@ -107,7 +107,10 @@ export abstract class WagoCommissioningOwnership extends WagoCommissioningRecove
   ): Promise<void> {
     const controller = await openWagoStorage(this.context).controllers.get(id);
     if (!controller) throw new NotFoundException('controller not found');
-    const sessions = await this.sessions.find({ where: { hardwareId: controller.hardwareId }, orderBy: [{ field: 'id', direction: 'desc' }] });
+    const sessions = await this.sessions.find({
+      where: { hardwareId: controller.hardwareId },
+      orderBy: [{ field: 'id', direction: 'desc' }],
+    });
     if (!sessions.length) {
       await remove(async () => undefined);
       return;
@@ -158,7 +161,10 @@ export abstract class WagoCommissioningOwnership extends WagoCommissioningRecove
   ): Promise<T> {
     const controller = await openWagoStorage(this.context).controllers.get(id);
     if (!controller) throw new NotFoundException('controller not found');
-    const sessions = await this.sessions.find({ where: { hardwareId: controller.hardwareId }, orderBy: [{ field: 'id', direction: 'desc' }] });
+    const sessions = await this.sessions.find({
+      where: { hardwareId: controller.hardwareId },
+      orderBy: [{ field: 'id', direction: 'desc' }],
+    });
     if (!sessions.length) {
       if (requireCommissioningSession)
         throw new ConflictException('A commissioning session must remain pinned while rotating credentials.');

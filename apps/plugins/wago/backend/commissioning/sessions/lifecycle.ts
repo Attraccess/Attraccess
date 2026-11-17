@@ -51,7 +51,12 @@ export abstract class WagoCommissioningProgress extends WagoCommissioningTranspo
 
   protected async retireSupersededSessions(hardwareId: string, completedSessionId: number): Promise<void> {
     for (let skip = 0; ; skip += 100) {
-      const sessions = await this.sessions.find({ where: { hardwareId }, orderBy: [{ field: 'id' }], limit: 100, offset: skip });
+      const sessions = await this.sessions.find({
+        where: { hardwareId },
+        orderBy: [{ field: 'id' }],
+        limit: 100,
+        offset: skip,
+      });
       await Promise.all(
         sessions
           .filter(
@@ -78,7 +83,12 @@ export abstract class WagoCommissioningProgress extends WagoCommissioningTranspo
 
   protected async reconcileCompletedSessions(): Promise<void> {
     for (let skip = 0; ; skip += 100) {
-      const page = await this.sessions.find({ where: { state: 'completed' }, orderBy: [{ field: 'id' }], limit: 100, offset: skip });
+      const page = await this.sessions.find({
+        where: { state: 'completed' },
+        orderBy: [{ field: 'id' }],
+        limit: 100,
+        offset: skip,
+      });
       for (const session of page) {
         if (session.state === 'completed')
           await this.withControllerLock(session.id, () =>

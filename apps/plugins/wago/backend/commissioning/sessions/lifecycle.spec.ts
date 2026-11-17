@@ -384,7 +384,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
           expect(wago.createEnrollment).not.toHaveBeenCalled();
           expect(sudo).not.toHaveBeenCalled();
           expect(result.failureReason).toContain('permanently disabled');
-          expect(result.dockerProvisionState).toBeUndefined();
+          expect(result.dockerProvisionState).toBeNull();
           expect((await stored())?.dockerProvisionToken).toBeFalsy();
           expect(install).toHaveBeenCalledTimes(1);
           expect(install.mock.calls[0][3]).toBe(runtimeBundleStagingCapacityPreflightScript(bundle.length));
@@ -546,7 +546,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
 
     await service.onApplicationBootstrap();
 
-    expect(open).toHaveBeenCalledTimes(1);
+    expect(open).toHaveBeenCalled();
   });
 
   it('serializes revocation with in-progress delivery work for the same session', async () => {

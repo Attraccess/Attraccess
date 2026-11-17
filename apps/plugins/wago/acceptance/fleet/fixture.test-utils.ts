@@ -111,19 +111,17 @@ export class FleetFixtureState {
       ],
     ] as const;
     definitions.forEach(([type, data], index) => {
-      this.nodes.push(
-        {
-          id: `${id}-${index}`,
-          type: `plugin.wago.${type}`,
-          // Resource-flow rows; a global-flow row would set flowId and leave resourceId null.
-          resourceId: 1,
-          flowId: null,
-          data,
-          position: { x: index * 100, y: 0 },
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      );
+      this.nodes.push({
+        id: `${id}-${index}`,
+        type: `plugin.wago.${type}`,
+        // Resource-flow rows; a global-flow row would set flowId and leave resourceId null.
+        resourceId: 1,
+        flowId: null,
+        data,
+        position: { x: index * 100, y: 0 },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
       if (index)
         this.edges.push({
           source: `${id}-${index - 1}`,

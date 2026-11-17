@@ -1,4 +1,4 @@
-import { controllerRow, sessionRow } from '../rows.test-utils';
+import { controllerRow } from '../rows.test-utils';
 import { createWagoTestStorage, type WagoTestStorage } from '../storage/testing';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { existsSync } from 'node:fs';
@@ -181,11 +181,14 @@ describe('commissioning workflows with in-memory storage and mocked device trans
 
   it('blocks an unfinished preparation before any further host mutation', async () => {
     const token = 'c'.repeat(32);
-    await sessions().update({ id: session.id }, {
-      platformReport: JSON.stringify({ platform: 'supported', provision: 'review-start-installed-runtime' }),
-      dockerProvisionToken: token,
-      dockerProvisionState: token ? 'starting' : null,
-    });
+    await sessions().update(
+      { id: session.id },
+      {
+        platformReport: JSON.stringify({ platform: 'supported', provision: 'review-start-installed-runtime' }),
+        dockerProvisionToken: token,
+        dockerProvisionState: token ? 'starting' : null,
+      },
+    );
     const before = await storedSession(session.id);
     const remote = jest.spyOn(service as never, 'sudoRunScript');
     await expect(
@@ -300,9 +303,7 @@ describe('commissioning workflows with in-memory storage and mocked device trans
         );
       expect(remote).not.toHaveBeenCalled();
       expect(wago.createEnrollment).not.toHaveBeenCalled();
-      expect(
-        (await storedSession(session.id)).dockerProvisionToken,
-      ).toBeNull();
+      expect((await storedSession(session.id)).dockerProvisionToken).toBeNull();
       expect(existsSync(directory)).toBe(false);
     },
   );
@@ -313,9 +314,7 @@ describe('commissioning workflows with in-memory storage and mocked device trans
     const bundle = await service['acquireRuntimeBundle'](session);
     expect(artifacts.acquire).toHaveBeenCalledWith();
     expect(bundle.digest).toBe(currentDigest);
-    expect(
-      (await storedSession(session.id)).runtimeArtifactDigest,
-    ).toBe(currentDigest);
+    expect((await storedSession(session.id)).runtimeArtifactDigest).toBe(currentDigest);
   });
 
   it('delivers the current build to a legacy session whose stored digest belongs to an older build', async () => {
@@ -338,9 +337,7 @@ describe('commissioning workflows with in-memory storage and mocked device trans
     expect(result.state).toBe('awaiting_discovery');
     expect(copy.mock.calls[0]).toContain(currentPath);
     expect(artifacts.acquire).toHaveBeenCalledWith();
-    expect(
-      (await storedSession(session.id)).runtimeArtifactDigest,
-    ).toBe(currentDigest);
+    expect((await storedSession(session.id)).runtimeArtifactDigest).toBe(currentDigest);
   });
 
   it('does not transfer a snapshot after the current release changes mid-delivery', async () => {
@@ -367,9 +364,7 @@ describe('commissioning workflows with in-memory storage and mocked device trans
     const result = await service.deliver(session.id, { confirmInstall: true, temporarySsh: credential }, principal);
     expect(result.state).toBe('delivery_failed');
     expect(result.failureReason).toContain('runtime release changed');
-    expect(
-      (await storedSession(session.id)).deliveryToken,
-    ).not.toBeNull();
+    expect((await storedSession(session.id)).deliveryToken).not.toBeNull();
     expect(wago.revokeEnrollmentById).toHaveBeenCalled();
   });
 
@@ -420,7 +415,10 @@ describe('commissioning workflows with in-memory storage and mocked device trans
   it.each(['starting', 'recovering'])(
     'retains interrupted %s preparation for explicit cleanup after restart',
     async (state) => {
-        await sessions().update({ id: session.id }, { dockerProvisionToken: 'c'.repeat(32), dockerProvisionState: state });
+      await sessions().update(
+        { id: session.id },
+        { dockerProvisionToken: 'c'.repeat(32), dockerProvisionState: state },
+      );
       const remote = jest.spyOn(service as never, 'sudoRunScript');
       await service.onApplicationBootstrap();
       expect(await storedSession(session.id)).toMatchObject({
@@ -456,10 +454,13 @@ describe('commissioning workflows with in-memory storage and mocked device trans
 
   it('retains an old restored token when final lifecycle reconciliation fails', async () => {
     const token = 'c'.repeat(32);
-    await sessions().update({ id: session.id }, {
-      dockerProvisionToken: token,
-      dockerProvisionState: 'restored',
-    });
+    await sessions().update(
+      { id: session.id },
+      {
+        dockerProvisionToken: token,
+        dockerProvisionState: 'restored',
+      },
+    );
     jest.spyOn(service as never, 'sudoRunScript').mockRejectedValue(new Error('unresolved-lifecycle-effects') as never);
     const result = await service.platform(
       session.id,
@@ -472,9 +473,7 @@ describe('commissioning workflows with in-memory storage and mocked device trans
     );
     expect(result.dockerProvisionState).toBe('recovery_required');
     expect(result.failureReason).toContain('cleanup remains unverified');
-    expect(
-      (await storedSession(session.id)).dockerProvisionToken,
-    ).toBe(token);
+    expect((await storedSession(session.id)).dockerProvisionToken).toBe(token);
   });
 
   it('resolves the current artifact and carries an existing Docker token into the runtime transaction', async () => {
@@ -485,10 +484,13 @@ describe('commissioning workflows with in-memory storage and mocked device trans
           ? `epoch=${Math.floor(Date.now() / 1000)}\nuptime=100.00\nboot=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\ntool=supported\n`
           : stoppedReport) as never);
     await service.platform(session.id, 'inspect', { temporarySsh: credential }, principal);
-    await sessions().update({ id: session.id }, {
-      dockerProvisionToken: 'c'.repeat(32),
-      dockerProvisionState: 'started',
-    });
+    await sessions().update(
+      { id: session.id },
+      {
+        dockerProvisionToken: 'c'.repeat(32),
+        dockerProvisionState: 'started',
+      },
+    );
     const saved = await storedSession(session.id);
     expect(saved.dockerProvisionToken).toMatch(/^[a-f0-9]{32}$/);
     const copy = jest.spyOn(service as never, 'copyTo').mockResolvedValue(undefined as never);
@@ -506,12 +508,15 @@ describe('commissioning workflows with in-memory storage and mocked device trans
 
   it('retries only preparation acknowledgement after runtime cleanup and preparation containment succeeded', async () => {
     const token = 'd'.repeat(32);
-    await sessions().update({ id: session.id }, {
-      state: 'delivery_failed',
-      deliveryToken: token,
-      dockerProvisionToken: token,
-      dockerProvisionState: 'started',
-    });
+    await sessions().update(
+      { id: session.id },
+      {
+        state: 'delivery_failed',
+        deliveryToken: token,
+        dockerProvisionToken: token,
+        dockerProvisionState: 'started',
+      },
+    );
     const remote = jest
       .spyOn(service as never, 'sudoRunScript')
       .mockResolvedValueOnce('' as never) // runtime cleanup

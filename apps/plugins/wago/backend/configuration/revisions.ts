@@ -24,7 +24,11 @@ import { runtimeSupportErrors, requireRuntimeSupport } from './channel-enabled';
 
 export abstract class WagoRevisions extends WagoDrafts {
   protected async latestRevision(controllerId: number): Promise<WagoConfigurationRevision | null> {
-    const [revision] = await this.revisions.find({ where: { controllerId }, orderBy: [{ field: 'revision', direction: 'desc' }], limit: 1 });
+    const [revision] = await this.revisions.find({
+      where: { controllerId },
+      orderBy: [{ field: 'revision', direction: 'desc' }],
+      limit: 1,
+    });
     return revision ?? null;
   }
 
@@ -266,7 +270,11 @@ export abstract class WagoRevisions extends WagoDrafts {
       const controller = await this.claimedController(controllerId);
       const selected = await this.revisions.findOne({ where: { controllerId, revision } });
       if (!selected) throw new NotFoundException(`WAGO configuration revision ${revision} not found`);
-      const [current] = await this.revisions.find({ where: { controllerId }, orderBy: [{ field: 'revision', direction: 'desc' }], limit: 1 });
+      const [current] = await this.revisions.find({
+        where: { controllerId },
+        orderBy: [{ field: 'revision', direction: 'desc' }],
+        limit: 1,
+      });
       const draft = await this.drafts.findOne({ where: { controllerId } });
       const snapshot = JSON.parse(selected.snapshot);
       const impacts = await configurationFlowImpacts(
@@ -315,10 +323,18 @@ export abstract class WagoRevisions extends WagoDrafts {
         'rejection_acknowledgement',
         { revision },
         async () => {
-          const acknowledged = { rejectionAcknowledgedAt: new Date().toISOString(), rejectionAcknowledgedBy: principal.userId };
+          const acknowledged = {
+            rejectionAcknowledgedAt: new Date().toISOString(),
+            rejectionAcknowledgedBy: principal.userId,
+          };
           // Compare-and-set: an acknowledgement that raced this one, or a re-report, wins.
           const changed = await this.revisions.update(
-            { id: rejected.id, state: 'rejected', reportedAt: rejected.reportedAt, rejectionAcknowledgedAt: { isNull: true } },
+            {
+              id: rejected.id,
+              state: 'rejected',
+              reportedAt: rejected.reportedAt,
+              rejectionAcknowledgedAt: { isNull: true },
+            },
             acknowledged,
           );
           if (!changed) throw new ConflictException('rejection changed; refresh and review it before acknowledging');
