@@ -40,27 +40,46 @@ namespace ble
         return true;
     }
 
-    bool NotificationBuffer::pop(Entry &out)
+    bool NotificationBuffer::peek(Entry &out) const
     {
         std::lock_guard<std::mutex> lock(mutex);
         if (entries.empty()) return false;
-        out = std::move(entries.front());
-        entries.pop_front();
-        if (!out.overflow)
-        {
-            dataEntries--;
-            bytes -= out.value.size();
-        }
+        out = entries.front();
         return true;
     }
 
-    void NotificationBuffer::rearm(const Uuid &service, const Uuid &characteristic)
+    void NotificationBuffer::removeOldest()
     {
         std::lock_guard<std::mutex> lock(mutex);
+        if (entries.empty()) return;
+        if (!entries.front().overflow)
+        {
+            dataEntries--;
+            bytes -= entries.front().value.size();
+        }
+        entries.pop_front();
+    }
+
+    void NotificationBuffer::forget(const Uuid &service, const Uuid &characteristic)
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        const auto matches = [&](const Uuid &s, const Uuid &c) { return s == service && c == characteristic; };
+        for (auto it = entries.begin(); it != entries.end();)
+        {
+            if (!matches(it->service, it->characteristic))
+            {
+                ++it;
+                continue;
+            }
+            if (!it->overflow)
+            {
+                dataEntries--;
+                bytes -= it->value.size();
+            }
+            it = entries.erase(it);
+        }
         overflowedKeys.erase(std::remove_if(overflowedKeys.begin(), overflowedKeys.end(),
-                                            [&](const Key &key) {
-                                                return key.service == service && key.characteristic == characteristic;
-                                            }),
+                                            [&](const Key &key) { return matches(key.service, key.characteristic); }),
                              overflowedKeys.end());
     }
 

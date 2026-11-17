@@ -47,6 +47,14 @@ namespace ble
                                        Error &error) = 0;
     };
 
+    enum class LogLevel : uint8_t
+    {
+        Debug, // successful operations: one line each, too many for info during bulk transfers
+        Info,
+        Warn, // a request or stream failed
+        Error, // the proxy itself failed
+    };
+
     class IBleSink
     {
     public:
@@ -55,7 +63,7 @@ namespace ble
         virtual bool send(const std::string &message) = 0;
         // Whether the outbound queue has room for notifications; otherwise they stay in the bounded buffer.
         virtual bool canSendNotification() { return true; }
-        virtual void log(bool isError, const char *line) { (void)isError, (void)line; }
+        virtual void log(LogLevel level, const char *line) { (void)level, (void)line; }
     };
 
     class BleProxyCore
@@ -92,6 +100,12 @@ namespace ble
 
         Owner owner() const { return currentOwner; }
         bool radioReady() const { return initialized; }
+        // Nothing to do until the next request or radio event: no owner (so no deadline), nothing waiting to go
+        // out. The proxy task then sleeps instead of polling.
+        bool idle() const { return currentOwner == Owner::None && outbox.empty() && notifications.size() == 0; }
+        // Whether the next request may be taken. Answers are never dropped: the outbox keeps room for everything
+        // already accepted work still owes, so a request waits (in the proxy's command queue) while it is full.
+        bool acceptsRequests() const;
         uint16_t mtu() const { return session.mtu; }
         size_t pendingRequests() const { return session.queue.size() + (session.current.active ? 1 : 0); }
 
@@ -170,7 +184,8 @@ namespace ble
         Session session;
         Scan scan;
         uint32_t nextToken = 0;
-        // Answers the websocket did not take yet; dropped when the connection is lost.
+        // Answers and session ends the websocket did not take yet; dropped when the connection is lost.
+        // Notifications never wait here: they stay in their own bounded buffer.
         std::deque<std::string, PsAlloc<std::string>> outbox;
 
         bool ota() const { return otaActive && otaActive(); }
@@ -201,6 +216,6 @@ namespace ble
                     uint32_t now = 0);
         void send(std::string &&message);
         void flushOutbox();
-        void logf(bool isError, const char *format, ...);
+        void logf(LogLevel level, const char *format, ...);
     };
 }

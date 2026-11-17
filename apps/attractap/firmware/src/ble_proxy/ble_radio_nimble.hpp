@@ -8,6 +8,7 @@
 
 #if ATTRACTAP_BLE_PROXY
 
+#include <atomic>
 #include <mutex>
 
 #include "ble_core.hpp"
@@ -64,8 +65,12 @@ namespace ble
         int onRead(uint16_t conn, const ::ble_gatt_error *error, ::ble_gatt_attr *attr);
         int onWrite(uint16_t conn, const ::ble_gatt_error *error, ::ble_gatt_attr *attr);
         void onSync();
+        // Counts connect() calls. Events of an earlier link (posted, not yet handled) are recognised by it.
+        uint32_t linkEpoch() const { return epoch.load(); }
 
     private:
+        static constexpr uint16_t NO_CONN = 0xffff;
+
         struct Characteristic
         {
             Uuid service;
@@ -88,8 +93,10 @@ namespace ble
         std::recursive_mutex mutex; // guards the connection state and the handle table (host task vs proxy task)
         bool synced = false;
         uint8_t ownAddressType = 0;
-        uint16_t conn = 0xffff;
+        uint16_t conn = NO_CONN;
         bool connecting = false;
+        // The core gave up on a connect that is still pending: its link goes down as soon as it is up.
+        bool abandoned = false;
         bool connectReported = false;
         // A link dropped during discovery: its failure is reported once the link is really down.
         bool hasPendingFailure = false;
@@ -103,8 +110,12 @@ namespace ble
         size_t discoveryCharacteristic = 0;
         uint32_t opToken = 0;
         Bytes opValue;
+        std::atomic<uint32_t> epoch{0};
 
+        void terminate();
+        void abandonConnect();
         void failConnect(const Error &error);
+        void startDiscovery();
         void discoverNextService();
         void discoverNextDescriptor();
         void finishDiscovery();

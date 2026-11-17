@@ -40,4 +40,7 @@ namespace ble
     std::string notificationMessage(const char *sessionId, uint32_t subscriptionId, uint32_t seq, const Error &error,
                                     const uint8_t *value, size_t length);
     std::string sessionEndedMessage(const char *sessionId, const char *reason, const char *detail);
+    // The answer to a request refused before the state machine sees it (untrusted channel, malformed, no room).
+    // Empty when it cannot be addressed: no requestId or sessionId, or a BLE_CANCEL (never answered).
+    std::string refusalMessage(const Command &command, const Error &error);
 }

@@ -3,8 +3,9 @@
 #include <cstdio>
 
 // Plugin BLE proxy (ATT-1033/ATT-1036): the reader is a dumb, bounded BLE central for the API.
-// The API sends one request at a time per session (protocol v1, JSON EVENT messages, bytes as base64),
-// the reader enforces the allowlist the API sent at session open, its own deadlines and its own bounds.
+// The API may pipeline requests of a session (up to 8 writes without response in flight; protocol v1, JSON EVENT
+// messages, bytes as base64). The reader runs them one at a time in arrival order and enforces the allowlist the
+// API sent at session open, its own deadlines and its own bounds.
 //
 // Everything in this header is plain C++ so host tests can drive the whole state machine without NimBLE.
 

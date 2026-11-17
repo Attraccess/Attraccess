@@ -39,8 +39,10 @@ public:
     static constexpr bool supported() { return ATTRACTAP_BLE_PROXY; }
 
     void setup(Hooks hooks);
-    // Websocket task. true: `type` is a BLE request (handled here, never ACKed).
-    bool handleMessage(const char *type, JsonObjectConst payload);
+    // Websocket task. true: `type` is a BLE request (handled here, never ACKed). `trusted`: it came from the server
+    // that authenticated this reader on the paired session channel; anything else is answered READER_UNSUPPORTED
+    // `unauthenticated` and never reaches the radio.
+    bool handleMessage(const char *type, JsonObjectConst payload, bool trusted);
     // The websocket connection that owned BLE work is gone (closed, or a channel switch). Any task.
     void linkLost();
     // A reader OTA starts. Any task.

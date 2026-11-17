@@ -48,6 +48,11 @@ public:
         (void)reserve;
         return true;
     }
+    // The BLE proxy's reserves: its answers stop with this many slots free, its notifications earlier. On a
+    // healthy link a BLE burst fills the queue up to the answer reserve, so the websocket's network quality
+    // counts only a deeper backlog as degraded.
+    static constexpr size_t BULK_ANSWER_RESERVE = 2;
+    static constexpr size_t BULK_NOTIFICATION_RESERVE = 4;
 
     // --- Reader identity ------------------------------------------------------------------------
     // An admin asked a token-signed-in reader to pair (READER_START_PAIRING), or the reader has no

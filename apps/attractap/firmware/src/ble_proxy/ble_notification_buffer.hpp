@@ -1,9 +1,10 @@
 #pragma once
 
 // The session's notification buffer, bounded by count and bytes. NimBLE's host task pushes, the proxy task
-// pops and forwards as fast as the websocket takes them. When it is full the characteristic gets one overflow
-// marker (delivered after what was buffered before it) and nothing more until it is subscribed again: the
-// API fails that stream with NOTIFICATION_OVERFLOW instead of seeing a silent gap.
+// forwards the oldest entry and removes it only once the websocket took it, so a busy link backs up here and
+// nowhere else. When it is full the characteristic gets one overflow marker (delivered after what was buffered
+// before it) and nothing more until it is subscribed again: the API fails that stream with NOTIFICATION_OVERFLOW
+// instead of seeing a silent gap.
 
 #include <deque>
 #include <mutex>
@@ -31,9 +32,12 @@ namespace ble
 
         // false: dropped (buffer full, or the characteristic already overflowed).
         bool push(const Uuid &service, const Uuid &characteristic, const uint8_t *data, size_t length);
-        bool pop(Entry &out);
-        // A new subscription to the characteristic: it may deliver again.
-        void rearm(const Uuid &service, const Uuid &characteristic);
+        // The oldest entry, left in place. Only the proxy task peeks and removes, so it stays the oldest until then.
+        bool peek(Entry &out) const;
+        void removeOldest();
+        // The characteristic's subscription ended or starts again: what is buffered for it belonged to the old
+        // one and goes, and so does its overflow marker, so a new subscription starts clean.
+        void forget(const Uuid &service, const Uuid &characteristic);
         void clear();
         size_t size() const;
 

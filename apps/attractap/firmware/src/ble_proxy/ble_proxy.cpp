@@ -28,7 +28,17 @@ namespace
     constexpr TickType_t EVENT_POST_TIMEOUT = pdMS_TO_TICKS(200);
     constexpr uint32_t TASK_STACK = 6144;
     constexpr UBaseType_t TASK_PRIORITY = 3;
-    constexpr TickType_t IDLE_WAIT = pdMS_TO_TICKS(20);
+    // While work is pending (deadlines, a websocket that does not take answers yet) the task polls this often;
+    // otherwise it sleeps until a request or a radio event wakes it.
+    constexpr TickType_t POLL_WAIT = pdMS_TO_TICKS(20);
+    constexpr uint32_t PSRAM_CAPS = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
+
+    QueueHandle_t createQueue(UBaseType_t depth, UBaseType_t itemSize)
+    {
+        // Only tasks use these queues (never an ISR or code that runs with the cache off), so PSRAM is fine.
+        QueueHandle_t queue = xQueueCreateWithCaps(depth, itemSize, PSRAM_CAPS);
+        return queue ? queue : xQueueCreate(depth, itemSize);
+    }
 
     void logHeap(Logger &logger, const char *when)
     {
@@ -60,6 +70,8 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
         uint32_t token = 0;
         ble::Error error;
         ble::Bytes data;
+        // The radio's link epoch when NimBLE reported it: link events of an earlier link never reach a newer session.
+        uint32_t epoch = 0;
     };
 
     Hooks hooks;
@@ -78,10 +90,15 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
     // --- IBleSink (proxy task) ----------------------------------------------------------------------------
     bool send(const std::string &message) override { return hooks.send && hooks.send(message.data(), message.size()); }
     bool canSendNotification() override { return !hooks.canSendNotification || hooks.canSendNotification(); }
-    void log(bool isError, const char *line) override
+    void log(ble::LogLevel level, const char *line) override
     {
-        if (isError) logger.error(line);
-        else logger.info(line);
+        switch (level)
+        {
+        case ble::LogLevel::Debug: logger.debug(line); break;
+        case ble::LogLevel::Info: logger.info(line); break;
+        case ble::LogLevel::Warn: logger.warn(line); break;
+        case ble::LogLevel::Error: logger.error(line); break;
+        }
     }
 
     // --- IRadioEvents (NimBLE host task) ------------------------------------------------------------------
@@ -98,7 +115,10 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
     RadioEvent *make(RadioEvent::Kind kind)
     {
         auto *event = new (std::nothrow) RadioEvent();
-        if (event) event->kind = kind;
+        if (!event) return nullptr;
+        event->kind = kind;
+        // Called from inside the radio, under its lock: the epoch belongs to the link the event is about.
+        event->epoch = radio.linkEpoch();
         return event;
     }
     void radioAdvertisement(const ble::Address &address, int8_t rssi, bool hasRssi, const uint8_t *data,
@@ -161,6 +181,15 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
 
     void dispatch(RadioEvent &event, uint32_t now)
     {
+        // A link event posted just before a new connect (the old link's disconnect, say) would otherwise fail the
+        // new session. Scan events belong to no link.
+        const bool linkEvent =
+            event.kind != RadioEvent::Kind::Advertisement && event.kind != RadioEvent::Kind::ScanComplete;
+        if (linkEvent && event.epoch != radio.linkEpoch())
+        {
+            logger.debug("ble stale radio event dropped");
+            return;
+        }
         switch (event.kind)
         {
         case RadioEvent::Kind::Advertisement:
@@ -188,7 +217,9 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
     {
         for (;;)
         {
-            ulTaskNotifyTake(pdTRUE, IDLE_WAIT);
+            // A reader that never uses BLE never wakes this task: nothing has a deadline and nothing waits.
+            const bool idle = core.idle() && uxQueueMessagesWaiting(commands) == 0;
+            ulTaskNotifyTake(pdTRUE, idle ? portMAX_DELAY : POLL_WAIT);
             uint32_t now = millis();
             const uint32_t current = generation.load();
             if (current != handledGeneration)
@@ -204,7 +235,8 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
                 delete event;
             }
             ble::Command *command = nullptr;
-            while (xQueueReceive(commands, &command, 0) == pdTRUE)
+            // A full outbox holds requests back in the queue: their answers must not be dropped later.
+            while (core.acceptsRequests() && xQueueReceive(commands, &command, 0) == pdTRUE)
             {
                 // Requests of a connection that is already gone never run.
                 if (command->generation == handledGeneration)
@@ -232,24 +264,24 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
     // Answers a request that never reaches the state machine (malformed, or no room). Websocket task.
     void reject(const ble::Command &command, const ble::Error &error)
     {
-        if (!command.requestId || !command.sessionId[0]) return;
-        const std::string message =
-            command.type == ble::CommandType::Scan
-                ? ble::scanResultMessage(command.sessionId, command.requestId, error, nullptr)
-                : ble::resultMessage(command.sessionId, command.requestId, error);
-        send(message);
+        const std::string message = ble::refusalMessage(command, error);
+        if (!message.empty()) send(message);
     }
 };
 
 void BleProxy::setup(Hooks hooks)
 {
     if (impl) return;
-    impl = new (std::nothrow) Impl();
-    if (!impl) return;
+    // Every reader builds this at boot, BLE or not: the state lives in PSRAM so it costs no internal RAM. Never
+    // freed (the proxy lives until reboot).
+    void *memory = heap_caps_aligned_alloc(alignof(Impl), sizeof(Impl), PSRAM_CAPS);
+    if (!memory) memory = heap_caps_aligned_alloc(alignof(Impl), sizeof(Impl), MALLOC_CAP_8BIT);
+    if (!memory) return;
+    impl = new (memory) Impl();
     impl->hooks = std::move(hooks);
     impl->core.setOtaActive(impl->hooks.otaActive);
-    impl->commands = xQueueCreate(COMMAND_QUEUE_DEPTH, sizeof(ble::Command *));
-    impl->events = xQueueCreate(EVENT_QUEUE_DEPTH, sizeof(Impl::RadioEvent *));
+    impl->commands = createQueue(COMMAND_QUEUE_DEPTH, sizeof(ble::Command *));
+    impl->events = createQueue(EVENT_QUEUE_DEPTH, sizeof(Impl::RadioEvent *));
     logHeap(impl->logger, "at boot");
     // A PSRAM stack costs no internal RAM; the task never touches flash.
     if (!impl->commands || !impl->events ||
@@ -261,17 +293,21 @@ void BleProxy::setup(Hooks hooks)
     }
 }
 
-bool BleProxy::handleMessage(const char *type, JsonObjectConst payload)
+bool BleProxy::handleMessage(const char *type, JsonObjectConst payload, bool trusted)
 {
     if (!ble::isRequestType(type)) return false;
     if (!impl) return true;
     auto *command = new (std::nothrow) ble::Command();
     if (!command) return true;
     ble::Error error;
-    if (!ble::parseCommand(type, payload, *command, error) || !impl->task)
+    // Parsed even when untrusted: the refusal needs the requestId and sessionId to reach the caller.
+    const bool parsed = ble::parseCommand(type, payload, *command, error);
+    if (!trusted) error = ble::Error(ble::Code::ReaderUnsupported, "unauthenticated");
+    else if (parsed && !impl->task) error = ble::Error(ble::Code::ReaderOffline, "ble-init-failed");
+    if (!error.ok())
     {
-        if (!impl->task) error = ble::Error(ble::Code::ReaderOffline, "ble-init-failed");
-        impl->logger.errorf("Refused %s: %s %s", type, ble::codeName(error.code), error.detail);
+        impl->logger.warnf("ble request refused type=%s code=%s detail=%s", type, ble::codeName(error.code),
+                           error.detail);
         impl->reject(*command, error);
         delete command;
         return true;
@@ -311,9 +347,9 @@ void BleProxy::fillCapability(JsonObject capabilities, char *scratch, size_t siz
 
 // No proxy on this build: no capability, so the API never sends BLE requests; stray ones are dropped.
 void BleProxy::setup(Hooks hooks) { (void)hooks; }
-bool BleProxy::handleMessage(const char *type, JsonObjectConst payload)
+bool BleProxy::handleMessage(const char *type, JsonObjectConst payload, bool trusted)
 {
-    (void)payload;
+    (void)payload, (void)trusted;
     return ble::isRequestType(type);
 }
 void BleProxy::linkLost() {}

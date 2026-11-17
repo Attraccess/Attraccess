@@ -442,4 +442,12 @@ namespace ble
         if (detail && detail[0]) payload["detail"] = detail;
         return serialize(doc);
     }
+
+    std::string refusalMessage(const Command &command, const Error &error)
+    {
+        if (!command.requestId || !command.sessionId[0]) return std::string();
+        if (command.type == CommandType::Scan)
+            return scanResultMessage(command.sessionId, command.requestId, error, nullptr);
+        return resultMessage(command.sessionId, command.requestId, error);
+    }
 }

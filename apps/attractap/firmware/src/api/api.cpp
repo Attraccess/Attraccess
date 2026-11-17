@@ -50,8 +50,12 @@ void API::setup()
     BleProxy::Hooks bleHooks;
     // Answers keep two queue slots free, notifications four: heartbeats and UI traffic always fit.
     bleHooks.send = [this](const char *message, size_t length)
-    { return this->transport.sendQueueHasRoom(2) && this->transport.sendMessage(message, length); };
-    bleHooks.canSendNotification = [this]() { return this->transport.sendQueueHasRoom(4); };
+    {
+        return this->transport.sendQueueHasRoom(IReaderTransport::BULK_ANSWER_RESERVE) &&
+               this->transport.sendMessage(message, length);
+    };
+    bleHooks.canSendNotification = [this]()
+    { return this->transport.sendQueueHasRoom(IReaderTransport::BULK_NOTIFICATION_RESERVE); };
     bleHooks.otaActive = [this]() { return this->firmware.inProgress(); };
     this->bleProxy.setup(std::move(bleHooks));
 #ifdef ESP_PLATFORM
@@ -431,13 +435,6 @@ void API::processIncomingMessage(const char *buf, size_t len)
         return;
     }
 
-    // BLE proxy requests carry their own requestId and answers; never ACKed (ATT-1033).
-    if (strncmp(eventType, "BLE_", 4) == 0 &&
-        this->bleProxy.handleMessage(eventType, inboundDoc["data"]["payload"].as<JsonObjectConst>()))
-    {
-        return;
-    }
-
     // Card APDUs are the latency-critical path of a tap: handled before anything else, never ACKed.
     if (strcmp(eventType, "CARD_APDU") == 0)
     {
@@ -448,6 +445,15 @@ void API::processIncomingMessage(const char *buf, size_t len)
     {
         this->onCardConversationEnd(inboundDoc["data"].as<JsonObject>());
         return;
+    }
+    // BLE proxy requests carry their own requestId and answers; never ACKed (ATT-1033). Only the server that
+    // authenticated this reader on the paired session channel (mutual TLS) may drive its radio: not the legacy
+    // token or pairing channel, and not before READER_AUTHENTICATED. Others get READER_UNSUPPORTED.
+    if (strncmp(eventType, "BLE_", 4) == 0)
+    {
+        const bool trusted = this->transport.authenticatesReader() && State::getApiState().authenticated;
+        if (this->bleProxy.handleMessage(eventType, inboundDoc["data"]["payload"].as<JsonObjectConst>(), trusted))
+            return;
     }
     // Coredump upload replies (ATT-1144) pace the upload themselves (one chunk in flight, retried on a
     // timeout), so the server sends them without waiting for an ACK. Their errors are upload steps.

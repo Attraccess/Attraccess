@@ -15,15 +15,17 @@ namespace ble
 {
     using namespace core_detail;
 
-    void BleProxyCore::logf(bool isError, const char *format, ...)
+    void BleProxyCore::logf(LogLevel level, const char *format, ...)
     {
         char line[160];
         va_list args;
         va_start(args, format);
         std::vsnprintf(line, sizeof line, format, args);
         va_end(args);
-        sink.log(isError, line);
+        sink.log(level, line);
     }
+
+    bool BleProxyCore::acceptsRequests() const { return outbox.size() + OUTBOX_RESERVE < MAX_OUTBOX; }
 
     // ------------------------------------------------------------------------------------------- requests
 
@@ -63,7 +65,7 @@ namespace ble
         const Error error = radio.init();
         if (!error.ok())
         {
-            logf(true, "ble init failed (%s)", error.detail);
+            logf(LogLevel::Error, "ble init failed detail=%s", error.detail);
             answer(command, Error(Code::ReaderOffline, "ble-init-failed"));
             return false;
         }
@@ -183,7 +185,10 @@ namespace ble
         const Error allowed = checkAllowed(command);
         if (!allowed.ok())
         {
-            logf(true, "ble %s rejected by allowlist (%s)", opName(command.type), allowed.detail);
+            char id[9];
+            shortId(command.sessionId, id);
+            logf(LogLevel::Warn, "ble %s session=%s req=%u rejected by allowlist detail=%s", opName(command.type), id,
+                 static_cast<unsigned>(command.requestId), allowed.detail);
             answer(command, allowed, nullptr, 0, now);
             return;
         }
@@ -268,6 +273,8 @@ namespace ble
 
     void BleProxyCore::removeSubscription(const Uuid &service, const Uuid &characteristic)
     {
+        // Buffered notifications belong to the subscription that ends here; a later one must not see them.
+        notifications.forget(service, characteristic);
         auto &subs = session.subscriptions;
         subs.erase(std::remove_if(subs.begin(), subs.end(),
                                   [&](const Subscription &s) {
@@ -320,7 +327,8 @@ namespace ble
         {
             if (!current.retry)
             {
-                // Forwarding starts with the CCCD write: a notification may beat its confirmation.
+                // Forwarding starts with the CCCD write: a notification may beat its confirmation. A previous
+                // subscription to the characteristic ends here, with whatever it still had buffered.
                 const AllowEntry *entry = findEntry(command.service, command.characteristic);
                 removeSubscription(command.service, command.characteristic);
                 Subscription subscription;
@@ -329,7 +337,6 @@ namespace ble
                 subscription.id = command.requestId;
                 subscription.maxBytes = entry ? entry->maxNotification : 0;
                 session.subscriptions.push_back(subscription);
-                notifications.rearm(command.service, command.characteristic);
             }
             start = radio.setNotifications(current.token, command.service, command.characteristic,
                                            command.indicate ? 2 : 1, error);
@@ -399,7 +406,7 @@ namespace ble
         Current &current = session.current;
         if (currentOwner != Owner::Session || !current.active || current.token != token)
         {
-            logf(false, "ble late radio result dropped");
+            logf(LogLevel::Debug, "ble late radio result dropped");
             return;
         }
         current.radioBusy = false;

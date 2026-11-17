@@ -98,7 +98,9 @@ namespace ble
         }
         char id[9];
         shortId(scan.command.sessionId, id);
-        logf(!error.ok(), "ble scan session=%s %s results=%u %ums", id, error.ok() ? "ok" : codeName(error.code),
+        const LogLevel level =
+            error.ok() ? LogLevel::Debug : error.code == Code::Cancelled ? LogLevel::Info : LogLevel::Warn;
+        logf(level, "ble scan session=%s %s results=%u %ums", id, error.ok() ? "ok" : codeName(error.code),
              static_cast<unsigned>(matches.size()), static_cast<unsigned>(now - scan.command.receivedMs));
         send(scanResultMessage(scan.command.sessionId, scan.command.requestId, error, error.ok() ? &matches : nullptr));
         scan = Scan();
@@ -126,7 +128,8 @@ namespace ble
         }
         session.mtu = std::min<uint16_t>(std::max<uint16_t>(mtu, MIN_MTU), MAX_MTU);
         session.state = SessionState::Open;
-        session.leaseDeadline = session.openedMs + session.leaseMs + LEASE_GRACE_MS;
+        // The API starts its lease once the session is open, so the reader's starts here too, not at the request.
+        session.leaseDeadline = now + session.leaseMs + LEASE_GRACE_MS;
         answer(session.current.command, Error(), nullptr, session.mtu, now);
         session.current = Current();
         pump(now);
@@ -185,7 +188,7 @@ namespace ble
         session.releaseDeadline = now + RELEASE_DEADLINE_MS;
         char id[9];
         shortId(session.id, id);
-        logf(false, "ble session=%s ended reason=%s detail=%s after %ums", id, reason, pending.detail,
+        logf(LogLevel::Info, "ble session=%s ended reason=%s detail=%s after %ums", id, reason, pending.detail,
              static_cast<unsigned>(now - session.openedMs));
         if (radioDown)
         {
@@ -315,16 +318,28 @@ namespace ble
 
     void BleProxyCore::drainNotifications()
     {
+        // Answers go first and a notification leaves the buffer only once the websocket took it: a busy link backs
+        // notifications up in their bounded buffer (which overflows with a marker), never into the outbox.
+        if (!outbox.empty()) return;
         NotificationBuffer::Entry entry;
-        while (sink.canSendNotification() && notifications.pop(entry))
+        while (sink.canSendNotification() && notifications.peek(entry))
         {
-            if (currentOwner != Owner::Session || session.state != SessionState::Open) continue;
-            Subscription *subscription = findSubscription(entry.service, entry.characteristic);
-            if (!subscription || subscription->failed) continue;
+            Subscription *subscription = currentOwner == Owner::Session && session.state == SessionState::Open
+                                             ? findSubscription(entry.service, entry.characteristic)
+                                             : nullptr;
+            if (!subscription || subscription->failed)
+            {
+                notifications.removeOldest();
+                continue;
+            }
             Error error;
             if (entry.overflow) error = Error(Code::NotificationOverflow, "reader-buffer");
             else if (entry.oversizedLength || entry.value.size() > subscription->maxBytes)
                 error = Error(Code::PayloadTooLarge, "max-notification");
+            if (!sink.send(notificationMessage(session.id, subscription->id, subscription->seq + 1, error,
+                                               entry.value.data(), entry.value.size())))
+                return; // stays buffered; the next tick tries again
+            notifications.removeOldest();
             subscription->seq++;
             if (!error.ok())
             {
@@ -332,11 +347,9 @@ namespace ble
                 subscription->failed = true;
                 char id[9];
                 shortId(session.id, id);
-                logf(true, "ble notification session=%s sub=%u failed %s", id, static_cast<unsigned>(subscription->id),
-                     codeName(error.code));
+                logf(LogLevel::Warn, "ble notification session=%s sub=%u failed code=%s", id,
+                     static_cast<unsigned>(subscription->id), codeName(error.code));
             }
-            send(notificationMessage(session.id, subscription->id, subscription->seq, error, entry.value.data(),
-                                     entry.value.size()));
         }
     }
 
@@ -351,9 +364,11 @@ namespace ble
         // The API closes every cancelled open again (the cancel may have raced the connect): not an error.
         const bool expected = error.code == Code::Cancelled ||
                               (command.type == CommandType::Close && error.code == Code::SessionClosed);
-        logf(!error.ok() && !expected, "ble %s session=%s req=%u %s%s%s %ums", opName(command.type),
+        const LogLevel level = error.ok() ? LogLevel::Debug : expected ? LogLevel::Info : LogLevel::Warn;
+        logf(level, "ble %s session=%s req=%u %s%s%s %ums", opName(command.type),
              id, static_cast<unsigned>(command.requestId), error.ok() ? "ok" : codeName(error.code),
-             error.detail[0] ? " " : "", error.detail, static_cast<unsigned>(now ? now - command.receivedMs : 0));
+             error.detail[0] ? " detail=" : "", error.detail,
+             static_cast<unsigned>(now ? now - command.receivedMs : 0));
         if (command.type == CommandType::Scan)
             send(scanResultMessage(command.sessionId, command.requestId, error, nullptr));
         else
@@ -362,13 +377,10 @@ namespace ble
 
     void BleProxyCore::send(std::string &&message)
     {
-        // Answers keep their order: nothing overtakes what is already waiting.
+        // Answers keep their order: nothing overtakes what is already waiting. Never dropped: the API would wait
+        // for a lost answer until its own timeout, and a lost session end would leave it holding the reader.
+        // acceptsRequests() keeps the outbox bounded.
         if (outbox.empty() && sink.send(message)) return;
-        if (outbox.size() >= MAX_OUTBOX)
-        {
-            logf(true, "ble outbox full, answer dropped");
-            return;
-        }
         outbox.push_back(std::move(message));
     }
 
