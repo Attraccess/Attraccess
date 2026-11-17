@@ -1,4 +1,3 @@
-import { DataSource, EntityManager, Repository } from 'typeorm';
 import { PLUGIN_HOST_CONNECTION } from '../persistence/plugin-host-data.port';
 
 /**
@@ -6,7 +5,6 @@ import { PLUGIN_HOST_CONNECTION } from '../persistence/plugin-host-data.port';
  * its managers and repositories, and the host connection token of the plugin runtime. `@nestjs/typeorm` names the
  * repository of an entity `<Entity>Repository`, and the default data source `DataSource`.
  */
-const DATABASE_CLASSES: readonly unknown[] = [DataSource, EntityManager, Repository];
 const DATABASE_CLASS_NAMES = new Set(['DataSource', 'EntityManager', 'QueryRunner', 'Repository', 'Connection']);
 const DATABASE_TOKEN_NAME = /^(DataSource|EntityManager|QueryRunner|Connection|.*Repository)$/;
 
@@ -14,12 +12,11 @@ const DATABASE_TOKEN_NAME = /^(DataSource|EntityManager|QueryRunner|Connection|.
 export function isDatabaseToken(token: unknown): boolean {
   if (token === PLUGIN_HOST_CONNECTION) return true;
   if (typeof token === 'function') {
-    // A class from another copy of typeorm has the same name; subclasses of Repository are repositories.
-    return (
-      DATABASE_CLASSES.some(
-        (klass) => token === klass || (token as { prototype?: unknown }).prototype instanceof (klass as never),
-      ) || DATABASE_CLASS_NAMES.has(token.name)
-    );
+    // Matched by name along the prototype chain, so a class from another copy of typeorm and subclasses of
+    // Repository are recognised without the host runtime importing the ORM.
+    for (let klass: unknown = token; typeof klass === 'function'; klass = Object.getPrototypeOf(klass)) {
+      if (DATABASE_CLASS_NAMES.has((klass as { name: string }).name)) return true;
+    }
   }
   if (typeof token === 'string') return DATABASE_TOKEN_NAME.test(token);
   if (typeof token === 'symbol') return DATABASE_TOKEN_NAME.test(token.description ?? '');
