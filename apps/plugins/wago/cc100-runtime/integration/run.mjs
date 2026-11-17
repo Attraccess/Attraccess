@@ -23,20 +23,11 @@ function backendSource(sourceRoot, currentPath, legacyPath) {
 // Plugin SDK 2.0 removed the TypeORM decorators from the SDK root (they moved to `/sqlite`). A base revision that still
 // imports them from the root cannot load against the SDK of the revision under test, so the "main" service falls back
 // to the current service until the base revision is on SDK 2.0 too. The simulator itself does not use the SDK.
+const legacyDecoratorImport =
+  /import\s*\{[^}]*\b(?:PrimaryGeneratedColumn|Entity)\b[^}]*\}\s*from\s*'@attraccess\/plugins-backend-sdk'/;
 async function usesLegacySdkPersistence(directory) {
-  for (const entry of await readdir(directory, { withFileTypes: true })) {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) {
-      if (await usesLegacySdkPersistence(path)) return true;
-    } else if (
-      path.endsWith('.ts') &&
-      /import\s*\{[^}]*\b(?:PrimaryGeneratedColumn|Entity)\b[^}]*\}\s*from\s*'@attraccess\/plugins-backend-sdk'/.test(
-        await readFile(path, 'utf8'),
-      )
-    ) {
-      return true;
-    }
-  }
+  const files = (await readdir(directory, { recursive: true })).filter((file) => file.endsWith('.ts'));
+  for (const file of files) if (legacyDecoratorImport.test(await readFile(join(directory, file), 'utf8'))) return true;
   return false;
 }
 async function snapshot(ref, label, directories) {
