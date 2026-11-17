@@ -65,6 +65,16 @@ def control(*payload):
     return {"op": "write", "key": "control", "value": bytes(payload).hex()}
 
 
+def run_when_free(ble, endpoint, steps, within=3.0, **options):
+    """``run``, retried while the reader still finishes cancelled work (READER_BUSY for about one round trip)."""
+    deadline = time.monotonic() + within
+    while True:
+        result = run(ble, endpoint, steps, **options)
+        if result["open"].get("code") != "READER_BUSY" or time.monotonic() > deadline:
+            return result
+        time.sleep(0.3)
+
+
 def save(artifacts, name, data):
     (artifacts / f"ble-{name}.json").write_text(json.dumps(data, indent=1))
 
@@ -116,6 +126,7 @@ def test_ble_rejects_outside_the_profile_before_execution(ble, peripheral, reade
 def test_ble_read_write_and_notifications(ble, peripheral, artifacts):
     result = run(ble, peripheral, [
         {"op": "mtu"},
+        control(0x05, 64, 0),  # the read length outlives connections: start from the 64-byte default
         {"op": "read", "key": "read"},
         {"op": "write", "key": "write", "value": "c0ffee" * 100},
         {"op": "read", "key": "write"},
@@ -130,8 +141,8 @@ def test_ble_read_write_and_notifications(ble, peripheral, artifacts):
     save(artifacts, "basic", result)
     assert result["open"]["ok"] and all(step["ok"] for step in result["steps"]), result
     assert result["steps"][0]["mtu"] > 23
-    assert result["steps"][1]["value"] == bytes(range(64)).hex()
-    assert result["steps"][3]["value"] == "c0ffee" * 100
+    assert result["steps"][2]["value"] == bytes(range(64)).hex()
+    assert result["steps"][4]["value"] == "c0ffee" * 100
     assert result["closed"] == {"reason": "closed"}
 
 
@@ -159,13 +170,17 @@ def test_ble_notification_burst_and_overflow(ble, peripheral, artifacts):
 
 @needs_peripheral
 def test_ble_cancellation_releases_the_reader(ble, reader, peripheral):
-    """Cancel a connect to an absent device and a notification wait; the reader is free right after."""
+    """Cancel a connect to an absent device and a notification wait; the reader is free right after.
+
+    "Right after" is once the reader confirmed the cancel, about one round trip: until then the reader answers
+    READER_BUSY (retryable), as the plugin docs say.
+    """
     absent = ble("endpoints", {"readerId": reader["id"], "address": "02:00:00:00:00:01", "addressType": "random",
                                "profileId": "test-peripheral"})["id"]
     cancelled = run(ble, absent, [], connectTimeoutMs=15_000, abortOpenAfterMs=1500)
     assert cancelled["open"]["code"] == "CANCELLED", cancelled
     started = time.monotonic()
-    waited = run(ble, peripheral, [
+    waited = run_when_free(ble, peripheral, [
         {"op": "subscribe", "key": "notify"},
         {"op": "next", "key": "notify", "timeoutMs": 30_000, "abortAfterMs": 1000},
         {"op": "read", "key": "read"},
