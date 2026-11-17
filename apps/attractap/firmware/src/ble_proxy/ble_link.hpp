@@ -1,8 +1,9 @@
 #pragma once
 
 // The link the reader asks for on every plugin BLE connect (ATT-1296): a short connection interval and the
-// largest LE data length (no 2M PHY: it measured no gain, the round trip is the websocket's), so bulk writes without response and their acks need fewer connection events. These are
-// requests: a peripheral may refuse or change any of them and the session works with whatever it ends up with.
+// largest LE data length, so bulk writes without response and their acks need fewer connection events. No 2M PHY:
+// it measured no gain, the round trip is the websocket's. These are requests: a peripheral may refuse or change any
+// of them and the session works with whatever it ends up with.
 // Plain C++ (no NimBLE), so host tests cover the values and the log line.
 
 #include <cstddef>
