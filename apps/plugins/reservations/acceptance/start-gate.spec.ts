@@ -101,6 +101,8 @@ describe.each([['session' as const], ['api-token' as const]])('host start gate w
       { onCleared: () => undefined, raise: async () => ({}), clearWhere: async () => undefined } as never,
       { record: async () => undefined } as never,
       { get: () => ({}) } as never,
+      // The pre-start path opens no host transaction, so no unit of work is needed.
+      {} as never,
     );
     const hostPreStart = new HostPreStartService(
       { precheckStart: async () => undefined } as never,
