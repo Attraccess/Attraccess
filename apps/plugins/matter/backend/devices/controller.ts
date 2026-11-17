@@ -12,6 +12,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
+import { MATTER_OPERATIONS } from '../permissions';
 import { principalOf } from '../connection/controller';
 import { validationMessages } from '../connection/validation';
 import { MatterLifecycleService } from './lifecycle.service';
@@ -46,8 +47,6 @@ export type ReconciliationStatusResponse = ReconciliationStatusView & {
 /**
  * Admin REST API for Matter nodes and endpoints. No endpoint here sends a command to a device.
  */
-// TODO(ATT-1003): replace system.plugins.manage with a dedicated Matter permission
-@Auth('system.plugins.manage')
 @Controller('matter')
 export class MatterDevicesController {
   constructor(
@@ -56,52 +55,61 @@ export class MatterDevicesController {
     @Inject(MatterStateService) private readonly state: MatterStateService,
   ) {}
 
+  @Auth(...MATTER_OPERATIONS.nodeList)
   @Get('nodes')
   async listNodes(@Query() query: unknown) {
     const filter = parse(listQuerySchema, query, 'query');
     return (await this.lifecycle.listNodes(filter)).map(nodeView);
   }
 
+  @Auth(...MATTER_OPERATIONS.nodeGet)
   @Get('nodes/:id')
   async getNode(@Param('id') id: string) {
     return nodeDetailView(await this.lifecycle.getNode(parseId(id)));
   }
 
+  @Auth(...MATTER_OPERATIONS.nodeUpdate)
   @Patch('nodes/:id')
   async updateNode(@Param('id') id: string, @Body() body: unknown, @Req() request: AuthenticatedRequest) {
     return nodeView(await this.lifecycle.updateNode(parseId(id), parse(metadataSchema, body), principalOf(request)));
   }
 
+  @Auth(...MATTER_OPERATIONS.nodeClaim)
   @Post('nodes/:id/claim')
   @HttpCode(200)
   async claim(@Param('id') id: string, @Body() body: unknown, @Req() request: AuthenticatedRequest) {
     return nodeView(await this.lifecycle.claim(parseId(id), parse(claimSchema, body ?? {}), principalOf(request)));
   }
 
+  @Auth(...MATTER_OPERATIONS.nodeRelink)
   @Post('nodes/:id/relink')
   @HttpCode(200)
   async relink(@Param('id') id: string, @Body() body: unknown, @Req() request: AuthenticatedRequest) {
     return nodeView(await this.lifecycle.relink(parseId(id), parse(relinkSchema, body), principalOf(request)));
   }
 
+  @Auth(...MATTER_OPERATIONS.nodeRepair)
   @Post('nodes/:id/repair')
   @HttpCode(200)
   async repair(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     return nodeView(await this.lifecycle.repair(parseId(id), principalOf(request)));
   }
 
+  @Auth(...MATTER_OPERATIONS.nodeArchive)
   @Post('nodes/:id/archive')
   @HttpCode(200)
   async archive(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     return nodeView(await this.lifecycle.archive(parseId(id), principalOf(request)));
   }
 
+  @Auth(...MATTER_OPERATIONS.nodeRestore)
   @Post('nodes/:id/restore')
   @HttpCode(200)
   async restore(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
     return nodeView(await this.lifecycle.restore(parseId(id), principalOf(request)));
   }
 
+  @Auth(...MATTER_OPERATIONS.nodeForceRemove)
   @Post('nodes/:id/force-remove')
   @HttpCode(200)
   async forceRemove(@Param('id') id: string, @Body() body: unknown, @Req() request: AuthenticatedRequest) {
@@ -109,6 +117,7 @@ export class MatterDevicesController {
     return nodeView(await this.lifecycle.forceRemove(parseId(id), principalOf(request)));
   }
 
+  @Auth(...MATTER_OPERATIONS.endpointUpdate)
   @Patch('endpoints/:id')
   async updateEndpoint(@Param('id') id: string, @Body() body: unknown, @Req() request: AuthenticatedRequest) {
     return endpointView(
@@ -116,18 +125,21 @@ export class MatterDevicesController {
     );
   }
 
+  @Auth(...MATTER_OPERATIONS.endpointState)
   @Get('endpoints/:id/state')
   async endpointState(@Param('id') id: string): Promise<{ endpointRef: string; states: StateEntryView[] }> {
     const endpoint = await this.lifecycle.getEndpoint(parseId(id));
     return { endpointRef: endpoint.id, states: await this.state.read(endpoint.id) };
   }
 
+  @Auth(...MATTER_OPERATIONS.reconciliationStatus)
   @Get('reconciliation')
   async reconciliationStatus(): Promise<ReconciliationStatusResponse> {
     return { ...(await this.reconciliation.status()), events: { ...this.state.stats } };
   }
 
   /** Runs a reconciliation now (or joins the one in progress) and returns the resulting status. */
+  @Auth(...MATTER_OPERATIONS.reconciliationRun)
   @Post('reconciliation')
   @HttpCode(200)
   async trigger(@Req() request: AuthenticatedRequest): Promise<ReconciliationStatusResponse> {

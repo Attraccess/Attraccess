@@ -15,13 +15,14 @@ import { ApiBearerAuth, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { DualAuthGuard } from './dual-auth.guard';
 import { AuthenticatedUser } from './auth.types';
 import { SystemPermission } from '@attraccess/shared';
+import type { PermissionKey } from './plugin-permissions';
 
 export type { SystemPermission };
 
-const NeedsPermissions = Reflector.createDecorator<SystemPermission[]>();
-const NeedsAnyPermission = Reflector.createDecorator<SystemPermission[]>();
+const NeedsPermissions = Reflector.createDecorator<PermissionKey[]>();
+const NeedsAnyPermission = Reflector.createDecorator<PermissionKey[]>();
 
-export function Auth(...permissions: SystemPermission[]) {
+export function Auth(...permissions: PermissionKey[]) {
   return applyDecorators(
     NeedsPermissions(permissions),
     UseGuards(DualAuthGuard, EffectivePermissionsGuard),
@@ -30,7 +31,7 @@ export function Auth(...permissions: SystemPermission[]) {
   );
 }
 
-export function AuthAny(...permissions: SystemPermission[]) {
+export function AuthAny(...permissions: PermissionKey[]) {
   return applyDecorators(
     NeedsAnyPermission(permissions),
     UseGuards(DualAuthGuard, EffectivePermissionsGuard),
@@ -39,7 +40,7 @@ export function AuthAny(...permissions: SystemPermission[]) {
   );
 }
 
-export function SessionAuth(...permissions: SystemPermission[]) {
+export function SessionAuth(...permissions: PermissionKey[]) {
   return applyDecorators(
     NeedsPermissions(permissions),
     UseGuards(DualAuthGuard, EffectivePermissionsGuard, SessionOnlyGuard),

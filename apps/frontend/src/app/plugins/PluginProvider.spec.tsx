@@ -270,7 +270,22 @@ describe('PluginProvider', () => {
     const instance = usePluginState.getState().plugins[0].plugin;
     await waitFor(() => expect(instance.onApiEndpointChange).toHaveBeenCalledWith('http://test.local'));
     expect(instance.onApiAuthStateChange).toHaveBeenCalledWith(
-      expect.objectContaining({ authToken: '', user: hoisted.user }),
+      expect.objectContaining({ authToken: '', user: hoisted.user, effectivePermissions: [] }),
+    );
+  });
+
+  it("passes the user's effective permissions, plugin keys included, to plugins", async () => {
+    hoisted.user = { id: 1, username: 'admin', effectivePermissions: ['resources.read', 'matter.devices.read'] };
+    primeManifest();
+
+    render(<PluginProvider />);
+
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(1));
+    const instance = usePluginState.getState().plugins[0].plugin;
+    await waitFor(() =>
+      expect(instance.onApiAuthStateChange).toHaveBeenCalledWith(
+        expect.objectContaining({ effectivePermissions: ['resources.read', 'matter.devices.read'] }),
+      ),
     );
   });
 

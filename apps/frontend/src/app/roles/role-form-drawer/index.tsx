@@ -12,14 +12,13 @@ import {
 } from '@heroui/react';
 import { LockIcon } from 'lucide-react';
 import { PermissionPicker } from '../../../components/permissionPicker/index';
+import { groupPermissionsByCategory } from '../../../components/permissionPicker/groupPermissionsByCategory';
 import { useEffect, useMemo, useState } from 'react';
 import type { Key } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
-import type { SystemPermission } from '@attraccess/shared';
 import {
   ApiError,
-  Permission,
   useRbacServiceCreateRole,
   useRbacServiceListPermissions,
   useRbacServiceListRolesKey,
@@ -34,7 +33,7 @@ import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 
-export const CATEGORY_ORDER = ['resources', 'users', 'system', 'billing'];
+export { CATEGORY_ORDER } from '../../../components/permissionPicker/groupPermissionsByCategory';
 
 export interface Props {
   isOpen: boolean;
@@ -51,7 +50,7 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
     useRbacCatalogTranslations();
   const toast = useToastMessage();
   const queryClient = useQueryClient();
-  const { hasPermission } = useAuth();
+  const { hasPermissionKey } = useAuth();
 
   const isReadOnly = !!role?.isSystemManaged;
   const mode = role === null ? 'create' : isReadOnly ? 'view' : 'edit';
@@ -69,25 +68,12 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
     setSelectedKeys(new Set((role?.rolePermissions ?? []).map((rp) => rp.permissionKey)));
   }, [isOpen, role, roleName, roleDescription]);
 
-  const permissionsByCategory = useMemo(() => {
-    const groups = new Map<string, Permission[]>();
-    for (const permission of permissions ?? []) {
-      const group = groups.get(permission.category) ?? [];
-      group.push(permission);
-      groups.set(permission.category, group);
-    }
-    const categories = [...groups.keys()].sort((a, b) => {
-      const ia = CATEGORY_ORDER.indexOf(a);
-      const ib = CATEGORY_ORDER.indexOf(b);
-      return (ia === -1 ? CATEGORY_ORDER.length : ia) - (ib === -1 ? CATEGORY_ORDER.length : ib);
-    });
-    return categories.map((category) => ({ category, permissions: groups.get(category) as Permission[] }));
-  }, [permissions]);
+  const permissionsByCategory = useMemo(() => groupPermissionsByCategory(permissions ?? []), [permissions]);
 
   // Permissions the acting user does not hold: visible but locked (grant safety)
   const nonGrantableKeys = useMemo(
-    () => (permissions ?? []).filter((p) => !hasPermission(p.key as SystemPermission)).map((p) => p.key),
-    [permissions, hasPermission],
+    () => (permissions ?? []).filter((p) => !hasPermissionKey(p.key)).map((p) => p.key),
+    [permissions, hasPermissionKey],
   );
 
   // Locked keys can be neither added nor removed, no matter how the change was triggered
@@ -181,13 +167,14 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
               {permissionsByCategory
                 .map(({ category, permissions: categoryPermissions }) => ({
                   category,
+                  sample: categoryPermissions[0],
                   selected: categoryPermissions.filter((p) => selectedKeys.has(p.key)),
                 }))
                 .filter(({ selected }) => selected.length > 0)
-                .map(({ category, selected }) => (
+                .map(({ category, sample, selected }) => (
                   <div key={category} className="flex flex-col gap-1.5">
                     <p className="text-xs font-semibold text-default-500 uppercase tracking-wide">
-                      {permissionCategory(category)}
+                      {permissionCategory(category, sample)}
                     </p>
                     <div className="flex flex-wrap gap-1">
                       {selected.map((permission) => (

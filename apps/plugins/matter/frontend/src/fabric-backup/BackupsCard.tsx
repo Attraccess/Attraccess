@@ -13,6 +13,8 @@ type Props = Readonly<{
   onBackup: () => void;
   onDownload: (item: BackupView) => void;
   onRestore: () => void;
+  /** Holds `matter.devices.manage`: without it the actions and download buttons are hidden. */
+  canManage: boolean;
   formatDateTime: (value: string | null) => React.ReactNode;
 }>;
 
@@ -69,7 +71,7 @@ function BackupActions({ status, pending, onBackup, onRestore }: Props) {
   );
 }
 
-function StoredList({ status, pending, onDownload, formatDateTime }: Props) {
+function StoredList({ status, pending, onDownload, canManage, formatDateTime }: Props) {
   const { t } = useMatterTranslations();
   const formatSize = useFormatSize();
   const { stored } = status.backups;
@@ -95,15 +97,17 @@ function StoredList({ status, pending, onDownload, formatDateTime }: Props) {
               {!item.consistent && ` · ${t('fabric.backups.inconsistentMark')}`}
             </p>
           </div>
-          <Button
-            variant="tertiary"
-            isDisabled={pending !== null}
-            isPending={pending === downloadAction(item)}
-            onPress={() => onDownload(item)}
-            data-cy={`matter-backup-download-${item.id}`}
-          >
-            {t('fabric.backups.download')}
-          </Button>
+          {canManage && (
+            <Button
+              variant="tertiary"
+              isDisabled={pending !== null}
+              isPending={pending === downloadAction(item)}
+              onPress={() => onDownload(item)}
+              data-cy={`matter-backup-download-${item.id}`}
+            >
+              {t('fabric.backups.download')}
+            </Button>
+          )}
         </li>
       ))}
     </ul>
@@ -137,7 +141,7 @@ export function BackupsCard(props: Props) {
           </Field>
         </dl>
         {lastAttempt?.outcome === 'failed' && <LastFailure reason={lastAttempt.reason} />}
-        <BackupActions {...props} />
+        {props.canManage && <BackupActions {...props} />}
         <StoredList {...props} />
         <p className="mt:text-xs mt:text-muted">{t('fabric.backups.retention', { count: backups.retention })}</p>
       </Card.Content>

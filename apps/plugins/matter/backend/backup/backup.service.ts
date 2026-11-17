@@ -10,7 +10,7 @@ import {
 import { randomUUID, createHash } from 'node:crypto';
 import type { EntityManager } from 'typeorm';
 import { MatterConnectionService } from '../connection/connection.service';
-import { DeviceAuditService } from '../devices/audit.service';
+import { DeviceAuditService, auditUserId, isSystemAudit, type AuditBy } from '../devices/audit.service';
 import { MatterFabric } from '../devices/entities';
 import { runTransaction } from '../fabric/db';
 import { INSECURE_MESSAGE, conflict, sidecarCode } from '../fabric/errors';
@@ -178,45 +178,39 @@ export class MatterBackupService {
 
   /**
    * Takes a backup now. Joins a backup that is already running, except for `pre_restore`, `restore` and `fresh` ones,
-   * which must reflect the state at their own moment. `principal: null` is the plugin itself (schedule, events).
+   * which must reflect the state at their own moment. `by: null` is the plugin itself (schedule, events); an actor ties
+   * the entry to the operation that asked for the backup.
    */
-  async backup(
-    trigger: BackupTrigger,
-    principal: PluginAuditPrincipal | null = null,
-    options: BackupOptions = {},
-  ): Promise<BackupView> {
+  async backup(trigger: BackupTrigger, by: AuditBy = null, options: BackupOptions = {}): Promise<BackupView> {
     if (this.guard.busy) throw conflict('busy', 'A restore is in progress.');
     const own = options.fresh === true || trigger === 'pre_restore' || trigger === 'restore';
     while (this.inFlight) {
       if (!own) return this.inFlight;
       await this.inFlight.catch(() => undefined);
     }
-    const run = this.attempt(trigger, principal, options).finally(() => {
+    const run = this.attempt(trigger, by, options).finally(() => {
       if (this.inFlight === run) this.inFlight = undefined;
     });
     this.inFlight = run;
     return run;
   }
 
-  private async attempt(
-    trigger: BackupTrigger,
-    principal: PluginAuditPrincipal | null,
-    options: BackupOptions,
-  ): Promise<BackupView> {
+  private async attempt(trigger: BackupTrigger, by: AuditBy, options: BackupOptions): Promise<BackupView> {
     const id = randomUUID();
     const createdAt = new Date().toISOString();
+    const system = isSystemAudit(by);
     try {
-      const row = await this.produce({ id, createdAt, trigger, actor: principal?.userId ?? null }, options);
+      const row = await this.produce({ id, createdAt, trigger, actor: auditUserId(by) }, options);
       await this.prune();
       await this.audit.record(
         'matter.backup_succeeded',
-        principal,
+        by,
         { type: 'matter.backup', ref: id },
         {
           backupRef: id,
           trigger,
           fabricGeneration: row.fabricGeneration ?? 0,
-          system: principal === null,
+          system,
         },
       );
       for (const listener of this.succeededListeners) listener(trigger);
@@ -224,12 +218,12 @@ export class MatterBackupService {
     } catch (error) {
       const reason = error instanceof BackupFailure ? error.reason : 'internal';
       if (!(error instanceof BackupFailure)) this.context.logger.warn?.('A Matter backup failed unexpectedly.');
-      await this.recordFailure(id, createdAt, trigger, principal?.userId ?? null, reason);
+      await this.recordFailure(id, createdAt, trigger, auditUserId(by), reason);
       await this.audit.record(
         'matter.backup_failed',
-        principal,
+        by,
         { type: 'matter.backup', ref: id },
-        { backupRef: id, trigger, reason, system: principal === null },
+        { backupRef: id, trigger, reason, system },
         'failed',
       );
       throw this.toHttp(reason);
@@ -414,10 +408,16 @@ export class MatterBackupService {
     };
   }
 
-  /** The encrypted file, as stored: the ciphertext only, with a download name. */
-  async download(id: string): Promise<{ filename: string; file: Buffer }> {
+  /** The encrypted file, as stored: the ciphertext only, with a download name. Audited: it leaves the installation. */
+  async download(id: string, principal: PluginAuditPrincipal): Promise<{ filename: string; file: Buffer }> {
     const row = await this.repo.findOneBy({ id, outcome: 'succeeded' });
     if (!row?.blob) throw new NotFoundException({ code: 'not_found', message: 'There is no such backup.' });
+    await this.audit.record(
+      'matter.backup_downloaded',
+      principal,
+      { type: 'matter.backup', ref: row.id },
+      { backupRef: row.id, fabricGeneration: row.fabricGeneration ?? 0 },
+    );
     const date = row.createdAt.slice(0, 10);
     return {
       filename: `attraccess-matter-${date}-${row.id.slice(0, 8)}${FILE_EXTENSION}`,

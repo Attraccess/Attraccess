@@ -8,7 +8,14 @@ const state = vi.hoisted(() => ({
   me: 1,
   manageCards: false,
   roles: [] as { id: number; rolePermissions?: { permissionKey: string }[] }[],
-  permissions: [] as { key: string; label: string; description: string; category?: string }[],
+  permissions: [] as {
+    key: string;
+    label: string;
+    description: string;
+    category?: string;
+    pluginName?: string;
+    categoryLabel?: string;
+  }[],
   assignments: [] as { roleId: number }[],
   providers: [] as Record<string, unknown>[],
   loading: false,
@@ -48,7 +55,7 @@ vi.mock('../../../hooks/useRbacCatalogTranslations', () => ({
   useRbacCatalogTranslations: () => ({
     permissionLabel: (p: { label: string }) => p.label,
     permissionDescription: (p: { description: string }) => p.description,
-    permissionCategory: (category: string) => category,
+    permissionCategory: (category: string, p?: { categoryLabel?: string }) => p?.categoryLabel ?? category,
   }),
 }));
 vi.mock('../../../components/toastProvider', () => ({
@@ -118,6 +125,27 @@ it('combines assigned roles without exposing unassigned permissions, grouped by 
   expect(screen.getByText('effectivePermissions.uncategorized')).toBeTruthy();
   expect(screen.queryByText('Secret admin')).toBeNull();
   expect(state.permissionProps.roleIdToAssign).toBe(3);
+});
+it('lists plugin categories by their label after the core categories', () => {
+  state.roles = [
+    { id: 1, rolePermissions: [{ permissionKey: 'matter.devices.read' }, { permissionKey: 'resources.read' }] },
+  ];
+  state.assignments = [{ roleId: 1 }];
+  state.permissions = [
+    {
+      key: 'matter.devices.read',
+      label: 'View Matter devices',
+      description: '',
+      category: 'plugin:matter',
+      pluginName: 'matter',
+      categoryLabel: 'Matter & Thread',
+    },
+    { key: 'resources.read', label: 'Read resources', description: '', category: 'resources' },
+  ];
+  show();
+  expect(screen.queryByText('plugin:matter')).toBeNull();
+  const headings = screen.getAllByText(/^(resources|Matter & Thread)$/).map((node) => node.textContent);
+  expect(headings).toEqual(['resources', 'Matter & Thread']);
 });
 it('shows loading and empty permissions and prevents self deletion', () => {
   state.loading = true;

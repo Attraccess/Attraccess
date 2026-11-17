@@ -29,4 +29,35 @@ describe('useRbacCatalogTranslations', () => {
     expect(result.current.roleName({ name: 'Keyless Role' })).toBe('Keyless Role');
     expect(result.current.roleDescription({ description: 'Keyless description' })).toBe('Keyless description');
   });
+
+  it('localizes plugin permissions from the API fields with English and key fallbacks', () => {
+    const plugin = {
+      key: 'matter.devices.read',
+      pluginName: 'matter',
+      label: 'View Matter devices',
+      labelDe: 'Matter-Geräte ansehen',
+      description: 'Shows status',
+      descriptionDe: null,
+      categoryLabel: 'Matter',
+      categoryLabelDe: 'Matter (DE)',
+    };
+    useTranslationState.getState().setLanguage('de');
+    const { result, rerender } = renderHook(() => useRbacCatalogTranslations());
+
+    expect(result.current.permissionLabel(plugin)).toBe('Matter-Geräte ansehen');
+    expect(result.current.permissionDescription(plugin)).toBe('Shows status');
+    expect(result.current.permissionCategory('plugin:matter', plugin)).toBe('Matter (DE)');
+    expect(result.current.permissionLabel({ key: 'acme.thing.read', pluginName: 'acme', label: null })).toBe(
+      'acme.thing.read',
+    );
+    // Without a category label the plugin name names the group
+    expect(result.current.permissionCategory('plugin:acme', { key: 'acme.thing.read', pluginName: 'acme' })).toBe(
+      'acme',
+    );
+
+    useTranslationState.getState().setLanguage('en');
+    rerender();
+    expect(result.current.permissionLabel(plugin)).toBe('View Matter devices');
+    expect(result.current.permissionCategory('plugin:matter', plugin)).toBe('Matter');
+  });
 });

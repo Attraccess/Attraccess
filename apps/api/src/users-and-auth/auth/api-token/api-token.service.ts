@@ -29,7 +29,8 @@ export class ApiTokenService {
       skip: (page - 1) * limit,
       take: limit,
     });
-    return { data, total, page, limit };
+    const hidden = await this.rbacService.getUnavailablePermissionKeys();
+    return { data: data.map((apiToken) => this.withoutHidden(apiToken, hidden)), total, page, limit };
   }
 
   async create(
@@ -64,19 +65,39 @@ export class ApiTokenService {
     input: { name?: string; permissionKeys?: string[]; expiresAt?: Date | null },
   ): Promise<ApiToken> {
     const apiToken = await this.findOwned(userId, tokenId);
-    if (input.permissionKeys) await this.assertAllowedPermissions(userId, input.permissionKeys);
+    const hidden = await this.rbacService.getUnavailablePermissionKeys();
+    // The token UI cannot see grants of unavailable plugin keys, so a full-set update must keep them.
+    const keptHidden = apiToken.apiTokenPermissions
+      .map((permission) => permission.permissionKey)
+      .filter((key) => hidden.has(key));
+    const permissionKeys = input.permissionKeys?.filter((key) => !keptHidden.includes(key));
+    if (permissionKeys) await this.assertAllowedPermissions(userId, permissionKeys);
     if (input.expiresAt !== null) this.assertExpiry(input.expiresAt);
-    return this.apiTokenRepository.manager.transaction(async (manager) => {
+    const saved = await this.apiTokenRepository.manager.transaction(async (manager) => {
       const tokenRepository = manager.getRepository(ApiToken);
       const permissionRepository = manager.getRepository(ApiTokenPermission);
       if (input.name !== undefined) apiToken.name = input.name.trim();
-      if (input.permissionKeys !== undefined) {
+      if (permissionKeys !== undefined) {
         await permissionRepository.delete({ apiTokenId: apiToken.id });
-        apiToken.apiTokenPermissions = await this.createPermissions(manager, apiToken.id, input.permissionKeys);
+        apiToken.apiTokenPermissions = await this.createPermissions(manager, apiToken.id, [
+          ...permissionKeys,
+          ...keptHidden,
+        ]);
       }
       if (input.expiresAt !== undefined) apiToken.expiresAt = input.expiresAt;
       return tokenRepository.save(apiToken);
     });
+    return this.withoutHidden(saved, hidden);
+  }
+
+  /** The token as its owner sees it: grants of unavailable plugin keys stay stored but are not listed. */
+  private withoutHidden(apiToken: ApiToken, hidden: Set<string>): ApiToken {
+    if (hidden.size > 0 && apiToken.apiTokenPermissions) {
+      apiToken.apiTokenPermissions = apiToken.apiTokenPermissions.filter(
+        (permission) => !hidden.has(permission.permissionKey),
+      );
+    }
+    return apiToken;
   }
 
   async revoke(userId: number, tokenId: number): Promise<void> {

@@ -38,7 +38,7 @@ interface PermissionDrawerProps {
   itemDataCy?: (permissionKey: string) => string;
   permissionLabel: (permission: Permission) => string;
   permissionDescription: (permission: Permission) => string;
-  permissionCategory: (category: string) => string;
+  permissionCategory: (category: string, permission?: Permission) => string;
 }
 
 /** Edits a draft of the selection by category; Apply hands the draft to onChange, Cancel drops it. */
@@ -107,13 +107,17 @@ export function PermissionDrawer({
               selectablePermissions.every((permission) => draftKeys.has(permission.key));
 
             return (
-              <AccordionItem key={category} id={category} aria-label={permissionCategory(category)}>
+              <AccordionItem
+                key={category}
+                id={category}
+                aria-label={permissionCategory(category, categoryPermissions[0])}
+              >
                 <AccordionHeading>
                   <AccordionTrigger className="gap-3">
                     <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
                       <span className="flex min-w-0 items-center gap-2">
                         <CategoryIcon category={category} />
-                        <span>{permissionCategory(category)}</span>
+                        <span>{permissionCategory(category, categoryPermissions[0])}</span>
                       </span>
                       <span className="shrink-0 text-sm font-normal tabular-nums text-default-500">
                         {selectedInCategory}/{categoryPermissions.length}

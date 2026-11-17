@@ -19,7 +19,12 @@ const failure = async (promise: Promise<unknown>): Promise<{ status: number; bod
   }
   throw new Error('expected a failure');
 };
-type AuditCall = { action: string; subject: { type: string; id: number }; details: Record<string, unknown> };
+type AuditCall = {
+  action: string;
+  operationId: string;
+  subject: { type: string; id: number };
+  details: Record<string, unknown>;
+};
 
 describe('MatterRestoreService', () => {
   let h: FabricHarness;
@@ -196,6 +201,31 @@ describe('MatterRestoreService', () => {
       expect(h.emitted()).not.toContain(key.toString('base64'));
     });
 
+    it('gives every entry of one restore its validation ID: recovery choice, key, backup and outcome', async () => {
+      // Disaster recovery in recovery state onto an installation without a key, so every follow-up step is audited.
+      const key = generateRecoveryKey();
+      const file = await forge(undefined, key);
+      await disaster();
+      await h.dataSource.getRepository(MatterRecoveryKey).clear();
+      expect(h.guard.recoveryRequired).toBe(true);
+      const validation = await h.restore.validate(upload(file), formatRecoveryKey(key), ADMIN);
+      h.audit.mockClear();
+
+      await h.restore.confirm(validation.validationId, undefined, ADMIN);
+
+      const entries = h.audit.mock.calls.map((call) => (call as unknown as [AuditCall])[0]);
+      expect(entries.map((entry) => entry.action)).toEqual(
+        expect.arrayContaining([
+          'matter.recovery_action_chosen',
+          'matter.restore_confirmed',
+          'matter.restore_succeeded',
+          'matter.recovery_key_generated',
+          'matter.backup_succeeded',
+        ]),
+      );
+      expect(new Set(entries.map((entry) => entry.operationId))).toEqual(new Set([validation.validationId]));
+    });
+
     it('does not replace an existing key with the typed-in one', async () => {
       const current = (await h.keys.current())?.keyId;
       const other = generateRecoveryKey();
@@ -265,6 +295,10 @@ describe('MatterRestoreService', () => {
       await h.restore.confirm(validation.validationId, originalFabricId, ADMIN);
       const triggers = (await h.backups.list()).map((b) => b.trigger);
       expect(triggers).toEqual(['restore', 'pre_restore', 'manual', 'fabric_created']);
+      // The pre-restore and the post-restore backup belong to the restore's operation.
+      const backups = auditCalls('matter.backup_succeeded');
+      expect(backups.map((entry) => entry.details['trigger'])).toEqual(['pre_restore', 'restore']);
+      expect(backups.map((entry) => entry.operationId)).toEqual([validation.validationId, validation.validationId]);
       expect(h.actions()).toEqual(
         expect.arrayContaining(['matter.backup_succeeded', 'matter.restore_confirmed', 'matter.restore_succeeded']),
       );

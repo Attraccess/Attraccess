@@ -233,5 +233,10 @@ export function useAuth() {
       const effectivePermissions: string[] = currentUser?.effectivePermissions ?? [];
       return effectivePermissions.includes(permission);
     },
+    /** For keys only known at runtime: plugin-declared keys from route configs or the permission catalog. */
+    hasPermissionKey: (key: string) => {
+      const effectivePermissions: string[] = currentUser?.effectivePermissions ?? [];
+      return effectivePermissions.includes(key);
+    },
   };
 }

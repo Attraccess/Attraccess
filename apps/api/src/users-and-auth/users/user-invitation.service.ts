@@ -1,3 +1,4 @@
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { User } from '@attraccess/database-entities';
 
 import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
@@ -41,7 +42,7 @@ export class UserInvitationService {
 
   protected async inviteUsersTransactional(
     candidates: Array<{ username: string; email: string; locale?: string; roleKey?: string }>,
-    options?: { grantAllPermissionsToFirst?: boolean; actorId?: number },
+    options?: { grantAllPermissionsToFirst?: boolean; actor?: AuthenticatedUser },
   ): Promise<User[]> {
     try {
       await this.usersService.ensureLicenseForNewUsers(candidates.length);
@@ -58,7 +59,7 @@ export class UserInvitationService {
         const createdUsers = await this.usersService.createMany(candidates, {
           grantAllPermissionsToFirst: options?.grantAllPermissionsToFirst ?? false,
           manager,
-          actorId: options?.actorId,
+          actor: options?.actor,
         });
 
         const invited: Array<{ user: User; token: string }> = [];
@@ -114,7 +115,7 @@ export class UserInvitationService {
     file: FileUpload | undefined,
     rawConfig: string | CsvInviteConfigDto | undefined,
     adminLocale?: string,
-    actorId?: number,
+    actor?: AuthenticatedUser,
   ): Promise<User[]> {
     let configPayload: unknown;
     try {
@@ -182,7 +183,7 @@ export class UserInvitationService {
     try {
       const invitedUsers = await this.inviteUsersTransactional(
         candidates.map((c) => ({ ...c, locale: adminLocale })),
-        { grantAllPermissionsToFirst: true, actorId },
+        { grantAllPermissionsToFirst: true, actor },
       );
       return invitedUsers;
     } catch (error) {

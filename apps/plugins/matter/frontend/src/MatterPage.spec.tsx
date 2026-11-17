@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConnectionSettings, ConnectionStatus } from './api';
 import { MatterPage } from './MatterPage';
+import { setMatterAuthData } from './permissions';
 import { STATUS_POLL_MS } from './useMatterPage';
 
 const api = vi.hoisted(() => ({
@@ -16,7 +17,17 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock('./api', () => api);
 // The fabric & backup section has its own spec (fabric-backup/FabricBackupSection.spec.tsx).
-vi.mock('./fabric-backup/FabricBackupSection', () => ({ FabricBackupSection: () => null }));
+vi.mock('./fabric-backup/FabricBackupSection', () => ({
+  FabricBackupSection: ({ canManage }: { canManage: boolean }) => (
+    <div data-testid="fabric-section-stub">{canManage ? 'manage' : 'read'}</div>
+  ),
+}));
+
+// HeroUI's spinner has no accessible role.
+const spinner = () => document.querySelector('[data-slot="spinner"]');
+
+const signIn = (...effectivePermissions: string[]) =>
+  act(() => setMatterAuthData({ authToken: '', user: {} as never, effectivePermissions }));
 
 const entry = {
   wireVersion: 1,
@@ -62,6 +73,8 @@ function renderPage(status: Partial<ConnectionStatus>, settings: ConnectionSetti
     </MemoryRouter>,
   );
 }
+
+beforeEach(() => signIn('matter.devices.read', 'matter.devices.manage'));
 
 afterEach(() => {
   cleanup();
@@ -161,16 +174,49 @@ describe('MatterPage', () => {
     expect(await screen.findByText('Insecure connection')).toBeInTheDocument();
   });
 
-  it('saves without sending the token when it was not replaced, then confirms in a dialog', async () => {
+  it('saves without sending the token when the URL and CA stay the same, then confirms in a dialog', async () => {
     const user = userEvent.setup();
     api.saveSettings.mockResolvedValue(configured);
     renderPage({ state: 'connected' }, configured);
     const url = await screen.findByLabelText(/Sidecar URL/);
-    await user.clear(url);
-    await user.type(url, 'https://other.example.com/matter');
+    // Another spelling of the same URL is no change.
+    await user.type(url, '/');
+    expect(screen.queryByLabelText(/^Token/)).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(api.saveSettings).toHaveBeenCalledWith({ url: 'https://other.example.com/matter' }));
+    await waitFor(() => expect(api.saveSettings).toHaveBeenCalledWith({ url: 'https://matter.example.com/' }));
     expect(await screen.findByText('Saved')).toBeInTheDocument();
+  });
+
+  it.each([
+    [
+      'URL',
+      async (user: ReturnType<typeof userEvent.setup>) => {
+        const url = screen.getByLabelText(/Sidecar URL/);
+        await user.clear(url);
+        await user.type(url, 'https://other.example.com/matter');
+      },
+      { url: 'https://other.example.com/matter' },
+    ],
+    [
+      'CA certificate',
+      async (user: ReturnType<typeof userEvent.setup>) => {
+        await user.click(screen.getByRole('button', { name: 'Clear CA certificate' }));
+      },
+      { url: 'https://matter.example.com', caCertificate: null },
+    ],
+  ] as const)('asks for the token again when the %s changes', async (_field, change, sent) => {
+    const user = userEvent.setup();
+    api.saveSettings.mockResolvedValue(configured);
+    renderPage({ state: 'connected' }, configured);
+    await screen.findByLabelText(/Sidecar URL/);
+    await change(user);
+    const token = screen.getByLabelText(/^Token/);
+    expect(screen.getByText(/enter the token again/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Keep current token' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    await user.type(token, 'x'.repeat(40));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.saveSettings).toHaveBeenCalledWith({ ...sent, credential: 'x'.repeat(40) }));
   });
 
   it('sends a new token and clears the CA certificate on request', async () => {
@@ -196,19 +242,18 @@ describe('MatterPage', () => {
     api.saveSettings.mockResolvedValue(cleared);
     renderPage({ state: 'connected' }, configured);
     await user.click(await screen.findByRole('button', { name: 'Clear CA certificate' }));
+    await user.type(screen.getByLabelText(/^Token/), 'x'.repeat(40));
     await user.click(screen.getByRole('button', { name: 'Save' }));
     await user.click(await screen.findByRole('button', { name: 'Close' }));
     const ca = screen.getByLabelText(/CA certificate/);
     expect(ca).toHaveValue('');
     expect(ca).toBeEnabled();
     expect(screen.queryByRole('button', { name: 'Clear CA certificate' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Token/)).not.toBeInTheDocument();
 
-    const url = screen.getByLabelText(/Sidecar URL/);
-    await user.clear(url);
-    await user.type(url, 'https://other.example.com');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.saveSettings).toHaveBeenCalledTimes(2));
-    expect(api.saveSettings).toHaveBeenLastCalledWith({ url: 'https://other.example.com' });
+    expect(api.saveSettings).toHaveBeenLastCalledWith({ url: 'https://matter.example.com' });
   });
 
   it('re-enables the CA field when the configuration is removed after clearing the CA', async () => {
@@ -342,17 +387,132 @@ describe('MatterPage recovery', () => {
   });
 });
 
+describe('MatterPage permissions', () => {
+  it('shows the status only to a matter.devices.read user and never asks for the settings', async () => {
+    signIn('matter.devices.read');
+    renderPage({ state: 'connected' }, configured);
+    expect(await screen.findByText('Connected')).toBeInTheDocument();
+    expect(screen.getByTestId('fabric-section-stub')).toHaveTextContent('read');
+    expect(api.getSettings).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText(/Sidecar URL/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('shows the settings form and the manage actions with matter.devices.manage', async () => {
+    renderPage({ state: 'connected' }, configured);
+    expect(await screen.findByLabelText(/Sidecar URL/)).toHaveValue('https://matter.example.com');
+    expect(screen.getByTestId('fabric-section-stub')).toHaveTextContent('manage');
+  });
+
+  it('requests nothing Matter-specific for a Thread-only user', async () => {
+    signIn('thread.network.read');
+    renderPage({ state: 'connected' }, configured);
+    await waitFor(() => expect(spinner()).not.toBeInTheDocument());
+    expect(api.getStatus).not.toHaveBeenCalled();
+    expect(api.getSettings).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('fabric-section-stub')).not.toBeInTheDocument();
+    expect(screen.getByText('Matter devices are hidden')).toBeInTheDocument();
+  });
+
+  it('keeps loading, without requests or the "hidden" notice, until the host has pushed the auth state', async () => {
+    act(() => setMatterAuthData(null));
+    renderPage({ state: 'connected' }, configured);
+    expect(spinner()).toBeInTheDocument();
+    expect(screen.queryByText('Matter devices are hidden')).not.toBeInTheDocument();
+    expect(api.getStatus).not.toHaveBeenCalled();
+    expect(api.getSettings).not.toHaveBeenCalled();
+    signIn('matter.devices.read');
+    expect(await screen.findByText('Connected')).toBeInTheDocument();
+    expect(spinner()).not.toBeInTheDocument();
+    expect(screen.queryByText('Matter devices are hidden')).not.toBeInTheDocument();
+  });
+
+  it('shows the spinner again when the permissions grow after a run that requested nothing', async () => {
+    signIn('thread.network.read');
+    renderPage({ state: 'connected' }, configured);
+    await waitFor(() => expect(spinner()).not.toBeInTheDocument());
+    let answer: (status: ConnectionStatus) => void = () => undefined;
+    api.getStatus.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+    signIn('matter.devices.read');
+    expect(spinner()).toBeInTheDocument();
+    await act(async () => answer({ ...baseStatus, state: 'connected' }));
+    expect(await screen.findByText('Connected')).toBeInTheDocument();
+    expect(spinner()).not.toBeInTheDocument();
+  });
+
+  it('shows no manage controls, and requests nothing, for matter.devices.manage without read', async () => {
+    signIn('matter.devices.manage');
+    renderPage({ state: 'connected' }, configured);
+    expect(await screen.findByText('Matter devices are hidden')).toBeInTheDocument();
+    expect(api.getStatus).not.toHaveBeenCalled();
+    expect(api.getSettings).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('fabric-section-stub')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Sidecar URL/)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    [['thread.network.read'], 0],
+    [['matter.devices.read'], 1],
+  ] as const)('never sends a request that would be refused while polling (%j)', async (keys, statusPerTick) => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    signIn(...keys);
+    renderPage({ state: 'connected' }, configured);
+    await waitFor(() => expect(spinner()).not.toBeInTheDocument());
+    const initial = api.getStatus.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STATUS_POLL_MS * 4);
+    });
+    expect(api.getStatus.mock.calls.length).toBe(initial + 4 * statusPerTick);
+    expect(api.getSettings).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['unavailable', null],
+    ['misconfigured', null],
+    ['incompatible', null],
+    ['incompatible', 'host version unavailable'],
+  ] as const)('tells a read-only user to ask an administrator (degraded/%s, %s)', async (reason, reasonDetail) => {
+    signIn('matter.devices.read');
+    renderPage({ state: 'degraded', reason, reasonDetail, insecureTransport: true }, configured);
+    expect(await screen.findByText('Degraded')).toBeInTheDocument();
+    expect(document.querySelector('[data-cy="matter-hint"]')).toHaveTextContent(/ask an administrator/i);
+    expect(document.querySelector('[data-cy="matter-insecure-warning"]')).toHaveTextContent(
+      /Ask an administrator to check the connection settings/,
+    );
+    expect(document.body.textContent).not.toMatch(
+      /Check that it is running|Check the URL and path prefix|Upgrade or downgrade Attraccess|Upgrade Attraccess to|Use https/,
+    );
+  });
+
+  it('tells a read-only user that an administrator sets up the connection', async () => {
+    signIn('matter.devices.read');
+    renderPage({});
+    expect(await screen.findByText(/An administrator needs to connect it/)).toBeInTheDocument();
+    expect(screen.queryByText(/Enter the sidecar URL and token below/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Matter devices are hidden')).not.toBeInTheDocument();
+  });
+});
+
 describe('plugin registration', () => {
   beforeEach(() => vi.resetModules());
 
-  it('adds one "Matter" entry to the devices group, guarded by system.plugins.manage', async () => {
+  it('adds one "Matter" entry to the devices group, opened by any Matter or Thread read key', async () => {
     const { default: MatterPlugin } = await import('./plugin');
     const plugin = new MatterPlugin();
     expect(plugin.getSidebarItems()).toEqual([
       expect.objectContaining({ label: 'Matter', path: '/matter', group: 'devices' }),
     ]);
     expect(plugin.getRoutes()).toEqual([
-      expect.objectContaining({ path: '/matter', authRequired: 'system.plugins.manage' }),
+      expect.objectContaining({ path: '/matter', authRequired: ['matter.devices.read', 'thread.network.read'] }),
     ]);
+  });
+
+  it('passes the host auth state on to the page', async () => {
+    const { default: MatterPlugin } = await import('./plugin');
+    const permissions = await import('./permissions');
+    const spy = vi.spyOn(permissions, 'setMatterAuthData');
+    const auth = { authToken: '', user: {} as never, effectivePermissions: ['matter.devices.read'] };
+    new MatterPlugin().onApiAuthStateChange(auth);
+    expect(spy).toHaveBeenCalledWith(auth);
   });
 });

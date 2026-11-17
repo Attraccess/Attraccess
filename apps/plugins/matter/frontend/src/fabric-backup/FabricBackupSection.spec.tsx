@@ -102,7 +102,7 @@ const validation = (preflight: Partial<RestoreValidation['preflight']> = {}): Re
 
 const renderSection = (status: FabricBackupStatus) => {
   api.getFabricStatus.mockResolvedValue(status);
-  return render(<FabricBackupSection />);
+  return render(<FabricBackupSection canManage />);
 };
 
 beforeEach(() => {
@@ -127,6 +127,44 @@ describe('FabricBackupSection status', () => {
     expect(screen.queryByRole('button', { name: 'Create fabric' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('matter-fabric-mismatch')).not.toBeInTheDocument();
     expect(screen.queryByText(/taken during recovery/)).not.toBeInTheDocument();
+  });
+
+  it('shows only the status to a user without matter.devices.manage: no actions, downloads or recovery panel', async () => {
+    api.getFabricStatus.mockResolvedValue(recovery('fabric_changed'));
+    const { unmount } = render(<FabricBackupSection canManage={false} />);
+    expect((await screen.findAllByText('FAB-1')).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    unmount();
+    for (const status of [healthy, uninitialized]) {
+      api.getFabricStatus.mockResolvedValue(status);
+      const view = render(<FabricBackupSection canManage={false} />);
+      expect(await screen.findByText('Fabric')).toBeInTheDocument();
+      expect(screen.queryByRole('button')).not.toBeInTheDocument();
+      expect(view.container.querySelector(`[data-cy="matter-backup-download-${backup.id}"]`)).toBeNull();
+      if (status === healthy) expect(screen.getByText(/Daily · generation 3/)).toBeInTheDocument();
+      if (status === uninitialized) {
+        expect(screen.getByText(en.fabric.uninitializedTextReadOnly)).toBeInTheDocument();
+        expect(screen.queryByText(en.fabric.uninitializedText)).not.toBeInTheDocument();
+      }
+      view.unmount();
+    }
+  });
+
+  it('tells a read-only user that an administrator has to act on the recovery key', async () => {
+    api.getFabricStatus.mockResolvedValue({
+      ...healthy,
+      recoveryKey: { present: true, keyId: 'KEY1', createdAt: null, acknowledged: false },
+    });
+    const view = render(<FabricBackupSection canManage={false} />);
+    expect(await screen.findByText(en.fabric.key.unacknowledgedTextReadOnly)).toBeInTheDocument();
+    expect(screen.queryByText(/Rotate it to get a new one/)).not.toBeInTheDocument();
+    view.unmount();
+    api.getFabricStatus.mockResolvedValue({
+      ...healthy,
+      recoveryKey: { present: false, keyId: null, createdAt: null, acknowledged: false },
+    });
+    render(<FabricBackupSection canManage={false} />);
+    expect(await screen.findByText(en.fabric.key.missingTextReadOnly)).toBeInTheDocument();
   });
 
   it('marks a stored backup that was taken during recovery', async () => {
@@ -223,7 +261,7 @@ describe('FabricBackupSection status', () => {
     expect(await screen.findByText('No backups stored yet.')).toBeInTheDocument();
     cleanup();
     api.getFabricStatus.mockRejectedValue(new Error('Failed to fetch'));
-    render(<FabricBackupSection />);
+    render(<FabricBackupSection canManage />);
     expect(await screen.findByText('The fabric status could not be loaded.')).toBeInTheDocument();
     expect(screen.getByText('Failed to fetch')).toBeInTheDocument();
   });
@@ -320,7 +358,7 @@ describe('FabricBackupSection status', () => {
 
   it('labels the loading spinner', async () => {
     api.getFabricStatus.mockReturnValue(new Promise(() => undefined));
-    render(<FabricBackupSection />);
+    render(<FabricBackupSection canManage />);
     expect(screen.getByLabelText('Loading the fabric status')).toBeInTheDocument();
   });
 

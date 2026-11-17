@@ -29,12 +29,12 @@ describe('fabric and backup controllers', () => {
   afterEach(() => h.close());
 
   it.each(['fabric/controller.ts', 'backup/controller.ts'])(
-    '%s is guarded by the plugin management permission, with the ATT-1003 marker',
+    '%s guards every route with its key from the Matter permission map',
     (file) => {
       const source = readFileSync(join(__dirname, '..', file), 'utf8');
-      expect(source).toContain("@Auth('system.plugins.manage')");
-      expect(source.match(/@Auth\(/g)).toHaveLength(1);
-      expect(source).toContain('TODO(ATT-1003)');
+      expect(source.match(/@Auth\(\.\.\.MATTER_OPERATIONS\./g)).toHaveLength(
+        source.match(/@(Get|Post)\(/g)?.length ?? -1,
+      );
       expect(source).toContain("@Controller('matter')");
     },
   );
@@ -72,7 +72,7 @@ describe('fabric and backup controllers', () => {
     expect(await status(() => backups.confirm({ validationId: 'x' }, request))).toBe(400);
     expect(await status(() => backups.confirm({ validationId: UUID, extra: true }, request))).toBe(400);
     expect(await status(() => backups.cancel('not-a-uuid', request))).toBe(400);
-    expect(await status(() => backups.download('../../etc/passwd'))).toBe(400);
+    expect(await status(() => backups.download('../../etc/passwd', request))).toBe(400);
   });
 
   it('does not echo what was submitted in a validation error', async () => {
@@ -94,7 +94,7 @@ describe('fabric and backup controllers', () => {
     const made = await backups.create(request);
     expect(made).toMatchObject({ trigger: 'manual', actor: '7' });
     expect((await backups.list())[0].id).toBe(made.id);
-    const download = await backups.download(made.id);
+    const download = await backups.download(made.id, request);
     expect(download).toBeInstanceOf(StreamableFile);
     expect(download.getHeaders()).toMatchObject({
       type: 'application/octet-stream',
@@ -122,7 +122,7 @@ describe('fabric and backup controllers', () => {
     await h.fabric.detect('connect');
     expect(await status(() => fabric.create({}, request))).toBe(409);
     expect(await status(() => fabric.acceptSidecar({ confirm: true }, request))).toBe(409);
-    expect(await status(() => backups.download(UUID))).toBe(404);
+    expect(await status(() => backups.download(UUID, request))).toBe(404);
     expect(
       await status(() =>
         backups.validate(

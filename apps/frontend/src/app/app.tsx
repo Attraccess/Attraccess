@@ -60,7 +60,7 @@ export function useIsTouchDevice() {
 
 // Exported for settingsAccess.spec.tsx, which drives the real route table through this gate.
 export function useRoutesWithAuthElements(routes: RouteConfig[]) {
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermissionKey } = useAuth();
 
   const routesWithAuthElements = useMemo(() => {
     return routes.map((route) => {
@@ -80,7 +80,7 @@ export function useRoutesWithAuthElements(routes: RouteConfig[]) {
         return route;
       }
 
-      if (!hasRequiredPermissions(route.authRequired, hasPermission)) {
+      if (!hasRequiredPermissions(route.authRequired, hasPermissionKey)) {
         return {
           ...route,
           element: <AccessDenied />,
@@ -89,7 +89,7 @@ export function useRoutesWithAuthElements(routes: RouteConfig[]) {
 
       return route;
     });
-  }, [routes, user, hasPermission]);
+  }, [routes, user, hasPermissionKey]);
 
   return useMemo(
     () =>

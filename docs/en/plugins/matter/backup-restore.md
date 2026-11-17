@@ -7,7 +7,7 @@
 
 > **Keep your recovery key off the server.** The Matter fabric is the identity every commissioned device trusts. If you lose the fabric, every device must be factory-reset and commissioned again. Attraccess stores encrypted backups of the fabric, but they can only be opened with the **recovery key**, which is shown **exactly once**. If you lose both the key and the server, the fabric cannot be recovered.
 
-This page describes how the Matter fabric is protected, how to back it up and how to restore it, including onto a fresh host. It builds on the [architecture](plugins/matter/architecture.md) and the [operator guide](plugins/matter/operator.md). All actions are in **Devices → Matter → Fabric & backup** and need the `system.plugins.manage` permission.
+This page describes how the Matter fabric is protected, how to back it up and how to restore it, including onto a fresh host. It builds on the [architecture](plugins/matter/architecture.md) and the [operator guide](plugins/matter/operator.md). All actions are in **Devices → Matter → Fabric & backup**. Viewing the status needs `matter.devices.read`; every action, including downloading a backup, needs `matter.devices.manage` (see [Permissions](plugins/matter/permissions.md)).
 
 ## What a Matter backup contains
 

@@ -45,6 +45,7 @@ function mockOperator(granted: SystemPermission[]) {
     user: { id: 1, username: 'operator' },
     isAuthenticated: true,
     hasPermission: (permission: SystemPermission) => granted.includes(permission),
+    hasPermissionKey: (permission: string) => (granted as string[]).includes(permission),
   } as unknown as ReturnType<typeof useAuth>);
 }
 
@@ -109,6 +110,7 @@ describe('not-found route', () => {
       user: null,
       isAuthenticated: false,
       hasPermission: () => false,
+      hasPermissionKey: () => false,
     } as unknown as ReturnType<typeof useAuth>);
 
     renderAt('/resourcez');
@@ -123,6 +125,7 @@ describe('not-found route', () => {
       user: null,
       isAuthenticated: false,
       hasPermission: () => false,
+      hasPermissionKey: () => false,
     } as unknown as ReturnType<typeof useAuth>);
 
     renderAt('/resources');

@@ -18,7 +18,7 @@ import { RabbitmqCredentialProvisioningProvider } from './credentials/provider';
 import { RabbitmqCapabilitiesController } from './capabilities';
 import { RabbitmqConnectionsController, RabbitmqConnectionsService } from './connections/service';
 import { RabbitmqStatsController, RabbitmqStatsService } from './stats/service';
-import { RABBITMQ_VIEW_PERMISSION } from './permissions';
+import { RABBITMQ_PERMISSIONS, RABBITMQ_VIEW_PERMISSION } from './permissions';
 
 // The host hands each plugin its PluginContext under this token. Recreate it
 // locally (do not import the value) so the artifact has no runtime dependency on
@@ -39,8 +39,7 @@ class RabbitmqService implements OnModuleInit {
   }
 }
 
-// Mounts `GET /rabbitmq/status` into the host API. Same access level as the
-// host MQTT servers controller.
+// Mounts `GET /rabbitmq/status` into the host API. View tier.
 @Auth(RABBITMQ_VIEW_PERMISSION)
 @Controller('rabbitmq')
 class RabbitmqController {
@@ -57,6 +56,8 @@ class RabbitmqController {
 class RabbitmqPluginModule {}
 
 const plugin: PluginBackendModule = {
+  // ATT-1003: the plugin's own view and manage keys (see ./permissions).
+  permissions: RABBITMQ_PERMISSIONS,
   credentialProvisioningProvider(context: PluginContext): RabbitmqCredentialProvisioningProvider {
     return new RabbitmqCredentialProvisioningProvider(context);
   },

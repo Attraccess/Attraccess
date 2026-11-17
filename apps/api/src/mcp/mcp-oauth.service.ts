@@ -92,6 +92,12 @@ export interface ConsentPermission {
   label: string;
   description: string;
   category: string;
+  /** Plugin permissions carry their own German texts and category headings; null for core permissions. */
+  pluginName: string | null;
+  labelDe: string | null;
+  descriptionDe: string | null;
+  categoryLabel: string | null;
+  categoryLabelDe: string | null;
 }
 
 export interface ConsentView {
@@ -321,6 +327,11 @@ export class McpOAuthService {
         label: known?.label ?? key,
         description: known?.description ?? '',
         category: known?.category ?? '',
+        pluginName: known?.pluginName ?? null,
+        labelDe: known?.labelDe ?? null,
+        descriptionDe: known?.descriptionDe ?? null,
+        categoryLabel: known?.categoryLabel ?? null,
+        categoryLabelDe: known?.categoryLabelDe ?? null,
       };
     });
     return {

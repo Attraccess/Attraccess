@@ -13,14 +13,14 @@ describe('CSV invitation role permission boundary', () => {
     expect(service.inviteUsersFromCsv).not.toHaveBeenCalled();
     request.user.effectivePermissions.add('users.roles.manage');
     expect(await controller.inviteUsersFromCsv(request as never, undefined, input)).toEqual([{ id: 7 }]);
-    expect(service.inviteUsersFromCsv).toHaveBeenCalledWith(undefined, input, 'de', 3);
+    expect(service.inviteUsersFromCsv).toHaveBeenCalledWith(undefined, input, 'de', request.user);
   });
   it('leaves malformed config validation to the service and permits ordinary CSV invitations', async () => {
     const service = { inviteUsersFromCsv: jest.fn().mockResolvedValue([]) };
     const controller = new UserInvitationsController(service as never);
     const request = { user: { id: 3, locale: 'en' } };
     await controller.inviteUsersFromCsv(request as never, undefined, '{');
-    expect(service.inviteUsersFromCsv).toHaveBeenCalledWith(undefined, '{', 'en', 3);
+    expect(service.inviteUsersFromCsv).toHaveBeenCalledWith(undefined, '{', 'en', request.user);
     await controller.inviteUsersFromCsv(request as never, undefined, { emailKey: 'email', usernameKey: 'username' });
     expect(service.inviteUsersFromCsv).toHaveBeenCalledTimes(2);
   });

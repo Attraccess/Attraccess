@@ -38,6 +38,7 @@ export function PermissionPickerDrawerField({
   const selectedCategories = permissionsByCategory
     .map(({ category, permissions: categoryPermissions }) => ({
       category,
+      sample: categoryPermissions[0],
       selectedCount: categoryPermissions.filter((permission) => selectedKeys.has(permission.key)).length,
     }))
     .filter(({ selectedCount: categorySelectedCount }) => categorySelectedCount > 0);
@@ -65,9 +66,9 @@ export function PermissionPickerDrawerField({
               <span className="text-sm text-default-500">{drawerEmptyPreview ?? placeholder}</span>
             ) : (
               <span className="flex flex-wrap gap-1">
-                {previewCategories.map(({ category, selectedCount: categorySelectedCount }) => (
+                {previewCategories.map(({ category, sample, selectedCount: categorySelectedCount }) => (
                   <span key={category} className="rounded-small bg-default-100 px-2 py-0.5 text-xs text-default-700">
-                    {permissionCategory(category)} · {categorySelectedCount}
+                    {permissionCategory(category, sample)} · {categorySelectedCount}
                   </span>
                 ))}
                 {hiddenPreviewCategoryCount > 0 ? (
