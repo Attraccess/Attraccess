@@ -45,7 +45,7 @@ describe('/cdn serve-static', () => {
     // NestFactory, not Test.createTestingModule: serve-static picks its loader from the
     // HTTP adapter while the module compiles, and a testing module has none yet.
     app = await NestFactory.create(CdnModule, { logger: false });
-    // As in configureBootstrapHttp: registered before the mount attaches on listen.
+    // As in configureBootstrapHttp: registered before the mount attaches while the app initialises.
     app.use(rejectEmptyAuthorityTargets);
     await app.listen(0, '127.0.0.1');
     port = (app.getHttpServer().address() as AddressInfo).port;
@@ -58,6 +58,15 @@ describe('/cdn serve-static', () => {
 
   it('serves a file inside the CDN root', async () => {
     await expect(rawGet('/cdn/resources/1/image.txt')).resolves.toEqual({ status: 200, body: 'image' });
+  });
+
+  // The host-less guard must not catch a target that names a host, nor a scheme further along the URL.
+  it.each([
+    'http://localhost/cdn/resources/1/image.txt',
+    'HTTP://u@localhost:1/cdn/resources/1/image.txt',
+    '/cdn/resources/1/image.txt?next=file:///x',
+  ])('still serves %s', async (path) => {
+    await expect(rawGet(path)).resolves.toEqual({ status: 200, body: 'image' });
   });
 
   it.each([

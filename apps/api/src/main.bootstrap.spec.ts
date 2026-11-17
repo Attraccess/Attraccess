@@ -233,22 +233,32 @@ describe('API bootstrap ordering and configuration', () => {
     });
 
     // supertest builds its own URL, so the absolute-form target goes out through Node's http client.
+    function rawPost(path: string, body: string): Promise<number | undefined> {
+      const { port } = httpApp.getHttpServer().address() as AddressInfo;
+      return new Promise((resolve, reject) => {
+        httpRequest(
+          { host: '127.0.0.1', port, path, method: 'POST', headers: { 'content-type': 'application/json' } },
+          (res) => {
+            res.resume();
+            resolve(res.statusCode);
+          },
+        )
+          .on('error', reject)
+          .end(body);
+      });
+    }
+
+    // Malformed JSON shows the guard answers before the body parser reads the request.
     it.each([
       'http:///api/plugin-configuration/1/validate',
       'HTTPS:///api/plugin-configuration/1/validate',
       'http://u@:80/api/plugin-configuration/1/validate',
     ])('answers the host-less absolute-form target %s with a 404', async (path) => {
-      const { port } = httpApp.getHttpServer().address() as AddressInfo;
-      const status = await new Promise<number | undefined>((resolve, reject) => {
-        httpRequest({ host: '127.0.0.1', port, path, method: 'POST' }, (res) => {
-          res.resume();
-          resolve(res.statusCode);
-        })
-          .on('error', reject)
-          .end();
-      });
+      await expect(rawPost(path, '{bad')).resolves.toBe(404);
+    });
 
-      expect(status).toBe(404);
+    it('still routes an absolute-form target with a host', async () => {
+      await expect(rawPost('http://localhost/api/plugin-configuration/1/validate', '{}')).resolves.toBe(201);
     });
   });
 

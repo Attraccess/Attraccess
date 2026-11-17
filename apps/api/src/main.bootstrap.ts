@@ -94,12 +94,13 @@ export function configureBootstrapApi(app: NestExpressApplication, appConfig: Ap
 }
 
 export function configureBootstrapHttp(app: NestExpressApplication, appConfig: AppConfigType, bootstrapLogger: Logger) {
+  // Registered before the body parser and the static mounts (which only attach while the app
+  // initialises), so a host-less target is answered before anything reads or serves it.
+  app.use(rejectEmptyAuthorityTargets);
+
   // Plugin configurations can include large device profiles and a previous
   // draft for conflict detection, exceeding Express's default 100 KiB limit.
   app.useBodyParser('json', { limit: '10mb' });
-
-  // Registered before the static mounts, which only attach while the app initialises.
-  app.use(rejectEmptyAuthorityTargets);
 
   // Behind a reverse proxy, X-Forwarded-For only reflects the real client IP when Express is told
   // how many proxy hops to trust. Without this, auth rate limiting buckets every request under the
