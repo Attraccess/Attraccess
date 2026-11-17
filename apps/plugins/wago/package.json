@@ -30,7 +30,7 @@
   "attraccess": {
     "displayName": "WAGO CC100",
     "description": "Discover, claim, and monitor WAGO CC100 controllers.",
-    "host": "^1.11.0-beta.2",
+    "host": "^1.11.0-beta.3",
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
     "migrations": "dist/migrations.js",

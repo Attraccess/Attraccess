@@ -19,7 +19,7 @@
     }
   },
   "attraccessVersion": {
-    "min": "1.11.0-beta.2"
+    "min": "1.11.0-beta.3"
   },
   "permissions": [
     "DATABASE_ACCESS",
