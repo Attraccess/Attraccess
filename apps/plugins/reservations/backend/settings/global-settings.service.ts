@@ -1,9 +1,8 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
-import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { Inject, Injectable } from '@nestjs/common';
 import { PLUGIN_CONTEXT } from '../constants';
-import { GlobalSettingsEntity } from '../entities/global-settings.entity';
 import { ReservationError } from '../reservations/errors';
+import { tablesOf } from '../storage';
 import { isValidTimeZone, serverTimeZone } from '../time/zone';
 
 const TIMEZONE_KEY = 'timezone';
@@ -18,9 +17,7 @@ export class GlobalSettingsService {
   /** The configured IANA timezone, or the server's when unset or no longer valid. Cached. */
   async getTimezone(): Promise<string> {
     if (this.cachedTimezone) return this.cachedTimezone;
-    const row = await sqlitePersistence(this.context)
-      .getRepository(GlobalSettingsEntity)
-      .findOneBy({ key: TIMEZONE_KEY });
+    const row = await tablesOf(this.context).globalSettings.get(TIMEZONE_KEY);
     this.cachedTimezone = row && isValidTimeZone(row.value) ? row.value : serverTimeZone();
     return this.cachedTimezone;
   }
@@ -34,12 +31,7 @@ export class GlobalSettingsService {
       throw new ReservationError('INVALID_TIMEZONE', `"${String(timezone)}" is not a valid IANA timezone`);
     }
     const before = await this.getTimezone();
-    const entity = new GlobalSettingsEntity();
-    entity.key = TIMEZONE_KEY;
-    entity.value = timezone;
-    await sqlitePersistence(this.context).transaction((manager) =>
-      manager.getRepository(GlobalSettingsEntity).save(entity),
-    );
+    await tablesOf(this.context).globalSettings.upsert({ key: TIMEZONE_KEY, value: timezone }, { conflictOn: ['key'] });
     this.cachedTimezone = timezone;
     return { timezone, before };
   }

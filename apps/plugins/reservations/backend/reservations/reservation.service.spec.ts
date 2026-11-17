@@ -1,6 +1,4 @@
 import { Logger } from '@nestjs/common';
-import { SelectQueryBuilder } from '@attraccess/plugins-backend-sdk/sqlite';
-import { ReservationEntity } from '../entities/reservation.entity';
 import { ReservationError } from './errors';
 import { Harness, at, createHarness, principal } from '../testing/harness.test-utils';
 
@@ -52,7 +50,7 @@ describe('ReservationService', () => {
       const visible = jest.spyOn(h.visibility, 'filterVisible');
       expect(await codeOf(book())).toBe('RESOURCE_NOT_FOUND');
       expect(visible).toHaveBeenCalledWith(alice, [1]);
-      expect(await h.dataSource.query('SELECT COUNT(*) AS n FROM reservations_reservation')).toEqual([{ n: 0 }]);
+      expect(await h.tables.reservations.count()).toBe(0);
       h.state.hidden.delete(1);
       expect((await book()).status).toBe('confirmed');
     });
@@ -362,13 +360,10 @@ describe('ReservationService', () => {
     it('counts with a COUNT query and cancels in one write, notifying in the background', async () => {
       await h.enable(1, { maxActiveBookingsPerUser: 0 });
       for (let hour = 8; hour < 18; hour += 1) await book(alice, [hour, hour + 1]);
-      const getMany = jest.spyOn(SelectQueryBuilder.prototype, 'getMany');
-      const getCount = jest.spyOn(SelectQueryBuilder.prototype, 'getCount');
+      h.storageCalls.length = 0;
       expect(await h.admin.futureBookingsCount(manager, 1)).toBe(10);
-      expect(getCount).toHaveBeenCalledTimes(1);
-      expect(getMany).not.toHaveBeenCalled();
-      getMany.mockRestore();
-      getCount.mockRestore();
+      // one COUNT, no rows loaded
+      expect(h.storageCalls).toEqual(['reservations.count']);
 
       const releases: (() => void)[] = [];
       h.notifier.onRemoved.mockImplementation(() => new Promise<void>((resolve) => releases.push(resolve)));
@@ -376,7 +371,7 @@ describe('ReservationService', () => {
       // the request returned while every mail is still in flight, and only 4 run at a time
       expect(result.cancelledBookings).toBe(10);
       expect(h.notifier.onRemoved).toHaveBeenCalledTimes(4);
-      expect(await h.dataSource.getRepository(ReservationEntity).countBy({ status: 'cancelled' })).toBe(10);
+      expect(await h.tables.reservations.count({ status: 'cancelled' })).toBe(10);
       while (releases.length > 0) {
         releases.shift()?.();
         await new Promise((resolve) => setImmediate(resolve));
@@ -408,7 +403,7 @@ describe('ReservationService', () => {
           expect(created.reason).toMatchObject({ code: 'RESERVATIONS_DISABLED' });
         }
       }
-      expect(await h.dataSource.getRepository(ReservationEntity).countBy({ status: 'confirmed' })).toBe(0);
+      expect(await h.tables.reservations.count({ status: 'confirmed' })).toBe(0);
     });
 
     it('can disable while keeping the bookings', async () => {
@@ -529,7 +524,7 @@ describe('ReservationService', () => {
       const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
       expect(failures).toHaveLength(11);
       expect(failures.every((f) => f.reason instanceof ReservationError && f.reason.code === 'OVERLAP')).toBe(true);
-      expect(await h.dataSource.query('SELECT COUNT(*) AS n FROM reservations_reservation')).toEqual([{ n: 1 }]);
+      expect(await h.tables.reservations.count()).toBe(1);
     });
 
     it('does not serialise different resources against each other', async () => {

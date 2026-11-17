@@ -1,13 +1,10 @@
-import { EmailTemplate, EmailTemplateTranslation } from '@attraccess/database-entities';
 import { EmailTemplateType } from '@attraccess/application-models';
 import { BadRequestException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { DataSource } from 'typeorm';
 import { UpdateEmailTemplateDto } from '../../../api/src/email-template/dto/update-email-template.dto';
 import { EmailTemplateService } from '../../../api/src/email-template/email-template.service';
-import { TypeOrmEmailTemplateStore } from '../../../api/src/database/adapters/email/typeorm-email-template-store';
-import { TransactionHandles } from '../../../api/src/database/adapters/common/transaction-handles';
+import { FakeEmailTemplateStore } from '../../../api/src/email-template/fake-email-template-store.test-fixture';
 import { MjmlService } from '../../../api/src/email-template/mjml.service';
 import {
   registerPluginEmailTemplates,
@@ -32,11 +29,10 @@ const PLUGIN = 'reservations';
 const keyOf = (id: string) => `plugin.${PLUGIN}.${id}` as EmailTemplateType;
 
 /**
- * The plugin's shipped templates against the host's template store: every template is registered on boot,
+ * The plugin's shipped templates against the host's template service (on its in-memory store port): every template is registered on boot,
  * and an admin who opens one in the editor and saves it unchanged never gets a 400.
  */
 describe('reservations email templates in the host template store', () => {
-  let dataSource: DataSource;
   let service: EmailTemplateService;
 
   beforeAll(() => {
@@ -44,28 +40,15 @@ describe('reservations email templates in the host template store', () => {
     convertMjmlDocuments(EMAIL_TEMPLATES.map((template) => mjmlDocumentOf(template.body)));
   });
 
-  beforeEach(async () => {
-    dataSource = await new DataSource({
-      type: 'sqlite',
-      database: ':memory:',
-      synchronize: true,
-      entities: [EmailTemplate, EmailTemplateTranslation],
-    }).initialize();
-    service = new EmailTemplateService(
-      new TypeOrmEmailTemplateStore(
-        dataSource.getRepository(EmailTemplate),
-        dataSource.getRepository(EmailTemplateTranslation),
-        new TransactionHandles(undefined as never),
-      ),
-      new MjmlService(),
-      { record: jest.fn().mockResolvedValue({ status: 'recorded' }) } as never,
-    );
+  beforeEach(() => {
+    service = new EmailTemplateService(new FakeEmailTemplateStore(), new MjmlService(), {
+      record: jest.fn().mockResolvedValue({ status: 'recorded' }),
+    } as never);
     registerPluginEmailTemplates(PLUGIN, EMAIL_TEMPLATES);
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     unregisterPluginEmailTemplates(PLUGIN);
-    await dataSource.destroy();
   });
 
   it('uses the real MJML validation (an unknown element is refused)', async () => {

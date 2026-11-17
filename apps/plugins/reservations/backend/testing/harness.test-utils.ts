@@ -1,14 +1,13 @@
-import type { PluginAccessPrincipal, PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { createSqlitePluginPersistence, DataSource, type EntityManager } from '@attraccess/plugins-backend-sdk/sqlite';
-import { GlobalSettingsEntity } from '../entities/global-settings.entity';
-import { IcalFeedEntity } from '../entities/ical-feed.entity';
-import { NoticeEntity } from '../entities/notice.entity';
-import { ReservationEntity } from '../entities/reservation.entity';
-import { ResourceSettingsEntity } from '../entities/resource-settings.entity';
-import * as pluginMigrations from '../migrations';
+import {
+  createInMemoryPluginStorage,
+  type InMemoryPluginStorage,
+  type PluginAccessPrincipal,
+  type PluginAuditPrincipal,
+  type PluginContext,
+  type PluginStorageContext,
+} from '@attraccess/plugins-backend-sdk';
+import { reservationsStorage, tablesOf } from '../storage';
+import type { ReservationRow, ReservationWhere } from '../storage/reservation-table';
 import { AccessService } from '../reservations/access.service';
 import type { ReservationActor } from '../reservations/actor';
 import type { VisibilityService } from '../ical/visibility.service';
@@ -49,34 +48,33 @@ interface AccessState {
 }
 
 /**
- * Like the host's SQLite connection: transactions begin IMMEDIATE (reserving the writer up front, waiting through the
- * busy timeout), so two connections on one file serialize their writes instead of failing a lock upgrade.
+ * The in-memory record port (the SDK's fake of the host's storage), real services, scripted host facade. Time is
+ * controlled via `setNow`. Pass another harness as `share` to run a second, independent host (own services, own
+ * in-process mutex) on the same storage: only the port's transactions then keep concurrent creates apart.
  */
-function beginImmediately(dataSource: DataSource): void {
-  const runner = dataSource.createQueryRunner(); // the SQLite driver hands every caller this one runner
-  const query = runner.query.bind(runner) as (...args: unknown[]) => Promise<unknown>;
-  runner.query = ((sql: string, ...rest: unknown[]) =>
-    query(sql === 'BEGIN TRANSACTION' ? 'BEGIN IMMEDIATE TRANSACTION' : sql, ...rest)) as typeof runner.query;
-}
-
-/**
- * Real SQLite (temp file), real services, scripted host facade. Time is controlled via `setNow`. Pass the
- * `databasePath` of another harness to run a second, independent host (own connection, own services) on its file.
- */
-export async function createHarness(options: { databasePath?: string } = {}) {
-  const dir = options.databasePath ? null : mkdtempSync(join(tmpdir(), 'reservations-test-'));
-  const databasePath = options.databasePath ?? join(dir as string, 'db.sqlite');
-  const dataSource = await new DataSource({
-    type: 'sqlite',
-    database: databasePath,
-    busyTimeout: 10_000,
-    entities: [ReservationEntity, ResourceSettingsEntity, GlobalSettingsEntity, IcalFeedEntity, NoticeEntity],
-    // Every migration the plugin registers (migrations.ts), as the host would run them.
-    migrations: Object.values(pluginMigrations),
-    synchronize: false,
-  }).initialize();
-  beginImmediately(dataSource);
-  await dataSource.runMigrations();
+export async function createHarness(options: { share?: { memory: InMemoryPluginStorage } } = {}) {
+  const memory: InMemoryPluginStorage = options.share?.memory ?? createInMemoryPluginStorage(reservationsStorage);
+  // Records every record-port call the services make (the unwrapped `tables` below are for test setup and asserts).
+  const storageCalls: string[] = [];
+  const countingStorage: PluginStorageContext = {
+    open: ((definition) => {
+      const opened = memory.storage.open(definition);
+      return Object.fromEntries(
+        Object.entries(opened).map(([table, api]) => [
+          table,
+          Object.fromEntries(
+            Object.entries(api).map(([method, call]) => [
+              method,
+              (...args: unknown[]) => {
+                storageCalls.push(`${table}.${method}`);
+                return (call as (...a: unknown[]) => unknown)(...args);
+              },
+            ]),
+          ),
+        ]),
+      );
+    }) as unknown as PluginStorageContext['open'],
+  };
 
   let now = new Date('2026-06-01T08:00:00.000Z');
   const state: AccessState = {
@@ -106,14 +104,6 @@ export async function createHarness(options: { databasePath?: string } = {}) {
     onRemoved: jest.fn(),
   } satisfies ReservationNotifier;
 
-  // Mirrors the host: concurrent callers run one at a time inside a transaction.
-  let tail: Promise<unknown> = Promise.resolve();
-  const runInTransaction = <T>(work: (manager: EntityManager) => Promise<T>): Promise<T> => {
-    const next = tail.catch(() => undefined).then(() => dataSource.transaction(work));
-    tail = next;
-    return next;
-  };
-
   // Like the host: a principal with effectivePermissions (a request's user) only uses the permissions inside that
   // scope; a plain id uses the user's full permissions. Maintainer roles and introductions are not permissions.
   const idOf = (subject: PluginAccessPrincipal) => (typeof subject === 'number' ? subject : subject.id);
@@ -127,12 +117,8 @@ export async function createHarness(options: { databasePath?: string } = {}) {
   const context = {
     audit,
     logger: console,
-    persistence: createSqlitePluginPersistence({
-      pluginName: 'reservations',
-      connection: () => dataSource,
-      entities: [ReservationEntity, ResourceSettingsEntity, GlobalSettingsEntity, IcalFeedEntity, NoticeEntity],
-      runInTransaction,
-    }),
+    persistence: memory.persistence,
+    storage: countingStorage,
     notifications: { dispatch },
     startBlocked: { invalidate: invalidateStartBlocked },
     readerUi: { invalidate: invalidateReaderUi },
@@ -228,9 +214,21 @@ export async function createHarness(options: { databasePath?: string } = {}) {
   const admin = new SettingsAdminService(settings, globalSettings, reservations, access, directory);
   await globalSettings.setTimezone('Europe/Berlin');
 
+  const tables = tablesOf({ storage: memory.storage } as PluginContext);
+
   return {
-    dataSource,
-    databasePath,
+    memory,
+    /** The plugin's tables on the record port, uncounted: for arranging and asserting state in tests. */
+    tables,
+    /** `table.method` of every record-port call the plugin services made so far (reset with `length = 0`). */
+    storageCalls,
+    /** The booking matching `where` (an id, or a field filter); fails when there is none. */
+    async reservation(where: number | ReservationWhere): Promise<ReservationRow> {
+      const row =
+        typeof where === 'number' ? await tables.reservations.get(where) : await tables.reservations.findOne({ where });
+      if (!row) throw new Error(`No reservation for ${JSON.stringify(where)}`);
+      return row as ReservationRow;
+    },
     context,
     state,
     audit,
@@ -279,8 +277,6 @@ export async function createHarness(options: { databasePath?: string } = {}) {
     },
     async close() {
       await reservations.flushNotifications();
-      await dataSource.destroy();
-      if (dir) rmSync(dir, { recursive: true, force: true });
     },
   };
 }

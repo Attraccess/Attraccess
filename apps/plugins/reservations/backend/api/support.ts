@@ -1,7 +1,7 @@
 import type { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { UnauthorizedException, applyDecorators } from '@nestjs/common';
 import { ApiConflictResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiBadRequestResponse } from '@nestjs/swagger';
-import { RESERVATION_STATUSES, ReservationStatus } from '../entities/reservation.entity';
+import { RESERVATION_STATUSES, ReservationStatus } from '../storage/reservation-table';
 import type { ReservationActor } from '../reservations/actor';
 import { ReservationError } from '../reservations/errors';
 import { ReservationErrorDto } from './dto.response';

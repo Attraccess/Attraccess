@@ -1,9 +1,8 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
-import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
 import { Inject, Injectable } from '@nestjs/common';
 import type { AvailabilityDto, ManagedReservationListDto, ReservationDto } from '../api/dto.response';
 import { Clock, PLUGIN_CONTEXT, RESERVATION_CLOCK } from '../constants';
-import { ReservationEntity, ReservationStatus } from '../entities/reservation.entity';
+import { ReservationRow, ReservationStatus } from '../storage/reservation-table';
 import { VisibilityService } from '../ical/visibility.service';
 import { GlobalSettingsService } from '../settings/global-settings.service';
 import { ResourceSettingsService } from '../settings/resource-settings.service';
@@ -43,7 +42,7 @@ export class ReservationQueryService {
    */
   async present(
     actor: ReservationActor,
-    rows: ReservationEntity[],
+    rows: ReservationRow[],
     knownManaged?: Map<number, boolean>,
   ): Promise<ReservationDto[]> {
     const known = knownManaged ?? new Map<number, boolean>();
@@ -224,8 +223,7 @@ export class ReservationQueryService {
   ): Promise<CanBookResult> {
     const result = await this.access.canBook(actor, resourceId, settings, isManager);
     if (!result.allowed || settings.maxActiveBookingsPerUser === 0) return result;
-    const manager = sqlitePersistence(this.context).manager;
-    const live = await this.store.countLiveForUser(manager, actor.userId, resourceId, this.clock());
+    const live = await this.store.countLiveForUser(undefined, actor.userId, resourceId, this.clock());
     return live >= settings.maxActiveBookingsPerUser ? { allowed: false, reason: 'USER_BOOKING_LIMIT' } : result;
   }
 }

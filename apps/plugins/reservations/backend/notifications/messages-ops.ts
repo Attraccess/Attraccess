@@ -1,4 +1,4 @@
-import type { ReservationEntity } from '../entities/reservation.entity';
+import type { ReservationRow } from '../storage/reservation-table';
 import type { ResourceSettings } from '../settings/settings.model';
 import { NoticeText, ROUTES, checkInRules, formatDateTime, formatRange, formatTime, pick } from './format';
 import { bookingVariables, checkInVariables, slotVariables } from './email/variables';
@@ -7,7 +7,7 @@ import type { MessageContext, Span } from './messages';
 const when = (m: MessageContext, r: Span) => formatRange(r.startTime, r.endTime, m);
 
 /** 48h before the start: "do you still need this?" with Keep / Cancel deep links (no tokens, no side effects). */
-export function stillNeeded(m: MessageContext, r: ReservationEntity): NoticeText {
+export function stillNeeded(m: MessageContext, r: ReservationRow): NoticeText {
   const { lang, resourceName } = m;
   return {
     email: { template: 'still-needed', variables: bookingVariables(m, r) },
@@ -23,7 +23,7 @@ export function stillNeeded(m: MessageContext, r: ReservationEntity): NoticeText
   };
 }
 
-export function reminder24h(m: MessageContext, r: ReservationEntity, settings: ResourceSettings): NoticeText {
+export function reminder24h(m: MessageContext, r: ReservationRow, settings: ResourceSettings): NoticeText {
   const { lang, resourceName } = m;
   return {
     email: {
@@ -59,7 +59,7 @@ export interface MaintenanceSpan {
  */
 export function maintenanceAffected(
   m: MessageContext,
-  bookings: readonly ReservationEntity[],
+  bookings: readonly ReservationRow[],
   window: MaintenanceSpan,
 ): NoticeText {
   const { lang, resourceName } = m;
@@ -113,7 +113,7 @@ export function maintenanceAffected(
   };
 }
 
-export function healthUnhealthy(m: MessageContext, r: ReservationEntity, reason: string | null): NoticeText {
+export function healthUnhealthy(m: MessageContext, r: ReservationRow, reason: string | null): NoticeText {
   const { lang, resourceName } = m;
   return {
     email: { template: 'health-unhealthy', variables: { ...bookingVariables(m, r), health: { reason: reason ?? '' } } },
@@ -131,7 +131,7 @@ export function healthUnhealthy(m: MessageContext, r: ReservationEntity, reason:
   };
 }
 
-export function healthRecovered(m: MessageContext, r: ReservationEntity): NoticeText {
+export function healthRecovered(m: MessageContext, r: ReservationRow): NoticeText {
   const { lang, resourceName } = m;
   return {
     email: { template: 'health-recovered', variables: bookingVariables(m, r) },
@@ -165,7 +165,7 @@ export function handover(m: MessageContext, r: Span): NoticeText {
 }
 
 /** Booking started while another user's session still runs: to the holder. */
-export function overrunForHolder(m: MessageContext, r: ReservationEntity): NoticeText {
+export function overrunForHolder(m: MessageContext, r: ReservationRow): NoticeText {
   const { lang, resourceName } = m;
   return {
     email: { template: 'overrun-holder', variables: bookingVariables(m, r) },
@@ -200,7 +200,7 @@ export function overrunForUser(m: MessageContext, r: Span): NoticeText {
 }
 
 /** A maintainer started the resource during the holder's booking: to the holder. */
-export function overrideForHolder(m: MessageContext, r: ReservationEntity, starterName: string): NoticeText {
+export function overrideForHolder(m: MessageContext, r: ReservationRow, starterName: string): NoticeText {
   const { lang, resourceName } = m;
   return {
     email: { template: 'override-holder', variables: { ...bookingVariables(m, r), actor: { name: starterName } } },
@@ -224,7 +224,7 @@ export function overrideForHolder(m: MessageContext, r: ReservationEntity, start
 /** A maintainer started the resource during someone's booking: to the other managers. */
 export function overrideForManagers(
   m: MessageContext,
-  r: ReservationEntity,
+  r: ReservationRow,
   starterName: string,
   holderName: string,
 ): NoticeText {

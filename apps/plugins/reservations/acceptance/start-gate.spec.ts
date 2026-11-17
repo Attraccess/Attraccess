@@ -9,7 +9,6 @@ import { ResourceUsageController } from '../../../api/src/resources/usage/sessio
 import { ResourceUsageService } from '../../../api/src/resources/usage/sessions/resource-usage.service';
 import { SessionEndNotifier } from '../../../api/src/resources/usage/pre-start/session-end-notifier.service';
 import { ReaderUiHooksService } from '../../../api/src/plugin-system/reader-ui/reader-ui-hooks.service';
-import { ReservationEntity } from '../backend/entities/reservation.entity';
 import { preStartHook, publishHookServices, startBlockedQuery } from '../backend/hooks/runtime';
 import { createBackgroundServices } from '../backend/testing/background-services.test-utils';
 import { Harness, createHarness } from '../backend/testing/harness.test-utils';
@@ -235,7 +234,7 @@ describe.each([['session' as const], ['api-token' as const]])('host start gate w
   });
 
   it('does not block once the booking is cancelled or ended', async () => {
-    await h.dataSource.getRepository(ReservationEntity).update({ userId: HOLDER }, { status: 'cancelled' });
+    await h.tables.reservations.update({ userId: HOLDER }, { status: 'cancelled' });
     principal = as(OTHER, via);
     expect((await start()).status).toBe(201);
   });

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { RESERVATION_STATUSES, ReservationStatus } from '../entities/reservation.entity';
+import { RESERVATION_STATUSES, ReservationStatus } from '../storage/reservation-table';
 import { BOOKING_CONFLICT_CODES, STATE_CONFLICT_CODES } from '../reservations/errors';
 import { INTEGER_RANGES, WHO_CAN_BOOK, WhoCanBook } from '../settings/settings.model';
 

@@ -4,8 +4,8 @@ import { Harness, at, createHarness, principal } from '../testing/harness.test-u
 const slot = { startTime: at('2026-06-02T08:00:00'), endTime: at('2026-06-02T09:00:00') };
 
 /**
- * Two independent hosts (own connection, own services, own in-process mutex) on one SQLite file: only the database
- * transaction keeps overlapping creates apart, as between two API processes.
+ * Two independent hosts (own services, own in-process mutex) on one storage: only the port's transactions (overlap
+ * check and insert in one scope) keep overlapping creates apart, as between two API processes.
  */
 describe('reservation creates across two connections', () => {
   let first: Harness;
@@ -13,7 +13,7 @@ describe('reservation creates across two connections', () => {
 
   beforeEach(async () => {
     first = await createHarness();
-    second = await createHarness({ databasePath: first.databasePath });
+    second = await createHarness({ share: first });
     await first.enable(1, { maxActiveBookingsPerUser: 0 });
   });
 
@@ -40,7 +40,7 @@ describe('reservation creates across two connections', () => {
 
     expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
     expect(rejectionCodes(results)).toEqual(Array(9).fill('OVERLAP'));
-    expect(await first.dataSource.query('SELECT COUNT(*) AS n FROM reservations_reservation')).toEqual([{ n: 1 }]);
+    expect(await first.tables.reservations.count()).toBe(1);
   });
 
   it('never exceeds the session limit of a shared machine', async () => {
@@ -51,6 +51,6 @@ describe('reservation creates across two connections', () => {
 
     expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(3);
     expect(rejectionCodes(results)).toEqual(Array(7).fill('OVERLAP'));
-    expect(await second.dataSource.query('SELECT COUNT(*) AS n FROM reservations_reservation')).toEqual([{ n: 3 }]);
+    expect(await second.tables.reservations.count()).toBe(3);
   });
 });

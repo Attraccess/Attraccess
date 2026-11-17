@@ -6,7 +6,7 @@ import {
 } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Clock, PLUGIN_CONTEXT, RESERVATION_CLOCK } from '../constants';
-import type { ReservationEntity } from '../entities/reservation.entity';
+import type { ReservationRow } from '../storage/reservation-table';
 import { PendingDecisionStore } from '../hooks/pending-decisions';
 import { HostInfoService } from '../notifications/host-info.service';
 import { ReservationNotifications } from '../notifications/notifier.service';
@@ -123,7 +123,7 @@ export class ReservationEventHandlers implements OnModuleInit, OnModuleDestroy {
     resourceId: number,
     userId: number,
     startTime: Date,
-  ): Promise<ReservationEntity | undefined> {
+  ): Promise<ReservationRow | undefined> {
     const running = await this.store.findActiveForResource(resourceId, startTime);
     const active = running.find((r) => r.userId !== userId);
     if (!active) return undefined;
@@ -188,7 +188,7 @@ export class ReservationEventHandlers implements OnModuleInit, OnModuleDestroy {
       'maintenance',
     );
     const told = new Set(notices.filter((notice) => notice.refKey === refKey).map((notice) => notice.reservationId));
-    const byHolder = new Map<number, ReservationEntity[]>();
+    const byHolder = new Map<number, ReservationRow[]>();
     for (const reservation of overlapping) {
       if (told.has(reservation.id)) continue;
       if (!(await this.store.claimNotice(reservation.id, 'maintenance', refKey, this.clock()))) continue;
@@ -240,7 +240,7 @@ export class ReservationEventHandlers implements OnModuleInit, OnModuleDestroy {
 
   /** Claims the notice and, only for the call that inserted it, sends. */
   private async once(
-    reservation: ReservationEntity,
+    reservation: ReservationRow,
     kind: string,
     refKey: string,
     send: () => Promise<boolean>,

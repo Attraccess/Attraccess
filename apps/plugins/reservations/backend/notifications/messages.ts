@@ -1,4 +1,4 @@
-import type { ReservationEntity } from '../entities/reservation.entity';
+import type { ReservationRow } from '../storage/reservation-table';
 import type { ResourceSettings } from '../settings/settings.model';
 import { NoticeText, ROUTES, TimeContext, checkInRules, formatRange, formatTime, minutesText, pick } from './format';
 import { bookingVariables, checkInVariables } from './email/variables';
@@ -8,12 +8,12 @@ export interface MessageContext extends TimeContext {
   resourceName: string;
 }
 
-export type Span = Pick<ReservationEntity, 'startTime' | 'endTime'>;
+export type Span = Pick<ReservationRow, 'startTime' | 'endTime'>;
 
 const when = (m: MessageContext, r: Span) => formatRange(r.startTime, r.endTime, m);
 
 /** Managers: a booking waits for approval. */
-export function pendingForManagers(m: MessageContext, r: ReservationEntity, holderName: string): NoticeText {
+export function pendingForManagers(m: MessageContext, r: ReservationRow, holderName: string): NoticeText {
   const { lang, resourceName } = m;
   return {
     email: { template: 'pending-approval', variables: { ...bookingVariables(m, r), holder: { name: holderName } } },
@@ -33,7 +33,7 @@ export function pendingForManagers(m: MessageContext, r: ReservationEntity, hold
 /** Holder: confirmation (directly, or after approval) including the check-in rules. */
 export function confirmed(
   m: MessageContext,
-  r: ReservationEntity,
+  r: ReservationRow,
   settings: ResourceSettings,
   viaApproval: boolean,
 ): NoticeText {
@@ -65,7 +65,7 @@ export function confirmed(
   };
 }
 
-export function rejected(m: MessageContext, r: ReservationEntity): NoticeText {
+export function rejected(m: MessageContext, r: ReservationRow): NoticeText {
   const { lang, resourceName } = m;
   return {
     email: { template: 'rejected', variables: bookingVariables(m, r) },
@@ -83,7 +83,7 @@ export function rejected(m: MessageContext, r: ReservationEntity): NoticeText {
   };
 }
 
-export function cancelledByManager(m: MessageContext, r: ReservationEntity): NoticeText {
+export function cancelledByManager(m: MessageContext, r: ReservationRow): NoticeText {
   const { lang, resourceName } = m;
   return {
     email: { template: 'cancelled-by-manager', variables: bookingVariables(m, r) },
@@ -101,7 +101,7 @@ export function cancelledByManager(m: MessageContext, r: ReservationEntity): Not
   };
 }
 
-export function endedEarlyByManager(m: MessageContext, r: ReservationEntity): NoticeText {
+export function endedEarlyByManager(m: MessageContext, r: ReservationRow): NoticeText {
   const { lang, resourceName } = m;
   return {
     email: { template: 'ended-early', variables: bookingVariables(m, r) },
@@ -119,7 +119,7 @@ export function endedEarlyByManager(m: MessageContext, r: ReservationEntity): No
 }
 
 /** A future booking was cancelled by the system: reservations were switched off, or fewer parallel bookings are allowed. */
-export function removed(m: MessageContext, r: ReservationEntity, capacityReduced = false): NoticeText {
+export function removed(m: MessageContext, r: ReservationRow, capacityReduced = false): NoticeText {
   const { lang, resourceName } = m;
   return {
     email: { template: 'removed', variables: { ...bookingVariables(m, r), removal: { capacity: capacityReduced } } },
@@ -142,7 +142,7 @@ export function removed(m: MessageContext, r: ReservationEntity, capacityReduced
 }
 
 /** Pending request that nobody decided before its start. */
-export function expired(m: MessageContext, r: ReservationEntity): NoticeText {
+export function expired(m: MessageContext, r: ReservationRow): NoticeText {
   const { lang, resourceName } = m;
   return {
     email: { template: 'expired', variables: bookingVariables(m, r) },
@@ -159,7 +159,7 @@ export function expired(m: MessageContext, r: ReservationEntity): NoticeText {
   };
 }
 
-export function noShow(m: MessageContext, r: ReservationEntity, settings: ResourceSettings): NoticeText {
+export function noShow(m: MessageContext, r: ReservationRow, settings: ResourceSettings): NoticeText {
   const { lang, resourceName } = m;
   return {
     email: {

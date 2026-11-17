@@ -33,12 +33,6 @@
     "host": "^2.0.0-0",
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
-    "persistence": {
-      "backends": [
-        "sqlite"
-      ]
-    },
-    "migrations": "dist/migrations.js",
     "styles": "frontend/style.css",
     "dashboardPaths": [
       "/reservations",
@@ -48,7 +42,7 @@
       "reservations-upcoming"
     ],
     "permissions": [
-      "DATABASE_ACCESS",
+      "PLUGIN_STORAGE",
       "ACCESS_HOOKS",
       "LISTEN_EVENTS",
       "ACCESS_RESOURCES",

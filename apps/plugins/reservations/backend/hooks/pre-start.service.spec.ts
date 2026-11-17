@@ -4,7 +4,6 @@ import {
   type StartBlockedContext,
   type StartBlockedState,
 } from '@attraccess/plugins-backend-sdk';
-import { ReservationEntity } from '../entities/reservation.entity';
 import { Harness, createHarness } from '../testing/harness.test-utils';
 import { BackgroundServices, createBackgroundServices } from '../testing/background-services.test-utils';
 import { PreStartService, overrideStepKey, reservationStepKey } from './pre-start.service';
@@ -35,21 +34,21 @@ describe('PreStartService', () => {
   afterEach(() => h.close());
 
   it('allows without any database access when reservations are disabled', async () => {
-    const getRepository = jest.spyOn(h.dataSource, 'getRepository');
+    h.storageCalls.length = 0;
     const query = jest.spyOn(h.store, 'findConfirmedOverlapping');
     const isManager = jest.spyOn(h.access, 'isManager');
     expect(await p.preStart.evaluate(ctx(10, { resourceId: 2 }))).toEqual({ decision: 'allow' });
-    expect(getRepository).not.toHaveBeenCalled();
+    expect(h.storageCalls).toEqual([]);
     expect(query).not.toHaveBeenCalled();
     expect(isManager).not.toHaveBeenCalled();
   });
 
   it('answers disabled resources from memory on every call (perf sanity)', async () => {
-    const getRepository = jest.spyOn(h.dataSource, 'getRepository');
+    h.storageCalls.length = 0;
     const started = process.hrtime.bigint();
     for (let i = 0; i < 5000; i += 1) await p.preStart.evaluate(ctx(10, { resourceId: 2 }));
     const perCallMs = Number(process.hrtime.bigint() - started) / 1e6 / 5000;
-    expect(getRepository).not.toHaveBeenCalled();
+    expect(h.storageCalls).toEqual([]);
     // Generous bound: the call count above is the real guarantee; this only catches pathological slowness
     // (coverage instrumentation and loaded CI hosts are far below it).
     expect(perCallMs).toBeLessThan(20);
@@ -127,7 +126,7 @@ describe('PreStartService', () => {
     });
 
     it('asks managers for an override confirmation naming the holder', async () => {
-      const [reservation] = await h.dataSource.getRepository(ReservationEntity).find();
+      const [reservation] = await h.tables.reservations.find();
       const result = await p.preStart.evaluate(ctx(99));
       expect(result).toMatchObject({
         decision: 'confirm',
@@ -196,7 +195,7 @@ describe('PreStartService', () => {
 
     it('asks for confirmation inside the confirm window with a countdown', async () => {
       h.setNow('2026-06-01T11:20:00Z');
-      const [reservation] = await h.dataSource.getRepository(ReservationEntity).find();
+      const [reservation] = await h.tables.reservations.find();
       const result = await p.preStart.evaluate(ctx(10));
       expect(result).toEqual({
         decision: 'confirm',
@@ -246,18 +245,16 @@ describe('PreStartService', () => {
 
   describe('several bookings of other users', () => {
     const insert = (userId: number, start: string, end: string) =>
-      h.dataSource.getRepository(ReservationEntity).save(
-        Object.assign(new ReservationEntity(), {
-          resourceId: 1,
-          userId,
-          startTime: new Date(`${start}Z`),
-          endTime: new Date(`${end}Z`),
-          bufferBeforeMinutes: 0,
-          bufferAfterMinutes: 0,
-          status: 'confirmed',
-          createdAt: h.clock(),
-        }),
-      );
+      h.tables.reservations.insert({
+        resourceId: 1,
+        userId,
+        startTime: new Date(`${start}Z`),
+        endTime: new Date(`${end}Z`),
+        bufferBeforeMinutes: 0,
+        bufferAfterMinutes: 0,
+        status: 'confirmed',
+        createdAt: h.clock(),
+      });
 
     it('asks about each upcoming booking in the window in turn', async () => {
       const a = await p.book(11, 1, '2026-06-01T11:30:00', '2026-06-01T11:45:00');
@@ -300,7 +297,7 @@ describe('PreStartService', () => {
   describe.each(['pending', 'cancelled', 'no_show', 'expired', 'rejected'] as const)('%s bookings', (status) => {
     it('never block and never ask', async () => {
       const booking = await p.book(11, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
-      await h.dataSource.getRepository(ReservationEntity).update({ id: booking.id }, { status });
+      await h.tables.reservations.update({ id: booking.id }, { status });
       h.setNow('2026-06-01T11:30:00Z');
       expect(await p.preStart.evaluate(ctx(10))).toEqual({ decision: 'allow' });
       h.setNow('2026-06-01T12:30:00Z');
@@ -400,7 +397,7 @@ describe('PreStartService', () => {
       expect(await query(10)).toBeNull();
       h.setNow('2026-06-01T13:15:00Z');
       expect(await query(10)).not.toBeNull();
-      await h.dataSource.getRepository(ReservationEntity).update({ userId: 11 }, { status: 'cancelled' });
+      await h.tables.reservations.update({ userId: 11 }, { status: 'cancelled' });
       expect(await query(10)).toBeNull();
       expect(await query(10, { resourceId: 2 })).toBeNull();
     });
@@ -427,7 +424,7 @@ describe('PreStartService', () => {
   describe('reader origin: names only after the card tap, to those who may see them', () => {
     const reader = (userId: number, patch: Partial<PreStartContext> = {}) =>
       ctx(userId, { origin: 'reader', ...patch });
-    const reservationOf = () => h.dataSource.getRepository(ReservationEntity).findOneByOrFail({ userId: 11 });
+    const reservationOf = () => h.reservation({ userId: 11 });
 
     describe('booking starts soon', () => {
       beforeEach(async () => {

@@ -1,7 +1,7 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CAPACITY_REDUCED_REASON, Clock, PLUGIN_CONTEXT, RESERVATION_CLOCK } from '../constants';
-import type { ReservationEntity } from '../entities/reservation.entity';
+import type { ReservationRow } from '../storage/reservation-table';
 import { DirectoryService } from '../reservations/directory.service';
 import type { ReservationNotifier } from '../reservations/notifier';
 import { ReservationStore } from '../reservations/reservation.store';
@@ -101,7 +101,7 @@ export class ReservationNotifications implements ReservationNotifier {
 
   // ------------------------------------------------ ReservationNotifier
 
-  async onPending(r: ReservationEntity): Promise<void> {
+  async onPending(r: ReservationRow): Promise<void> {
     const [managers, holder] = await Promise.all([
       this.managersExcept(r.resourceId, r.userId),
       this.holderName(r.userId),
@@ -111,7 +111,7 @@ export class ReservationNotifications implements ReservationNotifier {
     );
   }
 
-  async onConfirmed(r: ReservationEntity, context: { viaApproval: boolean }): Promise<void> {
+  async onConfirmed(r: ReservationRow, context: { viaApproval: boolean }): Promise<void> {
     // At-most-once: the claim comes first, so a retry or a double call never sends a second mail.
     if (!(await this.store.claimFlag(r.id, 'confirmationSentAt', this.clock()))) return;
     const settings = this.settings.getCachedSettings(r.resourceId);
@@ -124,27 +124,27 @@ export class ReservationNotifications implements ReservationNotifier {
     );
   }
 
-  async onRejected(r: ReservationEntity): Promise<void> {
+  async onRejected(r: ReservationRow): Promise<void> {
     await this.send('approvals', r.resourceId, [r.userId], `reservations:rejected:${r.id}`, (m) =>
       lifecycle.rejected(m, r),
     );
   }
 
-  async onCancelled(r: ReservationEntity, context: { byUserId: number; byHolder: boolean }): Promise<void> {
+  async onCancelled(r: ReservationRow, context: { byUserId: number; byHolder: boolean }): Promise<void> {
     if (context.byHolder) return;
     await this.send('bookings', r.resourceId, [r.userId], `reservations:cancelled:${r.id}`, (m) =>
       lifecycle.cancelledByManager(m, r),
     );
   }
 
-  async onEndedEarly(r: ReservationEntity, context: { byUserId: number }): Promise<void> {
+  async onEndedEarly(r: ReservationRow, context: { byUserId: number }): Promise<void> {
     if (context.byUserId === r.userId) return;
     await this.send('bookings', r.resourceId, [r.userId], `reservations:ended:${r.id}`, (m) =>
       lifecycle.endedEarlyByManager(m, r),
     );
   }
 
-  async onRemoved(r: ReservationEntity, context: { byUserId: number | null; reason?: string }): Promise<void> {
+  async onRemoved(r: ReservationRow, context: { byUserId: number | null; reason?: string }): Promise<void> {
     // A holder who switched reservations off themselves knows; a capacity cut always tells the holder.
     const capacityReduced = context.reason === CAPACITY_REDUCED_REASON;
     if (!capacityReduced && context.byUserId === r.userId) return;
@@ -155,26 +155,26 @@ export class ReservationNotifications implements ReservationNotifier {
 
   // ------------------------------------- scheduler / event notifications
 
-  notifyExpired(r: ReservationEntity): Promise<boolean> {
+  notifyExpired(r: ReservationRow): Promise<boolean> {
     return this.send('approvals', r.resourceId, [r.userId], `reservations:expired:${r.id}`, (m) =>
       lifecycle.expired(m, r),
     );
   }
 
-  notifyNoShow(r: ReservationEntity): Promise<boolean> {
+  notifyNoShow(r: ReservationRow): Promise<boolean> {
     const settings = this.settings.getCachedSettings(r.resourceId);
     return this.send('bookings', r.resourceId, [r.userId], `reservations:no-show:${r.id}`, (m) =>
       lifecycle.noShow(m, r, settings),
     );
   }
 
-  notifyStillNeeded(r: ReservationEntity): Promise<boolean> {
+  notifyStillNeeded(r: ReservationRow): Promise<boolean> {
     return this.send('reminders', r.resourceId, [r.userId], `reservations:still-needed:${r.id}`, (m) =>
       ops.stillNeeded(m, r),
     );
   }
 
-  notifyReminder24h(r: ReservationEntity): Promise<boolean> {
+  notifyReminder24h(r: ReservationRow): Promise<boolean> {
     const settings = this.settings.getCachedSettings(r.resourceId);
     return this.send('reminders', r.resourceId, [r.userId], `reservations:reminder-24h:${r.id}`, (m) =>
       ops.reminder24h(m, r, settings),
@@ -182,7 +182,7 @@ export class ReservationNotifications implements ReservationNotifier {
   }
 
   /** One notice to the holder of `bookings` (one holder, ordered by start) naming all of them. */
-  notifyMaintenance(bookings: ReservationEntity[], window: MaintenanceSpan, maintenanceId: number): Promise<boolean> {
+  notifyMaintenance(bookings: ReservationRow[], window: MaintenanceSpan, maintenanceId: number): Promise<boolean> {
     const [first] = bookings;
     return this.send(
       'availability',
@@ -193,20 +193,20 @@ export class ReservationNotifications implements ReservationNotifier {
     );
   }
 
-  notifyHealth(r: ReservationEntity, kind: 'unhealthy' | 'recovered', reason: string | null): Promise<boolean> {
+  notifyHealth(r: ReservationRow, kind: 'unhealthy' | 'recovered', reason: string | null): Promise<boolean> {
     return this.send('availability', r.resourceId, [r.userId], `reservations:health-${kind}:${r.id}`, (m) =>
       kind === 'unhealthy' ? ops.healthUnhealthy(m, r, reason) : ops.healthRecovered(m, r),
     );
   }
 
-  notifyHandover(r: ReservationEntity, sessionUserIds: number[]): Promise<boolean> {
+  notifyHandover(r: ReservationRow, sessionUserIds: number[]): Promise<boolean> {
     return this.send('handover', r.resourceId, sessionUserIds, `reservations:handover:${r.id}`, (m) =>
       ops.handover(m, r),
     );
   }
 
   /** Overrun: tells the holder and the user whose session still runs. Never touches the session. */
-  async notifyOverrun(r: ReservationEntity, sessionUserIds: number[]): Promise<boolean> {
+  async notifyOverrun(r: ReservationRow, sessionUserIds: number[]): Promise<boolean> {
     const holder = await this.send('handover', r.resourceId, [r.userId], `reservations:overrun:${r.id}`, (m) =>
       ops.overrunForHolder(m, r),
     );
@@ -217,7 +217,7 @@ export class ReservationNotifications implements ReservationNotifier {
   }
 
   /** A manager started the resource during the holder's booking: holder and the other managers. */
-  async notifyOverrideStart(r: ReservationEntity, starterId: number): Promise<boolean> {
+  async notifyOverrideStart(r: ReservationRow, starterId: number): Promise<boolean> {
     const [names, managers] = await Promise.all([
       this.directory.getUserNames([starterId, r.userId]),
       this.managersExcept(r.resourceId, starterId, r.userId),
