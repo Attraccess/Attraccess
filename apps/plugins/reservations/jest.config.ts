@@ -12,7 +12,6 @@ module.exports = {
   // Plugin sources import the host SDK, which exists only as a workspace path
   // alias (no node_modules entry) — point Jest at the library sources.
   moduleNameMapper: {
-    '^@attraccess/plugins-backend-sdk/sqlite$': '<rootDir>/../../../libs/plugins-backend-sdk/src/sqlite.ts',
     '^@attraccess/(.*)$': '<rootDir>/../../../libs/$1/src/index.ts',
   },
   // Unit coverage feeds the project's crap-score target.
