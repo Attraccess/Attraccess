@@ -13,18 +13,34 @@ import { excludedDirectory, generatedClients, git } from './lib/repo-files.mjs';
  * imports, re-exports, dynamic `import()`, `require()` and `import x = require()`.
  *
  * Adapter internals (apps/api/src/database/adapters, apps/api/src/database/sqlite, libs/database-entities) may only
- * be imported by Nest composition files (`*.module.ts`) and tests. The plugin SDK's engine subpath
- * (`@attraccess/plugins-backend-sdk/sqlite`) is for plugins; in the host only the plugin module loader and tests
- * name it.
+ * be imported by Nest composition files (`*.module.ts`) and tests. The SDK's former engine subpath
+ * (`@attraccess/plugins-backend-sdk/sqlite`) no longer exists and is flagged everywhere.
+ *
+ * Plugin zone (SDK 2.0: plugins have no database access): `apps/plugins/**`, `examples/**` and
+ * `libs/plugins-backend-sdk/src/**` get no exemptions at all, tests and migrations included. Besides the packages
+ * above they may not import `pg`, `mysql2`, `knex` or any subpath of `@attraccess/plugins-backend-sdk` (the package
+ * root and its package.json are the whole public surface). Plugin data goes through `context.storage`.
  *
  * Existing violations are recorded per file in scripts/persistence-boundaries.baseline.json. The baseline can only
  * shrink: a file that is not listed, or has more violations than listed, fails the check; a file that has fewer
- * fails until the baseline is lowered (run with --update). Neutral libraries and the frontend may never be listed.
+ * fails until the baseline is lowered (run with --update). Neutral libraries, the frontend and the SDK sources may
+ * never be listed.
+ *
+ * Plugin-zone entries in the baseline are TRANSITIONAL: they are the plugin sources that still use the old
+ * persistence surface while the bundled plugins are ported to the record port. The check reports how many remain.
+ * Once the ports have landed, run `--update` (the plugin entries vanish) and use `--require-clean-plugins`, which
+ * fails while any plugin-zone entry is left in the baseline or in the sources.
  */
 
 export const forbiddenPackage =
   /^(?:typeorm|@nestjs\/typeorm|sqlite3|better-sqlite3|@attraccess\/database-entities)(?:\/.*)?$/;
+// Removed in SDK 2.0; nothing resolves it any more.
 const sdkEngineSubpath = /^@attraccess\/plugins-backend-sdk\/sqlite(?:\/.*)?$/;
+// Plugin zone: no exemptions; a stricter package list and no SDK subpath (the package root is the public surface).
+const pluginZone = /^(?:apps\/plugins\/|examples\/|libs\/plugins-backend-sdk\/src\/)/;
+const pluginZonePackage =
+  /^(?:typeorm|@nestjs\/typeorm|sqlite3|better-sqlite3|pg|mysql2|knex|@attraccess\/database-entities)(?:\/.*)?$/;
+const sdkSubpath = /^@attraccess\/plugins-backend-sdk\/(?!package\.json$).+/;
 const adapterInternals =
   /^apps\/api\/src\/database\/(?:adapters|sqlite)(?:\/|$)|(?:^|\/)libs\/database-entities(?:\/|$)/;
 
@@ -44,24 +60,23 @@ const allowedPaths = [
   /\.(?:persistence|integration|e2e)\.spec\.ts$/,
   /^apps\/api\/src\/(?:e2e|test|__test__|test-utils)\//,
   /^apps\/plugins\/[^/]+\/acceptance\//,
-  // The plugin SDK's explicit engine subpath (`@attraccess/plugins-backend-sdk/sqlite`): the only SDK code that may
-  // name the engine. The SDK root stays neutral and is checked.
-  /^libs\/plugins-backend-sdk\/src\/(?:sqlite\.ts|lib\/sqlite\/)/,
 ];
 // Code that may never carry a baseline entry.
-const zeroTolerance = [/^libs\/application-models\//, /^apps\/frontend\//, /^libs\/(?:ui|shared|env|api-client)\//];
+const zeroTolerance = [
+  /^libs\/application-models\//,
+  /^apps\/frontend\//,
+  /^libs\/(?:ui|shared|env|api-client)\//,
+  /^libs\/plugins-backend-sdk\/src\//,
+];
 
 // Nest composition files wire adapters to ports; tests build adapters by hand.
 const compositionFile = /\.module\.ts$/;
 const testFile =
   /\.(?:spec|test)\.[cm]?tsx?$|\.test-(?:fixture|utils)\.ts$|(?:^|\/)(?:test|tests|__test__|test-utils|testing|e2e)\//;
-// Host application code that may not name the SDK's engine subpath, and the one host file that must (it hands the
-// subpath to plugin bundles).
-const hostApplication = /^apps\/api\/src\//;
-const sdkEngineSubpathHosts = new Set(['apps/api/src/plugin-system/runtime/module-loader.ts']);
-
 const sourceFile = /^(apps|libs|examples)\/.*\.(?:[cm]?ts|tsx)$/;
 const baselineFile = fileURLToPath(new URL('./persistence-boundaries.baseline.json', import.meta.url));
+
+export const isPluginZone = (file) => pluginZone.test(file);
 
 export function isChecked(file) {
   return (
@@ -69,7 +84,7 @@ export function isChecked(file) {
     !file.endsWith('.d.ts') &&
     !excludedDirectory.test(file) &&
     !generatedClients.test(file) &&
-    !allowedPaths.some((pattern) => pattern.test(file))
+    (isPluginZone(file) || !allowedPaths.some((pattern) => pattern.test(file)))
   );
 }
 
@@ -109,11 +124,11 @@ export function findViolations(file, content) {
   const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, false, kind);
   const specifiers = [];
   collectSpecifiers(source, specifiers);
-  const mayWireAdapters = compositionFile.test(file) || testFile.test(file);
-  const mayNameSdkEngine = !hostApplication.test(file) || testFile.test(file) || sdkEngineSubpathHosts.has(file);
+  const zone = isPluginZone(file);
+  const mayWireAdapters = !zone && (compositionFile.test(file) || testFile.test(file));
   return specifiers.filter((specifier) => {
-    if (forbiddenPackage.test(specifier)) return true;
-    if (sdkEngineSubpath.test(specifier)) return !mayNameSdkEngine;
+    if (forbiddenPackage.test(specifier) || sdkEngineSubpath.test(specifier)) return true;
+    if (zone && (pluginZonePackage.test(specifier) || sdkSubpath.test(specifier))) return true;
     if (!specifier.startsWith('.') || mayWireAdapters) return false;
     const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier));
     return adapterInternals.test(resolved);
@@ -164,7 +179,8 @@ export function compareWithBaseline(counts, baseline) {
     if (count > allowed) {
       problems.push(
         `${file}: ${count} forbidden persistence import(s), ${allowed} allowed. Use an application port instead of ` +
-          `typeorm, drivers, @attraccess/database-entities, the SDK engine subpath or adapter internals.`,
+          `typeorm, drivers, @attraccess/database-entities or adapter internals; plugins use context.storage and ` +
+          `import only the root of @attraccess/plugins-backend-sdk.`,
       );
     }
   }
@@ -177,8 +193,14 @@ export function compareWithBaseline(counts, baseline) {
   return problems;
 }
 
+/** Plugin-zone files that are still on the baseline or still violate: the transitional debt of the plugin ports. */
+export function pluginDebt(counts, baseline) {
+  return [...new Set([...Object.keys(counts), ...Object.keys(baseline)])].filter(isPluginZone).sort();
+}
+
 function main() {
   const update = process.argv.includes('--update');
+  const requireCleanPlugins = process.argv.includes('--require-clean-plugins');
   const counts = countViolations(workingTreeSources());
   if (update) {
     const entries = Object.entries(counts).filter(([file]) => !zeroTolerance.some((pattern) => pattern.test(file)));
@@ -189,12 +211,19 @@ function main() {
   }
   const baseline = JSON.parse(readFileSync(baselineFile, 'utf8'));
   const problems = compareWithBaseline(counts, baseline);
+  const debt = pluginDebt(counts, baseline);
+  if (requireCleanPlugins && debt.length > 0) {
+    problems.push(`${debt.length} plugin-zone file(s) still use the old persistence surface: ${debt.join(', ')}`);
+  }
   if (problems.length > 0) {
     console.error(`Persistence boundary check failed:\n${problems.map((problem) => `  ${problem}`).join('\n')}`);
     process.exitCode = 1;
     return;
   }
   console.log(`Persistence boundaries hold: ${Object.keys(baseline).length} files remain on the shrinking baseline.`);
+  if (debt.length > 0) {
+    console.log(`  ${debt.length} of them are transitional plugin-zone files (ports to context.storage pending).`);
+  }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main();

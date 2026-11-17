@@ -5,6 +5,8 @@ import {
   countViolations,
   findViolations,
   isChecked,
+  isPluginZone,
+  pluginDebt,
   workingTreeSources,
 } from './check-persistence-boundaries.mjs';
 
@@ -62,15 +64,108 @@ test('a Nest module still may not import the ORM itself', () => {
   assert.equal(find("import { TypeOrmModule } from '@nestjs/typeorm';", 'apps/api/src/x/x.module.ts').length, 1);
 });
 
-test('only the plugin module loader and tests name the SDK engine subpath in the host', () => {
+test('the removed SDK engine subpath is flagged everywhere', () => {
   const content = "import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';";
-  assert.equal(find(content, 'apps/api/src/plugin-system/reader-ui/reader-ui-hooks.service.ts').length, 1);
+  assert.equal(find(content, 'apps/api/src/plugin-system/runtime/module-loader.ts').length, 1);
+  assert.equal(find(content, 'apps/api/src/plugin-system/plugin.module.spec.ts').length, 1);
+  assert.equal(find(content, 'apps/plugins/wago/backend/flow/state.ts').length, 1);
   assert.equal(find("import x from '@attraccess/plugins-backend-sdk/sqlite/extra';").length, 1);
-  assert.equal(find(content, 'apps/api/src/plugin-system/runtime/module-loader.ts').length, 0);
-  assert.equal(find(content, 'apps/api/src/plugin-system/plugin.module.spec.ts').length, 0);
-  // Plugins are written against the engine subpath; the SDK root stays allowed everywhere.
-  assert.equal(find(content, 'apps/plugins/wago/backend/flow/state.ts').length, 0);
   assert.equal(find("import { PluginContext } from '@attraccess/plugins-backend-sdk';").length, 0);
+});
+
+test('plugin zone: apps/plugins, examples and the SDK sources', () => {
+  for (const file of [
+    'apps/plugins/wago/backend/x.ts',
+    'apps/plugins/wago/backend/x.spec.ts',
+    'apps/plugins/wago/acceptance/a.spec.ts',
+    'apps/plugins/wago/backend/migrations/1-x.ts',
+    'apps/plugins/wago/backend/x.persistence.spec.ts',
+    'examples/poc-backend-plugin/src/index.ts',
+    'libs/plugins-backend-sdk/src/lib/x.ts',
+  ]) {
+    assert.equal(isPluginZone(file), true, file);
+    assert.equal(isChecked(file), true, file);
+  }
+  for (const file of [
+    'apps/api/src/plugin-system/x.ts',
+    'libs/plugins-frontend-sdk/src/x.ts',
+    'libs/database-entities/x.ts',
+  ]) {
+    assert.equal(isPluginZone(file), false, file);
+  }
+});
+
+test('plugin zone: every import form of every persistence package and SDK subpath is flagged', () => {
+  const content = [
+    "import { Entity } from 'typeorm';",
+    "import type { Repository } from 'typeorm';",
+    "export { Column } from 'typeorm';",
+    "export * from '@attraccess/database-entities';",
+    "import Database from 'better-sqlite3';",
+    "import sqlite3 from 'sqlite3';",
+    "import { Pool } from 'pg';",
+    "import mysql from 'mysql2/promise';",
+    "import knex = require('knex');",
+    "const a = require('typeorm');",
+    "const b = await import('pg');",
+    "type T = typeof import('knex');",
+    "jest.requireActual('mysql2');",
+    "import { x } from '@attraccess/plugins-backend-sdk/sqlite';",
+    "import { y } from '@attraccess/plugins-backend-sdk/internal';",
+    "import { z } from '@attraccess/plugins-backend-sdk/testing';",
+    "import { InjectRepository } from '@nestjs/typeorm';",
+  ].join('\n');
+  for (const file of [
+    'apps/plugins/shelly/backend/service.ts',
+    'apps/plugins/shelly/backend/service.spec.ts',
+    'examples/poc-backend-plugin/src/index.ts',
+    'libs/plugins-backend-sdk/src/lib/x.ts',
+  ]) {
+    assert.equal(find(content, file).length, 17, file);
+  }
+});
+
+test('plugin zone: the SDK root and its package.json stay allowed, lookalikes are not flagged', () => {
+  const file = 'apps/plugins/shelly/backend/service.ts';
+  assert.equal(find("import { PluginContext } from '@attraccess/plugins-backend-sdk';", file).length, 0);
+  assert.equal(find("import pkg from '@attraccess/plugins-backend-sdk/package.json';", file).length, 0);
+  assert.equal(
+    find("import x from 'pg-promise';\nimport y from 'knex-helpers';\nimport z from './pg';", file).length,
+    0,
+  );
+  assert.equal(find("import { x } from '@attraccess/application-models';", file).length, 0);
+});
+
+test('plugin zone: a test or a migration may not reach adapter internals either', () => {
+  const content = "import { X } from '../../../api/src/database/adapters/x.store';";
+  assert.equal(find(content, 'apps/plugins/shelly/backend/a.spec.ts').length, 1);
+  assert.equal(
+    find("import { X } from '../../../../libs/database-entities/src/index';", 'apps/plugins/shelly/backend/a.spec.ts')
+      .length,
+    1,
+  );
+  assert.equal(
+    find("import { X } from '../../../../libs/database-entities/src/index';", 'apps/plugins/shelly/backend/x.module.ts')
+      .length,
+    1,
+  );
+});
+
+test('the SDK sources can never be baselined; plugin sources can, as transitional debt', () => {
+  const sdk = 'libs/plugins-backend-sdk/src/lib/x.ts';
+  assert.match(compareWithBaseline({ [sdk]: 1 }, { [sdk]: 5 })[0], /never depend on persistence/);
+  const plugin = 'apps/plugins/shelly/backend/service.ts';
+  assert.deepEqual(compareWithBaseline({ [plugin]: 2 }, { [plugin]: 2 }), []);
+  assert.match(compareWithBaseline({ [plugin]: 3 }, { [plugin]: 2 })[0], /3 forbidden.*2 allowed/);
+  assert.match(compareWithBaseline({ [plugin]: 1 }, { [plugin]: 2 })[0], /--update/);
+});
+
+test('the plugin debt lists the plugin-zone files that are on the baseline or still violate', () => {
+  const plugin = 'apps/plugins/shelly/backend/service.ts';
+  const example = 'examples/poc-backend-plugin/src/index.ts';
+  const host = 'apps/api/src/plugin-system/runtime/module-loader.ts';
+  assert.deepEqual(pluginDebt({ [plugin]: 1 }, { [example]: 1, [host]: 1 }), [plugin, example]);
+  assert.deepEqual(pluginDebt({}, { [host]: 1 }), []);
 });
 
 test('flags relative imports of adapter internals but not neutral modules', () => {
@@ -91,11 +186,9 @@ test('persistence implementation code is allowed, application code is checked', 
   assert.equal(isChecked('apps/api/src/database/sqlite/sqlite-backend.ts'), false);
   assert.equal(isChecked('apps/api/src/database/migrations/1-x.ts'), false);
   assert.equal(isChecked('libs/database-entities/src/lib/entities/user.entity.ts'), false);
-  assert.equal(isChecked('apps/plugins/wago/backend/migrations/1-x.ts'), false);
   assert.equal(isChecked('apps/api/src/billing/billing.integration.spec.ts'), false);
   assert.equal(isChecked('apps/api/src/resources/usage/x.persistence.spec.ts'), false);
   assert.equal(isChecked('apps/api/src/e2e/a.e2e.spec.ts'), false);
-  assert.equal(isChecked('apps/plugins/wago/acceptance/a.spec.ts'), false);
   assert.equal(isChecked('apps/api/src/billing/billing.service.spec.ts'), true);
   assert.equal(isChecked('apps/api/src/billing/billing.service.ts'), true);
   assert.equal(isChecked('libs/plugins-backend-sdk/src/lib/plugin-context.ts'), true);
@@ -119,14 +212,6 @@ test('only the engine folders of the database code are allowed; its neutral seam
   ]) {
     assert.equal(isChecked(`apps/api/src/database/${file}`), true, file);
   }
-});
-
-test('only the SDK engine subpath may name the engine; the SDK root stays checked', () => {
-  assert.equal(isChecked('libs/plugins-backend-sdk/src/sqlite.ts'), false);
-  assert.equal(isChecked('libs/plugins-backend-sdk/src/lib/sqlite/sqlite-persistence.ts'), false);
-  assert.equal(isChecked('libs/plugins-backend-sdk/src/index.ts'), true);
-  assert.equal(isChecked('libs/plugins-backend-sdk/src/lib/plugin-persistence.ts'), true);
-  assert.equal(isChecked('libs/plugins-backend-sdk/src/lib/sdk-sqlite.ts'), true);
 });
 
 test('the baseline only shrinks', () => {

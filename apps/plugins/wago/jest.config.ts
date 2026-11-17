@@ -17,7 +17,6 @@ module.exports = {
   // that fan-out across several Jest workers on constrained validation hosts.
   maxWorkers: 1,
   moduleNameMapper: {
-    '^@attraccess/plugins-backend-sdk/sqlite$': '<rootDir>/../../../libs/plugins-backend-sdk/src/sqlite.ts',
     '^@attraccess/(.*)$': '<rootDir>/../../../libs/$1/src/index.ts',
   },
 };
