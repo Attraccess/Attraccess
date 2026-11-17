@@ -1,12 +1,12 @@
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
-  PLUGIN_ENGINE_ACCESS,
   PluginContext,
   PluginPermission,
   PluginPermissionError,
   SystemEvent,
 } from '@attraccess/plugins-backend-sdk';
+import { DataSource, EntityManager } from 'typeorm';
 import { PluginSandboxService } from './plugin-sandbox.service';
 
 function buildBaseContext(events: EventEmitter2): PluginContext {
@@ -54,11 +54,9 @@ function buildBaseContext(events: EventEmitter2): PluginContext {
       getActiveSessions: jest.fn(async () => []),
     },
     persistence: {
-      backend: 'sqlite',
-      supports: (backend) => backend === 'sqlite',
       transaction: jest.fn(async (work) => work({ isOpen: true, afterCommit: () => undefined })),
-      [PLUGIN_ENGINE_ACCESS]: { backend: 'sqlite', connection: () => ({}), handleOf: () => ({}) },
     },
+    storage: { open: jest.fn(() => ({}) as never) },
     hostData: {
       resources: {
         get: jest.fn(async () => null),
@@ -197,14 +195,31 @@ describe('PluginSandboxService', () => {
       ).not.toThrow();
     });
 
-    it('throws when accessing the persistence context without DATABASE_ACCESS', () => {
+    it('throws when accessing the persistence context without PLUGIN_STORAGE', () => {
       const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), []);
-      expect(() => ctx.persistence).toThrow(/DATABASE_ACCESS/);
+      expect(() => ctx.persistence).toThrow(/PLUGIN_STORAGE/);
       const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [
-        PluginPermission.DATABASE_ACCESS,
+        PluginPermission.PLUGIN_STORAGE,
       ]);
-      expect(granted.persistence.backend).toBe('sqlite');
+      expect(typeof granted.persistence.transaction).toBe('function');
     });
+
+    it('gates the record port behind PLUGIN_STORAGE', () => {
+      const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), []);
+      expect(() => ctx.storage).toThrow(/PLUGIN_STORAGE/);
+      const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [
+        PluginPermission.PLUGIN_STORAGE,
+      ]);
+      expect(typeof granted.storage.open).toBe('function');
+    });
+
+    it.each([DataSource, EntityManager, 'DataSource', 'UserRepository'])(
+      'never resolves a database handle through context.get (%p), whatever the permission',
+      (token) => {
+        const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), Object.values(PluginPermission));
+        expect(() => ctx.get(token as never)).toThrow(/database handle/);
+      },
+    );
 
     it('exposes no connection, repository or host entity surface on the guarded context', () => {
       const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), Object.values(PluginPermission));
@@ -217,7 +232,7 @@ describe('PluginSandboxService', () => {
       ['users', 'getUsernames', [[1]], PluginPermission.READ_USERS],
       ['users', 'isActive', [1], PluginPermission.READ_USERS],
       ['settings', 'getApp', ['backend_url'], PluginPermission.READ_SETTINGS],
-      ['flows', 'findNodes', [{ typePrefix: 'plugin.x.' }], PluginPermission.DATABASE_ACCESS],
+      ['flows', 'findNodes', [{ typePrefix: 'plugin.x.' }], PluginPermission.TRIGGER_FLOWS],
     ] as const)('gates hostData.%s.%s behind its permission', async (group, method, args, permission) => {
       const call = (ctx: PluginContext) =>
         (ctx.hostData[group] as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>)[method](...args);

@@ -12,13 +12,13 @@ describe('PluginUninstallService', () => {
   const bleEndpoints = { deleteAllForPlugin: jest.fn().mockResolvedValue(undefined) };
   const uninstaller = () => new PluginUninstallService(new PluginService(), bleEndpoints as never);
 
-  function writeDeletablePlugin(migrations?: { directory: string; entryPoint: string }) {
+  function writeDeletablePlugin(withStorage = false) {
     fixture.writePlugin(fixture.root, 'delete-me', {
       name: 'delete-me',
       version: '1.0.0',
-      main: { backend: { directory: 'dist', entryPoint: 'index.js' }, migrations },
+      main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
       attraccessVersion: { min: '2.0.0-0' },
-      persistence: { backends: ['sqlite'] },
+      permissions: withStorage ? ['PLUGIN_STORAGE'] : [],
     });
     const [plugin] = PluginService.getPlugins();
     return plugin;
@@ -51,25 +51,25 @@ describe('PluginUninstallService', () => {
     expect(fixture.restartSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('reverts the plugin migrations while its bundle is still on disk', async () => {
-    const plugin = writeDeletablePlugin({ directory: 'dist', entryPoint: 'migrations.js' });
+  it('drops the plugin storage while its bundle is still on disk', async () => {
+    const plugin = writeDeletablePlugin(true);
     const folder = join(fixture.root, 'delete-me');
     const runDown = jest
-      .spyOn(PluginMigrationService, 'runDownMigrations')
-      .mockImplementation(async () => (existsSync(folder) ? 1 : 0));
+      .spyOn(PluginMigrationService, 'dropStorage')
+      .mockImplementation(async () => existsSync(folder));
 
     await uninstaller().deletePlugin(plugin.id, true);
 
     expect(runDown).toHaveBeenCalledWith(expect.objectContaining({ name: 'delete-me' }));
-    await expect(runDown.mock.results[0].value).resolves.toBe(1);
+    await expect(runDown.mock.results[0].value).resolves.toBe(true);
     expect(existsSync(folder)).toBe(false);
   });
 
-  it('still removes the plugin when reverting its migrations fails', async () => {
-    const plugin = writeDeletablePlugin({ directory: 'dist', entryPoint: 'migrations.js' });
+  it('still removes the plugin when dropping its storage fails', async () => {
+    const plugin = writeDeletablePlugin(true);
     const runDown = jest
-      .spyOn(PluginMigrationService, 'runDownMigrations')
-      .mockRejectedValue(new Error('migration failed'));
+      .spyOn(PluginMigrationService, 'dropStorage')
+      .mockRejectedValue(new Error('drop failed'));
 
     await uninstaller().deletePlugin(plugin.id, true);
 

@@ -17,12 +17,10 @@ const validPackage = {
     host: '^2.0.0',
     backend: 'dist/index.js',
     frontend: 'frontend/remoteEntry.js',
-    migrations: 'dist/migrations.js',
     styles: 'frontend/style.css',
     dashboardPaths: ['/plugin-report'],
     dashboardWidgets: ['plugin-report-summary'],
-    permissions: [PluginPermission.DATABASE_ACCESS],
-    persistence: { backends: ['sqlite'] },
+    permissions: [PluginPermission.PLUGIN_STORAGE],
     sdk: { backend: '^2.0.0', frontend: '^2.0.0' },
   },
 };
@@ -33,7 +31,7 @@ describe('parseNpmPluginPackage', () => {
     expect(manifest).toMatchObject({
       name: '@attraccess/plugin-example',
       version: '1.2.3',
-      permissions: [PluginPermission.DATABASE_ACCESS],
+      permissions: [PluginPermission.PLUGIN_STORAGE],
       main: {
         backend: { directory: 'dist', entryPoint: 'index.js' },
         frontend: {
@@ -146,11 +144,13 @@ describe('parseNpmPluginPackage', () => {
   });
 
   it.each([
-    [{ persistence: undefined }, 'declares no persistence.backends'],
-    [{ persistence: { backends: ['postgres'] } }, 'this host runs sqlite'],
-  ])('refuses a package whose storage does not support the host engine', (override, message) => {
+    [{ permissions: ['DATABASE_ACCESS'] }, 'DATABASE_ACCESS permission'],
+    [{ persistence: { backends: ['sqlite'] } }, 'persistence.backends'],
+    [{ migrations: 'dist/migrations.js' }, 'migrations entry'],
+  ])('refuses a package that still uses the SDK 1.x database contract', (override, message) => {
     const pkg = { ...validPackage, attraccess: { ...validPackage.attraccess, ...override } };
     expect(() => parseNpmPluginPackage(pkg, '2.0.0')).toThrow(message);
+    expect(() => parseNpmPluginPackage(pkg, '2.0.0')).toThrow(/Plugin @attraccess\/plugin-example .*migrating-to-2/s);
   });
 
   it.each([

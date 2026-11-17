@@ -20,7 +20,7 @@ describe('NpmPluginService', () => {
           registryUrl: 'https://registry.example.com',
           integrity: 'sha512-test',
           installPath: 'npm-plugin',
-          permissions: ['DATABASE_ACCESS'],
+          permissions: ['PLUGIN_STORAGE'],
           lastError: null,
         },
       ]),
@@ -48,7 +48,7 @@ describe('NpmPluginService', () => {
             displayName: 'Plugin',
             host: '>=2.0.0-0',
             backend: 'index.js',
-            permissions: ['DATABASE_ACCESS'],
+            permissions: ['PLUGIN_STORAGE'],
             persistence: { backends: ['sqlite'] },
             sdk: { backend: '*' },
           },
@@ -62,7 +62,7 @@ describe('NpmPluginService', () => {
             displayName: 'Plugin',
             host: '>=2.0.0-0',
             backend: 'index.js',
-            permissions: ['DATABASE_ACCESS', 'READ_USERS'],
+            permissions: ['PLUGIN_STORAGE', 'READ_USERS'],
             persistence: { backends: ['sqlite'] },
             sdk: { backend: '*' },
           },
@@ -74,7 +74,7 @@ describe('NpmPluginService', () => {
     await expect(service.installedVersionCandidates('@attraccess/plugin')).resolves.toEqual([
       expect.objectContaining({ version: '1.3.0', direction: 'newer', permissionAdditions: ['READ_USERS'] }),
       expect.objectContaining({ version: '1.2.0', direction: 'current', permissionAdditions: [] }),
-      expect.objectContaining({ version: '1.1.0', direction: 'older', permissionRemovals: ['DATABASE_ACCESS'] }),
+      expect.objectContaining({ version: '1.1.0', direction: 'older', permissionRemovals: ['PLUGIN_STORAGE'] }),
     ]);
     expect(npmInternals(service).catalog.packageMetadata).toHaveBeenCalledWith('@attraccess/plugin', 'private');
   });

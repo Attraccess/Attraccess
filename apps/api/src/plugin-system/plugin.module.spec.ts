@@ -3,15 +3,24 @@ import 'reflect-metadata';
 import { EMPTY } from 'rxjs';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ModuleRef } from '@nestjs/core';
-import { PLUGIN_AUDIT_HOST_PROVIDER, PluginPermission, PluginPermissionError } from '@attraccess/plugins-backend-sdk';
-import { sqlitePersistence } from '@attraccess/plugins-backend-sdk/sqlite';
+import {
+  PLUGIN_AUDIT_HOST_PROVIDER,
+  PluginPermission,
+  PluginPermissionError,
+  definePluginStorage,
+  f,
+  step,
+  table,
+} from '@attraccess/plugins-backend-sdk';
+import { handleOfScope } from './persistence/plugin-transaction-scope';
+import { compilePluginStorage } from './plugin-storage/storage-schema';
+import type { CompiledPluginStorage } from './plugin-storage/storage-model';
 import { LicenseService } from '../license/license.service';
 import { PluginModule } from './plugin.module';
 import { resolveAppVersion } from '../config/app.config';
 import { PluginLiveUpdatesService } from './plugin-live-updates.service';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { ResourceFlowsExecutorService } from '../resources/flows/execution/resource-flows-executor.service';
-import { dataSourceConfig } from './../database/datasource';
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { PluginService } from './plugin.service';
@@ -43,94 +52,108 @@ describe('PluginModule', () => {
   const fixture = registerPluginModuleFixture();
 
   describe('forRoot', () => {
-    it.each([false, true])('registers unique declared entities only with database access: %s', (allowed) => {
-      const registry = dataSourceConfig.entities as unknown[];
-      const previous = [...registry];
-      try {
-        mkdirSync(join(fixture.root, 'entities/dist'), { recursive: true });
-        writeFileSync(
-          join(fixture.root, 'entities/plugin.json'),
-          JSON.stringify({
-            name: 'entities',
-            version: '1.0.0',
-            main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-            permissions: allowed ? [PluginPermission.DATABASE_ACCESS] : [],
-            persistence: { backends: ['sqlite'] },
-            attraccessVersion: { min: '2.0.0-0' },
-          }),
-        );
-        writeFileSync(
-          join(fixture.root, 'entities/dist/index.js'),
-          'class Widget {} class WidgetModule {} module.exports = { default: { persistence: { sqlite: { entities: [Widget, Widget] } }, register: () => ({ module: WidgetModule }) } };',
-        );
-        PluginModule.forRoot();
-        expect(registry.length).toBe(previous.length + (allowed ? 1 : 0));
-        if (allowed) expect((registry.at(-1) as { name: string }).name).toBe('Widget');
-      } finally {
-        registry.splice(0, registry.length, ...previous);
-      }
+    const writeStoragePlugin = (name: string, permissions: string[], source: string) => {
+      mkdirSync(join(fixture.root, `${name}/dist`), { recursive: true });
+      writeFileSync(
+        join(fixture.root, `${name}/plugin.json`),
+        JSON.stringify({
+          name,
+          version: '1.0.0',
+          main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+          permissions,
+          attraccessVersion: { min: '2.0.0-0' },
+        }),
+      );
+      writeFileSync(join(fixture.root, `${name}/dist/index.js`), source);
+    };
+    const storagePlugin = (tableName: string, extra = '') => `
+      const { definePluginStorage, f, step, table } = require('@attraccess/plugins-backend-sdk');
+      const things = table({ id: f.id() }${extra});
+      class ThingsModule {}
+      exports.default = {
+        storage: definePluginStorage({ tables: { ${tableName}: things }, migrations: [{ version: 1, name: 'baseline', steps: [step.createTable('${tableName}', things)] }] }),
+        register: () => ({ module: ThingsModule }),
+      };`;
+
+    it('loads a plugin that declares storage and asks for PLUGIN_STORAGE', () => {
+      writeStoragePlugin('storing', [PluginPermission.PLUGIN_STORAGE], storagePlugin('things'));
+
+      const module = PluginModule.forRoot();
+
+      expect(module.imports).toHaveLength(HOST_IMPORTS.length + 1);
+      expect(PluginService.getPluginsWithLoadStatus().find(({ name }) => name === 'storing')?.status).not.toBe('error');
     });
 
-    it('refuses a plugin whose storage code does not support the active engine before registering anything', () => {
-      const registry = dataSourceConfig.entities as unknown[];
-      const previous = [...registry];
-      try {
-        mkdirSync(join(fixture.root, 'other-engine/dist'), { recursive: true });
-        writeFileSync(
-          join(fixture.root, 'other-engine/plugin.json'),
-          JSON.stringify({
-            name: 'other-engine',
-            version: '1.0.0',
-            main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-            permissions: [PluginPermission.DATABASE_ACCESS],
-            persistence: { backends: ['sqlite'] },
-            attraccessVersion: { min: '2.0.0-0' },
-          }),
-        );
-        writeFileSync(
-          join(fixture.root, 'other-engine/dist/index.js'),
-          'class Widget {} module.exports = { default: { persistence: { postgres: { entities: [Widget] } }, register: () => ({ module: class M {} }) } };',
-        );
-        const module = PluginModule.forRoot();
-        expect(registry).toEqual(previous);
-        expect(module.imports).toEqual(HOST_IMPORTS);
-        expect(PluginService.getPluginsWithLoadStatus().find(({ name }) => name === 'other-engine')).toMatchObject({
-          status: 'error',
-          error: expect.stringContaining('postgres'),
-        });
-      } finally {
-        registry.splice(0, registry.length, ...previous);
-      }
+    it('quarantines a plugin that declares storage without PLUGIN_STORAGE', () => {
+      writeStoragePlugin('no-permission', [], storagePlugin('things'));
+
+      const module = PluginModule.forRoot();
+
+      expect(module.imports).toEqual(HOST_IMPORTS);
+      expect(PluginService.getPluginsWithLoadStatus().find(({ name }) => name === 'no-permission')).toMatchObject({
+        status: 'error',
+        error: expect.stringContaining('PLUGIN_STORAGE'),
+      });
     });
 
-    it('refuses an SDK 1.x plugin before it loads, registers entities or reaches the database', () => {
-      const registry = dataSourceConfig.entities as unknown[];
-      const previous = [...registry];
-      try {
-        mkdirSync(join(fixture.root, 'legacy/dist'), { recursive: true });
-        writeFileSync(
-          join(fixture.root, 'legacy/plugin.json'),
-          JSON.stringify({
-            name: 'legacy',
-            version: '1.0.0',
-            main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-            permissions: [PluginPermission.DATABASE_ACCESS],
-            persistence: { backends: ['sqlite'] },
-            attraccessVersion: { min: '1.11.0-0' },
-          }),
-        );
-        writeFileSync(
-          join(fixture.root, 'legacy/dist/index.js'),
-          'throw new Error("a refused plugin must never be required");',
-        );
-        const module = PluginModule.forRoot();
-        expect(registry).toEqual(previous);
-        expect(module.imports).toEqual(HOST_IMPORTS);
-        const errors = (PluginService as unknown as { pluginLoadErrors: Map<string, Error> }).pluginLoadErrors;
-        expect(errors.get('legacy@1.0.0')?.message).toContain('migrating-to-2');
-      } finally {
-        registry.splice(0, registry.length, ...previous);
-      }
+    it('quarantines a plugin whose tables leave its namespace or collide with another plugin', () => {
+      const taken = `, { physicalName: 'plugin_collide_things' }`;
+      writeStoragePlugin('collide', [PluginPermission.PLUGIN_STORAGE], storagePlugin('things'));
+      writeStoragePlugin('intruder', [PluginPermission.PLUGIN_STORAGE], storagePlugin('things', taken));
+      writeStoragePlugin('user-table', [PluginPermission.PLUGIN_STORAGE], storagePlugin('things', `, { physicalName: 'user' }`));
+
+      PluginModule.forRoot();
+
+      const status = (name: string) => PluginService.getPluginsWithLoadStatus().find((plugin) => plugin.name === name);
+      expect(status('collide')?.status).not.toBe('error');
+      expect(status('intruder')).toMatchObject({ status: 'error', error: expect.stringContaining('physicalName') });
+      expect(status('user-table')).toMatchObject({ status: 'error', error: expect.stringContaining('physicalName') });
+    });
+
+    it.each([
+      ['the connection', 'class DataSource {}'],
+      ['an entity manager by token', "'EntityManager'"],
+      ['a repository by token', "'WidgetRepository'"],
+    ])('quarantines a plugin module that injects %s', (_label, token) => {
+      writeStoragePlugin(
+        'injector',
+        [],
+        `const { Inject } = require('@nestjs/common');
+        class Service {}
+        Inject(${token})(Service, undefined, 0);
+        class M {}
+        exports.default = { register: () => ({ module: M, providers: [Service] }) };`,
+      );
+
+      const module = PluginModule.forRoot();
+
+      expect(module.imports).toEqual(HOST_IMPORTS);
+      expect(PluginService.getPluginsWithLoadStatus().find(({ name }) => name === 'injector')).toMatchObject({
+        status: 'error',
+        error: expect.stringContaining('database handle'),
+      });
+    });
+
+    it('refuses an SDK 1.x plugin before it loads or reaches the database', () => {
+      mkdirSync(join(fixture.root, 'legacy/dist'), { recursive: true });
+      writeFileSync(
+        join(fixture.root, 'legacy/plugin.json'),
+        JSON.stringify({
+          name: 'legacy',
+          version: '1.0.0',
+          main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+          permissions: ['DATABASE_ACCESS'],
+          attraccessVersion: { min: '1.11.0-0' },
+        }),
+      );
+      writeFileSync(
+        join(fixture.root, 'legacy/dist/index.js'),
+        'throw new Error("a refused plugin must never be required");',
+      );
+      const module = PluginModule.forRoot();
+      expect(module.imports).toEqual(HOST_IMPORTS);
+      const errors = (PluginService as unknown as { pluginLoadErrors: Map<string, Error> }).pluginLoadErrors;
+      expect(errors.get('legacy@1.0.0')?.message).toContain('migrating-to-2');
     });
 
     it('still loads a plugin when a refused 1.x copy of the same name sits next to it', () => {
@@ -380,88 +403,69 @@ describe('PluginModule', () => {
       expect(moduleRef.get).toHaveBeenCalledWith(PluginLiveUpdatesService, { strict: false });
     });
 
-    it('gates the persistence context behind DATABASE_ACCESS and names the active engine', () => {
-      const context = build([PluginPermission.DATABASE_ACCESS]);
-      expect(context.persistence.backend).toBe('sqlite');
-      expect(context.persistence.supports('sqlite')).toBe(true);
+    it('gates the persistence and storage contexts behind PLUGIN_STORAGE and exposes no engine surface', () => {
+      const context = build([PluginPermission.PLUGIN_STORAGE]);
+      expect(typeof context.persistence.transaction).toBe('function');
+      expect(typeof context.storage.open).toBe('function');
+      expect(Object.keys(context.persistence)).toEqual(['transaction']);
       expect(() => build([]).persistence).toThrow(PluginPermissionError);
-      expect('dataSource' in context).toBe(false);
-      expect('getRepository' in context).toBe(false);
-      expect('runSerialized' in context).toBe(false);
+      expect(() => build([]).storage).toThrow(PluginPermissionError);
+      for (const removed of ['dataSource', 'getRepository', 'runSerialized']) expect(removed in context).toBe(false);
     });
 
-    it('lets a plugin constructor retain a repository before the host connection is injected', async () => {
-      class Widget {}
-      const find = jest.fn(async () => [new Widget()]);
-      const host = { getRepository: jest.fn(() => ({ find })) };
-      const internals = PluginModule as unknown as {
+    describe('record port', () => {
+      type StorageInternals = {
         connectionRef: object | null;
-        createPluginContext(
-          m: LoadedPluginManifest,
-          entities: unknown[],
-        ): import('@attraccess/plugins-backend-sdk').PluginContext;
-      };
-      internals.connectionRef = null;
-
-      const context = internals.createPluginContext(
-        fixture.manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }),
-        [Widget],
-      );
-      const retained = sqlitePersistence(context).getRepository(Widget);
-      expect(host.getRepository).not.toHaveBeenCalled();
-      expect(() => retained.find()).toThrow(/not available yet/);
-
-      new PluginModule(host, events, moduleRef);
-      await expect(retained.find()).resolves.toEqual([expect.any(Widget)]);
-      expect(host.getRepository).toHaveBeenCalledWith(Widget);
-      expect(find).toHaveBeenCalledTimes(1);
-    });
-
-    it('serves repositories only for entities the plugin registered, never host tables', () => {
-      class Widget {}
-      class Other {}
-      const host = { getRepository: jest.fn(() => ({})) };
-      new PluginModule(host, events, moduleRef);
-      const context = (
-        PluginModule as unknown as {
-          createPluginContext(
-            m: LoadedPluginManifest,
-            entities: unknown[],
-          ): import('@attraccess/plugins-backend-sdk').PluginContext;
-        }
-      ).createPluginContext(fixture.manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }), [Widget]);
-      const sqlite = sqlitePersistence(context);
-
-      expect(() => sqlite.getRepository(Widget)).not.toThrow();
-      expect(() => sqlite.getRepository(Other)).toThrow(/registered/);
-      expect(() => sqlite.getRepository('User')).toThrow(/registered/);
-    });
-
-    it('does not hand the second application a repository from the closed configuration application', async () => {
-      class Widget {}
-      const first = { getRepository: jest.fn(() => ({ find: async () => ['closed'] })) };
-      const find = jest.fn(async () => ['live']);
-      const second = { getRepository: jest.fn(() => ({ find })) };
-      const internals = PluginModule as unknown as {
         resetHostReferences(): void;
         createPluginContext(
           m: LoadedPluginManifest,
-          entities: unknown[],
+          storage: CompiledPluginStorage | null,
         ): import('@attraccess/plugins-backend-sdk').PluginContext;
       };
-      new PluginModule(first, events, moduleRef);
-      internals.resetHostReferences();
+      const internals = PluginModule as unknown as StorageInternals;
+      const notes = table({ id: f.id(), message: f.string() });
+      const definition = definePluginStorage({
+        tables: { notes },
+        migrations: [{ version: 1, name: 'baseline', steps: [step.createTable('notes', notes)] }],
+      });
+      const compiled = compilePluginStorage('ctx-plugin', definition, { reservedTables: new Set() });
+      const manifest = () => fixture.manifest({ permissions: [PluginPermission.PLUGIN_STORAGE] });
+      const host = (rows: unknown[]) => ({ manager: { query: jest.fn(async () => rows) } });
 
-      const context = internals.createPluginContext(
-        fixture.manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }),
-        [Widget],
-      );
-      const retained = sqlitePersistence(context).getRepository(Widget);
-      new PluginModule(second, events, moduleRef);
+      it('lets a plugin retain its tables before the host connection is injected', async () => {
+        internals.connectionRef = null;
+        const context = internals.createPluginContext(manifest(), compiled);
+        const retained = context.storage.open(definition);
+        const source = host([{ id: 1, message: 'hi' }]);
 
-      await expect(retained.find()).resolves.toEqual(['live']);
-      expect(first.getRepository).not.toHaveBeenCalled();
-      expect(second.getRepository).toHaveBeenCalledWith(Widget);
+        await expect(retained.notes.find()).rejects.toThrow(/not available yet/);
+
+        new PluginModule(source as never, events, moduleRef);
+        await expect(retained.notes.find()).resolves.toEqual([{ id: 1, message: 'hi' }]);
+        expect(source.manager.query).toHaveBeenCalledTimes(1);
+      });
+
+      it('serves only the definition the plugin registered, never another table', () => {
+        new PluginModule(host([]) as never, events, moduleRef);
+        const context = internals.createPluginContext(manifest(), compiled);
+        const other = definePluginStorage({ tables: {}, migrations: [] });
+
+        expect(() => context.storage.open(definition)).not.toThrow();
+        expect(() => context.storage.open(other)).toThrow(/registered/);
+        expect(() => internals.createPluginContext(manifest(), null).storage.open(definition)).toThrow(/registered/);
+      });
+
+      it('does not hand the second application a connection from the closed configuration application', async () => {
+        const first = host([{ id: 1, message: 'closed' }]);
+        const second = host([{ id: 2, message: 'live' }]);
+        new PluginModule(first as never, events, moduleRef);
+        internals.resetHostReferences();
+        const retained = internals.createPluginContext(manifest(), compiled).storage.open(definition);
+        new PluginModule(second as never, events, moduleRef);
+
+        await expect(retained.notes.find()).resolves.toEqual([{ id: 2, message: 'live' }]);
+        expect(first.manager.query).not.toHaveBeenCalled();
+      });
     });
 
     it('resolves host providers through the ModuleRef when permitted', () => {
@@ -494,18 +498,18 @@ describe('PluginModule', () => {
       createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
     };
 
-    it('runs the callback in a transaction of the host connection and hands the scope to the engine subpath', async () => {
+    it('runs the callback in a transaction of the host connection and hands an opaque scope carrying that transaction', async () => {
       const transaction = jest.fn(async (work: (manager: unknown) => Promise<unknown>) => work('tx-manager'));
       const host = {
         manager: { connection: { options: { type: 'postgres' } }, transaction },
       };
       new PluginModule(host, new EventEmitter2(), { get: jest.fn() } as unknown as ModuleRef);
       const context = (PluginModule as unknown as Internals).createPluginContext(
-        fixture.manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }),
+        fixture.manifest({ permissions: [PluginPermission.PLUGIN_STORAGE] }),
       );
 
       await expect(
-        context.persistence.transaction(async (scope) => `ran:${String(sqlitePersistence(context).managerOf(scope))}`),
+        context.persistence.transaction(async (scope) => `ran:${String(handleOfScope(scope))}`),
       ).resolves.toBe('ran:tx-manager');
       expect(transaction).toHaveBeenCalledTimes(1);
     });
@@ -525,7 +529,7 @@ describe('PluginModule', () => {
         } as unknown as ModuleRef,
       );
       const context = (PluginModule as unknown as Internals).createPluginContext(
-        fixture.manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }),
+        fixture.manifest({ permissions: [PluginPermission.PLUGIN_STORAGE] }),
       );
 
       await context.persistence.transaction(async (scope) => {
@@ -535,7 +539,7 @@ describe('PluginModule', () => {
       expect(order).toEqual(['commit', 'after']);
     });
 
-    it('is denied without DATABASE_ACCESS', () => {
+    it('is denied without PLUGIN_STORAGE', () => {
       const context = (PluginModule as unknown as Internals).createPluginContext(fixture.manifest({ permissions: [] }));
       expect(() => context.persistence).toThrow(PluginPermissionError);
     });
@@ -550,7 +554,7 @@ describe('PluginModule', () => {
         isNonProfit: false,
       }));
       const get = jest.fn((token: unknown) => (token === LicenseService ? { getLicenseData } : { token }));
-      new PluginModule({} as DataSource, new EventEmitter2(), { get } as unknown as ModuleRef);
+      new PluginModule({} as object, new EventEmitter2(), { get } as unknown as ModuleRef);
       const context = (
         PluginModule as unknown as {
           createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;

@@ -16,12 +16,9 @@ import { LoadedPluginManifest } from './plugin.manifest';
 import { zipFileUpload } from './__test__/make-zip';
 import { MqttClientService } from '../mqtt/mqtt-client.service';
 import { MqttServerService } from '../mqtt/servers/mqtt-server.service';
-import { dataSourceConfig } from '../database/datasource';
+import { PluginMigrationService } from './plugin-migration.service';
 
 let hostDataSource: DataSource;
-/** The host's entity registry, restored after the test: loading the plugin registers its entity into it. */
-const registry = dataSourceConfig.entities as unknown[];
-const registryBefore = [...registry];
 
 @Global()
 @Module({
@@ -48,7 +45,7 @@ const PLUGIN_NAME = 'poc-backend-plugin';
 const ALL_PERMISSIONS = [
   PluginPermission.LISTEN_EVENTS,
   PluginPermission.EMIT_EVENTS,
-  PluginPermission.DATABASE_ACCESS,
+  PluginPermission.PLUGIN_STORAGE,
   PluginPermission.RESOLVE_HOST_PROVIDERS,
 ];
 
@@ -72,12 +69,9 @@ const SHARED = [
   '@nestjs/core',
   '@nestjs/event-emitter',
   'eventemitter2',
-  'typeorm',
   'reflect-metadata',
   '@attraccess/plugins-backend-sdk',
 ];
-
-const SHARED_WITH_SUBPATH = [...SHARED, '@attraccess/plugins-backend-sdk/sqlite'];
 
 const PLUGIN_JSON = {
   name: PLUGIN_NAME,
@@ -87,7 +81,6 @@ const PLUGIN_JSON = {
     backend: { directory: 'dist', entryPoint: 'index.js' },
   },
   attraccessVersion: { min: '2.0.0-0' },
-  persistence: { backends: ['sqlite'] },
   permissions: ALL_PERMISSIONS,
 };
 
@@ -107,7 +100,7 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
       format: 'cjs',
       target: 'es2021',
       outfile: ARTIFACT,
-      external: SHARED_WITH_SUBPATH,
+      external: SHARED,
       tsconfigRaw: { compilerOptions: { experimentalDecorators: true, emitDecoratorMetadata: true } },
       logLevel: 'silent',
     });
@@ -137,16 +130,12 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
     PluginService.configure({ PLUGIN_DIR: PLUGIN_PATH, RESTART_BY_EXIT: true });
     PluginModule.configure({ DISABLE_PLUGINS: false });
 
-    // Loading the plugin registers its declared entity into the host's entity registry, before the connection opens.
+    // The host migrates the plugin's declared storage at boot, before the application starts.
+    const databaseFile = join(CACHE_DIR, 'host.sqlite');
+    PluginMigrationService.configureForTesting({ type: 'sqlite', database: databaseFile });
+    await PluginMigrationService.runPendingUpMigrationsForAllPlugins();
     const pluginModule = PluginModule.forRoot();
-    const pluginEntities = registry.filter((entity) => !registryBefore.includes(entity));
-    expect(pluginEntities.map((entity) => (entity as { name: string }).name)).toEqual(['PocNote']);
-    dataSource = new DataSource({
-      type: 'sqlite',
-      database: ':memory:',
-      synchronize: true,
-      entities: pluginEntities as never[],
-    });
+    dataSource = new DataSource({ type: 'sqlite', database: databaseFile, entities: [] });
     await dataSource.initialize();
     hostDataSource = dataSource;
     events = new EventEmitter2();
@@ -169,7 +158,7 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
   afterAll(async () => {
     if (app) await app.close();
     if (dataSource?.isInitialized) await dataSource.destroy();
-    registry.splice(0, registry.length, ...registryBefore);
+    PluginMigrationService.configureForTesting(null);
     jest.restoreAllMocks();
     rmSync(CACHE_DIR, { recursive: true, force: true });
   });
@@ -216,7 +205,7 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
     ).createPluginContext(manifest);
 
     expect(() => ctx.persistence).toThrow(PluginPermissionError);
-    expect(() => ctx.persistence).toThrow(/DATABASE_ACCESS/);
+    expect(() => ctx.persistence).toThrow(/PLUGIN_STORAGE/);
   });
 
   it('deletes the plugin and removes it from disk', async () => {
