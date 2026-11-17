@@ -14,8 +14,8 @@ import {
   SWEEP_EVERY_MS,
   ValkeySessionChangeCoordination,
 } from '../sessions/session-change-coordination';
-import { resetTestFixture } from './fixtures/setup.test-fixture';
-import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from './fixtures/state.test-fixture';
+import { resetTestFixture } from '../../../database/adapters/usage/lifecycle-fixtures/setup.test-fixture';
+import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../../../database/adapters/usage/lifecycle-fixtures/state.test-fixture';
 
 jest.setTimeout(30_000);
 

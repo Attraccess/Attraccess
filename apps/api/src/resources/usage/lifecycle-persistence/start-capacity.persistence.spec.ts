@@ -11,8 +11,8 @@ import { ResourceFullError } from '../errors/resource-full.error';
 import { StartBlockedException } from '../pre-start/start-confirmation.errors';
 import { countOccupiedSlots, findOccupyingUserIds } from '../sessions/active-usage';
 import { usageInternals } from '../sessions/fixtures/compose.test-fixture';
-import { resetTestFixture } from './fixtures/setup.test-fixture';
-import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from './fixtures/state.test-fixture';
+import { resetTestFixture } from '../../../database/adapters/usage/lifecycle-fixtures/setup.test-fixture';
+import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../../../database/adapters/usage/lifecycle-fixtures/state.test-fixture';
 
 jest.setTimeout(30_000);
 

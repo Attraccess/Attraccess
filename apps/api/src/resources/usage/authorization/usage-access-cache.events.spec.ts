@@ -1,4 +1,4 @@
-import { User } from '@attraccess/database-entities';
+import type { UsageSessionUser } from '@attraccess/application-models';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { MetricsService } from '../../../metrics/metrics.service';
@@ -13,7 +13,7 @@ import { UsageAccessRules } from './usage-access-rules';
 // The invalidation handlers moved from ResourceUsageService to this collaborator (ATT-1213): Nest must still
 // subscribe them, once, through the provider that owns the cache.
 describe('UsageAccessCache invalidation through Nest events', () => {
-  const user = { id: 7 } as User;
+  const user = { id: 7 } as UsageSessionUser;
   const rules = { canControl: jest.fn().mockResolvedValue(true) };
   let module: TestingModule;
   let cache: UsageAccessCache;

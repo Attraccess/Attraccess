@@ -10,7 +10,7 @@ import { DataSource } from 'typeorm';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { schemas } from '../../../resources/usage/lifecycle-persistence/fixtures/schemas.test-fixture';
+import { schemas } from '../usage/lifecycle-fixtures/schemas.test-fixture';
 import { resolveDatabaseBackend } from '../../backend';
 import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-transaction';
 import { createSqliteUnitOfWork } from '../../sqlite/sqlite-unit-of-work';

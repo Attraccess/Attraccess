@@ -5,7 +5,7 @@ import { DataSource } from 'typeorm';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { schemas } from '../../../resources/usage/lifecycle-persistence/fixtures/schemas.test-fixture';
+import { schemas } from './lifecycle-fixtures/schemas.test-fixture';
 import { PendingSessionDraft } from '../../../resources/usage/usage-session-store.port';
 import { resolveDatabaseBackend } from '../../backend';
 import { isUniqueViolation } from '../../persistence-errors';

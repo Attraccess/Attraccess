@@ -17,8 +17,8 @@ import { ParallelMachineSessions1792000000000 } from '../../../database/migratio
 import { recoverOrphanedUsages } from '../../../database/resource-usage-integrity';
 import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
 import { ResourceInUseError } from '../errors/resource-in-use.error';
-import { resetTestFixture } from './fixtures/setup.test-fixture';
-import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from './fixtures/state.test-fixture';
+import { resetTestFixture } from '../../../database/adapters/usage/lifecycle-fixtures/setup.test-fixture';
+import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../../../database/adapters/usage/lifecycle-fixtures/state.test-fixture';
 
 // Real repositories and relations for the lifecycle boundary; peripheral domain tables are omitted.
 describe('Usage lifecycle persistence around external flows', () => {

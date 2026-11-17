@@ -1,20 +1,19 @@
 import { supervisionModesFrom } from '../authorization/supervision-modes.test-fixture';
 import { NotFoundException } from '@nestjs/common';
-import { ResourceUsage } from '@attraccess/database-entities';
 import { SupervisionMode } from '@attraccess/application-models';
+import type { UsageSession } from '@attraccess/application-models';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { ResourceActivityVisibility } from '../../../settings/constants';
 import { ResourceActivityVisibilityService } from '../authorization/resource-activity-visibility.service';
 import { ResourceUsageController } from './resource-usage.controller';
-import { createResourceUsageServiceFixture } from './fixtures/service.test-fixture';
-import { resetTestFixture } from './fixtures/setup.test-fixture';
+import { createFakeStoreUsageScope } from './fixtures/fake-store.test-fixture';
 
 /**
  * The real usage service (its canControllResource, fed with introduction, group, introducer and maintainer rows from
  * fake collaborators), the real visibility service and the real controller, to pin down who reads which sessions.
  */
 describe('who reads other people’s sessions', () => {
-  const scope = createResourceUsageServiceFixture();
+  let scope: Awaited<ReturnType<typeof createFakeStoreUsageScope>>;
   const MACHINE = 1;
   const SUPERVISED = 2;
   const OTHER = 99;
@@ -33,19 +32,15 @@ describe('who reads other people’s sessions', () => {
       endTime: null,
       usageAction: 'usage',
       projectId: null,
-    }) as unknown as ResourceUsage;
+    }) as unknown as UsageSession;
 
   type Grant = 'direct' | 'group' | 'introducer' | 'maintainer' | 'blocked' | 'none';
   const grants = (grant: Grant) => {
-    scope.mockResourceIntroductionService.hasValidIntroduction.mockResolvedValue(
-      grant === 'direct' || grant === 'blocked',
-    );
-    scope.mockResourceRetrainingService.isResourceIntroductionBlocked.mockResolvedValue(grant === 'blocked');
-    scope.mockResourceIntroducersService.canMaintain.mockResolvedValue(
-      grant === 'introducer' || grant === 'maintainer',
-    );
-    scope.mockResourceGroupsService.getGroupsOfResource.mockResolvedValue(grant === 'group' ? [{ id: 3 }] : []);
-    scope.mockResourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(grant === 'group');
+    scope.introductions.hasValidIntroduction.mockResolvedValue(grant === 'direct' || grant === 'blocked');
+    scope.retraining.isResourceIntroductionBlocked.mockResolvedValue(grant === 'blocked');
+    scope.introducers.canMaintain.mockResolvedValue(grant === 'introducer' || grant === 'maintainer');
+    scope.groups.getGroupsOfResource.mockResolvedValue(grant === 'group' ? [{ id: 3 }] : []);
+    scope.groupIntroductions.hasValidIntroduction.mockResolvedValue(grant === 'group');
   };
   const viewer = (id: number, ...permissions: string[]) =>
     ({ id, effectivePermissions: new Set(['resources.read', ...permissions]) }) as unknown as AuthenticatedUser;
@@ -55,10 +50,10 @@ describe('who reads other people’s sessions', () => {
     controller.getSession(resourceId, 5, { user } as never);
 
   beforeEach(async () => {
-    await resetTestFixture(scope);
+    scope = await createFakeStoreUsageScope();
     mode = 'introduced';
     grants('none');
-    scope.mockResourceRetrainingService.getResourceRetrainingStatus.mockResolvedValue({
+    scope.retraining.getResourceRetrainingStatus.mockResolvedValue({
       blocksAccess: false,
       dueAt: null,
     });
@@ -82,17 +77,14 @@ describe('who reads other people’s sessions', () => {
       {} as never,
       {} as never,
     );
-    scope.resourceUsageRepository.findOne.mockImplementation(async ({ where }) =>
-      (where as { resourceId: number }).resourceId === SUPERVISED ? operatorSession(SUPERVISED) : operatorSession(),
+    scope.store.findPublishedSession.mockImplementation(async (resourceId) =>
+      resourceId === SUPERVISED ? operatorSession(SUPERVISED) : operatorSession(),
     );
-    (scope.resourceUsageRepository as unknown as { findAndCount: jest.Mock }).findAndCount = jest.fn(
-      async ({ where }) => {
-        const { userId, resourceId } = where as { userId?: number; resourceId: number };
-        const rows = [operatorSession(resourceId), { ...operatorSession(resourceId), id: 6, userId: 10 }];
-        const matching = rows.filter((row) => userId === undefined || row.userId === userId);
-        return [matching, matching.length];
-      },
-    );
+    scope.store.findHistory.mockImplementation(async (resourceId, _page, _limit, userId) => {
+      const rows = [operatorSession(resourceId), { ...operatorSession(resourceId), id: 6, userId: 10 }];
+      const matching = rows.filter((row) => userId === undefined || row.userId === userId);
+      return { data: matching, total: matching.length };
+    });
   });
 
   describe.each(['all', 'introduced'] as const)('in "%s" mode', (visibility) => {
@@ -124,23 +116,23 @@ describe('who reads other people’s sessions', () => {
     );
 
     it('lets a project member open a project-linked session in full, whatever their access', async () => {
-      scope.resourceUsageRepository.findOne.mockResolvedValue({ ...operatorSession(), projectId: 3 } as ResourceUsage);
-      scope.projectsService.findOneById.mockResolvedValue({ id: 3 } as never);
+      scope.store.findPublishedSession.mockResolvedValue({ ...operatorSession(), projectId: 3 } as UsageSession);
+      scope.projects.findOneById.mockResolvedValue({ id: 3 } as never);
       const opened = await session(viewer(10));
       expect(opened.startNotes).toBe('secret notes');
-      expect(scope.projectsService.findOneById).toHaveBeenCalledWith(10, 3);
+      expect(scope.projects.findOneById).toHaveBeenCalledWith(10, 3);
     });
 
     it('answers 404, not 403, to a non-member whether or not the session exists', async () => {
-      scope.resourceUsageRepository.findOne.mockResolvedValue({ ...operatorSession(), projectId: 3 } as ResourceUsage);
-      scope.projectsService.findOneById.mockRejectedValue(new NotFoundException('Project not found'));
+      scope.store.findPublishedSession.mockResolvedValue({ ...operatorSession(), projectId: 3 } as UsageSession);
+      scope.projects.findOneById.mockRejectedValue(new NotFoundException('Project not found'));
       await expect(session(viewer(10))).rejects.toBeInstanceOf(NotFoundException);
-      scope.resourceUsageRepository.findOne.mockResolvedValue(null);
+      scope.store.findPublishedSession.mockResolvedValue(null);
       await expect(session(viewer(10))).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('keeps a viewer’s own session readable, and their history their own', async () => {
-      scope.resourceUsageRepository.findOne.mockResolvedValue({ ...operatorSession(), userId: 10 } as ResourceUsage);
+      scope.store.findPublishedSession.mockResolvedValue({ ...operatorSession(), userId: 10 } as UsageSession);
       expect((await session(viewer(10))).id).toBe(5);
       expect((await history(viewer(10))).data.map((row) => row.userId)).toEqual([10]);
     });
@@ -162,11 +154,11 @@ describe('who reads other people’s sessions', () => {
     });
 
     it('still lets an eligible project member open the full session', async () => {
-      scope.resourceUsageRepository.findOne.mockResolvedValue({
+      scope.store.findPublishedSession.mockResolvedValue({
         ...operatorSession(SUPERVISED),
         projectId: 3,
-      } as ResourceUsage);
-      scope.projectsService.findOneById.mockResolvedValue({ id: 3 } as never);
+      } as UsageSession);
+      scope.projects.findOneById.mockResolvedValue({ id: 3 } as never);
       expect((await session(viewer(10), SUPERVISED)).startNotes).toBe('secret notes');
     });
 

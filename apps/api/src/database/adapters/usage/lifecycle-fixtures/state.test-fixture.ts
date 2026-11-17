@@ -10,11 +10,11 @@ import {
 } from '@attraccess/database-entities';
 import { BillingTransactionStatus, ResourceUsageAction } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
-import { ResourceUsageService } from '../../sessions/resource-usage.service';
-import { ResourceOperatingIntervalService } from '../../../operating-intervals/resource-operating-interval.service';
-import { ExternalEffectFailureError } from '../../../flows/errors/external-effect-failure.error';
-import { ResourceUsageIntegrity1790100000000 } from '../../../../database/migrations/1790100000000-resource-usage-integrity';
-import { ParallelMachineSessions1792000000000 } from '../../../../database/migrations/1792000000000-parallel-machine-sessions';
+import { ResourceUsageService } from '../../../../resources/usage/sessions/resource-usage.service';
+import { ResourceOperatingIntervalService } from '../../../../resources/operating-intervals/resource-operating-interval.service';
+import { ExternalEffectFailureError } from '../../../../resources/flows/errors/external-effect-failure.error';
+import { ResourceUsageIntegrity1790100000000 } from '../../../migrations/1790100000000-resource-usage-integrity';
+import { ParallelMachineSessions1792000000000 } from '../../../migrations/1792000000000-parallel-machine-sessions';
 import { schemas } from './schemas.test-fixture';
 export function createUsageLifecyclePersistenceAroundExternalFlowsFixture() {
   let directory: string;

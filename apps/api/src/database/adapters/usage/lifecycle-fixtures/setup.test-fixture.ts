@@ -6,12 +6,12 @@ import { DataSource, EntityManager } from 'typeorm';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createOperatingTimelineStore } from '../../../../database/adapters/operating-intervals/typeorm-operating-timeline.store';
-import { ResourceOperatingIntervalService } from '../../../operating-intervals/resource-operating-interval.service';
-import { ResourceOperatingAttributionService } from '../../../operating-intervals/resource-operating-attribution.service';
-import { USAGE_RECOVERY_TABLE_SQL } from '../../../../database/resource-usage-integrity';
-import type { UsageLifecyclePersistenceAroundExternalFlowsTestScope } from '../lifecycle.persistence.spec';
-import { composeResourceUsageService } from '../../sessions/fixtures/compose.test-fixture';
+import { createOperatingTimelineStore } from '../../operating-intervals/typeorm-operating-timeline.store';
+import { ResourceOperatingIntervalService } from '../../../../resources/operating-intervals/resource-operating-interval.service';
+import { ResourceOperatingAttributionService } from '../../../../resources/operating-intervals/resource-operating-attribution.service';
+import { USAGE_RECOVERY_TABLE_SQL } from '../../../resource-usage-integrity';
+import type { UsageLifecyclePersistenceAroundExternalFlowsTestScope } from '../../../../resources/usage/lifecycle-persistence/lifecycle.persistence.spec';
+import { composeResourceUsageService } from '../../../../resources/usage/sessions/fixtures/compose.test-fixture';
 export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExternalFlowsTestScope) {
   jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
   jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);

@@ -1,5 +1,5 @@
 import { supervisionModesFrom } from './supervision-modes.test-fixture';
-import { Resource, ResourceUsage } from '@attraccess/database-entities';
+import type { UsageSession, UsageSessionResource } from '@attraccess/application-models';
 import { SupervisionMode } from '@attraccess/application-models';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { Subject } from 'rxjs';
@@ -32,7 +32,7 @@ function setup(mode: ResourceActivityVisibility) {
     find: jest.fn(async ({ where }: { where: { id: { _value: number[] } } }) =>
       where.id._value
         .filter((id) => id === SUPERVISED_MACHINE)
-        .map((id) => ({ id, supervisionMode: SupervisionMode.SUPERVISION_ALLOWED }) as Resource),
+        .map((id) => ({ id, supervisionMode: SupervisionMode.SUPERVISION_ALLOWED }) as UsageSessionResource),
     ),
   };
   const controllable = new Set<number>();
@@ -139,11 +139,11 @@ describe('ResourceActivityVisibilityService', () => {
       endTime: null,
       startNotes: 'private',
       usageAction: 'usage',
-    } as unknown as ResourceUsage;
+    } as unknown as UsageSession;
     const { service } = setup('introduced');
 
     it('shows the viewer their own session in full, whatever the machine access', () => {
-      expect(service.viewUsage({ ...session, userId: 10 } as ResourceUsage, 'none', 10)).toMatchObject({ userId: 10 });
+      expect(service.viewUsage({ ...session, userId: 10 } as UsageSession, 'none', 10)).toMatchObject({ userId: 10 });
     });
     it('hides who is using a supervised-use machine', () => {
       const seen = service.viewUsage(session, 'anonymous', 10);

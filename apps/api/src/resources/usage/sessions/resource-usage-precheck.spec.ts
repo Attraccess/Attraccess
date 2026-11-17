@@ -1,23 +1,22 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { Resource, User } from '@attraccess/database-entities';
 import { ResourceType, SupervisionMode } from '@attraccess/application-models';
+import type { UsageSessionResource, UsageSessionUser } from '@attraccess/application-models';
 import { AlreadyHasActiveSessionError } from '../errors/already-has-active-session.error';
 import { ResourceInUseError } from '../errors/resource-in-use.error';
-import { resetTestFixture } from './fixtures/setup.test-fixture';
-import { createResourceUsageServiceFixture } from './fixtures/service.test-fixture';
+import { createFakeStoreUsageScope } from './fixtures/fake-store.test-fixture';
 import { usageInternals } from './fixtures/compose.test-fixture';
 
 describe('ResourceUsageService.precheckStart', () => {
-  const scope = createResourceUsageServiceFixture();
-  const user = { id: 7 } as User;
-  const machine = (overrides: Partial<Resource> = {}) =>
+  let scope: Awaited<ReturnType<typeof createFakeStoreUsageScope>>;
+  const user = { id: 7 } as UsageSessionUser;
+  const machine = (overrides: Partial<UsageSessionResource> = {}) =>
     ({
       id: 3,
       type: ResourceType.Machine,
       supervisionMode: SupervisionMode.NONE,
       allowTakeOver: false,
       ...overrides,
-    }) as Resource;
+    }) as UsageSessionResource;
 
   // The mixed-in helpers are exercised elsewhere; here only the refusal order matters.
   type Internals = {
@@ -31,7 +30,7 @@ describe('ResourceUsageService.precheckStart', () => {
   let internals: Internals;
 
   beforeEach(async () => {
-    await resetTestFixture(scope);
+    scope = await createFakeStoreUsageScope();
     const parts = usageInternals(scope.service);
     internals = {
       getResource: jest.spyOn(parts.gate as never, 'getResource').mockResolvedValue(machine() as never) as never,

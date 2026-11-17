@@ -17,8 +17,8 @@ import { NoOwnActiveSessionError } from '../errors/no-own-active-session.error';
 import { ResourceFullError } from '../errors/resource-full.error';
 import { ResourceInUseError } from '../errors/resource-in-use.error';
 import { TentativeSessionCancelledError } from '../errors/tentative-session-cancelled.error';
-import { resetTestFixture } from './fixtures/setup.test-fixture';
-import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from './fixtures/state.test-fixture';
+import { resetTestFixture } from '../../../database/adapters/usage/lifecycle-fixtures/setup.test-fixture';
+import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../../../database/adapters/usage/lifecycle-fixtures/state.test-fixture';
 import { usageInternals } from '../sessions/fixtures/compose.test-fixture';
 
 jest.setTimeout(30_000);
