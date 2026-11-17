@@ -513,13 +513,14 @@ const baseTargets = {
   lint: { command: 'eslint .' },
 };
 
-test('project.json counts as runtime source unless only check targets (test, lint, typecheck, crap-score) change', () => {
+test('project.json counts as runtime source unless only check targets (test, lint, typecheck, crap-score, pack-test) change', () => {
   const before = projectJson(baseTargets);
   for (const targets of [
     { ...baseTargets, 'test-cc100-runtime': { ...baseTargets['test-cc100-runtime'], inputs: ['default', 'x'] } },
     { ...baseTargets, lint: { command: 'eslint . --max-warnings=0' } },
     { ...baseTargets, 'typecheck-cc100-runtime': { command: 'tsc' } },
     { ...baseTargets, 'crap-score-cc100-runtime': { command: 'node run.mjs' } },
+    { ...baseTargets, 'pack-test': { command: 'node verify-packed-plugin.mjs', env: { HOST_VERSION: '2.0.0' } } },
     { 'build-cc100-runtime': baseTargets['build-cc100-runtime'] },
   ])
     assert.equal(projectConfigAffectsRuntime(before, projectJson(targets)), false, JSON.stringify(targets));

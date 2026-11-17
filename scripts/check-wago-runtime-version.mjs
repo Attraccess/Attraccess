@@ -62,9 +62,10 @@ export function isBuildCandidate(path) {
   return path.startsWith('apps/plugins/wago/') && !docsOrTests.test(path);
 }
 
-// Targets that only check the code (tests, lint, typecheck, CRAP score) never build, package or deploy what ships, so
+// Targets that only check the code (tests, lint, typecheck, CRAP score, the pack-test that verifies a packed plugin)
+// never build, package or deploy what ships, so
 // their configuration, e.g. a test target's cache inputs, can change without a runtime release.
-const checkOnlyTarget = /^(?:test|lint|typecheck|crap-score)(?:-|$)/;
+const checkOnlyTarget = /^(?:test|lint|typecheck|crap-score|pack-test)(?:-|$)/;
 
 function runtimeProjectConfig(text) {
   const config = JSON.parse(text);
