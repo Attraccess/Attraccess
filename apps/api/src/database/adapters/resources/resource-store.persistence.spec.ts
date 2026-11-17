@@ -69,11 +69,15 @@ describe('TypeOrmResourceStore on real SQLite', () => {
     expect(created).toMatchObject({ name: 'Laser', maxParallelSessions: 1, metadata: { room: 1 } });
     expect(await store.count()).toBe(1);
 
-    const saved = await store.save({ ...created, name: 'Laser 2', maxParallelSessions: 3, description: null });
+    const [detailed] = await store.findDetailed([created.id]);
+    const saved = await store.save({ ...detailed, name: 'Laser 2', maxParallelSessions: 3, description: null });
     expect(saved).toMatchObject({ id: created.id, name: 'Laser 2', maxParallelSessions: 3, description: null });
-    expect(saved.groups).toEqual([]);
-    expect(saved.usages).toEqual([]);
-    expect(saved.introductions).toEqual([]);
+    // The relations the caller loaded come back as given instead of being read again.
+    expect(saved.groups).toBe(detailed.groups);
+    expect(saved.usages).toBe(detailed.usages);
+    expect(saved.introductions).toBe(detailed.introductions);
+    expect(saved.createdAt).toEqual(detailed.createdAt);
+    expect((await store.findDetailed([created.id]))[0]).toMatchObject({ name: 'Laser 2', maxParallelSessions: 3 });
 
     await store.setImageFilename(created.id, 'laser.png');
     expect((await store.findDetailed([created.id]))[0].imageFilename).toBe('laser.png');

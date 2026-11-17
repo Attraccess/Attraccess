@@ -54,7 +54,10 @@ export interface ResourceStore {
 
   create(resource: NewResource): Promise<ResourceRecord>;
 
-  /** Stores the columns of the record and returns the resource as {@link findDetailed} reads it. */
+  /**
+   * Stores the columns of the record and returns it with its refreshed update time. Relations
+   * (groups, introductions, usages) are not written and come back exactly as passed in.
+   */
   save(resource: ResourceRecord): Promise<ResourceRecord>;
 
   setImageFilename(resourceId: number, filename: string): Promise<void>;
