@@ -15,7 +15,7 @@ The documentation pages are plain Markdown files. English pages live under https
 ## English: Installation
 - [Docker Compose](https://docs.attraccess.org/en/installation/docker-compose.md): Recommended production installation of Attraccess with Docker Compose, including project directory, environment variables and first start.
 - [Portainer](https://docs.attraccess.org/en/installation/portainer.md): Installs Attraccess as a stack in Portainer, including environment variables, deployment, first-time setup and stack updates.
-- [Environment Variables](https://docs.attraccess.org/en/installation/environment-variables.md): Reference of all environment variables that configure Attraccess: required settings, application, logging, storage, SMTP and TLS.
+- [Environment Variables](https://docs.attraccess.org/en/installation/environment-variables.md): Reference of all environment variables that configure Attraccess: required settings, application, logging, database, storage, SMTP and TLS.
 - [SSL Setup](https://docs.attraccess.org/en/installation/ssl-setup.md): How to serve Attraccess over HTTPS using a reverse proxy, self-signed or custom certificates, and what SSO requires.
 - [Updating](https://docs.attraccess.org/en/installation/updating.md): How to check for new Attraccess versions and update with Docker Compose, plain Docker or Portainer, or pin a specific version.
 - [Backup & Restore](https://docs.attraccess.org/en/installation/backup-restore.md): Explains what Attraccess data to back up, how to create a backup and how to restore it.
@@ -244,6 +244,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Plugins entwickeln](https://docs.attraccess.org/de/plugins/developing-plugins.md): Entwicklerleitfaden für Attraccess-Plugins: SDKs, Frontend- und Backend-Plugins, Abhängigkeiten, Reader-UI und Start-Hooks.
 - [Plugins auf SDK 2.0 umstellen](https://docs.attraccess.org/de/plugins/migrating-to-2.md): Was Plugin-Entwickler für Attraccess 2.0 ändern müssen: die Mindest-Host-Version, deklarierte Engines, die neue Persistenz-API mit Vorher-Nachher-Code und die Ablehnung älterer Plugins.
 - [Bluetooth-Transport für Plugins](https://docs.attraccess.org/de/plugins/ble-transport.md): Beschreibt den BLE-Transportvertrag, über den Backend-Plugins mit Bluetooth-Geräten über Attractap-Reader sprechen: Profile, Endpunkte, Sitzungen, Fehler, Grenzwerte und Tests mit dem Fake.
+- [Datenbankmigrationen](https://docs.attraccess.org/de/plugins/database-migrations.md): Wie ein Plugin SQL-Migrationen für eigene Tabellen über den SDK-Unterpfad sqlite mitliefert: Migrations-Eintrag deklarieren, schreiben und bündeln, Rollback-Verhalten und die Engine-Prüfung.
 
 ## Deutsch: Reservierungen
 - [Überblick](https://docs.attraccess.org/de/plugins/reservations/overview.md): Das Plugin Reservierungen lässt Mitglieder eine Ressource für ein Zeitfenster buchen; Überblick, Voraussetzungen und Links zu Mitglieder-, Administrations- und API-Seiten.

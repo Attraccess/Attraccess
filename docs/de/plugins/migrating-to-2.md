@@ -2,7 +2,7 @@
 
 <!-- llms-description: Was Plugin-Entwickler für Attraccess 2.0 ändern müssen: die Mindest-Host-Version, deklarierte Engines, die neue Persistenz-API mit Vorher-Nachher-Code und die Ablehnung älterer Plugins. -->
 
-Attraccess 2.0 trennt Plugins von der Datenbank-Engine. Für Plugins, die für 1.x gebaut wurden, ist das eine
+Attraccess 2.0 trennt Plugins von der Datenbank-Engine. Für Plugins, die für 1.x gebaut wurden, ist das ein
 Breaking Change.
 
 ## Was der Host durchsetzt
@@ -132,8 +132,9 @@ const nodes = await context.hostData.flows.findNodes({ typePrefix: 'plugin.x.', 
 | weitere Host-Tabellen über `DATABASE_ACCESS`   | `hostData.flows` (`DATABASE_ACCESS`); kein Zugriff auf andere Host-Tabellen                                |
 | Entitätstypen `User`, `Resource`               | `PluginUserModel`, `PluginResourceModel` aus `@attraccess/application-models` (vom SDK-Root re-exportiert) |
 
-Event-Nutzlasten (`RESOURCE_USAGE_STARTED`, `RESOURCE_USAGE_ENDED`) und `AuthenticatedRequest.user` enthalten nur diese
-neutralen Felder; Tokens und Kontaktdaten gehören nicht dazu. `DATABASE_ACCESS` schließt `READ_USERS`,
+Event-Nutzlasten (`RESOURCE_USAGE_STARTED`, `RESOURCE_USAGE_ENDED`) enthalten nur diese neutralen Felder; Tokens und
+Kontaktdaten gehören nicht dazu. `AuthenticatedRequest.user` ist mit diesen Feldern typisiert: Der Host kann zur
+Laufzeit mehr Felder übergeben, sie gehören aber nicht zur Plugin-API und können sich ohne Ankündigung ändern. `DATABASE_ACCESS` schließt `READ_USERS`,
 `ACCESS_RESOURCES` und `READ_SETTINGS` nicht mehr ein: Deklarieren Sie jede, die Sie nutzen.
 
 ### Migrationen
@@ -178,6 +179,13 @@ const held = await countSlotsHeldForOthers(manager, ctx.resourceId, ctx.userId, 
 
 `ctx.scope` ist ein `PluginTransactionScope` der Start-Transaktion des Hosts. Lesen Sie nur darüber; starten Sie im
 Hook nie eine Transaktion.
+
+### Frontend-SDK
+
+`@attraccess/plugins-frontend-sdk` folgt derselben Trennung. `AttraccessFrontendPluginAuthData.user` ist jetzt ein
+`PluginUserModel` (`id`, `username`, `locale`, `isDisabled`) statt der `User`-Entity. Ein Frontend-Plugin, das weitere
+Benutzerfelder wie `email`, `creditBalance` oder `createdAt` gelesen hat, lädt sie stattdessen über den API-Client.
+Installieren Sie `@attraccess/plugins-frontend-sdk` und `@attraccess/plugins-frontend-ui` im selben Bereich `^2.0.0-0`.
 
 ### Tests
 

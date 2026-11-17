@@ -128,8 +128,9 @@ const nodes = await context.hostData.flows.findNodes({ typePrefix: 'plugin.x.', 
 | other host tables via `DATABASE_ACCESS`        | `hostData.flows` (`DATABASE_ACCESS`); no access to other host tables                                         |
 | `User`, `Resource` entity types                | `PluginUserModel`, `PluginResourceModel` from `@attraccess/application-models` (re-exported by the SDK root) |
 
-Event payloads (`RESOURCE_USAGE_STARTED`, `RESOURCE_USAGE_ENDED`) and `AuthenticatedRequest.user` carry only these
-neutral fields; tokens and contact data are not part of them. `DATABASE_ACCESS` no longer implies `READ_USERS`,
+Event payloads (`RESOURCE_USAGE_STARTED`, `RESOURCE_USAGE_ENDED`) carry only these neutral fields; tokens and contact
+data are not part of them. `AuthenticatedRequest.user` is typed with them: the host may pass more fields at runtime,
+but they are not part of the plugin API and can change without notice. `DATABASE_ACCESS` no longer implies `READ_USERS`,
 `ACCESS_RESOURCES` or `READ_SETTINGS`: declare each one you use.
 
 ### Migrations
@@ -173,6 +174,13 @@ const held = await countSlotsHeldForOthers(manager, ctx.resourceId, ctx.userId, 
 
 `ctx.scope` is a `PluginTransactionScope` of the host's start transaction. Read through it only; never start a
 transaction inside the hook.
+
+### Frontend SDK
+
+`@attraccess/plugins-frontend-sdk` follows the same split. `AttraccessFrontendPluginAuthData.user` is now a
+`PluginUserModel` (`id`, `username`, `locale`, `isDisabled`) instead of the `User` entity. A frontend plugin that read
+other user fields, such as `email`, `creditBalance` or `createdAt`, loads them through the API client instead. Install
+`@attraccess/plugins-frontend-sdk` and `@attraccess/plugins-frontend-ui` at the same `^2.0.0-0` range.
 
 ### Tests
 

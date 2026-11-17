@@ -1,6 +1,6 @@
 # Environment Variables
 
-<!-- llms-description: Reference of all environment variables that configure Attraccess: required settings, application, logging, storage, SMTP and TLS. -->
+<!-- llms-description: Reference of all environment variables that configure Attraccess: required settings, application, logging, database, storage, SMTP and TLS. -->
 
 All configuration options for Attraccess that can be set via environment variables.
 
