@@ -1,15 +1,37 @@
 import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
-import { Resource, ResourceGroup, ResourceIntroducer, ResourceIntroduction } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test } from '@nestjs/testing';
-import { DataSource, EntitySchema } from 'typeorm';
+import { DataSource } from 'typeorm';
+import { entities, ResourceGroup } from '@attraccess/database-entities';
+import type { ResourceGroupRecord } from '@attraccess/application-models';
 import { MetricsService } from '../../metrics/metrics.service';
 import { ResourceGroupsService } from './resourceGroups.service';
+import { RESOURCE_GROUP_STORE } from './resource-group-store.port';
+import { TypeOrmResourceGroupStore } from '../../database/adapters/resources/resource-group-store.adapter';
+
+const record = (overrides: Partial<ResourceGroupRecord> = {}): ResourceGroupRecord => ({
+  id: 5,
+  name: 'Workshop',
+  description: 'Old description',
+  retrainingMaxAgeDays: null,
+  retrainingMaxInactivityDays: null,
+  retrainingBlocksAccess: false,
+  isHidden: false,
+  createdAt: new Date('2030-01-01T00:00:00Z'),
+  updatedAt: new Date('2030-01-01T00:00:00Z'),
+  ...overrides,
+});
 
 describe('ResourceGroupsService audit events', () => {
-  const groupRepository = { create: jest.fn(), save: jest.fn(), findOne: jest.fn(), delete: jest.fn() };
-  const resourceRepository = { findOne: jest.fn() };
+  const store = {
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    findById: jest.fn(),
+    resourceExists: jest.fn(),
+    addResource: jest.fn(),
+    removeResource: jest.fn(),
+  };
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
   let service: ResourceGroupsService;
 
@@ -19,10 +41,7 @@ describe('ResourceGroupsService audit events', () => {
       await Test.createTestingModule({
         providers: [
           ResourceGroupsService,
-          { provide: getRepositoryToken(ResourceGroup), useValue: groupRepository },
-          { provide: getRepositoryToken(Resource), useValue: resourceRepository },
-          { provide: getRepositoryToken(ResourceIntroducer), useValue: {} },
-          { provide: getRepositoryToken(ResourceIntroduction), useValue: {} },
+          { provide: RESOURCE_GROUP_STORE, useValue: store },
           { provide: EventEmitter2, useValue: { emit: jest.fn() } },
           { provide: MetricsService, useValue: { resourceGroupsTotal: { inc: jest.fn(), dec: jest.fn() } } },
           { provide: AUDIT_RECORDER, useValue: audit },
@@ -32,9 +51,8 @@ describe('ResourceGroupsService audit events', () => {
   });
 
   it('audits group creation and safe updates', async () => {
-    const group = { id: 5, name: 'Workshop', description: 'Old description', isHidden: false } as ResourceGroup;
-    groupRepository.create.mockReturnValue(group);
-    groupRepository.save.mockResolvedValue(group);
+    const group = record();
+    store.create.mockResolvedValue(group);
     await service.createOne({ name: 'Workshop' }, { id: 9 });
     expect(audit.record).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -46,12 +64,7 @@ describe('ResourceGroupsService audit events', () => {
     );
 
     jest.spyOn(service, 'getOne').mockResolvedValue(group);
-    groupRepository.save.mockResolvedValue({
-      ...group,
-      name: 'Machines',
-      description: 'New description',
-      isHidden: true,
-    });
+    store.update.mockResolvedValue({ ...group, name: 'Machines', description: 'New description', isHidden: true });
     await service.updateOneById(5, { name: 'Machines', description: 'not audited', isHidden: true }, { id: 9 });
     expect(audit.record).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -69,10 +82,9 @@ describe('ResourceGroupsService audit events', () => {
   });
 
   it('audits membership changes and deletion without group descriptions', async () => {
-    const group = { id: 5, name: 'Workshop', isHidden: false, resources: [] } as ResourceGroup;
+    const group = { ...record(), resources: [] as Array<{ id: number }> };
     jest.spyOn(service, 'getOne').mockResolvedValue(group);
-    resourceRepository.findOne.mockResolvedValue({ id: 7 });
-    groupRepository.save.mockResolvedValue(group);
+    store.resourceExists.mockResolvedValue(true);
     await service.addResource(5, 7, { id: 9 });
     expect(audit.record).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -82,7 +94,7 @@ describe('ResourceGroupsService audit events', () => {
       }),
     );
 
-    group.resources = [{ id: 7 }] as never;
+    group.resources = [{ id: 7 }];
     await service.removeResource(5, 7, { id: 9 });
     expect(audit.record).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -92,7 +104,7 @@ describe('ResourceGroupsService audit events', () => {
       }),
     );
 
-    groupRepository.delete.mockResolvedValue({ affected: 1 });
+    store.delete.mockResolvedValue(1);
     await service.deleteOne(5, { id: 9 });
     expect(audit.record).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -105,18 +117,6 @@ describe('ResourceGroupsService audit events', () => {
 });
 
 describe('ResourceGroupsService partial updates', () => {
-  const resourceGroupSchema = new EntitySchema({
-    name: 'resource_group',
-    columns: {
-      id: { type: Number, primary: true, generated: true },
-      name: { type: String },
-      description: { type: String, nullable: true },
-      retrainingMaxAgeDays: { type: Number, nullable: true },
-      retrainingMaxInactivityDays: { type: Number, nullable: true },
-      retrainingBlocksAccess: { type: Boolean, default: false },
-      isHidden: { type: Boolean, default: false },
-    },
-  });
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
   let source: DataSource;
   let service: ResourceGroupsService;
@@ -125,14 +125,11 @@ describe('ResourceGroupsService partial updates', () => {
     source = await new DataSource({
       type: 'sqlite',
       database: ':memory:',
-      entities: [resourceGroupSchema],
+      entities: Object.values(entities),
       synchronize: true,
     }).initialize();
     service = new ResourceGroupsService(
-      source.getRepository('resource_group') as never,
-      {} as never,
-      {} as never,
-      {} as never,
+      new TypeOrmResourceGroupStore(source),
       { emit: jest.fn() } as never,
       { resourceGroupsTotal: { inc: jest.fn(), dec: jest.fn() } } as never,
       audit as never,
@@ -145,7 +142,7 @@ describe('ResourceGroupsService partial updates', () => {
   });
 
   it('preserves omitted fields with SQLite persistence and skips no-op audits', async () => {
-    const repository = source.getRepository('resource_group');
+    const repository = source.getRepository(ResourceGroup);
     const group = await repository.save({
       name: 'Workshop',
       description: 'Original description',

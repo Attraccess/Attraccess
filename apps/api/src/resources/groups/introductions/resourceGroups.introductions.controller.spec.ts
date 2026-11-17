@@ -13,19 +13,24 @@ describe('ResourceGroupsIntroductionsController', () => {
     );
   });
 
-  it.each(['grant', 'revoke'] as const)(
-    'delegates the authenticated user on introduction %s',
-    async (action) => {
-      const data = { comment: 'Approved' };
-      const req = { user: { id: 9 } } as AuthenticatedRequest;
+  it.each(['grant', 'revoke'] as const)('delegates the authenticated user on introduction %s', async (action) => {
+    const data = { comment: 'Approved' };
+    const req = { user: { id: 9 } } as AuthenticatedRequest;
+    resourceGroupsIntroductionsService[action].mockResolvedValue({
+      id: 1,
+      introductionId: 2,
+      action: 'grant',
+      performedByUserId: 9,
+      comment: 'Approved',
+      createdAt: new Date(),
+    });
 
-      await controller[action](5, 3, data, req);
+    await controller[action](5, 3, data, req);
 
-      expect(resourceGroupsIntroductionsService[action]).toHaveBeenCalledWith(5, 3, data, {
-        performedByUserId: 9,
-        authenticationMethod: undefined,
-        apiTokenId: undefined,
-      });
-    },
-  );
+    expect(resourceGroupsIntroductionsService[action]).toHaveBeenCalledWith(5, 3, data, {
+      performedByUserId: 9,
+      authenticationMethod: undefined,
+      apiTokenId: undefined,
+    });
+  });
 });

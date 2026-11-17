@@ -6,9 +6,8 @@ import {
   Logger,
   BadRequestException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ResourceIntroducer, User } from '@attraccess/database-entities';
+import { Inject } from '@nestjs/common';
+import { RESOURCE_GROUP_INTRODUCER_STORE, type ResourceGroupIntroducerStore } from '../resource-group-store.port';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 @Injectable()
@@ -16,13 +15,13 @@ export class IsResourceGroupIntroducerGuard implements CanActivate {
   private readonly logger = new Logger(IsResourceGroupIntroducerGuard.name);
 
   constructor(
-    @InjectRepository(ResourceIntroducer)
-    private resourceIntroducerRepository: Repository<ResourceIntroducer>,
+    @Inject(RESOURCE_GROUP_INTRODUCER_STORE)
+    private introducerStore: ResourceGroupIntroducerStore,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    const user = request.user as User;
+    const user = request.user as AuthenticatedUser;
 
     // If no user is present, deny access
     if (!user) {
@@ -30,7 +29,7 @@ export class IsResourceGroupIntroducerGuard implements CanActivate {
     }
 
     // Check if the user has system permissions to manage all resources
-    const permissions = (user as unknown as AuthenticatedUser).effectivePermissions;
+    const permissions = user.effectivePermissions;
     if (permissions?.has('resources.access.manage') === true) {
       return true;
     }
@@ -58,16 +57,7 @@ export class IsResourceGroupIntroducerGuard implements CanActivate {
 
     try {
       // Check if the user is an introducer for this resource group
-      const introducer = await this.resourceIntroducerRepository.findOne({
-        where: {
-          user: {
-            id: user.id,
-          },
-          resourceGroup: {
-            id: groupId,
-          },
-        },
-      });
+      const introducer = await this.introducerStore.find(groupId, user.id);
 
       if (introducer) {
         return true;

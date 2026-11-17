@@ -43,11 +43,42 @@ export class TypeOrmResourceIntroductionStore implements ResourceIntroductionSto
     return entity ? toIntroductionRecord(entity) : null;
   }
 
-  async findOfGroupUser(groupId: number, userId: number): Promise<IntroductionRecord | null> {
-    const entity = await this.introductions.findOne({
-      where: { resourceGroup: { id: groupId }, receiverUser: { id: userId } },
-    });
+  async findOfGroupUser(
+    groupId: number,
+    userId: number,
+    context?: ResourcePersistenceContext,
+  ): Promise<IntroductionRecord | null> {
+    const entity = await this.manager(context)
+      .getRepository(ResourceIntroduction)
+      .findOne({ where: { resourceGroup: { id: groupId }, receiverUser: { id: userId } } });
     return entity ? toIntroductionRecord(entity) : null;
+  }
+
+  async listForGroup(groupId: number): Promise<IntroductionRecord[]> {
+    const rows = await this.introductions.find({
+      where: { resourceGroup: { id: groupId } },
+      relations: ['receiverUser', 'tutorUser', 'history'],
+      cache: false,
+    });
+    return rows.map(toIntroductionRecord);
+  }
+
+  async historyOfGroupUser(groupId: number, userId: number): Promise<IntroductionHistoryRecord[]> {
+    const rows = await this.history.find({
+      where: { introduction: { resourceGroup: { id: groupId }, receiverUser: { id: userId } } },
+    });
+    return rows.map(toHistoryRecord);
+  }
+
+  async createForGroup(groupId: number, userId: number, tutorUserId?: number): Promise<IntroductionRecord> {
+    const saved = await this.introductions.save(
+      this.introductions.create({
+        resourceGroup: { id: groupId },
+        receiverUser: { id: userId },
+        ...(tutorUserId != null ? { tutorUser: { id: tutorUserId } } : {}),
+      }),
+    );
+    return toIntroductionRecord(saved);
   }
 
   async findById(introductionId: number): Promise<IntroductionRecord | null> {

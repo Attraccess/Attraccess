@@ -1,12 +1,4 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import {
-  Resource,
-  ResourceGroup,
-  ResourceIntroducer,
-  ResourceIntroduction,
-  ResourceIntroductionHistoryItem,
-} from '@attraccess/database-entities';
 import { ResourceGroupsController } from './resourceGroups.controller';
 import { ResourceGroupsIntroductionsController } from './introductions/resourceGroups.introductions.controller';
 import { ResourceGroupsIntroducersController } from './introducers/resourceGroups.introducers.controller';
@@ -16,20 +8,10 @@ import { IsResourceGroupIntroducerGuard } from './introductions/isIntroducerGuar
 import { NotificationsModule } from '../../notifications/notifications.module';
 import { ResourceRetrainingModule } from '../retraining/resourceRetraining.module';
 import { ResourceGroupsCoreModule } from './resourceGroupsCore.module';
+import { GroupsPersistenceModule } from '../../database/adapters/resources/groups-persistence.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([
-      Resource,
-      ResourceGroup,
-      ResourceIntroduction,
-      ResourceIntroductionHistoryItem,
-      ResourceIntroducer,
-    ]),
-    NotificationsModule,
-    ResourceGroupsCoreModule,
-    ResourceRetrainingModule,
-  ],
+  imports: [GroupsPersistenceModule, NotificationsModule, ResourceGroupsCoreModule, ResourceRetrainingModule],
   controllers: [ResourceGroupsController, ResourceGroupsIntroductionsController, ResourceGroupsIntroducersController],
   providers: [ResourceGroupsIntroductionsService, ResourceGroupsIntroducersService, IsResourceGroupIntroducerGuard],
   exports: [

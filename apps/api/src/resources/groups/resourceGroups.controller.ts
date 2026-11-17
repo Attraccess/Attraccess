@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Req } from '@nestjs/common';
 import { ResourceGroupsService, GroupVisibilityContext } from './resourceGroups.service';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ResourceGroup } from '@attraccess/database-entities';
+import { ResourceGroup, toResourceGroupDto } from './dto/resource-group.dto';
 import { CreateResourceGroupDto } from './dto/createGroup.dto';
 import { UpdateResourceGroupDto } from './dto/updateGroup.dto';
 import { VisibleResourcesExistDto } from './dto/visibleResourcesExist.dto';
@@ -28,7 +28,7 @@ export class ResourceGroupsController {
   })
   @Auth('resources.update')
   async createOne(@Body() createDto: CreateResourceGroupDto, @Req() req: AuthenticatedRequest): Promise<ResourceGroup> {
-    return await this.resourceGroupsService.createOne(createDto, req.user);
+    return toResourceGroupDto(await this.resourceGroupsService.createOne(createDto, req.user));
   }
 
   @Get()
@@ -40,7 +40,7 @@ export class ResourceGroupsController {
     type: [ResourceGroup],
   })
   async getAll(@Req() req: AuthenticatedRequest): Promise<ResourceGroup[]> {
-    return await this.resourceGroupsService.getMany(this.getVisibilityContext(req));
+    return (await this.resourceGroupsService.getMany(this.getVisibilityContext(req))).map(toResourceGroupDto);
   }
 
   @Get('resources-exist')
@@ -68,7 +68,9 @@ export class ResourceGroupsController {
     type: ResourceGroup,
   })
   async getOne(@Param('id', ParseIntPipe) id: number, @Req() req: AuthenticatedRequest): Promise<ResourceGroup> {
-    return await this.resourceGroupsService.getOne({ id }, undefined, this.getVisibilityContext(req));
+    return toResourceGroupDto(
+      await this.resourceGroupsService.getOne({ id }, undefined, this.getVisibilityContext(req)),
+    );
   }
 
   @Put(':id')
@@ -89,7 +91,7 @@ export class ResourceGroupsController {
     @Body() updateDto: UpdateResourceGroupDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceGroup> {
-    return await this.resourceGroupsService.updateOneById(id, updateDto, req.user);
+    return toResourceGroupDto(await this.resourceGroupsService.updateOneById(id, updateDto, req.user));
   }
 
   @Post(':groupId/resources/:resourceId')

@@ -17,7 +17,18 @@ export interface ResourceIntroductionStore {
   ): Promise<IntroductionRecord | null>;
 
   /** The introduction of the user to the resource group, if any. */
-  findOfGroupUser(groupId: number, userId: number): Promise<IntroductionRecord | null>;
+  findOfGroupUser(
+    groupId: number,
+    userId: number,
+    context?: ResourcePersistenceContext,
+  ): Promise<IntroductionRecord | null>;
+
+  /** Introductions to the group with receiver, tutor and history. */
+  listForGroup(groupId: number): Promise<IntroductionRecord[]>;
+
+  historyOfGroupUser(groupId: number, userId: number): Promise<IntroductionHistoryRecord[]>;
+
+  createForGroup(groupId: number, userId: number, tutorUserId?: number): Promise<IntroductionRecord>;
 
   findById(introductionId: number): Promise<IntroductionRecord | null>;
 

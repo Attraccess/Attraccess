@@ -92,8 +92,7 @@ describe('inherited introduction query', () => {
   ])('uses the newest event ID when %s %s history timestamps match', async (id, kind) => {
     const historyRepository = source.getRepository(ResourceIntroductionHistoryItem);
     const groups = new ResourceGroupsIntroductionsService(
-      source.getRepository(ResourceIntroduction),
-      historyRepository,
+      new TypeOrmResourceIntroductionStore(source),
       {} as never,
       {} as never,
       {} as never,
