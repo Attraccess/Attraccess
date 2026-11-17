@@ -12,7 +12,9 @@ import time
 
 from attractap_lab.reader_screen import ReaderCommandError, ReaderTestHooks
 
-IDLE_SCREEN = "ResourceListScreen"
+# Signed out: the resource list, or the notice a reader with no linked resource shows instead (a fresh
+# run until the first test links one).
+IDLE_SCREENS = ("ResourceListScreen", "NoResourcesScreen")
 SIGN_OUT = ("Sign out", "Abmelden")
 CANCEL = ("Abbrechen", "Cancel")
 # Screens waiting for a card or a supervisor; they would time out on their own, but only after minutes.
@@ -86,7 +88,7 @@ def ensure_connected(api, admin, reader, hooks):
 
 
 def leave_to_idle(hooks, timeout=IDLE_TIMEOUT):
-    """Dismiss notices, cancel an armed screen and sign out until the signed-out resource list shows."""
+    """Dismiss notices, cancel an armed screen and sign out until a signed-out idle screen shows."""
     actions = []
     deadline = time.monotonic() + timeout
     while True:
@@ -94,7 +96,7 @@ def leave_to_idle(hooks, timeout=IDLE_TIMEOUT):
         screen = listing["screen"]
         texts = {widget["text"] for widget in listing["widgets"]}
         signed_in = bool(texts & set(SIGN_OUT))
-        if screen == IDLE_SCREEN and not signed_in and "OK" not in texts:
+        if screen in IDLE_SCREENS and not signed_in and "OK" not in texts:
             return actions
         if time.monotonic() > deadline:
             raise ReaderNotIdle(f"reader not idle after {timeout}s: on {screen}, showing {sorted(t for t in texts if t)}")
