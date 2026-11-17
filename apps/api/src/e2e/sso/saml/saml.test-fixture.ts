@@ -131,7 +131,6 @@ beforeAll(async () => {
   const authDetailRepo = dataSource.getRepository(AuthenticationDetail);
   const sessionRepo = dataSource.getRepository(Session);
   const resourceUsageRepo = dataSource.getRepository(ResourceUsage);
-  const userRoleRepo = dataSource.getRepository(UserRole);
   const roleRepo = dataSource.getRepository(Role);
   const permissionRepo = dataSource.getRepository(Permission);
   const rolePermissionRepo = dataSource.getRepository(RolePermission);
