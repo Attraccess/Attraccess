@@ -16,17 +16,9 @@ type Insertable<T extends PluginStorageTable> = PluginStorageInsert<T>;
 
 /** A row as written: narrowed columns keep their required/optional status from the declaration. */
 export type TypedInsert<T extends PluginStorageTable, N extends object = object> = Omit<Insertable<T>, keyof N> & {
-  [K in keyof N as K extends keyof Insertable<T>
-    ? undefined extends Insertable<T>[K]
-      ? never
-      : K
-    : never]: N[K];
+  [K in keyof N as K extends keyof Insertable<T> ? (undefined extends Insertable<T>[K] ? never : K) : never]: N[K];
 } & {
-  [K in keyof N as K extends keyof Insertable<T>
-    ? undefined extends Insertable<T>[K]
-      ? K
-      : never
-    : never]?: N[K];
+  [K in keyof N as K extends keyof Insertable<T> ? (undefined extends Insertable<T>[K] ? K : never) : never]?: N[K];
 };
 
 /**
@@ -38,7 +30,10 @@ export interface TypedTableApi<T extends PluginStorageTable, N extends object = 
   insertMany(rows: readonly TypedInsert<T, N>[], options?: PluginStorageCallOptions): Promise<TypedRow<T, N>[]>;
   get(key: PluginStorageKey<T>, options?: PluginStorageCallOptions): Promise<TypedRow<T, N> | null>;
   find(query?: PluginStorageQuery<TypedRow<T, N>>, options?: PluginStorageCallOptions): Promise<TypedRow<T, N>[]>;
-  findOne(query?: PluginStorageQuery<TypedRow<T, N>>, options?: PluginStorageCallOptions): Promise<TypedRow<T, N> | null>;
+  findOne(
+    query?: PluginStorageQuery<TypedRow<T, N>>,
+    options?: PluginStorageCallOptions,
+  ): Promise<TypedRow<T, N> | null>;
   count(where?: PluginStorageWhere<TypedRow<T, N>>, options?: PluginStorageCallOptions): Promise<number>;
   /** Atomic compare-and-set: the condition is evaluated together with the write; returns the affected row count. */
   update(

@@ -63,9 +63,9 @@ describe('WAGO storage baseline against the 1.x migrations', () => {
 
   it('declares exactly the tables the legacy migrations leave behind', () => {
     const legacy = (
-      db
-        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
-        .all() as { name: string }[]
+      db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as {
+        name: string;
+      }[]
     ).map(({ name }) => name);
     expect(bySorted(tables.map(([, definition]) => physicalName(definition)))).toEqual(bySorted(legacy));
   });
@@ -154,7 +154,9 @@ describe('WAGO storage definition', () => {
 
   it('ships the declared layout as baseline version 1 and creates referenced tables first', () => {
     expect(wagoStorage.migrations.map((migration) => migration.version)).toEqual([1]);
-    const created = (wagoStorage.migrations[0].steps ?? []).map((item) => (item.op === 'createTable' ? item.table : ''));
+    const created = (wagoStorage.migrations[0].steps ?? []).map((item) =>
+      item.op === 'createTable' ? item.table : '',
+    );
     expect(created).toEqual(Object.keys(wagoTables));
     for (const item of wagoStorage.migrations[0].steps ?? []) {
       if (item.op !== 'createTable') continue;
