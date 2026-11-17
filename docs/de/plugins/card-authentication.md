@@ -20,7 +20,7 @@ Eine an einem Attractap registrierte Karte funktioniert deshalb am Gerät des Pl
 
 Kartenschlüssel und Sitzungsschlüssel verlassen die API nie. Das Plugin sieht nur die APDUs, die Attraccess sendet, und
 die Antworten der Karte; beide sind durch das Secure Messaging der Karte geschützt. Das Ergebnis enthält `id`, `uid` und
-`userId` der Karte, sonst nichts.
+`userId` der Karte, sonst nichts; für ein Plugin mit `READER_DEVICES` zusätzlich `authentication` (siehe unten).
 
 ## Berechtigung
 
@@ -60,6 +60,16 @@ async function onCardPresented(
   return access.allowed ? grant(result.card.userId) : deny('NO_ACCESS');
 }
 ```
+
+### Eine Tür mit dem Ergebnis öffnen
+
+Die Authentifizierung sagt nur, wem die Karte gehört. Um damit eine Aktion von Attraccess auszuführen, zum Beispiel eine
+Tür mit reinem Zutritt zu öffnen, registrieren Sie das Gerät als [Plugin-Reader](plugins/plugin-readers.md)
+(Berechtigung `READER_DEVICES`). Für ein solches Plugin enthält ein erfolgreiches Ergebnis zusätzlich
+`card.authentication`: einen undurchsichtigen, einmal verwendbaren Nachweis dieser Authentifizierung an diesem `device`,
+30 Sekunden gültig, den `context.readers.tap` entgegennimmt. Ohne `READER_DEVICES` und bei Hosts, die älter als
+Plugin-Reader sind, fehlt er; prüfen Sie ihn daher: `if (context.readers && result.card.authentication)`. Protokollieren
+Sie ihn nie.
 
 ### Der Kartenkanal
 

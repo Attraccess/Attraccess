@@ -12,7 +12,8 @@ describe('PluginUninstallService', () => {
   const fixture = registerPluginServiceFixture();
 
   const bleEndpoints = { deleteAllForPlugin: jest.fn().mockResolvedValue(undefined) };
-  const uninstaller = () => new PluginUninstallService(new PluginService(), bleEndpoints as never);
+  const readers = { deleteAllForPlugin: jest.fn().mockResolvedValue(undefined) };
+  const uninstaller = () => new PluginUninstallService(new PluginService(), bleEndpoints as never, readers as never);
 
   function writeDeletablePlugin(withStorage = false) {
     fixture.writePlugin(fixture.root, 'delete-me', {
@@ -37,6 +38,17 @@ describe('PluginUninstallService', () => {
 
     const second = writeDeletablePlugin();
     bleEndpoints.deleteAllForPlugin.mockRejectedValueOnce(new Error('db locked'));
+    await uninstaller().deletePlugin(second.id, true);
+    expect(existsSync(join(fixture.root, 'delete-me'))).toBe(false);
+  });
+
+  it('deletes the plugin readers, and still uninstalls when that fails', async () => {
+    const plugin = writeDeletablePlugin();
+    await uninstaller().deletePlugin(plugin.id, true);
+    expect(readers.deleteAllForPlugin).toHaveBeenCalledWith(plugin.id);
+
+    const second = writeDeletablePlugin();
+    readers.deleteAllForPlugin.mockRejectedValueOnce(new Error('db locked'));
     await uninstaller().deletePlugin(second.id, true);
     expect(existsSync(join(fixture.root, 'delete-me'))).toBe(false);
   });

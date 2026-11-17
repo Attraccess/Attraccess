@@ -427,6 +427,21 @@ describe('PluginSandboxService', () => {
       expect(() => withoutHostSupport.cards).toThrow(/unavailable in this host/);
     });
 
+    it('gates readers behind READER_DEVICES', () => {
+      const readers = { tap: jest.fn() };
+      const base = { ...buildBaseContext(events), readers } as never as PluginContext;
+      const denied = PluginSandboxService.createGuardedContext(base, [PluginPermission.CARD_AUTHENTICATION]);
+      expect(() => denied.readers).toThrow(PluginPermissionError);
+      expect(() => denied.readers).toThrow(/READER_DEVICES/);
+
+      const granted = PluginSandboxService.createGuardedContext(base, [PluginPermission.READER_DEVICES]);
+      expect(granted.readers).toBe(readers);
+      const withoutHostSupport = PluginSandboxService.createGuardedContext(buildBaseContext(events), [
+        PluginPermission.READER_DEVICES,
+      ]);
+      expect(() => withoutHostSupport.readers).toThrow(/unavailable in this host/);
+    });
+
     it('gates readerUi.invalidate behind READER_UI', () => {
       const base = { ...buildBaseContext(events), readerUi: { invalidate: jest.fn() } };
       const denied = PluginSandboxService.createGuardedContext(base, []);

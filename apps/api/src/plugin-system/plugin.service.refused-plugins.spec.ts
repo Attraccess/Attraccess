@@ -80,8 +80,9 @@ describe('PluginService refused plugins', () => {
     const [plugin] = PluginService.getDiscoveredPlugins();
     const runDown = jest.spyOn(PluginMigrationService, 'dropStorage').mockResolvedValue(true);
     const ble = { deleteAllForPlugin: jest.fn().mockResolvedValue(undefined) };
+    const readers = { deleteAllForPlugin: jest.fn().mockResolvedValue(undefined) };
 
-    await new PluginUninstallService(new PluginService(), ble as never).deletePlugin(plugin.id, true);
+    await new PluginUninstallService(new PluginService(), ble as never, readers as never).deletePlugin(plugin.id, true);
 
     expect(runDown).not.toHaveBeenCalled();
     expect(existsSync(join(fixture.root, 'legacy-plugin'))).toBe(false);
