@@ -6,6 +6,7 @@ import { Button, StandardDrawer, useTranslations } from '@attraccess/plugins-fro
 import en from './UploadPluginModal.en.json';
 import de from './UploadPluginModal.de.json';
 import { useToastMessage } from '../../components/toastProvider';
+import { installFailureReason } from '../settings/sections/plugins/marketplace/describeInstallFailure';
 
 interface UploadPluginModalProps {
   isOpen: boolean;
@@ -33,9 +34,10 @@ export function UploadPluginModal({ isOpen, onClose }: UploadPluginModalProps) {
     },
     onError: (error) => {
       console.error('Failed to upload plugin:', error);
+      // The server's 400 names what is wrong with the archive (e.g. an SDK 1.x plugin and its migration guide).
       toast.error({
         title: t('error.title'),
-        description: t('error.description'),
+        description: installFailureReason(error) ?? t('error.description'),
       });
     },
   });

@@ -40,7 +40,12 @@ export type SettingsMock = {
   setSecretSetting: jest.Mock;
 };
 
-async function packageTarball(name: string, permissions: string[] = []): Promise<Buffer> {
+/** A packed npm plugin; `options` overrides the version or entries of its `attraccess` contract. */
+async function packageTarball(
+  name: string,
+  permissions: string[] = [],
+  options: { version?: string; attraccess?: Record<string, unknown> } = {},
+): Promise<Buffer> {
   const root = mkdtempSync(join(tmpdir(), 'npm-plugin-package-'));
   try {
     mkdirSync(join(root, 'package', 'dist'), { recursive: true });
@@ -48,7 +53,7 @@ async function packageTarball(name: string, permissions: string[] = []): Promise
       join(root, 'package', 'package.json'),
       JSON.stringify({
         name,
-        version: '1.2.3',
+        version: options.version ?? '1.2.3',
         keywords: ['attraccess-plugin'],
         peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
         attraccess: {
@@ -57,6 +62,7 @@ async function packageTarball(name: string, permissions: string[] = []): Promise
           backend: 'dist/index.js',
           permissions,
           sdk: { backend: '*' },
+          ...options.attraccess,
         },
       }),
     );

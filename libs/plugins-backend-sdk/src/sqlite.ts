@@ -12,6 +12,7 @@ export * from './lib/sqlite/typeorm-surface';
 export {
   createHostTransactionScope,
   createSqlitePluginPersistence,
+  managerOfTransactionScope,
   sqlitePersistence,
   type SqliteEngineAccess,
   type SqlitePersistence,

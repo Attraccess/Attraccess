@@ -49,23 +49,42 @@ export function createHostResourceAccessContext(host: PluginHostRefs): PluginRes
   });
 }
 
+/** Exactly the methods of each SDK directory interface; the keys must match the interfaces one to one. */
+const HOST_DATA_METHODS: { [K in keyof PluginHostDataContext]: Record<keyof PluginHostDataContext[K], true> } = {
+  resources: {
+    get: true,
+    getNames: true,
+    filterVisible: true,
+    filterRequiringSupervision: true,
+    listIdsInGroups: true,
+    countUnhealthyEntries: true,
+    listIntroducerUserIds: true,
+  },
+  users: { getUsernames: true, getLocales: true, isActive: true, listIdsWithAnyPermission: true },
+  settings: { getApp: true },
+  flows: { findNodes: true },
+};
+
 /**
  * `context.hostData`. Every call resolves the host adapter when it is made, so a directory a plugin retained during
- * bootstrap keeps working once the host finished starting.
+ * bootstrap keeps working once the host finished starting. Each directory is a frozen object with only the SDK
+ * interface's methods: nothing else of the host adapter (its connection, other members) is reachable, and the
+ * directory is not a thenable.
  */
 export function createHostDataContext(host: PluginHostRefs): PluginHostDataContext {
-  const directory = <K extends keyof PluginHostDataContext>(name: K): PluginHostDataContext[K] =>
-    new Proxy({} as PluginHostDataContext[K], {
-      get:
-        (_, method) =>
-        (...args: unknown[]) =>
-          (
-            host.get<PluginHostDataPort>(PLUGIN_HOST_DATA)[name] as unknown as Record<
-              string | symbol,
-              (...a: unknown[]) => unknown
-            >
-          )[method](...args),
-    });
+  const directory = <K extends keyof PluginHostDataContext>(name: K): PluginHostDataContext[K] => {
+    const forward =
+      (method: string) =>
+      (...args: unknown[]) => {
+        const adapter = host.get<PluginHostDataPort>(PLUGIN_HOST_DATA)[name] as unknown as Record<
+          string,
+          (...a: unknown[]) => unknown
+        >;
+        return adapter[method](...args);
+      };
+    const methods = Object.keys(HOST_DATA_METHODS[name]).map((method) => [method, forward(method)]);
+    return Object.freeze(Object.fromEntries(methods)) as PluginHostDataContext[K];
+  };
   return {
     resources: directory('resources'),
     users: directory('users'),

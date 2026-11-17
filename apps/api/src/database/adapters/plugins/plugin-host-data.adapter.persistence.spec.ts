@@ -20,6 +20,8 @@ import {
   SupervisionMode,
 } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
+import type { PluginTransactionScope } from '@attraccess/plugins-backend-sdk';
+import { createHostTransactionScope } from '@attraccess/plugins-backend-sdk/sqlite';
 import * as migrations from '../../migrations';
 import { createPluginCoreLookup, createPluginHostData } from './plugin-host-data.adapter';
 
@@ -190,6 +192,20 @@ describe('plugin host data adapter on a real database', () => {
         [ids.door, 'Door'],
       ]);
       expect((await hostData().resources.getNames([])).size).toBe(0);
+    });
+
+    it('reads a resource inside the transaction of a scope it is given, and refuses a closed scope', async () => {
+      let kept: PluginTransactionScope | undefined;
+      await source.transaction(async (manager) => {
+        await manager.getRepository(Resource).update(ids.printer, { maxParallelSessions: 5 });
+        kept = createHostTransactionScope(manager);
+        // The uncommitted change is only visible inside the transaction.
+        expect(await hostData().resources.get(ids.printer, kept)).toMatchObject({ maxParallelSessions: 5 });
+        throw new Error('roll back');
+      }).catch(() => undefined);
+
+      expect(await hostData().resources.get(ids.printer)).toMatchObject({ maxParallelSessions: 3 });
+      await expect(hostData().resources.get(ids.printer, kept)).rejects.toThrow('The transaction scope is closed');
     });
 
     it('hides resources that only belong to hidden groups unless the user may see them', async () => {

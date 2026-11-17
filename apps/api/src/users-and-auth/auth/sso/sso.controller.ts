@@ -74,6 +74,7 @@ import { ApiProvisioningRoute } from './provisioning/provisioning-route.decorato
 import { SsoProvisioningService, SsoProvisioningTarget } from './provisioning/sso-provisioning.service';
 
 import { SsoLoginService } from './sso-login.service';
+import { toSessionUser } from '../session-user';
 
 import { SsoIpThrottleService } from './sso-ip-throttle.service';
 
@@ -548,7 +549,7 @@ export class SSOController {
     await this.cookieConfigService.setAuthCookie(response, sessionToken);
 
     const auth: CreateSessionResponse = {
-      user: request.user,
+      user: toSessionUser(request.user),
       authToken: sessionToken,
     };
 

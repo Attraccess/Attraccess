@@ -1,4 +1,5 @@
 import * as semver from 'semver';
+import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 import type { DatabaseType } from '../../database/backend/database-backend';
 
 /** The first host version whose plugin SDK has no TypeORM surface (SDK 2.0). */
@@ -80,5 +81,25 @@ export function assertModulePersistenceSupportsBackend(
   throw new PluginIncompatibleError(
     `Plugin ${safeName(pluginName)} provides storage code for the database engines ${declared.join(', ')} but this ` +
       `host runs ${active}. It was not started and no data was changed.`,
+  );
+}
+
+/** The manifest fields the host checks before a plugin is installed, started or migrated. */
+export interface PluginCompatibilityManifest {
+  name: string;
+  attraccessVersion?: { min?: string };
+  main?: { migrations?: unknown };
+  permissions?: readonly PluginPermission[];
+  persistence?: { backends?: readonly string[] };
+}
+
+/** SDK 2.0 and engine support of a manifest. Shared by ZIP uploads, npm installs and discovery. */
+export function assertManifestCompatible(manifest: PluginCompatibilityManifest, active: DatabaseType): void {
+  assertPluginTargetsSdk2(manifest.name, manifest.attraccessVersion?.min);
+  assertPluginSupportsBackend(
+    manifest.name,
+    manifest.persistence?.backends,
+    Boolean(manifest.main?.migrations) || (manifest.permissions ?? []).includes(PluginPermission.DATABASE_ACCESS),
+    active,
   );
 }

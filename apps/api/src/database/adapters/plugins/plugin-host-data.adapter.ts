@@ -15,8 +15,10 @@ import type {
   PluginHostDataContext,
   PluginResourceDirectory,
   PluginSettingsDirectory,
+  PluginTransactionScope,
   PluginUserDirectory,
 } from '@attraccess/plugins-backend-sdk';
+import { managerOfTransactionScope } from '@attraccess/plugins-backend-sdk/sqlite';
 import { Brackets, DataSource, In, SelectQueryBuilder } from 'typeorm';
 import type { PluginResourceModel } from '@attraccess/application-models';
 
@@ -51,10 +53,10 @@ function toResourceModel(row: Resource): PluginResourceModel {
 class ResourceDirectory implements PluginResourceDirectory {
   constructor(private readonly source: () => DataSource) {}
 
-  async get(resourceId: number): Promise<PluginResourceModel | null> {
-    const row = await this.source()
-      .getRepository(Resource)
-      .findOne({ where: { id: resourceId } });
+  async get(resourceId: number, scope?: PluginTransactionScope): Promise<PluginResourceModel | null> {
+    // With a scope the read joins the plugin's transaction (its connection), never the shared one.
+    const manager = scope ? managerOfTransactionScope(scope) : this.source().manager;
+    const row = await manager.getRepository(Resource).findOne({ where: { id: resourceId } });
     return row ? toResourceModel(row) : null;
   }
 

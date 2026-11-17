@@ -15,6 +15,7 @@ import { TokenHashService } from '../../../encryption/token-hash.service';
 import { SessionStore } from '../../../users-and-auth/auth/session-store/session-store';
 import { matchesSsoSession } from '../../../users-and-auth/auth/session-store/sso-session-selector';
 import { runSerializedTransaction } from '../../sqlite/run-serialized-transaction';
+import { toAuthenticatedSessionUser } from './typeorm-session-user-directory';
 
 const LAST_ACCESSED_THROTTLE_MS = 60_000;
 
@@ -65,7 +66,10 @@ export class SqliteSessionStore implements SessionStore {
       session.lastAccessedAt = new Date();
       await this.sessionRepository.update({ id: session.id }, { lastAccessedAt: session.lastAccessedAt });
     }
-    return { user: session.user, session: { id: String(session.id), ssoContext: session.ssoContext ?? null } };
+    return {
+      user: toAuthenticatedSessionUser(session.user),
+      session: { id: String(session.id), ssoContext: session.ssoContext ?? null },
+    };
   }
 
   async rotateSession(token: string, newHashedToken: string, newExpiresAt: Date): Promise<boolean> {

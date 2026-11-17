@@ -18,9 +18,8 @@ import { PluginManifestSchema, LoadedPluginManifest, PluginManifest } from './pl
 
 import { type PluginManifestInfo } from '@attraccess/plugins-backend-sdk';
 
-import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 import { resolveDatabaseBackend } from '../database/backend';
-import { assertPluginSupportsBackend, assertPluginTargetsSdk2 } from './runtime/plugin-compatibility';
+import { assertManifestCompatible } from './runtime/plugin-compatibility';
 import { PluginBootGuard } from './runtime/boot-guard';
 
 import { PluginSandboxService } from './plugin-sandbox.service';
@@ -36,7 +35,18 @@ export class PluginService {
 
   protected static RESTART_BY_EXIT_FLAG: boolean;
 
+  /** Every discovered manifest, including the ones the host refuses to load (see {@link refusedPlugins}). */
   protected static plugins: LoadedPluginManifest[] | null = null;
+
+  /**
+   * Plugin directories whose manifest the host refuses (an SDK 1.x plugin, an unsupported database engine, invalid
+   * permissions). They stay listed with their error so an admin can see and delete them, but their code is never
+   * loaded, migrated or reverted.
+   */
+  protected static refusedPlugins: Set<string> = new Set();
+
+  /** {@link getPlugins} cached per discovery scan, so callers see one stable array between scans. */
+  protected static loadablePlugins: { source: LoadedPluginManifest[]; plugins: LoadedPluginManifest[] } | null = null;
 
   protected static loadedPlugins: Set<string> = new Set();
 
@@ -98,6 +108,7 @@ export class PluginService {
     getImplementationClass().PLUGIN_PATH = config.PLUGIN_DIR; // Assume PLUGIN_DIR from appConfig is already resolved or correct
     getImplementationClass().RESTART_BY_EXIT_FLAG = config.RESTART_BY_EXIT;
     getImplementationClass().plugins = null; // Discovery may have been cached with an unset path before configure() ran; force a re-scan.
+    getImplementationClass().refusedPlugins.clear();
     getImplementationClass().loadedPlugins.clear();
     getImplementationClass().pluginLoadErrors.clear();
     PluginBootGuard.loadFailures(getImplementationClass().PLUGIN_PATH);
@@ -313,7 +324,20 @@ export class PluginService {
     return candidates[0];
   }
 
+  /** The plugins the host may load, migrate and serve. Refused manifests are left out. */
   public static getPlugins(): LoadedPluginManifest[] {
+    const discovered = getImplementationClass().getDiscoveredPlugins();
+    if (getImplementationClass().loadablePlugins?.source !== discovered) {
+      getImplementationClass().loadablePlugins = {
+        source: discovered,
+        plugins: discovered.filter((plugin) => !getImplementationClass().isPluginRefused(plugin)),
+      };
+    }
+    return getImplementationClass().loadablePlugins.plugins;
+  }
+
+  /** Every plugin found in the plugin folder, including refused ones; for listing and removal only. */
+  public static getDiscoveredPlugins(): LoadedPluginManifest[] {
     if (!getImplementationClass().plugins) {
       getImplementationClass().plugins = getImplementationClass().findPluginsInFolder(
         getImplementationClass().PLUGIN_PATH,
@@ -326,9 +350,14 @@ export class PluginService {
     return getImplementationClass().plugins;
   }
 
+  /** Whether discovery refused the manifest: its code must never run (no load, no migration, no revert). */
+  public static isPluginRefused(manifest: Pick<LoadedPluginManifest, 'pluginDirectory'>): boolean {
+    return getImplementationClass().refusedPlugins.has(manifest.pluginDirectory);
+  }
+
   public static getManifestById(id: string): LoadedPluginManifest | undefined {
     return getImplementationClass()
-      .getPlugins()
+      .getDiscoveredPlugins()
       .find((plugin) => plugin.id === id);
   }
 
@@ -337,7 +366,7 @@ export class PluginService {
   // instead of silently showing them as if everything were fine.
   public static getPluginsWithLoadStatus(): LoadedPluginManifest[] {
     return getImplementationClass()
-      .getPlugins()
+      .getDiscoveredPlugins()
       .map((manifest) => {
         const key = `${manifest.name}@${manifest.version}`;
         const error = getImplementationClass().pluginLoadErrors.get(key);
@@ -441,8 +470,9 @@ export class PluginService {
           PluginService.assertManifestCompatible(manifest);
           manifest.permissions = PluginSandboxService.validateDeclaredPermissions(manifest.name, manifest.permissions);
         } catch (error) {
+          // Listed with the refusal (and its migration guide) so it can be deleted, but never loaded or migrated.
           getImplementationClass().setPluginLoadError(`${manifest.name}@${manifest.version}`, error as Error);
-          return null;
+          getImplementationClass().refusedPlugins.add(pluginFolder);
         }
 
         return manifest;
@@ -452,13 +482,7 @@ export class PluginService {
 
   /** SDK 2.0 and engine support, checked before a plugin is installed, started or migrated. */
   protected static assertManifestCompatible(manifest: PluginManifest): void {
-    assertPluginTargetsSdk2(manifest.name, manifest.attraccessVersion?.min);
-    assertPluginSupportsBackend(
-      manifest.name,
-      manifest.persistence?.backends,
-      Boolean(manifest.main?.migrations) || (manifest.permissions ?? []).includes(PluginPermission.DATABASE_ACCESS),
-      resolveDatabaseBackend().type,
-    );
+    assertManifestCompatible(manifest, resolveDatabaseBackend().type);
   }
 
   protected static findPluginManifestInPluginFolder(rootFolder: string, pluginFolder: string): PluginManifest | null {

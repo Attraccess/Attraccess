@@ -14,6 +14,7 @@ import {
 } from './passkey.dto';
 import { SessionService } from '../session.service';
 import { CreateSessionResponse } from '../auth.types';
+import { toUserDto } from '../../users/dtos/user.dto';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 import { resolveIp, setRetryAfter } from '../../rate-limiting/login.rate-limit.guard';
 import { auditOriginOf } from '../../../audit/recorder/audit-event';
@@ -105,12 +106,11 @@ export class PasskeyController {
     await this.assertNotThrottled(request);
     const ip = resolveIp(request);
 
-    // The stored account is serialized as the `User` schema (CreateSessionResponse); secrets carry @Exclude.
-    const user = (await this.passkeyService.signIn(
+    const user = await this.passkeyService.signIn(
       body.response as unknown as AuthenticationResponseJSON,
       requestOrigin(request),
       ip,
-    )) as CreateSessionResponse['user'];
+    );
 
     // A passkey proves possession of the authenticator (and usually a biometric/PIN on top of it),
     // so it stands on its own and does not additionally prompt for the TOTP code.
@@ -121,10 +121,10 @@ export class PasskeyController {
 
     if (body.tokenLocation === 'cookie') {
       await this.cookieConfigService.setAuthCookie(response, sessionToken);
-      return { user, authToken: '' };
+      return { user: toUserDto(user), authToken: '' };
     }
 
-    return { user, authToken: sessionToken };
+    return { user: toUserDto(user), authToken: sessionToken };
   }
 
   private async assertNotThrottled(request: Request): Promise<void> {

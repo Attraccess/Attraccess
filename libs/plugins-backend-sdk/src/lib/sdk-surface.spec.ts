@@ -68,6 +68,7 @@ describe('plugin SDK 2.0 surface', () => {
       'sqlitePersistence',
       'createSqlitePluginPersistence',
       'createHostTransactionScope',
+      'managerOfTransactionScope',
     ]) {
       expect(Object.keys(sqlite)).toContain(exported);
     }

@@ -69,17 +69,43 @@ class OwnedScope implements SqliteScope {
 }
 
 /**
+ * Whether the transaction behind `manager` is still running. A manager bound to a query runner (what a TypeORM
+ * transaction hands out) is open until that transaction commits or rolls back; a manager without one is not a
+ * transaction that could end.
+ */
+function transactionActive(manager: EntityManager): boolean {
+  const runner = manager.queryRunner;
+  return !runner || (runner.isTransactionActive && !runner.isReleased);
+}
+
+/**
  * The scope of a transaction the host opened itself (for example the start transaction handed to a capacity hook).
  * It exposes the transaction to {@link SqlitePersistence.managerOf}; it never commits, so it cannot defer work.
+ * It is open only while the host transaction is: by default until the transaction of the manager's query runner
+ * commits or rolls back. The host passes `isOpen` when it tracks the transaction's end itself (TypeORM's SQLite drivers reuse
+ * one query runner per connection, so only the host knows that a later transaction is a different one).
  */
-export function createHostTransactionScope(manager: EntityManager): PluginTransactionScope {
+export function createHostTransactionScope(
+  manager: EntityManager,
+  isOpen: () => boolean = () => transactionActive(manager),
+): PluginTransactionScope {
   return {
-    isOpen: true,
+    get isOpen(): boolean {
+      return isOpen();
+    },
     afterCommit(): void {
       throw new Error('afterCommit is not available in a transaction owned by the host');
     },
     [SCOPE_HANDLE]: manager,
   } as SqliteScope;
+}
+
+/**
+ * The SQLite transaction behind an open scope (a plugin transaction or a host-owned one). Hosts use it to run a
+ * lookup a plugin asked for inside the plugin's transaction. Throws for a closed or foreign scope.
+ */
+export function managerOfTransactionScope(scope: PluginTransactionScope): EntityManager {
+  return managerOfScope(scope);
 }
 
 function managerOfScope(scope: PluginTransactionScope): EntityManager {
@@ -98,6 +124,11 @@ function managerOfScope(scope: PluginTransactionScope): EntityManager {
 /**
  * The SQLite implementation of {@link PluginPersistenceContext}. The host builds the plugin's context with it;
  * plugin tests use it to run against their own in-memory or file database.
+ *
+ * SQLite has a single writer: the host runs every transaction (plugin transactions and core lifecycle writes such as
+ * session start and end) one at a time on one shared write queue, so a check-then-write sequence is race-free. Because
+ * the queue is shared, a slow `work` delays every session start and end, and a transaction started (or a core write
+ * awaited) inside `work` would wait for `work` itself: the nested call is rejected with an error.
  */
 export function createSqlitePluginPersistence(options: SqlitePluginPersistenceOptions): PluginPersistenceContext {
   const running = new AsyncLocalStorage<{ active: boolean }>();
