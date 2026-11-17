@@ -13,7 +13,7 @@ import {
   type TableSnapshot,
 } from '../transfer-snapshot';
 
-/** Prefix of the plugin-scoped migration tables (PluginMigrationService.migrationsTableName). */
+/** Prefix of the legacy (1.x TypeORM) plugin migration tables, which a plugin adopted into SDK 2.0 storage keeps. */
 export const PLUGIN_MIGRATIONS_TABLE_PREFIX = 'plugin_migrations_';
 
 export function pluginMigrationsTable(pluginId: string): string {
