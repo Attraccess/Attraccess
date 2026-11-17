@@ -1,17 +1,6 @@
-import {
-  Resource,
-  ResourceGroup,
-  ResourceIntroduction,
-  ResourceIntroductionHistoryItem,
-  ResourceUsage,
-} from '@attraccess/database-entities';
-import { IntroductionHistoryAction } from '@attraccess/application-models';
+import { IntroductionHistoryAction, type IntroductionRecord } from '@attraccess/application-models';
 
 import { Injectable, Logger, Inject } from '@nestjs/common';
-
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { Repository, In, IsNull, Not } from 'typeorm';
 
 import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 
@@ -19,6 +8,11 @@ import { EmailService } from '../../email/email.service';
 
 import { ResourceGroupsService } from '../groups/resourceGroups.service';
 import { Cron } from '@nestjs/schedule';
+import {
+  RESOURCE_INTRODUCTION_STORE,
+  type ResourceIntroductionStore,
+} from '../introductions/resource-introduction-store.port';
+import { RESOURCE_RETRAINING_STORE, type RetrainingStore } from './retraining-store.port';
 export interface RetrainingPolicy {
   retrainingMaxAgeDays: number | null;
   retrainingMaxInactivityDays: number | null;
@@ -52,16 +46,10 @@ export const EMPTY_EVALUATION: RetrainingEvaluation = {
 @Injectable()
 export class ResourceRetrainingService {
   constructor(
-    @InjectRepository(Resource)
-    protected readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(ResourceGroup)
-    protected readonly resourceGroupRepository: Repository<ResourceGroup>,
-    @InjectRepository(ResourceUsage)
-    protected readonly resourceUsageRepository: Repository<ResourceUsage>,
-    @InjectRepository(ResourceIntroduction)
-    protected readonly resourceIntroductionRepository: Repository<ResourceIntroduction>,
-    @InjectRepository(ResourceIntroductionHistoryItem)
-    protected readonly historyRepository: Repository<ResourceIntroductionHistoryItem>,
+    @Inject(RESOURCE_RETRAINING_STORE)
+    protected readonly retrainingStore: RetrainingStore,
+    @Inject(RESOURCE_INTRODUCTION_STORE)
+    protected readonly introductionStore: ResourceIntroductionStore,
     protected readonly resourceGroupsService: ResourceGroupsService,
     protected readonly emailService: EmailService,
     @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
@@ -143,7 +131,7 @@ export class ResourceRetrainingService {
   }
 
   public async getIntroductionRetrainingStatus(introductionId: number): Promise<RetrainingEvaluation | null> {
-    const introduction = await this.resourceIntroductionRepository.findOne({ where: { id: introductionId } });
+    const introduction = await this.introductionStore.findById(introductionId);
     if (!introduction || !(await this.isValid(introduction.id))) return null;
     const trainedAt = await this.getTrainedAt(introduction);
     if (!trainedAt) return null;
@@ -160,14 +148,12 @@ export class ResourceRetrainingService {
     userId: number,
     now: Date,
   ): Promise<RetrainingEvaluation | null> {
-    const introduction = await this.resourceIntroductionRepository.findOne({
-      where: { resource: { id: resourceId }, receiverUser: { id: userId } },
-    });
+    const introduction = await this.introductionStore.findOfUser(resourceId, userId);
     if (!introduction || !(await this.isValid(introduction.id))) {
       return null;
     }
 
-    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    const resource = await this.retrainingStore.findResourceTarget(resourceId);
     if (!resource) {
       return null;
     }
@@ -182,14 +168,12 @@ export class ResourceRetrainingService {
     userId: number,
     now: Date,
   ): Promise<RetrainingEvaluation | null> {
-    const introduction = await this.resourceIntroductionRepository.findOne({
-      where: { resourceGroup: { id: groupId }, receiverUser: { id: userId } },
-    });
+    const introduction = await this.introductionStore.findOfGroupUser(groupId, userId);
     if (!introduction || !(await this.isValid(introduction.id))) {
       return null;
     }
 
-    const group = await this.resourceGroupRepository.findOne({ where: { id: groupId } });
+    const group = await this.retrainingStore.findGroupTarget(groupId);
     if (!group) {
       return null;
     }
@@ -225,57 +209,37 @@ export class ResourceRetrainingService {
   }
 
   protected async getIntroductionPolicyTarget(
-    introduction: ResourceIntroduction,
+    introduction: IntroductionRecord,
   ): Promise<{ id: number; name: string; isGroup: boolean; policy: RetrainingPolicy } | null> {
     if (introduction.resourceId) {
-      const resource = await this.resourceRepository.findOne({ where: { id: introduction.resourceId } });
+      const resource = await this.retrainingStore.findResourceTarget(introduction.resourceId);
       return resource ? { id: resource.id, name: resource.name, isGroup: false, policy: resource } : null;
     }
 
     if (introduction.resourceGroupId) {
-      const group = await this.resourceGroupRepository.findOne({ where: { id: introduction.resourceGroupId } });
+      const group = await this.retrainingStore.findGroupTarget(introduction.resourceGroupId);
       return group ? { id: group.id, name: group.name, isGroup: true, policy: group } : null;
     }
 
     return null;
   }
 
-  protected async getTrainedAt(introduction: ResourceIntroduction): Promise<Date | null> {
-    const latestGrant = await this.historyRepository.findOne({
-      where: { introduction: { id: introduction.id }, action: IntroductionHistoryAction.GRANT },
-      order: { createdAt: 'DESC', id: 'DESC' },
-    });
+  protected async getTrainedAt(introduction: IntroductionRecord): Promise<Date | null> {
+    const latestGrant = await this.introductionStore.latestGrant(introduction.id);
     return latestGrant?.createdAt ?? introduction.completedAt ?? introduction.createdAt ?? null;
   }
 
   protected async isValid(introductionId: number): Promise<boolean> {
-    const lastHistoryItem = await this.historyRepository.findOne({
-      where: { introduction: { id: introductionId } },
-      order: { createdAt: 'DESC', id: 'DESC' },
-    });
+    const lastHistoryItem = await this.introductionStore.lastHistoryItem(introductionId);
     return lastHistoryItem?.action === IntroductionHistoryAction.GRANT;
   }
 
   protected async getResourceLastUsedAt(resourceId: number, userId: number): Promise<Date | null> {
-    const lastUsage = await this.resourceUsageRepository.findOne({
-      where: { resourceId, userId, endTime: Not(IsNull()) },
-      order: { endTime: 'DESC' },
-    });
-    return lastUsage?.endTime ?? null;
+    return this.retrainingStore.lastResourceUseAt(resourceId, userId);
   }
 
   protected async getGroupLastUsedAt(groupId: number, userId: number): Promise<Date | null> {
-    const group = await this.resourceGroupRepository.findOne({ where: { id: groupId }, relations: ['resources'] });
-    const resourceIds = (group?.resources ?? []).map((resource) => resource.id);
-    if (resourceIds.length === 0) {
-      return null;
-    }
-
-    const lastUsage = await this.resourceUsageRepository.findOne({
-      where: { resourceId: In(resourceIds), userId, endTime: Not(IsNull()) },
-      order: { endTime: 'DESC' },
-    });
-    return lastUsage?.endTime ?? null;
+    return this.retrainingStore.lastGroupUseAt(groupId, userId);
   }
 
   protected addDays(date: Date, days: number): Date {
@@ -285,16 +249,7 @@ export class ResourceRetrainingService {
   @Cron('0 3 * * *')
   public async evaluateAndNotify(): Promise<void> {
     const now = new Date();
-    const introductions = await this.resourceIntroductionRepository
-      .createQueryBuilder('introduction')
-      .leftJoinAndSelect('introduction.receiverUser', 'receiverUser')
-      .leftJoin('introduction.resource', 'resource')
-      .leftJoin('introduction.resourceGroup', 'resourceGroup')
-      .where('resource.retrainingMaxAgeDays IS NOT NULL')
-      .orWhere('resource.retrainingMaxInactivityDays IS NOT NULL')
-      .orWhere('resourceGroup.retrainingMaxAgeDays IS NOT NULL')
-      .orWhere('resourceGroup.retrainingMaxInactivityDays IS NOT NULL')
-      .getMany();
+    const introductions = await this.introductionStore.listWithRetrainingRule();
 
     for (const introduction of introductions) {
       try {
@@ -305,7 +260,7 @@ export class ResourceRetrainingService {
     }
   }
 
-  protected async notifyIfDue(introduction: ResourceIntroduction, now: Date): Promise<void> {
+  protected async notifyIfDue(introduction: IntroductionRecord, now: Date): Promise<void> {
     if (!(await this.isValid(introduction.id))) {
       return;
     }
@@ -344,20 +299,20 @@ export class ResourceRetrainingService {
       });
       // A dropped row (audit off, queue full, storage error) is retried on the next evaluation.
       if (receipt.status === 'recorded') {
-        await this.resourceIntroductionRepository.update(introduction.id, { retrainingRequiredAuditedAt: now });
+        await this.introductionStore.markRetrainingRequiredAudited(introduction.id, now);
       }
     }
     if (introduction.retrainingNotifiedAt && introduction.retrainingNotifiedAt.getTime() >= trainedAt.getTime()) {
       return;
     }
-    if (introduction.receiverUser?.email) {
+    if (introduction.receiver?.email) {
       await this.emailService.sendUserRetrainingEmail(
-        introduction.receiverUser,
+        introduction.receiver as unknown as Parameters<EmailService['sendUserRetrainingEmail']>[0],
         { id: policyTarget.id, name: policyTarget.name, isGroup: policyTarget.isGroup },
         { reason: evaluation.reason, blocksAccess: evaluation.blocksAccess },
       );
     }
     // A failed delivery must remain eligible for the next scheduled retry.
-    await this.resourceIntroductionRepository.update(introduction.id, { retrainingNotifiedAt: now });
+    await this.introductionStore.markRetrainingNotified(introduction.id, now);
   }
 }

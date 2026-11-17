@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { SupervisionService } from './supervision.service';
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
-import { User } from '@attraccess/database-entities';
+import type { SupervisionUser } from './supervision.types';
 import { ResourceIntroducerType } from '@attraccess/application-models';
 import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto';
 
@@ -108,7 +108,7 @@ describe('SupervisionService', () => {
 
   it('rejects approval from someone other than the requested supervisor', async () => {
     const { requestId } = await fixture.createRequest();
-    const stranger = { id: 3, username: 'stranger' } as User;
+    const stranger = { id: 3, username: 'stranger' } as SupervisionUser;
 
     await expect(fixture.service.approve(requestId, stranger)).rejects.toBeInstanceOf(ForbiddenException);
     expect(fixture.resourceUsageService.startSession).not.toHaveBeenCalled();
@@ -168,7 +168,7 @@ describe('SupervisionService', () => {
 
     it('lets any eligible supervisor approve: starts the session and notifies the reader + all popups', async () => {
       const { requestId, onResolved } = createReaderRequest();
-      const otherSupervisor = { id: 3, username: 'other' } as User;
+      const otherSupervisor = { id: 3, username: 'other' } as SupervisionUser;
 
       const session = await fixture.service.approve(requestId, otherSupervisor);
 
@@ -192,7 +192,7 @@ describe('SupervisionService', () => {
 
     it('rejects approval from a non-introducer who did not receive the request', async () => {
       const { requestId } = createReaderRequest();
-      const stranger = { id: 9, username: 'stranger' } as User;
+      const stranger = { id: 9, username: 'stranger' } as SupervisionUser;
       fixture.resourceUsageService.validateSupervisedStart.mockRejectedValueOnce(
         new ForbiddenException('not an introducer'),
       );
@@ -203,7 +203,7 @@ describe('SupervisionService', () => {
 
     it('allows an introducer granted after the request was broadcast to approve', async () => {
       const { requestId, onResolved } = createReaderRequest();
-      const newlyGrantedIntroducer = { id: 9, username: 'new-introducer' } as User;
+      const newlyGrantedIntroducer = { id: 9, username: 'new-introducer' } as SupervisionUser;
 
       const session = await fixture.service.approve(requestId, newlyGrantedIntroducer);
 
@@ -528,7 +528,7 @@ describe('SupervisionService', () => {
 
     it('rejects a resource manager who is not an introducer', async () => {
       const { requestId } = await requestAtReader();
-      const globalManager = { id: 99, username: 'admin' } as User;
+      const globalManager = { id: 99, username: 'admin' } as SupervisionUser;
       fixture.resourceUsageService.validateSupervisedStart.mockRejectedValueOnce(
         new ForbiddenException('not an introducer'),
       );

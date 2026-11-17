@@ -1,42 +1,56 @@
 import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ResourceIntroduction, ResourceIntroductionHistoryItem } from '@attraccess/database-entities';
-import { IntroductionHistoryAction } from '@attraccess/application-models';
+import { IntroductionHistoryAction, type IntroductionRecord } from '@attraccess/application-models';
 import { ResourceIntroductionsService } from './resouceIntroductions.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
 import { ResourceRetrainingService } from '../retraining/resourceRetraining.service';
+import { RESOURCE_INTRODUCTION_STORE, type ResourceIntroductionStore } from './resource-introduction-store.port';
+
+const introduction = (overrides: Partial<IntroductionRecord> = {}): IntroductionRecord => ({
+  id: 10,
+  resourceId: 7,
+  resourceGroupId: null,
+  receiverUserId: 3,
+  tutorUserId: null,
+  completedAt: new Date('2030-01-01T00:00:00Z'),
+  retrainingNotifiedAt: null,
+  retrainingRequiredAuditedAt: null,
+  createdAt: new Date('2030-01-01T00:00:00Z'),
+  ...overrides,
+});
 
 describe('ResourceIntroductionsService notifications', () => {
   let service: ResourceIntroductionsService;
-  let introductionRepository: {
-    findOne: jest.Mock;
-    create: jest.Mock;
-    save: jest.Mock;
-    update: jest.Mock;
-    find: jest.Mock;
-  };
-  let historyRepository: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; find: jest.Mock };
+  let store: { [K in keyof ResourceIntroductionStore]: jest.Mock };
   let notifications: { dispatch: jest.Mock };
   let retraining: { getIntroductionRetrainingStatus: jest.Mock };
   let audit: { record: jest.Mock };
 
   beforeEach(async () => {
-    introductionRepository = {
-      findOne: jest.fn().mockResolvedValue(null),
-      create: jest.fn().mockImplementation((data) => ({ id: 10, ...data })),
-      save: jest.fn().mockImplementation(async (data) => ({ id: 10, ...data })),
-      update: jest.fn(),
-      find: jest.fn(),
-    };
-    historyRepository = {
-      findOne: jest.fn(),
-      create: jest.fn().mockImplementation((data) => data),
-      save: jest.fn().mockImplementation(async (data) => ({ id: 20, ...data })),
-      find: jest.fn(),
+    store = {
+      findOfUser: jest.fn().mockResolvedValue(null),
+      findOfGroupUser: jest.fn().mockResolvedValue(null),
+      findById: jest.fn(),
+      lastHistoryItem: jest.fn().mockResolvedValue(null),
+      latestGrant: jest.fn(),
+      listForResource: jest.fn().mockResolvedValue([]),
+      historyOfUser: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockImplementation(async () => introduction()),
+      setTutor: jest.fn().mockResolvedValue(undefined),
+      addHistoryItem: jest.fn().mockImplementation(async (introductionId, action, comment, performedByUserId) => ({
+        id: 20,
+        introductionId,
+        action,
+        comment: comment ?? null,
+        performedByUserId,
+        createdAt: new Date(),
+      })),
+      listWithRetrainingRule: jest.fn(),
+      markRetrainingRequiredAudited: jest.fn(),
+      markRetrainingNotified: jest.fn(),
     };
     notifications = { dispatch: jest.fn().mockResolvedValue(undefined) };
     retraining = { getIntroductionRetrainingStatus: jest.fn().mockResolvedValue({ isDue: false }) };
@@ -45,8 +59,7 @@ describe('ResourceIntroductionsService notifications', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResourceIntroductionsService,
-        { provide: getRepositoryToken(ResourceIntroduction), useValue: introductionRepository },
-        { provide: getRepositoryToken(ResourceIntroductionHistoryItem), useValue: historyRepository },
+        { provide: RESOURCE_INTRODUCTION_STORE, useValue: store },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         { provide: MetricsService, useValue: { resourceIntroductionsTotal: { inc: jest.fn() } } },
         { provide: NotificationDispatchService, useValue: notifications },
@@ -73,10 +86,21 @@ describe('ResourceIntroductionsService notifications', () => {
     );
   });
 
-  it('records the acting user for a granted introduction', async () => {
-    await service.grant(7, 3, undefined, { performedByUserId: 9 });
+  it('creates the introduction with its tutor on the first grant and changes a different tutor later', async () => {
+    await service.grant(7, 3, undefined, { tutorUserId: 4 });
+    expect(store.create).toHaveBeenCalledWith(7, 3, 4);
 
-    expect(historyRepository.create).toHaveBeenCalledWith(expect.objectContaining({ performedByUser: { id: 9 } }));
+    store.findOfUser.mockResolvedValue(introduction({ tutorUserId: 4 }));
+    await service.grant(7, 3, undefined, { tutorUserId: 4 });
+    expect(store.setTutor).not.toHaveBeenCalled();
+    await service.grant(7, 3, undefined, { tutorUserId: 5 });
+    expect(store.setTutor).toHaveBeenCalledWith(10, 5);
+  });
+
+  it('records the acting user for a granted introduction', async () => {
+    await service.grant(7, 3, { comment: 'Welcome' }, { performedByUserId: 9 });
+
+    expect(store.addHistoryItem).toHaveBeenCalledWith(10, IntroductionHistoryAction.GRANT, 'Welcome', 9);
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
         domain: 'resource',
@@ -89,7 +113,7 @@ describe('ResourceIntroductionsService notifications', () => {
   });
 
   it('records a cleared event only when the renewed resource introduction was due', async () => {
-    introductionRepository.findOne.mockResolvedValue({ id: 10, receiverUser: { id: 3 } });
+    store.findOfUser.mockResolvedValue(introduction());
     retraining.getIntroductionRetrainingStatus
       .mockResolvedValueOnce({ isDue: true })
       .mockResolvedValueOnce({ isDue: false });
@@ -107,7 +131,7 @@ describe('ResourceIntroductionsService notifications', () => {
   });
 
   it('does not clear a resource introduction when inactivity remains due after renewal', async () => {
-    introductionRepository.findOne.mockResolvedValue({ id: 10, receiverUser: { id: 3 } });
+    store.findOfUser.mockResolvedValue(introduction());
     retraining.getIntroductionRetrainingStatus.mockResolvedValue({ isDue: true });
 
     await service.grant(7, 3);
@@ -116,11 +140,11 @@ describe('ResourceIntroductionsService notifications', () => {
   });
 
   it('records the acting user for a revoked introduction', async () => {
-    introductionRepository.findOne.mockResolvedValue({ id: 10, receiverUser: { id: 3 } });
+    store.findOfUser.mockResolvedValue(introduction());
 
     await service.revoke(7, 3, undefined, { performedByUserId: 9 });
 
-    expect(historyRepository.create).toHaveBeenCalledWith(expect.objectContaining({ performedByUser: { id: 9 } }));
+    expect(store.addHistoryItem).toHaveBeenCalledWith(10, IntroductionHistoryAction.REVOKE, undefined, 9);
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
         domain: 'resource',
@@ -131,8 +155,8 @@ describe('ResourceIntroductionsService notifications', () => {
   });
 
   it('does not notify when a resource introduction is granted twice without an effective access change', async () => {
-    introductionRepository.findOne.mockResolvedValue({ id: 10, receiverUser: { id: 3 } });
-    historyRepository.findOne.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.GRANT });
+    store.findOfUser.mockResolvedValue(introduction());
+    store.lastHistoryItem.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.GRANT });
 
     await service.grant(7, 3);
 
@@ -140,8 +164,8 @@ describe('ResourceIntroductionsService notifications', () => {
   });
 
   it('notifies the user when a resource introduction is revoked', async () => {
-    introductionRepository.findOne.mockResolvedValue({ id: 10, receiverUser: { id: 3 } });
-    historyRepository.findOne.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.GRANT });
+    store.findOfUser.mockResolvedValue(introduction());
+    store.lastHistoryItem.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.GRANT });
     await service.revoke(7, 3);
 
     expect(notifications.dispatch).toHaveBeenCalledWith(
@@ -155,8 +179,8 @@ describe('ResourceIntroductionsService notifications', () => {
   });
 
   it('does not notify when a resource introduction is revoked twice without an effective access change', async () => {
-    introductionRepository.findOne.mockResolvedValue({ id: 10, receiverUser: { id: 3 } });
-    historyRepository.findOne.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.REVOKE });
+    store.findOfUser.mockResolvedValue(introduction());
+    store.lastHistoryItem.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.REVOKE });
 
     await service.revoke(7, 3);
 
@@ -167,5 +191,25 @@ describe('ResourceIntroductionsService notifications', () => {
     await service.revoke(7, 3);
 
     expect(notifications.dispatch).not.toHaveBeenCalled();
+  });
+
+  it('answers validity from the newest history item, inside the caller transaction when one is given', async () => {
+    store.findOfUser.mockResolvedValue(introduction());
+    store.lastHistoryItem.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.GRANT });
+    const context = {};
+
+    expect(await service.hasValidIntroduction(7, 3, context)).toBe(true);
+    expect(store.findOfUser).toHaveBeenCalledWith(7, 3, context);
+    expect(store.lastHistoryItem).toHaveBeenCalledWith(10, context);
+
+    store.findOfUser.mockResolvedValue(null);
+    expect(await service.hasValidIntroduction(7, 3)).toBe(false);
+  });
+
+  it('lists introductions and history through the store', async () => {
+    await service.getMany(7, true);
+    expect(store.listForResource).toHaveBeenCalledWith(7, true);
+    await service.getHistoryByResourceIdAndUserId(7, 3);
+    expect(store.historyOfUser).toHaveBeenCalledWith(7, 3);
   });
 });

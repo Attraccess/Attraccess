@@ -17,8 +17,7 @@ import { ResourceIntroducersService } from '../introducers/resourceIntroducers.s
 import { ResourceUsageService } from '../usage/sessions/resource-usage.service';
 
 import { SupervisionLiveService } from './supervision-live.service';
-import { ResourceUsage, User } from '@attraccess/database-entities';
-import { ResourceIntroducerType } from '@attraccess/application-models';
+import { ResourceIntroducerType, type UsageSession } from '@attraccess/application-models';
 
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
 
@@ -34,7 +33,12 @@ import { StartUsageSessionDto } from '../usage/dtos/startUsageSession.dto';
 
 import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto';
 
-import { PendingSupervisionRequest, ReaderSupervisionCallbacks, ReaderSupervisionArmer } from './supervision.types';
+import {
+  PendingSupervisionRequest,
+  ReaderSupervisionCallbacks,
+  ReaderSupervisionArmer,
+  SupervisionUser,
+} from './supervision.types';
 export type {
   PendingSupervisionRequest,
   ReaderSupervisionCallbacks,
@@ -91,7 +95,7 @@ export class SupervisionService {
     this.pending.delete(request.id);
   }
 
-  protected fulfil(request: PendingSupervisionRequest, session: ResourceUsage): void {
+  protected fulfil(request: PendingSupervisionRequest, session: UsageSession): void {
     if (request.settled) {
       return;
     }
@@ -128,10 +132,10 @@ export class SupervisionService {
    */
   public async approve(
     requestId: string,
-    supervisor: User,
+    supervisor: SupervisionUser,
     authenticationMethod: 'session' | 'api-token' | null = 'session',
     apiTokenId?: number,
-  ): Promise<ResourceUsage> {
+  ): Promise<UsageSession> {
     const request = this.getPendingForSupervisorOrThrow(requestId, supervisor, { allowAnyAuthorized: true });
     await this.assertMayApprove(request, supervisor);
 
@@ -185,7 +189,7 @@ export class SupervisionService {
    */
   public reject(
     requestId: string,
-    supervisor: User,
+    supervisor: SupervisionUser,
     authenticationMethod: 'session' | 'api-token' = 'session',
     apiTokenId?: number,
   ): SupervisionDecisionResponseDto {
@@ -228,7 +232,7 @@ export class SupervisionService {
 
   protected getPendingForSupervisorOrThrow(
     requestId: string,
-    supervisor: User,
+    supervisor: SupervisionUser,
     opts: { allowAnyAuthorized?: boolean } = {},
   ): PendingSupervisionRequest {
     const request = this.pending.get(requestId);
@@ -250,7 +254,7 @@ export class SupervisionService {
    * introducer granted access after the request was broadcast, without admitting maintainers or
    * resource managers. Named requests are revalidated by startSession immediately before creation.
    */
-  protected async assertMayApprove(request: PendingSupervisionRequest, supervisor: User): Promise<void> {
+  protected async assertMayApprove(request: PendingSupervisionRequest, supervisor: SupervisionUser): Promise<void> {
     if (request.supervisorUserId !== null) {
       return;
     }
@@ -273,7 +277,7 @@ export class SupervisionService {
    */
   public createReaderRequest(params: {
     resourceId: number;
-    requester: User;
+    requester: SupervisionUser;
     dto: StartUsageSessionDto;
     eligibleSupervisorIds: number[];
     callbacks: ReaderSupervisionCallbacks;
@@ -309,20 +313,20 @@ export class SupervisionService {
   protected createPending(params: {
     id?: string;
     resourceId: number;
-    requester: User;
+    requester: SupervisionUser;
     dto: StartUsageSessionDto;
     supervisorUserId: number | null;
     eligibleSupervisorIds: number[];
     readerCallbacks?: ReaderSupervisionCallbacks;
     readerId?: number;
     signal?: AbortSignal;
-  }): { id: string; expiresAt: Date; promise: Promise<ResourceUsage> } {
+  }): { id: string; expiresAt: Date; promise: Promise<UsageSession> } {
     params.signal?.throwIfAborted();
     const id = params.id ?? randomUUID();
     const createdAt = new Date();
     const expiresAt = new Date(createdAt.getTime() + SupervisionService.APPROVAL_TTL_MS);
 
-    const promise = new Promise<ResourceUsage>((resolve, reject) => {
+    const promise = new Promise<UsageSession>((resolve, reject) => {
       const timeout = setTimeout(() => this.expire(id), SupervisionService.APPROVAL_TTL_MS);
       // Don't keep the process alive solely for a pending approval.
       if (typeof timeout.unref === 'function') {
@@ -427,10 +431,10 @@ export class SupervisionService {
    */
   public async requestSupervisedSession(
     resourceId: number,
-    requester: User,
+    requester: SupervisionUser,
     dto: RequestSupervisedSessionDto,
     signal?: AbortSignal,
-  ): Promise<ResourceUsage> {
+  ): Promise<UsageSession> {
     const { supervisorUserId, readerId } = dto;
 
     if ((supervisorUserId == null) === (readerId == null)) {
@@ -445,11 +449,11 @@ export class SupervisionService {
   /** Web flow (ATT-487): one named supervisor, notified over SSE, approves from their own device. */
   protected async requestFromSupervisor(
     resourceId: number,
-    requester: User,
+    requester: SupervisionUser,
     dto: RequestSupervisedSessionDto,
     supervisorUserId: number,
     signal?: AbortSignal,
-  ): Promise<ResourceUsage> {
+  ): Promise<UsageSession> {
     // Validate eagerly so the requester gets immediate, meaningful feedback instead of waiting 30s
     // for a request that could never have been approved (wrong supervisor, self-supervision, ...).
     await this.resourceUsageService.validateSupervisedStart(resourceId, requester, supervisorUserId);
@@ -477,11 +481,11 @@ export class SupervisionService {
    */
   protected async requestAtReader(
     resourceId: number,
-    requester: User,
+    requester: SupervisionUser,
     dto: RequestSupervisedSessionDto,
     readerId: number,
     signal?: AbortSignal,
-  ): Promise<ResourceUsage> {
+  ): Promise<UsageSession> {
     if (!this.readerArmer) {
       throw new ServiceUnavailableException('Reader-based supervision is unavailable');
     }

@@ -53,3 +53,4 @@ export * from './lib/plugin-host-models';
 export * from './lib/reader-ui-alert';
 export * from './lib/resource-form-records';
 export * from './lib/resource-introducer-records';
+export * from './lib/resource-introduction-records';

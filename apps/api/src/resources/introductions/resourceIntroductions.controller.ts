@@ -2,7 +2,12 @@ import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Req, Forbidde
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ResourceIntroductionsService } from './resouceIntroductions.service';
-import { ResourceIntroduction, ResourceIntroductionHistoryItem } from '@attraccess/database-entities';
+import {
+  ResourceIntroduction,
+  ResourceIntroductionHistoryItem,
+  toIntroductionDto,
+  toIntroductionHistoryDto,
+} from './dtos/introduction-records.dto';
 import { IsResourceIntroducer } from './isIntroducer.decorator';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { UpdateResourceIntroductionDto } from './dtos/update.request.dto';
@@ -29,7 +34,7 @@ export class ResourceIntroductionsController {
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroduction[]> {
     await this.assertCanViewAccessLists(resourceId, req);
-    return await this.resourceIntroductionsService.getMany(resourceId);
+    return (await this.resourceIntroductionsService.getMany(resourceId)).map(toIntroductionDto);
   }
 
   @Get('people')
@@ -45,7 +50,7 @@ export class ResourceIntroductionsController {
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroduction[]> {
     await this.assertCanViewAccessLists(resourceId, req);
-    return this.resourceIntroductionsService.getMany(resourceId, true);
+    return (await this.resourceIntroductionsService.getMany(resourceId, true)).map(toIntroductionDto);
   }
 
   private async assertCanViewAccessLists(resourceId: number, req: AuthenticatedRequest): Promise<void> {
@@ -68,11 +73,13 @@ export class ResourceIntroductionsController {
     @Body() data: UpdateResourceIntroductionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem> {
-    return await this.resourceIntroductionsService.grant(resourceId, userId, data, {
-      performedByUserId: req.user.id,
-      authenticationMethod: req.user.authenticationMethod,
-      apiTokenId: req.user.apiTokenId,
-    });
+    return toIntroductionHistoryDto(
+      await this.resourceIntroductionsService.grant(resourceId, userId, data, {
+        performedByUserId: req.user.id,
+        authenticationMethod: req.user.authenticationMethod,
+        apiTokenId: req.user.apiTokenId,
+      }),
+    );
   }
 
   @Delete('/:userId/revoke')
@@ -92,11 +99,13 @@ export class ResourceIntroductionsController {
     @Body() data: UpdateResourceIntroductionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem> {
-    return await this.resourceIntroductionsService.revoke(resourceId, userId, data, {
-      performedByUserId: req.user.id,
-      authenticationMethod: req.user.authenticationMethod,
-      apiTokenId: req.user.apiTokenId,
-    });
+    return toIntroductionHistoryDto(
+      await this.resourceIntroductionsService.revoke(resourceId, userId, data, {
+        performedByUserId: req.user.id,
+        authenticationMethod: req.user.authenticationMethod,
+        apiTokenId: req.user.apiTokenId,
+      }),
+    );
   }
 
   @Get('/:userId/history')
@@ -119,6 +128,8 @@ export class ResourceIntroductionsController {
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem[]> {
     await this.assertCanViewAccessLists(resourceId, req);
-    return await this.resourceIntroductionsService.getHistoryByResourceIdAndUserId(resourceId, userId);
+    return (await this.resourceIntroductionsService.getHistoryByResourceIdAndUserId(resourceId, userId)).map(
+      toIntroductionHistoryDto,
+    );
   }
 }

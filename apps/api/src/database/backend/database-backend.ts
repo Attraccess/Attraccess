@@ -1,5 +1,4 @@
-import type { DataSource, DataSourceOptions, EntityManager } from 'typeorm';
-import type { ScopedUnitOfWork } from '../unit-of-work';
+import type { DataSource, DataSourceOptions } from 'typeorm';
 import type { PersistenceErrorClassifier } from '../persistence-errors';
 import type { DatabaseTransfer } from '../transfer-snapshot';
 

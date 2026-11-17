@@ -4,20 +4,22 @@ import {
   GoneException,
   HttpException,
   HttpStatus,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { randomBytes, randomUUID } from 'crypto';
-import { Resource, ResourceGroup } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { ResourceIntroductionsService } from '../introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { ResourceGroupsIntroductionsService } from '../groups/introductions/resourceGroups.introductions.service';
 import { ResourceGroupsIntroducersService } from '../groups/introducers/resourceGroups.introducers.service';
+import {
+  MASS_INTRODUCTION_TARGET_STORE,
+  type MassIntroductionTargetStore,
+} from './mass-introduction-target-store.port';
 import { MassIntroductionLiveService } from './mass-introduction-live.service';
 import {
   ActiveMassIntroduction,
@@ -68,8 +70,7 @@ export class MassIntroductionService {
     protected readonly groupIntroductions: ResourceGroupsIntroductionsService,
     protected readonly groupIntroducers: ResourceGroupsIntroducersService,
     protected readonly live: MassIntroductionLiveService,
-    @InjectRepository(Resource) protected readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(ResourceGroup) protected readonly resourceGroupRepository: Repository<ResourceGroup>,
+    @Inject(MASS_INTRODUCTION_TARGET_STORE) protected readonly targets: MassIntroductionTargetStore,
   ) {}
 
   /** Registered by the Attractap module at startup; see {@link MassIntroductionReaderPort}. */
@@ -321,24 +322,20 @@ export class MassIntroductionService {
     if (target.type === MassIntroductionTargetType.RESOURCE) {
       return [target.id];
     }
-    const resources = await this.resourceRepository.find({
-      where: { groups: { id: target.id } },
-      select: { id: true },
-    });
-    return resources.map((resource) => resource.id);
+    return this.targets.resourceIdsOfGroup(target.id);
   }
 
   protected async loadTarget(
     dto: Pick<StartMassIntroductionDto, 'resourceId' | 'resourceGroupId'>,
   ): Promise<MassIntroductionTarget> {
     if (dto.resourceId != null) {
-      const resource = await this.resourceRepository.findOne({ where: { id: dto.resourceId } });
+      const resource = await this.targets.findResourceName(dto.resourceId);
       if (!resource) {
         throw new NotFoundException(`Resource not found: ${dto.resourceId}`);
       }
       return { type: MassIntroductionTargetType.RESOURCE, id: resource.id, name: resource.name };
     }
-    const group = await this.resourceGroupRepository.findOne({ where: { id: dto.resourceGroupId } });
+    const group = await this.targets.findGroupName(dto.resourceGroupId);
     if (!group) {
       throw new NotFoundException(`Resource group not found: ${dto.resourceGroupId}`);
     }

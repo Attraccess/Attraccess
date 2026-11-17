@@ -1,5 +1,6 @@
 import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
-import { ResourceUsage, User } from '@attraccess/database-entities';
+import type { UsageSession } from '@attraccess/application-models';
+import type { SupervisionUser } from './supervision.types';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { PreStartService } from '../usage/pre-start/pre-start.service';
@@ -26,13 +27,13 @@ export function registerSupervisionServiceFixture() {
 
   let audit: { record: jest.Mock };
 
-  const requester: User = { id: 1, username: 'requester' } as User;
+  const requester: SupervisionUser = { id: 1, username: 'requester' };
 
-  const supervisor: User = { id: 2, username: 'supervisor' } as User;
+  const supervisor: SupervisionUser = { id: 2, username: 'supervisor' };
 
   const dto: RequestSupervisedSessionDto = { supervisorUserId: 2, notes: 'please supervise' };
 
-  const startedSession = { id: 99, resourceId: 5, userId: 1, supervisorUserId: 2 } as ResourceUsage;
+  const startedSession = { id: 99, resourceId: 5, userId: 1, supervisorUserId: 2 } as UsageSession;
 
   beforeEach(async () => {
     resourceUsageService = {
