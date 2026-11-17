@@ -332,8 +332,19 @@ describe('BillingService', () => {
 
       expect(transaction?.amount).toBe(-25);
       expect(f.unitOfWork.runs).toBe(1);
-      expect(f.ledgerStore.audits).toHaveLength(1);
-      expect(f.ledgerStore.audits[0].context).toBeDefined();
+      // The audit row describes the completed charge and is written in the unit of work of the charge itself.
+      expect(f.ledgerStore.audits).toEqual([
+        {
+          event: billingTransactionAuditEvent({
+            transactionId: transaction?.id as number,
+            userId: 25,
+            amount: -25,
+            status: BillingTransactionStatus.Completed,
+            source: 'resource-usage',
+          }),
+          context: f.unitOfWork.scopes[0],
+        },
+      ]);
       expect(publishedInsideWork).toBe(false);
       expect(f.liveNotifications.notifyTransactionUpdate).toHaveBeenCalledTimes(1);
       expect(f.email.sendResourceUsageBillingSummaryEmail).toHaveBeenCalledTimes(1);
