@@ -239,9 +239,13 @@ power.off()  # two presses, then waits for it to disappear
 Native `labgrid-client power on|off|cycle|get` uses the same driver. A reader
 already in the requested state is left alone, so `on()` is safe on any reader.
 A V1 switched on from parking runs the dark parking image, so it switches
-itself off again about 30 s later, which a slow flash can outlast.
+itself off again about 36 s later (measured in the lab), which a slow flash
+can outlast. A reader being flashed draws little too, so the cut can also come
+a few seconds after the flash's reset, before the new image lights the screen.
 `flash_reader` therefore flashes it once more if it went off mid-flash, and
-presses the button again if it is off after the reset.
+watches it for 15 s after the reset (`POWER_CUT_WATCH_SECONDS`), pressing the
+button again whenever it is off. Once the new image has lit the screen, the
+chip keeps the power on.
 
 ### USB power switch (Touch V2)
 
