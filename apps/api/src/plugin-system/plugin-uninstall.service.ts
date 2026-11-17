@@ -26,7 +26,8 @@ export class PluginUninstallService {
   ) {}
 
   async deletePlugin(pluginId: string, deferRestart = false) {
-    const plugin = PluginService.getPlugins().find((plugin) => plugin.id === pluginId);
+    // Refused plugins (SDK 1.x, unsupported engine) are listed too, so an admin can remove them.
+    const plugin = PluginService.getManifestById(pluginId);
 
     if (!plugin) {
       PluginUninstallService.logger.error(`Plugin with id ${pluginId} not found`);
@@ -45,7 +46,8 @@ export class PluginUninstallService {
     // files are removed — the migration classes live in the plugin bundle and
     // must still be on disk to run. A failure here is logged but never blocks the
     // uninstall: the admin asked for the plugin to be gone.
-    if (PluginMigrationService.hasMigrations(plugin)) {
+    // A refused plugin's code never runs, not even its down() migrations: its tables (if any) are left in place.
+    if (!PluginService.isPluginRefused(plugin) && PluginMigrationService.hasMigrations(plugin)) {
       try {
         await PluginMigrationService.runDownMigrations(plugin);
       } catch (error) {
