@@ -206,7 +206,7 @@ NimBLE finished. The reader ends the session itself only when the lease expires 
 finished a GATT procedure after about 35 s. Writes without response
 retry on full controller buffers until their deadline. The reader requests MTU 517 and reports the
 negotiated MTU; writes with response above `mtu - 3` use long writes. Notifications are buffered per
-session (32 entries, 16 KiB) and forwarded with `seq`; overflow (`NOTIFICATION_OVERFLOW`,
+session (64 entries, 32 KiB) and forwarded with `seq`; overflow (`NOTIFICATION_OVERFLOW`,
 `reader-buffer`) or an oversized notification (`PAYLOAD_TOO_LARGE`, `max-notification`) ends that
 stream with an `error` instead of dropping data. A read result above its bound is answered
 `PAYLOAD_TOO_LARGE` (`max-read`). Scans deduplicate by address; a scan filter takes at most 8

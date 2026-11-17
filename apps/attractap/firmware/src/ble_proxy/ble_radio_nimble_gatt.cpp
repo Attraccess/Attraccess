@@ -88,6 +88,19 @@ namespace ble
 
     void NimbleRadio::startDiscovery()
     {
+        // The services to discover, built before the MTU exchange: discovery also runs when the exchange fails to start.
+        services.clear();
+        for (const AllowEntry &entry : allowlist)
+        {
+            const bool known = std::any_of(services.begin(), services.end(),
+                                           [&](const Service &s) { return s.uuid == entry.service; });
+            if (!known)
+            {
+                Service service;
+                service.uuid = entry.service;
+                services.push_back(service);
+            }
+        }
         // Ask for the largest MTU first: bulk writes without response depend on it.
         if (ble_gattc_exchange_mtu(conn, mtuTrampoline, this) != 0)
         {
@@ -104,18 +117,6 @@ namespace ble
         // A peripheral that refuses the exchange keeps the default 23.
         mtu = error->status == 0 ? value : ble_att_mtu(conn);
         discoveryService = 0;
-        services.clear();
-        for (const AllowEntry &entry : allowlist)
-        {
-            const bool known = std::any_of(services.begin(), services.end(),
-                                           [&](const Service &s) { return s.uuid == entry.service; });
-            if (!known)
-            {
-                Service service;
-                service.uuid = entry.service;
-                services.push_back(service);
-            }
-        }
         discoverNextService();
         return 0;
     }

@@ -33,8 +33,8 @@ namespace ble
     constexpr uint16_t MAX_MTU = 517;
     constexpr uint16_t MIN_MTU = 23;
     constexpr size_t MAX_PAYLOAD_BYTES = 512;
-    constexpr size_t MAX_NOTIFICATION_QUEUE = 32;
-    constexpr size_t MAX_NOTIFICATION_QUEUE_BYTES = 16 * 1024;
+    constexpr size_t MAX_NOTIFICATION_QUEUE = 64;
+    constexpr size_t MAX_NOTIFICATION_QUEUE_BYTES = 32 * 1024;
     constexpr size_t MAX_ALLOWLIST_ENTRIES = 16;
     constexpr size_t MAX_PENDING_REQUESTS = 16;
     constexpr size_t MAX_SESSION_ID_LENGTH = 64;

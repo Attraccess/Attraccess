@@ -231,7 +231,7 @@ Real readers add these limits:
 | Scan filter (profile `advertisement`) | 8 service UUIDs, 8 manufacturer ids, name prefix of 64 bytes (UTF-8); a larger filter rejects with `INVALID_ARGUMENT`        |
 | Characteristics per profile           | 16 (more reject with `READER_UNSUPPORTED`, detail `allowlist-too-large:<n>`)                                                 |
 | Requests waiting for one reader       | 16, the lower of the host cap (32) and the limit the firmware announces; more reject with `READER_BUSY`, detail `queue-full` |
-| Notification buffer on the reader     | 32 notifications or 16 KiB per session                                                                                       |
+| Notification buffer on the reader     | 64 notifications or 32 KiB per session                                                                                       |
 
 An advertised name is at most 31 bytes, so a name prefix longer than that never matches.
 
@@ -246,7 +246,7 @@ The reader firmware (2.5.0 or later) announces plugin Bluetooth when it connects
   - The reader ends the session itself only when a GATT operation is stuck in the radio stack (about 35 s) or when the reader's lease expires (your lease plus 10 s, counted from when the connection was established).
   - When the reader loses its connection to the server, it disconnects the device at once.
 - **Bytes from the reader** are checked before the host decodes them. A read result above its bound rejects with `PAYLOAD_TOO_LARGE` (detail `max-read`); a malformed one (bad encoding or no value) rejects with `INTERNAL` (detail `malformed-result`).
-- **Notifications** are buffered on the reader (32 notifications or 16 KiB per session) and forwarded in order with a sequence number. Each failure fails the stream:
+- **Notifications** are buffered on the reader (64 notifications or 32 KiB per session) and forwarded in order with a sequence number. Each failure fails the stream:
   - a full reader buffer: `NOTIFICATION_OVERFLOW` (detail `reader-buffer`); a full host queue for the subscription: `NOTIFICATION_OVERFLOW`;
   - a notification above `maxNotificationBytes`: `PAYLOAD_TOO_LARGE` (detail `max-notification`);
   - a gap or duplicate in the sequence, or a malformed notification: `INTERNAL` (detail `malformed-notification`).
