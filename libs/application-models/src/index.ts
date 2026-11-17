@@ -73,3 +73,4 @@ export * from './lib/rbac-record';
 export * from './lib/api-token';
 export * from './lib/authentication-credential';
 export * from './lib/password-policy-records';
+export * from './lib/user-account';

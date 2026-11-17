@@ -1,62 +1,55 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Setting } from '@attraccess/database-entities';
+import type { SettingsRows } from '../../settings/settings-rows.port';
+import { ForbiddenSignupDomainException } from './errors/forbiddenSignupDomain.exception';
 import { SignupDomainService } from './signup-domain.service';
 
 describe('SignupDomainService', () => {
   let service: SignupDomainService;
-  let settingRepository: {
-    findOne: jest.Mock;
-    update: jest.Mock;
-  };
+  let settings: jest.Mocked<Pick<SettingsRows, 'findValue' | 'upsertValue'>>;
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        SignupDomainService,
-        {
-          provide: getRepositoryToken(Setting),
-          useValue: {
-            findOne: jest.fn(),
-            update: jest.fn(),
-          },
-        },
-      ],
-    }).compile();
-
-    service = module.get<SignupDomainService>(SignupDomainService);
-    settingRepository = module.get(getRepositoryToken(Setting));
+  beforeEach(() => {
+    settings = { findValue: jest.fn(), upsertValue: jest.fn() };
+    service = new SignupDomainService(settings as unknown as SettingsRows);
   });
 
   it('getWhitelist should return default "*" when missing', async () => {
-    settingRepository.findOne.mockResolvedValue(null);
+    settings.findValue.mockResolvedValue(null);
     const result = await service.getWhitelist();
     expect(result).toEqual(['*']);
   });
 
   it('getWhitelist should parse and normalize domains', async () => {
-    settingRepository.findOne.mockResolvedValue({ value: ' Example.COM ,allowed.org,  ,Another.Net ' });
+    settings.findValue.mockResolvedValue(' Example.COM ,allowed.org,  ,Another.Net ');
     const result = await service.getWhitelist();
     expect(result).toEqual(['example.com', 'allowed.org', 'another.net']);
+    expect(settings.findValue).toHaveBeenCalledWith('auth', 'local_signup_domain_whitelist');
   });
 
-  it('setWhitelist should update repository with joined list', async () => {
+  it('setWhitelist should store the joined list', async () => {
     await service.setWhitelist(['example.com', 'allowed.org']);
-    expect(settingRepository.update).toHaveBeenCalledWith(
-      { parent: 'auth', key: 'local_signup_domain_whitelist' },
-      { value: 'example.com,allowed.org' },
+    expect(settings.upsertValue).toHaveBeenCalledWith(
+      'auth',
+      'local_signup_domain_whitelist',
+      'example.com,allowed.org',
     );
   });
 
   it('isLocalSignupEnabled should return false when list is empty', async () => {
-    settingRepository.findOne.mockResolvedValue({ value: '' });
+    settings.findValue.mockResolvedValue('');
     const result = await service.isLocalSignupEnabled();
     expect(result).toBe(false);
   });
 
   it('isLocalSignupEnabled should return true when list has any value', async () => {
-    settingRepository.findOne.mockResolvedValue({ value: '*' });
+    settings.findValue.mockResolvedValue('*');
     const result = await service.isLocalSignupEnabled();
     expect(result).toBe(true);
+  });
+
+  it('assertEmailDomainAllowed accepts listed domains and rejects others', async () => {
+    settings.findValue.mockResolvedValue('example.com');
+    await expect(service.assertEmailDomainAllowed('a@Example.com')).resolves.toBeUndefined();
+    await expect(service.assertEmailDomainAllowed('a@other.org')).rejects.toBeInstanceOf(
+      ForbiddenSignupDomainException,
+    );
   });
 });

@@ -1,6 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { User } from '@attraccess/database-entities';
-import type { UserRoleRecord } from '@attraccess/application-models';
+import type { UserRecord, UserRoleRecord } from '@attraccess/application-models';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { identityAuditEvent } from '../../audit/policies/identity';
 import { AUDIT_RECORDER, AuditOrigin, AuditRecorder } from '../../audit/recorder/audit-event';
@@ -61,7 +60,7 @@ export class UserPermissionsService {
     await this.audit.record(identityAuditEvent(action, origin, { id: userId }, { role: roleKey }));
   }
 
-  notifyPermissionsChanged(user: User, actorId: number): void {
+  notifyPermissionsChanged(user: UserRecord, actorId: number): void {
     const title = 'Your permissions changed';
     const body = 'Your RBAC role assignments were updated.';
 

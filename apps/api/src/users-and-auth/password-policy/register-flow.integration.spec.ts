@@ -1,7 +1,6 @@
 import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Setting } from '@attraccess/database-entities';
+import { SETTINGS_ROWS } from '../../settings/settings-rows.port';
 import { AuthenticationType, type PasswordPolicyValues } from '@attraccess/application-models';
 import { UNIT_OF_WORK } from '../../database/unit-of-work';
 import { CREDENTIAL_STORE } from '../auth/credentials/credential-store.port';
@@ -138,8 +137,8 @@ describe('Register flow + password policy (integration)', () => {
           useValue: { hashToken: (t: string) => `hashed:${t}` },
         },
         {
-          provide: getRepositoryToken(Setting),
-          useValue: { findOne: jest.fn(async () => null), insert: jest.fn(), update: jest.fn() },
+          provide: SETTINGS_ROWS,
+          useValue: { findValue: jest.fn(async () => null), upsertValue: jest.fn(), remove: jest.fn() },
         },
         {
           provide: BruteForceProtectionService,
@@ -225,7 +224,10 @@ describe('Register flow + password policy (integration)', () => {
         { provide: EmailService, useValue: { sendVerificationEmail: jest.fn() } },
         { provide: SSOService, useValue: { getProviderByTypeAndIdWithConfiguration: jest.fn() } },
         { provide: TokenHashService, useValue: { hashToken: (t: string) => `hashed:${t}` } },
-        { provide: getRepositoryToken(Setting), useValue: { findOne: jest.fn(async () => null) } },
+        {
+          provide: SETTINGS_ROWS,
+          useValue: { findValue: jest.fn(async () => null), upsertValue: jest.fn(), remove: jest.fn() },
+        },
         {
           provide: BruteForceProtectionService,
           useValue: {

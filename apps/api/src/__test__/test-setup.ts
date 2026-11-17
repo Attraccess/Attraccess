@@ -1,8 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { bootstrap } from '../main.bootstrap';
 import request from 'supertest';
-import { User } from '@attraccess/database-entities';
-import { AuthenticationType } from '@attraccess/application-models';
+import { AuthenticationType, type UserRecord } from '@attraccess/application-models';
 import { UsersService } from '../users-and-auth/users/users.service';
 import { AuthService } from '../users-and-auth/auth/auth.service';
 import { SessionService } from '../users-and-auth/auth/session.service';
@@ -20,7 +19,7 @@ export class TestSetup {
     this.testInstanceIdentifier = randomBytes(3).toString('base64url').slice(0, 4);
   }
 
-  private users: User[] = [];
+  private users: UserRecord[] = [];
 
   async initApp() {
     TestSetup.instantiations++;

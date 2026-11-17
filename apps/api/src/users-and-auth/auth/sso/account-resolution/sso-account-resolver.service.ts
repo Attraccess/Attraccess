@@ -98,8 +98,7 @@ export class SsoAccountResolver {
     const username = this.usersService.buildUsernameFromSSOClaim(input.usernameClaim || email, email);
     const user = await this.usersService.createOne(
       { username, email, externalIdentifier: null, isEmailVerified: input.emailVerified !== false },
-      // UsersService takes the caller's transaction as its own handle type.
-      transaction as never,
+      transaction,
     );
     if (!user) throw new UnauthorizedException();
     await this.authService.addAuthenticationDetails(

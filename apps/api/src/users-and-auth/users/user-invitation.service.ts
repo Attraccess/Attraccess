@@ -1,8 +1,6 @@
-import { User } from '@attraccess/database-entities';
+import type { UserRecord } from '@attraccess/application-models';
 
 import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
-
-import { EntityManager } from 'typeorm';
 
 import { EmailService } from '../../email/email.service';
 
@@ -42,7 +40,7 @@ export class UserInvitationService {
   protected async inviteUsersTransactional(
     candidates: Array<{ username: string; email: string; locale?: string; roleKey?: string }>,
     options?: { grantAllPermissionsToFirst?: boolean; actorId?: number },
-  ): Promise<User[]> {
+  ): Promise<UserRecord[]> {
     try {
       await this.usersService.ensureLicenseForNewUsers(candidates.length);
     } catch (error) {
@@ -53,40 +51,48 @@ export class UserInvitationService {
       throw error;
     }
 
+    // SMTP can take seconds, and while a transaction is open every other request waits for the connection: the mails
+    // go out after the commit. A failed send takes the invitation back, as the rollback did when sending ran inside it.
+    const send: { failure?: { error: unknown } } = {};
     const invitations = await this.usersService
-      .withTransaction(async (manager: EntityManager) => {
+      .withTransaction(async (scope) => {
         const createdUsers = await this.usersService.createMany(candidates, {
           grantAllPermissionsToFirst: options?.grantAllPermissionsToFirst ?? false,
-          manager,
+          context: scope,
           actorId: options?.actorId,
         });
 
-        const invited: Array<{ user: User; token: string }> = [];
+        const invited: Array<{ user: UserRecord; token: string }> = [];
         for (const user of createdUsers) {
-          invited.push({ user, token: await this.authService.generateEmailVerificationToken(user, manager) });
+          invited.push({ user, token: await this.authService.generateEmailVerificationToken(user, scope) });
         }
+        scope.afterCommit(async () => {
+          try {
+            for (const { user, token } of invited) {
+              await this.emailService.sendUserInvitationEmail(user, token);
+            }
+          } catch (error) {
+            send.failure = { error };
+            await this.takeBackInvitations(invited.map(({ user }) => user.id));
+          }
+        });
         return invited;
       })
       .catch((error) => mapEmailSendError(error));
 
-    // SMTP can take seconds, and while a transaction is open every other request waits for the connection: send after
-    // the commit. A failed send takes the invitation back, as the rollback did when sending ran inside it.
-    try {
-      for (const { user, token } of invitations) {
-        await this.emailService.sendUserInvitationEmail(user, token);
-      }
-    } catch (error) {
-      try {
-        await this.usersService.deleteUnacceptedInvitations(invitations.map(({ user }) => user.id));
-      } catch (revertError) {
-        this.logger.error('Failed to take back invitations after an email failure', (revertError as Error).stack);
-      }
-      mapEmailSendError(error);
-    }
+    if (send.failure) mapEmailSendError(send.failure.error);
     return invitations.map(({ user }) => user);
   }
 
-  public async inviteUser(body: InviteUserDto, adminLocale?: string): Promise<User> {
+  private async takeBackInvitations(userIds: number[]): Promise<void> {
+    try {
+      await this.usersService.deleteUnacceptedInvitations(userIds);
+    } catch (revertError) {
+      this.logger.error('Failed to take back invitations after an email failure', (revertError as Error).stack);
+    }
+  }
+
+  public async inviteUser(body: InviteUserDto, adminLocale?: string): Promise<UserRecord> {
     // createMany does not check for taken identities and the unique constraints would surface as a 500
     const email = normalizeEmail(body.email);
     const username = this.usersService.cleanupUsername(body.username);
@@ -115,7 +121,7 @@ export class UserInvitationService {
     rawConfig: string | CsvInviteConfigDto | undefined,
     adminLocale?: string,
     actorId?: number,
-  ): Promise<User[]> {
+  ): Promise<UserRecord[]> {
     let configPayload: unknown;
     try {
       configPayload = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;

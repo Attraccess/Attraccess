@@ -1,8 +1,7 @@
 import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
-import { Setting } from '@attraccess/database-entities';
+import { SETTINGS_ROWS } from '../../settings/settings-rows.port';
 import type { PasswordPolicyValues } from '@attraccess/application-models';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { UNIT_OF_WORK } from '../../database/unit-of-work';
 import { EmailService } from '../../email/email.service';
 import { TokenHashService } from '../../encryption/token-hash.service';
@@ -72,6 +71,7 @@ async function buildController(opts: BuildOpts = {}) {
 
   const usersFindOne = jest.fn(async () => user);
   const usersUpdateOne = jest.fn(async () => undefined);
+  const consumePasswordResetToken = jest.fn(async () => true);
   const changePassword = jest.fn(async () => undefined);
   const addAuthenticationDetails = jest.fn(async () => ({ id: 1, password: 'hashed-new' }));
   const verifyEmail = jest.fn(async () => undefined);
@@ -131,6 +131,7 @@ async function buildController(opts: BuildOpts = {}) {
         useValue: {
           findOne: usersFindOne,
           updateOne: usersUpdateOne,
+          consumePasswordResetToken,
           isSSOUser,
           findMany: jest.fn(async () => ({ data: [], total: 0 })),
           countUsers: jest.fn(async () => 1),
@@ -159,8 +160,8 @@ async function buildController(opts: BuildOpts = {}) {
         useValue: { hashToken: (t: string) => `hashed:${t}` },
       },
       {
-        provide: getRepositoryToken(Setting),
-        useValue: { findOne: jest.fn(async () => null), insert: jest.fn(), update: jest.fn() },
+        provide: SETTINGS_ROWS,
+        useValue: { findValue: jest.fn(async () => null), upsertValue: jest.fn(), remove: jest.fn() },
       },
       {
         provide: BruteForceProtectionService,
@@ -184,6 +185,7 @@ async function buildController(opts: BuildOpts = {}) {
     changePassword,
     addAuthenticationDetails,
     usersUpdateOne,
+    consumePasswordResetToken,
     policyStore,
     credentialStore,
     user,

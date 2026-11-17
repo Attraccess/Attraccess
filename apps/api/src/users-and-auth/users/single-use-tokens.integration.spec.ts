@@ -39,6 +39,59 @@ const FIRST_RESET_PASSWORD = 'Tr0ub4dor-Hummingbird-9!plate';
 const SECOND_RESET_PASSWORD = 'Diff3rent-Hummingbird-9!plate';
 const TOO_SHORT_PASSWORD = 'a1!';
 
+/** One application stack (services and stores) on its own connection to the database file. */
+function buildStack(db: DataSource) {
+  const rbac = createMock<RbacService>({ getEffectivePermissions: async () => new Set<string>() });
+  const emailService = createMock<EmailService>();
+  const tokenHash = new TokenHashService({
+    get: () => ({ AUTH_SESSION_SECRET: 'single-use-token-secret' }),
+  } as never);
+  const users = composeUsersService(
+    db.getRepository(User),
+    undefined,
+    undefined,
+    undefined,
+    createMock<LicenseService>(),
+    emailService,
+    db,
+    tokenHash,
+    createMock<MetricsService>(),
+    rbac,
+    undefined,
+  );
+  const unitOfWork = unitOfWorkFor(db);
+  const credentials = new TypeOrmCredentialStore(
+    db.getRepository(AuthenticationDetail),
+    new TransactionContextResolver(db, unitOfWork),
+  );
+  const passwordPolicy = new PasswordPolicyService(
+    new TypeOrmPasswordPolicyStore(
+      db.getRepository(PasswordPolicy),
+      db.getRepository(PasswordPolicyOverride),
+      db.getRepository(PasswordHistory),
+      unitOfWork,
+    ),
+    credentials,
+    unitOfWork,
+    createMock<HibpClient>({ check: async () => ({ pwned: false, count: 0, available: true }) }),
+    createMock<ZxcvbnService>({
+      evaluate: () => ({ score: 4, guessesLog10: 12, crackTimesSeconds: {}, warning: '', suggestions: [] }),
+    }),
+    rbac,
+    { record: jest.fn() },
+  );
+  const auth = new AuthService(
+    emailService,
+    credentials,
+    users,
+    tokenHash,
+    createMock<MetricsService>(),
+    passwordPolicy,
+  );
+  const passwords = new UserPasswordService(users, auth, emailService, tokenHash, passwordPolicy);
+  return { users, auth, passwords, emailService };
+}
+
 describe('single-use reset and verification tokens (integration)', () => {
   let source: DataSource;
   let directory: string;
@@ -59,50 +112,10 @@ describe('single-use reset and verification tokens (integration)', () => {
     }).initialize();
     await source.runMigrations();
 
-    const rbac = createMock<RbacService>({ getEffectivePermissions: async () => new Set<string>() });
-    emailService = createMock<EmailService>();
-    const tokenHash = new TokenHashService({
-      get: () => ({ AUTH_SESSION_SECRET: 'single-use-token-secret' }),
-    } as never);
-    users = composeUsersService(
-      source.getRepository(User),
-      undefined,
-      undefined,
-      undefined,
-      createMock<LicenseService>(),
-      emailService,
-      source,
-      tokenHash,
-      createMock<MetricsService>(),
-      rbac,
-      undefined,
-    );
-    const unitOfWork = unitOfWorkFor(source);
-    const credentials = new TypeOrmCredentialStore(
-      source.getRepository(AuthenticationDetail),
-      new TransactionContextResolver(source, unitOfWork),
-    );
-    const passwordPolicy = new PasswordPolicyService(
-      new TypeOrmPasswordPolicyStore(
-        source.getRepository(PasswordPolicy),
-        source.getRepository(PasswordPolicyOverride),
-        source.getRepository(PasswordHistory),
-        unitOfWork,
-      ),
-      credentials,
-      unitOfWork,
-      createMock<HibpClient>({ check: async () => ({ pwned: false, count: 0, available: true }) }),
-      createMock<ZxcvbnService>({
-        evaluate: () => ({ score: 4, guessesLog10: 12, crackTimesSeconds: {}, warning: '', suggestions: [] }),
-      }),
-      rbac,
-      { record: jest.fn() },
-    );
-    auth = new AuthService(emailService, credentials, users, tokenHash, createMock<MetricsService>(), passwordPolicy);
+    ({ users, auth, passwords, emailService } = buildStack(source));
     // Keep password history on so a rejected reset can be shown not to archive anything.
-    await passwordPolicy.getPolicy();
-    await passwordPolicy.updatePolicy({ historySize: 3, checkHIBP: false });
-    passwords = new UserPasswordService(users, auth, emailService, tokenHash, passwordPolicy);
+    await auth['passwordPolicy'].getPolicy();
+    await auth['passwordPolicy'].updatePolicy({ historySize: 3, checkHIBP: false });
   }, 60_000);
 
   afterEach(() => {
@@ -304,5 +317,63 @@ describe('single-use reset and verification tokens (integration)', () => {
         UserEmailInvalidVerificationTokenException,
       );
     });
+  });
+
+  describe('racing requests on independent connections', () => {
+    let secondSource: DataSource;
+    let second: ReturnType<typeof buildStack>;
+
+    beforeAll(async () => {
+      secondSource = await createDataSource({
+        type: 'sqlite',
+        database: join(directory, 'tokens.sqlite'),
+        busyTimeout: 5000,
+        entities: Object.values(entities),
+      }).initialize();
+      second = buildStack(secondSource);
+    });
+
+    afterAll(async () => {
+      if (secondSource) await closeResourceTransactionConnection(secondSource);
+      if (secondSource?.isInitialized) await secondSource.destroy();
+    });
+
+    it('lets exactly one of two concurrent resets with the same token change the password', async () => {
+      for (let round = 0; round < 5; round++) {
+        const user = await createLocalUser();
+        const token = await auth.generatePasswordResetToken(user.email);
+
+        const settled = await Promise.allSettled([
+          passwords.changePasswordViaResetToken(user.id, { token, password: FIRST_RESET_PASSWORD }),
+          second.passwords.changePasswordViaResetToken(user.id, { token, password: SECOND_RESET_PASSWORD }),
+        ]);
+
+        expect(settled.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+        const rejected = settled.find((result) => result.status === 'rejected') as PromiseRejectedResult;
+        expect(rejected.reason).toBeInstanceOf(ForbiddenException);
+        const winner = settled[0].status === 'fulfilled' ? FIRST_RESET_PASSWORD : SECOND_RESET_PASSWORD;
+        const loser = winner === FIRST_RESET_PASSWORD ? SECOND_RESET_PASSWORD : FIRST_RESET_PASSWORD;
+        expect(await passwordMatches(user.id, winner)).toBe(true);
+        expect(await passwordMatches(user.id, loser)).toBe(false);
+        expect(await persisted(user.id)).toMatchObject({ passwordResetToken: null });
+      }
+    }, 60_000);
+
+    it('lets exactly one of two concurrent verifications with the same token succeed', async () => {
+      for (let round = 0; round < 5; round++) {
+        const user = await createLocalUser();
+        const token = await auth.generateEmailVerificationToken(user);
+
+        const settled = await Promise.allSettled([
+          auth.verifyEmail(user.email, token),
+          second.auth.verifyEmail(user.email, token),
+        ]);
+
+        expect(settled.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+        const rejected = settled.find((result) => result.status === 'rejected') as PromiseRejectedResult;
+        expect(rejected.reason).toBeInstanceOf(UserEmailInvalidVerificationTokenException);
+        expect(await persisted(user.id)).toMatchObject({ isEmailVerified: true, emailVerificationToken: null });
+      }
+    }, 60_000);
   });
 });

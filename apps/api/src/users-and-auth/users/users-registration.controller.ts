@@ -1,12 +1,12 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Post, Req, UseInterceptors } from '@nestjs/common';
 import type { Request } from 'express';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { User } from '@attraccess/database-entities';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
 import { AuthRateLimit } from '../rate-limiting/rate-limit.decorator';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { BooleanDto } from '../../types/boolean.dto';
 import { CreateUserDto } from './dtos/createUser.dto';
+import { UserDto, toUserAccountDto } from './dtos/user.dto';
 import { VerifyEmailDto } from './dtos/verifyEmail.dto';
 import { ResendVerificationEmailDto } from './dtos/resendVerificationEmail.dto';
 import { AcceptInvitationDto } from './dtos/acceptInvitation.dto';
@@ -59,7 +59,7 @@ export class UsersRegistrationController {
   @ApiResponse({
     status: 201,
     description: 'The user has been successfully created.',
-    type: User,
+    type: UserDto,
   })
   @ApiResponse({
     status: 400,
@@ -73,11 +73,11 @@ export class UsersRegistrationController {
     status: 503,
     description: 'The account could not be created because the verification email could not be sent.',
   })
-  async createOne(@Body() body: CreateUserDto, @Req() req: Request): Promise<User> {
+  async createOne(@Body() body: CreateUserDto, @Req() req: Request): Promise<UserDto> {
     const acceptLanguage = req.headers['accept-language'];
     const locale = (acceptLanguage?.split(',')[0]?.split(';')[0] ?? '').trim() || undefined;
     const userAgent = req.headers['user-agent'];
-    return this.registrationService.createOne(body, locale, { ipAddress: req.ip, userAgent });
+    return toUserAccountDto(await this.registrationService.createOne(body, locale, { ipAddress: req.ip, userAgent }));
   }
 
   @Get('local-signup-enabled')
@@ -139,14 +139,14 @@ export class UsersRegistrationController {
   @ApiResponse({
     status: 200,
     description: 'Invitation accepted successfully.',
-    type: User,
+    type: UserDto,
   })
   @ApiResponse({
     status: 400,
     description: 'Invalid input data.',
   })
-  async acceptInvitation(@Body() body: AcceptInvitationDto): Promise<User> {
-    return this.registrationService.acceptInvitation(body);
+  async acceptInvitation(@Body() body: AcceptInvitationDto): Promise<UserDto> {
+    return toUserAccountDto(await this.registrationService.acceptInvitation(body));
   }
 
   @Post('reset-password')

@@ -1,4 +1,5 @@
 import { registerAuthServiceFixture } from './auth.service.auth-service.test-fixture';
+import { UserEmailInvalidVerificationTokenException } from './auth.service';
 import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
 import { ForbiddenException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
@@ -77,13 +78,21 @@ describe('AuthService', () => {
         emailVerificationTokenExpiresAt: new Date(Date.now() + 60000),
       } as never);
       await fixture.authService.verifyEmail('user@example.com', 'token');
-      expect(fixture.usersService.updateOne).toHaveBeenCalledWith(7, {
-        isEmailVerified: true,
-        emailVerificationToken: null,
-        emailVerificationTokenExpiresAt: null,
-      });
+      expect(fixture.usersService.consumeEmailVerificationToken).toHaveBeenCalledWith(7, stored);
     },
   );
+
+  it('rejects a verification token that a concurrent request consumed first', async () => {
+    jest.spyOn(fixture.usersService, 'findOne').mockResolvedValue({
+      id: 7,
+      emailVerificationToken: 'hashed:token',
+      emailVerificationTokenExpiresAt: new Date(Date.now() + 60000),
+    } as never);
+    jest.spyOn(fixture.usersService, 'consumeEmailVerificationToken').mockResolvedValue(false);
+    await expect(fixture.authService.verifyEmail('user@example.com', 'token')).rejects.toBeInstanceOf(
+      UserEmailInvalidVerificationTokenException,
+    );
+  });
 
   it('rejects missing users, invalid tokens and expired verification links without modifying the account', async () => {
     jest.spyOn(fixture.usersService, 'findOne').mockResolvedValue(null);
@@ -100,7 +109,7 @@ describe('AuthService', () => {
       emailVerificationTokenExpiresAt: new Date(0),
     } as never);
     await expect(fixture.authService.verifyEmail('user@example.com', 'token')).rejects.toThrow();
-    expect(fixture.usersService.updateOne).not.toHaveBeenCalled();
+    expect(fixture.usersService.consumeEmailVerificationToken).not.toHaveBeenCalled();
   });
 
   it('should be defined', () => {

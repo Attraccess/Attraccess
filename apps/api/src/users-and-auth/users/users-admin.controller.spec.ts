@@ -7,7 +7,32 @@ import { UsersService } from './users.service';
 import { UserPasswordService } from './user-password.service';
 import { BruteForceProtectionService } from '../rate-limiting/brute-force.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
-import { User } from '@attraccess/database-entities';
+import { AuthenticationType, SSOProviderType, type UserAccount as User } from '@attraccess/application-models';
+import { toUserAccountDto } from './dtos/user.dto';
+import { aUserRecord } from './fakes/in-memory-user-store.test-fixture';
+
+const PRIVATE_FIELDS = [
+  'email',
+  'emailVerificationToken',
+  'emailVerificationTokenExpiresAt',
+  'passwordResetToken',
+  'passwordResetTokenExpiresAt',
+  'lastUsernameChangeAt',
+  'lockedUntil',
+  'failedLoginAttempts',
+  'firstFailedLoginAt',
+  'deleteAccountToken',
+  'deleteAccountTokenExpiresAt',
+  'deleteAccountRequestedAt',
+  'nfcKeySeedToken',
+  'password',
+  'totpSecret',
+];
+
+function expectNoPrivateFields(body: unknown) {
+  const json = JSON.parse(JSON.stringify(body));
+  for (const field of PRIVATE_FIELDS) expect(json).not.toHaveProperty(field);
+}
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
 describe('UsersAdminController', () => {
@@ -178,19 +203,37 @@ describe('UsersAdminController', () => {
     });
 
     it('should return the full user shape with users.read', async () => {
-      const user = {
+      const user = aUserRecord({
         id: 1,
         username: 'admin',
         creditBalance: 100,
         billingFactor: 2,
         isEmailVerified: true,
-        authenticationDetails: [{ providerType: 'sso' }],
-      } as User;
+        passwordResetToken: 'secret-reset-token',
+        deleteAccountToken: 'secret-delete-token',
+        failedLoginAttempts: 3,
+        authenticationDetails: [
+          {
+            id: 4,
+            userId: 1,
+            type: AuthenticationType.SSO,
+            providerType: SSOProviderType.OIDC,
+            providerId: 2,
+            ssoSubject: 'sub',
+          },
+        ],
+      });
       jest.spyOn(usersService, 'findMany').mockResolvedValue({ ...paginated(1, 10, 1), data: [user] });
 
       const result = await controller.findMany({ page: 1, limit: 10 }, makeRequest(['users.read']));
 
-      expect(result.data).toEqual([user]);
+      expect(result.data).toEqual([toUserAccountDto(user)]);
+      expect(result.data[0]).toMatchObject({
+        id: 1,
+        username: 'admin',
+        authenticationDetails: [expect.objectContaining({ providerType: SSOProviderType.OIDC, ssoSubject: 'sub' })],
+      });
+      expectNoPrivateFields(result.data[0]);
     });
 
     it('should throw ForbiddenException when includeRoles=true without users.read', async () => {
@@ -216,13 +259,15 @@ describe('UsersAdminController', () => {
 
   describe('getOneById', () => {
     it('should return a user by ID', async () => {
-      const user = {
+      const user = aUserRecord({
         id: 1,
         username: 'testuser',
         email: 'test@example.com',
         isEmailVerified: true,
+        emailVerificationToken: 'secret-verification-token',
+        lockedUntil: new Date(),
         authenticationDetails: [],
-      } as User;
+      });
 
       jest.spyOn(usersService, 'findOne').mockResolvedValue(user);
 
@@ -237,7 +282,8 @@ describe('UsersAdminController', () => {
       };
 
       const response = await controller.getOneById(user.id, mockRequest as AuthenticatedRequest);
-      expect(response).toEqual(user);
+      expect(response).toEqual(toUserAccountDto(user));
+      expectNoPrivateFields(response);
     });
   });
 });

@@ -141,8 +141,7 @@ export class AuthService {
         emailVerificationToken: storedToken,
         emailVerificationTokenExpiresAt: addDays(new Date(), 3),
       },
-      // UsersService takes the caller's transaction as its own handle type.
-      manager as never,
+      manager,
     );
 
     this.logger.debug(`Email verification token set for user ID: ${user.id}`);
@@ -170,11 +169,11 @@ export class AuthService {
     }
 
     this.logger.debug(`Marking email as verified for user ID: ${user.id}`);
-    await this.usersService.updateOne(user.id, {
-      isEmailVerified: true,
-      emailVerificationToken: null,
-      emailVerificationTokenExpiresAt: null,
-    });
+    // Exactly one of any number of concurrent requests with the same token gets to consume it.
+    if (!(await this.usersService.consumeEmailVerificationToken(user.id, user.emailVerificationToken))) {
+      this.logger.debug(`Verification token of user ID ${user.id} was already consumed`);
+      throw new UserEmailInvalidVerificationTokenException();
+    }
     this.logger.debug(`Email successfully verified for user ID: ${user.id}`);
   }
 

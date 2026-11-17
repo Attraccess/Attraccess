@@ -1,4 +1,4 @@
-import { User } from '@attraccess/database-entities';
+import type { UserAccount } from '@attraccess/application-models';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import { identityAuditEvent } from '../../audit/policies/identity';
@@ -26,19 +26,24 @@ export class UserAdministrationService {
     await this.record('user_updated', id, origin, 'password');
   }
 
-  async changeUsername(id: number, username: string, actor: AuthenticatedUser, origin: AuditOrigin): Promise<User> {
+  async changeUsername(
+    id: number,
+    username: string,
+    actor: AuthenticatedUser,
+    origin: AuditOrigin,
+  ): Promise<UserAccount> {
     const user = await this.usersService.changeUsername(id, username, actor);
     await this.record('user_updated', id, origin, 'username');
     return user;
   }
 
-  async changeEmail(id: number, email: string, actor: AuthenticatedUser, origin: AuditOrigin): Promise<User> {
+  async changeEmail(id: number, email: string, actor: AuthenticatedUser, origin: AuditOrigin): Promise<UserAccount> {
     const user = await this.usersService.changeEmail(id, email, actor);
     await this.record('user_updated', id, origin, 'email');
     return user;
   }
 
-  async changeBillingFactor(id: number, billingFactor: number, origin: AuditOrigin): Promise<User> {
+  async changeBillingFactor(id: number, billingFactor: number, origin: AuditOrigin): Promise<UserAccount> {
     const user = await this.usersService.changeBillingFactor(id, billingFactor);
     await this.record('user_updated', id, origin, 'billingFactor');
     return user;

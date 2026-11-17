@@ -53,6 +53,7 @@ export function registerAuthServiceFixture() {
             findOne: jest.fn(),
             findByLoginIdentifier: jest.fn(),
             updateOne: jest.fn(),
+            consumeEmailVerificationToken: jest.fn().mockResolvedValue(true),
             isSSOUser: jest.fn().mockResolvedValue(false),
           },
         },

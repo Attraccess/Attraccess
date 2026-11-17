@@ -59,13 +59,15 @@ describe('Password policy on remaining endpoints (integration)', () => {
     });
 
     it('accepts a strong password and clears the reset token', async () => {
-      const { passwordService, changePassword, usersUpdateOne } = await fixture.buildController({ zxcvbnScore: 4 });
+      const { passwordService, changePassword, consumePasswordResetToken } = await fixture.buildController({
+        zxcvbnScore: 4,
+      });
       await passwordService.changePasswordViaResetToken(42, {
         password: fixture.STRONG_PASSWORD,
         token: 'reset-token-123',
       });
       expect(changePassword).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }), fixture.STRONG_PASSWORD);
-      expect(usersUpdateOne).toHaveBeenCalledWith(42, expect.objectContaining({ passwordResetToken: null }));
+      expect(consumePasswordResetToken).toHaveBeenCalledWith(42, expect.any(String));
     });
 
     it('blocks reuse when candidate matches a prior history entry', async () => {
