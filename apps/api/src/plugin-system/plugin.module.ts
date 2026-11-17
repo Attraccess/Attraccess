@@ -175,7 +175,10 @@ export class PluginModule {
     for (const manifest of ordered) {
       if (
         PluginService.isPluginQuarantined(manifest) ||
-        PluginService.getPluginsWithLoadStatus().find((plugin) => plugin.name === manifest.name)?.status === 'error'
+        // Matched by directory: a refused copy of the same plugin name (an old 1.x upload next to its 2.x build) must
+        // not disable the compatible one.
+        PluginService.getPluginsWithLoadStatus().find((plugin) => plugin.pluginDirectory === manifest.pluginDirectory)
+          ?.status === 'error'
       )
         continue;
       const failedDependency = manifest.dependencies?.find(

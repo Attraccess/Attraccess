@@ -132,6 +132,34 @@ describe('PluginModule', () => {
       }
     });
 
+    it('still loads a plugin when a refused 1.x copy of the same name sits next to it', () => {
+      const write = (folder: string, version: string, min: string, code: string) => {
+        mkdirSync(join(fixture.root, folder, 'dist'), { recursive: true });
+        writeFileSync(
+          join(fixture.root, folder, 'plugin.json'),
+          JSON.stringify({
+            name: 'twin',
+            version,
+            main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+            attraccessVersion: { min },
+          }),
+        );
+        writeFileSync(join(fixture.root, folder, 'dist', 'index.js'), code);
+      };
+      // Both orders of discovery: the refused copy must never take the name from the compatible one.
+      write('a-twin-legacy', '1.0.0', '1.11.0-0', 'throw new Error("a refused plugin must never be required");');
+      write(
+        'b-twin',
+        '2.0.0',
+        '2.0.0-0',
+        'class Twin {}\nmodule.exports = { default: { register: () => ({ module: Twin }) } };',
+      );
+      write('z-twin-legacy', '1.0.1', '1.11.0-0', 'throw new Error("a refused plugin must never be required");');
+
+      const module = PluginModule.forRoot();
+      expect(module.imports).toEqual([...HOST_IMPORTS, expect.any(Object)]);
+    });
+
     it('exposes only the host providers and controller when plugins are disabled', () => {
       PluginModule.configure({ DISABLE_PLUGINS: true });
       const module = PluginModule.forRoot();

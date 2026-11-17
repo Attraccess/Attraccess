@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { LoadedPluginManifest, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
 import { loadFrontendPlugin } from './loadFrontendPlugin';
+import { onePluginPerName } from './onePluginPerName';
 import usePluginState from './plugin.state';
 import { pluginStore } from './pluginStore';
 
@@ -38,7 +39,8 @@ export function usePluginLoading() {
           description: plugin.error ?? 'The plugin failed to load. Open Settings > Plugins for details.',
         });
       }
-      const byName = new Map(pluginsArray.map((manifest) => [manifest.name, manifest]));
+      const candidates = onePluginPerName(pluginsArray);
+      const byName = new Map(candidates.map((manifest) => [manifest.name, manifest]));
       const dependencyFailures = new Map<string, string | null>();
       const dependencyFailure = (manifest: LoadedPluginManifest, path: string[] = []): string | null => {
         if (path.includes(manifest.name)) return `Plugin dependency cycle: ${[...path, manifest.name].join(' → ')}`;
@@ -95,7 +97,7 @@ export function usePluginLoading() {
         loads.set(manifest.name, loading);
         return loading;
       };
-      await Promise.all(pluginsArray.map((manifest) => loadManifest(manifest)));
+      await Promise.all(candidates.map((manifest) => loadManifest(manifest)));
     } catch (error) {
       console.error('Attraccess Plugin System: Failed to fetch plugins', error);
     } finally {
