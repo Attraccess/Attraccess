@@ -261,6 +261,38 @@ describe('RbacService', () => {
     expect((await fixture.service.getPermissions()).map((p) => p.key)).toEqual(['a.read']);
   });
 
+  it('hides grants of unavailable plugin keys from role lists unless a ceiling check asks for them', async () => {
+    const role = makeRoleWith(['users.read', 'acme.widgets.read']);
+    fixture.store.listRoles.mockResolvedValue([role]);
+    fixture.store.listRolesWithUserCounts.mockResolvedValue([{ ...role, userCount: 1 }]);
+    fixture.store.listUnavailablePermissionKeys.mockResolvedValue(['acme.widgets.read']);
+
+    const keys = (roles: Array<{ rolePermissions?: Array<{ permissionKey: string }> }>) =>
+      roles.map((r) => r.rolePermissions?.map((rp) => rp.permissionKey));
+    expect(keys(await fixture.service.getRoles())).toEqual([['users.read']]);
+    expect(keys(await fixture.service.getRolesWithUsage())).toEqual([['users.read']]);
+    expect(keys(await fixture.service.getRoles(true))).toEqual([['users.read', 'acme.widgets.read']]);
+    // the stored record is not changed by the filtering
+    expect(role.rolePermissions).toHaveLength(2);
+  });
+
+  it('adds dormant role grants to the grant ceiling, for tokens only inside their own scope', async () => {
+    fixture.store.dormantPermissionKeysOf.mockResolvedValue(['acme.widgets.read', 'acme.widgets.manage']);
+    const effectivePermissions = new Set(['users.read']);
+
+    const session = await fixture.service.getGrantCeiling({ id: 10, effectivePermissions });
+    const token = await fixture.service.getGrantCeiling({
+      id: 10,
+      effectivePermissions,
+      authenticationMethod: 'api-token',
+      permissionScope: ['acme.widgets.read'],
+    });
+
+    expect([...session].sort()).toEqual(['acme.widgets.manage', 'acme.widgets.read', 'users.read']);
+    expect([...token].sort()).toEqual(['acme.widgets.read', 'users.read']);
+    expect(fixture.store.dormantPermissionKeysOf).toHaveBeenCalledWith(10);
+  });
+
   describe('createRole', () => {
     it('creates a custom role with a slugified key and permissions', async () => {
       fixture.store.findKnownPermissionKeys.mockResolvedValue(['a.read']);

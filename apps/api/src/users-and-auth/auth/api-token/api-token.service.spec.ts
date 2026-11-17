@@ -83,6 +83,25 @@ describe('ApiTokenService', () => {
     });
   });
 
+  it('keeps and hides grants of unavailable plugin keys on update and in the list', async () => {
+    rbacService.getUnavailablePermissionKeys.mockResolvedValue(new Set(['acme.widgets.read']));
+    store.findActiveOwned.mockResolvedValue(record({ permissionKeys: ['acme.widgets.read', 'resources.read'] }));
+    store.update.mockImplementation(async (_id, changes) => record({ permissionKeys: changes.permissionKeys }));
+
+    const updated = await service.update(3, 1, { permissionKeys: ['resources.read'] });
+
+    // the client cannot see the dormant grant, so its full-set update must not drop it
+    expect(store.update).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        permissionKeys: ['resources.read', 'acme.widgets.read'],
+      }),
+    );
+    expect(updated.permissionKeys).toEqual(['resources.read']);
+    store.listActive.mockResolvedValue({ data: [record({ permissionKeys: ['acme.widgets.read'] })], total: 1 });
+    expect((await service.list(3, 1, 10)).data[0].permissionKeys).toEqual([]);
+  });
+
   it('clears the expiry when null is given', async () => {
     store.findActiveOwned.mockResolvedValue(record({ expiresAt: new Date(Date.now() + 60_000) }));
     store.update.mockResolvedValue(record());

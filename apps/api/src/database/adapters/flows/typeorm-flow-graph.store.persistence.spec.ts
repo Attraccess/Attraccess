@@ -234,6 +234,27 @@ describe('flow adapters on real SQLite', () => {
       expect(await graph.findNodesForResources([], type)).toEqual([]);
       expect(await source.getRepository(ResourceFlowEdge).count()).toBe(1);
     });
+
+    it("reads a resource's nodes inside the caller's transaction, uncommitted writes included", async () => {
+      const { source } = await instance();
+      const uow = unitOfWorkFor(source);
+      const graph = new TypeOrmFlowGraphStore(source, uow, audit as never);
+      const laser = await newResource(source, 'Laser');
+      const type = ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED;
+
+      const seen = await uow.run(async (scope) => {
+        await uow.handleOf(scope).insert(ResourceFlowNode, {
+          id: 'pending',
+          resourceId: laser,
+          type,
+          position: { x: 0, y: 0 },
+          data: {},
+        });
+        return graph.findResourceNodes(laser, type, scope);
+      });
+
+      expect(seen.map((node) => node.id)).toEqual(['pending']);
+    });
   });
 
   describe('flow variable store', () => {

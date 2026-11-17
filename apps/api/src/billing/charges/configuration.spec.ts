@@ -244,6 +244,15 @@ describe('BillingService configuration and usage start', () => {
 
       await expect(f.service.isBillingEnabled(1)).resolves.toBe(true);
     });
+
+    it("reads the flow nodes inside the caller's transaction", async () => {
+      // A lifecycle transaction holds the write lock; a read outside it could wait on a write that waits for it.
+      const scope = fakeTransactionScope();
+
+      await f.service.isBillingEnabled(1, scope);
+
+      expect(f.flows.getNodes).toHaveBeenCalledWith(1, expect.anything(), scope);
+    });
   });
 
   describe('updateResourceBillingConfiguration', () => {
