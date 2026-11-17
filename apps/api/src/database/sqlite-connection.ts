@@ -29,10 +29,17 @@ export function createDataSource(options: DataSourceOptions): DataSource {
   const busyTimeout = options.busyTimeout ?? SQLITE_BUSY_TIMEOUT_MS;
   const source = new DataSource({ ...options, busyTimeout });
   const isolation = createIsolation(busyTimeout);
+  const connection: Connection = { database: options.database, isolation };
+  connections.add(connection);
+  const destroy = source.destroy.bind(source);
+  source.destroy = () => {
+    connections.delete(connection);
+    return destroy();
+  };
   // The SQLite driver hands every caller the same query runner, so patching it covers all work on the connection.
   const driver = source.driver;
   const createQueryRunner = driver.createQueryRunner.bind(driver);
-  driver.createQueryRunner = (mode) => guardSharedRunner(createQueryRunner(mode), isolation);
+  driver.createQueryRunner = (mode) => guardSharedRunner(createQueryRunner(mode), connection);
   // Entry points that start transactions through the runner (or run work on it) give the call its own flow. The
   // constructor built source.manager already; every later manager (createQueryRunner().manager, the transactional
   // manager of transaction()) is wrapped as it is created.
@@ -55,6 +62,30 @@ const newFlow = (): Flow => ({ nested: 0 });
 
 /** Per DataSource: which flow owns the connection's open transaction, and the queue of flows waiting for it. */
 type Isolation = ReturnType<typeof createIsolation>;
+
+/** A guarded DataSource: its database file, its isolation and (once its runner exists) its guarded query. */
+type Connection = {
+  database: unknown;
+  isolation: Isolation;
+  query?: (sql: string, parameters?: unknown[], useStructuredResult?: boolean) => Promise<unknown>;
+};
+
+/** The initialized guarded DataSources, so a statement can find a transaction its flow owns on another one. */
+const connections = new Set<Connection>();
+
+/**
+ * The other connection to the same database file whose open transaction the calling async flow owns. Such a
+ * transaction holds SQLite's write lock (BEGIN IMMEDIATE) until it ends, and it awaits the statement.
+ */
+function transactionOwnedElsewhere(self: Connection): Connection | undefined {
+  if (typeof self.database !== 'string' || self.database === ':memory:') return undefined;
+  for (const other of connections) {
+    if (other === self || other.database !== self.database || !other.query) continue;
+    const { owner, flows } = other.isolation;
+    if (owner !== undefined && flows.getStore() === owner) return other;
+  }
+  return undefined;
+}
 
 /** A flow waiting for the owner: a transaction start (`claims`) or a statement. */
 type Waiter = { flow: Flow; claims: boolean; wake: (passed: boolean) => void; timer?: NodeJS.Timeout };
@@ -238,12 +269,20 @@ function nestedCall(isolation: Isolation, flow: Flow, call: () => unknown) {
  *   transaction. The outermost COMMIT or ROLLBACK waits for a nested start, and a start waits for it, so neither acts
  *   on a stale depth. Without that, a savepoint lands outside the committed transaction and leaves the runner in one
  *   that never ends. A failed outermost COMMIT rolls back before the gate opens, for the same reason.
+ * Several guarded DataSources can open the same file (the main connection and runSerializedTransaction's
+ * resource-lifecycle connection). A statement issued by the flow that owns an open transaction on another of them
+ * (work inside that transaction that uses an injected repository instead of the transaction's manager) runs inside
+ * that transaction, on that connection: it sees the transaction's writes and commits or rolls back with it. Here it
+ * would queue behind another flow's write or BEGIN, which waits in SQLite for the write lock that transaction holds
+ * until it ends, and both would wait out the busy timeout. A transaction start (transaction(), save()) from such work
+ * is not moved: it still waits for that lock and fails after the busy timeout. Use the transaction's manager.
  * Subscribers run in the owner's flow. They must not start a transaction on this connection (including save()) from a
  * transaction event, nor run a query from a query event: they would wait for themselves. A transaction must not
  * await work that runs in another async context and needs this connection; that work waits for the timeout.
  */
-function guardSharedRunner(runner: QueryRunner, isolation: Isolation): QueryRunner {
+function guardSharedRunner(runner: QueryRunner, connection: Connection): QueryRunner {
   if (guardedRunners.has(runner)) return runner;
+  const { isolation } = connection;
   const internals = runner as RunnerInternals;
   if (typeof internals.transactionDepth !== 'number') {
     throw new Error('Unsupported TypeORM SQLite query runner: transactionDepth is not readable');
@@ -298,6 +337,11 @@ function guardSharedRunner(runner: QueryRunner, isolation: Isolation): QueryRunn
   };
   runner.query = async (sql: string, parameters?: unknown[], useStructuredResult?: boolean) => {
     const flow = flows.getStore();
+    // Issued by work inside a transaction this flow owns on another connection to the file (an injected repository
+    // instead of the transaction's manager): run it there. Here it could queue behind a write of another flow that
+    // waits for that transaction's write lock, and both would wait out the busy timeout.
+    const owning = flow !== undefined && flow === isolation.owner ? undefined : transactionOwnedElsewhere(connection);
+    if (owning?.query) return owning.query(sql, parameters, useStructuredResult);
     // Let through at a release: runs on its own even if the next owner was already chosen (its BEGIN waits for it).
     let passed = false;
     for (;;) {
@@ -311,6 +355,7 @@ function guardSharedRunner(runner: QueryRunner, isolation: Isolation): QueryRunn
       if (passed) isolation.endPass();
     }
   };
+  connection.query = runner.query;
   const runOnConnection = async (sql: string, parameters?: unknown[], useStructuredResult?: boolean) => {
     if (sql === 'BEGIN TRANSACTION' || (internals.transactionDepth === 0 && !/^\s*SELECT\b/i.test(sql))) {
       const statement = sql === 'BEGIN TRANSACTION' ? 'BEGIN IMMEDIATE TRANSACTION' : sql;
