@@ -19,6 +19,11 @@ Backend plugins with the `BLE_TRANSPORT` permission can talk to Bluetooth Low En
 
 Enforcement always runs in the host. The validation helpers are exported from the SDK so the fake behaves identically, but a plugin cannot skip them.
 
+Plugin Bluetooth works only on [paired readers](attractap/pairing.md), which talk to the server over the encrypted reader link. The reader firmware refuses BLE commands on the older token-based connection and before the reader has signed in; the host reports such a reader as `READER_OFFLINE` with detail `pairing-required`.
+
+> [!IMPORTANT]
+> The radio link between the reader and the device has **no Bluetooth-level security**. The reader firmware is built without BLE security (`CONFIG_BT_NIMBLE_SECURITY_ENABLE` is off): it never pairs or bonds with a device, and the BLE link is not encrypted. Anyone in radio range can record the traffic. If payloads are sensitive (user codes, keys, unlock commands), your plugin must encrypt and authenticate them itself, for example with the device's own protocol security.
+
 Administrators stay in control: a reader is closed to plugins by default. An administrator enables **Allow plugins to use Bluetooth** in the reader editor (General tab). Turning it off ends all plugin BLE sessions on that reader immediately; existing endpoints stay, but scans, new endpoints and sessions fail with `READER_ACCESS_DENIED`.
 
 > [!WARNING]
@@ -98,7 +103,7 @@ const advertisements = await ble.scan(readers[0].readerId, 'door-lock', {
 
 `listReaders` returns only readers an administrator opened for plugins. `available` is true while the reader is online and its firmware supports plugin Bluetooth. It is false when the host has no transport driver, the reader is offline, or its firmware is too old. A reader that is busy with another plugin's session stays `available`.
 
-A reader runs **one BLE job at a time**: one scan or one session, for all plugins together. A `scan` or `openSession` while another scan or session uses the reader rejects at once with `READER_BUSY` (retryable). Nothing is queued. A scan returns at most 32 advertisements, deduplicated by address.
+A reader runs **one BLE job at a time**: one scan or one session, for all plugins together. A `scan` or `openSession` while another scan or session uses the reader rejects at once with `READER_BUSY` (retryable). Nothing is queued. A scan returns at most 32 advertisements, deduplicated by address (on the reader and again in the host).
 
 `scan` has a host-side deadline: if the transport does not answer within `durationMs` plus 5 s, it rejects with `TIMEOUT`. Advertisements the reader reports in a malformed form are skipped; they do not fail the scan.
 
@@ -161,7 +166,7 @@ Rules:
 
 - **One open session per endpoint.** A second `openSession` rejects with `ENDPOINT_BUSY` (retryable). There is no queue.
 - **One session per reader.** A reader holds one BLE connection at a time, for all plugins. While a session or scan uses it, `openSession` and `scan` through that reader reject with `READER_BUSY` (retryable). A long session, such as a firmware update of a device, blocks that reader for every plugin until it ends, so keep sessions as short as the job allows.
-- **Writes without response are pipelined.** `write(..., { withoutResponse: true })` resolves once the reader link queued the write in order, not after a round trip, so bulk transfers are fast. If the reader later fails one of them, the next call on the session rejects with that error. Chunk bulk data to `session.mtu - 3` bytes.
+- **Writes without response are pipelined.** `write(..., { withoutResponse: true })` resolves once the reader link queued the write in order, not after a round trip, so bulk transfers are fast. If the reader later fails one of them, the next `read`, `write` or `subscribe` your plugin starts on the session rejects with that error's code. If no such operation follows, the failure is only logged when the session closes; your plugin does not learn about it. End a transfer with an operation that has an answer (a write with response, a read, or the device's acknowledgement notification) to know that it arrived. Chunk bulk data to `session.mtu - 3` bytes.
 - **Operations run one at a time, in call order.**
 - **Notifications** arrive in order per subscription, only to the owning session, in a bounded queue (default 32, profile maximum 256). Consume them promptly. Subscribing to a key that is already subscribed rejects with `INVALID_ARGUMENT`.
 - **A failing stream never drops data silently.** When the queue overflows, the host discards the queued notifications and fails the stream at once with `NOTIFICATION_OVERFLOW`. A notification above `maxNotificationBytes` fails the stream the same way with `PAYLOAD_TOO_LARGE`. Every pending and later `next()` then rejects with that code, while the session stays open. Call `session.unsubscribe(key)` and subscribe again to resume.
@@ -206,17 +211,29 @@ Every failure is a `PluginBleError` with a stable `code`, a `retryable` flag, an
 
 ## Limits and caps
 
-| Limit                                | Default | Maximum                                               |
-| ------------------------------------ | ------- | ----------------------------------------------------- |
-| Operation timeout (`timeoutMs`)      | 10 s    | 60 s                                                  |
-| Connect timeout (`connectTimeoutMs`) | 15 s    | 60 s                                                  |
-| Session lease (`leaseMs`)            | 30 s    | profile `maxSessionMs` (default 30 s), at most 15 min |
-| Scan duration (`durationMs`)         | 5 s     | 15 s                                                  |
-| Notification queue per subscription  | 32      | 256 (profile `maxNotificationQueue`)                  |
-| Payload per characteristic           | -       | 1..512 bytes, set in the profile                      |
-| Endpoint label                       | -       | 100 characters                                        |
+| Limit                                | Default    | Maximum                                               |
+| ------------------------------------ | ---------- | ----------------------------------------------------- |
+| Operation timeout (`timeoutMs`)      | 10 s       | 60 s                                                  |
+| Connect timeout (`connectTimeoutMs`) | 15 s       | 60 s                                                  |
+| Session lease (`leaseMs`)            | 30 s       | profile `maxSessionMs` (default 30 s), at most 15 min |
+| Scan duration (`durationMs`)         | 5 s        | 15 s                                                  |
+| Notification queue per subscription  | 32         | 256 (profile `maxNotificationQueue`)                  |
+| Payload per characteristic           | -          | 1..512 bytes, set in the profile                      |
+| ATT MTU (`session.mtu`)              | negotiated | 23..517                                               |
+| Endpoint label                       | -          | 100 characters                                        |
 
 Values above a cap are rejected with `INVALID_ARGUMENT` (or `INVALID_PROFILE` in a profile); they are never silently clamped. The constants are exported as `PLUGIN_BLE_LIMITS`.
+
+Real readers add these limits:
+
+| Limit                                 | Maximum                                                                                                                      |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Scan filter (profile `advertisement`) | 8 service UUIDs, 8 manufacturer ids, name prefix of 64 bytes (UTF-8); a larger filter rejects with `INVALID_ARGUMENT`        |
+| Characteristics per profile           | 16 (more reject with `READER_UNSUPPORTED`, detail `allowlist-too-large:<n>`)                                                 |
+| Requests waiting for one reader       | 16, the lower of the host cap (32) and the limit the firmware announces; more reject with `READER_BUSY`, detail `queue-full` |
+| Notification buffer on the reader     | 32 notifications or 16 KiB per session                                                                                       |
+
+An advertised name is at most 31 bytes, so a name prefix longer than that never matches.
 
 ## Real readers
 
@@ -224,11 +241,25 @@ The reader firmware (2.5.0 or later) announces plugin Bluetooth when it connects
 
 - **Compatibility.** A reader without the capability, or with a protocol version the host does not support, makes `scan` and `openSession` reject with `READER_UNSUPPORTED`. `detail` is `no-ble-capability`, `protocol-version:<n>` or `missing-operation:<op>`. A profile with more characteristics than the reader accepts (16) rejects with `READER_UNSUPPORTED`, detail `allowlist-too-large:<n>`. Update the reader firmware (OTA from the server) to fix the first case.
 - **Enforcement on the reader.** With each session the host sends the reader the profile as an allowlist: the bound address and, per characteristic, the service, the operations and the payload bounds. The reader refuses anything else before it touches the radio. This protects against host bugs, not against a compromised server, which could send any allowlist.
-- **Deadlines on the reader.** The reader keeps its own lease (your lease plus 10 s) and operation deadlines. When the server goes silent or the reader loses its connection to the server, the reader disconnects the device on its own.
-- **Notifications** are buffered on the reader (32 notifications or 16 KiB per session) and forwarded in order with a sequence number. A full reader buffer fails the stream with `NOTIFICATION_OVERFLOW`; a gap or duplicate fails it with `INTERNAL` (detail `malformed-notification`). Nothing is dropped silently.
-- **Diagnostics.** Radio failures map to the codes above; `detail` carries the raw reason as safe text, for example `nimble:rc=13`, `hci:0x3e`, `att:0x0a` or `reason:0x08`.
+- **Deadlines on the reader.** The reader keeps its own deadlines, so it disconnects the device on its own when the server goes silent:
+  - Each operation has a reader deadline of its `timeoutMs` plus 2 s. An operation that passes it rejects with `TIMEOUT` and the session stays open, as on the host.
+  - The reader ends the session itself only when a GATT operation is stuck in the radio stack (about 35 s) or when the reader's lease expires (your lease plus 10 s, counted from when the connection was established).
+  - When the reader loses its connection to the server, it disconnects the device at once.
+- **Bytes from the reader** are checked before the host decodes them. A read result above its bound rejects with `PAYLOAD_TOO_LARGE` (detail `max-read`); a malformed one (bad encoding or no value) rejects with `INTERNAL` (detail `malformed-result`).
+- **Notifications** are buffered on the reader (32 notifications or 16 KiB per session) and forwarded in order with a sequence number. Each failure fails the stream:
+  - a full reader buffer: `NOTIFICATION_OVERFLOW` (detail `reader-buffer`); a full host queue for the subscription: `NOTIFICATION_OVERFLOW`;
+  - a notification above `maxNotificationBytes`: `PAYLOAD_TOO_LARGE` (detail `max-notification`);
+  - a gap or duplicate in the sequence, or a malformed notification: `INTERNAL` (detail `malformed-notification`).
+
+  Nothing is dropped silently.
+
+- **Diagnostics.** Radio failures map to the codes above; `detail` carries the raw reason as safe text, for example `nimble:rc=13`, `hci:0x3e`, `att:0x0a` or `reason:0x08`. `READER_OFFLINE` has these details:
+  - `pairing-required`: the reader is not paired (see [Trust boundary](#trust-boundary)). Pair it.
+  - `firmware-info-pending`: the reader connected but has not announced its firmware yet. Retry after a moment.
+  - `ble-init-failed`: the reader could not start its Bluetooth stack. Restart the reader if the error persists.
+  - no detail: the reader is not connected.
 - **Latency.** Every operation you await travels from the server to the reader and back, typically 0.2 to 0.3 s over Wi-Fi. A protocol that waits for an acknowledgement after every chunk is limited by that round trip (measured: about 1.8 KiB/s with 512-byte chunks). Send bulk data as pipelined writes without response, or in larger windows between acknowledgements.
-- **Cancelling on the reader.** A cancelled `scan` or `openSession` rejects at once, but the reader stays busy until it confirmed the cancel, usually one round trip (0.2 to 0.3 s). A `scan` or `openSession` in that window rejects with `READER_BUSY` (retryable); retry after a short pause.
+- **Cancelling on the reader.** A cancelled `scan` or `openSession` rejects at once, but the reader stays busy until it answered the cancelled request (the cancel itself has no answer), usually one round trip (0.2 to 0.3 s). A `scan` or `openSession` in that window rejects with `READER_BUSY` (retryable); retry after a short pause.
 - **Firmware updates.** A reader that starts a firmware update ends its BLE session (`disconnected`) and refuses new BLE work with `READER_BUSY` (detail `ota`) until it restarted.
 
 ## Cleanup obligations

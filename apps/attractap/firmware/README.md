@@ -163,7 +163,11 @@ gateway: the server opens a session for one device and sends the profile with it
 and the reader refuses everything outside it before it touches the radio. The reader announces
 `capabilities.ble` (protocol `version: 1`, the supported operations and its limits) in its firmware
 info; the server answers readers without it, or with another version, with `READER_UNSUPPORTED`.
-Demo variants, park images and the desktop simulator announce no `ble`.
+Demo variants, park images and the desktop simulator announce no `ble`. BLE works only on paired
+readers: the reader accepts BLE requests only on the secure link (see "Pairing and session
+protocol" below) after it signed in, and refuses them on the legacy token channel and before
+sign-in. The server reports a reader that is not on the secure link as `READER_OFFLINE`
+(`pairing-required`) and sends it no BLE requests.
 
 | Direction       | Event               | Payload (besides `v: 1` and `sessionId`)                                                                                          |
 | --------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
@@ -189,17 +193,25 @@ never payload bytes. Requests with another `v` are refused.
 queue) for the `ble_proxy` task, which runs the state machine (`ble_core*.cpp`); NimBLE's host task
 reports radio events back through a second queue. The state machine, allowlist, codec, deadlines,
 notification buffer and error mapping are free of NimBLE and FreeRTOS and covered by host tests
-(`tests/ble-proxy`); `ble_radio_nimble.cpp` is the only NimBLE code.
+(`tests/ble-proxy`); `ble_radio_nimble*.cpp` is the only NimBLE code.
 
 **Rules.** One owner at a time: a scan or one session (`CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1`); a
-second open or scan gets `READER_BUSY`. Operations run one at a time in order. The reader keeps its
-own deadlines: the lease plus 10 s, each operation's `timeoutMs` plus 2 s, and the connect
-timeout. A GATT procedure NimBLE cannot abort is answered `CANCELLED` or `TIMEOUT` at once; its late
-result is discarded and the next operation waits until NimBLE finished. Writes without response
+second open or scan gets `READER_BUSY`. Operations run one at a time in order, at most 16 queued
+per session (announced as `maxPendingRequests`; more get `READER_BUSY` `queue-full`). The reader
+keeps its own deadlines: the lease plus 10 s (counted from when the connection was established),
+each operation's `timeoutMs` plus 2 s, and the connect timeout. An operation past its deadline is
+answered `TIMEOUT` and the session stays open. A GATT procedure NimBLE cannot abort is answered
+`CANCELLED` or `TIMEOUT` at once; its late result is discarded and the next operation waits until
+NimBLE finished. The reader ends the session itself only when the lease expires or NimBLE has not
+finished a GATT procedure after about 35 s. Writes without response
 retry on full controller buffers until their deadline. The reader requests MTU 517 and reports the
 negotiated MTU; writes with response above `mtu - 3` use long writes. Notifications are buffered per
-session (32 entries, 16 KiB) and forwarded with `seq`; overflow or an oversized notification ends
-that stream with an `error` instead of dropping data. Losing the websocket, switching to pairing or
+session (32 entries, 16 KiB) and forwarded with `seq`; overflow (`NOTIFICATION_OVERFLOW`,
+`reader-buffer`) or an oversized notification (`PAYLOAD_TOO_LARGE`, `max-notification`) ends that
+stream with an `error` instead of dropping data. A read result above its bound is answered
+`PAYLOAD_TOO_LARGE` (`max-read`). Scans deduplicate by address; a scan filter takes at most 8
+service UUIDs, 8 manufacturer ids and a name prefix of 64 bytes (larger filters get
+`INVALID_ARGUMENT`); advertised names are at most 31 bytes, so longer prefixes never match. Losing the websocket, switching to pairing or
 the secure link, re-authenticating, and starting an OTA end the session and disconnect the device at
 once; BLE requests during an OTA get `READER_BUSY` (`ota`).
 
@@ -210,8 +222,16 @@ before. Host memory and the proxy task stack live in PSRAM; the controller runs 
 boot and after the first BLE init. Init failure is reported as `READER_OFFLINE` (`ble-init-failed`)
 and never stops the reader.
 
+**Logs.** Each scan, operation and session end logs the session id, operation, outcome, NimBLE code
+and duration, never payload bytes. Successful operations log at debug level, cancels and expected session ends at info, failures,
+allowlist rejections and notification failures at warn, and an init failure at error.
+
 **Trust boundary.** The allowlist protects devices against bugs in the server, not against a
-compromised server, which can send any allowlist. The reader stores no device credentials.
+compromised server, which can send any allowlist. The reader stores no device credentials. The
+BLE link itself has no Bluetooth-level security: NimBLE is built without it
+(`CONFIG_BT_NIMBLE_SECURITY_ENABLE` off), so the reader never pairs or bonds and the radio traffic
+is not encrypted. Plugins must encrypt and authenticate sensitive payloads in their own protocol.
+Only the reader-server hop is protected, by the secure link.
 
 ## Pairing and session protocol (1.8.0)
 

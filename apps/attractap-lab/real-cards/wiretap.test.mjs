@@ -45,6 +45,7 @@ const server = tls.createServer({ ...${JSON.stringify(TLS_OPTIONS)}, pskCallback
   socket.write(frame(1, JSON.stringify({ event: 'PING' })).toString('latin1'));
   socket.write(frame(1, 'null'));
   socket.write(frame(1, 'not json'));
+  if (process.env.BLE_FRAMES) for (const [type, payload] of JSON.parse(process.env.BLE_FRAMES)) socket.write(message(type, payload));
   socket.write(Buffer.from([9, 0, 0, 0, 1, 0xff]));
   socket.write(Buffer.from([1, 0x7f, 0xff, 0xff, 0xff, 0]));
 });
@@ -208,6 +209,46 @@ for (const [name, env] of [
     );
   });
 }
+
+test('records BLE messages with the length of their bytes instead of the bytes', async (t) => {
+  const dir = tempDir(t);
+  const file = join(dir, 'wiretap.jsonl');
+  const secret = Buffer.from('12345600\x31').toString('base64');
+  const frames = [
+    ['BLE_WRITE', { v: 1, sessionId: 's', requestId: 3, s: 'fff0', c: 'fff1', value: secret, withoutResponse: false }],
+    ['BLE_RESULT', { v: 1, sessionId: 's', requestId: 4, ok: true, value: 'AQID' }],
+    [
+      'BLE_SCAN_RESULT',
+      {
+        v: 1,
+        requestId: 5,
+        ok: true,
+        advertisements: [{ address: 'AA', name: 'Lock', manufacturerData: [{ companyId: 1, data: 'AQ==' }] }],
+      },
+    ],
+    ['BLE_NOTIFICATION', { v: 1, sessionId: 's', subscriptionId: 6, seq: 2, error: { code: 'NOTIFICATION_OVERFLOW' } }],
+  ];
+  const run = await session({ WIRETAP_FILE: file, FIRST_APDU: '9060000000', BLE_FRAMES: JSON.stringify(frames) });
+  assert.equal(run.code, 0, run.stderr);
+  assert.equal(readFileSync(file, 'utf8').includes(secret), false);
+  const redacted = (bytes) => ({ redacted: true, bytes });
+  const ble = (type, payload) => ({ sock: 1, dir: 's2r', type, payload });
+  const recorded = lines(file)
+    .filter((entry) => entry.type?.startsWith('BLE_'))
+    .map(({ bytes: _bytes, ...entry }) => entry);
+  assert.deepEqual(
+    recorded,
+    parsed([
+      ble('BLE_WRITE', { ...frames[0][1], value: redacted(9) }),
+      ble('BLE_RESULT', { ...frames[1][1], value: redacted(3) }),
+      ble('BLE_SCAN_RESULT', {
+        ...frames[2][1],
+        advertisements: [{ address: 'AA', name: 'Lock', manufacturerData: [{ companyId: 1, data: redacted(1) }] }],
+      }),
+      ble('BLE_NOTIFICATION', frames[3][1]),
+    ]),
+  );
+});
 
 test('refuses to load without an output file', () => {
   const env = { ...process.env };

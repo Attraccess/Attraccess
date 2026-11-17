@@ -193,7 +193,8 @@ async function runStep(state: ScriptState, step: Step): Promise<StepResult> {
   return handler(state, step).catch(failure);
 }
 
-@Auth()
+// Administrators only: the routes drive the reader's radio and can write arbitrary bytes to allowed characteristics.
+@Auth('system.plugins.manage')
 @Controller('ble-lab')
 export class BleLabController {
   constructor(@Inject(CONTEXT) private readonly context: PluginContext) {}

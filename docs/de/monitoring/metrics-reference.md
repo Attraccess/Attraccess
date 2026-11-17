@@ -177,16 +177,16 @@ sum by (event) (rate(attraccess_ws_messages_total{status="error"}[5m]))
 
 ## Plugin-Bluetooth (BLE)
 
-Plugins mit der Berechtigung `BLE_TRANSPORT` sprechen über Attractap-Reader mit Bluetooth-Geräten. Die Labels haben wenige Ausprägungen: Reader-, Endpunkt- und Sitzungs-IDs stehen nur in den API-Logs (Zeilen `ble op=...`).
+Plugins mit der Berechtigung `BLE_TRANSPORT` sprechen über Attractap-Reader mit Bluetooth-Geräten. Die Labels haben wenige Ausprägungen: Reader-, Endpunkt- und Sitzungs-IDs stehen nur in den API-Logs, in Zeilen der Form `ble op=<Operation> ... outcome=<ok oder Code> detail=<sicheres Detail> <Dauer>ms`. Erfolgreiche Operationen werden auf Debug-Ebene protokolliert, fehlgeschlagene auf Info-Ebene (`log`); um jede Operation zu sehen, aktivieren Sie das Debug-Logging. Die Zeilen enthalten nie Nutzdaten-Bytes.
 
 | Metrik | Typ | Labels | Beschreibung |
 |--------|-----|--------|--------------|
 | `attraccess_plugin_ble_operations_total` | Counter | `operation`, `outcome` | Plugin-BLE-Operationen (`scan`, `connect`, `read`, `write`, `subscribe`, `unsubscribe`, ...); `outcome` ist `ok` oder der Fehlercode |
-| `attraccess_plugin_ble_operation_duration_seconds` | Histogram | `operation` | Dauer erfolgreicher Operationen, einschließlich des Roundtrips zum Reader |
+| `attraccess_plugin_ble_operation_duration_seconds` | Histogram | `operation` | Dauer nur erfolgreicher Operationen, einschließlich des Roundtrips zum Reader; fehlgeschlagene Operationen zählen nur in `attraccess_plugin_ble_operations_total` |
 | `attraccess_plugin_ble_sessions_active` | Gauge | -- | Offene Plugin-BLE-Sitzungen |
 | `attraccess_plugin_ble_session_closes_total` | Counter | `reason` | Geschlossene Sitzungen nach Grund (`closed`, `lease-expired`, `disconnected`, `cancelled`, ...) |
 | `attraccess_plugin_ble_rejections_total` | Counter | `code` | Aufrufe, die Profil, Reader-Allowlist oder ein Größenlimit abgelehnt haben (`OPERATION_NOT_ALLOWED`, `UNKNOWN_CHARACTERISTIC`, `PAYLOAD_TOO_LARGE`) |
-| `attraccess_plugin_ble_notifications_total` | Counter | `outcome` | Benachrichtigungen nach Ergebnis: `delivered`, `overflow`, `oversized`, `malformed` |
+| `attraccess_plugin_ble_notifications_total` | Counter | `outcome` | Benachrichtigungen nach Ergebnis: `delivered` (an den Stream des Plugins übergeben), `overflow` (der Puffer des Readers oder die Warteschlange der API pro Abonnement ist übergelaufen; der Stream scheitert mit `NOTIFICATION_OVERFLOW`), `oversized` (über `maxNotificationBytes` des Profils; `PAYLOAD_TOO_LARGE`), `malformed` (fehlerhafte Kodierung oder eine Lücke oder ein Duplikat in der Sequenz des Readers; `INTERNAL`). Jedes Ergebnis außer `delivered` lässt diesen Stream scheitern |
 
 **Buckets der Operationsdauer:** 10ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s, 30s, 60s
 

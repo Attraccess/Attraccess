@@ -13,14 +13,17 @@ the API it starts) and select these tests with ``-k ble``. The devices are confi
 Results (throughput, notification rate, heap before and after BLE init) land in ``ble-*.json`` artifacts.
 """
 
+import base64
 import json
 import os
 import time
+from pathlib import Path
 
 import pytest
 
 from conftest import PROFILE, read_heap, record_heap
 from heap_floors import floors
+from wire import Wire
 
 pytestmark = pytest.mark.skipif(os.environ.get("HIL_BLE") != "1", reason="plugin BLE tests are opt-in (HIL_BLE=1)")
 
@@ -172,8 +175,8 @@ def test_ble_notification_burst_and_overflow(ble, peripheral, artifacts):
 def test_ble_cancellation_releases_the_reader(ble, reader, peripheral):
     """Cancel a connect to an absent device and a notification wait; the reader is free right after.
 
-    "Right after" is once the reader confirmed the cancel, about one round trip: until then the reader answers
-    READER_BUSY (retryable), as the plugin docs say.
+    "Right after" is once the reader answered the cancelled request, about one round trip (BLE_CANCEL has no answer
+    of its own): until then the reader answers READER_BUSY (retryable), as the plugin docs say.
     """
     absent = ble("endpoints", {"readerId": reader["id"], "address": "02:00:00:00:00:01", "addressType": "random",
                                "profileId": "test-peripheral"})["id"]
@@ -242,3 +245,19 @@ def test_ble_solo_bt_smoke(ble, reader, artifacts):
                                                                for step in result["steps"]]})
     assert all(step["ok"] for step in result["steps"]), [step.get("code") for step in result["steps"]]
     assert result["closed"] == {"reason": "closed"}
+    assert_wiretap_redacted(unlock)
+
+
+def assert_wiretap_redacted(value_hex):
+    """The wiretap (a CI artifact) recorded the BLE_WRITE, but only the length of its bytes, never the code."""
+    path = os.environ.get("WIRETAP_FILE")
+    if not path:
+        return
+    raw = bytes.fromhex(value_hex)
+    text = Path(path).read_text(errors="replace")
+    # Booleans only: pytest's assertion rewriting would print both operands of an `in` into the report.
+    leaked = base64.b64encode(raw).decode() in text or value_hex in text.lower()
+    assert not leaked, "the wiretap recorded the SOLO user code"
+    writes = Wire(path).messages(0, "BLE_WRITE", "s2r")
+    assert any(write.get("payload", {}).get("value") == {"redacted": True, "bytes": len(raw)} for write in writes), \
+        "the wiretap did not record the unlock write (redacted) at all"

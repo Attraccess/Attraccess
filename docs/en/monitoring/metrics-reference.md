@@ -177,16 +177,16 @@ sum by (event) (rate(attraccess_ws_messages_total{status="error"}[5m]))
 
 ## Plugin Bluetooth (BLE)
 
-Plugins with the `BLE_TRANSPORT` permission talk to Bluetooth devices through Attractap readers. Labels stay low-cardinality: reader, endpoint and session ids appear only in the API logs (`ble op=...` lines).
+Plugins with the `BLE_TRANSPORT` permission talk to Bluetooth devices through Attractap readers. Labels stay low-cardinality: reader, endpoint and session ids appear only in the API logs, in `ble op=<operation> ... outcome=<ok or code> detail=<safe detail> <duration>ms` lines. Successful operations log at debug level, failed ones at info (`log`) level, so enable debug logging to see every operation. The lines never contain payload bytes.
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
 | `attraccess_plugin_ble_operations_total` | Counter | `operation`, `outcome` | Plugin BLE operations (`scan`, `connect`, `read`, `write`, `subscribe`, `unsubscribe`, ...); `outcome` is `ok` or the error code |
-| `attraccess_plugin_ble_operation_duration_seconds` | Histogram | `operation` | Duration of successful operations, including the reader round trip |
+| `attraccess_plugin_ble_operation_duration_seconds` | Histogram | `operation` | Duration of successful operations only, including the reader round trip; failed operations count only in `attraccess_plugin_ble_operations_total` |
 | `attraccess_plugin_ble_sessions_active` | Gauge | -- | Open plugin BLE sessions |
 | `attraccess_plugin_ble_session_closes_total` | Counter | `reason` | Closed sessions by reason (`closed`, `lease-expired`, `disconnected`, `cancelled`, ...) |
 | `attraccess_plugin_ble_rejections_total` | Counter | `code` | Calls refused by the profile, the reader allowlist or a payload bound (`OPERATION_NOT_ALLOWED`, `UNKNOWN_CHARACTERISTIC`, `PAYLOAD_TOO_LARGE`) |
-| `attraccess_plugin_ble_notifications_total` | Counter | `outcome` | Notifications by outcome: `delivered`, `overflow`, `oversized`, `malformed` |
+| `attraccess_plugin_ble_notifications_total` | Counter | `outcome` | Notifications by outcome: `delivered` (handed to the plugin's stream), `overflow` (the reader's buffer or the API's per-subscription queue overflowed; the stream fails with `NOTIFICATION_OVERFLOW`), `oversized` (above the profile's `maxNotificationBytes`; `PAYLOAD_TOO_LARGE`), `malformed` (bad encoding or a sequence gap or duplicate from the reader; `INTERNAL`). Every outcome other than `delivered` fails that stream |
 
 **Operation duration buckets:** 10ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s, 30s, 60s
 

@@ -367,7 +367,11 @@ through `pnpm serve` and nx to the API) and exports `WIRETAP_FILE`
 (`hil-artifacts/wiretap.jsonl`, emptied at the start of each run). Against an
 API started by hand without the preload, the tests that need the wire
 (`test_z_matrix_extra.py`) skip. The file holds card APDUs in full: lab
-evidence only, never commit it.
+evidence only, never commit it. Plugin BLE bytes are the exception: for
+`BLE_*` messages the wiretap keeps the structure but replaces every byte field
+(`value`, advertisement `data`) with `{"redacted": true, "bytes": <length>}`,
+because they carry device credentials (a lock's user code and crypt token) and
+CI uploads `hil-artifacts/` as an artifact.
 
 The tests in `test_nfc_cards.py` build on each other: one whose prerequisite
 (an enrolled card from an earlier test) is missing fails and names it, so
@@ -500,14 +504,17 @@ its polling (register reads grow, none fail).
 `hil/test_ble.py` checks plugin BLE through the reader (ATT-1033, ATT-1036). It is not part of the CI matrix and
 skips unless `HIL_BLE=1`. With it, `run.sh` builds the lab fixture plugin (`ble-fixture-plugin/`, never shipped;
 it only uses `context.ble` and offers REST routes that run step scripts inside one session) into the plugin
-directory of the API it starts. The devices come from the environment:
+directory of the API it starts. Its routes require the `system.plugins.manage` permission (the suite calls them as
+the admin). The devices come from the environment:
 
 - `BLE_PERIPHERAL_ADDRESS`: the generic GATT test peripheral (`ble-test-peripheral/`, see its README) in range of
   the reader, for example a second lab place flashed with it inside its own labgrid session for the duration of the
   run. It prints its address at boot (`ready address=...`).
 - `SOLO_USER_CODE` (and optionally `SOLO_ADDRESS`, else the first lock the scan finds): a PS Locks SOLO BT in
   factory `CRYPT_OFF` mode for the real-lock smoke. The
-  code is only ever passed through the environment.
+  code is only ever passed through the environment. It stays out of the artifacts: `ble-solo.json` drops the step
+  values, the wiretap records only byte lengths for BLE, and the test fails if `wiretap.jsonl` contains the bytes
+  of the unlock write. Vendor names like this one belong in the lab only, never in core docs or code.
 - `HIL_BLE_LONG=1` adds the 10-minute transfer (at least 256 KiB of MTU-sized writes without response, each
   acknowledged by a notification).
 
