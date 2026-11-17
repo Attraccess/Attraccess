@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { NFCCard, NFCCardPendingChange } from '@attraccess/database-entities';
 import type {
+  AttractapCardOwner,
   AttractapNfcCard,
   AttractapNfcCardPendingChange,
   NewAttractapNfcCard,
@@ -9,7 +10,7 @@ import type {
 } from '@attraccess/application-models';
 import { Repository } from 'typeorm';
 import type { AttractapCardStore } from '../../../attractap/card-store.port';
-import { toNfcCard, toPendingChange } from './attractap-mappers';
+import { toCardOwner, toNfcCard, toPendingChange } from './attractap-mappers';
 
 @Injectable()
 export class TypeOrmAttractapCardStore implements AttractapCardStore {
@@ -40,15 +41,14 @@ export class TypeOrmAttractapCardStore implements AttractapCardStore {
     return (await this.cards.count({ where: { user: { id: userId }, isActive: true } })) > 0;
   }
 
-  async create(userId: number, card: NewAttractapNfcCard, activate: boolean): Promise<AttractapNfcCard> {
+  async create(owner: AttractapCardOwner, card: NewAttractapNfcCard, activate: boolean): Promise<AttractapNfcCard> {
     const saved = await this.cards.manager.transaction(async (manager) => {
-      if (activate) await manager.update(NFCCard, { user: { id: userId } }, { isActive: false });
-      return await manager.save(NFCCard, { ...card, user: { id: userId }, isActive: activate });
+      if (activate) await manager.update(NFCCard, { user: { id: owner.id } }, { isActive: false });
+      return await manager.save(NFCCard, { ...card, user: { id: owner.id }, isActive: activate });
     });
-    // The owner is returned as the stored user row, which the notification of the new card is addressed to.
-    return toNfcCard(
-      (await this.cards.findOne({ where: { id: saved.id }, relations: ['user'] })) ?? (saved as NFCCard),
-    );
+    // The owner the caller loaded is the user the notification of the new card is addressed to; it is
+    // projected to the card owner fields so nothing else of the caller's user record leaves the store.
+    return { ...toNfcCard(saved as NFCCard), user: toCardOwner(owner) };
   }
 
   async activateExclusively(id: number): Promise<AttractapNfcCard> {

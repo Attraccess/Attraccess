@@ -104,15 +104,18 @@ describe('Attractap persistence adapters on SQLite', () => {
     it('switches the other cards of the owner off in the same transaction that stores the new one', async () => {
       const user = await source.getRepository(User).save({ username: 'owner', email: 'owner@example.test' });
       const cards = store();
-      const first = await cards.create(user.id, { uid: '01', keyNo: 1, key: 'k1' }, true);
+      const first = await cards.create(user, { uid: '01', keyNo: 1, key: 'k1' }, true);
+      // The owner is the caller's user projected to the owner fields, the same shape a lookup returns.
+      expect(first.user).toEqual((await cards.findById(first.id)).user);
       expect(first).toMatchObject({ isActive: true, user: { id: user.id, username: 'owner' } });
+      expect(first.user).not.toHaveProperty('passwordResetToken');
 
-      const second = await cards.create(user.id, { uid: '02', keyNo: 1, key: 'k2' }, true);
+      const second = await cards.create(user, { uid: '02', keyNo: 1, key: 'k2' }, true);
       expect(second.isActive).toBe(true);
       expect((await cards.findById(first.id)).isActive).toBe(false);
 
       // A card enrolled while another is active stays inactive and leaves the active one alone.
-      const third = await cards.create(user.id, { uid: '03', keyNo: 1, key: 'k3' }, false);
+      const third = await cards.create(user, { uid: '03', keyNo: 1, key: 'k3' }, false);
       expect(third.isActive).toBe(false);
       expect((await cards.findById(second.id)).isActive).toBe(true);
       expect(await cards.userHasActiveCard(user.id)).toBe(true);

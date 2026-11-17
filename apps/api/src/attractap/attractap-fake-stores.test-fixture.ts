@@ -1,4 +1,5 @@
 import type {
+  AttractapCardOwner,
   AttractapCrashReportRecord,
   AttractapCrashSymbolication,
   AttractapCredentialEventRecord,
@@ -151,8 +152,8 @@ export class FakeCardStore implements AttractapCardStore {
   async userHasActiveCard(userId: number) {
     return this.cards.some((card) => card.user?.id === userId && card.isActive);
   }
-  async create(userId: number, card: NewAttractapNfcCard, activate: boolean): Promise<AttractapNfcCard> {
-    if (activate) for (const other of this.cards) if (other.user?.id === userId) other.isActive = false;
+  async create(owner: AttractapCardOwner, card: NewAttractapNfcCard, activate: boolean): Promise<AttractapNfcCard> {
+    if (activate) for (const other of this.cards) if (other.user?.id === owner.id) other.isActive = false;
     const created = {
       id: this.nextId++,
       ...card,
@@ -160,7 +161,7 @@ export class FakeCardStore implements AttractapCardStore {
       updatedAt: new Date(0),
       lastSeen: new Date(0),
       isActive: activate,
-      user: { id: userId } as AttractapNfcCard['user'],
+      user: owner,
     };
     this.cards.push(created);
     return created;
