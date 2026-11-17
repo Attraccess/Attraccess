@@ -18,13 +18,14 @@ import {
   Setting,
   User,
 } from '@attraccess/database-entities';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { toProjectInvitationDto } from '../../../projects/dto/project.dto';
 import { ProjectsService } from '../../../projects/projects.service';
 import { resolveDatabaseBackend } from '../../backend';
 import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-transaction';
 import { createDataSource } from '../../sqlite/sqlite-connection';
 import { createSqliteUnitOfWork } from '../../sqlite/sqlite-unit-of-work';
+import type { TransactionScope } from '../../unit-of-work';
 import { TypeOrmProjectInvitationStore } from './typeorm-project-invitation.store';
 import { TypeOrmProjectStore } from './typeorm-project.store';
 import { TypeOrmProjectUsageStore } from './typeorm-project-usage.store';
@@ -204,8 +205,11 @@ describe('project persistence adapters on a real SQLite file', () => {
       const { id } = await projects.create({ ownerId: 1, name: 'Audited', description: null });
       const auditedInOpenTransaction: boolean[] = [];
       const audit = {
-        record: jest.fn(async (_event: unknown, manager?: EntityManager) => {
-          auditedInOpenTransaction.push(manager?.queryRunner?.isTransactionActive === true);
+        // The service hands the recorder its scope; the recorder joins the transaction behind it.
+        record: jest.fn(async (_event: unknown, scope?: TransactionScope) => {
+          auditedInOpenTransaction.push(
+            scope?.isOpen === true && uow.handleOf(scope).queryRunner?.isTransactionActive === true,
+          );
         }),
       };
       const metrics = { projectsTotal: { inc: jest.fn(), dec: jest.fn() } };
