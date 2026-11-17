@@ -28,6 +28,6 @@
     "@attraccess/application-models": "1.11.0-beta.1"
   },
   "peerDependencies": {
-    "@attraccess/plugins-frontend-ui": "^1.11.0-0"
+    "@attraccess/plugins-frontend-ui": "^2.0.0-0"
   }
 }
