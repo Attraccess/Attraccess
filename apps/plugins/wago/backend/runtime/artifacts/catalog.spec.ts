@@ -348,6 +348,8 @@ describe('runtime artifact catalog (isolated disk)', () => {
     expect(project.targets.build.outputs).toEqual([
       '{projectRoot}/package/package.json',
       '{projectRoot}/package/plugin.json',
+      // The licence file is copied with the manifests; it is not a built bundle.
+      '{projectRoot}/package/LICENSE.md',
     ]);
   });
 
