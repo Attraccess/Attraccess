@@ -90,7 +90,22 @@ export function toReader(reader: Attractap): AttractapReader {
   };
 }
 
-export function toCardOwner(user: User): AttractapCardOwner {
+/** The user fields a card owner is built from; a user row and the application's user record both carry them. */
+type CardOwnerSource = Pick<
+  User,
+  | 'id'
+  | 'username'
+  | 'email'
+  | 'locale'
+  | 'dateTimeLocale'
+  | 'isEmailVerified'
+  | 'isDisabled'
+  | 'externalIdentifier'
+  | 'createdAt'
+  | 'updatedAt'
+> & { deletedAt?: Date | null };
+
+export function toCardOwner(user: CardOwnerSource): AttractapCardOwner {
   return {
     id: user.id,
     username: user.username,

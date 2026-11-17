@@ -281,7 +281,7 @@ export class UsersService {
       for (let i = 0; i < saved.length; i++) {
         const roleKey = normalized[i]?.roleKey;
         if (roleKey) {
-          const role = await this.rbacStore.findRoleByKey(roleKey, context);
+          const role = await this.rbacStore.findRoleByKey(roleKey, context, { withPermissions: true });
           if (!role) {
             throw new BadRequestException(`Role with key '${roleKey}' not found`);
           }

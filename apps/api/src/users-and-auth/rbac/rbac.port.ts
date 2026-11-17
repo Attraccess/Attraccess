@@ -20,7 +20,12 @@ export interface RbacStore {
   userIdsWithPermission(permissionKey: string): Promise<number[]>;
   findUserRoles(userId: number): Promise<UserRoleRecord[]>;
   userExists(userId: number): Promise<boolean>;
-  findRoleByKey(key: string, context?: TransactionContext): Promise<RoleRecord | null>;
+  /** The role alone; `withPermissions` also reads the permissions it grants. */
+  findRoleByKey(
+    key: string,
+    context?: TransactionContext,
+    options?: { withPermissions?: boolean },
+  ): Promise<RoleRecord | null>;
   findRoleById(roleId: number, context?: TransactionContext): Promise<RoleRecord | null>;
   findDefaultRoles(context?: TransactionContext): Promise<RoleRecord[]>;
   roleKeyOf(roleId: number): Promise<string | null>;

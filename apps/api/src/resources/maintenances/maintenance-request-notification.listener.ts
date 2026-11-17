@@ -2,7 +2,7 @@
 // FEATURE: Manual maintenance mode for resources
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import type { ResourceNotificationRecipient } from '@attraccess/application-models';
+import type { NotificationRecipient } from '@attraccess/application-models';
 import { ResourceMaintenanceRequestCreatedEvent } from './events/maintenance-request-created.event';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
@@ -13,12 +13,6 @@ import * as de from './maintenance-request-notification.de.json';
 import { MAINTENANCE_NOTIFICATION_STORE, type MaintenanceNotificationStore } from './maintenance-request-store.port';
 
 const t = createTranslator({ en, de });
-
-type DispatchRecipient = Parameters<NotificationDispatchService['dispatch']>[0]['recipients'][number];
-
-/** The dispatcher reads the id, the address and the locale of a recipient, which the recipient model carries. */
-const asDispatchRecipient = (recipient: ResourceNotificationRecipient): DispatchRecipient =>
-  recipient as unknown as DispatchRecipient;
 
 @Injectable()
 export class MaintenanceRequestNotificationListener {
@@ -54,7 +48,7 @@ export class MaintenanceRequestNotificationListener {
 
       await this.notifications.dispatch({
         category: NotificationCategory.MAINTENANCE_REQUESTS,
-        recipients: recipients.map(asDispatchRecipient),
+        recipients,
         title: (recipient) => t(recipient.locale, 'title', { resourceName: resource.name }),
         body: (recipient) => {
           const requestedBy = requestedByUsername ?? t(recipient.locale, 'fallbackUser');
@@ -79,15 +73,12 @@ export class MaintenanceRequestNotificationListener {
     }
   }
 
-  private async collectRecipients(resource: {
-    id: number;
-    groupIds: number[];
-  }): Promise<ResourceNotificationRecipient[]> {
+  private async collectRecipients(resource: { id: number; groupIds: number[] }): Promise<NotificationRecipient[]> {
     const adminIds = await this.rbacService.getUserIdsWithPermission('resources.maintenance.manage');
     const admins = adminIds.length > 0 ? await this.store.findUsersByIds(adminIds) : [];
     const introducerUsers = await this.store.findIntroducerUsers(resource.id, resource.groupIds);
 
-    const byId = new Map<number, ResourceNotificationRecipient>();
+    const byId = new Map<number, NotificationRecipient>();
     for (const admin of admins) {
       if (admin.email) {
         byId.set(admin.id, admin);

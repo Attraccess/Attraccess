@@ -1,4 +1,5 @@
 import type {
+  AttractapCardOwner,
   AttractapNfcCard,
   AttractapNfcCardPendingChange,
   NewAttractapNfcCard,
@@ -15,8 +16,11 @@ export interface AttractapCardStore {
   listForUser(userId: number): Promise<AttractapNfcCard[]>;
   listAll(): Promise<AttractapNfcCard[]>;
   userHasActiveCard(userId: number): Promise<boolean>;
-  /** Stores the card; with `activate` the user's other cards are switched off in the same transaction. */
-  create(userId: number, card: NewAttractapNfcCard, activate: boolean): Promise<AttractapNfcCard>;
+  /**
+   * Stores the card for the owner; with `activate` the owner's other cards are switched off in the same
+   * transaction. The returned card carries the owner as passed in, projected to the card owner fields.
+   */
+  create(owner: AttractapCardOwner, card: NewAttractapNfcCard, activate: boolean): Promise<AttractapNfcCard>;
   /** Activates the card and deactivates the user's other cards atomically. Throws when the card does not exist. */
   activateExclusively(id: number): Promise<AttractapNfcCard>;
   deactivate(id: number): Promise<void>;

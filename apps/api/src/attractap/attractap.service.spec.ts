@@ -1,4 +1,4 @@
-import type { AttractapNfcCard } from '@attraccess/application-models';
+import type { AttractapCardOwner, AttractapNfcCard } from '@attraccess/application-models';
 import { AttractapService, SYMBOLICATION_CONCURRENCY } from './attractap.service';
 import { ReaderUpdatedEvent } from './events';
 import { EncryptionService } from '../encryption/encryption.service';
@@ -20,7 +20,7 @@ describe.each(['en', 'de', 'de-DE', undefined, 'fr'])('AttractapService RFID car
   let cards: FakeCardStore;
   let notifications: { dispatch: jest.Mock };
 
-  const user = { id: 12, username: 'jane', locale } as AttractapNfcCard['user'];
+  const user = { id: 12, username: 'jane', locale } as AttractapCardOwner;
   const seedCard = (): AttractapNfcCard => ({
     id: 7,
     uid: '04AABBCC',
@@ -60,7 +60,7 @@ describe.each(['en', 'de', 'de-DE', undefined, 'fr'])('AttractapService RFID car
   it('notifies the card owner when an RFID card is registered', async () => {
     await service.createNFCCard(user, { uid: '04AABBCC', key: 'secret', keyNo: 1 });
 
-    expect(cards.create).toHaveBeenCalledWith(12, { uid: '04AABBCC', key: 'encrypted:secret', keyNo: 1 }, true);
+    expect(cards.create).toHaveBeenCalledWith(user, { uid: '04AABBCC', key: 'encrypted:secret', keyNo: 1 }, true);
     expect(notifications.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
         category: NotificationCategory.NFC_CARDS,

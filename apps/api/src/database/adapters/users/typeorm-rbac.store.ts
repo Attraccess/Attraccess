@@ -109,12 +109,16 @@ export class TypeOrmRbacStore implements RbacStore {
     return this.source.getRepository(User).existsBy({ id: userId });
   }
 
-  async findRoleByKey(key: string, context?: TransactionContext): Promise<RoleRecord | null> {
+  async findRoleByKey(
+    key: string,
+    context?: TransactionContext,
+    options: { withPermissions?: boolean } = {},
+  ): Promise<RoleRecord | null> {
     const role = await this.manager(context)
       .getRepository(Role)
       .findOne({
         where: { key },
-        relations: ['rolePermissions'],
+        relations: options.withPermissions ? ['rolePermissions'] : [],
       });
     return role ? toRoleRecord(role) : null;
   }

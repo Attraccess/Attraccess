@@ -1,4 +1,8 @@
-import type { AttractapNfcCard, AttractapNfcCardPendingChange } from '@attraccess/application-models';
+import type {
+  AttractapCardOwner,
+  AttractapNfcCard,
+  AttractapNfcCardPendingChange,
+} from '@attraccess/application-models';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 import { EncryptionService } from '../../encryption/encryption.service';
@@ -157,7 +161,7 @@ export class CardOperationsService {
   }
 
   private async recordEnrollment(
-    user: { id: number },
+    user: AttractapCardOwner,
     uid: string,
     pending: AttractapNfcCardPendingChange,
     keyHex: string,

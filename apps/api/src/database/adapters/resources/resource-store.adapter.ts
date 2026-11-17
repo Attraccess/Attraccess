@@ -205,27 +205,31 @@ export class TypeOrmResourceStore implements ResourceStore {
   }
 
   async save(record: ResourceRecord): Promise<ResourceRecord> {
-    const entity = await this.resources.findOneByOrFail({ id: record.id });
-    entity.name = record.name;
-    entity.type = record.type;
-    entity.separateUnlockAndUnlatch = record.separateUnlockAndUnlatch;
-    entity.description = record.description;
-    entity.imageFilename = record.imageFilename;
-    entity.documentationType = record.documentationType;
-    entity.documentationMarkdown = record.documentationMarkdown;
-    entity.documentationUrl = record.documentationUrl;
-    entity.metadata = record.metadata;
-    entity.allowTakeOver = record.allowTakeOver;
-    entity.maxParallelSessions = record.maxParallelSessions;
-    entity.retrainingMaxAgeDays = record.retrainingMaxAgeDays;
-    entity.retrainingMaxInactivityDays = record.retrainingMaxInactivityDays;
-    entity.retrainingBlocksAccess = record.retrainingBlocksAccess;
-    entity.supervisionMode = record.supervisionMode;
-    entity.supervisedUsagesUntilIntroduction = record.supervisedUsagesUntilIntroduction;
-    entity.autoIntroductionTarget = record.autoIntroductionTarget;
-    entity.autoIntroductionGroupId = record.autoIntroductionGroupId;
-    await this.resources.save(entity);
-    return (await this.findDetailed([record.id]))[0];
+    // Writes only the columns; the relations the caller already loaded go back unchanged, so an
+    // update does not read every usage session of the resource a second time.
+    const entity = this.resources.create({
+      id: record.id,
+      name: record.name,
+      type: record.type,
+      separateUnlockAndUnlatch: record.separateUnlockAndUnlatch,
+      description: record.description,
+      imageFilename: record.imageFilename,
+      documentationType: record.documentationType,
+      documentationMarkdown: record.documentationMarkdown,
+      documentationUrl: record.documentationUrl,
+      metadata: record.metadata,
+      allowTakeOver: record.allowTakeOver,
+      maxParallelSessions: record.maxParallelSessions,
+      retrainingMaxAgeDays: record.retrainingMaxAgeDays,
+      retrainingMaxInactivityDays: record.retrainingMaxInactivityDays,
+      retrainingBlocksAccess: record.retrainingBlocksAccess,
+      supervisionMode: record.supervisionMode,
+      supervisedUsagesUntilIntroduction: record.supervisedUsagesUntilIntroduction,
+      autoIntroductionTarget: record.autoIntroductionTarget,
+      autoIntroductionGroupId: record.autoIntroductionGroupId,
+    });
+    const saved = await this.resources.save(entity);
+    return { ...record, updatedAt: saved.updatedAt ?? record.updatedAt };
   }
 
   async setImageFilename(resourceId: number, filename: string): Promise<void> {

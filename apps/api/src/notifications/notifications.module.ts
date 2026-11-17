@@ -10,9 +10,18 @@ import { EmailModule } from '../email/email.module';
 import { LiveTopicsModule } from '../live-updates/live-topics.module';
 import { NotificationLiveTopicsProvider } from './notification-live-topics.provider';
 import { SettingsModule } from '../settings/settings.module';
+import { EmailPersistenceModule } from '../database/adapters/email/email-persistence.module';
 
 @Module({
-  imports: [NotificationsPersistenceModule, PushModule, MetricsModule, EmailModule, SettingsModule, LiveTopicsModule],
+  imports: [
+    NotificationsPersistenceModule,
+    EmailPersistenceModule,
+    PushModule,
+    MetricsModule,
+    EmailModule,
+    SettingsModule,
+    LiveTopicsModule,
+  ],
   controllers: [NotificationsController],
   providers: [
     NotificationPreferenceService,

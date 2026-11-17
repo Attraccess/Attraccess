@@ -30,8 +30,6 @@ import {
 
 import type { ResourcePersistenceContext } from '../../resource-persistence-context';
 
-type DispatchRecipient = Parameters<NotificationDispatchService['dispatch']>[0]['recipients'][number];
-
 @Injectable()
 export class ResourceGroupsIntroductionsService {
   constructor(
@@ -83,9 +81,8 @@ export class ResourceGroupsIntroductionsService {
     const url = `/resource-groups/${groupId}`;
 
     void this.notifications
-      .dispatch({
+      .dispatchToUser(userId, {
         category: NotificationCategory.ACCESS_CHANGES,
-        recipients: [{ id: userId } as unknown as DispatchRecipient],
         title,
         body,
         url,

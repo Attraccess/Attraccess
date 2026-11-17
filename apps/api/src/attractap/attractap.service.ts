@@ -5,6 +5,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import type {
   AttractapCrashReportRecord,
+  AttractapCardOwner,
   AttractapFirmwareInfo,
   AttractapNfcCard,
   AttractapReader,
@@ -12,6 +13,7 @@ import type {
   AttractapReaderFilter,
   AttractapReaderWithResources,
   NewAttractapNfcCard,
+  NotificationRecipient,
 } from '@attraccess/application-models';
 
 import { AUDIT_RECORDER, AuditRecorder } from '../audit/recorder/audit-event';
@@ -45,8 +47,6 @@ import { ATTRACTAP_CARD_STORE, type AttractapCardStore } from './card-store.port
 import { ATTRACTAP_CRASH_REPORT_STORE, type AttractapCrashReportStore } from './crash-report-store.port';
 
 import { ATTRACTAP_READER_STORE, type AttractapReaderStore } from './reader-store.port';
-
-import { asCoreUser, type NotificationRecipient } from './core-user';
 
 import { NotificationCategory } from '../notifications/notification-types';
 
@@ -393,7 +393,8 @@ export class AttractapService {
     void this.notifications
       .dispatch({
         category: NotificationCategory.NFC_CARDS,
-        recipients: [asCoreUser(owner)],
+        // A card owner carries the id, address and locale the dispatcher reads.
+        recipients: [owner],
         title: (recipient: NotificationRecipient) => t(recipient.locale, `${action}Title`),
         body: (recipient: NotificationRecipient) => t(recipient.locale, `${action}Body`, { cardId: card.id }),
         url: '/attractap/nfc-cards',
@@ -425,13 +426,13 @@ export class AttractapService {
   }
 
   public async createNFCCard(
-    user: { id: number },
+    user: AttractapCardOwner,
     data: NewAttractapNfcCard,
     options: { activate?: boolean } = {},
   ): Promise<AttractapNfcCard> {
     const activate = options.activate ?? true;
     const card = await this.cardStore.create(
-      user.id,
+      user,
       { uid: data.uid, keyNo: data.keyNo, key: this.encryptionService.encrypt(data.key) },
       activate,
     );

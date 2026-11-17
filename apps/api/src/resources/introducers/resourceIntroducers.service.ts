@@ -26,8 +26,6 @@ import * as en from './resourceIntroducers.en.json';
 
 export const t = createTranslator({ en, de });
 
-type DispatchRecipient = Parameters<NotificationDispatchService['dispatch']>[0]['recipients'][number];
-
 @Injectable()
 export class ResourceIntroducersService {
   constructor(
@@ -117,26 +115,21 @@ export class ResourceIntroducersService {
           ? 'grantedIntroducer'
           : 'revokedIntroducer';
 
-    void this.store
-      .findUserLocale(userId)
-      .then((user) => {
-        const recipient = (user ?? { id: userId }) as unknown as DispatchRecipient;
-        return this.notifications.dispatch({
-          category: NotificationCategory.ACCESS_CHANGES,
-          recipients: [recipient],
-          title: (r) => t(r.locale, 'title'),
-          body: (r) => t(r.locale, bodyKey, { resourceId }),
-          url,
-          dedupeKey: `resource-access-${resourceId}-${userId}-${bodyKey}`,
-          sendEmail: (r) =>
-            this.notifications.sendEmailTemplate(r, NotificationCategory.ACCESS_CHANGES, {
-              accessChange: {
-                title: t(r.locale, 'title'),
-                body: t(r.locale, bodyKey, { resourceId }),
-                url,
-              },
-            }),
-        });
+    void this.notifications
+      .dispatchToUser(userId, {
+        category: NotificationCategory.ACCESS_CHANGES,
+        title: (r) => t(r.locale, 'title'),
+        body: (r) => t(r.locale, bodyKey, { resourceId }),
+        url,
+        dedupeKey: `resource-access-${resourceId}-${userId}-${bodyKey}`,
+        sendEmail: (r) =>
+          this.notifications.sendEmailTemplate(r, NotificationCategory.ACCESS_CHANGES, {
+            accessChange: {
+              title: t(r.locale, 'title'),
+              body: t(r.locale, bodyKey, { resourceId }),
+              url,
+            },
+          }),
       })
       .catch((error) => {
         this.logger.error(`Failed to notify user ${userId} about resource access changes: ${(error as Error).message}`);

@@ -41,7 +41,7 @@ describe('persisted resource introducer aggregation', () => {
       await source.query(`DELETE FROM "${metadata.tableName}"`);
     }
     service = new ResourceIntroducersService(new TypeOrmResourceIntroducerStore(source), new EventEmitter2(), {
-      dispatch: jest.fn(),
+      dispatchToUser: jest.fn(),
     } as unknown as NotificationDispatchService);
     await source.getRepository(User).insert(
       Array.from({ length: 6 }, (_, index) => ({

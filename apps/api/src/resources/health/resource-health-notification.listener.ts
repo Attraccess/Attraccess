@@ -2,7 +2,7 @@
 // FEATURE: Resource health monitoring system for subsystem-level status tracking
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { ResourceHealthStatus, type ResourceNotificationRecipient } from '@attraccess/application-models';
+import { ResourceHealthStatus, type NotificationRecipient } from '@attraccess/application-models';
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
@@ -13,12 +13,6 @@ import * as en from './resource-health-notification.en.json';
 import * as de from './resource-health-notification.de.json';
 
 const t = createTranslator({ en, de });
-
-type DispatchRecipient = Parameters<NotificationDispatchService['dispatch']>[0]['recipients'][number];
-
-/** The dispatcher reads the id, the address and the locale of a recipient, which the recipient model carries. */
-const asDispatchRecipient = (recipient: ResourceNotificationRecipient): DispatchRecipient =>
-  recipient as unknown as DispatchRecipient;
 
 @Injectable()
 export class ResourceHealthNotificationListener {
@@ -52,7 +46,7 @@ export class ResourceHealthNotificationListener {
       const becameUnhealthy = event.status === ResourceHealthStatus.UNHEALTHY;
       await this.notifications.dispatch({
         category: NotificationCategory.RESOURCE_HEALTH,
-        recipients: recipients.map(asDispatchRecipient),
+        recipients,
         title: (recipient) =>
           t(recipient.locale, becameUnhealthy ? 'titleDegraded' : 'titleRecovered', { resourceName: resource.name }),
         body: (recipient) =>
@@ -83,15 +77,12 @@ export class ResourceHealthNotificationListener {
     }
   }
 
-  private async collectRecipients(resource: {
-    id: number;
-    groupIds: number[];
-  }): Promise<ResourceNotificationRecipient[]> {
+  private async collectRecipients(resource: { id: number; groupIds: number[] }): Promise<NotificationRecipient[]> {
     const adminIds = await this.rbacService.getUserIdsWithPermission('resources.maintenance.manage');
     const admins = adminIds.length > 0 ? await this.recipientStore.findUsersByIds(adminIds) : [];
     const introducerUsers = await this.recipientStore.findIntroducerUsers(resource.id, resource.groupIds);
 
-    const byId = new Map<number, ResourceNotificationRecipient>();
+    const byId = new Map<number, NotificationRecipient>();
     for (const admin of admins) {
       if (admin.email) {
         byId.set(admin.id, admin);

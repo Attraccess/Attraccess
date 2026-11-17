@@ -159,13 +159,13 @@ export interface MeteringBillableUsage extends MeteringUsageRecord {
 }
 
 /** The flow nodes and edges that define a resource's meters. */
-export interface MeteringFlowNodeRecord {
+interface MeteringFlowNodeRecord {
   id: string;
   type: string;
   data: Record<string, unknown> | null;
 }
 
-export interface MeteringFlowEdgeRecord {
+interface MeteringFlowEdgeRecord {
   source: string;
   target: string;
 }

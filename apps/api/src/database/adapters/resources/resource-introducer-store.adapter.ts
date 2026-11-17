@@ -1,7 +1,7 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In } from 'typeorm';
-import { ResourceIntroducer, User } from '@attraccess/database-entities';
+import { ResourceIntroducer } from '@attraccess/database-entities';
 import type { ResourceIntroducerRecord, ResourceIntroducerType } from '@attraccess/application-models';
 import type { ResourcePersistenceContext } from '../../../resources/resource-persistence-context';
 import type { ResourceIntroducerStore } from '../../../resources/introducers/resource-introducer-store.port';
@@ -120,10 +120,5 @@ export class TypeOrmResourceIntroducerStore implements ResourceIntroducerStore {
 
   async remove(grantId: number): Promise<void> {
     await this.repository().delete({ id: grantId });
-  }
-
-  async findUserLocale(userId: number): Promise<{ id: number; locale: string } | null> {
-    const user = await this.dataSource.getRepository(User).findOne({ where: { id: userId }, select: ['id', 'locale'] });
-    return user ? { id: user.id, locale: user.locale } : null;
   }
 }

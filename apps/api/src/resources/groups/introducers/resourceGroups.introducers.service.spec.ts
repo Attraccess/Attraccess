@@ -9,7 +9,7 @@ import { NotificationCategory } from '../../../notifications/notification-types'
 describe('ResourceGroupsIntroducersService notifications', () => {
   let service: ResourceGroupsIntroducersService;
   let repository: { list: jest.Mock; find: jest.Mock; insert: jest.Mock; remove: jest.Mock };
-  let notifications: { dispatch: jest.Mock };
+  let notifications: { dispatchToUser: jest.Mock };
 
   beforeEach(async () => {
     repository = {
@@ -18,7 +18,7 @@ describe('ResourceGroupsIntroducersService notifications', () => {
       insert: jest.fn().mockImplementation(async (groupId, userId, type) => ({ id: 1, userId, type })),
       remove: jest.fn().mockResolvedValue(undefined),
     };
-    notifications = { dispatch: jest.fn().mockResolvedValue(undefined) };
+    notifications = { dispatchToUser: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -35,10 +35,10 @@ describe('ResourceGroupsIntroducersService notifications', () => {
   it('notifies the user when group maintainer status is granted', async () => {
     await service.grant(5, 3, ResourceIntroducerType.MAINTAINER);
 
-    expect(notifications.dispatch).toHaveBeenCalledWith(
+    expect(notifications.dispatchToUser).toHaveBeenCalledWith(
+      3,
       expect.objectContaining({
         category: NotificationCategory.ACCESS_CHANGES,
-        recipients: [expect.objectContaining({ id: 3 })],
         title: 'Your group access changed',
         body: 'You were made a maintainer for group #5.',
         url: '/resource-groups/5',
@@ -51,10 +51,10 @@ describe('ResourceGroupsIntroducersService notifications', () => {
 
     await service.revoke(5, 3, ResourceIntroducerType.INTRODUCER);
 
-    expect(notifications.dispatch).toHaveBeenCalledWith(
+    expect(notifications.dispatchToUser).toHaveBeenCalledWith(
+      3,
       expect.objectContaining({
         category: NotificationCategory.ACCESS_CHANGES,
-        recipients: [expect.objectContaining({ id: 3 })],
         body: 'Your introducer status for group #5 was revoked.',
         url: '/resource-groups/5',
       }),

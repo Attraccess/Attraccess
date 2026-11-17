@@ -18,7 +18,7 @@ export interface FlowRecord {
   updatedAt: Date;
 }
 
-export interface FlowNodePosition {
+interface FlowNodePosition {
   x: number;
   y: number;
 }

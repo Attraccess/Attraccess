@@ -9,11 +9,13 @@ import { NotificationLiveService } from './notification-live.service';
 import { NotificationCategory, NotificationChannel } from './notification-types';
 import { PushService } from '../push/push.service';
 import { EmailService } from '../email/email.service';
+import { EMAIL_RECIPIENT_DIRECTORY } from '../email/email-recipient-directory.port';
 
 describe('NotificationDispatchService', () => {
   let service: NotificationDispatchService;
   const settings = { resolveLanguage: jest.fn(async (locale: string | undefined) => locale?.trim() || 'en') };
   let preferences: { isChannelEnabled: jest.Mock };
+  let directory: { findById: jest.Mock };
   let push: { sendToUser: jest.Mock };
   let live: { emitToUser: jest.Mock; isUserPresent: jest.Mock };
   let email: {
@@ -28,6 +30,7 @@ describe('NotificationDispatchService', () => {
   beforeEach(async () => {
     settings.resolveLanguage.mockImplementation(async (locale) => locale?.trim() || 'en');
     preferences = { isChannelEnabled: jest.fn().mockResolvedValue(true) };
+    directory = { findById: jest.fn().mockResolvedValue(null) };
     push = { sendToUser: jest.fn().mockResolvedValue(undefined) };
     live = { emitToUser: jest.fn(), isUserPresent: jest.fn().mockReturnValue(true) };
     email = {
@@ -45,6 +48,7 @@ describe('NotificationDispatchService', () => {
         { provide: PushService, useValue: push },
         { provide: NotificationLiveService, useValue: live },
         { provide: EmailService, useValue: email },
+        { provide: EMAIL_RECIPIENT_DIRECTORY, useValue: directory },
       ],
     }).compile();
 
@@ -77,6 +81,32 @@ describe('NotificationDispatchService', () => {
       url: '/resources/4/maintenance',
       severity: 'info',
     });
+  });
+
+  it('loads a user known only by id and addresses the texts and the email to that recipient', async () => {
+    const stored = { id: 7, username: 'ada', email: 'ada@example.com', locale: 'de' };
+    directory.findById.mockResolvedValue(stored);
+    const sendEmail = jest.fn().mockResolvedValue(undefined);
+    const title = jest.fn((r: NotificationRecipient) => `title:${r.locale}`);
+
+    await service.dispatchToUser(7, {
+      category: NotificationCategory.ACCESS_CHANGES,
+      title,
+      body: 'body',
+      sendEmail,
+    });
+
+    expect(directory.findById).toHaveBeenCalledWith(7);
+    expect(title).toHaveBeenCalledWith(expect.objectContaining({ id: 7, locale: 'de' }));
+    expect(sendEmail).toHaveBeenCalledWith(stored, 'de');
+    expect(push.sendToUser).toHaveBeenCalledWith(7, expect.objectContaining({ title: 'title:de' }));
+  });
+
+  it('notifies nobody when the user known by id no longer exists', async () => {
+    await service.dispatchToUser(8, { category: NotificationCategory.ACCESS_CHANGES, title: 't', body: 'b' });
+
+    expect(push.sendToUser).not.toHaveBeenCalled();
+    expect(live.emitToUser).not.toHaveBeenCalled();
   });
 
   it('respects per-channel preferences for plugin categories', async () => {

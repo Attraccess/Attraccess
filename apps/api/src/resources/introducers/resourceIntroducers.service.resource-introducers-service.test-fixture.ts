@@ -22,7 +22,7 @@ export function registerResourceIntroducersServiceFixture() {
   let service: ResourceIntroducersService;
   let store: IntroducerStoreFake;
   let eventEmitter: { emit: jest.Mock };
-  let notifications: { dispatch: jest.Mock; sendEmailTemplate: jest.Mock };
+  let notifications: { dispatchToUser: jest.Mock; sendEmailTemplate: jest.Mock };
 
   beforeEach(async () => {
     store = {
@@ -34,10 +34,9 @@ export function registerResourceIntroducersServiceFixture() {
       listViaGroupsForResources: jest.fn().mockResolvedValue([]),
       insert: jest.fn(),
       remove: jest.fn().mockResolvedValue(undefined),
-      findUserLocale: jest.fn().mockResolvedValue({ id: 2, locale: 'en' }),
     };
     eventEmitter = { emit: jest.fn() };
-    notifications = { dispatch: jest.fn().mockResolvedValue(undefined), sendEmailTemplate: jest.fn() };
+    notifications = { dispatchToUser: jest.fn().mockResolvedValue(undefined), sendEmailTemplate: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
