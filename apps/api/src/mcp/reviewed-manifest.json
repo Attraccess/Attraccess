@@ -272,12 +272,12 @@
   "getAllSSOProviders": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "cf12d8af"
+    "shape": "7be0f077"
   },
   "createOneSsoProvider": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "8a0e0b47"
+    "shape": "4f9ca7ef"
   },
   "linkUserToExternalAccount": {
     "decision": "deny",
@@ -287,12 +287,12 @@
   "getOneSSOProviderById": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "6a5f50e9"
+    "shape": "4dbf75b1"
   },
   "updateOneSSOProvider": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "dd34b8ea"
+    "shape": "238ea0b2"
   },
   "deleteOneSSOProvider": {
     "decision": "allow",
