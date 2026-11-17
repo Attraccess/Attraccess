@@ -3,6 +3,23 @@ import { createDataSource } from './sqlite-connection';
 
 const sqliteTransactions = new WeakMap<DataSource, Promise<unknown>>();
 const resourceConnections = new WeakMap<DataSource, Promise<DataSource>>();
+const connectionHooks = new WeakMap<DataSource, Array<(connection: DataSource) => void>>();
+
+/**
+ * Applies `hook` to the dedicated resource-lifecycle connection of `source` (query instrumentation): right away when it
+ * is open, otherwise as soon as it opens. A connection reopened after shutdown gets the hook again.
+ */
+export function onResourceConnection(source: DataSource, hook: (connection: DataSource) => void): void {
+  const hooks = connectionHooks.get(source) ?? [];
+  hooks.push(hook);
+  connectionHooks.set(source, hooks);
+  void resourceConnections.get(source)?.then(hook, () => undefined);
+}
+
+function applyConnectionHooks(source: DataSource, connection: DataSource): DataSource {
+  for (const hook of connectionHooks.get(source) ?? []) hook(connection);
+  return connection;
+}
 
 async function getResourceConnection(source: DataSource): Promise<DataSource> {
   if (source.options.type !== 'sqlite') return source;
@@ -17,7 +34,9 @@ async function getResourceConnection(source: DataSource): Promise<DataSource> {
       synchronize: false,
       migrationsRun: false,
       dropSchema: false,
-    }).initialize();
+    })
+      .initialize()
+      .then((opened) => applyConnectionHooks(source, opened));
     resourceConnections.set(source, connection);
   }
   return connection;

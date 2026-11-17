@@ -4,7 +4,7 @@ import { resolveDatabasePath } from '../../config/storage-path';
 import * as migrations from '../migrations';
 import type { MigrationTrack } from '../backend/database-backend';
 import type { TypeOrmDatabaseBackend } from '../backend/resolve-database-backend';
-import { closeResourceTransactionConnection } from './run-serialized-transaction';
+import { closeResourceTransactionConnection, onResourceConnection } from './run-serialized-transaction';
 import { createDataSource } from './sqlite-connection';
 import { sqliteErrorClassifier } from './sqlite-errors';
 import { createSqlitePluginMigrationEngine } from './sqlite-plugin-migration-engine';
@@ -49,6 +49,7 @@ export const sqliteBackend: TypeOrmDatabaseBackend = {
     hostTransactionScope: sqliteHostTransactionScope,
   },
   transfer: createSqliteTransfer(migrationTrack),
+  onCompanionConnection: onResourceConnection,
   async shutdown(source: DataSource): Promise<void> {
     await closeResourceTransactionConnection(source);
   },
