@@ -121,6 +121,62 @@ describe('plugin persistence host on a real SQLite file', () => {
     expect(order).toEqual(['core:start', 'core:end', 'plugin:start']);
   });
 
+  /**
+   * A nested `persistence.transaction` call inside a plugin transaction would wait for the write queue its own outer
+   * unit holds. The documented outcome: the nested call is rejected at once and never writes. If the plugin lets that
+   * rejection propagate, the outer unit rolls back its write too; if the plugin catches it, the outer unit is not
+   * affected and commits its own write.
+   */
+  describe('a nested persistence.transaction call on the host file', () => {
+    const NESTED = /inside a transaction callback/;
+
+    /** Fails the test instead of hanging when `promise` does not settle in time (a deadlock on the queue). */
+    async function withoutDeadlock<T>(promise: Promise<T>): Promise<T> {
+      let timer: NodeJS.Timeout | undefined;
+      const deadline = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('deadlocked on the shared write queue')), 5_000);
+      });
+      try {
+        return await Promise.race([promise, deadline]);
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    it('is rejected without a deadlock, and the outer write rolls back when the rejection propagates', async () => {
+      const { persistence } = context();
+      const sqlite = sqlitePersistence({ persistence });
+      const outer = sqlite.transaction(async (manager) => {
+        await manager.getRepository(Booking).save({ slot: 'outer' });
+        await sqlite.transaction(async (inner) => {
+          await inner.getRepository(Booking).save({ slot: 'inner' });
+        });
+      });
+
+      await expect(withoutDeadlock(outer)).rejects.toThrow(NESTED);
+      expect(await slots()).toEqual([]);
+      // The queue is free for the next caller.
+      await withoutDeadlock(persistence.transaction(async () => undefined));
+    });
+
+    it('is rejected without a deadlock, and the outer write commits when the plugin catches the rejection', async () => {
+      const { persistence } = context();
+      const sqlite = sqlitePersistence({ persistence });
+      let nested: unknown;
+      await withoutDeadlock(
+        sqlite.transaction(async (manager) => {
+          await manager.getRepository(Booking).save({ slot: 'outer' });
+          nested = await sqlite
+            .transaction(async (inner) => inner.getRepository(Booking).save({ slot: 'inner' }))
+            .catch((error: unknown) => error);
+        }),
+      );
+
+      expect((nested as Error).message).toMatch(NESTED);
+      expect(await slots()).toEqual(['outer']);
+    });
+  });
+
   it('only serves repositories of the entities the plugin registered', async () => {
     const sqlite = sqlitePersistence(context());
     await sqlite.getRepository(Booking).save({ slot: 'wed' });

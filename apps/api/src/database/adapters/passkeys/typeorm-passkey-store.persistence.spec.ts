@@ -52,38 +52,8 @@ describe('TypeOrmPasskeyStore on real SQLite', () => {
   });
 
   describe('challenge consumption', () => {
-    it('hands a stored challenge to exactly one of many concurrent consumers on independent connections', async () => {
-      await storeA.issueChallenge({ challenge: 'c-1', userId: null, expiresAt: new Date(Date.now() + 60_000) });
-
-      const results = await Promise.all(
-        Array.from({ length: 8 }, (_, index) => (index % 2 ? storeA : storeB).consumeChallenge('c-1')),
-      );
-
-      expect(results.filter((result) => result !== null)).toHaveLength(1);
-      expect(await storeA.consumeChallenge('c-1')).toBeNull();
-    });
-
-    it('returns the stored challenge with its owner and expiry as neutral values', async () => {
-      const expiresAt = new Date(Date.now() + 60_000);
-      await storeA.issueChallenge({ challenge: 'c-2', userId: 7, expiresAt });
-
-      const consumed = await storeB.consumeChallenge('c-2');
-
-      expect(consumed).toEqual({ challenge: 'c-2', userId: 7, expiresAt });
-      expect(consumed?.expiresAt).toBeInstanceOf(Date);
-    });
-
-    it('burns an expired challenge too, and reports it with a past expiry for the caller to refuse', async () => {
-      await first
-        .getRepository(PasskeyChallenge)
-        .insert({ challenge: 'c-3', userId: null, expiresAt: new Date(Date.now() - 1000) });
-
-      const consumed = await storeA.consumeChallenge('c-3');
-
-      expect(consumed?.expiresAt.getTime()).toBeLessThan(Date.now());
-      expect(await storeA.consumeChallenge('c-3')).toBeNull();
-    });
-
+    // Single consumption across connections and the neutral challenge values are part of the PasskeyStore
+    // conformance suite (database/conformance/ports).
     it('sweeps expired challenges when a new one is issued', async () => {
       await first
         .getRepository(PasskeyChallenge)
@@ -92,10 +62,6 @@ describe('TypeOrmPasskeyStore on real SQLite', () => {
       await storeA.issueChallenge({ challenge: 'fresh', userId: null, expiresAt: new Date(Date.now() + 60_000) });
 
       expect((await first.getRepository(PasskeyChallenge).find()).map((row) => row.challenge)).toEqual(['fresh']);
-    });
-
-    it('answers null for a challenge that was never issued', async () => {
-      expect(await storeA.consumeChallenge('unknown')).toBeNull();
     });
   });
 

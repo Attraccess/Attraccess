@@ -1,6 +1,5 @@
 import { BillingTransactionStatus } from '@attraccess/application-models';
 import { BillingTransaction, BillingTransactionItem, Setting, User } from '@attraccess/database-entities';
-import { BadRequestException } from '@nestjs/common';
 import { instanceToPlain } from 'class-transformer';
 import { billingTransactionAuditEvent } from '../../../audit/policies/billing';
 import { toBillingTransactionDto } from '../../../billing/dto/billing-dto.mapper';
@@ -149,38 +148,8 @@ describe('TypeOrmBillingLedgerStore on real SQLite', () => {
       expect(await main.ledger.getBalance(987654)).toBeNull();
     });
 
-    it('reads the balance a caller transaction has not committed yet', async () => {
-      const { user } = await db.seed(db.primary, 'inside');
-
-      await main.unitOfWork.run(async (scope) => {
-        await main.ledger.insertTransaction(
-          { userId: user.id, amount: 40, status: BillingTransactionStatus.Completed },
-          { context: scope },
-        );
-        expect(await main.ledger.getBalance(user.id, scope)).toBe(40);
-        expect(await main.ledger.getBalance(user.id)).toBe(0);
-      });
-      expect(await balanceOf(user.id)).toBe(40);
-    });
-
-    it('keeps the balance exact when independent connections add to the same account at once', async () => {
-      const { user } = await db.seed(db.primary, 'race');
-      const other = await db.connectIndependent();
-      const writers = [main, other];
-
-      await Promise.all(
-        Array.from({ length: 30 }, (_, index) =>
-          writers[index % 2].ledger.insertTransaction({
-            userId: user.id,
-            amount: 3,
-            status: BillingTransactionStatus.Completed,
-          }),
-        ),
-      );
-
-      expect(await balanceOf(user.id)).toBe(90);
-      expect(await db.primary.getRepository(BillingTransaction).countBy({ userId: user.id })).toBe(30);
-    }, 60_000);
+    // Uncommitted reads and exact concurrent sums are part of the BillingLedgerStore conformance suite
+    // (database/conformance/ports), which runs them on every backend.
   });
 
   describe('settleUsageCharge', () => {
@@ -253,24 +222,6 @@ describe('TypeOrmBillingLedgerStore on real SQLite', () => {
       expect(await db.primary.getRepository(Setting).countBy({ parent: 'audit-probe' })).toBe(probes);
     });
 
-    it('joins the caller unit of work: nothing persists or is published when it rolls back', async () => {
-      const { user, resource } = await db.seed(db.primary, 'joined');
-      const usage = await db.seedUsage(db.primary, user.id, resource.id);
-      const effect = jest.fn();
-
-      await expect(
-        main.unitOfWork.run(async (scope) => {
-          await main.service.chargeForResourceUsage(billable(usage), scope);
-          scope.afterCommit(effect);
-          throw new Error('abort the lifecycle');
-        }),
-      ).rejects.toThrow('abort the lifecycle');
-
-      expect(await db.primary.getRepository(BillingTransaction).countBy({ resourceUsageId: usage.id })).toBe(0);
-      expect(effect).not.toHaveBeenCalled();
-      expect(main.mail.sendResourceUsageBillingSummaryEmail).not.toHaveBeenCalled();
-    });
-
     it('publishes the receipt only after the charge committed', async () => {
       const { user, resource } = await db.seed(db.primary, 'publish');
       const usage = await db.seedUsage(db.primary, user.id, resource.id);
@@ -323,23 +274,6 @@ describe('TypeOrmBillingLedgerStore on real SQLite', () => {
     });
   });
 
-  describe('no duplicated charge', () => {
-    it('charges a usage exactly once when two connections settle it at the same time', async () => {
-      const { user, resource } = await db.seed(db.primary, 'dup');
-      const usage = await db.seedUsage(db.primary, user.id, resource.id);
-      await main.ledger.insertTransaction({ userId: user.id, amount: 100, status: BillingTransactionStatus.Completed });
-      const other = await db.connectIndependent();
-
-      const outcomes = await Promise.allSettled([
-        main.service.chargeForResourceUsage(billable(usage)),
-        other.service.chargeForResourceUsage(billable(usage)),
-      ]);
-
-      expect(outcomes.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1);
-      const rejected = outcomes.find((outcome) => outcome.status === 'rejected') as PromiseRejectedResult;
-      expect(rejected.reason).toBeInstanceOf(BadRequestException);
-      expect(await db.primary.getRepository(BillingTransaction).countBy({ resourceUsageId: usage.id })).toBe(1);
-      expect(await balanceOf(user.id)).toBe(75);
-    }, 60_000);
-  });
+  // Joining the caller unit of work and charging a usage exactly once across connections are part of the
+  // BillingLedgerStore conformance suite (database/conformance/ports).
 });
