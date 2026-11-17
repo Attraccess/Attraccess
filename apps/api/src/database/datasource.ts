@@ -1,6 +1,5 @@
 // typeorm.config.ts
 
-import { DataSourceOptions } from 'typeorm';
 import { Logger } from '@nestjs/common';
 import { resolveDatabaseBackend } from './backend';
 
@@ -11,6 +10,6 @@ const dbConfig = backend.createDataSourceOptions();
 new Logger('Database').log(`backend ${backend.type}`);
 
 export const databaseBackend = backend;
-export const dataSourceConfig: Partial<DataSourceOptions> = dbConfig;
+export const dataSourceConfig = dbConfig;
 
-export default backend.createDataSource(dataSourceConfig as DataSourceOptions);
+export default backend.createDataSource(dataSourceConfig);

@@ -1,5 +1,3 @@
-import type { DataSource } from 'typeorm';
-
 /**
  * The neutral form of a whole database for export, import and backup (docs/en/developer/adding-a-database-backend.md,
  * "Export, import and backup contract"). It carries no engine syntax: each backend adapter converts its own storage
@@ -88,9 +86,10 @@ export class SnapshotIncompatibleError extends Error {
  * snapshot's migration state (the same core track and the same plugin migrations), replaces its data completely, and
  * either succeeds fully or changes nothing.
  */
-export interface DatabaseTransfer {
-  exportSnapshot(source: DataSource, options?: ExportSnapshotOptions): Promise<DatabaseSnapshot>;
-  importSnapshot(target: DataSource, snapshot: DatabaseSnapshot): Promise<void>;
+/** `TSource` is the engine's connection; the backend registry fixes it. */
+export interface DatabaseTransfer<TSource = unknown> {
+  exportSnapshot(source: TSource, options?: ExportSnapshotOptions): Promise<DatabaseSnapshot>;
+  importSnapshot(target: TSource, snapshot: DatabaseSnapshot): Promise<void>;
 }
 
 /** Snapshots are plain JSON; this is the one place that fixes how they are written and read. */

@@ -1,3 +1,6 @@
+/** Connection settings a test hands in to point the engine at its own database. Opaque to the plugin system. */
+export type PluginMigrationEngineConfig = object;
+
 /** Constructor of a migration class a plugin ships. The engine adapter knows how to run it. */
 export type PluginMigrationClassRef = new () => object;
 

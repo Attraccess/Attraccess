@@ -13,7 +13,7 @@ import {
   type StartBlockedState,
   type StartCapacityResult,
 } from '@attraccess/plugins-backend-sdk';
-import { pluginScopeOfHostTransaction } from '../../database/adapters/plugins/plugin-transaction-scope';
+import { resolveDatabaseBackend } from '../../database/backend';
 import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 import type { AppConfigType } from '../../config/app.config';
 import {
@@ -219,7 +219,7 @@ export class ReaderUiHooksService {
             resourceId: run.resourceId,
             userId: run.userId,
             principal: run.principal,
-            scope: pluginScopeOfHostTransaction(run.manager),
+            scope: resolveDatabaseBackend().plugins.hostTransactionScope(run.manager),
             action: run.action,
             origin: run.origin,
             sessionLimit: run.sessionLimit,

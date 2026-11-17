@@ -14,12 +14,9 @@ import { PluginService } from './plugin.service';
 
 import { Logger } from '@nestjs/common';
 
-import {
-  createPluginMigrationEngine,
-  type PluginMigrationEngineConfig,
-} from '../database/adapters/plugins/plugin-migration-engine';
+import { resolveDatabaseBackend } from '../database/backend';
 
-import type { PluginMigrationEngine } from './persistence/plugin-migration-engine.port';
+import type { PluginMigrationEngine, PluginMigrationEngineConfig } from './persistence/plugin-migration-engine.port';
 
 function getImplementationClass(): typeof PluginMigrationService {
   return require('./plugin-migration.service').PluginMigrationService;
@@ -33,7 +30,7 @@ export class PluginMigrationService {
   /** The active backend's migration engine. Built on first use so a test can redirect its connection first. */
   protected static engine(): PluginMigrationEngine {
     const owner = getImplementationClass();
-    return (owner.engineInstance ??= createPluginMigrationEngine(owner.baseConfigOverride));
+    return (owner.engineInstance ??= resolveDatabaseBackend().plugins.createMigrationEngine(owner.baseConfigOverride));
   }
 
   protected static engineInstance: PluginMigrationEngine | null = null;
