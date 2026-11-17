@@ -21,7 +21,7 @@ import { InvalidCidrError } from './discovery/network-scan';
 import { validateShellyAddress } from '../communication/address';
 import type { ShellyDeviceInfo } from '../communication/device-api.service';
 import { ShellyDeviceApiService } from '../communication/device-api.service';
-import { ShellyDevice } from './registry/device.entity';
+import type { ShellyDevice } from './registry/storage';
 import type { FirmwareStage, FirmwareStatus } from '../firmware/service.service';
 import { ShellyFirmwareService } from '../firmware/service.service';
 import { ShellyProbeService } from './discovery/probe.service';
