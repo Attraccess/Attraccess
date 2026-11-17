@@ -100,6 +100,7 @@ describe('/cdn serve-static', () => {
     'http://@/cdn/',
     'http://u:p@/cdn/',
     'http://@:80/cdn/',
+    'http://a@b@/cdn/',
   ])('answers %s from the router, not the index fallback', async (path) => {
     const res = await rawGet(path);
 

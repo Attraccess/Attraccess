@@ -2,8 +2,9 @@ import { NotFoundException } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 
 // `scheme://` with an empty host, optionally with userinfo and a port (`http://u@:80/`), followed by
-// the path, query, fragment or the end of the target.
-const EMPTY_AUTHORITY_TARGET = /^[a-z][a-z\d+.-]*:\/\/(?:[^/?#]*@)?(?::[^/?#]*)?(?=[/?#]|$)/i;
+// the path, query, fragment or the end of the target. Each userinfo segment excludes `@`, so the
+// pattern stays linear on long targets.
+const EMPTY_AUTHORITY_TARGET = /^[a-z][a-z\d+.-]*:\/\/(?:[^/?#@]*@)*(?::\d*)?(?=[/?#]|$)/i;
 
 /**
  * Answers absolute-form request targets without a host (`GET HTTP:///cdn/`, `GET http://:80/cdn/`)
