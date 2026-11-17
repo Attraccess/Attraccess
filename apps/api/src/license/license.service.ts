@@ -25,9 +25,81 @@ export enum LicenseModuleType {
   MAINTENANCE = 'maintenance',
 }
 
-interface LicenseRequirements {
-  modules?: LicenseModuleType[];
-  usageLimits?: { [key in LicenseUsageLimitType]?: number | undefined };
+/** Modules are free-form keys: core modules ({@link LicenseModuleType}) and modules of plugins (e.g. `wago`). */
+export interface LicenseRequirements {
+  modules?: string[];
+  usageLimits?: { [key: string]: number | undefined };
+}
+
+export const NON_PROFIT_LICENSE_KEY =
+  'I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md';
+
+/**
+ * Resolves the license data for a key. Shared by {@link LicenseService} and the plugin pre-evaluation at startup,
+ * which runs before the Nest container exists. The non-profit key grants core modules only, never plugin modules.
+ */
+export async function resolveLicenseData(
+  licenseKey: string | null,
+  getUrl: () => Promise<string | null>,
+  licensoPublicKey: string,
+  logger?: Logger,
+): Promise<LicenseDataDto> {
+  if (!licenseKey) {
+    return {
+      valid: false,
+      reason: 'LICENSE_KEY_NOT_CONFIGURED',
+      modules: [],
+      usageLimits: {},
+      isNonProfit: false,
+    };
+  }
+
+  let response: LicenseDataDto;
+
+  if (licenseKey === NON_PROFIT_LICENSE_KEY) {
+    response = {
+      valid: true,
+      modules: Object.values(LicenseModuleType),
+      usageLimits: Object.fromEntries(Object.values(LicenseUsageLimitType).map((usageLimit) => [usageLimit, Infinity])),
+      isNonProfit: true,
+    };
+  } else {
+    // Lazy-load ESM dependency to keep Jest/CommonJS happy in tests
+    try {
+      const { verifyLicense } = await import('@licenso/client');
+      const url = await getUrl();
+      const licensoDeviceId = buildLicensoDeviceId(url ?? null);
+      const licenseData = await verifyLicense(licenseKey, licensoPublicKey, licensoDeviceId);
+
+      response = {
+        valid: licenseData.valid,
+        reason: licenseData.reason,
+        modules: Object.entries(licenseData.payload.cfg.modules)
+          .filter(([, value]) => value === true)
+          .map(([key]) => key),
+        usageLimits: licenseData.payload.cfg.usageLimits ?? {},
+        isNonProfit: false,
+      };
+    } catch (error) {
+      logger?.error(error);
+      throw new LicenseError(
+        'Failed to verify license, did you provide a valid license key? Maybe there is a typo? Check your brackets ;)',
+      );
+    }
+  }
+
+  if (process.env.BALENA_DEVICE_UUID) {
+    response.modules.push('balena');
+  }
+
+  return response;
+}
+
+function buildLicensoDeviceId(source?: string | null): string {
+  if (!source) {
+    return 'unknown';
+  }
+  return source.replace('https://', '').replace('http://', '');
 }
 
 @Injectable()
@@ -45,60 +117,12 @@ export class LicenseService {
     }
 
     const licenseKey = await this.settingsService.getLicenseKey();
-    if (!licenseKey) {
-      return {
-        valid: false,
-        reason: 'LICENSE_KEY_NOT_CONFIGURED',
-        modules: [],
-        usageLimits: {},
-        isNonProfit: false,
-      };
-    }
-
-    let response: LicenseDataDto;
-
-    if (
-      licenseKey ===
-      'I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md'
-    ) {
-      response = {
-        valid: true,
-        modules: Object.values(LicenseModuleType),
-        usageLimits: Object.fromEntries(
-          Object.values(LicenseUsageLimitType).map((usageLimit) => [usageLimit, Infinity]),
-        ),
-        isNonProfit: true,
-      };
-    } else {
-      // Lazy-load ESM dependency to keep Jest/CommonJS happy in tests
-      try {
-        const { verifyLicense } = await import('@licenso/client');
-        const url = await this.settingsService.getUrl();
-        const licensoDeviceId = this.buildLicensoDeviceId(url ?? null);
-        const licenseData = await verifyLicense(licenseKey, appConfig.LICENSO_PUBLIC_KEY, licensoDeviceId);
-
-        response = {
-          valid: licenseData.valid,
-          reason: licenseData.reason,
-          modules: Object.entries(licenseData.payload.cfg.modules)
-            .filter(([, value]) => value === true)
-            .map(([key]) => key),
-          usageLimits: licenseData.payload.cfg.usageLimits ?? {},
-          isNonProfit: false,
-        };
-      } catch (error) {
-        this.logger.error(error);
-        throw new LicenseError(
-          'Failed to verify license, did you provide a valid license key? Maybe there is a typo? Check your brackets ;)',
-        );
-      }
-    }
-
-    if (process.env.BALENA_DEVICE_UUID) {
-      response.modules.push('balena');
-    }
-
-    return response;
+    return resolveLicenseData(
+      licenseKey,
+      () => this.settingsService.getUrl(),
+      appConfig.LICENSO_PUBLIC_KEY,
+      this.logger,
+    );
   }
 
   public async verifyLicense(requirements?: LicenseRequirements): Promise<LicenseDataDto> {
@@ -126,7 +150,7 @@ export class LicenseService {
       if (limit === -1) {
         return false;
       }
-      return currentUsage >= limit;
+      return (currentUsage ?? 0) >= limit;
     });
 
     if (reachedUsageLimits.length > 0) {
@@ -136,12 +160,5 @@ export class LicenseService {
     }
 
     return licenseData;
-  }
-
-  private buildLicensoDeviceId(source?: string | null): string {
-    if (!source) {
-      return 'unknown';
-    }
-    return source.replace('https://', '').replace('http://', '');
   }
 }

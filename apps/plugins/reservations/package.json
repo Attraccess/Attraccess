@@ -2,7 +2,7 @@
   "name": "@attraccess/plugin-reservations",
   "version": "0.1.0-alpha.0",
   "description": "Official Attraccess plugin to reserve resources for a specific time window.",
-  "license": "AGPL-3.0-only",
+  "license": "SEE LICENSE IN LICENSE.md",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Attraccess/Attraccess.git",
@@ -30,7 +30,7 @@
   "attraccess": {
     "displayName": "Reservations",
     "description": "Reserve a resource for a specific time window.",
-    "host": "^1.11.0-0",
+    "host": "^1.11.0-beta.2",
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
     "migrations": "dist/migrations.js",
@@ -51,6 +51,12 @@
       "READ_SETTINGS",
       "SEND_NOTIFICATIONS"
     ],
+    "license": {
+      "required": true,
+      "modules": [
+        "reservations"
+      ]
+    },
     "sdk": {
       "backend": "^1.9.0",
       "frontend": "^1.9.0"

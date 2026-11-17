@@ -1,6 +1,6 @@
 # Prosperity Public License 3.0 – Modified Version
 
-Copyright (c) 2025 Jan Jaap (Github: JappyJan, E-Mail: mail@janjaap.de) 
+Copyright (c) 2025 Jan Jaap (Github: JappyJan, E-Mail: mail@janjaap.de)
 Project: Attraccess
 
 ## 1. Zweck
@@ -36,7 +36,13 @@ Ziel ist es, Privatpersonen und gemeinnützigen Organisationen volle Freiheit zu
 
 Diese Software enthält Komponenten, die unter der MIT-Lizenz stehen. Diese Teile bleiben unter ihren ursprünglichen Bedingungen lizenziert. Siehe [LICENSE-fabinfra.md](./LICENSE-fabinfra.md).
 
-## 5. Keine Garantie
+## 5. Plugins
+
+- Plugins können eigene Lizenzen haben. Maßgeblich ist die Datei `LICENSE.md` im jeweiligen Plugin-Ordner (`apps/plugins/<name>`) beziehungsweise im Plugin-Paket.
+- Hat ein Plugin keine eigene Lizenz, gilt für das Plugin diese Lizenz (die des Kerns).
+- Die Erlaubnis zur kostenlosen Nutzung durch Privatpersonen und gemeinnützige Organisationen (Abschnitt 2.1) und der Lizenzschlüssel für gemeinnützige Nutzung erstrecken sich **nicht automatisch** auf Plugins mit eigener, kommerzieller Lizenz. Solche Plugins erfordern die dort genannte Lizenz, zum Beispiel ein bezahltes Lizenzmodul.
+
+## 6. Keine Garantie
 
 DIE SOFTWARE WIRD OHNE JEGLICHE GARANTIE ZUR VERFÜGUNG GESTELLT. DER AUTOR ÜBERNIMMT KEINE HAFTUNG FÜR DIREKTE ODER INDIREKTE SCHÄDEN ODER FOLGEKOSTEN.
 

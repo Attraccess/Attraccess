@@ -12,6 +12,7 @@ import { PluginModule } from './plugin-system/plugin.module';
 import { loadRecordedPermissionOwners } from './plugin-system/runtime/permission-owners';
 import { setRecordedPermissionOwners } from './plugin-system/runtime/plugin-permissions';
 import { PluginService } from './plugin-system/plugin.service';
+import { evaluateStartupLicense } from './plugin-system/license/startup-license';
 import { SettingsService } from './settings/settings.service';
 import { createWsAdapter } from './common/text-frame-ws-adapter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -295,8 +296,16 @@ export async function bootstrap() {
   if (earlyConfig.PLUGIN_DIR) await NpmPluginService.recoverBackups();
   bootstrapLogger.log('PluginSystem configured.');
 
-  // Record active plugins before migrations or module loading execute plugin code.
   const shouldGuardPluginLifecycle = !earlyConfig.DISABLE_PLUGINS && Boolean(earlyConfig.PLUGIN_DIR);
+
+  // Decide which license-gated plugins may load. PluginModule.forRoot() is synchronous, so the license is read here,
+  // before AppModule is imported. A failure never aborts boot: gated plugins then count as unlicensed. It runs before
+  // the boot guard, so plugins the license keeps out are never recorded as active (and never quarantined).
+  if (shouldGuardPluginLifecycle) {
+    PluginService.setLicenseSnapshot(await evaluateStartupLicense(earlyConfig, bootstrapLogger));
+  }
+
+  // Record active plugins before migrations or module loading execute plugin code.
   if (shouldGuardPluginLifecycle) PluginService.beginBootGuard();
 
   // Run plugin-shipped up-migrations BEFORE AppModule is imported, so every

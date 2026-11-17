@@ -7,6 +7,7 @@ import type { PluginReaderUiApi, PluginStartBlockedApi } from './reader-ui';
 import type { PluginNotificationsContext } from './plugin-notifications';
 import type { PluginResourceAccessContext } from './plugin-resource-access';
 import type { PluginLiveUpdatesContext } from './plugin-live-updates';
+import type { PluginLicenseContext } from './plugin-license';
 import type { PluginBleContext } from './plugin-ble';
 import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscription } from './plugin.interface';
 /**
@@ -224,6 +225,12 @@ export interface PluginContext {
    * must not be awaited inside `fn` either.
    */
   runSerialized<T>(fn: (manager: EntityManager) => Promise<T>): Promise<T>;
+
+  /**
+   * Query the license at runtime (see {@link PluginLicenseContext}). Needs no permission. Optional because hosts
+   * older than the plugin license support do not provide it; check before use when the plugin supports them.
+   */
+  readonly license?: PluginLicenseContext;
 }
 
 export { PluginBackendModule } from './plugin-backend-module';

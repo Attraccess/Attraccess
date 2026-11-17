@@ -521,6 +521,8 @@ test('project.json counts as runtime source unless only check targets (test, lin
     { ...baseTargets, 'typecheck-cc100-runtime': { command: 'tsc' } },
     { ...baseTargets, 'crap-score-cc100-runtime': { command: 'node run.mjs' } },
     { 'build-cc100-runtime': baseTargets['build-cc100-runtime'] },
+    // The npm package assembly (`build`) only copies metadata and licence files next to the plugin bundles.
+    { ...baseTargets, build: { command: 'node -e "copy LICENSE.md"', dependsOn: ['build-backend'] } },
   ])
     assert.equal(projectConfigAffectsRuntime(before, projectJson(targets)), false, JSON.stringify(targets));
   // Whitespace and key order are not changes either.
@@ -529,6 +531,8 @@ test('project.json counts as runtime source unless only check targets (test, lin
   for (const after of [
     projectJson({ ...baseTargets, 'build-cc100-runtime': { command: 'node other.mjs' } }),
     projectJson({ ...baseTargets, 'build-runtime': { command: 'node build-owned-runtime.mjs' } }),
+    // Only the exact `build` target is the package assembly; targets that merely start with it are not.
+    projectJson({ ...baseTargets, 'build-backend': { command: 'node esbuild-backend.mjs' } }),
     // Targets that merely start with a check word are not check targets.
     projectJson({ ...baseTargets, testament: { command: 'deploy' } }),
     projectJson(baseTargets, { tags: ['host:fhs'] }),

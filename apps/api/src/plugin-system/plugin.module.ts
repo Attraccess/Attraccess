@@ -79,6 +79,8 @@ import { LoadedPluginManifest } from './plugin.manifest';
 
 import { PluginService } from './plugin.service';
 
+import { PluginLicenseWatcher } from './license/plugin-license-watcher.service';
+
 import { dataSourceConfig } from '../database/datasource';
 
 import { EncryptionService } from '../encryption/encryption.service';
@@ -86,26 +88,22 @@ import { EncryptionService } from '../encryption/encryption.service';
 import { ResourceFlowsExecutorService } from '../resources/flows/execution/resource-flows-executor.service';
 
 import { createPluginAuditContext } from './runtime/audit-context';
-
 import { createPluginBleContext } from './ble/plugin-ble-context';
-
 import { PluginBleService } from './ble/plugin-ble.service';
-
 import { preparePluginNotifications } from './runtime/plugin-notifications';
 import { preparePluginPermissions } from './runtime/plugin-permissions';
 import {
   PLUGIN_START_BLOCKED_CHANGED_EVENT,
   type PluginStartBlockedChanged,
 } from './start-blocked/start-blocked.events';
-
 import {
   createHostNotificationsContext,
   createHostResourceAccessContext,
   PluginHostRefs,
 } from './runtime/host-contexts';
-
+import { LicenseService } from '../license/license.service';
+import { createPluginLicenseContext } from './runtime/plugin-license-context';
 import { createPluginRunSerialized } from './runtime/plugin-serialized';
-
 import { arePluginsDisabled, setPluginsDisabled } from './plugins-disabled';
 
 function getImplementationClass(): typeof PluginModule {
@@ -171,6 +169,12 @@ export class PluginModule {
     const modulesByName = new Map<string, DynamicModule>();
     const active = new Set<string>();
     for (const manifest of ordered) {
+      // Not a failure: no quarantine, no boot-guard entry. The plugin loads after a restart once it is licensed.
+      const licenseMissing = PluginService.getLicenseMissingReason(manifest);
+      if (licenseMissing) {
+        getImplementationClass().logger.log(`Plugin ${manifest.name} is not loaded: ${licenseMissing}`);
+        continue;
+      }
       if (
         PluginService.isPluginQuarantined(manifest) ||
         PluginService.getPluginsWithLoadStatus().find((plugin) => plugin.name === manifest.name)?.status === 'error'
@@ -232,6 +236,7 @@ export class PluginModule {
         PluginClassificationService,
         PluginLiveUpdatesService,
         PluginSystemEventsBridge,
+        PluginLicenseWatcher,
         PluginBleService,
         ReaderUiWiring,
       ],
@@ -520,6 +525,7 @@ export class PluginModule {
           decrypt: (ciphertext) => encryption.decryptForPlugin(manifest.id, ciphertext),
         };
       },
+      license: createPluginLicenseContext(() => getImplementationClass().hostRefs().get(LicenseService)),
       notifications: createHostNotificationsContext(manifest.name, getImplementationClass().hostRefs()),
       resourceAccess: createHostResourceAccessContext(getImplementationClass().hostRefs()),
       runSerialized: createPluginRunSerialized(

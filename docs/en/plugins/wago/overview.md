@@ -1,4 +1,5 @@
 # WAGO
+
 <!-- llms-description: The WAGO plugin connects WAGO CC100 controllers over MQTT to switch outputs, read inputs and Modbus meters and trigger flows; overview and prerequisites. -->
 
 > [!NOTE]
@@ -16,6 +17,11 @@ an output, react to an input or an event).
 
 ## Prerequisites
 
+- A paid Attraccess license that includes the **`wago`** license module. The WAGO plugin is a commercial add-on: the key
+  for non-profit use does **not** unlock it, and there is no free use. Without the module the plugin is not loaded and
+  appears in **Settings → Plugins** as **License missing**. After you save a valid license key with the module,
+  Attraccess restarts and loads the plugin. See [Installing Plugins](plugins/installing-plugins.md#license-missing). Licenses:
+  [contact@attraccess.org](mailto:contact@attraccess.org).
 - Attraccess 1.11.0 or newer and the `wago` plugin, installed as described in
   [Installing Plugins](plugins/installing-plugins.md). It needs the `DATABASE_ACCESS`, `ACCESS_MQTT_SERVERS`,
   `TRIGGER_FLOWS` and `MANAGE_SECRETS` permissions.
@@ -33,14 +39,14 @@ an output, react to an input or an event).
 
 ## Start here
 
-| Page                                                                          | Covers                                                           |
-| ----------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| [Guided CC100 Commissioning](plugins/wago/cc100-commissioning.md)             | Commission a controller step by step                             |
-| [CC100 Docker Runtime](plugins/wago/cc100-runtime.md)                         | Front panel configuration, live controls, runtime deployment     |
-| [Production Support](plugins/wago/production-support.md)                      | Tested compatibility, broker settings, limits                    |
-| [Recovery Runbooks](plugins/wago/recovery-runbooks.md)                        | Credential compromise, broker outage, controller replacement     |
-| [Threat Model and Pen-Test Brief](plugins/wago/threat-model.md)               | Actors, trust boundaries, attack surfaces                        |
-| [Safety Boundary](plugins/wago/safety-boundary.md)                            | What the integration is not, with a wording checklist            |
+| Page                                                              | Covers                                                       |
+| ----------------------------------------------------------------- | ------------------------------------------------------------ |
+| [Guided CC100 Commissioning](plugins/wago/cc100-commissioning.md) | Commission a controller step by step                         |
+| [CC100 Docker Runtime](plugins/wago/cc100-runtime.md)             | Front panel configuration, live controls, runtime deployment |
+| [Production Support](plugins/wago/production-support.md)          | Tested compatibility, broker settings, limits                |
+| [Recovery Runbooks](plugins/wago/recovery-runbooks.md)            | Credential compromise, broker outage, controller replacement |
+| [Threat Model and Pen-Test Brief](plugins/wago/threat-model.md)   | Actors, trust boundaries, attack surfaces                    |
+| [Safety Boundary](plugins/wago/safety-boundary.md)                | What the integration is not, with a wording checklist        |
 
 ## Reference pages
 

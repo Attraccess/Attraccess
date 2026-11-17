@@ -28,9 +28,13 @@ jest.mock('./app/app.module', () => ({ AppModule: class AppModule {} }));
 jest.mock('./plugin-system/plugin.service', () => ({
   PluginService: {
     configure: jest.fn(),
+    setLicenseSnapshot: jest.fn(),
     beginBootGuard: jest.fn(),
     recordBootFailure: jest.fn(),
   },
+}));
+jest.mock('./plugin-system/license/startup-license', () => ({
+  evaluateStartupLicense: jest.fn(async () => ({ valid: true, modules: ['wago'] })),
 }));
 jest.mock('./plugin-system/plugin.module', () => ({
   PluginModule: { configure: jest.fn(), resetHostReferences: jest.fn() },
@@ -289,6 +293,13 @@ describe('API bootstrap ordering and configuration', () => {
     const migrationOrder = jest.mocked(PluginMigrationService.runPendingUpMigrationsForAllPlugins).mock
       .invocationCallOrder[0];
     expect(migrationOrder).toBeLessThan(jest.mocked(NestFactory.create).mock.invocationCallOrder[0]);
+    // The license decides which plugins load, so it is known before migrations and before AppModule is imported.
+    expect(PluginService.setLicenseSnapshot).toHaveBeenCalledWith({ valid: true, modules: ['wago'] });
+    const snapshotOrder = jest.mocked(PluginService.setLicenseSnapshot).mock.invocationCallOrder[0];
+    expect(snapshotOrder).toBeLessThan(migrationOrder);
+    // configure() resets the snapshot, and the boot guard must not record plugins the license keeps out.
+    expect(jest.mocked(PluginService.configure).mock.invocationCallOrder[0]).toBeLessThan(snapshotOrder);
+    expect(snapshotOrder).toBeLessThan(jest.mocked(PluginService.beginBootGuard).mock.invocationCallOrder[0]);
     expect(early.close).toHaveBeenCalled();
     expect(initializeProcessLogging).toHaveBeenCalledTimes(1);
     expect(early.useLogger).toHaveBeenCalledWith(jest.mocked(initializeProcessLogging).mock.results[0].value);
@@ -308,6 +319,7 @@ describe('API bootstrap ordering and configuration', () => {
     const result = await bootstrap();
     expect(result.shouldGuardPluginLifecycle).toBe(false);
     expect(PluginService.beginBootGuard).not.toHaveBeenCalled();
+    expect(PluginService.setLicenseSnapshot).not.toHaveBeenCalled();
     expect(PluginMigrationService.runPendingUpMigrationsForAllPlugins).not.toHaveBeenCalled();
     expect(datasource.initialize).not.toHaveBeenCalled();
     expect(datasource.runMigrations).not.toHaveBeenCalled();

@@ -213,6 +213,99 @@ Optionale Abhängigkeiten (`required: false`) werden nicht automatisch installie
 
 Updates und Downgrades müssen auch die Anforderungen installierter abhängiger Plugins erfüllen. Beim Entfernen einer erforderlichen Abhängigkeit müssen alle direkt und indirekt abhängigen Plugins ausdrücklich zur gemeinsamen Entfernung bestätigt werden. Automatisch installierte Abhängigkeiten bleiben normale Plugins; sie werden nicht automatisch entfernt, wenn ihr letztes abhängiges Plugin entfernt wird. Paketänderungen werden gemeinsam übernommen; Migrationen und Aktivierung erfolgen beim Neustart gemäß dem bestehenden Lebenszyklus. Beim Entfernen von npm-Plugins bleiben Daten und Geheimnisse erhalten.
 
+## Lizenzanforderungen
+
+Ein Plugin kann eine Attraccess-Lizenz voraussetzen. Der Host erzwingt die Anforderung mit derselben Lizenzlogik wie bei
+Kernfunktionen (gültiger Schlüssel, optional mit benannten Modulen). Ein Plugin baut also keine eigene Lizenzprüfung.
+
+Ein Plugin ohne eigene Lizenzbedingungen steht unter der Kernlizenz (siehe `LICENSE.md` im Repository), einschließlich
+der kostenlosen Nutzung durch Privatpersonen und gemeinnützige Organisationen. Ein Plugin mit eigener kommerzieller
+Lizenz fällt nicht unter diese Erlaubnis: Es bringt eine eigene `LICENSE.md` mit und deklariert sein bezahltes Modul wie
+unten beschrieben. Der Schlüssel für gemeinnützige Nutzung schaltet nur die Kernmodule frei und **nie ein
+Plugin-Modul**.
+
+### Anforderung deklarieren
+
+Ergänzen Sie einen optionalen `license`-Block. Bei einem ZIP-Plugin steht er in der `plugin.json`, bei einem npm-Plugin in
+der `package.json` unter `attraccess` (daraus baut der Host das Manifest):
+
+```json
+{ "license": { "required": true, "modules": ["wago"] } }
+```
+
+| Feld       | Typ        | Bedeutung                                                                                                                                         |
+| ---------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `modules`  | `string[]` | Lizenzmodule, ohne die das Plugin gar nicht geladen werden darf. Eine nicht leere Liste impliziert `required`.                                    |
+| `required` | `boolean`  | Das Plugin braucht eine gültige Attraccess-Lizenz (der Schlüssel für gemeinnützige Nutzung zählt), aber kein bestimmtes Modul. Standard: `false`. |
+
+Alles, was hier steht, ist eine harte Anforderung. Der Host prüft die Lizenz **einmal beim Start**, bevor er ein Plugin
+lädt. Ist die Anforderung nicht erfüllt, wird das Plugin gar nicht geladen: kein Backend, keine Migrationen, keine
+Flow-Knoten, Audit-Domänen, Reader-UI, Hooks oder Frontend. In **Einstellungen → Plugins** steht es als **Lizenz fehlt**,
+mit den fehlenden Modulen. Lässt sich die Lizenz nicht ermitteln (kein Schlüssel, ein Schlüssel, der sich nicht prüfen
+lässt, nicht lesbare Einstellungen), gilt ein geschütztes Plugin als nicht lizenziert. Bei einer Neuinstallation nutzt
+der Host die Umgebungsvariable `LICENSE_KEY`. Ein Plugin mit einer erforderlichen Abhängigkeit von einem nicht
+lizenzierten Plugin wird ebenfalls nicht geladen; es zeigt den üblichen Abhängigkeitsfehler.
+
+Das Nichtladen aus Lizenzgründen ist kein Fehler: Das Plugin wird nicht unter Quarantäne gestellt und lädt nach dem
+nächsten Neustart, sobald die Lizenz es abdeckt. Ein ungültiger `license`-Block (falsche Typen, unbekannte Schlüssel) ist
+ein Manifestfehler: Das Plugin wird nicht geladen, ein ZIP-Upload wird mit HTTP 400 abgelehnt. Hosts, die älter als die
+Plugin-Lizenzunterstützung sind, ignorieren den Block. Setzen Sie bei npm-Plugins `attraccess.host` auf die erste Version,
+die ihn durchsetzt; der Host prüft diesen Bereich bei der Installation. Das `attraccessVersion` eines ZIP-Plugins wird
+nicht mit der Host-Version verglichen, ein alter Host lädt ein ZIP-Plugin daher ohne die Sperre.
+
+Speichert eine Administratorin oder ein Administrator einen anderen, gültigen Lizenzschlüssel oder entfernt den
+Schlüssel, prüft der Host die Plugins erneut. Er startet genau dann automatisch neu, wenn sich dadurch ändert, ob mindestens ein geschütztes Plugin
+geladen wird. Ein ungültiger, abgelaufener oder nicht prüfbarer Schlüssel startet nie neu, weil der Host damit nicht
+starten würde. Es gibt keine periodische Prüfung: Eine abgelaufene Lizenz fällt beim nächsten Start auf.
+
+### Zur Laufzeit entscheiden
+
+Soll ein Plugin je nach Lizenz mehr oder weniger anbieten, statt gar nicht zu laden, deklariert es das Modul **nicht**
+im Manifest. Es fragt den Host und entscheidet selbst. Der Host sperrt Routen oder UI eines solchen Plugins nicht.
+
+**Backend:** `context.license` (im Typ optional, weil ältere Hosts es nicht bereitstellen; keine Berechtigung nötig):
+
+| Member                          | Zweck                                                                                                                                      |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `license.getLicense()`          | `{ valid, reason?, modules, usageLimits, isNonProfit }`. Wirft nie: Lässt sich die Lizenz nicht ermitteln, ist `valid` `false`.            |
+| `license.hasModule(module)`     | `true` nur, wenn die Lizenz gültig ist und das Modul enthält. `false`, wenn sie sich nicht ermitteln lässt.                                |
+| `license.verify(requirements?)` | Läuft durch, wenn die Lizenz gültig ist und `{ modules?, usageLimits? }` erfüllt, sonst wirft sie einen `PluginLicenseError` mit `reason`. |
+
+Jeder Aufruf prüft die Lizenz neu (eine lokale Signaturprüfung, keine Netzwerkanfrage), ein Plugin sieht einen
+geänderten Schlüssel also ohne Neustart. Eine ungültige Lizenz meldet keine Module und keine Nutzungsgrenzen. Prüfen Sie
+in häufig durchlaufenem Code, etwa pro Nachricht oder pro Reader-Ereignis, einmal pro Vorgang statt pro Element.
+
+```ts
+import { PluginLicenseError } from '@attraccess/plugins-backend-sdk';
+
+// Export nur mit dem Modul `reports` anbieten. `false` auf Hosts ohne `context.license`.
+if (!(await context.license?.hasModule('reports'))) throw new ForbiddenException('Benötigt das Modul reports');
+
+// Oder mit dem Grund des Hosts scheitern. Zuerst auf `context.license` prüfen: Auf älteren Hosts täte `?.verify` nichts.
+if (!context.license) throw new ForbiddenException('Dieser Host kann die Lizenz nicht prüfen');
+try {
+  await context.license.verify({ modules: ['reports'], usageLimits: { users: userCount } });
+} catch (error) {
+  if (error instanceof PluginLicenseError) throw new ForbiddenException(error.reason);
+  throw error;
+}
+```
+
+**Frontend:** `usePluginLicense()` aus `@attraccess/plugins-frontend-sdk` liest `GET /api/license-data` (für angemeldete
+Nutzer). Es liefert `{ license, isLoading, error, hasModule(module), refetch() }`; `hasModule` ist beim Laden und bei
+unbekannter Lizenz `false`. Eingebundene Hooks teilen sich 30 Sekunden lang eine Anfrage; `refetch()` fragt neu.
+`fetchPluginLicense()` macht dieselbe Anfrage ohne React.
+
+```tsx
+import { usePluginLicense } from '@attraccess/plugins-frontend-sdk';
+
+function Reports() {
+  const { hasModule, isLoading } = usePluginLicense();
+  if (isLoading) return null;
+  return hasModule('reports') ? <ReportsPage /> : <p>Berichte brauchen das Lizenzmodul reports.</p>;
+}
+```
+
 ## Backend-Plugins
 
 Das Backend-SDK ermöglicht es Ihrem Plugin, API-Endpunkte zu registrieren, die auf dem Attraccess-Server ausgeführt werden.

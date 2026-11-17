@@ -689,6 +689,52 @@ describe('PluginsSection', () => {
     expect(screen.getByText("Cannot find module '@nestjs/common'")).toBeInTheDocument();
   });
 
+  it('shows a missing license as a warning with only the missing modules and no load-error action', () => {
+    hoisted.plugins = [
+      makePlugin({
+        status: 'license_missing',
+        // The row renders its own translated text from missingLicenseModules, not the server's English error.
+        error: 'server message',
+        license: { required: true, modules: ['wago', 'other'] },
+        missingLicenseModules: ['other'],
+      }),
+    ];
+    renderWithQuery(<PluginsSection />);
+
+    expect(screen.getByText('License missing')).toBeInTheDocument();
+    expect(screen.getByText('Requires license module: other')).toBeInTheDocument();
+    expect(screen.queryByText('server message')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'View load error for Cool Plugin' })).not.toBeInTheDocument();
+  });
+
+  it('names every missing module when several are missing', () => {
+    hoisted.plugins = [
+      makePlugin({
+        status: 'license_missing',
+        error: 'server message',
+        license: { required: true, modules: ['wago', 'reservations'] },
+        missingLicenseModules: ['wago', 'reservations'],
+      }),
+    ];
+    renderWithQuery(<PluginsSection />);
+
+    expect(screen.getByText('Requires license modules: wago, reservations')).toBeInTheDocument();
+  });
+
+  it('names a valid license when a plugin needs no specific module', () => {
+    hoisted.plugins = [
+      makePlugin({
+        status: 'license_missing',
+        error: 'Requires a valid Attraccess license',
+        license: { required: true },
+        missingLicenseModules: [],
+      }),
+    ];
+    renderWithQuery(<PluginsSection />);
+
+    expect(screen.getByText('Requires a valid Attraccess license')).toBeInTheDocument();
+  });
+
   it('warns when plugins are globally disabled', async () => {
     hoisted.pluginSystemStatus = { disabled: true, instanceId: 'original-instance' };
     renderWithQuery(<PluginsSection />);

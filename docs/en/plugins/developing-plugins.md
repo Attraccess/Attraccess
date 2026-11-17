@@ -73,17 +73,18 @@ keyword and an `attraccess` object:
 }
 ```
 
-| Field                                        | Required     | Notes                                                                                                  |
-| -------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------ |
-| `name`                                       | yes          | Immutable npm package identifier.                                                                      |
-| `version`                                    | yes          | Your plugin's semantic version.                                                                        |
-| `attraccess.backend` / `attraccess.frontend` | at least one | Relative package entry point.                                                                          |
-| `attraccess.styles`                          | no           | Stylesheet alongside the frontend entry point.                                                         |
-| `attraccess.dashboardPaths`                  | no           | Sidebar paths users may pin to their dashboard. See [Dashboard pins](#dashboard-pins).                 |
-| `attraccess.dashboardWidgets`                | no           | Ids of the dashboard widgets the plugin offers. See [Dashboard widgets](#dashboard-widgets).           |
-| `attraccess.migrations`                      | no           | Module exporting TypeORM migration classes. See [Database Migrations](plugins/database-migrations.md). |
-| `attraccess.host`                            | yes          | Compatible Attraccess host semver range.                                                               |
-| `attraccess.permissions`                     | no           | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`.      |
+| Field                                        | Required     | Notes                                                                                                       |
+| -------------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------- |
+| `name`                                       | yes          | Immutable npm package identifier.                                                                           |
+| `version`                                    | yes          | Your plugin's semantic version.                                                                             |
+| `attraccess.backend` / `attraccess.frontend` | at least one | Relative package entry point.                                                                               |
+| `attraccess.styles`                          | no           | Stylesheet alongside the frontend entry point.                                                              |
+| `attraccess.dashboardPaths`                  | no           | Sidebar paths users may pin to their dashboard. See [Dashboard pins](#dashboard-pins).                      |
+| `attraccess.dashboardWidgets`                | no           | Ids of the dashboard widgets the plugin offers. See [Dashboard widgets](#dashboard-widgets).                |
+| `attraccess.migrations`                      | no           | Module exporting TypeORM migration classes. See [Database Migrations](plugins/database-migrations.md).      |
+| `attraccess.host`                            | yes          | Compatible Attraccess host semver range.                                                                    |
+| `attraccess.permissions`                     | no           | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`.           |
+| `attraccess.license`                         | no           | License modules or a valid license the plugin requires (see [License requirements](#license-requirements)). |
 
 ## Dependencies on other Attraccess plugins
 
@@ -104,6 +105,98 @@ The marketplace resolves the entire required dependency graph before installatio
 Optional dependencies (`required: false`) are not installed automatically and do not gate activation. If present, their versions must satisfy the declared range. Required dependencies load and migrate before their dependants. A missing, incompatible, quarantined, or failed required dependency keeps its dependants inactive; the Plugins settings page shows the failure. Repair the dependency and restart to reactivate its dependants.
 
 Updates and downgrades must satisfy both the target version's dependencies and installed dependants' requirements. Removing a required dependency requires explicit confirmation of every direct and transitive dependant to remove in the same operation. Automatically installed dependencies remain ordinary plugins and are not automatically removed when their last dependant is removed. Package changes commit together; migrations and runtime activation run on restart, using the existing plugin lifecycle. Removing npm plugins retains their data and secrets.
+
+## License requirements
+
+A plugin can require an Attraccess license. The host enforces the requirement with the same license logic as core
+features (a valid key, optionally with named modules), so a plugin never re-implements a license check.
+
+A plugin without its own license terms is under the core license (see the `LICENSE.md` of the repository), including
+its free use by private individuals and non-profit organizations. A plugin with its own commercial license is not
+covered by that non-profit permission: it ships its own `LICENSE.md` and declares its paid module as below. The
+non-profit key grants the core modules only and **never a plugin module**.
+
+### Declaring a requirement
+
+Add an optional `license` block. In a ZIP plugin it belongs in `plugin.json`; in an npm plugin it belongs in
+`package.json` under `attraccess` (the host builds the manifest from it):
+
+```json
+{ "license": { "required": true, "modules": ["wago"] } }
+```
+
+| Field      | Type       | Meaning                                                                                                              |
+| ---------- | ---------- | -------------------------------------------------------------------------------------------------------------------- |
+| `modules`  | `string[]` | License modules without which the plugin must not load at all. A non-empty list implies `required`.                  |
+| `required` | `boolean`  | The plugin needs a valid Attraccess license (the non-profit key counts) but no specific module. Defaults to `false`. |
+
+Anything declared here is a hard requirement. The host evaluates the license **once at startup**, before it loads any
+plugin. If the requirement is not met, the plugin is not loaded at all: no backend, migrations, flow nodes, audit
+domains, reader UI, hooks or frontend. **Settings → Plugins** shows it as **License missing**, with the missing modules.
+If the license cannot be determined (no key, a key that does not verify, unreadable settings), a gated plugin counts as
+unlicensed. On a fresh install, the host uses the `LICENSE_KEY` environment variable. A plugin that has a required
+dependency on an unlicensed plugin does not load either; it shows the usual dependency error.
+
+Not loading for license reasons is not a failure: the plugin is not quarantined, and it loads after the next restart
+once the license covers it. An invalid `license` block (wrong types, unknown keys) is a manifest error: the plugin does
+not load, and a ZIP upload is rejected with HTTP 400. Hosts older than the plugin license support ignore the block. For
+npm plugins, set `attraccess.host` to the first version that enforces it; the host checks that range on install. A ZIP
+plugin's `attraccessVersion` is not compared with the host version, so an old host loads a ZIP plugin without the
+gate.
+
+When an administrator saves a different, valid license key or removes the key, the host checks the plugins again. It
+restarts automatically exactly when that changes whether at least one gated plugin loads. An invalid, expired or
+unverifiable key never restarts, because the host refuses to start with it. There is no periodic re-check: an expired
+license is noticed at the next startup.
+
+### Deciding at runtime
+
+If a plugin should offer more or less depending on the license instead of not loading at all, it does **not** declare
+the module in the manifest. It asks the host and decides itself. The host does not block the routes or UI of such a
+plugin.
+
+**Backend:** `context.license` (optional in the type, because older hosts do not provide it; it needs no permission):
+
+| Member                          | Purpose                                                                                                                               |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `license.getLicense()`          | `{ valid, reason?, modules, usageLimits, isNonProfit }`. Never throws: when the license cannot be determined, `valid` is `false`.     |
+| `license.hasModule(module)`     | `true` only if the license is valid and grants the module. `false` when it cannot be determined.                                      |
+| `license.verify(requirements?)` | Resolves if the license is valid and satisfies `{ modules?, usageLimits? }`, otherwise throws a `PluginLicenseError` with a `reason`. |
+
+Every call checks the license anew (a local signature check, no network request), so a plugin sees a changed key
+without a restart. An invalid license reports no modules and no usage limits. In hot paths, such as per message or per
+reader event, check once per operation rather than per item.
+
+```ts
+import { PluginLicenseError } from '@attraccess/plugins-backend-sdk';
+
+// Offer the export only with the `reports` module. `false` on hosts without `context.license`.
+if (!(await context.license?.hasModule('reports'))) throw new ForbiddenException('Requires the reports module');
+
+// Or fail with the host's reason. Check for `context.license` first: on an older host, `?.verify` would do nothing.
+if (!context.license) throw new ForbiddenException('This host cannot check the license');
+try {
+  await context.license.verify({ modules: ['reports'], usageLimits: { users: userCount } });
+} catch (error) {
+  if (error instanceof PluginLicenseError) throw new ForbiddenException(error.reason);
+  throw error;
+}
+```
+
+**Frontend:** `usePluginLicense()` from `@attraccess/plugins-frontend-sdk` reads `GET /api/license-data` (for a signed-in
+user). It returns `{ license, isLoading, error, hasModule(module), refetch() }`; `hasModule` is `false` while loading or
+when the license is unknown. Mounted hooks share one request for 30 seconds; `refetch()` asks again.
+`fetchPluginLicense()` does the same request without React.
+
+```tsx
+import { usePluginLicense } from '@attraccess/plugins-frontend-sdk';
+
+function Reports() {
+  const { hasModule, isLoading } = usePluginLicense();
+  if (isLoading) return null;
+  return hasModule('reports') ? <ReportsPage /> : <p>Reports need the reports license module.</p>;
+}
+```
 
 ## Backend plugins
 
@@ -200,6 +293,7 @@ export default plugin;
 | `context.startBlocked.invalidate({ resourceId })`         | Tell open resource pages that your `startBlockedQuery` answer changed. See [Start-blocked state](#start-blocked-state).                                           | `ACCESS_HOOKS`           |
 | `context.resourceAccess`                                  | Read-only authorization, maintenance and session queries. See [Resource access](#resource-access-queries).                                                        | `ACCESS_RESOURCES`       |
 | `context.runSerialized(fn)`                               | Run database work in one serialized transaction. See [Serialized transactions](#serialized-transactions).                                                         | `DATABASE_ACCESS`        |
+| `context.license`                                         | Query the license (`getLicense`, `hasModule`, `verify`). Optional: older hosts do not provide it. See [License requirements](#license-requirements).              | none                     |
 | `context.ble`                                             | Bluetooth transport through Attractap readers: profiles, endpoints, sessions. See [Bluetooth Transport for Plugins](plugins/ble-transport.md).                    | `BLE_TRANSPORT`          |
 
 > [!IMPORTANT]

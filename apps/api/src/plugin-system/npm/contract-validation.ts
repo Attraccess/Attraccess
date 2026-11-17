@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { PluginDependenciesSchema } from '../runtime/dependencies';
 import { dashboardPathsSchema, dashboardWidgetsSchema } from '../runtime/manifest-schema';
 import { PluginManifest, PluginManifestSchema } from '../plugin.manifest';
+import { PluginLicenseDeclarationSchema } from '../license/plugin-license';
 
 const entryPath = z
   .string()
@@ -36,6 +37,8 @@ const packageSchema = z
       dashboardPaths: dashboardPathsSchema.optional(),
       dashboardWidgets: dashboardWidgetsSchema.optional(),
       permissions: z.array(z.nativeEnum(PluginPermission)).default([]),
+      // npm installs get a synthesized plugin.json, so the license requirement travels in package.json.
+      license: PluginLicenseDeclarationSchema.optional(),
       sdk: z
         .object({
           backend: z.string().optional(),
@@ -109,6 +112,7 @@ export function parseNpmPluginPackage(
       attraccessVersion: { exact: hostVersion },
       permissions: pkg.attraccess.permissions,
       dependencies: pkg.attraccess.dependencies,
+      license: pkg.attraccess.license,
     }),
   };
 }

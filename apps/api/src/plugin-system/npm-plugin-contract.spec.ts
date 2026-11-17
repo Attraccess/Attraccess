@@ -1,5 +1,8 @@
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 import { parseNpmPluginPackage } from './npm/contract-validation';
+import { existsSync, readFileSync, readdirSync } from 'fs';
+import { join } from 'path';
+import { PluginManifestSchema } from './runtime/manifest-schema';
 
 const validPackage = {
   name: '@attraccess/plugin-example',
@@ -41,6 +44,51 @@ describe('parseNpmPluginPackage', () => {
         },
       },
     });
+  });
+
+  it('carries the license requirement of package.json into the synthesized manifest', () => {
+    const license = { required: true, modules: ['wago'] };
+    const { manifest } = parseNpmPluginPackage(
+      { ...validPackage, attraccess: { ...validPackage.attraccess, license } },
+      '1.9.0',
+    );
+    expect(manifest.license).toEqual(license);
+    expect(parseNpmPluginPackage(validPackage, '1.9.0').manifest.license).toBeUndefined();
+  });
+
+  it.each(['wago', 'reservations'])('keeps the paid %s module required in both manifests', (name) => {
+    // Without this block the host would load the plugin for every license, including the non-profit key.
+    const read = (file: string) => JSON.parse(readFileSync(join(__dirname, '../../../plugins', name, file), 'utf8'));
+    const pkg = read('package.json');
+    const expected = { required: true, modules: [name] };
+    expect(PluginManifestSchema.parse(read('plugin.json')).license).toEqual(expected);
+    expect(parseNpmPluginPackage(pkg, pkg.attraccess.host.replace(/^\^/, '')).manifest.license).toEqual(expected);
+  });
+
+  it('declares the same license block in plugin.json and package.json for every first-party plugin', () => {
+    // npm installs build the manifest from package.json, ZIP and directory installs read plugin.json: both must gate.
+    const pluginsRoot = join(__dirname, '../../../plugins');
+    const plugins = readdirSync(pluginsRoot).filter(
+      (name) =>
+        existsSync(join(pluginsRoot, name, 'plugin.json')) && existsSync(join(pluginsRoot, name, 'package.json')),
+    );
+    expect(plugins).toEqual(expect.arrayContaining(['wago', 'reservations']));
+    for (const name of plugins) {
+      const read = (file: string) => JSON.parse(readFileSync(join(pluginsRoot, name, file), 'utf8'));
+      expect({ name, license: read('package.json').attraccess?.license }).toEqual({
+        name,
+        license: read('plugin.json').license,
+      });
+    }
+  });
+
+  it('rejects an invalid license requirement', () => {
+    expect(() =>
+      parseNpmPluginPackage(
+        { ...validPackage, attraccess: { ...validPackage.attraccess, license: { modules: 'wago' } } },
+        '1.9.0',
+      ),
+    ).toThrow();
   });
 
   it('rejects dashboard paths outside plain sidebar routes', () => {

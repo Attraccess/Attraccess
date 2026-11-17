@@ -2,7 +2,7 @@
   "name": "@attraccess/plugin-rabbitmq",
   "version": "0.1.0-alpha.0",
   "description": "Official Attraccess integration for RabbitMQ.",
-  "license": "AGPL-3.0-only",
+  "license": "SEE LICENSE IN LICENSE.md",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Attraccess/Attraccess.git",
