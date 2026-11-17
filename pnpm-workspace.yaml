@@ -55,8 +55,11 @@ allowBuilds:
 patchedDependencies:
   # typescript@7.0.2: bridges the TS 7 package to the TS 6 JS API (relies on the `>typescript` overrides above).
   # @nestjs/swagger@12.1.2: exports the dist/* internals that nestjs-asyncapi 2 deep-imports.
+  # @peculiar/x509@3.1.0: registers in its own tsyringe child container; @simplewebauthn/server brings x509 2,
+  #   and two majors in tsyringe's global container break certificate generation (ATT-1312).
   ts-api-utils@2.5.0: patches/ts-api-utils@2.5.0.patch
   typescript@7.0.2: patches/typescript@7.0.2.patch
   '@swc-node/register@1.12.1': patches/@swc-node__register@1.12.1.patch
   crap-score@1.2.1: patches/crap-score@1.2.1.patch
   '@nestjs/swagger@12.1.2': patches/@nestjs__swagger@12.1.2.patch
+  '@peculiar/x509@3.1.0': patches/@peculiar__x509@3.1.0.patch

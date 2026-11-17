@@ -1,4 +1,8 @@
-import { X509Certificate } from 'crypto';
+// Loaded first, as in the API process: it brings its own @peculiar/x509 major. Without the pnpm patch that
+// gives ours its own tsyringe container, both register the same tokens and certificate generation breaks.
+import '@simplewebauthn/server';
+import { X509Certificate, webcrypto } from 'crypto';
+import { createRequire } from 'module';
 import {
   INSTALLATION_URI_PREFIX,
   READER_URI_PREFIX,
@@ -33,6 +37,25 @@ describe('pki', () => {
     const nodeLeaf = new X509Certificate(leaf.toString('pem'));
     expect(nodeLeaf.checkIssued(nodeCa)).toBe(true);
     expect(nodeLeaf.verify(nodeCa.publicKey)).toBe(true);
+  });
+
+  it("leaves @simplewebauthn/server's own @peculiar/x509 working", async () => {
+    await createCaCertificate('inst-2');
+    const passkeyRequire = createRequire(require.resolve('@simplewebauthn/server'));
+    const theirs = passkeyRequire('@peculiar/x509') as typeof x509;
+    expect(theirs).not.toBe(x509);
+    theirs.cryptoProvider.set(webcrypto as unknown as Crypto);
+    const alg = { name: 'ECDSA', namedCurve: 'P-256', hash: 'SHA-256' };
+    const keys = await webcrypto.subtle.generateKey(alg, true, ['sign', 'verify']);
+
+    const cert = await theirs.X509CertificateGenerator.createSelfSigned({
+      serialNumber: '01',
+      name: 'CN=passkey side',
+      keys: keys as unknown as CryptoKeyPair,
+      signingAlgorithm: alg,
+    });
+
+    expect(await cert.verify()).toBe(true);
   });
 
   it('fingerprints the SPKI DER', async () => {
