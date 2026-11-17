@@ -1,6 +1,6 @@
 import type { PluginContext } from './plugin-context';
 import { DynamicModule } from '@nestjs/common';
-import type { PluginPersistenceDeclaration } from './plugin-persistence';
+import type { PluginStorageDefinition } from './plugin-storage';
 import type { MqttCredentialProvisioningProviderFactory } from './mqtt-credential-provisioning';
 import type { PluginAuditDomainDeclaration } from './plugin-audit';
 import type { PluginFlowNodeDefinition } from './plugin-flow-node';
@@ -16,14 +16,11 @@ export interface PluginBackendModule {
   register(context: PluginContext): DynamicModule;
 
   /**
-   * Optional engine capability declaration: the engines this plugin provides storage code for, with the entity
-   * classes per engine (`persistence: { sqlite: { entities: [Widget] } }`). The host registers an engine's entities
-   * into its shared connection at load time, so the plugin can query them through that engine's subpath
-   * (`sqlitePersistence(context).getRepository(Widget)`). The schema itself is owned by the plugin's migrations, so
-   * an entity describes an existing table. Requires the DATABASE_ACCESS permission. A plugin whose declaration does
-   * not include the engine the host runs is not loaded. See `docs/en/plugins/database-migrations.md`.
+   * The plugin's own storage: declared tables plus neutral migrations (see `definePluginStorage`). The host creates
+   * and migrates the tables in the plugin's namespace; the plugin reads and writes them through `context.storage`.
+   * Requires the PLUGIN_STORAGE permission.
    */
-  persistence?: PluginPersistenceDeclaration;
+  storage?: PluginStorageDefinition;
 
   /**
    * Optional custom flow node types this plugin contributes. The host registers

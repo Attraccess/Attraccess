@@ -7,6 +7,7 @@ export * from './lib/plugin-audit';
 export * from './lib/plugin-permissions';
 export * from './lib/mqtt-credential-provisioning';
 export * from './lib/plugin-persistence';
+export * from './lib/plugin-storage';
 export * from './lib/plugin-host-data';
 export * from './lib/semver';
 export * from './lib/reader-ui';

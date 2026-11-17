@@ -7,6 +7,7 @@ import type { PluginNotificationsContext } from './plugin-notifications';
 import type { PluginResourceAccessContext } from './plugin-resource-access';
 import type { PluginHostDataContext } from './plugin-host-data';
 import type { PluginPersistenceContext } from './plugin-persistence';
+import type { PluginStorageContext } from './plugin-storage';
 import type { PluginLiveUpdatesContext } from './plugin-live-updates';
 import type { PluginLicenseContext } from './plugin-license';
 import type { PluginBleContext } from './plugin-ble';
@@ -209,14 +210,17 @@ export interface PluginContext {
   readonly resourceAccess: PluginResourceAccessContext;
 
   /**
-   * Backend-neutral host persistence: the active engine, an atomic transaction with a post-commit hook and the seam
-   * to the engine subpath (`@attraccess/plugins-backend-sdk/sqlite`). Requires DATABASE_ACCESS.
+   * Atomic transactions with a post-commit hook. A transaction scope joins `storage` and host port calls into one
+   * unit. Requires PLUGIN_STORAGE.
    */
   readonly persistence: PluginPersistenceContext;
 
+  /** Record port for the plugin's own declared tables. Requires PLUGIN_STORAGE. See `plugin-storage.ts`. */
+  readonly storage: PluginStorageContext;
+
   /**
    * Read-only lookups of host data (resources, users, settings, flow nodes) as neutral models. Each group has its own
-   * permission (ACCESS_RESOURCES, READ_USERS, READ_SETTINGS, DATABASE_ACCESS).
+   * permission (ACCESS_RESOURCES, READ_USERS, READ_SETTINGS, TRIGGER_FLOWS).
    */
   readonly hostData: PluginHostDataContext;
 
