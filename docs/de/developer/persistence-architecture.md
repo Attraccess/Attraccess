@@ -67,33 +67,71 @@ eingetragen werden. Erlaubte Orte: `libs/database-entities`, `apps/api/src/datab
 
 ## Zuständigkeit je Funktionsbereich
 
-Jeder Bereich unten persistiert heute über das TypeORM-Schema in `libs/database-entities`. „Grenze“ ist der Stand der
-Importprüfung, „Port“ ob ein anwendungseigener Persistenz-Port existiert.
+Jeder Bereich persistiert über das TypeORM-Schema in `libs/database-entities`, aber nur Adapter berühren es. Die
+Grenzprüfung hat eine leere Baseline: keine Anwendungs-, Domänen- oder Transportdatei importiert `typeorm`, die Treiber,
+die Entity-Bibliothek oder Adapter-Interna. „Port“ nennt den anwendungseigenen Persistenzvertrag, „Adapter“ den Ort seiner
+SQLite-Implementierung (`apps/api/src/database/adapters/<Bereich>`).
 
-| Funktionsbereich                                                                                          | Code                                           | Grenze                                | Port        |
-| --------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------- | ----------- |
-| Backend-Auswahl, Verbindung, Migrationen, Herunterfahren                                                  | `database/backend`, `database/sqlite`          | Adapter                               | Naht fertig |
-| Fehlerdeutung (busy, unique, conflict)                                                                    | `database/persistence-errors.ts`               | Neutral                               | Fertig      |
-| Transaktionen, Post-Commit-Hooks, begrenzter Retry                                                        | `database/unit-of-work.ts`                     | Neutral                               | Fertig      |
-| Ressourcenzugriff, Supervision, Nutzungssitzungen, Betriebsintervalle, Messung, Wartung, Formulare, Flows | `resources/**`                                 | Baseline                              | Offen       |
-| Abrechnung, Zahlungen, Guthaben                                                                           | `billing/**`                                   | Baseline                              | Offen       |
-| Benutzer, Auth, RBAC, SSO, Passkeys, Passwortrichtlinie, Rate Limiting, Sitzungen, MCP-OAuth              | `users-and-auth/**`                            | Baseline                              | Offen       |
-| Audit                                                                                                     | `audit/**`                                     | Baseline                              | Offen       |
-| Attractap-Leser, Zugangsdaten, Absturzberichte, Secure Boot                                               | `attractap/**`                                 | Baseline                              | Offen       |
-| Companion-Geräte                                                                                          | `companion/**`                                 | Baseline                              | Offen       |
-| Nachrichten, Benachrichtigungen, Push, E-Mail, E-Mail-Vorlagen                                            | `messaging`, `notifications`, `push`, `email*` | Baseline                              | Offen       |
-| Einstellungen, Analytics, Metriken, MQTT, Projekte, Version                                               | jeweilige Ordner                               | Baseline                              | Offen       |
-| Plugin-Verwaltung und Plugin-SDK                                                                          | `plugin-system/**`, `libs/plugins-backend-sdk` | Baseline                              | Offen       |
-| Eingebaute Plugins                                                                                        | `apps/plugins/*`                               | Baseline (Matter, Reservations, WAGO) | Offen       |
-| Frontend                                                                                                  | `apps/frontend`                                | Sauber                                | n/a         |
+| Funktionsbereich                                                                  | Anwendungscode                                                  | Port                                                                                                             | Adapter                                                               |
+| --------------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Backend-Auswahl, Verbindung, Migrationen, Herunterfahren, Transfer                | `database/backend`, `database/sqlite`                           | `DatabaseBackend`                                                                                                | `database/sqlite`                                                     |
+| Fehlerkategorien, Transaktionen, Post-Commit-Hooks, begrenzter Retry              | `database/persistence-errors.ts`, `database/unit-of-work.ts`    | `UnitOfWork`, Fehlerklassifizierer                                                                               | `database/sqlite`                                                     |
+| Nutzungssitzungen (Start, Ende, Übernahme, Wiederherstellung), Betriebsintervalle | `resources/usage`, `resources/operating-intervals`              | `UsageSessionStore`, `OperatingTimelineStore`                                                                    | `adapters/usage`, `adapters/operating-intervals`                      |
+| Messung                                                                           | `resources/metering`                                            | `MeteringStore`                                                                                                  | `adapters/metering`                                                   |
+| Abrechnung, Zahlungen, Guthaben, SumUp                                            | `billing`                                                       | `BillingLedgerStore`, `BillingConfigurationStore`, `SumUpCredentialStore`                                        | `adapters/billing`                                                    |
+| Ressourcen, Gruppen, Einweisungen, Einweiser, Nachschulung, Supervision           | `resources/**`                                                  | `ResourceStore`, `ResourceGroupStore`, `ResourceIntroductionStore`, `ResourceIntroducerStore`, `RetrainingStore` | `adapters/resources`                                                  |
+| Wartung (Einträge, Anfragen, Pläne, Auswertung), Zustand, Formulare               | `resources/maintenances`, `resources/health`, `resources/forms` | `MaintenanceEvaluationStore` und die Wartungs-, Zustands- und Formular-Stores                                    | `adapters/resources`                                                  |
+| Flows, Flow-Knoten, Variablen, Executor                                           | `resources/flows`                                               | `FlowGraphStore`, `FlowTriggerStore`, `FlowVariableStore`, `FlowResourceDirectory`, `FlowBillingItemStore`       | `adapters/flows`                                                      |
+| Benutzer, Einladungen, Registrierung, Passwörter                                  | `users-and-auth/users`                                          | `UserStore`                                                                                                      | `adapters/users`                                                      |
+| RBAC, Berechtigungen, Rollenzuweisung                                             | `users-and-auth/rbac`                                           | `RbacStore`                                                                                                      | `adapters/users`                                                      |
+| Lokale Zugangsdaten, TOTP, API-Tokens, Passwortrichtlinie                         | `users-and-auth/auth`, `password-policy`                        | `CredentialStore`, `TotpStore`, `ApiTokenStore`, `PasswordPolicyStore`                                           | `adapters/auth`                                                       |
+| Sitzungen (SQLite und Valkey), Passkeys, SSO, Rate Limiting                       | `users-and-auth/auth`                                           | `SessionStore`, `PasskeyStore`, `SsoProviderStore`, `AccountLockoutStore`                                        | `adapters/sessions`, `passkeys`, `sso`, `rate-limiting`               |
+| Audit                                                                             | `audit`                                                         | `AuditStore`                                                                                                     | `adapters/audit` (eigene Verbindung, PRAGMAs, dauerhafte Bestätigung) |
+| Attractap-Leser, Zugangsdaten, Karten, Absturzberichte, Secure Boot               | `attractap`                                                     | `ATTRACTAP_*`-Stores                                                                                             | `adapters/attractap`                                                  |
+| Companion-Geräte, MQTT-Server                                                     | `companion`, `mqtt`                                             | `CompanionDeviceStore`, `MqttServerStore`                                                                        | `adapters/companion`, `adapters/mqtt`                                 |
+| Nachrichten, Benachrichtigungen, Push, E-Mail, Vorlagen                           | `messaging`, `notifications`, `push`, `email*`                  | Konversations-, Benachrichtigungs-, Push-, Vorlagen- und Empfänger-Stores                                        | `adapters/messaging`, `notifications`, `push`, `email`                |
+| Einstellungen, Analytics, CSV-Export, Metriken                                    | `settings`, `analytics`, `metrics`                              | `SettingsRows`, `AnalyticsReader`, `CsvExportTemplateStore`, Metrik-Reader                                       | `adapters/settings`, `analytics`, `metrics`                           |
+| Projekte, Systemstatistik                                                         | `projects`, `version`                                           | `ProjectStore`, `ProjectInvitationStore`, `SystemStatsStore`                                                     | `adapters/projects`, `adapters/system`                                |
+| Plugin-Verwaltung, Plugin-SDK                                                     | `plugin-system`, `libs/plugins-backend-sdk`                     | Plugin-Persistenz-Host, Host-Daten, Migrationen                                                                  | `adapters/plugins`                                                    |
+| Eingebaute Plugins und Beispiele                                                  | `apps/plugins/*`, `examples/*`                                  | neutrale SDK-2.0-Wurzel plus der Engine-Unterpfad `/sqlite`                                                      | Plugin-eigen                                                          |
+| Frontend                                                                          | `apps/frontend`                                                 | keiner, importiert nur `@attraccess/application-models`                                                          | n/a                                                                   |
 
-Maßgeblich ist die aktuelle Liste in `scripts/persistence-boundaries.baseline.json`.
+Die SDK-Wurzel enthält kein TypeORM und keine Host-Entity. Die engine-spezifische Oberfläche ist der explizite Unterpfad
+`@attraccess/plugins-backend-sdk/sqlite`; er funktioniert nur, wenn das aktive Backend SQLite ist, und wird sonst mit
+einem klaren Fehler verweigert (siehe [Plugins auf SDK 2.0 umstellen](plugins/migrating-to-2.md)).
+
+### Bekannte verbleibende Nahtstellen
+
+Das sind akzeptierte Grenzen dieser Änderung, keine versteckte Arbeit:
+
+- Echt-Engine-Tests und -Fixtures dürfen das ORM nutzen (siehe erlaubte Orte oben).
+- Einige Kollaborateure nehmen neben einem `TransactionScope` (`TransactionContext`) noch einen rohen `EntityManager`
+  an, solange ihre Aufrufer umziehen, etwa der Audit-Recorder. Adapter entpacken beide Formen.
+- Drei kleine Helfer entpacken einen Scope für Adapter (`TransactionHandles`, `TransactionContextResolver`,
+  `EntityManagerResolver`). Sie teilen eine Unit of Work je Verbindung (`unitOfWorkFor`) und lassen sich zu einem vereinen.
+- Swagger-Schemas, die geheime oder nie befüllte Felder dokumentierten, sind jetzt korrekt (siehe unten).
+- Nach dem Abzweigen dieses Branches in `main` gelandeter Code (etwa die MCP-OAuth-Tabellen) liegt noch nicht hinter
+  Ports. Die Grenzprüfung lässt die CI daran fehlschlagen, bis er umgezogen ist.
 
 ## Vertragstreue
 
 HTTP- und WebSocket-Antworten behalten ihre Form. Gibt ein Service keine ORM-Entities mehr zurück, mappt er explizit
 auf ein DTO. Swagger und AsyncAPI werden mit `api:export-swagger` und `api:export-asyncapi` erzeugt und verglichen;
 generierte Clients werden nicht eingecheckt.
+
+### Absichtliche Unterschiede zum bisherigen Swagger
+
+Gegenüber dem Vertrag vor dieser Änderung ist AsyncAPI identisch, und der HTTP-Vertrag weicht nur hier ab:
+
+- `AuthenticationDetail` dokumentiert `password`, `totpSecret` und `totpEnabledAt` nicht mehr, `MqttServer` nicht mehr
+  `password`. Diese Geheimnisse wurden nie zurückgegeben; das Schema sagt es jetzt.
+- `GET /companion-devices/{id}` antwortet mit `CompanionDeviceDetailDto`. Die alte Antwort spreizte die Entity und enthielt
+  den Token-Hash; das entfällt. `CompanionDevice.resources` listet nur die sinnvollen Felder.
+- `Form` dokumentiert `submissions` und `resource` nicht mehr, `ResourceFlowNode` nicht mehr `resource`; die API hat sie nie
+  befüllt. Formularfelder nutzen `FormFieldResponseDto`.
+- Als Akteure eingebettete Benutzer (Einweiser, Einweisungen, Wartung) nutzen `ResourceActorUserDto` statt des vollen
+  `User`-Schemas.
+- Einige Eigenschaften wechseln zwischen `type: object` und `allOf`/`$ref` mit demselben referenzierten Schema.
 
 ### Vertrag zweier Commits vergleichen
 
