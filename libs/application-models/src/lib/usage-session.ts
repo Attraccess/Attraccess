@@ -1,14 +1,12 @@
+import type { BillingTransactionRecord } from './billing-ledger';
 import { ResourceFormAction } from './form';
+import type { ProjectRecord } from './project-record';
+import type { FormFieldRecord, FormRecord } from './resource-form-records';
+import type { ResourceRecord } from './resource-records';
 import { ResourceType } from './resource-type';
 import { AutoIntroductionTarget, SupervisionMode } from './resource-supervision';
 import { ResourceUsageAction } from './resourceUsage-type';
-
-/**
- * Related records of a usage session are carried as they were read (their fields are owned by the user, resource,
- * project, form and billing features). The lifecycle only relies on the fields named in the narrow views below.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- a deliberately open shape owned by another feature
-export type UsageRelatedRecord = any;
+import type { UserContact, UserProfile } from './user-record';
 
 /** What the session lifecycle needs of a user. */
 export interface UsageSessionUser {
@@ -45,7 +43,33 @@ export interface UsageMeterRate {
   allocation?: 'shared' | 'per-session';
 }
 
-/** A usage session (or a stored door action) with the relations a read asked for. */
+/**
+ * The user of a session: the public profile plus the mail address that flows and notifications need. It never leaves
+ * the server as it is; responses map it to the public profile.
+ */
+export type UsageSessionUserRecord = UserContact;
+
+/** The form a stored submission answers, without its fields. */
+export type UsageSessionForm = Omit<FormRecord, 'fields'>;
+
+/** A stored form submission of a session, with the relations a read asked for. */
+export interface UsageSessionFormSubmission {
+  id: number;
+  formId: number;
+  data: Record<string, UsageFormAnswer>;
+  createdAt: Date;
+  updatedAt: Date;
+  userId: number;
+  resourceUsageId: number;
+  action: ResourceFormAction;
+  form?: UsageSessionForm;
+  user?: UserProfile | null;
+}
+
+/**
+ * A usage session (or a stored door action) with the relations a read asked for. A relation that was not read is
+ * absent; a loaded relation whose row does not exist (a deleted user, no project) is null.
+ */
 export interface UsageSession {
   id: number;
   usageAction: ResourceUsageAction;
@@ -68,19 +92,25 @@ export interface UsageSession {
   billingFactor: number | null;
   meterRates: UsageMeterRate[] | null;
   attributedOperatingDurationInMinutes: number | null;
-  resource: UsageRelatedRecord;
-  user: UsageRelatedRecord;
-  project: UsageRelatedRecord;
-  supervisorUser: UsageRelatedRecord;
-  formSubmissions: UsageRelatedRecord;
-  billingTransaction: UsageRelatedRecord;
+  resource?: ResourceRecord;
+  user?: UsageSessionUserRecord | null;
+  project?: ProjectRecord | null;
+  supervisorUser?: UserProfile | null;
+  formSubmissions?: UsageSessionFormSubmission[];
+  billingTransaction?: BillingTransactionRecord | null;
 }
+
+/** A session read together with its resource and its user (null once the user was deleted). */
+export type UsageSessionWithParties = UsageSession & {
+  resource: ResourceRecord;
+  user: UsageSessionUserRecord | null;
+};
 
 export type UsageLifecycleKind = 'start' | 'end' | 'takeover';
 
 export interface UsageFormAnswer {
   value: string;
-  fieldDefinition: { id: number; name: string } & UsageRelatedRecord;
+  fieldDefinition: FormFieldRecord;
 }
 
 /** An answered form that is stored with the session change it belongs to. */
@@ -90,7 +120,7 @@ export interface UsageFormSubmissionDraft {
   userId: number | null;
   action: ResourceFormAction;
   data: Record<string, UsageFormAnswer>;
-  form?: UsageRelatedRecord;
+  form?: FormRecord;
 }
 
 /** A billing item a flow staged for the session change; stored on the bill when the change commits. */

@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { UsageSession } from '@attraccess/application-models';
 import { ResourceUsageResponseDto } from './resource-usage-response.dto';
+import type { UsageSessionResponse } from './usage-session-response';
 
 export class GetActiveUsageSessionDto {
   @ApiProperty({
@@ -8,14 +8,14 @@ export class GetActiveUsageSessionDto {
     type: () => ResourceUsageResponseDto,
     nullable: true,
   })
-  usage: UsageSession | null;
+  usage: UsageSessionResponse | null;
 
   @ApiProperty({
     description: 'All active usage sessions of the resource, earliest started first',
     type: () => ResourceUsageResponseDto,
     isArray: true,
   })
-  usages: UsageSession[];
+  usages: UsageSessionResponse[];
 
   @ApiProperty({ description: 'Number of active usage sessions', example: 1 })
   activeSessionCount: number;

@@ -24,6 +24,7 @@ import { ResourceActivityVisibilityService } from '../authorization/resource-act
 import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
 
 import { GetActiveUsageSessionDto } from '../dtos/getActiveUsageSession.dto';
+import { toUsageSessionResponse, type UsageSessionResponse } from '../dtos/usage-session-response';
 
 import { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
 
@@ -62,8 +63,8 @@ export class ResourceUsageController {
   async lockDoor(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
-  ): Promise<UsageSession> {
-    return await this.resourceUsageService.lockDoor(resourceId, req.user);
+  ): Promise<UsageSessionResponse> {
+    return toUsageSessionResponse(await this.resourceUsageService.lockDoor(resourceId, req.user));
   }
 
   @Post('unlock')
@@ -89,8 +90,8 @@ export class ResourceUsageController {
   async unlockDoor(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
-  ): Promise<UsageSession> {
-    return await this.resourceUsageService.unlockDoor(resourceId, req.user);
+  ): Promise<UsageSessionResponse> {
+    return toUsageSessionResponse(await this.resourceUsageService.unlockDoor(resourceId, req.user));
   }
 
   @Post('unlatch')
@@ -116,8 +117,8 @@ export class ResourceUsageController {
   async unlatchDoor(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
-  ): Promise<UsageSession> {
-    return await this.resourceUsageService.unlatchDoor(resourceId, req.user);
+  ): Promise<UsageSessionResponse> {
+    return toUsageSessionResponse(await this.resourceUsageService.unlatchDoor(resourceId, req.user));
   }
 
   @Get('history')
@@ -165,7 +166,8 @@ export class ResourceUsageController {
     );
     const data = sessions
       .map((session) => this.activityVisibility.viewUsage(session, access, req.user.id))
-      .filter((session): session is UsageSession => session !== null);
+      .filter((session): session is UsageSession => session !== null)
+      .map(toUsageSessionResponse);
 
     return {
       data,
@@ -236,7 +238,7 @@ export class ResourceUsageController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Body() dto: StartUsageSessionDto,
     @Req() req: AuthenticatedRequest,
-  ): Promise<UsageSession> {
+  ): Promise<UsageSessionResponse> {
     // Only a browser session is "web"; API-token and MCP clients are programmatic.
     const origin =
       req.user.authenticationMethod === undefined || req.user.authenticationMethod === 'session' ? 'web' : 'api';
@@ -245,11 +247,12 @@ export class ResourceUsageController {
       authenticationMethod: req.user.authenticationMethod,
       ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
     });
-    return this.resourceUsageService.startSession(resourceId, req.user, dto, {
+    const started = await this.resourceUsageService.startSession(resourceId, req.user, dto, {
       auditOrigin: auditActorOf(req.user),
       origin,
       confirmedStepKeys,
     });
+    return toUsageSessionResponse(started);
   }
 
   @Put('end')
@@ -277,7 +280,7 @@ export class ResourceUsageController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Body() dto: EndUsageSessionDto,
     @Req() req: AuthenticatedRequest,
-  ): Promise<UsageSession> {
+  ): Promise<UsageSessionResponse> {
     const ended = await this.resourceUsageService.endSession(resourceId, req.user, dto, {
       auditOrigin: auditActorOf(req.user),
     });
@@ -289,7 +292,7 @@ export class ResourceUsageController {
         req.user.locale,
       );
     }
-    return ended;
+    return ended && toUsageSessionResponse(ended);
   }
 
   @Put('sessions/:usageId/project')
@@ -324,8 +327,10 @@ export class ResourceUsageController {
     @Param('usageId', ParseIntPipe) usageId: number,
     @Body() dto: UpdateUsageSessionProjectDto,
     @Req() req: AuthenticatedRequest,
-  ): Promise<UsageSession> {
-    return this.resourceUsageService.updateSessionProject(resourceId, usageId, req.user, dto);
+  ): Promise<UsageSessionResponse> {
+    return toUsageSessionResponse(
+      await this.resourceUsageService.updateSessionProject(resourceId, usageId, req.user, dto),
+    );
   }
 
   @Get('active')
@@ -367,7 +372,12 @@ export class ResourceUsageController {
       throw new ForbiddenException('You cannot view activity on this resource');
     }
     const usage = overview.usage ? view(overview.usage) : null;
-    return { ...overview, usage: usage ?? usages[usages.length - 1] ?? null, usages };
+    const shown = usage ?? usages[usages.length - 1] ?? null;
+    return {
+      ...overview,
+      usage: shown && toUsageSessionResponse(shown),
+      usages: usages.map(toUsageSessionResponse),
+    };
   }
 
   @Get(':usageId')
@@ -379,15 +389,16 @@ export class ResourceUsageController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('usageId', ParseIntPipe) usageId: number,
     @Req() req: AuthenticatedRequest,
-  ): Promise<UsageSession> {
+  ): Promise<UsageSessionResponse> {
     const access = await this.activityVisibility.resolveSessions(req.user, resourceId);
     // Other people's sessions open for full access or project members; anonymous access gets the redacted view.
-    return this.resourceUsageService.getSessionDetails(
+    const session = await this.resourceUsageService.getSessionDetails(
       resourceId,
       usageId,
       req.user,
       access === 'full',
       access === 'anonymous' ? (usage) => this.activityVisibility.redactUsage(usage) : undefined,
     );
+    return toUsageSessionResponse(session);
   }
 }

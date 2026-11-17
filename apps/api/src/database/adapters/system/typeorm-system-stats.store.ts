@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Project, Resource, ResourceUsage, Session, User } from '@attraccess/database-entities';
 import { MoreThan, Repository } from 'typeorm';
-import { activeUsageWhere } from '../../../resources/usage/sessions/active-usage';
+import { activeUsageWhere } from '../usage/active-usage-queries';
 import type { SystemCounts, SystemStatsStore } from '../../../version/system-stats.port';
 
 @Injectable()

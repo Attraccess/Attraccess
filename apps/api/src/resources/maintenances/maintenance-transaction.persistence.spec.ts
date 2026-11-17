@@ -14,6 +14,8 @@ import {
   TypeOrmMaintenanceEvaluationView,
 } from '../../database/adapters/resources/maintenance-evaluation-store.adapter';
 import { unitOfWorkFor } from '../../database/adapters/shared-unit-of-work';
+import { engineTransactionOf } from '../../database/adapters/common/legacy-engine-transaction';
+import type { TransactionScope } from '../../database/unit-of-work';
 import { MaintenanceResourceEvaluation } from './evaluation/resource-evaluation';
 
 const deferred = () => {
@@ -83,19 +85,19 @@ describe('Maintenance transaction coordination (file-backed SQLite)', () => {
         completedSessions: 0,
       },
     ]);
-    const handle = (context: object) =>
-      context instanceof EntityManager ? context : unitOfWorkFor(source).handleOf(context as never);
+    const handle = (context: TransactionScope) =>
+      engineTransactionOf(context) ?? unitOfWorkFor(source).handleOf(context);
     evaluator = new MaintenanceScheduleEvaluatorService(
       store,
       {
-        hasActiveMaintenance: async (resourceId: number, context: object) =>
+        hasActiveMaintenance: async (resourceId: number, context: TransactionScope) =>
           (await handle(context).query('SELECT * FROM maintenance_probe WHERE resourceId = ?', [resourceId])).length >
           0,
         createMaintenanceFromSchedule: async (
           resourceId: number,
           _scheduleId: number,
           _reason: string,
-          context: object,
+          context: TransactionScope,
           notify: boolean,
         ) => {
           expect(notify).toBe(false);

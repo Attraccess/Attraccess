@@ -15,7 +15,8 @@ import {
   ResourceType,
   SupervisionMode,
 } from '@attraccess/application-models';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource } from 'typeorm';
+import type { TransactionScope } from '../../../unit-of-work';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -107,8 +108,8 @@ export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
       creditsPerOperatingMinute: 0,
     })),
     validateResourceUsageStart: jest.fn().mockResolvedValue(undefined),
-    handleResourceUsageStart: jest.fn(async (_id: number, session: ResourceUsage, user: User, manager: EntityManager) =>
-      manager.save(BillingTransaction, {
+    handleResourceUsageStart: jest.fn(async (_id: number, session: ResourceUsage, user: User, tx: TransactionScope) =>
+      unitOfWork.handleOf(tx).save(BillingTransaction, {
         resourceUsageId: session.id,
         userId: user.id,
         amount: 0,
@@ -116,7 +117,8 @@ export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
       }),
     ),
     // The real charge sums the items already on the transaction; that is all these tests need from it.
-    chargeForResourceUsage: jest.fn(async (session: ResourceUsage, manager: EntityManager) => {
+    chargeForResourceUsage: jest.fn(async (session: ResourceUsage, tx: TransactionScope) => {
+      const manager = unitOfWork.handleOf(tx);
       scope.log.push('charge');
       const transaction = await manager.findOneByOrFail(BillingTransaction, { resourceUsageId: session.id });
       const rows = await manager.find(BillingTransactionItem, { where: { billingTransactionId: transaction.id } });

@@ -6,7 +6,7 @@ import type {
 import type { PluginPersistenceHost } from '../../plugin-system/persistence/plugin-persistence-host.port';
 import type { PersistenceErrorClassifier } from '../persistence-errors';
 import type { DatabaseTransfer } from '../transfer-snapshot';
-import type { ScopedUnitOfWork } from '../unit-of-work';
+import type { ScopedUnitOfWork, TransactionScope, UnitOfWork } from '../unit-of-work';
 import type { DatabaseType } from './database-type';
 
 export { DEFAULT_DATABASE_TYPE, SUPPORTED_DATABASE_TYPES } from './database-type';
@@ -31,8 +31,11 @@ export interface DatabaseBackendPluginHooks {
   createMigrationEngine(config: PluginMigrationEngineConfig | null): PluginMigrationEngine;
   /** The plugin persistence host. `getConnection` resolves the host connection lazily. */
   createPersistenceHost(getConnection: () => unknown): PluginPersistenceHost;
-  /** The read-only scope plugin hooks receive for a transaction the host opened itself. */
-  hostTransactionScope(transaction: object): PluginTransactionScope;
+  /**
+   * The read-only scope plugin hooks receive for a unit of work the host opened itself. It closes together with the
+   * host's scope.
+   */
+  hostTransactionScope(unitOfWork: UnitOfWork, scope: TransactionScope): PluginTransactionScope;
 }
 
 /**

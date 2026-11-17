@@ -221,6 +221,18 @@ describe('session and health events', () => {
     sub.unsubscribe();
   });
 
+  it('carries the started session with its user as the public profile, never the mail address', async () => {
+    const { service, callback, sub } = await open();
+    const user = { id: 7, username: 'ada', locale: 'en', email: 'ada@example.test' } as User;
+    service.handleResourceUsage(startedEvent({ id: 3, userId: 7, user }));
+    await flush();
+    const { usage } = callback.mock.calls[0][0].data;
+    expect(usage).toMatchObject({ id: 3, user: { id: 7, username: 'ada' } });
+    expect(JSON.stringify(usage)).not.toContain('ada@example.test');
+    expect(usage.user).not.toHaveProperty('email');
+    sub.unsubscribe();
+  });
+
   it('sends exactly one session_ended for the events emitted when a session ends', async () => {
     const { service, callback, sub } = await open({ resource: { maxParallelSessions: 2 }, usages: [row()] });
     // The usage service announces an end only through ResourceUsageSessionEndedEvent.

@@ -8,8 +8,6 @@ import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 import { USAGE_SESSION_STORE, UsageSessionStore } from '../usage-session-store.port';
 
-import { asLegacy } from '../legacy-seams';
-
 import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../../exceptions/resource.maintenance.inUse.exception';
 
 import { ResourceNotFoundException } from '../../../exceptions/resource.notFound.exception';
@@ -24,7 +22,8 @@ import { ResourceIntroducersService } from '../../introducers/resourceIntroducer
 
 import { ResourceMaintenanceService } from '../../maintenances/maintenance.service';
 
-import { LegacyTransactionHandle, RESOURCE_USAGE_LOG_CONTEXT } from '../lifecycle/usage-lifecycle';
+import type { TransactionScope } from '../../../database/unit-of-work';
+import { RESOURCE_USAGE_LOG_CONTEXT } from '../lifecycle/usage-lifecycle';
 
 import { UsageAccessCache } from './usage-access-cache';
 
@@ -46,11 +45,11 @@ export class UsageResourceGate {
     resourceId: number,
     user: UsageSessionUser,
     opts: { checkMaintenance: boolean; checkControlPermission: boolean },
-    transactionalLegacyTransactionHandle?: LegacyTransactionHandle,
+    scope?: TransactionScope,
   ): Promise<UsageSessionResource> {
     const { checkMaintenance, checkControlPermission } = opts;
 
-    const resource = await this.sessions.findResource(resourceId, transactionalLegacyTransactionHandle);
+    const resource = await this.sessions.findResource(resourceId, scope);
     if (!resource) {
       this.logger.warn(`Resource ${resourceId} not found`);
       throw new ResourceNotFoundException(resourceId);
@@ -61,16 +60,13 @@ export class UsageResourceGate {
       // Single enforcement point for maintenance mode: only users who can manage maintenance
       // may start a session (or lock/unlock door, etc.). Applies to both manual and
       // schedule-triggered maintenances (see hasActiveMaintenance).
-      const hasActiveMaintenance = await this.resourceMaintenanceService.hasActiveMaintenance(
-        resourceId,
-        transactionalLegacyTransactionHandle,
-      );
+      const hasActiveMaintenance = await this.resourceMaintenanceService.hasActiveMaintenance(resourceId, scope);
       if (hasActiveMaintenance) {
         // Check if user can manage maintenance (which allows them to use during maintenance)
         const canManageMaintenance = await this.resourceMaintenanceService.canManageMaintenance(
-          asLegacy(user),
+          user,
           resourceId,
-          transactionalLegacyTransactionHandle,
+          scope,
         );
 
         if (!canManageMaintenance) {
@@ -85,15 +81,12 @@ export class UsageResourceGate {
 
       // Health gate: block non-maintenance users when any health entry is unhealthy.
       // Users that can manage maintenance are intentionally allowed through so they can investigate/repair.
-      const isUnhealthy = await this.resourceHealthService.isResourceUnhealthy(
-        resourceId,
-        transactionalLegacyTransactionHandle,
-      );
+      const isUnhealthy = await this.resourceHealthService.isResourceUnhealthy(resourceId, scope);
       if (isUnhealthy) {
         const canManageMaintenance = await this.resourceMaintenanceService.canManageMaintenance(
-          asLegacy(user),
+          user,
           resourceId,
-          transactionalLegacyTransactionHandle,
+          scope,
         );
         if (!canManageMaintenance) {
           this.logger.warn(`User ${user.id} blocked from resource ${resourceId} because it is currently unhealthy`);
@@ -106,11 +99,7 @@ export class UsageResourceGate {
     }
 
     if (checkControlPermission) {
-      const canStartSession = await this.access.canControllResource(
-        resourceId,
-        user,
-        transactionalLegacyTransactionHandle,
-      );
+      const canStartSession = await this.access.canControllResource(resourceId, user, scope);
 
       if (!canStartSession) {
         this.logger.warn(`User ${user.id} cannot control resource ${resourceId} - missing introduction`);
@@ -137,16 +126,16 @@ export class UsageResourceGate {
     resourceId: number,
     requester: UsageSessionUser,
     supervisorUserId: number,
-    transactionalLegacyTransactionHandle?: LegacyTransactionHandle,
+    scope?: TransactionScope,
     preloadedResource?: UsageSessionResource,
   ): Promise<void> {
-    await this.assertSupportsSupervision(resourceId, transactionalLegacyTransactionHandle, preloadedResource);
+    await this.assertSupportsSupervision(resourceId, scope, preloadedResource);
 
     if (supervisorUserId === requester.id) {
       throw new BadRequestException('You cannot supervise your own session');
     }
 
-    if (!(await this.sessions.userExists(supervisorUserId, transactionalLegacyTransactionHandle))) {
+    if (!(await this.sessions.userExists(supervisorUserId, scope))) {
       throw new NotFoundException(`Supervisor with ID ${supervisorUserId} not found`);
     }
 
@@ -154,7 +143,7 @@ export class UsageResourceGate {
       resourceId,
       supervisorUserId,
       true,
-      transactionalLegacyTransactionHandle,
+      scope,
     );
 
     if (!supervisorIsIntroducer) {
@@ -169,11 +158,10 @@ export class UsageResourceGate {
    */
   public async assertSupportsSupervision(
     resourceId: number,
-    transactionalLegacyTransactionHandle?: LegacyTransactionHandle,
+    scope?: TransactionScope,
     preloadedResource?: UsageSessionResource,
   ): Promise<UsageSessionResource> {
-    const resource =
-      preloadedResource ?? (await this.sessions.findResource(resourceId, transactionalLegacyTransactionHandle));
+    const resource = preloadedResource ?? (await this.sessions.findResource(resourceId, scope));
     if (!resource) {
       throw new ResourceNotFoundException(resourceId);
     }

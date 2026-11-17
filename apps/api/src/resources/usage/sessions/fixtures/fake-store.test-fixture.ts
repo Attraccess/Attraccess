@@ -1,7 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AUDIT_RECORDER } from '../../../../audit/recorder/audit-event';
-import { EntityManagerResolver } from '../../../../database/adapters/entity-manager-resolver';
 import type { TransactionScope, UnitOfWork } from '../../../../database/unit-of-work';
 import { UNIT_OF_WORK } from '../../../../database/unit-of-work';
 import { BillingService } from '../../../../billing/charges/billing.service';
@@ -119,11 +118,6 @@ async function buildUsageScope<S extends UsageSessionStore>(store: S, unitOfWork
       ...RESOURCE_USAGE_COLLABORATORS,
       { provide: USAGE_SESSION_STORE, useValue: store },
       { provide: UNIT_OF_WORK, useValue: unitOfWork },
-      // The legacy handle of a scope is the scope itself, so a spec can tell which transaction a collaborator joined.
-      {
-        provide: EntityManagerResolver,
-        useValue: { resolve: () => undefined, legacyHandle: (context: object) => context },
-      },
       { provide: ResourcesService, useValue: mocks.resourcesService },
       { provide: ResourceIntroductionsService, useValue: mocks.introductions },
       { provide: ResourceIntroducersService, useValue: mocks.introducers },

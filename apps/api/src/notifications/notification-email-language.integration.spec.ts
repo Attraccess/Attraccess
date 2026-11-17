@@ -1,7 +1,7 @@
 import { createMock } from '@golevelup/ts-jest';
 import { Test } from '@nestjs/testing';
-import { EmailTemplate, Resource, ResourceUsage, User } from '@attraccess/database-entities';
-import { EmailTemplateType } from '@attraccess/application-models';
+import { EmailTemplate, Resource, User } from '@attraccess/database-entities';
+import { EmailTemplateType, type UsageSession } from '@attraccess/application-models';
 import { createTransport } from 'nodemailer';
 import { EmailService } from '../email/email.service';
 import { EmailTemplateService } from '../email-template/email-template.service';
@@ -113,7 +113,7 @@ describe('Notification email language fallback', () => {
           resource,
           resourceId: resource.id,
           endTime: null,
-        } as ResourceUsage,
+        } as unknown as UsageSession,
         null,
       ),
     );
@@ -172,7 +172,7 @@ describe('Notification email language fallback', () => {
           resource,
           resourceId: resource.id,
           endTime: null,
-        } as ResourceUsage,
+        } as unknown as UsageSession,
         actor,
       ),
     );

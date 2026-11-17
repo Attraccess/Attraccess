@@ -4,6 +4,7 @@ import {
 } from './resourceIntroducers.service.resource-introducers-service.test-fixture';
 import { ResourceIntroducerType, type ResourceIntroducerRecord } from '@attraccess/application-models';
 import { NotificationCategory } from './../../notifications/notification-types';
+import { fakeTransactionScope } from '../../database/fake-transaction-scope.test-fixture';
 
 type User = { locale: string };
 
@@ -167,7 +168,7 @@ describe('ResourceIntroducersService', () => {
       await expect(fixture.service.isIntroducer(1, 2, false)).resolves.toBe(false);
       expect(fixture.store.hasGroupGrant).not.toHaveBeenCalled();
       fixture.store.hasGroupGrant.mockResolvedValue(true);
-      const context = {};
+      const context = fakeTransactionScope();
       await expect(fixture.service.isIntroducer(1, 2, true, context)).resolves.toBe(true);
       expect(fixture.store.hasGroupGrant).toHaveBeenCalledWith(1, 2, ResourceIntroducerType.INTRODUCER, context);
     });

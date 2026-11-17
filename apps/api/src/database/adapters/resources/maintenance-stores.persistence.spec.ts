@@ -23,6 +23,7 @@ import {
 } from './maintenance-request-store.adapter';
 import { TypeOrmMaintenanceScheduleStore } from './maintenance-schedule-store.adapter';
 import { TypeOrmResourceRecipientStore } from './resource-recipient-store.adapter';
+import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 
 describe('maintenance stores on real SQLite', () => {
   let source: DataSource;
@@ -169,10 +170,12 @@ describe('maintenance stores on real SQLite', () => {
       const rolledBack = source.transaction(async (manager) => {
         const created = await maintenance.createFromSchedule(
           { resourceId, scheduleId, reason: 'Due', startTime: new Date() },
-          manager,
+          legacyEngineTransactionScope(manager),
         );
         expect(created?.reason).toBe('Due');
-        expect(await maintenance.hasActive({ resourceId }, new Date(), manager)).toBe(true);
+        expect(await maintenance.hasActive({ resourceId }, new Date(), legacyEngineTransactionScope(manager))).toBe(
+          true,
+        );
         throw new Error('roll back');
       });
       await expect(rolledBack).rejects.toThrow('roll back');

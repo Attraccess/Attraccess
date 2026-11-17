@@ -25,6 +25,7 @@ import * as Handlebars from 'handlebars';
 import { createTransport } from 'nodemailer';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import type { TransactionScope } from '../database/unit-of-work';
 
 export const EMAIL_LOGO_CID = 'attraccess-logo';
 
@@ -392,7 +393,11 @@ export class EmailService {
     await this.sendEmail(user, EmailTemplateType.VERIFY_EMAIL, context);
   }
 
-  async sendUserInvitationEmail(user: NotificationRecipient, verificationToken: string, transaction?: object) {
+  async sendUserInvitationEmail(
+    user: NotificationRecipient,
+    verificationToken: string,
+    transaction?: TransactionScope,
+  ) {
     const url = await this.settingsService.getUrl();
     if (!url) throw new Error('Application URL not configured');
     const verificationUrl = `${url}/accept-invitation?email=${encodeURIComponent(
@@ -512,7 +517,7 @@ export class EmailService {
     user: NotificationRecipient,
     templateType: EmailTemplateKey,
     context: Record<string, unknown>,
-    transaction?: object,
+    transaction?: TransactionScope,
   ) {
     try {
       const locale = user.locale || (await this.settingsService.getDefaultLanguage());

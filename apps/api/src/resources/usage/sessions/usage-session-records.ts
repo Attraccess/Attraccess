@@ -5,7 +5,7 @@ import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
-import type { TransactionContext } from '../../../database/transaction-context';
+import type { TransactionScope } from '../../../database/unit-of-work';
 
 import { ProjectsService } from '../../../projects/projects.service';
 
@@ -33,7 +33,7 @@ export class UsageSessionRecords {
    */
   public async getActiveSession(
     resourceId: number,
-    context?: TransactionContext,
+    context?: TransactionScope,
     preferUserId?: number,
   ): Promise<UsageSession | null> {
     const sessions = await this.getActiveSessionsForResource(resourceId, context);
@@ -45,7 +45,7 @@ export class UsageSessionRecords {
   }
 
   /** All active sessions of one resource, earliest started first. */
-  public async getActiveSessionsForResource(resourceId: number, context?: TransactionContext): Promise<UsageSession[]> {
+  public async getActiveSessionsForResource(resourceId: number, context?: TransactionScope): Promise<UsageSession[]> {
     return this.sessionStore.findActiveSessions(resourceId, context);
   }
 
@@ -156,6 +156,6 @@ export class UsageSessionRecords {
 
     const project = dto.projectId === null ? null : await this.projectsService.findOneById(user.id, dto.projectId);
 
-    return this.sessionStore.assignProject(usage, project);
+    return this.sessionStore.assignProject(usage.id, project?.id ?? null);
   }
 }

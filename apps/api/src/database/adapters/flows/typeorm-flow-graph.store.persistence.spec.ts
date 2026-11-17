@@ -5,6 +5,7 @@ import type { AuditEvent } from '../../../audit/recorder/audit-event';
 import { FlowCanvasIdConflictError } from '../../../resources/flows/flow-graph.port';
 import { SqliteFileFixture } from '../sqlite-file.test-fixture';
 import { unitOfWorkFor } from '../shared-unit-of-work';
+import type { TransactionScope } from '../../unit-of-work';
 import { TypeOrmFlowGraphStore } from './typeorm-flow-graph.store';
 import { TypeOrmFlowResourceDirectory } from './typeorm-flow-resource-directory';
 import { TypeOrmFlowVariableStore } from './typeorm-flow-variable.store';
@@ -95,12 +96,10 @@ describe('flow adapters on real SQLite', () => {
       const resourceId = await newResource(source, 'Laser');
       await graph.replaceResourceCanvas(resourceId, canvas('a'), () => undefined);
       const seen: boolean[] = [];
-      audit.record.mockImplementationOnce(
-        async (_event: AuditEvent, manager: { queryRunner?: { isTransactionActive: boolean } }) => {
-          seen.push(manager?.queryRunner?.isTransactionActive === true);
-          return { status: 'recorded' };
-        },
-      );
+      audit.record.mockImplementationOnce(async (_event: AuditEvent, scope: TransactionScope) => {
+        seen.push(unitOfWorkFor(source).handleOf(scope).queryRunner?.isTransactionActive === true);
+        return { status: 'recorded' };
+      });
 
       await graph.replaceResourceCanvas(resourceId, canvas('b'), (previous) => {
         expect(previous.nodes).toHaveLength(2);

@@ -115,13 +115,13 @@ describe('ResourceFormsService pagination + per-field validation', () => {
   });
 
   it('validates lifecycle form drafts without publishing submissions', async () => {
-    const manager = {};
+    const scope = { isOpen: true, afterCommit: jest.fn() };
     const drafts = await service.prepareRequiredSubmissions({
       resourceId: 5,
       action: ResourceFormAction.START,
       userId: 3,
       resourceUsageId: 9,
-      manager,
+      scope,
       submissions: [
         {
           formId: 7,
@@ -133,7 +133,7 @@ describe('ResourceFormsService pagination + per-field validation', () => {
         },
       ],
     });
-    expect(store.findRequiredForAction).toHaveBeenCalledWith(5, ResourceFormAction.START, manager);
+    expect(store.findRequiredForAction).toHaveBeenCalledWith(5, ResourceFormAction.START, scope);
     expect(drafts).toHaveLength(1);
     expect(drafts[0]).toMatchObject({ resourceUsageId: 9, userId: 3, formId: 7 });
     expect(drafts[0].data['11'].value).toBe('Alice');

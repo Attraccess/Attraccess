@@ -8,11 +8,7 @@ export function activeUsageWhere(): FindOptionsWhere<ResourceUsage> {
   return { ...publishedState, endTime: IsNull() };
 }
 
-export function activeUsageSql(alias: string): string {
-  return `${alias}.endTime IS NULL AND ${Object.entries(publishedState)
-    .map(([column, value]) => `${alias}.${column} = ${typeof value === 'boolean' ? Number(value) : `'${value}'`}`)
-    .join(' AND ')}`;
-}
+export { activeUsageSql } from '../../../resources/usage/sessions/active-usage';
 
 /** All published sessions of a machine, earliest first. */
 export function findActiveUsages(manager: EntityManager, resourceId: number): Promise<ResourceUsage[]> {

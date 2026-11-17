@@ -17,6 +17,7 @@ import {
 } from '../../../audit/audit-persistence.port';
 
 import { SQLITE_BUSY_TIMEOUT_MS } from '../../sqlite/sqlite-connection';
+import { engineTransactionOf } from '../common/legacy-engine-transaction';
 import { isSqliteBusyError, sqliteErrorCode } from '../../sqlite/sqlite-errors';
 import {
   ScopedUnitOfWork,
@@ -54,14 +55,11 @@ const FILTER_COLUMNS = [
 ] as const satisfies readonly (keyof AuditEntryFilter)[];
 
 class SqliteAuditTransaction implements AuditTransaction {
-  constructor(readonly manager: EntityManager) {}
-
-  get settingsHandle(): EntityManager {
-    return this.manager;
-  }
+  constructor(
+    readonly manager: EntityManager,
+    readonly settingsHandle: TransactionScope,
+  ) {}
 }
-
-const isTransactionScope = (ref: object): ref is TransactionScope => 'afterCommit' in ref && 'isOpen' in ref;
 
 const sqliteDate = (date: Date): string => date.toISOString().replace('T', ' ').replace('Z', '');
 
@@ -165,21 +163,20 @@ export class SqliteAuditStore implements AuditStore {
     if (storage?.isInitialized) await storage.destroy().catch(() => undefined);
   }
 
-  activeTransaction(ref: object | undefined): AuditTransaction | undefined {
+  activeTransaction(ref: TransactionScope | undefined): AuditTransaction | undefined {
     if (!ref) return undefined;
-    let manager: EntityManager;
-    if (isTransactionScope(ref)) {
-      // A scope that already committed or rolled back has no transaction left to join: the record is written
-      // durably, as for a native handle whose transaction is no longer active.
-      if (!ref.isOpen) return undefined;
-      if (!(this.unitOfWork instanceof ScopedUnitOfWork))
-        throw new TransactionScopeError('No unit of work is available to resolve the transaction scope');
-      manager = this.unitOfWork.handleOf(ref) as EntityManager;
-    } else {
-      // The native transaction handle of this adapter, still passed by callers that run their own transaction.
-      manager = ref as EntityManager;
-    }
-    return manager.queryRunner?.isTransactionActive ? new SqliteAuditTransaction(manager) : undefined;
+    const engine = engineTransactionOf(ref);
+    // A scope that already committed or rolled back has no transaction left to join: the record is written
+    // durably, as for a native handle whose transaction is no longer active.
+    if (!engine && !ref.isOpen) return undefined;
+    const manager = engine ?? this.managerOfScope(ref);
+    return manager.queryRunner?.isTransactionActive ? new SqliteAuditTransaction(manager, ref) : undefined;
+  }
+
+  private managerOfScope(scope: TransactionScope): EntityManager {
+    if (!(this.unitOfWork instanceof ScopedUnitOfWork))
+      throw new TransactionScopeError('No unit of work is available to resolve the transaction scope');
+    return this.unitOfWork.handleOf(scope) as EntityManager;
   }
 
   /**

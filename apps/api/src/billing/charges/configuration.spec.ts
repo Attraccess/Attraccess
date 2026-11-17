@@ -5,6 +5,7 @@ import { Currency } from '../dto/set-configuration.dto';
 import { InsufficientBalanceError } from '../errors/insufficient-balance.error';
 import { ResourceBillingConfigurationNotFoundException } from '../errors/resource-billing-configuration-not-found.error';
 import { billableUsage, createBillingServiceFixture } from './fixtures/billing-service.test-fixture';
+import { fakeTransactionScope } from '../../database/fake-transaction-scope.test-fixture';
 
 describe('BillingService configuration and usage start', () => {
   let f: ReturnType<typeof createBillingServiceFixture>;
@@ -44,7 +45,7 @@ describe('BillingService configuration and usage start', () => {
         creditsPerUsage: null,
       });
 
-      const transaction = await f.service.chargeForResourceUsage(usage, {});
+      const transaction = await f.service.chargeForResourceUsage(usage, fakeTransactionScope());
 
       expect(transaction?.amount).toBe(-23);
       expect(transaction?.items).toContainEqual(
@@ -87,7 +88,7 @@ describe('BillingService configuration and usage start', () => {
     };
 
     it('keeps the fee and session minutes personal and charges the exact whole-credit share of running time', async () => {
-      const transaction = await f.service.chargeForResourceUsage(usage, {}, share as never);
+      const transaction = await f.service.chargeForResourceUsage(usage, fakeTransactionScope(), share as never);
 
       // 5 per use + 10 minutes at 2 per minute + the 23 credits of running time; no per-minute round-up of the share.
       expect(transaction?.amount).toBe(-(5 + 20 + 23));
@@ -110,7 +111,7 @@ describe('BillingService configuration and usage start', () => {
     });
 
     it('shows no share of running time when the shared session had none', async () => {
-      const transaction = await f.service.chargeForResourceUsage(usage, {}, {
+      const transaction = await f.service.chargeForResourceUsage(usage, fakeTransactionScope(), {
         shared: true,
         shareMs: 0,
         credits: 0,
@@ -130,7 +131,10 @@ describe('BillingService configuration and usage start', () => {
     });
 
     it('bills a session that did not share exactly as before even when a share is passed', async () => {
-      const transaction = await f.service.chargeForResourceUsage(usage, {}, { ...share, shared: false } as never);
+      const transaction = await f.service.chargeForResourceUsage(usage, fakeTransactionScope(), {
+        ...share,
+        shared: false,
+      } as never);
 
       // 3.75 operating minutes round up to 4 at 6 credits.
       expect(transaction?.amount).toBe(-(5 + 20 + 24));
@@ -170,7 +174,7 @@ describe('BillingService configuration and usage start', () => {
     });
 
     it('audits the pending start transaction inside the caller transaction', async () => {
-      const callerTransaction = {};
+      const callerTransaction = fakeTransactionScope();
 
       await f.service.handleResourceUsageStart(205, { id: 31 }, { id: 32 }, callerTransaction);
 

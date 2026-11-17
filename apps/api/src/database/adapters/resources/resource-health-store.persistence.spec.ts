@@ -2,6 +2,7 @@ import { DataSource } from 'typeorm';
 import { entities, Resource } from '@attraccess/database-entities';
 import { ResourceHealthSource, ResourceHealthStatus, ResourceType } from '@attraccess/application-models';
 import { TypeOrmResourceHealthStore } from './resource-health-store.adapter';
+import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 
 describe('TypeOrmResourceHealthStore on real SQLite', () => {
   let source: DataSource;
@@ -56,7 +57,7 @@ describe('TypeOrmResourceHealthStore on real SQLite', () => {
     expect(await store.hasUnhealthyEntry(resourceId)).toBe(false);
     await source.transaction(async (manager) => {
       await store.upsertReport(report('ir', ResourceHealthStatus.UNHEALTHY, 'gone'));
-      expect(await store.hasUnhealthyEntry(resourceId, manager)).toBe(true);
+      expect(await store.hasUnhealthyEntry(resourceId, legacyEngineTransactionScope(manager))).toBe(true);
     });
     expect(await store.hasUnhealthyEntry(resourceId)).toBe(true);
   });

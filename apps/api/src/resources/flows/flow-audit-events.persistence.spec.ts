@@ -1,6 +1,7 @@
 import { ResourceFlowNodeType } from '@attraccess/application-models';
 import { auditActorOf } from '../../audit/recorder/audit-event';
 import { projectAuditRow } from '../../audit/recorder/audit-row';
+import { unitOfWorkFor } from '../../database/adapters/shared-unit-of-work';
 import {
   openFlowCanvasDatabase,
   startToHttpCanvas,
@@ -21,8 +22,8 @@ describe('flow audit events', () => {
   /** Whether the next recorded event is written while the caller's transaction is still open. */
   const recordsInTransaction = () => {
     const state = { active: false };
-    db.audit.record.mockImplementationOnce(async (_event, manager) => {
-      state.active = manager?.queryRunner?.isTransactionActive === true;
+    db.audit.record.mockImplementationOnce(async (_event, scope) => {
+      state.active = unitOfWorkFor(db.source).handleOf(scope).queryRunner?.isTransactionActive === true;
       return { status: 'recorded' };
     });
     return state;

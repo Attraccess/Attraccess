@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { asLegacy } from '../legacy-seams';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ResourceUsageSessionEndedEvent, ResourceUsageSessionTakenOverEvent } from '../events/resource-usage.events';
 import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
@@ -19,7 +18,7 @@ export class ResourceSessionNotificationListener {
     const newUserUsername = event.newUser.username;
     await this.notifications.dispatch({
       category: NotificationCategory.RESOURCE_TAKEOVER,
-      recipients: [asLegacy(event.previousUser)],
+      recipients: [event.previousUser],
       actorId: event.newUser.id,
       title: (recipient) => t(recipient.locale, 'takeoverTitle', { resourceName: event.resource.name }),
       body: (recipient) => {

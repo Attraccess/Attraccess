@@ -4,16 +4,15 @@ import { BadRequestException } from '@nestjs/common';
 import { NoOwnActiveSessionError } from '../errors/no-own-active-session.error';
 import { publishedState } from './published-state';
 
-// The queries behind "active sessions" belong to the persistence adapter; they stay importable from here for the
-// features that have not moved to the usage session port yet.
-export {
-  activeUsageSql,
-  activeUsageWhere,
-  countOccupiedSlots,
-  findActiveUsage,
-  findActiveUsages,
-  findOccupyingUserIds,
-} from '../../../database/adapters/usage/active-usage-queries';
+/**
+ * SQL condition of a published, usable session on the usage table under `alias`. The released migration
+ * 1790100000000 imports it from this module, so it stays here; the persistence adapter's queries use it too.
+ */
+export function activeUsageSql(alias: string): string {
+  return `${alias}.endTime IS NULL AND ${Object.entries(publishedState)
+    .map(([column, value]) => `${alias}.${column} = ${typeof value === 'boolean' ? Number(value) : `'${value}'`}`)
+    .join(' AND ')}`;
+}
 
 /** In-memory counterpart of the active-sessions query, for usages that were loaded without that filter. */
 export function isActiveUsage(usage: Pick<UsageSession, 'endTime' | keyof typeof publishedState>): boolean {

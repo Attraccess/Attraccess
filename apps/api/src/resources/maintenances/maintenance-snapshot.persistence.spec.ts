@@ -28,6 +28,8 @@ import {
   closeResourceTransactionConnection,
   runSerializedTransaction,
 } from '../../database/sqlite/run-serialized-transaction';
+import { engineTransactionOf } from '../../database/adapters/common/legacy-engine-transaction';
+import type { TransactionScope } from '../../database/unit-of-work';
 
 const UsageSchema = new EntitySchema<ResourceUsage>({
   name: 'ResourceUsage',
@@ -133,11 +135,11 @@ describe('Maintenance snapshots (file-backed SQLite)', () => {
       return getRepository.call(this, target) as never;
     });
     const attribution = new ResourceOperatingAttributionService(createOperatingTimelineStore(source));
-    durationScan = jest.fn(async (windows: ResourceDurationWindow[], now: Date, manager?: EntityManager) => {
-      const durations = await attribution.getDurationsForWindows(windows, now, manager);
+    durationScan = jest.fn(async (windows: ResourceDurationWindow[], now: Date, context?: TransactionScope) => {
+      const durations = await attribution.getDurationsForWindows(windows, now, context);
       // Pause after reading real history but before returning its result. A queued
       // writer can now invalidate that history before maintenance is persisted.
-      if (manager) {
+      if (context) {
         scanEntered.resolve();
         await releaseScan.promise;
       }
@@ -156,19 +158,19 @@ describe('Maintenance snapshots (file-backed SQLite)', () => {
     jest
       .spyOn(TypeOrmMaintenanceEvaluationView.prototype, 'baselineDate')
       .mockImplementation(async () => new Date(baseline.getTime()));
-    const handle = (context: object) =>
-      context instanceof EntityManager ? context : unitOfWorkFor(source).handleOf(context as never);
+    const handle = (context: TransactionScope) =>
+      engineTransactionOf(context) ?? unitOfWorkFor(source).handleOf(context);
     evaluator = new MaintenanceScheduleEvaluatorService(
       store,
       {
-        hasActiveMaintenance: async (resourceId: number, context: object) =>
+        hasActiveMaintenance: async (resourceId: number, context: TransactionScope) =>
           (await handle(context).query('SELECT * FROM maintenance_probe WHERE resourceId = ?', [resourceId])).length >
           0,
         createMaintenanceFromSchedule: async (
           resourceId: number,
           _scheduleId: number,
           _reason: string,
-          context: object,
+          context: TransactionScope,
           notify: boolean,
         ) => {
           expect(notify).toBe(false);

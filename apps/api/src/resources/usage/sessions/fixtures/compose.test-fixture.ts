@@ -40,7 +40,7 @@ export function composeResourceUsageService(
   valkeyClient: unknown,
   metering?: unknown,
 ): ResourceUsageService {
-  const { unitOfWork, handles, store } = usagePersistenceFor({ usage: resourceUsageRepository });
+  const { unitOfWork, store } = usagePersistenceFor({ usage: resourceUsageRepository });
   const turns = new SessionChangeTurns(store, valkeyClient as never);
   const rules = new UsageAccessRules(
     resourceIntroductionService as never,
@@ -68,7 +68,6 @@ export function composeResourceUsageService(
   const lifecycle = new UsageLifecycle(
     store,
     unitOfWork,
-    handles,
     eventEmitter as never,
     billingService as never,
     turns,

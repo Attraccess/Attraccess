@@ -1,11 +1,12 @@
 import { registerMaintenanceServiceFixture } from './maintenance.service.maintenance-service.test-fixture';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { fakeTransactionScope } from '../../database/fake-transaction-scope.test-fixture';
 
 describe('MaintenanceService', () => {
   const fixture = registerMaintenanceServiceFixture();
 
   it('creates scheduled maintenance with deferred notifications in a transaction', async () => {
-    const context = {};
+    const context = fakeTransactionScope();
     const emit = jest.spyOn(fixture.service, 'emitScheduledMaintenanceCreated');
     expect(await fixture.service.createMaintenanceFromSchedule(1, 8, 'Due', context, false)).toBe(
       fixture.mockMaintenance,
@@ -26,7 +27,7 @@ describe('MaintenanceService', () => {
     expect(await fixture.service.hasActiveMaintenance(1)).toBe(true);
     expect(fixture.store.hasActive).toHaveBeenLastCalledWith({ resourceId: 1 }, expect.any(Date), undefined);
     fixture.store.hasActive.mockResolvedValue(false);
-    const context = {};
+    const context = fakeTransactionScope();
     expect(await fixture.service.hasActiveMaintenance({ resourceId: 1, scheduleId: 8 }, context)).toBe(false);
     expect(fixture.store.hasActive).toHaveBeenLastCalledWith(
       { resourceId: 1, scheduleId: 8 },

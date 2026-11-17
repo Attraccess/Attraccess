@@ -13,6 +13,7 @@ import {
   type PluginStartBlockedChanged,
 } from '../../plugin-system/start-blocked/start-blocked.events';
 import { getSessionCapacity } from '../usage/sessions/active-usage';
+import { toUsageSessionResponse } from '../usage/dtos/usage-session-response';
 import { RESOURCE_STORE, type ResourceStore } from '../resource-store.port';
 
 interface MessageEvent {
@@ -144,7 +145,11 @@ export class ResourceEventsService implements OnModuleInit, OnModuleDestroy {
   @OnEvent(ResourceSessionStartedEvent.EVENT_NAME)
   handleResourceUsage(event: ResourceSessionStartedEvent) {
     const resourceId = event.usage.resource.id;
-    this.emitWithSessionStatus(resourceId, { ...event, eventType: ResourceSessionStartedEvent.EVENT_NAME });
+    // The live feed carries the session as responses do: users as their public profile only.
+    this.emitWithSessionStatus(resourceId, {
+      usage: toUsageSessionResponse(event.usage),
+      eventType: ResourceSessionStartedEvent.EVENT_NAME,
+    });
     this.logger.debug(`Queued ${ResourceSessionStartedEvent.EVENT_NAME} event for resource ${resourceId}`);
   }
 

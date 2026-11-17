@@ -1,8 +1,9 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ResourceType, ResourceUsageAction } from '@attraccess/application-models';
-import type { UsageSession } from '@attraccess/application-models';
+import type { UsageSession, UsageSessionWithParties } from '@attraccess/application-models';
 import { UsageSessionStore } from '../usage-session-store.port';
 import { UsageSessionRecords } from './usage-session-records';
+import { fakeTransactionScope } from '../../../database/fake-transaction-scope.test-fixture';
 
 /** The records read through the usage session port only: no ORM, no database. */
 describe('UsageSessionRecords', () => {
@@ -41,7 +42,10 @@ describe('UsageSessionRecords', () => {
       findPublishedSession: jest.fn(),
       findHistory: jest.fn(),
       findSessionForProjectChange: jest.fn(),
-      assignProject: jest.fn(async (usage) => usage),
+      assignProject: jest.fn(
+        async (usageId: number, projectId: number | null) =>
+          session({ id: usageId, projectId }) as UsageSessionWithParties,
+      ),
     };
     projects = { findOneById: jest.fn() };
     records = new UsageSessionRecords(store as unknown as UsageSessionStore, projects as never);
@@ -58,7 +62,7 @@ describe('UsageSessionRecords', () => {
     });
 
     it('hands the caller transaction to the store, so a read sees what the transaction wrote', async () => {
-      const transaction = {};
+      const transaction = fakeTransactionScope();
 
       await records.getActiveSessionsForResource(5, transaction);
 
@@ -149,7 +153,7 @@ describe('UsageSessionRecords', () => {
       await records.updateSessionProject(5, 1, owner, { projectId: 3 });
 
       expect(projects.findOneById).toHaveBeenCalledWith(7, 3);
-      expect(store.assignProject).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), { id: 3 });
+      expect(store.assignProject).toHaveBeenCalledWith(1, 3);
     });
 
     it('takes a session out of its project', async () => {
@@ -157,7 +161,7 @@ describe('UsageSessionRecords', () => {
 
       await records.updateSessionProject(5, 1, owner, { projectId: null });
 
-      expect(store.assignProject).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), null);
+      expect(store.assignProject).toHaveBeenCalledWith(1, null);
     });
 
     it.each([

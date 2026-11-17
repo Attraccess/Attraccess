@@ -8,6 +8,7 @@ import { NotificationDispatchService } from '../../notifications/notification-di
 import { NotificationCategory } from '../../notifications/notification-types';
 import { ResourceRetrainingService } from '../retraining/resourceRetraining.service';
 import { RESOURCE_INTRODUCTION_STORE, type ResourceIntroductionStore } from './resource-introduction-store.port';
+import { fakeTransactionScope } from '../../database/fake-transaction-scope.test-fixture';
 
 const introduction = (overrides: Partial<IntroductionRecord> = {}): IntroductionRecord => ({
   id: 10,
@@ -196,7 +197,7 @@ describe('ResourceIntroductionsService notifications', () => {
   it('answers validity from the newest history item, inside the caller transaction when one is given', async () => {
     store.findOfUser.mockResolvedValue(introduction());
     store.lastHistoryItem.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.GRANT });
-    const context = {};
+    const context = fakeTransactionScope();
 
     expect(await service.hasValidIntroduction(7, 3, context)).toBe(true);
     expect(store.findOfUser).toHaveBeenCalledWith(7, 3, context);

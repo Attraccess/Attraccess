@@ -4,6 +4,7 @@ import { createHostTransactionScope, createSqlitePluginPersistence } from '@attr
 import type { PluginEntityClass, PluginTransactionScope } from '@attraccess/plugins-backend-sdk';
 import type { PluginPersistenceHost } from '../../plugin-system/persistence/plugin-persistence-host.port';
 import { runSerializedTransaction } from './run-serialized-transaction';
+import { ScopedUnitOfWork, TransactionScopeError, type TransactionScope, type UnitOfWork } from '../unit-of-work';
 
 const logger = new Logger('PluginPersistence');
 
@@ -49,6 +50,10 @@ export function createSqlitePluginPersistenceHost(
  * The scope plugin hooks receive for a transaction the host opened itself (the serialized start transaction of a
  * session). The plugin reads through it with its engine subpath; it cannot commit it or defer work onto it.
  */
-export function sqliteHostTransactionScope(transaction: object): PluginTransactionScope {
-  return createHostTransactionScope(transaction as EntityManager);
+export function sqliteHostTransactionScope(unitOfWork: UnitOfWork, scope: TransactionScope): PluginTransactionScope {
+  if (!(unitOfWork instanceof ScopedUnitOfWork)) {
+    throw new TransactionScopeError('The unit of work is not backed by the SQLite adapter');
+  }
+  const manager = (unitOfWork as ScopedUnitOfWork<EntityManager>).handleOf(scope);
+  return createHostTransactionScope(manager, () => scope.isOpen);
 }

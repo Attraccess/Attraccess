@@ -1,4 +1,10 @@
-import type { UsageSession } from '@attraccess/application-models';
+import type {
+  PluginResourceModel,
+  PluginUserModel,
+  ResourceRecord,
+  UsageSession,
+  UserProfile,
+} from '@attraccess/application-models';
 import { SystemEvent, SystemEventPayload } from '@attraccess/plugins-backend-sdk';
 import type { Logger } from '@nestjs/common';
 import type { PluginEventsService } from '../../../plugin-system/plugin-events.service';
@@ -19,6 +25,25 @@ function emitSafely<E extends PluginUsageEvent>(
   } catch (error) {
     logger.error(`Failed to emit plugin SystemEvent ${event}`, (error as Error).stack);
   }
+}
+
+/** The resource and user of a RESOURCE_USAGE_STARTED/ENDED event, as the plugin SDK models them (nothing else). */
+export function pluginUsageParties(
+  resource: ResourceRecord,
+  user: UserProfile,
+): { resource: PluginResourceModel; user: PluginUserModel } {
+  return {
+    resource: {
+      id: resource.id,
+      name: resource.name,
+      type: resource.type,
+      description: resource.description,
+      allowTakeOver: resource.allowTakeOver,
+      maxParallelSessions: resource.maxParallelSessions,
+      supervisionMode: resource.supervisionMode,
+    },
+    user: { id: user.id, username: user.username, locale: user.locale, isDisabled: user.isDisabled },
+  };
 }
 
 /** Emits RESOURCE_USAGE_SESSION_ENDED for a finished (or taken-over) session. Never throws. */

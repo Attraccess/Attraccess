@@ -14,6 +14,7 @@ import {
 import { AuditService } from './audit.service';
 import { MAX_PENDING_AUDIT_WRITES } from './persistence/audit-storage';
 import type { AuditEvent } from './recorder/audit-event';
+import { fakeTransactionScope } from '../database/fake-transaction-scope.test-fixture';
 
 /** An in-memory AuditStore: it records what the application asked for and answers with scripted results. */
 class FakeAuditStore implements AuditStore {
@@ -121,7 +122,7 @@ describe('AuditService on a fake audit store', () => {
 
   it('writes inside the caller transaction when the store reports it active, and reads settings through it', async () => {
     const { store, service, getPlainSetting } = setup();
-    const scope = {};
+    const scope = fakeTransactionScope();
     store.activeFor.add(scope);
     expect(await service.record(event, scope)).toEqual({ status: 'recorded' });
     expect(store.transactional).toHaveLength(1);
@@ -131,7 +132,7 @@ describe('AuditService on a fake audit store', () => {
 
   it('writes durably when the handed transaction is not active', async () => {
     const { store, service } = setup();
-    expect(await service.record(event, {})).toEqual({ status: 'recorded' });
+    expect(await service.record(event, fakeTransactionScope())).toEqual({ status: 'recorded' });
     expect(store.durable).toHaveLength(1);
   });
 
@@ -165,7 +166,7 @@ describe('AuditService on a fake audit store', () => {
 
   it('counts a failed in-transaction insert but lets the caller continue', async () => {
     const { store, service, metrics } = setup();
-    const scope = {};
+    const scope = fakeTransactionScope();
     store.activeFor.add(scope);
     store.transactionalResult = () => ({ status: 'failed', error: new Error('x'), code: 'SQLITE_CONSTRAINT' });
     expect(await service.record(event, scope)).toEqual({ status: 'unavailable' });
@@ -174,7 +175,7 @@ describe('AuditService on a fake audit store', () => {
 
   it('counts and rethrows a transaction the database discarded', async () => {
     const { store, service, metrics } = setup();
-    const scope = {};
+    const scope = fakeTransactionScope();
     store.activeFor.add(scope);
     store.transactionalResult = () => {
       throw new AuditTransactionAbortedError('SQLITE_FULL');

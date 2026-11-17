@@ -21,6 +21,8 @@ const NOW = new Date('2026-09-20T12:00:00.000Z');
 /** A unit of work that runs `work` once, runs post-commit callbacks after it resolved and drops them on failure. */
 export class FakeUnitOfWork implements UnitOfWork {
   runs = 0;
+  /** Every scope a run opened, in order, so a spec can tell which unit of work a write joined. */
+  readonly scopes: TransactionScope[] = [];
   private open: TransactionScope | undefined;
 
   current(): TransactionScope | undefined {
@@ -36,6 +38,7 @@ export class FakeUnitOfWork implements UnitOfWork {
       afterCommit: (callback) => void callbacks.push(callback),
     };
     this.open = scope;
+    this.scopes.push(scope);
     let result: T;
     try {
       result = await work(scope);

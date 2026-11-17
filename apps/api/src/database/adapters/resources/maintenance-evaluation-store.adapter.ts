@@ -14,7 +14,8 @@ import type {
   ServiceCycleRequest,
   ServiceCycleState,
 } from '../../../resources/maintenances/maintenance-evaluation-store.port';
-import { ScopedUnitOfWork, UNIT_OF_WORK, type UnitOfWork } from '../../unit-of-work';
+import { ScopedUnitOfWork, UNIT_OF_WORK, type TransactionScope, type UnitOfWork } from '../../unit-of-work';
+import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 import {
   MAX_PAIRS_PER_QUERY,
   buildScheduleEvaluationQuery,
@@ -41,7 +42,7 @@ export class TypeOrmMaintenanceEvaluationView implements MaintenanceEvaluationVi
 
   constructor(
     private readonly manager: EntityManager,
-    readonly context: object | undefined,
+    readonly context: TransactionScope | undefined,
   ) {}
 
   async enabledSchedules(resourceId: number): Promise<MaintenanceScheduleRecord[]> {
@@ -191,7 +192,7 @@ export class TypeOrmMaintenanceEvaluationStore implements MaintenanceEvaluationS
   async inSnapshot<T>(work: (view: MaintenanceEvaluationView) => Promise<T>): Promise<T> {
     this.snapshotReader ??= new MaintenanceSnapshotReader(this.dataSource);
     const reader = await this.snapshotReader.manager();
-    return work(new TypeOrmMaintenanceEvaluationView(reader, reader));
+    return work(new TypeOrmMaintenanceEvaluationView(reader, legacyEngineTransactionScope(reader)));
   }
 
   inTransaction<T>(work: (view: MaintenanceEvaluationView) => Promise<T>): Promise<T> {

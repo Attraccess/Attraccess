@@ -7,6 +7,7 @@ import { droppedRecords, setupAuditDatabase } from '../database/adapters/audit/a
 import { billingTransactionAuditEvent } from './policies/billing';
 import { AuditEvent } from './recorder/audit-event';
 import { projectAuditRow } from './recorder/audit-row';
+import { legacyEngineTransactionScope } from '../database/adapters/common/legacy-engine-transaction';
 
 const actor = { id: 42, authenticationMethod: 'session' as const };
 
@@ -86,7 +87,9 @@ describe('AuditRecorder', () => {
     it('commits the row with the change', async () => {
       await fixture.source.transaction(async (manager) => {
         await manager.query('INSERT INTO business_change VALUES (1)');
-        expect(await fixture.service.record(event, manager)).toEqual({ status: 'recorded' });
+        expect(await fixture.service.record(event, legacyEngineTransactionScope(manager))).toEqual({
+          status: 'recorded',
+        });
       });
       expect(await stored()).toHaveLength(1);
     });
@@ -95,7 +98,9 @@ describe('AuditRecorder', () => {
       await expect(
         fixture.source.transaction(async (manager) => {
           await manager.query('INSERT INTO business_change VALUES (1)');
-          expect(await fixture.service.record(event, manager)).toEqual({ status: 'recorded' });
+          expect(await fixture.service.record(event, legacyEngineTransactionScope(manager))).toEqual({
+            status: 'recorded',
+          });
           throw new Error('rollback');
         }),
       ).rejects.toThrow('rollback');

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import type { UsageSessionResource, UsageSessionUser } from '@attraccess/application-models';
+import type { UsageSessionResource, UsageSessionUser, UsageSessionUserRecord } from '@attraccess/application-models';
 import { ResourceUsageSessionEndedEvent, ResourceUsageSessionTakenOverEvent } from '../events/resource-usage.events';
 import { ResourceSessionNotificationListener } from './session.listener';
 import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
@@ -26,7 +26,7 @@ describe('ResourceSessionNotificationListener', () => {
   });
 
   it('notifies the previous user when their resource session is taken over', async () => {
-    const bob = { id: 2, username: 'bob', locale: 'en' } as UsageSessionUser;
+    const bob = { id: 2, username: 'bob', locale: 'en' } as UsageSessionUserRecord;
     await listener.handleTakenOver(
       new ResourceUsageSessionTakenOverEvent(
         { id: 4, name: 'Laser cutter' } as unknown as UsageSessionResource,
@@ -58,7 +58,7 @@ describe('ResourceSessionNotificationListener', () => {
         { id: 4, name: 'Laser cutter' } as unknown as UsageSessionResource,
         new Date('2026-01-01T12:00:00.000Z'),
         { id: 1, username: 'alice' } as UsageSessionUser,
-        { id: 2, username: 'bob' } as UsageSessionUser,
+        { id: 2, username: 'bob' } as UsageSessionUserRecord,
       ),
     );
 

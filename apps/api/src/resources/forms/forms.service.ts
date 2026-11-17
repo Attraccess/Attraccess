@@ -24,7 +24,7 @@ import { MissingFormSubmissionException } from './errors/missingFormSubmission.e
 
 import { RESOURCE_FORM_STORE, type FormFieldInput, type ResourceFormStore } from './forms-store.port';
 
-import type { ResourcePersistenceContext } from '../resource-persistence-context';
+import type { TransactionScope } from '../../database/unit-of-work';
 
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 
@@ -79,10 +79,10 @@ export class ResourceFormsService {
   protected async getFormsByAction(
     resourceId: number,
     action: ResourceFormAction,
-    manager?: ResourcePersistenceContext,
+    scope?: TransactionScope,
   ): Promise<FormRecord[]> {
     this.assertSupportedAction(action);
-    return this.store.findRequiredForAction(resourceId, action, manager);
+    return this.store.findRequiredForAction(resourceId, action, scope);
   }
 
   protected assertSupportedAction(action: ResourceFormAction): void {
@@ -175,10 +175,10 @@ export class ResourceFormsService {
     submissions: FormSubmissionRequestDto[] | undefined;
     userId: number;
     resourceUsageId: number;
-    /** The transaction of the lifecycle step the forms are validated in. */
-    manager?: ResourcePersistenceContext;
+    /** The unit of work of the lifecycle step the forms are validated in. */
+    scope?: TransactionScope;
   }): Promise<UsageFormSubmissionDraft[]> {
-    const forms = await this.getFormsByAction(options.resourceId, options.action, options.manager);
+    const forms = await this.getFormsByAction(options.resourceId, options.action, options.scope);
 
     if (!forms.length) {
       if (options.submissions?.length) {

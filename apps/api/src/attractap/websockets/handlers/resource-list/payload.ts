@@ -27,7 +27,8 @@ interface ReaderSessionSource {
   id: number;
   userId: number;
   startTime: Date;
-  user: { username: string };
+  /** Always loaded for the active sessions the reader lists. */
+  user?: { username: string } | null;
   supervisorUser?: { username: string } | null;
 }
 

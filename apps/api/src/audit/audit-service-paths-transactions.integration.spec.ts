@@ -32,6 +32,7 @@ import { AuditService } from './audit.service';
 import { createTestAuditMetrics, droppedRecords } from '../database/adapters/audit/audit.test-fixture';
 import { AuditMetrics } from '../metrics/definitions/audit.metrics';
 import { TypeOrmSettingsRows } from '../database/adapters/settings/typeorm-settings-rows';
+import { legacyEngineTransactionScope } from '../database/adapters/common/legacy-engine-transaction';
 
 /**
  * A service that owns a transactional change records its audit row with the same EntityManager, so the row commits
@@ -135,7 +136,7 @@ describe('audit recorded by an owning service inside its transaction', () => {
     /** The usage-start path: the resource usage service hands its own manager to the billing service. */
     const startUsage = (afterStart: (manager: EntityManager) => Promise<void> = async () => undefined) =>
       source.transaction(async (manager) => {
-        await billing.handleResourceUsageStart(usage.resourceId, usage, user, manager);
+        await billing.handleResourceUsageStart(usage.resourceId, usage, user, legacyEngineTransactionScope(manager));
         await afterStart(manager);
       });
 

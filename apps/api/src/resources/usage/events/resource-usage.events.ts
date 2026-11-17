@@ -2,7 +2,12 @@
  * Events emitted when resource usage status changes
  */
 
-import type { UsageSession, UsageSessionResource, UsageSessionUser } from '@attraccess/application-models';
+import type {
+  UsageSession,
+  UsageSessionResource,
+  UsageSessionUser,
+  UsageSessionUserRecord,
+} from '@attraccess/application-models';
 
 export class ResourceSessionStartedEvent {
   public static readonly EVENT_NAME = 'resource.usage.session_started';
@@ -17,7 +22,7 @@ export class ResourceUsageSessionTakenOverEvent {
     public readonly resource: Pick<UsageSessionResource, 'id' | 'name'>,
     public readonly takeoverTime: Date,
     public readonly newUser: UsageSessionUser,
-    public readonly previousUser: UsageSessionUser | null, // Previous user might not exist if resource was free
+    public readonly previousUser: UsageSessionUserRecord | null, // Previous user might not exist if resource was free
   ) {}
 }
 

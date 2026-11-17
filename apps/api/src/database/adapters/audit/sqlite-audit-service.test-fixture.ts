@@ -2,6 +2,7 @@ import type { DataSource } from 'typeorm';
 import { AuditService } from '../../../audit/audit.service';
 import type { AuditMetrics } from '../../../metrics/definitions/audit.metrics';
 import type { SettingsStoreService } from '../../../settings/settings-store.service';
+import { unitOfWorkFor } from '../shared-unit-of-work';
 import { SqliteAuditStore } from './sqlite-audit-store';
 
 /** An AuditService on the SQLite audit store of the given main connection (tests and standalone wiring). */
@@ -10,7 +11,8 @@ export function createSqliteAuditService(
   settings: SettingsStoreService,
   metrics: AuditMetrics,
 ): AuditService {
-  return new AuditService(new SqliteAuditStore(source), settings, metrics);
+  // The application's one unit of work of this connection, so scopes of other adapters resolve here too.
+  return new AuditService(new SqliteAuditStore(source, unitOfWorkFor(source)), settings, metrics);
 }
 
 /** The dedicated durable audit connection behind a service built with the SQLite audit store (tests spy on it). */

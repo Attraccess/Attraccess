@@ -3,6 +3,7 @@ import { UserEmailInvalidVerificationTokenException } from './auth.service';
 import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
 import { ForbiddenException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { fakeTransactionScope } from '../../database/fake-transaction-scope.test-fixture';
 
 jest.mock('bcrypt', () => ({
   compare: jest.fn(),
@@ -39,7 +40,7 @@ describe('AuthService', () => {
       { type: AuthenticationType.LOCAL_PASSWORD, passwordHash: 'hashed-password' },
       undefined,
     );
-    const transaction = { tag: 'transaction' };
+    const transaction = fakeTransactionScope();
     const sso = await fixture.authService.addAuthenticationDetails(
       7,
       {
