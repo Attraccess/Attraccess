@@ -1,10 +1,9 @@
 // Emails introducers, maintainers and admins when a user attaches a note to a usage session.
 // FEATURE: inform introducers/maintainers about usage notes (ATT-174)
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
-import { Resource, ResourceIntroducer, User } from '@attraccess/database-entities';
+import type { ResourceNotificationRecipient } from '@attraccess/application-models';
+import { RESOURCE_RECIPIENT_STORE, ResourceRecipientStore } from '../../health/resource-health-store.port';
 import { ResourceUsageNoteAddedEvent } from '../events/resource-usage.events';
 import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../../notifications/notification-types';
@@ -20,12 +19,7 @@ export class ResourceUsageNoteNotificationListener {
   private readonly logger = new Logger(ResourceUsageNoteNotificationListener.name);
 
   constructor(
-    @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(ResourceIntroducer)
-    private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    @Inject(RESOURCE_RECIPIENT_STORE) private readonly recipientStore: ResourceRecipientStore,
     private readonly notifications: NotificationDispatchService,
     private readonly rbacService: RbacService,
   ) {}
@@ -33,10 +27,7 @@ export class ResourceUsageNoteNotificationListener {
   @OnEvent(ResourceUsageNoteAddedEvent.EVENT_NAME)
   async handleNoteAdded(event: ResourceUsageNoteAddedEvent): Promise<void> {
     try {
-      const resource = await this.resourceRepository.findOne({
-        where: { id: event.resourceId },
-        relations: ['groups'],
-      });
+      const resource = await this.recipientStore.findResource(event.resourceId);
       if (!resource) {
         this.logger.warn(`Usage note for missing resource ${event.resourceId}; skipping notifications`);
         return;
@@ -77,33 +68,21 @@ export class ResourceUsageNoteNotificationListener {
   }
 
   // Introducers/maintainers of the resource (or its groups) plus admins, excluding the note author.
-  private async collectRecipients(resource: Resource, authorId: number): Promise<User[]> {
-    const groupIds = (resource.groups ?? []).map((group) => group.id);
-
+  private async collectRecipients(
+    resource: { id: number; groupIds: number[] },
+    authorId: number,
+  ): Promise<ResourceNotificationRecipient[]> {
     const adminIds = await this.rbacService.getUserIdsWithPermission('resources.maintenance.manage');
-    const admins = adminIds.length > 0 ? await this.userRepository.findBy({ id: In(adminIds) }) : [];
+    const admins = adminIds.length > 0 ? await this.recipientStore.findUsersByIds(adminIds) : [];
+    const introducers = await this.recipientStore.findIntroducerUsers(resource.id, resource.groupIds);
 
-    const introducerWhere: Array<Record<string, unknown>> = [{ resourceId: resource.id }];
-    if (groupIds.length > 0) {
-      introducerWhere.push({ resourceGroupId: In(groupIds) });
-    }
-    const introducerRows = await this.resourceIntroducerRepository.find({
-      where: introducerWhere,
-      relations: ['user'],
-    });
-
-    const byId = new Map<number, User>();
+    const byId = new Map<number, ResourceNotificationRecipient>();
     for (const admin of admins) {
-      if (admin.email && admin.id !== authorId) {
-        byId.set(admin.id, admin);
-      }
+      if (admin.email && admin.id !== authorId) byId.set(admin.id, admin);
     }
-    for (const row of introducerRows) {
-      if (row.user?.email && row.user.id !== authorId && !byId.has(row.user.id)) {
-        byId.set(row.user.id, row.user);
-      }
+    for (const user of introducers) {
+      if (user.email && user.id !== authorId && !byId.has(user.id)) byId.set(user.id, user);
     }
-
     return Array.from(byId.values());
   }
 }

@@ -1,3 +1,4 @@
+import { supervisionModesFrom } from '../../resources/usage/authorization/supervision-modes.test-fixture';
 import { ResourceMaintenance, ResourceUsage, User } from '@attraccess/database-entities';
 import { SupervisionMode } from '@attraccess/application-models';
 import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
@@ -59,7 +60,7 @@ describe('plugin resourceAccess', () => {
     activityVisibility = 'introduced';
     const visibility = new ResourceActivityVisibilityService(
       { getResourceActivityVisibility: async () => activityVisibility } as never,
-      { find: async () => [...resources.values()] } as never,
+      supervisionModesFrom(async () => [...resources.values()]) as never,
       scope.service,
     );
     access = createResourceAccessContext(() => ({

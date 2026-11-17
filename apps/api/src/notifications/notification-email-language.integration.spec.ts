@@ -1,9 +1,7 @@
 import { createMock } from '@golevelup/ts-jest';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { EmailTemplate, Resource, ResourceIntroducer, ResourceUsage, User } from '@attraccess/database-entities';
+import { EmailTemplate, Resource, ResourceUsage, User } from '@attraccess/database-entities';
 import { EmailTemplateType } from '@attraccess/application-models';
-import { Repository } from 'typeorm';
 import { createTransport } from 'nodemailer';
 import { EmailService } from '../email/email.service';
 import { EmailTemplateService } from '../email-template/email-template.service';
@@ -20,6 +18,7 @@ import { ExternalCallTimer } from '../metrics/instrumentation/external/external.
 import { PushService } from '../push/push.service';
 import { RbacService } from '../users-and-auth/rbac/rbac.service';
 import { ResourceSessionNotificationListener } from '../resources/usage/notifications/session.listener';
+import { RESOURCE_RECIPIENT_STORE } from '../resources/health/resource-health-store.port';
 import { ResourceUsageNoteNotificationListener } from '../resources/usage/notifications/notes.listener';
 import {
   ResourceUsageNoteAddedEvent,
@@ -73,12 +72,11 @@ describe('Notification email language fallback', () => {
     (createTransport as jest.Mock).mockReturnValue({ sendMail, close: jest.fn() });
     const preferences = createMock<NotificationPreferenceService>();
     preferences.isChannelEnabled.mockResolvedValue(true);
-    const resources = createMock<Repository<Resource>>();
-    resources.findOne.mockResolvedValue(resource);
-    const introducers = createMock<Repository<ResourceIntroducer>>();
-    introducers.find.mockResolvedValue([]);
-    const users = createMock<Repository<User>>();
-    users.findBy.mockResolvedValue([recipient]);
+    const recipients = {
+      findResource: jest.fn(async () => ({ id: resource.id, name: resource.name, groupIds: [] })),
+      findUsersByIds: jest.fn(async () => [recipient]),
+      findIntroducerUsers: jest.fn(async () => []),
+    };
     const rbac = createMock<RbacService>();
     rbac.getUserIdsWithPermission.mockResolvedValue([recipient.id]);
 
@@ -97,9 +95,7 @@ describe('Notification email language fallback', () => {
         { provide: NotificationLiveService, useValue: createMock<NotificationLiveService>() },
         { provide: PushService, useValue: push },
         { provide: EMAIL_RECIPIENT_DIRECTORY, useValue: { findById: jest.fn() } },
-        { provide: getRepositoryToken(User), useValue: users },
-        { provide: getRepositoryToken(Resource), useValue: resources },
-        { provide: getRepositoryToken(ResourceIntroducer), useValue: introducers },
+        { provide: RESOURCE_RECIPIENT_STORE, useValue: recipients },
         { provide: RbacService, useValue: rbac },
       ],
     }).compile();

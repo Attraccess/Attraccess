@@ -1,14 +1,12 @@
-import { Resource, User } from '@attraccess/database-entities';
+import type { UsageSessionResource } from '@attraccess/application-models';
 import { SupervisionMode } from '@attraccess/application-models';
 import type { UsageSession, UsageSessionUser } from '@attraccess/application-models';
 
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { EntityManager, Repository } from 'typeorm';
+import { USAGE_SESSION_STORE, UsageSessionStore } from '../usage-session-store.port';
 
 import { asLegacy } from '../legacy-seams';
 
@@ -26,7 +24,7 @@ import { ResourceIntroducersService } from '../../introducers/resourceIntroducer
 
 import { ResourceMaintenanceService } from '../../maintenances/maintenance.service';
 
-import { RESOURCE_USAGE_LOG_CONTEXT } from '../lifecycle/usage-lifecycle';
+import { LegacyTransactionHandle, RESOURCE_USAGE_LOG_CONTEXT } from '../lifecycle/usage-lifecycle';
 
 import { UsageAccessCache } from './usage-access-cache';
 
@@ -36,10 +34,7 @@ export class UsageResourceGate {
   private readonly logger = new Logger(RESOURCE_USAGE_LOG_CONTEXT);
 
   constructor(
-    @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    @Inject(USAGE_SESSION_STORE) private readonly sessions: UsageSessionStore,
     private readonly resourceMaintenanceService: ResourceMaintenanceService,
     private readonly resourceHealthService: ResourceHealthService,
     private readonly resourceIntroducersService: ResourceIntroducersService,
@@ -51,15 +46,11 @@ export class UsageResourceGate {
     resourceId: number,
     user: UsageSessionUser,
     opts: { checkMaintenance: boolean; checkControlPermission: boolean },
-    transactionalEntityManager?: EntityManager,
-  ): Promise<Resource> {
+    transactionalLegacyTransactionHandle?: LegacyTransactionHandle,
+  ): Promise<UsageSessionResource> {
     const { checkMaintenance, checkControlPermission } = opts;
 
-    const resourceRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(Resource)
-      : this.resourceRepository;
-
-    const resource = await resourceRepository.findOne({ where: { id: resourceId } });
+    const resource = await this.sessions.findResource(resourceId, transactionalLegacyTransactionHandle);
     if (!resource) {
       this.logger.warn(`Resource ${resourceId} not found`);
       throw new ResourceNotFoundException(resourceId);
@@ -72,14 +63,14 @@ export class UsageResourceGate {
       // schedule-triggered maintenances (see hasActiveMaintenance).
       const hasActiveMaintenance = await this.resourceMaintenanceService.hasActiveMaintenance(
         resourceId,
-        transactionalEntityManager,
+        transactionalLegacyTransactionHandle,
       );
       if (hasActiveMaintenance) {
         // Check if user can manage maintenance (which allows them to use during maintenance)
         const canManageMaintenance = await this.resourceMaintenanceService.canManageMaintenance(
           asLegacy(user),
           resourceId,
-          transactionalEntityManager,
+          transactionalLegacyTransactionHandle,
         );
 
         if (!canManageMaintenance) {
@@ -94,12 +85,15 @@ export class UsageResourceGate {
 
       // Health gate: block non-maintenance users when any health entry is unhealthy.
       // Users that can manage maintenance are intentionally allowed through so they can investigate/repair.
-      const isUnhealthy = await this.resourceHealthService.isResourceUnhealthy(resourceId, transactionalEntityManager);
+      const isUnhealthy = await this.resourceHealthService.isResourceUnhealthy(
+        resourceId,
+        transactionalLegacyTransactionHandle,
+      );
       if (isUnhealthy) {
         const canManageMaintenance = await this.resourceMaintenanceService.canManageMaintenance(
           asLegacy(user),
           resourceId,
-          transactionalEntityManager,
+          transactionalLegacyTransactionHandle,
         );
         if (!canManageMaintenance) {
           this.logger.warn(`User ${user.id} blocked from resource ${resourceId} because it is currently unhealthy`);
@@ -112,7 +106,11 @@ export class UsageResourceGate {
     }
 
     if (checkControlPermission) {
-      const canStartSession = await this.access.canControllResource(resourceId, user, transactionalEntityManager);
+      const canStartSession = await this.access.canControllResource(
+        resourceId,
+        user,
+        transactionalLegacyTransactionHandle,
+      );
 
       if (!canStartSession) {
         this.logger.warn(`User ${user.id} cannot control resource ${resourceId} - missing introduction`);
@@ -139,21 +137,16 @@ export class UsageResourceGate {
     resourceId: number,
     requester: UsageSessionUser,
     supervisorUserId: number,
-    transactionalEntityManager?: EntityManager,
-    preloadedResource?: Resource,
+    transactionalLegacyTransactionHandle?: LegacyTransactionHandle,
+    preloadedResource?: UsageSessionResource,
   ): Promise<void> {
-    await this.assertSupportsSupervision(resourceId, transactionalEntityManager, preloadedResource);
+    await this.assertSupportsSupervision(resourceId, transactionalLegacyTransactionHandle, preloadedResource);
 
     if (supervisorUserId === requester.id) {
       throw new BadRequestException('You cannot supervise your own session');
     }
 
-    const userRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(User)
-      : this.userRepository;
-
-    const supervisor = await userRepository.findOne({ where: { id: supervisorUserId } });
-    if (!supervisor) {
+    if (!(await this.sessions.userExists(supervisorUserId, transactionalLegacyTransactionHandle))) {
       throw new NotFoundException(`Supervisor with ID ${supervisorUserId} not found`);
     }
 
@@ -161,7 +154,7 @@ export class UsageResourceGate {
       resourceId,
       supervisorUserId,
       true,
-      transactionalEntityManager,
+      transactionalLegacyTransactionHandle,
     );
 
     if (!supervisorIsIntroducer) {
@@ -176,14 +169,11 @@ export class UsageResourceGate {
    */
   public async assertSupportsSupervision(
     resourceId: number,
-    transactionalEntityManager?: EntityManager,
-    preloadedResource?: Resource,
-  ): Promise<Resource> {
-    const resourceRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(Resource)
-      : this.resourceRepository;
-
-    const resource = preloadedResource ?? (await resourceRepository.findOne({ where: { id: resourceId } }));
+    transactionalLegacyTransactionHandle?: LegacyTransactionHandle,
+    preloadedResource?: UsageSessionResource,
+  ): Promise<UsageSessionResource> {
+    const resource =
+      preloadedResource ?? (await this.sessions.findResource(resourceId, transactionalLegacyTransactionHandle));
     if (!resource) {
       throw new ResourceNotFoundException(resourceId);
     }

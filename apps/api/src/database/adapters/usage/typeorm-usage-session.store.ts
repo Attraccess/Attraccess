@@ -4,10 +4,12 @@ import {
   FormSubmission,
   Resource,
   ResourceMeter,
+  User,
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
 } from '@attraccess/database-entities';
 import { ResourceUsageAction } from '@attraccess/application-models';
+import type { SupervisionMode, UsageSessionResource } from '@attraccess/application-models';
 import type {
   UsageBillingItemDraft,
   UsageLifecycleAttempt,
@@ -15,7 +17,7 @@ import type {
   UsageSession,
 } from '@attraccess/application-models';
 import { Injectable } from '@nestjs/common';
-import { In, IsNull } from 'typeorm';
+import { In, IsNull, Not } from 'typeorm';
 import {
   DoorActionDraft,
   MachineCapacity,
@@ -56,6 +58,55 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
       select: { id: true, type: true, maxParallelSessions: true },
     });
     return sessionLimitOf(resource);
+  }
+
+  async findResource(resourceId: number, context?: TransactionContext): Promise<UsageSessionResource | null> {
+    return this.managers
+      .resolve(context)
+      .getRepository(Resource)
+      .findOne({ where: { id: resourceId } });
+  }
+
+  async findSupervisionModes(resourceIds: number[]): Promise<Map<number, SupervisionMode | undefined>> {
+    const resources = await this.managers
+      .resolve()
+      .getRepository(Resource)
+      .find({
+        where: { id: In(resourceIds) },
+        select: { id: true, supervisionMode: true },
+      });
+    return new Map(resources.map((resource) => [resource.id, resource.supervisionMode]));
+  }
+
+  async userExists(userId: number, context?: TransactionContext): Promise<boolean> {
+    return Boolean(
+      await this.managers
+        .resolve(context)
+        .getRepository(User)
+        .findOne({ where: { id: userId } }),
+    );
+  }
+
+  async findGroupResourceIds(groupId: number): Promise<number[]> {
+    const resources = await this.managers
+      .resolve()
+      .getRepository(Resource)
+      .find({ where: { groups: { id: groupId } } });
+    return resources.map((resource) => resource.id);
+  }
+
+  countCompletedSupervisedSessions(resourceIds: number[], userId: number): Promise<number> {
+    return this.managers
+      .resolve()
+      .getRepository(ResourceUsage)
+      .count({
+        where: {
+          resourceId: resourceIds.length === 1 ? resourceIds[0] : In(resourceIds),
+          userId,
+          supervisorUserId: Not(IsNull()),
+          endTime: Not(IsNull()),
+        },
+      });
   }
 
   async findMachineCapacity(resourceId: number): Promise<MachineCapacity | null> {

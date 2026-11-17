@@ -62,8 +62,7 @@ export function composeResourceUsageService(
     valkeyClient as never,
   );
   const gate = new UsageResourceGate(
-    resourceRepository as never,
-    userRepository as never,
+    store,
     resourceMaintenanceService as never,
     resourceHealthService as never,
     resourceIntroducersService as never,

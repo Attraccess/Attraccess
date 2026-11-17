@@ -28,6 +28,8 @@ import { SSEController } from './sse/sse.controller';
 import { ResourceEventsService } from './sse/resource-events.service';
 import { ResourceUsageController } from './usage/sessions/resource-usage.controller';
 import { ResourceUsageService } from './usage/sessions/resource-usage.service';
+import { USAGE_SESSION_STORE } from './usage/usage-session-store.port';
+import { supervisionModesFrom } from './usage/authorization/supervision-modes.test-fixture';
 import { ResourceActivityVisibilityService } from './usage/authorization/resource-activity-visibility.service';
 import { PreStartService } from './usage/pre-start/pre-start.service';
 import { SessionEndNotifier } from './usage/pre-start/session-end-notifier.service';
@@ -66,6 +68,14 @@ const PERSONAS: Record<string, Persona> = {
   'manage resources': { permissions: ['resources.read', 'resources.update'] },
   'manage access': { permissions: ['resources.read', 'resources.access.manage'] },
 };
+
+const supervisionFind = jest.fn(async ({ where }: { where: { id: { _value: number[] } } }) =>
+  where.id._value.map((id) => ({
+    id,
+    supervisionMode:
+      id === SUPERVISED_MACHINE ? SupervisionMode.SUPERVISION_ALLOWED : SupervisionMode.INTRODUCTION_REQUIRED,
+  })),
+);
 
 describe('reads of equipment activity and access lists (ATT-1149)', () => {
   let app: INestApplication;
@@ -196,18 +206,9 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
         { provide: SettingsService, useValue: { getResourceActivityVisibility: jest.fn(async () => mode) } },
         {
           provide: getRepositoryToken(Resource),
-          useValue: {
-            find: jest.fn(async ({ where }: { where: { id: { _value: number[] } } }) =>
-              where.id._value.map((id) => ({
-                id,
-                supervisionMode:
-                  id === SUPERVISED_MACHINE
-                    ? SupervisionMode.SUPERVISION_ALLOWED
-                    : SupervisionMode.INTRODUCTION_REQUIRED,
-              })),
-            ),
-          },
+          useValue: { find: supervisionFind },
         },
+        { provide: USAGE_SESSION_STORE, useValue: supervisionModesFrom(supervisionFind) },
         { provide: LiveTopicsService, useValue: { register: jest.fn() } },
         { provide: FlowLogRecorderService, useValue: {} },
         { provide: PreStartService, useValue: { gateHttp: jest.fn() } },
