@@ -134,7 +134,7 @@ describe('resource diagnostics', () => {
       expect(guard.canActivate(context(['resources.update']))).toBe(true);
     }
   });
-  it('delegates the resource endpoint without consulting the controller list', () => {
+  it('delegates the resource endpoint without consulting the controller list', async () => {
     const { service } = await setup([]);
     const getResource = jest.spyOn(service, 'getResource');
     new WagoDiagnosticsController(service).getResource(42);

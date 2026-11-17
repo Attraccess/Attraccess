@@ -1,12 +1,13 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
-import type { Repository } from '@attraccess/plugins-backend-sdk/sqlite';
-import { flowNode, hostDataWithFlows, persistenceFaking } from '../persistence.test-utils';
+import { flowNode, hostDataWithFlows } from '../persistence.test-utils';
+import { controllerRow } from '../rows.test-utils';
+import { spyOnWagoStorage } from '../storage-spy.test-utils';
+import { createWagoTestStorage } from '../storage/testing';
 import { WagoCommandHandler } from './handler';
-import { WagoController } from '../controllers/entity';
-import { WagoConfigurationRevision } from '../configuration/revision.entity';
+import type { WagoConfigurationRevision } from '../configuration/revision.entity';
 
 describe('WAGO command form', () => {
-  const revision = Object.assign(new WagoConfigurationRevision(), {
+  const revision = {
     revision: 3,
     snapshot: JSON.stringify({
       logicalChannels: [
@@ -15,25 +16,30 @@ describe('WAGO command form', () => {
         { id: 'lamp', profile: 'generic-digital-output', capabilities: ['output'] },
       ],
     }),
-  });
+  } as WagoConfigurationRevision;
   const appliedRevision = jest.fn();
-  const draftLookup = jest.fn().mockResolvedValue({
-    presetProvenance: JSON.stringify({ editor: { names: { 'door-lock': 'Workshop door lock' } } }),
-  });
   const findNodes = jest.fn().mockResolvedValue([flowNode({ id: 'other-node', resourceId: 7 })]);
+  const storage = createWagoTestStorage();
+  const spy = spyOnWagoStorage(storage);
+  const draftLookup = spy.spied.configurationDrafts.findOne;
   const handler = new WagoCommandHandler({
-    context: {
-      hostData: hostDataWithFlows(findNodes),
-      persistence: persistenceFaking(() => ({ findOneBy: draftLookup })),
-    } as unknown as PluginContext,
-    controllers: () =>
-      ({
-        find: async () => [{ id: 1, name: 'Workshop' }],
-        findOneBy: async () => ({ id: 1, trustState: 'claimed' }),
-      }) as unknown as Repository<WagoController>,
+    context: { hostData: hostDataWithFlows(findNodes), ...spy.context } as unknown as PluginContext,
+    controllers: () => storage.tables.controllers,
     claimedController: jest.fn(),
     getSettings: jest.fn(),
     appliedRevision,
+  });
+
+  beforeAll(async () => {
+    await storage.tables.controllers.insert(
+      controllerRow({ id: 1, name: 'Workshop', hardwareId: 'workshop', trustState: 'claimed' }),
+    );
+    await storage.tables.configurationDrafts.insert({
+      controllerId: 1,
+      snapshot: '{}',
+      presetProvenance: JSON.stringify({ editor: { names: { 'door-lock': 'Workshop door lock' } } }),
+      updatedAt: '2026-09-05T12:00:00.000Z',
+    });
   });
 
   beforeEach(() => appliedRevision.mockResolvedValue(revision));
