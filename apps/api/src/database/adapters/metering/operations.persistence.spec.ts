@@ -7,7 +7,7 @@ import {
 
 import { rm } from 'node:fs/promises';
 
-import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
+import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-transaction';
 
 import { inheritTestScope } from '../../../test-utils/inherit-test-scope';
 
@@ -170,7 +170,7 @@ describe('Flow-defined metering', () => {
       operationsScope.onCollect = ({ complete }) => complete({ kind: 'ready' });
       await expect(operationsScope.run(session)).rejects.toThrow(/does not answer/);
 
-      const { MeteringReportExecutor } = await import('../../flows/node-executors');
+      const { MeteringReportExecutor } = await import('../../../resources/flows/node-executors');
       await expect(
         new MeteringReportExecutor(operationsScope.metering).execute(
           { resourceId: 99, data: { meterId: 1, value: '1' } } as never,

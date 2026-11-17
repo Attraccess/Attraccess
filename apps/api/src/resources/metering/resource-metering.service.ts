@@ -1,21 +1,14 @@
 import { Inject, Injectable, OnModuleInit, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { Repository, EntityManager, In } from 'typeorm';
-
 import {
-  ResourceMeter,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  ResourceMeteringOperation,
-  ResourceMeteringSession,
-  ResourceMeteringOperationKind,
-  ResourceMeterAllocation,
-  ResourceUsage,
-  ResourceUsageLifecycleAttempt,
-} from '@attraccess/database-entities';
-import { ResourceFlowNodeType, ResourceMeteringSessionStatus } from '@attraccess/application-models';
+  ResourceFlowNodeType,
+  MeterAllocationKind,
+  MeteringOperationKind,
+  ResourceMeteringOperationRecord,
+  ResourceMeteringSessionRecord,
+  ResourceMeteringSessionStatus,
+  MeteringUsageRecord,
+} from '@attraccess/application-models';
 
 import { ResourceFlowsExecutorService } from '../flows/execution/resource-flows-executor.service';
 
@@ -26,6 +19,12 @@ import { LiveNotificationsService } from '../../billing/live-notifications/live-
 import { MeteringOperationError, MeteringReadings } from './metering-readings';
 
 import { MeteringReport } from '../flows/node-executors/index';
+
+import type { TransactionContext } from '../../database/transaction-context';
+
+import { UNIT_OF_WORK, UnitOfWork } from '../../database/unit-of-work';
+
+import { METERING_STORE, MeteringStore } from './metering-store.port';
 
 import { randomUUID } from 'node:crypto';
 
@@ -54,20 +53,18 @@ export class MeteringTimeoutError extends MeteringOperationError {
 @Injectable()
 export class ResourceMeteringService implements OnModuleInit {
   public constructor(
-    @InjectRepository(ResourceMeter) protected readonly meters: Repository<ResourceMeter>,
-    @InjectRepository(ResourceMeteringSession) protected readonly sessions: Repository<ResourceMeteringSession>,
-    @InjectRepository(ResourceMeteringOperation) protected readonly operations: Repository<ResourceMeteringOperation>,
-    @InjectRepository(ResourceFlowNode) nodes: Repository<ResourceFlowNode>,
-    @InjectRepository(ResourceFlowEdge) edges: Repository<ResourceFlowEdge>,
+    @Inject(METERING_STORE) protected readonly store: MeteringStore,
+    @Inject(UNIT_OF_WORK) protected readonly unitOfWork: UnitOfWork,
     protected readonly flows: ResourceFlowsExecutorService,
     @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
     liveNotifications: LiveNotificationsService,
   ) {
-    this.catalog = new MeteringCatalog(this.meters, this.sessions, nodes, edges);
-    this.readings = new MeteringReadings(this.sessions.manager, this.freshAfter);
-    this.settlement = new MeteringSettlement(this.sessions, audit, liveNotifications, this.logger);
+    this.catalog = new MeteringCatalog(this.store);
+    this.readings = new MeteringReadings(this.store, this.unitOfWork, this.freshAfter);
+    this.settlement = new MeteringSettlement(this.store, this.unitOfWork, audit, liveNotifications, this.logger);
     this.segments = new MeteringSegments(
-      this.sessions.manager,
+      this.store,
+      this.unitOfWork,
       {
         runOperation: (session, kind, options) => this.runOperation(session, kind, options),
         settleClosed: (segmentId) => this.settlement.settleClosedSegment(segmentId),
@@ -94,6 +91,18 @@ export class ResourceMeteringService implements OnModuleInit {
   // ponytail: in-memory; after a restart the cadence falls back to the last successful reading
   protected readonly interimAttempts = new Map<string, { at: number; running: boolean }>();
 
+  protected async requireUsage(usageId: number): Promise<MeteringUsageRecord> {
+    const usage = await this.store.findUsage(usageId);
+    if (!usage) throw new Error(`The usage ${usageId} does not exist`);
+    return usage;
+  }
+
+  protected async requireSession(sessionId: string): Promise<ResourceMeteringSessionRecord> {
+    const session = await this.store.findSession(sessionId);
+    if (!session) throw new Error(`The metering session ${sessionId} does not exist`);
+    return session;
+  }
+
   protected reason(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
   }
@@ -103,36 +112,28 @@ export class ResourceMeteringService implements OnModuleInit {
     resourceId: number,
     meterId: number,
     report: Extract<MeteringReport, { kind: 'reading' }>,
-    transactionManager?: EntityManager,
+    context?: TransactionContext,
     lifecycleAttemptId?: string,
     reportId?: string,
     usageId?: number,
   ): Promise<void> {
-    return this.readings.report(resourceId, meterId, report, transactionManager, lifecycleAttemptId, reportId, usageId);
+    return this.readings.report(resourceId, meterId, report, context, lifecycleAttemptId, reportId, usageId);
   }
 
   protected async close(operationId: string, status: 'failed' | 'expired', error: string): Promise<void> {
-    await this.operations.update({ id: operationId, status: 'pending' }, { status, error, completedAt: new Date() });
+    await this.store.closePendingOperation(operationId, status, error, new Date());
   }
 
   protected runOperation(
     session: { id: string | null; meterId: number; resourceId: number; usageId: number | null },
-    kind: ResourceMeteringOperationKind,
+    kind: MeteringOperationKind,
     options: { trigger: ResourceFlowNodeType; timeoutSeconds: number; freshAfter?: Date },
-  ): Promise<ResourceMeteringOperation> {
+  ): Promise<ResourceMeteringOperationRecord> {
     return this.enqueue(session.resourceId, async () => {
       const requestedAt = new Date();
       // A flow addresses the person's own measuring point with the user the session belongs to.
-      const userId =
-        session.usageId === null
-          ? null
-          : ((
-              await this.sessions.manager.findOne(ResourceUsage, {
-                where: { id: session.usageId },
-                select: { id: true, userId: true },
-              })
-            )?.userId ?? null);
-      const operation = await this.operations.save({
+      const userId = session.usageId === null ? null : await this.store.findUsageOwner(session.usageId);
+      const operation = await this.store.createOperation({
         id: randomUUID(),
         sessionId: session.id,
         meterId: session.meterId,
@@ -140,7 +141,7 @@ export class ResourceMeteringService implements OnModuleInit {
         kind,
         status: 'pending',
         requestedAt,
-      } as ResourceMeteringOperation);
+      });
       if (options.freshAfter) this.freshAfter.set(operation.id, options.freshAfter);
       let timer: NodeJS.Timeout | undefined;
       try {
@@ -188,7 +189,8 @@ export class ResourceMeteringService implements OnModuleInit {
         clearTimeout(timer);
         this.freshAfter.delete(operation.id);
       }
-      const done = await this.operations.findOneByOrFail({ id: operation.id });
+      const done = await this.store.findOperation(operation.id);
+      if (!done) throw new Error(`The metering operation ${operation.id} is gone`);
       if (done.status !== 'completed') {
         const message = `The ${kind === 'start' ? 'start' : 'collection'} branch finished without ${kind === 'start' ? 'acknowledging' : 'reporting'}`;
         await this.close(operation.id, 'failed', message);
@@ -213,7 +215,7 @@ export class ResourceMeteringService implements OnModuleInit {
 
   @Cron(CronExpression.EVERY_MINUTE)
   async collectInterimReadings(): Promise<void> {
-    for (const meter of await this.meters.find()) {
+    for (const meter of await this.store.listAllMeters()) {
       const key = String(meter.id);
       try {
         const definition = await this.getDefinition(meter.resourceId, meter.id);
@@ -225,9 +227,8 @@ export class ResourceMeteringService implements OnModuleInit {
             definition.collect.interimIntervalMinutes * 60_000
         )
           continue;
-        if (await this.sessions.manager.existsBy(ResourceUsageLifecycleAttempt, { resourceId: meter.resourceId }))
-          continue;
-        const { byMeter } = await findActiveMeterSessions(this.sessions.manager, meter.resourceId, [meter.id]);
+        if (await this.store.existsLifecycleAttempt(meter.resourceId)) continue;
+        const { byMeter } = await findActiveMeterSessions(this.store, meter.resourceId, [meter.id]);
         const running = (byMeter.get(meter.id) ?? []).flatMap(({ session }) => (session ? [session] : []));
         // A session measured per session is read at its own measuring point; everyone else shares one reading.
         // Each session follows the allocation it captured at its start.
@@ -263,7 +264,7 @@ export class ResourceMeteringService implements OnModuleInit {
   }
 
   async setRate(resourceId: number, meterId: number, creditsPerUnit: number, initiatorId?: number) {
-    const before = await this.meters.findOneBy({ id: meterId, resourceId });
+    const before = await this.store.findMeter(resourceId, meterId);
     const updated = await this.catalog.setRate(resourceId, meterId, creditsPerUnit);
     if (before && initiatorId !== undefined && before.creditsPerUnit !== creditsPerUnit)
       await this.audit.record({
@@ -282,8 +283,8 @@ export class ResourceMeteringService implements OnModuleInit {
   }
 
   /** The rate and allocation are billing terms: every change is recorded. */
-  async setAllocation(resourceId: number, meterId: number, allocation: ResourceMeterAllocation, initiatorId: number) {
-    const before = await this.meters.findOneBy({ id: meterId, resourceId });
+  async setAllocation(resourceId: number, meterId: number, allocation: MeterAllocationKind, initiatorId: number) {
+    const before = await this.store.findMeter(resourceId, meterId);
     const updated = await this.catalog.setAllocation(resourceId, meterId, allocation);
     if (before && before.allocation !== allocation)
       await this.audit.record({
@@ -313,20 +314,24 @@ export class ResourceMeteringService implements OnModuleInit {
     return this.catalog.listMeters(resourceId);
   }
 
-  waive(resourceId: number, sessionId: string, initiatorId: number): Promise<ResourceMeteringSession> {
+  waive(resourceId: number, sessionId: string, initiatorId: number): Promise<ResourceMeteringSessionRecord> {
     return this.settlement.waive(resourceId, sessionId, initiatorId);
   }
 
   // ---- reconciliation ---------------------------------------------------------------------------
 
   /** Retries the final collection of a usage that already ended and bills the meter consumption as a separate correction. */
-  async retrySettlement(resourceId: number, sessionId: string, initiatorId: number): Promise<ResourceMeteringSession> {
-    const session = await this.sessions.findOne({ where: { id: sessionId, resourceId } });
+  async retrySettlement(
+    resourceId: number,
+    sessionId: string,
+    initiatorId: number,
+  ): Promise<ResourceMeteringSessionRecord> {
+    const session = await this.store.findSessionOfResource(resourceId, sessionId);
     if (!session) throw new BadRequestException('METER_SESSION_NOT_FOUND');
     if (session.status !== ResourceMeteringSessionStatus.Pending) {
       throw new ConflictException('METER_SESSION_NOT_PENDING');
     }
-    const usage = await this.sessions.manager.findOneOrFail(ResourceUsage, { where: { id: session.usageId } });
+    const usage = await this.requireUsage(session.usageId);
     if (!usage.endTime) throw new ConflictException('METER_SESSION_NOT_PENDING');
     const { collect } = await this.getDefinition(resourceId, session.meterId);
     if (session.accounting === 'segmented') return this.retrySegmented(session, usage, collect, initiatorId);
@@ -340,10 +345,10 @@ export class ResourceMeteringService implements OnModuleInit {
       await this.settlement.settleLate(session.id, operation.id, initiatorId);
     } catch (error) {
       const reason = this.reason(error);
-      await this.sessions.update({ id: session.id }, { failureReason: reason });
+      await this.store.updateSession(session.id, { failureReason: reason });
       throw new BadRequestException(`METER_SETTLEMENT_FAILED: ${reason}`);
     }
-    return this.sessions.findOneByOrFail({ id: session.id });
+    return this.requireSession(session.id);
   }
 
   /**
@@ -351,39 +356,39 @@ export class ResourceMeteringService implements OnModuleInit {
    * that reading now. Whatever closes the segment bills every session that was waiting for it.
    */
   protected async retrySegmented(
-    session: ResourceMeteringSession,
-    usage: ResourceUsage,
+    session: ResourceMeteringSessionRecord,
+    usage: MeteringUsageRecord,
     collect: { timeoutSeconds: number },
     initiatorId: number,
-  ): Promise<ResourceMeteringSession> {
+  ): Promise<ResourceMeteringSessionRecord> {
     try {
       await this.segments.retryClosing(session, usage, collect.timeoutSeconds);
       await this.settlement.settleSegmentedLate(session.id, initiatorId);
     } catch (error) {
       const reason = this.reason(error);
-      await this.sessions.update({ id: session.id }, { failureReason: reason });
+      await this.store.updateSession(session.id, { failureReason: reason });
       throw new BadRequestException(`METER_SETTLEMENT_FAILED: ${reason}`);
     }
-    return this.sessions.findOneByOrFail({ id: session.id });
+    return this.requireSession(session.id);
   }
 
   /** Removes the metering of a tentative usage that is being rolled back. */
-  async discardCandidate(manager: EntityManager, usageId: number): Promise<void> {
-    await this.segments.withdraw(manager, usageId);
-    await manager.delete(ResourceMeteringSession, { usageId });
+  async discardCandidate(context: TransactionContext, usageId: number): Promise<void> {
+    await this.segments.withdraw(context, usageId);
+    await this.store.deleteSessionsOfUsage(usageId, context);
   }
 
   /** A stop that never completed leaves its session running, so it takes part in the open segment again. */
-  restoreParticipant(manager: EntityManager, usageId: number): Promise<void> {
-    return this.segments.restore(manager, usageId);
+  restoreParticipant(context: TransactionContext, usageId: number): Promise<void> {
+    return this.segments.restore(context, usageId);
   }
 
   /** Runs inside the transaction that ends the usage, before the bill is finalized. Idempotent. */
-  settleInTransaction(manager: EntityManager, usageId: number, final: FinalCollection): Promise<void> {
-    return this.settlement.settleInTransaction(manager, usageId, final);
+  settleInTransaction(context: TransactionContext, usageId: number, final: FinalCollection): Promise<void> {
+    return this.settlement.settleInTransaction(context, usageId, final);
   }
 
-  protected async collectSessionFinal(session: ResourceMeteringSession, freshAfter: Date): Promise<MeterFinal> {
+  protected async collectSessionFinal(session: ResourceMeteringSessionRecord, freshAfter: Date): Promise<MeterFinal> {
     const usageId = session.usageId;
     if (session.compromisedReason) return { status: 'unavailable', reason: session.compromisedReason };
     if (session.accounting === 'segmented') {
@@ -395,7 +400,7 @@ export class ResourceMeteringService implements OnModuleInit {
       );
     }
     if (session.collectionMode === 'increment') {
-      const operation = await this.operations.save({
+      const operation = await this.store.createOperation({
         id: randomUUID(),
         sessionId: session.id,
         meterId: session.meterId,
@@ -434,7 +439,7 @@ export class ResourceMeteringService implements OnModuleInit {
 
   /** Never throws: a missing final total must not prevent the usage from ending. */
   async collectFinal(usageId: number, freshAfter: Date): Promise<FinalCollection> {
-    const sessions = await this.sessions.find({ where: { usageId, status: ResourceMeteringSessionStatus.Active } });
+    const sessions = await this.store.findRunningSessionsOfUsage(usageId);
     if (!sessions.length) return { status: 'not-metered' };
     const meters: Record<string, MeterFinal> = {};
     for (const session of sessions) {
@@ -460,17 +465,17 @@ export class ResourceMeteringService implements OnModuleInit {
    * machine initializes it.
    */
   async initialize(input: { resourceId: number; usageId: number; supersedes?: number }): Promise<void> {
-    const usage = await this.sessions.manager.findOneOrFail(ResourceUsage, { where: { id: input.usageId } });
+    const usage = await this.requireUsage(input.usageId);
     const meters =
       usage.meterRates ??
-      (await this.meters.find({ where: { resourceId: input.resourceId } })).map((m) => ({
+      (await this.store.listMeters(input.resourceId)).map((m) => ({
         meterId: m.id,
         name: m.name,
         creditsPerUnit: m.creditsPerUnit,
         allocation: m.allocation,
       }));
     const initializedMeters = new Set<number>();
-    const parallelSessions = (await getMeteringSessionLimit(this.sessions.manager, input.resourceId)) > 1;
+    const parallelSessions = (await getMeteringSessionLimit(this.store, input.resourceId)) > 1;
     try {
       for (const meter of meters) {
         const definition = await this.getDefinition(input.resourceId, meter.meterId);
@@ -520,7 +525,7 @@ export class ResourceMeteringService implements OnModuleInit {
             continue;
           }
         }
-        const session = await this.sessions.save(values);
+        const session = await this.store.createSession(values);
         if (!definition.incrementOnly) {
           // Once initialization is issued, the device may reset even without a reply.
           // Increment-only meters dispatch no start branch and retain their outgoing evidence.
@@ -532,27 +537,26 @@ export class ResourceMeteringService implements OnModuleInit {
             });
           } catch (error) {
             if (meter.creditsPerUnit > 0) throw error;
-            await this.sessions.delete(session.id);
+            await this.store.deleteSession(session.id);
             this.logger.warn(`Skipping tracking-only meter ${meter.meterId}: ${this.reason(error)}`);
             continue;
           }
         }
         // A measuring point of its own restarts nothing that earlier sessions could still be owed from.
         if (!perSession) {
-          await this.segments.abandonOpen(this.sessions.manager, meter.meterId);
+          await this.segments.abandonOpen(undefined, meter.meterId);
           await this.invalidateOlderPending(meter.meterId);
         }
       }
     } catch (error) {
       // A meter read before the failing one already added the session to its open segment.
-      await this.segments.withdraw(this.sessions.manager, input.usageId, input.resourceId);
-      await this.sessions.delete({ usageId: input.usageId });
+      await this.segments.withdraw(undefined, input.usageId, input.resourceId);
+      await this.store.deleteSessionsOfUsage(input.usageId);
       if (input.supersedes !== undefined && initializedMeters.size)
-        await this.sessions.update(
-          { usageId: input.supersedes, meterId: In([...initializedMeters]), accounting: 'own' },
-          {
-            compromisedReason: 'The meter was re-initialized by a takeover that did not complete',
-          },
+        await this.store.markOwnSessionsCompromised(
+          input.supersedes,
+          [...initializedMeters],
+          'The meter was re-initialized by a takeover that did not complete',
         );
       if (error instanceof BadRequestException && this.reason(error).startsWith('METER_SHARING_UNSUPPORTED: '))
         throw error;
@@ -573,6 +577,6 @@ export class ResourceMeteringService implements OnModuleInit {
   }
 
   async onModuleInit(): Promise<void> {
-    await this.operations.update({ status: 'pending' }, { status: 'expired', error: 'Interrupted by a restart' });
+    await this.store.expirePendingOperations('Interrupted by a restart');
   }
 }

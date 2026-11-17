@@ -49,3 +49,4 @@ export * from './lib/attractap-crash-report';
 export * from './lib/attractap-installation';
 export * from './lib/attractap-reader';
 export * from './lib/attractap-secure-boot';
+export * from './lib/metering-records';

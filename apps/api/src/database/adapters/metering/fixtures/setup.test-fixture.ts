@@ -1,4 +1,4 @@
-import { createOperatingTimelineStore } from '../../../../database/adapters/operating-intervals/typeorm-operating-timeline.store';
+import { createOperatingTimelineStore } from '../../operating-intervals/typeorm-operating-timeline.store';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Logger } from '@nestjs/common';
 import {
@@ -6,10 +6,6 @@ import {
   BillingTransactionItem,
   Resource,
   ResourceMeter,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  ResourceMeteringOperation,
-  ResourceMeteringSession,
   ResourceUsage,
   User,
 } from '@attraccess/database-entities';
@@ -23,11 +19,20 @@ import { DataSource, EntityManager } from 'typeorm';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ResourceOperatingAttributionService } from '../../../operating-intervals/resource-operating-attribution.service';
-import { MeteringReport } from '../../../flows/node-executors';
-import { ResourceMeteringService } from '../../resource-metering.service';
+import { ResourceOperatingAttributionService } from '../../../../resources/operating-intervals/resource-operating-attribution.service';
+import { MeteringReport } from '../../../../resources/flows/node-executors';
+import { EntityManagerResolver } from '../../entity-manager-resolver';
+import { unitOfWorkFor } from '../../shared-unit-of-work';
+import { TypeOrmMeteringStore } from '../typeorm-metering.store';
+import { ResourceMeteringService } from '../../../../resources/metering/resource-metering.service';
 import type { FlowDefinedMeteringTestScope } from '../flow-defined-meters.persistence.spec';
-import { composeResourceUsageService } from '../../../usage/sessions/fixtures/compose.test-fixture';
+import { composeResourceUsageService } from '../../../../resources/usage/sessions/fixtures/compose.test-fixture';
+/** The metering port on a real connection, wired by hand with the connection's one unit of work. */
+export function createMeteringPersistence(source: DataSource) {
+  const unitOfWork = unitOfWorkFor(source);
+  return { unitOfWork, store: new TypeOrmMeteringStore(new EntityManagerResolver(unitOfWork, source)) };
+}
+
 export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
   for (const method of ['debug', 'log', 'warn', 'error'] as const) {
     jest.spyOn(Logger.prototype, method).mockImplementation(() => undefined);
@@ -87,12 +92,10 @@ export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
   await scope.source
     .getRepository(ResourceMeter)
     .save({ id: 1, resourceId: 1, name: 'Energy (kWh)', creditsPerUnit: 30 });
+  const { store, unitOfWork } = createMeteringPersistence(scope.source);
   scope.metering = new ResourceMeteringService(
-    scope.source.getRepository(ResourceMeter),
-    scope.source.getRepository(ResourceMeteringSession),
-    scope.source.getRepository(ResourceMeteringOperation),
-    scope.source.getRepository(ResourceFlowNode),
-    scope.source.getRepository(ResourceFlowEdge),
+    store,
+    unitOfWork,
     scope.flows as never,
     scope.audit as never,
     scope.liveNotifications as never,

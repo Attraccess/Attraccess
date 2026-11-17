@@ -7,9 +7,9 @@ import {
   User,
 } from '@attraccess/database-entities';
 import { DataSource } from 'typeorm';
-import { ResourceUsageService } from '../../../usage/sessions/resource-usage.service';
-import { MeteringReport } from '../../../flows/node-executors';
-import { ResourceMeteringService } from '../../resource-metering.service';
+import { ResourceUsageService } from '../../../../resources/usage/sessions/resource-usage.service';
+import { MeteringReport } from '../../../../resources/flows/node-executors';
+import { ResourceMeteringService } from '../../../../resources/metering/resource-metering.service';
 import { T } from './node-types.test-fixture';
 import { schemas } from './schemas.test-fixture';
 import { Handler } from './report-handler.test-fixture';

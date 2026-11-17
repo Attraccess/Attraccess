@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Patch, Param, ParseUUIDPipe, ParseIntPipe, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { ResourceMeteringSession } from '@attraccess/database-entities';
+import { ResourceMeteringSessionRecord } from '@attraccess/application-models';
 import { ResourceMeteringService } from './resource-metering.service';
 import {
   MeterAllocationDto,
@@ -159,7 +159,9 @@ export class ResourceMeteringController {
     return this.toDto(await this.metering.waive(resourceId, sessionId, req.user.id));
   }
 
-  private toDto(session: ResourceMeteringSession): ResourceMeteringSettlementDto {
+  private toDto(
+    session: Pick<ResourceMeteringSessionRecord, 'id' | 'status' | 'chargeCredits'>,
+  ): ResourceMeteringSettlementDto {
     return { sessionId: session.id, status: session.status, chargeCredits: session.chargeCredits };
   }
 }
