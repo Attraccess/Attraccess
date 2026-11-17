@@ -8,7 +8,7 @@
  * Put both into the `PluginContext` a test hands to the plugin.
  *
  * Behaviour a test can rely on, because the host guarantees it too:
- * - Transactions run one at a time (SQLite semantics); a call without a scope waits for an open transaction.
+ * - Transactions run one at a time (a single writer); a call without a scope waits for an open transaction.
  *   A call without a scope *inside* a transaction, a nested transaction and a call with a closed scope throw.
  * - Filters follow SQL: comparing a NULL value is unknown and does not match, also under `not` and `ne`/`notIn`.
  *   Use `isNull` or `eq: null` to match NULL. An undefined filter value throws instead of matching everything.
