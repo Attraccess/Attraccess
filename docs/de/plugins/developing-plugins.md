@@ -248,7 +248,8 @@ lizenzierten Plugin wird ebenfalls nicht geladen; es zeigt den üblichen Abhäng
 
 Das Nichtladen aus Lizenzgründen ist kein Fehler: Das Plugin wird nicht unter Quarantäne gestellt und lädt nach dem
 nächsten Neustart, sobald die Lizenz es abdeckt. Ein ungültiger `license`-Block (falsche Typen, unbekannte Schlüssel) ist
-ein Manifestfehler: Das Plugin wird nicht geladen, ein ZIP-Upload wird mit HTTP 400 abgelehnt. Hosts, die älter als die
+ein Manifestfehler: Das Plugin wird nicht geladen (**Einstellungen → Plugins** listet es mit dem Fehler, damit es
+gelöscht werden kann), ein ZIP-Upload wird mit HTTP 400 abgelehnt. Hosts, die älter als die
 Plugin-Lizenzunterstützung sind, ignorieren den Block. Setzen Sie bei npm-Plugins `attraccess.host` auf die erste Version,
 die ihn durchsetzt; der Host prüft diesen Bereich bei der Installation. Das `attraccessVersion` eines ZIP-Plugins wird
 nicht mit der Host-Version verglichen, ein alter Host lädt ein ZIP-Plugin daher ohne die Sperre.

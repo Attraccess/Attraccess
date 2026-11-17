@@ -139,7 +139,8 @@ dependency on an unlicensed plugin does not load either; it shows the usual depe
 
 Not loading for license reasons is not a failure: the plugin is not quarantined, and it loads after the next restart
 once the license covers it. An invalid `license` block (wrong types, unknown keys) is a manifest error: the plugin does
-not load, and a ZIP upload is rejected with HTTP 400. Hosts older than the plugin license support ignore the block. For
+not load (**Settings → Plugins** lists it with the error, so it can be deleted), and a ZIP upload is rejected with
+HTTP 400. Hosts older than the plugin license support ignore the block. For
 npm plugins, set `attraccess.host` to the first version that enforces it; the host checks that range on install. A ZIP
 plugin's `attraccessVersion` is not compared with the host version, so an old host loads a ZIP plugin without the
 gate.

@@ -428,7 +428,10 @@ export class PluginService {
       .getDiscoveredPlugins()
       .map((manifest) => {
         const key = `${manifest.name}@${manifest.version}`;
-        const shortfall = getImplementationClass().getLicenseShortfall(manifest);
+        // A refused plugin never loads whatever the license says; its refusal is the actionable error.
+        const shortfall = getImplementationClass().isPluginRefused(manifest)
+          ? null
+          : getImplementationClass().getLicenseShortfall(manifest);
         if (shortfall) {
           return {
             ...manifest,
@@ -539,20 +542,13 @@ export class PluginService {
         try {
           PluginService.assertManifestCompatible(manifest);
           manifest.permissions = PluginSandboxService.validateDeclaredPermissions(manifest.name, manifest.permissions);
+          // A malformed license block is refused like invalid permissions: the host cannot tell what it requires.
+          const license = parseManifestLicense(manifest.name, manifest.license);
+          if (license) manifest.license = license;
         } catch (error) {
           // Listed with the refusal (and its migration guide) so it can be deleted, but never loaded or migrated.
           getImplementationClass().setPluginLoadError(`${manifest.name}@${manifest.version}`, error as Error);
           getImplementationClass().refusedPlugins.add(pluginFolder);
-        }
-
-        // Like invalid permissions, a malformed license block means the plugin is not loaded: the host could not
-        // tell what the plugin requires, and guessing would risk loading a paid plugin without its license.
-        try {
-          const license = parseManifestLicense(manifest.name, manifest.license);
-          if (license) manifest.license = license;
-        } catch (error) {
-          getImplementationClass().setPluginLoadError(`${manifest.name}@${manifest.version}`, error as Error);
-          return null;
         }
 
         return manifest;
