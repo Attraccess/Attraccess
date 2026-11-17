@@ -22,7 +22,7 @@ import { type WagoConfigurationSnapshot } from '../configuration/model';
 
 import { WagoConfigurationRevision } from '../configuration/revision.entity';
 
-import { type WagoControllerRow } from '../domain-storage';
+import { type WagoControllerRow } from '../storage';
 
 import { type WagoOperationalMessage, parseOperationalMessage } from '../protocol/index';
 

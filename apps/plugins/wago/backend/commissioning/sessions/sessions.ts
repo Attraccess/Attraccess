@@ -16,7 +16,7 @@ import { scanHostKey } from '../delivery/host-identity';
 
 import { commissioningAcceptanceScript } from '../delivery/accept';
 
-import { wagoTables } from '../../domain-storage';
+import { openWagoStorage } from '../../storage';
 
 import { createWagoManagementService } from '../../management/store';
 
@@ -153,7 +153,7 @@ export abstract class WagoCommissioningSessions extends WagoCommissioningService
 
   async onApplicationBootstrap(): Promise<void> {
     // The host datasource is available only after plugin module construction completes.
-    this.sessions = wagoTables(this.context).commissioningSessions;
+    this.sessions = openWagoStorage(this.context).commissioningSessions;
     this.managedRuntime?.registerRootProbe(async (host, fingerprint, password) => {
       try {
         return (

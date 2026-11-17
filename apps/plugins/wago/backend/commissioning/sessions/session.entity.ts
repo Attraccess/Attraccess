@@ -1,18 +1,6 @@
-import type { WagoCommissioningSessionRow } from '../../domain-storage';
+import type { WagoCommissioningSessionRow, WagoCommissioningState } from '../../storage';
 
-export type WagoCommissioningState =
-  | 'awaiting_delivery'
-  | 'delivering'
-  | 'awaiting_identity_confirmation'
-  | 'awaiting_codesys_confirmation'
-  | 'delivery_failed'
-  | 'awaiting_discovery'
-  | 'awaiting_claim'
-  | 'awaiting_verification'
-  | 'claim_interrupted'
-  | 'recovery_revocation_pending'
-  | 'completed'
-  | 'revoked';
+export type { WagoCommissioningState };
 
-/** Row of the commissioning session table; `state` is always a {@link WagoCommissioningState}. */
+/** Row of the commissioning session table. */
 export type WagoCommissioningSession = WagoCommissioningSessionRow;

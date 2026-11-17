@@ -1,4 +1,4 @@
-import type { WagoConfigurationDraftRow } from '../domain-storage';
+import type { WagoConfigurationDraftRow } from '../storage';
 
 /** Row of the configuration draft table (one draft per controller). */
 export type WagoConfigurationDraft = WagoConfigurationDraftRow;

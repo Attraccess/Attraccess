@@ -1,6 +1,6 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import type { WagoCommissioningSession } from './session.entity';
-import { wagoTables } from '../../domain-storage';
+import { openWagoStorage } from '../../storage';
 import type { CommissioningRuntimeState } from '../readiness/readiness';
 
 export async function commissioningVerification(
@@ -8,7 +8,7 @@ export async function commissioningVerification(
   session: WagoCommissioningSession,
   runtime?: CommissioningRuntimeState,
 ) {
-  const tables = wagoTables(context);
+  const tables = openWagoStorage(context);
   const controller = await tables.controllers.findOne({
     where: { hardwareId: session.hardwareId, mqttServerId: session.mqttServerId },
   });

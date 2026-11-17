@@ -1,21 +1,13 @@
-import { repositoryDouble } from '../persistence.test-utils';
+import { createWagoTestStorage, type WagoTestStorage } from '../storage/testing';
 import type { PluginContext, PluginMqttMessage } from '@attraccess/plugins-backend-sdk';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { DataSource } from '@attraccess/plugins-backend-sdk/sqlite';
 import { MemoryDeviceAdapter } from '../../cc100-runtime/src/io/adapters';
 import type { RuntimeState } from '../../cc100-runtime/src/runtime';
 import { WagoRuntime } from '../../cc100-runtime/src/runtime';
-import { WagoController } from '../controllers/entity';
 import { WagoCredentialRotationService, WagoCredentialRotationUncertainError } from './service';
-import { WagoCredentialRotationEntity } from './service';
-import { WagoCredentialRotation1780010610000 } from './migration';
 
-describe('credential rotation with isolated SQLite and fixture broker transport', () => {
-  let db: DataSource;
-  let directory: string;
+describe('credential rotation with in-memory storage and fixture broker transport', () => {
+  let storage: WagoTestStorage;
   let service: WagoCredentialRotationService;
   let context: PluginContext;
   let receive: (message: PluginMqttMessage) => void | Promise<void>;
@@ -47,20 +39,15 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
     jest.clearAllMocks();
     owned = true;
     abort = new AbortController();
-    directory = await mkdtemp(join(tmpdir(), 'wago-rotation-database-'));
-    db = await new DataSource({
-      type: 'sqlite',
-      database: join(directory, 'rotation.sqlite'),
-      entities: [WagoController, WagoCredentialRotationEntity],
-      synchronize: true,
-    }).initialize();
-    await db.getRepository(WagoController).save({
+    storage = createWagoTestStorage();
+    await storage.tables.controllers.insert({
       id: 1,
       hardwareId: 'fixture',
       trustState: 'claimed',
       mqttServerId: 2,
       name: 'Fixture',
       pairingCodeHash: '',
+      credentialEpoch,
       protocolVersion: '1.0.0',
       runtimeVersion: '0.1.0',
       capabilities: '["credential-rotation-v1"]',
@@ -69,13 +56,10 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
-    const columns = await db.query('PRAGMA table_info(plugin_wago_controllers)');
-    if (!columns.some((column: { name: string }) => column.name === 'credential_epoch'))
-      await db.query('ALTER TABLE plugin_wago_controllers ADD COLUMN credential_epoch varchar');
-    await db.query('UPDATE plugin_wago_controllers SET credential_epoch = ? WHERE id = 1', [credentialEpoch]);
     const key = randomBytes(32);
     context = {
-      ...repositoryDouble((entity) => db.getRepository(entity)),
+      storage: storage.storage,
+      persistence: storage.persistence,
       getMqttCredentialProvisioning: () => ({ rotate }),
       mqtt: {
         publish,
@@ -115,20 +99,15 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
   });
   afterEach(async () => {
     jest.useRealTimers();
-    await db.destroy();
-    await rm(directory, { recursive: true, force: true });
   });
 
-  const row = () =>
-    db
-      .getRepository(WagoCredentialRotationEntity)
-      .createQueryBuilder('rotation')
-      .addSelect('rotation.encryptedCredentials')
-      .getOne();
+  const row = () => storage.tables.credentialRotations.get(1);
+  const updateController = (patch: Parameters<WagoTestStorage['tables']['controllers']['update']>[1]) =>
+    storage.tables.controllers.update({ id: 1 }, patch);
   it.each([0, 2100])(
     'persists encrypted handoff and requires reconnect acknowledgement with %i ms clock skew',
     async (skew) => {
-      await db.getRepository(WagoController).update(1, { lastHeartbeatAt: new Date(Date.now() + skew).toISOString() });
+      await updateController({ lastHeartbeatAt: new Date(Date.now() + skew).toISOString() });
       let acknowledge!: () => Promise<void>;
       let started!: () => void;
       const dispatched = new Promise<void>((resolve) => {
@@ -225,15 +204,8 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
     await failure;
     expect((await row())?.phase).toBe('pending');
     jest.useRealTimers();
-    await db.destroy();
-    db = await new DataSource({
-      type: 'sqlite',
-      database: join(directory, 'rotation.sqlite'),
-      entities: [WagoController, WagoCredentialRotationEntity],
-      synchronize: false,
-    }).initialize();
     // Recovery resends the already rotated credential even when liveness has been lost.
-    await db.getRepository(WagoController).update(1, { lastHeartbeatAt: null });
+    await updateController({ lastHeartbeatAt: null });
     publish.mockImplementation(async (serverId, topic, payload) => {
       const retried = JSON.parse(payload);
       const first = JSON.parse(firstPayload);
@@ -278,7 +250,7 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
   });
 
   it('refuses old runtime capabilities before touching broker credentials or audit', async () => {
-    await db.getRepository(WagoController).update(1, { capabilities: '["commands"]' });
+    await updateController({ capabilities: '["commands"]' });
     await expect(service.rotate(1, 'attraccess/wago', principal, guard())).rejects.toThrow('credential-rotation-v1');
     expect(rotate).not.toHaveBeenCalled();
     expect(record).not.toHaveBeenCalled();
@@ -286,7 +258,7 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
   });
 
   it('requires the persisted registration epoch before any broker mutation', async () => {
-    await db.query('UPDATE plugin_wago_controllers SET credential_epoch = NULL WHERE id = 1');
+    await updateController({ credentialEpoch: null });
     await expect(service.rotate(1, 'attraccess/wago', principal, guard())).rejects.toThrow('credential epoch');
     expect(rotate).not.toHaveBeenCalled();
   });
@@ -297,7 +269,7 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
     new Date(Date.now() - 90_001).toISOString(),
     new Date(Date.now() + 3_600_000).toISOString(),
   ])('refuses a claimed controller without fresh permanent heartbeat evidence (%p)', async (lastHeartbeatAt) => {
-    await db.getRepository(WagoController).update(1, { lastHeartbeatAt });
+    await updateController({ lastHeartbeatAt });
     await expect(service.rotate(1, 'attraccess/wago', principal, guard())).rejects.toThrow(
       'permanent controller heartbeat',
     );
@@ -344,26 +316,16 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
     await service.rotate(1, 'attraccess/wago', principal, guard());
     await expect(service.assertRemovalBroker(1, 9)).rejects.toThrow('original rotation broker');
     await expect(service.assertRemovalBroker(1, 2)).resolves.toBeUndefined();
-    const runner = db.createQueryRunner();
-    await expect(new WagoCredentialRotation1780010610000().down(runner)).rejects.toThrow('rotation history');
     expect((await row())?.revision).toBe(1);
-    await runner.release();
   });
 
-  it('creates the actual migration and clears recovery state only when its controller registration is deleted', async () => {
-    const runner = db.createQueryRunner();
-    await runner.query('DROP TABLE "plugin_wago_credential_rotations"');
-    await runner.query('ALTER TABLE plugin_wago_controllers DROP COLUMN credential_epoch');
-    const migration = new WagoCredentialRotation1780010610000();
-    await migration.up(runner);
-    await db.query('UPDATE plugin_wago_controllers SET credential_epoch = ? WHERE id = 1', [credentialEpoch]);
+  it('keeps the completed rotation history until its controller registration is deleted', async () => {
     await service.rotate(1, 'attraccess/wago', principal, guard());
     expect(await service.status(1)).toEqual({ state: 'completed', revision: 1 });
-    await expect(migration.down(runner)).rejects.toThrow('rotation history');
-    await db.getRepository(WagoController).delete(1);
+    expect(await row()).toMatchObject({ phase: 'completed', encryptedCredentials: null });
+    await storage.tables.controllers.delete({ id: 1 });
     expect(await row()).toBeNull();
-    await migration.down(runner);
-    await runner.release();
+    expect(await service.status(1)).toEqual({ state: 'none' });
   });
 
   it('composes the real backend and runtime across persistence, fixture authentication and reconnect acknowledgement', async () => {

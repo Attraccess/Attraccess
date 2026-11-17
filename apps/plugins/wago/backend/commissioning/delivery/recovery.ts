@@ -2,7 +2,7 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 
 import { randomBytes } from 'node:crypto';
 
-import { wagoTables } from '../../domain-storage';
+import { openWagoStorage } from '../../storage';
 
 import { type CommissioningOperationGuard } from '../../runtime/operation-guard';
 
@@ -61,7 +61,7 @@ export abstract class WagoCommissioningRecovery extends WagoCommissioningPlatfor
       let deviceOperations: WagoDeviceOperations | undefined;
       const owner = randomBytes(16).toString('hex');
       if (this.managedRuntime) {
-        deviceOperations = new WagoDeviceOperations(wagoTables(this.context).deviceOperations);
+        deviceOperations = new WagoDeviceOperations(openWagoStorage(this.context).deviceOperations);
         if (!(await deviceOperations.acquire(key, owner, Date.now(), deadline + 60_000)))
           throw new ConflictException('Another controller operation is active. Retry after it finishes.');
       }
@@ -72,7 +72,7 @@ export abstract class WagoCommissioningRecovery extends WagoCommissioningPlatfor
       };
       try {
         const enrolled = session.hardwareId
-          ? await wagoTables(this.context).controllers.findOne({ where: { hardwareId: session.hardwareId } })
+          ? await openWagoStorage(this.context).controllers.findOne({ where: { hardwareId: session.hardwareId } })
           : null;
         await this.managedRuntime?.assertNetworkSettled(enrolled?.id ?? null, session.hostKeyFingerprint ?? undefined);
         this.activeDeadlines.set(id, deadline);

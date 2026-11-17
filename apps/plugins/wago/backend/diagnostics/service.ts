@@ -7,7 +7,7 @@ import { freshness } from './store';
 import { safeValidationSummaries } from './validation';
 import { WagoConfigurationDraft } from '../configuration/draft.entity';
 import { WagoConfigurationRevision } from '../configuration/revision.entity';
-import { wagoTables } from '../domain-storage';
+import { openWagoStorage } from '../storage';
 import { WagoService } from '../controllers/service';
 import { channelEnabled, MAX_CONFIGURATION_ITEMS } from '../../shared/configuration-limits';
 import { MAX_CHANNELS } from './store';
@@ -158,7 +158,7 @@ export class WagoDiagnosticsService {
   ) {}
 
   async get(controllerId: number): Promise<WagoDiagnostics> {
-    const tables = wagoTables(this.context);
+    const tables = openWagoStorage(this.context);
     const controller = await tables.controllers.get(controllerId);
     if (!controller) throw new NotFoundException('WAGO controller not found');
     const [draft, latest, applied, nodes] = await Promise.all([
@@ -339,7 +339,7 @@ export class WagoDiagnosticsService {
       ),
     ];
     const controllerIdsForQuery = selectedControllerIds;
-    const tables = wagoTables(this.context);
+    const tables = openWagoStorage(this.context);
     const [controllers, appliedRows, conflictNodes] = await Promise.all([
       tables.controllers.find({ where: { id: { in: selectedControllerIds } } }),
       // Newest first, so the first row of each controller is its latest applied revision.

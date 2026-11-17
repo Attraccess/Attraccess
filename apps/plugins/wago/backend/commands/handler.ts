@@ -4,7 +4,7 @@ import { outputBehavior, supportsOutputAction } from '../../channel-behavior';
 import { type WagoConfigurationSnapshot } from '../configuration/model';
 import { commandTopic, parseControllerJson } from '../protocol/index';
 import { WagoConfigurationRevision } from '../configuration/revision.entity';
-import { wagoTables, type WagoControllerRow, type WagoTables } from '../domain-storage';
+import { openWagoStorage, type WagoControllerRow, type WagoStorage } from '../storage';
 import { wagoFlowPreview } from '../flow/preview';
 
 export const DEFAULT_COMMAND_TIMEOUT_SECONDS = 30;
@@ -26,7 +26,7 @@ export function positiveInteger(value: unknown): number | undefined {
 
 export type Dependencies = {
   context: PluginContext;
-  controllers: () => WagoTables['controllers'];
+  controllers: () => WagoStorage['controllers'];
   claimedController: (id: number) => Promise<WagoControllerRow>;
   getSettings: () => Promise<{ operationalPrefix: string }>;
   appliedRevision: (controllerId: number) => Promise<WagoConfigurationRevision | null>;
@@ -517,7 +517,7 @@ export class WagoCommandHandler {
     if (controllerId) {
       const draft = appliedOnly
         ? null
-        : await wagoTables(this.dependencies.context).configurationDrafts.findOne({ where: { controllerId } });
+        : await openWagoStorage(this.dependencies.context).configurationDrafts.findOne({ where: { controllerId } });
       try {
         const storedNames = JSON.parse(revision?.presetProvenance ?? draft?.presetProvenance ?? 'null')?.editor?.names;
         if (storedNames && typeof storedNames === 'object' && !Array.isArray(storedNames)) names = storedNames;

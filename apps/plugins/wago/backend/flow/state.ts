@@ -1,5 +1,5 @@
 import { type PluginMqttSubscription, type PluginContext } from '@attraccess/plugins-backend-sdk';
-import { wagoTables, type WagoControllerRow, type WagoTables } from '../domain-storage';
+import { openWagoStorage, type WagoControllerRow, type WagoStorage } from '../storage';
 import { type WagoConfigurationRevision } from '../configuration/revision.entity';
 
 import { Inject } from '@nestjs/common';
@@ -56,16 +56,16 @@ export abstract class WagoFlowServiceState {
   protected refreshTimer: ReturnType<typeof setInterval> | null = null;
 
   // Plugin registration precedes the host storage; open the tables only when used.
-  protected get controllers(): WagoTables['controllers'] {
-    return wagoTables(this.context).controllers;
+  protected get controllers(): WagoStorage['controllers'] {
+    return openWagoStorage(this.context).controllers;
   }
 
-  protected get revisions(): WagoTables['configurationRevisions'] {
-    return wagoTables(this.context).configurationRevisions;
+  protected get revisions(): WagoStorage['configurationRevisions'] {
+    return openWagoStorage(this.context).configurationRevisions;
   }
 
-  protected get settings(): WagoTables['settings'] {
-    return wagoTables(this.context).settings;
+  protected get settings(): WagoStorage['settings'] {
+    return openWagoStorage(this.context).settings;
   }
 
   abstract onModuleInit(): Promise<void>;

@@ -16,8 +16,7 @@ import type { WagoConfigurationDraft, WagoConfigurationDraftInput } from './draf
 
 import { compatibilityError } from '../protocol/index';
 
-import type { WagoControllerRow } from '../domain-storage';
-import { wagoTransaction } from '../domain-storage';
+import type { WagoControllerRow } from '../storage';
 
 import { WagoDrafts } from './drafts';
 
@@ -87,7 +86,7 @@ export abstract class WagoRevisions extends WagoDrafts {
       : undefined;
     const persist = async () => {
       // The draft and the new revision are stored together; the dispatch to the controller follows the commit.
-      const stored = await wagoTransaction(this.context, async (scope) => {
+      const stored = await this.context.persistence.transaction(async (scope) => {
         if (preparedDraft) await this.storeDraft(preparedDraft, scope);
         if (
           previous?.state === 'pending' &&
@@ -319,7 +318,7 @@ export abstract class WagoRevisions extends WagoDrafts {
           const acknowledged = { rejectionAcknowledgedAt: new Date().toISOString(), rejectionAcknowledgedBy: principal.userId };
           // Compare-and-set: an acknowledgement that raced this one, or a re-report, wins.
           const changed = await this.revisions.update(
-            { id: rejected.id, state: 'rejected', reportedAt: rejected.reportedAt, rejectionAcknowledgedAt: null },
+            { id: rejected.id, state: 'rejected', reportedAt: rejected.reportedAt, rejectionAcknowledgedAt: { isNull: true } },
             acknowledged,
           );
           if (!changed) throw new ConflictException('rejection changed; refresh and review it before acknowledging');

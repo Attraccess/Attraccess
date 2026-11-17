@@ -1,6 +1,6 @@
-import type { WagoConfigurationRevisionRow } from '../domain-storage';
+import type { WagoConfigurationRevisionRow, WagoConfigurationRevisionState } from '../storage';
 
-export type WagoConfigurationRevisionState = 'pending' | 'published' | 'applied' | 'rejected';
+export type { WagoConfigurationRevisionState };
 
-/** Row of the configuration revision table; `state` is always a {@link WagoConfigurationRevisionState}. */
+/** Row of the configuration revision table. */
 export type WagoConfigurationRevision = WagoConfigurationRevisionRow;

@@ -2,7 +2,7 @@ import { auditCommissioning, commissioningPrincipal, CommissioningPrincipal } fr
 
 import { ConflictException, NotFoundException } from '@nestjs/common';
 
-import { wagoTables } from '../../domain-storage';
+import { openWagoStorage } from '../../storage';
 
 import { type CommissioningOperationGuard } from '../../runtime/operation-guard';
 
@@ -105,7 +105,7 @@ export abstract class WagoCommissioningOwnership extends WagoCommissioningRecove
     id: number,
     remove: (assertOwned: () => Promise<void>) => Promise<string>,
   ): Promise<void> {
-    const controller = await wagoTables(this.context).controllers.get(id);
+    const controller = await openWagoStorage(this.context).controllers.get(id);
     if (!controller) throw new NotFoundException('controller not found');
     const sessions = await this.sessions.find({ where: { hardwareId: controller.hardwareId }, orderBy: [{ field: 'id', direction: 'desc' }] });
     if (!sessions.length) {
@@ -156,7 +156,7 @@ export abstract class WagoCommissioningOwnership extends WagoCommissioningRecove
     operation: (assertOwned: () => Promise<void>, guard: CommissioningOperationGuard) => Promise<T>,
     requireCommissioningSession = false,
   ): Promise<T> {
-    const controller = await wagoTables(this.context).controllers.get(id);
+    const controller = await openWagoStorage(this.context).controllers.get(id);
     if (!controller) throw new NotFoundException('controller not found');
     const sessions = await this.sessions.find({ where: { hardwareId: controller.hardwareId }, orderBy: [{ field: 'id', direction: 'desc' }] });
     if (!sessions.length) {

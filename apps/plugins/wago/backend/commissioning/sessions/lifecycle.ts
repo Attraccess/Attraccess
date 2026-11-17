@@ -4,7 +4,7 @@ import { CommissioningSessionResponse } from '../model';
 
 import { ConflictException, NotFoundException } from '@nestjs/common';
 
-import { wagoTables } from '../../domain-storage';
+import { openWagoStorage } from '../../storage';
 
 import { VERIFIER_PREFIX } from '../model';
 
@@ -135,7 +135,7 @@ export abstract class WagoCommissioningProgress extends WagoCommissioningTranspo
               const controller =
                 session.enrollmentId === null
                   ? null
-                  : await wagoTables(this.context).controllers.findOne({
+                  : await openWagoStorage(this.context).controllers.findOne({
                       where: {
                         hardwareId: session.hardwareId,
                         mqttServerId: session.mqttServerId,

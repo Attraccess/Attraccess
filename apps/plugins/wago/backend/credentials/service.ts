@@ -10,7 +10,7 @@ import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../../shared/clock';
 import { sourceTime } from '../diagnostics/envelope';
 import { normalizeOperationalPrefix, parseControllerJson } from '../protocol/index';
 import { WagoAudit } from '../audit/index';
-import { wagoTables, type WagoControllerRow, type WagoCredentialRotationRow } from '../domain-storage';
+import { openWagoStorage, type WagoControllerRow, type WagoCredentialRotationRow } from '../storage';
 import { type CommissioningOperationGuard } from '../runtime/operation-guard';
 
 export class WagoCredentialRotationUncertainError extends ConflictException {
@@ -20,7 +20,7 @@ export class WagoCredentialRotationUncertainError extends ConflictException {
 }
 
 /** Rotation recovery record. Never expose it (or its encrypted credentials) through an API. */
-export type WagoCredentialRotation = WagoCredentialRotationRow & { phase: 'provisioning' | 'pending' | 'completed' };
+export type WagoCredentialRotationEntity = WagoCredentialRotationRow;
 
 export const CAPABILITY = 'credential-rotation-v1';
 
@@ -60,7 +60,7 @@ export function assertRotationController(
 }
 
 export function checkPendingRotation(
-  previous: WagoCredentialRotation | null,
+  previous: WagoCredentialRotationEntity | null,
   credentialEpoch: string,
   retry: boolean,
   mqttServerId: number,
@@ -84,7 +84,7 @@ export class WagoCredentialRotationService {
 
   protected async handoff(
     hardwareId: string,
-    row: WagoCredentialRotation,
+    row: WagoCredentialRotationEntity,
     credential: Credential,
     guard: CommissioningOperationGuard,
   ) {
@@ -181,7 +181,7 @@ export class WagoCredentialRotationService {
       throw new ConflictException('Re-enroll this controller with a credential epoch before rotating credentials.');
     prefix = normalizeOperationalPrefix(prefix);
     const identity = `wago-controller-${controller.hardwareId}`;
-    const previous = (await this.tables.credentialRotations.get(controllerId)) as WagoCredentialRotation | null;
+    const previous = await this.tables.credentialRotations.get(controllerId);
     const completed = checkPendingRotation(previous, credentialEpoch, retry, controller.mqttServerId, prefix);
     if (completed) return completed;
     const lifecycle = new WagoAudit(this.context).begin(principal, controllerId, 'credential_rotation');
@@ -282,6 +282,6 @@ export class WagoCredentialRotationService {
   }
 
   protected get tables() {
-    return wagoTables(this.context);
+    return openWagoStorage(this.context);
   }
 }

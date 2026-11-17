@@ -18,7 +18,7 @@ import { runProcess } from './process';
 
 import { ConflictException, NotFoundException } from '@nestjs/common';
 
-import { wagoTables } from '../../domain-storage';
+import { openWagoStorage } from '../../storage';
 
 import { ManagementError } from '../../management/service';
 
@@ -172,7 +172,7 @@ export abstract class WagoCommissioningPlatform extends WagoCommissioningSession
         )
           throw new ConflictException('Confirm controller identity and finish delivery before management changes.');
         if (!session.managementControllerId) {
-          const controller = await wagoTables(this.context).controllers.findOne({
+          const controller = await openWagoStorage(this.context).controllers.findOne({
             where: { hardwareId: session.hardwareId, mqttServerId: session.mqttServerId },
           });
           if (!controller) throw new ConflictException('Wait for controller enrollment before management inspection.');
@@ -420,7 +420,7 @@ export abstract class WagoCommissioningPlatform extends WagoCommissioningSession
       const page = await this.sessions.find({ orderBy: [{ field: 'id' }], limit: 100, offset: skip });
       for (const session of page) {
         if (session.state !== 'awaiting_discovery' || session.enrollmentId === null) continue;
-        const controller = await wagoTables(this.context).controllers.findOne({
+        const controller = await openWagoStorage(this.context).controllers.findOne({
           where: {
             hardwareId: session.hardwareId,
             mqttServerId: session.mqttServerId,
