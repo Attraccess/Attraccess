@@ -29,6 +29,7 @@ import { McpToolRegistry } from './mcp/mcp-tool-registry';
 import type { OpenApiDocument } from './mcp/openapi-tools';
 import { MCP_UNPREFIXED_ROUTES } from './mcp/mcp-routes';
 import { join } from 'path';
+import { rejectEmptyAuthorityTargets } from './app/empty-authority-target';
 
 /** SAML state may carry authentication context. HTTPS is required even when
  * the configured application URL is missing, HTTP, or later changed. Express
@@ -96,6 +97,9 @@ export function configureBootstrapHttp(app: NestExpressApplication, appConfig: A
   // Plugin configurations can include large device profiles and a previous
   // draft for conflict detection, exceeding Express's default 100 KiB limit.
   app.useBodyParser('json', { limit: '10mb' });
+
+  // Registered before the static mounts, which only attach while the app initialises.
+  app.use(rejectEmptyAuthorityTargets);
 
   // Behind a reverse proxy, X-Forwarded-For only reflects the real client IP when Express is told
   // how many proxy hops to trust. Without this, auth rate limiting buckets every request under the

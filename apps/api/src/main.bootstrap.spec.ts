@@ -6,6 +6,8 @@ import { Body, Controller, Logger, Post } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
+import { request as httpRequest } from 'http';
+import { AddressInfo } from 'net';
 import { bootstrap } from './main.bootstrap';
 import { SettingsService } from './settings/settings.service';
 import { PluginService } from './plugin-system/plugin.service';
@@ -229,6 +231,24 @@ describe('API bootstrap ordering and configuration', () => {
       expect(response.status).toBe(201);
       expect(response.body).toEqual(body);
     });
+
+    // supertest builds its own URL, so the absolute-form target goes out through Node's http client.
+    it.each(['http:///api/plugin-configuration/1/validate', 'HTTPS:///api/plugin-configuration/1/validate'])(
+      'answers the host-less absolute-form target %s with a 404',
+      async (path) => {
+        const { port } = httpApp.getHttpServer().address() as AddressInfo;
+        const status = await new Promise<number | undefined>((resolve, reject) => {
+          httpRequest({ host: '127.0.0.1', port, path, method: 'POST' }, (res) => {
+            res.resume();
+            resolve(res.statusCode);
+          })
+            .on('error', reject)
+            .end();
+        });
+
+        expect(status).toBe(404);
+      },
+    );
   });
 
   it('configures plugins and migrates before returning the configured application', async () => {

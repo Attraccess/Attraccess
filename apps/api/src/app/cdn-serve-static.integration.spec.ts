@@ -11,6 +11,7 @@ import { AddressInfo } from 'net';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { cdnServeStaticOptions } from './cdn-serve-static';
+import { rejectEmptyAuthorityTargets } from './empty-authority-target';
 
 const SECRET = 'SECRET-2d81c6a0-outside-the-cdn-root';
 
@@ -44,6 +45,8 @@ describe('/cdn serve-static', () => {
     // NestFactory, not Test.createTestingModule: serve-static picks its loader from the
     // HTTP adapter while the module compiles, and a testing module has none yet.
     app = await NestFactory.create(CdnModule, { logger: false });
+    // As in configureBootstrapHttp: registered before the mount attaches on listen.
+    app.use(rejectEmptyAuthorityTargets);
     await app.listen(0, '127.0.0.1');
     port = (app.getHttpServer().address() as AddressInfo).port;
   }, 30_000);
@@ -82,7 +85,16 @@ describe('/cdn serve-static', () => {
     'http://localhost/cdn/missing.png',
     'http://localhost:1/cdn/',
     'http:///cdn/missing.png',
+    'http:///cdn',
+    'http:///cdn/',
+    'HTTP:///cdn',
     'HTTP:///cdn/',
+    'Http:///cdn/',
+    'https:///cdn',
+    'https:///cdn/',
+    'HTTPS:///cdn/',
+    'hTtPs:///cdn/missing.png',
+    'http:///cdn/?x=1',
   ])('answers %s from the router, not the index fallback', async (path) => {
     const res = await rawGet(path);
 
