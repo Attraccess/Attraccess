@@ -1,3 +1,14 @@
+## 1.10.3 (2026-11-18)
+
+### 🩹 Fixes
+
+- **ci:** run plugin tests outside the production env ([#2238](https://github.com/Attraccess/Attraccess/pull/2238))
+
+### ❤️ Thank You
+
+- Claude Opus 5.5
+- Jan Jaap @jappyjan
+
 ## 1.10.2 (2026-11-17)
 
 This was a version bump only, there were no code changes.
