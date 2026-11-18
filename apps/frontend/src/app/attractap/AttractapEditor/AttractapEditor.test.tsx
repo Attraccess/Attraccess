@@ -137,8 +137,8 @@ describe('AttractapEditor for a BLE Bridge', () => {
     state.reader = reader({ nfc: false });
     render(<AttractapEditor readerId={1} isOpen onSave={vi.fn()} onCancel={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'save' }));
-    const [{ requestBody }] = state.mutate.mock.calls[0];
-    expect(requestBody).toEqual({ name: 'Bridge', connectedResourceIds: [] });
+    const [{ body }] = state.mutate.mock.calls[0];
+    expect(body).toEqual({ name: 'Bridge', connectedResourceIds: [] });
   });
 
   it.each([

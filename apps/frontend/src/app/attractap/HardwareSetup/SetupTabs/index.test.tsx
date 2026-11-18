@@ -23,7 +23,7 @@ const bridge = {
 } satisfies AttractapFirmware;
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useAttractapServiceGetFirmwareBinary: () => ({ data: new Blob(['firmware']), isLoading: false }),
+  useGetFirmwareBinary: () => ({ data: new Blob(['firmware']), isLoading: false }),
 }));
 vi.mock('../../../../utils/esp-tools', () => ({
   ESPTools: { getInstance: () => ({ connectToDevice: async () => ({ success: true }), flashFirmware: state.flash }) },
