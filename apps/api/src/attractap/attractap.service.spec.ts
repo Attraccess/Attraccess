@@ -273,6 +273,34 @@ describe('AttractapService reader maintenance and crash reports', () => {
     );
     expect(readers.edits).toEqual([]);
   });
+  it('opens a reader for plugin BLE once, when it first reports itself as a BLE Bridge', async () => {
+    const { service, reader } = setup();
+    const bridge = { ...reader.firmware, name: 'attractap_bridge', capabilities: { nfc: false } };
+    await service.updateReaderFirmware(4, { ...reader.firmware, capabilities: { nfc: true } } as never);
+    expect((reader as { allowPluginBle?: boolean }).allowPluginBle).toBeUndefined();
+
+    await service.updateReaderFirmware(4, bridge as never);
+    expect((reader as { allowPluginBle?: boolean }).allowPluginBle).toBe(true);
+
+    // The administrator turns it off; reconnects of the same bridge keep it off.
+    await service.updateReader(4, { allowPluginBle: false }, false);
+    await service.updateReaderFirmware(4, bridge as never);
+    await service.updateReaderFirmware(4, bridge as never);
+    expect((reader as { allowPluginBle?: boolean }).allowPluginBle).toBe(false);
+  });
+
+  it('refuses to assign any resource to a BLE Bridge', async () => {
+    const { service, reader, readers } = setup();
+    Object.assign(reader.firmware.capabilities, { nfc: false });
+
+    await expect(service.updateReader(4, { connectedResourceIds: [1] }, false)).rejects.toThrow(
+      'This reader is a Bluetooth bridge and cannot serve resources',
+    );
+    expect(readers.save).not.toHaveBeenCalled();
+    await service.updateReader(4, { connectedResourceIds: [] }, false);
+    expect(readers.save).toHaveBeenCalledTimes(1);
+  });
+
   it('normalizes crash report metrics and avoids symbolication when no dump is provided', async () => {
     const { service, reports, symbolication } = setup();
     const report = await service.createCrashReport(4, {

@@ -42,6 +42,17 @@ describe('ResourceListService', () => {
       expect(matchA.sendMessage.mock.calls[0][0]).not.toBe(matchB.sendMessage.mock.calls[0][0]);
       expect(matchA.sendMessage.mock.calls[0][0].data.payload).toBe(matchB.sendMessage.mock.calls[0][0].data.payload);
     });
+
+    it('sends nothing to a BLE Bridge, which has no NFC and serves no resource', async () => {
+      const bridge = fixture.createMockSocket({ id: 'b', readerId: 42, state: { nfc: false } });
+      fixture.websocketService.sockets.set('b', bridge);
+      fixture.attractapService.findReaderById.mockResolvedValue(fixture.createReaderFixture());
+
+      await fixture.service.sendResourceList(42);
+      await fixture.service.sendResourceListToSocket(bridge);
+
+      expect(bridge.sendMessage).not.toHaveBeenCalled();
+    });
   });
 
   describe('per-resource card access', () => {

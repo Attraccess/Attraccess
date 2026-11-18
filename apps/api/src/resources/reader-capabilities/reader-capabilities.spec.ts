@@ -2,9 +2,12 @@ import { ResourceType } from '@attraccess/application-models';
 import {
   ACCESS_ONLY_DOOR_MESSAGE,
   ATTRACTAP_READER_CAPABILITIES,
+  BLE_BRIDGE_MESSAGE,
+  BLE_BRIDGE_READER_CAPABILITIES,
   ReaderCapabilities,
   ReaderCapabilityResource,
   allowedReaderActions,
+  attractapReaderCapabilities,
   canAssign,
   effectiveReaderAction,
   readerActionRefusal,
@@ -67,6 +70,24 @@ describe('reader capabilities', () => {
       expect(canAssign(openOnly, accessOnlyDoor)).toBe(true);
       expect(canAssign(openOnly, door)).toBe(false);
       expect(canAssign(openOnly, machine)).toBe(false);
+    });
+  });
+
+  describe('BLE Bridge', () => {
+    it('picks the bridge capabilities only for a reader that reports no NFC', () => {
+      const withNfc = (nfc?: boolean) => ({ firmware: { capabilities: nfc === undefined ? {} : { nfc } } });
+      expect(attractapReaderCapabilities(withNfc(false))).toBe(BLE_BRIDGE_READER_CAPABILITIES);
+      expect(attractapReaderCapabilities(withNfc(true))).toBe(ATTRACTAP_READER_CAPABILITIES);
+      expect(attractapReaderCapabilities(withNfc())).toBe(ATTRACTAP_READER_CAPABILITIES);
+      expect(attractapReaderCapabilities({ firmware: null })).toBe(ATTRACTAP_READER_CAPABILITIES);
+    });
+
+    it('serves no resource and says why', () => {
+      for (const resource of [machine, door, unlatchDoor, accessOnlyDoor]) {
+        expect(canAssign(BLE_BRIDGE_READER_CAPABILITIES, resource)).toBe(false);
+      }
+      expect(readerActionRefusal(BLE_BRIDGE_READER_CAPABILITIES, door, 'unlock')).toBe(BLE_BRIDGE_MESSAGE);
+      expect(readerActionRefusal(BLE_BRIDGE_READER_CAPABILITIES, machine, 'start')).toBe(BLE_BRIDGE_MESSAGE);
     });
   });
 

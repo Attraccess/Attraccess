@@ -92,6 +92,8 @@ export class AttractapFirmwareHandler {
     // Only readers that relay card APDUs (firmware 2.0.0+) get card functions. Set before the
     // database write so a card tapped right after connecting is not refused.
     socket.state.cardRelay = data.payload?.capabilities?.cardRelay === true;
+    // Firmware before 2.7.0 does not report nfc; only the BLE Bridge reports false.
+    socket.state.nfc = data.payload?.capabilities?.nfc !== false;
     // Plugin BLE (protocol v1): older or incompatible firmware makes plugins see READER_UNSUPPORTED.
     socket.state.ble = parseBleCapability(data.payload?.capabilities?.ble);
     // The eFuse report on the control channel waits for the build: hand it over before the database writes,
@@ -164,7 +166,7 @@ export class AttractapFirmwareHandler {
       this.logger.warn('Ignoring invalid capabilities.ui from reader firmware info');
     }
     const resetReason = typeof payload.resetReason === 'string' ? payload.resetReason.slice(0, 32) : null;
-    return { ...payload, capabilities: { ...capabilities, ui, resetReason } };
+    return { ...payload, capabilities: { ...capabilities, nfc: capabilities.nfc !== false, ui, resetReason } };
   }
 
   private async isFirmwareLatest(firmware: AttractapFirmware): Promise<boolean> {
