@@ -60,8 +60,8 @@ export function setupAuditLoadFixture(machineCount: number) {
     );
     const people = await scope.source.getRepository(User).save(
       resources.flatMap((id) => [
-        { id: 100 + id, username: `owner-${id}` },
-        { id: 200 + id, username: `taker-${id}` },
+        { id: 100 + id, username: `owner-${id}`, email: `owner-${id}@example.invalid` },
+        { id: 200 + id, username: `taker-${id}`, email: `taker-${id}@example.invalid` },
       ]),
     );
     people.forEach((person) => Object.assign(person, { effectivePermissions: new Set(['resources.update']) }));

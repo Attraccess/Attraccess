@@ -1,13 +1,11 @@
 import { Logger } from '@nestjs/common';
 import { McpTestApp, startMcpTestApp } from '../test-utils/mcp-app.test-fixture';
-import { createTestDatabaseEnv } from '../test/test-database-env';
 
 // A plain-HTTP deployment on a LAN address: neither https nor loopback.
 const PUBLIC_URL = 'http://192.168.1.50:3000';
 
 describe('MCP on a plain-HTTP, non-loopback deployment (real application)', () => {
   let t: McpTestApp;
-  const database = createTestDatabaseEnv();
   let token: string;
   const startupWarnings: string[] = [];
 
@@ -26,7 +24,6 @@ describe('MCP on a plain-HTTP, non-loopback deployment (real application)', () =
 
   afterAll(async () => {
     await t?.close();
-    await database.teardown();
   });
 
   it('warns at startup, before any request, that OAuth is disabled', () => {

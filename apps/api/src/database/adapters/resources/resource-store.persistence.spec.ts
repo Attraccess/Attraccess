@@ -2,7 +2,6 @@ import { closeTestDataSource, createTestDataSource } from '../../../test-utils/t
 import type { DataSource } from 'typeorm';
 import {
   DashboardPin,
-  entities,
   Resource,
   ResourceGroup,
   ResourceIntroducer,

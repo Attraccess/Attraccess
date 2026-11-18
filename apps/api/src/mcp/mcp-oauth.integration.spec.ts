@@ -4,7 +4,6 @@ import { McpOAuthGrant } from '@attraccess/database-entities';
 import { McpOAuthService } from './mcp-oauth.service';
 import { McpRateLimitGuard } from './mcp-rate-limit.guard';
 import { McpTestApp, startMcpTestApp } from '../test-utils/mcp-app.test-fixture';
-import { createTestDatabaseEnv } from '../test/test-database-env';
 
 const PUBLIC_URL = 'http://localhost:3000';
 const RESOURCE = `${PUBLIC_URL}/api/mcp`;
@@ -18,16 +17,13 @@ const pkce = () => {
 
 describe('MCP OAuth (real application)', () => {
   let t: McpTestApp;
-  const database = createTestDatabaseEnv();
 
   beforeAll(async () => {
-    await database.setup();
     t = await startMcpTestApp(PUBLIC_URL);
   }, 240_000);
 
   afterAll(async () => {
     await t?.close();
-    await database.teardown();
   });
 
   // Every request comes from 127.0.0.1: start each test with fresh windows so that the suite never trips the per-IP

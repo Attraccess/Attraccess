@@ -71,15 +71,15 @@ export interface DatabaseBackend<TSource = unknown, TOptions = unknown, THandle 
   readonly migrationTrack: MigrationTrack;
   /** Opens a connection with the engine's connection rules (busy handling, flow ownership, PRAGMAs). */
   createDataSource(options: TOptions): TSource;
-  /** The unit of work of a connection, with the engine's transaction rules (for SQLite: one writer at a time). */
+  /** The unit of work of a connection, with the engine's transaction rules (PostgreSQL: one transaction per scope on its own pooled connection). */
   createUnitOfWork(source: TSource): ScopedUnitOfWork<THandle>;
   readonly errors: PersistenceErrorClassifier;
   /** Neutral export and import of the whole database for backup, restore and engine transfer. */
   readonly transfer: DatabaseTransfer<TSource>;
   readonly plugins: DatabaseBackendPluginHooks;
   /**
-   * Applies `hook` to every connection the backend opens beside the application connection (SQLite: the serialized
-   * write connection), now and when it opens later. Query instrumentation uses it to cover all statements.
+   * Applies `hook` to every connection the backend opens beside the application connection (none on PostgreSQL),
+   * now and when it opens later. Query instrumentation uses it to cover all statements.
    */
   onCompanionConnection(source: TSource, hook: (connection: TSource) => void): void;
   /** Releases connections the backend opened beside the given application connection. */

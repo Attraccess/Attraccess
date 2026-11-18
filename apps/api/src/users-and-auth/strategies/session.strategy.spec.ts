@@ -259,8 +259,11 @@ describe('SessionStrategy', () => {
     });
 
     it.each([
-      ['a connection-guard timeout', Object.assign(new Error('SQLITE_BUSY: waited 5000 ms'), { code: 'SQLITE_BUSY' })],
-      ['a driver busy error', Object.assign(new Error('database is locked'), { driverError: { code: 'SQLITE_BUSY' } })],
+      ['a lock timeout', Object.assign(new Error('canceling statement due to lock timeout'), { code: '55P03' })],
+      [
+        'a driver statement timeout',
+        Object.assign(new Error('canceling statement due to statement timeout'), { driverError: { code: '57014' } }),
+      ],
     ])('answers 503, not 401, when %s hits the database during authentication', async (_name, busy) => {
       const mockRequest = {
         headers: { authorization: 'Bearer valid-token' },

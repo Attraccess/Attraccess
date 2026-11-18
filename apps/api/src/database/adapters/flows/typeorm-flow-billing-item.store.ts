@@ -21,7 +21,11 @@ export class TypeOrmFlowBillingItemStore implements FlowBillingItemStore {
     context: TransactionContext,
   ): Promise<boolean> {
     const manager = managerFor(context, this.dataSource.manager, this.unitOfWork);
+    // The row lock makes a delayed event wait for a finalization that has already changed the bill: PostgreSQL then
+    // re-checks the Pending status after the commit, so no item reaches a completed bill. Only the bill is locked
+    // (`tables`), the joined usage row is not.
     const billingTransaction = await manager.findOne(BillingTransaction, {
+      lock: { mode: 'pessimistic_write', tables: ['billing_transaction'] },
       where: {
         resourceUsageId: usage.usageId,
         resourceUsage: { resourceId: usage.resourceId },

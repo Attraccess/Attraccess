@@ -5,7 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
-import { testTypeOrmModule, dropTestDatabases } from './typeorm-test-module.test-fixture';
+import { testTypeOrmModule, dropTestDatabases } from '../test-utils/typeorm-test-module.test-fixture';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { AuditModule } from '../audit/audit.module';

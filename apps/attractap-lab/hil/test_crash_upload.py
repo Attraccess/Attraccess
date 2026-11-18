@@ -15,7 +15,6 @@ The secure profile has no coredumps: the test skips there.
 import json
 import os
 import re
-import sqlite3
 import time
 import zlib
 
@@ -37,12 +36,12 @@ FAULTS = re.compile(r"Guru Meditation|Task watchdog got triggered|abort\(\) was 
 
 
 def reports(api, reader_id):
-    with sqlite3.connect(api.database) as db:
-        db.row_factory = sqlite3.Row
-        return [dict(row) for row in db.execute(
-            "SELECT id, resetReason, rebootReason, firmwareVersion, coredumpStatus, coredumpExpectedSize, "
-            "coredumpExpectedCrc32, coredumpSize, coredump, coredumpBuildId, symbolicationStatus, "
-            "symbolizedBacktrace FROM attractap_crash_report WHERE attractapId = ? ORDER BY id", (reader_id,))]
+    columns = ["id", "resetReason", "rebootReason", "firmwareVersion", "coredumpStatus", "coredumpExpectedSize",
+               "coredumpExpectedCrc32", "coredumpSize", "coredump", "coredumpBuildId", "symbolicationStatus",
+               "symbolizedBacktrace"]
+    selected = ", ".join(f'"{column}"' for column in columns)
+    rows, _ = api.sql(f'SELECT {selected} FROM attractap_crash_report WHERE "attractapId" = ? ORDER BY id', reader_id)
+    return [dict(zip(columns, row)) for row in rows]
 
 
 def api_log_since(offset):

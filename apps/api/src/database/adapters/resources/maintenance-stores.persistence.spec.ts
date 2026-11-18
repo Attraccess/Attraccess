@@ -1,7 +1,6 @@
 import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import type { DataSource } from 'typeorm';
 import {
-  entities,
   Resource,
   ResourceGroup,
   ResourceIntroducer,

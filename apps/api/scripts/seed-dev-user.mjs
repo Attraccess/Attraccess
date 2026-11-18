@@ -155,7 +155,7 @@ export async function applyResources(db, entries) {
     if (!resource.name || !['machine', 'door'].includes(resource.type)) {
       throw new Error('Every resource requires a name and a type of machine or door');
     }
-    const existing = await get(db, 'SELECT id FROM resource WHERE name = ? AND \"deletedAt\" IS NULL', [resource.name]);
+    const existing = await get(db, 'SELECT id FROM resource WHERE name = ? AND "deletedAt" IS NULL', [resource.name]);
     let resourceId = existing?.id;
     if (resourceId) {
       if (Object.hasOwn(resource, 'description')) {
@@ -180,7 +180,7 @@ export async function applyResources(db, entries) {
       if (!group) throw new Error(`Resource group not found: ${groupName}`);
       await run(
         db,
-        'INSERT INTO resource_groups_resource_group (\"resourceId\", \"resourceGroupId\") VALUES (?, ?) ON CONFLICT DO NOTHING',
+        'INSERT INTO resource_groups_resource_group ("resourceId", "resourceGroupId") VALUES (?, ?) ON CONFLICT DO NOTHING',
         [resourceId, group.id],
       );
     }
@@ -220,12 +220,12 @@ export async function applyRoles(db, entries) {
       roleId = result.lastID;
     }
     for (const permissionKey of role.permissions) {
-      const grant = await get(db, 'SELECT id FROM role_permission WHERE \"roleId\" = ? AND \"permissionKey\" = ?', [
+      const grant = await get(db, 'SELECT id FROM role_permission WHERE "roleId" = ? AND "permissionKey" = ?', [
         roleId,
         permissionKey,
       ]);
       if (!grant)
-        await run(db, 'INSERT INTO role_permission (\"roleId\", \"permissionKey\") VALUES (?, ?)', [
+        await run(db, 'INSERT INTO role_permission ("roleId", "permissionKey") VALUES (?, ?)', [
           roleId,
           permissionKey,
         ]);
@@ -243,11 +243,6 @@ function parseArgs(argv) {
     }
   }
   return out;
-}
-
-function within(directory, file) {
-  const relative = path.relative(directory, file);
-  return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
 }
 
 export async function main(

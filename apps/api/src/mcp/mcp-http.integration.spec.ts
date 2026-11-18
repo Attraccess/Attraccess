@@ -1,5 +1,4 @@
 import { McpTestApp, startMcpTestApp } from '../test-utils/mcp-app.test-fixture';
-import { createTestDatabaseEnv } from '../test/test-database-env';
 
 const PUBLIC_URL = 'http://localhost:3000';
 const RESOURCE_METADATA = `${PUBLIC_URL}/.well-known/oauth-protected-resource/api/mcp`;
@@ -10,12 +9,10 @@ const resultOf = (body: { result: ToolResult }) => body.result;
 
 describe('MCP endpoint with API tokens (real application)', () => {
   let t: McpTestApp;
-  const database = createTestDatabaseEnv();
   let admin: { id: number; roleId: number };
   let token: string;
 
   beforeAll(async () => {
-    await database.setup();
     t = await startMcpTestApp(PUBLIC_URL);
     admin = (await t.createUser(ADMIN_PERMISSIONS)) as never;
     token = await t.createApiToken(admin.id, ADMIN_PERMISSIONS);
@@ -23,7 +20,6 @@ describe('MCP endpoint with API tokens (real application)', () => {
 
   afterAll(async () => {
     await t?.close();
-    await database.teardown();
   });
 
   describe('authentication', () => {

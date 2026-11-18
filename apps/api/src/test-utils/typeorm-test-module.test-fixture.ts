@@ -4,7 +4,7 @@ import {
   createTestDataSourceOptions,
   createTestDatabaseLocation,
   type TestDatabaseLocation,
-} from '../test-utils/test-database';
+} from './test-database';
 
 /**
  * `TypeOrmModule.forRoot` for specs that boot Nest modules: every compiled module graph gets a private PostgreSQL

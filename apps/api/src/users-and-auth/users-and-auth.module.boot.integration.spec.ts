@@ -4,7 +4,7 @@ import type { InjectionToken, ModuleMetadata, Type } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
-import { testTypeOrmModule, dropTestDatabases } from './typeorm-test-module.test-fixture';
+import { testTypeOrmModule, dropTestDatabases } from '../test-utils/typeorm-test-module.test-fixture';
 import { AuditModule } from '../audit/audit.module';
 import { ApprovedOriginsService } from '../common/security/approved-origins.service';
 import { SecurityModule } from '../common/security/security.module';

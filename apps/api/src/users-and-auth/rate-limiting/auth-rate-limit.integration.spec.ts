@@ -24,7 +24,7 @@ class FakeController {
   @AuthRateLimit('register')
   register(@Body() body: { fail?: boolean; smtpDown?: boolean; dbBusy?: boolean }) {
     if (body?.dbBusy) {
-      throw Object.assign(new Error('SQLITE_BUSY: waited 5000 ms'), { code: 'SQLITE_BUSY' });
+      throw Object.assign(new Error('canceling statement due to lock timeout'), { code: '55P03' });
     }
     if (body?.smtpDown) {
       throw new ServiceUnavailableException('EmailSendFailed');

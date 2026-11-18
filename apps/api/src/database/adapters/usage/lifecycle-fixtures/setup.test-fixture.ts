@@ -1,6 +1,6 @@
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Logger } from '@nestjs/common';
-import { BillingTransaction, Form, Resource, ResourceUsage, User } from '@attraccess/database-entities';
+import { BillingTransaction, Resource, ResourceUsage, User } from '@attraccess/database-entities';
 import { BillingTransactionStatus, ResourceType, SupervisionMode } from '@attraccess/application-models';
 import { closeTestDataSource, createTestDataSource } from '../../../../test-utils/test-database';
 import type { TransactionScope } from '../../../unit-of-work';

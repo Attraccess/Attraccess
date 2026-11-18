@@ -11,7 +11,7 @@
 #
 # Builds both firmware images (unless READER_IMAGE / EMULATOR_IMAGE are set;
 # the reader image for READER_VARIANT, by default the place name without its
-# -<n> suffix), starts an API with a throwaway database (waiting up to
+# -<n> suffix), starts an API with a throwaway PostgreSQL database (waiting up to
 # API_START_TIMEOUT seconds, default 600), and runs pytest inside one labgrid
 # session on LG_PLACE_NAME. Needs ESP-IDF (source export.sh) for the builds,
 # the labgrid client environment (LAB_PYTHON: labgrid fork + pytest) and a lab
@@ -167,6 +167,10 @@ fi
 
 API_PORT="${API_PORT:-$(python3 -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1])')}"
 export STORAGE_ROOT="$WORK/storage"
+# The run's own PostgreSQL database on the server HIL_DATABASE_ADMIN_URL (else DATABASE_URL, else .env) names;
+# the API, the seed and the tests reach it through DATABASE_URL. Dropped when the run ends.
+DATABASE_URL="$(node "$HERE/throwaway-db.mjs" create)" || fail "Cannot create the throwaway database: set HIL_DATABASE_ADMIN_URL"
+export DATABASE_URL
 if [[ "${HIL_BLE:-}" == 1 ]]; then
   # Plugin BLE tests (test_ble.py, opt-in): the lab fixture plugin talks to devices through context.ble.
   fixture="$STORAGE_ROOT/plugins/ble-lab-fixture"
@@ -206,7 +210,12 @@ set -m
   exec pnpm serve --only=api >"$WORK/api.log" 2>&1) &
 api_pid=$!
 set +m
-trap 'kill -- "-$api_pid" 2>/dev/null || true' EXIT
+cleanup() {
+  kill -- "-$api_pid" 2>/dev/null || true
+  sleep 1
+  node "$HERE/throwaway-db.mjs" drop "$DATABASE_URL" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
 api_deadline=$((SECONDS + ${API_START_TIMEOUT:-600}))
 until curl -sf -o /dev/null "http://127.0.0.1:$API_PORT/api/info"; do
   kill -0 "$api_pid" 2>/dev/null || { cat "$WORK/api.log" >&2; exit 1; }
@@ -230,7 +239,7 @@ GRPC_ENABLE_FORK_SUPPORT=0 PYTHONPATH="$HERE/../src:$HERE" LAB_PYTHON="$LAB_PYTH
   READER_OTA_IMAGE="${READER_OTA_IMAGE:-}" READER_BASE_VERSION="$READER_BASE_VERSION" READER_OTA_VERSION="$READER_OTA_VERSION" \
   OTA_ASSETS_DIR="$ATTRACTAP_FIRMWARE_ASSETS_DIR" \
   READER_IMAGE="$READER_IMAGE" READER_VARIANT="$VARIANT" READER_PROFILE="$READER_PROFILE" EMULATOR_IMAGE="$EMULATOR_IMAGE" \
-  API_URL="http://127.0.0.1:$API_PORT" API_DB="$STORAGE_ROOT/attraccess.sqlite" \
+  API_URL="http://127.0.0.1:$API_PORT" DATABASE_URL="$DATABASE_URL" \
   API_HOST="${API_HOST:-}" API_PORT="$API_PORT" READER_API_PORT="$READER_API_PORT" \
   API_RELAY_SSH="${API_RELAY_SSH:-}" WIRETAP_FILE="$WIRETAP_FILE" API_LOG="$WORK/api.log" \
   HIL_BLE="${HIL_BLE:-}" HIL_BLE_LONG="${HIL_BLE_LONG:-}" BLE_PERIPHERAL_ADDRESS="${BLE_PERIPHERAL_ADDRESS:-}" \

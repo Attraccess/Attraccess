@@ -10,7 +10,7 @@ import type {
 /**
  * What differs between database engines for plugin storage. A backend provides one dialect (statement syntax, value
  * representation) and one executor (how a statement runs); the record port, the query compiler and the migration
- * runner are shared. ATT-584 adds a PostgreSQL dialect and executor next to the SQLite ones.
+ * runner are shared. PostgreSQL is the only runtime engine, so there is one dialect and executor.
  */
 export interface PluginStorageDialect {
   quote(identifier: string): string;

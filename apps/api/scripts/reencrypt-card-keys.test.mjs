@@ -25,7 +25,6 @@ async function database(t) {
 }
 const run = async (db, sql, params = []) => void (await postgresProvider.run(db, sql, params));
 const all = async (db, sql) => postgresProvider.all(db, sql);
-const quoted = (name) => `"${name}"`;
 
 test('moves card keys to the new secret', opts, async (t) => {
   const db = await database(t);

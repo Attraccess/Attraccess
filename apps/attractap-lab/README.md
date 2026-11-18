@@ -344,7 +344,8 @@ pnpm nx run attractap-lab:hil -- -k enroll
 ```
 
 The runner builds both firmware images, starts an API on a free port with a
-throwaway database (`STORAGE_ROOT`), and runs pytest inside one labgrid
+throwaway PostgreSQL database (created and dropped on the server
+`HIL_DATABASE_ADMIN_URL`, else `DATABASE_URL`, names), and runs pytest inside one labgrid
 session on `LG_PLACE_NAME` (default `attractap-touch-v2-1`). The reader image
 is built for `READER_VARIANT`, by default the place name without its `-<n>`
 suffix (`attractap-touch-1` runs the `attractap-touch` firmware). The tests

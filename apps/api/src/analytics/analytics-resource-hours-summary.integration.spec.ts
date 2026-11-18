@@ -10,7 +10,7 @@ import { createTestDataSource, closeTestDataSource } from '../test-utils/test-da
 const HOUR = 3_600_000;
 const FEBRUARY = { start: new Date('2024-02-01T00:00:00Z'), end: new Date('2024-03-01T00:00:00Z') };
 
-describe('AnalyticsService resource hours summary (SQLite)', () => {
+describe('AnalyticsService resource hours summary (PostgreSQL)', () => {
   let source: DataSource;
   let attribution: ResourceOperatingAttributionService;
   let service: AnalyticsService;
@@ -26,6 +26,8 @@ describe('AnalyticsService resource hours summary (SQLite)', () => {
       userId: 1,
       usageAction: ResourceUsageAction.Usage,
       lifecyclePending: false,
+      // The database refuses an open usage that is neither finalized (published) nor lifecycle-pending.
+      isFinalized: endTime === null,
       startTime: new Date(startTime),
       endTime: endTime ? new Date(endTime) : null,
       ...overrides,
