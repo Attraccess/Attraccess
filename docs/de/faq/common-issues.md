@@ -83,7 +83,7 @@ Wenn Sie die E-Mail zum Zurücksetzen nicht erhalten, wenden Sie sich an Ihren A
 | Ursache | Lösung |
 |---------|--------|
 | Speicherberechtigungen | Stellen Sie sicher, dass das Verzeichnis `storage/` (oder das Docker-Volume) die korrekten Lese-/Schreibberechtigungen hat. |
-| Festplatte voll | Prüfen Sie, ob der Server genügend freien Speicherplatz für die SQLite-Datenbankdatei hat. |
+| Festplatte voll | Prüfen Sie, ob der Server genügend freien Speicherplatz für das PostgreSQL-Datenvolume und das Storage-Volume hat. |
 | Beschädigte Datenbank | Stellen Sie ein Backup wieder her. Siehe [Backup & Wiederherstellung](installation/backup-restore.md). |
 
 ## Siehe auch

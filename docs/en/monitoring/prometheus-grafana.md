@@ -274,11 +274,11 @@ Things to know:
 
 ## Audit alert
 
-`AuditRecordsDropped` is a critical Grafana alert. It fires as soon as `attraccess_audit_records_dropped_total` increased in the last 5 minutes, which means at least one audit record could not be stored, and clears about 5 minutes after the last drop. The change the record described still went through. The API log has one `Audit record dropped` line per drop with the domain, action, reason and the SQLite error code (never event details). The `reason` label tells you why:
+`AuditRecordsDropped` is a critical Grafana alert. It fires as soon as `attraccess_audit_records_dropped_total` increased in the last 5 minutes, which means at least one audit record could not be stored, and clears about 5 minutes after the last drop. The change the record described still went through. The API log has one `Audit record dropped` line per drop with the domain, action, reason and the database error code (never event details). The `reason` label tells you why:
 
-- `storage_error`: the insert failed; the SQLite code says why (for example `SQLITE_BUSY` when the database stayed locked for 5 seconds).
+- `storage_error`: the insert failed; the PostgreSQL code says why (for example `55P03` or `57014` when the insert waited longer than the 10-second lock timeout).
 - `queue_full`: more than 1,000 audit writes were waiting.
-- `storage_unavailable`: audit storage not available (startup failed or in-memory database).
+- `storage_unavailable`: audit storage not available (startup failed).
 - `shutting_down`: the record arrived while the API was shutting down; expected during a restart.
 - `settings_unavailable`: the audit settings could not be read.
 - `invalid_event`: the event was rejected as invalid, which points to a bug.

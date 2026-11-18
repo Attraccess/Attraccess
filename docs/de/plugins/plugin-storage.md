@@ -180,9 +180,6 @@ Grenzen übernommener Tabellen:
 - `f.decimal` ist an einer übernommenen Tabelle nicht erlaubt (1.x hat Dezimalzahlen anders gespeichert). Behalten Sie
   eine solche Spalte so, wie sie gespeichert ist, etwa als `f.string()`, oder kopieren Sie sie in eine neue Tabelle
   (siehe unten).
-- Unter SQLite darf eine spätere Version keinen `UNIQUE`-Constraint aus 1.x entfernen und keine Spalte, die ein
-  `UNIQUE`- oder `CHECK`-Constraint aus 1.x abdeckt: Dafür müsste die Tabelle neu aufgebaut werden, was der Host noch
-  nicht tut. Die Migration wird abgelehnt.
 - Es gibt keinen Binärtyp. Eine 1.x-Spalte vom Typ `blob`, als `f.text()` deklariert, liest sich als Base64-Text;
   schreiben Sie ebenfalls Base64.
 
@@ -320,9 +317,11 @@ Regeln:
   abgewiesen. Nur ein Lesezugriff ohne Scope läuft außerhalb der Transaktion, und er sieht die noch nicht committeten
   Schreibvorgänge von `work` **nicht**.
 - In `work` nicht auf Kern-Vorgänge warten, die schreiben (Sitzungsstart oder -ende).
-- Wie der Host Transaktionen ordnet, ist ein Detail der Engine. Unter SQLite führt er sie pro Host-Prozess nacheinander
-  aus; Ausschluss über mehrere API-Instanzen braucht daher eine eigene Sperre. Das Reservierungs-Plugin läuft deshalb
-  mit einer Instanz (siehe [Reservierungen](plugins/reservations/administration.md#betrieb-mit-einer-instanz)).
+- Der Host serialisiert Plugin-Transaktionen nicht pro Prozess: Unter PostgreSQL laufen sie parallel, mit
+  Isolation auf Zeilenebene (`READ COMMITTED`). Nutzen Sie `update` als Compare-and-Set oder einen Unique-Schlüssel,
+  wenn nicht zwei Schreiber gewinnen dürfen, und wiederholen Sie einen `PluginStorageConflict`. Ausschluss über mehrere
+  API-Instanzen braucht weiterhin eine eigene Sperre; das Reservierungs-Plugin läuft deshalb mit einer Instanz (siehe
+  [Reservierungen](plugins/reservations/administration.md#betrieb-mit-einer-instanz)).
 
 Der Scope im `startCapacityHook` (`ctx.scope`) ist die Start-Transaktion des Kerns: Lesen Sie darüber mit
 `{ scope: ctx.scope }`, schreiben Sie nie und rufen Sie darauf nie `afterCommit` auf. In einem Host-Hook, der Ihnen

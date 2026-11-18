@@ -1185,9 +1185,10 @@ nicht. Halten Sie Effekte in `afterCommit`, damit der Aufrufer die ganze Transak
   abgewiesen; nur ein Lesezugriff ohne Scope läuft außerhalb der Transaktion und sieht die noch nicht committeten
   Schreibvorgänge von `work` nicht.
 
-Wie der Host Transaktionen ordnet, ist ein Detail der Engine. Unter SQLite führt er sie pro Host-Prozess nacheinander
-aus, in derselben Warteschlange wie Sitzungsstart und -ende des Kerns. Plugins, die Ausschluss über mehrere
-API-Instanzen brauchen, benötigen daher eine eigene instanzübergreifende Sperre; das Reservierungs-Plugin läuft deshalb
+Der Host serialisiert Plugin-Transaktionen nicht pro Prozess. Unter PostgreSQL laufen sie parallel zu Sitzungsstart und
+-ende des Kerns, mit `READ COMMITTED`. Nutzen Sie `update` als Compare-and-Set oder einen Unique-Schlüssel, wenn nicht
+zwei Schreiber gewinnen dürfen, und wiederholen Sie einen `PluginStorageConflict`. Plugins, die Ausschluss über mehrere
+API-Instanzen brauchen, benötigen eine eigene instanzübergreifende Sperre; das Reservierungs-Plugin läuft deshalb
 mit einer Instanz (siehe [Reservierungen](plugins/reservations/administration.md#betrieb-mit-einer-instanz)).
 
 ### Flow-Knoten

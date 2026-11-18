@@ -1,9 +1,40 @@
 # Persistenz-Garantien
 
-<!-- llms-description: Der Transaktions- und Nebenläufigkeitsvertrag der Persistenzschicht, wo welche Garantie getestet wird und welche Annahmen nur für eine einzelne API-Instanz gelten. -->
+<!-- llms-description: Der Transaktions- und Nebenläufigkeitsvertrag der PostgreSQL-Persistenzschicht, wo welche Garantie durchgesetzt und getestet wird und welche Annahmen nur für eine einzelne API-Instanz gelten. -->
 
-Diese Seite nennt, was die Persistenzschicht zusichert, wie jede Zusicherung getestet wird und was bei mehr als einer
-API-Instanz **nicht** zugesichert ist. Horizontale Skalierung wird nicht behauptet.
+Diese Seite nennt, was die Persistenzschicht auf PostgreSQL zusichert, wie jede Zusicherung getestet wird und was bei
+mehr als einer API-Instanz **nicht** zugesichert ist. Horizontale Skalierung wird nicht behauptet.
+
+## PostgreSQL-Semantik
+
+PostgreSQL ist das einzige Laufzeit-Backend (SQLite wird nur von der einmaligen [Übernahme](installation/updating.md#umzug-von-sqlite-auf-postgresql) gelesen).
+Es gibt keine prozessweite Schreibsperre: Unabhängige Transaktionen laufen parallel, und die Korrektheit stellt die
+Datenbank sicher.
+
+- **Isolation.** Transaktionen laufen mit `READ COMMITTED`. Was sich nicht verzahnen darf, wird ausdrücklich
+  abgesichert, nicht durch eine strengere Isolationsstufe.
+- **Zeilensperren.** Lesen-ändern-schreiben auf einer Zeile nutzt `SELECT … FOR UPDATE`.
+- **Advisory Locks.** Arbeit je Ressource nimmt `pg_advisory_xact_lock(Namensraum, Ressourcen-ID)` und hält sie bis
+  Commit oder Rollback (`adapters/resources/resource-locks.ts`): ein Namensraum für den Nutzungs-Lifecycle
+  (Kapazität, eine Sitzung je Benutzer, Übernahme-Reservierungen) und einer für die Betriebszeitleiste (das eine offene
+  Intervall). Andere Ressourcen und alle einfachen Lesevorgänge laufen weiter.
+- **Unique-Constraints und Trigger.** Einzelgewinner-Beanspruchungen sind Unique-Constraints; Guthaben, Nutzungsintegrität
+  (keine doppelte aktive Sitzung, keine kollidierende Reservierung) und die Unveränderlichkeit des Audit-Logs setzen
+  Trigger und Teilindizes in der Datenbank durch und gelten damit für jeden Schreiber.
+- **Lock-Timeout.** Jede Verbindung setzt `lock_timeout` auf 10 s, damit eine Anweisung, die auf eine Sperre wartet,
+  fehlschlägt, statt ewig zu warten. Die Zeitzone ist `UTC`.
+- **Wiederholungen.** Eine Transaktion, die PostgreSQL mit `40001` (Serialisierungsfehler) oder `40P01` (Deadlock)
+  abbricht, ist ein `conflict`; `runWithRetry` führt sie erneut aus (siehe unten). Externe Effekte werden nie
+  wiederholt, weil sie in `afterCommit` laufen.
+- **Fehlerklassifizierung** (`database/postgres/postgres-errors.ts`): `40001` und `40P01` sind Konflikte; `55P03`
+  (Sperre nicht verfügbar), `57014` (Timeout), `53300` (zu viele Verbindungen), `08xxx` (Verbindung) und `57P01`
+  (Administrator-Shutdown) sind busy; `23505` ist eine Unique-Verletzung, `23503` eine Fremdschlüsselverletzung,
+  `25006` schreibgeschützt. Eine beschäftigte Datenbank antwortet mit `503`.
+- **Typen.** Zeitpunkte sind `timestamptz` (UTC). Credits und Zählerwerte sind `bigint` oder exakte Dezimalzahlen, nie
+  Gleitkomma.
+- **Migrationen.** Die PostgreSQL-Spur besteht aus einer Baseline-Migration (`apps/api/src/database/postgres/migrations`);
+  spätere Migrationen sind nur für PostgreSQL. Die veröffentlichten SQLite-Migrationen sind eingefroren und laufen nur
+  auf der temporären Kopie während der Übernahme.
 
 ## Unit of Work
 
@@ -16,7 +47,7 @@ API-Instanz **nicht** zugesichert ist. Horizontale Skalierung wird nicht behaupt
 - Ein Bereich ist nach Commit oder Rollback geschlossen. Ein geschlossener oder fremder Bereich (andere Verbindung)
   wird mit `TransactionScopeError` abgelehnt.
 - `runWithRetry` ist der vorgesehene Weg, Datenbankarbeit zu wiederholen. Es startet die äußerste Einheit bei
-  vorübergehenden Fehlern (busy, Schreibkonflikt) neu: standardmäßig drei Versuche, nie mehr als zehn, mit
+  vorübergehenden Fehlern (busy, Konflikt: `40001`, `40P01`) neu: standardmäßig drei Versuche, nie mehr als zehn, mit
   zufällig gestreutem exponentiellem Backoff (50 ms Basis, höchstens 1 s). Innerhalb einer offenen Einheit verweigert es
   den Start, weil ein Retry dort die Schreibvorgänge der äußeren Einheit nicht zurücknehmen könnte. Die Arbeit läuft von
   vorn und darf keine externen Effekte auslösen. Effekte gehören in
@@ -30,32 +61,27 @@ nach dem Commit gesendet und bei Fehlschlag kompensiert.
 
 | Garantie                                                                                            | Wo durchgesetzt                                                                                                             | Test                                                                                                                                                                                                                                                                                                                                  |
 | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Kein verlorenes Update auf ein Konto aus unabhängigen Verbindungen                                  | Transaktionsisolation des Backends (SQLite: ein Schreiber, `BEGIN IMMEDIATE`); Guthaben-Trigger (Migration `1759695000000`) | `database/conformance` (inkl. `ports/billing-ledger`), `e2e/migrations/billing-balance-triggers`                                                                                                                                                                                                                                      |
-| Unabhängige Ressourcen laufen nicht durch einen anwendungsweiten Mutex                              | Der Vertrag sichert nur Isolation je Einheit zu; der einzelne SQLite-Schreiber ist Adapterdetail                            | `conformance/ports`: ein Lesen auf einer anderen Verbindung läuft, während eine Einheit offen ist, und ein wartender zweiter Schreiber committet ohne Deadlock. Ein Schreiben auf ein anderes Konto während einer offenen Einheit läuft nur bei Fixtures mit `concurrentWriters` (nicht SQLite, das je Datei einen Schreiber zulässt) |
-| Atomare Mehrfach-Schreibvorgänge, Rollback hinterlässt nichts                                       | `UnitOfWork`                                                                                                                | `unit-of-work.spec.ts`, `sqlite-unit-of-work.spec.ts`, `conformance`                                                                                                                                                                                                                                                                  |
+| Kein verlorenes Update auf ein Konto aus unabhängigen Verbindungen                                  | Zeilensperren und Guthaben-Trigger in der PostgreSQL-Baseline | `database/conformance` (inkl. `ports/billing-ledger`), `e2e/migrations/billing-balance-triggers`                                                                                                                                                                                                                                      |
+| Unabhängige Ressourcen laufen nicht durch einen anwendungsweiten Mutex                              | Kein globaler Mutex: nur Zeilensperren und Advisory Locks je Ressource (`pg_advisory_xact_lock`)                            | `conformance/ports`: ein Lesen auf einer anderen Verbindung läuft, während eine Einheit offen ist, ein Schreiben auf ein anderes Konto läuft während einer offenen Einheit, und ein zweiter Schreiber committet ohne Deadlock |
+| Atomare Mehrfach-Schreibvorgänge, Rollback hinterlässt nichts                                       | `UnitOfWork`                                                                                                                | `unit-of-work.spec.ts`, `conformance`                                                                                                                                                                                                                                                                  |
 | Post-Commit-Arbeit nach dem Commit, nie nach Rollback                                               | `UnitOfWork.afterCommit`                                                                                                    | ebenso, plus Sichtbarkeit aus einer zweiten Verbindung                                                                                                                                                                                                                                                                                |
-| Begrenzter Retry ohne Wiederholung externer Effekte                                                 | `runWithRetry`                                                                                                              | `conformance`: echter Busy-Fehler aus einer dritten Verbindung, als `busy` klassifiziert; Effekte laufen einmal                                                                                                                                                                                                                       |
+| Begrenzter Retry ohne Wiederholung externer Effekte                                                 | `runWithRetry`                                                                                                              | `conformance`: echter Lock-Timeout oder Deadlock aus einer anderen Verbindung, als `busy` oder `conflict` klassifiziert; Effekte laufen einmal                                                                                                                                                                                                                       |
 | Doppelte Beanspruchung eines Schlüssels: genau einer gewinnt, der andere ist eine Unique-Verletzung | Unique-Constraints, `isUniqueViolation`                                                                                     | `conformance`                                                                                                                                                                                                                                                                                                                         |
-| Keine doppelte aktive Sitzung und keine kollidierende Reservierung je Ressource                     | Nutzungs-Integritäts-Trigger und Teilindizes (Migration `1790100000000`), Ressourcen-Lifecycle-Transaktionen                | `resources/usage/lifecycle-persistence/*.spec.ts`                                                                                                                                                                                                                                                                                     |
-| Dauerhaftigkeit und Reihenfolge der Audit-Bestätigung (ATT-1212)                                    | Eigene Audit-Verbindung, `database/adapters/audit/audit-storage.ts`                                                         | `audit/*.spec.ts`                                                                                                                                                                                                                                                                                                                     |
-| Token-Rotation, Logout-Beleg, SSO-Widerruf atomar und idempotent                                    | `SessionStore` (SQLite, Valkey)                                                                                             | `conformance/ports/session-store`, `adapters/sessions/sqlite-session-store.persistence.spec.ts`                                                                                                                                                                                                                                       |
+| Keine doppelte aktive Sitzung und keine kollidierende Reservierung je Ressource                     | Nutzungs-Integritäts-Trigger und Teilindizes (PostgreSQL-Baseline), Advisory Locks je Ressource in den Lifecycle-Transaktionen                | `resources/usage/lifecycle-persistence/*.spec.ts`                                                                                                                                                                                                                                                                                     |
+| Dauerhaftigkeit und Reihenfolge der Audit-Bestätigung (ATT-1212)                                    | Audit-Speicher (`database/adapters/audit`), Einträge per Trigger unveränderlich                                                         | `audit/*.spec.ts`                                                                                                                                                                                                                                                                                                                     |
+| Token-Rotation, Logout-Beleg, SSO-Widerruf atomar und idempotent                                    | `SessionStore` (PostgreSQL, Valkey)                                                                                             | `conformance/ports/session-store`, `adapters/sessions/postgres-session-store.persistence.spec.ts`                                                                                                                                                                                                                                       |
 | Passkey-Challenge wird genau einmal verbraucht                                                      | `PasskeyStore` (`DELETE … RETURNING`)                                                                                       | `conformance/ports/passkey-store`                                                                                                                                                                                                                                                                                                     |
 | Beschäftigte Datenbank antwortet 503 und zählt nicht als Brute-Force-Fehlversuch                    | `persistence-errors.ts`, Session-Strategie, Rate Limiter (ATT-1269)                                                         | `session.strategy.spec.ts`, Rate-Limit-Specs                                                                                                                                                                                                                                                                                          |
 
 Bestehende Tests zu dauerhaftem Audit, Guthaben, Nutzungswiederherstellung und Geräteeffekten bleiben, wo sie sind; die
 Conformance-Suite ergänzt daneben den engineunabhängigen Vertrag.
 
-## Details des SQLite-Adapters
+## Plugin-Transaktionen
 
-Diese liegen nur in `apps/api/src/database/sqlite` und in den Audit-Speicherverbindungen:
-
-- Transaktionen beginnen `IMMEDIATE` mit Busy-Timeout, damit ein Wechsel von Lesen auf Schreiben nicht halb scheitern kann.
-- Die Hauptverbindung weist jedem asynchronen Ablauf seine Transaktion zu (AsyncLocalStorage) und reiht andere Abläufe
-  der Reihe nach ein (ATT-1269). Anweisungen anderer Abläufe warten höchstens das Busy-Timeout, dann `SQLITE_BUSY`.
-- Schreibvorgänge des Ressourcen-Lifecycles nutzen eine eigene zweite Verbindung zur selben Datei, eine Einheit nach der anderen.
-- Der Audit-Dienst hält eigene Verbindungen und PRAGMAs.
-
-Ein anderes Backend erfüllt denselben Verhaltensvertrag mit eigener Sperr- und Isolationstechnik.
+Plugin-Transaktionen werden nicht mehr pro Host-Prozess serialisiert. Zwei Plugin-Transaktionen, oder eine
+Plugin-Transaktion und ein Sitzungsstart des Kerns, können gleichzeitig laufen; Konflikte erscheinen als
+`PluginStorageConflict` und sind vom Plugin zu wiederholen. Plugins, die gegenseitigen Ausschluss brauchen, nutzen
+`update` als Compare-and-Set oder einen Unique-Schlüssel.
 
 ## Plugin-Speicher
 
@@ -81,19 +107,19 @@ Das deckt die Plugin-Speicher-Conformance-Suite ab, die jeder Backend-Adapter be
 
 ## Eine Instanz gegenüber mehreren Replikaten
 
-Attraccess ist als **ein API-Prozess je Datenbank** entworfen und getestet. Mit SQLite ist das auch zwingend: die
-Datenbank ist eine lokale Datei.
+Attraccess ist als **ein API-Prozess je Datenbank** entworfen und getestet. PostgreSQL beseitigt die Dateisperre des
+früheren SQLite-Setups, und die oben genannten Garantien auf Datenbankebene gelten auch für mehrere Prozesse; die
+Anwendung behauptet aber keine horizontale Skalierung.
 
 Prozesslokale Annahmen, die ein zweites Replikat brechen würde:
 
-- Serialisierungswarteschlange und Ablaufzuordnung des SQLite-Adapters (im Speicher, je Prozess).
 - Speicherinterne Ketten und Sperren wie die Session-Change-Queue, die Leser-Sitzungsverwaltung und Plugin-Upload-Sperren.
 - Zeitgeber, etwa die Auswertung der Wartungspläne (ATT-627), die in jedem Replikat liefen.
 - Live-Update-Verteilung und WebSocket-Sitzungen, die nur Clients desselben Prozesses erreichen.
 - Die MQTT-Verbindungen und der Plugin-Event-Bus.
 - Rate-Limit-Zustand ohne Valkey; mit Valkey ist er geteilt.
 
-Eine geteilte Datenbank müsste statt Prozessspeicher liefern: die atomaren Guthaben- und Nutzungs-Integritätsgarantien
-(Constraints oder Trigger), Einzelgewinner bei Unique-Schlüsseln, dauerhafte Audit-Bestätigung, atomare Sitzungs- und
-Token-Rotation sowie einen Leader oder eine Sperre für Zeitgeber. Das ist hier nicht umgesetzt; die
-PostgreSQL-Arbeit in ATT-584 und die Skalierungs-Folgearbeiten übernehmen es.
+Was PostgreSQL für eine geteilte Datenbank bereits liefert: die atomaren Guthaben- und Nutzungs-Integritätsgarantien
+(Constraints, Trigger, Advisory Locks), Einzelgewinner bei Unique-Schlüsseln und atomare Sitzungs- und Token-Rotation.
+Für mehrere Replikate fehlen noch ein Leader oder eine Sperre für Zeitgeber sowie geteilte Live Updates; die
+Skalierungs-Folgearbeiten übernehmen das.

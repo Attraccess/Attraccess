@@ -83,7 +83,7 @@ If you do not receive the reset email, contact your administrator. They can rese
 | Cause | Solution |
 |-------|----------|
 | Storage permissions | Make sure the `storage/` directory (or Docker volume) has the correct read/write permissions. |
-| Disk full | Check that the server has enough free disk space for the SQLite database file. |
+| Disk full | Check that the server has enough free disk space for the PostgreSQL data volume and the storage volume. |
 | Corrupted database | Restore from a backup. See [Backup & Restore](installation/backup-restore.md). |
 
 ## See Also

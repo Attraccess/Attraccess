@@ -1,6 +1,6 @@
 # Umgebungsvariablen
 
-<!-- llms-description: Referenz aller Umgebungsvariablen zur Konfiguration von Attraccess: Pflichteinstellungen, Anwendung, Logs, Datenbank, Speicher, SMTP und TLS. -->
+<!-- llms-description: Referenz aller Umgebungsvariablen zur Konfiguration von Attraccess: Pflichteinstellungen, Anwendung, Logs, Datenbank, Backup, Speicher, SMTP und TLS. -->
 
 Alle Konfigurationsoptionen für Attraccess, die über Umgebungsvariablen gesetzt werden können.
 
@@ -49,11 +49,31 @@ In Containern benötigt die API Schreibrechte für den Pfad. Mounten Sie das Ver
 
 ## Datenbank
 
-| Variable        | Standard | Beschreibung                                                                                                                               |
-| --------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DATABASE_TYPE` | `sqlite` | Datenbank-Engine. Nur `sqlite` wird unterstützt; jeder andere Wert bricht den Start ab, bevor eine Datenbank oder ein Plugin berührt wird. |
+Attraccess speichert alle Daten in PostgreSQL. Eine andere Laufzeitdatenbank gibt es nicht: SQLite wird nur einmalig gelesen, wenn eine bestehende 1.x-Installation übernommen wird, siehe [Aktualisierung](installation/updating.md#umzug-von-sqlite-auf-postgresql).
+
+| Variable            | Standard   | Beschreibung                                                                                                                                                                                       |
+| ------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`      | –          | **Pflicht.** Verbindungs-URL der PostgreSQL-Datenbank, z. B. `postgres://benutzer:passwort@postgres:5432/attraccess`. Sonderzeichen im Passwort müssen prozentkodiert sein.                         |
+| `DATABASE_SSL`      | `off`      | TLS zu PostgreSQL: `off`, `require`, `verify-ca` oder `verify-full`. `true` und `1` bedeuten `require`; `false` und `0` bedeuten `off`.                                                            |
+| `DATABASE_POOL_MAX` | `10`       | Maximale Verbindungen im Pool eines API-Prozesses, eine ganze Zahl von 1 bis 500. Halten Sie sie unter `max_connections` des Servers geteilt durch die Zahl der API-Instanzen.                      |
+| `DATABASE_SCHEMA`   | `public`   | PostgreSQL-Schema, das die Tabellen enthält. Ein einfacher SQL-Bezeichner.                                                                                                                         |
+| `DATABASE_TYPE`     | `postgres` | Datenbank-Engine. Nur `postgres` wird unterstützt. `sqlite` bricht den Start mit einer Meldung ab, die auf die [Upgrade-Anleitung](installation/updating.md) verweist; jeder andere Wert bricht ihn ebenfalls ab. |
+
+Fehlt eine Einstellung oder ist sie ungültig, bricht der Start mit einer klaren Meldung ab, die nie das Passwort enthält. Das Image enthält kein PostgreSQL: Betreiben Sie es als eigenen Dienst (alle mitgelieferten Compose-Dateien enthalten bereits einen, festgelegt auf `postgres:18.6-alpine`). Zur Sicherung siehe [Backup & Wiederherstellung](installation/backup-restore.md).
 
 Zur Engine-Naht siehe [Datenbank-Backend hinzufügen](developer/adding-a-database-backend.md).
+
+### Backup-Sidecar (balena)
+
+Der balena-Stack enthält einen Dienst `backup`, der Datenbank und Volumes mit restic sichert. Er wird mit den folgenden Variablen konfiguriert, siehe [Backup & Wiederherstellung](installation/backup-restore.md#balena-restic-sidecar).
+
+| Variable                                                  | Standard      | Beschreibung                                                                              |
+| --------------------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------- |
+| `BACKUP_REPOSITORY`                                       | –             | restic-Repository, z. B. `s3:s3.amazonaws.com/bucket/attraccess`. Ohne Angabe läuft kein Backup. |
+| `BACKUP_PASSWORD`                                         | –             | Verschlüsselt das Repository. Pflicht; ohne es sind die Backups nicht lesbar.             |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `B2_*`, … | –             | Zugangsdaten des Backup-Ziels, unverändert an restic weitergereicht.                      |
+| `BACKUP_SCHEDULE`                                         | `0 3 * * *`   | Cron-Ausdruck (5 Felder); standardmäßig jede Nacht um 03:00 Uhr.                          |
+| `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_KEEP_MONTHLY` | `7`, `4`, `6` | Wie viele tägliche, wöchentliche und monatliche Snapshots behalten werden.           |
 
 ## Speicher
 
@@ -95,13 +115,13 @@ Zur Engine-Naht siehe [Datenbank-Backend hinzufügen](developer/adding-a-databas
 | ------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `AUTH_SESSION_SECRET`    | –           | **Pflicht.** Geheimer Schlüssel für Sitzungsverschlüsselung                                                                                                                                                                                                                                                                                                                                       |
 | `SESSION_COOKIE_MAX_AGE` | `604800000` | Maximale Sitzungsdauer in Millisekunden (Standard: 7 Tage)                                                                                                                                                                                                                                                                                                                                        |
-| `VALKEY_URL`             | –           | Verbindungs-URL für einen Valkey/Redis-kompatiblen Sitzungsspeicher (z. B. `redis://valkey:6379`). Wenn gesetzt, werden Sitzungen in Valkey mit nativem TTL gespeichert statt in SQLite — erforderlich für horizontale Skalierung. Ohne Konfiguration wird SQLite verwendet. Unterstützt jede `ioredis`-kompatible URL inkl. `rediss://` (TLS), Redis Cluster, Sentinel, ElastiCache und Upstash. |
+| `VALKEY_URL`             | –           | Verbindungs-URL für einen Valkey/Redis-kompatiblen Sitzungsspeicher (z. B. `redis://valkey:6379`). Wenn gesetzt, werden Sitzungen in Valkey mit nativem TTL gespeichert statt in PostgreSQL — erforderlich für horizontale Skalierung. Ohne Konfiguration wird PostgreSQL verwendet. Unterstützt jede `ioredis`-kompatible URL inkl. `rediss://` (TLS), Redis Cluster, Sentinel, ElastiCache und Upstash. |
 
 > [!NOTE]
 > Die mitgelieferten Docker-Compose-Varianten (Balena, Coolify) enthalten einen `valkey/valkey:9-alpine`-Sidecar und setzen `VALKEY_URL` automatisch. Für externe Deployments muss `VALKEY_URL` auf die eigene Valkey/Redis-Instanz zeigen.
 
 > [!NOTE]
-> Ist `VALKEY_URL` gesetzt, startet die API auch dann, wenn Valkey nicht erreichbar ist (etwa während der Valkey-Container noch startet). Bis Valkey erreichbar ist, protokolliert sie eine Warnung und bei jedem Verbindungsversuch eine Zeile `Valkey connection error`. Sitzungen werden nicht nach SQLite verlagert: Bis Valkey wieder erreichbar ist, werden Anmeldungen, Anfragen angemeldeter Benutzer und Anfragen mit API-Tokens mit `503 Service Unavailable` beantwortet; öffentliche Seiten funktionieren weiter. Sobald Valkey wieder erreichbar ist, funktioniert die Anmeldung wieder, und die Invalidierung des Berechtigungs-Caches sowie die Sperren für Starts und Enden von Maschinen über API-Instanzen hinweg laufen von selbst wieder an, ohne Neustart der API.
+> Ist `VALKEY_URL` gesetzt, startet die API auch dann, wenn Valkey nicht erreichbar ist (etwa während der Valkey-Container noch startet). Bis Valkey erreichbar ist, protokolliert sie eine Warnung und bei jedem Verbindungsversuch eine Zeile `Valkey connection error`. Sitzungen werden nicht nach PostgreSQL verlagert: Bis Valkey wieder erreichbar ist, werden Anmeldungen, Anfragen angemeldeter Benutzer und Anfragen mit API-Tokens mit `503 Service Unavailable` beantwortet; öffentliche Seiten funktionieren weiter. Sobald Valkey wieder erreichbar ist, funktioniert die Anmeldung wieder, und die Invalidierung des Berechtigungs-Caches sowie die Sperren für Starts und Enden von Maschinen über API-Instanzen hinweg laufen von selbst wieder an, ohne Neustart der API.
 
 ## Plugins
 

@@ -775,9 +775,10 @@ Keep effects in `afterCommit` so the caller can run the whole transaction again.
 - pass `{ scope }` on every write inside `work`. A write without it is rejected with `PluginStorageInvalid`; only a
   read without a scope runs outside the transaction, and it does not see the uncommitted writes of `work`.
 
-How the host orders transactions is an engine detail. On SQLite it runs them one at a time per host process, sharing
-that queue with core session starts and ends, so plugins that need exclusion across several API instances need a
-cross-instance lock of their own; the reservations plugin runs on a single instance for that reason (see
+The host does not serialise plugin transactions per process. On PostgreSQL they run in parallel with core session
+starts and ends, at `READ COMMITTED`. Use `update` as compare-and-set or a unique key when two writers must not both win,
+and retry a `PluginStorageConflict`. Plugins that need exclusion across several API instances need a cross-instance lock
+of their own; the reservations plugin runs on a single instance for that reason (see
 [Reservations](plugins/reservations/administration.md#single-instance-operation)).
 
 ### Flow nodes

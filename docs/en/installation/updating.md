@@ -1,6 +1,6 @@
 # Updating
 
-<!-- llms-description: How to check for new Attraccess versions and update with Docker Compose, plain Docker or Portainer, pin a specific version, and upgrade to 2.0 through 1.11. -->
+<!-- llms-description: How to check for new Attraccess versions and update with Docker Compose, plain Docker or Portainer, pin a specific version, upgrade to 2.0 through 1.11, and move from SQLite to PostgreSQL. -->
 
 How to update Attraccess to the latest version.
 
@@ -19,6 +19,54 @@ You can also check manually at any time by comparing your running version (shown
 > Create a [backup](installation/backup-restore.md) of your data before each update.
 
 Check the [release notes](https://github.com/Attraccess/Attraccess/releases) for breaking changes before updating.
+
+## Moving from SQLite to PostgreSQL
+
+Attraccess now runs on PostgreSQL only. This is a breaking change and ships in a major release. Installations of earlier releases that stored their data in `<STORAGE_ROOT>/attraccess.sqlite` move their data automatically on the first start.
+
+### Before you upgrade
+
+1. Create a [backup](installation/backup-restore.md) of the storage volume (it contains `attraccess.sqlite`).
+2. **Add a PostgreSQL service** and point `DATABASE_URL` at an empty database. The shipped Compose files (Docker Compose, Portainer, Coolify, balena) already contain one (`postgres:18.6-alpine`, not part of the Attraccess image); see [Docker Compose](installation/docker-compose.md) and [Portainer](installation/portainer.md). If you started Attraccess with a bare `docker run`, you must start a PostgreSQL container and set `DATABASE_URL` **before** you pull the new image, because the new version does not start without it.
+3. Make sure all plugins that hold data are installed in `<STORAGE_ROOT>/plugins` and can be loaded (see [Installing Plugins](plugins/installing-plugins.md)).
+4. Plan for disk space: the old SQLite file stays on disk after the transfer (see below), next to the new PostgreSQL data.
+
+Do not set `DATABASE_TYPE=sqlite`: the start fails with a message that links to this page.
+
+### What happens on the first start
+
+When the storage directory contains `attraccess.sqlite` and the PostgreSQL database is empty, Attraccess transfers the data **before** it serves migrations, starts plugins, opens HTTP or talks to devices:
+
+1. The SQLite file (with its `-wal` and `-shm` files) is copied to a temporary working copy. **The original is never modified.** Any supported older release works as the source: a frozen copy of the old SQLite migrations first brings the working copy up to the last SQLite schema.
+2. The data, including the tables of installed plugins and their storage versions, is read into a neutral snapshot.
+3. The snapshot is imported into PostgreSQL in **one transaction**. Identifiers and sequences, UTC points in time and exact decimal values are preserved, and balances are not applied twice. Integrity checks run before the transaction commits.
+4. On success the file is renamed to `attraccess.sqlite.migrated-to-postgres-<timestamp>`, and the log shows a row count per table. The renamed file is **kept and never deleted** by Attraccess; delete it yourself once you have verified the installation and have a PostgreSQL backup. The next start does not transfer again.
+
+The log lines come from `SqliteTransfer`; follow them with `docker compose logs -f attraccess`. Large installations take longer to start the first time.
+
+### Failure and retry
+
+If anything fails, the PostgreSQL transaction is rolled back, the SQLite file is untouched, and the API stops with a clear error and a link to this page. Fix the cause and start again: the next start retries the transfer from the beginning.
+
+- **A plugin is missing.** A plugin that has data in the SQLite file but is not installed stops the transfer with a clear error and nothing is imported. Install the plugin (its 2.0 build, see [Upgrading to Attraccess 2.0](#upgrading-to-attraccess-20)) and start again.
+- **Two instances start at once.** A PostgreSQL advisory lock makes sure only one of them transfers; the other waits.
+- **PostgreSQL already holds data.** If the database is not empty and the SQLite file still exists, Attraccess logs a warning and transfers nothing. Use the manual command below if you want to replace the data.
+
+### Running the transfer manually
+
+Run it inside the container (the API must be stopped or not running against the same database):
+
+```bash
+docker compose run --rm attraccess node dist/apps/api/main.js transfer-sqlite [--sqlite <path>] [--force] [--keep]
+```
+
+| Option            | Meaning                                                                                      |
+| ----------------- | -------------------------------------------------------------------------------------------- |
+| `--sqlite <path>` | The SQLite file; default `<STORAGE_ROOT>/attraccess.sqlite`                                  |
+| `--force`         | Replace data that is already in the PostgreSQL database. Without it a non-empty target is refused |
+| `--keep`          | Do not rename the SQLite file after a successful transfer                                    |
+
+In a development checkout the equivalent is `pnpm nx run api:transfer-sqlite -- --sqlite <path>`.
 
 ## Upgrading to Attraccess 2.0
 
@@ -52,7 +100,7 @@ docker compose up -d
 ```
 
 Attraccess runs database migrations automatically on startup. Within a major version no manual steps are required.
-Upgrading from 1.x to 2.0 needs one extra step, see [Upgrading to Attraccess 2.0](#upgrading-to-attraccess-20).
+Upgrading from 1.x needs extra steps, see [Moving from SQLite to PostgreSQL](#moving-from-sqlite-to-postgresql) and [Upgrading to Attraccess 2.0](#upgrading-to-attraccess-20).
 
 ## Plain Docker
 
@@ -65,7 +113,8 @@ docker pull attraccess/attraccess:latest
 # or:
 docker pull ghcr.io/attraccess/attraccess:latest
 
-# Recreate the container with the same volumes/env you used before
+# Recreate the container with the same volumes/env you used before, plus DATABASE_URL of a
+# PostgreSQL service you started first (see "Moving from SQLite to PostgreSQL")
 docker run -d --name attraccess ... attraccess/attraccess:latest
 ```
 

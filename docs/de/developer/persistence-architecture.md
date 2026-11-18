@@ -1,26 +1,29 @@
 # Persistenz-Architektur
 
-<!-- llms-description: Wer in Attraccess den Datenbankzugriff besitzt: neutrale Modelle, SQLite-Schema, Backend-Naht, Ports und Adapter, die erzwungene Importgrenze und die Zuständigkeit je Bereich. -->
+<!-- llms-description: Wer in Attraccess den Datenbankzugriff besitzt: neutrale Modelle, PostgreSQL-Schema, Backend-Naht, Ports und Adapter, die erzwungene Importgrenze und die Zuständigkeit je Bereich. -->
 
 Attraccess trennt Geschäftslogik, HTTP-/WebSocket-/MQTT-/Geräteverträge und Plugin-APIs von der Datenbank-Engine.
-SQLite ist das einzige funktionierende Backend und der Standard. Diese Seite beschreibt die Struktur, mit der ein
-zweites relationales Backend (PostgreSQL, ATT-584) nur durch Adapter, Schema und Konfiguration ergänzt werden kann,
-ohne Fachregeln oder öffentliche Verträge umzuschreiben.
+PostgreSQL ist das einzige Laufzeit-Backend. SQLite ist nur noch Import: Seine eingefrorenen Migrationen und ein
+Leseadapter dienen allein dazu, die Daten einer alten Installation einmalig nach PostgreSQL zu übernehmen (siehe
+[Aktualisierung](installation/updating.md#umzug-von-sqlite-auf-postgresql)). Diese Seite beschreibt die Struktur, die
+ein weiteres relationales Backend allein durch Adapter, Schema und Konfiguration möglich hält, ohne Fachregeln oder
+öffentliche Verträge umzuschreiben.
 
 > [!NOTE]
 > Die Trennung wird schrittweise eingeführt. Diese Seite nennt, was fertig ist und welcher Code noch vom ORM abhängt
-> (siehe [Zuständigkeit je Funktionsbereich](#zuständigkeit-je-funktionsbereich)). Es wird keine PostgreSQL-Unterstützung behauptet.
+> (siehe [Zuständigkeit je Funktionsbereich](#zuständigkeit-je-funktionsbereich)).
 
 ## Die Schichten
 
-| Schicht                                             | Ort                                                                         | Darf `typeorm`, Treiber, Entities importieren? |
-| --------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------- |
-| Neutrale Modelle, Enums, Konstanten                 | `libs/application-models` (`@attraccess/application-models`)                | Nein, nie                                      |
-| Anwendung, Domäne, HTTP-/WebSocket-Transport        | `apps/api/src/**` (außer `database/`)                                       | Nein (siehe Baseline unten)                    |
-| Backend-Naht, Ports, Fehlerkategorien               | `apps/api/src/database/backend`, `persistence-errors.ts`, `unit-of-work.ts` | Nur die Naht: Typen, keine Abfragen            |
-| SQLite-Adapter                                      | `apps/api/src/database/sqlite`                                              | Ja                                             |
-| SQLite-/TypeORM-Schema (Entities, Spalten, Indizes) | `libs/database-entities`                                                    | Ja                                             |
-| Veröffentlichte SQLite-Migrationen                  | `apps/api/src/database/migrations`                                          | Ja, eingefroren                                |
+| Schicht                                                         | Ort                                                                         | Darf `typeorm`, Treiber, Entities importieren? |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------- |
+| Neutrale Modelle, Enums, Konstanten                             | `libs/application-models` (`@attraccess/application-models`)                | Nein, nie                                      |
+| Anwendung, Domäne, HTTP-/WebSocket-Transport                    | `apps/api/src/**` (außer `database/`)                                       | Nein (siehe Baseline unten)                    |
+| Backend-Naht, Ports, Fehlerkategorien                           | `apps/api/src/database/backend`, `persistence-errors.ts`, `unit-of-work.ts` | Nur die Naht: Typen, keine Abfragen            |
+| PostgreSQL-Adapter                                              | `apps/api/src/database/postgres`                                            | Ja                                             |
+| SQLite-Import (eingefrorene Spur, Leseadapter, Übernahme)       | `apps/api/src/database/sqlite`, `apps/api/src/database/transfer`            | Ja, nur Import                                 |
+| TypeORM-Schema (Entities, Spalten, Indizes)                     | `libs/database-entities`                                                    | Ja                                             |
+| Veröffentlichte SQLite-Migrationen (eingefroren, nur Übernahme) | `apps/api/src/database/migrations`                                          | Ja, eingefroren                                |
 
 `libs/database-entities` importiert aus `libs/application-models`, nie umgekehrt. Die Enums, Singleton-IDs und der
 SSO-Sitzungskontext, die früher in den Entity-Dateien lagen, liegen jetzt in der neutralen Bibliothek. Die
@@ -31,21 +34,22 @@ geändert werden dürfen.
 
 Eine Kompositionsnaht, `apps/api/src/database/backend`, wählt die Engine:
 
-- `DATABASE_TYPE` (Standard `sqlite`). Jeder andere Wert bricht den Start ab, bevor eine Verbindung, Migration oder
+- `DATABASE_TYPE` (Standard `postgres`, der einzige unterstützte Wert; `sqlite` bricht mit einer Meldung ab, die auf die Upgrade-Anleitung verweist). Jeder andere Wert bricht den Start ab, bevor eine Verbindung, Migration oder
   Plugin-Arbeit stattfindet. Die Fehlermeldung nennt die unterstützten Werte und gibt keinen Wert aus, der nicht wie
   ein einfacher Engine-Name aussieht.
 - Ein `DatabaseBackend` bündelt Verbindungsoptionen, Entity-Satz, Migrationsspur, Verbindungsfabrik, Deutung von
   Treiberfehlern und das Schließen zusätzlicher Verbindungen.
-- Eine **Migrationsspur** ist eine geordnete, veröffentlichte Historie für eine Engine. Die SQLite-Spur behält den
-  Tabellennamen `migrations` und alle veröffentlichten Migrationen Byte für Byte. Eine andere Engine bekommt eine
-  eigene Spur statt SQLite-SQL wiederzuverwenden.
+- Eine **Migrationsspur** ist eine geordnete, veröffentlichte Historie für eine Engine. Die PostgreSQL-Spur besteht aus einer
+  Baseline-Migration mit späteren PostgreSQL-only-Migrationen. Die veröffentlichten SQLite-Migrationen bleiben Byte für
+  Byte erhalten, laufen aber nur auf einer temporären Kopie während der Übernahme. Eine andere Engine bekommt eine
+  eigene Spur statt PostgreSQL-SQL wiederzuverwenden.
 
 ## Neutrale Fehlerkategorien
 
 Anwendungscode liest keine Treiber-Fehlercodes. Das aktive Backend registriert einen Klassifizierer, die Anwendung
 fragt `isDatabaseBusyError`, `isUniqueViolation` oder `isWriteConflict` (`persistence-errors.ts`). Der
-SQLite-Klassifizierer mit Codes wie `SQLITE_BUSY` und der Meldungsform von Constraint-Fehlern liegt in
-`database/sqlite/sqlite-errors.ts`.
+PostgreSQL-Klassifizierer mit SQLSTATEs wie `40001`, `40P01`, `55P03` und `23505` liegt in
+`database/postgres/postgres-errors.ts`.
 
 ## Unit of Work
 
@@ -60,9 +64,18 @@ der Merge Queue ausführt) schlägt fehl, wenn Code außerhalb der Persistenz-Im
 Adapter-Interna importiert. Erfasst werden statische Imports, reine Typ-Imports, Re-Exports, dynamisches `import()`,
 `require()`, `import x = require()` und `import('x')`-Typen.
 
-Adapter-Interna sind `apps/api/src/database/adapters/**`, `apps/api/src/database/sqlite/**` und
+Adapter-Interna sind `apps/api/src/database/adapters/**`, `apps/api/src/database/postgres/**` und
 `libs/database-entities`. Nur Nest-Kompositionsdateien (`*.module.ts`) und Tests dürfen sie importieren; Anwendungs-,
-Domänen- und Transportcode erreicht die Persistenz also nur über Ports. Die neutralen Nahtdateien in
+Domänen- und Transportcode erreicht die Persistenz also nur über Ports. `apps/api/src/database/transfer/**` (der
+SQLite-Import beim Start) dürfen zusätzlich die beiden Prozess-Einstiegspunkte `main.ts` und `main.bootstrap.ts`
+importieren.
+
+PostgreSQL ist die einzige Laufzeit-Datenbank. `apps/api/src/database/sqlite/**` gibt es nur für den einmaligen
+SQLite-Import: nur der Importpfad (`database/transfer`) und Tests dürfen es nutzen, Kompositionsdateien und
+Einstiegspunkte nicht. Die entfernte SQLite-Laufzeit (prozessweite Schreibwarteschlange und Dateisperre,
+`runSerializedTransaction`, SQLite-Backend, Unit of Work und Verbindungsfabrik) darf in keiner Datei zurückkehren,
+auch nicht in den Persistenzordnern und Tests; die Prüfung meldet diese Funde getrennt und akzeptiert sie nie in der
+Baseline. Die neutralen Nahtdateien in
 `apps/api/src/database` (`unit-of-work.ts`, `persistence-errors.ts`, `backend/database-backend.ts`) werden wie
 Anwendungscode geprüft. Das Plugin-SDK hat keinen Engine-Unterpfad mehr: Plugins können weder TypeORM noch einen Treiber noch eine Entity importieren.
 
@@ -76,35 +89,35 @@ eingetragen werden. Erlaubte Orte: `libs/database-entities`, die Engine- und Ada
 Jeder Bereich persistiert über das TypeORM-Schema in `libs/database-entities`, aber nur Adapter berühren es. Die
 Grenzprüfung hat eine leere Baseline: keine Anwendungs-, Domänen- oder Transportdatei importiert `typeorm`, die Treiber,
 die Entity-Bibliothek oder Adapter-Interna. „Port“ nennt den anwendungseigenen Persistenzvertrag, „Adapter“ den Ort seiner
-SQLite-Implementierung (`apps/api/src/database/adapters/<Bereich>`).
+Implementierung (`apps/api/src/database/adapters/<Bereich>`).
 
-| Funktionsbereich                                                                  | Anwendungscode                                                  | Port                                                                                                             | Adapter                                                               |
-| --------------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Backend-Auswahl, Verbindung, Migrationen, Herunterfahren, Transfer                | `database/backend`, `database/sqlite`                           | `DatabaseBackend`                                                                                                | `database/sqlite`                                                     |
-| Fehlerkategorien, Transaktionen, Post-Commit-Hooks, begrenzter Retry              | `database/persistence-errors.ts`, `database/unit-of-work.ts`    | `UnitOfWork`, Fehlerklassifizierer                                                                               | `database/sqlite`                                                     |
-| Nutzungssitzungen (Start, Ende, Übernahme, Wiederherstellung), Betriebsintervalle | `resources/usage`, `resources/operating-intervals`              | `UsageSessionStore`, `OperatingTimelineStore`                                                                    | `adapters/usage`, `adapters/operating-intervals`                      |
-| Messung                                                                           | `resources/metering`                                            | `MeteringStore`                                                                                                  | `adapters/metering`                                                   |
-| Abrechnung, Zahlungen, Guthaben, SumUp                                            | `billing`                                                       | `BillingLedgerStore`, `BillingConfigurationStore`, `SumUpCredentialStore`                                        | `adapters/billing`                                                    |
-| Ressourcen, Gruppen, Einweisungen, Einweiser, Nachschulung, Supervision           | `resources/**`                                                  | `ResourceStore`, `ResourceGroupStore`, `ResourceIntroductionStore`, `ResourceIntroducerStore`, `RetrainingStore` | `adapters/resources`                                                  |
-| Wartung (Einträge, Anfragen, Pläne, Auswertung), Zustand, Formulare               | `resources/maintenances`, `resources/health`, `resources/forms` | `MaintenanceEvaluationStore` und die Wartungs-, Zustands- und Formular-Stores                                    | `adapters/resources`                                                  |
-| Flows, Flow-Knoten, Variablen, Executor                                           | `resources/flows`                                               | `FlowGraphStore`, `FlowTriggerStore`, `FlowVariableStore`, `FlowResourceDirectory`, `FlowBillingItemStore`       | `adapters/flows`                                                      |
-| Benutzer, Einladungen, Registrierung, Passwörter                                  | `users-and-auth/users`                                          | `UserStore`                                                                                                      | `adapters/users`                                                      |
-| RBAC, Berechtigungen, Rollenzuweisung                                             | `users-and-auth/rbac`                                           | `RbacStore`                                                                                                      | `adapters/users`                                                      |
-| Lokale Zugangsdaten, TOTP, API-Tokens, Passwortrichtlinie                         | `users-and-auth/auth`, `password-policy`                        | `CredentialStore`, `TotpStore`, `ApiTokenStore`, `PasswordPolicyStore`                                           | `adapters/auth`                                                       |
-| Sitzungen (SQLite und Valkey), Passkeys, SSO, Rate Limiting                       | `users-and-auth/auth`                                           | `SessionStore`, `PasskeyStore`, `SsoProviderStore`, `AccountLockoutStore`                                        | `adapters/sessions`, `passkeys`, `sso`, `rate-limiting`               |
-| Audit                                                                             | `audit`                                                         | `AuditStore`                                                                                                     | `adapters/audit` (eigene Verbindung, PRAGMAs, dauerhafte Bestätigung) |
-| Attractap-Leser, Zugangsdaten, Karten, Absturzberichte, Secure Boot               | `attractap`                                                     | `ATTRACTAP_*`-Stores                                                                                             | `adapters/attractap`                                                  |
-| Companion-Geräte, MQTT-Server                                                     | `companion`, `mqtt`                                             | `CompanionDeviceStore`, `MqttServerStore`                                                                        | `adapters/companion`, `adapters/mqtt`                                 |
-| Nachrichten, Benachrichtigungen, Push, E-Mail, Vorlagen                           | `messaging`, `notifications`, `push`, `email*`                  | Konversations-, Benachrichtigungs-, Push-, Vorlagen- und Empfänger-Stores                                        | `adapters/messaging`, `notifications`, `push`, `email`                |
-| Einstellungen, Analytics, CSV-Export, Metriken                                    | `settings`, `analytics`, `metrics`                              | `SettingsRows`, `AnalyticsReader`, `CsvExportTemplateStore`, Metrik-Reader                                       | `adapters/settings`, `analytics`, `metrics`                           |
-| Projekte, Systemstatistik                                                         | `projects`, `version`                                           | `ProjectStore`, `ProjectInvitationStore`, `SystemStatsStore`                                                     | `adapters/projects`, `adapters/system`                                |
-| Plugin-Verwaltung, Plugin-SDK                                                     | `plugin-system`, `libs/plugins-backend-sdk`                     | Plugin-Speicher (Record-Port), Host-Daten, neutrale Migrationen, Transaktionen                                   | `adapters/plugins`                                                    |
-| Eingebaute Plugins und Beispiele                                                  | `apps/plugins/*`, `examples/*`                                  | nur die SDK-2.0-Wurzel: `context.storage`, Host-Ports                                                            | keiner: der Plugin-Speicher-Adapter des Hosts bedient sie             |
-| MCP-OAuth-Clients, -Freigaben und -Tokens                                         | `mcp`                                                           | `McpOAuthStore`                                                                                                  | `adapters/mcp`                                                        |
-| Dashboard-Pins                                                                    | `dashboard`                                                     | `DashboardPinStore`                                                                                              | `adapters/dashboard`                                                  |
-| Start, Herunterfahren, Persistenz-Fehlerfilter                                    | `main.bootstrap.ts`, `app`, `exceptions`                        | `DatabaseLifecycle`, neutrale Fehlerkategorien                                                                   | `database/sqlite`                                                     |
-| Seeds, Setup-Skripte, Testdatenbanken, Werkzeuge                                  | `apps/api/scripts`, `scripts/*`, `apps/api/src/e2e`             | `DATABASE_TYPE`-Provider (`apps/api/scripts/lib/database-provider.mjs`), `apps/api/migration-tracks.cjs`         | `database/sqlite`                                                     |
-| Frontend                                                                          | `apps/frontend`                                                 | keiner, importiert nur `@attraccess/application-models`                                                          | n/a                                                                   |
+| Funktionsbereich                                                                  | Anwendungscode                                                  | Port                                                                                                             | Adapter                                                   |
+| --------------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Backend-Auswahl, Verbindung, Migrationen, Herunterfahren, Transfer                | `database/backend`, `database/postgres`                         | `DatabaseBackend`                                                                                                | `database/postgres`                                       |
+| Fehlerkategorien, Transaktionen, Post-Commit-Hooks, begrenzter Retry              | `database/persistence-errors.ts`, `database/unit-of-work.ts`    | `UnitOfWork`, Fehlerklassifizierer                                                                               | `database/postgres`                                       |
+| Nutzungssitzungen (Start, Ende, Übernahme, Wiederherstellung), Betriebsintervalle | `resources/usage`, `resources/operating-intervals`              | `UsageSessionStore`, `OperatingTimelineStore`                                                                    | `adapters/usage`, `adapters/operating-intervals`          |
+| Messung                                                                           | `resources/metering`                                            | `MeteringStore`                                                                                                  | `adapters/metering`                                       |
+| Abrechnung, Zahlungen, Guthaben, SumUp                                            | `billing`                                                       | `BillingLedgerStore`, `BillingConfigurationStore`, `SumUpCredentialStore`                                        | `adapters/billing`                                        |
+| Ressourcen, Gruppen, Einweisungen, Einweiser, Nachschulung, Supervision           | `resources/**`                                                  | `ResourceStore`, `ResourceGroupStore`, `ResourceIntroductionStore`, `ResourceIntroducerStore`, `RetrainingStore` | `adapters/resources`                                      |
+| Wartung (Einträge, Anfragen, Pläne, Auswertung), Zustand, Formulare               | `resources/maintenances`, `resources/health`, `resources/forms` | `MaintenanceEvaluationStore` und die Wartungs-, Zustands- und Formular-Stores                                    | `adapters/resources`                                      |
+| Flows, Flow-Knoten, Variablen, Executor                                           | `resources/flows`                                               | `FlowGraphStore`, `FlowTriggerStore`, `FlowVariableStore`, `FlowResourceDirectory`, `FlowBillingItemStore`       | `adapters/flows`                                          |
+| Benutzer, Einladungen, Registrierung, Passwörter                                  | `users-and-auth/users`                                          | `UserStore`                                                                                                      | `adapters/users`                                          |
+| RBAC, Berechtigungen, Rollenzuweisung                                             | `users-and-auth/rbac`                                           | `RbacStore`                                                                                                      | `adapters/users`                                          |
+| Lokale Zugangsdaten, TOTP, API-Tokens, Passwortrichtlinie                         | `users-and-auth/auth`, `password-policy`                        | `CredentialStore`, `TotpStore`, `ApiTokenStore`, `PasswordPolicyStore`                                           | `adapters/auth`                                           |
+| Sitzungen (PostgreSQL und Valkey), Passkeys, SSO, Rate Limiting                   | `users-and-auth/auth`                                           | `SessionStore`, `PasskeyStore`, `SsoProviderStore`, `AccountLockoutStore`                                        | `adapters/sessions`, `passkeys`, `sso`, `rate-limiting`   |
+| Audit                                                                             | `audit`                                                         | `AuditStore`                                                                                                     | `adapters/audit` (dauerhafte Bestätigung)                 |
+| Attractap-Leser, Zugangsdaten, Karten, Absturzberichte, Secure Boot               | `attractap`                                                     | `ATTRACTAP_*`-Stores                                                                                             | `adapters/attractap`                                      |
+| Companion-Geräte, MQTT-Server                                                     | `companion`, `mqtt`                                             | `CompanionDeviceStore`, `MqttServerStore`                                                                        | `adapters/companion`, `adapters/mqtt`                     |
+| Nachrichten, Benachrichtigungen, Push, E-Mail, Vorlagen                           | `messaging`, `notifications`, `push`, `email*`                  | Konversations-, Benachrichtigungs-, Push-, Vorlagen- und Empfänger-Stores                                        | `adapters/messaging`, `notifications`, `push`, `email`    |
+| Einstellungen, Analytics, CSV-Export, Metriken                                    | `settings`, `analytics`, `metrics`                              | `SettingsRows`, `AnalyticsReader`, `CsvExportTemplateStore`, Metrik-Reader                                       | `adapters/settings`, `analytics`, `metrics`               |
+| Projekte, Systemstatistik                                                         | `projects`, `version`                                           | `ProjectStore`, `ProjectInvitationStore`, `SystemStatsStore`                                                     | `adapters/projects`, `adapters/system`                    |
+| Plugin-Verwaltung, Plugin-SDK                                                     | `plugin-system`, `libs/plugins-backend-sdk`                     | Plugin-Speicher (Record-Port), Host-Daten, neutrale Migrationen, Transaktionen                                   | `adapters/plugins`                                        |
+| Eingebaute Plugins und Beispiele                                                  | `apps/plugins/*`, `examples/*`                                  | nur die SDK-2.0-Wurzel: `context.storage`, Host-Ports                                                            | keiner: der Plugin-Speicher-Adapter des Hosts bedient sie |
+| MCP-OAuth-Clients, -Freigaben und -Tokens                                         | `mcp`                                                           | `McpOAuthStore`                                                                                                  | `adapters/mcp`                                            |
+| Dashboard-Pins                                                                    | `dashboard`                                                     | `DashboardPinStore`                                                                                              | `adapters/dashboard`                                      |
+| Start, Herunterfahren, Persistenz-Fehlerfilter                                    | `main.bootstrap.ts`, `app`, `exceptions`                        | `DatabaseLifecycle`, neutrale Fehlerkategorien                                                                   | `database/postgres`                                       |
+| Seeds, Setup-Skripte, Testdatenbanken, Werkzeuge                                  | `apps/api/scripts`, `scripts/*`, `apps/api/src/e2e`             | `DATABASE_TYPE`-Provider (`apps/api/scripts/lib/database-provider.mjs`), `apps/api/migration-tracks.cjs`         | `database/postgres`                                       |
+| Frontend                                                                          | `apps/frontend`                                                 | keiner, importiert nur `@attraccess/application-models`                                                          | n/a                                                       |
 
 Plugins haben keinen Datenbankzugriff. Das SDK enthält kein TypeORM, keine Host-Entity, kein rohes SQL und keinen
 Engine-Unterpfad. Ein Plugin deklariert Tabellen in einem neutralen Schema und nutzt den Record-Port; der
@@ -124,7 +137,7 @@ Das sind akzeptierte Grenzen dieser Änderung, keine versteckte Arbeit:
   `EntityManagerResolver`, `managerFor`). Alle lösen über die eine globale Unit of Work auf und lassen sich vereinen.
 - Die eingebauten Plugins nutzen nur den Record-Port und laufen daher auf jeder Engine mit Plugin-Speicher-Adapter. Der
   Port kennt keine Joins; Plugins lesen über mehrere eigene Tabellen mit mehreren Aufrufen.
-- Plugin-Transaktionen werden pro Host-Prozess serialisiert, wie die des Kerns.
+- Plugin-Transaktionen werden nicht pro Host-Prozess serialisiert; sie laufen parallel, und Konflikte werden als `PluginStorageConflict` gemeldet.
 - Einige Lifecycle-Test-Fixtures bauen ältere Schemas absichtlich mit `synchronize`, um Upgrades und Wiederherstellung
   aus einem Schema vor den Integritätsmigrationen zu testen.
 - Swagger-Schemas, die geheime oder nie befüllte Felder dokumentierten, sind jetzt korrekt (siehe unten).

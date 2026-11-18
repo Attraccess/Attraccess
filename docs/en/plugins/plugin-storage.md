@@ -173,8 +173,6 @@ Limits of adopted tables:
 
 - `f.decimal` is not allowed on an adopted table (1.x stored decimals differently). Keep such a column as it was
   stored, for example `f.string()`, or copy it into a new table (below).
-- On SQLite, a later version may not drop a 1.x `UNIQUE` constraint, or a column that a 1.x `UNIQUE` or `CHECK`
-  constraint covers: that needs a table rebuild, which the host does not do yet. The migration is refused.
 - There is no binary field type. A 1.x `blob` column declared as `f.text()` reads as base64 text; write base64 too.
 
 **1.x names the host refuses.** When a 1.x table name is one of the forbidden names above, the table cannot be
@@ -308,9 +306,11 @@ Rules:
 - Pass `{ scope }` on every write inside `work`. A write without it is rejected with `PluginStorageInvalid`. Only a
   read without a scope runs outside the transaction, and it does **not** see the uncommitted writes of `work`.
 - Do not await core operations that write (starting or ending a session) inside `work`.
-- How the host orders transactions is an engine detail. On SQLite it runs them one at a time per host process, so
-  exclusion across several API instances needs a lock of your own; the reservations plugin runs on a single instance
-  for that reason (see [Reservations](plugins/reservations/administration.md#single-instance-operation)).
+- The host does not serialise plugin transactions per process: on PostgreSQL they run in parallel, with row-level
+  isolation (`READ COMMITTED`). Use `update` as compare-and-set or a unique key when two writers must not both win, and
+  retry a `PluginStorageConflict`. Exclusion across several API instances still needs a lock of your own; the
+  reservations plugin runs on a single instance for that reason (see
+  [Reservations](plugins/reservations/administration.md#single-instance-operation)).
 
 The scope you get in `startCapacityHook` (`ctx.scope`) is core's own start transaction: read through it with
 `{ scope: ctx.scope }`, never write and never call `afterCommit` on it. Inside a host hook that hands you a host scope,

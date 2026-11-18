@@ -22,6 +22,7 @@ Create a file called `.env`:
 ```bash
 # Required settings
 AUTH_SESSION_SECRET=your-random-secure-key
+POSTGRES_PASSWORD=your-database-password
 ATTRACCESS_URL=https://attraccess.your-domain.com
 
 # Email (SMTP)
@@ -46,6 +47,9 @@ TZ=Europe/Berlin
 > ```bash
 > openssl rand -base64 32
 > ```
+> Use letters and digits for `POSTGRES_PASSWORD` (e.g. `openssl rand -hex 24`): it becomes part of the database URL.
+
+Attraccess stores its data in PostgreSQL. The image does not include a database, so the compose file below starts a `postgres` service next to it and passes the connection to Attraccess as `DATABASE_URL`.
 
 All available variables are documented at [Environment Variables](installation/environment-variables.md).
 
@@ -63,10 +67,31 @@ services:
       - attraccess-storage:/app/storage
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgres://attraccess:${POSTGRES_PASSWORD}@postgres:5432/attraccess
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:18.6-alpine
+    environment:
+      POSTGRES_USER: attraccess
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: attraccess
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U attraccess -d attraccess"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
 volumes:
   attraccess-storage:
+  postgres-data:
 ```
 
 ## 4. Start
@@ -101,6 +126,26 @@ services:
       - attraccess-storage:/app/storage
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgres://attraccess:${POSTGRES_PASSWORD}@postgres:5432/attraccess
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:18.6-alpine
+    environment:
+      POSTGRES_USER: attraccess
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: attraccess
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U attraccess -d attraccess"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   proxy:
@@ -116,6 +161,7 @@ services:
 
 volumes:
   attraccess-storage:
+  postgres-data:
   proxy-data:
   proxy-letsencrypt:
 ```
