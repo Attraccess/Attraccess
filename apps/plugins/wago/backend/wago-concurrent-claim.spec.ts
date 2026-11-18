@@ -133,6 +133,24 @@ describe('concurrent WAGO claims on two instances', () => {
     });
   });
 
+  it('revokes its identity when the controller was removed while the claim ran', async () => {
+    const test = createWagoTestStorage();
+    await seed(test);
+    const { service, provider, context } = instance(test, async () => ({}));
+    // Another instance removes the registration after this claim provisioned the identity.
+    jest.mocked(context.mqtt.publish).mockImplementationOnce(async () => {
+      await test.tables.controllers.delete({ id: 1 });
+      throw new Error('broker unavailable');
+    });
+
+    await expect(service.claim(1, 'Mine', 'fixture-code', 1)).rejects.toThrow('broker unavailable');
+
+    expect(provider.revoke).toHaveBeenCalledWith(
+      expect.objectContaining({ mqttServerId: 1, identity: 'wago-controller-fixture' }),
+    );
+    expect(test.rows('controllers')).toEqual([]);
+  });
+
   it('still rolls back its own failed claim', async () => {
     const test = createWagoTestStorage();
     await seed(test);

@@ -44,7 +44,7 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
     // Another claim that took over the controller owns the broker identity now: revoking it or resetting the row
     // would undo that claim. Only the claim whose credential epoch the row still carries rolls back.
     const epoch = controller.credentialEpoch;
-    if (!epoch || (await this.controllers.get(controller.id))?.credentialEpoch !== epoch) return;
+    if (!epoch || (await this.claimTakenOver(controller, epoch))) return;
     const manual = await this.context
       .getMqttCredentialProvisioning()
       .revoke({ mqttServerId, identity, username: identity, vhost: '/' });
@@ -64,6 +64,21 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
           `Could not restore WAGO controller ${controller.id} after claim failure: ${String(rollbackError)}`,
         );
       });
+  }
+
+  /**
+   * Whether another claim owns the broker identity now. When the row is gone (removed while this claim ran), the
+   * identity this claim provisioned is still revoked, unless a new registration of the hardware already carries a
+   * claim of its own.
+   */
+  private async claimTakenOver(controller: WagoController, epoch: string): Promise<boolean> {
+    const current = await this.controllers.get(controller.id);
+    if (current) return current.credentialEpoch !== epoch;
+    const reclaimed = await this.controllers.count({
+      hardwareId: controller.hardwareId,
+      credentialEpoch: { isNull: false },
+    });
+    return reclaimed > 0;
   }
 
   protected async restoreUnclaimedController(
