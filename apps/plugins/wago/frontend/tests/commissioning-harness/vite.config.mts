@@ -1,11 +1,26 @@
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
-import base from '../harness/vite.config.mts';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-  ...base,
   root: fileURLToPath(new URL('.', import.meta.url)),
+  envDir: false,
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@attraccess/plugins-frontend-sdk': fileURLToPath(
+        new URL('../../../../../../libs/plugins-frontend-sdk/src/index.ts', import.meta.url),
+      ),
+      '@attraccess/application-models': fileURLToPath(
+        new URL('../../../../../../libs/application-models/src/index.ts', import.meta.url),
+      ),
+      '@attraccess/database-entities': fileURLToPath(
+        new URL('../../../../../../libs/database-entities/src/index.ts', import.meta.url),
+      ),
+    },
+  },
   build: {
     outDir: resolve(
       process.env.WAGO_BROWSER_ARTIFACTS_ROOT ??

@@ -513,7 +513,7 @@ const baseTargets = {
   lint: { command: 'eslint .' },
 };
 
-test('project.json counts as runtime source unless only check targets (test, lint, typecheck, crap-score, pack-test) change', () => {
+test('project.json counts as runtime source unless only check targets (test, lint, typecheck, crap-score, pack-test, fleet-acceptance) change', () => {
   const before = projectJson(baseTargets);
   for (const targets of [
     { ...baseTargets, 'test-cc100-runtime': { ...baseTargets['test-cc100-runtime'], inputs: ['default', 'x'] } },
@@ -526,6 +526,8 @@ test('project.json counts as runtime source unless only check targets (test, lin
     { ...baseTargets, build: { command: 'node -e "copy LICENSE.md"', dependsOn: ['build-backend'] } },
     // `build-backend` bundles the plugin's own NestJS backend; it never builds the CC100 runtime.
     { ...baseTargets, 'build-backend': { command: 'node esbuild-backend.mjs' } },
+    // The composed release gate only runs other targets.
+    { ...baseTargets, 'fleet-acceptance': { options: { commands: ['pnpm nx run plugin-wago:e2e'] } } },
   ])
     assert.equal(projectConfigAffectsRuntime(before, projectJson(targets)), false, JSON.stringify(targets));
   // Whitespace and key order are not changes either.
@@ -538,6 +540,7 @@ test('project.json counts as runtime source unless only check targets (test, lin
     projectJson({ ...baseTargets, 'build-frontend': { command: 'node build-ui.mjs' } }),
     // Targets that merely start with a check word are not check targets.
     projectJson({ ...baseTargets, testament: { command: 'deploy' } }),
+    projectJson({ ...baseTargets, 'fleet-acceptance-deploy': { command: 'deploy' } }),
     projectJson(baseTargets, { tags: ['host:fhs'] }),
     '{ not json',
     null,
