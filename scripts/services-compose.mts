@@ -134,6 +134,7 @@ export type Action = 'up' | 'stop' | 'down' | 'status' | 'list';
 export const ACTIONS: Action[] = ['up', 'stop', 'down', 'status', 'list'];
 
 export const SETS: Record<string, string[]> = {
+  postgres: ['postgres'],
   mailpit: ['mailpit'],
   valkey: ['valkey'],
   authentik: ['authentik-postgresql', 'authentik-redis', 'authentik-server', 'authentik-worker'],

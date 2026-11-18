@@ -2,28 +2,33 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import Database from 'better-sqlite3';
+import { postgresProvider } from './lib/database-provider.mjs';
+import { createTestDatabase, skipWithoutPostgres } from './lib/test-postgres.mjs';
 import {
   decrypt,
   deriveKey,
   encrypt,
   parseArgs,
   reencryptCardKeys,
-  resolveDatabasePath,
+  resolveDatabaseUrl,
 } from './reencrypt-card-keys.mjs';
 
-const run = async (db, sql, params = []) => void db.prepare(sql).run(...params);
-const all = async (db, sql) => db.prepare(sql).all();
+const opts = { skip: skipWithoutPostgres };
 
-async function database() {
-  const db = new Database(':memory:');
-  await run(db, 'CREATE TABLE nfc_card (id integer primary key, key text)');
-  await run(db, 'CREATE TABLE nfc_card_pending_change (id integer primary key, key text)');
-  return db;
+/** A fresh database with the two card tables; the handle is the provider's connection. */
+async function database(t) {
+  const created = await createTestDatabase('attraccess_reencrypt_test');
+  t.after(() => created.drop());
+  await created.db.query('CREATE TABLE nfc_card (id integer primary key, key text)');
+  await created.db.query('CREATE TABLE nfc_card_pending_change (id integer primary key, key text)');
+  return created.db;
 }
+const run = async (db, sql, params = []) => void (await postgresProvider.run(db, sql, params));
+const all = async (db, sql) => postgresProvider.all(db, sql);
+const quoted = (name) => `"${name}"`;
 
-test('moves card keys to the new secret', async () => {
-  const db = await database();
+test('moves card keys to the new secret', opts, async (t) => {
+  const db = await database(t);
   const oldKey = deriveKey('old-secret');
   await run(db, 'INSERT INTO nfc_card (id, key) VALUES (1, ?)', [encrypt(oldKey, '00112233445566778899aabbccddeeff')]);
   await run(db, 'INSERT INTO nfc_card_pending_change (id, key) VALUES (1, ?)', [
@@ -41,11 +46,11 @@ test('moves card keys to the new secret', async () => {
   assert.throws(() => decrypt(deriveKey('old-secret'), card.key));
 });
 
-test('moves the reader pairing keys too', async () => {
-  const db = await database();
+test('moves the reader pairing keys too', opts, async (t) => {
+  const db = await database(t);
   await run(
     db,
-    'CREATE TABLE attractap_installation (id integer primary key, caPrivateKeyEncrypted text NOT NULL, serverPrivateKeyEncrypted text NOT NULL)',
+    'CREATE TABLE attractap_installation (id integer primary key, "caPrivateKeyEncrypted" text NOT NULL, "serverPrivateKeyEncrypted" text NOT NULL)',
   );
   const oldKey = deriveKey('old-secret');
   await run(db, 'INSERT INTO attractap_installation VALUES (1, ?, ?)', [
@@ -66,15 +71,15 @@ test('moves the reader pairing keys too', async () => {
   assert.equal(decrypt(newKey, row.serverPrivateKeyEncrypted), 'server private key pem');
 });
 
-test('counts an empty installation table and skips one an older database does not have', async () => {
-  const db = await database();
+test('counts an empty installation table and skips one an older database does not have', opts, async (t) => {
+  const db = await database(t);
   assert.deepEqual(await reencryptCardKeys(db, 'old-secret', 'new-secret'), {
     nfc_card: 0,
     nfc_card_pending_change: 0,
   });
   await run(
     db,
-    'CREATE TABLE attractap_installation (id integer primary key, caPrivateKeyEncrypted text, serverPrivateKeyEncrypted text)',
+    'CREATE TABLE attractap_installation (id integer primary key, "caPrivateKeyEncrypted" text, "serverPrivateKeyEncrypted" text)',
   );
   assert.equal(
     (await reencryptCardKeys(db, 'old-secret', 'new-secret'))['attractap_installation.caPrivateKeyEncrypted'],
@@ -82,11 +87,11 @@ test('counts an empty installation table and skips one an older database does no
   );
 });
 
-test('names the column of a pairing key that does not decrypt', async () => {
-  const db = await database();
+test('names the column of a pairing key that does not decrypt', opts, async (t) => {
+  const db = await database(t);
   await run(
     db,
-    'CREATE TABLE attractap_installation (id integer primary key, caPrivateKeyEncrypted text, serverPrivateKeyEncrypted text)',
+    'CREATE TABLE attractap_installation (id integer primary key, "caPrivateKeyEncrypted" text, "serverPrivateKeyEncrypted" text)',
   );
   const oldKey = deriveKey('old-secret');
   const ca = encrypt(oldKey, 'ca');
@@ -96,13 +101,13 @@ test('names the column of a pairing key that does not decrypt', async () => {
     /attractap_installation\.serverPrivateKeyEncrypted row 1 cannot be read/,
   );
   assert.equal(
-    (await all(db, 'SELECT caPrivateKeyEncrypted FROM attractap_installation'))[0].caPrivateKeyEncrypted,
+    (await all(db, 'SELECT "caPrivateKeyEncrypted" FROM attractap_installation'))[0].caPrivateKeyEncrypted,
     ca,
   );
 });
 
-test('writes nothing for a dry run or when a value does not decrypt', async () => {
-  const db = await database();
+test('writes nothing for a dry run or when a value does not decrypt', opts, async (t) => {
+  const db = await database(t);
   const stored = encrypt(deriveKey('old-secret'), 'aa');
   await run(db, 'INSERT INTO nfc_card (id, key) VALUES (1, ?)', [stored]);
   await reencryptCardKeys(db, 'old-secret', 'new-secret', { dryRun: true });
@@ -116,30 +121,29 @@ test('writes nothing for a dry run or when a value does not decrypt', async () =
   assert.equal((await all(db, 'SELECT key FROM nfc_card WHERE id = 1'))[0].key, stored);
 });
 
-test('refuses missing or identical secrets', async () => {
-  const db = await database();
+test('refuses missing or identical secrets', opts, async (t) => {
+  const db = await database(t);
   await assert.rejects(() => reencryptCardKeys(db, '', 'x'));
   await assert.rejects(() => reencryptCardKeys(db, 'same', 'same'));
 });
 
-test('finds the database like the API does, unless --db names it', async () => {
-  const { resolveDatabasePath: apiResolveDatabasePath } = await import('../src/config/storage-path.ts');
-  for (const env of [{}, { STORAGE_ROOT: '/srv/attraccess' }, { STORAGE_ROOT: 'relative/storage' }]) {
-    assert.equal(resolveDatabasePath(env, '/work'), apiResolveDatabasePath(env, '/work'));
-  }
-  assert.equal(resolveDatabasePath({ STORAGE_ROOT: '/app/storage' }, '/app'), '/app/storage/attraccess.sqlite');
+test('finds the database like the API does, unless --db names it', () => {
+  const env = { DATABASE_URL: ' postgres://u:p@db:5432/attraccess ' };
+  assert.equal(resolveDatabaseUrl(env), 'postgres://u:p@db:5432/attraccess');
+  assert.throws(() => resolveDatabaseUrl({}), /DATABASE_URL is required/);
+  assert.throws(
+    () => resolveDatabaseUrl({ DATABASE_TYPE: 'sqlite', DATABASE_URL: 'x' }),
+    /Unsupported DATABASE_TYPE "sqlite"/,
+  );
 
-  assert.deepEqual(parseArgs([], { STORAGE_ROOT: '/app/storage' }, '/app'), {
-    dryRun: false,
-    databasePath: '/app/storage/attraccess.sqlite',
-  });
-  assert.deepEqual(parseArgs(['--', '--dry-run', '--db', 'copy.sqlite'], {}, '/backup'), {
+  assert.deepEqual(parseArgs([], env), { dryRun: false, databaseUrl: 'postgres://u:p@db:5432/attraccess' });
+  assert.deepEqual(parseArgs(['--', '--dry-run', '--db', 'postgres://copy/db'], {}), {
     dryRun: true,
-    databasePath: '/backup/copy.sqlite',
+    databaseUrl: 'postgres://copy/db',
   });
-  assert.equal(parseArgs(['--db=/data/a.sqlite'], {}, '/x').databasePath, '/data/a.sqlite');
-  assert.throws(() => parseArgs(['--db']), /--db needs a path/);
-  assert.throws(() => parseArgs(['--secret=abc']), /unknown argument/);
+  assert.equal(parseArgs(['--db=postgres://x/y'], {}).databaseUrl, 'postgres://x/y');
+  assert.throws(() => parseArgs(['--db'], env), /--db needs a connection URL/);
+  assert.throws(() => parseArgs(['--secret=abc'], env), /unknown argument/);
 });
 
 test('runs as a plain Node script without TypeScript sources', async () => {

@@ -236,6 +236,25 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_USER: attraccess
+          POSTGRES_PASSWORD: attraccess
+          POSTGRES_DB: attraccess
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U attraccess -d attraccess"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_TYPE: postgres
+      DATABASE_URL: postgres://attraccess:attraccess@127.0.0.1:5432/attraccess
+      # Admin connection the tests create one database per test from.
+      TEST_DATABASE_URL: postgres://attraccess:attraccess@127.0.0.1:5432/postgres
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -245,12 +264,31 @@ jobs:
         with:
           esp-idf: 'false'
       # Runs every test target, api:test-conformance included: the backend-parameterised persistence contract
-      # (ATT-1146) on real SQLite files with independent connections. api:test leaves those specs to it.
+      # (ATT-1146) on a real PostgreSQL service with independent connections. api:test leaves those specs to it.
       - name: Test all core projects
         run: node scripts/ci-test-projects.mjs --group=core
 
   browser-e2e:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_USER: attraccess
+          POSTGRES_PASSWORD: attraccess
+          POSTGRES_DB: attraccess
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U attraccess -d attraccess"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_TYPE: postgres
+      DATABASE_URL: postgres://attraccess:attraccess@127.0.0.1:5432/attraccess
+      # Admin connection the tests create one database per test from.
+      TEST_DATABASE_URL: postgres://attraccess:attraccess@127.0.0.1:5432/postgres
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -295,6 +333,25 @@ jobs:
     # RabbitMQ plugin E2E tests use Testcontainers and require Docker, which is
     # available on the stable Ubuntu runner image.
     runs-on: ubuntu-26.04
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_USER: attraccess
+          POSTGRES_PASSWORD: attraccess
+          POSTGRES_DB: attraccess
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U attraccess -d attraccess"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_TYPE: postgres
+      DATABASE_URL: postgres://attraccess:attraccess@127.0.0.1:5432/attraccess
+      # Admin connection the tests create one database per test from.
+      TEST_DATABASE_URL: postgres://attraccess:attraccess@127.0.0.1:5432/postgres
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
