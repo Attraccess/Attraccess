@@ -113,7 +113,7 @@ describe.each(BUNDLED_PLUGINS)('adoption of the 1.x tables of the bundled plugin
     const expectedError = legacy.length > 1 ? PluginStorageMigrationRefused : PluginStorageMigrationFailed;
     await expect(db.engine.migrate(compiled)).rejects.toBeInstanceOf(expectedError);
     if (legacy.length > 1) {
-      await expect(db.engine.migrate(compiled)).rejects.toThrow(/Install the last 1\.x release of the plugin first/);
+      await expect(db.engine.migrate(compiled)).rejects.toThrow(/update to Attraccess 1\.11 and start it once/);
     }
 
     expect(await db.snapshot()).toBe(before);
