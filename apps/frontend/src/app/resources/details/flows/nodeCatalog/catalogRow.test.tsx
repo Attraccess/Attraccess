@@ -14,7 +14,16 @@ const tStub: TFunction = ((key: string) => {
 }) as unknown as TFunction;
 
 const node: CatalogNode = {
-  schema: { type: ResourceFlowNodeType.INPUT_BUTTON, inputs: [], outputs: ['out'], isInput: true, isOutput: false, supportedByResource: true, supportedFlowScopes: ['resource'], configSchema: {} },
+  schema: {
+    type: ResourceFlowNodeType.INPUT_BUTTON,
+    inputs: [],
+    outputs: ['out'],
+    isInput: true,
+    isOutput: false,
+    supportedByResource: true,
+    supportedFlowScopes: ['resource'],
+    configSchema: {},
+  },
   direction: 'down',
 };
 
@@ -44,7 +53,10 @@ describe('CatalogRow', () => {
     render(<CatalogRow node={pluginNode} tNodeTranslations={tStub} onSelect={vi.fn()} />);
 
     expect(screen.getByText('Control device')).toBeInTheDocument();
-    expect(screen.getByText('Select a capability to control.')).toBeInTheDocument();
+    expect(screen.getByText('Select a capability to control.')).toHaveAttribute(
+      'title',
+      'Select a capability to control.',
+    );
   });
 
   it('calls onSelect with node type on click', async () => {
