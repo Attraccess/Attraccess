@@ -340,10 +340,16 @@ void ReaderLink::onControl(const std::string &payload)
             socket.forceReconnect("installation mismatch");
             return;
         }
-        // The server accepted this key: a DS session may retire the software key, and a reader paired with
-        // the software key asks for its identity upgrade.
-        onDsSessionConfirmed();
-        startIdentityUpgrade();
+        // The software key's removal and the identity upgrade wait for the sign-in and READER_FIRMWARE_INFO
+        // (onFirmwareInfoSent): the server's upgrade gate needs the profile from that message.
+        return;
+    }
+
+    if (strcmp(type, "identity.recover") == 0)
+    {
+        // An upgrade-only session for this replaced P-256 key: the server applied our upgrade, we lost the
+        // certificate. No sign-in follows; ask again with the same DS key.
+        startIdentityUpgrade(true);
         return;
     }
 

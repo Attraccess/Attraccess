@@ -118,14 +118,21 @@ export class ReaderSessionService implements OnModuleDestroy {
       const fingerprint = peerFingerprint as string | null;
       const algorithm = peerSpki ? readerKeyAlgorithm(peerSpki) : null;
       if (decision.kind === 'upgrade-recovery') {
-        if (fingerprint)
-          this.controls.attach(
-            connection,
-            new SessionSecurityState(decision.readerId, fingerprint, algorithm),
-            'recovery',
-          );
-        // No application messages in this session: anything but control frames ends it.
-        connection.on('message', () => connection.close());
+        if (!fingerprint) {
+          connection.close();
+          return;
+        }
+        // Sends identity.recover (never session.hello): the reader asks for the upgrade again on this key.
+        this.controls.attach(
+          connection,
+          new SessionSecurityState(decision.readerId, fingerprint, algorithm),
+          'recovery',
+        );
+        // No application messages in this session. The reader's keep-alive runs regardless of sign-in and is
+        // ignored; anything else ends the session.
+        connection.on('message', (frame: Frame) => {
+          if (frame.type !== FrameType.HEARTBEAT) connection.close();
+        });
         return;
       }
 

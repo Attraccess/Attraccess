@@ -13,8 +13,35 @@
 //   server -> {"t":"identity.upgraded","certificate":"<PEM>"}  |  {"t":"identity.upgrade.rejected","reason":"..."}
 // The proof signs IdentityProof::tuple (domain separated; binds installation, reader, the old key's
 // fingerprint, the new SPKI and the nonce). Pure message code; ReaderLink drives it and owns the key switch.
+//
+// When the reader asks (shouldRequest):
+//  - after READER_FIRMWARE_INFO of the session went out: the server's gate reads the profile from it;
+//  - when the server opens an upgrade-only session for the replaced P-256 key ({"t":"identity.recover"}): the
+//    reader lost the certificate of an upgrade the server already applied (15 minute window).
 namespace IdentityUpgrade
 {
+    enum class Trigger
+    {
+        FirmwareInfoSent,
+        ServerRecover,
+    };
+
+    struct RequestState
+    {
+        // DS key available and the session runs on the P-256 software key, whose certificate is stored.
+        bool candidate = false;
+        // Already asked in this session.
+        bool requested = false;
+        // The server answered `not-allowed` earlier in this boot.
+        bool blocked = false;
+        // NVS works: the new certificate can be stored before the reconnect.
+        bool storageReady = false;
+    };
+
+    // Whether to send identity.upgrade.request now. A server-initiated recovery is not held back by an earlier
+    // `not-allowed`: the server already applied the upgrade and only re-sends the certificate.
+    bool shouldRequest(Trigger trigger, const RequestState &state);
+
     using Signer = std::function<bool(const std::vector<uint8_t> &message, std::vector<uint8_t> &signature)>;
 
     struct Context

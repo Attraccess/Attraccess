@@ -8,9 +8,7 @@
 #include "ds_storage.hpp"
 #include "esp_ds.h"
 #include "esp_efuse.h"
-#include "identity_proof.hpp"
 #include "psa_crypto_driver_esp_rsa_ds.h"
-#include "rsa_der.hpp"
 
 struct DsReaderKeyImpl
 {
@@ -75,27 +73,6 @@ std::unique_ptr<DsReaderKey> DsReaderKey::fromRecord(const DsRecord::Record &rec
     }
     result->spki = record.spki;
     return result;
-}
-
-bool DsReaderKey::signPss(const std::vector<uint8_t> &message, std::vector<uint8_t> &signature) const
-{
-    uint8_t digest[32];
-    size_t digestLength = 0;
-    if (psa_hash_compute(PSA_ALG_SHA_256, message.data(), message.size(), digest, sizeof(digest), &digestLength) !=
-        PSA_SUCCESS)
-    {
-        return false;
-    }
-    signature.assign(RsaDer::MODULUS_BYTES, 0);
-    size_t length = 0;
-    if (psa_sign_hash(key, PSA_ALG_RSA_PSS(PSA_ALG_SHA_256), digest, digestLength, signature.data(), signature.size(),
-                      &length) != PSA_SUCCESS ||
-        length != RsaDer::MODULUS_BYTES)
-    {
-        signature.clear();
-        return false;
-    }
-    return true;
 }
 
 DsReaderKeyStore::Status DsReaderKeyStore::status()

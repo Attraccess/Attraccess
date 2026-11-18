@@ -121,6 +121,33 @@ namespace ReaderIdentity
         return mbedtls_pk_wrap_psa(&pk, key.keyId());
     }
 
+    bool signRsaPssSha256(const IReaderKey &key, const std::vector<uint8_t> &message, std::vector<uint8_t> &signature)
+    {
+        signature.clear();
+        if (key.algorithm() != IReaderKey::Algorithm::Rsa3072Ds)
+        {
+            return false;
+        }
+        uint8_t digest[32];
+        size_t digestLength = 0;
+        if (psa_hash_compute(PSA_ALG_SHA_256, message.data(), message.size(), digest, sizeof(digest),
+                             &digestLength) != PSA_SUCCESS)
+        {
+            return false;
+        }
+        // PSA's RSA-PSS uses MGF1 with the same hash and a salt as long as the hash (32 bytes).
+        signature.assign(RsaDer::MODULUS_BYTES, 0);
+        size_t length = 0;
+        if (psa_sign_hash(key.keyId(), PSA_ALG_RSA_PSS(PSA_ALG_SHA_256), digest, digestLength, signature.data(),
+                          signature.size(), &length) != PSA_SUCCESS ||
+            length != RsaDer::MODULUS_BYTES)
+        {
+            signature.clear();
+            return false;
+        }
+        return true;
+    }
+
     bool selfSignedCertificate(const IReaderKey &key, std::vector<uint8_t> &der)
     {
         mbedtls_pk_context pk;

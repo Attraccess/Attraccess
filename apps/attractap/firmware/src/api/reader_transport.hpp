@@ -65,4 +65,8 @@ public:
     virtual bool authenticatesReader() const { return false; }
     // Key of the current session, as READER_FIRMWARE_INFO reports it: "ecdsa-p256" or "ds-rsa3072".
     virtual const char *identityName() const { return "ecdsa-p256"; }
+    // The API sent READER_FIRMWARE_INFO of this sign-in (called right after the send succeeded). The secure reader
+    // link sends its eFuse report and asks for the identity upgrade only then: the server's upgrade gate reads the
+    // profile from that message.
+    virtual void onFirmwareInfoSent() {}
 };

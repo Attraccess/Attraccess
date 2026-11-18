@@ -29,6 +29,7 @@ import { PairingService } from './security/pairing.service';
 import { ReaderSessionService } from './security/reader-session.service';
 import { ReaderControlService } from './security/reader-control.service';
 import { IdentityUpgradeService } from './security/identity-upgrade.service';
+import { conversionStateStubProvider } from './security/identity-upgrade-gate';
 import { EfuseReportService } from './security/efuse-report.service';
 import { SessionMetrics } from './security/session-metrics';
 import { SecureBootKeyService } from './secure-boot/secure-boot-key.service';
@@ -112,6 +113,8 @@ import { BLE_TRANSPORT_DRIVER } from '../plugin-system/ble/ble-transport-driver'
     ReaderSessionService,
     ReaderControlService,
     IdentityUpgradeService,
+    // T3 HOOK (ATT-1208): replace with the provider that reads the persisted conversion state.
+    conversionStateStubProvider,
     EfuseReportService,
     SecureBootKeyService,
     SecureImageService,

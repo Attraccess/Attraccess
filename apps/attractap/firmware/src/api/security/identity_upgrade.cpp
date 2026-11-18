@@ -9,6 +9,15 @@
 
 namespace IdentityUpgrade
 {
+    bool shouldRequest(Trigger trigger, const RequestState &state)
+    {
+        if (!state.candidate || state.requested || !state.storageReady)
+        {
+            return false;
+        }
+        return trigger == Trigger::ServerRecover || !state.blocked;
+    }
+
     std::string requestMessage()
     {
         return "{\"t\":\"identity.upgrade.request\"}";

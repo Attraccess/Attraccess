@@ -9,8 +9,9 @@
 //
 // Integration: ESP-IDF v6.0.2 ships a PSA opaque driver for the DS peripheral
 // (PSA_KEY_LIFETIME_ESP_RSA_DS_VOLATILE, the one esp-tls uses). The key is imported as an opaque PSA
-// RSA key pair; mbedTLS signs the TLS 1.3 CertificateVerify (rsa_pss_rsae_sha256) and IdentityUpgrade signs
-// its proof through psa_sign_hash. The driver keeps pointers into our DS data, so DsReaderKey owns it.
+// RSA key pair; mbedTLS signs the TLS 1.3 CertificateVerify (rsa_pss_rsae_sha256) and the identity upgrade signs
+// its proof through ReaderIdentity::signRsaPssSha256 (psa_sign_hash on keyId()). The driver keeps pointers
+// into our DS data, so DsReaderKey owns it.
 // Only the encrypted DS parameters (DS record) exist in flash; the HMAC key that decrypts them lives
 // read-protected in eFuse KEY3 and never leaves the chip.
 #if defined(ESP_PLATFORM) && defined(ATTRACTAP_SECURE_BUILD)
@@ -31,9 +32,6 @@ public:
     Algorithm algorithm() const override { return Algorithm::Rsa3072Ds; }
     const std::vector<uint8_t> &publicKeySpki() const override { return spki; }
     mbedtls_svc_key_id_t keyId() const override { return key; }
-
-    // RSA-PSS SHA-256 (MGF1-SHA256, salt 32) over `message`.
-    bool signPss(const std::vector<uint8_t> &message, std::vector<uint8_t> &signature) const;
 
 private:
     DsReaderKey() = default;

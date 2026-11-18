@@ -3,9 +3,10 @@ import { constants, createHash, generateKeyPairSync, sign, type KeyObject } from
 import { validAttractapDetails } from '../../audit/policies/attractap';
 import { FakeCredentialStore, FakeUnitOfWork } from '../attractap-fake-stores.test-fixture';
 import { CredentialRegistryService } from './credential-registry.service';
-import { isIdentityUpgradeAllowed, readerConversionState } from './identity-upgrade-gate';
+import { isIdentityUpgradeAllowed, noConversionState } from './identity-upgrade-gate';
 import { buildProofTuple, type ProofFields } from './identity-upgrade-proof';
 import {
+  FIRMWARE_INFO_WAIT_MS,
   IdentityUpgradeService,
   NONCE_TTL_MS,
   RECOVERY_WINDOW_MS,
@@ -14,6 +15,7 @@ import {
 } from './identity-upgrade.service';
 import { spkiFingerprint } from './pki';
 import { SessionSecurityState, type ReportedBuild } from './session-security-state';
+import type { AttractapConversionState } from '@attraccess/application-models';
 
 const INSTALLATION = 'installation-1';
 const lab: ReportedBuild = { profile: 'secure-lab', release: false, variant: 'attractap-touch-v2', secureVersion: 1 };
@@ -52,7 +54,7 @@ describe('identity upgrade', () => {
         notAfter: new Date(Date.now() + 1e10),
       })),
     };
-    service = new IdentityUpgradeService(identity as never, registry, audit);
+    service = new IdentityUpgradeService(identity as never, registry, audit, noConversionState);
   });
 
   const session = (
@@ -240,14 +242,33 @@ describe('identity upgrade', () => {
       ['no firmware info', null],
     ] as Array<[string, ReportedBuild | null]>)('an upgrade by %s: the gate is closed', async (_name, build) => {
       const s = session(build);
-      expect(await s.handleRequest()).toEqual({ t: 'identity.upgrade.rejected', reason: 'not-allowed' });
-      // A valid-looking exchange does not get around the gate either.
-      const nonce = Buffer.alloc(32, 1);
-      expect(await upgrade(s, dsSpki, proofFor(nonce))).toEqual({
-        t: 'identity.upgrade.rejected',
-        reason: 'not-allowed',
-      });
+      // Without firmware info the gate waits for it first.
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+      try {
+        const answer = s.handleRequest();
+        await jest.advanceTimersByTimeAsync(FIRMWARE_INFO_WAIT_MS);
+        expect(await answer).toEqual({ t: 'identity.upgrade.rejected', reason: 'not-allowed' });
+        // A valid-looking exchange does not get around the gate either.
+        const nonce = Buffer.alloc(32, 1);
+        const attempt = upgrade(s, dsSpki, proofFor(nonce));
+        await jest.advanceTimersByTimeAsync(FIRMWARE_INFO_WAIT_MS);
+        expect(await attempt).toEqual({ t: 'identity.upgrade.rejected', reason: 'not-allowed' });
+      } finally {
+        jest.useRealTimers();
+      }
       unchanged();
+      expect(identity.issueReaderCertificate).not.toHaveBeenCalled();
+    });
+
+    it('nothing while the firmware info is still on its way: the request waits for it', async () => {
+      const state = new SessionSecurityState(7, oldFingerprint, 'ecdsa-p256');
+      const s = service.createSession(state);
+      // The reader sends the request right after READER_FIRMWARE_INFO; the gateway may process that one later.
+      const answer = s.handleRequest();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      state.setBuild(lab);
+      const nonce = Buffer.from(((await answer) as { nonce: string }).nonce, 'base64');
+      expect((await upgrade(s, dsSpki, proofFor(nonce))).t).toBe('identity.upgraded');
     });
 
     it('an upgrade from a session that already uses an RSA key', async () => {
@@ -265,6 +286,7 @@ describe('identity upgrade', () => {
         reason: 'not-allowed',
       });
       expect(store.events).toHaveLength(0);
+      expect(identity.issueReaderCertificate).not.toHaveBeenCalled();
     });
 
     it('an upgrade that loses a race with a revoke (the revoke wins, nothing is re-paired)', async () => {
@@ -311,15 +333,26 @@ describe('identity upgrade', () => {
 
   describe('the gate', () => {
     it('opens for the lab profile and for a conversion in creating-key, nothing else', async () => {
-      expect(await isIdentityUpgradeAllowed(1, lab)).toBe(true);
-      expect(await isIdentityUpgradeAllowed(1, { ...lab, profile: 'secure', release: true })).toBe(false);
-      expect(await isIdentityUpgradeAllowed(1, null)).toBe(false);
-      expect(await isIdentityUpgradeAllowed(1, { ...lab, profile: 'secure' }, async () => 'creating-key')).toBe(true);
-      expect(await isIdentityUpgradeAllowed(1, { ...lab, profile: 'plain' }, async () => 'staging')).toBe(false);
+      const converting = (state: AttractapConversionState) => ({ stateOf: async () => state });
+      expect(await isIdentityUpgradeAllowed(1, lab, noConversionState)).toBe(true);
+      expect(await isIdentityUpgradeAllowed(1, { ...lab, profile: 'secure', release: true }, noConversionState)).toBe(
+        false,
+      );
+      expect(await isIdentityUpgradeAllowed(1, null, noConversionState)).toBe(false);
+      expect(await isIdentityUpgradeAllowed(1, { ...lab, profile: 'secure' }, converting('creating-key'))).toBe(true);
+      expect(await isIdentityUpgradeAllowed(1, { ...lab, profile: 'plain' }, converting('transferring'))).toBe(false);
     });
 
     it('has a T3 hook that answers "not converting" until the conversion exists', async () => {
-      expect(await readerConversionState(1)).toBeNull();
+      expect(await noConversionState.stateOf(1)).toBeNull();
+    });
+
+    it('asks the injected conversion state (T3 hook) for a release secure reader', async () => {
+      const conversions = { stateOf: jest.fn(async () => 'creating-key' as const) };
+      service = new IdentityUpgradeService(identity as never, registry, audit, conversions);
+      const s = session({ profile: 'secure', release: true, variant: 'v', secureVersion: 1 });
+      expect((await upgrade(s, dsSpki, proofFor(await challenge(s)))).t).toBe('identity.upgraded');
+      expect(conversions.stateOf).toHaveBeenCalledWith(7);
     });
   });
 
@@ -344,13 +377,62 @@ describe('identity upgrade', () => {
       await upgradeOnce();
       const s = session(null, 'ecdsa-p256', 'recovery');
       const otherSpki = spkiOf(other.publicKey);
+      identity.issueReaderCertificate.mockClear();
       expect(
         await upgrade(s, otherSpki, proofFor(await challenge(s), { newSpki: otherSpki }, other.privateKey)),
       ).toEqual({ t: 'identity.upgrade.rejected', reason: 'bad-spki' });
+      expect(identity.issueReaderCertificate).not.toHaveBeenCalled();
       expect(await service.isRecoverable(7, oldFingerprint, Date.now() + RECOVERY_WINDOW_MS + 60_000)).toBe(false);
       expect(await service.isRecoverable(7, spkiFingerprint(Buffer.from('never paired')))).toBe(false);
       // The active key itself is not "recoverable": it signs in normally.
       expect(await service.isRecoverable(7, spkiFingerprint(dsSpki))).toBe(false);
+    });
+
+    it('refuses a recovery attempt after the window without issuing a certificate', async () => {
+      await upgradeOnce();
+      identity.issueReaderCertificate.mockClear();
+      const s = session(null, 'ecdsa-p256', 'recovery');
+      const nonce = await challenge(s);
+      jest.spyOn(Date, 'now').mockReturnValue(Date.now() + RECOVERY_WINDOW_MS + 60_000);
+      try {
+        expect(await upgrade(s, dsSpki, proofFor(nonce), 0)).toEqual({
+          t: 'identity.upgrade.rejected',
+          reason: 'not-allowed',
+        });
+      } finally {
+        jest.restoreAllMocks();
+      }
+      expect(identity.issueReaderCertificate).not.toHaveBeenCalled();
+    });
+
+    it('never treats a key an admin replaced (takeover) as recoverable', async () => {
+      // The takeover writes `replaced` too, but with the admin as actor.
+      await registry.markPaired({
+        readerId: 7,
+        fingerprint: spkiFingerprint(dsSpki),
+        certificate: { serial: '0c', notAfter: new Date(Date.now() + 1e10) },
+        actorId: 1,
+        previousCredentialBecomes: 'replaced',
+      });
+      expect(store.events.map((e) => [e.state, e.actorId])).toEqual([
+        ['replaced', 1],
+        ['paired', 1],
+      ]);
+      expect(await service.isRecoverable(7, oldFingerprint)).toBe(false);
+    });
+
+    it('stops the recovery once anything changed the credential after the upgrade', async () => {
+      await upgradeOnce();
+      // An admin re-pairs the DS key (e.g. after a revoke): the upgrade rows are no longer the newest.
+      await registry.revoke(7, 1);
+      await registry.markPaired({
+        readerId: 7,
+        fingerprint: spkiFingerprint(dsSpki),
+        certificate: { serial: '0d', notAfter: new Date(Date.now() + 1e10) },
+        actorId: 1,
+        previousCredentialBecomes: 'revoked',
+      });
+      expect(await service.isRecoverable(7, oldFingerprint)).toBe(false);
     });
   });
 

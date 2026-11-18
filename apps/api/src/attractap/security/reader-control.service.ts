@@ -11,7 +11,15 @@ type ReaderControlType = (typeof READER_CONTROL_TYPES)[number];
 
 const MAX_EFUSE_REPORTS_PER_SESSION = 3;
 /** An upgrade-only (recovery) session has nothing else to do and does not linger. */
-const RECOVERY_SESSION_MS = 30_000;
+export const RECOVERY_SESSION_MS = 30_000;
+/** After identity.upgraded the old key's session stays open this long, so the reply can leave before the close. */
+export const UPGRADED_CLOSE_DELAY_MS = 1_000;
+/**
+ * Server->reader CONTROL that opens an upgrade-only (recovery) session. Never session.hello: the reader must not
+ * take it for a normal session. A reader that still holds its replaced P-256 key and has its DS key asks for the
+ * upgrade again on it.
+ */
+export const IDENTITY_RECOVER_CONTROL = { t: 'identity.recover' } as const;
 
 export function parseReaderControl(payload: Buffer): { t: ReaderControlType; body: Record<string, unknown> } | null {
   try {
@@ -43,7 +51,10 @@ export class ReaderControlService {
     const upgrade = this.upgrades.createSession(state, mode);
     let reports = 0;
     let queue: Promise<void> = Promise.resolve();
-    if (mode === 'recovery') setTimeout(() => connection.close(), RECOVERY_SESSION_MS).unref();
+    if (mode === 'recovery') {
+      setTimeout(() => connection.close(), RECOVERY_SESSION_MS).unref();
+      connection.sendFrame(FrameType.CONTROL, encode(IDENTITY_RECOVER_CONTROL));
+    }
 
     connection.on('control', (payload: Buffer) => {
       const message = parseReaderControl(payload);
@@ -74,8 +85,12 @@ export class ReaderControlService {
         ? await upgrade.handleRequest()
         : await upgrade.handleUpgrade(message.body);
     if (reply === 'violation') return connection.close();
-    connection.sendFrame(FrameType.CONTROL, Buffer.from(JSON.stringify(reply), 'utf8'));
+    connection.sendFrame(FrameType.CONTROL, encode(reply));
     // The old key is no credential any more: its session ends once the reply had time to leave (the reader reconnects).
-    if (reply['t'] === 'identity.upgraded') setTimeout(() => connection.close(), 1000).unref();
+    if (reply.t === 'identity.upgraded') setTimeout(() => connection.close(), UPGRADED_CLOSE_DELAY_MS).unref();
   }
+}
+
+function encode(message: object): Buffer {
+  return Buffer.from(JSON.stringify(message), 'utf8');
 }

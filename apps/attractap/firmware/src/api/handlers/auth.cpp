@@ -127,7 +127,7 @@ void API::sendFirmwareInfo()
     if (BleProxy::supported())
         this->bleProxy.fillCapability(event["data"]["payload"]["capabilities"], bleCaps, sizeof bleCaps);
 
-    // The ui and ble blocks make this message ~1.1 KB; a smaller buffer would be truncated silently.
+    // The ui and ble blocks make this message ~1.2 KB (1232 B measured by tests/ui-schema); a smaller buffer would be truncated silently.
     char json[JSON_OUTBUF_AUTH];
     size_t n = serializeJson(event, json, sizeof(json));
     if (n == 0 || n >= sizeof(json))
@@ -135,7 +135,11 @@ void API::sendFirmwareInfo()
         this->logger.error("Failed to serialize firmware info");
         return;
     }
-    this->transport.sendMessage(json, n);
+    if (this->transport.sendMessage(json, n))
+    {
+        // Explicit, not a scan of outgoing bytes: the session's eFuse report and identity upgrade follow this message.
+        this->transport.onFirmwareInfoSent();
+    }
 }
 
 void API::onReaderAuthenticated(JsonObject data)

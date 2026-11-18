@@ -17,17 +17,6 @@
 #include "identity_upgrade.hpp"
 #include "nvs_erase_gate.hpp"
 
-namespace
-{
-    // The DS signature (RSA-3072 on the peripheral) runs on the main loop; it takes well under a second.
-    bool signWith(const std::shared_ptr<IReaderKey> &key, const std::vector<uint8_t> &message,
-                  std::vector<uint8_t> &signature)
-    {
-        const DsReaderKey *ds = static_cast<const DsReaderKey *>(key.get());
-        return ds->signPss(message, signature);
-    }
-}
-
 bool ReaderLink::selectSecureIdentity()
 {
     dsKey.reset();
@@ -140,15 +129,39 @@ void ReaderLink::resetSessionIdentityState()
     efuseReportSent = false;
 }
 
-void ReaderLink::startIdentityUpgrade()
+void ReaderLink::onFirmwareInfoSent()
 {
-    if (!upgradeCandidate || upgradeRequested || upgradeBlocked || !dsKey || !key || key == dsKey ||
-        !credentials.hasCertificate() || !NvsEraseGate::initialized())
+    if (channel != Channel::Session || !sessionReady.load())
     {
         return;
     }
+    // Signed in on the DS key (READER_AUTHENTICATED, after the server re-checked the credential): the P-256
+    // software key is not needed any more.
+    onDsSessionConfirmed();
+    sendEfuseReport();
+    startIdentityUpgrade(false);
+}
+
+void ReaderLink::startIdentityUpgrade(bool serverRecover)
+{
+    IdentityUpgrade::RequestState state;
+    state.candidate = upgradeCandidate && dsKey && key && key != dsKey && credentials.hasCertificate();
+    state.requested = upgradeRequested;
+    state.blocked = upgradeBlocked;
+    state.storageReady = NvsEraseGate::initialized();
+    const IdentityUpgrade::Trigger trigger =
+        serverRecover ? IdentityUpgrade::Trigger::ServerRecover : IdentityUpgrade::Trigger::FirmwareInfoSent;
+    if (!IdentityUpgrade::shouldRequest(trigger, state))
+    {
+        if (serverRecover)
+        {
+            logger.info("Server offers identity recovery, but this boot has no upgrade to repeat");
+        }
+        return;
+    }
     upgradeRequested = true;
-    logger.info("Requesting the identity upgrade to the DS key");
+    logger.info(serverRecover ? "Repeating the identity upgrade (server recovery)"
+                              : "Requesting the identity upgrade to the DS key");
     sendControl(IdentityUpgrade::requestMessage());
 }
 
@@ -164,8 +177,9 @@ void ReaderLink::onIdentityChallenge(const std::string &nonceBase64)
     context.oldSpki = key->publicKeySpki();
     context.newSpki = dsKey->publicKeySpki();
     const std::shared_ptr<IReaderKey> signer = dsKey;
+    // The DS signature (RSA-3072 on the peripheral) runs on the main loop; it takes well under a second.
     context.sign = [signer](const std::vector<uint8_t> &message, std::vector<uint8_t> &signature) {
-        return signWith(signer, message, signature);
+        return ReaderIdentity::signRsaPssSha256(*signer, message, signature);
     };
     std::string message;
     if (!IdentityUpgrade::upgradeMessage(context, nonceBase64, message))
@@ -227,7 +241,6 @@ void ReaderLink::onDsSessionConfirmed()
         return;
     }
     softwareKeyDropped = true;
-    // A DS session worked: the P-256 software key is not needed any more.
     if (softwareKey)
     {
         keyStore.erase();
@@ -236,19 +249,9 @@ void ReaderLink::onDsSessionConfirmed()
     }
 }
 
-void ReaderLink::sendEfuseReportAfter(const char *message, size_t length)
+void ReaderLink::sendEfuseReport()
 {
-    if (efuseReportSent || !message || length < 20)
-    {
-        return;
-    }
-    static const char NEEDLE[] = "READER_FIRMWARE_INFO";
-    bool found = false;
-    for (size_t i = 0; !found && i + sizeof(NEEDLE) - 1 <= length; i++)
-    {
-        found = memcmp(message + i, NEEDLE, sizeof(NEEDLE) - 1) == 0;
-    }
-    if (!found)
+    if (efuseReportSent)
     {
         return;
     }
@@ -277,11 +280,12 @@ bool ReaderLink::sendControl(const std::string &)
     return false;
 }
 void ReaderLink::resetSessionIdentityState() {}
-void ReaderLink::startIdentityUpgrade() {}
+void ReaderLink::onFirmwareInfoSent() {}
+void ReaderLink::startIdentityUpgrade(bool) {}
 void ReaderLink::onIdentityChallenge(const std::string &) {}
 void ReaderLink::onIdentityUpgraded(const char *) {}
 void ReaderLink::onIdentityRejected(const char *) {}
 void ReaderLink::onDsSessionConfirmed() {}
-void ReaderLink::sendEfuseReportAfter(const char *, size_t) {}
+void ReaderLink::sendEfuseReport() {}
 
 #endif

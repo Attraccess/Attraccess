@@ -241,12 +241,18 @@ describe('reader session through the real gateway', () => {
       const reader = new EmulatedReader({ url, identity });
       readers.push(reader);
       await reader.connect();
+      // The server invites the upgrade; it never sends session.hello in such a session.
+      await reader.nextFrame((f) => f.type === FrameType.CONTROL && json(f).t === 'identity.recover');
       control(reader, { t: 'identity.upgrade.request' });
       await reader.nextFrame((f) => f.type === FrameType.CONTROL && json(f).t === 'identity.challenge');
       expect(upgrades.createSession).toHaveBeenLastCalledWith(expect.anything(), 'recovery');
-      // Nothing of the application protocol is available in it.
-      expect(reader.frames.filter((f) => f.type === FrameType.JSON)).toEqual([]);
+      // The reader's keep-alive is ignored; nothing of the application protocol is available in it.
       reader.send(FrameType.HEARTBEAT, Buffer.alloc(0));
+      control(reader, { t: 'identity.upgrade.request' });
+      await reader.nextFrame((f) => f.type === FrameType.CONTROL && json(f).t === 'identity.challenge');
+      expect(reader.frames.filter((f) => f.type === FrameType.JSON)).toEqual([]);
+      expect(reader.frames.some((f) => f.type === FrameType.CONTROL && json(f).t === 'session.hello')).toBe(false);
+      reader.send(FrameType.JSON, JSON.stringify({ event: 'HEARTBEAT', data: {} }));
       await reader.closed;
     });
   });

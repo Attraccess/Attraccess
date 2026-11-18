@@ -84,6 +84,9 @@ public:
     void startPairing(const std::string &ticket) override;
     bool authenticatesReader() const override { return channel == Channel::Session; }
     const char *identityName() const override { return usingDsKey.load() ? "ds-rsa3072" : "ecdsa-p256"; }
+    // Secure builds: the eFuse report, the software key's removal (DS session) and the identity upgrade request
+    // follow READER_FIRMWARE_INFO of a session. No-op on plain builds and outside a session.
+    void onFirmwareInfoSent() override;
 
     Channel currentChannel() const { return channel.load(); }
     // Lock-free: the main loop never waits for the TLS worker to learn this.
@@ -151,14 +154,16 @@ private:
     bool selectSecureIdentity();
     // The pairing is gone (rejected by the server): a DS reader pairs again with its DS key.
     bool newSecureIdentity();
-    void startIdentityUpgrade();
+    // Sends identity.upgrade.request when IdentityUpgrade::shouldRequest says so. `serverRecover`: the server opened
+    // an upgrade-only session (identity.recover) for this replaced key.
+    void startIdentityUpgrade(bool serverRecover);
     void onIdentityChallenge(const std::string &nonceBase64);
     void onIdentityUpgraded(const char *certificatePem);
     void onIdentityRejected(const char *reason);
-    // First message of an authenticated session on the DS key: the server accepted it.
+    // The DS session was signed in (READER_AUTHENTICATED, firmware info sent): the software key goes.
     void onDsSessionConfirmed();
-    // Sends the eFuse report once per session, after READER_FIRMWARE_INFO went out.
-    void sendEfuseReportAfter(const char *message, size_t length);
+    // Sends the eFuse report once per session.
+    void sendEfuseReport();
     bool sendControl(const std::string &json);
     void resetSessionIdentityState();
 
@@ -195,7 +200,7 @@ private:
     std::atomic<bool> usingDsKey{false};
     // Paired with the software key although a DS key exists: the identity upgrade moves it.
     bool upgradeCandidate = false;
-    // One request per session; `not-allowed` stops them until the next boot.
+    // One request per session; `not-allowed` stops them until the next boot (except a server recovery).
     bool upgradeRequested = false;
     bool upgradeBlocked = false;
     bool upgradeProofSent = false;

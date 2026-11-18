@@ -740,6 +740,25 @@ void testRsaSessionTls()
     SessionTls bootstrapClient;
     SessionTls::Config bootstrap{rsa.get(), selfSigned, pki.caKey->publicKeySpki(), "", 0};
     CHECK(handshake(bootstrapClient, bootstrapServer, bootstrap) == SessionTls::Status::Open);
+
+    // The identity upgrade proof signs through IReaderKey's PSA key id (no DS-specific code): RSA-PSS SHA-256,
+    // salt 32, verified with the public key alone.
+    const Bytes message = {'p', 'r', 'o', 'o', 'f'};
+    Bytes signature;
+    CHECK(ReaderIdentity::signRsaPssSha256(*rsa, message, signature) && signature.size() == RsaDer::MODULUS_BYTES);
+    constexpr size_t HEADER = RsaDer::SPKI_BYTES - 398; // the SPKI's algorithm header before the RSAPublicKey
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+    psa_set_key_type(&attributes, PSA_KEY_TYPE_RSA_PUBLIC_KEY);
+    psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_VERIFY_MESSAGE);
+    psa_set_key_algorithm(&attributes, PSA_ALG_RSA_PSS(PSA_ALG_SHA_256));
+    mbedtls_svc_key_id_t verifier = MBEDTLS_SVC_KEY_ID_INIT;
+    CHECK(psa_import_key(&attributes, rsa->publicKeySpki().data() + HEADER, rsa->publicKeySpki().size() - HEADER,
+                         &verifier) == PSA_SUCCESS);
+    CHECK(psa_verify_message(verifier, PSA_ALG_RSA_PSS(PSA_ALG_SHA_256), message.data(), message.size(),
+                             signature.data(), signature.size()) == PSA_SUCCESS);
+    psa_destroy_key(verifier);
+    // A P-256 key never signs a proof.
+    CHECK(!ReaderIdentity::signRsaPssSha256(*pki.readerKey, message, signature) && signature.empty());
 }
 
 void testIdentity()

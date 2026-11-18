@@ -386,8 +386,6 @@ bool ReaderLink::sendMessage(const char *message, size_t length)
         }
         if (flushOutbox())
         {
-            lock.unlock();
-            sendEfuseReportAfter(message, length);
             return true;
         }
         closeSessionLocked();
