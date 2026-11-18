@@ -27,13 +27,15 @@ You open the case only for the first flash. All later updates go over the networ
 The micro-USB port of the S10 only supplies power; there is no USB-serial chip. To flash it, you need a **3.3 V USB-TTL adapter**:
 
 1. Open the case.
-2. Connect the adapter to the serial pads: TX to RX, RX to TX (crossed), GND to GND and 3.3 V to 3.3 V.
-3. Hold the download button (**GPIO0**) while you power up the S10. It starts in download mode.
+2. Connect the adapter to the serial pads: TX to RX, RX to TX (crossed) and GND to GND. Leave the 3.3 V pin of the adapter unconnected.
+3. Power the S10 from its micro-USB port. Hold the download button (**GPIO0**) while you plug in the power, and it starts in download mode.
 
 > [!WARNING]
 > **Never power the S10 through USB and PoE at the same time.** Disconnect the Ethernet cable while the adapter is connected.
 >
 > **Never use a 5 V adapter on the logic pins.** 5 V damages the ESP32. Check that your adapter is set to 3.3 V before you connect it.
+>
+> **Do not power the S10 from the adapter.** The 3.3 V output of a USB-TTL adapter cannot supply the radio: the bridge firmware restarts with a brownout a few seconds after every start.
 
 ### Back up the stock firmware
 
@@ -51,7 +53,7 @@ Keep the file private. You can restore the stock firmware later with `esptool.py
 2. In Attraccess, open the readers page (**Devices** > **Attractap Readers**) and choose **Set up Attractap**.
 3. Click **Connect via USB** and pick the serial port of your adapter.
 4. On the **Firmware** tab, choose **Attractap BLE Bridge** (ESP32, GL.iNet GL-S10) and click **Install Now**. Read the warning and confirm it. Attraccess refuses to flash if the connected chip is not the expected one.
-5. Power-cycle the S10 **without** holding GPIO0. It now starts the bridge firmware.
+5. Unplug the micro-USB power and plug it in again **without** holding GPIO0. It now starts the bridge firmware.
 6. Click **Continue setup**. The page continues into the configuration on the same port. Set the PIN, the Wi-Fi network (optional) and the API URL of your Attraccess server.
 
 > [!NOTE]

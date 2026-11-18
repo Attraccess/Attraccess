@@ -29,15 +29,15 @@
   "bridgeWarning": {
     "title": "GL.iNet GL-S10 vorbereiten",
     "power": "Versorge den GL-S10 nie gleichzeitig über USB und PoE mit Strom.",
-    "wiring": "Öffne das Gehäuse und schließe einen 3,3-V-USB-TTL-Adapter an die seriellen Pads an: TX an RX, RX an TX, GND an GND und 3,3 V an 3,3 V. Verwende nie einen 5-V-Adapter.",
-    "downloadMode": "Halte den Download-Taster (GPIO0) gedrückt, während du den GL-S10 einschaltest, und starte dann die Installation.",
+    "wiring": "Öffne das Gehäuse und schließe einen 3,3-V-USB-TTL-Adapter an die seriellen Pads an: TX an RX, RX an TX und GND an GND. Lass den 3,3-V-Pin des Adapters frei: Er kann den Funk nicht versorgen, und die Bridge würde ständig neu starten. Verwende nie einen 5-V-Adapter.",
+    "downloadMode": "Halte den Download-Taster (GPIO0) gedrückt, während du die Micro-USB-Stromversorgung des GL-S10 einsteckst, und starte dann die Installation.",
     "docsLink": "Schritt-für-Schritt-Anleitung zu Pads und Verkabelung",
     "docsUrl": "https://docs.attraccess.org/#/de/attractap/ble-bridge",
     "confirm": "Jetzt installieren"
   },
   "powerCycle": {
     "title": "Bridge neu starten",
-    "description": "Die Firmware ist installiert. Die Bridge kann nicht automatisch neu gestartet werden: Schalte ihre Stromversorgung aus und wieder ein, ohne GPIO0 zu halten, und lass den USB-TTL-Adapter verbunden. Richte danach PIN, Netzwerk und Server über dieselbe Verbindung ein.",
+    "description": "Die Firmware ist installiert. Die Bridge kann nicht automatisch neu gestartet werden: Zieh ihre Micro-USB-Stromversorgung ab und steck sie wieder ein, ohne GPIO0 zu halten, und lass den USB-TTL-Adapter verbunden. Richte danach PIN, Netzwerk und Server über dieselbe Verbindung ein.",
     "continue": "Einrichtung fortsetzen"
   },
   "chipMismatch": {
