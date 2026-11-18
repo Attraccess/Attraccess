@@ -223,7 +223,7 @@ describe('PluginMigrationService', () => {
 
       await expect(
         PluginMigrationService.assertReplacementMigrationHistory(rediscover('widgets'), root),
-      ).rejects.toThrow(/Install the last 1\.x release of the plugin first/);
+      ).rejects.toThrow(/update to Attraccess 1\.11 and start it once/);
       await expect(PluginMigrationService.runUpMigrations(rediscover('widgets'))).rejects.toThrow(/partial history/);
 
       expect(

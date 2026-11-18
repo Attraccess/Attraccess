@@ -9,12 +9,14 @@ import type {
 import {
   type CompiledPluginStorage,
   type CompiledSchema,
+  type ResolvedStep,
   legacyMigrationsTableName,
   versionsTableName,
 } from '../../../plugin-system/plugin-storage/storage-model';
 import { createRecordPort } from '../../../plugin-system/plugin-storage/storage-records';
 import { createDataSource, SQLITE_BUSY_TIMEOUT_MS } from '../sqlite-connection';
 import { formatSqliteTimestamp, sqliteStorageDialect } from './sqlite-storage-dialect';
+import { checkSqliteStep } from './sqlite-storage-step-guard';
 import { ManagerExecutor } from './sqlite-storage-sessions';
 
 const { quote } = sqliteStorageDialect;
@@ -65,15 +67,19 @@ class SqliteMigrationSession implements PluginStorageMigrationSession {
     for (const statement of statements) await this.manager.query(statement);
   }
 
+  checkStep(step: ResolvedStep): Promise<void> {
+    return checkSqliteStep((sql, params) => this.manager.query(sql, params as unknown[]), step);
+  }
+
   recordPort(schema: CompiledSchema): unknown {
     return createRecordPort(schema, sqliteStorageDialect, { run: (_access, _scope, work) => work(this.executor) });
   }
 
-  async dropAll(tables: readonly string[]): Promise<void> {
+  async dropAll(tables: readonly string[], options: { readonly keepLegacyHistory: boolean }): Promise<void> {
     // Children first: the plugin's tables are listed parents before children.
     for (const table of [...tables].reverse()) await this.manager.query(`DROP TABLE IF EXISTS ${quote(table)}`);
     await this.manager.query(`DROP TABLE IF EXISTS ${quote(this.versions)}`);
-    await this.manager.query(`DROP TABLE IF EXISTS ${quote(this.legacy)}`);
+    if (!options.keepLegacyHistory) await this.manager.query(`DROP TABLE IF EXISTS ${quote(this.legacy)}`);
   }
 }
 

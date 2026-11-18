@@ -21,6 +21,9 @@ export interface PluginMigrationEngine {
   assess(storage: CompiledPluginStorage): Promise<PluginStorageMigrationPlan>;
   /** Applies every pending version in one transaction (all or nothing). */
   migrate(storage: CompiledPluginStorage): Promise<PluginStorageMigrationPlan>;
-  /** Drops the plugin's tables, its version bookkeeping and its legacy migrations table, in one transaction. */
+  /**
+   * Drops the tables of the plugin's committed versions, its version bookkeeping and its legacy migrations table, in
+   * one transaction. Tables of a version that never committed are not the plugin's and stay.
+   */
   dropAll(storage: CompiledPluginStorage): Promise<void>;
 }

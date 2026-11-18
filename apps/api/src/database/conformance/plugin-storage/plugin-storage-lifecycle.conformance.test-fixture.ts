@@ -300,7 +300,7 @@ export function describePluginStorageLifecycle(fixture: StorageBackendFixture): 
           'only some of the 1.x migrations applied',
           LEGACY_MIGRATIONS.slice(0, 1),
           adoptingV1,
-          /Install the last 1\.x release of the plugin first/,
+          /update to Attraccess 1\.11 and start it once/,
         ],
         [
           '1.x migrations this release does not know',

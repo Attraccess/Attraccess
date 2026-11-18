@@ -79,10 +79,18 @@ export interface PluginStorageMigrationReader {
 export interface PluginStorageMigrationSession extends PluginStorageMigrationReader {
   recordVersion(entry: { version: number; name: string; source: 'migrated' | 'adopted' }): Promise<void>;
   execute(statements: readonly string[]): Promise<void>;
+  /**
+   * Refuses a step the engine cannot apply to the objects as they are (an index of another table, a constraint of an
+   * adopted 1.x table that needs a rebuild). Runs before the step's statements; throwing rolls the migration back.
+   */
+  checkStep(step: ResolvedStep): Promise<void>;
   /** The record port of `schema` over this transaction, for a data step. */
   recordPort(schema: ReadonlyMap<string, CompiledTable>): unknown;
-  /** Drops the tables (children first), the version bookkeeping and the legacy migrations table of the plugin. */
-  dropAll(tables: readonly string[]): Promise<void>;
+  /**
+   * Drops the tables (children first) and the version bookkeeping of the plugin, and its legacy migrations table
+   * unless `keepLegacyHistory` (it then still describes 1.x tables that stay).
+   */
+  dropAll(tables: readonly string[], options: { readonly keepLegacyHistory: boolean }): Promise<void>;
 }
 
 export interface PluginStorageMigrationDriver {

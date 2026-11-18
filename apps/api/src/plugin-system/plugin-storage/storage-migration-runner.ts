@@ -1,4 +1,5 @@
 import type { PluginMigrationEngine, PluginStorageMigrationPlan } from '../persistence/plugin-migration-engine.port';
+import { PLUGIN_MIGRATION_GUIDE_URL } from '../runtime/plugin-compatibility';
 import type { PluginStorageDdl, PluginStorageMigrationDriver } from './storage-dialect.port';
 import {
   type CompiledPluginStorage,
@@ -6,8 +7,34 @@ import {
   PluginStorageMigrationRefused,
 } from './storage-model';
 
-const INSTALL_FIRST_RELEASE =
-  'Install the last 1.x release of the plugin first, start Attraccess once so its migrations finish, then upgrade.';
+/** The 1.x release whose plugin data 2.0 adopts: every bundled plugin's legacy history is complete there. */
+const LAST_1X_RELEASE = '1.11';
+const LISTED_MISSING = 5;
+
+/** Why a partial 1.x history is refused, and the only way forward: through the last 1.x release. */
+function partialHistoryReason(pluginName: string, missing: readonly string[]): string {
+  const listed =
+    missing.length > LISTED_MISSING
+      ? `${missing.slice(0, LISTED_MISSING).join(', ')} and ${missing.length - LISTED_MISSING} more`
+      : missing.join(', ');
+  return (
+    `the 1.x migrations ${listed} are not applied (partial history). Attraccess 2.0 adopts the data of plugin ` +
+    `"${pluginName}" only from the last 1.x release (${LAST_1X_RELEASE}). Restore the backup taken before this ` +
+    `upgrade, update to Attraccess ${LAST_1X_RELEASE} and start it once so the plugin's migrations finish, then ` +
+    `update to 2.0. Migration guide: ${PLUGIN_MIGRATION_GUIDE_URL}`
+  );
+}
+
+/** The tables the committed versions (up to `version`) created, parents before children. */
+function tablesCreatedUpTo(storage: CompiledPluginStorage, version: number): string[] {
+  const tables: string[] = [];
+  for (const migration of storage.migrations.filter((candidate) => candidate.version <= version)) {
+    for (const step of migration.steps) {
+      if (step.op === 'createTable' && !tables.includes(step.table.physical)) tables.push(step.table.physical);
+    }
+  }
+  return tables;
+}
 
 /**
  * Decides what to do with a plugin's tables from what the database holds: the versions of the neutral bookkeeping
@@ -57,9 +84,7 @@ export function planStorageMigration(
   }
   const missing = storage.legacyMigrations.filter((name) => !names.includes(name));
   if (missing.length > 0) {
-    throw refuse(
-      `the 1.x migrations ${missing.join(', ')} are not applied (partial history). ${INSTALL_FIRST_RELEASE}`,
-    );
+    throw refuse(partialHistoryReason(storage.pluginName, missing));
   }
   return { pending: versions.filter((version) => version > 1), adopt: true };
 }
@@ -88,7 +113,10 @@ export class StorageMigrationRunner implements PluginMigrationEngine {
       }
       for (const migration of storage.migrations.filter(({ version }) => plan.pending.includes(version))) {
         try {
-          for (const step of migration.steps) await session.execute(this.ddl.statements(step));
+          for (const step of migration.steps) {
+            await session.checkStep(step);
+            await session.execute(this.ddl.statements(step));
+          }
           if (migration.data) await migration.data({ tables: session.recordPort(migration.schemaAfter) });
           await session.recordVersion({ version: migration.version, name: migration.name, source: 'migrated' });
         } catch (error) {
@@ -99,7 +127,16 @@ export class StorageMigrationRunner implements PluginMigrationEngine {
     });
   }
 
+  /**
+   * Drops what the plugin owns: the tables of its committed versions (an adopted baseline counts as version 1) and
+   * its bookkeeping. A plugin whose first version never committed (it failed, or was refused because a declared
+   * table already existed) owns none of the declared tables, so none is dropped and its 1.x history stays with them.
+   */
   dropAll(storage: CompiledPluginStorage): Promise<void> {
-    return this.driver.transaction(storage, (session) => session.dropAll(storage.ownedTables));
+    return this.driver.transaction(storage, async (session) => {
+      const applied = await session.appliedVersions();
+      const committed = applied.length === 0 ? 0 : Math.max(...applied);
+      await session.dropAll(tablesCreatedUpTo(storage, committed), { keepLegacyHistory: committed === 0 });
+    });
   }
 }
