@@ -39,10 +39,13 @@ const rejects = (filter: unknown, message: RegExp) => {
 };
 
 describe('compileWhere', () => {
-  it('matches everything without a filter or with an empty one', () => {
+  it('matches everything without a filter or with an empty one, and refuses a null filter', () => {
     expect(where(undefined)).toEqual({ sql: '1 = 1', params: [] });
-    expect(where(null).sql).toBe('1 = 1');
-    expect(where({}).sql).toBe('1 = 1');
+    expect(where({})).toEqual({ sql: '1 = 1', params: [] });
+    rejects(null, /A filter is an object of field conditions/);
+    rejects({ and: [null] }, /A filter is an object of field conditions/);
+    rejects({ or: [undefined] }, /A filter is an object of field conditions/);
+    rejects({ not: null }, /A filter is an object of field conditions/);
   });
 
   it('compares a field to a value or null directly', () => {
@@ -92,6 +95,8 @@ describe('compileWhere', () => {
     it('startsWith binds the prefix and asks the dialect', () => {
       expect(where({ name: { startsWith: 'ab' } })).toEqual({ sql: 'substr("name", 1, 2) = ?', params: ['ab'] });
       expect(where({ note: { startsWith: 'x' } }).sql).toBe('substr("memo", 1, 1) = ?');
+      // The length in characters (code points), as SQLite's substr counts: an emoji is one, not two UTF-16 units.
+      expect(where({ note: { startsWith: '😀a' } })).toEqual({ sql: 'substr("memo", 1, 2) = ?', params: ['😀a'] });
       rejects({ name: { startsWith: 3 } }, /"startsWith" takes a string/);
       rejects({ qty: { startsWith: 'a' } }, /applies to string and text fields/);
     });
@@ -100,8 +105,18 @@ describe('compileWhere', () => {
       expect(where({ qty: { gt: 1, lt: 9 } })).toEqual({ sql: '("qty" > ? AND "qty" < ?)', params: [1, 9] });
     });
 
-    it('treats an empty condition object as always true', () => {
-      expect(where({ qty: {} }).sql).toBe('1 = 1');
+    it('refuses an empty operator object instead of matching every row', () => {
+      rejects({ qty: {} }, /The operator object of "qty" is empty/);
+      rejects({ and: [{ name: 'a', qty: {} }] }, /The operator object of "qty" is empty/);
+    });
+
+    it('takes no null operand except for eq and ne', () => {
+      for (const operator of ['lt', 'lte', 'gt', 'gte']) {
+        rejects({ qty: { [operator]: null } }, /takes no null; use isNull/);
+      }
+      rejects({ qty: { between: [null, 2] } }, /takes no null/);
+      rejects({ qty: { isNull: 'yes' } }, /"isNull" on "qty" takes a boolean/);
+      expect(where({ qty: { isNull: false } })).toEqual({ sql: '"qty" IS NOT NULL', params: [] });
     });
 
     it('refuses ordering operators on json and boolean fields', () => {
@@ -140,20 +155,19 @@ describe('compileWhere', () => {
       expect(where({ qty: { notIn: [] } }).sql).toBe('"qty" IS NOT NULL');
     });
 
-    it('lets null in an in list match rows without a value', () => {
-      expect(where({ qty: { in: [1, null] } }).sql).toBe('("qty" IN (?) OR "qty" IS NULL)');
-      expect(where({ qty: { in: [null] } }).sql).toBe('(0 = 1 OR "qty" IS NULL)');
+    it('refuses null inside a list: rows without a value are found with isNull', () => {
+      rejects({ qty: { in: [1, null] } }, /"in" on "qty" takes no null; use isNull, or "or" with isNull/);
+      rejects({ qty: { in: [null] } }, /takes no null/);
+      rejects({ qty: { notIn: [1, null] } }, /"notIn" on "qty" takes no null/);
     });
 
-    it('never matches notIn with a null in the list', () => {
-      expect(where({ qty: { notIn: [1, null] } }).sql).toBe('0 = 1');
-    });
-
-    it('takes lists only, of bounded size, with valid values', () => {
+    it('takes lists only, of valid values, up to the parameter limit of the dialect', () => {
       rejects({ qty: { in: 1 } }, /"in" on "qty" takes a list/);
       rejects({ qty: { notIn: 'x' } }, /"notIn" on "qty" takes a list/);
-      rejects({ qty: { in: new Array(20_001).fill(1) } }, /"in" takes at most 20000 values/);
-      expect(where({ qty: { in: new Array(20_000).fill(1) } }).params).toHaveLength(20_000);
+      const limit = sqliteStorageDialect.maxParameters;
+      expect(where({ qty: { in: new Array(limit).fill(1) } }).params).toHaveLength(limit);
+      rejects({ qty: { in: new Array(limit + 1).fill(1) } }, new RegExp(`binds at most ${limit} values`));
+      rejects({ name: 'a', qty: { in: new Array(limit).fill(1) } }, /binds at most/);
       rejects({ qty: { in: ['x'] } }, /expected a safe integer/);
     });
   });
@@ -200,14 +214,47 @@ describe('compileWhere', () => {
     rejects({ and: [{ ghost: 1 }] }, /Unknown field "ghost"/);
   });
 
-  it('validates values against the field type', () => {
-    rejects({ name: 5 }, /Invalid value for name \(string\): expected a string/);
-    rejects({ name: 'x'.repeat(21) }, /longer than 20 characters/);
-    rejects({ price: '1.234' }, /at most 2 fraction digits/);
+  it('checks filter values for their type only, not for the limits of the column', () => {
+    rejects({ name: 5 }, /Invalid value for name \(string\): "eq" takes a string value/);
+    rejects({ due: '2026-3-1' }, /"eq" takes a date value/);
+    rejects({ price: 1.5 }, /"eq" takes a decimal value/);
+    rejects({ qty: { gt: '1' } }, /expected a safe integer/);
+    const long = 'x'.repeat(300);
+    expect(where({ name: long })).toEqual({ sql: '"name" = ?', params: [long] });
+    expect(where({ due: '2026-02-30' })).toEqual({ sql: '"due" = ?', params: ['2026-02-30'] });
   });
 
-  it('binds only the non-null entries of an in list on a required field', () => {
-    expect(where({ name: { in: ['a', null] } }).params).toEqual(['a']);
+  it('compares a decimal finer than the scale with the stored value just below it', () => {
+    expect(where({ price: '1.234' })).toEqual({ sql: '0 = 1', params: [] });
+    expect(where({ price: '1.230' })).toEqual({ sql: '"price" = ?', params: [123] });
+    expect(where({ price: { ne: '1.234' } })).toEqual({ sql: '"price" IS NOT NULL', params: [] });
+    expect(where({ price: { lt: '1.234' } })).toEqual({ sql: '"price" <= ?', params: [123] });
+    expect(where({ price: { lte: '1.234' } })).toEqual({ sql: '"price" <= ?', params: [123] });
+    expect(where({ price: { gt: '1.234' } })).toEqual({ sql: '"price" > ?', params: [123] });
+    expect(where({ price: { gte: '-1.234' } })).toEqual({ sql: '"price" > ?', params: [-124] });
+    expect(where({ price: { gte: '1.23' } })).toEqual({ sql: '"price" >= ?', params: [123] });
+    expect(where({ price: { between: ['1.001', '2.009'] } })).toEqual({
+      sql: '("price" > ? AND "price" <= ?)',
+      params: [100, 200],
+    });
+    expect(where({ price: { in: ['1.001', '2.00'] } })).toEqual({ sql: '"price" IN (?)', params: [200] });
+    expect(where({ price: { in: ['1.001'] } })).toEqual({ sql: '0 = 1', params: [] });
+    expect(where({ price: { notIn: ['1.001'] } })).toEqual({ sql: '"price" IS NOT NULL', params: [] });
+  });
+
+  it('lowercases a uuid operand without checking its form', () => {
+    const refs = compileTable(
+      naming,
+      'refs',
+      table({ id: f.id(), ref: f.uuid() }),
+      'plugin_demo_refs',
+      () => undefined,
+    );
+    const params = new StorageParams(sqliteStorageDialect);
+    expect(compileWhere(refs, sqliteStorageDialect, params, { ref: { in: ['ABC', 'Not-A-Uuid'] } })).toBe(
+      '"ref" IN (?, ?)',
+    );
+    expect(params.values).toEqual(['abc', 'not-a-uuid']);
   });
 });
 

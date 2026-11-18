@@ -141,7 +141,59 @@ export function normalizeValue(field: CompiledField, value: unknown, label?: str
   return normalize ? normalize(field, value, label) : invalid(field, label, 'unknown field type');
 }
 
-/** Whether `value` is allowed in a filter for the field's type (equality, ordering and prefix operators). */
+/** Whether the field's type has an order: comparisons, `between` and `orderBy` (not JSON, not boolean). */
 export function isOrderable(field: CompiledField): boolean {
   return field.type !== 'json' && field.type !== 'boolean';
+}
+
+/** A filter operand in canonical form. `exact` is false for a decimal no stored value can equal; `value` is then
+ * the largest value of the field's scale below it. */
+export interface FilterOperand {
+  readonly value: unknown;
+  readonly exact: boolean;
+}
+
+/** A decimal string rounded down to `scale` fraction digits, with whether that lost a non-zero digit. */
+function floorDecimal(value: string, scale: number): FilterOperand {
+  const [, sign, whole, fraction = ''] = DECIMAL_PATTERN.exec(value) as RegExpExecArray;
+  const kept = BigInt(`${whole}${fraction.slice(0, scale).padEnd(scale, '0')}`);
+  const exact = !/[1-9]/.test(fraction.slice(scale));
+  const floor = sign ? -kept - (exact ? BigInt(0) : BigInt(1)) : kept;
+  const digits = (floor < 0 ? -floor : floor).toString().padStart(scale + 1, '0');
+  const text = scale > 0 ? `${digits.slice(0, -scale)}.${digits.slice(-scale)}` : digits;
+  return { value: floor < 0 ? `-${text}` : text, exact };
+}
+
+type FilterNormalizer = (field: CompiledField, value: unknown) => FilterOperand | undefined;
+
+const exactly = (value: unknown): FilterOperand => ({ value, exact: true });
+
+/** Type checks of filter operands; undefined when the value has the wrong type. */
+const FILTER_NORMALIZERS = new Map<string, FilterNormalizer>([
+  ['string', (_field, value) => (typeof value === 'string' ? exactly(value) : undefined)],
+  ['text', (_field, value) => (typeof value === 'string' ? exactly(value) : undefined)],
+  ['uuid', (_field, value) => (typeof value === 'string' ? exactly(value.toLowerCase()) : undefined)],
+  ['date', (_field, value) => (typeof value === 'string' && DATE_PATTERN.test(value) ? exactly(value) : undefined)],
+  [
+    'decimal',
+    (field, value) =>
+      typeof value === 'string' && DECIMAL_PATTERN.test(value) ? floorDecimal(value, field.scale ?? 0) : undefined,
+  ],
+]);
+
+/**
+ * The canonical form of a filter operand. Only the type and form are checked (a string, a safe integer, a decimal
+ * string, a valid Date, a "YYYY-MM-DD" day, a boolean), never the limits of the column: a longer string, a decimal
+ * with more places than the scale, a day that does not exist or a malformed UUID is a valid operand that matches
+ * what an exact comparison with it matches (usually nothing). `null` is not an operand: use `isNull`.
+ */
+export function normalizeFilterValue(field: CompiledField, value: unknown, operator: string): FilterOperand {
+  if (value === null) {
+    throw new PluginStorageInvalid(`"${operator}" on "${field.name}" takes no null; use isNull, or "or" with isNull.`);
+  }
+  const special = FILTER_NORMALIZERS.get(field.type);
+  if (!special) return exactly(normalizeValue({ ...field, nullable: false }, value));
+  const operand = special(field, value);
+  if (!operand) invalid(field, undefined, `"${operator}" takes a ${field.type} value`);
+  return operand;
 }

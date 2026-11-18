@@ -60,6 +60,19 @@ const DECODERS: Partial<Record<FieldType, Codec>> = {
 };
 
 /**
+ * A string or text column. A BLOB in it (an adopted 1.x binary column declared as text, such as Matter's backup
+ * file) reads as base64: the neutral schema has no binary type, and UTF-8 decoding would corrupt the bytes.
+ */
+function decodeText(stored: unknown): string {
+  if (stored instanceof Uint8Array)
+    return Buffer.from(stored.buffer, stored.byteOffset, stored.byteLength).toString('base64');
+  return String(stored);
+}
+
+/** SQLite's default SQLITE_MAX_VARIABLE_NUMBER (since 3.32). */
+const SQLITE_MAX_PARAMETERS = 32_766;
+
+/**
  * SQLite value representation of plugin storage: decimals are scaled integers (exact, ordered and summable),
  * timestamps are UTC text in TypeORM's `datetime` form, booleans are 0/1, JSON is text. Adopted 1.x tables hold the
  * same forms, so their rows read unchanged.
@@ -75,14 +88,18 @@ export const sqliteStorageDialect: PluginStorageDialect = {
   decode(field: CompiledField, stored: unknown): unknown {
     if (stored === null || stored === undefined) return null;
     const decoder = DECODERS[field.type];
-    return decoder ? decoder(field, stored) : String(stored);
+    return decoder ? decoder(field, stored) : decodeText(stored);
   },
   limit(limit, offset) {
     if (limit === undefined && offset === undefined) return '';
     // SQLite needs a LIMIT before an OFFSET; -1 is "no limit".
     return `LIMIT ${limit ?? -1}${offset ? ` OFFSET ${offset}` : ''}`;
   },
-  // substr compares exactly (LIKE ignores ASCII case) and needs no escaping of the prefix.
+  // substr compares exactly (LIKE ignores ASCII case) and needs no escaping of the prefix. It counts characters
+  // (code points), so `prefixLength` is the prefix's code point count.
   startsWith: (column, placeholder, prefixLength) => `substr(${column}, 1, ${prefixLength}) = ${placeholder}`,
   orderTerm: (column, direction) => `${column} ${direction === 'asc' ? 'ASC NULLS FIRST' : 'DESC NULLS LAST'}`,
+  // The executor reads the generated key from the statement's last row id.
+  returning: () => '',
+  maxParameters: SQLITE_MAX_PARAMETERS,
 };

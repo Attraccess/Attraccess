@@ -20,11 +20,20 @@ export class ManagerExecutor implements PluginStorageExecutor {
   }
 
   async execute(sql: string, params: readonly unknown[]): Promise<PluginStorageWriteResult> {
+    const result = await this.write(sql, params);
+    return { affected: result.affected ?? 0 };
+  }
+
+  async insert(sql: string, params: readonly unknown[], generatedKey: string | undefined): Promise<unknown> {
+    const result = await this.write(sql, params);
+    // For an INSERT the driver reports the last row id: the generated INTEGER PRIMARY KEY.
+    return generatedKey === undefined ? undefined : Number(result.raw);
+  }
+
+  private write(sql: string, params: readonly unknown[]): Promise<{ affected?: number; raw: unknown }> {
     const runner = this.manager.queryRunner;
     if (!runner) throw new Error('A write needs a transaction.');
-    // The statement text decides how the driver runs it (INSERT/UPDATE/DELETE report changes and the row id).
-    const result = await runner.query(sql, [...params], true);
-    return { affected: result.affected ?? 0, insertedId: /^INSERT /.test(sql) ? Number(result.raw) : undefined };
+    return runner.query(sql, [...params], true);
   }
 }
 

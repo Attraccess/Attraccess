@@ -20,19 +20,30 @@ export interface PluginStorageDialect {
   startsWith(column: string, placeholder: string, prefixLength: number): string;
   /** Orders nulls as the lowest value: first ascending, last descending. */
   orderTerm(column: string, direction: 'asc' | 'desc'): string;
+  /**
+   * The clause appended to an INSERT of one row so that {@link PluginStorageExecutor.insert} can report the
+   * generated key in the quoted `column` (` RETURNING "id"` on PostgreSQL); empty when the engine reports it without
+   * one (SQLite's last row id).
+   */
+  returning(column: string): string;
+  /** The most parameters one statement may bind (SQLite: 32766). The record port refuses calls that need more. */
+  readonly maxParameters: number;
 }
 
 /** Result of a statement that writes. */
 export interface PluginStorageWriteResult {
   readonly affected: number;
-  /** The key of the row an insert created (engines with row ids); undefined otherwise. */
-  readonly insertedId?: number;
 }
 
 /** Runs statements on one connection or transaction. Parameters are always bound, never spliced. */
 export interface PluginStorageExecutor {
   query(sql: string, params: readonly unknown[]): Promise<Record<string, unknown>[]>;
   execute(sql: string, params: readonly unknown[]): Promise<PluginStorageWriteResult>;
+  /**
+   * Runs an INSERT of one row (built with the dialect's `returning` clause when `generatedKey` is given) and returns
+   * the value the engine generated for the key column `generatedKey`, or undefined without one.
+   */
+  insert(sql: string, params: readonly unknown[], generatedKey: string | undefined): Promise<unknown>;
 }
 
 /**

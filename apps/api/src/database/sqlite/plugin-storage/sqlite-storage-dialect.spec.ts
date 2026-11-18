@@ -150,6 +150,14 @@ describe('sqliteStorageDialect', () => {
       expect(decode(field({ type: 'text' }), 5)).toBe('5');
       expect(decode(field({ type: 'uuid' }), 'u')).toBe('u');
     });
+
+    it('reads binary data in a text field as base64, never as UTF-8', () => {
+      const bytes = Buffer.from([0x00, 0xff, 0xfe, 0x80, 0x41]);
+      expect(decode(field({ type: 'text' }), bytes)).toBe(bytes.toString('base64'));
+      expect(decode(field({ type: 'string' }), new Uint8Array(bytes))).toBe(bytes.toString('base64'));
+      const view = new Uint8Array(bytes.buffer, bytes.byteOffset + 1, 2);
+      expect(Buffer.from(decode(field({ type: 'text' }), view) as string, 'base64')).toEqual(Buffer.from([0xff, 0xfe]));
+    });
   });
 
   describe('syntax', () => {
@@ -165,6 +173,11 @@ describe('sqliteStorageDialect', () => {
       expect(sqliteStorageDialect.startsWith('"c"', '?', 3)).toBe('substr("c", 1, 3) = ?');
       expect(sqliteStorageDialect.orderTerm('"c"', 'asc')).toBe('"c" ASC NULLS FIRST');
       expect(sqliteStorageDialect.orderTerm('"c"', 'desc')).toBe('"c" DESC NULLS LAST');
+    });
+
+    it('reports generated keys without a RETURNING clause and binds at most 32766 parameters', () => {
+      expect(sqliteStorageDialect.returning('"id"')).toBe('');
+      expect(sqliteStorageDialect.maxParameters).toBe(32_766);
     });
   });
 });

@@ -92,21 +92,30 @@ function insertStatement(
   return { sql: `${head} (${columns.join(', ')}) VALUES (${markers.join(', ')})${tail}`, params: params.values };
 }
 
-/** The row an insert produced, built from what was written (plus the key the engine assigned). */
-function writtenRow(context: TableContext, values: ReadonlyMap<string, unknown>, insertedId?: number): Row {
+/** The row an insert produced, built from what was written (plus the key the engine generated). */
+function writtenRow(context: TableContext, values: ReadonlyMap<string, unknown>, generated: unknown): Row {
   const row: Row = {};
   for (const field of context.table.fields.values()) {
-    const value = values.has(field.name) ? values.get(field.name) : field.generated ? insertedId : null;
+    const value = values.has(field.name) ? values.get(field.name) : field.generated ? generated : null;
     row[field.name] = normalizeValue(field, value ?? null);
   }
   return row;
 }
 
+/** The generated key field the engine fills for this insert (an integer key the row does not give), if any. */
+const engineGeneratedKey = (table: CompiledTable, values: ReadonlyMap<string, unknown>): CompiledField | undefined =>
+  [...table.fields.values()].find((field) => field.generated && !values.has(field.name));
+
 async function insertRow(context: TableContext, executor: PluginStorageExecutor, input: unknown): Promise<Row> {
   const { values } = buildInsert(context.table, input);
-  const statement = insertStatement(context, values);
-  const result = await executor.execute(statement.sql, statement.params);
-  return writtenRow(context, values, result.insertedId);
+  const key = engineGeneratedKey(context.table, values);
+  const statement = insertStatement(
+    context,
+    values,
+    key ? context.dialect.returning(context.dialect.quote(key.column)) : '',
+  );
+  const generated = await executor.insert(statement.sql, statement.params, key?.column);
+  return writtenRow(context, values, key ? context.dialect.decode(key, generated) : undefined);
 }
 
 /** The where clause that selects one row by its primary key given as a value (one-field key) or an object. */
@@ -153,14 +162,15 @@ function checkConflictTarget(table: CompiledTable, conflictOn: unknown): string[
 
 /** The fields an upsert overwrites on conflict: `update` when given, otherwise every plain field outside the key. */
 function overwriteFields(table: CompiledTable, target: readonly string[], update: unknown): string[] {
+  if (update !== undefined && !Array.isArray(update)) throw new PluginStorageInvalid('update is a list of fields.');
   const overwrite =
     update === undefined
       ? [...table.fields.values()]
           .filter((field) => !field.generated && !target.includes(field.name))
           .map((field) => field.name)
       : (update as unknown[]).map((name) => fieldOf(table, name, 'update').name);
-  if (overwrite.some((name) => target.includes(name))) {
-    throw new PluginStorageInvalid('update may not list a field of conflictOn.');
+  if (overwrite.some((name) => target.includes(name) || table.fields.get(name)?.generated)) {
+    throw new PluginStorageInvalid('update may not list a field of conflictOn or a generated field.');
   }
   return overwrite;
 }

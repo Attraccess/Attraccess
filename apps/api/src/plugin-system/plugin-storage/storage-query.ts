@@ -1,7 +1,7 @@
 import { PluginStorageInvalid } from '@attraccess/plugins-backend-sdk';
 import type { PluginStorageDialect } from './storage-dialect.port';
 import type { CompiledField, CompiledTable } from './storage-model';
-import { isOrderable, normalizeValue } from './storage-values';
+import { isOrderable, normalizeFilterValue, type FilterOperand } from './storage-values';
 
 /**
  * Compiles the structured filters, orders and patches of the record port into parameterised SQL. A field name from
@@ -9,15 +9,19 @@ import { isOrderable, normalizeValue } from './storage-values';
  * column, quoted by the dialect. Values are always bound parameters.
  */
 
-const MAX_IN_LIST = 20_000;
 const MAX_FILTER_DEPTH = 16;
 
-/** Collects the bound parameters of one statement and hands out their markers. */
+/** Collects the bound parameters of one statement and hands out their markers, up to the engine's limit. */
 export class StorageParams {
   readonly values: unknown[] = [];
   constructor(private readonly dialect: PluginStorageDialect) {}
 
   add(value: unknown): string {
+    if (this.values.length >= this.dialect.maxParameters) {
+      throw new PluginStorageInvalid(
+        `A storage call binds at most ${this.dialect.maxParameters} values; split long in/notIn lists.`,
+      );
+    }
     this.values.push(value);
     return this.dialect.placeholder(this.values.length);
   }
@@ -54,8 +58,8 @@ class Compiler {
     return this.dialect.quote(field.column);
   }
 
-  private bind(field: CompiledField, value: unknown): string {
-    return this.params.add(this.dialect.encode(field, normalizeValue(field, value)));
+  private bind(field: CompiledField, operand: FilterOperand): string {
+    return this.params.add(this.dialect.encode(field, operand.value));
   }
 
   private requireOrderable(field: CompiledField, operator: string): void {
@@ -64,9 +68,10 @@ class Compiler {
     }
   }
 
+  /** `undefined` at the top selects every row; anywhere else, and `null` everywhere, a filter must be an object. */
   where(where: unknown, depth = 0): string {
     if (depth > MAX_FILTER_DEPTH) throw new PluginStorageInvalid('The filter is nested too deeply.');
-    if (where === undefined || where === null) return '1 = 1';
+    if (where === undefined && depth === 0) return '1 = 1';
     if (!isPlainObject(where)) throw new PluginStorageInvalid('A filter is an object of field conditions.');
     return joinTerms(
       Object.entries(where).map(([key, value]) => this.term(key, value, depth)),
@@ -93,6 +98,7 @@ class Compiler {
     if (condition === null) return `${this.column(field)} IS NULL`;
     if (!isPlainObject(condition)) return this.operator(field, 'eq', condition);
     const operators = Object.entries(condition);
+    if (operators.length === 0) throw new PluginStorageInvalid(`The operator object of "${field.name}" is empty.`);
     this.checkOperators(field, operators);
     return joinTerms(
       operators.map(([name, value]) => this.operator(field, name, value)),
@@ -112,25 +118,19 @@ class Compiler {
     }
   }
 
-  private list(field: CompiledField, operator: string, value: unknown): { values: string[]; hasNull: boolean } {
+  /** The markers of the list entries a stored value can equal (a decimal finer than the scale equals none). */
+  private list(field: CompiledField, operator: string, value: unknown): string[] {
     if (!Array.isArray(value)) throw new PluginStorageInvalid(`"${operator}" on "${field.name}" takes a list.`);
-    if (value.length > MAX_IN_LIST)
-      throw new PluginStorageInvalid(`"${operator}" takes at most ${MAX_IN_LIST} values.`);
-    const present = value.filter((entry) => entry !== null);
-    return {
-      values: present.map((entry) => this.bind({ ...field, nullable: false }, entry)),
-      hasNull: present.length < value.length,
-    };
+    return value
+      .map((entry) => normalizeFilterValue(field, entry, operator))
+      .filter((operand) => operand.exact)
+      .map((operand) => this.bind(field, operand));
   }
 
   /** Builds the condition of one operator; every name here is also a valid filter operator. */
   private readonly operators = new Map<string, (field: CompiledField, column: string, value: unknown) => string>([
     ['eq', (field, column, value) => this.equals(field, column, value)],
-    // SQL three-valued logic: a row without a value never matches `ne`; use isNull to find it.
-    [
-      'ne',
-      (field, column, value) => (value === null ? `${column} IS NOT NULL` : `${column} <> ${this.bind(field, value)}`),
-    ],
+    ['ne', (field, column, value) => this.notEquals(field, column, value)],
     ['in', (field, column, value) => this.membership(field, column, 'in', value)],
     ['notIn', (field, column, value) => this.membership(field, column, 'notIn', value)],
     ['lt', (field, column, value) => this.comparison(field, column, 'lt', value)],
@@ -138,7 +138,7 @@ class Compiler {
     ['gt', (field, column, value) => this.comparison(field, column, 'gt', value)],
     ['gte', (field, column, value) => this.comparison(field, column, 'gte', value)],
     ['between', (field, column, value) => this.between(field, column, value)],
-    ['isNull', (_field, column, value) => (value === false ? `${column} IS NOT NULL` : `${column} IS NULL`)],
+    ['isNull', (field, column, value) => this.nullTest(field, column, value)],
     ['startsWith', (field, column, value) => this.startsWith(field, column, value)],
   ]);
 
@@ -147,41 +147,60 @@ class Compiler {
     return build(field, this.column(field), value);
   }
 
+  private nullTest(field: CompiledField, column: string, value: unknown): string {
+    if (typeof value !== 'boolean') throw new PluginStorageInvalid(`"isNull" on "${field.name}" takes a boolean.`);
+    return value ? `${column} IS NULL` : `${column} IS NOT NULL`;
+  }
+
   private equals(field: CompiledField, column: string, value: unknown): string {
     if (field.type === 'json' && value !== null) {
       throw new PluginStorageInvalid(`JSON field "${field.name}" can only be filtered with isNull.`);
     }
-    return value === null ? `${column} IS NULL` : `${column} = ${this.bind(field, value)}`;
+    if (value === null) return `${column} IS NULL`;
+    const operand = normalizeFilterValue(field, value, 'eq');
+    return operand.exact ? `${column} = ${this.bind(field, operand)}` : '0 = 1';
   }
 
+  // SQL three-valued logic: a row without a value never matches `ne`; use isNull to find it.
+  private notEquals(field: CompiledField, column: string, value: unknown): string {
+    if (value === null) return `${column} IS NOT NULL`;
+    const operand = normalizeFilterValue(field, value, 'ne');
+    return operand.exact ? `${column} <> ${this.bind(field, operand)}` : `${column} IS NOT NULL`;
+  }
+
+  /**
+   * A decimal operand finer than the scale lies strictly between two stored values, so it compares like the stored
+   * value just below it (`value`): below or equal for lt/lte, above for gt/gte.
+   */
   private comparison(field: CompiledField, column: string, name: keyof typeof COMPARISONS, value: unknown): string {
     this.requireOrderable(field, name);
-    return `${column} ${COMPARISONS[name]} ${this.bind(field, value)}`;
+    const operand = normalizeFilterValue(field, value, name);
+    const operator = operand.exact ? COMPARISONS[name] : name === 'lt' || name === 'lte' ? '<=' : '>';
+    return `${column} ${operator} ${this.bind(field, operand)}`;
   }
 
   private between(field: CompiledField, column: string, value: unknown): string {
     this.requireOrderable(field, 'between');
     if (!Array.isArray(value) || value.length !== 2) throw new PluginStorageInvalid('"between" takes [low, high].');
-    return `${column} BETWEEN ${this.bind(field, value[0])} AND ${this.bind(field, value[1])}`;
+    const [low, high] = value.map((bound) => normalizeFilterValue(field, bound, 'between'));
+    const [from, to] = [this.bind(field, low), this.bind(field, high)];
+    // `high` compares the same either way (<= the value or the stored value below it); `low` is exclusive when finer.
+    return low.exact ? `${column} BETWEEN ${from} AND ${to}` : `(${column} > ${from} AND ${column} <= ${to})`;
   }
 
   private startsWith(field: CompiledField, column: string, value: unknown): string {
     if ((field.type !== 'string' && field.type !== 'text') || typeof value !== 'string') {
       throw new PluginStorageInvalid(`"startsWith" takes a string and applies to string and text fields.`);
     }
-    return this.dialect.startsWith(column, this.params.add(value), value.length);
+    // The length in characters (code points), as the engines count them; JavaScript counts UTF-16 units.
+    return this.dialect.startsWith(column, this.params.add(value), [...value].length);
   }
 
+  /** Three-valued logic again: NULL rows never match notIn. An empty list matches nothing (in), every value (notIn). */
   private membership(field: CompiledField, column: string, name: 'in' | 'notIn', value: unknown): string {
-    const { values, hasNull } = this.list(field, name, value);
-    const items = values.join(', ');
-    if (name === 'in') {
-      const inList = values.length > 0 ? `${column} IN (${items})` : '0 = 1';
-      return hasNull ? `(${inList} OR ${column} IS NULL)` : inList;
-    }
-    // Three-valued logic again: NULL rows never match notIn, and a null in the list matches nothing.
-    if (hasNull) return '0 = 1';
-    return values.length > 0 ? `${column} NOT IN (${items})` : `${column} IS NOT NULL`;
+    const items = this.list(field, name, value).join(', ');
+    if (name === 'in') return items ? `${column} IN (${items})` : '0 = 1';
+    return items ? `${column} NOT IN (${items})` : `${column} IS NOT NULL`;
   }
 
   orderBy(orderBy: unknown): string {
