@@ -47,12 +47,12 @@ Bewahren Sie die Datei privat auf. Mit `esptool.py --chip esp32 --port <port> wr
 
 ### Bridge-Firmware flashen
 
-1. Öffnen Sie in Attraccess die Leser-Seite (**Geräte** > **Attractap-Lesegeräte**) und wählen Sie **Geräte-Einrichtung** > **RFID-Leser Einrichten**.
-2. Wählen Sie die Firmware **Attractap BLE Bridge — GL.iNet GL-S10** und lesen Sie den Warnhinweis.
-3. Klicken Sie auf **Verbinden** und wählen Sie den seriellen Port Ihres Adapters. Der Browser kann den Chip nicht zurücksetzen; der S10 muss also bereits im Download-Modus sein.
-4. Flashen Sie die Firmware. Attraccess verweigert das Flashen, wenn der angeschlossene Chip nicht der erwartete ist.
+1. Versetzen Sie den S10 in den Download-Modus: Halten Sie GPIO0 gedrückt, während Sie ihn einschalten. Der Browser kann den Chip nicht zurücksetzen; der S10 muss also bereits im Download-Modus sein.
+2. Öffnen Sie in Attraccess die Leser-Seite (**Geräte** > **Attractap-Lesegeräte**) und wählen Sie **Attractap einrichten**.
+3. Klicken Sie auf **Per USB verbinden** und wählen Sie den seriellen Port Ihres Adapters.
+4. Wählen Sie im Tab **Firmware** die Firmware **Attractap BLE Bridge** (ESP32, GL.iNet GL-S10) und klicken Sie auf **Jetzt Installieren**. Lesen Sie den Warnhinweis und bestätigen Sie ihn. Attraccess verweigert das Flashen, wenn der angeschlossene Chip nicht der erwartete ist.
 5. Trennen Sie den S10 kurz vom Strom und schalten Sie ihn wieder ein, **ohne** GPIO0 zu halten. Er startet jetzt die Bridge-Firmware.
-6. Die Seite geht auf demselben Port in die Konfiguration über. Legen Sie die PIN, das WLAN (optional) und die API-URL Ihres Attraccess-Servers fest.
+6. Klicken Sie auf **Einrichtung fortsetzen**. Die Seite geht auf demselben Port in die Konfiguration über. Legen Sie die PIN, das WLAN (optional) und die API-URL Ihres Attraccess-Servers fest.
 
 > [!NOTE]
 > Ein Weg, die Bridge aus der Original-Firmware von GL.iNet heraus über das Netzwerk zu installieren, ist nicht bekannt. Für das erste Flashen brauchen Sie den seriellen Adapter.
