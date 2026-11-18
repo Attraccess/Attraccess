@@ -26,11 +26,8 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: [fileURLToPath(new URL('../../scripts/css-escape.test-setup.ts', import.meta.url))],
     include: ['apps/plugins/wago/frontend/tests/*.test.tsx', 'apps/plugins/wago/frontend/src/**/*.{test,spec}.tsx'],
-    // The visual editor and Modbus form tests both render into jsdom's global document.
-    // Running files concurrently allows user-event interactions in one file to target
-    // another file's DOM, producing intermittent input corruption and timeouts.
-    fileParallelism: false,
-    // The user-event editor flows take ~15 s on loaded hosts and CI runners.
+    // tests/front-panel.test.tsx drives user-event flows (add meter, channel-limit dialogs) that take 8-16 s on a
+    // loaded host and exceed the 5 s default (measured ATT-1216); file parallelism needs no override.
     testTimeout: 30_000,
     coverage: {
       // Unit coverage feeds the project's crap-score target.

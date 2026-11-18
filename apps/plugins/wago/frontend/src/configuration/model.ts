@@ -241,21 +241,6 @@ export function configurationNames(
   };
 }
 
-export function metadataForSnapshot(
-  snapshot: WagoConfigurationSnapshot,
-  metadata: ConfigurationEditorMetadata,
-): ConfigurationEditorMetadata {
-  const retainedIds = new Set([...snapshot.logicalChannels, ...snapshot.physicalPoints].map((item) => item.id));
-  return {
-    ...metadata,
-    names: Object.fromEntries(
-      Object.entries(metadata.names).filter(
-        ([id, name]) => retainedIds.has(id) || (name.trim().length > 0 && name.length <= 120),
-      ),
-    ),
-  };
-}
-
 export function pointLabel(point: PhysicalPoint, names: Record<string, string>, t?: TFunction) {
   return point.hardwareProfile === '751-9301'
     ? `${names[point.id] ?? 'CC100'} · ${digitalTerminalLabel(point.channel)}`
