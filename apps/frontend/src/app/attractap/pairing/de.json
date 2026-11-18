@@ -110,7 +110,8 @@
   },
   "kind": {
     "touch": "Touch",
-    "lite": "Lite"
+    "lite": "Lite",
+    "bridge": "Bluetooth-Bridge"
   },
   "enrollLink": {
     "noPermissionTitle": "Du kannst keine Reader freigeben",

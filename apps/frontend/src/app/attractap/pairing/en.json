@@ -110,7 +110,8 @@
   },
   "kind": {
     "touch": "Touch",
-    "lite": "Lite"
+    "lite": "Lite",
+    "bridge": "Bluetooth bridge"
   },
   "enrollLink": {
     "noPermissionTitle": "You can't approve readers",

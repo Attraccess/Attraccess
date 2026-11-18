@@ -12,7 +12,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ReactNode, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { PairingDialog, PairingDialogProps } from './PairingDialog';
-import { PairingRow, readerKindOf } from './PairingRow';
+import { PairingRow, readerTypeOf } from './PairingRow';
 import { apiErrorMessage, isPairingRunning } from './pairingUtils';
 import de from './de.json';
 import en from './en.json';
@@ -95,7 +95,7 @@ export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: 
             {readers.map((reader) => (
               <PairingRow
                 key={`reader-${reader.id}`}
-                kind={readerKindOf(reader.firmware)}
+                kind={readerTypeOf(reader.firmware)}
                 name={reader.name}
                 detail={t('toPair.pairingRemoved')}
                 note={resourcesOf(reader)}
@@ -119,7 +119,7 @@ export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: 
             {running.map((pairing) => (
               <PairingRow
                 key={pairing.id}
-                kind={pairing.kind}
+                kind={readerTypeOf(pairing.firmware, pairing.kind)}
                 name={t('toPair.newReader')}
                 detail={t('toPair.waitingSince', { time: format(pairing.createdAt) })}
                 action={
