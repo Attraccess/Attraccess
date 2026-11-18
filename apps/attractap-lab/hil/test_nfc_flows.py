@@ -113,14 +113,50 @@ def start_reset(api, admin, reader, card_id):
     return status, body, mark
 
 
-def enroll_card(api, admin, reader, emulator, hooks, user_id, profile, tries=6):
-    """Enroll through the reader; True once the server recorded the card."""
-    uid = uid_of(emulator, profile)
+def arm_enroll(api, admin, reader, user_id):
+    """Open the enrollment screen; the console mark from before the request."""
     status, body, mark = start_enroll(api, admin, reader, user_id)
     assert status in (200, 201), body
     reader["console"].expect(r"Received enroll new card available key no", mark, 15)
+    return mark
+
+
+def arm_reset(api, admin, reader, card_id):
+    """Open the reset screen; the console mark from before the request."""
+    status, body, mark = start_reset(api, admin, reader, card_id)
+    assert status in (200, 201), body
+    reader["console"].expect(r"Transitioning to screen: ResetScreen", mark, 15)
+    return mark
+
+
+ENROLL_SCREEN_CLOSED = "Enrollment timeout reached"
+RESET_SCREEN_CLOSED = "Reset timeout reached"
+
+
+def present_armed(emulator, reader, hooks, arm, closed, profile, done, window, tries):
+    """``present_until`` on an enroll or reset screen, arming a new one whenever the reader closed the last.
+
+    The reader closes the screen 30 s after it opened and logs ``closed``. On the Touch V1 one exchange
+    takes 12 to 13 s, so a few dropped exchanges use up a screen, and further presentations would be
+    plain login taps that can never finish the operation.
+    """
+    since = arm()
+    for _ in range(tries):
+        if closed in reader["console"].since(since):
+            emulator.command("remove")
+            idle_reader(hooks)
+            since = arm()
+        if present_until(emulator, profile, done, window, tries=1):
+            return True
+    return done()
+
+
+def enroll_card(api, admin, reader, emulator, hooks, user_id, profile, tries=6):
+    """Enroll through the reader; True once the server recorded the card."""
+    uid = uid_of(emulator, profile)
     try:
-        assert present_until(emulator, profile, lambda: card_record(api, admin, user_id, uid) is not None,
+        assert present_armed(emulator, reader, hooks, lambda: arm_enroll(api, admin, reader, user_id),
+                             ENROLL_SCREEN_CLOSED, profile, lambda: card_record(api, admin, user_id, uid) is not None,
                              window=12, tries=tries), "the server never recorded the enrolled card"
     finally:
         emulator.command("remove")
@@ -134,11 +170,9 @@ def reset_card(api, admin, reader, emulator, hooks, user_id, card_id, profile, t
     while hooks.screen() == "ResetScreen" and time.monotonic() < deadline:
         time.sleep(0.5)
     time.sleep(2)  # a new request arriving as the result screen closes would be closed with it
-    status, body, mark = start_reset(api, admin, reader, card_id)
-    assert status in (200, 201), body
-    reader["console"].expect(r"Transitioning to screen: ResetScreen", mark, 15)
     try:
-        assert present_until(emulator, profile, lambda: card_id not in card_ids(api, admin, user_id),
+        assert present_armed(emulator, reader, hooks, lambda: arm_reset(api, admin, reader, card_id),
+                             RESET_SCREEN_CLOSED, profile, lambda: card_id not in card_ids(api, admin, user_id),
                              window=12, tries=tries), "the server never removed the card record"
     finally:
         emulator.command("remove")
@@ -544,13 +578,11 @@ def test_forged_change_key_success_never_records_an_enrollment(api, admin, reade
     make_factory(api, emulator, "carol")
     idle_reader(hooks)
     user_id, uid = people["carol"], uid_of(emulator, "carol")
-    status, body, mark = start_enroll(api, admin, reader, user_id)
-    assert status in (200, 201), body
-    reader["console"].expect(r"Received enroll new card available key no", mark, 15)
     emulator.command("overrides.set", {"rules": FORGED_CHANGE_KEY()})
     try:
         probe = reader["console"].mark()
-        present_until(emulator, "carol", lambda: "Enroll new card error from server: ENROLL_NOT_CONFIRMED" in reader["console"].since(probe),
+        present_armed(emulator, reader, hooks, lambda: arm_enroll(api, admin, reader, user_id), ENROLL_SCREEN_CLOSED,
+                      "carol", lambda: "Enroll new card error from server: ENROLL_NOT_CONFIRMED" in reader["console"].since(probe),
                       window=10, tries=6)
         assert "Enroll new card error from server: ENROLL_NOT_CONFIRMED" in reader["console"].since(probe)
         assert card_ids(api, admin, user_id) == [] and stored_card(api, uid) is None
@@ -559,9 +591,8 @@ def test_forged_change_key_success_never_records_an_enrollment(api, admin, reade
     finally:
         emulator.command("remove")
         emulator.command("behavior.clear")
-    # With honest answers the pending enrollment is replaced by a new attempt that works. The
-    # enrollment screen closes 30 s after it opened, and on the V1 board the forged attempt, a
-    # dropped exchange and an honest enrollment do not fit into one screen, so arm a new one.
+    # With honest answers the pending enrollment is replaced by a new attempt that works. It gets its
+    # own screen: on the Touch V1 the forged and the honest exchange do not fit into one.
     idle_reader(hooks)
     card = enroll_card(api, admin, reader, emulator, hooks, user_id, "carol")
     assert stored_card(api, uid) is not None and stored_card(api, uid)[0] == card
@@ -574,13 +605,11 @@ def test_forged_change_key_success_never_removes_a_card_record(api, admin, reade
     idle_reader(hooks)
     alice, card = people["alice"], enrolled_alice["card"]
     keys_before = key_versions(emulator, "alice")
-    status, body, mark = start_reset(api, admin, reader, card)
-    assert status in (200, 201), body
-    reader["console"].expect(r"Transitioning to screen: ResetScreen", mark, 15)
     emulator.command("overrides.set", {"rules": FORGED_CHANGE_KEY()})
     try:
         probe = reader["console"].mark()
-        present_until(emulator, "alice", lambda: "Reset nfc card error from server: RESET_NOT_CONFIRMED" in reader["console"].since(probe),
+        present_armed(emulator, reader, hooks, lambda: arm_reset(api, admin, reader, card), RESET_SCREEN_CLOSED,
+                      "alice", lambda: "Reset nfc card error from server: RESET_NOT_CONFIRMED" in reader["console"].since(probe),
                       window=10, tries=6)
         assert "Reset nfc card error from server: RESET_NOT_CONFIRMED" in reader["console"].since(probe)
         assert card in card_ids(api, admin, alice)
