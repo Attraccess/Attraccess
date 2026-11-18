@@ -1,6 +1,5 @@
 """Explicit browser-only WAGO simulator. Never forwards a WAGO request to hardware."""
 
-from copy import deepcopy
 import hashlib
 import json
 import os
@@ -38,8 +37,6 @@ class WagoFixture:
         self.revisions = []
         self.calls = []
         self.unexpected = []
-        self.reject_next = False
-        self.preview = None
 
     def route(self, route):
         request = route.request
@@ -91,9 +88,6 @@ class WagoFixture:
             reply([])
         elif path == "/api/wago/settings":
             reply({"defaultMqttServerId": None})
-        elif path == "/api/wago/configuration/presets":
-            reply([{"id": "generic-digital-output", "name": "Generic digital output", "description": "A conservative output foundation."},
-                   {"id": "pulsed-lock-bank", "name": "Pulsed lock bank", "description": "Pulses an output briefly and returns it to off immediately when disconnected."}])
         elif suffix == "baseline":
             reply(next((r for r in self.revisions if r["state"] == "applied"), None))
         elif suffix == "draft":
@@ -103,25 +97,6 @@ class WagoFixture:
             reply(self.draft)
         elif suffix == "validate":
             reply({"valid": True, "errors": []})
-        elif suffix == "presets/preview":
-            candidate = deepcopy(body["snapshot"])
-            index = next(i for i, c in enumerate(candidate["logicalChannels"]) if c["id"] == body["application"]["channelId"])
-            channel = candidate["logicalChannels"][index]
-            before = deepcopy(channel)
-            assert body["application"]["presetId"] == "pulsed-lock-bank", "Fixture supports pulsed preset only"
-            channel.update(profile="pulsed-lock-bank", capabilities=["output", "pulse"], pulse={"durationMs": 500})
-            changes = [{"path": f"$.logicalChannels[{index}].{key}", "previous": before.get(key), "current": channel[key]}
-                       for key in ("profile", "capabilities", "pulse") if before.get(key) != channel[key]]
-            self.preview = {"draftHash": "qa-preview-hash", "snapshot": candidate, "diff": changes, "errors": []}
-            reply(self.preview)
-        elif suffix == "presets/apply":
-            assert body["previewedDraftHash"] == self.preview["draftHash"]
-            candidate = deepcopy(body["snapshot"])
-            for change in self.preview["diff"]:
-                if change["path"] in body["selectedPaths"]:
-                    index = int(change["path"].split("[")[1].split("]")[0])
-                    candidate["logicalChannels"][index][change["path"].rsplit(".", 1)[1]] = change["current"]
-            reply({"snapshot": json.dumps(candidate)})
         elif suffix == "review":
             assert self.draft, "Save is required before review"
             self.draft["reviewedHash"] = self.draft_identity()
@@ -173,12 +148,7 @@ class WagoFixture:
 
     def new_revision(self, snapshot):
         revision = {"revision": len(self.revisions) + 1, "contentHash": identity(json.loads(snapshot)),
-                    "state": "rejected" if self.reject_next else "applied", "publishedAt": NOW, "reportedAt": NOW,
-                    "rejectionErrors": json.dumps([{"path": "$.logicalChannels[0]", "code": "QA_REJECTED", "message": "Simulated controller rejection: output unavailable"}]) if self.reject_next else None,
+                    "state": "applied", "publishedAt": NOW, "reportedAt": NOW, "rejectionErrors": None,
                     "snapshot": snapshot, "presetProvenance": self.draft["presetProvenance"]}
-        self.reject_next = False
         self.revisions.insert(0, revision)
         return revision
-
-    def count(self, suffix):
-        return sum(call["method"] == "POST" and call["path"].endswith(suffix) for call in self.calls)

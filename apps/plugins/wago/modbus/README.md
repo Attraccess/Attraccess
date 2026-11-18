@@ -6,9 +6,9 @@ Its complete read-only register map follows the WAGO meter manual. See
 [setup and evidence](../../../../docs/en/plugins/wago/879-3020-modbus-rtu.md).
 Communication evidence does not qualify loaded energy accuracy or every physical assembly.
 
-## Configuration and shared editor integration
+## Configuration
 
-`model.ts` is the pure shared model used by backend validation, the frontend form,
+`model.ts` is the pure shared model used by backend validation, the frontend forms,
 and the standalone runtime. Persist `snapshot.modbus` alongside physical points and
 logical channels through the existing configuration draft/revision APIs. There is
 no Modbus environment JSON. Configuration uses three arrays (maximum 64 each):
@@ -21,35 +21,21 @@ no Modbus environment JSON. Configuration uses three arrays (maximum 64 each):
 - `profiles`: custom profiles with versioned, named measurements and actions.
   Built-in IDs cannot be overridden. Duplicate a built-in to edit its map.
 
-The ATT-1058 owner can import these exports from
-`frontend/src/configuration/modbus/ConfigurationForm.tsx`:
-
-```tsx
-<ModbusConfigurationForm
-  value={snapshot.modbus ?? { connections: [], devices: [], profiles: [] }}
-  onChange={(modbus) => setSnapshot({ ...snapshot, modbus })}
-  isDisabled={saving}
-/>
-```
-
-`ModbusProfileForm` accepts `{ value: ModbusProfile, onChange, isDisabled? }`.
-It renders editable named measurements/actions, numeric fields, selects, and
-read-only built-ins. `ModbusPointForm` accepts
-`{ configuration: ModbusConfiguration, value: ModbusPoint, onChange, isDisabled? }`.
-It selects a device and named measurement/action. Persist the binding as
+Persist a channel binding as
 `physicalPoint.modbus = { deviceId, measurementId?, actionId? }`, with
 `hardwareProfile: 'modbus'` and `channel: 0` (channel is not a register address).
 Measurement channels must use the profile's physical unit/kind with logical
 `scale: 1, offset: 0`; the profile applies register scaling once. Output channels
 require a named action. `validateModbus` and `validateModbusBindings` return
-`{ path, code, message }[]`; disable the host editor's save/apply actions while
-the full snapshot has errors. Removing or renaming referenced entries intentionally
-produces reference errors until the editor repairs the bindings.
+`{ path, code, message }[]`; backend configuration validation runs them, and the
+front panel does not save or apply a snapshot that fails validation. Removing or
+renaming referenced entries intentionally produces reference errors until the
+bindings are repaired.
 
-The shared controller editor mounts these forms under **External devices**. Profile
-versions are embedded in each configuration revision; update device references
-when changing a custom profile version. Custom profiles are not globally shared
-between controllers.
+The front panel (`frontend/src/front-panel/`) edits devices and custom profiles
+with the shared `ModbusProfileForm`. Profile versions are embedded in each
+configuration revision; update device references when changing a custom profile
+version. Custom profiles are not globally shared between controllers.
 
 ## Registers, values and actions
 

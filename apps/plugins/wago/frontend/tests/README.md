@@ -1,10 +1,10 @@
-# WAGO Fixture-Only Browser Tests
+# WAGO Browser Acceptance Tests
 
-The browser suite builds a static harness, serves it from a fixture-only Playwright
-router and drives it in desktop and touch/mobile Chromium. No application source,
-dependency manifests, generated API clients, or database files are modified. Build
-output and browser evidence are not source files to commit. The frontend Vitest
-suites run separately through `plugin-wago:test-frontend`.
+The commissioning browser suite builds a static harness, serves it through a
+Playwright router and drives it in desktop and touch/mobile Chromium. No application
+source, dependency manifests, generated API clients, or database files are modified.
+Build output and browser evidence are not source files to commit. The frontend
+Vitest suites run separately through `plugin-wago:test-frontend`.
 
 ## Commissioning
 
@@ -21,8 +21,7 @@ through `acceptance/commissioning/browser.spec.ts`. It executes one journey at
 each viewport size: `CommissioningDesktop` (1440x1000) and `CommissioningMobile`
 (390x844), for two Python tests.
 
-This harness permits selected requests
-to its runner-owned ephemeral loopback API. It uses production commissioning
+This harness permits selected requests to its runner-owned ephemeral loopback API. It uses production commissioning
 controllers/services with an in-memory database and fixture device/enrollment
 transports. Unknown endpoints and other origins are blocked. It does not use a
 shared database, broker or device, host login, or plugin federation. The fixture
@@ -94,3 +93,5 @@ failures for that tested snapshot. It predates the subsequent host-supervisor,
 identity/descriptor and containment security changes. It does not verify those
 changes or hardware; rerun against the final source and retain a new snapshot
 record. The former two-error baseline documentation was corrected after validation.
+The configuration browser suite counted above was removed with the old configuration
+editor (ATT-1216).
