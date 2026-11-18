@@ -91,6 +91,8 @@ describe('fabric and backup controllers', () => {
     const rotated = await fabric.rotate({ confirm: true }, request);
     expect(rotated.keyId).not.toBe(recoveryKey?.keyId);
 
+    // Backups of the same millisecond have random ids and cannot be ordered: let the clock move on.
+    await new Promise((resolve) => setTimeout(resolve, 5));
     const made = await backups.create(request);
     expect(made).toMatchObject({ trigger: 'manual', actor: '7' });
     expect((await backups.list())[0].id).toBe(made.id);
