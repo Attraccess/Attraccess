@@ -31,11 +31,14 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({
     invalidateQueries: state.invalidate,
     resetQueries: state.reset,
-    getQueryState: () => state.currentUser,
+    // Exact-key lookup, like TanStack's: the key the current-user hook caches under.
+    getQueryState: (key: unknown) =>
+      JSON.stringify(key) === JSON.stringify(['current-user', {}]) ? state.currentUser : undefined,
   }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   useGetCurrentKey: 'current-user',
+  UseGetCurrentKeyFn: (clientOptions = {}) => ['current-user', clientOptions],
   useConfirmDeleteAccount: (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
     return { mutate: state.mutate, isPending: state.pending };

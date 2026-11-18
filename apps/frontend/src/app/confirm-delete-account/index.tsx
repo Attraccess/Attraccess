@@ -3,7 +3,12 @@ import { StatusDialog, TranslationMessage, useTranslations, useUrlQuery } from '
 import { useNavigate } from 'react-router-dom';
 import en from './en.json';
 import de from './de.json';
-import { useConfirmDeleteAccount, useGetCurrentKey, ApiError } from '@attraccess/react-query-client';
+import {
+  useConfirmDeleteAccount,
+  useGetCurrentKey,
+  UseGetCurrentKeyFn,
+  ApiError,
+} from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { getTranslationKeyForApiError } from '../../utils/apiError';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
@@ -73,7 +78,7 @@ export function ConfirmDeleteAccount() {
 
   const leaveDeletedAccount = () => {
     // A failed refetch keeps the deleted user cached; reset it unless another signed-in user was confirmed.
-    const currentUser = queryClient.getQueryState([useGetCurrentKey]);
+    const currentUser = queryClient.getQueryState(UseGetCurrentKeyFn());
     if (currentUser?.status !== 'success' || currentUser.fetchStatus !== 'idle') {
       queryClient.resetQueries({ queryKey: [useGetCurrentKey] });
     }
