@@ -223,6 +223,12 @@ export function filterVocabulary(meta: AuditMetaDto | undefined): AuditFilterVoc
   return meta ? { subjectTypes: meta.subjectTypes, eventPrefixes: knownEventPrefixes(meta.actions) } : {};
 }
 
+function validEventPrefix(prefix: string, eventPrefixes: readonly string[] | undefined): boolean {
+  if (prefix.length > AuditQueryDtoSchema.properties.eventPrefix.maxLength || !eventPrefix.test(prefix)) return false;
+  // Once meta loaded, the leading segment must be a known one, as the API requires.
+  return !eventPrefixes || eventPrefixes.includes(prefix.split('.')[0]);
+}
+
 export function filterRequest(
   filters: AuditFilters,
   { subjectTypes, eventPrefixes }: AuditFilterVocabulary = {},
@@ -242,14 +248,7 @@ export function filterRequest(
   }
   if (request.from && request.to && request.from > request.to) return { error: 'invalidRange' };
   const prefix = filters.eventPrefix.trim();
-  if (
-    prefix &&
-    (prefix.length > AuditQueryDtoSchema.properties.eventPrefix.maxLength ||
-      !eventPrefix.test(prefix) ||
-      // Once meta loaded, the leading segment must be a known one, as the API requires.
-      (eventPrefixes && !eventPrefixes.includes(prefix.split('.')[0])))
-  )
-    return { error: 'invalidEventPrefix' };
+  if (prefix && !validEventPrefix(prefix, eventPrefixes)) return { error: 'invalidEventPrefix' };
   if (prefix) request.eventPrefix = prefix;
   const subjectType = filters.subjectType.trim();
   if (subjectType) {
