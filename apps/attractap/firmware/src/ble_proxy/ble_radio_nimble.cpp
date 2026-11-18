@@ -30,7 +30,7 @@ namespace ble
     namespace
     {
         constexpr uint32_t SYNC_TIMEOUT_MS = 3000;
-        // NimBLE's own host task, like nimble_port_freertos_init but with its stack in PSRAM.
+        // NimBLE's own host task, like nimble_port_freertos_init but with its stack in PSRAM where the board has it.
         constexpr uint32_t HOST_TASK_STACK = 4096;
         // Free DMA-capable internal RAM the stack needs to start. Espressif's controller takes about 24 KB of it
         // (28 KB with a link) and does not check every allocation: with too little it asserts and the reader
@@ -49,6 +49,8 @@ namespace ble
         SemaphoreHandle_t hostStopped = nullptr;
         // Set while the stack is up (nimble_port_init done, host task running).
         TaskHandle_t hostTaskHandle = nullptr;
+        // The host task's stack came from xTaskCreatePinnedToCoreWithCaps (PSRAM), so it is deleted the same way.
+        bool hostTaskWithCaps = false;
 
         void toNimble(const Address &address, ble_addr_t &out)
         {
@@ -123,10 +125,14 @@ namespace ble
             if (err != ESP_OK) return espError(err);
             ble_hs_cfg.sync_cb = onSyncCallback;
             ble_hs_cfg.reset_cb = onResetCallback;
-            if (xTaskCreatePinnedToCoreWithCaps(hostTask, "nimble_host", HOST_TASK_STACK, nullptr,
-                                                configMAX_PRIORITIES - 4, &hostTaskHandle,
-                                                CONFIG_BT_NIMBLE_PINNED_TO_CORE,
-                                                MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS)
+            // Boards without PSRAM (the BLE bridge) take the host stack from internal RAM.
+            hostTaskWithCaps = xTaskCreatePinnedToCoreWithCaps(hostTask, "nimble_host", HOST_TASK_STACK, nullptr,
+                                                               configMAX_PRIORITIES - 4, &hostTaskHandle,
+                                                               CONFIG_BT_NIMBLE_PINNED_TO_CORE,
+                                                               MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) == pdPASS;
+            if (!hostTaskWithCaps &&
+                xTaskCreatePinnedToCore(hostTask, "nimble_host", HOST_TASK_STACK, nullptr, configMAX_PRIORITIES - 4,
+                                        &hostTaskHandle, CONFIG_BT_NIMBLE_PINNED_TO_CORE) != pdPASS)
             {
                 hostTaskHandle = nullptr;
                 (void)nimble_port_deinit();
@@ -153,7 +159,8 @@ namespace ble
         synced = false;
         // nimble_port_stop() returns once the host task ran its stop event; it gives this a few instructions later.
         xSemaphoreTake(hostStopped, portMAX_DELAY);
-        vTaskDeleteWithCaps(hostTaskHandle);
+        if (hostTaskWithCaps) vTaskDeleteWithCaps(hostTaskHandle);
+        else vTaskDelete(hostTaskHandle);
         hostTaskHandle = nullptr;
         {
             std::lock_guard<std::recursive_mutex> lock(mutex);
