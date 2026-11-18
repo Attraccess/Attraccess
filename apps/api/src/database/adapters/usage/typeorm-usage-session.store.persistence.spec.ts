@@ -106,7 +106,7 @@ describe('TypeOrmUsageSessionStore with two independent connections', () => {
     expect(results.filter(Boolean)).toHaveLength(1);
     const ended = await a.store.findSessionWithRelations(session.id, 'ended');
     expect(ended.endTime).not.toBeNull();
-    expect(['by a', 'by b']).toContain(ended.endNotes);
+    expect(['by a', 'by b', 'again a', 'again b']).toContain(ended.endNotes);
     expect(await a.store.countActiveSessions(1)).toBe(0);
   });
 

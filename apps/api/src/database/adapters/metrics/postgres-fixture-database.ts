@@ -21,7 +21,7 @@ export interface PostgresFixtureDatabase extends FixtureQueries {
  * created by SQL.
  */
 export async function openPostgresFixtureDatabase(location: string): Promise<PostgresFixtureDatabase> {
-  const source = await createTestDataSource({ location, entities: [AttractapCrashReport] });
+  const source = await createTestDataSource({ location });
   return {
     query: (sql, parameters) => source.query(sql, parameters),
     transaction: (work) =>

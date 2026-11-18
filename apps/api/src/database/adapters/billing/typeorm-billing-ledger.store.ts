@@ -6,7 +6,6 @@ import {
 } from '@attraccess/application-models';
 import { BillingTransaction, BillingTransactionItem, User } from '@attraccess/database-entities';
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { isUniqueViolation } from '../../persistence-errors';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../audit/recorder/audit-event';
@@ -140,27 +139,36 @@ export class TypeOrmBillingLedgerStore implements BillingLedgerStore {
     return this.contexts.run(context, async (manager, scope) => {
       let settled: BillingTransactionRecord;
       if (input.existing) {
-        await manager.update(BillingTransaction, input.existing.id, {
-          amount: input.amount,
-          status: BillingTransactionStatus.Completed,
-        });
+        // Only a bill that is not completed yet may be settled: a concurrent settlement that committed first wins.
+        const updated = await manager
+          .createQueryBuilder()
+          .update(BillingTransaction)
+          .set({ amount: input.amount, status: BillingTransactionStatus.Completed })
+          .where('"id" = :id AND "status" <> :completed', {
+            id: input.existing.id,
+            completed: BillingTransactionStatus.Completed,
+          })
+          .execute();
+        if (!updated.affected) throw new BadRequestException('Billing transaction already exists for this resource usage');
         settled = { ...input.existing, amount: input.amount, status: BillingTransactionStatus.Completed };
       } else {
-        let saved: BillingTransaction;
-        try {
-          saved = await manager.save(BillingTransaction, {
+        // ON CONFLICT DO NOTHING: a failed INSERT would abort the PostgreSQL transaction. A concurrent settlement of
+        // the same usage holds the unique index on resourceUsageId; this one waits for it and then inserts nothing.
+        const inserted = await manager
+          .createQueryBuilder()
+          .insert()
+          .into(BillingTransaction)
+          .values({
             userId: input.userId,
             resourceUsageId: input.usageId,
             amount: input.amount,
             status: BillingTransactionStatus.Completed,
-          } as Partial<BillingTransaction>);
-        } catch (error) {
-          // A concurrent settlement of the same usage won the unique index on resourceUsageId.
-          if (isUniqueViolation(error)) {
-            throw new BadRequestException('Billing transaction already exists for this resource usage');
-          }
-          throw error;
-        }
+          } as Partial<BillingTransaction>)
+          .orIgnore()
+          .returning('*')
+          .execute();
+        const saved = (inserted.raw as BillingTransaction[])[0];
+        if (!saved) throw new BadRequestException('Billing transaction already exists for this resource usage');
         settled = toTransactionRecord(saved);
       }
       await this.audit.record(input.audit(settled.id), scope);

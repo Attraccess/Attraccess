@@ -281,7 +281,9 @@ describe('MatterRestoreService', () => {
       const validation = await h.restore.validate(stored(), undefined, ADMIN);
       await h.restore.confirm(validation.validationId, originalFabricId, ADMIN);
       const triggers = (await h.backups.list()).map((b) => b.trigger);
-      expect(triggers).toEqual(['restore', 'pre_restore', 'manual', 'fabric_created']);
+      // Backups of one millisecond have random ids, so the two oldest cannot be ordered among themselves.
+      expect(triggers.slice(0, 2)).toEqual(['restore', 'pre_restore']);
+      expect(triggers.slice(2).sort()).toEqual(['fabric_created', 'manual']);
       // The pre-restore and the post-restore backup belong to the restore's operation.
       const backups = auditCalls('matter.backup_succeeded');
       expect(backups.map((entry) => entry.details['trigger'])).toEqual(['pre_restore', 'restore']);
