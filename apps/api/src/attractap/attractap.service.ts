@@ -291,11 +291,13 @@ export class AttractapService {
     }
 
     const firmware = updateData.firmware ?? reader.firmware;
+    let openedForPlugins = false;
     if (updateData.firmware) {
       this.logger.debug('Updating reader firmware info', updateData.firmware);
       // A BLE Bridge exists to carry plugin Bluetooth traffic, so it starts open for plugins. Only when the
       // reader becomes a bridge: an administrator who turns it off later keeps it off across reconnects.
-      if (!isBleBridge(reader) && isBleBridge(updateData)) edit.allowPluginBle = true;
+      openedForPlugins = !isBleBridge(reader) && isBleBridge(updateData) && !reader.allowPluginBle;
+      if (openedForPlugins) edit.allowPluginBle = true;
       edit.firmware = updateData.firmware;
     }
 
@@ -331,7 +333,8 @@ export class AttractapService {
     await this.readerStore.applyEdit(id, edit);
     const response = (await this.findReaderById(id)) ?? reader;
 
-    if (emitEvent) {
+    // Opening a new bridge for plugins is always announced: running advertisement watches add it from the event.
+    if (emitEvent || openedForPlugins) {
       this.eventEmitter.emit(ReaderUpdatedEvent.EVENT_NAME, new ReaderUpdatedEvent(response));
     }
 
