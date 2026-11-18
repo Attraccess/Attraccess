@@ -75,11 +75,14 @@ void ReaderLink::setup()
     if (!sessionWorker)
     {
         // Key exchange and signature checks need ~10 KB of stack; keep them off the main loop's
-        // internal stack. A PSRAM stack costs no internal heap; the task never touches flash.
+        // internal stack. A PSRAM stack costs no internal heap; the task never touches flash. Boards
+        // without PSRAM (the BLE bridge) take it from internal RAM.
         TaskHandle_t handle = nullptr;
         if (xTaskCreatePinnedToCoreWithCaps(sessionWorkerEntry, "rl_tls", SESSION_WORKER_STACK, this,
                                             SESSION_WORKER_PRIORITY, &handle, tskNO_AFFINITY,
-                                            MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) == pdPASS)
+                                            MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) == pdPASS ||
+            xTaskCreatePinnedToCore(sessionWorkerEntry, "rl_tls", SESSION_WORKER_STACK, this, SESSION_WORKER_PRIORITY,
+                                    &handle, tskNO_AFFINITY) == pdPASS)
         {
             sessionWorker = handle;
         }
