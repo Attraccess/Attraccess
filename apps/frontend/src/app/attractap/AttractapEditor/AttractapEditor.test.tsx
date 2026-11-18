@@ -6,12 +6,16 @@ import { AttractapEditor } from './AttractapEditor';
 
 const state = vi.hoisted(() => ({
   reader: undefined as unknown,
+  queryOptions: undefined as unknown as { refetchInterval: (query: { state: { data: unknown } }) => number | false },
   mutate: undefined as unknown as ReturnType<typeof vi.fn>,
 }));
 
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useGetReaderById: () => ({ data: state.reader }),
+  useGetReaderById: (_query: unknown, _key: unknown, options: typeof state.queryOptions) => {
+    state.queryOptions = options;
+    return { data: state.reader };
+  },
   useGetReadersKey: 'readers',
   UseGetReaderByIdKeyFn: () => ['reader'],
   useUpdateReader: () => ({ mutate: state.mutate, isPending: false }),
@@ -151,5 +155,16 @@ describe('AttractapEditor for a BLE Bridge', () => {
     expect(screen.getByRole('tab', { name: 'tabs.readerUi' })).toBeInTheDocument();
     expect(screen.getByText('ledBrightness')).toBeInTheDocument();
     expect(screen.queryByText('bleBridgeDescription')).toBeNull();
+  });
+});
+
+describe('AttractapEditor right after pairing', () => {
+  it('reloads the reader until it reports its firmware, so a bridge gets the bridge settings', () => {
+    state.reader = undefined;
+    render(<AttractapEditor readerId={1} isOpen onSave={vi.fn()} onCancel={vi.fn()} />);
+    const interval = (data: unknown) => state.queryOptions.refetchInterval({ state: { data } });
+    expect(interval({ id: 1, firmware: { name: null, capabilities: {} } })).toBe(2000);
+    expect(interval({ id: 1, firmware: { name: 'attractap_bridge', capabilities: { nfc: false } } })).toBe(false);
+    expect(interval(undefined)).toBe(false);
   });
 });

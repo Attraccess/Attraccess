@@ -44,6 +44,9 @@ export function AttractapEditor(props: Readonly<Props>) {
 
   const { data: reader } = useGetReaderById({ path: { readerId: props.readerId as number } }, undefined, {
     enabled: props.readerId !== undefined,
+    // The editor opens right after pairing, before the reader reports its firmware: until then a BLE Bridge
+    // would look like a card reader, so reload until the firmware is known.
+    refetchInterval: (query) => (query.state.data && !query.state.data.firmware?.name ? 2000 : false),
   });
 
   const toast = useToastMessage();
