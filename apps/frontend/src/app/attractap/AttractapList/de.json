@@ -3,7 +3,7 @@
     "title": "Attractap",
     "actions": {
       "menu": "Geräte-Einrichtung",
-      "openHardwareSetup": "RFID-Leser Einrichten",
+      "openHardwareSetup": "Attractap einrichten",
       "openSerialConsole": "Serielle Konsole"
     }
   },

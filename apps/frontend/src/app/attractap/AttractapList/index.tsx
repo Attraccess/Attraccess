@@ -259,7 +259,12 @@ export function AttractapList() {
                             {isBleBridge(reader) && (
                               <>
                                 <br />
-                                <Chip variant="soft" color="accent" data-cy={`attractap-list-ble-bridge-${reader.id}`}>
+                                <Chip
+                                  variant="soft"
+                                  color="accent"
+                                  className="whitespace-nowrap"
+                                  data-cy={`attractap-list-ble-bridge-${reader.id}`}
+                                >
                                   {t('bleBridge')}
                                 </Chip>
                               </>

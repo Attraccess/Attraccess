@@ -2,7 +2,7 @@
   "success": {
     "toast": {
       "title": "Installation successful",
-      "description": "You can now set up and use the RFID reader."
+      "description": "You can now set up and use the reader."
     }
   },
   "action": {
@@ -31,14 +31,14 @@
     "power": "Never power the GL-S10 through USB and PoE at the same time.",
     "wiring": "Open the case and connect a 3.3 V USB-TTL adapter to the serial pads: TX to RX, RX to TX, GND to GND and 3.3 V to 3.3 V. Never use a 5 V adapter.",
     "downloadMode": "Hold the download button (GPIO0) while you power the GL-S10 up, then start the installation.",
-    "docsLink": "Step-by-step guide with photos of the pads",
+    "docsLink": "Step-by-step guide to the pads and wiring",
     "docsUrl": "https://docs.attraccess.org/#/en/attractap/ble-bridge",
-    "confirm": "The bridge is in download mode, install"
+    "confirm": "Install now"
   },
   "powerCycle": {
     "title": "Restart the bridge",
     "description": "The firmware is installed. The bridge cannot be restarted automatically: switch its power off and on again without holding GPIO0, and keep the USB-TTL adapter connected. Then continue with the PIN, network and server settings over the same connection.",
-    "continue": "The bridge is restarted, continue"
+    "continue": "Continue setup"
   },
   "chipMismatch": {
     "title": "Wrong chip for this firmware",
