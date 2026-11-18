@@ -53,16 +53,20 @@ export interface PluginStorageDdl {
   statements(step: ResolvedStep): string[];
 }
 
+/** What planning reads: the bookkeeping of a plugin, nothing else. */
+export interface PluginStorageMigrationReader {
+  /** Versions recorded for the plugin, ascending. Empty when the plugin has no bookkeeping yet. */
+  appliedVersions(): Promise<number[]>;
+  /** The names in the plugin's legacy TypeORM migrations table, or null when that table does not exist. */
+  legacyMigrationNames(): Promise<string[] | null>;
+}
+
 /**
  * The engine-specific side of the migration runner. Everything runs inside one transaction: the version bookkeeping,
  * the DDL and the data steps commit together or not at all.
  */
-export interface PluginStorageMigrationSession {
-  /** Versions recorded for the plugin, ascending. Empty when the plugin has no bookkeeping yet. */
-  appliedVersions(): Promise<number[]>;
+export interface PluginStorageMigrationSession extends PluginStorageMigrationReader {
   recordVersion(entry: { version: number; name: string; source: 'migrated' | 'adopted' }): Promise<void>;
-  /** The names in the plugin's legacy TypeORM migrations table, or null when that table does not exist. */
-  legacyMigrationNames(): Promise<string[] | null>;
   execute(statements: readonly string[]): Promise<void>;
   /** The record port of `schema` over this transaction, for a data step. */
   recordPort(schema: ReadonlyMap<string, CompiledTable>): unknown;
@@ -76,4 +80,9 @@ export interface PluginStorageMigrationDriver {
     storage: CompiledPluginStorage,
     work: (session: PluginStorageMigrationSession) => Promise<T>,
   ): Promise<T>;
+  /**
+   * Runs `work` in a read-only transaction on a connection of its own. It takes no write lock, so planning (an
+   * upgrade check while the server runs) neither waits behind writers nor blocks them.
+   */
+  read<T>(storage: CompiledPluginStorage, work: (session: PluginStorageMigrationReader) => Promise<T>): Promise<T>;
 }

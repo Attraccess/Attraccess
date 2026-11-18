@@ -117,6 +117,30 @@ export function describePluginStorageLifecycle(fixture: StorageBackendFixture): 
         expect(await db.engine.migrate(compile(storageV3))).toEqual({ pending: [1, 2, 3], adopt: false });
         expect(await db.engine.migrate(compile(storageV3))).toEqual({ pending: [], adopt: false });
       });
+
+      it('plans without waiting for a writer that holds the database (upgrade check while the server runs)', async () => {
+        await db.engine.migrate(compile(storageV1));
+        const side = await db.connect();
+        let release = () => undefined as void;
+        let holding = () => undefined as void;
+        const held = new Promise<void>((resolve) => (release = resolve));
+        const writing = new Promise<void>((resolve) => (holding = resolve));
+        const writer = side.unitOfWork.run(async (scope) => {
+          await side.insertResource(scope, 'held-by-writer');
+          holding();
+          await held;
+        });
+        await writing;
+        try {
+          const started = Date.now();
+          await expect(db.engine.assess(compile(storageV2))).resolves.toEqual({ pending: [2], adopt: false });
+          // The write transaction is still open: planning neither queued behind it nor took the write lock.
+          expect(Date.now() - started).toBeLessThan(2_000);
+        } finally {
+          release();
+          await writer;
+        }
+      });
     });
 
     describe('failures roll back and leave nothing behind', () => {

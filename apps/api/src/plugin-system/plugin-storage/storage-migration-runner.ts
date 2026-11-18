@@ -75,7 +75,7 @@ export class StorageMigrationRunner implements PluginMigrationEngine {
   ) {}
 
   assess(storage: CompiledPluginStorage): Promise<PluginStorageMigrationPlan> {
-    return this.driver.transaction(storage, async (session) =>
+    return this.driver.read(storage, async (session) =>
       planStorageMigration(storage, await session.appliedVersions(), await session.legacyMigrationNames()),
     );
   }

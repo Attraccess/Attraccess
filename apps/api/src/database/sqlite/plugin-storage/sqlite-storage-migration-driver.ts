@@ -1,8 +1,9 @@
 import { mkdirSync } from 'fs';
 import { dirname } from 'path';
-import type { DataSource, DataSourceOptions, EntityManager } from 'typeorm';
+import { DataSource, type DataSourceOptions, type EntityManager } from 'typeorm';
 import type {
   PluginStorageMigrationDriver,
+  PluginStorageMigrationReader,
   PluginStorageMigrationSession,
 } from '../../../plugin-system/plugin-storage/storage-dialect.port';
 import {
@@ -84,7 +85,7 @@ class SqliteMigrationSession implements PluginStorageMigrationSession {
 export class SqliteStorageMigrationDriver implements PluginStorageMigrationDriver {
   constructor(private readonly base: () => DataSourceOptions) {}
 
-  private open(): DataSource {
+  private open(readOnly = false): DataSource {
     const base = this.base();
     const databaseFile = (base as { database?: unknown }).database;
     if (typeof databaseFile === 'string') {
@@ -92,13 +93,25 @@ export class SqliteStorageMigrationDriver implements PluginStorageMigrationDrive
       // on a fresh install.
       mkdirSync(dirname(databaseFile), { recursive: true });
     }
-    return createDataSource({
-      ...base,
-      entities: [],
-      synchronize: false,
-      migrationsRun: false,
-      migrations: [],
-    } as DataSourceOptions);
+    const options = { ...base, entities: [], synchronize: false, migrationsRun: false, migrations: [] };
+    // createDataSource turns every transaction into BEGIN IMMEDIATE (the write lock); a plain source begins deferred.
+    return readOnly ? new DataSource(options as DataSourceOptions) : createDataSource(options as DataSourceOptions);
+  }
+
+  async read<T>(
+    storage: CompiledPluginStorage,
+    work: (session: PluginStorageMigrationReader) => Promise<T>,
+  ): Promise<T> {
+    const source = this.open(true);
+    await source.initialize();
+    try {
+      await source.query(`PRAGMA busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`);
+      await source.query('PRAGMA query_only = ON');
+      // A deferred transaction: both reads see one consistent state without reserving the writer.
+      return await source.transaction((manager) => work(new SqliteMigrationSession(manager, storage)));
+    } finally {
+      await source.destroy();
+    }
   }
 
   async transaction<T>(
