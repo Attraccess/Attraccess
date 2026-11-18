@@ -1,3 +1,4 @@
+import { spawnSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { runInNewContext } from 'vm';
@@ -44,6 +45,34 @@ describe('Attraccess brand theme', () => {
     for (const foreground of ['foreground', 'muted', 'accent', 'chart-sessions', 'chart-minutes', 'chart-spend']) {
       expect(contrast(colors[foreground], colors.background)).toBeGreaterThanOrEqual(4.5);
     }
+  });
+
+  it.each(['light', 'dark'])('keeps %s field borders above WCAG non-text contrast on every surface', (theme) => {
+    const split = tokens.indexOf('  .dark,');
+    const css = theme === 'light' ? tokens.slice(0, split) : tokens.slice(split);
+    const colors = Object.fromEntries(
+      [...css.matchAll(/--([\w-]+):\s*(#[\da-f]{6});/gi)].map((match) => [match[1], match[2]]),
+    );
+    const surfaces = ['background', 'surface', 'surface-secondary', 'surface-tertiary', 'overlay'];
+    for (const token of ['field-border', 'field-border-hover', ...surfaces]) {
+      expect({ token, value: colors[token] }).toEqual({ token, value: expect.stringMatching(/^#/) });
+    }
+    for (const border of ['field-border', 'field-border-hover']) {
+      for (const surface of surfaces) {
+        expect(contrast(colors[border], colors[surface])).toBeGreaterThanOrEqual(3);
+      }
+    }
+    expect(contrast(colors['field-border'], colors['field-border-hover'])).toBeGreaterThanOrEqual(1.4);
+  });
+
+  it('leaves field borders to the shared tokens instead of component overrides', () => {
+    const overrides = spawnSync(
+      'git',
+      ['grep', '-l', '-E', 'field-border|border-width-field', '--', 'libs/*.ts', 'libs/*.tsx', 'apps/*.ts', 'apps/*.tsx'],
+      { cwd: root, encoding: 'utf8' },
+    );
+    expect(overrides.status).toBe(1);
+    expect(overrides.stdout).toBe('');
   });
 
   it('shares tokens across both applications while following the system appearance by default', () => {
