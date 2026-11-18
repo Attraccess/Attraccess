@@ -14,10 +14,10 @@ unlock of the door (`DoorUnlock`) and starts the flows of the "door unlocked" tr
 ## Permission
 
 Declare `READER_DEVICES` together with `CARD_AUTHENTICATION` (see
-[Card Authentication for Plugins](plugins/card-authentication.md)): the plugin authenticates the card first and hands the
-proof of that authentication to the reader. The SDK describes the permission as _"Register the plugin's own card
-readers. An administrator assigns each one a resource; a card authenticated on a reader runs its action on that resource
-for the card owner, with the same checks as an Attractap reader."_
+[Card Authentication for Plugins](plugins/card-authentication.md)): the plugin authenticates the card first and hands
+the proof of that authentication to the reader. The SDK describes the permission as _"Register the plugin's own card
+readers and assign each one a resource its capabilities allow (today an access-only door); a card authenticated on a
+reader runs its action on that resource for the card owner, with the same checks as an Attractap reader."_
 
 ```json
 {

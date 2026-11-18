@@ -2,9 +2,9 @@
  * Plugin readers (permission `READER_DEVICES`).
  *
  * A plugin reader is a card reader that a plugin owns, for example an NFC reader built into a device the plugin
- * talks to. It behaves like an Attractap reader without a display: an administrator assigns it a resource, and a
- * card held to it runs the one action its capabilities allow on that resource, with the same checks, usage record,
- * flows and audit as the same action on an Attractap reader.
+ * talks to. It behaves like an Attractap reader without a display: the plugin assigns it a resource its capabilities
+ * allow, and a card held to it runs the one action its capabilities allow on that resource, with the same checks,
+ * usage record, flows and audit as the same action on an Attractap reader.
  *
  * The plugin never acts on a bare user id. It authenticates the card held to its device with `context.cards`
  * (which returns a single-use authentication for that device) and hands that authentication to `tap`.

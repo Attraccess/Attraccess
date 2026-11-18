@@ -17,8 +17,9 @@ das Entriegeln der Tür gespeichert und gemeldet (`DoorUnlock`) und startet die 
 Deklarieren Sie `READER_DEVICES` zusammen mit `CARD_AUTHENTICATION` (siehe
 [Kartenauthentifizierung für Plugins](plugins/card-authentication.md)): Das Plugin authentifiziert zuerst die Karte und
 übergibt den Nachweis dieser Authentifizierung an den Reader. Das SDK beschreibt die Berechtigung so: _„Register the
-plugin's own card readers. An administrator assigns each one a resource; a card authenticated on a reader runs its
-action on that resource for the card owner, with the same checks as an Attractap reader.“_
+plugin's own card readers and assign each one a resource its capabilities allow (today an access-only door); a card
+authenticated on a reader runs its action on that resource for the card owner, with the same checks as an Attractap
+reader.“_
 
 ```json
 {

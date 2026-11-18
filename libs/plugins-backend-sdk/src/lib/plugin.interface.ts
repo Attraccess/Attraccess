@@ -185,7 +185,7 @@ export const PLUGIN_PERMISSION_DESCRIPTIONS: Record<PluginPermission, string> = 
   [PluginPermission.CARD_AUTHENTICATION]:
     "Authenticate NFC cards held to the plugin's own devices with the Attraccess card keys. The plugin receives the card and its owner, never the keys.",
   [PluginPermission.READER_DEVICES]:
-    "Register the plugin's own card readers. An administrator assigns each one a resource; a card authenticated on a reader runs its action on that resource for the card owner, with the same checks as an Attractap reader.",
+    "Register the plugin's own card readers and assign each one a resource its capabilities allow (today an access-only door); a card authenticated on a reader runs its action on that resource for the card owner, with the same checks as an Attractap reader.",
 };
 
 /**
