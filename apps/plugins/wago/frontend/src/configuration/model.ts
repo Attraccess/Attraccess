@@ -241,14 +241,6 @@ export function configurationNames(
   };
 }
 
-export function pointLabel(point: PhysicalPoint, names: Record<string, string>, t?: TFunction) {
-  return point.hardwareProfile === '751-9301'
-    ? `${names[point.id] ?? 'CC100'} · ${digitalTerminalLabel(point.channel)}`
-    : t
-      ? t('fields.externalAssignment', { name: names[point.id] ?? point.id, profile: point.hardwareProfile })
-      : `${names[point.id] ?? point.id} · external assignment (${point.hardwareProfile})`;
-}
-
 export function presetDisplayName(profile: string, t?: TFunction): string {
   if (!Object.hasOwn(englishPresets.items, profile)) return profile;
   return t

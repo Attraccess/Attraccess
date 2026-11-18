@@ -26,8 +26,10 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: [fileURLToPath(new URL('../../scripts/css-escape.test-setup.ts', import.meta.url))],
     include: ['apps/plugins/wago/frontend/tests/*.test.tsx', 'apps/plugins/wago/frontend/src/**/*.{test,spec}.tsx'],
-    // tests/front-panel.test.tsx drives user-event flows (add meter, channel-limit dialogs) that take 8-16 s on a
-    // loaded host and exceed the 5 s default (measured ATT-1216); file parallelism needs no override.
+    // tests/front-panel.test.tsx drives user-event flows through the large 879-3020 meter form. With the 5 s default
+    // on a quiet host "adds a meter with the recommended readings and switches readings per register" times out
+    // (5.2 s; "keeps a reading that a guard uses enabled..." takes 4.0 s). On a loaded host the three slowest tests
+    // take 11-25 s (measured ATT-1216, coverage enabled). File parallelism needs no override.
     testTimeout: 30_000,
     coverage: {
       // Unit coverage feeds the project's crap-score target.

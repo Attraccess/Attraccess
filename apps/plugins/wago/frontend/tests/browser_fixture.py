@@ -10,9 +10,7 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parents[5]
 # Keep reruns in their own directory when earlier acceptance evidence must survive.
 BROWSER_ARTIFACTS_ROOT = ROOT / os.environ.get("WAGO_BROWSER_ARTIFACTS_ROOT", "output/playwright")
-ARTIFACTS = BROWSER_ARTIFACTS_ROOT / "att-1058"
 NOW = "2026-09-05T12:00:00.000Z"
-EMPTY = {"version": 1, "physicalPoints": [], "logicalChannels": []}
 
 
 def identity(value):
