@@ -1,4 +1,5 @@
 import { PluginManifestSchema } from './plugin.manifest';
+import { LoadedPluginManifest } from './runtime/manifest';
 
 const BASE = {
   name: 'demo',
@@ -29,6 +30,14 @@ describe('PluginManifestSchema SDK 2.0 contract', () => {
     });
     expect(parsed.main).not.toHaveProperty('migrations');
     expect(parsed).not.toHaveProperty('persistence');
+  });
+});
+
+describe('LoadedPluginManifest API contract', () => {
+  it('documents no persistence field: SDK 2.0 removed the engine list, so the API never returns one', () => {
+    const documented: string[] = Reflect.getMetadata('swagger/apiModelPropertiesArray', LoadedPluginManifest.prototype);
+    expect(documented).toContain(':permissions');
+    expect(documented).not.toContain(':persistence');
   });
 });
 
