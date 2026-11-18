@@ -13,6 +13,9 @@
 #else
 #include "api/security/reader_link.hpp"
 #endif
+#include "api/security/build_profile.hpp"
+#include "api/security/migration_pending.hpp"
+#include "api/security/nvs_erase_gate.hpp"
 #include "logger/logger.hpp"
 #include "platform.hpp"
 #include "utils.hpp"
@@ -85,18 +88,46 @@ static void logLoopStackUsage()
 }
 #endif
 
+// Maps nvs_flash_init()'s result for NvsEraseGate (host-tested decision, tests/identity-upgrade).
+static NvsEraseGate::NvsInitResult nvsInitResult(esp_err_t err)
+{
+    switch (err)
+    {
+    case ESP_OK:
+        return NvsEraseGate::NvsInitResult::Ok;
+    case ESP_ERR_NVS_NO_FREE_PAGES:
+        return NvsEraseGate::NvsInitResult::NoFreePages;
+    case ESP_ERR_NVS_NEW_VERSION_FOUND:
+        return NvsEraseGate::NvsInitResult::NewVersionFound;
+    default:
+        return NvsEraseGate::NvsInitResult::OtherError;
+    }
+}
+
 extern "C" void app_main(void)
 {
     // NVS backs all settings (the Arduino core used to initialize it implicitly).
     // The erase path only triggers on a truly incompatible/corrupt partition —
     // same recovery the Arduino core performed.
     esp_err_t nvsErr = nvs_flash_init();
-    if (nvsErr == ESP_ERR_NVS_NO_FREE_PAGES || nvsErr == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    if (NvsEraseGate::shouldErase(nvsInitResult(nvsErr), BuildProfile::secureBuild(),
+                                  BuildProfile::secureBuild() && migrationPending()))
     {
         ESP_ERROR_CHECK(nvs_flash_erase());
         nvsErr = nvs_flash_init();
     }
-    ESP_ERROR_CHECK(nvsErr);
+    NvsEraseGate::initialized() = nvsErr == ESP_OK;
+    if (nvsErr != ESP_OK)
+    {
+        if (!BuildProfile::secureBuild())
+        {
+            ESP_ERROR_CHECK(nvsErr);
+        }
+        // Secure builds never erase on a key error or while a migration is pending, and never abort into
+        // a boot loop either: the reader boots without NVS, ReaderLink shows the error state (SESSION_PROBLEM_STORAGE_FAILED)
+        // and refuses DS creation and the identity upgrade until the next boot.
+        mainLogger.errorf("NVS init failed (0x%x); secure build keeps the partition untouched", (unsigned)nvsErr);
+    }
 
 #ifndef ATTRACTAP_SECURE_PROFILE
     // Console input (serialCommandHandler) reads from the USB-Serial-JTAG
@@ -117,6 +148,12 @@ extern "C" void app_main(void)
     // log firmware info
     mainLogger.info("Welcome to Attractap");
     mainLogger.infof("Firmware: %s, Variant: %s, Version: %s", FIRMWARE_FRIENDLY_NAME, FIRMWARE_VARIANT_FRIENDLY_NAME, FIRMWARE_VERSION);
+
+    // Referencing the marker keeps it in the image: secure_packaging.py and SecureImageService look for it.
+    if (BuildProfile::secureBuild())
+    {
+        mainLogger.infof("Secure profile: %s", BuildProfile::secureProfileMarker());
+    }
 
     mainLogger.info("Console initialized");
 

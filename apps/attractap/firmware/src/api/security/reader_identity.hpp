@@ -15,12 +15,22 @@
 class IReaderKey
 {
 public:
+    enum class Algorithm
+    {
+        EcdsaP256,
+        // RSA-3072 in the ESP32-S3 Digital Signature peripheral (ATT-1207): TLS signs RSA-PSS SHA-256.
+        Rsa3072Ds,
+    };
+
     virtual ~IReaderKey() = default;
+    virtual Algorithm algorithm() const { return Algorithm::EcdsaP256; }
     // Canonical uncompressed P-256 SubjectPublicKeyInfo (91 bytes).
     virtual const std::vector<uint8_t> &publicKeySpki() const = 0;
     // PSA key usable for ECDSA with SHA-256 (mbedtls_pk_wrap_psa).
     virtual mbedtls_svc_key_id_t keyId() const = 0;
 };
+
+struct mbedtls_pk_context;
 
 // Software key in a PSA volatile slot, persisted as the raw 32-byte private scalar.
 class SoftwareReaderKey : public IReaderKey
@@ -56,6 +66,10 @@ namespace ReaderIdentity
     std::vector<uint8_t> spkiFromPoint(const uint8_t *point, size_t length);
     // True for exactly the canonical uncompressed P-256 SPKI form.
     bool isCanonicalP256Spki(const std::vector<uint8_t> &spki);
+
+    // Wraps the key's PSA handle into `pk`. A Digital Signature key has no exportable public key, so its
+    // public part (from the DS record) is preset in the context and the wrap never asks PSA for it.
+    int wrapKey(mbedtls_pk_context &pk, const IReaderKey &key);
 
     // Self-signed certificate over the reader key for the first (bootstrap) session: the server
     // looks the key up by fingerprint and answers with the issued certificate. DER output.

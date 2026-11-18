@@ -20,6 +20,9 @@
 #ifdef ATTRACTAP_TEST_HOOKS
 #include "../testhooks/test_hooks.hpp"
 #endif
+#ifdef ATTRACTAP_SECURE_LAB
+#include "../api/security/ds_console.hpp"
+#endif
 
 std::string SerialCommandHandler::inputBuffer = "";
 Logger SerialCommandHandler::logger("SerialCmd");
@@ -302,6 +305,14 @@ void SerialCommandHandler::triggerCrash(uint32_t stackBytes)
 
 void SerialCommandHandler::handleCommand(const std::string &topic, const std::string &payload)
 {
+#ifdef ATTRACTAP_SECURE_LAB
+    // Lab-only DS commands (ATT-1207). They take a raw argument (the chip MAC), not JSON, and print
+    // their own result lines; see api/security/ds_console.hpp.
+    if (DsConsole::handle(topic, payload))
+    {
+        return;
+    }
+#endif
     bool hasPin = pinIsSet();
 
     StaticJsonDocument<512> payloadDoc;

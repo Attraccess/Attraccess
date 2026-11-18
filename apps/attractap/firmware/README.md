@@ -394,6 +394,102 @@ shows that lock.
 Lab secure readers use public keys and development-mode flash encryption; see
 `lab/secure-boot/README.md`.
 
+### Reader identity: RSA-3072 in the Digital Signature peripheral (ATT-1207)
+
+Secure-profile builds (`ATTRACTAP_SECURE_PROFILE`, compile definition `ATTRACTAP_SECURE_BUILD`) can hold the
+reader's server identity as an RSA-3072 key (e = 65537) in the ESP32-S3 Digital Signature (DS) peripheral.
+Plain builds stay ECDSA P-256 only and are unchanged. The private key exists only as encrypted DS parameters;
+the 256-bit HMAC key that decrypts them lives read-protected in eFuse KEY3 (`HMAC_DOWN_DIGITAL_SIGNATURE`) and
+never leaves the chip.
+
+**TLS integration.** ESP-IDF v6.0.2 ships a PSA opaque driver for the DS peripheral
+(`PSA_KEY_LIFETIME_ESP_RSA_DS_VOLATILE`, enabled by `CONFIG_MBEDTLS_HARDWARE_RSA_DS_PERIPHERAL` in
+`sdkconfig.secure`; the same driver esp-tls uses). `DsReaderKey` imports the DS parameters as an opaque PSA RSA
+key pair (PKCS#1 v1.5 as key algorithm, RSA-PSS as enrollment algorithm), so `session_tls.cpp` and the identity
+upgrade sign through the same `IReaderKey`/PSA key id as the software key. The driver cannot export a public
+key, so `ReaderIdentity::wrapKey` presets it from the DS record before `mbedtls_pk_wrap_psa`. The client
+offers `rsa_pss_rsae_sha256` (and still `ecdsa_secp256r1_sha256` for the server's certificate) only when the
+active key is RSA; TLS 1.3 has no PKCS#1 v1.5 CertificateVerify. The CA and server certificates stay P-256.
+
+**DS record and flash layout.** One 4 KiB sector at the start of the `spiffs` partition (0xc90000), written and
+read with flash encryption (`esp_flash_write_encrypted` / `esp_flash_read_encrypted`); the partition table is
+unchanged and the firmware never mounts spiffs:
+
+| Range                              | Use                                                            |
+| ---------------------------------- | -------------------------------------------------------------- |
+| 0xc90000 - 0xc90fff (first sector) | DS record (ATT-1207)                                           |
+| 0xc91000 - 0xfdefff                | unused                                                         |
+| 0xfdf000 - 0xfdffff (last sector)  | conversion staging header (ATT-1208, `migration_pending.hpp`)  |
+
+Record layout (little endian, unused bytes 0xFF): `"ATDS"`, u16 version 1, u16 reserved 0, u32 payload length,
+SHA-256 of the payload, then the payload: u8 key block (3), u8 reserved, u16 RSA length field (95), 16-byte IV,
+u16 length + the encrypted DS parameters (`esp_ds_data_t.c`, 1584 bytes), u16 length + the RSA-3072 SPKI. The
+record is not secret. A valid record plus KEY3 purpose `HMAC_DOWN_DIGITAL_SIGNATURE` means DS is available. A KEY3
+burned for DS without a valid record is "DS params missing": the reader logs it, falls back to its P-256
+software identity and never burns KEY3 again.
+
+**Identity selection (`reader_link_identity.cpp`).**
+
+- DS available and the reader unpaired: it pairs with the DS key.
+- DS available and paired with the P-256 key: after `session.hello` it runs the upgrade. It sends
+  `identity.upgrade.request`, the server answers `identity.challenge {nonce}`, the reader sends
+  `identity.upgrade {spki, proof}` (RSA-PSS SHA-256, salt 32, over the domain-separated tuple in
+  `identity_proof.hpp`, shared byte for byte with the API through `tests/identity-upgrade/proof-vector.json`),
+  the server replies `identity.upgraded {certificate}`. The reader stores the certificate in NVS **before**
+  reconnecting with the DS key and deletes the software key (`readerpair/key`) only after the server accepted a
+  DS session (its first `session.hello`). `identity.upgrade.rejected`: the P-256 identity stays, the reason code is
+  logged, a new request follows on a later session (`not-allowed`: on a later boot).
+- A rejected pairing (`session.rejected`) makes a DS reader pair again with its DS key.
+- Which key a stored certificate belongs to is decided by the certificate's public key (`readerpair/ik` records
+  it for a pairing that has no certificate yet).
+
+**eFuse report.** Secure builds send `efuse.report` (CONTROL frame) once per session, right after
+`READER_FIRMWARE_INFO`: key purposes and used/read-protected state for KEY0-KEY5, the two public Secure Boot
+digests, revoke bits, `SPI_BOOT_CRYPT_CNT` (+ write-protect), `DIS_DOWNLOAD_MANUAL_ENCRYPT`, JTAG and download
+bits, RD_DIS (+ write-protect), SECURE_VERSION, flash encryption mode and the MAC. No key blocks are read.
+`READER_FIRMWARE_INFO` also carries `profile` (`plain`/`secure`/`secure-lab`), `release`, `secureVersion`,
+`secured` and `identity` (`ecdsa-p256`/`ds-rsa3072`). The server treats all of it as a claim: the reader is not
+attested.
+
+**NVS erase gate.** `main.cpp` erases the NVS on `NO_FREE_PAGES`/`NEW_VERSION_FOUND` through
+`NvsEraseGate::shouldErase` (host tested). Plain builds are unchanged. Secure builds erase only while
+`migrationPending()` is false, never on encryption/HMAC key errors, and never abort on a failed init: they boot,
+show the secure-connection error state and refuse DS creation and the upgrade. `migrationPending()` checks for
+the staging header magic `ATMG` at the start of the last spiffs sector; no staging exists in ATT-1207 (T3 hook).
+
+**DS key creation (irreversible).** `DsCreator::create()` burns KEY3 and write-protects RD_DIS. It refuses unless
+KEY3 and its purpose are unused, KEY2/KEY4 hold XTS/HMAC_UP and are read-protected, RD_DIS is not locked and the
+NVS is up. Order: generate HMAC key and RSA-3072 key in software, encrypt the parameters, write the DS record and
+read it back, burn KEY3 (purpose + read protection in one eFuse batch), DS self-test (PSS and PKCS#1 v1.5 verified
+against the public key), zero all plaintext, lock RD_DIS. Nothing after the burn is retried; a failure returns a
+code. It is never called on a boot. ATT-1207 triggers it only from the secure-lab console below; release secure
+builds compile it and T3 (`creating-key`) wires the trigger.
+
+Secure-lab console (CMND lines on the USB console, secure-lab builds only; output parsed by
+`tools/secure_lab_reader.py`):
+
+| Command                | Output                                                                                    |
+| ---------------------- | ----------------------------------------------------------------------------------------- |
+| `CMND ds.status`       | `DS_STATUS available=<0/1> record=<0/1> key3=<purpose or unused> fe=<mode>`               |
+| `CMND ds.create <mac>` | `DS_CREATE_BURNED <0/1>`, then `DS_CREATE_RESULT ok` or `DS_CREATE_RESULT error <code>`   |
+| `CMND ds.export`       | `DS_RECORD_BEGIN`, one line of base64 (the record), `DS_RECORD_END`                       |
+
+`ds.create` takes the lowercase colon MAC and compares it with the chip's own (`error mac-mismatch` otherwise).
+Error codes: `nvs-not-ready`, `key3-in-use`, `key2-not-xts`, `key4-not-hmac-up`, `keys-not-read-protected`,
+`rd-dis-locked`, `crypto-init-failed`, `random-failed`, `keygen-failed`, `params-failed`, `encrypt-failed`,
+`record-write-failed`, `record-verify-failed` (all before the burn), `burn-failed`, `burn-verify-failed`,
+`self-test-failed`, `rd-dis-lock-failed` (after it: `DS_CREATE_BURNED 1`, never retry). Nothing is printed through
+ESP_LOG: no HMAC key, RSA private part, DS parameters, nonce or proof appears in any log.
+
+Test hooks (`ATTRACTAP_TEST_HOOKS`, never in release): `CMND identity.get` replies `softwareKey`, `paired`,
+`hasCertificate`, `profile`, `ds`; `CMND identity.force-p256` forgets the pairing and the software key, sets a
+one-shot flag and restarts, so the next boot pairs with a fresh P-256 key although DS is available and the
+upgrade can run again.
+
+The firmware embeds `attractap-secure-profile-v1` in every secure app (`build_profile.cpp`) so
+`secure_packaging.py` and the API's `SecureImageService` recognise it. The lab DS burn and restore (committed DS
+record under `lab/ds/`, `secure_lab_reader.py create-ds`) is described in `lab/ds/README.md`.
+
 ## Building
 
 Prerequisites: [ESP-IDF v6.0.2](https://docs.espressif.com/projects/esp-idf/en/v6.0.2/esp32s3/get-started/index.html) installed for the `esp32s3` target. Install the project-local toolchain at `.tools/esp-idf` with `pnpm nx run attractap-firmware:setup-toolchain`, or use `INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh --workspace-only` during bootstrap. Local setup and CI share `tools/setup-esp-idf.sh` and the pin in `esp-idf-version.txt`; setup repairs partial installs and verifies `idf.py` can run. No extra Python packages are needed — `esptool` is picked up from your `PATH` or from ESP-IDF's own Python environment, and `cmake`/`ninja` are installed into the IDF tool set automatically if your system lacks them.

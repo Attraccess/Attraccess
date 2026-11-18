@@ -14,6 +14,7 @@
 #include "api/security/pairing_client.hpp"
 #include "api/security/pairing_codec.hpp"
 #include "api/security/reader_identity.hpp"
+#include "api/security/rsa_der.hpp"
 #include "api/security/session_certificates.hpp"
 #include "api/security/session_framing.hpp"
 #include "api/security/session_tls.hpp"
@@ -380,7 +381,7 @@ Bytes writeCertificate(const IReaderKey &subject, const IReaderKey &issuer, cons
     mbedtls_pk_context subjectPk, issuerPk;
     mbedtls_pk_init(&subjectPk);
     mbedtls_pk_init(&issuerPk);
-    CHECK(mbedtls_pk_wrap_psa(&subjectPk, subject.keyId()) == 0);
+    CHECK(ReaderIdentity::wrapKey(subjectPk, subject) == 0);
     CHECK(mbedtls_pk_wrap_psa(&issuerPk, issuer.keyId()) == 0);
     mbedtls_x509write_cert writer;
     mbedtls_x509write_crt_init(&writer);
@@ -674,6 +675,73 @@ void testSessionTls()
     }
 }
 
+// An RSA-3072 key set up like the DS key (PKCS#1 v1.5 as key algorithm, RSA-PSS as enrollment algorithm), but
+// in software: the reader's TLS code only sees IReaderKey and a PSA key id, exactly as with the DS peripheral.
+class SoftwareRsaKey : public IReaderKey
+{
+public:
+    static std::unique_ptr<SoftwareRsaKey> generate()
+    {
+        std::unique_ptr<SoftwareRsaKey> key(new SoftwareRsaKey());
+        psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+        psa_set_key_type(&attributes, PSA_KEY_TYPE_RSA_KEY_PAIR);
+        psa_set_key_bits(&attributes, 3072);
+        psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_SIGN_HASH | PSA_KEY_USAGE_EXPORT);
+        psa_set_key_algorithm(&attributes, PSA_ALG_RSA_PKCS1V15_SIGN(PSA_ALG_ANY_HASH));
+        psa_set_key_enrollment_algorithm(&attributes, PSA_ALG_RSA_PSS(PSA_ALG_ANY_HASH));
+        CHECK(psa_generate_key(&attributes, &key->id) == PSA_SUCCESS);
+        Bytes der(PSA_EXPORT_KEY_PAIR_OR_PUBLIC_MAX_SIZE);
+        size_t length = 0;
+        RsaDer::PrivateKeyParts parts;
+        CHECK(psa_export_key(key->id, der.data(), der.size(), &length) == PSA_SUCCESS);
+        CHECK(RsaDer::parsePrivateKey(der.data(), length, parts));
+        key->spki = RsaDer::spkiFromModulus(parts.modulus.data(), parts.modulus.size());
+        return key;
+    }
+    ~SoftwareRsaKey() override { psa_destroy_key(id); }
+    Algorithm algorithm() const override { return Algorithm::Rsa3072Ds; }
+    const Bytes &publicKeySpki() const override { return spki; }
+    mbedtls_svc_key_id_t keyId() const override { return id; }
+
+private:
+    mbedtls_svc_key_id_t id = MBEDTLS_SVC_KEY_ID_INIT;
+    Bytes spki;
+};
+
+// ATT-1207: a reader with an RSA-3072 (DS-style) key opens the session with rsa_pss_rsae_sha256; the
+// certificate is RSA, the CA and the server stay ECDSA P-256.
+void testRsaSessionTls()
+{
+    SessionPki pki;
+    auto rsa = SoftwareRsaKey::generate();
+    // Issued like the API does: an RSA reader certificate signed by the ECDSA CA.
+    const Bytes rsaCertificate = writeCertificate(*rsa, *pki.caKey, "CN=reader", "CN=Attractap CA", false,
+                                                  "urn:attraccess:reader:7", MBEDTLS_OID_CLIENT_AUTH,
+                                                  MBEDTLS_OID_SIZE(MBEDTLS_OID_CLIENT_AUTH));
+    CHECK(SessionCertificates::isReaderCertificate(rsaCertificate, rsa->publicKeySpki(), pki.caKey->publicKeySpki(), 7));
+    Bytes certificateSpki;
+    CHECK(SessionCertificates::certificateSpki(rsaCertificate, certificateSpki) && certificateSpki == rsa->publicKeySpki());
+    CHECK(!SessionCertificates::isReaderCertificate(rsaCertificate, pki.readerKey->publicKeySpki(),
+                                                    pki.caKey->publicKeySpki(), 7));
+
+    TestServer server(*pki.serverKey, pki.serverCertificate);
+    SessionTls client;
+    SessionTls::Config config{rsa.get(), rsaCertificate, pki.caKey->publicKeySpki(), "inst-1",
+                              TimeFloor::FIRMWARE_FLOOR_SECONDS};
+    CHECK(handshake(client, server, config) == SessionTls::Status::Open);
+    CHECK(server.handshakeResult == 0);
+    const mbedtls_x509_crt *peer = mbedtls_ssl_get_peer_cert(&server.ssl);
+    CHECK(peer != nullptr && mbedtls_pk_get_bitlen(&peer->pk) == 3072);
+
+    // The bootstrap (self-signed, RSA) certificate works as well.
+    Bytes selfSigned;
+    CHECK(ReaderIdentity::selfSignedCertificate(*rsa, selfSigned));
+    TestServer bootstrapServer(*pki.serverKey, pki.serverCertificate);
+    SessionTls bootstrapClient;
+    SessionTls::Config bootstrap{rsa.get(), selfSigned, pki.caKey->publicKeySpki(), "", 0};
+    CHECK(handshake(bootstrapClient, bootstrapServer, bootstrap) == SessionTls::Status::Open);
+}
+
 void testIdentity()
 {
     auto key = SoftwareReaderKey::generate();
@@ -708,6 +776,7 @@ int main()
     testFraming();
     testIdentity();
     testSessionTls();
+    testRsaSessionTls();
     testTimeFloor();
     if (failures)
     {

@@ -83,6 +83,7 @@ public:
 #endif
     void startPairing(const std::string &ticket) override;
     bool authenticatesReader() const override { return channel == Channel::Session; }
+    const char *identityName() const override { return usingDsKey.load() ? "ds-rsa3072" : "ecdsa-p256"; }
 
     Channel currentChannel() const { return channel.load(); }
     // Lock-free: the main loop never waits for the TLS worker to learn this.
@@ -144,6 +145,23 @@ private:
     bool loadIdentity();
     bool newIdentity();
 
+    // --- Digital Signature identity (ATT-1207, reader_link_identity.cpp). All of it is a no-op on plain builds.
+    // Picks the DS key or the software key at boot: DS unpaired -> DS; paired with P-256 -> keep it and
+    // upgrade; a certificate on the DS key -> DS. False when the software identity applies.
+    bool selectSecureIdentity();
+    // The pairing is gone (rejected by the server): a DS reader pairs again with its DS key.
+    bool newSecureIdentity();
+    void startIdentityUpgrade();
+    void onIdentityChallenge(const std::string &nonceBase64);
+    void onIdentityUpgraded(const char *certificatePem);
+    void onIdentityRejected(const char *reason);
+    // First message of an authenticated session on the DS key: the server accepted it.
+    void onDsSessionConfirmed();
+    // Sends the eFuse report once per session, after READER_FIRMWARE_INFO went out.
+    void sendEfuseReportAfter(const char *message, size_t length);
+    bool sendControl(const std::string &json);
+    void resetSessionIdentityState();
+
     void onSessionConnected();
     // A handshake did not complete (not an unverifiable server): shown after a few in a row.
     void onHandshakeFailed();
@@ -170,7 +188,19 @@ private:
     std::atomic<Channel> channel{Channel::Pairing};
     ReaderCredentials credentials;
     SoftwareReaderKeyStore keyStore;
-    std::unique_ptr<IReaderKey> key;
+    // The key of this boot's sessions: the software key or the DS key (both shared with the two below).
+    std::shared_ptr<IReaderKey> key;
+    std::shared_ptr<IReaderKey> dsKey;
+    std::shared_ptr<IReaderKey> softwareKey;
+    std::atomic<bool> usingDsKey{false};
+    // Paired with the software key although a DS key exists: the identity upgrade moves it.
+    bool upgradeCandidate = false;
+    // One request per session; `not-allowed` stops them until the next boot.
+    bool upgradeRequested = false;
+    bool upgradeBlocked = false;
+    bool upgradeProofSent = false;
+    bool efuseReportSent = false;
+    bool softwareKeyDropped = false;
     std::unique_ptr<PairingClient> pairing;
     std::string pairingTicket;
     // Pairing was started from the token channel: a failure goes back to it.

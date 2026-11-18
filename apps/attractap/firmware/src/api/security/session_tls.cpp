@@ -17,6 +17,10 @@ namespace
     const int CIPHERSUITES[] = {MBEDTLS_TLS1_3_AES_128_GCM_SHA256, 0};
     const uint16_t GROUPS[] = {MBEDTLS_SSL_IANA_TLS_GROUP_SECP256R1, MBEDTLS_SSL_IANA_TLS_GROUP_NONE};
     const uint16_t SIGNATURE_ALGORITHMS[] = {MBEDTLS_TLS1_3_SIG_ECDSA_SECP256R1_SHA256, MBEDTLS_TLS1_3_SIG_NONE};
+    // A Digital Signature key signs RSA-PSS (rsa_pss_rsae_sha256; TLS 1.3 has no PKCS#1 v1.5). The server's
+    // own certificate is still ECDSA, so that stays acceptable. Plain builds never hold an RSA key.
+    const uint16_t SIGNATURE_ALGORITHMS_RSA[] = {MBEDTLS_TLS1_3_SIG_ECDSA_SECP256R1_SHA256,
+                                                 MBEDTLS_TLS1_3_SIG_RSA_PSS_RSAE_SHA256, MBEDTLS_TLS1_3_SIG_NONE};
     // Small on purpose: the caller's stack also carries the handshake.
     constexpr size_t READ_CHUNK_BYTES = 1024;
 
@@ -113,7 +117,9 @@ bool SessionTls::begin(const Config &newConfig, SendRecords send)
         mbedtls_ssl_conf_max_tls_version(&conf, MBEDTLS_SSL_VERSION_TLS1_3);
         mbedtls_ssl_conf_ciphersuites(&conf, CIPHERSUITES);
         mbedtls_ssl_conf_groups(&conf, GROUPS);
-        mbedtls_ssl_conf_sig_algs(&conf, SIGNATURE_ALGORITHMS);
+        mbedtls_ssl_conf_sig_algs(&conf, config.key->algorithm() == IReaderKey::Algorithm::Rsa3072Ds
+                                                  ? SIGNATURE_ALGORITHMS_RSA
+                                                  : SIGNATURE_ALGORITHMS);
         // Full ephemeral handshakes only: no PSK, so no resumption and no 0-RTT.
         mbedtls_ssl_conf_tls13_key_exchange_modes(&conf, MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_EPHEMERAL);
 #if defined(MBEDTLS_SSL_SESSION_TICKETS)
@@ -127,7 +133,7 @@ bool SessionTls::begin(const Config &newConfig, SendRecords send)
     }
     if (result == 0)
     {
-        result = mbedtls_pk_wrap_psa(&impl->ownKey, config.key->keyId());
+        result = ReaderIdentity::wrapKey(impl->ownKey, *config.key);
     }
     if (result == 0)
     {

@@ -63,4 +63,6 @@ public:
     virtual void startPairing(const std::string &ticket) { (void)ticket; }
     // The transport authenticated the reader itself (paired TLS session): no token sign-in.
     virtual bool authenticatesReader() const { return false; }
+    // Key of the current session, as READER_FIRMWARE_INFO reports it: "ecdsa-p256" or "ds-rsa3072".
+    virtual const char *identityName() const { return "ecdsa-p256"; }
 };

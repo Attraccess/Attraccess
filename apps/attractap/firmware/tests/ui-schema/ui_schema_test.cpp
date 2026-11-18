@@ -104,17 +104,23 @@ static void roundTrip(const char *name, const ui::VariantTraits &traits, const c
 {
     JsonDocument event;
     char uiCaps[ui::CAPABILITIES_UI_SCRATCH];
-    ui::buildFirmwareInfo(event, {"attractap_touch_v2", "attractap-touch-v2", "1.9.0", "CPU_LOCKUP", 4294967295u},
+    ui::buildFirmwareInfo(event,
+                          {"attractap_touch_v2", "attractap-touch-v2", "1.9.0", "CPU_LOCKUP", 4294967295u,
+                           "secure-lab", false, 1, false, "ds-rsa3072"},
                           traits, uiCaps, sizeof uiCaps);
-    char buf[1024]; // JSON_OUTBUF_AUTH
+    char buf[1536]; // JSON_OUTBUF_AUTH
     const size_t n = serializeJson(event, buf, sizeof buf);
-    CHECK(n > 0 && n < sizeof buf && n == measureJson(event), name << ": serialized completely in 1024 B (" << n << ")");
+    CHECK(n > 0 && n < sizeof buf && n == measureJson(event), name << ": serialized completely in 1536 B (" << n << ")");
     JsonDocument back;
     CHECK(!deserializeJson(back, buf, n), name << ": parses back");
     JsonObject payload = back["data"]["payload"];
     CHECK(back["data"]["type"] == "READER_FIRMWARE_INFO" && payload["resetReason"] == "CPU_LOCKUP" &&
               payload["uptimeMs"] == 4294967295u && payload["version"] == "1.9.0",
           name << ": fields");
+    // ATT-1207: the reader's profile claims (the server never trusts them on their own).
+    CHECK(payload["profile"] == "secure-lab" && payload["release"] == false && payload["secureVersion"] == 1 &&
+              payload["secured"] == false && payload["identity"] == "ds-rsa3072",
+          name << ": profile fields");
     CHECK(payload["capabilities"]["resourceSelection"] == traits.hasDisplay &&
               payload["capabilities"]["cardEnrollment"] == traits.hasDisplay &&
               payload["capabilities"]["hasLeds"] == traits.hasLeds,
@@ -316,6 +322,18 @@ int main()
     // Touch V2: display, touch, beeper, no LED ring. Lite: LED ring and beeper, card-confirm.
     roundTrip("touch", {true, true, false, true, false, 480, 480}, "caps-touch.json");
     roundTrip("lite", {false, false, true, true, true, 0, 0}, "caps-lite.json");
+    {
+        // A plain build reports its defaults: profile plain, no secureVersion, software identity.
+        JsonDocument event;
+        char uiCaps[ui::CAPABILITIES_UI_SCRATCH];
+        ui::buildFirmwareInfo(event, {"attractap_touch_v2", "attractap-touch-v2", "2.6.0", "POWERON", 1u},
+                              {true, true, false, true, false, 480, 480}, uiCaps, sizeof uiCaps);
+        JsonObject payload = event["data"]["payload"];
+        CHECK(payload["profile"] == "plain" && payload["release"] == false && payload["secured"] == false &&
+                  payload["identity"] == "ecdsa-p256" && payload["secureVersion"].isNull() &&
+                  !payload.containsKey("secureVersion"),
+              "plain build: default profile fields");
+    }
     if (failures) { std::cerr << failures << " failure(s)\n"; return 1; }
     std::cout << "ui-schema ok\n";
     return 0;

@@ -392,7 +392,7 @@ void InitScreen::loop()
    const State::SessionProblem sessionProblem = apiState.authenticated ? State::SESSION_PROBLEM_NONE : State::getSessionProblem();
    setLabelTextIfChanged(this->apiAuthenticationLabel,
                          sessionProblem == State::SESSION_PROBLEM_SERVER_UNTRUSTED ? FirmwareI18n::Message::ServerCouldNotBeVerified
-                         : sessionProblem == State::SESSION_PROBLEM_HANDSHAKE_FAILED ? FirmwareI18n::Message::SecureConnectionFailed
+                         : sessionProblem == State::SESSION_PROBLEM_HANDSHAKE_FAILED || sessionProblem == State::SESSION_PROBLEM_STORAGE_FAILED ? FirmwareI18n::Message::SecureConnectionFailed
                                                                                      : FirmwareI18n::Message::AuthenticatingWithApi);
    this->applyStage(this->apiAuthenticationSpinner, this->apiAuthenticationLabel,
                     apiState.authenticated                                ? StageState::SUCCESS

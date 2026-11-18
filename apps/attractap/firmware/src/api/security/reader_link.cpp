@@ -120,6 +120,10 @@ void ReaderLink::setup()
 bool ReaderLink::loadIdentity()
 {
     credentials = CredentialStore::load();
+    if (selectSecureIdentity())
+    {
+        return true;
+    }
     key = keyStore.load();
     if (key)
     {
@@ -130,6 +134,10 @@ bool ReaderLink::loadIdentity()
 
 bool ReaderLink::newIdentity()
 {
+    if (newSecureIdentity())
+    {
+        return true;
+    }
     // A new key drops everything bound to the old one (pinned CA, certificate).
     key = keyStore.createNew();
     credentials = CredentialStore::load();
@@ -248,6 +256,7 @@ void ReaderLink::handle(Event &event)
             std::lock_guard<std::mutex> lock(sessionMutex);
             closeSessionLocked();
             outbox.clear();
+            resetSessionIdentityState();
             // The sign-in belonged to that session; the next one authenticates again.
             State::setApiState(false, "");
         }
@@ -314,6 +323,7 @@ void ReaderLink::useChannel(Channel next, const char *reason)
         closeSessionLocked();
         outbox.clear();
     }
+    resetSessionIdentityState();
     pairing.reset();
     connected = false;
     handshakeStartedMs = 0;
@@ -369,13 +379,15 @@ bool ReaderLink::sendMessage(const char *message, size_t length)
         {
             return false;
         }
-        std::lock_guard<std::mutex> lock(sessionMutex);
+        std::unique_lock<std::mutex> lock(sessionMutex);
         if (!tls.sendFrame(SessionFraming::FrameType::JSON, reinterpret_cast<const uint8_t *>(message), length))
         {
             return false;
         }
         if (flushOutbox())
         {
+            lock.unlock();
+            sendEfuseReportAfter(message, length);
             return true;
         }
         closeSessionLocked();
@@ -490,6 +502,10 @@ void ReaderLink::onPairingEnded(PairingClient::Outcome outcome)
             return;
         }
         credentials.caSpki = caSpki;
+        // Remember which key this pairing belongs to until the certificate itself shows it.
+        CredentialStore::saveIdentityKind(key && key->algorithm() == IReaderKey::Algorithm::Rsa3072Ds
+                                              ? CredentialStore::IdentityKind::Ds
+                                              : CredentialStore::IdentityKind::Software);
         // The token stays until the bootstrap session delivered a verified grant: if this approval
         // came from someone posing as the server, the reader can still fall back to it.
         pairingFromToken = false;

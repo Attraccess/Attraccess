@@ -8,6 +8,7 @@
 #include "../../display/ui/ui_capabilities.hpp"
 #include "../../ble_proxy/ble_capability.hpp"
 #include "../diagnostics/reset-reason.hpp"
+#include "../security/build_profile.hpp"
 #ifdef ESP_PLATFORM
 #include "esp_system.h"
 #endif
@@ -111,8 +112,14 @@ void API::sendFirmwareInfo()
 #endif
     JsonDocument event;
     char uiCaps[ui::CAPABILITIES_UI_SCRATCH];
-    ui::buildFirmwareInfo(event, {FIRMWARE_NAME, FIRMWARE_VARIANT, FIRMWARE_VERSION, resetReason, millis()}, traits,
-                          uiCaps, sizeof uiCaps);
+    // Profile, release flag, secure_version and identity are the reader's claims (ATT-1207). The server
+    // decides "secured" only from the eFuse report and the key of the authenticated session. `secured`
+    // is informational: this reader does not evaluate its own eFuses here.
+    ui::buildFirmwareInfo(event,
+                          {FIRMWARE_NAME, FIRMWARE_VARIANT, FIRMWARE_VERSION, resetReason, millis(),
+                           BuildProfile::name(), BuildProfile::release(), BuildProfile::secureVersion(), false,
+                           this->transport.identityName()},
+                          traits, uiCaps, sizeof uiCaps);
     // This reader relays card APDUs to the server and holds no card keys (firmware 2.0.0+).
     event["data"]["payload"]["capabilities"]["cardRelay"] = true;
     // Plugin BLE proxy, protocol v1 (ATT-1033). Builds without it send no `ble`: the API answers READER_UNSUPPORTED.

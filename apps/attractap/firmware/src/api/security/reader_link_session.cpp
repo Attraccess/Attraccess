@@ -338,7 +338,30 @@ void ReaderLink::onControl(const std::string &payload)
         {
             logger.error("Session hello names another installation");
             socket.forceReconnect("installation mismatch");
+            return;
         }
+        // The server accepted this key: a DS session may retire the software key, and a reader paired with
+        // the software key asks for its identity upgrade.
+        onDsSessionConfirmed();
+        startIdentityUpgrade();
+        return;
+    }
+
+    if (strcmp(type, "identity.challenge") == 0)
+    {
+        onIdentityChallenge(message["nonce"] | "");
+        return;
+    }
+
+    if (strcmp(type, "identity.upgraded") == 0)
+    {
+        onIdentityUpgraded(message["certificate"] | "");
+        return;
+    }
+
+    if (strcmp(type, "identity.upgrade.rejected") == 0)
+    {
+        onIdentityRejected(message["reason"] | "unknown");
         return;
     }
 

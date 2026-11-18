@@ -19,6 +19,19 @@ MAC = "dc:b4:d9:21:71:c8"
 EMPTY_BLOCK = " ".join(["00"] * 32)
 
 
+_EMPTY_DS_DIR = tempfile.TemporaryDirectory()
+
+
+def setUpModule():
+    """Never pick up the DS record committed for the real lab reader (its MAC is the one used below)."""
+    os.environ["ATTRACTAP_LAB_DS_DIR"] = _EMPTY_DS_DIR.name
+
+
+def tearDownModule():
+    os.environ.pop("ATTRACTAP_LAB_DS_DIR", None)
+    _EMPTY_DS_DIR.cleanup()
+
+
 def spaced(hex_digest):
     return " ".join(hex_digest[i:i + 2] for i in range(0, len(hex_digest), 2))
 

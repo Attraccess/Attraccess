@@ -14,6 +14,8 @@ namespace SessionCertificates
     bool pemToDer(const std::string &pem, std::vector<uint8_t> &der);
 
     // `crt` is an mbedtls_x509_crt; void keeps mbedTLS out of this header.
+    // SubjectPublicKeyInfo DER of the certificate's key (picks which identity key a stored certificate belongs to).
+    bool certificateSpki(const std::vector<uint8_t> &der, std::vector<uint8_t> &spki);
     bool signedByPinnedKey(const void *crt, const std::vector<uint8_t> &caSpki);
     bool uriSanValue(const void *crt, const char *prefix, std::string &value);
     int64_t notAfterSeconds(const void *crt);
