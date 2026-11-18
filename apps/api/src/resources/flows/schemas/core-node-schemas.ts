@@ -147,10 +147,9 @@ export function getCoreNodeFlowScopes(type: string): FlowScope[] | undefined {
   return presentation ? [...(presentation.flowScopes ?? ALL_FLOW_SCOPES)] : undefined;
 }
 
-/** Whether a trigger can fire for a resource of this type; an access-only door only fires door unlocked. */
-export function coreTriggerFiresFor(type: string, resourceType: ResourceType, accessOnly = false): boolean {
-  const presentation = presentations[type as ResourceFlowNodeType];
-  if (!presentation) return true;
+/** Whether a node works on a resource of this type; an access-only door only fires the door unlocked trigger. */
+function nodeSupportedByResource(type: ResourceFlowNodeType, resourceType: ResourceType, accessOnly: boolean): boolean {
+  const presentation = presentations[type];
   if (presentation.resourceType !== undefined && presentation.resourceType !== resourceType) return false;
   return !(accessOnly && presentation.notAccessOnly);
 }
@@ -168,7 +167,7 @@ export function getCoreNodeSchemas(resourceType?: ResourceType, accessOnly = fal
       configSchema: z.toJSONSchema(getNodeDataSchema(type), { io: 'input' }),
       inputs: [...(presentation.inputs ?? [])],
       outputs: [...(presentation.outputs ?? [])],
-      supportedByResource: resourceType === undefined || coreTriggerFiresFor(type, resourceType, accessOnly),
+      supportedByResource: resourceType === undefined || nodeSupportedByResource(type, resourceType, accessOnly),
       supportedFlowScopes: [...(presentation.flowScopes ?? ALL_FLOW_SCOPES)],
       isOutput: presentation.isOutput ?? false,
       isInput: presentation.isInput ?? false,
