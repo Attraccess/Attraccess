@@ -24,21 +24,34 @@ function statusFailure(manifest: LoadedPluginManifest): PluginFailure | null {
 
 /**
  * Fetches the plugin manifests, loads each plugin's frontend in dependency order, quarantines failures with a toast,
- * and rechecks whenever the tab regains focus. Only plugin managers see the toast: nobody else can act on it.
+ * and rechecks whenever the tab regains focus. Only plugin managers see the toast: nobody else can act on it. The
+ * plugin list usually arrives before the signed-in user does, so failures wait until the permission is known.
  */
 export function usePluginLoading() {
   const { refetch: refetchPlugins } = usePluginsServiceGetPlugins();
   const toast = useToastMessage();
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
+  const canManagePlugins = hasPermission('system.plugins.manage');
   const warnedFailures = useRef(new Set<string>());
+  const pendingFailures = useRef(new Map<string, { manifest: LoadedPluginManifest; failure: PluginFailure }>());
   const warnRef = useRef<(manifest: LoadedPluginManifest, failure: PluginFailure) => void>(() => undefined);
   warnRef.current = (manifest, failure) => {
     const key = `${manifest.name}@${manifest.version}`;
-    if (!hasPermission('system.plugins.manage') || warnedFailures.current.has(key)) return;
+    if (warnedFailures.current.has(key)) return;
+    if (!canManagePlugins) {
+      pendingFailures.current.set(key, { manifest, failure });
+      return;
+    }
+    pendingFailures.current.delete(key);
     warnedFailures.current.add(key);
     toast.warning({ title: t('disabledTitle', { name: manifest.name }), description: t(failure.key, failure.values) });
   };
+
+  useEffect(() => {
+    if (!canManagePlugins) return;
+    for (const { manifest, failure } of [...pendingFailures.current.values()]) warnRef.current(manifest, failure);
+  }, [canManagePlugins]);
 
   const arePluginsLoaded = useRef(false);
   const loadingPlugins = useRef(false);
@@ -100,6 +113,7 @@ export function usePluginLoading() {
             if (await loadFrontendPlugin(manifest)) {
               loadedManifests.current.set(manifest.name, manifest.version);
               warnedFailures.current.delete(key);
+              pendingFailures.current.delete(key);
             } else failure = { key: 'frontendFailed' };
           }
           if (failure) {

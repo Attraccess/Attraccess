@@ -393,6 +393,26 @@ describe('PluginProvider', () => {
     expect(hoisted.toastWarningMock).not.toHaveBeenCalled();
   });
 
+  it('shows the failure toast once the signed-in plugin manager arrives after the plugin list', async () => {
+    hoisted.permissions = [];
+    hoisted.user = null;
+    hoisted.refetchMock.mockResolvedValue({
+      data: [{ name: 'BrokenPlugin', version: '1.0.0', status: 'error', error: 'x', main: {} }],
+    });
+
+    const { rerender } = render(<PluginProvider />);
+    await waitFor(() => expect(usePluginState.getState().isInitialized).toBe(true));
+    expect(hoisted.toastWarningMock).not.toHaveBeenCalled();
+
+    hoisted.permissions = ['system.plugins.manage'];
+    hoisted.user = { id: 1, username: 'admin' };
+    rerender(<PluginProvider />);
+
+    await waitFor(() => expect(hoisted.toastWarningMock).toHaveBeenCalledTimes(1));
+    rerender(<PluginProvider />);
+    expect(hoisted.toastWarningMock).toHaveBeenCalledTimes(1);
+  });
+
   it('neither loads the frontend of a license_missing plugin nor shows a toast for it', async () => {
     hoisted.refetchMock.mockResolvedValue({
       data: [
