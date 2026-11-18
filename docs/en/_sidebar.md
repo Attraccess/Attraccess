@@ -60,6 +60,7 @@
   - [Overview](attractap/overview.md)
   - [Using the Reader](attractap/using-the-reader.md)
   - [Hardware](attractap/hardware.md)
+  - [BLE Bridge](attractap/ble-bridge.md)
   - [Setup](attractap/setup.md)
   - [Reader Pairing](attractap/pairing.md)
   - [RFID Cards](attractap/rfid-cards.md)

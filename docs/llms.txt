@@ -67,6 +67,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Overview](https://docs.attraccess.org/en/attractap/overview.md): Introduces Attractap, the ESP32-based RFID reader for machine and door access, with features, workflow and hardware variants.
 - [Using the Reader](https://docs.attraccess.org/en/attractap/using-the-reader.md): How to use an Attractap touch reader: sign in with a card, start or stop machines, open doors, view usage and complete forms.
 - [Hardware](https://docs.attraccess.org/en/attractap/hardware.md): Describes the Attractap hardware variants, core components, connectivity, firmware updates and mounting.
+- [BLE Bridge](https://docs.attraccess.org/en/attractap/ble-bridge.md): Sets up the Attractap BLE Bridge on a GL.iNet GL-S10, a headless reader that only relays Bluetooth Low Energy for plugins such as door locks.
 - [Setup](https://docs.attraccess.org/en/attractap/setup.md): Guide to connect a new Attractap reader to your network, pair it with Attraccess and assign resources to it.
 - [Reader Pairing](https://docs.attraccess.org/en/attractap/pairing.md): How a reader joins an installation with one admin approval, reader states, re-pairing and the encrypted connection.
 - [RFID Cards](https://docs.attraccess.org/en/attractap/rfid-cards.md): How RFID cards link to user accounts, how to manage cards, supported card types and which readers may enroll or reset cards.
@@ -227,6 +228,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Überblick](https://docs.attraccess.org/de/attractap/overview.md): Stellt Attractap vor, den ESP32-basierten RFID-Leser für Maschinen- und Türzugang, mit Funktionen, Ablauf und Hardware-Varianten.
 - [Leser benutzen](https://docs.attraccess.org/de/attractap/using-the-reader.md): So bedienen Sie den Attractap-Touchleser: mit Karte anmelden, Maschinen starten oder beenden, Türen öffnen und Formulare ausfüllen.
 - [Hardware](https://docs.attraccess.org/de/attractap/hardware.md): Beschreibt die Attractap-Hardwarevarianten, Kernkomponenten, Konnektivität, Firmware-Updates und Montage.
+- [BLE Bridge](https://docs.attraccess.org/de/attractap/ble-bridge.md): Richtet die Attractap BLE Bridge auf einem GL.iNet GL-S10 ein, einem Leser ohne Display, der nur Bluetooth Low Energy für Plugins wie Türschlösser weiterleitet.
 - [Einrichtung](https://docs.attraccess.org/de/attractap/setup.md): Anleitung, einen neuen Attractap-Leser mit dem Netzwerk zu verbinden, mit Attraccess zu koppeln und Ressourcen zuzuweisen.
 - [Reader koppeln](https://docs.attraccess.org/de/attractap/pairing.md): Wie ein Leser mit einer Admin-Freigabe in die Installation aufgenommen wird: Status, erneutes Koppeln und verschlüsselte Verbindung.
 - [RFID-Karten](https://docs.attraccess.org/de/attractap/rfid-cards.md): Wie RFID-Karten mit Benutzerkonten verknüpft sind, Kartenverwaltung, Kartentypen und welche Leser Karten registrieren oder zurücksetzen dürfen.
