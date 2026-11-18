@@ -57,10 +57,13 @@ A transfer or restore, whatever its tooling, must preserve:
 SQLite conformance for this contract: a fresh install, an upgrade from older migration states with data and the
 migration track's unchanged table name are tested (`apps/api/src/e2e/migrations`). The contract itself is a neutral
 snapshot (`database/transfer-snapshot.ts`: tables, stored columns in neutral kinds, instants as ISO-8601 UTC, integers
-beyond 2^53 and decimal text exactly, sequences, core and plugin migration state) that a backend exports and imports
-through `DatabaseBackend.transfer`. `describeTransferConformance` (`database/conformance`, run by `api:test-conformance`)
+beyond 2^53 and decimal text exactly, sequences, core migration state, and per plugin its storage namespace and applied
+storage versions) that a backend exports and imports through `DatabaseBackend.transfer`. Plugin columns are typed from
+the plugin's storage declaration, not from the engine's column type: decimals as exact text (kind `decimal`), `date` as
+`YYYY-MM-DD` (kind `date`), timestamps as ISO-8601 UTC, booleans as booleans. `importSnapshot` takes the target's plugin
+descriptors (`{ plugins }`) and refuses a plugin that is missing there or at other storage versions. `describeTransferConformance` (`database/conformance`, run by `api:test-conformance`)
 checks it per backend: stable ids and relationships, instants, exact monetary and meter values, plugin tables and
-plugin migration state, core migration state, derived balances not applied twice, and an atomic restore that refuses a
+plugin storage versions, core migration state, derived balances not applied twice, and an atomic restore that refuses a
 snapshot written for another migration state. A backend adds a `TransferBackendFixture`. The cross-engine transfer
 command itself is not part of this work.
 

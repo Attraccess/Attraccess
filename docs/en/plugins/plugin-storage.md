@@ -170,6 +170,7 @@ Limits of adopted tables:
   stored, for example `f.string()`, or copy it into a new table (below).
 - On SQLite, a later version may not drop a 1.x `UNIQUE` constraint, or a column that a 1.x `UNIQUE` or `CHECK`
   constraint covers: that needs a table rebuild, which the host does not do yet. The migration is refused.
+- There is no binary field type. A 1.x `blob` column declared as `f.text()` reads as base64 text; write base64 too.
 
 **1.x names the host refuses.** When a 1.x table name is one of the forbidden names above, the table cannot be
 declared, so a 2.0 build can neither read, adopt nor drop it. Contact the Attraccess maintainers before you release
@@ -228,7 +229,17 @@ timestamps, strings for decimals.
   matches everything.
 - An empty top-level `where` (`{}`) matches **all rows**. Mind this for `update` and `delete`.
 - Filter values are checked against the field's type only (a string for a string field, a `Date` for a timestamp).
-  Length, precision or other column limits are checked on writes, not on filters.
+  Length, precision or other column limits are checked on writes, not on filters. A decimal finer than the field's
+  scale compares exactly: `eq` matches nothing, the range operators compare as written.
+- `null` works only with `eq`/`ne` (the same as `isNull`); every other operator refuses it.
+- `in: []` matches nothing; `notIn: []` matches every row with a value. Rows without a value (NULL) never match `ne`,
+  `notIn`, a comparison, or a `not` around them.
+- `and`, `or` and `not` can stand next to field conditions in one object; everything is ANDed. `and: []` is true,
+  `or: []` is false.
+- Boolean and JSON fields cannot be ordered or compared with `lt`/`gt`/`between`.
+- Results come in `orderBy` order, then by primary key ascending (also without `orderBy`), so pages are stable. NULL
+  sorts first ascending and last descending.
+- `startsWith` is case-sensitive and counts characters (code points).
 
 There are **no joins**. Read over several tables with several calls, and use an `in` filter instead of one query per
 row (no N+1 on hot paths):
@@ -248,7 +259,9 @@ const won = await bookings.update({ id, status: 'pending' }, { status: 'confirme
 if (won === 0) throw new ConflictException('Somebody else got there first');
 ```
 
-Integer fields also accept `increment(n)` in a patch: `update({ id }, { attempts: increment(1) })` adds atomically.
+Integer fields also accept `increment(n)` in a patch: `update({ id }, { attempts: increment(1) })` adds atomically;
+a NULL value counts as 0. `upsert` needs a value for every `conflictOn` field, and a patch may not change key or
+generated fields.
 
 ### Errors
 

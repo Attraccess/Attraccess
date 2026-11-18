@@ -60,10 +60,14 @@ Ein Transfer oder Restore muss, egal mit welchem Werkzeug, erhalten:
 SQLite-Conformance für diesen Vertrag: Neuinstallation, Upgrade aus älteren Migrationsständen mit Daten und der
 unveränderte Tabellenname der Migrationsspur sind getestet (`apps/api/src/e2e/migrations`). Der Vertrag selbst ist ein
 neutraler Snapshot (`database/transfer-snapshot.ts`: Tabellen, gespeicherte Spalten in neutralen Arten, Zeitpunkte als
-ISO-8601 UTC, Ganzzahlen über 2^53 und Dezimaltext exakt, Sequenzen, Kern- und Plugin-Migrationsstand), den ein Backend
-über `DatabaseBackend.transfer` exportiert und importiert. `describeTransferConformance` (`database/conformance`,
+ISO-8601 UTC, Ganzzahlen über 2^53 und Dezimaltext exakt, Sequenzen, Kern-Migrationsstand sowie je Plugin sein
+Speicher-Namensraum und die angewendeten Speicherversionen), den ein Backend über `DatabaseBackend.transfer` exportiert
+und importiert. Plugin-Spalten werden aus der Speicherdeklaration des Plugins typisiert, nicht aus dem Spaltentyp der
+Engine: Dezimalzahlen als exakter Text (Art `decimal`), `date` als `YYYY-MM-DD` (Art `date`), Zeitstempel als ISO-8601
+UTC, boolesche Werte als boolesche Werte. `importSnapshot` erhält die Plugin-Beschreibungen des Ziels (`{ plugins }`)
+und lehnt ein Plugin ab, das dort fehlt oder auf anderen Speicherversionen steht. `describeTransferConformance` (`database/conformance`,
 ausgeführt von `api:test-conformance`) prüft ihn je Backend: stabile IDs und Beziehungen, Zeitpunkte, exakte Geld- und
-Zählerwerte, Plugin-Tabellen und Plugin-Migrationsstand, Kern-Migrationsstand, nicht doppelt angewendete abgeleitete
+Zählerwerte, Plugin-Tabellen und Plugin-Speicherversionen, Kern-Migrationsstand, nicht doppelt angewendete abgeleitete
 Guthaben und einen atomaren Restore, der einen Snapshot für einen anderen Migrationsstand ablehnt. Ein Backend ergänzt
 eine `TransferBackendFixture`. Der Engine-übergreifende Transferbefehl selbst gehört nicht zu dieser Arbeit.
 

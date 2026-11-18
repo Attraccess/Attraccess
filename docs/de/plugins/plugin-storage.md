@@ -176,6 +176,8 @@ Grenzen übernommener Tabellen:
 - Unter SQLite darf eine spätere Version keinen `UNIQUE`-Constraint aus 1.x entfernen und keine Spalte, die ein
   `UNIQUE`- oder `CHECK`-Constraint aus 1.x abdeckt: Dafür müsste die Tabelle neu aufgebaut werden, was der Host noch
   nicht tut. Die Migration wird abgelehnt.
+- Es gibt keinen Binärtyp. Eine 1.x-Spalte vom Typ `blob`, als `f.text()` deklariert, liest sich als Base64-Text;
+  schreiben Sie ebenfalls Base64.
 
 **1.x-Namen, die der Host ablehnt.** Ist ein 1.x-Tabellenname einer der oben verbotenen Namen, lässt sich die Tabelle
 nicht deklarieren; ein 2.0-Build kann sie dann weder lesen noch übernehmen noch löschen. Wenden Sie sich an die
@@ -235,7 +237,18 @@ folgen den obigen Feldtypen: `Date` für Zeitstempel, Strings für Dezimalzahlen
   Operator nie alles trifft.
 - Ein leeres `where` auf oberster Ebene (`{}`) trifft **alle Zeilen**. Beachten Sie das bei `update` und `delete`.
 - Filterwerte werden nur auf den Typ des Feldes geprüft (ein String für ein String-Feld, ein `Date` für einen
-  Zeitstempel). Länge, Genauigkeit und andere Spaltengrenzen werden beim Schreiben geprüft, nicht in Filtern.
+  Zeitstempel). Länge, Genauigkeit und andere Spaltengrenzen werden beim Schreiben geprüft, nicht in Filtern. Eine
+  Dezimalzahl mit mehr Nachkommastellen als das Feld wird exakt verglichen: `eq` trifft nichts, die Bereichsoperatoren
+  vergleichen den Wert wie angegeben.
+- `null` geht nur mit `eq`/`ne` (gleichbedeutend mit `isNull`); alle anderen Operatoren lehnen es ab.
+- `in: []` trifft nichts; `notIn: []` trifft jede Zeile mit Wert. Zeilen ohne Wert (NULL) treffen nie `ne`, `notIn`,
+  einen Vergleich oder ein `not` darum herum.
+- `and`, `or` und `not` dürfen neben Feldbedingungen im selben Objekt stehen; alles wird mit UND verknüpft. `and: []`
+  ist wahr, `or: []` ist falsch.
+- Boolesche und JSON-Felder lassen sich nicht sortieren und nicht mit `lt`/`gt`/`between` vergleichen.
+- Ergebnisse kommen in `orderBy`-Reihenfolge, danach aufsteigend nach Primärschlüssel (auch ohne `orderBy`), damit
+  Seiten stabil sind. NULL steht aufsteigend vorn und absteigend hinten.
+- `startsWith` unterscheidet Groß- und Kleinschreibung und zählt Zeichen (Codepoints).
 
 Es gibt **keine Joins**. Lesen Sie über mehrere Tabellen mit mehreren Aufrufen und nutzen Sie einen `in`-Filter statt
 einer Abfrage je Zeile (kein N+1 auf heißen Pfaden):
@@ -255,7 +268,9 @@ const won = await bookings.update({ id, status: 'pending' }, { status: 'confirme
 if (won === 0) throw new ConflictException('Jemand anderes war schneller');
 ```
 
-Integer-Felder akzeptieren im Patch auch `increment(n)`: `update({ id }, { attempts: increment(1) })` addiert atomar.
+Integer-Felder akzeptieren im Patch auch `increment(n)`: `update({ id }, { attempts: increment(1) })` addiert atomar;
+ein NULL-Wert zählt als 0. `upsert` braucht einen Wert für jedes `conflictOn`-Feld, und ein Patch darf keine
+Schlüssel- oder erzeugten Felder ändern.
 
 ### Fehler
 
