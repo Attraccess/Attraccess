@@ -6,7 +6,8 @@ import { ConfirmableHostContext, ConfirmableRequest } from './ConfirmableHostCon
 
 /**
  * Wrap content that unmounts when used (a dropdown menu) and render the host where it stays mounted.
- * Every ConfirmableButton inside opens its dialog here instead of in itself.
+ * Every ConfirmableButton inside opens its dialog here instead of in itself. The dialog shows the
+ * button's props as they were when it opened, so an input in `confirm.message` must keep its own state.
  */
 export function ConfirmableHost({ children }: Readonly<{ children: ReactNode }>) {
   const [request, setRequest] = useState<ConfirmableRequest>();

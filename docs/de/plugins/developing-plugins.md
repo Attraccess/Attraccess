@@ -178,7 +178,7 @@ ignoriert, und jeder Beitrag läuft in einer Error Boundary. Verfügbare Slots:
 | Slot-ID                   | Ort                                                                                               | Kontext                   |
 | ------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------- |
 | `mqtt.server.detail`      | Detail-/Bearbeitungsansicht eines MQTT-Servers                                                    | `{ mqttServerId }`        |
-| `mqtt.server.list.row`    | MQTT-Serverliste, Aktionsbereich pro Zeile                                                        | `{ mqttServerId }`        |
+| `mqtt.server.list.row`    | MQTT-Serverliste, Badge-Bereich neben dem Servernamen                                             | `{ mqttServerId }`        |
 | `resource.overview`       | Hauptbereich der Ressourcen-Detailseite                                                           | `{ resourceId }`          |
 | `resource.active-session` | Panel der aktiven Nutzung, direkt nach den Flow-Bedienelementen                                   | `{ resourceId, usageId }` |
 | `resource.list.row`       | Kompakter Statusbereich einer Ressourcenzeile                                                     | `{ resourceId }`          |

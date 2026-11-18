@@ -57,6 +57,37 @@ describe('PageHeaderActions', () => {
     expect(destructive).toHaveBeenCalled();
   });
 
+  it('confirms an overflow action in a dialog that outlives the menu', async () => {
+    const destructive = vi.fn().mockResolvedValue(undefined);
+    renderActions([
+      {
+        key: 'delete',
+        label: 'Delete',
+        variant: 'destructive',
+        onPress: destructive,
+        confirm: { title: 'Delete Laser?', confirmDataCy: 'confirm-delete' },
+      },
+    ]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Delete Laser?' });
+    expect(destructive).not.toHaveBeenCalled();
+
+    await userEvent.click(dialog.querySelector('[data-cy="confirm-delete"]') as HTMLElement);
+    expect(destructive).toHaveBeenCalledTimes(1);
+  });
+
+  it('confirms an inline action before running it', async () => {
+    const onPress = vi.fn();
+    renderActions([{ key: 'reset', label: 'Reset', onPress, confirm: { title: 'Reset?', confirmLabel: 'Yes' } }]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    expect(onPress).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Yes' }));
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
   it('collapses surplus actions beyond maxVisible into overflow', async () => {
     const handlers = Array.from({ length: 6 }, () => vi.fn());
     renderActions(

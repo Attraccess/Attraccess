@@ -1531,7 +1531,7 @@ knowledge. Host slot ids available today:
 | Slot id                   | Where it renders                                                                        | Context                   |
 | ------------------------- | --------------------------------------------------------------------------------------- | ------------------------- |
 | `mqtt.server.detail`      | MQTT server detail/edit view (extensions section)                                       | `{ mqttServerId }`        |
-| `mqtt.server.list.row`    | MQTT server list, per-row action area                                                   | `{ mqttServerId }`        |
+| `mqtt.server.list.row`    | MQTT server list, badge area next to the server name                                    | `{ mqttServerId }`        |
 | `resource.overview`       | Resource detail overview body (resource-level status or controls)                       | `{ resourceId }`          |
 | `resource.active-session` | Active-usage panel, directly after the host flow controls                               | `{ resourceId, usageId }` |
 | `resource.list.row`       | Resource list row, compact status area                                                  | `{ resourceId }`          |
