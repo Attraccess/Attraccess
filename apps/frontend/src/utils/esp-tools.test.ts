@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
   writeFlash: vi.fn(),
   loader: vi.fn(),
   connected: true,
+  chipName: 'ESP32-S3',
 }));
 vi.mock('esptool-js', () => ({
   Transport: class {
@@ -33,6 +34,9 @@ vi.mock('esptool-js', () => ({
       state.loader(options);
     }
     main = state.main;
+    get chip() {
+      return { CHIP_NAME: state.chipName };
+    }
     flashId = state.flashId;
     writeFlash = state.writeFlash;
   },
@@ -42,6 +46,7 @@ beforeEach(() => {
   vi.resetModules();
   vi.resetAllMocks();
   state.connected = true;
+  state.chipName = 'ESP32-S3';
   for (const fn of [
     state.open,
     state.close,
@@ -212,4 +217,28 @@ it('uses safe flash defaults and reports loader and reset failures', async () =>
   expect(state.writeFlash).toHaveBeenCalledWith(
     expect.objectContaining({ flashSize: 'keep', flashMode: 'dio', flashFreq: '80m' }),
   );
+});
+it('refuses an image built for another chip before writing anything', async () => {
+  const esp = await instance();
+  state.chipName = 'ESP32';
+  expect(await esp.flashFirmware({ firmware: new Blob(['image']), chip: 'esp32s3' })).toMatchObject({
+    success: false,
+    error: { type: 'CHIP_MISMATCH', details: { expected: 'esp32s3', detected: 'ESP32' } },
+  });
+  expect(state.writeFlash).not.toHaveBeenCalled();
+  expect(await esp.flashFirmware({ firmware: new Blob(['image']), chip: 'esp32' })).toMatchObject({ success: true });
+});
+it('flashes through a USB-TTL adapter without auto-reset, falling back to the ROM baud rate', async () => {
+  const esp = await instance();
+  state.chipName = 'ESP32';
+  state.main.mockRejectedValueOnce(new Error('No sync at 460800'));
+  vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  const result = await esp.flashFirmware({ firmware: new Blob(['image']), chip: 'esp32', manualDownloadMode: true });
+  expect(result.success).toBe(true);
+  expect(state.main.mock.calls.map(([mode]) => mode)).toEqual(['no_reset', 'no_reset']);
+  expect(state.loader.mock.calls.map(([options]) => (options as { baudrate: number }).baudrate)).toEqual([
+    460800, 115200,
+  ]);
+  // No RTS pulse afterwards: the user power-cycles the bridge.
+  expect(state.signals).not.toHaveBeenCalled();
 });
