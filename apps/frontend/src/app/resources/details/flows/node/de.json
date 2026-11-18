@@ -88,7 +88,7 @@
           },
           "takeover": {
             "title": "Nutzung übernommen",
-            "description": "Wird ausgelöst, wenn eine Nutzungssitzung übernommen wird. Nutzung beendet läuft für die bisherige Sitzung nicht; Posten dafür hier hinzufügen.",
+            "description": "Wird ausgelöst, wenn eine Nutzungssitzung übernommen wird. Nutzung beendet läuft für die bisherige Sitzung nicht; Abrechnungspositionen dafür hier hinzufügen.",
             "outputs": {
               "output": "Ausgabe"
             }

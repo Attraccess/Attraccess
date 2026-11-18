@@ -25,6 +25,11 @@ describe('CatalogRow', () => {
     expect(screen.getByText('User-triggered start')).toBeInTheDocument();
   });
 
+  it('exposes the full description as a tooltip because the row truncates it to one line', () => {
+    render(<CatalogRow node={node} tNodeTranslations={tStub} onSelect={vi.fn()} />);
+    expect(screen.getByText('User-triggered start')).toHaveAttribute('title', 'User-triggered start');
+  });
+
   it('renders a plugin-provided name and description without i18n', () => {
     const pluginNode: CatalogNode = {
       ...node,
