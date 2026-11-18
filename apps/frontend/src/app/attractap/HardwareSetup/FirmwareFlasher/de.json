@@ -17,6 +17,7 @@
     "DEVICE_NOT_FOUND": "Gerät nicht gefunden",
     "FIRMWARE_READ_FAILED": "Firmware konnte nicht gelesen werden",
     "RESET_FAILED": "Neustart des RFID-Lesers fehlgeschlagen",
+    "CHIP_MISMATCH": "Falscher Chip für diese Firmware",
     "UNKNOWN_ERROR": "Unbekannter Fehler"
   },
   "downloading": {
@@ -24,5 +25,23 @@
   },
   "terminal": {
     "title": "Terminalausgabe"
+  },
+  "bridgeWarning": {
+    "title": "GL.iNet GL-S10 vorbereiten",
+    "power": "Versorge den GL-S10 nie gleichzeitig über USB und PoE mit Strom.",
+    "wiring": "Öffne das Gehäuse und schließe einen 3,3-V-USB-TTL-Adapter an die seriellen Pads an: TX an RX, RX an TX, GND an GND und 3,3 V an 3,3 V. Verwende nie einen 5-V-Adapter.",
+    "downloadMode": "Halte den Download-Taster (GPIO0) gedrückt, während du den GL-S10 einschaltest, und starte dann die Installation.",
+    "docsLink": "Schritt-für-Schritt-Anleitung mit Fotos der Pads",
+    "docsUrl": "https://docs.attraccess.org/#/de/attractap/ble-bridge",
+    "confirm": "Die Bridge ist im Download-Modus, installieren"
+  },
+  "powerCycle": {
+    "title": "Bridge neu starten",
+    "description": "Die Firmware ist installiert. Die Bridge kann nicht automatisch neu gestartet werden: Schalte ihre Stromversorgung aus und wieder ein, ohne GPIO0 zu halten, und lass den USB-TTL-Adapter verbunden. Richte danach PIN, Netzwerk und Server über dieselbe Verbindung ein.",
+    "continue": "Die Bridge ist neu gestartet, weiter"
+  },
+  "chipMismatch": {
+    "title": "Falscher Chip für diese Firmware",
+    "description": "Diese Firmware ist für {{expected}} gebaut, das verbundene Gerät ist aber ein {{detected}}. Es wurde nichts installiert. Wähle die Firmware für dieses Gerät."
   }
 }

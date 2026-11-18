@@ -34,6 +34,7 @@ import {
 import { useToastMessage } from '../../../components/toastProvider';
 import { ReaderSecurity } from '../pairing/ReaderSecurity';
 import { ReaderUiReaderPanel } from '../../readerUi/ReaderUiReaderPanel';
+import { isBleBridge } from '../bleBridge';
 
 interface Props {
   readerId?: number;
@@ -62,6 +63,8 @@ export function AttractapEditor(props: Readonly<Props>) {
   const allowPluginBleDescriptionId = useId();
   const [connectedResourceIds, setConnectedResourceIds] = useState<number[]>([]);
   const [selectedTab, setSelectedTab] = useState<'general' | 'resources' | 'readerUi' | 'security'>('general');
+  // A BLE Bridge has no NFC, display or LEDs and serves no resource: only its name, plugin Bluetooth and pairing apply.
+  const bleBridge = reader !== undefined && isBleBridge(reader);
   const updateReaderMutation = useUpdateReader(undefined, {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: [useGetReadersKey] });
@@ -101,12 +104,12 @@ export function AttractapEditor(props: Readonly<Props>) {
       path: { readerId: props.readerId },
       body: {
         name,
-        connectedResourceIds,
-        ledBrightness,
+        // A bridge serves no resource and has no LEDs.
+        ...(bleBridge ? { connectedResourceIds: [] } : { connectedResourceIds, ledBrightness }),
         ...(allowPluginBleChanged ? { allowPluginBle } : {}),
       },
     });
-  }, [name, connectedResourceIds, ledBrightness, allowPluginBle, reader, props, updateReaderMutation]);
+  }, [name, connectedResourceIds, ledBrightness, allowPluginBle, reader, bleBridge, props, updateReaderMutation]);
 
   const onSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -126,7 +129,10 @@ export function AttractapEditor(props: Readonly<Props>) {
           <Form onSubmit={onSubmit} className="flex flex-col gap-4">
             <Tabs
               selectedKey={
-                !reader && (selectedTab === 'security' || selectedTab === 'readerUi') ? 'general' : selectedTab
+                (!reader && (selectedTab === 'security' || selectedTab === 'readerUi')) ||
+                (bleBridge && (selectedTab === 'resources' || selectedTab === 'readerUi'))
+                  ? 'general'
+                  : selectedTab
               }
               onSelectionChange={(k) => setSelectedTab(k as 'general' | 'resources' | 'readerUi' | 'security')}
               className="w-full"
@@ -138,11 +144,13 @@ export function AttractapEditor(props: Readonly<Props>) {
                     <Tabs.Indicator />
                     {t('tabs.general')}
                   </Tab>
-                  <Tab id="resources" data-cy="attractap-editor-resources-tab">
-                    <Tabs.Indicator />
-                    {t('tabs.resources')}
-                  </Tab>
-                  {reader && (
+                  {!bleBridge && (
+                    <Tab id="resources" data-cy="attractap-editor-resources-tab">
+                      <Tabs.Indicator />
+                      {t('tabs.resources')}
+                    </Tab>
+                  )}
+                  {reader && !bleBridge && (
                     <Tab id="readerUi" data-cy="attractap-editor-reader-ui-tab">
                       <Tabs.Indicator />
                       {t('tabs.readerUi')}
@@ -162,7 +170,8 @@ export function AttractapEditor(props: Readonly<Props>) {
                     <Label>{t('readerName')}</Label>
                     <Input placeholder={t('enterReaderName')} data-cy="attractap-editor-name-input" />
                   </TextField>
-                  {reader?.firmware.capabilities.hasLeds && (
+                  {bleBridge && <p className="text-sm text-default-500">{t('bleBridgeDescription')}</p>}
+                  {reader?.firmware.capabilities.hasLeds && !bleBridge && (
                     <Slider
                       step={1}
                       minValue={0}
@@ -194,18 +203,20 @@ export function AttractapEditor(props: Readonly<Props>) {
                   </div>
                 </div>
               </TabPanel>
-              <TabPanel id="resources" className="pt-4">
-                <div className="flex flex-col gap-3 w-full">
-                  <p className="text-sm text-default-500">{t('connectedResourcesDescription')}</p>
-                  <ResourceSelector
-                    selection={connectedResourceIds}
-                    onSelectionChange={setConnectedResourceIds}
-                    data-cy="attractap-editor-resource-selector"
-                    multiple={reader?.firmware.capabilities.resourceSelection ?? true}
-                  />
-                </div>
-              </TabPanel>
-              {reader && (
+              {!bleBridge && (
+                <TabPanel id="resources" className="pt-4">
+                  <div className="flex flex-col gap-3 w-full">
+                    <p className="text-sm text-default-500">{t('connectedResourcesDescription')}</p>
+                    <ResourceSelector
+                      selection={connectedResourceIds}
+                      onSelectionChange={setConnectedResourceIds}
+                      data-cy="attractap-editor-resource-selector"
+                      multiple={reader?.firmware.capabilities.resourceSelection ?? true}
+                    />
+                  </div>
+                </TabPanel>
+              )}
+              {reader && !bleBridge && (
                 <TabPanel id="readerUi" className="pt-4">
                   <ReaderUiReaderPanel readerId={reader.id} resources={reader.resources} />
                 </TabPanel>

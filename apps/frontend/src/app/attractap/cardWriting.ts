@@ -1,14 +1,16 @@
 import { Attractap } from '@attraccess/react-query-client';
+import { isBleBridge } from './bleBridge';
 
 /**
  * Why a reader cannot enroll or reset cards, whatever the administrator's card enrollment setting
  * says: firmware before 2.0.0 does not relay card commands to the server, and some readers have no
- * way to guide a member through enrollment.
+ * way to guide a member through enrollment. A BLE Bridge has no NFC at all.
  */
 export type CardWritingBlocker = 'firmwareUpdateRequired' | 'noCardEnrollment';
 
 export function cardWritingBlocker(reader: Pick<Attractap, 'firmware'>): CardWritingBlocker | null {
   const capabilities = reader.firmware?.capabilities;
+  if (isBleBridge(reader)) return 'noCardEnrollment';
   if (!capabilities?.cardRelay) return 'firmwareUpdateRequired';
   if (!capabilities.cardEnrollment) return 'noCardEnrollment';
   return null;

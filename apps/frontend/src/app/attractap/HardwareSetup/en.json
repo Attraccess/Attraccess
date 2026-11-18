@@ -8,6 +8,7 @@
   "connect": {
     "title": "Connect your Attractap",
     "description": "Plug your Attractap into a USB port, then click connect and pick the correct serial port in the browser dialog.",
+    "bleBridgeHint": "Setting up an Attractap BLE Bridge (GL.iNet GL-S10)? Connect your 3.3 V USB-TTL adapter instead and put the bridge into download mode first.",
     "button": {
       "label": "Connect via USB"
     }

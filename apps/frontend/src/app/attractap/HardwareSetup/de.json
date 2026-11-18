@@ -8,6 +8,7 @@
   "connect": {
     "title": "Attractap verbinden",
     "description": "Schließe deinen Attractap an einen USB-Port an, klicke auf Verbinden und wähle im Browser-Dialog den richtigen seriellen Port aus.",
+    "bleBridgeHint": "Du richtest eine Attractap BLE-Bridge (GL.iNet GL-S10) ein? Schließe stattdessen deinen 3,3-V-USB-TTL-Adapter an und versetze die Bridge zuerst in den Download-Modus.",
     "button": {
       "label": "Per USB verbinden"
     }

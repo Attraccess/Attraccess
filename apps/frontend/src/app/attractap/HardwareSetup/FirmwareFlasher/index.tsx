@@ -20,7 +20,7 @@ import {
 } from '@heroui/react';
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../../components/toastProvider';
-import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Terminal } from '../../../../components/Terminal';
 
 import de from './de.json';
@@ -47,6 +47,11 @@ export function FirmwareFlasher(props: Props) {
   const [logLines, setLogLines] = useState<string[]>([]);
   const [flashError, setFlashError] = useState<{ type: ESPToolsErrorType; details?: unknown } | null>(null);
   const [isFlashing, setIsFlashing] = useState<boolean>(false);
+  // The BLE Bridge has no auto-reset wiring: the user opens it, wires a USB-TTL adapter and power-cycles it by hand.
+  const bleBridge = props.firmware.bleBridge === true;
+  const [isBridgeWarningOpen, setIsBridgeWarningOpen] = useState(false);
+  const [isPowerCycleOpen, setIsPowerCycleOpen] = useState(false);
+  const [chipMismatch, setChipMismatch] = useState<{ expected: string; detected: string } | null>(null);
 
   const flashFirmware = useCallback(async () => {
     if (!firmwareBinary) {
@@ -73,6 +78,8 @@ export function FirmwareFlasher(props: Props) {
       flashMode: props.firmware.flashMode as import('esptool-js').FlashModeValues | undefined,
       flashFreq: props.firmware.flashFreq as import('esptool-js').FlashFreqValues | undefined,
       flashSize: props.firmware.flashSize as import('esptool-js').FlashSizeValues | undefined,
+      chip: props.firmware.chip,
+      manualDownloadMode: bleBridge,
       onProgress: (progressPct) => {
         setFlashProgress(progressPct);
         if (progressPct === 100) {
@@ -81,7 +88,8 @@ export function FirmwareFlasher(props: Props) {
             description: t('success.toast.description'),
           });
           setIsFlashing(false);
-          props.onCompleted();
+          if (bleBridge) setIsPowerCycleOpen(true);
+          else props.onCompleted();
         }
       },
       terminal: {
@@ -104,10 +112,79 @@ export function FirmwareFlasher(props: Props) {
     });
 
     if (!flashResult.success) {
-      setFlashError(flashResult.error);
+      if (flashResult.error?.type === ESPToolsErrorType.CHIP_MISMATCH) {
+        const chips = flashResult.error.details as { expected: string; detected: string };
+        setChipMismatch(chips);
+        setFlashError({ type: ESPToolsErrorType.CHIP_MISMATCH, details: t('chipMismatch.description', chips) });
+      } else {
+        setFlashError(flashResult.error);
+      }
       setIsFlashing(false);
     }
-  }, [firmwareBinary, props, toast, t]);
+  }, [firmwareBinary, props, toast, t, bleBridge]);
+
+  const startFlash = useCallback(() => {
+    if (bleBridge) setIsBridgeWarningOpen(true);
+    else void flashFirmware();
+  }, [bleBridge, flashFirmware]);
+
+  const dialogs = (
+    <>
+      <StatusDialog
+        isOpen={isBridgeWarningOpen}
+        onClose={() => setIsBridgeWarningOpen(false)}
+        status="warning"
+        title={t('bridgeWarning.title')}
+        action={{
+          label: t('bridgeWarning.confirm'),
+          onPress: () => {
+            setIsBridgeWarningOpen(false);
+            void flashFirmware();
+          },
+          'data-cy': 'firmware-flasher-bridge-confirm',
+        }}
+        data-cy="firmware-flasher-bridge-warning"
+      >
+        <div className="flex flex-col gap-2">
+          <p className="font-semibold">{t('bridgeWarning.power')}</p>
+          <p>{t('bridgeWarning.wiring')}</p>
+          <p>{t('bridgeWarning.downloadMode')}</p>
+          <a href={t('bridgeWarning.docsUrl')} target="_blank" rel="noreferrer" className="text-accent underline">
+            {t('bridgeWarning.docsLink')}
+          </a>
+        </div>
+      </StatusDialog>
+      <StatusDialog
+        isOpen={isPowerCycleOpen}
+        onClose={() => {
+          setIsPowerCycleOpen(false);
+          props.onCompleted();
+        }}
+        status="info"
+        title={t('powerCycle.title')}
+        action={{
+          label: t('powerCycle.continue'),
+          onPress: () => {
+            setIsPowerCycleOpen(false);
+            props.onCompleted();
+          },
+          'data-cy': 'firmware-flasher-power-cycle-continue',
+        }}
+        data-cy="firmware-flasher-power-cycle"
+      >
+        {t('powerCycle.description')}
+      </StatusDialog>
+      <StatusDialog
+        isOpen={chipMismatch !== null}
+        onClose={() => setChipMismatch(null)}
+        status="error"
+        title={t('chipMismatch.title')}
+        data-cy="firmware-flasher-chip-mismatch"
+      >
+        {chipMismatch ? t('chipMismatch.description', chipMismatch) : undefined}
+      </StatusDialog>
+    </>
+  );
 
   if (isDownloadingFirmware) {
     return (
@@ -125,9 +202,10 @@ export function FirmwareFlasher(props: Props) {
   if (flashProgress === 0 && logLines.length === 0 && !flashError) {
     return (
       <div className="space-y-4">
-        <Button variant="primary" isPending={isFlashing} onPress={flashFirmware}>
+        <Button variant="primary" isPending={isFlashing} onPress={startFlash}>
           {t('action.flash')}
         </Button>
+        {dialogs}
       </div>
     );
   }
@@ -141,7 +219,7 @@ export function FirmwareFlasher(props: Props) {
           </AlertContent>
           <div>{(flashError.details as string) || 'Unknown error occurred'}</div>
 
-          <Button variant="primary" onPress={flashFirmware}>
+          <Button variant="primary" onPress={startFlash}>
             {t('action.retryFlash')}
           </Button>
         </Alert>
@@ -154,6 +232,8 @@ export function FirmwareFlasher(props: Props) {
           </ProgressBarTrack>
         </ProgressBar>
       )}
+
+      {dialogs}
 
       <Accordion>
         <AccordionItem key="terminal" id="terminal">
