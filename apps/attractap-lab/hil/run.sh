@@ -169,7 +169,14 @@ API_PORT="${API_PORT:-$(python3 -c 'import socket; s=socket.socket(); s.bind((""
 export STORAGE_ROOT="$WORK/storage"
 # The run's own PostgreSQL database on the server HIL_DATABASE_ADMIN_URL (else DATABASE_URL, else .env) names;
 # the API, the seed and the tests reach it through DATABASE_URL. Dropped when the run ends.
-DATABASE_URL="$(node "$HERE/throwaway-db.mjs" create)" || fail "Cannot create the throwaway database: set HIL_DATABASE_ADMIN_URL"
+# HIL_DATABASE_URL names a database that already exists (used as is, never dropped).
+own_database=0
+if [[ -n "${HIL_DATABASE_URL:-}" ]]; then
+  DATABASE_URL="$HIL_DATABASE_URL"
+else
+  DATABASE_URL="$(node "$HERE/throwaway-db.mjs" create)" || fail "Cannot create the throwaway database: set HIL_DATABASE_ADMIN_URL"
+  own_database=1
+fi
 export DATABASE_URL
 if [[ "${HIL_BLE:-}" == 1 ]]; then
   # Plugin BLE tests (test_ble.py, opt-in): the lab fixture plugin talks to devices through context.ble.
@@ -213,7 +220,9 @@ set +m
 cleanup() {
   kill -- "-$api_pid" 2>/dev/null || true
   sleep 1
-  node "$HERE/throwaway-db.mjs" drop "$DATABASE_URL" >/dev/null 2>&1 || true
+  if [[ "$own_database" == 1 ]]; then
+    node "$HERE/throwaway-db.mjs" drop "$DATABASE_URL" >/dev/null 2>&1 || true
+  fi
 }
 trap cleanup EXIT
 api_deadline=$((SECONDS + ${API_START_TIMEOUT:-600}))

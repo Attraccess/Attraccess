@@ -4,6 +4,7 @@ import { entities } from '@attraccess/database-entities';
 import type { MigrationTrack } from '../backend/database-backend';
 import type { TypeOrmDatabaseBackend } from '../backend/resolve-database-backend';
 import { postgresMigrations } from './migrations';
+import { parsePostgresConfig, type PostgresConfig } from './postgres-config';
 import { postgresConnectionOptions, createDataSource } from './postgres-connection';
 import { postgresErrorClassifier } from './postgres-errors';
 import { readPostgresPermissionOwners, openPostgresStartupSettings } from './postgres-startup-reads';
@@ -44,9 +45,23 @@ function coreTableNames(): ReadonlySet<string> {
   return names;
 }
 
+/**
+ * SKIP_DATABASE_MIGRATIONS=true marks a process that builds the application but never uses the database (the Swagger
+ * and AsyncAPI export, also inside the image build): it needs no DATABASE_URL, a placeholder keeps the options
+ * constructible and nothing connects (see database-connection.module).
+ */
+function configuration(): PostgresConfig {
+  try {
+    return parsePostgresConfig();
+  } catch (error) {
+    if (process.env.SKIP_DATABASE_MIGRATIONS !== 'true') throw error;
+    return { url: 'postgres://unused:unused@localhost:5432/unused', ssl: 'off', poolMax: 1, schema: 'public' };
+  }
+}
+
 function createDataSourceOptions(): DataSourceOptions {
   return {
-    ...postgresConnectionOptions(),
+    ...postgresConnectionOptions(configuration()),
     migrations: [...postgresMigrations],
     migrationsTableName: POSTGRES_MIGRATIONS_TABLE,
     // Providers access database-backed settings while Nest constructs AppModule.
