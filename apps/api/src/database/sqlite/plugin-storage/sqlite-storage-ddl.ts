@@ -8,25 +8,19 @@ const { quote } = sqliteStorageDialect;
 
 const NOW_DEFAULT = `(strftime('%Y-%m-%d %H:%M:%f', 'now'))`;
 
+const COLUMN_TYPES: Record<Exclude<CompiledField['type'], 'string'>, string> = {
+  uuid: 'varchar(36)',
+  text: 'text',
+  json: 'text',
+  integer: 'integer',
+  decimal: 'integer', // a scaled integer, see the dialect
+  boolean: 'boolean',
+  timestamp: 'datetime',
+  date: 'date',
+};
+
 function columnType(field: CompiledField): string {
-  switch (field.type) {
-    case 'string':
-      return `varchar(${field.length ?? 255})`;
-    case 'uuid':
-      return 'varchar(36)';
-    case 'text':
-    case 'json':
-      return 'text';
-    case 'integer':
-    case 'decimal': // a scaled integer, see the dialect
-      return 'integer';
-    case 'boolean':
-      return 'boolean';
-    case 'timestamp':
-      return 'datetime';
-    case 'date':
-      return 'date';
-  }
+  return field.type === 'string' ? `varchar(${field.length ?? 255})` : COLUMN_TYPES[field.type];
 }
 
 function literal(value: unknown): string {
@@ -77,26 +71,23 @@ function createIndex(table: CompiledTable, index: CompiledTable['indexes'][numbe
   return `CREATE ${index.unique ? 'UNIQUE ' : ''}INDEX ${quote(index.name)} ON ${quote(table.physical)} (${columns.join(', ')})`;
 }
 
+type StepStatements = { [Op in ResolvedStep['op']]: (step: Extract<ResolvedStep, { op: Op }>) => string[] };
+
+const STATEMENTS: StepStatements = {
+  createTable: (step) => createTable(step.table),
+  dropTable: (step) => [`DROP TABLE ${quote(step.table.physical)}`],
+  addColumn: (step) => [`ALTER TABLE ${quote(step.table.physical)} ADD COLUMN ${columnDefinition(step.field, false)}`],
+  dropColumn: (step) => [`ALTER TABLE ${quote(step.table.physical)} DROP COLUMN ${quote(step.field.column)}`],
+  renameColumn: (step) => [
+    `ALTER TABLE ${quote(step.table.physical)} RENAME COLUMN ${quote(step.from.column)} TO ${quote(step.to.column)}`,
+  ],
+  addIndex: (step) => [createIndex(step.table, step.index)],
+  dropIndex: (step) => [`DROP INDEX ${quote(step.index.name)}`],
+};
+
 /** SQLite statements of the neutral migration steps. Table rebuilds are never needed: SQLite alters in place. */
 export const sqliteStorageDdl: PluginStorageDdl = {
   statements(step: ResolvedStep): string[] {
-    switch (step.op) {
-      case 'createTable':
-        return createTable(step.table);
-      case 'dropTable':
-        return [`DROP TABLE ${quote(step.table.physical)}`];
-      case 'addColumn':
-        return [`ALTER TABLE ${quote(step.table.physical)} ADD COLUMN ${columnDefinition(step.field, false)}`];
-      case 'dropColumn':
-        return [`ALTER TABLE ${quote(step.table.physical)} DROP COLUMN ${quote(step.field.column)}`];
-      case 'renameColumn':
-        return [
-          `ALTER TABLE ${quote(step.table.physical)} RENAME COLUMN ${quote(step.from.column)} TO ${quote(step.to.column)}`,
-        ];
-      case 'addIndex':
-        return [createIndex(step.table, step.index)];
-      case 'dropIndex':
-        return [`DROP INDEX ${quote(step.index.name)}`];
-    }
+    return (STATEMENTS[step.op] as (step: ResolvedStep) => string[])(step);
   },
 };

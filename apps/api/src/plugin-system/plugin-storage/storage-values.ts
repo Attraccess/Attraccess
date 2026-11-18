@@ -23,6 +23,18 @@ function invalid(field: CompiledField, label: string | undefined, reason: string
   throw new PluginStorageInvalid(`Invalid value for ${describe(field, label)}: ${reason}.`);
 }
 
+const isPlainJsonObject = (value: unknown): value is Record<string, unknown> => {
+  if (typeof value !== 'object' || value === null) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === null || Object.getPrototypeOf(prototype) === null;
+};
+
+/** The nested values of an array or plain object; undefined for anything else. */
+function jsonChildren(value: unknown): unknown[] | undefined {
+  if (Array.isArray(value)) return value;
+  return isPlainJsonObject(value) ? Object.values(value) : undefined;
+}
+
 function checkJson(field: CompiledField, label: string | undefined, value: unknown, depth: number): void {
   if (depth > MAX_JSON_DEPTH) invalid(field, label, 'JSON nested too deeply');
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
@@ -30,24 +42,19 @@ function checkJson(field: CompiledField, label: string | undefined, value: unkno
     if (!Number.isFinite(value)) invalid(field, label, 'JSON numbers must be finite');
     return;
   }
-  if (Array.isArray(value)) {
-    for (const item of value) checkJson(field, label, item, depth + 1);
-    return;
+  const children = jsonChildren(value);
+  if (!children) {
+    invalid(field, label, 'only plain JSON values (objects, arrays, strings, finite numbers, booleans) are stored');
   }
-  const prototype = typeof value === 'object' ? Object.getPrototypeOf(value) : undefined;
-  if (typeof value === 'object' && (prototype === null || Object.getPrototypeOf(prototype) === null)) {
-    for (const item of Object.values(value as Record<string, unknown>)) checkJson(field, label, item, depth + 1);
-    return;
-  }
-  invalid(field, label, 'only plain JSON values (objects, arrays, strings, finite numbers, booleans) are stored');
+  for (const child of children) checkJson(field, label, child, depth + 1);
 }
 
 /** Digits of a decimal string normalised to exactly `scale` fraction digits; throws when it does not fit. */
 export function normalizeDecimal(field: CompiledField, label: string | undefined, value: string): string {
   const match = DECIMAL_PATTERN.exec(value);
+  if (!match) return invalid(field, label, 'a decimal is a string such as "12.50"');
   const precision = field.precision ?? MAX_DECIMAL_PRECISION;
   const scale = field.scale ?? 0;
-  if (!match) return invalid(field, label, 'a decimal is a string such as "12.50"');
   const [, sign, whole, fraction = ''] = match;
   if (fraction.length > scale) invalid(field, label, `at most ${scale} fraction digits (no silent rounding)`);
   const integerDigits = whole.replace(/^0+(?=\d)/, '');
@@ -55,6 +62,70 @@ export function normalizeDecimal(field: CompiledField, label: string | undefined
     invalid(field, label, `at most ${precision - scale} integer digits`);
   const text = `${integerDigits}${scale > 0 ? `.${fraction.padEnd(scale, '0')}` : ''}`;
   return sign && /[1-9]/.test(text) ? `-${text}` : text;
+}
+
+type Normalizer = (field: CompiledField, value: unknown, label: string | undefined) => unknown;
+
+const NORMALIZERS = new Map<string, Normalizer>([
+  [
+    'string',
+    (field, value, label) => {
+      if (typeof value !== 'string') return invalid(field, label, 'expected a string');
+      const limit = field.length ?? DEFAULT_STRING_LENGTH;
+      if (value.length > limit) invalid(field, label, `longer than ${limit} characters (use a text field)`);
+      return value;
+    },
+  ],
+  ['text', (field, value, label) => (typeof value === 'string' ? value : invalid(field, label, 'expected a string'))],
+  [
+    'integer',
+    (field, value, label) =>
+      typeof value === 'number' && Number.isSafeInteger(value)
+        ? value
+        : invalid(field, label, 'expected a safe integer'),
+  ],
+  [
+    'decimal',
+    (field, value, label) =>
+      typeof value === 'string'
+        ? normalizeDecimal(field, label, value)
+        : invalid(field, label, 'expected a decimal string'),
+  ],
+  [
+    'boolean',
+    (field, value, label) => (typeof value === 'boolean' ? value : invalid(field, label, 'expected a boolean')),
+  ],
+  [
+    'timestamp',
+    (field, value, label) =>
+      value instanceof Date && !Number.isNaN(value.getTime())
+        ? new Date(value.getTime())
+        : invalid(field, label, 'expected a valid Date'),
+  ],
+  ['date', normalizeDate],
+  ['json', normalizeJson],
+  [
+    'uuid',
+    (field, value, label) => {
+      const lowered = typeof value === 'string' ? value.toLowerCase() : '';
+      return UUID_PATTERN.test(lowered) ? lowered : invalid(field, label, 'expected a UUID');
+    },
+  ],
+]);
+
+function normalizeDate(field: CompiledField, value: unknown, label: string | undefined): unknown {
+  const match = typeof value === 'string' ? DATE_PATTERN.exec(value) : null;
+  if (!match) return invalid(field, label, 'expected "YYYY-MM-DD"');
+  const day = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  return day.toISOString().startsWith(value as string) ? value : invalid(field, label, 'not a calendar day');
+}
+
+function normalizeJson(field: CompiledField, value: unknown, label: string | undefined): unknown {
+  if (value === undefined) return invalid(field, label, 'undefined is not JSON');
+  checkJson(field, label, value, 0);
+  const text = JSON.stringify(value);
+  if (text.length > MAX_JSON_BYTES) invalid(field, label, `larger than ${MAX_JSON_BYTES} bytes`);
+  return JSON.parse(text);
 }
 
 /**
@@ -66,49 +137,8 @@ export function normalizeValue(field: CompiledField, value: unknown, label?: str
     if (!field.nullable) invalid(field, label, 'the field is required');
     return null;
   }
-  switch (field.type) {
-    case 'string': {
-      if (typeof value !== 'string') return invalid(field, label, 'expected a string');
-      const limit = field.length ?? DEFAULT_STRING_LENGTH;
-      if (value.length > limit) invalid(field, label, `longer than ${limit} characters (use a text field)`);
-      return value;
-    }
-    case 'text':
-      return typeof value === 'string' ? value : invalid(field, label, 'expected a string');
-    case 'integer':
-      return typeof value === 'number' && Number.isSafeInteger(value)
-        ? value
-        : invalid(field, label, 'expected a safe integer');
-    case 'decimal':
-      return typeof value === 'string'
-        ? normalizeDecimal(field, label, value)
-        : invalid(field, label, 'expected a decimal string');
-    case 'boolean':
-      return typeof value === 'boolean' ? value : invalid(field, label, 'expected a boolean');
-    case 'timestamp':
-      return value instanceof Date && !Number.isNaN(value.getTime())
-        ? new Date(value.getTime())
-        : invalid(field, label, 'expected a valid Date');
-    case 'date': {
-      const match = typeof value === 'string' ? DATE_PATTERN.exec(value) : null;
-      if (!match) return invalid(field, label, 'expected "YYYY-MM-DD"');
-      const day = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
-      return day.toISOString().startsWith(value as string) ? value : invalid(field, label, 'not a calendar day');
-    }
-    case 'json': {
-      if (value === undefined) return invalid(field, label, 'undefined is not JSON');
-      checkJson(field, label, value, 0);
-      const text = JSON.stringify(value);
-      if (text.length > MAX_JSON_BYTES) invalid(field, label, `larger than ${MAX_JSON_BYTES} bytes`);
-      return JSON.parse(text);
-    }
-    case 'uuid': {
-      const lowered = typeof value === 'string' ? value.toLowerCase() : '';
-      return UUID_PATTERN.test(lowered) ? lowered : invalid(field, label, 'expected a UUID');
-    }
-    default:
-      return invalid(field, label, 'unknown field type');
-  }
+  const normalize = NORMALIZERS.get(field.type);
+  return normalize ? normalize(field, value, label) : invalid(field, label, 'unknown field type');
 }
 
 /** Whether `value` is allowed in a filter for the field's type (equality, ordering and prefix operators). */

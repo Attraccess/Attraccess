@@ -40,6 +40,7 @@ const FIELD_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,62}$/;
 const RESERVED_FIELDS = new Set(['and', 'or', 'not']);
 const RESERVED_TABLE_PREFIXES = ['plugin_migrations_', 'plugin_storage_migrations_', 'sqlite_'];
 const MAX_IDENTIFIER_LENGTH = 63;
+const ON_DELETE_ACTIONS: readonly unknown[] = ['cascade', 'restrict', 'set-null'];
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 
@@ -95,16 +96,18 @@ function indexName(
   unique: boolean,
   given: unknown,
 ): string {
-  if (given !== undefined) {
-    if (typeof given !== 'string' || !IDENTIFIER.test(given) || !given.toLowerCase().includes(naming.namespace)) {
-      fail(naming, `index name "${String(given)}" must match ${IDENTIFIER.source} and contain "${naming.namespace}"`);
-    }
-    return given;
-  }
+  if (given !== undefined) return checkedIndexName(naming, given);
   const generated = `${unique ? 'uq' : 'idx'}_${table}_${fields.join('_')}`;
   if (generated.length <= MAX_IDENTIFIER_LENGTH) return generated;
   const digest = createHash('sha1').update(generated).digest('hex').slice(0, 10);
   return `${generated.slice(0, MAX_IDENTIFIER_LENGTH - 11)}_${digest}`;
+}
+
+function checkedIndexName(naming: StorageNaming, given: unknown): string {
+  if (typeof given !== 'string' || !IDENTIFIER.test(given) || !given.toLowerCase().includes(naming.namespace)) {
+    fail(naming, `index name "${String(given)}" must match ${IDENTIFIER.source} and contain "${naming.namespace}"`);
+  }
+  return given;
 }
 
 function readStringList(naming: StorageNaming, where: string, value: unknown): string[] {
@@ -146,19 +149,22 @@ function checkOptions(naming: StorageNaming, where: string, field: CompiledField
   if (field.length !== undefined && (field.type !== 'string' || !Number.isInteger(field.length) || field.length < 1)) {
     fail(naming, `length of ${where} must be a positive integer on a string field`);
   }
-  if (field.type === 'decimal') {
-    const { precision, scale } = field;
-    const valid =
-      Number.isInteger(precision) &&
-      Number.isInteger(scale) &&
-      (precision as number) >= 1 &&
-      (precision as number) <= MAX_DECIMAL_PRECISION &&
-      (scale as number) >= 0 &&
-      (scale as number) <= (precision as number);
-    if (!valid)
-      fail(naming, `decimal ${where} needs 1 <= precision <= ${MAX_DECIMAL_PRECISION} and 0 <= scale <= precision`);
-  } else if (field.precision !== undefined || field.scale !== undefined) {
+  if (field.type === 'decimal') checkDecimal(naming, where, field);
+  else if (field.precision !== undefined || field.scale !== undefined) {
     fail(naming, `precision and scale of ${where} apply to decimal fields only`);
+  }
+}
+
+function checkDecimal(naming: StorageNaming, where: string, { precision, scale }: CompiledField): void {
+  const valid =
+    Number.isInteger(precision) &&
+    Number.isInteger(scale) &&
+    (precision as number) >= 1 &&
+    (precision as number) <= MAX_DECIMAL_PRECISION &&
+    (scale as number) >= 0 &&
+    (scale as number) <= (precision as number);
+  if (!valid) {
+    fail(naming, `decimal ${where} needs 1 <= precision <= ${MAX_DECIMAL_PRECISION} and 0 <= scale <= precision`);
   }
 }
 
@@ -176,6 +182,15 @@ function checkDefault(naming: StorageNaming, where: string, field: CompiledField
     }
     return;
   }
+  checkLiteralDefault(naming, where, field, value);
+}
+
+function checkLiteralDefault(
+  naming: StorageNaming,
+  where: string,
+  field: CompiledField,
+  value: string | number | boolean,
+): void {
   try {
     normalizeValue(field, defaultInputOf(field, value), where);
   } catch (error) {
@@ -198,16 +213,34 @@ export function compileTable(
   physicalOf: (logical: string) => string | undefined,
 ): CompiledTable {
   if (!isRecord(decl) || !isRecord(decl.fields)) return fail(naming, `table "${logical}" must be built with table()`);
+  const fields = compileFields(naming, logical, decl.fields);
+  const primaryKey = readStringList(naming, `primaryKey of "${logical}"`, decl.primaryKey);
+  checkPrimaryKey(naming, logical, fields, primaryKey);
+  const indexes = compileIndexes(naming, logical, physical, fields, decl.indexes as PluginStorageIndex[] | undefined);
+  const foreignKeys = ((decl.foreignKeys as PluginStorageTable['foreignKeys'] | undefined) ?? []).map((fk) =>
+    compileForeignKey(naming, logical, fields, fk, physicalOf),
+  );
+  return { logical, physical, fields, primaryKey, indexes, foreignKeys };
+}
+
+function compileFields(naming: StorageNaming, logical: string, declared: Record<string, unknown>) {
   const fields = new Map<string, CompiledField>();
-  for (const [name, field] of Object.entries(decl.fields)) fields.set(name, compileField(naming, logical, name, field));
+  for (const [name, field] of Object.entries(declared)) fields.set(name, compileField(naming, logical, name, field));
   if (fields.size === 0) fail(naming, `table "${logical}" declares no fields`);
   const columns = new Set<string>();
   for (const field of fields.values()) {
     if (columns.has(field.column)) fail(naming, `table "${logical}" maps two fields to column "${field.column}"`);
     columns.add(field.column);
   }
+  return fields;
+}
 
-  const primaryKey = readStringList(naming, `primaryKey of "${logical}"`, decl.primaryKey);
+function checkPrimaryKey(
+  naming: StorageNaming,
+  logical: string,
+  fields: ReadonlyMap<string, CompiledField>,
+  primaryKey: readonly string[],
+): void {
   for (const key of primaryKey) {
     const field = fields.get(key);
     if (!field) fail(naming, `primaryKey of "${logical}" names the unknown field "${key}"`);
@@ -220,21 +253,23 @@ export function compileTable(
   ) {
     fail(naming, `table "${logical}": a generated field must be the whole primary key`);
   }
+}
 
-  const physicalName = physical;
-  const indexes = ((decl.indexes as PluginStorageIndex[] | undefined) ?? []).map((index) =>
-    compileIndex(naming, logical, physicalName, fields, index),
-  );
+function compileIndexes(
+  naming: StorageNaming,
+  logical: string,
+  physical: string,
+  fields: ReadonlyMap<string, CompiledField>,
+  declared: PluginStorageIndex[] | undefined,
+): CompiledIndex[] {
+  const indexes = (declared ?? []).map((index) => compileIndex(naming, logical, physical, fields, index));
   const names = new Set<string>();
   for (const index of indexes) {
     const key = index.name.toLowerCase();
     if (names.has(key)) fail(naming, `table "${logical}" declares the index "${index.name}" twice`);
     names.add(key);
   }
-  const foreignKeys = ((decl.foreignKeys as PluginStorageTable['foreignKeys'] | undefined) ?? []).map((fk) =>
-    compileForeignKey(naming, logical, fields, fk, physicalOf),
-  );
-  return { logical, physical: physicalName, fields, primaryKey, indexes, foreignKeys };
+  return indexes;
 }
 
 function compileIndex(
@@ -273,7 +308,7 @@ function compileForeignKey(
       `a foreign key of "${logical}" references "${String(references)}", which is not a table of this plugin`,
     );
   }
-  if (fk.onDelete !== undefined && !['cascade', 'restrict', 'set-null'].includes(fk.onDelete)) {
+  if (fk.onDelete !== undefined && !ON_DELETE_ACTIONS.includes(fk.onDelete)) {
     fail(naming, `a foreign key of "${logical}" has an unknown onDelete`);
   }
   return {

@@ -16,11 +16,14 @@ export function parseSqliteTimestamp(stored: unknown): Date | null {
   if (stored instanceof Date) return stored;
   if (typeof stored === 'number') return new Date(stored);
   if (typeof stored !== 'string') return null;
-  let text = stored;
-  if (/^\d\d\d\d-\d\d-\d\d \d\d:\d\d/.test(text)) text = text.replace(' ', 'T');
-  if (/^\d\d\d\d-\d\d-\d\dT\d\d:\d\d(:\d\d(\.\d+)?)?$/.test(text)) text += 'Z';
-  const parsed = new Date(text);
+  const parsed = new Date(withZone(stored));
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/** Text without a zone is UTC: TypeORM's `YYYY-MM-DD HH:MM[:SS[.mmm]]` becomes ISO with a `Z`. */
+function withZone(text: string): string {
+  const iso = /^\d\d\d\d-\d\d-\d\d \d\d:\d\d/.test(text) ? text.replace(' ', 'T') : text;
+  return /^\d\d\d\d-\d\d-\d\dT\d\d:\d\d(:\d\d(\.\d+)?)?$/.test(iso) ? `${iso}Z` : iso;
 }
 
 /** A decimal string as the integer of its digits (`"12.50"` at scale 2 is 1250). Exact: decimals have at most 15 digits. */
@@ -37,6 +40,25 @@ function fromScaled(value: number, scale: number): string {
   return value < 0 ? `-${text}` : text;
 }
 
+type FieldType = CompiledField['type'];
+type Codec = (field: CompiledField, value: unknown) => unknown;
+
+const ENCODERS: Partial<Record<FieldType, Codec>> = {
+  boolean: (_field, value) => (value ? 1 : 0),
+  timestamp: (_field, value) => formatSqliteTimestamp(value as Date),
+  decimal: (field, value) => toScaled(value as string, field.scale ?? 0),
+  json: (_field, value) => JSON.stringify(value),
+};
+
+const DECODERS: Partial<Record<FieldType, Codec>> = {
+  integer: (_field, stored) => Number(stored),
+  boolean: (_field, stored) => stored === 1 || stored === true || stored === '1' || stored === 'true',
+  timestamp: (_field, stored) => parseSqliteTimestamp(stored),
+  decimal: (field, stored) => fromScaled(Number(stored), field.scale ?? 0),
+  json: (_field, stored) => (typeof stored === 'string' ? JSON.parse(stored) : stored),
+  date: (_field, stored) => String(stored).slice(0, 10),
+};
+
 /**
  * SQLite value representation of plugin storage: decimals are scaled integers (exact, ordered and summable),
  * timestamps are UTC text in TypeORM's `datetime` form, booleans are 0/1, JSON is text. Adopted 1.x tables hold the
@@ -47,37 +69,13 @@ export const sqliteStorageDialect: PluginStorageDialect = {
   placeholder: () => '?',
   encode(field: CompiledField, value: unknown): unknown {
     if (value === null || value === undefined) return null;
-    switch (field.type) {
-      case 'boolean':
-        return value ? 1 : 0;
-      case 'timestamp':
-        return formatSqliteTimestamp(value as Date);
-      case 'decimal':
-        return toScaled(value as string, field.scale ?? 0);
-      case 'json':
-        return JSON.stringify(value);
-      default:
-        return value;
-    }
+    const encoder = ENCODERS[field.type];
+    return encoder ? encoder(field, value) : value;
   },
   decode(field: CompiledField, stored: unknown): unknown {
     if (stored === null || stored === undefined) return null;
-    switch (field.type) {
-      case 'integer':
-        return Number(stored);
-      case 'boolean':
-        return stored === 1 || stored === true || stored === '1' || stored === 'true';
-      case 'timestamp':
-        return parseSqliteTimestamp(stored);
-      case 'decimal':
-        return fromScaled(Number(stored), field.scale ?? 0);
-      case 'json':
-        return typeof stored === 'string' ? JSON.parse(stored) : stored;
-      case 'date':
-        return String(stored).slice(0, 10);
-      default:
-        return String(stored);
-    }
+    const decoder = DECODERS[field.type];
+    return decoder ? decoder(field, stored) : String(stored);
   },
   limit(limit, offset) {
     if (limit === undefined && offset === undefined) return '';

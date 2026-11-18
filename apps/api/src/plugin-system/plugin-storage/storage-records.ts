@@ -151,13 +151,41 @@ function checkConflictTarget(table: CompiledTable, conflictOn: unknown): string[
   return names;
 }
 
+/** The fields an upsert overwrites on conflict: `update` when given, otherwise every plain field outside the key. */
+function overwriteFields(table: CompiledTable, target: readonly string[], update: unknown): string[] {
+  const overwrite =
+    update === undefined
+      ? [...table.fields.values()]
+          .filter((field) => !field.generated && !target.includes(field.name))
+          .map((field) => field.name)
+      : (update as unknown[]).map((name) => fieldOf(table, name, 'update').name);
+  if (overwrite.some((name) => target.includes(name))) {
+    throw new PluginStorageInvalid('update may not list a field of conflictOn.');
+  }
+  return overwrite;
+}
+
+function conflictClause(
+  { table, dialect }: TableContext,
+  target: readonly string[],
+  overwrite: readonly string[],
+): string {
+  const targetColumns = target.map((name) => dialect.quote(fieldOf(table, name, 'conflictOn').column)).join(', ');
+  const assignments = overwrite.map((name) => {
+    const column = dialect.quote(fieldOf(table, name, 'update').column);
+    return `${column} = excluded.${column}`;
+  });
+  const action = overwrite.length === 0 ? 'DO NOTHING' : `DO UPDATE SET ${assignments.join(', ')}`;
+  return ` ON CONFLICT (${targetColumns}) ${action}`;
+}
+
 async function upsertRow(
   context: TableContext,
   executor: PluginStorageExecutor,
   input: unknown,
   options: { conflictOn?: unknown; update?: unknown } | undefined,
 ): Promise<Row> {
-  const { table, dialect } = context;
+  const { table } = context;
   const target = checkConflictTarget(table, options?.conflictOn);
   const { values, provided } = buildInsert(table, input);
   for (const name of target) {
@@ -165,26 +193,8 @@ async function upsertRow(
       throw new PluginStorageInvalid(`upsert needs a value for the key field "${table.logical}.${name}".`);
     }
   }
-  const overwrite =
-    options?.update === undefined
-      ? [...table.fields.values()]
-          .filter((field) => !field.generated && !target.includes(field.name))
-          .map((field) => field.name)
-      : (options.update as unknown[]).map((name) => fieldOf(table, name, 'update').name);
-  if (overwrite.some((name) => target.includes(name))) {
-    throw new PluginStorageInvalid('update may not list a field of conflictOn.');
-  }
-  const targetColumns = target.map((name) => dialect.quote(fieldOf(table, name, 'conflictOn').column)).join(', ');
-  const action =
-    overwrite.length === 0
-      ? 'DO NOTHING'
-      : `DO UPDATE SET ${overwrite
-          .map((name) => {
-            const column = dialect.quote(fieldOf(table, name, 'update').column);
-            return `${column} = excluded.${column}`;
-          })
-          .join(', ')}`;
-  const statement = insertStatement(context, values, ` ON CONFLICT (${targetColumns}) ${action}`);
+  const overwrite = overwriteFields(table, target, options?.update);
+  const statement = insertStatement(context, values, conflictClause(context, target, overwrite));
   await executor.execute(statement.sql, statement.params);
   const where: Row = Object.fromEntries(target.map((name) => [name, values.get(name)]));
   const [row] = await findRows(context, executor, { where, limit: 1 });
@@ -192,27 +202,31 @@ async function upsertRow(
   return row;
 }
 
-function patchAssignments(context: TableContext, params: StorageParams, patch: unknown): string {
-  const { table, dialect } = context;
-  if (!isPlainObject(patch)) throw new PluginStorageInvalid('A patch is an object of field values.');
-  const assignments: string[] = [];
-  for (const [name, value] of Object.entries(patch)) {
-    if (value === undefined) continue;
-    const field = fieldOf(table, name, 'a patch');
-    if (field.generated) throw new PluginStorageInvalid(`The generated field "${name}" cannot be changed.`);
-    const column = dialect.quote(field.column);
-    if (isPlainObject(value) && 'increment' in value) {
-      const by = value.increment;
-      if (field.type !== 'integer' || typeof by !== 'number' || !Number.isSafeInteger(by)) {
-        throw new PluginStorageInvalid(`increment applies to integer fields with an integer step ("${name}").`);
-      }
-      assignments.push(`${column} = COALESCE(${column}, 0) + ${params.add(by)}`);
-    } else {
-      assignments.push(
-        `${column} = ${params.add(dialect.encode(field, normalizeValue(field, value, `${table.logical}.${name}`)))}`,
-      );
-    }
+/** One `column = value` assignment of a patch: an `{ increment }` step on an integer, or a replacement value. */
+function patchAssignment(
+  { table, dialect }: TableContext,
+  params: StorageParams,
+  name: string,
+  value: unknown,
+): string {
+  const field = fieldOf(table, name, 'a patch');
+  if (field.generated) throw new PluginStorageInvalid(`The generated field "${name}" cannot be changed.`);
+  const column = dialect.quote(field.column);
+  if (!(isPlainObject(value) && 'increment' in value)) {
+    return `${column} = ${params.add(dialect.encode(field, normalizeValue(field, value, `${table.logical}.${name}`)))}`;
   }
+  const by = value.increment;
+  if (field.type !== 'integer' || typeof by !== 'number' || !Number.isSafeInteger(by)) {
+    throw new PluginStorageInvalid(`increment applies to integer fields with an integer step ("${name}").`);
+  }
+  return `${column} = COALESCE(${column}, 0) + ${params.add(by)}`;
+}
+
+function patchAssignments(context: TableContext, params: StorageParams, patch: unknown): string {
+  if (!isPlainObject(patch)) throw new PluginStorageInvalid('A patch is an object of field values.');
+  const assignments = Object.entries(patch)
+    .filter(([, value]) => value !== undefined)
+    .map(([name, value]) => patchAssignment(context, params, name, value));
   if (assignments.length === 0) throw new PluginStorageInvalid('A patch needs at least one field.');
   return assignments.join(', ');
 }
@@ -235,13 +249,11 @@ async function aggregateRows(context: TableContext, executor: PluginStorageExecu
     `SELECT MIN(${column}) AS "min", MAX(${column}) AS "max", ${summable ? `SUM(${column})` : 'NULL'} AS "sum", ` +
     `COUNT(*) AS "count" FROM ${dialect.quote(table.physical)} WHERE ${condition}`;
   const [raw] = await executor.query(sql, params.values);
+  const decoded = (value: unknown) => dialect.decode(field, value ?? null);
   return {
-    min: dialect.decode(field, raw?.min ?? null),
-    max: dialect.decode(field, raw?.max ?? null),
-    sum:
-      summable && raw?.sum !== null && raw?.sum !== undefined
-        ? (dialect.decode(field, raw.sum) as number | string)
-        : null,
+    min: decoded(raw?.min),
+    max: decoded(raw?.max),
+    sum: summable ? (decoded(raw?.sum) as number | string | null) : null,
     count: Number(raw?.count ?? 0),
   };
 }
@@ -274,7 +286,7 @@ function createTableApi(context: TableContext): AnyTableApi {
         for (const row of rows) inserted.push(await insertRow(context, executor, row));
         return inserted;
       }),
-    get: (key, options) => findOne({ where: keyFilter(table, key) }, options),
+    get: async (key, options) => findOne({ where: keyFilter(table, key) }, options),
     find: (query, options) => run('read', options, (executor) => findRows(context, executor, query)),
     findOne: (query, options) => findOne(query ?? {}, options),
     count: (where, options) =>
