@@ -128,11 +128,13 @@ export abstract class WagoFlowQueries extends WagoFlowServiceState {
     const controllerCacheKey = previewOnly
       ? `wago-flow-controllers:preview:${config.controllerId}`
       : 'wago-flow-controllers';
+    // A controller id that is not an integer (1.5, NaN) selects no controller; the integer filter would refuse it.
+    const controllerId = Number.isSafeInteger(config.controllerId) ? (config.controllerId as number) : null;
     const controllers = await this.cached(validationContext, controllerCacheKey, () =>
-      previewOnly && typeof config.controllerId !== 'number'
+      previewOnly && controllerId === null
         ? Promise.resolve([])
         : this.controllers.find({
-            where: { trustState: 'claimed', ...(previewOnly ? { id: config.controllerId as number } : {}) },
+            where: { trustState: 'claimed', ...(previewOnly ? { id: controllerId as number } : {}) },
             orderBy: [{ field: 'name', direction: 'asc' }],
           }),
     );

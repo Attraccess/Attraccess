@@ -84,6 +84,23 @@ describe('WagoFlowService schemas and dispatch', () => {
     expect(tables.controllers.find).toHaveBeenCalledTimes(2);
   });
 
+  it.each([1.5, Number.NaN, Number.POSITIVE_INFINITY, '1'])(
+    'previews a node whose controller id %p is not an integer as one without a controller',
+    async (controllerId) => {
+      const { service, tables } = await createService();
+      tables.controllers.find.mockClear();
+      const preview = service.resolveConfigSchema({ controllerId, channelId: 'door' }, 'read', new Map(), true);
+      await expect(preview).resolves.toEqual(expect.any(Object));
+      // No lookup at all, like for a missing id: the integer filter would refuse the value.
+      expect(tables.controllers.find).not.toHaveBeenCalled();
+      // Outside a preview the claimed controllers are listed, and none is selected.
+      await expect(
+        service.resolveConfigSchema({ controllerId, channelId: 'door' }, 'read', new Map()),
+      ).resolves.toEqual(expect.any(Object));
+      service.onModuleDestroy();
+    },
+  );
+
   it('starts with an unavailable MQTT broker and retries flow subscriptions', async () => {
     const { service, context } = await createService();
     const subscribe = context.mqtt.subscribe as jest.Mock;
