@@ -1,6 +1,6 @@
 import { DataSource } from 'typeorm';
 import { McpOAuthClient, McpOAuthGrant, McpOAuthToken, User } from '@attraccess/database-entities';
-import { SqliteFileFixture } from '../sqlite-file.test-fixture';
+import { PostgresDatabaseFixture } from '../postgres-database.test-fixture';
 import { unitOfWorkFor } from '../shared-unit-of-work';
 import { TypeOrmMcpOAuthStore } from './typeorm-mcp-oauth.store';
 
@@ -17,8 +17,8 @@ const storeOn = (source: DataSource) =>
 const inAnHour = () => new Date(Date.now() + 3_600_000);
 const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000);
 
-describe('MCP OAuth store on a real SQLite file', () => {
-  let fixture: SqliteFileFixture;
+describe('MCP OAuth store on real PostgreSQL', () => {
+  let fixture: PostgresDatabaseFixture;
   let first: DataSource;
   let second: DataSource;
   let store: TypeOrmMcpOAuthStore;
@@ -52,7 +52,7 @@ describe('MCP OAuth store on a real SQLite file', () => {
   });
 
   beforeAll(async () => {
-    fixture = await SqliteFileFixture.create();
+    fixture = await PostgresDatabaseFixture.create();
     first = await fixture.open();
     second = await fixture.open();
     await first.getRepository(User).save({ id: 1, username: 'one', email: 'one@example.com' });
@@ -166,6 +166,21 @@ describe('MCP OAuth store on a real SQLite file', () => {
       expect(admitted).not.toBeNull();
       expect(await store.findClient((old as { clientId: string }).clientId)).toBeNull();
       expect(await store.findClient(grantHolder)).not.toBeNull();
+    });
+
+    it('admits at most the limit when registrations race on independent connections', async () => {
+      const total = await first.getRepository(McpOAuthClient).count();
+      const limit = total + 3;
+      const sources = [first, second, await fixture.open(), await fixture.open()];
+
+      const results = await Promise.all(
+        Array.from({ length: 12 }, (_, index) =>
+          storeOn(sources[index % sources.length]).registerClient(newClient(`race-${index}`), limit, hoursAgo(24)),
+        ),
+      );
+
+      expect(results.filter(Boolean)).toHaveLength(3);
+      expect(await first.getRepository(McpOAuthClient).count()).toBe(limit);
     });
   });
 

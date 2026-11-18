@@ -28,13 +28,14 @@ import {
   UsageSessionStore,
 } from '../../../resources/usage/usage-session-store.port';
 import { sessionLimitOf } from '../../../resources/usage/sessions/active-usage';
-import { recoverOrphanedUsages } from '../../resource-usage-integrity';
+import { recoverOrphanedUsages } from '../../postgres/postgres-usage-recovery';
 import type { TransactionContext } from '../../transaction-context';
 import { EntityManagerResolver } from '../entity-manager-resolver';
 import { activeUsageWhere, countOccupiedSlots, findOccupyingUserIds } from './active-usage-queries';
 import { toUsageLifecycleAttempt, toUsageSession } from './usage-session-mapping';
 import { toResourceRecord } from '../resources/resource-mapping';
 import { findRelations } from '../find-options';
+import { RESOURCE_LOCK, lockResource } from '../resources/resource-locks';
 
 /** Relations of running sessions and of session details (exported for the mapping spec). */
 export const ACTIVE_RELATIONS = ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'];
@@ -60,8 +61,16 @@ const toSessionWithParties = (row: ResourceUsage): UsageSessionWithParties =>
 export class TypeOrmUsageSessionStore implements UsageSessionStore {
   constructor(private readonly managers: EntityManagerResolver) {}
 
+  /**
+   * The effective limit. Inside a unit of work this is the first read of every lifecycle transaction, so it also takes
+   * the per-resource lifecycle lock: starts, takeovers and capacity decisions of one resource queue behind each other
+   * and re-read the sessions the previous one committed (read committed), so simultaneous starts cannot exceed the
+   * limit or create a second session of one person. Other resources and plain reads are not blocked.
+   */
   async findSessionLimit(resourceId: number, context?: TransactionContext): Promise<number> {
-    const resource = await this.managers.resolve(context).findOne(Resource, {
+    const manager = this.managers.resolve(context);
+    if (context) await lockResource(manager, RESOURCE_LOCK.usageLifecycle, resourceId);
+    const resource = await manager.findOne(Resource, {
       where: { id: resourceId },
       select: { id: true, type: true, maxParallelSessions: true },
     });
@@ -378,11 +387,10 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     if (draft.supervisorUserId !== undefined) usageData.supervisorUserId = draft.supervisorUserId;
     if (draft.projectId !== undefined) usageData.projectId = draft.projectId;
 
-    await manager.createQueryBuilder().insert().into(ResourceUsage).values(usageData).execute();
+    const { identifiers } = await manager.createQueryBuilder().insert().into(ResourceUsage).values(usageData).execute();
 
     const createdSession = await manager.findOne(ResourceUsage, {
-      where: { resourceId, userId, endTime: IsNull(), lifecyclePending: true },
-      order: { startTime: 'DESC' },
+      where: { id: identifiers[0].id as number },
       relations: { resource: true, user: true, project: true },
     });
     if (!createdSession) throw new Error('Failed to retrieve the newly created session.');
@@ -462,7 +470,8 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
       };
       const existing = await manager.findOne(BillingTransactionItem, { where });
       if (existing) {
-        await manager.update(BillingTransactionItem, existing.id, { quantity: existing.quantity + quantity });
+        // Atomic in the database: two attempts adding to the same line never lose an increment.
+        await manager.increment(BillingTransactionItem, { id: existing.id }, 'quantity', quantity);
       } else {
         await manager.save(BillingTransactionItem, { billingTransactionId: transaction.id, ...item, quantity });
       }

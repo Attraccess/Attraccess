@@ -1,39 +1,22 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { Attractap, AttractapCredentialEvent, entities, Resource } from '@attraccess/database-entities';
-import { DataSource, Table } from 'typeorm';
+import { Attractap, AttractapCredentialEvent } from '@attraccess/database-entities';
+import { DataSource } from 'typeorm';
 import { CredentialRegistryService } from '../../../attractap/security/credential-registry.service';
-import { sqliteBackend } from '../../sqlite/sqlite-backend';
-import { createSqliteUnitOfWork } from '../../sqlite/sqlite-unit-of-work';
+import { PostgresDatabaseFixture } from '../postgres-database.test-fixture';
+import { unitOfWorkFor } from '../shared-unit-of-work';
 import { TransactionHandles } from '../common/transaction-handles';
 import { TypeOrmAttractapCredentialStore } from './typeorm-credential.store';
 
 /**
- * The credential changes on a real SQLite file, through two independent DataSources (two processes' worth of
+ * The credential changes on a real PostgreSQL database, through two independent DataSources (two processes' worth of
  * connections): the reader row and its history commit together, and one key never becomes the active credential of
  * two readers, whichever connection asks first.
  */
-describe('credential registry on SQLite (atomic reader row and history)', () => {
-  let directory: string;
-  const sources: DataSource[] = [];
-
-  const open = async (): Promise<DataSource> => {
-    const source = await sqliteBackend
-      .createDataSource({
-        type: 'better-sqlite3',
-        invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-        database: join(directory, 'credentials.sqlite'),
-        entities: Object.values(entities),
-      })
-      .initialize();
-    sources.push(source);
-    return source;
-  };
+describe('credential registry on PostgreSQL (atomic reader row and history)', () => {
+  let fixture: PostgresDatabaseFixture;
 
   const connect = async () => {
-    const source = await open();
-    const unitOfWork = createSqliteUnitOfWork(source);
+    const source = await fixture.open();
+    const unitOfWork = unitOfWorkFor(source);
     const store = new TypeOrmAttractapCredentialStore(
       source.getRepository(Attractap),
       source.getRepository(AttractapCredentialEvent),
@@ -43,29 +26,11 @@ describe('credential registry on SQLite (atomic reader row and history)', () => 
   };
 
   beforeEach(async () => {
-    directory = await mkdtemp(join(tmpdir(), 'credentials-'));
-    const setup = await open();
-    const readers = setup.getMetadata(Attractap);
-    const tables = [
-      setup.getMetadata(Resource),
-      readers,
-      ...readers.manyToManyRelations.flatMap((relation) => relation.junctionEntityMetadata ?? []),
-      setup.getMetadata(AttractapCredentialEvent),
-    ];
-    const queryRunner = setup.createQueryRunner();
-    try {
-      for (const table of tables) await queryRunner.createTable(Table.create(table, setup.driver));
-    } finally {
-      await queryRunner.release();
-    }
+    fixture = await PostgresDatabaseFixture.create();
   });
 
   afterEach(async () => {
-    for (const source of sources.splice(0)) {
-      await sqliteBackend.shutdown(source);
-      if (source.isInitialized) await source.destroy();
-    }
-    await rm(directory, { recursive: true, force: true });
+    await fixture.close();
   });
 
   const addReader = async (source: DataSource, name: string) =>

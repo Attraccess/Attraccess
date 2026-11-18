@@ -1,129 +1,112 @@
-import { DataSource, EntitySchema } from 'typeorm';
-import { buildScheduleEvaluationQuery, formatDbDate } from './maintenance-evaluation-queries';
+import {
+  Resource,
+  ResourceMaintenance,
+  ResourceMaintenanceSchedule,
+  ResourceUsage,
+} from '@attraccess/database-entities';
+import {
+  ResourceMaintenanceScheduleTriggerType,
+  ResourceType,
+  ResourceUsageAction,
+} from '@attraccess/application-models';
+import type { DataSource } from 'typeorm';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
+import { buildScheduleEvaluationQuery, buildScheduleStateQuery } from './maintenance-evaluation-queries';
 
 /**
- * Exercises the usage-aggregate SQL against a real SQLite database.
+ * Exercises the usage-aggregate SQL against the real PostgreSQL schema.
  *
- * The mocked unit tests can't catch this class of bug: a malformed SQL expression or a baseline
- * string that doesn't match how TypeORM serialises `datetime` columns both fail silently, returning
- * 0 instead of an error — which means usage-based maintenance would simply never trigger.
+ * The mocked unit tests can't catch this class of bug: a malformed SQL expression, an unquoted camelCase identifier
+ * or a mistyped CTE column returns 0 or fails silently, which means usage-based maintenance would simply never
+ * trigger.
  */
-
-// Mirrors the columns of ResourceUsage that the aggregate touches, including the generated column.
-const UsageSchema = new EntitySchema<{
-  id: number;
-  resourceId: number;
-  startTime: Date;
-  endTime: Date | null;
-  usageInMinutes: number;
-  lifecyclePending: boolean;
-  attributedOperatingDurationInMinutes: number | null;
-}>({
-  name: 'resource_usage',
-  columns: {
-    id: { type: Number, primary: true, generated: true },
-    resourceId: { type: 'integer' },
-    lifecyclePending: { type: Boolean, default: false },
-    startTime: { type: 'datetime' },
-    endTime: { type: 'datetime', nullable: true },
-    usageInMinutes: {
-      type: 'integer',
-      generatedType: 'STORED',
-      asExpression: `CASE WHEN "endTime" IS NULL THEN -1 ELSE (julianday("endTime") - julianday("startTime")) * 1440 END`,
-      insert: false,
-      update: false,
-    },
-    attributedOperatingDurationInMinutes: { type: 'integer', nullable: true },
-  },
-});
-
-const MaintenanceSchema = new EntitySchema<{
-  id: number;
-  resourceId: number;
-  maintenanceScheduleId: number;
-  startTime: Date;
-  endTime: Date | null;
-}>({
-  name: 'resource_maintenance',
-  columns: {
-    id: { type: Number, primary: true, generated: true },
-    resourceId: { type: 'integer' },
-    maintenanceScheduleId: { type: 'integer' },
-    startTime: { type: 'datetime' },
-    endTime: { type: 'datetime', nullable: true },
-  },
-});
-
-describe('buildScheduleEvaluationQuery (real sqlite)', () => {
+describe('buildScheduleEvaluationQuery (real PostgreSQL)', () => {
   let dataSource: DataSource;
 
   const RESOURCE = 1;
-  const SCHEDULE_NEW = 100; // never serviced -> old baseline
-  const SCHEDULE_RECENT = 200; // serviced recently -> recent baseline
+  let scheduleNew: number; // never serviced -> old baseline
+  let scheduleRecent: number; // serviced recently -> recent baseline
 
   const oldBaseline = new Date('2025-01-01T00:00:00.000Z');
   const recentBaseline = new Date('2026-06-01T12:00:00.000Z');
 
   beforeEach(async () => {
-    dataSource = new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      synchronize: true,
-      entities: [UsageSchema, MaintenanceSchema],
-    });
-    await dataSource.initialize();
+    dataSource = await createTestDataSource();
+    await dataSource.getRepository(Resource).save([
+      { name: 'Laser', type: ResourceType.Machine },
+      { name: 'Saw', type: ResourceType.Machine },
+    ]);
+    const schedules = await dataSource.getRepository(ResourceMaintenanceSchedule).save(
+      ['New', 'Recent'].map((name) => ({
+        resourceId: RESOURCE,
+        name,
+        triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_COUNT,
+        enabled: true,
+      })),
+    );
+    [scheduleNew, scheduleRecent] = schedules.map((schedule) => schedule.id);
 
-    const repo = dataSource.getRepository<{
-      resourceId: number;
-      startTime: Date;
-      endTime: Date | null;
-      attributedOperatingDurationInMinutes: number | null;
-    }>('resource_usage');
-    // Saving through TypeORM means endTime is serialised exactly as it is in production.
-    await repo.save([
-      // 60 min, before the recent baseline -> only SCHEDULE_NEW should see it
-      {
+    const usage = (fields: Partial<ResourceUsage>) =>
+      ({ usageAction: ResourceUsageAction.Usage, isFinalized: true, ...fields }) as ResourceUsage;
+    await dataSource.getRepository(ResourceUsage).save([
+      // 60 min, before the recent baseline -> only the never serviced schedule should see it
+      usage({
         resourceId: RESOURCE,
         startTime: new Date('2025-03-01T10:00:00.000Z'),
         endTime: new Date('2025-03-01T11:00:00.000Z'),
         attributedOperatingDurationInMinutes: 12,
-      },
+      }),
       // 30 min, exactly at the recent baseline -> boundary must be inclusive for both
-      {
+      usage({
         resourceId: RESOURCE,
         startTime: new Date('2026-06-01T11:30:00.000Z'),
         endTime: recentBaseline,
         attributedOperatingDurationInMinutes: 6,
-      },
+      }),
       // 15 min, after both baselines
-      {
+      usage({
         resourceId: RESOURCE,
         startTime: new Date('2026-07-01T09:45:00.000Z'),
         endTime: new Date('2026-07-01T10:00:00.000Z'),
         attributedOperatingDurationInMinutes: 3,
-      },
+      }),
       // still running -> excluded (endTime IS NULL)
-      { resourceId: RESOURCE, startTime: new Date('2026-07-02T09:00:00.000Z'), endTime: null },
+      usage({ resourceId: RESOURCE, startTime: new Date('2026-07-02T09:00:00.000Z'), endTime: null }),
+      // pending reservation -> excluded
+      usage({
+        resourceId: RESOURCE,
+        startTime: new Date('2026-07-03T09:00:00.000Z'),
+        endTime: new Date('2026-07-03T09:05:00.000Z'),
+        isFinalized: false,
+        lifecyclePending: true,
+      }),
       // different resource -> never counted
-      { resourceId: 2, startTime: new Date('2026-07-01T00:00:00.000Z'), endTime: new Date('2026-07-01T05:00:00.000Z') },
+      usage({
+        resourceId: 2,
+        startTime: new Date('2026-07-01T00:00:00.000Z'),
+        endTime: new Date('2026-07-01T05:00:00.000Z'),
+      }),
     ]);
   });
 
   afterEach(async () => {
-    await dataSource.destroy();
+    await closeTestDataSource(dataSource);
   });
 
+  const pairParams = (pairs: Array<[number, number, Date]>) => [
+    ...pairs.flatMap(([resourceId, scheduleId, baseline]) => [resourceId, scheduleId, baseline]),
+    new Date(),
+  ];
   const runAggregate = (pairs: Array<[number, number, Date]>) =>
-    dataSource.query(buildScheduleEvaluationQuery('resource_maintenance', 'resource_usage', pairs.length), [
-      ...pairs.flatMap(([resourceId, scheduleId, baseline]) => [resourceId, scheduleId, formatDbDate(baseline)]),
-      formatDbDate(new Date()),
-    ]);
+    dataSource.query(
+      buildScheduleEvaluationQuery('resource_maintenance', 'resource_usage', pairs.length),
+      pairParams(pairs),
+    );
 
   it('aggregates each (resource, schedule) pair against its own baseline', async () => {
     const rows = await runAggregate([
-      [RESOURCE, SCHEDULE_NEW, oldBaseline],
-      [RESOURCE, SCHEDULE_RECENT, recentBaseline],
+      [RESOURCE, scheduleNew, oldBaseline],
+      [RESOURCE, scheduleRecent, recentBaseline],
     ]);
 
     const bySchedule = new Map<number, { totalCount: number }>(
@@ -131,50 +114,71 @@ describe('buildScheduleEvaluationQuery (real sqlite)', () => {
     );
 
     // Preserve usage-count behavior: three completed sessions across the original cycle.
-    expect(bySchedule.get(SCHEDULE_NEW)?.totalCount).toBe(3);
+    expect(Number(bySchedule.get(scheduleNew)?.totalCount)).toBe(3);
     // Only the two sessions at/after the recent baseline — proves baselines aren't collapsed per resource
-    expect(bySchedule.get(SCHEDULE_RECENT)?.totalCount).toBe(2);
+    expect(Number(bySchedule.get(scheduleRecent)?.totalCount)).toBe(2);
   });
 
   it('uses the latest completed maintenance as the schedule baseline', async () => {
-    await dataSource.getRepository('resource_maintenance').save({
+    await dataSource.getRepository(ResourceMaintenance).save({
       resourceId: RESOURCE,
-      maintenanceScheduleId: SCHEDULE_RECENT,
+      maintenanceSchedule: { id: scheduleRecent },
       startTime: new Date('2026-06-01T10:00:00.000Z'),
       endTime: recentBaseline,
+      reason: null,
     });
 
     const rows = await runAggregate([
-      [RESOURCE, SCHEDULE_NEW, oldBaseline],
-      [RESOURCE, SCHEDULE_RECENT, oldBaseline],
+      [RESOURCE, scheduleNew, oldBaseline],
+      [RESOURCE, scheduleRecent, oldBaseline],
     ]);
-    const bySchedule = new Map<number, { baseline: string; totalCount: number }>(
+    const bySchedule = new Map<number, { baseline: Date; totalCount: number }>(
       rows.map((row: { scheduleId: number }) => [row.scheduleId, row]),
     );
 
-    expect(bySchedule.get(SCHEDULE_RECENT)).toMatchObject({
-      baseline: formatDbDate(recentBaseline),
-      totalCount: 2,
-    });
+    expect(bySchedule.get(scheduleRecent)?.baseline).toEqual(recentBaseline);
+    expect(Number(bySchedule.get(scheduleRecent)?.totalCount)).toBe(2);
   });
 
   it('returns zeroes rather than dropping a pair when a resource has no matching usage', async () => {
-    const rows = await runAggregate([[999, SCHEDULE_NEW, oldBaseline]]);
+    const rows = await runAggregate([[999, scheduleNew, oldBaseline]]);
 
     expect(rows).toEqual([
       {
         resourceId: 999,
-        scheduleId: SCHEDULE_NEW,
-        baseline: formatDbDate(oldBaseline),
-        hasActiveMaintenance: 0,
+        scheduleId: scheduleNew,
+        baseline: oldBaseline,
+        hasActiveMaintenance: false,
         totalCount: 0,
       },
     ]);
   });
 
-  it('matches the stored datetime format, so a baseline in the future excludes everything', async () => {
-    const rows = await runAggregate([[RESOURCE, SCHEDULE_NEW, new Date('2030-01-01T00:00:00.000Z')]]);
+  it('compares timestamps, so a baseline in the future excludes everything', async () => {
+    const rows = await runAggregate([[RESOURCE, scheduleNew, new Date('2030-01-01T00:00:00.000Z')]]);
 
     expect(rows[0]).toMatchObject({ totalCount: 0 });
+  });
+
+  it('reports a maintenance that started and has not ended, from the state query too', async () => {
+    await dataSource.getRepository(ResourceMaintenance).save({
+      resourceId: RESOURCE,
+      maintenanceSchedule: { id: scheduleNew },
+      startTime: new Date('2026-06-01T10:00:00.000Z'),
+      endTime: null,
+      reason: null,
+    });
+
+    const [state] = await dataSource.query(
+      buildScheduleStateQuery('resource_maintenance', 1),
+      pairParams([[RESOURCE, scheduleNew, oldBaseline]]),
+    );
+
+    expect(state).toEqual({
+      resourceId: RESOURCE,
+      scheduleId: scheduleNew,
+      baseline: oldBaseline,
+      hasActiveMaintenance: true,
+    });
   });
 });

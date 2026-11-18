@@ -5,37 +5,42 @@ import {
   PluginStorageUniqueViolation,
 } from '@attraccess/plugins-backend-sdk';
 import { registerPersistenceErrorClassifier } from '../../database/persistence-errors';
-import { sqliteErrorClassifier } from '../../database/sqlite/sqlite-errors';
+import { postgresErrorClassifier } from '../../database/postgres/postgres-errors';
 import { mapStorageError } from './storage-errors';
 
 /** A failed statement as TypeORM reports it: it carries the statement, its parameters and the driver error. */
 const driverFailure = (code: string, message: string) =>
   Object.assign(new Error(message), {
     name: 'QueryFailedError',
-    query: 'INSERT INTO "plugin_x_items" ("secret") VALUES (?)',
+    query: 'INSERT INTO "plugin_x_items" ("secret") VALUES ($1)',
     parameters: ['another user data'],
     driverError: Object.assign(new Error(message), { code }),
   });
 
 describe('mapStorageError', () => {
-  beforeAll(() => registerPersistenceErrorClassifier(sqliteErrorClassifier));
+  beforeAll(() => registerPersistenceErrorClassifier(postgresErrorClassifier));
 
   it.each([
     [
       'a unique key',
-      driverFailure('SQLITE_CONSTRAINT', 'UNIQUE constraint failed: plugin_x_items.name'),
+      driverFailure('23505', 'duplicate key value violates unique constraint "plugin_x_items_name_key"'),
       PluginStorageUniqueViolation,
     ],
-    ['the primary key', driverFailure('SQLITE_CONSTRAINT_PRIMARYKEY', 'x'), PluginStorageUniqueViolation],
     [
-      'a busy database',
-      Object.assign(new Error('SQLITE_BUSY: waited'), { code: 'SQLITE_BUSY' }),
+      'the primary key',
+      driverFailure('23505', 'duplicate key value violates unique constraint "plugin_x_items_pkey"'),
+      PluginStorageUniqueViolation,
+    ],
+    [
+      'a serialization failure',
+      Object.assign(new Error('could not serialize access'), { code: '40001' }),
       PluginStorageConflict,
     ],
-    ['a foreign key', driverFailure('SQLITE_CONSTRAINT', 'FOREIGN KEY constraint failed'), PluginStorageInvalid],
+    ['a deadlock', Object.assign(new Error('deadlock detected'), { code: '40P01' }), PluginStorageConflict],
+    ['a foreign key', driverFailure('23503', 'violates foreign key constraint'), PluginStorageInvalid],
     [
       'any other driver failure',
-      driverFailure('SQLITE_CONSTRAINT', 'NOT NULL constraint failed: plugin_x_items.name'),
+      driverFailure('23502', 'null value in column "name" violates not-null constraint'),
       PluginStorageInvalid,
     ],
   ])('maps %s to a neutral error that carries neither statement nor parameters', (_label, failure, expected) => {

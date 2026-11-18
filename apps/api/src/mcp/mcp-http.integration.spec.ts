@@ -1,4 +1,5 @@
 import { McpTestApp, startMcpTestApp } from '../test-utils/mcp-app.test-fixture';
+import { createTestDatabaseEnv } from '../test/test-database-env';
 
 const PUBLIC_URL = 'http://localhost:3000';
 const RESOURCE_METADATA = `${PUBLIC_URL}/.well-known/oauth-protected-resource/api/mcp`;
@@ -9,10 +10,12 @@ const resultOf = (body: { result: ToolResult }) => body.result;
 
 describe('MCP endpoint with API tokens (real application)', () => {
   let t: McpTestApp;
+  const database = createTestDatabaseEnv();
   let admin: { id: number; roleId: number };
   let token: string;
 
   beforeAll(async () => {
+    await database.setup();
     t = await startMcpTestApp(PUBLIC_URL);
     admin = (await t.createUser(ADMIN_PERMISSIONS)) as never;
     token = await t.createApiToken(admin.id, ADMIN_PERMISSIONS);
@@ -20,6 +23,7 @@ describe('MCP endpoint with API tokens (real application)', () => {
 
   afterAll(async () => {
     await t?.close();
+    await database.teardown();
   });
 
   describe('authentication', () => {
@@ -54,17 +58,19 @@ describe('MCP endpoint with API tokens (real application)', () => {
       const owner = await t.createUser(ADMIN_PERMISSIONS);
       const revoked = await t.createApiToken(owner.id, ADMIN_PERMISSIONS);
       expect((await t.rpc(revoked, 'tools/list')).status).toBe(200);
-      await t.db.query(`UPDATE api_token SET revokedAt = CURRENT_TIMESTAMP WHERE userId = ?`, [owner.id]);
+      await t.db.query(`UPDATE api_token SET "revokedAt" = CURRENT_TIMESTAMP WHERE "userId" = $1`, [owner.id]);
       expect((await t.rpc(revoked, 'tools/list')).status).toBe(401);
 
       const expiring = await t.createUser(ADMIN_PERMISSIONS);
       const expired = await t.createApiToken(expiring.id, ADMIN_PERMISSIONS);
-      await t.db.query(`UPDATE api_token SET expiresAt = datetime('now', '-1 hour') WHERE userId = ?`, [expiring.id]);
+      await t.db.query(`UPDATE api_token SET "expiresAt" = now() - interval '1 hour' WHERE "userId" = $1`, [
+        expiring.id,
+      ]);
       expect((await t.rpc(expired, 'tools/list')).status).toBe(401);
 
       const doomed = await t.createUser(ADMIN_PERMISSIONS);
       const orphaned = await t.createApiToken(doomed.id, ADMIN_PERMISSIONS);
-      await t.db.query(`UPDATE "user" SET isDisabled = 1 WHERE id = ?`, [doomed.id]);
+      await t.db.query(`UPDATE "user" SET "isDisabled" = true WHERE id = $1`, [doomed.id]);
       expect((await t.rpc(orphaned, 'tools/list')).status).toBe(401);
     });
 

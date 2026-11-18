@@ -11,6 +11,7 @@ import { ResourceIntroductionsService } from './resouceIntroductions.service';
 import { TypeOrmResourceIntroductionStore } from '../../database/adapters/resources/resource-introduction-store.adapter';
 import { ResourceGroupsIntroductionsService } from '../groups/introductions/resourceGroups.introductions.service';
 import { ResourceRetrainingService } from '../retraining/resourceRetraining.service';
+import { createTestDataSource, closeTestDataSource } from '../../test-utils/test-database';
 
 const user = new EntitySchema<User>({ name: 'User', target: User, columns: { id: { type: Number, primary: true } } });
 const resource = new EntitySchema<Resource>({
@@ -48,13 +49,10 @@ describe('inherited introduction query', () => {
   let source: DataSource;
   let service: ResourceIntroductionsService;
   beforeEach(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
+    source = await createTestDataSource({
       entities: [user, resource, group, introduction, history],
       synchronize: true,
-    }).initialize();
+    });
     service = new ResourceIntroductionsService(
       new TypeOrmResourceIntroductionStore(source),
       {} as never,
@@ -85,7 +83,7 @@ describe('inherited introduction query', () => {
     ]);
   });
   afterEach(async () => {
-    await source.destroy();
+    await closeTestDataSource(source);
   });
   it.each([
     [100, 'resource'],

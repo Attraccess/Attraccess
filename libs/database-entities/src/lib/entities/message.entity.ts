@@ -57,7 +57,7 @@ export class Message {
   })
   referenceUrl!: string | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When this message was created',
     example: '2025-01-18T12:00:00.000Z',

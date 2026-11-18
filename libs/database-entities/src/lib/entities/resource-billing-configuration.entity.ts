@@ -11,11 +11,11 @@ export class ResourceBillingConfiguration {
   })
   id!: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'The date and time the billing transaction was created' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'The date and time the billing transaction was last updated' })
   updatedAt!: Date;
 
@@ -27,15 +27,15 @@ export class ResourceBillingConfiguration {
   @ApiProperty({ description: 'The resource', required: false })
   resource!: Resource;
 
-  @Column({ type: 'integer' })
+  @Column({ type: 'bigint' })
   @ApiProperty({ description: 'The credit cost per usage' })
   creditsPerUsage!: number;
 
-  @Column({ type: 'integer' })
+  @Column({ type: 'bigint' })
   @ApiProperty({ description: 'The credit cost per minute' })
   creditsPerMinute!: number;
 
-  @Column({ type: 'integer', default: 0 })
+  @Column({ type: 'bigint', default: 0 })
   @ApiProperty({ description: 'The credit cost per attributable operating minute' })
   creditsPerOperatingMinute!: number;
 }

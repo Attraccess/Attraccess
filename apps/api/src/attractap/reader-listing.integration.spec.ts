@@ -1,16 +1,15 @@
-import { Attractap, entities, Resource } from '@attraccess/database-entities';
+import { Attractap, Resource } from '@attraccess/database-entities';
 import { ResourceType } from '@attraccess/application-models';
-import { DataSource, Table } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { TypeOrmAttractapReaderStore } from '../database/adapters/attractap/typeorm-reader.store';
 import { AttractapService } from './attractap.service';
+import { createTestDataSource, closeTestDataSource } from '../test-utils/test-database';
 
 /**
  * Readers that are not paired yet exist for the pairing session only. This runs the real queries
  * against a real database: every list the rest of the product reads has to leave them out.
  *
- * Only the tables these queries touch are created, from the real entity metadata. Replaying every
- * migration (or syncing all entities) made setup slow enough to time out on loaded coverage runs;
- * the pairing migration has its own spec.
+ * Each run gets a private database cloned from the migrated template.
  */
 describe('reader listings and pairing state', () => {
   let source: DataSource;
@@ -26,24 +25,7 @@ describe('reader listings and pairing state', () => {
     } as Attractap);
 
   beforeAll(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      entities: Object.values(entities),
-    }).initialize();
-    const readers = source.getMetadata(Attractap);
-    const tables = [
-      source.getMetadata(Resource),
-      readers,
-      ...readers.manyToManyRelations.flatMap((relation) => relation.junctionEntityMetadata ?? []),
-    ];
-    const queryRunner = source.createQueryRunner();
-    try {
-      for (const table of tables) await queryRunner.createTable(Table.create(table, source.driver));
-    } finally {
-      await queryRunner.release();
-    }
+    source = await createTestDataSource();
     resource = await source.getRepository(Resource).save({ name: 'Lathe', type: ResourceType.Machine });
     await addReader('paired', 'paired');
     await addReader('never paired', 'unpaired');
@@ -53,7 +35,7 @@ describe('reader listings and pairing state', () => {
   });
 
   afterAll(async () => {
-    if (source?.isInitialized) await source.destroy();
+    await closeTestDataSource(source);
   });
 
   it('lists only paired readers', async () => {

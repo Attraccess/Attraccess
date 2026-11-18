@@ -5,7 +5,7 @@ type Database = Awaited<ReturnType<typeof createBillingDatabase>>;
 
 jest.setTimeout(60_000);
 
-describe('TypeOrmSumUpCredentialStore on real SQLite', () => {
+describe('TypeOrmSumUpCredentialStore on real PostgreSQL', () => {
   let db: Database;
   let main: BillingConnection;
   let other: BillingConnection;

@@ -11,11 +11,8 @@ import { ResourceUsageService } from '../../../../resources/usage/sessions/resou
 import { MeteringReport } from '../../../../resources/flows/node-executors';
 import { ResourceMeteringService } from '../../../../resources/metering/resource-metering.service';
 import { T } from './node-types.test-fixture';
-import { schemas } from './schemas.test-fixture';
 import { Handler } from './report-handler.test-fixture';
 export function createFlowDefinedMeteringFixture() {
-  let directory: string;
-
   let source: DataSource;
 
   let metering: ResourceMeteringService;
@@ -60,13 +57,26 @@ export function createFlowDefinedMeteringFixture() {
   async function seedMeter(startData: object = {}, collectData: object = { finalRetryDelaySeconds: 0 }) {
     const nodes = source.getRepository(ResourceFlowNode);
     await nodes.save([
-      { id: 'start', type: T.INPUT_METERING_START, resourceId: 1, data: { meterId: 1, ...startData } },
-      { id: 'ready', type: T.OUTPUT_METERING_READY, resourceId: 1, data: { meterId: 1 } },
-      { id: 'collect', type: T.INPUT_METERING_COLLECT, resourceId: 1, data: { meterId: 1, ...collectData } },
+      {
+        id: 'start',
+        type: T.INPUT_METERING_START,
+        resourceId: 1,
+        position: { x: 0, y: 0 },
+        data: { meterId: 1, ...startData },
+      },
+      { id: 'ready', type: T.OUTPUT_METERING_READY, resourceId: 1, position: { x: 0, y: 0 }, data: { meterId: 1 } },
+      {
+        id: 'collect',
+        type: T.INPUT_METERING_COLLECT,
+        resourceId: 1,
+        position: { x: 0, y: 0 },
+        data: { meterId: 1, ...collectData },
+      },
       {
         id: 'report',
         type: T.OUTPUT_METERING_REPORT,
         resourceId: 1,
+        position: { x: 0, y: 0 },
         data: { meterId: 1, value: '1' },
       },
     ]);
@@ -87,12 +97,6 @@ export function createFlowDefinedMeteringFixture() {
   }
 
   const scope = {
-    get directory() {
-      return directory;
-    },
-    set directory(value: typeof directory) {
-      directory = value;
-    },
     get source() {
       return source;
     },
@@ -176,9 +180,6 @@ export function createFlowDefinedMeteringFixture() {
     },
     get items() {
       return items;
-    },
-    get schemas() {
-      return schemas;
     },
     get T() {
       return T;

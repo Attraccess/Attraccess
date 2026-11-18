@@ -25,7 +25,7 @@ import { toUserAccount, toUserRecord } from './user-mapping';
 import { applyUserListFilters } from './user-list-query';
 import { findRelations } from '../find-options';
 
-/** SQLite lower-cases ASCII only, so the email search term is folded in JavaScript like the stored value. */
+/** Emails are stored trimmed and lower-cased, so the email search term is folded the same way. */
 const foldEmail = (value: string) => value.trim().toLowerCase();
 
 @Injectable()
@@ -171,9 +171,11 @@ export class TypeOrmUserStore implements UserStore {
       .createQueryBuilder()
       .update(User)
       .set({ username: identity.username, email: identity.email })
-      .where('id = :id', { id: userId })
-      .andWhere('isEmailVerified = :isEmailVerified', { isEmailVerified: false })
-      .andWhere('NOT EXISTS (SELECT 1 FROM user AS other WHERE other.id != :id AND other.deletedAt IS NULL)')
+      .where('"id" = :id', { id: userId })
+      .andWhere('"isEmailVerified" = :isEmailVerified', { isEmailVerified: false })
+      .andWhere(
+        'NOT EXISTS (SELECT 1 FROM "user" AS "other" WHERE "other"."id" != :id AND "other"."deletedAt" IS NULL)',
+      )
       .execute();
     return claim.affected === 1;
   }

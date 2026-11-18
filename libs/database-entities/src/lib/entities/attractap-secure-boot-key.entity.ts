@@ -31,13 +31,13 @@ export class AttractapSecureBootKey {
   privateKeyEncrypted!: string | null;
 
   /** Recovery keys: when the admin proved they hold the downloaded file. */
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   verifiedAt!: Date | null;
 
   /** Set when the key came back from a backup or recovery file. */
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   restoredAt!: Date | null;
 
-  @CreateDateColumn({ type: 'datetime' })
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 }

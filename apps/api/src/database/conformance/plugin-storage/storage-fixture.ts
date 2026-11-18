@@ -36,6 +36,8 @@ export interface ColumnInfo {
  * assertions. ATT-584 adds a PostgreSQL fixture next to the SQLite one; the suite stays as it is.
  */
 export interface StorageDatabase {
+  /** The engine family: the few cases that depend on how it stores data (a binary value in a text column) branch on it. */
+  readonly flavor: 'sqlite' | 'postgres';
   /** `busyTimeoutMs` bounds how long the connection waits for another one's write lock (default: the host's). */
   connect(options?: { busyTimeoutMs?: number }): Promise<StorageConnection>;
   /** The migration engine of the backend, on its own short-lived connections. */
@@ -69,5 +71,6 @@ export interface StorageDatabase {
 
 export interface StorageBackendFixture {
   readonly name: string;
+  readonly flavor: StorageDatabase['flavor'];
   create(): Promise<StorageDatabase>;
 }

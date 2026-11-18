@@ -13,6 +13,9 @@ import type { TransactionScope } from '../../unit-of-work';
 import { TransactionHandles } from '../common/transaction-handles';
 import { toCredentialEvent } from './attractap-mappers';
 
+/** Advisory lock namespace (first key of the two-key form) for one pairing key. */
+const PAIRING_KEY_LOCK = 584_402;
+
 const CREDENTIAL_COLUMNS = {
   id: true,
   name: true,
@@ -47,6 +50,14 @@ export class TypeOrmAttractapCredentialStore implements AttractapCredentialStore
   }
 
   async findPairedReaderIdByFingerprint(fingerprint: string, scope?: TransactionScope): Promise<number | null> {
+    if (scope) {
+      // Pairing decides on this lookup inside its transaction: two readers asking for one key queue here, and the
+      // second one sees the first one's committed credential.
+      await this.manager(scope).query('SELECT pg_advisory_xact_lock($1, hashtext($2))', [
+        PAIRING_KEY_LOCK,
+        fingerprint,
+      ]);
+    }
     const readers = scope ? this.manager(scope).getRepository(Attractap) : this.readers;
     const reader = await readers.findOne({
       where: { credentialFingerprint: fingerprint, pairingState: 'paired' },
@@ -59,6 +70,8 @@ export class TypeOrmAttractapCredentialStore implements AttractapCredentialStore
     const reader = await this.manager(scope).findOne(Attractap, {
       where: { id: readerId },
       select: CREDENTIAL_COLUMNS,
+      // Changes of one reader's credential queue on its row, so the history is decided on the row as it is.
+      lock: { mode: 'pessimistic_write' },
     });
     if (!reader) return null;
     return {

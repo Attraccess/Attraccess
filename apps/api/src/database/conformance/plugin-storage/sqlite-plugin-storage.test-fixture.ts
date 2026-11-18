@@ -34,6 +34,7 @@ const openSqlite = (file: string, busyTimeout?: number) =>
 /** Real SQLite files, one DataSource (own handle, own unit of work and write queue) per `connect()`. */
 export const sqliteStorageFixture: StorageBackendFixture = {
   name: 'sqlite',
+  flavor: 'sqlite',
   async create(): Promise<StorageDatabase> {
     registerPersistenceErrorClassifier(sqliteBackend.errors);
     const directory = await mkdtemp(join(tmpdir(), 'plugin-storage-'));
@@ -58,6 +59,7 @@ export const sqliteStorageFixture: StorageBackendFixture = {
       primary.query(sql, params);
 
     return {
+      flavor: 'sqlite',
       engine,
       coreTables: () => core,
       async connect(options = {}): Promise<StorageConnection> {

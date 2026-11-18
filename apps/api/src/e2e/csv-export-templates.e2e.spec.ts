@@ -10,16 +10,18 @@ import { DualAuthGuard, EffectivePermissionsGuard } from '@attraccess/plugins-ba
 import { CsvExportTemplatesController } from '../analytics/csv-export-templates.controller';
 import { CsvExportTemplatesService } from '../analytics/csv-export-templates.service';
 import { CSV_EXPORT_TEMPLATE_STORE } from '../analytics/csv-export-template-store.port';
+import { createTestDatabaseEnv } from '../test/test-database-env';
 import { TypeOrmCsvExportTemplateStore } from '../database/adapters/analytics/typeorm-csv-export-template-store';
 
 jest.setTimeout(120_000);
 
-// Real SQLite database (all migrations applied) behind the real controller and service:
+// Real PostgreSQL database (all migrations applied) behind the real controller and service:
 // proves the migration's table and unique constraint, and the HTTP error mapping end to end.
 describe('CSV export templates API (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
   let storageRoot: string;
+  const database = createTestDatabaseEnv();
   let permissions: string[] = ['resources.reports.export'];
 
   const url = '/analytics/csv-export-templates';
@@ -31,6 +33,7 @@ describe('CSV export templates API (e2e)', () => {
   beforeAll(async () => {
     storageRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'attraccess-csv-templates-e2e-'));
     process.env.STORAGE_ROOT = storageRoot;
+    await database.setup();
     const dsModule = await import('../database/datasource');
     dataSource = (dsModule as unknown as { default: DataSource }).default;
     if (!dataSource.isInitialized) await dataSource.initialize();
@@ -70,11 +73,12 @@ describe('CSV export templates API (e2e)', () => {
     await app?.close();
     if (dataSource?.isInitialized) await dataSource.destroy();
     await fs.rm(storageRoot, { recursive: true, force: true });
+    await database.teardown();
   });
 
   beforeEach(async () => {
     permissions = ['resources.reports.export'];
-    await dataSource.getRepository(CsvExportTemplate).clear();
+    await dataSource.query('DELETE FROM csv_export_template');
   });
 
   it('creates, lists (per type, sorted by name), reads, updates and deletes a template', async () => {

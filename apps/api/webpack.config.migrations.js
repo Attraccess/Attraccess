@@ -44,6 +44,7 @@ module.exports = {
     typeorm: 'commonjs typeorm',
     tslib: 'commonjs tslib',
     zod: 'commonjs zod',
+    pg: 'commonjs pg',
   },
   entry: {
     main: './apps/api/src/database/datasource.ts',

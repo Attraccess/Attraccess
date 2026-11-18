@@ -1,4 +1,4 @@
-import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { Check, Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import { AUTHENTICATION_METHODS, type AuthenticationMethod } from '@attraccess/application-models';
 
 export { AUTHENTICATION_METHODS };
@@ -6,6 +6,7 @@ export type { AuthenticationMethod };
 
 /** Historical identifiers deliberately have no foreign keys or cascade relations. */
 @Entity('audit_log')
+@Check('CHK_audit_log_details_size', 'octet_length("details"::text) <= 4096')
 @Index('IDX_audit_log_at', ['at'])
 @Index('IDX_audit_log_domain_id', ['domain', 'id'])
 @Index('IDX_audit_log_actor_id', ['actorId', 'id'])
@@ -16,7 +17,7 @@ export class AuditLog {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: 'timestamptz' })
   at!: Date;
 
   @Column({ type: 'varchar' })
@@ -46,7 +47,7 @@ export class AuditLog {
   @Column({ type: 'varchar' })
   subjectType!: string;
 
-  @Column({ type: 'integer', nullable: true })
+  @Column({ type: 'bigint', nullable: true })
   subjectId!: number | null;
 
   @Column({ type: 'varchar', nullable: true })
@@ -55,6 +56,6 @@ export class AuditLog {
   @Column({ type: 'varchar', nullable: true })
   userAgent!: string | null;
 
-  @Column({ type: 'simple-json' })
+  @Column({ type: 'jsonb' })
   details!: Record<string, string | number | boolean | null>;
 }

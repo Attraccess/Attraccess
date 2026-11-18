@@ -1,13 +1,5 @@
 import { findRelations } from '../find-options';
-import {
-  BillingTransaction,
-  Form,
-  FormSubmission,
-  Project,
-  Resource,
-  ResourceUsage,
-  User,
-} from '@attraccess/database-entities';
+import { BillingTransaction, FormSubmission, Resource, ResourceUsage, User } from '@attraccess/database-entities';
 import {
   BillingTransactionStatus,
   ResourceFormAction,
@@ -19,7 +11,7 @@ import type { UsageSession } from '@attraccess/application-models';
 import { instanceToPlain } from 'class-transformer';
 import type { DataSource } from 'typeorm';
 import { toUsageSessionResponse } from '../../../resources/usage/dtos/usage-session-response';
-import { createMigratedUsageDatabase, userRow } from './migrated-usage-database.test-fixture';
+import { createMigratedUsageDatabase, insertProject, insertRow, userRow } from './migrated-usage-database.test-fixture';
 import { ACTIVE_RELATIONS, DETAIL_RELATIONS, type TypeOrmUsageSessionStore } from './typeorm-usage-session.store';
 
 jest.setTimeout(30_000);
@@ -75,7 +67,7 @@ describe('usage session mapping against the migrated schema', () => {
       nfcKeySeedToken: 'nfc-seed-token',
     };
     await source.getRepository(User).save([1, 2, 3].map((id) => userRow(id, secrets)));
-    await source.getRepository(Project).save({ id: 9, name: 'Thesis', owner: { id: 1 } });
+    await insertProject(source, { id: 9, name: 'Thesis', ownerId: 1 });
     await source.getRepository(ResourceUsage).save([
       {
         id: 1,
@@ -109,7 +101,7 @@ describe('usage session mapping against the migrated schema', () => {
       amount: 0,
       status: BillingTransactionStatus.Pending,
     });
-    await source.getRepository(Form).save({ id: 11, name: 'Checklist', resourceId: 1 });
+    await insertRow(source, 'form', { id: 11, name: 'Checklist', resourceId: 1 });
     await source.getRepository(FormSubmission).save({
       formId: 11,
       userId: 2,
@@ -164,7 +156,7 @@ describe('usage session mapping against the migrated schema', () => {
   });
 
   it('keeps a deleted user as null and a relation that was not read absent', async () => {
-    await source.query('UPDATE resource_usage SET userId = NULL WHERE id = 2');
+    await source.query('UPDATE resource_usage SET "userId" = NULL WHERE id = 2');
     const [running] = await store.findActiveSessions(1);
     const [entity] = await entityRows([2], ACTIVE_RELATIONS);
 

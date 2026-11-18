@@ -1,5 +1,5 @@
 import type { DataSource } from 'typeorm';
-import { closeTestDataSource, createTestDataSource } from '../../test-utils/test-database';
+import { createSqliteTestFile, type SqliteTestFile } from './sqlite-test-file.test-fixture';
 import type { MigrationTrack } from '../backend/database-backend';
 import { SnapshotIncompatibleError, type DatabaseSnapshot } from '../transfer-snapshot';
 import { columnKind, createSqliteTransfer, toInstantIso } from './sqlite-transfer';
@@ -7,13 +7,20 @@ import { columnKind, createSqliteTransfer, toInstantIso } from './sqlite-transfe
 const track: MigrationTrack = { name: 'test-track', tableName: 'migrations', directory: 'none', migrations: [] };
 const transfer = createSqliteTransfer(track);
 
+const files: SqliteTestFile[] = [];
+async function newSource(): Promise<DataSource> {
+  const file = await createSqliteTestFile();
+  files.push(file);
+  return file.source;
+}
+
 /**
  * A tiny schema with the shapes that matter for a transfer: an account whose balance a trigger maintains from its
  * entries (the account table sorts first, so a trigger left active would apply every entry on top of the copied
  * balance), generated keys, a generated column, binary data, big integers and exact text.
  */
 async function createDatabase(): Promise<DataSource> {
-  const source = await createTestDataSource();
+  const source = await newSource();
   await source.query(
     'CREATE TABLE migrations (id integer PRIMARY KEY AUTOINCREMENT NOT NULL, timestamp bigint NOT NULL, name varchar NOT NULL)',
   );
@@ -50,7 +57,8 @@ describe('SQLite transfer', () => {
   };
 
   afterEach(async () => {
-    await Promise.all(open.splice(0).map((source) => closeTestDataSource(source)));
+    open.length = 0;
+    await Promise.all(files.splice(0).map((file) => file.close()));
   });
 
   describe('column kinds', () => {

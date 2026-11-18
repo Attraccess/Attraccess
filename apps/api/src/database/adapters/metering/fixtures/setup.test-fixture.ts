@@ -15,11 +15,9 @@ import {
   ResourceType,
   SupervisionMode,
 } from '@attraccess/application-models';
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import type { TransactionScope } from '../../../unit-of-work';
-import { mkdtemp } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { closeTestDataSource, createTestDataSource } from '../../../../test-utils/test-database';
 import { ResourceOperatingAttributionService } from '../../../../resources/operating-intervals/resource-operating-attribution.service';
 import { MeteringReport } from '../../../../resources/flows/node-executors';
 import { EntityManagerResolver } from '../../entity-manager-resolver';
@@ -38,24 +36,17 @@ export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
   for (const method of ['debug', 'log', 'warn', 'error'] as const) {
     jest.spyOn(Logger.prototype, method).mockImplementation(() => undefined);
   }
-  scope.directory = await mkdtemp(join(tmpdir(), 'attraccess-metering-'));
-  scope.source = await new DataSource({
-    type: 'better-sqlite3',
-    invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-    database: join(scope.directory, 'test.sqlite'),
-    synchronize: true,
-    entities: scope.schemas,
-  }).initialize();
+  // The released schema with its triggers and indexes, in a database of its own (dropped by `closeMeteringFixture`).
+  scope.source = await createTestDataSource();
   await scope.source.getRepository(Resource).save({
-    id: 1,
     name: 'Laser',
     type: ResourceType.Machine,
     allowTakeOver: true,
     supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED,
   });
   scope.users = await scope.source.getRepository(User).save([
-    { id: 1, username: 'owner' },
-    { id: 2, username: 'next-user' },
+    { username: 'owner', email: 'owner@example.test' },
+    { username: 'next-user', email: 'next-user@example.test' },
   ]);
   scope.users.forEach((user) => Object.assign(user, { effectivePermissions: new Set(['resources.update']) }));
 
@@ -91,9 +82,7 @@ export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
   };
   scope.audit = { record: jest.fn() };
   scope.liveNotifications = { notifyTransactionUpdate: jest.fn().mockResolvedValue(undefined) };
-  await scope.source
-    .getRepository(ResourceMeter)
-    .save({ id: 1, resourceId: 1, name: 'Energy (kWh)', creditsPerUnit: 30 });
+  await scope.source.getRepository(ResourceMeter).save({ resourceId: 1, name: 'Energy (kWh)', creditsPerUnit: 30 });
   const { store, unitOfWork } = createMeteringPersistence(scope.source);
   scope.metering = new ResourceMeteringService(
     store,
@@ -165,4 +154,9 @@ export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
     null,
     scope.metering,
   );
+}
+
+/** Releases the database of the fixture and drops it. */
+export async function closeMeteringFixture(scope: FlowDefinedMeteringTestScope) {
+  await closeTestDataSource(scope.source);
 }

@@ -7,6 +7,7 @@ import { TransactionHandles } from '../database/adapters/common/transaction-hand
 import { EmailTemplateService } from './email-template.service';
 import { MjmlService } from './mjml.service';
 import { registerPluginEmailTemplates, unregisterPluginEmailTemplates } from './plugin-email-templates';
+import { createTestDataSource, closeTestDataSource } from '../test-utils/test-database';
 
 const ACTOR = { id: 1, authenticationMethod: 'session' as const };
 const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
@@ -37,13 +38,7 @@ describe('EmailTemplateService with plugin templates (real SQLite)', () => {
     );
 
   beforeEach(async () => {
-    dataSource = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      synchronize: true,
-      entities: [EmailTemplate, EmailTemplateTranslation],
-    }).initialize();
+    dataSource = await createTestDataSource({ synchronize: true, entities: [EmailTemplate, EmailTemplateTranslation] });
     service = new EmailTemplateService(
       new TypeOrmEmailTemplateStore(
         dataSource.getRepository(EmailTemplate),
@@ -58,7 +53,7 @@ describe('EmailTemplateService with plugin templates (real SQLite)', () => {
 
   afterEach(async () => {
     unregisterPluginEmailTemplates('demo');
-    await dataSource.destroy();
+    await closeTestDataSource(dataSource);
   });
 
   it('seeds the declared template and its shipped translations on first use', async () => {

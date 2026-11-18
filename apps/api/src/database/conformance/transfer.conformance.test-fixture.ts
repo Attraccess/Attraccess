@@ -251,7 +251,7 @@ export function describeTransferConformance(fixture: TransferBackendFixture): vo
 
     describe('core migration state', () => {
       it('exports the migration state of the core track and restores it', async () => {
-        expect(snapshot.core.migrations.length).toBeGreaterThan(100);
+        expect(snapshot.core.migrations.length).toBeGreaterThanOrEqual(1);
         expect(new Set(snapshot.core.migrations.map((migration) => migration.name)).size).toBe(
           snapshot.core.migrations.length,
         );

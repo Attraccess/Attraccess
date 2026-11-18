@@ -1,8 +1,9 @@
 import { ResourceUsage } from '@attraccess/database-entities';
 import { SystemEvent } from '@attraccess/plugins-backend-sdk';
-import { rm } from 'node:fs/promises';
-import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
-import { resetTestFixture } from '../../../database/adapters/usage/lifecycle-fixtures/setup.test-fixture';
+import {
+  closeLifecycleFixture,
+  resetTestFixture,
+} from '../../../database/adapters/usage/lifecycle-fixtures/setup.test-fixture';
 import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../../../database/adapters/usage/lifecycle-fixtures/state.test-fixture';
 
 /** Plugin SystemEvents for session start, takeover and end, driven through the real lifecycle. */
@@ -13,16 +14,10 @@ describe('Plugin session SystemEvents', () => {
 
   beforeEach(async () => {
     await resetTestFixture(scope);
-    await scope.migrateIntegrity();
   });
 
   afterEach(async () => {
-    scope.usage?.onModuleDestroy();
-    if (scope.source) {
-      await closeResourceTransactionConnection(scope.source);
-      if (scope.source.isInitialized) await scope.source.destroy();
-    }
-    if (scope.directory) await rm(scope.directory, { recursive: true, force: true });
+    await closeLifecycleFixture(scope);
   });
 
   it('emits RESOURCE_USAGE_SESSION_STARTED with ids after a committed start', async () => {

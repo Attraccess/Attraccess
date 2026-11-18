@@ -1,11 +1,11 @@
-import { entities, User } from '@attraccess/database-entities';
+import { User } from '@attraccess/database-entities';
 import { AuthenticationType } from '@attraccess/application-models';
 import { Logger } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { testTypeOrmModule, dropTestDatabases } from './typeorm-test-module.test-fixture';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { AuditModule } from '../audit/audit.module';
@@ -55,13 +55,7 @@ describe('UsersAndAuthModule with Valkey configured but unreachable', () => {
           isGlobal: true,
         }),
         EventEmitterModule.forRoot(),
-        TypeOrmModule.forRoot({
-          type: 'better-sqlite3',
-          invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-          database: ':memory:',
-          synchronize: true,
-          entities: Object.values(entities),
-        }),
+        testTypeOrmModule(),
         MetricsModule,
         ValkeyModule,
         AuditModule,
@@ -76,6 +70,7 @@ describe('UsersAndAuthModule with Valkey configured but unreachable', () => {
   afterAll(async () => {
     process.off('unhandledRejection', recordUnhandledRejection);
     await app?.close();
+    await dropTestDatabases();
     if (previousValkeyUrl === undefined) delete process.env.VALKEY_URL;
     else process.env.VALKEY_URL = previousValkeyUrl;
     jest.restoreAllMocks();

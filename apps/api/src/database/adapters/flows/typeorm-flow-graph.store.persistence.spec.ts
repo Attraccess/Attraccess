@@ -3,7 +3,7 @@ import { ResourceFlowNodeType, ResourceFlowVariableScope, ResourceType } from '@
 import type { FlowCanvasInput } from '@attraccess/application-models';
 import type { AuditEvent } from '../../../audit/recorder/audit-event';
 import { FlowCanvasIdConflictError } from '../../../resources/flows/flow-graph.port';
-import { SqliteFileFixture } from '../sqlite-file.test-fixture';
+import { PostgresDatabaseFixture } from '../postgres-database.test-fixture';
 import { unitOfWorkFor } from '../shared-unit-of-work';
 import type { TransactionScope } from '../../unit-of-work';
 import { TypeOrmFlowGraphStore } from './typeorm-flow-graph.store';
@@ -41,12 +41,12 @@ const event = (id: number): AuditEvent => ({
   details: {},
 });
 
-describe('flow adapters on real SQLite', () => {
-  let fixture: SqliteFileFixture;
+describe('flow adapters on real PostgreSQL', () => {
+  let fixture: PostgresDatabaseFixture;
   let audit: { record: jest.Mock };
 
   beforeEach(async () => {
-    fixture = await SqliteFileFixture.create();
+    fixture = await PostgresDatabaseFixture.create();
     audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
   });
 
@@ -54,8 +54,8 @@ describe('flow adapters on real SQLite', () => {
     await fixture.close();
   });
 
-  const instance = async (createSchema = false) => {
-    const source = await fixture.open(createSchema);
+  const instance = async () => {
+    const source = await fixture.open();
     const graph = new TypeOrmFlowGraphStore(source, unitOfWorkFor(source), audit as never);
     return { source, graph };
   };
@@ -147,7 +147,7 @@ describe('flow adapters on real SQLite', () => {
     });
 
     it('leaves exactly one of two canvases when two connections replace the same canvas concurrently', async () => {
-      const a = await instance(true);
+      const a = await instance();
       const b = await instance();
       const resourceId = await newResource(a.source, 'Laser');
 
@@ -164,6 +164,27 @@ describe('flow adapters on real SQLite', () => {
       ]).toContainEqual(ids);
       const edges = (await b.graph.loadResourceCanvas(resourceId)).edges.map((edge) => edge.id);
       expect(edges).toEqual([ids[0].startsWith('a') ? 'a-e0' : 'b-e0']);
+    });
+
+    it('serialises parallel saves of one canvas (advisory lock): no unique violation, no mix of both canvases', async () => {
+      const a = await instance();
+      const b = await instance();
+      const c = await instance();
+      const resourceId = await newResource(a.source, 'Laser');
+      // The same ids in every save: without the lock the second delete cannot see the first save's rows and its
+      // insert hits the primary key.
+      for (let round = 0; round < 5; round++) {
+        const results = await Promise.allSettled(
+          [a, b, c].map(({ graph }, index) =>
+            graph.replaceResourceCanvas(resourceId, canvas('same', 2 + (index % 2)), () => undefined),
+          ),
+        );
+        expect(results.filter((result) => result.status === 'rejected')).toEqual([]);
+        const saved = await a.graph.loadResourceCanvas(resourceId);
+        expect(saved.nodes.length === 2 || saved.nodes.length === 3).toBe(true);
+        expect(saved.edges.map((edge) => edge.id)).toEqual(['same-e0']);
+      }
+      expect(await a.source.getRepository(ResourceFlowNode).countBy({ resourceId })).toBeLessThanOrEqual(3);
     });
 
     it('manages global flows: create, update, list with node counts, delete with the canvas in the audit event', async () => {
@@ -288,6 +309,23 @@ describe('flow adapters on real SQLite', () => {
       expect(await store.delete(global)).toBe(false);
       expect(await store.find(global)).toBeNull();
       expect(await store.find(own)).not.toBeNull();
+    });
+
+    it('keeps one row when connections first write the same global variable at the same time', async () => {
+      const stores = [
+        new TypeOrmFlowVariableStore((await instance()).source),
+        new TypeOrmFlowVariableStore((await instance()).source),
+      ];
+      const global = { scope: ResourceFlowVariableScope.GLOBAL, resourceId: null, key: 'race' };
+
+      await Promise.all(
+        Array.from({ length: 8 }, (_unused, index) =>
+          stores[index % 2].save(global, JSON.stringify(index), 'number', null),
+        ),
+      );
+
+      const rows = await stores[0].findMany(ResourceFlowVariableScope.GLOBAL, null, ['race']);
+      expect(rows).toHaveLength(1);
     });
   });
 

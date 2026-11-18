@@ -1,27 +1,22 @@
-import { CompanionDevice, Resource, ResourceFlowNode, entities } from '@attraccess/database-entities';
+import { CompanionDevice, Resource, ResourceFlowNode } from '@attraccess/database-entities';
 import { ResourceType } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { TypeOrmCompanionDeviceStore } from './typeorm-companion-device.store';
 
-describe('TypeOrmCompanionDeviceStore on real SQLite', () => {
+describe('TypeOrmCompanionDeviceStore on real PostgreSQL', () => {
   let source: DataSource;
   let store: TypeOrmCompanionDeviceStore;
 
   beforeEach(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      entities: Object.values(entities),
-      synchronize: true,
-    }).initialize();
+    source = await createTestDataSource();
     store = new TypeOrmCompanionDeviceStore(
       source.getRepository(CompanionDevice),
       source.getRepository(ResourceFlowNode),
     );
   });
 
-  afterEach(() => source.destroy());
+  afterEach(() => closeTestDataSource(source));
 
   it('registers, finds, renames, locks and deletes a device with neutral records', async () => {
     const created = await store.registerDevice({ name: 'abcd', tokenHash: 'hash' });

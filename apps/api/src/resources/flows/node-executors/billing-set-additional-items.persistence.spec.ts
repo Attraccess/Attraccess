@@ -5,10 +5,6 @@ import { DataSource, EntitySchema } from 'typeorm';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import {
-  closeResourceTransactionConnection,
-  runSerializedTransaction,
-} from '../../../database/sqlite/run-serialized-transaction';
 import { unitOfWorkFor } from '../../../database/adapters/shared-unit-of-work';
 import { TypeOrmFlowBillingItemStore } from '../../../database/adapters/flows/typeorm-flow-billing-item.store';
 import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
@@ -16,6 +12,7 @@ import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { BillingSetAdditionalItemsExecutor } from './billing-set-additional-items.executor';
 import { NodeExecutionContext } from './node-executor.interface';
 import { legacyEngineTransactionScope } from '../../../database/adapters/common/legacy-engine-transaction';
+import { createTestDataSource, closeTestDataSource } from '../../../test-utils/test-database';
 
 const schemas = [
   new EntitySchema<ResourceUsage>({
@@ -65,13 +62,7 @@ describe('Additional billing items around finalization', () => {
   beforeEach(async () => {
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     directory = await mkdtemp(join(tmpdir(), 'attraccess-billing-items-'));
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: join(directory, 'test.sqlite'),
-      entities: schemas,
-      synchronize: true,
-    }).initialize();
+    source = await createTestDataSource({ synchronize: true, entities: schemas });
     await source.getRepository(ResourceUsage).save({ id: 1, resourceId: 1 });
     await source
       .getRepository(BillingTransaction)
@@ -85,8 +76,7 @@ describe('Additional billing items around finalization', () => {
   });
 
   afterEach(async () => {
-    await closeResourceTransactionConnection(source);
-    await source.destroy();
+    await closeTestDataSource(source);
     await rm(directory, { recursive: true, force: true });
     jest.restoreAllMocks();
   });

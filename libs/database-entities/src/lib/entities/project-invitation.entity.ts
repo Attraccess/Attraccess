@@ -63,18 +63,18 @@ export class ProjectInvitation {
   })
   requestedRole!: ProjectMemberRole;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @ApiProperty({
     description: 'Timestamp when the invitation was responded to (accept/decline/cancel)',
     required: false,
   })
   respondedAt!: Date | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'When the invitation was created' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'When the invitation was last updated' })
   updatedAt!: Date;
 }

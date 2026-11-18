@@ -13,6 +13,7 @@ import { SecureBootKeyService } from './secure-boot-key.service';
 import type { AuditEvent } from '../../audit/recorder/audit-event';
 import { projectAuditRow } from '../../audit/recorder/audit-row';
 import { signSecureBootImage, verifySecureBootImage } from './secure-boot-signer';
+import { createTestDataSource, closeTestDataSource } from '../../test-utils/test-database';
 
 jest.setTimeout(120_000);
 
@@ -34,18 +35,12 @@ beforeAll(async () => {
 
 const databases: DataSource[] = [];
 afterAll(async () => {
-  await Promise.all(databases.map((database) => database.destroy()));
+  await Promise.all(databases.map((database) => closeTestDataSource(database)));
 });
 
 async function setup(secret = 'test-secret', database?: DataSource) {
   if (!database) {
-    database = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      entities: Object.values(entities),
-      synchronize: true,
-    }).initialize();
+    database = await createTestDataSource({ entities: Object.values(entities), synchronize: true });
     databases.push(database);
   }
   const keys = database.getRepository(AttractapSecureBootKey);

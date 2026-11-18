@@ -20,7 +20,7 @@ type ContractFactory = (
 // SDK's public entry deliberately does not export test code.
 const sdkLib = resolve(__dirname, '../../../../../../libs/plugins-backend-sdk/src/lib');
 const { definePluginStorageContractSuite } = require(resolve(sdkLib, 'plugin-storage-contract.test-cases')) as {
-  definePluginStorageContractSuite(name: string, create: ContractFactory): void;
+  definePluginStorageContractSuite(name: string, create: ContractFactory, options?: { queuesWrites?: boolean }): void;
 };
 
 /**
@@ -28,18 +28,23 @@ const { definePluginStorageContractSuite } = require(resolve(sdkLib, 'plugin-sto
  * backend's migration engine, and every `open()` is a new independent connection with the plugin's contexts on it.
  */
 export function describePluginStorageContract(fixture: StorageBackendFixture): void {
-  definePluginStorageContractSuite(fixture.name, async (definition) => {
-    const db = await fixture.create();
-    const compiled = compilePluginStorage(CONTRACT_PLUGIN, definition, { reservedTables: db.coreTables() });
-    await db.engine.migrate(compiled);
-    return {
-      async open() {
-        const connection = await db.connect();
-        const contexts = connection.contexts(CONTRACT_PLUGIN, compiled);
-        const tables = contexts.storage.open(definition) as unknown as Omit<ContractSide, 'persistence'>;
-        return { persistence: contexts.persistence, ...tables };
-      },
-      close: () => db.close(),
-    };
-  });
+  definePluginStorageContractSuite(
+    fixture.name,
+    async (definition) => {
+      const db = await fixture.create();
+      const compiled = compilePluginStorage(CONTRACT_PLUGIN, definition, { reservedTables: db.coreTables() });
+      await db.engine.migrate(compiled);
+      return {
+        async open() {
+          const connection = await db.connect();
+          const contexts = connection.contexts(CONTRACT_PLUGIN, compiled);
+          const tables = contexts.storage.open(definition) as unknown as Omit<ContractSide, 'persistence'>;
+          return { persistence: contexts.persistence, ...tables };
+        },
+        close: () => db.close(),
+      };
+    },
+    // SQLite has one writer, so a write waits behind an open transaction; PostgreSQL runs them concurrently.
+    { queuesWrites: fixture.flavor === 'sqlite' },
+  );
 }

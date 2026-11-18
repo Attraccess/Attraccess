@@ -37,7 +37,7 @@ export class ProjectMember {
   })
   role!: ProjectMemberRole;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'When the membership started' })
   joinedAt!: Date;
 }

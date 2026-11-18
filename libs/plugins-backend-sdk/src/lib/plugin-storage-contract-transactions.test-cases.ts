@@ -30,7 +30,7 @@ const names = async (side: StorageContractSide, prefix: string, scope?: PluginTr
 const NESTED = /inside a transaction callback/;
 
 /** `context.persistence.transaction` with the record port: atomicity, visibility, scope rules. */
-export function describeStorageContractTransactions(open: OpenSide): void {
+export function describeStorageContractTransactions(open: OpenSide, queuesWrites = true): void {
   describe('transactions', () => {
     it('commits, then runs after-commit work in registration order', async () => {
       const side = await open();
@@ -137,23 +137,30 @@ export function describeStorageContractTransactions(open: OpenSide): void {
       expect(await names(side, 'tx-open-')).toEqual(['tx-open-row']);
     });
 
-    it('queues a write without scope behind an open transaction, as a transaction of its own', async () => {
-      const side = await open();
-      const held = gate();
-      const order: string[] = [];
-      const transaction = side.persistence.transaction(async (scope) => {
-        await side.items.insert({ name: 'tx-queue-a' }, { scope });
-        await held.opened;
-        order.push('transaction');
-      });
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      const write = side.items.insert({ name: 'tx-queue-b' }).then(() => void order.push('write'));
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      held.open();
-      await Promise.all([transaction, write]);
-      expect(order).toEqual(['transaction', 'write']);
-      expect(await names(side, 'tx-queue-')).toEqual(['tx-queue-a', 'tx-queue-b']);
-    });
+    it(
+      queuesWrites
+        ? 'queues a write without scope behind an open transaction, as a transaction of its own'
+        : 'runs a write without scope as a transaction of its own, not behind an open transaction',
+      async () => {
+        const side = await open();
+        const held = gate();
+        const order: string[] = [];
+        const transaction = side.persistence.transaction(async (scope) => {
+          await side.items.insert({ name: 'tx-queue-a' }, { scope });
+          await held.opened;
+          order.push('transaction');
+        });
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        const write = side.items.insert({ name: 'tx-queue-b' }).then(() => void order.push('write'));
+        // Without a queue the write completes while the transaction is still open (the wait covers a new connection).
+        if (queuesWrites) await new Promise((resolve) => setTimeout(resolve, 20));
+        else await settlesWithin(write);
+        held.open();
+        await Promise.all([transaction, write]);
+        expect(order).toEqual(queuesWrites ? ['transaction', 'write'] : ['write', 'transaction']);
+        expect(await names(side, 'tx-queue-')).toEqual(['tx-queue-a', 'tx-queue-b']);
+      },
+    );
 
     describe('inside a transaction callback', () => {
       it('rejects a nested transaction without a deadlock; the outer write rolls back when it propagates', async () => {

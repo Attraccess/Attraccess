@@ -1,11 +1,12 @@
-import { DataSource } from 'typeorm';
-import { entities, Resource, ResourceGroup, User } from '@attraccess/database-entities';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
+import type { DataSource } from 'typeorm';
+import { Resource, ResourceGroup, User } from '@attraccess/database-entities';
 import { IntroductionHistoryAction, ResourceType } from '@attraccess/application-models';
 import { TypeOrmResourceIntroductionStore } from './resource-introduction-store.adapter';
 import { TypeOrmMassIntroductionTargetStore, TypeOrmRetrainingStore } from './retraining-store.adapter';
 import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 
-describe('introduction stores on real SQLite', () => {
+describe('introduction stores on real PostgreSQL', () => {
   let source: DataSource;
   let store: TypeOrmResourceIntroductionStore;
   let resourceId: number;
@@ -13,13 +14,7 @@ describe('introduction stores on real SQLite', () => {
   let tutorId: number;
 
   beforeEach(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      synchronize: true,
-      entities: Object.values(entities),
-    }).initialize();
+    source = await createTestDataSource();
     store = new TypeOrmResourceIntroductionStore(source);
     const resources = source.getRepository(Resource);
     resourceId = (
@@ -31,7 +26,7 @@ describe('introduction stores on real SQLite', () => {
   });
 
   afterEach(async () => {
-    await source.destroy();
+    await closeTestDataSource(source);
   });
 
   it('creates an introduction with a tutor, tracks history newest first and answers from a transaction', async () => {

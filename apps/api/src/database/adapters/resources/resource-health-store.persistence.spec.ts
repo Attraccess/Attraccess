@@ -1,10 +1,11 @@
-import { DataSource } from 'typeorm';
-import { entities, Resource } from '@attraccess/database-entities';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
+import type { DataSource } from 'typeorm';
+import { Resource } from '@attraccess/database-entities';
 import { ResourceHealthSource, ResourceHealthStatus, ResourceType } from '@attraccess/application-models';
 import { TypeOrmResourceHealthStore } from './resource-health-store.adapter';
 import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 
-describe('TypeOrmResourceHealthStore on real SQLite', () => {
+describe('TypeOrmResourceHealthStore on real PostgreSQL', () => {
   let source: DataSource;
   let store: TypeOrmResourceHealthStore;
   let resourceId: number;
@@ -19,20 +20,14 @@ describe('TypeOrmResourceHealthStore on real SQLite', () => {
   });
 
   beforeEach(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      synchronize: true,
-      entities: Object.values(entities),
-    }).initialize();
+    source = await createTestDataSource();
     store = new TypeOrmResourceHealthStore(source);
     const resources = source.getRepository(Resource);
     resourceId = (await resources.save(resources.create({ name: 'Laser', type: ResourceType.Machine }))).id;
   });
 
   afterEach(async () => {
-    await source.destroy();
+    await closeTestDataSource(source);
   });
 
   it('keeps one entry per identifier and reports the previous status', async () => {

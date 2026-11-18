@@ -14,13 +14,13 @@ export class ResourceMaintenanceRequest {
   })
   id!: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the request was created',
   })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the request was last updated',
   })
@@ -70,7 +70,7 @@ export class ResourceMaintenanceRequest {
   })
   resolvedByUser!: User | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @ApiProperty({
     description: 'When the request was resolved or dismissed',
     required: false,

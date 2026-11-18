@@ -296,6 +296,13 @@ export async function bootstrap() {
   if (earlyConfig.PLUGIN_DIR) await NpmPluginService.recoverBackups();
   bootstrapLogger.log('PluginSystem configured.');
 
+  // PostgreSQL is the only database. Before anything reads it: wait for it to accept connections, apply the baseline
+  // and move the data of an existing SQLite installation (nothing is served, no plugin runs, until that is done).
+  if (!skipDatabaseMigrations) {
+    const { prepareDatabaseAtStartup } = await import('./database/transfer/startup-transfer');
+    await prepareDatabaseAtStartup();
+  }
+
   const shouldGuardPluginLifecycle = !earlyConfig.DISABLE_PLUGINS && Boolean(earlyConfig.PLUGIN_DIR);
 
   // Decide which license-gated plugins may load. PluginModule.forRoot() is synchronous, so the license is read here,

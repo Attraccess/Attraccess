@@ -10,7 +10,7 @@ type Database = Awaited<ReturnType<typeof createBillingDatabase>>;
 
 const asJson = (value: unknown) => JSON.parse(JSON.stringify(value));
 
-describe('TypeOrmBillingLedgerStore on real SQLite', () => {
+describe('TypeOrmBillingLedgerStore on real PostgreSQL', () => {
   let db: Database;
   let main: BillingConnection;
 

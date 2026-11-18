@@ -5,9 +5,10 @@ import {
   type UsageReceiptSource,
 } from '@attraccess/application-models';
 import { BillingTransaction, BillingTransactionItem, User } from '@attraccess/database-entities';
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { isUniqueViolation } from '../../persistence-errors';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../audit/recorder/audit-event';
 import {
   BillingAuditFactory,
@@ -80,10 +81,29 @@ export class TypeOrmBillingLedgerStore implements BillingLedgerStore {
     return row ? toTransactionRecord(row) : null;
   }
 
+  /**
+   * Inside a unit of work the usage's bill row is locked (FOR NO KEY UPDATE) until commit before it is read: two
+   * settlements of one usage queue on it, and the second one reads the committed bill (and refuses to charge again)
+   * instead of posting the charge or adding its items twice. A usage without a bill yet is protected by the unique
+   * index on the usage reference. The user's balance is maintained by a database trigger with row level updates, so
+   * it is never read and written back.
+   */
+  private async lockBillOfUsage(manager: EntityManager, usageId: number): Promise<void> {
+    await manager
+      .createQueryBuilder(BillingTransaction, 'bill')
+      .select('bill.id')
+      .where('bill.resourceUsageId = :usageId', { usageId })
+      .setLock('for_no_key_update')
+      .getMany();
+  }
+
   async hasCompletedChargeForUsage(usageId: number, context?: BillingTransactionContext): Promise<boolean> {
-    const row = await this.contexts
-      .manager(context)
-      .findOneBy(BillingTransaction, { resourceUsageId: usageId, status: BillingTransactionStatus.Completed });
+    const manager = this.contexts.manager(context);
+    if (context) await this.lockBillOfUsage(manager, usageId);
+    const row = await manager.findOneBy(BillingTransaction, {
+      resourceUsageId: usageId,
+      status: BillingTransactionStatus.Completed,
+    });
     return Boolean(row);
   }
 
@@ -91,9 +111,12 @@ export class TypeOrmBillingLedgerStore implements BillingLedgerStore {
     usageId: number,
     context?: BillingTransactionContext,
   ): Promise<BillingTransactionRecord | null> {
-    const row = await this.contexts
-      .manager(context)
-      .findOne(BillingTransaction, { where: { resourceUsageId: usageId }, relations: { items: true } });
+    const manager = this.contexts.manager(context);
+    if (context) await this.lockBillOfUsage(manager, usageId);
+    const row = await manager.findOne(BillingTransaction, {
+      where: { resourceUsageId: usageId },
+      relations: { items: true },
+    });
     return row ? toTransactionRecord(row) : null;
   }
 
@@ -123,12 +146,21 @@ export class TypeOrmBillingLedgerStore implements BillingLedgerStore {
         });
         settled = { ...input.existing, amount: input.amount, status: BillingTransactionStatus.Completed };
       } else {
-        const saved = await manager.save(BillingTransaction, {
-          userId: input.userId,
-          resourceUsageId: input.usageId,
-          amount: input.amount,
-          status: BillingTransactionStatus.Completed,
-        } as Partial<BillingTransaction>);
+        let saved: BillingTransaction;
+        try {
+          saved = await manager.save(BillingTransaction, {
+            userId: input.userId,
+            resourceUsageId: input.usageId,
+            amount: input.amount,
+            status: BillingTransactionStatus.Completed,
+          } as Partial<BillingTransaction>);
+        } catch (error) {
+          // A concurrent settlement of the same usage won the unique index on resourceUsageId.
+          if (isUniqueViolation(error)) {
+            throw new BadRequestException('Billing transaction already exists for this resource usage');
+          }
+          throw error;
+        }
         settled = toTransactionRecord(saved);
       }
       await this.audit.record(input.audit(settled.id), scope);

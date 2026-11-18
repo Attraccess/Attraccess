@@ -1,20 +1,37 @@
-import { resolveDatabaseBackend, UnsupportedDatabaseTypeError } from './resolve-database-backend';
+import { postgresBackend } from '../postgres/postgres-backend';
+import { UPGRADE_DOCS_URL } from './database-type';
+import { parseDatabaseType, resolveDatabaseBackend, UnsupportedDatabaseTypeError } from './resolve-database-backend';
 
 describe('database backend selection', () => {
-  it('defaults to sqlite and accepts it explicitly', () => {
-    expect(resolveDatabaseBackend({}).type).toBe('sqlite');
-    expect(resolveDatabaseBackend({ DATABASE_TYPE: ' SQLite ' }).type).toBe('sqlite');
+  it('defaults to postgres and accepts it explicitly, ignoring blanks and case', () => {
+    expect(resolveDatabaseBackend({}).type).toBe('postgres');
+    expect(resolveDatabaseBackend({ DATABASE_TYPE: '' }).type).toBe('postgres');
+    expect(resolveDatabaseBackend({ DATABASE_TYPE: '  ' }).type).toBe('postgres');
+    expect(resolveDatabaseBackend({ DATABASE_TYPE: ' PostgreS ' })).toBe(postgresBackend);
+    expect(parseDatabaseType({})).toBe('postgres');
   });
 
-  it('exposes the released sqlite migration track with the unchanged migrations table', () => {
+  it('exposes the postgres migration track under the migrations table name', () => {
     const track = resolveDatabaseBackend({}).migrationTrack;
+    expect(track.name).toBe('postgres');
     expect(track.tableName).toBe('migrations');
-    expect(track.migrations.length).toBeGreaterThanOrEqual(204);
+    expect(track.directory).toBe('apps/api/src/database/postgres/migrations');
+    expect(track.migrations.filter((candidate) => typeof candidate === 'function')).toHaveLength(1);
   });
 
-  it('rejects an unsupported type before touching a database, naming the supported values', () => {
-    expect(() => resolveDatabaseBackend({ DATABASE_TYPE: 'postgres' })).toThrow(UnsupportedDatabaseTypeError);
-    expect(() => resolveDatabaseBackend({ DATABASE_TYPE: 'postgres' })).toThrow(/Supported values: sqlite/);
+  it('rejects sqlite before touching a database and points to the upgrade instructions', () => {
+    expect(() => resolveDatabaseBackend({ DATABASE_TYPE: 'sqlite' })).toThrow(UnsupportedDatabaseTypeError);
+    expect(() => resolveDatabaseBackend({ DATABASE_TYPE: 'sqlite' })).toThrow(/no longer supported.*PostgreSQL/s);
+    expect(() => resolveDatabaseBackend({ DATABASE_TYPE: 'sqlite' })).toThrow(UPGRADE_DOCS_URL);
+    // Any spelling of the value is refused, and the docs are linked.
+    expect(() => resolveDatabaseBackend({ DATABASE_TYPE: ' SQLite ' })).toThrow(UPGRADE_DOCS_URL);
+  });
+
+  it('rejects another unsupported type naming the supported values and the docs', () => {
+    expect(() => resolveDatabaseBackend({ DATABASE_TYPE: 'mysql' })).toThrow(
+      /Unsupported DATABASE_TYPE "mysql"\. Supported values: postgres\./,
+    );
+    expect(() => resolveDatabaseBackend({ DATABASE_TYPE: 'mysql' })).toThrow(UPGRADE_DOCS_URL);
   });
 
   it('does not echo a value that looks like a connection string', () => {
@@ -23,6 +40,7 @@ describe('database backend selection', () => {
       resolveDatabaseBackend({ DATABASE_TYPE: secret });
       throw new Error('expected a throw');
     } catch (error) {
+      expect(error).toBeInstanceOf(UnsupportedDatabaseTypeError);
       expect((error as Error).message).not.toContain('hunter2');
       expect((error as Error).message).toContain('redacted');
     }

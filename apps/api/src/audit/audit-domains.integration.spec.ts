@@ -1,7 +1,7 @@
-import { createSqliteAuditService } from '../database/adapters/audit/sqlite-audit-service.test-fixture';
+import { createPostgresAuditService } from '../database/adapters/audit/postgres-audit-service.test-fixture';
 import { AUDIT_RECORDER } from './recorder/audit-event';
 import { billingTransactionAuditEvent } from './policies/billing';
-import { AuditLog, entities, Setting } from '@attraccess/database-entities';
+import { AuditLog, Setting } from '@attraccess/database-entities';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -12,7 +12,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
-import * as migrations from '../database/migrations';
 import {
   getPluginAuditDomain,
   registerPluginAuditDomains,
@@ -44,6 +43,7 @@ import { AuditService } from './audit.service';
 import { createTestAuditMetrics } from '../database/adapters/audit/audit.test-fixture';
 import { SessionPermissionSync } from '../users-and-auth/auth/sso/session-permission-sync';
 import { TypeOrmSettingsRows } from '../database/adapters/settings/typeorm-settings-rows';
+import { createTestDataSource, closeTestDataSource } from '../test-utils/test-database';
 
 describe('audit domains through migrated storage and the admin HTTP API', () => {
   let directory: string;
@@ -81,16 +81,9 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
       },
     ]);
     directory = await mkdtemp(join(tmpdir(), 'audit-domains-'));
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: join(directory, 'audit.sqlite'),
-      entities: Object.values(entities),
-      migrations: Object.values(migrations),
-    }).initialize();
-    await source.runMigrations();
+    source = await createTestDataSource();
     store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(source.getRepository(Setting)), null);
-    audit = createSqliteAuditService(source, store, createTestAuditMetrics());
+    audit = createPostgresAuditService(source, store, createTestAuditMetrics());
     settings = new SettingsService(null, store, { getSettings: async () => ({}) } as never, null, events);
     const module = await Test.createTestingModule({
       controllers: [AuditController, SettingsController],
@@ -145,7 +138,7 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
   afterAll(async () => {
     resetPluginAuditRegistry();
     if (app) await app.close();
-    if (source?.isInitialized) await source.destroy();
+    await closeTestDataSource(source);
     if (directory) await rm(directory, { recursive: true, force: true });
   });
   const fixture = {

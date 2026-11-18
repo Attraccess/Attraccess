@@ -36,6 +36,6 @@ export class NFCCardPendingChange {
   @Column({ type: 'integer', nullable: true })
   actorId!: number | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 }

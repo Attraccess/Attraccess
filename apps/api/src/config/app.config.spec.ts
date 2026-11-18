@@ -1,3 +1,4 @@
+import { UPGRADE_DOCS_URL } from '../database/backend/database-type';
 import { resolveDatabaseBackend } from '../database/backend';
 import appConfig, { AppEnvSchema, DEFAULT_PLUGIN_DIR, resolveAppVersion, resolvePluginDir } from './app.config';
 
@@ -184,15 +185,15 @@ describe('DATABASE_TYPE', () => {
   const secret = 'postgres://user:hunter2@db.example/attraccess';
   const parse = (value: string | undefined) => AppEnvSchema.shape.DATABASE_TYPE.safeParse(value);
 
-  it.each([undefined, '', '   ', 'sqlite', 'SQLite', ' sqlite ', 'SQLITE'])(
-    'reads %p as sqlite, like the backend',
+  it.each([undefined, '', '   ', 'postgres', 'PostgreS', ' postgres ', 'POSTGRES'])(
+    'reads %p as postgres, like the backend',
     (value) => {
-      expect(parse(value)).toMatchObject({ success: true, data: 'sqlite' });
-      expect(resolveDatabaseBackend({ DATABASE_TYPE: value }).type).toBe('sqlite');
+      expect(parse(value)).toMatchObject({ success: true, data: 'postgres' });
+      expect(resolveDatabaseBackend({ DATABASE_TYPE: value }).type).toBe('postgres');
     },
   );
 
-  it.each(['postgres', 'mysql', secret])('rejects %p with the backend message', (value) => {
+  it.each(['sqlite', 'mysql', secret])('rejects %p with the backend message', (value) => {
     const result = parse(value);
     expect(result.success).toBe(false);
     const expected = (() => {
@@ -227,14 +228,14 @@ describe('DATABASE_TYPE', () => {
         message = (error as Error).message;
       }
       expect(message).toBe(
-        'DATABASE_TYPE: Unsupported DATABASE_TYPE (redacted: not a database type name). Supported values: sqlite.',
+        `DATABASE_TYPE: Unsupported DATABASE_TYPE (redacted: not a database type name). Supported values: postgres. See ${UPGRADE_DOCS_URL}.`,
       );
       expect(JSON.stringify(consoleError.mock.calls)).not.toContain('hunter2');
     });
 
     it('accepts a differently cased value', () => {
-      process.env.DATABASE_TYPE = ' SQLite ';
-      expect(appConfig().DATABASE_TYPE).toBe('sqlite');
+      process.env.DATABASE_TYPE = ' PostgreS ';
+      expect(appConfig().DATABASE_TYPE).toBe('postgres');
     });
   });
 });

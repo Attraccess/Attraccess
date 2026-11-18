@@ -1,9 +1,10 @@
-import { DataSource } from 'typeorm';
-import { entities, Form, FormField, FormSubmission, Resource } from '@attraccess/database-entities';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
+import type { DataSource } from 'typeorm';
+import { Form, FormField, FormSubmission, Resource } from '@attraccess/database-entities';
 import { FormFieldType, ResourceFormAction, ResourceType } from '@attraccess/application-models';
 import { TypeOrmResourceFormStore } from './resource-form-store.adapter';
 
-describe('TypeOrmResourceFormStore on real SQLite', () => {
+describe('TypeOrmResourceFormStore on real PostgreSQL', () => {
   let source: DataSource;
   let store: TypeOrmResourceFormStore;
   let resourceId: number;
@@ -24,20 +25,14 @@ describe('TypeOrmResourceFormStore on real SQLite', () => {
   });
 
   beforeEach(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      synchronize: true,
-      entities: Object.values(entities),
-    }).initialize();
+    source = await createTestDataSource();
     store = new TypeOrmResourceFormStore(source);
     const resources = source.getRepository(Resource);
     resourceId = (await resources.save(resources.create({ name: 'Laser', type: ResourceType.Machine }))).id;
   });
 
   afterEach(async () => {
-    await source.destroy();
+    await closeTestDataSource(source);
   });
 
   it('creates a form with its fields and lists forms by name', async () => {

@@ -21,7 +21,7 @@ export class ResourceMeter {
   @Column({ type: 'varchar' })
   name!: string;
 
-  @Column({ type: 'integer', default: 0 })
+  @Column({ type: 'bigint', default: 0 })
   creditsPerUnit!: number;
 
   /** `shared`: every start and stop opens a time segment whose consumption is split equally. `per-session`: a flow measures each session. */
@@ -34,6 +34,6 @@ export class ResourceMeter {
   @Column({ type: 'varchar', nullable: true })
   counterValue!: string | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   latestObservedAt!: Date | null;
 }

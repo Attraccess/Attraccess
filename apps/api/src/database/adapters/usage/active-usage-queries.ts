@@ -8,7 +8,16 @@ export function activeUsageWhere(): FindOptionsWhere<ResourceUsage> {
   return { ...publishedState, endTime: IsNull() };
 }
 
-export { activeUsageSql } from '../../../resources/usage/sessions/active-usage';
+/**
+ * SQL condition (QueryBuilder property paths) of a published, usable session on the usage table under `alias`.
+ * PostgreSQL has real booleans, so they are written as `true` / `false` (the legacy SQLite helper in
+ * resources/usage/sessions/active-usage emits 0/1 for the released SQLite migration and must not be used here).
+ */
+export function activeUsageSql(alias: string): string {
+  return `${alias}.endTime IS NULL AND ${Object.entries(publishedState)
+    .map(([column, value]) => `${alias}.${column} = ${typeof value === 'boolean' ? String(value) : `'${value}'`}`)
+    .join(' AND ')}`;
+}
 
 /** All published sessions of a machine, earliest first. */
 export function findActiveUsages(manager: EntityManager, resourceId: number): Promise<ResourceUsage[]> {
@@ -41,7 +50,7 @@ function occupiedSlotsQuery(manager: EntityManager, resourceId: number) {
     .where('usage.resourceId = :resourceId', { resourceId })
     .andWhere('usage.usageAction = :action', { action: ResourceUsageAction.Usage })
     .andWhere('usage.endTime IS NULL')
-    .andWhere('(usage.isFinalized = 1 OR usage.lifecyclePending = 1)');
+    .andWhere('(usage.isFinalized = true OR usage.lifecyclePending = true)');
 }
 
 /** Published sessions plus pending starts occupy a slot. Supervisors never take one. */

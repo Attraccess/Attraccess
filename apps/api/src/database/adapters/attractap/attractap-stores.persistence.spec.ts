@@ -2,14 +2,15 @@ import {
   Attractap,
   AttractapCrashReport,
   AttractapInstallation,
-  entities,
   NFCCard,
   NFCCardPendingChange,
   Resource,
   User,
 } from '@attraccess/database-entities';
 import { ResourceType } from '@attraccess/application-models';
-import { DataSource, Table } from 'typeorm';
+import { DataSource } from 'typeorm';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
+
 import { TypeOrmAttractapCardStore } from './typeorm-card.store';
 import { TypeOrmAttractapCrashReportStore } from './typeorm-crash-report.store';
 import { TypeOrmAttractapInstallationStore } from './typeorm-installation.store';
@@ -17,37 +18,15 @@ import { TypeOrmAttractapReaderStore } from './typeorm-reader.store';
 import { TypeOrmAttractapResourceReads } from './typeorm-resource-reads';
 
 /** Mapping and write behaviour of the Attractap adapters against the real entity metadata. */
-describe('Attractap persistence adapters on SQLite', () => {
+describe('Attractap persistence adapters on PostgreSQL', () => {
   let source: DataSource;
 
   beforeAll(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      entities: Object.values(entities),
-    }).initialize();
-    const readers = source.getMetadata(Attractap);
-    const tables = [
-      source.getMetadata(User),
-      source.getMetadata(Resource),
-      readers,
-      ...readers.manyToManyRelations.flatMap((relation) => relation.junctionEntityMetadata ?? []),
-      source.getMetadata(AttractapCrashReport),
-      source.getMetadata(AttractapInstallation),
-      source.getMetadata(NFCCard),
-      source.getMetadata(NFCCardPendingChange),
-    ];
-    const queryRunner = source.createQueryRunner();
-    try {
-      for (const table of tables) await queryRunner.createTable(Table.create(table, source.driver));
-    } finally {
-      await queryRunner.release();
-    }
+    source = await createTestDataSource();
   });
 
   afterAll(async () => {
-    if (source?.isInitialized) await source.destroy();
+    await closeTestDataSource(source);
   });
 
   describe('reader store', () => {

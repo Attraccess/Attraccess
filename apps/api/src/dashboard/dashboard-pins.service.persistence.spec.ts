@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { DashboardPin, Resource, ResourceType, User } from '@attraccess/database-entities';
 import { DataSource } from 'typeorm';
-import { SqliteFileFixture } from '../database/adapters/sqlite-file.test-fixture';
+import { PostgresDatabaseFixture } from '../database/adapters/postgres-database.test-fixture';
 import { TypeOrmDashboardPinStore } from '../database/adapters/dashboard/typeorm-dashboard-pin.store';
 import { unitOfWorkFor } from '../database/adapters/shared-unit-of-work';
 import { PluginService } from '../plugin-system/plugin.service';
@@ -19,8 +19,8 @@ const serviceOn = (source: DataSource) => {
   return new DashboardPinsService(new TypeOrmDashboardPinStore(source, uow), uow);
 };
 
-describe('DashboardPinsService on real SQLite', () => {
-  let fixture: SqliteFileFixture;
+describe('DashboardPinsService on real PostgreSQL', () => {
+  let fixture: PostgresDatabaseFixture;
   let source: DataSource;
   let service: DashboardPinsService;
   let userId: number;
@@ -31,7 +31,7 @@ describe('DashboardPinsService on real SQLite', () => {
   const ids = async (forUser = userId) => (await service.getPins(forUser)).map(({ itemId }) => itemId);
 
   beforeEach(async () => {
-    fixture = await SqliteFileFixture.create();
+    fixture = await PostgresDatabaseFixture.create();
     source = await fixture.open();
     const users = source.getRepository(User);
     userId = (await users.save({ username: 'pinner', email: 'pinner@example.com' } as User)).id;

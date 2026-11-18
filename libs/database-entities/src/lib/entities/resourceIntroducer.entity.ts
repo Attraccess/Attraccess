@@ -1,10 +1,18 @@
 import { ResourceIntroducerType } from '@attraccess/application-models';
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
 import { User } from './user.entity';
 import { ResourceGroup } from './resourceGroup.entity';
 
+@Index('IDX_resource_introducer_group_user_type', ['resourceGroupId', 'userId', 'type'], {
+  unique: true,
+  where: '"resourceGroupId" IS NOT NULL',
+})
+@Index('IDX_resource_introducer_resource_user_type', ['resourceId', 'userId', 'type'], {
+  unique: true,
+  where: '"resourceId" IS NOT NULL',
+})
 @Entity()
 export class ResourceIntroducer {
   @PrimaryGeneratedColumn()
@@ -51,7 +59,7 @@ export class ResourceIntroducer {
   })
   resourceGroupId!: number | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the permission was granted',
   })

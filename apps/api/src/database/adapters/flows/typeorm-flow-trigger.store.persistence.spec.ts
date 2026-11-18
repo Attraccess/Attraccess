@@ -1,5 +1,4 @@
 import {
-  entities,
   Flow,
   Resource,
   ResourceFlowEdge,
@@ -9,11 +8,12 @@ import {
 } from '@attraccess/database-entities';
 import { ResourceFlowNodeType, ResourceType, ResourceUsageAction } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { TypeOrmFlowTriggerStore } from './typeorm-flow-trigger.store';
 import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 
-// The trigger lookups run against a real SQLite schema, so "disabled flows never run" is not only checked on fakes.
-describe('TypeOrmFlowTriggerStore (SQLite)', () => {
+// The trigger lookups run against a real PostgreSQL schema, so "disabled flows never run" is not only checked on fakes.
+describe('TypeOrmFlowTriggerStore (PostgreSQL)', () => {
   const type = ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED;
   let source: DataSource;
   let store: TypeOrmFlowTriggerStore;
@@ -24,13 +24,7 @@ describe('TypeOrmFlowTriggerStore (SQLite)', () => {
   const ids = (nodes: Array<{ id: string }>) => nodes.map((node) => node.id).sort();
 
   beforeAll(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      database: ':memory:',
-      entities: Object.values(entities),
-      synchronize: true,
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-    }).initialize();
+    source = await createTestDataSource();
     store = new TypeOrmFlowTriggerStore(source);
     const nodes = source.getRepository(ResourceFlowNode);
     const resources = source.getRepository(Resource);
@@ -95,7 +89,7 @@ describe('TypeOrmFlowTriggerStore (SQLite)', () => {
   });
 
   afterAll(async () => {
-    await source.destroy();
+    await closeTestDataSource(source);
   });
 
   it('finds the nodes of every resource flow plus those of enabled global flows', async () => {

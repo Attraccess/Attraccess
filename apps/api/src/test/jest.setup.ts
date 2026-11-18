@@ -12,6 +12,10 @@ const testStorageRoot = process.env.TEST_STORAGE_ROOT
     );
 
 process.env.STORAGE_ROOT = testStorageRoot;
+// PostgreSQL is the only database: code that resolves the backend needs a connection URL. Specs open their databases
+// through test-utils/test-database (private databases on the TEST_DATABASE_URL server); this only satisfies config.
+process.env.DATABASE_URL ??=
+  process.env.TEST_DATABASE_URL ?? 'postgres://attraccess:attraccess@127.0.0.1:5432/postgres';
 
 fs.rmSync(testStorageRoot, { recursive: true, force: true });
 fs.mkdirSync(testStorageRoot, { recursive: true });
@@ -19,5 +23,8 @@ fs.mkdirSync(testStorageRoot, { recursive: true });
 // Application code interprets driver errors through the active backend's classifier (see database/backend). Only the
 // classifier is registered here: resolving the whole backend would load every entity and migration for each test file.
 require('../database/persistence-errors').registerPersistenceErrorClassifier(
-  require('../database/sqlite/sqlite-errors').sqliteErrorClassifier,
+  require('../database/postgres/postgres-errors').postgresErrorClassifier,
 );
+
+// TypeORM drops explicit auto-increment ids from PostgreSQL inserts; specs rely on setting them.
+require('./explicit-primary-keys');

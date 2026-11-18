@@ -8,16 +8,13 @@ import {
   User,
 } from '@attraccess/database-entities';
 import { BillingTransactionStatus, ResourceFormAction, ResourceUsageAction } from '@attraccess/application-models';
-import { rm } from 'node:fs/promises';
-import { DataSource, DataSourceOptions } from 'typeorm';
 import { InsufficientBalanceError } from '../../../billing/errors/insufficient-balance.error';
-import { dataSourceConfig } from '../../../database/datasource';
-import { ResourceUsageIntegrity1790100000000 } from '../../../database/migrations/1790100000000-resource-usage-integrity';
-import { ParallelMachineSessions1792000000000 } from '../../../database/migrations/1792000000000-parallel-machine-sessions';
-import { recoverOrphanedUsages } from '../../../database/resource-usage-integrity';
-import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
+import { recoverOrphanedUsages } from '../../../database/postgres/postgres-usage-recovery';
 import { ResourceInUseError } from '../errors/resource-in-use.error';
-import { resetTestFixture } from '../../../database/adapters/usage/lifecycle-fixtures/setup.test-fixture';
+import {
+  closeLifecycleFixture,
+  resetTestFixture,
+} from '../../../database/adapters/usage/lifecycle-fixtures/setup.test-fixture';
 import { unitOfWorkFor } from '../../../database/adapters/shared-unit-of-work';
 import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../../../database/adapters/usage/lifecycle-fixtures/state.test-fixture';
 
@@ -30,12 +27,7 @@ describe('Usage lifecycle persistence around external flows', () => {
   });
 
   afterEach(async () => {
-    scope.usage?.onModuleDestroy();
-    if (scope.source) {
-      await closeResourceTransactionConnection(scope.source);
-      if (scope.source.isInitialized) await scope.source.destroy();
-    }
-    if (scope.directory) await rm(scope.directory, { recursive: true, force: true });
+    await closeLifecycleFixture(scope);
     jest.restoreAllMocks();
   });
 
@@ -43,13 +35,8 @@ describe('Usage lifecycle persistence around external flows', () => {
     'recovers a legacy orphan on restart without losing forms or changing billing (bill=%s)',
     async (hasBill) => {
       await scope.source.getRepository(Resource).update(1, { allowTakeOver: false });
-      const orphan = await scope.source.getRepository(ResourceUsage).save({
-        resourceId: 1,
-        userId: 1,
+      const orphan = await scope.seedLegacyOrphan({
         startTime: new Date('2026-09-23T14:00:40Z'),
-        endTime: null,
-        isFinalized: false,
-        lifecyclePending: false,
         startNotes: 'DEMO: ongoing laboratory run',
         endNotes: 'Original note',
         attributedOperatingDurationInMinutes: 17,
@@ -119,15 +106,9 @@ describe('Usage lifecycle persistence around external flows', () => {
     },
   );
 
-  it('reconciles legacy orphans before enforcing open-state and occupancy constraints', async () => {
-    const orphan = await scope.source.getRepository(ResourceUsage).save({
-      resourceId: 1,
-      userId: 1,
-      startTime: new Date(),
-      isFinalized: false,
-      lifecyclePending: false,
-    });
-    await scope.migrateIntegrity();
+  it('reconciles legacy orphans on startup and then enforces open-state and occupancy constraints', async () => {
+    const orphan = await scope.seedLegacyOrphan();
+    await scope.usage.recoverInterruptedLifecycles();
     expect(await scope.source.getRepository(ResourceUsage).findOneByOrFail({ id: orphan.id })).toMatchObject({
       endTime: orphan.startTime,
       isFinalized: false,
@@ -137,6 +118,7 @@ describe('Usage lifecycle persistence around external flows', () => {
       scope.source.getRepository(ResourceUsage).save({
         resourceId: 1,
         userId: 1,
+        usageAction: ResourceUsageAction.Usage,
         startTime: new Date(),
       }),
     ).rejects.toThrow('Open usage must be finalized or lifecycle-pending');
@@ -151,6 +133,7 @@ describe('Usage lifecycle persistence around external flows', () => {
     const candidate = await scope.source.getRepository(ResourceUsage).save({
       resourceId: 1,
       userId: 1,
+      usageAction: ResourceUsageAction.Usage,
       startTime: new Date(),
       lifecyclePending: true,
       isFinalized: false,
@@ -165,10 +148,11 @@ describe('Usage lifecycle persistence around external flows', () => {
       scope.source.getRepository(ResourceUsage).save({
         resourceId: 1,
         userId: 1,
+        usageAction: ResourceUsageAction.Usage,
         startTime: new Date(),
         lifecyclePending: true,
       }),
-    ).rejects.toThrow('UNIQUE constraint');
+    ).rejects.toThrow('duplicate key value violates unique constraint');
     await expect(scope.usage.startSession(1, scope.users[1], {})).rejects.toThrow(
       'A usage lifecycle operation is already in progress',
     );
@@ -181,15 +165,13 @@ describe('Usage lifecycle persistence around external flows', () => {
     await scope.usage.recoverInterruptedLifecycles();
     await expect(scope.usage.startSession(1, scope.users[1], {})).rejects.toBeInstanceOf(ResourceInUseError);
     expect(scope.flow.runFlow).not.toHaveBeenCalled();
-    expect(await scope.source.query('PRAGMA foreign_key_check')).toEqual([]);
-    expect(await scope.source.query('PRAGMA integrity_check')).toEqual([{ integrity_check: 'ok' }]);
   });
 
   it('retains duplicate legacy real sessions and resolves them consistently without cancelling or charging them', async () => {
     const first = await scope.seedActiveSession();
-    const second = await scope.seedActiveSession();
+    // The one-session-per-person guard refuses a duplicate now; legacy data from before it still exists.
+    const second = await scope.withoutIntegrityTriggers(() => scope.seedActiveSession());
     const before = await scope.publishedState();
-    await scope.migrateIntegrity();
     await scope.usage.recoverInterruptedLifecycles();
     expect(await scope.publishedState()).toEqual(before);
     expect((await scope.usage.getActiveSession(1))?.id).toBe(second.id);
@@ -204,7 +186,6 @@ describe('Usage lifecycle persistence around external flows', () => {
   });
 
   it('keeps valid in-flight start reservations protected and never quarantines them', async () => {
-    await scope.migrateIntegrity();
     let enteredFlow!: () => void;
     const entered = new Promise<void>((resolve) => {
       enteredFlow = resolve;
@@ -242,96 +223,69 @@ describe('Usage lifecycle persistence around external flows', () => {
     expect(await scope.source.query('SELECT * FROM resource_usage_recovery')).toEqual([]);
   });
 
-  it('never repairs history without its audit journal and retains evidence on downgrade', async () => {
-    const orphan = await scope.source.getRepository(ResourceUsage).save({
-      resourceId: 1,
-      userId: 1,
-      startTime: new Date(),
-      isFinalized: false,
-      lifecyclePending: false,
+  it('never repairs history without its audit journal', async () => {
+    const orphan = await scope.seedLegacyOrphan();
+    const removeTrigger = await scope.installTrigger({
+      name: 'reject_recovery_audit',
+      table: 'resource_usage_recovery',
+      event: 'INSERT',
+      body: "RAISE EXCEPTION 'journal unavailable';",
     });
-    await scope.source.query(`CREATE TRIGGER reject_recovery_audit BEFORE INSERT ON resource_usage_recovery
-      BEGIN SELECT RAISE(ABORT, 'journal unavailable'); END`);
     await expect(scope.usage.recoverInterruptedLifecycles()).rejects.toThrow('journal unavailable');
     expect(await scope.source.getRepository(ResourceUsage).findOneByOrFail({ id: orphan.id })).toEqual(orphan);
-    await scope.source.query('DROP TRIGGER reject_recovery_audit');
-    await scope.migrateIntegrity();
+    expect(await scope.source.query('SELECT * FROM resource_usage_recovery')).toEqual([]);
+    await removeTrigger();
+
+    await scope.usage.recoverInterruptedLifecycles();
+
     const journal = await scope.source.query('SELECT * FROM resource_usage_recovery');
-    const runner = scope.source.createQueryRunner();
-    try {
-      await new ParallelMachineSessions1792000000000().down(runner);
-      await new ResourceUsageIntegrity1790100000000().down(runner);
-    } finally {
-      await runner.release();
-    }
-    expect(await scope.source.query('SELECT * FROM resource_usage_recovery')).toEqual(journal);
+    expect(journal).toEqual([expect.objectContaining({ usageId: orphan.id })]);
     expect(await scope.source.getRepository(ResourceUsage).findOneByOrFail({ id: orphan.id })).toMatchObject({
       endTime: orphan.startTime,
       isFinalized: false,
     });
   });
 
-  it.each(['startup', 'upgrade migration'])(
-    'rolls back a written recovery journal when the usage update fails (%s)',
-    async (recoveryPath) => {
-      const orphan = await scope.source.getRepository(ResourceUsage).save({
-        resourceId: 1,
-        userId: 1,
-        startTime: new Date('2026-09-23T14:00:40Z'),
-        startNotes: 'DEMO: ongoing laboratory run',
-        endNotes: 'Original note',
-        attributedOperatingDurationInMinutes: 17,
-        isFinalized: false,
-        lifecyclePending: false,
-      });
-      const before = await scope.publishedState();
-      const journalBefore = await scope.source.query('SELECT * FROM resource_usage_recovery');
-      // This failure proves the journal INSERT succeeded within the recovery transaction.
-      await scope.source.query(`CREATE TRIGGER reject_recovery_update BEFORE UPDATE ON resource_usage
-        WHEN OLD.id = ${orphan.id}
-        BEGIN
-          SELECT CASE WHEN EXISTS (SELECT 1 FROM resource_usage_recovery WHERE usageId = OLD.id)
-            THEN RAISE(ABORT, 'usage update rejected after journal insert')
-            ELSE RAISE(ABORT, 'recovery journal missing before update') END;
-        END`);
+  it('rolls back a written recovery journal when the usage update fails', async () => {
+    const orphan = await scope.seedLegacyOrphan({
+      startTime: new Date('2026-09-23T14:00:40Z'),
+      startNotes: 'DEMO: ongoing laboratory run',
+      endNotes: 'Original note',
+      attributedOperatingDurationInMinutes: 17,
+    });
+    const before = await scope.publishedState();
+    const journalBefore = await scope.source.query('SELECT * FROM resource_usage_recovery');
+    // This failure proves the journal INSERT succeeded within the recovery transaction.
+    const removeTrigger = await scope.installTrigger({
+      name: 'reject_recovery_update',
+      table: 'resource_usage',
+      event: 'UPDATE',
+      when: `OLD."id" = ${orphan.id}`,
+      body: `IF EXISTS (SELECT 1 FROM resource_usage_recovery WHERE "usageId" = OLD."id") THEN
+          RAISE EXCEPTION 'usage update rejected after journal insert';
+        END IF;
+        RAISE EXCEPTION 'recovery journal missing before update';`,
+    });
 
-      // Retain the production automatic migration runner and its transaction configuration.
-      const upgrade = new DataSource({
-        ...dataSourceConfig,
-        database: scope.source.options.database,
-        entities: scope.schemas,
-        migrations: [ResourceUsageIntegrity1790100000000],
-      } as DataSourceOptions);
-      try {
-        const recover = () =>
-          recoveryPath === 'startup' ? scope.usage.recoverInterruptedLifecycles() : upgrade.initialize();
-        await expect(recover()).rejects.toThrow('usage update rejected after journal insert');
-        expect(await scope.publishedState()).toEqual(before);
-        expect(await scope.source.query('SELECT * FROM resource_usage_recovery')).toEqual(journalBefore);
-        if (recoveryPath === 'upgrade migration') {
-          expect(await scope.source.query('SELECT * FROM migrations')).toEqual([]);
-        }
+    await expect(scope.usage.recoverInterruptedLifecycles()).rejects.toThrow(
+      'usage update rejected after journal insert',
+    );
+    expect(await scope.publishedState()).toEqual(before);
+    expect(await scope.source.query('SELECT * FROM resource_usage_recovery')).toEqual(journalBefore);
 
-        await scope.source.query('DROP TRIGGER reject_recovery_update');
-        await recover();
-        expect(await scope.source.getRepository(ResourceUsage).findOneByOrFail({ id: orphan.id })).toMatchObject({
-          endTime: orphan.startTime,
-          isFinalized: false,
-          attributedOperatingDurationInMinutes: 0,
-        });
-        expect(await scope.source.query('SELECT usageId FROM resource_usage_recovery')).toEqual([
-          { usageId: orphan.id },
-        ]);
-      } finally {
-        if (upgrade.isInitialized) await upgrade.destroy();
-      }
-    },
-  );
+    await removeTrigger();
+    await scope.usage.recoverInterruptedLifecycles();
+    expect(await scope.source.getRepository(ResourceUsage).findOneByOrFail({ id: orphan.id })).toMatchObject({
+      endTime: orphan.startTime,
+      isFinalized: false,
+      attributedOperatingDurationInMinutes: 0,
+    });
+    expect(await scope.source.query('SELECT "usageId" FROM resource_usage_recovery')).toEqual([{ usageId: orphan.id }]);
+  });
 
   it.each([false, true])(
     'preserves the complete price contract through a start flow (takeover=%s)',
     async (takeover) => {
-      await scope.migrateIntegrity();
       if (takeover) await scope.seedActiveSession();
       const starter = scope.users[1];
       await scope.source.getRepository(User).update(starter.id, { billingFactor: 50 });
@@ -365,8 +319,12 @@ describe('Usage lifecycle persistence around external flows', () => {
   );
 
   it('does not start or run physical flows if its price snapshot cannot be persisted', async () => {
-    await scope.source.query(`CREATE TRIGGER reject_price_snapshot BEFORE UPDATE OF billingFactor ON resource_usage
-      BEGIN SELECT RAISE(ABORT, 'snapshot unavailable'); END`);
+    await scope.installTrigger({
+      name: 'reject_price_snapshot',
+      table: 'resource_usage',
+      event: 'UPDATE OF "billingFactor"',
+      body: "RAISE EXCEPTION 'snapshot unavailable';",
+    });
 
     await expect(scope.usage.startSession(1, scope.users[0], {})).rejects.toThrow('snapshot unavailable');
 
@@ -396,7 +354,6 @@ describe('Usage lifecycle persistence around external flows', () => {
   });
 
   it('aborts a failed start without publishing its candidate, forms, or bill and keeps accepted operation', async () => {
-    await scope.migrateIntegrity();
     const before = await scope.publishedState();
     scope.failAfterObservation();
 
@@ -422,7 +379,6 @@ describe('Usage lifecycle persistence around external flows', () => {
   });
 
   it('keeps the outgoing session intact and removes the candidate after a failed takeover', async () => {
-    await scope.migrateIntegrity();
     await scope.seedActiveSession();
     const before = await scope.publishedState();
     scope.failAfterObservation();
@@ -584,12 +540,12 @@ describe('Usage lifecycle persistence around external flows', () => {
   });
 
   it('aborts an abandoned takeover at startup without replaying flows or discarding accepted operation', async () => {
-    await scope.migrateIntegrity();
     const previous = await scope.seedActiveSession();
     const before = await scope.publishedState();
     const candidate = await scope.source.getRepository(ResourceUsage).save({
       resourceId: 1,
       userId: 2,
+      usageAction: ResourceUsageAction.Usage,
       startTime: new Date(),
       endTime: null,
       lifecyclePending: true,

@@ -1,11 +1,12 @@
-import { DataSource } from 'typeorm';
-import { entities, Resource, User } from '@attraccess/database-entities';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
+import type { DataSource } from 'typeorm';
+import { Resource, User } from '@attraccess/database-entities';
 import { IntroductionHistoryAction, ResourceIntroducerType, ResourceType } from '@attraccess/application-models';
 import { TypeOrmResourceGroupIntroducerStore, TypeOrmResourceGroupStore } from './resource-group-store.adapter';
 import { TypeOrmResourceIntroductionStore } from './resource-introduction-store.adapter';
 import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 
-describe('resource group stores on real SQLite', () => {
+describe('resource group stores on real PostgreSQL', () => {
   let source: DataSource;
   let groups: TypeOrmResourceGroupStore;
   let introducers: TypeOrmResourceGroupIntroducerStore;
@@ -23,13 +24,7 @@ describe('resource group stores on real SQLite', () => {
     });
 
   beforeEach(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      synchronize: true,
-      entities: Object.values(entities),
-    }).initialize();
+    source = await createTestDataSource();
     groups = new TypeOrmResourceGroupStore(source);
     introducers = new TypeOrmResourceGroupIntroducerStore(source);
     const resources = source.getRepository(Resource);
@@ -39,7 +34,7 @@ describe('resource group stores on real SQLite', () => {
   });
 
   afterEach(async () => {
-    await source.destroy();
+    await closeTestDataSource(source);
   });
 
   it('creates, updates and deletes groups', async () => {

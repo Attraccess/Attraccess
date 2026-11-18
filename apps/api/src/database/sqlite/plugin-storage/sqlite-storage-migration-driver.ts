@@ -15,10 +15,10 @@ import {
   versionsTableName,
 } from '../../../plugin-system/plugin-storage/storage-model';
 import { createRecordPort } from '../../../plugin-system/plugin-storage/storage-records';
-import { createDataSource, SQLITE_BUSY_TIMEOUT_MS } from '../sqlite-connection';
+import { SQLITE_BUSY_TIMEOUT_MS } from '../sqlite-source';
 import { formatSqliteTimestamp, sqliteStorageDialect } from './sqlite-storage-dialect';
 import { checkSqliteStep } from './sqlite-storage-step-guard';
-import { ManagerExecutor } from './sqlite-storage-sessions';
+import { ManagerExecutor } from './sqlite-storage-executor';
 
 const { quote } = sqliteStorageDialect;
 
@@ -101,8 +101,8 @@ export class SqliteStorageMigrationDriver implements PluginStorageMigrationDrive
       mkdirSync(dirname(databaseFile), { recursive: true });
     }
     const options = { ...base, entities: [], synchronize: false, migrationsRun: false, migrations: [] };
-    // createDataSource turns every transaction into BEGIN IMMEDIATE (the write lock); a plain source begins deferred.
-    return readOnly ? new DataSource(options as DataSourceOptions) : createDataSource(options as DataSourceOptions);
+    void readOnly;
+    return new DataSource(options as DataSourceOptions);
   }
 
   async read<T>(owner: PluginStorageOwner, work: (session: PluginStorageMigrationReader) => Promise<T>): Promise<T> {

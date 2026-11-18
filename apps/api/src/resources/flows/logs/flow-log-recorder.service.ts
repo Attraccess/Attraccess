@@ -45,7 +45,7 @@ interface Recording {
  * Flow logs are a debugging aid, not an audit trail: they are collected only
  * while a user explicitly records a flow, held in memory, and thrown away when
  * the recording stops or expires. Nothing reaches the database — one chatty
- * MQTT device used to write ~2M rows/day through SQLite's single connection.
+ * MQTT device used to write ~2M rows/day through the database.
  */
 @Injectable()
 export class FlowLogRecorderService implements OnModuleInit, OnModuleDestroy {

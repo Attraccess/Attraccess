@@ -99,7 +99,7 @@ export class ResourceFlowNode {
   })
   position!: ResourceFlowNodePosition;
 
-  @Column({ type: 'json', nullable: true })
+  @Column({ type: 'jsonb', nullable: true })
   @ApiProperty({
     description: 'The data of the node, depending on the type of the node',
     example: {
@@ -109,7 +109,7 @@ export class ResourceFlowNode {
   })
   data!: Record<string, unknown>;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the node was created',
     type: String,
@@ -118,7 +118,7 @@ export class ResourceFlowNode {
   })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the node was last updated',
     type: String,

@@ -1,12 +1,12 @@
-import { Attractap, Resource, entities } from '@attraccess/database-entities';
-import { DataSource, Table } from 'typeorm';
+import { Attractap, Resource } from '@attraccess/database-entities';
+import type { DataSource } from 'typeorm';
 import type { AttractapReaderStore } from '../../../attractap/reader-store.port';
 import type { PluginBleStore } from '../../../plugin-system/ble/plugin-ble-store.port';
-import { PluginBleTransport1793300000000 } from '../../migrations/1793300000000-plugin-ble-transport';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { TypeOrmAttractapReaderStore } from '../attractap/typeorm-reader.store';
 import { createTypeOrmPluginBleStore } from './typeorm-plugin-ble.store';
 
-/** An in-memory SQLite database with the reader and plugin BLE endpoint tables, behind the real BLE store adapter. */
+/** A PostgreSQL database with the reader and plugin BLE endpoint tables, behind the real BLE store adapter. */
 export interface PluginBleTestDatabase {
   store: PluginBleStore;
   /** The reader store behind the same database, for tests that drive the real reader service. */
@@ -17,30 +17,10 @@ export interface PluginBleTestDatabase {
   dispose(): Promise<void>;
 }
 
-/**
- * `fullSchema` synchronizes every entity (the reader service reads readers with their resources); by default only
- * the tables the BLE host needs are created, the endpoint table by its real migration.
- */
-export async function createPluginBleTestDatabase(
-  options: { fullSchema?: boolean } = {},
-): Promise<PluginBleTestDatabase> {
-  const source = await new DataSource({
-    type: 'better-sqlite3',
-    invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-    database: ':memory:',
-    entities: Object.values(entities),
-    synchronize: options.fullSchema ?? false,
-  }).initialize();
-  if (options.fullSchema) return wrap(source);
-  const queryRunner = source.createQueryRunner();
-  try {
-    await queryRunner.createTable(Table.create(source.getMetadata(Attractap), source.driver));
-    // The real migration creates the endpoint table, including its cascading foreign key to the reader.
-    await new PluginBleTransport1793300000000().up(queryRunner);
-  } finally {
-    await queryRunner.release();
-  }
-  return wrap(source);
+/** The database starts at the current release, so the reader and endpoint tables (with their cascading foreign key) exist. */
+/** `options` is kept for callers: the schema is always complete. */
+export async function createPluginBleTestDatabase(_options: { fullSchema?: boolean } = {}): Promise<PluginBleTestDatabase> {
+  return wrap(await createTestDataSource());
 }
 
 function wrap(source: DataSource): PluginBleTestDatabase {
@@ -62,6 +42,6 @@ function wrap(source: DataSource): PluginBleTestDatabase {
     async setReaderAccess(readerId, allowed) {
       await readers().update(readerId, { allowPluginBle: allowed });
     },
-    dispose: () => source.destroy(),
+    dispose: () => closeTestDataSource(source),
   };
 }

@@ -14,8 +14,12 @@ import type {
  */
 export interface PluginStorageDialect {
   quote(identifier: string): string;
-  /** The parameter marker of the n-th parameter (1-based). */
-  placeholder(position: number): string;
+  /**
+   * The parameter marker of the n-th parameter (1-based). `field` is the column a filter compares the value with; an
+   * engine that types its parameters (PostgreSQL) uses it to widen the marker (`$1::bigint`), so a filter value
+   * outside the column's range compares instead of failing.
+   */
+  placeholder(position: number, field?: CompiledField): string;
   /** A canonical value (see storage-values) as the engine stores it. */
   encode(field: CompiledField, value: unknown): unknown;
   /** A stored value back as the canonical JavaScript value. */

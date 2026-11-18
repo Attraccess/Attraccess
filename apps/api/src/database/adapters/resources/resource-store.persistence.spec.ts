@@ -1,4 +1,5 @@
-import { DataSource } from 'typeorm';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
+import type { DataSource } from 'typeorm';
 import {
   DashboardPin,
   entities,
@@ -20,7 +21,7 @@ import {
 import { TypeOrmResourceStore } from './resource-store.adapter';
 import type { NewResource } from '../../../resources/resource-store.port';
 
-describe('TypeOrmResourceStore on real SQLite', () => {
+describe('TypeOrmResourceStore on real PostgreSQL', () => {
   let source: DataSource;
   let store: TypeOrmResourceStore;
 
@@ -51,18 +52,12 @@ describe('TypeOrmResourceStore on real SQLite', () => {
   };
 
   beforeEach(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      synchronize: true,
-      entities: Object.values(entities),
-    }).initialize();
+    source = await createTestDataSource();
     store = new TypeOrmResourceStore(source);
   });
 
   afterEach(async () => {
-    await source.destroy();
+    await closeTestDataSource(source);
   });
 
   it('creates, saves, counts and deletes resources', async () => {
