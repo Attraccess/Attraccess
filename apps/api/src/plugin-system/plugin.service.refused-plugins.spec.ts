@@ -30,7 +30,7 @@ describe('PluginService refused plugins', () => {
 
     const [listed] = PluginService.getPluginsWithLoadStatus();
 
-    expect(listed).toMatchObject({ name: 'legacy-plugin', status: 'error' });
+    expect(listed).toMatchObject({ name: 'legacy-plugin', status: 'error', refused: true });
     expect(listed.error).toContain('Plugin legacy-plugin');
     expect(listed.error).toContain('migrating-to-2');
     expect(PluginService.getManifestById(listed.id)).toMatchObject({ name: 'legacy-plugin' });
@@ -65,11 +65,14 @@ describe('PluginService refused plugins', () => {
     fixture.writePlugin(fixture.root, 'legacy-plugin-2', { ...fixture.VALID_MANIFEST, name: 'legacy-plugin' });
 
     expect(PluginService.getPlugins().map((plugin) => plugin.pluginDirectory)).toEqual(['legacy-plugin-2']);
-    const statuses = Object.fromEntries(
-      PluginService.getPluginsWithLoadStatus().map((plugin) => [plugin.pluginDirectory, plugin.status]),
-    );
+    const listed = PluginService.getPluginsWithLoadStatus();
+    const statuses = Object.fromEntries(listed.map((plugin) => [plugin.pluginDirectory, plugin.status]));
     expect(statuses['legacy-plugin']).toBe('error');
     expect(statuses['legacy-plugin-2']).not.toBe('error');
+    // Both copies are listed under distinct ids, and only the 1.x one is marked refused (the admin UI keys rows by id).
+    const refused = Object.fromEntries(listed.map((plugin) => [plugin.pluginDirectory, plugin.refused]));
+    expect(refused).toEqual({ 'legacy-plugin': true, 'legacy-plugin-2': false });
+    expect(new Set(listed.map((plugin) => plugin.id)).size).toBe(2);
   });
 
   it('deletes a refused plugin without loading its code or dropping its tables', async () => {

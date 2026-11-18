@@ -221,6 +221,15 @@ export class LoadedPluginManifest extends PluginManifest {
 
   @ApiProperty({
     description:
+      'True when the host refused the plugin at discovery (SDK 1.x, a removed database contract, a database import in ' +
+      'the bundle, invalid permissions or license block). A refused plugin has status "error", never loads and cannot ' +
+      'be retried: install a compatible build or delete it. Deleting it keeps its tables.',
+    example: false,
+  })
+  refused: boolean;
+
+  @ApiProperty({
+    description:
       'For status "license_missing": the declared license modules the license does not grant. Empty when the plugin only needs a valid license.',
     type: [String],
     required: false,

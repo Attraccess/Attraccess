@@ -144,6 +144,8 @@ Compared with the contract before this change, AsyncAPI is identical and the HTT
   `User` schema.
 - A few properties switch between `type: object` and `allOf`/`$ref` with the same referenced schema.
 - `LoadedPluginManifest.permissions` lists `PLUGIN_STORAGE` instead of `DATABASE_ACCESS` (SDK 2.0).
+- `LoadedPluginManifest` has a new boolean `refused` (additive): the host refused the plugin at discovery, so it cannot
+  be retried, only replaced or deleted. The admin UI hides **Retry** for it and offers **Remove**.
 - `RenameCompanionDeviceDto` now documents its required `name`; the old schema was an empty object and the global
   whitelisting pipe stripped the field, so the rename answered 500.
 

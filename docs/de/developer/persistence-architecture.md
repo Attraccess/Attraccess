@@ -149,6 +149,9 @@ Gegenüber dem Vertrag vor dieser Änderung ist AsyncAPI identisch, und der HTTP
   `User`-Schemas.
 - Einige Eigenschaften wechseln zwischen `type: object` und `allOf`/`$ref` mit demselben referenzierten Schema.
 - `LoadedPluginManifest.permissions` nennt `PLUGIN_STORAGE` statt `DATABASE_ACCESS` (SDK 2.0).
+- `LoadedPluginManifest` hat das neue boolesche Feld `refused` (additiv): Der Host hat das Plugin bei der Erkennung
+  abgelehnt, es lässt sich daher nicht erneut versuchen, nur ersetzen oder löschen. Die Admin-Oberfläche blendet
+  **Erneut versuchen** dafür aus und bietet **Entfernen** an.
 - `RenameCompanionDeviceDto` dokumentiert jetzt das Pflichtfeld `name`; das alte Schema war ein leeres Objekt, die globale
   Whitelist-Pipe entfernte das Feld, und das Umbenennen antwortete mit 500.
 

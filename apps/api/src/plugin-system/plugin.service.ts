@@ -438,13 +438,13 @@ export class PluginService {
       .getDiscoveredPlugins()
       .map((manifest) => {
         const key = `${manifest.name}@${manifest.version}`;
+        const refused = getImplementationClass().isPluginRefused(manifest);
         // A refused plugin never loads whatever the license says; its refusal is the actionable error.
-        const shortfall = getImplementationClass().isPluginRefused(manifest)
-          ? null
-          : getImplementationClass().getLicenseShortfall(manifest);
+        const shortfall = refused ? null : getImplementationClass().getLicenseShortfall(manifest);
         if (shortfall) {
           return {
             ...manifest,
+            refused,
             status: 'license_missing' as const,
             error: shortfall.message,
             missingLicenseModules: shortfall.missingModules,
@@ -460,7 +460,7 @@ export class PluginService {
           status = 'loaded';
         }
 
-        return { ...manifest, status, error: error ? error.message : null };
+        return { ...manifest, refused, status, error: error ? error.message : null };
       });
   }
 
