@@ -139,6 +139,21 @@ it('frames commands and parses matching responses across chunks while ignoring n
   expect(await esp.sendCommand({ topic: 'restart' }, false)).toBeNull();
   expect(state.read).not.toHaveBeenCalled();
 });
+it('gives up on a silent device after the timeout and frees the port for the next caller', async () => {
+  // A chip waiting in ROM download mode never answers a configurator command.
+  vi.useFakeTimers();
+  const esp = await instance();
+  const cancel = vi.fn().mockResolvedValue(undefined);
+  state.read.mockImplementation(function (this: { reader?: unknown }) {
+    this.reader = { cancel };
+    return new Promise(() => undefined);
+  });
+  const pending = esp.sendCommand({ topic: 'auth.status.get' }, true, 5000);
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(await pending).toBeNull();
+  expect(cancel).toHaveBeenCalledOnce();
+  expect(await esp.sendCommand({ topic: 'restart' }, false)).toBeNull();
+});
 it('releases transport ownership after failure and drops a disconnected device', async () => {
   const esp = await instance();
   state.request.mockRejectedValueOnce(new Error('No device'));

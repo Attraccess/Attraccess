@@ -111,14 +111,20 @@ export class ESPTools {
         let continueReading = true;
         let buffer = '';
 
-        const timeoutId = setTimeout(() => {
-          continueReading = false;
-        }, timeout);
-
         let resolveResult: ((v: string | null) => void) | null = null;
         const resultPromise = new Promise<string | null>((resolve) => {
           resolveResult = resolve;
         });
+
+        // A silent device (for example a chip waiting in ROM download mode) never sends a line, so rawRead would
+        // keep the port locked and this command would hold the transport forever: give up and cancel the read.
+        const timeoutId = setTimeout(() => {
+          continueReading = false;
+          resolveResult?.(null);
+          (transport as unknown as { reader?: ReadableStreamDefaultReader }).reader?.cancel().catch((err) => {
+            console.error('Failed to cancel the serial read', err);
+          });
+        }, timeout);
 
         transport.rawRead(
           (value) => {
