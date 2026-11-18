@@ -113,7 +113,9 @@ export function FirmwareFlasher(props: Props) {
 
     if (!flashResult.success) {
       if (flashResult.error?.type === ESPToolsErrorType.CHIP_MISMATCH) {
-        const chips = flashResult.error.details as { expected: string; detected: string };
+        const detected = (flashResult.error.details as { detected: string }).detected;
+        // Name the expected chip like the firmware list and the detected one (ESP32-S3), not by its build id.
+        const chips = { expected: props.firmware.boardFamily || props.firmware.chip || '', detected };
         setChipMismatch(chips);
         setFlashError({ type: ESPToolsErrorType.CHIP_MISMATCH, details: t('chipMismatch.description', chips) });
       } else {
