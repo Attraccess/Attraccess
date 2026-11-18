@@ -5,6 +5,8 @@ import { join } from 'path';
 import { PluginMigrationService } from './plugin-migration.service';
 import { PluginService } from './plugin.service';
 import { PluginUninstallService } from './plugin-uninstall.service';
+import { compilePluginStorage } from './plugin-storage/storage-schema';
+import { assertNamespaceUnclaimed, claimStorageNames } from './plugin-storage/storage-registry';
 
 describe('PluginUninstallService', () => {
   const fixture = registerPluginServiceFixture();
@@ -63,6 +65,17 @@ describe('PluginUninstallService', () => {
     expect(runDown).toHaveBeenCalledWith(expect.objectContaining({ name: 'delete-me' }));
     await expect(runDown.mock.results[0].value).resolves.toBe(true);
     expect(existsSync(folder)).toBe(false);
+  });
+
+  it('frees the storage names the plugin claimed', async () => {
+    const plugin = writeDeletablePlugin(true);
+    jest.spyOn(PluginMigrationService, 'dropStorage').mockResolvedValue(true);
+    claimStorageNames(compilePluginStorage('delete-me', { tables: {}, migrations: [] }, { reservedTables: new Set() }));
+    expect(() => assertNamespaceUnclaimed('Delete.Me', 'delete_me')).toThrow(/plugin "delete-me"/);
+
+    await uninstaller().deletePlugin(plugin.id, true);
+
+    expect(() => assertNamespaceUnclaimed('Delete.Me', 'delete_me')).not.toThrow();
   });
 
   it('still removes the plugin when dropping its storage fails', async () => {

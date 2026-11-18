@@ -12,6 +12,8 @@ import { PluginBleService } from './ble/plugin-ble.service';
 
 import { PluginService } from './plugin.service';
 
+import { releaseStorageNames } from './plugin-storage/storage-registry';
+
 /**
  * Removes an uploaded plugin: drops its tables, deletes its directory and clears its quarantine. It sits
  * above both PluginService and PluginMigrationService, because migrations find plugin bundles through PluginService.
@@ -67,6 +69,8 @@ export class PluginUninstallService {
     // delete folder. The plugin's RBAC permission rows stay: deleting them would cascade to every role and
     // API-token grant. The next boot marks them unavailable, and a reinstall brings them back with their grants.
     await rm(pluginFolder, { recursive: true });
+    // Its table and index names are free again: a reinstall before the restart must not meet its old claim.
+    releaseStorageNames(plugin.name);
     try {
       PluginService.clearPluginQuarantine(plugin.pluginDirectory);
     } catch (error) {
