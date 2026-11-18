@@ -8,6 +8,7 @@ import { AttractapFirmware } from '../../../dtos/firmware.dto';
 import { validateReaderUiCapabilities } from '../../../../resources/forms/reader-ui.validation';
 import { promptPairing } from '../../../reader-pairing';
 import { PairingService } from '../../../security/pairing.service';
+import { parseReportedBuild } from '../../../security/session-security-state';
 import { AttractapUiHandler } from '../ui/ui.handler';
 import { parseBleCapability } from '../ble/ble-wire';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
@@ -90,6 +91,10 @@ export class AttractapFirmwareHandler {
     // Plugin BLE (protocol v1): older or incompatible firmware makes plugins see READER_UNSUPPORTED.
     socket.state.ble = parseBleCapability(data.payload?.capabilities?.ble);
     await this.attractapService.updateReaderFirmware(socket.readerId, this.withValidatedUi(data.payload));
+    const build = parseReportedBuild(data.payload);
+    await this.attractapService.recordReaderBuild(socket.readerId, build);
+    // The eFuse report on the control channel waits for this.
+    socket.sessionSecurity?.setBuild(build);
     // Initial full slot sync and crash-loop protection, in the background: it must not stop or delay the OTA check.
     // A reader that is not paired shows nothing from the server.
     if (!socket.state.pairingRequired)

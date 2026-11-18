@@ -7,6 +7,7 @@ import type {
   AttractapReader,
   AttractapReaderEdit,
   AttractapReaderFilter,
+  AttractapReaderSecurityPatch,
   AttractapReaderWithResources,
 } from '@attraccess/application-models';
 import { FindOptionsWhere, In, Not, Repository } from 'typeorm';
@@ -82,6 +83,11 @@ export class TypeOrmAttractapReaderStore implements AttractapReaderStore {
     if (edit.firmware) changes.firmware = firmwareColumns(edit.firmware);
     if (edit.resourceIds) changes.resources = edit.resourceIds.map((resourceId) => ({ id: resourceId }) as Resource);
     await this.readers.save(changes);
+  }
+
+  async applySecurity(id: number, patch: AttractapReaderSecurityPatch): Promise<void> {
+    if (Object.keys(patch).length === 0) return;
+    await this.readers.update(id, { ...patch });
   }
 
   async recordConnection(id: number, at: Date): Promise<void> {

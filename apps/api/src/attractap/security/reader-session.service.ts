@@ -7,6 +7,10 @@ import { CredentialRegistryService } from './credential-registry.service';
 import { HandshakeLimiter } from './handshake-limiter';
 import { InstallationIdentityService } from './installation-identity.service';
 import { BootstrapGrant, PairingService } from './pairing.service';
+import { ReaderControlService } from './reader-control.service';
+import { IdentityUpgradeService } from './identity-upgrade.service';
+import { readerKeyAlgorithm } from './reader-spki';
+import { SessionSecurityState } from './session-security-state';
 import { PeerIdentity, SessionConnection, SessionDecision, SessionError } from './session-connection';
 import { Frame, FrameType } from './session-framing';
 import { SessionMetrics } from './session-metrics';
@@ -32,6 +36,8 @@ export class ReaderSessionService implements OnModuleDestroy {
     private readonly pairing: PairingService,
     private readonly authHandler: AttractapAuthHandler,
     private readonly metrics: SessionMetrics,
+    private readonly controls: ReaderControlService,
+    private readonly upgrades: IdentityUpgradeService,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {
     this.flushTimer = setInterval(() => void this.flushRejections(), AGGREGATE_FLUSH_MS);
@@ -92,6 +98,10 @@ export class ReaderSessionService implements OnModuleDestroy {
           if (peer.readerId === null) return { kind: 'reject', reason: 'no-reader-id', notifyReader: false };
           rejectedReaderId = peer.readerId;
           if (!(await this.registry.isActive(peer.readerId, peer.spkiFingerprint))) {
+            // A P-256 key replaced by the DS key a moment ago: an upgrade-only session may re-send the certificate.
+            if (await this.upgrades.isRecoverable(peer.readerId, peer.spkiFingerprint)) {
+              return { kind: 'upgrade-recovery', readerId: peer.readerId };
+            }
             return { kind: 'reject', reason: 'inactive-credential', notifyReader: true };
           }
           return { kind: 'reader', readerId: peer.readerId, certificateNotAfter: peer.certificateNotAfter };
@@ -105,10 +115,27 @@ export class ReaderSessionService implements OnModuleDestroy {
         return;
       }
 
+      const fingerprint = peerFingerprint as string | null;
+      const algorithm = peerSpki ? readerKeyAlgorithm(peerSpki) : null;
+      if (decision.kind === 'upgrade-recovery') {
+        if (fingerprint)
+          this.controls.attach(
+            connection,
+            new SessionSecurityState(decision.readerId, fingerprint, algorithm),
+            'recovery',
+          );
+        // No application messages in this session: anything but control frames ends it.
+        connection.on('message', () => connection.close());
+        return;
+      }
+
       // Known before any await, so a revoke that lands during sign-in finds this socket.
       socket.readerId = decision.readerId;
+      if (fingerprint) {
+        socket.sessionSecurity = new SessionSecurityState(decision.readerId, fingerprint, algorithm);
+        this.controls.attach(connection, socket.sessionSecurity);
+      }
       this.attach(socket, connection, onReady);
-      const fingerprint = peerFingerprint as string | null;
       if (fingerprint) this.pairing.forgetGrant(fingerprint);
 
       // The server time goes first: it feeds the reader's trusted-time floor before anything else.

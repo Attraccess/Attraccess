@@ -1,5 +1,6 @@
 import type { AttractapReader } from '@attraccess/application-models';
 import { ResourceFormAction } from '@attraccess/application-models';
+import type { SessionSecurityState } from '../security/session-security-state';
 import type { CardConversation } from './card-conversation.service';
 import type { BleCapabilityState } from './handlers/ble/ble-wire';
 import type { CardSessionState, UiSlotsState, UiStepState } from './handlers/ui/ui-socket-state';
@@ -264,6 +265,8 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
    * TLS rather than the WebSocket; read it through `queuedSendBytes`, which falls back to `bufferedAmount`.
    */
   pendingSendBytes?: () => number;
+  /** The credential this session authenticated with and the build the reader reported; session transport only. */
+  sessionSecurity?: SessionSecurityState;
   readerId: AttractapReader['id'] | null;
   readerName: string | null;
   /**

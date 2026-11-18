@@ -23,7 +23,7 @@ const mockReadSync = readSync as jest.MockedFunction<typeof readSync>;
 export function registerAttractapFirmwareHandlerFixture() {
   let handler: AttractapFirmwareHandler;
 
-  let mockAttractapService: { updateReaderFirmware: jest.Mock };
+  let mockAttractapService: { updateReaderFirmware: jest.Mock; recordReaderBuild: jest.Mock };
 
   let mockFirmwareService: { getFirmwareDefinition: jest.Mock };
 
@@ -53,7 +53,10 @@ export function registerAttractapFirmwareHandlerFixture() {
       debug: jest.fn(),
     };
 
-    mockAttractapService = { updateReaderFirmware: jest.fn().mockResolvedValue(undefined) };
+    mockAttractapService = {
+      updateReaderFirmware: jest.fn().mockResolvedValue(undefined),
+      recordReaderBuild: jest.fn().mockResolvedValue(undefined),
+    };
     mockFirmwareService = { getFirmwareDefinition: jest.fn() };
     mockMetricsService = { attractapFirmwareUpdatesTotal: { inc: jest.fn() } };
 

@@ -24,6 +24,7 @@ import { EnrollmentLimitsService } from '../../device-enrollment/enrollment-limi
 import { SettingsService } from '../../settings/settings.service';
 import { AttractapService } from '../attractap.service';
 import { BootstrapGrants } from './bootstrap-grants';
+import { canonicalReaderSpki } from './reader-spki';
 import { CredentialRegistryService } from './credential-registry.service';
 import { InstallationIdentityService } from './installation-identity.service';
 import { PairingApproval } from './pairing-approval';
@@ -39,7 +40,6 @@ import {
   PairingRequest,
   PairingView,
   Round,
-  canonicalP256Spki,
   isTerminal,
   roundsOf,
   validFirmware,
@@ -160,7 +160,8 @@ export class PairingService implements OnApplicationShutdown {
     if (message['kind'] !== 'lite' && message['kind'] !== 'touch') throw new Error('invalid hello');
     const kind = message['kind'];
     const firmware = validFirmware(message['firmware']);
-    const readerPublicKey = await canonicalP256Spki(message['publicKey']);
+    // P-256, or RSA-3072 for a reader whose identity lives in the DS peripheral.
+    const { spki: readerPublicKey } = await canonicalReaderSpki(message['publicKey']);
 
     // Admitted first: a rate-limited hello must not use up the reader's one-time ticket.
     const admission = this.limits.admit(connectionId, address);

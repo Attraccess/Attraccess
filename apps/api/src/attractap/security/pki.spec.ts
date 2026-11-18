@@ -1,7 +1,7 @@
 // Loaded first, as in the API process: it brings its own @peculiar/x509 major. Without the pnpm patch that
 // gives ours its own tsyringe container, both register the same tokens and certificate generation breaks.
 import '@simplewebauthn/server';
-import { X509Certificate, webcrypto } from 'crypto';
+import { X509Certificate, generateKeyPairSync, webcrypto } from 'crypto';
 import { createRequire } from 'module';
 import {
   INSTALLATION_URI_PREFIX,
@@ -62,5 +62,40 @@ describe('pki', () => {
     const keys = await generateKeyPair();
     const spki = Buffer.from(await x509.PublicKey.create(keys.publicKey).then((k) => k.rawData));
     expect(spkiFingerprint(spki)).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('pki with RSA reader keys', () => {
+  const issue = async (spki: Buffer) => {
+    const ca = await createCaCertificate('inst-rsa');
+    const leaf = await issueLeaf({
+      caCert: ca.cert,
+      caKey: ca.keys.privateKey,
+      subjectPublicKey: spki,
+      commonName: 'rsa reader',
+      uri: `${READER_URI_PREFIX}9`,
+      usage: 'client',
+      validityMs: 1000 * 60 * 60,
+    });
+    return { ca, leaf };
+  };
+
+  it('certifies an RSA-3072 SPKI under the ECDSA P-256 CA, with the same SANs', async () => {
+    const spki = generateKeyPairSync('rsa', { modulusLength: 3072, publicExponent: 65537 }).publicKey.export({
+      type: 'spki',
+      format: 'der',
+    });
+    const { ca, leaf } = await issue(spki);
+    const node = new X509Certificate(leaf.toString('pem'));
+    expect(node.publicKey.asymmetricKeyType).toBe('rsa');
+    expect(node.publicKey.export({ type: 'spki', format: 'der' })).toEqual(spki);
+    expect(node.verify(new X509Certificate(ca.cert.toString('pem')).publicKey)).toBe(true);
+    expect(ca.cert.publicKey.algorithm.name).toBe('ECDSA');
+    expect(uriSanValue(leaf, READER_URI_PREFIX)).toBe('9');
+  });
+
+  it.each([2048, 4096])('never certifies an RSA-%s key', async (bits) => {
+    const spki = generateKeyPairSync('rsa', { modulusLength: bits }).publicKey.export({ type: 'spki', format: 'der' });
+    await expect(issue(spki)).rejects.toThrow('unsupported reader public key');
   });
 });

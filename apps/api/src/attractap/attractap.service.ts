@@ -7,6 +7,7 @@ import type {
   AttractapCrashReportRecord,
   AttractapCardOwner,
   AttractapFirmwareInfo,
+  AttractapFirmwareProfile,
   AttractapNfcCard,
   AttractapReader,
   AttractapReaderEdit,
@@ -356,6 +357,21 @@ export class AttractapService {
    */
   public async updateReaderFirmware(id: number, firmware: AttractapFirmwareInfo) {
     await this.updateReader(id, { firmware }, false);
+  }
+
+  /**
+   * Stores what the reader reported about its build (profile, app secure_version). A claim: it never makes a reader
+   * secured. A reader that is not a release secure build any more loses `secured` right away.
+   */
+  public async recordReaderBuild(
+    id: number,
+    build: { profile: AttractapFirmwareProfile | null; release: boolean; secureVersion: number | null },
+  ) {
+    await this.readerStore.applySecurity(id, {
+      firmwareProfile: build.profile,
+      secureVersion: build.secureVersion,
+      ...(build.profile === 'secure' && build.release ? {} : { secured: false, securedAt: null }),
+    });
   }
 
   public async getAllReaders(filter?: AttractapReaderFilter): Promise<AttractapReader[]> {

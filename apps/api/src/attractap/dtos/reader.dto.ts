@@ -120,6 +120,39 @@ export class AttractapReaderDto {
   certificateSerial!: string | null;
 
   @ApiProperty({
+    description:
+      'True when the last eFuse report matched the secure profile on a release build and an RSA (DS) identity',
+    default: false,
+  })
+  secured!: boolean;
+
+  @ApiProperty({ description: 'When the reader last became secured', nullable: true })
+  securedAt!: Date | null;
+
+  @ApiProperty({
+    description: 'Firmware profile the reader reported (a claim, not attestation)',
+    enum: ['plain', 'secure', 'secure-lab'],
+    nullable: true,
+  })
+  firmwareProfile!: 'plain' | 'secure' | 'secure-lab' | null;
+
+  @ApiProperty({ description: "The app's secure_version as the reader reported it", nullable: true })
+  secureVersion!: number | null;
+
+  @ApiProperty({ description: 'The eFuse SECURE_VERSION from the last eFuse report', nullable: true })
+  efuseSecureVersion!: number | null;
+
+  @ApiProperty({ description: 'When the last eFuse report was checked', nullable: true })
+  securityReportCheckedAt!: Date | null;
+
+  @ApiProperty({
+    description: 'Problem codes of the last eFuse report check (empty when it passed)',
+    type: [String],
+    nullable: true,
+  })
+  securityReportProblems!: string[] | null;
+
+  @ApiProperty({
     description: 'The resources that the reader has access to',
     type: 'array',
     items: { $ref: getSchemaPath('Resource') },
@@ -166,6 +199,13 @@ export function toReaderDto(reader: AttractapReader): AttractapReaderDto {
     pairedAt: reader.pairedAt,
     certificateNotAfter: reader.certificateNotAfter,
     certificateSerial: reader.certificateSerial,
+    secured: reader.secured,
+    securedAt: reader.securedAt,
+    firmwareProfile: reader.firmwareProfile,
+    secureVersion: reader.secureVersion,
+    efuseSecureVersion: reader.efuseSecureVersion,
+    securityReportCheckedAt: reader.securityReportCheckedAt,
+    securityReportProblems: reader.securityReportProblems,
     ...(reader.resources ? { resources: reader.resources } : {}),
     lastConnection: reader.lastConnection,
     firstConnection: reader.firstConnection,

@@ -27,6 +27,9 @@ export interface CredentialPatch {
   certificateNotAfter?: Date | null;
   certificateSerial?: string | null;
   apiTokenHash?: string;
+  /** Cleared when the credential goes away or changes hands; the eFuse report check sets it again. */
+  secured?: boolean;
+  securedAt?: Date | null;
 }
 
 /**

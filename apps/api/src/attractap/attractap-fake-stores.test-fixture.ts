@@ -11,6 +11,7 @@ import type {
   AttractapReader,
   AttractapReaderEdit,
   AttractapReaderFilter,
+  AttractapReaderSecurityPatch,
   AttractapReaderWithResources,
   AttractapSecureBootKeyRecord,
   AttractapSecureBootKeyRole,
@@ -59,6 +60,13 @@ export function makeReader(overrides: Partial<AttractapReader> = {}): AttractapR
     pairedAt: null,
     certificateNotAfter: null,
     certificateSerial: null,
+    secured: false,
+    securedAt: null,
+    firmwareProfile: null,
+    secureVersion: null,
+    efuseSecureVersion: null,
+    securityReportCheckedAt: null,
+    securityReportProblems: null,
     lastConnection: new Date(0),
     firstConnection: new Date(0),
     ledBrightness: 255,
@@ -120,6 +128,11 @@ export class FakeReaderStore implements AttractapReaderStore {
     if (edit.firmware) reader.firmware = edit.firmware;
     if (edit.resourceIds)
       reader.resources = edit.resourceIds.map((rid) => this.resources.get(rid) ?? makeResource(rid));
+  }
+
+  async applySecurity(id: number, patch: AttractapReaderSecurityPatch): Promise<void> {
+    const reader = this.readers.get(id);
+    if (reader) Object.assign(reader, patch);
   }
 
   async recordConnection(id: number, at: Date): Promise<void> {
@@ -326,7 +339,7 @@ export class FakeCredentialStore implements AttractapCredentialStore {
     Object.assign(this.rows.get(readerId), patch);
   }
   async appendEvent(_scope: TransactionScope, event: CredentialEventInput) {
-    this.events.push({ id: this.nextEventId++, createdAt: new Date(0), ...event });
+    this.events.push({ id: this.nextEventId++, createdAt: new Date(), ...event });
   }
   async updateCertificateIfActive(
     readerId: number,

@@ -1,6 +1,6 @@
 import { createServer, Server } from 'http';
 import { AddressInfo } from 'net';
-import { ECDH, webcrypto } from 'crypto';
+import { ECDH, generateKeyPairSync, webcrypto } from 'crypto';
 import { WebSocket, WebSocketServer } from 'ws';
 import { CREDENTIAL_CHANGED_EVENT, PairingService } from './pairing.service';
 import { commitmentMatches, deriveCode } from './pairing-protocol';
@@ -212,8 +212,8 @@ describe('PairingService', () => {
   const firmware = { name: 'attractap', variant: 'touch', version: '1.8.0' };
 
   /** A reader that follows the protocol: hello, round, nonce, reveal and its own derivation. */
-  async function announce(extra: Record<string, unknown> = {}, kind: 'touch' | 'lite' = 'touch') {
-    const publicKey = await readerKey();
+  async function announce(extra: Record<string, unknown> = {}, kind: 'touch' | 'lite' = 'touch', key?: Buffer) {
+    const publicKey = key ?? (await readerKey());
     const client = new PairingClient(url);
     clients.push(client);
     await client.opened();
@@ -304,6 +304,11 @@ describe('PairingService', () => {
     release();
     await client.next('round');
     expect(service.list()).toHaveLength(1);
+  });
+
+  it('pairs a reader whose key is RSA-3072 (the DS identity)', async () => {
+    const { publicKey } = generateKeyPairSync('rsa', { modulusLength: 3072 });
+    await announce({}, 'touch', publicKey.export({ type: 'spki', format: 'der' }));
   });
 
   it('records the flasher as the method when approving through it', async () => {

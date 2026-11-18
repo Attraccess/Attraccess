@@ -4,6 +4,10 @@ import type { ResourceType } from './resource-type';
 
 export type AttractapPairingState = 'unpaired' | 'paired' | 'revoked';
 
+/** Firmware build profile a reader reports: plain, release secure or the lab's development-mode secure build. */
+export const ATTRACTAP_FIRMWARE_PROFILES = ['plain', 'secure', 'secure-lab'] as const;
+export type AttractapFirmwareProfile = (typeof ATTRACTAP_FIRMWARE_PROFILES)[number];
+
 /** What the reader firmware can do, as reported by the reader. */
 export interface AttractapReaderCapabilities {
   resourceSelection: boolean;
@@ -62,6 +66,18 @@ export interface AttractapReader {
   pairedAt: Date | null;
   certificateNotAfter: Date | null;
   certificateSerial: string | null;
+  /** The server checked the reader's eFuse report against the secure profile (never the reader's own claim). */
+  secured: boolean;
+  securedAt: Date | null;
+  /** Profile the reader reported in its firmware info; a claim, not attestation. */
+  firmwareProfile: AttractapFirmwareProfile | null;
+  /** The app's secure_version as the reader reported it. */
+  secureVersion: number | null;
+  /** The eFuse SECURE_VERSION from the reader's last eFuse report. */
+  efuseSecureVersion: number | null;
+  securityReportCheckedAt: Date | null;
+  /** Problem codes of the last eFuse report check; empty when it passed, null when none was received. */
+  securityReportProblems: string[] | null;
   /** Present only when the read asked for the linked resources. */
   resources?: AttractapLinkedResource[];
   lastConnection: Date;
@@ -70,6 +86,17 @@ export interface AttractapReader {
   /** Whether backend plugins with the BLE_TRANSPORT permission may use this reader's Bluetooth radio. */
   allowPluginBle: boolean;
   firmware: AttractapFirmwareInfo;
+}
+
+/** The security columns the server writes on its own (firmware info, eFuse report); never part of an edit. */
+export interface AttractapReaderSecurityPatch {
+  secured?: boolean;
+  securedAt?: Date | null;
+  firmwareProfile?: AttractapFirmwareProfile | null;
+  secureVersion?: number | null;
+  efuseSecureVersion?: number | null;
+  securityReportCheckedAt?: Date | null;
+  securityReportProblems?: string[] | null;
 }
 
 /** A reader read together with its linked resources. */

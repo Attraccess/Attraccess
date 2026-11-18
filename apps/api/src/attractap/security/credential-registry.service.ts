@@ -77,7 +77,8 @@ export class CredentialRegistryService {
     readerId: number;
     fingerprint: string;
     certificate: IssuedCertificate;
-    actorId: number;
+    /** The responsible user; null when the reader itself changes its identity (identity upgrade). */
+    actorId: number | null;
     previousCredentialBecomes: 'revoked' | 'replaced';
   }): Promise<{ previousFingerprint: string | null; before: CredentialSnapshot }> {
     const { readerId, fingerprint, certificate, actorId } = input;
@@ -111,6 +112,9 @@ export class CredentialRegistryService {
           certificateNotAfter: certificate.notAfter,
           certificateSerial: certificate.serial,
           apiTokenHash: '', // token sign-in is over for this reader
+          // A new credential has to pass the eFuse report check again.
+          secured: false,
+          securedAt: null,
         });
         await this.store.appendEvent(scope, {
           readerId: reader.id,
@@ -189,7 +193,12 @@ export class CredentialRegistryService {
           state: 'revoked',
           actorId,
         });
-        await this.store.updateCredential(scope, reader.id, { pairingState: 'revoked', certificateNotAfter: null });
+        await this.store.updateCredential(scope, reader.id, {
+          pairingState: 'revoked',
+          certificateNotAfter: null,
+          secured: false,
+          securedAt: null,
+        });
       });
     } finally {
       this.invalidate(readerId);

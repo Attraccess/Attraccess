@@ -170,6 +170,46 @@ export class Attractap {
   @ApiProperty({ description: 'Serial number of the current reader certificate', nullable: true })
   certificateSerial!: string | null;
 
+  @Column({ type: 'boolean', nullable: false, default: false })
+  @ApiProperty({
+    description:
+      'True when the last eFuse report matched the secure profile on a release build and an RSA (DS) identity. Set by the server only.',
+    default: false,
+  })
+  secured!: boolean;
+
+  @Column({ type: 'datetime', nullable: true })
+  @ApiProperty({ description: 'When the reader last became secured', nullable: true })
+  securedAt!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: 'Firmware profile the reader reported',
+    enum: ['plain', 'secure', 'secure-lab'],
+    nullable: true,
+  })
+  firmwareProfile!: 'plain' | 'secure' | 'secure-lab' | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({ description: "The app's secure_version as the reader reported it", nullable: true })
+  secureVersion!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({ description: 'The eFuse SECURE_VERSION from the last eFuse report', nullable: true })
+  efuseSecureVersion!: number | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  @ApiProperty({ description: 'When the last eFuse report was checked', nullable: true })
+  securityReportCheckedAt!: Date | null;
+
+  @Column({ type: 'simple-json', nullable: true })
+  @ApiProperty({
+    description: 'Problem codes of the last eFuse report check (empty when it passed)',
+    type: [String],
+    nullable: true,
+  })
+  securityReportProblems!: string[] | null;
+
   @ManyToMany(() => Resource, (resource) => resource.attractapReaders)
   @JoinTable()
   @ApiProperty({ description: 'The resources that the reader has access to', type: () => Resource, isArray: true })

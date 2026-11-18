@@ -7,7 +7,7 @@ import { join, relative } from 'path';
  * modules, including calls that span several lines and values passed as extra arguments.
  */
 const SECRET =
-  /token|nonce|ticket|secret|password|privatekey|private_key|\bkey\b|keystring|\bcode\b|payload|plaintext|decrypted|pem\b|passphrase/i;
+  /token|nonce|ticket|secret|password|privatekey|private_key|\bkey\b|keystring|\bcode\b|payload|plaintext|decrypted|pem\b|passphrase|proof|spki|certificate|signature/i;
 /** Extra arguments that are whole message objects carry payloads. */
 const WHOLE_MESSAGE = /^(data|message|event|eventdata|payload|body|frame|request|req)(\.data)?(\.payload)?$/i;
 
@@ -86,6 +86,35 @@ describe('secret hygiene in logs', () => {
   it.each(files.map((f) => [relative(ROOT, f), f]))('%s logs no secret material', (_name, file) => {
     const offending = logCalls(readFileSync(file, 'utf8')).filter((call) => leaks(call).length > 0);
     expect(offending).toEqual([]);
+  });
+
+  describe('the identity upgrade, the challenge and the eFuse report', () => {
+    it.each([
+      'identity-upgrade.service.ts',
+      'identity-upgrade-proof.ts',
+      'identity-upgrade-gate.ts',
+      'efuse-report.service.ts',
+      'efuse-report.ts',
+      'reader-control.service.ts',
+      'session-security-state.ts',
+    ])('%s is scanned', (name) => {
+      expect(files.map((f) => relative(join(ROOT, 'security'), f))).toContain(name);
+    });
+
+    it('catches a nonce, proof, public key, certificate or report put into a log', () => {
+      for (const example of [
+        'this.logger.debug(`challenge ${this.nonce.value.toString("hex")}`);',
+        'this.logger.warn(`upgrade ${message.proof}`);',
+        'this.logger.debug("upgrade failed", message);',
+        'this.logger.log(`report`, body);',
+        'this.logger.debug(`upgrade spki ${spki.toString("base64")}`, spki);',
+      ]) {
+        expect(logCalls(example).flatMap(leaks)).not.toEqual([]);
+      }
+      expect(
+        logCalls('this.logger.warn(`Identity upgrade failed: ${(error as Error).message}`);').flatMap(leaks),
+      ).toEqual([]);
+    });
   });
 
   it('catches the leaks this scan exists for', () => {

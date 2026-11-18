@@ -4,6 +4,7 @@ import type {
   AttractapReader,
   AttractapReaderEdit,
   AttractapReaderFilter,
+  AttractapReaderSecurityPatch,
   AttractapReaderWithResources,
 } from '@attraccess/application-models';
 
@@ -23,6 +24,8 @@ export interface AttractapReaderStore {
   findResourcesByIds(ids: number[]): Promise<AttractapLinkedResource[]>;
   /** Saves name, brightness, firmware and linked resources; credentials stay as they are. */
   applyEdit(id: number, edit: AttractapReaderEdit): Promise<void>;
+  /** Writes the security columns only (firmware profile, eFuse report result, secured); nothing else changes. */
+  applySecurity(id: number, patch: AttractapReaderSecurityPatch): Promise<void>;
   recordConnection(id: number, at: Date): Promise<void>;
   /** True when a reader was deleted. */
   delete(id: number): Promise<boolean>;

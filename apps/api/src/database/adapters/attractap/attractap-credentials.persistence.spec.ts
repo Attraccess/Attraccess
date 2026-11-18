@@ -8,6 +8,7 @@ import { sqliteBackend } from '../../sqlite/sqlite-backend';
 import { createSqliteUnitOfWork } from '../../sqlite/sqlite-unit-of-work';
 import { TransactionHandles } from '../common/transaction-handles';
 import { TypeOrmAttractapCredentialStore } from './typeorm-credential.store';
+import { TypeOrmAttractapReaderStore } from './typeorm-reader.store';
 
 /**
  * The credential changes on a real SQLite file, through two independent DataSources (two processes' worth of
@@ -181,6 +182,41 @@ describe('credential registry on SQLite (atomic reader row and history)', () => 
       [readerId, 'revoked', 'fp'],
     ]);
     expect((await registry.history(readerId)).map((e) => e.state)).toEqual(['revoked', 'paired']);
+  });
+
+  it('clears secured when the credential is revoked or replaced, and keeps the other security columns', async () => {
+    const { source, registry } = await connect();
+    const readerId = await addReader(source, 'one');
+    const readers = new TypeOrmAttractapReaderStore(source.getRepository(Attractap), source.getRepository(Resource));
+    const pair = (fingerprint: string) =>
+      registry.markPaired({ readerId, fingerprint, certificate, actorId: null, previousCredentialBecomes: 'replaced' });
+    await pair('fp');
+    const checkedAt = new Date('2026-11-18T10:00:00Z');
+    await readers.applySecurity(readerId, {
+      secured: true,
+      securedAt: checkedAt,
+      firmwareProfile: 'secure',
+      efuseSecureVersion: 1,
+      securityReportCheckedAt: checkedAt,
+      securityReportProblems: [],
+    });
+    expect(await readers.findById(readerId)).toMatchObject({
+      secured: true,
+      firmwareProfile: 'secure',
+      securityReportProblems: [],
+    });
+
+    await pair('fp-ds'); // an identity upgrade: the new key has to pass the report check again
+    expect(await readers.findById(readerId)).toMatchObject({
+      secured: false,
+      securedAt: null,
+      firmwareProfile: 'secure',
+      efuseSecureVersion: 1,
+      securityReportCheckedAt: checkedAt,
+    });
+    await readers.applySecurity(readerId, { secured: true, securedAt: checkedAt });
+    await registry.revoke(readerId, 9);
+    expect(await readers.findById(readerId)).toMatchObject({ secured: false, securedAt: null });
   });
 
   it('gives a token reader its token back when the pairing is undone', async () => {
