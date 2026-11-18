@@ -4,10 +4,12 @@ import { Harness, at, createHarness, principal } from '../testing/harness.test-u
 const slot = { startTime: at('2026-06-02T08:00:00'), endTime: at('2026-06-02T09:00:00') };
 
 /**
- * Two independent hosts (own services, own in-process mutex) on one storage: only the port's transactions (overlap
- * check and insert in one scope) keep overlapping creates apart, as between two API processes.
+ * Two plugin instances (own services, own in-process mutex) on one shared in-memory store: only the store's serialized
+ * transactions (overlap check and insert in one scope) keep overlapping creates apart. This is the in-process fake;
+ * it does not prove the same for two processes on independent database connections (a host-side spec on the real
+ * engine does).
  */
-describe('reservation creates across two connections', () => {
+describe('reservation creates from two plugin instances sharing one serialized store', () => {
   let first: Harness;
   let second: Harness;
 
@@ -22,7 +24,7 @@ describe('reservation creates across two connections', () => {
     await first.close();
   });
 
-  /** N overlapping creates, alternating between the two hosts, all started at once. */
+  /** N overlapping creates, alternating between the two instances, all started at once. */
   const createConcurrently = (count: number) =>
     Promise.allSettled(
       Array.from({ length: count }, (_, i) =>
