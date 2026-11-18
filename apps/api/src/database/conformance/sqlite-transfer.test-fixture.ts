@@ -1,34 +1,17 @@
 import { copyFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { DataSource, MigrationInterface, QueryRunner } from 'typeorm';
+import type { DataSource, DataSourceOptions } from 'typeorm';
+import { compilePluginStorage } from '../../plugin-system/plugin-storage/storage-schema';
 import { closeTestDataSource, createTestDataSource } from '../../test-utils/test-database';
 import { resolveDatabaseBackend } from '../backend';
-import { pluginMigrationsTable } from '../sqlite/sqlite-transfer';
+import {
+  createSqlitePluginMigrationEngine,
+  createSqlitePluginPersistenceHost,
+} from '../sqlite/plugin-storage/sqlite-plugin-storage';
 import type { PluginDescriptor } from '../transfer-snapshot';
+import { TRANSFER_PLUGIN_ROWS, TRANSFER_PLUGIN_STORAGE } from './transfer-plugin.test-fixture';
 import type { TransferBackendFixture, TransferDatabase } from './transfer-fixture';
-
-/** The migrations a plugin ships, in the form the plugin system runs them: a plugin-scoped migration track. */
-class CreateMeasurements1700000000001 implements MigrationInterface {
-  name = 'CreateMeasurements1700000000001';
-  async up(runner: QueryRunner): Promise<void> {
-    await runner.query(`CREATE TABLE "demo_measurement" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-      "sensor" varchar NOT NULL, "reading" varchar NOT NULL, "takenAt" datetime NOT NULL)`);
-  }
-  async down(runner: QueryRunner): Promise<void> {
-    await runner.query('DROP TABLE "demo_measurement"');
-  }
-}
-class AddMeasurementUnit1700000000002 implements MigrationInterface {
-  name = 'AddMeasurementUnit1700000000002';
-  async up(runner: QueryRunner): Promise<void> {
-    await runner.query('ALTER TABLE "demo_measurement" ADD COLUMN "unit" varchar');
-  }
-  async down(): Promise<void> {
-    return undefined;
-  }
-}
-const PLUGIN_MIGRATIONS = [CreateMeasurements1700000000001, AddMeasurementUnit1700000000002];
 
 /** One migrated database per test file: copying a closed file is much faster than running the whole track again. */
 let template: Promise<{ directory: string; file: string }> | undefined;
@@ -102,29 +85,24 @@ async function openDatabase(): Promise<TransferDatabase> {
     },
 
     async installPlugin(plugin, withData): Promise<PluginDescriptor> {
-      const pluginSource = await createTestDataSource({
-        location: file,
-        entities: [],
-        migrations: PLUGIN_MIGRATIONS,
-        migrationsTableName: pluginMigrationsTable(plugin.id),
+      const { plugins } = resolveDatabaseBackend();
+      const storage = compilePluginStorage(plugin.id, TRANSFER_PLUGIN_STORAGE, {
+        reservedTables: plugins.coreTableNames(),
       });
-      try {
-        await pluginSource.runMigrations({ transaction: 'all' });
-        if (withData) {
-          await pluginSource.query(
-            `INSERT INTO demo_measurement (id, sensor, reading, takenAt, unit) VALUES
-              (1, 'pm25', '12.340000000000000001', '2026-06-01 10:00:00.5', 'ug/m3'),
-              (7, 'co2', '415', '2026-06-01T12:00:00+02:00', NULL)`,
-          );
-        }
-      } finally {
-        await closeTestDataSource(pluginSource);
+      const engineOptions = { type: 'sqlite', database: file } as DataSourceOptions;
+      await createSqlitePluginMigrationEngine(engineOptions, () => engineOptions).migrate(storage);
+      if (withData) {
+        const contexts = createSqlitePluginPersistenceHost(() => source).createContexts(plugin.id, storage);
+        const tables = contexts.storage.open(TRANSFER_PLUGIN_STORAGE) as never as {
+          measurement: { insertMany(rows: unknown[]): Promise<unknown> };
+        };
+        await tables.measurement.insertMany(TRANSFER_PLUGIN_ROWS.map((row) => row.write));
       }
-      return { ...plugin, tables: ['demo_measurement'] };
+      return { ...plugin, storage };
     },
 
     exportSnapshot: (options) => transfer.exportSnapshot(source, options),
-    importSnapshot: (snapshot) => transfer.importSnapshot(source, snapshot),
+    importSnapshot: (snapshot, options) => transfer.importSnapshot(source, snapshot, options),
 
     async addTopUp(userId, amount) {
       await source.query("INSERT INTO billing_transaction (userId, amount, status) VALUES (?, ?, 'completed')", [

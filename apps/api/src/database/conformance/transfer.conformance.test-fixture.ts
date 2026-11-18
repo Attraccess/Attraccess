@@ -8,6 +8,7 @@ import {
   type TableSnapshot,
 } from '../transfer-snapshot';
 import type { TransferBackendFixture, TransferDatabase } from './transfer-fixture';
+import { TRANSFER_PLUGIN, TRANSFER_PLUGIN_ROWS, TRANSFER_PLUGIN_TABLE } from './transfer-plugin.test-fixture';
 
 /**
  * The data every backend fixture writes in `populate()`. Ids are chosen with gaps on purpose (a deleted user, a
@@ -28,8 +29,6 @@ export const TRANSFER_DATASET = {
   /** The highest transaction id ever issued, deleted again: the next generated id must be above it. */
   highestIssuedTransactionId: 99,
 } as const;
-
-export const TRANSFER_PLUGIN = { id: '@demo/air-quality', version: '1.2.3' } as const;
 
 const table = (snapshot: DatabaseSnapshot, name: string): TableSnapshot => {
   const found = snapshot.tables.find((candidate) => candidate.name === name);
@@ -52,6 +51,7 @@ export function describeTransferConformance(fixture: TransferBackendFixture): vo
     let source: TransferDatabase;
     let target: TransferDatabase;
     let plugin: PluginDescriptor;
+    let targetPlugin: PluginDescriptor;
     let snapshot: DatabaseSnapshot;
     const open: TransferDatabase[] = [];
 
@@ -65,7 +65,7 @@ export function describeTransferConformance(fixture: TransferBackendFixture): vo
       source = await create();
       target = await create();
       plugin = await source.installPlugin(TRANSFER_PLUGIN, true);
-      await target.installPlugin(TRANSFER_PLUGIN, false);
+      targetPlugin = await target.installPlugin(TRANSFER_PLUGIN, false);
       await source.populate();
       snapshot = await source.exportSnapshot({ plugins: [plugin] });
     });
@@ -78,29 +78,31 @@ export function describeTransferConformance(fixture: TransferBackendFixture): vo
       await fixture.dispose?.();
     });
 
-    const restoredSnapshot = () => target.exportSnapshot({ plugins: [plugin] });
+    const restoredSnapshot = () => target.exportSnapshot({ plugins: [targetPlugin] });
+    /** A restore into the target, which has the plugin installed at the same storage versions. */
+    const restore = (into: DatabaseSnapshot) => target.importSnapshot(into, { plugins: [targetPlugin] });
 
     it('restores everything: exporting the restored database equals the source export', async () => {
-      await target.importSnapshot(snapshot);
+      await restore(snapshot);
       expect(await restoredSnapshot()).toEqual(snapshot);
       expect(await target.integrityViolations()).toEqual([]);
     });
 
     it('restores from the serialized form, so a snapshot can be stored and moved as a file', async () => {
-      await target.importSnapshot(parseSnapshot(serializeSnapshot(snapshot)));
+      await restore(parseSnapshot(serializeSnapshot(snapshot)));
       expect(await restoredSnapshot()).toEqual(snapshot);
     });
 
     it('replaces data that already exists in the target instead of merging with it', async () => {
       await target.populate();
       await target.addTopUp(1, 5);
-      await target.importSnapshot(snapshot);
+      await restore(snapshot);
       expect(await restoredSnapshot()).toEqual(snapshot);
     });
 
     describe('stable ids and relationships', () => {
       it('keeps every primary key, including gaps, and every reference between rows', async () => {
-        await target.importSnapshot(snapshot);
+        await restore(snapshot);
         const restored = await restoredSnapshot();
         expect(records(restored, 'user').map((user) => user.id)).toEqual(TRANSFER_DATASET.userIds);
         const [usage] = records(restored, 'resource_usage');
@@ -113,7 +115,7 @@ export function describeTransferConformance(fixture: TransferBackendFixture): vo
 
       it('continues generated ids after the highest id the source ever issued', async () => {
         const sourceNext = await source.addTopUp(1, 1);
-        await target.importSnapshot(snapshot);
+        await restore(snapshot);
         const targetNext = await target.addTopUp(1, 1);
         expect(sourceNext.id).toBe(TRANSFER_DATASET.highestIssuedTransactionId + 1);
         expect(targetNext.id).toBe(sourceNext.id);
@@ -144,7 +146,7 @@ export function describeTransferConformance(fixture: TransferBackendFixture): vo
       });
 
       it('restores the same instants', async () => {
-        await target.importSnapshot(snapshot);
+        await restore(snapshot);
         const restored = await restoredSnapshot();
         const [usage] = records(restored, 'resource_usage');
         expect(Date.parse(String(usage.endTime)) - Date.parse(String(usage.startTime))).toBe(105 * 60_000);
@@ -165,7 +167,7 @@ export function describeTransferConformance(fixture: TransferBackendFixture): vo
       });
 
       it('copies price snapshots and accepted observations unchanged', async () => {
-        await target.importSnapshot(snapshot);
+        await restore(snapshot);
         const restored = await restoredSnapshot();
         const [usage] = records(restored, 'resource_usage');
         expect(usage).toMatchObject({
@@ -184,39 +186,58 @@ export function describeTransferConformance(fixture: TransferBackendFixture): vo
       });
 
       it('keeps text exactly, including non-ASCII characters', async () => {
-        await target.importSnapshot(snapshot);
+        await restore(snapshot);
         const role = records(await restoredSnapshot(), 'role').find((candidate) => candidate.key === 'administrator');
         expect(role?.description).toBe(TRANSFER_DATASET.adminDescription);
       });
     });
 
     describe('plugin data and plugin migration state', () => {
-      it('exports the plugin tables with their rows, the plugin migration state and the plugin version', () => {
-        expect(snapshot.plugins).toHaveLength(1);
-        const exported = snapshot.plugins[0];
-        expect(exported).toMatchObject({ id: TRANSFER_PLUGIN.id, version: TRANSFER_PLUGIN.version });
-        expect(exported.tables).toEqual(plugin.tables);
-        expect(exported.migrations.length).toBeGreaterThan(0);
-        for (const name of plugin.tables) expect(table(snapshot, name).rows.length).toBeGreaterThan(0);
+      it('exports the plugin tables with their rows, the plugin storage versions and the plugin version', () => {
+        expect(snapshot.plugins).toEqual([
+          {
+            id: TRANSFER_PLUGIN.id,
+            version: TRANSFER_PLUGIN.version,
+            tables: [TRANSFER_PLUGIN_TABLE],
+            storage: { namespace: 'demo_air_quality', versions: [1, 2] },
+          },
+        ]);
+        expect(table(snapshot, TRANSFER_PLUGIN_TABLE).rows).toHaveLength(TRANSFER_PLUGIN_ROWS.length);
       });
 
-      it('restores plugin rows and the plugin migration state into the plugin schema', async () => {
-        await target.importSnapshot(snapshot);
+      it('exports plugin values by their declaration, not by how the engine stores them', () => {
+        expect(table(snapshot, TRANSFER_PLUGIN_TABLE).columns).toEqual([
+          { name: 'id', kind: 'integer' },
+          { name: 'sensor', kind: 'text' },
+          { name: 'reading', kind: 'decimal' },
+          { name: 'takenAt', kind: 'timestamp' },
+          { name: 'calibrated', kind: 'boolean' },
+          { name: 'day', kind: 'date' },
+          { name: 'meta', kind: 'text' },
+          { name: 'unit', kind: 'text' },
+        ]);
+        const rows = records(snapshot, TRANSFER_PLUGIN_TABLE);
+        TRANSFER_PLUGIN_ROWS.forEach((row, index) => expect(rows[index]).toMatchObject(row.exported));
+        expect(JSON.parse(String(rows[0].meta))).toEqual({ source: 'lab' });
+      });
+
+      it('restores plugin rows and the plugin storage state into the plugin schema', async () => {
+        await restore(snapshot);
         const restored = await restoredSnapshot();
         expect(restored.plugins).toEqual(snapshot.plugins);
-        for (const name of plugin.tables) expect(table(restored, name)).toEqual(table(snapshot, name));
+        for (const name of snapshot.plugins[0].tables) expect(table(restored, name)).toEqual(table(snapshot, name));
       });
 
-      it('refuses a target whose plugin is at another migration state, and changes nothing', async () => {
+      it('refuses a target whose plugin storage is at another version, and changes nothing', async () => {
         const before = await restoredSnapshot();
         const advanced = {
           ...snapshot,
           plugins: snapshot.plugins.map((candidate) => ({
             ...candidate,
-            migrations: candidate.migrations.slice(0, -1),
+            storage: { ...candidate.storage, versions: candidate.storage.versions.slice(0, -1) },
           })),
         };
-        await expect(target.importSnapshot(advanced)).rejects.toThrow(SnapshotIncompatibleError);
+        await expect(restore(advanced)).rejects.toThrow(SnapshotIncompatibleError);
         expect(await restoredSnapshot()).toEqual(before);
       });
 
@@ -234,26 +255,26 @@ export function describeTransferConformance(fixture: TransferBackendFixture): vo
         expect(new Set(snapshot.core.migrations.map((migration) => migration.name)).size).toBe(
           snapshot.core.migrations.length,
         );
-        await target.importSnapshot(snapshot);
+        await restore(snapshot);
         expect((await restoredSnapshot()).core).toEqual(snapshot.core);
       });
 
       it('refuses a database at another core migration state, and changes nothing', async () => {
         const before = await restoredSnapshot();
         const newer = { ...snapshot, core: { ...snapshot.core, migrations: snapshot.core.migrations.slice(0, -1) } };
-        await expect(target.importSnapshot(newer)).rejects.toThrow(/core migration state/);
+        await expect(restore(newer)).rejects.toThrow(/core migration state/);
         expect(await restoredSnapshot()).toEqual(before);
       });
 
       it('refuses a snapshot written by another migration track', async () => {
         const foreign = { ...snapshot, core: { ...snapshot.core, track: 'another-engine' } };
-        await expect(target.importSnapshot(foreign)).rejects.toThrow(/migration track/);
+        await expect(restore(foreign)).rejects.toThrow(/migration track/);
       });
     });
 
     describe('derived data', () => {
       it('does not apply balances a second time while rows are copied', async () => {
-        await target.importSnapshot(snapshot);
+        await restore(snapshot);
         expect(await target.integrityViolations()).toEqual([]);
         expect(records(await restoredSnapshot(), 'user').find((user) => user.id === 1)?.creditBalance).toEqual({
           integer: TRANSFER_DATASET.hugeAmount,
@@ -261,7 +282,7 @@ export function describeTransferConformance(fixture: TransferBackendFixture): vo
       });
 
       it('keeps the balance maintenance active after the restore', async () => {
-        await target.importSnapshot(snapshot);
+        await restore(snapshot);
         const afterSource = await source.addTopUp(3, 250);
         const afterTarget = await target.addTopUp(3, 250);
         expect(afterTarget.balance).toBe(afterSource.balance);
@@ -286,7 +307,7 @@ export function describeTransferConformance(fixture: TransferBackendFixture): vo
                 },
           ),
         };
-        await expect(target.importSnapshot(broken)).rejects.toThrow(/foreign key/i);
+        await expect(restore(broken)).rejects.toThrow(/foreign key/i);
         expect(await restoredSnapshot()).toEqual(before);
         expect(await target.integrityViolations()).toEqual([]);
       });
@@ -301,7 +322,7 @@ export function describeTransferConformance(fixture: TransferBackendFixture): vo
               : candidate,
           ),
         };
-        await expect(target.importSnapshot(renamed)).rejects.toThrow(SnapshotIncompatibleError);
+        await expect(restore(renamed)).rejects.toThrow(SnapshotIncompatibleError);
         expect(await restoredSnapshot()).toEqual(before);
       });
     });

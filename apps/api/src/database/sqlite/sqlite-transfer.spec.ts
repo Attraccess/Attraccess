@@ -2,7 +2,7 @@ import type { DataSource } from 'typeorm';
 import { closeTestDataSource, createTestDataSource } from '../../test-utils/test-database';
 import type { MigrationTrack } from '../backend/database-backend';
 import { SnapshotIncompatibleError, type DatabaseSnapshot } from '../transfer-snapshot';
-import { columnKind, createSqliteTransfer, pluginMigrationsTable, toInstantIso } from './sqlite-transfer';
+import { columnKind, createSqliteTransfer, toInstantIso } from './sqlite-transfer';
 
 const track: MigrationTrack = { name: 'test-track', tableName: 'migrations', directory: 'none', migrations: [] };
 const transfer = createSqliteTransfer(track);
@@ -135,17 +135,6 @@ describe('SQLite transfer', () => {
       await source.query('INSERT INTO a_account (id) VALUES (1)');
       await source.query("INSERT INTO b_entry (id, accountId, amount, bookedAt) VALUES (1, 1, 1, 'last tuesday')");
       await expect(transfer.exportSnapshot(source)).rejects.toThrow(/b_entry\.bookedAt/);
-    });
-
-    it('rejects plugin tables that do not exist', async () => {
-      const source = await database();
-      await expect(
-        transfer.exportSnapshot(source, { plugins: [{ id: 'p', version: '1', tables: ['missing'] }] }),
-      ).rejects.toThrow(/missing/);
-    });
-
-    it('derives the plugin migration table name like the plugin system', () => {
-      expect(pluginMigrationsTable('@demo/air-quality')).toBe('plugin_migrations__demo_air_quality');
     });
   });
 

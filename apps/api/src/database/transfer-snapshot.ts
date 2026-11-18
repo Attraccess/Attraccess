@@ -1,7 +1,13 @@
+import type { CompiledPluginStorage } from '../plugin-system/plugin-storage/storage-model';
+
 /**
  * The neutral form of a whole database for export, import and backup (docs/en/developer/adding-a-database-backend.md,
  * "Export, import and backup contract"). It carries no engine syntax: each backend adapter converts its own storage
  * to and from it, so a snapshot written from one engine can in principle be read by another (ATT-584).
+ *
+ * Core tables are typed by the engine's declared column types. Plugin tables (SDK 2.0 storage) are typed by the
+ * plugin's compiled storage declaration instead, because the engine form of a plugin value is not its meaning: a
+ * SQLite plugin decimal is a scaled integer (`1250` for `"12.50"`) and exports as the decimal string.
  */
 
 /** How the value of a column is represented in a snapshot, independent of the engine's column type. */
@@ -15,6 +21,13 @@ export type SnapshotColumnKind =
   | 'timestamp'
   /** Text, including exact decimal strings (meter readings) and JSON documents. Never re-interpreted. */
   | 'text'
+  /**
+   * An exact decimal of a plugin `f.decimal` field, as a plain decimal string with the field's scale (`"12.50"`),
+   * whatever the engine stores (SQLite: a scaled integer).
+   */
+  | 'decimal'
+  /** A calendar date of a plugin `f.date` field, `YYYY-MM-DD`, no time and no zone. */
+  | 'date'
   | 'blob';
 
 export type SnapshotValue =
@@ -39,14 +52,21 @@ export interface MigrationRecord {
   readonly name: string;
 }
 
+/**
+ * A plugin with declared storage (SDK 2.0). Its rows, its version bookkeeping (`plugin_storage_migrations_<namespace>`)
+ * and an adopted 1.x migrations table are in `DatabaseSnapshot.tables` like every other table.
+ */
 export interface PluginSnapshot {
   readonly id: string;
   /** The plugin version the data belongs to; a restore needs the same plugin build to read its tables. */
   readonly version: string;
-  /** Tables the plugin owns. Their rows are in `DatabaseSnapshot.tables` like every other table. */
+  /** The tables of the plugin's declared storage (physical names). */
   readonly tables: readonly string[];
-  /** The plugin's own migration state, separate from the core track. */
-  readonly migrations: readonly MigrationRecord[];
+  /**
+   * The storage state the rows belong to: the plugin's storage namespace and the versions of its declared storage
+   * applied to the database, ascending. A restore needs the target at exactly these versions.
+   */
+  readonly storage: { readonly namespace: string; readonly versions: readonly number[] };
 }
 
 export interface DatabaseSnapshot {
@@ -62,14 +82,24 @@ export interface DatabaseSnapshot {
   readonly sequences: Readonly<Record<string, number>>;
 }
 
+/** A plugin with declared storage as the plugin system knows it. */
 export interface PluginDescriptor {
   readonly id: string;
   readonly version: string;
-  readonly tables: readonly string[];
+  /** The compiled storage declaration: it names the plugin's tables and types their columns. */
+  readonly storage: CompiledPluginStorage;
 }
 
 export interface ExportSnapshotOptions {
-  /** Plugins whose tables and migration state belong to the backup, as the plugin system knows them. */
+  /** Plugins whose tables and storage state belong to the backup. */
+  readonly plugins?: readonly PluginDescriptor[];
+}
+
+export interface ImportSnapshotOptions {
+  /**
+   * The plugins installed in the target. Every plugin of the snapshot must be among them, at the same storage
+   * versions; their declarations type the plugin columns of the target.
+   */
   readonly plugins?: readonly PluginDescriptor[];
 }
 
@@ -83,13 +113,13 @@ export class SnapshotIncompatibleError extends Error {
 
 /**
  * The export/import capability of a backend. Import restores into a database that already has the schema of the
- * snapshot's migration state (the same core track and the same plugin migrations), replaces its data completely, and
- * either succeeds fully or changes nothing.
+ * snapshot's migration state (the same core track and the same plugin storage versions), replaces its data
+ * completely, and either succeeds fully or changes nothing. `TSource` is the engine's connection; the backend
+ * registry fixes it.
  */
-/** `TSource` is the engine's connection; the backend registry fixes it. */
 export interface DatabaseTransfer<TSource = unknown> {
   exportSnapshot(source: TSource, options?: ExportSnapshotOptions): Promise<DatabaseSnapshot>;
-  importSnapshot(target: TSource, snapshot: DatabaseSnapshot): Promise<void>;
+  importSnapshot(target: TSource, snapshot: DatabaseSnapshot, options?: ImportSnapshotOptions): Promise<void>;
 }
 
 /** Snapshots are plain JSON; this is the one place that fixes how they are written and read. */

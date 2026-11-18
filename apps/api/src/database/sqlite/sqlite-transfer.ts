@@ -1,10 +1,12 @@
 import type { DataSource, EntityManager } from 'typeorm';
+import type { CompiledField } from '../../plugin-system/plugin-storage/storage-model';
 import type { MigrationTrack } from '../backend/database-backend';
 import {
   SnapshotIncompatibleError,
   type DatabaseSnapshot,
   type DatabaseTransfer,
   type ExportSnapshotOptions,
+  type ImportSnapshotOptions,
   type MigrationRecord,
   type PluginSnapshot,
   type SnapshotColumn,
@@ -12,19 +14,26 @@ import {
   type SnapshotValue,
   type TableSnapshot,
 } from '../transfer-snapshot';
-
-/** Prefix of the legacy (1.x TypeORM) plugin migration tables, which a plugin adopted into SDK 2.0 storage keeps. */
-export const PLUGIN_MIGRATIONS_TABLE_PREFIX = 'plugin_migrations_';
-
-export function pluginMigrationsTable(pluginId: string): string {
-  return `${PLUGIN_MIGRATIONS_TABLE_PREFIX}${pluginId.replace(/[^a-zA-Z0-9_]/g, '_')}`;
-}
+import {
+  appliedStorageVersions,
+  bindDeclaredValue,
+  declaredColumns,
+  declaredTables,
+  exportDeclaredValue,
+  fieldKind,
+  type DeclaredColumns,
+} from './sqlite-transfer-plugins';
 
 interface ColumnInfo {
   name: string;
   type: string;
   pk: number;
   hidden: number;
+}
+
+/** A column of a snapshot table with the plugin field that types it, if a plugin declared the table. */
+interface ColumnPlan extends SnapshotColumn {
+  readonly field?: CompiledField;
 }
 
 const quote = (identifier: string): string => `"${identifier.replace(/"/g, '""')}"`;
@@ -94,16 +103,32 @@ async function storedColumns(manager: Pick<EntityManager, 'query'>, table: strin
   return columns.filter((column) => column.hidden === 0);
 }
 
-function exportValue(
-  kind: SnapshotColumnKind,
-  row: Record<string, unknown>,
-  index: number,
-  where: string,
-): SnapshotValue {
+/** Stored columns with their neutral kinds: from the plugin declaration for plugin tables, else the declared type. */
+async function columnPlans(
+  source: Pick<EntityManager, 'query'>,
+  table: string,
+  declared: DeclaredColumns,
+): Promise<{ columns: ColumnInfo[]; plans: ColumnPlan[] }> {
+  const columns = await storedColumns(source, table);
+  const fields = declared.get(table);
+  const plans = columns.map((column): ColumnPlan => {
+    const field = fields?.get(column.name);
+    return field
+      ? { name: column.name, kind: fieldKind(field), field }
+      : { name: column.name, kind: columnKind(column.type) };
+  });
+  return { columns, plans };
+}
+
+function exportValue(plan: ColumnPlan, row: Record<string, unknown>, index: number, where: string): SnapshotValue {
+  const { kind } = plan;
   const value = row[`v${index}`];
   const storage = row[`t${index}`];
   if (storage === 'null' || value === null || value === undefined) return null;
   switch (kind) {
+    case 'decimal':
+    case 'date':
+      return exportDeclaredValue(kind, plan.field, value, storage, where);
     case 'boolean':
       if (value === 0 || value === 1) return value === 1;
       throw new SnapshotIncompatibleError(`${where}: ${String(value)} is not a boolean`);
@@ -126,9 +151,8 @@ function exportValue(
   }
 }
 
-async function exportTable(source: DataSource, table: string): Promise<TableSnapshot> {
-  const columns = await storedColumns(source, table);
-  const kinds: SnapshotColumn[] = columns.map((column) => ({ name: column.name, kind: columnKind(column.type) }));
+async function exportTable(source: DataSource, table: string, declared: DeclaredColumns): Promise<TableSnapshot> {
+  const { columns, plans } = await columnPlans(source, table, declared);
   const selects = columns.flatMap((column, index) => {
     const name = quote(column.name);
     return [
@@ -146,10 +170,8 @@ async function exportTable(source: DataSource, table: string): Promise<TableSnap
       : await source.query(`SELECT ${selects.join(', ')} FROM ${quote(table)} ORDER BY ${order}`);
   return {
     name: table,
-    columns: kinds,
-    rows: rows.map((row) =>
-      kinds.map((column, index) => exportValue(column.kind, row, index, `${table}.${column.name}`)),
-    ),
+    columns: plans.map(({ name, kind }) => ({ name, kind })),
+    rows: rows.map((row) => plans.map((plan, index) => exportValue(plan, row, index, `${table}.${plan.name}`))),
   };
 }
 
@@ -162,9 +184,13 @@ async function readMigrations(source: Pick<EntityManager, 'query'>, table: strin
   return rows.map((row) => ({ timestamp: Number(row.timestamp), name: row.name }));
 }
 
-function bindValue(kind: SnapshotColumnKind, value: SnapshotValue, where: string): unknown {
+function bindValue(plan: ColumnPlan, value: SnapshotValue, where: string): unknown {
   if (value === null) return null;
+  const { kind } = plan;
   switch (kind) {
+    case 'decimal':
+    case 'date':
+      return bindDeclaredValue(kind, plan.field, value, where);
     case 'boolean':
       return value === true ? 1 : 0;
     case 'integer':
@@ -182,7 +208,37 @@ function sameNames(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((name, index) => name === right[index]);
 }
 
-async function assertRestorable(target: DataSource, snapshot: DatabaseSnapshot, track: MigrationTrack): Promise<void> {
+async function assertPluginsRestorable(
+  target: DataSource,
+  snapshot: DatabaseSnapshot,
+  options: ImportSnapshotOptions,
+): Promise<void> {
+  for (const plugin of snapshot.plugins) {
+    const installed = options.plugins?.find((candidate) => candidate.id === plugin.id);
+    if (!installed) {
+      throw new SnapshotIncompatibleError(
+        `Plugin ${plugin.id} is not installed in the target; install version ${plugin.version} first`,
+      );
+    }
+    const versions = await appliedStorageVersions(target, installed.storage.namespace);
+    if (
+      installed.storage.namespace !== plugin.storage.namespace ||
+      !sameNames(versions.map(String), plugin.storage.versions.map(String))
+    ) {
+      throw new SnapshotIncompatibleError(
+        `The storage of plugin ${plugin.id} is at version ${versions.at(-1) ?? 'none'}, the snapshot at version ` +
+          `${plugin.storage.versions.at(-1) ?? 'none'} (plugin version ${plugin.version}); install that plugin version first`,
+      );
+    }
+  }
+}
+
+async function assertRestorable(
+  target: DataSource,
+  snapshot: DatabaseSnapshot,
+  track: MigrationTrack,
+  options: ImportSnapshotOptions,
+): Promise<Map<string, ColumnPlan[]>> {
   if (snapshot.format !== 1) throw new SnapshotIncompatibleError(`Unsupported snapshot format ${snapshot.format}`);
   if (snapshot.core.track !== track.name) {
     throw new SnapshotIncompatibleError(
@@ -200,19 +256,7 @@ async function assertRestorable(target: DataSource, snapshot: DatabaseSnapshot, 
       'The core migration state of the database differs from the snapshot; restore with the matching application version',
     );
   }
-  for (const plugin of snapshot.plugins) {
-    const state = await readMigrations(target, pluginMigrationsTable(plugin.id));
-    if (
-      !sameNames(
-        state.map((m) => m.name),
-        plugin.migrations.map((m) => m.name),
-      )
-    ) {
-      throw new SnapshotIncompatibleError(
-        `The migration state of plugin ${plugin.id} differs from the snapshot (version ${plugin.version}); install that plugin version first`,
-      );
-    }
-  }
+  await assertPluginsRestorable(target, snapshot, options);
   const existing = await userTables(target);
   const described = new Set(snapshot.tables.map((table) => table.name));
   const undescribed = existing.filter((name) => !described.has(name));
@@ -221,21 +265,25 @@ async function assertRestorable(target: DataSource, snapshot: DatabaseSnapshot, 
       `The database has tables the snapshot does not describe: ${undescribed.join(', ')}`,
     );
   }
+  const declared = declaredColumns(options.plugins);
+  const plans = new Map<string, ColumnPlan[]>();
   for (const table of snapshot.tables) {
     if (!existing.includes(table.name)) throw new SnapshotIncompatibleError(`The database has no table ${table.name}`);
-    const columns = (await storedColumns(target, table.name)).map((c) => `${c.name}:${columnKind(c.type)}`);
+    const { plans: columns } = await columnPlans(target, table.name, declared);
     if (
       !sameNames(
-        columns,
+        columns.map((c) => `${c.name}:${c.kind}`),
         table.columns.map((c) => `${c.name}:${c.kind}`),
       )
     ) {
       throw new SnapshotIncompatibleError(`The columns of table ${table.name} differ from the snapshot`);
     }
+    plans.set(table.name, columns);
   }
+  return plans;
 }
 
-async function loadTable(manager: EntityManager, table: TableSnapshot): Promise<void> {
+async function loadTable(manager: EntityManager, table: TableSnapshot, plans: readonly ColumnPlan[]): Promise<void> {
   if (table.columns.length === 0 || table.rows.length === 0) return;
   const names = table.columns.map((column) => quote(column.name)).join(', ');
   // SQLite allows 32766 bound variables per statement from 3.32; stay far below older limits.
@@ -245,7 +293,7 @@ async function loadTable(manager: EntityManager, table: TableSnapshot): Promise<
     const placeholders = chunk.map(() => `(${table.columns.map(() => '?').join(', ')})`).join(', ');
     const params = chunk.flatMap((row, offset) =>
       row.map((value, index) =>
-        bindValue(table.columns[index].kind, value, `${table.name}[${start + offset}].${table.columns[index].name}`),
+        bindValue(plans[index], value, `${table.name}[${start + offset}].${table.columns[index].name}`),
       ),
     );
     await manager.query(`INSERT INTO ${quote(table.name)} (${names}) VALUES ${placeholders}`, params);
@@ -260,22 +308,25 @@ async function loadTable(manager: EntityManager, table: TableSnapshot): Promise<
 export function createSqliteTransfer(track: MigrationTrack): DatabaseTransfer {
   return {
     async exportSnapshot(source: DataSource, options: ExportSnapshotOptions = {}): Promise<DatabaseSnapshot> {
+      const declared = declaredColumns(options.plugins);
       const tables: TableSnapshot[] = [];
-      for (const name of await userTables(source)) tables.push(await exportTable(source, name));
+      for (const name of await userTables(source)) tables.push(await exportTable(source, name, declared));
       const present = new Set(tables.map((table) => table.name));
       const plugins: PluginSnapshot[] = [];
       for (const plugin of options.plugins ?? []) {
-        const missing = plugin.tables.filter((name) => !present.has(name));
+        const pluginTables = declaredTables(plugin);
+        const missing = pluginTables.filter((name) => !present.has(name));
         if (missing.length > 0) {
           throw new SnapshotIncompatibleError(
-            `Plugin ${plugin.id} lists tables that do not exist: ${missing.join(', ')}`,
+            `Plugin ${plugin.id} declares tables that do not exist: ${missing.join(', ')}`,
           );
         }
+        const { namespace } = plugin.storage;
         plugins.push({
           id: plugin.id,
           version: plugin.version,
-          tables: [...plugin.tables],
-          migrations: await readMigrations(source, pluginMigrationsTable(plugin.id)),
+          tables: pluginTables,
+          storage: { namespace, versions: await appliedStorageVersions(source, namespace) },
         });
       }
       const sequenceTable = await source.query("SELECT 1 FROM sqlite_master WHERE name = 'sqlite_sequence'");
@@ -296,8 +347,12 @@ export function createSqliteTransfer(track: MigrationTrack): DatabaseTransfer {
       };
     },
 
-    async importSnapshot(target: DataSource, snapshot: DatabaseSnapshot): Promise<void> {
-      await assertRestorable(target, snapshot, track);
+    async importSnapshot(
+      target: DataSource,
+      snapshot: DatabaseSnapshot,
+      options: ImportSnapshotOptions = {},
+    ): Promise<void> {
+      const plans = await assertRestorable(target, snapshot, track, options);
       const [{ foreign_keys: foreignKeys }] = await target.query('PRAGMA foreign_keys');
       // The pragma is a no-op inside a transaction, so it is switched before and restored after.
       await target.query('PRAGMA foreign_keys = OFF');
@@ -308,7 +363,7 @@ export function createSqliteTransfer(track: MigrationTrack): DatabaseTransfer {
           );
           for (const trigger of triggers) await manager.query(`DROP TRIGGER ${quote(trigger.name)}`);
           for (const table of snapshot.tables) await manager.query(`DELETE FROM ${quote(table.name)}`);
-          for (const table of snapshot.tables) await loadTable(manager, table);
+          for (const table of snapshot.tables) await loadTable(manager, table, plans.get(table.name) ?? []);
           // Generated keys continue after the highest id the source ever issued, also after deletes.
           await manager.query('DELETE FROM sqlite_sequence');
           for (const [name, seq] of Object.entries(snapshot.sequences)) {
