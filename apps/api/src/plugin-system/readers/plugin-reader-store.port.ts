@@ -27,6 +27,8 @@ export interface PluginReaderStore {
   findResource(resourceId: number): Promise<PluginReaderResource | null>;
   /** The user, or null when the account does not exist or was deleted. */
   findCardOwner(userId: number): Promise<PluginReaderCardOwner | null>;
+  /** Whether the card still exists, is active and belongs to the user. */
+  isActiveCardOf(cardId: number, userId: number): Promise<boolean>;
 }
 
 export const PLUGIN_READER_STORE = Symbol.for('attraccess.plugin-system.reader-store');

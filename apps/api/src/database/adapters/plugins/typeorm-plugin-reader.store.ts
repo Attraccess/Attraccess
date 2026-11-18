@@ -1,4 +1,4 @@
-import { PluginReaderEntity, Resource, User } from '@attraccess/database-entities';
+import { NFCCard, PluginReaderEntity, Resource, User } from '@attraccess/database-entities';
 import type { PluginReaderRecord } from '@attraccess/application-models';
 import type { DataSource } from 'typeorm';
 import type { PluginReaderStore } from '../../../plugin-system/readers/plugin-reader-store.port';
@@ -78,6 +78,12 @@ export function createTypeOrmPluginReaderStore(source: () => DataSource): Plugin
         .getRepository(User)
         .findOne({ where: { id: userId }, select: { id: true, username: true, isDisabled: true } });
       return row ? { id: row.id, username: row.username, isDisabled: Boolean(row.isDisabled) } : null;
+    },
+
+    isActiveCardOf(cardId, userId) {
+      return source()
+        .getRepository(NFCCard)
+        .existsBy({ id: cardId, isActive: true, user: { id: userId } });
     },
   };
 }

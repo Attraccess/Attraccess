@@ -52,7 +52,14 @@ export async function createPluginReadersHost(
     {} as any,
     access as any,
   );
-  const notifications = new UsageSessionNotifications(database.usage, events, {} as any, {} as any, {} as any, {} as any);
+  const notifications = new UsageSessionNotifications(
+    database.usage,
+    events,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+  );
   const doors = new UsageDoorActions(database.usage, gate, notifications);
   const usage = {
     openDoor: jest.fn((resourceId: number, user: UsageSessionUser) => doors.openDoor(resourceId, user)),
@@ -77,8 +84,8 @@ export async function createPluginReadersHost(
       manifest({ id, name: `plugin-${id}`, permissions }),
     );
 
-  /** What a successful `cards.authenticate` on the device hands the plugin. */
-  const authenticate = (pluginId: string, device: string, userId: number, cardId = 7) =>
+  /** What a successful `cards.authenticate` on the device hands the plugin: by default the user's card. */
+  const authenticate = (pluginId: string, device: string, userId: number, cardId = database.cardOf(userId)) =>
     authentications.issue({ pluginId, device, cardId, userId });
 
   return {
@@ -95,6 +102,7 @@ export async function createPluginReadersHost(
     contextOf,
     createDoor: database.createDoor,
     createUser: database.createUser,
+    cardOf: database.cardOf,
     authenticate,
     doorActions: database.doorActions,
   };

@@ -213,6 +213,8 @@ export class PluginReadersService {
     // A deleted user is not found (soft delete); a disabled one may not act.
     const user = await this.store.findCardOwner(card.userId);
     if (!user || user.isDisabled) return refuse('ACCESS_DENIED');
+    // The card may have been deactivated or removed since it was authenticated.
+    if (!(await this.store.isActiveCardOf(card.cardId, user.id))) return refuse('ACCESS_DENIED');
     try {
       await this.moduleRef
         .get(ResourceUsageService, { strict: false })

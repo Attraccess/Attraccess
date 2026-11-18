@@ -102,7 +102,10 @@ export const PluginReaderTapFailureReason = {
   NO_RESOURCE: 'NO_RESOURCE',
   /** None of the reader's actions is allowed on its resource (for example the door is no longer "access only"). */
   ACTION_NOT_ALLOWED: 'ACTION_NOT_ALLOWED',
-  /** The card owner may not use the resource (no permission, no introduction, account blocked). */
+  /**
+   * The card owner may not use the resource (no permission, no introduction, account blocked), or the card was
+   * deactivated or removed since it was authenticated.
+   */
   ACCESS_DENIED: 'ACCESS_DENIED',
   /** The resource is under maintenance. */
   MAINTENANCE: 'MAINTENANCE',

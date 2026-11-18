@@ -241,7 +241,7 @@ describe('context.readers', () => {
 
     it('audits an accepted tap without the handle', async () => {
       const { door, user } = await setUp();
-      const authentication = host.authenticate(PLUGIN_A, 'device-1', user.id, 42);
+      const authentication = host.authenticate(PLUGIN_A, 'device-1', user.id);
 
       await readers.tap({ deviceId: 'device-1', authentication });
 
@@ -257,7 +257,7 @@ describe('context.readers', () => {
             subjectLabel: 'Side entrance',
             result: 'accepted',
             resourceId: door.id,
-            cardId: 42,
+            cardId: host.cardOf(user.id),
             userId: user.id,
           },
         },
@@ -395,6 +395,21 @@ describe('context.readers', () => {
       expect(
         await readers.tap({ deviceId: 'device-1', authentication: host.authenticate(PLUGIN_A, 'device-1', 9999) }),
       ).toEqual({ ok: false, reason: 'ACCESS_DENIED' });
+      expect(host.usage.openDoor).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['deactivated', (cardId: number) => host.database.deactivateCard(cardId)],
+      ['deleted', (cardId: number) => host.database.deleteCard(cardId)],
+    ])('refuses a card %s after it was authenticated', async (_label, change) => {
+      const { user } = await setUp();
+      const authentication = host.authenticate(PLUGIN_A, 'device-1', user.id);
+      await change(host.cardOf(user.id));
+
+      expect(await readers.tap({ deviceId: 'device-1', authentication })).toEqual({
+        ok: false,
+        reason: 'ACCESS_DENIED',
+      });
       expect(host.usage.openDoor).not.toHaveBeenCalled();
     });
 
