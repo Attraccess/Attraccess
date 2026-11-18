@@ -4,6 +4,7 @@
 
 #include <cstring>
 
+#include "esp_efuse.h"
 #include "esp_flash.h"
 #include "esp_flash_encrypt.h"
 #include "esp_heap_caps.h"
@@ -21,7 +22,7 @@ namespace
 
     bool readWindow(uint8_t *buffer)
     {
-        if (esp_flash_encryption_enabled())
+        if (esp_efuse_is_flash_encryption_enabled())
         {
             return esp_flash_read_encrypted(nullptr, DsRecord::FLASH_OFFSET, buffer, READ_BYTES) == ESP_OK;
         }
@@ -73,7 +74,7 @@ namespace DsStorage
         bool ok = esp_flash_erase_region(nullptr, DsRecord::FLASH_OFFSET, DsRecord::SECTOR_BYTES) == ESP_OK;
         if (ok)
         {
-            ok = esp_flash_encryption_enabled()
+            ok = esp_efuse_is_flash_encryption_enabled()
                      ? esp_flash_write_encrypted(nullptr, DsRecord::FLASH_OFFSET, buffer, READ_BYTES) == ESP_OK
                      : esp_flash_write(nullptr, buffer, DsRecord::FLASH_OFFSET, READ_BYTES) == ESP_OK;
         }

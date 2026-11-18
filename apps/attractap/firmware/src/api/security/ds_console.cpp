@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <memory>
 
 #include "ds_creator.hpp"
 #include "ds_reader_key.hpp"
@@ -36,18 +37,28 @@ namespace
         return text;
     }
 
+    // SHA-256 of the SPKI in the record the DS key was loaded from (needs KEY3 for DS); empty when there is none.
+    // Only DS_CREATE_RESULT's spki (the key generated in RAM) is independent of the record.
+    std::string loadedSpkiFingerprint()
+    {
+        const std::unique_ptr<IReaderKey> loaded = DsReaderKeyStore().load();
+        return loaded ? DsCreator::spkiFingerprint(loaded->publicKeySpki()) : "";
+    }
+
     void status()
     {
         DsRecord::Record record;
         const bool hasRecord = DsStorage::read(record);
         const bool dsAvailable = DsReaderKeyStore::status() == DsReaderKeyStore::Status::Available;
+        const std::string spki = dsAvailable ? loadedSpkiFingerprint() : "";
         const int purpose = static_cast<int>(esp_efuse_get_key_purpose(EFUSE_BLK_KEY3));
         const bool unused = esp_efuse_key_block_unused(EFUSE_BLK_KEY3) && purpose == 0;
         const char *flash = "disabled";
         const EfuseReport::Snapshot snapshot = EfuseSnapshot::read();
         flash = snapshot.flashEncryptionMode.c_str();
         const char *block3 = unused ? "unused" : EfuseSnapshot::purposeName(purpose);
-        printf("DS_STATUS available=%d record=%d key3=%s fe=%s\n", dsAvailable ? 1 : 0, hasRecord ? 1 : 0, block3, flash);
+        printf("DS_STATUS available=%d record=%d key3=%s fe=%s spki=%s\n", dsAvailable ? 1 : 0, hasRecord ? 1 : 0, block3,
+               flash, spki.empty() ? "-" : spki.c_str());
     }
 
     void create(const std::string &argument)
@@ -68,7 +79,7 @@ namespace
         printf("DS_CREATE_BURNED %d\n", result.burned ? 1 : 0);
         if (result.ok)
         {
-            printf("DS_CREATE_RESULT ok\n");
+            printf("DS_CREATE_RESULT ok spki=%s\n", result.spkiSha256.c_str());
         }
         else
         {

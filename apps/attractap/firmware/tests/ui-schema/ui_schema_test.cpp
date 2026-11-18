@@ -2,6 +2,7 @@
 // READER_FIRMWARE_INFO capabilities serialize without truncation for Touch and Lite.
 #include <ArduinoJson.h>
 
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -9,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "ble_capability.hpp"
 #include "ui_capabilities.hpp"
 #include "ui_record.hpp"
 #include "ui_slot_cache.hpp"
@@ -23,6 +25,10 @@ static int failures = 0;
     } while (0)
 
 static ui::SlotRecord record;
+
+// API::JSON_OUTBUF_AUTH (src/api/api.hpp): the buffer READER_FIRMWARE_INFO is serialized into.
+static constexpr size_t JSON_OUTBUF_AUTH = 1536;
+static constexpr size_t FIRMWARE_INFO_BUDGET = 1400;
 
 static void runFixtures()
 {
@@ -99,18 +105,32 @@ static JsonDocument loadFixture(const char *name)
     return doc;
 }
 
-// The event API::sendFirmwareInfo sends, built by the same function, against the shared capability fixtures.
+// The event API::sendFirmwareInfo sends, built the same way (buildFirmwareInfo plus the cardRelay and ble
+// blocks auth.cpp adds), against the shared capability fixtures. Longest identity strings of the real
+// variants, so the size check is the worst case.
 static void roundTrip(const char *name, const ui::VariantTraits &traits, const char *fixture)
 {
     JsonDocument event;
     char uiCaps[ui::CAPABILITIES_UI_SCRATCH];
     ui::buildFirmwareInfo(event,
-                          {"attractap_touch_v2", "attractap-touch-v2", "1.9.0", "CPU_LOCKUP", 4294967295u,
-                           "secure-lab", false, 1, false, "ds-rsa3072"},
+                          {"attractap_touch_v2_secure_lab_park", "attractap-touch-v2", "1.9.0", "CPU_LOCKUP",
+                           4294967295u, "secure-lab", false, 65535, false, "ds-rsa3072"},
                           traits, uiCaps, sizeof uiCaps);
-    char buf[1536]; // JSON_OUTBUF_AUTH
+    event["data"]["payload"]["capabilities"]["cardRelay"] = true;
+    char bleCaps[ble::CAPABILITY_SCRATCH];
+    ble::fillCapability(event["data"]["payload"]["capabilities"], bleCaps, sizeof bleCaps);
+    CHECK(std::strlen(bleCaps) + 1 < sizeof bleCaps, name << ": ble capability fits its scratch");
+    std::ifstream apiHeader(API_HEADER);
+    std::stringstream header;
+    header << apiHeader.rdbuf();
+    CHECK(header.str().find("JSON_OUTBUF_AUTH = " + std::to_string(JSON_OUTBUF_AUTH) + ";") != std::string::npos,
+          "JSON_OUTBUF_AUTH matches src/api/api.hpp");
+    char buf[JSON_OUTBUF_AUTH];
     const size_t n = serializeJson(event, buf, sizeof buf);
-    CHECK(n > 0 && n < sizeof buf && n == measureJson(event), name << ": serialized completely in 1536 B (" << n << ")");
+    std::cout << name << ": READER_FIRMWARE_INFO " << n << " of " << JSON_OUTBUF_AUTH << " B\n";
+    CHECK(n > 0 && n < sizeof buf && n == measureJson(event), name << ": serialized completely (" << n << ")");
+    // Headroom for the next capability block: an overflow is only caught by auth.cpp's size check.
+    CHECK(n <= FIRMWARE_INFO_BUDGET, name << ": " << n << " B exceeds the " << FIRMWARE_INFO_BUDGET << " B budget");
     JsonDocument back;
     CHECK(!deserializeJson(back, buf, n), name << ": parses back");
     JsonObject payload = back["data"]["payload"];
@@ -118,13 +138,15 @@ static void roundTrip(const char *name, const ui::VariantTraits &traits, const c
               payload["uptimeMs"] == 4294967295u && payload["version"] == "1.9.0",
           name << ": fields");
     // ATT-1207: the reader's profile claims (the server never trusts them on their own).
-    CHECK(payload["profile"] == "secure-lab" && payload["release"] == false && payload["secureVersion"] == 1 &&
+    CHECK(payload["profile"] == "secure-lab" && payload["release"] == false && payload["secureVersion"] == 65535 &&
               payload["secured"] == false && payload["identity"] == "ds-rsa3072",
           name << ": profile fields");
     CHECK(payload["capabilities"]["resourceSelection"] == traits.hasDisplay &&
               payload["capabilities"]["cardEnrollment"] == traits.hasDisplay &&
               payload["capabilities"]["hasLeds"] == traits.hasLeds,
           name << ": core capabilities");
+    CHECK(payload["capabilities"]["cardRelay"] == true && payload["capabilities"]["ble"]["version"] == 1,
+          name << ": cardRelay and ble blocks");
     JsonDocument expected = loadFixture(fixture);
     CHECK(payload["capabilities"]["ui"] == expected["payload"], name << ": capabilities.ui equals " << fixture);
 }
@@ -329,9 +351,10 @@ int main()
         ui::buildFirmwareInfo(event, {"attractap_touch_v2", "attractap-touch-v2", "2.6.0", "POWERON", 1u},
                               {true, true, false, true, false, 480, 480}, uiCaps, sizeof uiCaps);
         JsonObject payload = event["data"]["payload"];
+        bool hasSecureVersion = false;
+        for (JsonPair field : payload) hasSecureVersion = hasSecureVersion || field.key() == "secureVersion";
         CHECK(payload["profile"] == "plain" && payload["release"] == false && payload["secured"] == false &&
-                  payload["identity"] == "ecdsa-p256" && payload["secureVersion"].isNull() &&
-                  !payload.containsKey("secureVersion"),
+                  payload["identity"] == "ecdsa-p256" && !hasSecureVersion,
               "plain build: default profile fields");
     }
     if (failures) { std::cerr << failures << " failure(s)\n"; return 1; }

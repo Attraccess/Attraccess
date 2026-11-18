@@ -4,6 +4,7 @@
 
 #include <cstring>
 #include <memory>
+#include <new>
 
 #include "../../logger/logger.hpp"
 #include "ds_params.hpp"
@@ -15,6 +16,7 @@
 #include "esp_heap_caps.h"
 #include "mbedtls/platform_util.h"
 #include "nvs_erase_gate.hpp"
+#include "efuse_report.hpp"
 #include "psa/crypto.h"
 #include "rsa_der.hpp"
 
@@ -24,23 +26,65 @@ namespace
 
     static_assert(sizeof(DsParams::Operands) == sizeof(esp_ds_p_data_t), "DS operand layouts match");
 
+    // Creation runs on the main loop and must not run out of internal RAM half way: a failure after the
+    // burn cannot be retried. Estimate of what create() holds at its peak (NOT measured on the device):
+    //   key generation: mbedTLS RSA-3072 context and prime search temporaries (~10 KiB, internal RAM on
+    //     secure builds: CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC), the PSA key slot (~1.8 KiB) and the exported
+    //     PKCS#1 DER (2.4 KiB);
+    //   parameters and record: DS operands (1.5 KiB), esp_ds_data_t (1.6 KiB), the record and its serialized,
+    //     written and read-back copies (4 x ~2.1 KiB);
+    //   self-test: the opaque DS key, a PSA RSA public key and its RSA-3072 public operation (~5 KiB).
+    // That is ~22 KiB. The floor adds ~18 KiB for the tasks that keep running meanwhile (Wi-Fi, TLS, LVGL);
+    // the secure-lab Touch V2 idles at ~64 KB free with a ~30 KB largest block (apps/attractap-lab
+    // hil/heap_floors.py). The largest single allocation of create() is ~2.4 KiB; mbedTLS bignum work
+    // wants a few contiguous KiB more, so 12 KiB leaves room for fragmentation. Measure with
+    // ds.create on the lab reader and tighten these when there are numbers.
+    constexpr size_t MIN_FREE_INTERNAL_BYTES = 40 * 1024;
+    constexpr size_t MIN_LARGEST_INTERNAL_BLOCK_BYTES = 12 * 1024;
+
+    // Plaintext key material lives in internal RAM (never PSRAM, also with CONFIG_SPIRAM_USE_MALLOC) and is
+    // wiped before it is freed, whatever path drops it.
+    template <typename T>
+    struct InternalDeleter
+    {
+        void operator()(T *p) const
+        {
+            if (p)
+            {
+                p->~T();
+                mbedtls_platform_zeroize(p, sizeof(T));
+                heap_caps_free(p);
+            }
+        }
+    };
+    template <typename T>
+    using InternalPtr = std::unique_ptr<T, InternalDeleter<T>>;
+
+    template <typename T>
+    InternalPtr<T> makeInternal()
+    {
+        // heap_caps memory is at least word aligned, as the DS peripheral needs for its operands.
+        void *memory = heap_caps_calloc(1, sizeof(T), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+        return InternalPtr<T>(memory ? new (memory) T() : nullptr);
+    }
+
+    // A PKCS#1 RSA-3072 private key as psa_export_key writes it (about 1.8 KiB).
+    struct PrivateKeyDer
+    {
+        uint8_t bytes[2400];
+    };
+
     // Plaintext material: all of it is wiped in the destructor, whatever path leaves create().
     struct Secrets
     {
         uint8_t hmacKey[32] = {};
-        std::unique_ptr<DsParams::Operands, void (*)(DsParams::Operands *)> operands{nullptr, release};
+        InternalPtr<RsaDer::PrivateKeyParts> parts;
+        InternalPtr<DsParams::Operands> operands;
 
-        static void release(DsParams::Operands *p)
-        {
-            if (p)
-            {
-                mbedtls_platform_zeroize(p, sizeof(*p));
-                heap_caps_free(p);
-            }
-        }
         void wipe()
         {
             mbedtls_platform_zeroize(hmacKey, sizeof(hmacKey));
+            parts.reset();
             operands.reset();
         }
         ~Secrets() { wipe(); }
@@ -63,18 +107,24 @@ namespace
         psa_set_key_bits(&attributes, 3072);
         psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_EXPORT);
         psa_set_key_algorithm(&attributes, PSA_ALG_RSA_PSS(PSA_ALG_SHA_256));
+        InternalPtr<PrivateKeyDer> der = makeInternal<PrivateKeyDer>();
         mbedtls_svc_key_id_t id = MBEDTLS_SVC_KEY_ID_INIT;
-        if (psa_generate_key(&attributes, &id) != PSA_SUCCESS)
+        if (!der || psa_generate_key(&attributes, &id) != PSA_SUCCESS)
         {
             return false;
         }
-        std::vector<uint8_t> der(2400); // a PKCS#1 RSA-3072 private key is about 1.8 KiB
         size_t length = 0;
-        const bool exported = psa_export_key(id, der.data(), der.size(), &length) == PSA_SUCCESS;
+        const bool exported = psa_export_key(id, der->bytes, sizeof(der->bytes), &length) == PSA_SUCCESS;
         psa_destroy_key(id);
-        const bool parsed = exported && RsaDer::parsePrivateKey(der.data(), length, parts);
-        mbedtls_platform_zeroize(der.data(), der.size());
-        return parsed;
+        // `der` is wiped when it goes out of scope.
+        return exported && RsaDer::parsePrivateKey(der->bytes, length, parts);
+    }
+
+    // Locks RD_DIS (write-protects it), so no further key block can become read-protected.
+    bool lockRdDis()
+    {
+        return esp_efuse_write_field_bit(ESP_EFUSE_WR_DIS_RD_DIS) == ESP_OK &&
+               esp_efuse_read_field_bit(ESP_EFUSE_WR_DIS_RD_DIS);
     }
 
     // RSAPublicKey (PKCS#1) of a canonical SPKI, as PSA imports an RSA public key.
@@ -158,7 +208,26 @@ namespace DsCreator
         {
             return "rd-dis-locked";
         }
+        if (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) < MIN_FREE_INTERNAL_BYTES ||
+            heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) < MIN_LARGEST_INTERNAL_BLOCK_BYTES)
+        {
+            return "low-memory";
+        }
         return "";
+    }
+
+    std::string spkiFingerprint(const std::vector<uint8_t> &spki)
+    {
+        uint8_t digest[32];
+        size_t length = 0;
+        if (spki.empty() || psa_crypto_init() != PSA_SUCCESS ||
+            psa_hash_compute(PSA_ALG_SHA_256, spki.data(), spki.size(), digest, sizeof(digest), &length) !=
+                PSA_SUCCESS ||
+            length != sizeof(digest))
+        {
+            return "";
+        }
+        return EfuseReport::hex(digest, sizeof(digest));
     }
 
     Result create()
@@ -178,24 +247,31 @@ namespace DsCreator
         {
             return fail("random-failed");
         }
-        RsaDer::PrivateKeyParts parts;
+        secrets.parts = makeInternal<RsaDer::PrivateKeyParts>();
         logger.info("Generating the RSA-3072 key (this takes a while)");
-        if (!generateRsa(parts))
+        if (!secrets.parts || !generateRsa(*secrets.parts))
         {
             return fail("keygen-failed");
         }
         DsRecord::Record record;
-        record.spki = RsaDer::spkiFromModulus(parts.modulus.data(), parts.modulus.size());
+        record.spki = RsaDer::spkiFromModulus(secrets.parts->modulus.data(), secrets.parts->modulus.size());
 
         // The DS peripheral reads its operands from internal, word-aligned memory.
-        secrets.operands.reset(static_cast<DsParams::Operands *>(
-            heap_caps_calloc(1, sizeof(DsParams::Operands), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)));
-        const bool computed = secrets.operands && DsParams::compute(parts.modulus.data(), parts.privateExponent.data(),
+        secrets.operands = makeInternal<DsParams::Operands>();
+        const bool computed = secrets.operands && DsParams::compute(secrets.parts->modulus.data(),
+                                                                     secrets.parts->privateExponent.data(),
                                                                      *secrets.operands);
-        mbedtls_platform_zeroize(parts.privateExponent.data(), parts.privateExponent.size());
+        // The private exponent now lives in the operands only.
+        secrets.parts.reset();
         if (!computed || record.spki.empty())
         {
             return fail("params-failed");
+        }
+        // Of the key generated in RAM, before anything is stored: what the lab compares with the server's view.
+        const std::string fingerprint = spkiFingerprint(record.spki);
+        if (fingerprint.empty())
+        {
+            return fail("fingerprint-failed");
         }
         uint8_t iv[DsRecord::IV_BYTES];
         if (psa_generate_random(iv, sizeof(iv)) != PSA_SUCCESS)
@@ -218,7 +294,6 @@ namespace DsCreator
 
         // The record must be stored and verified BEFORE KEY3 is burned: with the record lost after a
         // burn, the key would be gone for good.
-        DsRecord::Record readBack;
         const std::vector<uint8_t> expected = DsRecord::serialize(record);
         std::vector<uint8_t> stored;
         if (expected.empty() || !DsStorage::write(record))
@@ -255,13 +330,19 @@ namespace DsCreator
             return fail("burn-verify-failed", true);
         }
 
-        if (!selfTest(record))
+        // KEY3 is burned: from here on every step runs once, and the RD_DIS lock is attempted even when the
+        // self-test fails, so the reader always ends in the janitor's post-burn state (KEY3 + RD_DIS locked).
+        // The first failure is reported: self-test-failed wins over rd-dis-lock-failed, whose own outcome
+        // is logged.
+        const bool selfTestPassed = selfTest(record);
+        mbedtls_platform_zeroize(data.get(), sizeof(*data));
+        const bool locked = lockRdDis();
+        if (!selfTestPassed)
         {
+            logger.errorf("RD_DIS lock after the failed self-test: %s", locked ? "done" : "failed");
             return fail("self-test-failed", true);
         }
-        mbedtls_platform_zeroize(data.get(), sizeof(*data));
-
-        if (esp_efuse_write_field_bit(ESP_EFUSE_WR_DIS_RD_DIS) != ESP_OK || !esp_efuse_read_field_bit(ESP_EFUSE_WR_DIS_RD_DIS))
+        if (!locked)
         {
             return fail("rd-dis-lock-failed", true);
         }
@@ -269,6 +350,7 @@ namespace DsCreator
         Result result;
         result.ok = true;
         result.burned = true;
+        result.spkiSha256 = fingerprint;
         return result;
     }
 }

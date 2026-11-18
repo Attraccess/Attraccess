@@ -4,7 +4,6 @@
 
 #include <cstdio>
 
-#include "build_profile.hpp"
 #include "esp_efuse.h"
 #include "esp_efuse_table.h"
 #include "esp_flash_encrypt.h"
@@ -132,13 +131,6 @@ namespace EfuseSnapshot
             break;
         }
         return s;
-    }
-
-    bool looksSecured()
-    {
-        return !BuildProfile::lab() && esp_get_flash_encryption_mode() == ESP_FLASH_ENC_MODE_RELEASE &&
-               bit(ESP_EFUSE_SECURE_BOOT_EN) && bit(ESP_EFUSE_WR_DIS_RD_DIS) &&
-               esp_efuse_get_key_purpose(EFUSE_BLK_KEY3) == ESP_EFUSE_KEY_PURPOSE_HMAC_DOWN_DIGITAL_SIGNATURE;
     }
 }
 #endif

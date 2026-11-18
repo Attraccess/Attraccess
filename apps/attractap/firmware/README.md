@@ -431,20 +431,39 @@ software identity and never burns KEY3 again.
 **Identity selection (`reader_link_identity.cpp`).**
 
 - DS available and the reader unpaired: it pairs with the DS key.
-- DS available and paired with the P-256 key: after `session.hello` it runs the upgrade. It sends
+- DS available and paired with the P-256 key: the reader runs the upgrade once it is signed in and has sent
+  `READER_FIRMWARE_INFO` (the API calls `IReaderTransport::onFirmwareInfoSent()` right after that send; the server's
+  gate reads the `secure-lab` profile, or T3's `creating-key` conversion state, from that session). Order:
   `identity.upgrade.request`, the server answers `identity.challenge {nonce}`, the reader sends
   `identity.upgrade {spki, proof}` (RSA-PSS SHA-256, salt 32, over the domain-separated tuple in
-  `identity_proof.hpp`, shared byte for byte with the API through `tests/identity-upgrade/proof-vector.json`),
-  the server replies `identity.upgraded {certificate}`. The reader stores the certificate in NVS **before**
-  reconnecting with the DS key and deletes the software key (`readerpair/key`) only after the server accepted a
-  DS session (its first `session.hello`). `identity.upgrade.rejected`: the P-256 identity stays, the reason code is
-  logged, a new request follows on a later session (`not-allowed`: on a later boot).
+  `identity_proof.hpp`, shared byte for byte with the API through `tests/identity-upgrade/proof-vector.json`;
+  signed through the key's PSA id by `ReaderIdentity::signRsaPssSha256`), the server replies
+  `identity.upgraded {certificate}` and closes the P-256 session after 1 s. The reader stores the certificate in NVS
+  **before** reconnecting with the DS key. The control channel and the application channel are processed
+  independently on the server, so the server waits up to 5 s for the session's firmware info before it answers a
+  request. `identity.upgrade.rejected`: the P-256 identity stays, the reason code is logged, a new request follows
+  on a later session (`not-allowed`: on a later boot).
+- The software key (`readerpair/key`) is deleted only after a DS session was **signed in**: `READER_AUTHENTICATED`
+  (sent after the server re-checked the credential) and the firmware info that follows it, not already on
+  `session.hello`. Until then a failed DS session still leaves the P-256 key and its history.
+- Crash safety (15 minute window). A reader that lost the certificate (crash or lost frame between
+  `identity.upgraded` and the NVS write) still holds the P-256 key and its old certificate, so it reconnects with
+  that key. The server no longer accepts it as a credential, but for 15 minutes after the upgrade it opens an
+  upgrade-only session for it: no `session.hello`, no sign-in, only the CONTROL `identity.recover`. On it the reader
+  sends `identity.upgrade.request` again (even after an earlier `not-allowed` in this boot), answers the fresh
+  challenge with a fresh proof for the **same** DS key, and gets the certificate of its already active DS key (no new
+  credential history row); then it stores it and reconnects with the DS key as above. Only the key the upgrade
+  replaced qualifies: a key an admin replaced (takeover), a revoke or re-pair since, another SPKI, or a request
+  after the window gets `inactive-credential` / `identity.upgrade.rejected` and the reader has to be re-paired by an
+  admin. Heartbeats are ignored in that session; any application message or `efuse.report` ends it, and it closes
+  after 30 s. Tested in `apps/api/src/attractap/security/identity-upgrade.integration.spec.ts` (gateway, emulated
+  reader) and `tests/identity-upgrade` (`IdentityUpgrade::shouldRequest`).
 - A rejected pairing (`session.rejected`) makes a DS reader pair again with its DS key.
 - Which key a stored certificate belongs to is decided by the certificate's public key (`readerpair/ik` records
   it for a pairing that has no certificate yet).
 
-**eFuse report.** Secure builds send `efuse.report` (CONTROL frame) once per session, right after
-`READER_FIRMWARE_INFO`: key purposes and used/read-protected state for KEY0-KEY5, the two public Secure Boot
+**eFuse report.** Secure builds send `efuse.report` (CONTROL frame) once per signed-in session, right after
+`READER_FIRMWARE_INFO` (`onFirmwareInfoSent`; never in an upgrade-only session): key purposes and used/read-protected state for KEY0-KEY5, the two public Secure Boot
 digests, revoke bits, `SPI_BOOT_CRYPT_CNT` (+ write-protect), `DIS_DOWNLOAD_MANUAL_ENCRYPT`, JTAG and download
 bits, RD_DIS (+ write-protect), SECURE_VERSION, flash encryption mode and the MAC. No key blocks are read.
 `READER_FIRMWARE_INFO` also carries `profile` (`plain`/`secure`/`secure-lab`), `release`, `secureVersion`,
@@ -454,31 +473,40 @@ attested.
 **NVS erase gate.** `main.cpp` erases the NVS on `NO_FREE_PAGES`/`NEW_VERSION_FOUND` through
 `NvsEraseGate::shouldErase` (host tested). Plain builds are unchanged. Secure builds erase only while
 `migrationPending()` is false, never on encryption/HMAC key errors, and never abort on a failed init: they boot,
-show the secure-connection error state and refuse DS creation and the upgrade. `migrationPending()` checks for
+show "Reader storage error. Contact your administrator." on the connecting screen and refuse DS creation and the
+upgrade. `migrationPending()` checks for
 the staging header magic `ATMG` at the start of the last spiffs sector; no staging exists in ATT-1207 (T3 hook).
 
 **DS key creation (irreversible).** `DsCreator::create()` burns KEY3 and write-protects RD_DIS. It refuses unless
-KEY3 and its purpose are unused, KEY2/KEY4 hold XTS/HMAC_UP and are read-protected, RD_DIS is not locked and the
-NVS is up. Order: generate HMAC key and RSA-3072 key in software, encrypt the parameters, write the DS record and
-read it back, burn KEY3 (purpose + read protection in one eFuse batch), DS self-test (PSS and PKCS#1 v1.5 verified
-against the public key), zero all plaintext, lock RD_DIS. Nothing after the burn is retried; a failure returns a
-code. It is never called on a boot. ATT-1207 triggers it only from the secure-lab console below; release secure
-builds compile it and T3 (`creating-key`) wires the trigger.
+KEY3 and its purpose are unused, KEY2/KEY4 hold XTS/HMAC_UP and are read-protected, RD_DIS is not locked, the
+NVS is up and at least 40 KiB internal RAM is free with a 12 KiB largest block (`low-memory`; an unmeasured
+estimate of creation's ~22 KiB peak plus headroom, see `ds_creator.cpp`). Order: generate HMAC key and RSA-3072
+key in software (in internal RAM, never PSRAM), encrypt the parameters, write the DS record and read it back, burn
+KEY3 (purpose + read protection in one eFuse batch), DS self-test (PSS and PKCS#1 v1.5 verified against the public
+key), lock RD_DIS. The lock runs after a verified burn even when the self-test failed, so the reader always ends
+with KEY3 and RD_DIS locked (the lab janitor's post-burn state); the code is then `self-test-failed` and the lock's
+outcome is logged. All plaintext (HMAC key, RSA private key, DS operands) is wiped on every path. Nothing after
+the burn is retried; a failure returns a code. It is never called on a boot. ATT-1207 triggers it only from the
+secure-lab console below; release secure builds compile it and T3 (`creating-key`) wires the trigger.
 
 Secure-lab console (CMND lines on the USB console, secure-lab builds only; output parsed by
 `tools/secure_lab_reader.py`):
 
-| Command                | Output                                                                                    |
-| ---------------------- | ----------------------------------------------------------------------------------------- |
-| `CMND ds.status`       | `DS_STATUS available=<0/1> record=<0/1> key3=<purpose or unused> fe=<mode>`               |
-| `CMND ds.create <mac>` | `DS_CREATE_BURNED <0/1>`, then `DS_CREATE_RESULT ok` or `DS_CREATE_RESULT error <code>`   |
-| `CMND ds.export`       | `DS_RECORD_BEGIN`, one line of base64 (the record), `DS_RECORD_END`                       |
+| Command                | Output                                                                                                |
+| ---------------------- | ----------------------------------------------------------------------------------------------------- |
+| `CMND ds.status`       | `DS_STATUS available=<0/1> record=<0/1> key3=<purpose or unused> fe=<mode> spki=<64 hex or ->`        |
+| `CMND ds.create <mac>` | `DS_CREATE_BURNED <0/1>`, then `DS_CREATE_RESULT ok spki=<64 hex>` or `DS_CREATE_RESULT error <code>` |
+| `CMND ds.export`       | `DS_RECORD_BEGIN`, one line of base64 (the record), `DS_RECORD_END`                                   |
 
 `ds.create` takes the lowercase colon MAC and compares it with the chip's own (`error mac-mismatch` otherwise).
+`spki` is the lowercase hex SHA-256 of the DS public key's SPKI DER: in `DS_CREATE_RESULT ok` of the key generated
+in RAM (not re-read from flash), in `DS_STATUS` of the record the DS key was loaded from (`-` when DS is not available; only the `DS_CREATE_RESULT` value is independent of the record). The
+lab compares it with the fingerprint the server shows for the reader.
 Error codes: `nvs-not-ready`, `key3-in-use`, `key2-not-xts`, `key4-not-hmac-up`, `keys-not-read-protected`,
-`rd-dis-locked`, `crypto-init-failed`, `random-failed`, `keygen-failed`, `params-failed`, `encrypt-failed`,
-`record-write-failed`, `record-verify-failed` (all before the burn), `burn-failed`, `burn-verify-failed`,
-`self-test-failed`, `rd-dis-lock-failed` (after it: `DS_CREATE_BURNED 1`, never retry). Nothing is printed through
+`rd-dis-locked`, `low-memory`, `crypto-init-failed`, `random-failed`, `keygen-failed`, `params-failed`,
+`fingerprint-failed`, `encrypt-failed`, `record-write-failed`, `record-verify-failed` (all before the burn),
+`burn-failed`, `burn-verify-failed`, `self-test-failed`, `rd-dis-lock-failed` (after it: `DS_CREATE_BURNED 1`,
+never retry). Nothing is printed through
 ESP_LOG: no HMAC key, RSA private part, DS parameters, nonce or proof appears in any log.
 
 Test hooks (`ATTRACTAP_TEST_HOOKS`, never in release): `CMND identity.get` replies `softwareKey`, `paired`,

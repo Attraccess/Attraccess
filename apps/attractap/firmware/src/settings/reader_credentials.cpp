@@ -8,6 +8,17 @@ namespace
     constexpr size_t MAX_CERTIFICATE_BYTES = 2048;
     constexpr size_t MAX_KEY_BYTES = 64;
     constexpr size_t MAX_SPKI_BYTES = 128;
+    // Everything bound to one pairing: reader ID, installation ID, certificate, identity kind and (last,
+    // removed by the callers) the pin "ca". A new key or a new pairing drops all of it.
+    constexpr const char *PAIRING_KEYS[] = {"rid", "inst", "cert", "ik"};
+
+    void removePairing(KVStore &store)
+    {
+        for (const char *key : PAIRING_KEYS)
+        {
+            store.remove(key);
+        }
+    }
 
     std::vector<uint8_t> readBlob(KVStore &store, const char *key, size_t maxLength)
     {
@@ -68,10 +79,7 @@ namespace CredentialStore
             return false;
         }
         store.remove("ca");
-        store.remove("rid");
-        store.remove("inst");
-        store.remove("cert");
-        store.remove("ik");
+        removePairing(store);
         return writeBlob(store, "key", privateKey);
     }
 
@@ -100,10 +108,7 @@ namespace CredentialStore
         {
             return false;
         }
-        store.remove("rid");
-        store.remove("inst");
-        store.remove("cert");
-        store.remove("ik");
+        removePairing(store);
         return store.remove("ca");
     }
 
@@ -114,6 +119,7 @@ namespace CredentialStore
         return saveCertificate(certificate) && saveIdentityKind(IdentityKind::Ds);
     }
 
+#ifdef ATTRACTAP_TEST_HOOKS
     bool setForceSoftwareIdentity(bool force)
     {
         KVStore store;
@@ -139,6 +145,7 @@ namespace CredentialStore
         store.remove("fp256");
         return true;
     }
+#endif
 
     bool savePin(const std::vector<uint8_t> &caSpki)
     {

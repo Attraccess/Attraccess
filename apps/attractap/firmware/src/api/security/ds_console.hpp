@@ -7,8 +7,13 @@
 // console and do not compile this. Output lines are parsed by tools/secure_lab_reader.py; keep them exact:
 //
 //   CMND ds.status                       ->  DS_STATUS available=<0|1> record=<0|1> key3=<purpose|unused> fe=<mode>
+//                                            spki=<64 lowercase hex|->   (one line)
 //   CMND ds.create <mac>                 ->  DS_CREATE_BURNED <0|1> (not for a MAC mismatch), then
-//                                            DS_CREATE_RESULT ok | DS_CREATE_RESULT error <code>
+//                                            DS_CREATE_RESULT ok spki=<64 lowercase hex> | DS_CREATE_RESULT error <code>
+//
+// `spki` is the SHA-256 of the DS public key's SubjectPublicKeyInfo DER: for ds.status of the key as loaded
+// for signing (`-` when DS is not available), for ds.create of the key generated in RAM (not re-read from
+// flash). The lab compares it with the fingerprint the server shows for the reader.
 //   CMND ds.export                       ->  DS_RECORD_BEGIN / <base64 of the DS record> / DS_RECORD_END
 //
 // `ds.create` takes the chip MAC in lowercase colon form and compares it with the chip's own; any other

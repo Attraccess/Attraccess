@@ -8,7 +8,8 @@
 // data a conversion still needs, start-up must not erase the NVS.
 //
 // ATT-1207 only defines the check: a staging header with this magic at the start of the last sector
-// of the partition means "migration pending". No staging area exists yet, so it returns false.
+// of the partition means "migration pending". No staging area exists yet: it is false while no staging
+// header exists.
 // T3 owns the staging layout and may extend the check; keep the call site in main.cpp.
 namespace MigrationStaging
 {

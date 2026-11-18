@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -18,13 +19,27 @@ namespace RsaDer
     // The 384-byte modulus of a canonical RSA-3072 SPKI; empty otherwise.
     std::vector<uint8_t> modulusFromSpki(const std::vector<uint8_t> &spki);
 
+    // Zeroes `length` bytes through a volatile pointer, so the compiler cannot drop it (no mbedTLS here).
+    void wipe(void *data, size_t length);
+
+    // Fixed-size, so parsing never reallocates (and leaves) a copy of d on the heap. Wiped on destruction;
+    // the owner decides where it lives (the reader keeps it in internal RAM, see ds_creator.cpp).
     struct PrivateKeyParts
     {
-        std::vector<uint8_t> modulus;         // 384 bytes, big endian
-        std::vector<uint8_t> publicExponent;  // minimal big endian
-        std::vector<uint8_t> privateExponent; // 384 bytes, big endian, zero padded
+        std::array<uint8_t, MODULUS_BYTES> modulus{};         // big endian
+        std::array<uint8_t, MODULUS_BYTES> privateExponent{}; // big endian, zero padded on the left
+
+        PrivateKeyParts() = default;
+        PrivateKeyParts(const PrivateKeyParts &) = default;
+        PrivateKeyParts &operator=(const PrivateKeyParts &) = default;
+        ~PrivateKeyParts() { clear(); }
+        void clear()
+        {
+            wipe(modulus.data(), modulus.size());
+            wipe(privateExponent.data(), privateExponent.size());
+        }
     };
-    // Reads n, e and d from a PKCS#1 RSAPrivateKey (what psa_export_key returns). False unless a
-    // 3072-bit key with e = 65537 and a well-formed structure.
+    // Reads n and d from a PKCS#1 RSAPrivateKey (what psa_export_key returns) into `out`, checking
+    // e = 65537. False unless a 3072-bit key with a well-formed structure; `out` is wiped then. No heap.
     bool parsePrivateKey(const uint8_t *der, size_t length, PrivateKeyParts &out);
 }

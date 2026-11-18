@@ -48,9 +48,14 @@ namespace CredentialStore
     bool clearPairing();
     // The certificate the server issued for the DS key after an identity upgrade, and the matching kind.
     bool saveUpgradedCertificate(const std::vector<uint8_t> &certificate);
-    // Test hook (ATTRACTAP_TEST_HOOKS): the next boot ignores the DS key and pairs with a fresh P-256 key.
+#ifdef ATTRACTAP_TEST_HOOKS
+    // Test hook: the next boot ignores the DS key and pairs with a fresh P-256 key. Release builds (no
+    // ATTRACTAP_TEST_HOOKS) contain neither the setter nor the NVS flag check.
     bool setForceSoftwareIdentity(bool force);
     bool consumeForceSoftwareIdentity();
+#else
+    inline bool consumeForceSoftwareIdentity() { return false; }
+#endif
     bool savePin(const std::vector<uint8_t> &caSpki);
     // Forgets the pinned CA and everything bound to it; keeps the reader key. Only for a reader
     // whose bootstrap session never reached a verifiable server (no certificate yet).

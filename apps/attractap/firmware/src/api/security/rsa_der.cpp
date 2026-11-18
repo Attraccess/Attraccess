@@ -52,8 +52,8 @@ namespace
         }
     };
 
-    // INTEGER value without sign padding; false for negative or non-minimal encodings.
-    bool unsignedInteger(const uint8_t *value, size_t length, std::vector<uint8_t> &out)
+    // INTEGER value without sign padding, as a view into the DER; false for negative or non-minimal encodings.
+    bool unsignedInteger(const uint8_t *&value, size_t &length)
     {
         if (length == 0 || (value[0] & 0x80))
         {
@@ -63,9 +63,18 @@ namespace
         {
             return false;
         }
-        const size_t skip = value[0] == 0 && length > 1 ? 1 : 0;
-        out.assign(value + skip, value + length);
+        if (value[0] == 0 && length > 1)
+        {
+            value++;
+            length--;
+        }
         return true;
+    }
+
+    // The next INTEGER of `seq` as an unsigned view.
+    bool nextInteger(Reader &seq, const uint8_t *&value, size_t &length)
+    {
+        return seq.next(0x02, value, length) && unsignedInteger(value, length);
     }
 }
 
@@ -99,40 +108,38 @@ namespace RsaDer
         return std::vector<uint8_t>(spki.begin() + PREFIX_BYTES, spki.begin() + PREFIX_BYTES + MODULUS_BYTES);
     }
 
+    void wipe(void *data, size_t length)
+    {
+        volatile uint8_t *p = static_cast<volatile uint8_t *>(data);
+        while (length--)
+        {
+            *p++ = 0;
+        }
+    }
+
     bool parsePrivateKey(const uint8_t *der, size_t length, PrivateKeyParts &out)
     {
+        // Views into `der` only: nothing secret is copied until every check has passed.
         Reader outer{der, der + length};
         const uint8_t *body = nullptr;
         size_t bodyLength = 0;
-        if (!outer.next(0x30, body, bodyLength) || outer.p != outer.end)
-        {
-            return false;
-        }
-        Reader seq{body, body + bodyLength};
-        const uint8_t *value = nullptr;
-        size_t valueLength = 0;
-        std::vector<uint8_t> version, n, e, d;
-        if (!seq.next(0x02, value, valueLength) || !unsignedInteger(value, valueLength, version) ||
-            version.size() != 1 || version[0] != 0)
-        {
-            return false;
-        }
-        if (!seq.next(0x02, value, valueLength) || !unsignedInteger(value, valueLength, n) ||
-            !seq.next(0x02, value, valueLength) || !unsignedInteger(value, valueLength, e) ||
-            !seq.next(0x02, value, valueLength) || !unsignedInteger(value, valueLength, d))
-        {
-            return false;
-        }
+        const uint8_t *version = nullptr, *n = nullptr, *e = nullptr, *d = nullptr;
+        size_t versionLength = 0, nLength = 0, eLength = 0, dLength = 0;
         static const uint8_t EXPONENT[] = {0x01, 0x00, 0x01};
-        if (n.size() != MODULUS_BYTES || !(n[0] & 0x80) || e.size() != sizeof(EXPONENT) ||
-            memcmp(e.data(), EXPONENT, sizeof(EXPONENT)) != 0 || d.size() > MODULUS_BYTES)
+        bool ok = der && outer.next(0x30, body, bodyLength) && outer.p == outer.end;
+        Reader seq{body, body + bodyLength};
+        ok = ok && nextInteger(seq, version, versionLength) && versionLength == 1 && version[0] == 0 &&
+             nextInteger(seq, n, nLength) && nextInteger(seq, e, eLength) && nextInteger(seq, d, dLength) &&
+             nLength == MODULUS_BYTES && (n[0] & 0x80) && eLength == sizeof(EXPONENT) &&
+             memcmp(e, EXPONENT, sizeof(EXPONENT)) == 0 && dLength <= MODULUS_BYTES;
+        out.clear();
+        if (!ok)
         {
             return false;
         }
-        d.insert(d.begin(), MODULUS_BYTES - d.size(), 0);
-        out.modulus = std::move(n);
-        out.publicExponent = std::move(e);
-        out.privateExponent = std::move(d);
+        memcpy(out.modulus.data(), n, MODULUS_BYTES);
+        // Right-aligned into the fixed buffer: the zero padding is already there.
+        memcpy(out.privateExponent.data() + MODULUS_BYTES - dLength, d, dLength);
         return true;
     }
 }

@@ -146,7 +146,8 @@ void testRsaDer(const TestKey &key)
 {
     CHECK(key.spki.size() == RsaDer::SPKI_BYTES);
     CHECK(RsaDer::isCanonicalRsa3072Spki(key.spki));
-    CHECK(RsaDer::modulusFromSpki(key.spki) == key.parts.modulus);
+    const Bytes modulus(key.parts.modulus.begin(), key.parts.modulus.end());
+    CHECK(RsaDer::modulusFromSpki(key.spki) == modulus);
     Bytes bad = key.spki;
     bad[bad.size() - 1] ^= 0x02; // e = 65539
     CHECK(!RsaDer::isCanonicalRsa3072Spki(bad));
@@ -157,10 +158,81 @@ void testRsaDer(const TestKey &key)
     bad[30] ^= 0x01; // not the rsaEncryption / 3072 framing any more
     CHECK(!RsaDer::isCanonicalRsa3072Spki(bad));
     CHECK(!RsaDer::isCanonicalRsa3072Spki(Bytes(91, 0x30)));
-    Bytes even = key.parts.modulus;
+    Bytes even = modulus;
     even.back() &= 0xfe;
     CHECK(RsaDer::spkiFromModulus(even.data(), even.size()).empty());
     CHECK(RsaDer::spkiFromModulus(key.parts.modulus.data(), 383).empty());
+}
+
+// DER TLV with a short or two-byte long-form length (enough for an RSA-3072 RSAPrivateKey).
+Bytes tlv(uint8_t tag, const Bytes &value)
+{
+    Bytes out{tag};
+    if (value.size() < 0x80)
+    {
+        out.push_back(static_cast<uint8_t>(value.size()));
+    }
+    else
+    {
+        out.insert(out.end(), {0x82, static_cast<uint8_t>(value.size() >> 8), static_cast<uint8_t>(value.size())});
+    }
+    out.insert(out.end(), value.begin(), value.end());
+    return out;
+}
+
+// RSAPrivateKey prefix (version, n, e, d): the parser reads nothing after d.
+Bytes privateKeyDer(const Bytes &n, const Bytes &e, const Bytes &d)
+{
+    Bytes body = tlv(0x02, {0x00});
+    Bytes signedN{0x00};
+    signedN.insert(signedN.end(), n.begin(), n.end());
+    for (const Bytes &integer : {signedN, e, d})
+    {
+        const Bytes item = tlv(0x02, integer);
+        body.insert(body.end(), item.begin(), item.end());
+    }
+    return tlv(0x30, body);
+}
+
+// d shorter than the modulus lands right-aligned in the fixed buffer; a rejected key leaves `out` wiped.
+void testParsePrivateKey(const TestKey &key)
+{
+    const Bytes n(key.parts.modulus.begin(), key.parts.modulus.end());
+    RsaDer::PrivateKeyParts parts;
+    const Bytes shortD = privateKeyDer(n, {0x01, 0x00, 0x01}, {0x01, 0x02});
+    CHECK(RsaDer::parsePrivateKey(shortD.data(), shortD.size(), parts));
+    CHECK(parts.modulus == key.parts.modulus);
+    CHECK(parts.privateExponent[RsaDer::MODULUS_BYTES - 2] == 0x01 &&
+          parts.privateExponent[RsaDer::MODULUS_BYTES - 1] == 0x02);
+    bool padded = true;
+    for (size_t i = 0; i + 2 < RsaDer::MODULUS_BYTES; i++)
+    {
+        padded = padded && parts.privateExponent[i] == 0;
+    }
+    CHECK(padded);
+
+    const auto zeroed = [](const RsaDer::PrivateKeyParts &p) {
+        for (size_t i = 0; i < RsaDer::MODULUS_BYTES; i++)
+        {
+            if (p.modulus[i] || p.privateExponent[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    };
+    const Bytes wrongExponent = privateKeyDer(n, {0x03}, {0x01, 0x02});
+    parts.privateExponent.fill(0xa5);
+    CHECK(!RsaDer::parsePrivateKey(wrongExponent.data(), wrongExponent.size(), parts));
+    CHECK(zeroed(parts));
+    Bytes truncated = privateKeyDer(n, {0x01, 0x00, 0x01}, Bytes(RsaDer::MODULUS_BYTES, 0x11));
+    truncated.pop_back();
+    parts.modulus.fill(0x5a);
+    CHECK(!RsaDer::parsePrivateKey(truncated.data(), truncated.size(), parts));
+    CHECK(zeroed(parts));
+    CHECK(!RsaDer::parsePrivateKey(nullptr, 0, parts));
+    const Bytes tooLong = privateKeyDer(n, {0x01, 0x00, 0x01}, Bytes(RsaDer::MODULUS_BYTES + 1, 0x11));
+    CHECK(!RsaDer::parsePrivateKey(tooLong.data(), tooLong.size(), parts));
 }
 
 void testDsParams()
@@ -357,6 +429,38 @@ void testEfuseReport()
     CHECK(EfuseReport::hex(reinterpret_cast<const uint8_t *>("\x01\xab"), 2) == "01ab");
 }
 
+// --- when the reader asks for the upgrade -----------------------------------------------------
+
+void testUpgradeRequestTrigger()
+{
+    using IdentityUpgrade::Trigger;
+    IdentityUpgrade::RequestState ready;
+    ready.candidate = true;
+    ready.storageReady = true;
+    // After READER_FIRMWARE_INFO (the server's gate needs the profile), and on the server's recovery offer.
+    CHECK(IdentityUpgrade::shouldRequest(Trigger::FirmwareInfoSent, ready));
+    CHECK(IdentityUpgrade::shouldRequest(Trigger::ServerRecover, ready));
+    // Once per session.
+    IdentityUpgrade::RequestState asked = ready;
+    asked.requested = true;
+    CHECK(!IdentityUpgrade::shouldRequest(Trigger::FirmwareInfoSent, asked));
+    CHECK(!IdentityUpgrade::shouldRequest(Trigger::ServerRecover, asked));
+    // `not-allowed` earlier in this boot holds back the reader's own request, not the server's recovery offer.
+    IdentityUpgrade::RequestState blocked = ready;
+    blocked.blocked = true;
+    CHECK(!IdentityUpgrade::shouldRequest(Trigger::FirmwareInfoSent, blocked));
+    CHECK(IdentityUpgrade::shouldRequest(Trigger::ServerRecover, blocked));
+    // Nothing to upgrade (no DS key, already on the DS key, no P-256 certificate) or no NVS for the certificate.
+    IdentityUpgrade::RequestState none = ready;
+    none.candidate = false;
+    CHECK(!IdentityUpgrade::shouldRequest(Trigger::FirmwareInfoSent, none));
+    CHECK(!IdentityUpgrade::shouldRequest(Trigger::ServerRecover, none));
+    IdentityUpgrade::RequestState noStorage = ready;
+    noStorage.storageReady = false;
+    CHECK(!IdentityUpgrade::shouldRequest(Trigger::FirmwareInfoSent, noStorage));
+    CHECK(!IdentityUpgrade::shouldRequest(Trigger::ServerRecover, noStorage));
+}
+
 // --- NVS erase gate and migration staging -----------------------------------------------------
 
 void testEraseGate()
@@ -399,12 +503,14 @@ void testMigrationStaging()
 int main()
 {
     testProofVector();
+    testUpgradeRequestTrigger();
     testEraseGate();
     testMigrationStaging();
     testEfuseReport();
     testDsParams();
     const TestKey key = makeKey();
     testRsaDer(key);
+    testParsePrivateKey(key);
     testDsRecord(key);
     testUpgradeMessage(key);
     if (failures)
