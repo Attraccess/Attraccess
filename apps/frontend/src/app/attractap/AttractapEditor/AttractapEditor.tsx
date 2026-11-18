@@ -1,10 +1,4 @@
-import {
-  Button,
-  LabeledSwitch,
-  ResourceSelector,
-  StandardDrawer,
-  useTranslations,
-} from '@attraccess/plugins-frontend-ui';
+import { Button, ResourceSelector, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './AttractapEditor.de.json';
 import en from './AttractapEditor.en.json';
 import {
@@ -13,17 +7,12 @@ import {
   DrawerHeader,
   DrawerHeading,
   Form,
-  Slider,
-  SliderTrack,
-  SliderFill,
-  SliderThumb,
   Tab,
   TabList,
   TabPanel,
   Tabs,
 } from '@heroui/react';
-import { TextField, Label, Input } from '@heroui/react';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useGetReaderById,
@@ -36,6 +25,7 @@ import { ReaderSecurity } from '../pairing/ReaderSecurity';
 import { ReaderUiReaderPanel } from '../../readerUi/ReaderUiReaderPanel';
 import { isBleBridge } from '../bleBridge';
 import { EditorTab, visibleEditorTabs } from './editorTabs';
+import { GeneralSettings } from './GeneralSettings';
 
 interface Props {
   readerId?: number;
@@ -215,60 +205,5 @@ export function AttractapEditor(props: Readonly<Props>) {
         </DrawerFooter>
       </div>
     </StandardDrawer>
-  );
-}
-
-interface GeneralSettingsProps {
-  name: string;
-  onNameChange: (name: string) => void;
-  bleBridge: boolean;
-  showLedBrightness: boolean;
-  ledBrightness: number;
-  onLedBrightnessChange: (brightness: number) => void;
-  allowPluginBle: boolean;
-  onAllowPluginBleChange: (allow: boolean) => void;
-}
-
-function GeneralSettings(props: Readonly<GeneralSettingsProps>) {
-  const { t } = useTranslations({ de, en });
-  const allowPluginBleDescriptionId = useId();
-  return (
-    <div className="flex flex-col gap-4">
-      <TextField value={props.name} onChange={props.onNameChange} className="w-full">
-        <Label>{t('readerName')}</Label>
-        <Input placeholder={t('enterReaderName')} data-cy="attractap-editor-name-input" />
-      </TextField>
-      {props.bleBridge && <p className="text-sm text-default-500">{t('bleBridgeDescription')}</p>}
-      {props.showLedBrightness && (
-        <Slider
-          step={1}
-          minValue={0}
-          maxValue={255}
-          value={props.ledBrightness}
-          onChange={(val) => props.onLedBrightnessChange(val as number)}
-          className="w-full"
-          data-cy="attractap-editor-led-brightness-slider"
-        >
-          <Label>{t('ledBrightness')}</Label>
-          <SliderTrack>
-            <SliderFill />
-            <SliderThumb />
-          </SliderTrack>
-        </Slider>
-      )}
-      <div className="flex flex-col gap-1">
-        <LabeledSwitch
-          isSelected={props.allowPluginBle}
-          onChange={props.onAllowPluginBleChange}
-          aria-describedby={allowPluginBleDescriptionId}
-          data-cy="attractap-editor-allow-plugin-ble-switch"
-        >
-          {t('allowPluginBle')}
-        </LabeledSwitch>
-        <p id={allowPluginBleDescriptionId} className="text-sm text-default-500">
-          {t('allowPluginBleDescription')}
-        </p>
-      </div>
-    </div>
   );
 }
