@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PluginContext, PluginPermission, PluginPermissionError, SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { DataSource, EntityManager } from 'typeorm';
 import { PluginSandboxService } from './plugin-sandbox.service';
+import { createHostDataContext } from './runtime/host-contexts';
 
 function buildBaseContext(events: EventEmitter2): PluginContext {
   return {
@@ -241,6 +242,23 @@ describe('PluginSandboxService', () => {
       expect(() => call(denied)).toThrow(new RegExp(permission));
       const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [permission]);
       await expect(call(granted)).resolves.not.toThrow();
+    });
+
+    // The host builds hostData as frozen objects; a guard that proxies a frozen object throws on every call.
+    it('guards the frozen host hostData directories the host really builds', async () => {
+      const port = { resources: { getNames: jest.fn(async () => new Map([[1, 'Laser']])) } };
+      const base = {
+        ...buildBaseContext(events),
+        hostData: createHostDataContext({ get: () => port as never }),
+      };
+      const granted = PluginSandboxService.createGuardedContext(base, [PluginPermission.ACCESS_RESOURCES]);
+
+      await expect(granted.hostData.resources.getNames([1])).resolves.toEqual(new Map([[1, 'Laser']]));
+      expect(port.resources.getNames).toHaveBeenCalledWith([1]);
+      expect(Object.isFrozen(granted.hostData.resources)).toBe(true);
+
+      const denied = PluginSandboxService.createGuardedContext(base, []);
+      expect(() => denied.hostData.resources.getNames([1])).toThrow(/ACCESS_RESOURCES/);
     });
 
     it('gates get() behind RESOLVE_HOST_PROVIDERS', () => {

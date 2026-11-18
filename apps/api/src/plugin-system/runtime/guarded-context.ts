@@ -36,24 +36,31 @@ const HOST_DATA_PERMISSIONS: Record<keyof PluginHostDataContext, PluginPermissio
   flows: PluginPermission.TRIGGER_FLOWS,
 };
 
-/** Wraps one host data group so every method checks the group's permission when it is called. */
+/**
+ * Wraps one host data group so every method checks the group's permission when it is called.
+ * Builds a fresh object: the host groups are frozen, and a Proxy over a frozen target must return the target's own
+ * property values, so it could not return the guarded wrappers.
+ */
 function guardDirectory<T extends object>(
   group: T,
   groupName: string,
   permission: PluginPermission,
   require: (permission: PluginPermission, capability: string) => void,
 ): T {
-  return new Proxy(group, {
-    get(target, property, receiver) {
-      const value = Reflect.get(target, property, receiver);
-      if (typeof value !== 'function') return value;
-      return (...args: unknown[]) => {
-        require(permission, `hostData.${groupName}.${String(property)}()`);
-        return value.apply(target, args);
-      };
-    },
-  });
+  const guarded = Object.fromEntries(
+    Object.entries(group).map(([name, value]) => [
+      name,
+      typeof value === 'function'
+        ? (...args: unknown[]) => {
+            require(permission, `hostData.${groupName}.${name}()`);
+            return value.apply(group, args);
+          }
+        : value,
+    ]),
+  );
+  return Object.freeze(guarded) as T;
 }
+
 export function createGuardedContext(
   context: PluginSandboxServicePluginGuardedContextContext,
   base: PluginContext,
