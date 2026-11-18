@@ -554,6 +554,14 @@ it('labels every flow audit event, target and detail field in both languages', (
     'after.enabled',
     'before.description',
     'after.description',
+    'fingerprint',
+    'oldFingerprint',
+    'newFingerprint',
+    'algorithm',
+    'profile',
+    'secureVersion',
+    'efuseSecureVersion',
+    'problems',
   ];
   // English labels that are already the humanized key.
   const humanizedInEnglish = ['scope', 'key'];
