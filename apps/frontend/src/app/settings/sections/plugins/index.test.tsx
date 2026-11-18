@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 // Register the shared API mocks before loading the component's feature modules.
-import { deferred, hoisted, makePlugin, renderWithQuery } from './index.test.hoisted';
+import { chooseRowAction, deferred, hoisted, makePlugin, renderWithQuery } from './index.test.hoisted';
 import { PluginsSection } from './index';
 
 import { describe } from 'vitest';
@@ -19,6 +19,63 @@ describe('PluginsSection', () => {
     expect(screen.getByText('Permissions')).toBeInTheDocument();
     expect(screen.getByText('Status')).toBeInTheDocument();
     expect(screen.getByText('Actions')).toBeInTheDocument();
+  });
+
+  it('uses the full content width and offers the plugin docs in the toolbar instead of an aside', () => {
+    const { container } = renderWithQuery(<PluginsSection />);
+
+    expect(container.querySelector('[data-slot="settings-aside"]')).toBeNull();
+    expect(container.querySelector('[data-slot="settings-content"]')).not.toHaveClass('max-w-2xl');
+    const docs = screen.getByRole('link', { name: 'Documentation' });
+    expect(docs).toHaveAttribute('data-cy', 'plugins-list-docs-link');
+    expect(docs).toHaveAttribute('href', 'https://docs.attraccess.org/#/plugins/developing-plugins');
+    expect(docs).toHaveAttribute('target', '_blank');
+    expect(docs).toHaveAttribute('rel', 'noreferrer');
+  });
+
+  it('collects the row actions of a registry-installed plugin in one named menu', async () => {
+    hoisted.plugins = [makePlugin()];
+    hoisted.apiMock.mockImplementation((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: async () =>
+          url.endsWith('/api/plugins/installed')
+            ? [
+                {
+                  name: 'Cool Plugin',
+                  version: '1.2.3',
+                  installPath: '/plugins/cool',
+                  registryId: 'npm',
+                  registryUrl: 'https://registry.example.org',
+                },
+              ]
+            : [],
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithQuery(<PluginsSection />);
+
+    expect((await screen.findAllByText('https://registry.example.org')).length).toBeGreaterThan(0);
+    const trigger = screen.getByRole('button', { name: 'Actions for Cool Plugin' });
+    expect(trigger).toHaveAttribute('data-cy', 'plugins-list-actions-button-plugin-1');
+    await user.click(trigger);
+    const items = await screen.findAllByRole('menuitem');
+    expect(items.map((item) => item.textContent)).toEqual(['Details', 'Manage version', 'Remove plugin']);
+    expect(items.map((item) => item.getAttribute('data-cy'))).toEqual([
+      'plugins-list-details-button-plugin-1',
+      'plugins-list-manage-version-button-plugin-1',
+      'plugins-list-delete-plugin-button-plugin-1',
+    ]);
+  });
+
+  it('offers only removal for a plugin that was not installed from a registry', async () => {
+    hoisted.plugins = [makePlugin()];
+    const user = userEvent.setup();
+    renderWithQuery(<PluginsSection />);
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Cool Plugin' }));
+    const items = await screen.findAllByRole('menuitem');
+    expect(items.map((item) => item.textContent)).toEqual(['Remove plugin']);
   });
 
   it('checks marketplace plugins for updates and takes the admin to the in-place update flow', async () => {
@@ -833,7 +890,7 @@ describe('PluginsSection', () => {
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
 
-    await user.click(document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element);
+    await chooseRowAction(user, 'plugin-1', 'Remove plugin');
 
     await waitFor(() =>
       expect(document.querySelector('[data-cy="plugins-list-delete-confirmation-delete-button"]')).toBeInTheDocument(),
@@ -845,7 +902,7 @@ describe('PluginsSection', () => {
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
 
-    await user.click(document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element);
+    await chooseRowAction(user, 'plugin-1', 'Remove plugin');
     const confirm = await waitFor(() =>
       document.querySelector('[data-cy="plugins-list-delete-confirmation-delete-button"]'),
     );
@@ -880,7 +937,7 @@ describe('PluginsSection', () => {
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
 
-    await user.click(document.querySelector('[data-cy="plugins-list-delete-plugin-button-plugin-1"]') as Element);
+    await chooseRowAction(user, 'plugin-1', 'Remove plugin');
     const cancel = await waitFor(() =>
       document.querySelector('[data-cy="plugins-list-delete-confirmation-cancel-button"]'),
     );

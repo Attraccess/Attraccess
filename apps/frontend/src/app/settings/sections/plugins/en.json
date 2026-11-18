@@ -153,10 +153,7 @@
     }
   },
   "deleteTooltip": "Remove plugin",
-  "aside": {
-    "title": "Writing a plugin",
-    "description": "Plugins extend the API and the frontend from a single bundle. The developer guide covers the manifest, the permission model and local development."
-  },
+  "rowActions": "Actions for {{pluginName}}",
   "deleteConfirmation": {
     "title": "Remove plugin?",
     "cancel": "Cancel",

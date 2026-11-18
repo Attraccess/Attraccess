@@ -35,6 +35,22 @@ describe('SettingsSection', () => {
     expect(container.querySelector('[data-slot="settings-aside"]')).toBeInTheDocument();
     expect(screen.getByText('endpoint')).toBeInTheDocument();
   });
+
+  it('caps the content column unless the section asks for the full width', () => {
+    const { container, rerender } = render(
+      <SettingsSection title="General">
+        <p>body</p>
+      </SettingsSection>,
+    );
+    expect(container.querySelector('[data-slot="settings-content"]')).toHaveClass('max-w-2xl');
+
+    rerender(
+      <SettingsSection title="Plugins" fullWidth>
+        <p>body</p>
+      </SettingsSection>,
+    );
+    expect(container.querySelector('[data-slot="settings-content"]')).not.toHaveClass('max-w-2xl');
+  });
 });
 
 describe('SettingsRow', () => {
