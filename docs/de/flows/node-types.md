@@ -1,4 +1,5 @@
 # Knotentypen
+
 <!-- llms-description: Referenz aller eingebauten Flow-Knoten, gegliedert in Eingabe-Trigger, Verarbeitungs-Knoten und Ausgabe-Aktionen. -->
 
 Diese Referenz beschreibt alle eingebauten Flow-Knoten. Der Editor gruppiert sie nach Zweck, etwa Abrechnung, Nachrichten und Flow-Steuerung, und zeigt die vom Ressourcentyp unterstützten Knoten. Nutzungs-, Aktivitäts- und Abrechnungsknoten sind für **Maschinen**; Tür-Trigger für **Türen**. Plugins können weitere Knoten mit eigenen Einstellungen ergänzen.
@@ -44,6 +45,8 @@ Läuft bei Übernahme einer aktiven Sitzung. Keine Einstellungen. Die Payload en
 Typ: `input.resource.door.unlocked` · Türen
 
 Läuft bei einer Entriegelungsaktion. Keine Einstellungen. Die Payload enthält `event.timestamp`, `usage.start`, `usage.end`, `user.id`, `user.username`, `user.externalIdentifier`. Beispiel: Entriegelungsbefehl mit **MQTT-Nachricht senden** versenden.
+
+Eine Türaktion wartet auf ihre Flows. Schlägt ein Knoten mit **Flow abbrechen** fehl, sieht die Person an der Tür den Fehler in der Web-App, am Attractap oder am Leser des Plugins. Die Aktion bleibt im Nutzungsverlauf. Das gilt ebenso für **Tür verriegelt** und **Tür-Falle geöffnet**.
 
 ### Tür verriegelt
 
@@ -255,11 +258,11 @@ Aktionen mit **Ausgang** können nachfolgende Knoten ausführen. Abrechnungspost
 
 **HTTP-Anfrage**, **MQTT-Nachricht senden**, **Auf MQTT-Nachricht warten** und **Nutzungssitzung beenden** bieten **Bei Fehler** (`failureBehavior`):
 
-| Auswahl                                                          | Ergebnis                                                                                   |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| **Flow abbrechen** (`fail-flow`)                                 | Löst einen Fehler aus und stoppt diesen Pfad; kann die auslösende Nutzungsaktion abbrechen |
-| **Über Fehlerausgang fortfahren** (`failure-output`)             | Gibt den ursprünglichen Eingang plus `flowError: { kind, message }` über **Fehler** weiter |
-| **Protokollieren und fortfahren** (`log-and-continue`, Standard) | Protokolliert den Fehler und gibt den ursprünglichen Eingang über **Ausgang** weiter       |
+| Auswahl                                                          | Ergebnis                                                                                                                          |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Flow abbrechen** (`fail-flow`)                                 | Löst einen Fehler aus und stoppt diesen Pfad; kann die auslösende Nutzungsaktion abbrechen oder die Türaktion fehlschlagen lassen |
+| **Über Fehlerausgang fortfahren** (`failure-output`)             | Gibt den ursprünglichen Eingang plus `flowError: { kind, message }` über **Fehler** weiter                                        |
+| **Protokollieren und fortfahren** (`log-and-continue`, Standard) | Protokolliert den Fehler und gibt den ursprünglichen Eingang über **Ausgang** weiter                                              |
 
 `flowError.kind` ist `transport-dispatch`, `acknowledgement-timeout`, `controller-rejection` oder `node-failure`. `{{flowError.message}}` liest die Meldung im Fehlerzweig. Ein angeschlossener Fehlerausgang allein aktiviert die Weiterleitung nicht.
 
