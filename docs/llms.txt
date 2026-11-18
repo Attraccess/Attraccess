@@ -17,7 +17,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Portainer](https://docs.attraccess.org/en/installation/portainer.md): Installs Attraccess as a stack in Portainer, including environment variables, deployment, first-time setup and stack updates.
 - [Environment Variables](https://docs.attraccess.org/en/installation/environment-variables.md): Reference of all environment variables that configure Attraccess: required settings, application, logging, database, storage, SMTP and TLS.
 - [SSL Setup](https://docs.attraccess.org/en/installation/ssl-setup.md): How to serve Attraccess over HTTPS using a reverse proxy, self-signed or custom certificates, and what SSO requires.
-- [Updating](https://docs.attraccess.org/en/installation/updating.md): How to check for new Attraccess versions and update with Docker Compose, plain Docker or Portainer, or pin a specific version.
+- [Updating](https://docs.attraccess.org/en/installation/updating.md): How to check for new Attraccess versions and update with Docker Compose, plain Docker or Portainer, pin a specific version, and upgrade to 2.0 through 1.11.
 - [Backup & Restore](https://docs.attraccess.org/en/installation/backup-restore.md): Explains what Attraccess data to back up, how to create a backup and how to restore it.
 
 ## English: First-Time Setup
@@ -172,7 +172,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Portainer](https://docs.attraccess.org/de/installation/portainer.md): Installation von Attraccess als Stack in Portainer, inklusive Umgebungsvariablen, Deployment, Ersteinrichtung und Stack-Update.
 - [Umgebungsvariablen](https://docs.attraccess.org/de/installation/environment-variables.md): Referenz aller Umgebungsvariablen zur Konfiguration von Attraccess: Pflichteinstellungen, Anwendung, Logs, Datenbank, Speicher, SMTP und TLS.
 - [SSL einrichten](https://docs.attraccess.org/de/installation/ssl-setup.md): Wie Attraccess per HTTPS bereitgestellt wird: Reverse Proxy, selbst-signierte oder eigene Zertifikate und Anforderungen für SSO.
-- [Aktualisierung](https://docs.attraccess.org/de/installation/updating.md): So prüfen Sie auf neue Attraccess-Versionen und aktualisieren mit Docker Compose, Docker oder Portainer oder legen eine feste Version fest.
+- [Aktualisierung](https://docs.attraccess.org/de/installation/updating.md): So prüfen Sie auf neue Attraccess-Versionen und aktualisieren mit Docker Compose, Docker oder Portainer, legen eine feste Version fest und gehen über 1.11 auf 2.0.
 - [Backup & Wiederherstellung](https://docs.attraccess.org/de/installation/backup-restore.md): Erklärt, welche Attraccess-Daten gesichert werden, wie Sie ein Backup erstellen und wiederherstellen.
 
 ## Deutsch: Ersteinrichtung

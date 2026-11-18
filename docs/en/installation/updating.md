@@ -1,5 +1,6 @@
 # Updating
-<!-- llms-description: How to check for new Attraccess versions and update with Docker Compose, plain Docker or Portainer, or pin a specific version. -->
+
+<!-- llms-description: How to check for new Attraccess versions and update with Docker Compose, plain Docker or Portainer, pin a specific version, and upgrade to 2.0 through 1.11. -->
 
 How to update Attraccess to the latest version.
 
@@ -19,6 +20,25 @@ You can also check manually at any time by comparing your running version (shown
 
 Check the [release notes](https://github.com/Attraccess/Attraccess/releases) for breaking changes before updating.
 
+## Upgrading to Attraccess 2.0
+
+Attraccess 2.0 takes over the data of plugins (WAGO, Matter, Shelly, Reservations and others) only from the last 1.x
+release, **Attraccess 1.11**. Update in two steps:
+
+1. Create a [backup](installation/backup-restore.md).
+2. Update to Attraccess 1.11 (pin the newest `v1.11.x` tag, see [Pinning a specific version](#pinning-a-specific-version))
+   and start it **once**, so every plugin finishes its migrations. Check in **Settings → Plugins** that all plugins
+   load.
+3. Create another backup, then update to 2.0.
+
+If you skip step 2, for example coming from 1.10, Attraccess 2.0 refuses each affected plugin with a message such as:
+"Attraccess 2.0 adopts the data of plugin "wago" only from the last 1.x release (1.11). Restore the backup taken before
+this upgrade, update to Attraccess 1.11 and start it once so the plugin's migrations finish, then update to 2.0."
+Nothing is changed in that case: follow the message.
+
+Plugins built for 1.x do not load on 2.0 at all; install their 2.0 builds (see
+[Upgrading to Attraccess 2.0](plugins/installing-plugins.md#upgrading-to-attraccess-20) in the plugin guide).
+
 ## Docker Compose
 
 ```bash
@@ -31,7 +51,8 @@ docker compose pull
 docker compose up -d
 ```
 
-Attraccess runs database migrations automatically on startup. No manual steps are required.
+Attraccess runs database migrations automatically on startup. Within a major version no manual steps are required.
+Upgrading from 1.x to 2.0 needs one extra step, see [Upgrading to Attraccess 2.0](#upgrading-to-attraccess-20).
 
 ## Plain Docker
 
