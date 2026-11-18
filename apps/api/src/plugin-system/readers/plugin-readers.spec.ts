@@ -401,15 +401,19 @@ describe('context.readers', () => {
     it('refuses a second tap on the reader while one runs', async () => {
       const { user } = await setUp();
       let release!: () => void;
-      host.access.canControllResource.mockImplementationOnce(
-        () => new Promise((resolve) => (release = () => resolve(true))),
-      );
+      let reached!: () => void;
+      const checking = new Promise<void>((resolve) => (reached = resolve));
+      host.access.canControllResource.mockImplementationOnce(() => {
+        reached();
+        return new Promise((resolve) => (release = () => resolve(true)));
+      });
 
       const first = readers.tap({
         deviceId: 'device-1',
         authentication: host.authenticate(PLUGIN_A, 'device-1', user.id),
       });
-      await new Promise((resolve) => setTimeout(resolve, 20));
+      // The first tap is inside the door action's permission check.
+      await checking;
       const second = await readers.tap({
         deviceId: 'device-1',
         authentication: host.authenticate(PLUGIN_A, 'device-1', user.id),
