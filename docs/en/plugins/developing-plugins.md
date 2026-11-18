@@ -1602,21 +1602,51 @@ and `attraccessVersion.min`, and those hosts share this module.
 `@attraccess/plugins-frontend-ui` also ships the host's UI building blocks, so
 plugins look and behave like core instead of carrying their own copies:
 
-| Component                                               | Use it for                                                        |
-| ------------------------------------------------------- | ----------------------------------------------------------------- |
-| `StatusDialog`                                          | Notices and confirmations (`info`, `success`, `warning`, `error`) |
-| `DeleteConfirmationModal`                               | Confirming a deletion of a named item                             |
-| `StandardModal`, `StandardDrawer`                       | Richer modals and drawers (forms, lists)                          |
-| `Button`                                                | Buttons with a pending spinner                                    |
-| `AlertStatusIcon`, `StatusAlert`                        | Alerts with a status icon                                         |
-| `LabeledSwitch`, `PasswordInput`                        | Switch with label, password field with show/hide                  |
-| `EmptyState`, `TableDataLoadingIndicator`, `PageHeader` | Empty lists, centred loading indicator, page title with actions   |
-| `DateTimeDisplay`, `useDateTimeFormatter`               | Dates and times that follow the user's date/time preferences      |
+| Component                                               | Use it for                                                                         |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `StatusDialog`                                          | Notices (`info`, `success`, `warning`, `error`)                                    |
+| `ConfirmableButton`                                     | A button that asks for confirmation in a `StatusDialog` before it runs its action  |
+| `TableRowActions`, `TableActionsColumnHeader`           | A table row's actions: ⋮ menu in the last column, headed "Actions"                 |
+| `DeleteConfirmationModal`                               | **Deprecated**: use `ConfirmableButton`                                            |
+| `StandardModal`, `StandardDrawer`                       | Richer modals and drawers (forms, lists)                                           |
+| `Button`                                                | Buttons with a pending spinner                                                     |
+| `AlertStatusIcon`, `StatusAlert`                        | Alerts with a status icon                                                          |
+| `LabeledSwitch`, `PasswordInput`                        | Switch with label, password field with show/hide                                   |
+| `EmptyState`, `TableDataLoadingIndicator`, `PageHeader` | Empty lists, centred loading indicator, page title with actions                    |
+| `DateTimeDisplay`, `useDateTimeFormatter`               | Dates and times that follow the user's date/time preferences                       |
 
 Use `StatusDialog` for short notices and confirmations. Only `error` renders a
 red (danger) action button; every other status renders a primary one. Escape
 calls `onClose`, a click on the backdrop does nothing. Reach for
 `StandardModal` only when the dialog needs richer content.
+
+Confirm destructive or irreversible actions with `ConfirmableButton`. It takes
+a `label`, an `onConfirm` action, a `status` and the dialog's `confirm` text.
+While `onConfirm` runs, the dialog stays open and shows pending; it closes when
+the action succeeds and stays open when it throws, so report the error yourself
+(for example in a toast). `renderActivator` replaces the default button.
+
+Give every table with row actions a last column headed
+`<TableActionsColumnHeader />` and put a `TableRowActions` in its cells. Each
+action has a `label` and an `icon`; `tone: 'danger'` marks destructive ones,
+which get their own last section, and `confirm` asks before `onPress` runs:
+
+```tsx
+<TableRowActions
+  itemName={server.name}
+  actions={[
+    { key: 'edit', label: t('edit'), icon: PencilIcon, onPress: () => edit(server) },
+    {
+      key: 'delete',
+      label: t('delete'),
+      icon: Trash2Icon,
+      tone: 'danger',
+      onPress: () => remove(server.id),
+      confirm: { title: t('deleteTitle'), message: t('deleteMessage', { name: server.name }) },
+    },
+  ]}
+/>
+```
 
 The `StandardModal` and `StandardDrawer` exports of
 `@attraccess/plugins-frontend-sdk` are **deprecated** re-exports of the

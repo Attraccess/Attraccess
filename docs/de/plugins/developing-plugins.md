@@ -1322,21 +1322,53 @@ und diese Hosts teilen die Bibliothek.
 `@attraccess/plugins-frontend-ui` enthält auch die UI-Bausteine des Hosts, damit
 Plugins wie der Kern aussehen und sich verhalten, statt eigene Kopien mitzubringen:
 
-| Komponente                                              | Verwendung                                                         |
-| ------------------------------------------------------- | ------------------------------------------------------------------ |
-| `StatusDialog`                                          | Hinweise und Bestätigungen (`info`, `success`, `warning`, `error`) |
-| `DeleteConfirmationModal`                               | Löschen eines benannten Eintrags bestätigen                        |
-| `StandardModal`, `StandardDrawer`                       | Umfangreichere Modals und Drawer (Formulare, Listen)               |
-| `Button`                                                | Buttons mit Ladeanzeige                                            |
-| `AlertStatusIcon`, `StatusAlert`                        | Hinweise mit Statussymbol                                          |
-| `LabeledSwitch`, `PasswordInput`                        | Schalter mit Beschriftung, Passwortfeld mit Anzeigen/Verbergen     |
-| `EmptyState`, `TableDataLoadingIndicator`, `PageHeader` | Leere Listen, zentrierte Ladeanzeige, Seitenkopf mit Aktionen      |
-| `DateTimeDisplay`, `useDateTimeFormatter`               | Datum und Uhrzeit nach den Einstellungen des Benutzers             |
+| Komponente                                              | Verwendung                                                                       |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `StatusDialog`                                          | Hinweise (`info`, `success`, `warning`, `error`)                                 |
+| `ConfirmableButton`                                     | Button, der vor seiner Aktion in einem `StatusDialog` um Bestätigung bittet      |
+| `TableRowActions`, `TableActionsColumnHeader`           | Aktionen einer Tabellenzeile: ⋮-Menü in der letzten Spalte „Aktionen“            |
+| `DeleteConfirmationModal`                               | **Veraltet**: nutze `ConfirmableButton`                                          |
+| `StandardModal`, `StandardDrawer`                       | Umfangreichere Modals und Drawer (Formulare, Listen)                             |
+| `Button`                                                | Buttons mit Ladeanzeige                                                          |
+| `AlertStatusIcon`, `StatusAlert`                        | Hinweise mit Statussymbol                                                        |
+| `LabeledSwitch`, `PasswordInput`                        | Schalter mit Beschriftung, Passwortfeld mit Anzeigen/Verbergen                   |
+| `EmptyState`, `TableDataLoadingIndicator`, `PageHeader` | Leere Listen, zentrierte Ladeanzeige, Seitenkopf mit Aktionen                    |
+| `DateTimeDisplay`, `useDateTimeFormatter`               | Datum und Uhrzeit nach den Einstellungen des Benutzers                           |
 
 Verwende `StatusDialog` für kurze Hinweise und Bestätigungen. Nur `error` zeigt
 eine rote (Danger-)Aktionsschaltfläche, alle anderen Status eine primäre. Escape
 ruft `onClose` auf, ein Klick auf den Hintergrund bewirkt nichts. Nimm
 `StandardModal` nur, wenn der Dialog umfangreichere Inhalte braucht.
+
+Bestätige zerstörerische oder unumkehrbare Aktionen mit `ConfirmableButton`. Er
+nimmt ein `label`, eine Aktion `onConfirm`, einen `status` und die Texte des
+Dialogs in `confirm`. Während `onConfirm` läuft, bleibt der Dialog offen und zeigt
+den Ladezustand; er schließt sich, wenn die Aktion gelingt, und bleibt offen, wenn
+sie einen Fehler wirft. Melde den Fehler also selbst (zum Beispiel als Toast).
+`renderActivator` ersetzt den Standard-Button.
+
+Gib jeder Tabelle mit Zeilenaktionen eine letzte Spalte mit der Überschrift
+`<TableActionsColumnHeader />` und setze in ihre Zellen ein `TableRowActions`.
+Jede Aktion hat ein `label` und ein `icon`; `tone: 'danger'` markiert
+zerstörerische Aktionen, die einen eigenen letzten Abschnitt bekommen, und
+`confirm` fragt nach, bevor `onPress` läuft:
+
+```tsx
+<TableRowActions
+  itemName={server.name}
+  actions={[
+    { key: 'edit', label: t('edit'), icon: PencilIcon, onPress: () => edit(server) },
+    {
+      key: 'delete',
+      label: t('delete'),
+      icon: Trash2Icon,
+      tone: 'danger',
+      onPress: () => remove(server.id),
+      confirm: { title: t('deleteTitle'), message: t('deleteMessage', { name: server.name }) },
+    },
+  ]}
+/>
+```
 
 Die Exporte `StandardModal` und `StandardDrawer` aus
 `@attraccess/plugins-frontend-sdk` sind **veraltet** (Re-Exports der obigen
