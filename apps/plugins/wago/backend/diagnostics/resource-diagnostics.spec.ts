@@ -1,5 +1,5 @@
 import { flowNode, hostDataWithFlows } from '../persistence.test-utils';
-import { controllerRow } from '../rows.test-utils';
+import { controllerRow, revisionRow } from '../rows.test-utils';
 import { spyOnWagoStorage } from '../storage-spy.test-utils';
 import { createWagoTestStorage } from '../storage/testing';
 import { type ExecutionContext, ForbiddenException } from '@nestjs/common';
@@ -27,7 +27,13 @@ describe('resource diagnostics', () => {
       { ...spy.context, hostData: hostDataWithFlows(findNodes) } as unknown as PluginContext,
       {} as WagoService,
     );
-    return { findNodes, controllers: spy.spied.controllers, revisions: spy.spied.configurationRevisions, service };
+    return {
+      findNodes,
+      controllers: spy.spied.controllers,
+      revisions: spy.spied.configurationRevisions,
+      service,
+      storage,
+    };
   }
 
   it('looks up only the requested resource and batches controller associations', async () => {
@@ -39,15 +45,41 @@ describe('resource diagnostics', () => {
       orderById: true,
       limit: 1001,
     });
-    // One lookup for all controllers and one for their applied revisions, however many nodes reference them.
+    // One lookup for all controllers and one revision-number aggregate per controller, however many nodes reference
+    // them. Neither controller has an applied revision, so no revision row (and no snapshot) is read.
     expect(controllers.find).toHaveBeenCalledTimes(1);
     expect(controllers.find).toHaveBeenCalledWith({ where: { id: { in: [1, 2] } } });
-    expect(revisions.find).toHaveBeenCalledTimes(1);
-    expect(revisions.find).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { controllerId: { in: [1, 2] }, state: 'applied' } }),
-    );
+    expect(revisions.aggregate).toHaveBeenCalledTimes(2);
+    expect(revisions.aggregate).toHaveBeenCalledWith('revision', { controllerId: 1, state: 'applied' });
+    expect(revisions.find).not.toHaveBeenCalled();
     expect(result.controllers.map((controller) => controller.name)).toEqual(['Controller 1', 'Controller 2']);
     expect(result.truncated).toBe(false);
+  });
+  it("reads only each controller's latest applied revision, not its older snapshots", async () => {
+    const { findNodes, revisions, service, storage } = await setup([1]);
+    const snapshot = (channel: string) =>
+      JSON.stringify({ logicalChannels: [{ id: channel, capabilities: ['output'] }] });
+    await storage.tables.configurationRevisions.insertMany([
+      revisionRow({ controllerId: 1, revision: 1, state: 'applied', snapshot: snapshot('old') }),
+      revisionRow({ controllerId: 1, revision: 2, state: 'applied', snapshot: snapshot('do1') }),
+      revisionRow({ controllerId: 1, revision: 3, state: 'pending', snapshot: snapshot('next') }),
+    ]);
+    const node = flowNode({
+      id: 'relay-on',
+      resourceId: 42,
+      type: 'plugin.wago.command',
+      data: { controllerId: 1, channelId: 'do1', expectedConfigurationRevision: 2 },
+    });
+    findNodes.mockResolvedValueOnce([node]).mockResolvedValueOnce([node]);
+    revisions.find.mockClear();
+
+    const [controller] = (await service.getResource(42)).controllers;
+
+    expect(revisions.find).toHaveBeenCalledTimes(1);
+    expect(revisions.find).toHaveBeenCalledWith({
+      where: { and: [{ state: 'applied' }, { or: [{ controllerId: 1, revision: 2 }] }] },
+    });
+    expect(controller.references).toEqual([expect.objectContaining({ nodeId: 'relay-on', invalid: false })]);
   });
   it('does no controller work for unrelated resources', async () => {
     const { service, controllers } = await setup([]);

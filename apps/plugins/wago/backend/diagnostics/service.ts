@@ -8,6 +8,7 @@ import { safeValidationSummaries } from './validation';
 import { WagoConfigurationDraft } from '../configuration/draft.entity';
 import { WagoConfigurationRevision } from '../configuration/revision.entity';
 import { openWagoStorage } from '../storage';
+import { loadLatestAppliedRevisions } from '../configuration/latest-applied';
 import { WagoService } from '../controllers/service';
 import { channelEnabled, MAX_CONFIGURATION_ITEMS } from '../../shared/configuration-limits';
 import { MAX_CHANNELS } from './store';
@@ -342,14 +343,8 @@ export class WagoDiagnosticsService {
     const tables = openWagoStorage(this.context);
     const [controllers, appliedRows, conflictNodes] = await Promise.all([
       tables.controllers.find({ where: { id: { in: selectedControllerIds } } }),
-      // Newest first, so the first row of each controller is its latest applied revision.
-      tables.configurationRevisions.find({
-        where: { controllerId: { in: selectedControllerIds }, state: 'applied' },
-        orderBy: [
-          { field: 'controllerId', direction: 'asc' },
-          { field: 'revision', direction: 'desc' },
-        ],
-      }),
+      // Only the newest applied revision of each controller; older snapshots are never loaded.
+      loadLatestAppliedRevisions(tables.configurationRevisions, selectedControllerIds),
       localChannelIds.length
         ? this.context.hostData.flows.findNodes({
             type: 'plugin.wago.command',
@@ -359,9 +354,7 @@ export class WagoDiagnosticsService {
         : Promise.resolve([]),
     ]);
     const controllersById = new Map(controllers.map((controller) => [controller.id, controller]));
-    const appliedByControllerId = new Map<number, (typeof appliedRows)[number]>();
-    for (const revision of appliedRows)
-      if (!appliedByControllerId.has(revision.controllerId)) appliedByControllerId.set(revision.controllerId, revision);
+    const appliedByControllerId = new Map(appliedRows.map((revision) => [revision.controllerId, revision]));
     const referencesTruncated = conflictNodes.length > 1000;
     const conflictNodesByControllerId = new Map<number, DiagnosticNode[]>();
     for (const node of conflictNodes.slice(0, 1000)) {

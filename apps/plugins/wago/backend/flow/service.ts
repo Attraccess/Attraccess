@@ -21,6 +21,7 @@ import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../../shared/clock';
 import { type WagoConfigurationSnapshot } from '../configuration/model';
 
 import { WagoConfigurationRevision } from '../configuration/revision.entity';
+import { loadLatestAppliedRevisions } from '../configuration/latest-applied';
 
 import { type WagoControllerRow } from '../storage';
 
@@ -183,33 +184,7 @@ export class WagoFlowService extends WagoFlowQueries implements OnModuleInit, On
   }
 
   protected async loadLatestAppliedRevisions(controllerIds: number[]): Promise<WagoConfigurationRevision[]> {
-    if (!controllerIds.length) return [];
-    // The record port has no group-wise maximum: look up each controller's newest applied revision number
-    // (an indexed aggregate that moves no snapshots), then read exactly those rows with one filter.
-    const latest: Array<{ controllerId: number; revision: number }> = [];
-    for (let start = 0; start < controllerIds.length; start += 50) {
-      const found = await Promise.all(
-        controllerIds.slice(start, start + 50).map(async (controllerId) => ({
-          controllerId,
-          revision: (await this.revisions.aggregate('revision', { controllerId, state: 'applied' })).max as
-            number | null,
-        })),
-      );
-      for (const entry of found) if (entry.revision !== null) latest.push({ ...entry, revision: entry.revision });
-    }
-    const rows: WagoConfigurationRevision[] = [];
-    for (let start = 0; start < latest.length; start += 50)
-      rows.push(
-        ...(await this.revisions.find({
-          where: {
-            and: [
-              { state: 'applied' },
-              { or: latest.slice(start, start + 50).map(({ controllerId, revision }) => ({ controllerId, revision })) },
-            ],
-          },
-        })),
-      );
-    return rows;
+    return loadLatestAppliedRevisions(this.revisions, controllerIds);
   }
 
   protected async channels(controllerId: number): Promise<WagoConfigurationSnapshot['logicalChannels']> {
