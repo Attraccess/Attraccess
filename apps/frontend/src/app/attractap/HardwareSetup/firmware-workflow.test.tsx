@@ -231,11 +231,13 @@ it('refuses an image built for another chip', async () => {
     success: false,
     error: { type: 'CHIP_MISMATCH', details: { expected: 'esp32s3', detected: 'ESP32' } },
   });
-  render(<FirmwareFlasher firmware={{ ...firmware, chip: 'esp32s3' }} onCompleted={completed} />);
+  render(
+    <FirmwareFlasher firmware={{ ...firmware, boardFamily: 'ESP32-S3', chip: 'esp32s3' }} onCompleted={completed} />,
+  );
   fireEvent.click(screen.getByRole('button', { name: 'Install Now' }));
   const dialog = await screen.findByRole('alertdialog');
   expect(dialog).toHaveTextContent('Wrong chip for this firmware');
-  expect(dialog).toHaveTextContent('This firmware is built for esp32s3, but the connected device is an ESP32.');
+  expect(dialog).toHaveTextContent('This firmware is built for ESP32-S3, but the connected device is an ESP32.');
   expect(completed).not.toHaveBeenCalled();
   expect(state.success).not.toHaveBeenCalled();
 });
