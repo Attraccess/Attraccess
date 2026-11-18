@@ -12,7 +12,7 @@ const S_IFMT = 0o170000;
 const S_IFDIR = 0o040000;
 const S_IFREG = 0o100000;
 // yauzl's own name checks (strictFileNames) fail the entry iterator with these messages before we see the entry.
-const YAUZL_UNSAFE_NAME = /^(?:invalid characters in fileName|absolute path|invalid relative path): (.*)$/s;
+const YAUZL_UNSAFE_NAME = /^(?:invalid characters in fileName|absolute path|invalid relative path): ([\s\S]*)$/;
 // Writing an entry over one already extracted ('wx'), or a file where a folder is (or the reverse).
 const ENTRY_CONFLICT_CODES = new Set(['EEXIST', 'ENOTDIR', 'EISDIR']);
 
