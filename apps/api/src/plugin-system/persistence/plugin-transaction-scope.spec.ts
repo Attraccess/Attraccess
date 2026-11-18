@@ -1,3 +1,4 @@
+import { PluginStorageInvalid } from '@attraccess/plugins-backend-sdk';
 import { createTransactionScope, handleOfScope } from './plugin-transaction-scope';
 
 describe('plugin transaction scope', () => {
@@ -29,5 +30,26 @@ describe('plugin transaction scope', () => {
     expect(() => handleOfScope(scope)).toThrow(/closed/);
     expect(() => handleOfScope({ isOpen: true, afterCommit: () => undefined })).toThrow(/not created by the host/);
     expect(() => handleOfScope(undefined as never)).toThrow(/not created by the host/);
+    expect(() => handleOfScope(scope)).toThrow(PluginStorageInvalid);
+  });
+
+  it('serves a read-only scope for reads and refuses writes through it', () => {
+    const handle = {};
+    const scope = createTransactionScope(
+      handle,
+      () => true,
+      () => undefined,
+      { readOnly: true },
+    );
+    expect(handleOfScope(scope)).toBe(handle);
+    expect(handleOfScope(scope, 'read')).toBe(handle);
+    expect(() => handleOfScope(scope, 'write')).toThrow(PluginStorageInvalid);
+    expect(() => handleOfScope(scope, 'write')).toThrow(/read-only/);
+    const writable = createTransactionScope(
+      handle,
+      () => true,
+      () => undefined,
+    );
+    expect(handleOfScope(writable, 'write')).toBe(handle);
   });
 });

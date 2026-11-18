@@ -1,9 +1,21 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { DataSource, EntityManager } from 'typeorm';
 import { createDataSource } from './sqlite-connection';
 
 const sqliteTransactions = new WeakMap<DataSource, Promise<unknown>>();
 const resourceConnections = new WeakMap<DataSource, Promise<DataSource>>();
 const connectionHooks = new WeakMap<DataSource, Array<(connection: DataSource) => void>>();
+/** The connections whose serialized transaction the calling async flow runs in, while that transaction runs. */
+const serializedFlows = new AsyncLocalStorage<{ readonly connections: ReadonlySet<DataSource>; active: boolean }>();
+
+/**
+ * Whether the calling async flow runs inside a serialized transaction of `manager`'s connection that has not ended.
+ * Another serialized transaction started there would queue behind it and so wait for itself.
+ */
+export function insideSerializedTransaction(manager: EntityManager): boolean {
+  const flow = serializedFlows.getStore();
+  return flow?.active === true && flow.connections.has(manager.connection);
+}
 
 /**
  * Applies `hook` to the dedicated resource-lifecycle connection of `source` (query instrumentation): right away when it
@@ -77,7 +89,15 @@ export async function runSerializedTransaction<T>(
       dedicated.subscribers.splice(0, dedicated.subscribers.length, ...connection.subscribers);
       // createDataSource begins its transactions with BEGIN IMMEDIATE: a deferred read-to-write upgrade can fail
       // immediately with SQLITE_BUSY even when busyTimeout is configured.
-      return dedicated.transaction(work);
+      const outer = serializedFlows.getStore();
+      const marker = { connections: new Set([...(outer?.active ? outer.connections : []), connection]), active: true };
+      return serializedFlows.run(marker, async () => {
+        try {
+          return await dedicated.transaction(work);
+        } finally {
+          marker.active = false;
+        }
+      });
     });
   sqliteTransactions.set(connection, next);
   try {

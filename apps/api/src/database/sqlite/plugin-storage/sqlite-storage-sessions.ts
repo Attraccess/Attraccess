@@ -6,7 +6,7 @@ import type {
   PluginStorageSessions,
   PluginStorageWriteResult,
 } from '../../../plugin-system/plugin-storage/storage-dialect.port';
-import { runSerializedTransaction } from '../run-serialized-transaction';
+import { insideSerializedTransaction, runSerializedTransaction } from '../run-serialized-transaction';
 
 /**
  * Runs statements on a TypeORM entity manager (a transaction's manager, or the shared connection for reads). TypeORM
@@ -37,11 +37,26 @@ export class ManagerExecutor implements PluginStorageExecutor {
   }
 }
 
+/** Why a write without scope cannot run in the calling flow, or undefined when it can. */
+function unscopedWriteRefusal(connection: DataSource, isRunning: () => boolean): string | undefined {
+  if (isRunning()) {
+    return 'A write inside context.persistence.transaction needs the transaction scope: pass { scope } to the call.';
+  }
+  if (insideSerializedTransaction(connection.manager)) {
+    return (
+      "A plugin write cannot run inside the host's own transaction (a hook the host calls in it): it would wait " +
+      'for that transaction. Hooks read with the scope they are given and write nothing.'
+    );
+  }
+  return undefined;
+}
+
 /**
- * Sessions of plugin storage on SQLite. A call with a scope joins that transaction. Without one, a read sees the
- * committed state through the shared connection, and a write is a unit of work of its own on the serialized write
- * path (the dedicated lifecycle connection), so it queues with every plugin and core transaction. A write without
- * scope inside a transaction callback would wait for that callback, so it is rejected.
+ * Sessions of plugin storage on SQLite. A call with a scope joins that transaction. Without one, a read runs on the
+ * shared connection at once: it sees the committed state (a flow that owns a transaction of the database joins it).
+ * A write is a unit of work of its own on the serialized write path (the dedicated lifecycle connection), so it
+ * queues with every plugin and core transaction. A write without scope inside a plugin transaction callback, or
+ * inside the host's own serialized transaction (a hook), would wait for that transaction, so it is rejected.
  */
 export function createSqliteSessions(connection: () => DataSource, isRunning: () => boolean): PluginStorageSessions {
   return {
@@ -50,13 +65,10 @@ export function createSqliteSessions(connection: () => DataSource, isRunning: ()
       scope: PluginTransactionScope | undefined,
       work: (executor: PluginStorageExecutor) => Promise<T>,
     ): Promise<T> {
-      if (scope) return work(new ManagerExecutor(handleOfScope<EntityManager>(scope)));
+      if (scope) return work(new ManagerExecutor(handleOfScope<EntityManager>(scope, access)));
       if (access === 'read') return work(new ManagerExecutor(connection().manager));
-      if (isRunning()) {
-        throw new PluginStorageInvalid(
-          'A write inside context.persistence.transaction needs the transaction scope: pass { scope } to the call.',
-        );
-      }
+      const refusal = unscopedWriteRefusal(connection(), isRunning);
+      if (refusal) throw new PluginStorageInvalid(refusal);
       return runSerializedTransaction(connection().manager, (manager) => work(new ManagerExecutor(manager)));
     },
   };

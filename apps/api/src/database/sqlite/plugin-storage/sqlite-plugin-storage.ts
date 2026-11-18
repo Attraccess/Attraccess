@@ -16,7 +16,7 @@ import { StorageMigrationRunner } from '../../../plugin-system/plugin-storage/st
 import type { CompiledPluginStorage } from '../../../plugin-system/plugin-storage/storage-model';
 import { createRecordPort } from '../../../plugin-system/plugin-storage/storage-records';
 import { ScopedUnitOfWork, TransactionScopeError, type TransactionScope, type UnitOfWork } from '../../unit-of-work';
-import { runSerializedTransaction } from '../run-serialized-transaction';
+import { insideSerializedTransaction, runSerializedTransaction } from '../run-serialized-transaction';
 import { sqliteStorageDdl } from './sqlite-storage-ddl';
 import { sqliteStorageDialect } from './sqlite-storage-dialect';
 import { SqliteStorageMigrationDriver } from './sqlite-storage-migration-driver';
@@ -35,6 +35,7 @@ export function createSqlitePluginPersistenceHost(getConnection: () => unknown):
       const transactions = createPluginTransactions({
         pluginName,
         runInTransaction: (work) => runSerializedTransaction(connection().manager, (manager) => work(manager)),
+        insideHostTransaction: () => insideSerializedTransaction(connection().manager),
         onCallbackError: (error) =>
           logger.error(`A post-commit callback of plugin ${pluginName} failed: ${(error as Error)?.message}`),
       });
@@ -58,7 +59,8 @@ export function createSqlitePluginPersistenceHost(getConnection: () => unknown):
 
 /**
  * The scope plugin hooks receive for a transaction the host opened itself (the serialized start transaction of a
- * session). The plugin reads through it with the record port; it cannot commit it or defer work onto it.
+ * session). It is read-only: the plugin reads through it with the record port; writes through it are refused, and
+ * it cannot commit it or defer work onto it.
  */
 export function sqliteHostTransactionScope(unitOfWork: UnitOfWork, scope: TransactionScope): PluginTransactionScope {
   if (!(unitOfWork instanceof ScopedUnitOfWork)) {
@@ -69,8 +71,9 @@ export function sqliteHostTransactionScope(unitOfWork: UnitOfWork, scope: Transa
     manager,
     () => scope.isOpen,
     () => {
-      throw new Error('afterCommit is not available in a transaction owned by the host');
+      throw new PluginStorageInvalid('afterCommit is not available in a transaction owned by the host');
     },
+    { readOnly: true },
   );
 }
 
