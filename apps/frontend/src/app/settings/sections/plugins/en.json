@@ -99,8 +99,7 @@
     "directory": "Directory",
     "permissions": "Permissions",
     "source": "Source",
-    "status": "Status",
-    "actions": "Actions"
+    "status": "Status"
   },
   "status": {
     "loaded": "Loaded",

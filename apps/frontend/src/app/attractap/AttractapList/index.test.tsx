@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { useGetLicenseInformation } from '@attraccess/react-query-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AttractapList } from './index';
@@ -12,6 +13,9 @@ const data = vi.hoisted(() => ({
   onPaired: undefined as undefined | ((readerId: number) => void),
   editor: vi.fn(),
   toast: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
+  deleteReader: vi.fn(),
+  deleteOptions: undefined as undefined | { onSuccess?: () => void; onError?: (error: unknown) => void },
+  invalidateQueries: vi.fn(),
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
@@ -19,7 +23,14 @@ vi.mock('@attraccess/react-query-client', () => ({
   useGetFirmwares: () => ({ data: [] }),
   useGetReaders: () => ({ data: data.readers, error: null }),
   useGetReadersToPair: () => ({ data: data.toPair }),
+  useDeleteReader: (_key: unknown, options: typeof data.deleteOptions) => {
+    data.deleteOptions = options;
+    return { mutateAsync: data.deleteReader };
+  },
+  UseGetReadersKeyFn: () => ['readers'],
+  UseGetReadersToPairKeyFn: () => ['readers-to-pair'],
 }));
+vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: data.invalidateQueries }) }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   ...(await (() => ({
@@ -70,7 +81,6 @@ vi.mock('../pairing/ReadersToPair', () => ({
     );
   },
 }));
-vi.mock('./delete', () => ({ AttractapDeleteModal: () => null }));
 vi.mock('../../../hooks/useNow', () => ({ useNow: () => new Date() }));
 
 function mockLicense(modules: string[] | undefined) {
@@ -172,5 +182,60 @@ describe('AttractapList pairing', () => {
       editorOpenFor(9);
       expect(data.toast.success).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('AttractapList row actions', () => {
+  beforeEach(() => {
+    mockLicense(['attractap']);
+    data.toPair = [];
+    data.readers = [
+      {
+        id: 7,
+        name: 'Door',
+        pairingState: 'paired',
+        lastConnection: new Date().toISOString(),
+        firmware: { name: 'attractap', variant: 'touch', version: '1.0.0' },
+      },
+    ];
+    data.editor.mockClear();
+    data.deleteReader.mockReset().mockResolvedValue(undefined);
+    data.invalidateQueries.mockClear();
+  });
+
+  const openMenu = async () => {
+    await userEvent.click(screen.getByRole('button', { name: 'Actions for Door' }));
+    return screen.getByRole('menu');
+  };
+
+  it('offers edit, diagnostics and delete', async () => {
+    render(<AttractapList />);
+    const menu = await openMenu();
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent),
+    ).toEqual(['editReader', 'diagnostics', 'deleteReader']);
+    expect(within(menu).getByRole('menuitem', { name: 'diagnostics' })).toHaveAttribute(
+      'href',
+      '/attractap/readers/7/diagnostics',
+    );
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'editReader' }));
+    expect(data.editor).toHaveBeenLastCalledWith(expect.objectContaining({ readerId: 7, isOpen: true }));
+  });
+
+  it('deletes a reader after confirmation and refreshes both reader lists', async () => {
+    render(<AttractapList />);
+    await userEvent.click(within(await openMenu()).getByRole('menuitem', { name: 'deleteReader' }));
+    expect(data.deleteReader).not.toHaveBeenCalled();
+    await userEvent.click(document.querySelector('[data-cy="attractap-list-delete-reader-confirm-7"]') as HTMLElement);
+    expect(data.deleteReader).toHaveBeenCalledWith({ path: { readerId: 7 } });
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+
+    act(() => data.deleteOptions?.onSuccess?.());
+    expect(data.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['readers'] });
+    expect(data.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['readers-to-pair'] });
+    act(() => data.deleteOptions?.onError?.(new Error('Gone')));
+    expect(data.toast.error).toHaveBeenCalledWith({ title: 'deleteReader', description: 'Gone' });
   });
 });

@@ -1,5 +1,10 @@
 import { Button, Chip, Spinner } from '@heroui/react';
-import { AttraccessUser, StatusDialog, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  AttraccessUser,
+  ConfirmableButton,
+  useDateTimeFormatter,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import {
   Attractap,
   AttractapCredentialEvent,
@@ -13,7 +18,7 @@ import {
   useGetOneUserById,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { PairingDialog } from './PairingDialog';
 import { PairingStateChip } from './PairingStateChip';
@@ -34,20 +39,11 @@ function EventActor(props: Readonly<{ actorId: number | null }>) {
 }
 
 /** One action with a sentence that says what it does, so the buttons make sense on first sight. */
-function SecurityAction(
-  props: Readonly<{ label: string; description: string; onPress: () => void; dataCy: string; danger?: boolean }>,
-) {
+function SecurityAction(props: Readonly<{ description: string; children: ReactNode }>) {
   return (
     <div className="flex items-center justify-between gap-4">
       <p className="text-sm text-default-500">{props.description}</p>
-      <Button
-        className="shrink-0"
-        variant={props.danger ? 'danger' : 'secondary'}
-        onPress={props.onPress}
-        data-cy={props.dataCy}
-      >
-        {props.label}
-      </Button>
+      {props.children}
     </div>
   );
 }
@@ -68,7 +64,6 @@ export function ReaderSecurity(props: Readonly<{ reader: Attractap; onPairingRem
   const queryClient = useQueryClient();
 
   const [pairAgainOpen, setPairAgainOpen] = useState(false);
-  const [revokeOpen, setRevokeOpen] = useState(false);
 
   const { data: history } = useGetReaderCredentialHistory({ path: { readerId: reader.id } });
   const { data: pairings } = useGetPairings({}, undefined, { refetchInterval: 5000 });
@@ -78,7 +73,6 @@ export function ReaderSecurity(props: Readonly<{ reader: Attractap; onPairingRem
 
   const revoke = useRevokeReader(undefined, {
     onSuccess: () => {
-      setRevokeOpen(false);
       toast.success({ title: t('security.revoked') });
       // The reader moves from the paired list to the one under Not paired.
       queryClient.invalidateQueries({ queryKey: [useGetReadersKey] });
@@ -114,19 +108,33 @@ export function ReaderSecurity(props: Readonly<{ reader: Attractap; onPairingRem
 
       <div className="flex flex-col gap-3">
         <h3 className="font-semibold">{t('security.actions')}</h3>
-        <SecurityAction
-          label={t('security.repair')}
-          description={t('security.repairDescription')}
-          onPress={() => setPairAgainOpen(true)}
-          dataCy="attractap-security-repair"
-        />
-        <SecurityAction
-          label={t('security.revoke')}
-          description={t('security.revokeDescription')}
-          onPress={() => setRevokeOpen(true)}
-          dataCy="attractap-security-revoke"
-          danger
-        />
+        <SecurityAction description={t('security.repairDescription')}>
+          <Button
+            className="shrink-0"
+            variant="secondary"
+            onPress={() => setPairAgainOpen(true)}
+            data-cy="attractap-security-repair"
+          >
+            {t('security.repair')}
+          </Button>
+        </SecurityAction>
+        <SecurityAction description={t('security.revokeDescription')}>
+          <ConfirmableButton
+            label={t('security.revoke')}
+            status="error"
+            buttonProps={{ className: 'shrink-0' }}
+            data-cy="attractap-security-revoke"
+            confirm={{
+              title: t('security.revokeTitle'),
+              message: t('security.revokeMessage'),
+              cancelLabel: t('dialog.cancel'),
+              confirmDataCy: 'attractap-security-revoke-confirm',
+              'data-cy': 'attractap-security-revoke-dialog',
+            }}
+            isPending={revoke.isPending}
+            onConfirm={() => revoke.mutateAsync({ path: { readerId: reader.id } })}
+          />
+        </SecurityAction>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -148,23 +156,6 @@ export function ReaderSecurity(props: Readonly<{ reader: Attractap; onPairingRem
         onClose={() => setPairAgainOpen(false)}
         onPaired={() => setPairAgainOpen(false)}
       />
-
-      <StatusDialog
-        isOpen={revokeOpen}
-        onClose={() => setRevokeOpen(false)}
-        status="error"
-        title={t('security.revokeTitle')}
-        closeLabel={t('dialog.cancel')}
-        action={{
-          label: t('security.revoke'),
-          onPress: () => revoke.mutate({ path: { readerId: reader.id } }),
-          isPending: revoke.isPending,
-          'data-cy': 'attractap-security-revoke-confirm',
-        }}
-        data-cy="attractap-security-revoke-dialog"
-      >
-        {t('security.revokeMessage')}
-      </StatusDialog>
     </div>
   );
 }

@@ -8,15 +8,15 @@
     }
   },
   "error": {
-    "fetchReaders": "Could not fetch Attractaps"
+    "fetchReaders": "Could not fetch Attractaps",
+    "deleteReader": "Could not delete the Attractap"
   },
   "table": {
     "columns": {
       "name": "Name",
       "type": "Type",
       "lastConnection": "Last Connection",
-      "connected": "Status",
-      "actions": "Actions"
+      "connected": "Status"
     },
     "noData": "No Attractaps found",
     "actions": {
@@ -32,6 +32,10 @@
       "title": "Stale Attractaps",
       "description": "No connection for more than 24 hours"
     }
+  },
+  "deleteConfirm": {
+    "title": "Delete Attractap {{name}}?",
+    "message": "The reader is removed and has to be paired again before it can be used. This cannot be undone."
   },
   "connected": "Connected",
   "disconnected": "Disconnected",

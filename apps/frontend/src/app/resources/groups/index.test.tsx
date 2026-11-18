@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ManageResourceGroups } from './index';
@@ -74,7 +75,8 @@ it('optimistically adds membership, locks the pending row and invalidates both r
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ['resources'] });
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ['resource', 7] });
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ['introductions', { path: { resourceId: 7 } }] });
-  expect(screen.getByRole('link', { name: 'open: Workshop' })).toHaveAttribute('href', '/resource-groups/2');
+  await userEvent.click(screen.getByRole('button', { name: 'Actions for Workshop' }));
+  expect(await screen.findByRole('menuitem', { name: 'Open group' })).toHaveAttribute('href', '/resource-groups/2');
 });
 it('removes existing membership and restores the previous cache on a rejected change', async () => {
   vi.spyOn(client, 'invalidateQueries').mockResolvedValue();

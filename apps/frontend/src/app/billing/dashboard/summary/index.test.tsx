@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReactNode } from 'react';
@@ -20,6 +21,7 @@ const state = vi.hoisted(() => ({
   }[],
   balanceQuery: vi.fn(),
   transactionsQuery: vi.fn(),
+  refund: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -67,7 +69,7 @@ vi.mock('./transactionDetailsModal', () => ({
   }) => (isOpen ? <button onClick={onClose}>Details #{transactionId}</button> : null),
 }));
 vi.mock('./transactionDetailsModal/refund', () => ({
-  RefundModal: ({ children }: { children: (open: () => void) => ReactNode }) => children(() => undefined),
+  RefundModal: ({ children }: { children: (open: () => void) => ReactNode }) => children(state.refund),
 }));
 afterEach(() => {
   cleanup();
@@ -164,4 +166,15 @@ it('preserves every minor currency unit in settled transaction rows and balances
   open();
   expect(screen.getByText('EUR 90,071,992,547,409.91')).toBeTruthy();
   expect(screen.getByText('-90,071,992,547,409.91')).toBeTruthy();
+});
+
+it('opens the refund drawer from the row actions without opening the details', async () => {
+  state.transactions = [{ id: 1, amount: -123, status: 'completed', createdAt: '2026-09-01', resourceUsageId: 5 }];
+  open();
+  await userEvent.click(screen.getByRole('button', { name: 'Actions for #1' }));
+  await userEvent.click(
+    within(screen.getByRole('menu')).getByRole('menuitem', { name: 'transactions.table.actions.refund' }),
+  );
+  expect(state.refund).toHaveBeenCalledOnce();
+  expect(screen.queryByRole('button', { name: 'Details #1' })).toBeNull();
 });

@@ -893,5 +893,11 @@
         }
       }
     }
+  },
+  "deleteNode": {
+    "title": "Confirm Deletion",
+    "message": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+    "confirm": "Delete",
+    "cancel": "Cancel"
   }
 }

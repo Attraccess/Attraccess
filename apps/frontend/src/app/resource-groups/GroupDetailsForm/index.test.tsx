@@ -23,7 +23,17 @@ vi.mock('@attraccess/react-query-client', () => ({
   },
   useResourceGroupsDeleteOne: (_mutationKey: unknown, callbacks: (typeof state.callbacks)[string]) => {
     state.callbacks.remove = callbacks;
-    return { mutate: state.remove };
+    return {
+      mutateAsync: async (variables: unknown) => {
+        try {
+          await state.remove(variables);
+        } catch (error) {
+          state.callbacks.remove.onError(error as Error);
+          throw error;
+        }
+        state.callbacks.remove.onSuccess();
+      },
+    };
   },
   UseResourceGroupsGetOneKeyFn: (input: unknown) => ['group', input],
   UseResourceGroupsGetManyKeyFn: () => ['groups'],
@@ -88,11 +98,14 @@ it('requires delete confirmation and navigates away after success', async () => 
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(state.remove).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Delete Group' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+  state.remove.mockRejectedValueOnce(new Error('In use'));
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   expect(state.remove).toHaveBeenCalledWith({ path: { groupId: 7 } });
-  act(() => state.callbacks.remove.onError(new Error('In use')));
-  expect(state.toastError).toHaveBeenCalledWith(expect.objectContaining({ title: 'Failed to delete group' }));
-  act(() => state.callbacks.remove.onSuccess());
+  await waitFor(() =>
+    expect(state.toastError).toHaveBeenCalledWith(expect.objectContaining({ title: 'Failed to delete group' })),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+  await waitFor(() => expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['groups'] }));
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['groups'] });
   expect(await screen.findByText('Resource list')).toBeInTheDocument();
 });

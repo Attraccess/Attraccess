@@ -1,6 +1,7 @@
 import type { ComponentProps } from 'react';
 import type { RoleWithUsageDto } from '@attraccess/react-query-client';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { RolesPage } from './index';
@@ -71,6 +72,18 @@ beforeEach(() => {
   ];
 });
 afterEach(cleanup);
+function byDataCy(dataCy: string) {
+  const element = document.querySelector<HTMLElement>(`[data-cy="${dataCy}"]`);
+  if (!element) throw new Error(`No element with data-cy "${dataCy}"`);
+  return element;
+}
+function rowActionsTrigger(roleKey: string) {
+  return byDataCy(`roles-table-actions-${roleKey}`);
+}
+async function chooseRowAction(roleKey: string, itemDataCy: string) {
+  await userEvent.click(rowActionsTrigger(roleKey));
+  await userEvent.click(await waitFor(() => byDataCy(itemDataCy)));
+}
 it.each([RolesPage, RolesSection])(
   'renders system and custom roles with appropriate edit/delete controls (%#)',
   async (Component) => {
@@ -81,16 +94,16 @@ it.each([RolesPage, RolesSection])(
     );
     expect(screen.getByText('Workshop member')).toBeTruthy();
     expect(screen.getByText('Can use tools')).toBeTruthy();
-    const customEdit = document.querySelector('[data-cy="roles-table-edit-custom"]');
-    expect(customEdit).toBeTruthy();
-    fireEvent.click(customEdit!);
+    await chooseRowAction('custom', 'roles-table-edit-custom');
     expect(screen.getByRole('region', { name: 'Role editor' })).toHaveTextContent('Workshop member');
     fireEvent.click(screen.getByText('Close editor'));
-    fireEvent.click(document.querySelector('[data-cy="roles-table-edit-system"]')!);
+    await chooseRowAction('system', 'roles-table-edit-system');
     expect(screen.getByRole('region', { name: 'Role editor' })).toHaveTextContent('System member');
     fireEvent.click(screen.getByText('Close editor'));
+    await userEvent.click(rowActionsTrigger('system'));
     expect(document.querySelector('[data-cy="roles-table-delete-system"]')).toBeNull();
-    fireEvent.click(document.querySelector('[data-cy="roles-table-delete-custom"]')!);
+    await userEvent.keyboard('{Escape}');
+    await chooseRowAction('custom', 'roles-table-delete-custom');
     expect(await screen.findByRole('dialog')).toHaveTextContent('Workshop member');
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());

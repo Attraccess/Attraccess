@@ -16,7 +16,14 @@ import {
 import { KeyRound, Trash2 } from 'lucide-react';
 import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/browser';
 import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/browser';
-import { Button, DateTimeDisplay, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  Button,
+  DateTimeDisplay,
+  EmptyState,
+  TableActionsColumnHeader,
+  TableRowActions,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import {
   useDeletePasskey,
   useListPasskeys,
@@ -79,6 +86,7 @@ export function PasskeysCard() {
       } catch (error) {
         console.error('Failed to delete passkey', error);
         showToast({ title: t('errors.deleteFailed'), type: 'error' });
+        throw error;
       }
     },
     [deletePasskey, refetch, showToast, t],
@@ -107,10 +115,8 @@ export function PasskeysCard() {
                 {t('columns.name')}
               </TableColumn>
               <TableColumn id="lastUsed">{t('columns.lastUsed')}</TableColumn>
-              {/* ponytail: header text is sr-only - the icon buttons carry their own labels, and the visible
-                  word costs ~50px the Security column cannot spare at tablet width */}
               <TableColumn id="actions">
-                <span className="sr-only">{t('columns.actions')}</span>
+                <TableActionsColumnHeader />
               </TableColumn>
             </TableHeader>
             <TableBody
@@ -125,16 +131,25 @@ export function PasskeysCard() {
                     {passkey.lastUsedAt ? <DateTimeDisplay date={passkey.lastUsedAt} /> : t('neverUsed')}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      isIconOnly
-                      aria-label={t('actions.delete', { name: passkey.name })}
-                      onPress={() => handleDelete(passkey)}
-                      isDisabled={isDeleting}
-                      data-cy={`passkey-delete-${passkey.id}`}
-                    >
-                      <Trash2 size={16} className="text-danger" />
-                    </Button>
+                    <TableRowActions
+                      itemName={passkey.name}
+                      actions={[
+                        {
+                          key: 'delete',
+                          label: t('actions.delete'),
+                          icon: Trash2,
+                          tone: 'danger',
+                          isDisabled: isDeleting,
+                          onPress: () => handleDelete(passkey),
+                          confirm: {
+                            title: t('deleteConfirm.title', { name: passkey.name }),
+                            message: t('deleteConfirm.message'),
+                            confirmDataCy: `passkey-delete-confirm-${passkey.id}`,
+                          },
+                          'data-cy': `passkey-delete-${passkey.id}`,
+                        },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               )}

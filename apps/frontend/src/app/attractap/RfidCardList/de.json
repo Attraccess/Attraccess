@@ -7,13 +7,21 @@
       "id": "ID",
       "uid": "UID",
       "lastSeen": "Zuletzt gesehen",
-      "createdAt": "Erstellt am",
-      "actions": "Aktionen"
+      "createdAt": "Erstellt am"
     },
     "actions": {
       "delete": "Löschen",
       "deactivate": "Deaktivieren",
       "activate": "Aktivieren"
+    },
+    "toggleError": "RFID-Karte konnte nicht geändert werden",
+    "activateModal": {
+      "title": "RFID-Karte aktivieren",
+      "description": "Sind Sie sicher, dass Sie die RFID-Karte aktivieren möchten? Hierdurch werden alle anderen ihrer RFID-Karten deaktiviert."
+    },
+    "deactivateModal": {
+      "title": "RFID-Karte deaktivieren",
+      "description": "Sind Sie sicher, dass Sie die RFID-Karte deaktivieren möchten? Sie können die Karte später wieder aktivieren."
     },
     "deleteModal": {
       "title": "RFID-Karte löschen",

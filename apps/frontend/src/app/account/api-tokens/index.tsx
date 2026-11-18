@@ -14,7 +14,14 @@ import {
   TextField,
 } from '@heroui/react';
 import { Copy, KeyRound, Trash2, X } from 'lucide-react';
-import { Button, DateTimeDisplay, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  Button,
+  DateTimeDisplay,
+  EmptyState,
+  TableActionsColumnHeader,
+  TableRowActions,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import { PermissionPicker } from '../../../components/permissionPicker/index';
 import { SimplePagination } from '../../../components/simplePagination/index';
 import { useEffect, useMemo, useState } from 'react';
@@ -107,8 +114,9 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
       if (tokenPage?.data.length === 1 && page > 1) setPage(page - 1);
       else void refetchTokens();
       showToast({ title: t('success.revoked'), type: 'success' });
-    } catch {
+    } catch (error) {
       showToast({ title: t('errors.revokeFailed'), type: 'error' });
+      throw error;
     }
   };
 
@@ -155,7 +163,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
               <TableColumn id="lastUsed">{t('columns.lastUsed')}</TableColumn>
               <TableColumn id="expires">{t('columns.expires')}</TableColumn>
               <TableColumn id="actions">
-                <span className="sr-only">{t('columns.actions')}</span>
+                <TableActionsColumnHeader />
               </TableColumn>
             </TableHeader>
             <TableBody items={apiTokens} renderEmptyState={() => <EmptyState message={t('empty')} />}>
@@ -170,15 +178,23 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
                     {apiToken.expiresAt ? <DateTimeDisplay date={apiToken.expiresAt} /> : t('neverExpires')}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      isIconOnly
-                      aria-label={t('actions.revoke', { name: apiToken.name })}
-                      onPress={() => revokeToken(apiToken)}
-                      isDisabled={isRevoking}
-                    >
-                      <Trash2 size={16} className="text-danger" />
-                    </Button>
+                    <TableRowActions
+                      itemName={apiToken.name}
+                      actions={[
+                        {
+                          key: 'revoke',
+                          label: t('actions.revoke'),
+                          icon: Trash2,
+                          tone: 'danger',
+                          isDisabled: isRevoking,
+                          onPress: () => revokeToken(apiToken),
+                          confirm: {
+                            title: t('revokeConfirm.title', { name: apiToken.name }),
+                            message: t('revokeConfirm.message'),
+                          },
+                        },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               )}

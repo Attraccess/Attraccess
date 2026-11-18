@@ -65,7 +65,7 @@ describe('MonitoringSection', () => {
       isLoading: false,
     } as ReturnType<typeof useGetMetricsSettings>);
 
-    const idleMutation = { mutate: vi.fn(), isPending: false };
+    const idleMutation = { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false };
     vi.mocked(useGenerateMetricsApiKey).mockReturnValue(
       idleMutation as unknown as ReturnType<typeof useGenerateMetricsApiKey>,
     );
@@ -188,6 +188,32 @@ describe('MonitoringSection', () => {
     expect(success).toHaveBeenLastCalledWith({ title: 'toggles.savedTitle', description: 'toggles.savedDescription' });
     act(() => toggle.onError());
     expect(error).toHaveBeenLastCalledWith({ title: 'toggles.errorTitle', description: 'toggles.errorDescription' });
+  });
+
+  it('confirms regenerating and removing the API key before calling the API', async () => {
+    const reroll = vi.fn().mockResolvedValue({ apiKey: 'new' });
+    const remove = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(useGenerateMetricsApiKey).mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: reroll,
+      isPending: false,
+    } as unknown as ReturnType<typeof useGenerateMetricsApiKey>);
+    vi.mocked(useDeleteMetricsApiKey).mockReturnValue({
+      mutateAsync: remove,
+      isPending: false,
+    } as unknown as ReturnType<typeof useDeleteMetricsApiKey>);
+    render(<MonitoringSection />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'rerollButton' }));
+    expect(await screen.findByRole('alertdialog', { name: 'confirmReroll.title' })).toBeInTheDocument();
+    expect(reroll).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'confirmReroll.confirm' }));
+    expect(reroll).toHaveBeenCalledOnce();
+
+    await userEvent.click(screen.getByRole('button', { name: 'removeButton' }));
+    expect(await screen.findByRole('alertdialog', { name: 'confirmRemove.title' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'confirmRemove.confirm' }));
+    expect(remove).toHaveBeenCalledOnce();
   });
 
   it('reads the metrics settings once, in the section, so the rows do not refetch them on mount', () => {

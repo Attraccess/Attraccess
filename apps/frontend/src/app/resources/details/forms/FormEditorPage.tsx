@@ -1,4 +1,4 @@
-import { Button, DeleteConfirmationModal, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Spinner } from '@heroui/react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -37,7 +37,6 @@ export function FormEditorPage() {
   );
 
   const [form, setForm] = useState<EditableForm>({ ...EMPTY_FORM, fields: [] });
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   useEffect(() => {
     if (formResponse) {
@@ -128,7 +127,6 @@ export function FormEditorPage() {
 
   const handleDelete = async () => {
     await deleteForm.mutateAsync({ path: { resourceId, formId: mutationVariables.formId } });
-    setDeleteModalOpen(false);
   };
 
   if (!isCreateMode && isLoadingForm) {
@@ -151,7 +149,13 @@ export function FormEditorPage() {
             label: t('editor.delete'),
             variant: 'destructive',
             isHidden: isCreateMode,
-            onPress: () => setDeleteModalOpen(true),
+            onPress: handleDelete,
+            confirm: {
+              title: t('editor.deleteConfirmTitle', { formName: formResponse?.name ?? '' }),
+              message: t('editor.deleteConfirmDescription'),
+              confirmDataCy: 'delete-button',
+              cancelDataCy: 'cancel-button',
+            },
           },
         ]}
       />
@@ -186,14 +190,6 @@ export function FormEditorPage() {
           <FormPreview fields={form.fields} />
         </aside>
       </div>
-
-      <DeleteConfirmationModal
-        isOpen={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
-        onConfirm={handleDelete}
-        itemName={formResponse?.name ?? ''}
-        isDeleting={deleteForm.isPending}
-      />
     </div>
   );
 }

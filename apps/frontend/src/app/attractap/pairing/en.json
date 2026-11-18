@@ -110,7 +110,10 @@
     "resume": "Continue",
     "requestFailed": "Could not start pairing",
     "notConnected": "The reader is not connected right now. Switch it on and try again.",
-    "delete": "Delete"
+    "delete": "Delete",
+    "deleteTitle": "Confirm Deletion",
+    "deleteMessage": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+    "deleteFailed": "The reader could not be deleted"
   },
   "kind": {
     "touch": "Touch",

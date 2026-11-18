@@ -7,13 +7,21 @@
       "id": "ID",
       "uid": "UID",
       "lastSeen": "Last seen",
-      "createdAt": "Created at",
-      "actions": "Actions"
+      "createdAt": "Created at"
     },
     "actions": {
       "delete": "Delete",
       "deactivate": "Deactivate",
       "activate": "Activate"
+    },
+    "toggleError": "Could not change the RFID card",
+    "activateModal": {
+      "title": "Activate RFID card",
+      "description": "Are you sure you want to activate the RFID card? This will deactivate all other RFID cards you have."
+    },
+    "deactivateModal": {
+      "title": "Deactivate RFID card",
+      "description": "Are you sure you want to deactivate the RFID card? You can activate it again later."
     },
     "deleteModal": {
       "title": "Delete RFID Card",

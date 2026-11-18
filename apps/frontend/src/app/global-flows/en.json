@@ -9,13 +9,10 @@
     "columns": {
       "name": "Name",
       "enabled": "Enabled",
-      "nodes": "Nodes",
-      "actions": "Actions"
+      "nodes": "Nodes"
     },
     "toggle": "{{name}} enabled",
-    "edit": "Edit {{name}}",
     "editTooltip": "Open in editor",
-    "delete": "Delete {{name}}",
     "deleteTooltip": "Delete",
     "deleteTitle": "Delete flow",
     "deleteConfirmation": "Delete the flow \"{{name}}\" and all its nodes? This cannot be undone.",
@@ -26,7 +23,6 @@
     "createName": "Name",
     "createDescription": "Description",
     "createSubmit": "Create flow",
-    "editDetails": "Edit details of {{name}}",
     "editDetailsTooltip": "Edit details",
     "editModalTitle": "Edit flow details",
     "editSubmit": "Save"

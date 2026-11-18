@@ -1,5 +1,5 @@
 import { useReducer } from 'react';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { EditEmailTemplatePage } from './index';
@@ -34,7 +34,7 @@ vi.mock('@attraccess/react-query-client', () => ({
     isError: false,
   }),
   useEmailTemplateControllerUpdate: () => ({ mutate: state.update }),
-  useEmailTemplateControllerResetToDefault: () => ({ mutate: state.reset }),
+  useEmailTemplateControllerResetToDefault: () => ({ mutateAsync: state.reset }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -177,16 +177,16 @@ it('requires reset confirmation and reseeds the editor from the reset response',
   render(<Fixture />);
   await screen.findByRole('textbox');
   fireEvent.click(screen.getByRole('button', { name: 'actions.resetToDefault' }));
+  state.reset.mockRejectedValueOnce(new Error('offline'));
   fireEvent.click(await screen.findByRole('button', { name: 'resetConfirm.confirm' }));
-  expect(state.reset).toHaveBeenCalledWith({ path: { type: 'welcome' } }, expect.any(Object));
-  act(() => state.reset.mock.calls[0][1].onError());
-  expect(state.error).toHaveBeenCalledWith({ title: 'toast.resetError' });
-  act(() =>
-    state.reset.mock.calls[0][1].onSuccess({
-      subject: 'Default subject',
-      body: '<mj-section>Default body</mj-section>',
-    }),
-  );
+  expect(state.reset).toHaveBeenCalledWith({ path: { type: 'welcome' } });
+  await waitFor(() => expect(state.error).toHaveBeenCalledWith({ title: 'toast.resetError' }));
+  state.reset.mockResolvedValueOnce({
+    subject: 'Default subject',
+    body: '<mj-section>Default body</mj-section>',
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'resetConfirm.confirm' }));
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
   expect(await screen.findByRole('textbox')).toHaveValue('<mj-section>Default body</mj-section>');
   expect(state.success).toHaveBeenCalledWith({ title: 'toast.resetSuccess' });
   fireEvent.click(screen.getByRole('button', { name: 'actions.back' }));

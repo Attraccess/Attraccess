@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
 import { PasskeysCard } from './index';
 const state = vi.hoisted(() => ({
   supported: true,
@@ -101,12 +102,21 @@ it('lists last-use information and handles successful and failed deletion', asyn
   render(<PasskeysCard />);
   expect(screen.getByText('neverUsed')).toBeTruthy();
   expect(screen.getByText('2026-09-01')).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: 'actions.delete:Laptop' }));
+  const user = userEvent.setup();
+  const remove = async (id: number, name: string) => {
+    await user.click(screen.getByRole('button', { name: `Actions for ${name}` }));
+    await user.click(screen.getByRole('menuitem', { name: 'actions.delete' }));
+    expect(await screen.findByRole('alertdialog', { name: `deleteConfirm.title:${name}` })).toBeInTheDocument();
+    await user.click(document.querySelector(`[data-cy="passkey-delete-confirm-${id}"]`) as HTMLElement);
+  };
+  await remove(1, 'Laptop');
   await waitFor(() => expect(state.toast).toHaveBeenCalledWith({ title: 'success.deleted', type: 'success' }));
   expect(state.remove).toHaveBeenCalledWith({ path: { id: 1 } });
   expect(state.refetch).toHaveBeenCalledOnce();
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
   state.remove.mockRejectedValue(new Error('Unavailable'));
-  fireEvent.click(screen.getByRole('button', { name: 'actions.delete:Phone' }));
+  await remove(2, 'Phone');
   await waitFor(() => expect(state.toast).toHaveBeenCalledWith({ title: 'errors.deleteFailed', type: 'error' }));
   expect(state.refetch).toHaveBeenCalledOnce();
+  expect(screen.getByRole('alertdialog')).toBeInTheDocument();
 });

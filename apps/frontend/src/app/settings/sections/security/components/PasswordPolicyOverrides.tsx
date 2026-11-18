@@ -9,8 +9,9 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
+import { PencilIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { TableActionsColumnHeader, TableRowActions, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordPolicyDto, PasswordPolicyOverrideDto, PasswordPolicyRole } from '@attraccess/react-query-client';
 import { SettingsRow } from '../../../components/SettingsRow';
 import { POLICY_FIELD_KEYS } from '../policy-fields';
@@ -41,8 +42,8 @@ export function PasswordPolicyOverrides({ policy, overrides }: PasswordPolicyOve
               <TableHeader>
                 <TableColumn isRowHeader>{t('overrides.role')}</TableColumn>
                 <TableColumn>{t('overrides.status')}</TableColumn>
-                <TableColumn width="0" className="text-right">
-                  {t('overrides.actions')}
+                <TableColumn id="actions">
+                  <TableActionsColumnHeader />
                 </TableColumn>
               </TableHeader>
               <TableBody>
@@ -64,16 +65,19 @@ export function PasswordPolicyOverrides({ policy, overrides }: PasswordPolicyOve
                         )}
                       </TableCell>
                       <TableCell>
-                        <div className="flex justify-end">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onPress={() => setEditingRole(role)}
-                            data-testid={`policy-override-edit-${role}`}
-                          >
-                            {t('overrides.edit')}
-                          </Button>
-                        </div>
+                        <TableRowActions
+                          itemName={t(`overrides.roles.${role}`)}
+                          data-cy={`policy-override-actions-${role}`}
+                          actions={[
+                            {
+                              key: 'edit',
+                              label: t('overrides.edit'),
+                              icon: PencilIcon,
+                              onPress: () => setEditingRole(role),
+                              'data-cy': `policy-override-edit-${role}`,
+                            },
+                          ]}
+                        />
                       </TableCell>
                     </TableRow>
                   );

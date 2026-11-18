@@ -20,8 +20,7 @@
     "name": "Name",
     "introducer": "Einweiser",
     "role": "Rolle",
-    "introduced": "Eingewiesen",
-    "actions": "Aktionen"
+    "introduced": "Eingewiesen"
   },
   "roles": {
     "introducer": "Einweiser",
@@ -37,7 +36,11 @@
     "revokeMaintainer": "Wartenden-Status entziehen",
     "revokeIntroduction": "Einweisung widerrufen",
     "grantIntroduction": "Einweisung erneut gewähren",
-    "revokeDirectIntroduction": "Direkte Einweisung widerrufen"
+    "revokeDirectIntroduction": "Direkte Einweisung widerrufen",
+    "sections": {
+      "introduction": "Einweisung",
+      "introducer": "Einweiser"
+    }
   },
   "addModal": {
     "title": {
@@ -53,11 +56,6 @@
       "individual": "Einzeln",
       "mass": "Sammeleinweisung (QR-Code)"
     }
-  },
-  "commentModal": {
-    "title": "Kommentar hinzufügen",
-    "submit": "Absenden",
-    "cancel": "Abbrechen"
   },
   "emptyState": "Noch keine Einweiser oder Einweisungen",
   "loadError": "Daten konnten nicht geladen werden",
@@ -78,6 +76,10 @@
     "introducerRevokeFailed": {
       "title": "Fehler beim Entfernen des Einweisers",
       "description": "{{error}}"
+    },
+    "maintainerRevoked": {
+      "title": "Wartender entfernt",
+      "description": "Die Wartungs-Privilegien wurden widerrufen."
     },
     "maintainerGranted": {
       "title": "Wartender hinzugefügt",
@@ -103,5 +105,23 @@
   "sources": {
     "direct": "Direkte Einweisung",
     "group": "Eingewiesen über {{{group}}}"
+  },
+  "confirm": {
+    "revokeIntroduction": {
+      "title": "Einweisung widerrufen?",
+      "message": "Die Einweisung von {{{name}}} wird widerrufen. Sie können einen Kommentar für den Verlauf hinzufügen."
+    },
+    "grantIntroduction": {
+      "title": "Einweisung erneut gewähren?",
+      "message": "Die Einweisung von {{{name}}} wird erneut gewährt. Sie können einen Kommentar für den Verlauf hinzufügen."
+    },
+    "revokeIntroducer": {
+      "title": "Einweiser-Status entziehen?",
+      "message": "{{{name}}} kann dann keine anderen Benutzer mehr einweisen."
+    },
+    "revokeMaintainer": {
+      "title": "Wartenden-Status entziehen?",
+      "message": "{{{name}}} verliert die Wartungs-Privilegien."
+    }
   }
 }

@@ -3,11 +3,12 @@ import {
   EmptyState,
   PageAction,
   PageHeader,
+  TableActionsColumnHeader,
   TableDataLoadingIndicator,
+  TableRowActions,
   useTranslations,
 } from '@attraccess/plugins-frontend-ui';
 import {
-  Button,
   Chip,
   Table,
   TableBody,
@@ -21,7 +22,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@heroui/react';
-import { LockIcon, PencilIcon, PlusIcon, ShieldIcon, Trash2Icon } from 'lucide-react';
+import { EyeIcon, LockIcon, PencilIcon, PlusIcon, ShieldIcon, Trash2Icon } from 'lucide-react';
 import { RoleWithUsageDto, useListRoles } from '@attraccess/react-query-client';
 import { RoleFormDrawer } from './role-form-drawer';
 import { DeleteRoleModal } from './delete-role-modal';
@@ -83,8 +84,8 @@ export const RolesPage: React.FC = () => {
                   <TableColumn width="0" className="hidden sm:table-cell text-center">
                     {t('table.columns.users')}
                   </TableColumn>
-                  <TableColumn width="0" className="text-right">
-                    {t('table.columns.actions')}
+                  <TableColumn id="actions">
+                    <TableActionsColumnHeader />
                   </TableColumn>
                 </TableHeader>
 
@@ -132,31 +133,28 @@ export const RolesPage: React.FC = () => {
                       </TableCell>
                       <TableCell className="hidden sm:table-cell text-center">{role.userCount}</TableCell>
                       <TableCell>
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            isIconOnly
-                            aria-label={role.isSystemManaged ? t('table.actions.view') : t('table.actions.edit')}
-                            onPress={() => openForm(role)}
-                            data-cy={`roles-table-edit-${role.key}`}
-                          >
-                            <PencilIcon className="w-4 h-4" />
-                          </Button>
-                          {!role.isSystemManaged ? (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              isIconOnly
-                              aria-label={t('table.actions.delete')}
-                              className="text-danger"
-                              onPress={() => setRoleToDelete(role)}
-                              data-cy={`roles-table-delete-${role.key}`}
-                            >
-                              <Trash2Icon className="w-4 h-4" />
-                            </Button>
-                          ) : null}
-                        </div>
+                        <TableRowActions
+                          itemName={roleName(role)}
+                          data-cy={`roles-table-actions-${role.key}`}
+                          actions={[
+                            {
+                              key: 'edit',
+                              label: role.isSystemManaged ? t('table.actions.view') : t('table.actions.edit'),
+                              icon: role.isSystemManaged ? EyeIcon : PencilIcon,
+                              onPress: () => openForm(role),
+                              'data-cy': `roles-table-edit-${role.key}`,
+                            },
+                            {
+                              key: 'delete',
+                              label: t('table.actions.delete'),
+                              icon: Trash2Icon,
+                              tone: 'danger',
+                              isHidden: role.isSystemManaged,
+                              onPress: () => setRoleToDelete(role),
+                              'data-cy': `roles-table-delete-${role.key}`,
+                            },
+                          ]}
+                        />
                       </TableCell>
                     </TableRow>
                   )}

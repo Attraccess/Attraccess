@@ -301,7 +301,8 @@ describe('SecuritySection', () => {
     await userEvent.type(minLength, '16');
     await userEvent.tab();
 
-    await userEvent.click(screen.getByTestId('policy-override-edit-admin'));
+    await userEvent.click(document.querySelector('[data-cy="policy-override-actions-admin"]') as HTMLElement);
+    await userEvent.click(document.querySelector('[data-cy="policy-override-edit-admin"]') as HTMLElement);
     fireEvent.click(
       screen
         .getByTestId('override-admin-minLength-toggle')

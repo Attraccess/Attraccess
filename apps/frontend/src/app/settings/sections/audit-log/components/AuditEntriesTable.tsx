@@ -1,6 +1,11 @@
-import { Button, Table } from '@heroui/react';
-import { ChevronRightIcon } from 'lucide-react';
-import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Table } from '@heroui/react';
+import { EyeIcon } from 'lucide-react';
+import {
+  TableActionsColumnHeader,
+  TableRowActions,
+  useDateTimeFormatter,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import { AuditEntryDto } from '@attraccess/react-query-client';
 import { useAuditDomainLabel } from '../useAuditDomainLabel';
 import { actor } from './actor';
@@ -30,7 +35,9 @@ export function AuditEntriesTable({
               <Table.Column>{t('actor')}</Table.Column>
               <Table.Column>{t('target')}</Table.Column>
               <Table.Column>{t('time')}</Table.Column>
-              <Table.Column aria-label={t('eventDetails')}>{t('eventDetails')}</Table.Column>
+              <Table.Column id="actions">
+                <TableActionsColumnHeader />
+              </Table.Column>
             </Table.Header>
             <Table.Body>
               {items.map((entry) => (
@@ -57,14 +64,12 @@ export function AuditEntriesTable({
                     </time>
                   </Table.Cell>
                   <Table.Cell>
-                    <Button
-                      variant="ghost"
-                      isIconOnly
-                      aria-label={`${t('inspect')} #${entry.id}`}
-                      onPress={() => onInspect(entry)}
-                    >
-                      <ChevronRightIcon size={18} />
-                    </Button>
+                    <TableRowActions
+                      itemName={`#${entry.id}`}
+                      actions={[
+                        { key: 'inspect', label: t('inspect'), icon: EyeIcon, onPress: () => onInspect(entry) },
+                      ]}
+                    />
                   </Table.Cell>
                 </Table.Row>
               ))}

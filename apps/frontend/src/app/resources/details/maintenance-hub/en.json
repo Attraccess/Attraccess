@@ -33,7 +33,8 @@
       "resume": "Resume",
       "delete": "Delete"
     },
-    "deleteConfirm": "Delete schedule \"{{name}}\"?"
+    "deleteConfirm": "Delete schedule \"{{name}}\"?",
+    "deleteMessage": "This action cannot be undone."
   },
   "activity": {
     "actions": {

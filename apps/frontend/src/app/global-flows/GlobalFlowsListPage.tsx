@@ -14,18 +14,16 @@ import {
   TableHeader,
   TableRow,
   TableScrollContainer,
-  Tooltip,
-  TooltipContent,
   useOverlayState,
 } from '@heroui/react';
 import { PencilIcon, PlusIcon, SettingsIcon, Trash2Icon } from 'lucide-react';
 import {
   AlertStatusIcon,
-  Button,
   EmptyState,
   LabeledSwitch,
   PageHeader,
-  StatusDialog,
+  TableActionsColumnHeader,
+  TableRowActions,
 } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
@@ -54,7 +52,6 @@ export function GlobalFlowsListPage() {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   const createModal = useOverlayState();
-  const [flowToDelete, setFlowToDelete] = useState<ListedFlow | null>(null);
   const [flowToEdit, setFlowToEdit] = useState<ListedFlow | null>(null);
   const editModal = useOverlayState();
 
@@ -86,7 +83,6 @@ export function GlobalFlowsListPage() {
     onSuccess: () => {
       void refresh();
       toast.success({ title: t('list.deleted') });
-      setFlowToDelete(null);
     },
     onError,
   });
@@ -131,7 +127,9 @@ export function GlobalFlowsListPage() {
                 <TableColumn isRowHeader>{t('list.columns.name')}</TableColumn>
                 <TableColumn>{t('list.columns.enabled')}</TableColumn>
                 <TableColumn>{t('list.columns.nodes')}</TableColumn>
-                <TableColumn>{t('list.columns.actions')}</TableColumn>
+                <TableColumn>
+                  <TableActionsColumnHeader />
+                </TableColumn>
               </TableHeader>
               <TableBody
                 items={flows ?? []}
@@ -157,47 +155,44 @@ export function GlobalFlowsListPage() {
                     </TableCell>
                     <TableCell>{flow.nodeCount}</TableCell>
                     <TableCell>
-                      <div className="flex flex-row gap-2">
-                        <Tooltip>
-                          <Button
-                            isIconOnly
-                            variant="ghost"
-                            aria-label={t('list.edit', { name: flow.name })}
-                            onPress={() => navigate(`/devices/flows/${flow.id}`)}
-                            data-cy={`global-flow-edit-${flow.id}`}
-                          >
-                            <PencilIcon className="h-4 w-4" />
-                          </Button>
-                          <TooltipContent>{t('list.editTooltip')}</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <Button
-                            isIconOnly
-                            variant="ghost"
-                            aria-label={t('list.editDetails', { name: flow.name })}
-                            onPress={() => {
+                      <TableRowActions
+                        itemName={flow.name}
+                        actions={[
+                          {
+                            key: 'open',
+                            label: t('list.editTooltip'),
+                            icon: PencilIcon,
+                            onPress: () => navigate(`/devices/flows/${flow.id}`),
+                            'data-cy': `global-flow-edit-${flow.id}`,
+                          },
+                          {
+                            key: 'details',
+                            label: t('list.editDetailsTooltip'),
+                            icon: SettingsIcon,
+                            onPress: () => {
                               setFlowToEdit(flow);
                               editModal.open();
-                            }}
-                            data-cy={`global-flow-details-${flow.id}`}
-                          >
-                            <SettingsIcon className="h-4 w-4" />
-                          </Button>
-                          <TooltipContent>{t('list.editDetailsTooltip')}</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <Button
-                            isIconOnly
-                            variant="danger-soft"
-                            aria-label={t('list.delete', { name: flow.name })}
-                            onPress={() => setFlowToDelete(flow)}
-                            data-cy={`global-flow-delete-${flow.id}`}
-                          >
-                            <Trash2Icon className="h-4 w-4" />
-                          </Button>
-                          <TooltipContent>{t('list.deleteTooltip')}</TooltipContent>
-                        </Tooltip>
-                      </div>
+                            },
+                            'data-cy': `global-flow-details-${flow.id}`,
+                          },
+                          {
+                            key: 'delete',
+                            label: t('list.deleteTooltip'),
+                            icon: Trash2Icon,
+                            tone: 'danger',
+                            onPress: () => remove.mutateAsync({ path: { flowId: flow.id } }),
+                            confirm: {
+                              title: t('list.deleteTitle'),
+                              message: t('list.deleteConfirmation', { name: flow.name }),
+                              confirmLabel: t('list.deleteAction'),
+                              cancelLabel: t('list.cancel'),
+                              'data-cy': 'global-flows-delete-dialog',
+                              confirmDataCy: 'global-flows-delete-confirm',
+                            },
+                            'data-cy': `global-flow-delete-${flow.id}`,
+                          },
+                        ]}
+                      />
                     </TableCell>
                   </TableRow>
                 )}
@@ -213,23 +208,6 @@ export function GlobalFlowsListPage() {
         onOpenChange={editModal.setOpen}
         flow={flowToEdit ?? undefined}
       />
-
-      <StatusDialog
-        isOpen={flowToDelete !== null}
-        onClose={() => setFlowToDelete(null)}
-        status="error"
-        title={t('list.deleteTitle')}
-        closeLabel={t('list.cancel')}
-        action={{
-          label: t('list.deleteAction'),
-          onPress: () => flowToDelete && remove.mutate({ path: { flowId: flowToDelete.id } }),
-          isPending: remove.isPending,
-          'data-cy': 'global-flows-delete-confirm',
-        }}
-        data-cy="global-flows-delete-dialog"
-      >
-        {t('list.deleteConfirmation', { name: flowToDelete?.name ?? '' })}
-      </StatusDialog>
     </div>
   );
 }

@@ -15,16 +15,10 @@ import {
   useUnarchiveProject,
 } from '@attraccess/react-query-client';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  Button,
-  DeleteConfirmationModal,
-  PageAction,
-  PageHeader,
-  useTranslations,
-} from '@attraccess/plugins-frontend-ui';
+import { Button, PageAction, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
@@ -52,9 +46,8 @@ export function ProjectDetailsPage() {
   const { data: project } = useFindOneProject({ path: { id: projectId } }, undefined, {
     enabled: hasValidProjectId,
   });
-  const [showDeleteConfirmationModal, setShowDeleteConfirmationModal] = useState(false);
 
-  const { mutate: deleteProject } = useDeleteOneProject(undefined, {
+  const { mutateAsync: deleteProject } = useDeleteOneProject(undefined, {
     onSuccess: () => {
       toast.success({
         title: t('actions.delete.success.title'),
@@ -121,9 +114,7 @@ export function ProjectDetailsPage() {
     },
   });
 
-  const onDeleteProject = useCallback(() => {
-    deleteProject({ path: { id: projectId } });
-  }, [deleteProject, projectId]);
+  const onDeleteProject = useCallback(() => deleteProject({ path: { id: projectId } }), [deleteProject, projectId]);
 
   return (
     <>
@@ -191,18 +182,17 @@ export function ProjectDetailsPage() {
                   label: t('actions.delete.label'),
                   icon: <Trash2Icon className="size-4" />,
                   variant: 'destructive',
-                  onPress: () => setShowDeleteConfirmationModal(true),
+                  onPress: onDeleteProject,
+                  confirm: {
+                    title: t('actions.delete.confirm.title', { name: project?.name ?? '' }),
+                    message: t('actions.delete.confirm.message'),
+                    confirmDataCy: 'delete-button',
+                    cancelDataCy: 'cancel-button',
+                  },
                 },
               ] satisfies PageAction[])
             : undefined
         }
-      />
-
-      <DeleteConfirmationModal
-        isOpen={showDeleteConfirmationModal}
-        onClose={() => setShowDeleteConfirmationModal(false)}
-        onConfirm={onDeleteProject}
-        itemName={project?.name ?? ''}
       />
 
       {hasValidProjectId && (

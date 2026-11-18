@@ -1,4 +1,4 @@
-import { HTMLAttributes, useState, useEffect, useCallback } from 'react';
+import { HTMLAttributes, useState, useEffect } from 'react';
 import { Form, Input, Label, Spinner, TextArea, TextField } from '@heroui/react';
 import { Save, Edit3, Trash2Icon } from 'lucide-react';
 import {
@@ -9,7 +9,7 @@ import {
   useResourceGroupsDeleteOne,
   UseResourceGroupsGetManyKeyFn,
 } from '@attraccess/react-query-client';
-import { Button, DeleteConfirmationModal, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, ConfirmableButton, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import en from './translations/en.json';
@@ -72,7 +72,7 @@ export function GroupDetailsForm(
     });
   };
 
-  const { isPending: isDeleting, mutate: deleteGroupMutation } = useResourceGroupsDeleteOne(undefined, {
+  const { isPending: isDeleting, mutateAsync: deleteGroup } = useResourceGroupsDeleteOne(undefined, {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [useResourceIntroductionsGetPeopleKey] });
       success({
@@ -91,12 +91,6 @@ export function GroupDetailsForm(
       });
     },
   });
-
-  const handleDelete = useCallback(() => {
-    deleteGroupMutation({ path: { groupId } });
-  }, [deleteGroupMutation, groupId]);
-
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 
   if (isLoading) {
     return (
@@ -164,24 +158,22 @@ export function GroupDetailsForm(
             {t('form.buttons.save')}
           </Button>
 
-          <Button
-            variant="danger"
-            className="w-full"
-            onPress={() => setShowDeleteConfirmation(true)}
+          <ConfirmableButton
+            label={t('form.buttons.delete')}
+            icon={<Trash2Icon className="w-4 h-4" />}
+            status="error"
+            buttonProps={{ className: 'w-full' }}
             data-cy="group-details-form-delete-button"
-          >
-            <Trash2Icon className="w-4 h-4" />
-            {t('form.buttons.delete')}
-          </Button>
+            confirm={{
+              title: t('deleteConfirm.title'),
+              message: t('deleteConfirm.message', { name: group.name }),
+              confirmLabel: t('deleteConfirm.confirm'),
+              cancelLabel: t('deleteConfirm.cancel'),
+            }}
+            isPending={isDeleting}
+            onConfirm={() => deleteGroup({ path: { groupId } })}
+          />
         </div>
-
-        <DeleteConfirmationModal
-          isOpen={showDeleteConfirmation}
-          onClose={() => setShowDeleteConfirmation(false)}
-          onConfirm={() => handleDelete()}
-          itemName={group.name}
-          isDeleting={isDeleting}
-        />
       </Form>
     </div>
   );

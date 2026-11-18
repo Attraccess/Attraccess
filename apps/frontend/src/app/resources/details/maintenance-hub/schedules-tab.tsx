@@ -1,7 +1,6 @@
 import { Accordion, Skeleton } from '@heroui/react';
-import { Button, DeleteConfirmationModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PlusIcon, CalendarClockIcon } from 'lucide-react';
-import { useState } from 'react';
 import {
   useFindMaintenanceSchedulesKey,
   useDeleteMaintenanceSchedule,
@@ -34,14 +33,11 @@ export function SchedulesTab(props: Props) {
   );
   const trackingReadiness = useOperatingTrackingReadiness(resourceId, hasOperatingSchedule);
 
-  const [deleteTarget, setDeleteTarget] = useState<ResourceMaintenanceSchedule | null>(null);
-
-  const { mutate: deleteSchedule, isPending: isDeleting } = useDeleteMaintenanceSchedule(undefined, {
+  const { mutateAsync: deleteSchedule } = useDeleteMaintenanceSchedule(undefined, {
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: [useFindMaintenanceSchedulesKey],
       });
-      setDeleteTarget(null);
     },
   });
 
@@ -78,7 +74,7 @@ export function SchedulesTab(props: Props) {
             resourceId={resourceId}
             trackingReadiness={trackingReadiness}
             onEdit={() => onEdit(schedule.id)}
-            onDelete={() => setDeleteTarget(schedule)}
+            onDelete={() => deleteSchedule({ path: { resourceId, scheduleId: schedule.id } })}
           />
         ))}
       </Accordion>
@@ -95,18 +91,6 @@ export function SchedulesTab(props: Props) {
         <OperatingTrackingNotice resourceId={resourceId} readiness={trackingReadiness} schedule />
       )}
       {renderBody()}
-
-      <DeleteConfirmationModal
-        isOpen={deleteTarget != null}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={() => {
-          if (deleteTarget) {
-            deleteSchedule({ path: { resourceId, scheduleId: deleteTarget.id } });
-          }
-        }}
-        itemName={deleteTarget?.name ?? ''}
-        isDeleting={isDeleting}
-      />
     </SectionCard>
   );
 }

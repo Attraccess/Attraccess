@@ -33,7 +33,8 @@
       "resume": "Fortsetzen",
       "delete": "Löschen"
     },
-    "deleteConfirm": "Zeitplan \"{{name}}\" löschen?"
+    "deleteConfirm": "Zeitplan \"{{name}}\" löschen?",
+    "deleteMessage": "Diese Aktion kann nicht rückgängig gemacht werden."
   },
   "activity": {
     "actions": {

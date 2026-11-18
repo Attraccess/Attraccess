@@ -1,10 +1,17 @@
 import { Button, Card } from '@heroui/react';
 import { Trash2Icon } from 'lucide-react';
-import { PageHeader, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Attractap, useGetPairings, useRequestReaderPairing } from '@attraccess/react-query-client';
+import { ConfirmableButton, PageHeader, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  Attractap,
+  useDeleteReader,
+  useGetPairings,
+  UseGetReadersKeyFn,
+  UseGetReadersToPairKeyFn,
+  useRequestReaderPairing,
+} from '@attraccess/react-query-client';
+import { useQueryClient } from '@tanstack/react-query';
 import { ReactNode, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
-import { AttractapDeleteModal } from '../AttractapList/delete';
 import { PairingDialog, PairingDialogProps } from './PairingDialog';
 import { PairingRow, readerKindOf } from './PairingRow';
 import { apiErrorMessage, isPairingRunning } from './pairingUtils';
@@ -14,26 +21,41 @@ import en from './en.json';
 type OpenDialog = Pick<PairingDialogProps, 'pairingId' | 'waitForReaderId' | 'presetTargetReaderId'>;
 
 /** Actions of a reader record that is not paired: pair it or delete it. Its diagnostics wait until it is paired. */
-function RecordActions(props: Readonly<{ readerId: number; pair: ReactNode }>) {
+function RecordActions(props: Readonly<{ reader: Attractap; pair: ReactNode }>) {
   const { t } = useTranslations({ de, en });
-  const { readerId } = props;
+  const { reader } = props;
+  const queryClient = useQueryClient();
+  const toast = useToastMessage();
+  const deleteReader = useDeleteReader(undefined, {
+    onSuccess: () => {
+      // The deleted record can be in either list.
+      queryClient.invalidateQueries({ queryKey: UseGetReadersKeyFn() });
+      queryClient.invalidateQueries({ queryKey: UseGetReadersToPairKeyFn() });
+    },
+    onError: (error) => toast.error({ title: t('toPair.deleteFailed'), description: apiErrorMessage(error) }),
+  });
   return (
     <div className="flex items-center gap-1">
       {props.pair}
-      <AttractapDeleteModal readerId={readerId}>
-        {(onOpen) => (
+      <ConfirmableButton
+        label={t('toPair.delete')}
+        status="error"
+        confirm={{ title: t('toPair.deleteTitle'), message: t('toPair.deleteMessage', { name: reader.name }) }}
+        isPending={deleteReader.isPending}
+        onConfirm={() => deleteReader.mutateAsync({ path: { readerId: reader.id } })}
+        renderActivator={(open) => (
           <Button
             size="sm"
             variant="danger-soft"
             isIconOnly
             aria-label={t('toPair.delete')}
-            onPress={onOpen}
-            data-cy={`attractap-to-pair-delete-${readerId}`}
+            onPress={open}
+            data-cy={`attractap-to-pair-delete-${reader.id}`}
           >
             <Trash2Icon className="size-4" />
           </Button>
         )}
-      </AttractapDeleteModal>
+      />
     </div>
   );
 }
@@ -98,7 +120,7 @@ export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: 
                 noteCy={`attractap-to-pair-resources-${reader.id}`}
                 action={
                   <RecordActions
-                    readerId={reader.id}
+                    reader={reader}
                     pair={
                       <Button
                         size="sm"

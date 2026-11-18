@@ -8,15 +8,15 @@
     }
   },
   "error": {
-    "fetchReaders": "Attractap konnten nicht abgerufen werden"
+    "fetchReaders": "Attractap konnten nicht abgerufen werden",
+    "deleteReader": "Attractap konnte nicht gelöscht werden"
   },
   "table": {
     "columns": {
       "name": "Name",
       "type": "Typ",
       "lastConnection": "Letzte Verbindung",
-      "connected": "Status",
-      "actions": "Aktionen"
+      "connected": "Status"
     },
     "noData": "Keine Attractap gefunden",
     "actions": {
@@ -32,6 +32,10 @@
       "title": "Veraltete Attractaps",
       "description": "Keine Verbindung seit mehr als 24 Stunden"
     }
+  },
+  "deleteConfirm": {
+    "title": "Attractap {{name}} löschen?",
+    "message": "Der Leser wird entfernt und muss neu gekoppelt werden, bevor er wieder genutzt werden kann. Das kann nicht rückgängig gemacht werden."
   },
   "connected": "Verbunden",
   "disconnected": "Nicht verbunden",

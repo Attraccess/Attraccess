@@ -10,11 +10,10 @@
   "table": {
     "ariaLabel": "Erlaubte Registrierungs-Domains",
     "columns": {
-      "domain": "Domain",
-      "actions": "Aktionen"
+      "domain": "Domain"
     },
     "actions": {
-      "removeDomain": "entfernen"
+      "removeDomain": "Entfernen"
     }
   },
   "actions": {

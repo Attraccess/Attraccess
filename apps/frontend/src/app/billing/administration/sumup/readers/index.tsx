@@ -1,4 +1,10 @@
-import { EmptyState, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  EmptyState,
+  PageHeader,
+  TableActionsColumnHeader,
+  TableRowActions,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import {
@@ -15,18 +21,36 @@ import {
   TableScrollContainer,
 } from '@heroui/react';
 import { SmartphoneNfcIcon, Trash2Icon } from 'lucide-react';
-import { useGetSumUpConfiguration, useGetSumUpReaders } from '@attraccess/react-query-client';
+import {
+  useGetSumUpConfiguration,
+  useGetSumUpReaders,
+  useGetSumUpReadersKey,
+  useRemoveSumUpReader,
+} from '@attraccess/react-query-client';
+import { useQueryClient } from '@tanstack/react-query';
+import { useToastMessage } from '../../../../../components/toastProvider';
+import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import { SumUpReadersPairing } from './pairing';
-import { SumUpReaderDeleteModal } from './remove';
 
 export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
-  const { t, language } = useTranslations({ en, de });
+  const { t, tExists, language } = useTranslations({
+    en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
+    de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
+  });
+  const toast = useToastMessage();
+  const queryClient = useQueryClient();
 
   const { data: readers } = useGetSumUpReaders({}, undefined, {
     refetchInterval: 5000,
   });
 
   const { data: configuration } = useGetSumUpConfiguration();
+
+  const { mutateAsync: removeReader } = useRemoveSumUpReader(undefined, {
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [useGetSumUpReadersKey] }),
+    onError: (error: Error) => toast.apiError({ error, t, tExists, baseTranslationKey: 'api' }),
+  });
 
   if (!configuration?.enabled) {
     return null;
@@ -62,7 +86,9 @@ export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
                 <TableColumn isRowHeader>{t('table.columns.name')}</TableColumn>
                 <TableColumn>{t('table.columns.device')}</TableColumn>
                 <TableColumn>{t('table.columns.status')}</TableColumn>
-                <TableColumn>{t('table.columns.actions')}</TableColumn>
+                <TableColumn>
+                  <TableActionsColumnHeader />
+                </TableColumn>
               </TableHeader>
               {/* the mapping of the language into the readers is to trick heroui to re-render when the language changes */}
               <TableBody
@@ -75,14 +101,22 @@ export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
                     <TableCell>{reader.device.model}</TableCell>
                     <TableCell>{reader.status}</TableCell>
                     <TableCell>
-                      <SumUpReaderDeleteModal readerId={reader.id} readerName={reader.name}>
-                        {(onOpen) => (
-                          <Button variant="danger-soft" onPress={onOpen}>
-                            <Trash2Icon className="w-4 h-4" />
-                            {t('table.actions.deleteReader')}
-                          </Button>
-                        )}
-                      </SumUpReaderDeleteModal>
+                      <TableRowActions
+                        itemName={reader.name}
+                        actions={[
+                          {
+                            key: 'delete',
+                            label: t('table.actions.deleteReader'),
+                            icon: Trash2Icon,
+                            tone: 'danger',
+                            onPress: () => removeReader({ path: { readerId: reader.id } }),
+                            confirm: {
+                              title: t('deleteConfirm.title', { name: reader.name }),
+                              message: t('deleteConfirm.message'),
+                            },
+                          },
+                        ]}
+                      />
                     </TableCell>
                   </TableRow>
                 )}

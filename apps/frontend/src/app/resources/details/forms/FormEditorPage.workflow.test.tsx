@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { FormEditorPage } from './FormEditorPage';
@@ -158,7 +158,7 @@ it('confirms deletion and refreshes list and detail queries', async () => {
   mount('11');
   fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
   fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete form' }));
-  fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+  fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete form' }));
   await waitFor(() => expect(state.remove).toHaveBeenCalledWith({ path: { resourceId: 7, formId: 11 } }));
   expect(await screen.findByText('Form list')).toBeTruthy();
   expect(state.success).toHaveBeenCalledWith({ title: 'Form deleted' });

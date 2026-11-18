@@ -1,7 +1,7 @@
-import { Button } from '@attraccess/plugins-frontend-ui';
+import { TableRowActions } from '@attraccess/plugins-frontend-ui';
 import type { InstalledNpmPluginDto, LoadedPluginManifest } from '@attraccess/react-query-client';
 import { Chip, TableCell, TableRow, Tooltip, TooltipContent, TooltipTrigger } from '@heroui/react';
-import { AlertTriangle, CheckCircle2, KeyRound, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, History, Info, KeyRound, Trash2 } from 'lucide-react';
 import { PluginClassificationBadge } from '../PluginClassificationBadge';
 import type { FailedPlugin, MarketplaceDetailRequest, VersionPlugin } from '../types';
 import { usePluginsTranslations } from '../usePluginsTranslations';
@@ -117,40 +117,35 @@ export function PluginRow({ plugin, installed, onShowError, onShowDetails, onMan
         )}
       </TableCell>
       <TableCell>
-        <div className="flex justify-end">
-          {installed ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onPress={() => onShowDetails({ name: plugin.name, registryId: installed.registryId ?? 'npm' })}
-            >
-              {t('marketplace.details')}
-            </Button>
-          ) : null}
-          {installed ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              onPress={() => onManageVersion({ name: plugin.name, version: plugin.version })}
-              data-cy={`plugins-list-manage-version-button-${plugin.id}`}
-            >
-              {t('manageVersion')}
-            </Button>
-          ) : null}
-          <Tooltip>
-            <Button
-              variant="danger-soft"
-              size="sm"
-              isIconOnly
-              aria-label={t('deleteTooltip')}
-              onPress={() => onDelete(plugin.id)}
-              data-cy={`plugins-list-delete-plugin-button-${plugin.id}`}
-            >
-              <Trash2 size={16} />
-            </Button>
-            <TooltipContent>{t('deleteTooltip')}</TooltipContent>
-          </Tooltip>
-        </div>
+        <TableRowActions
+          itemName={plugin.name}
+          data-cy={`plugins-list-actions-${plugin.id}`}
+          actions={[
+            {
+              key: 'details',
+              label: t('marketplace.details'),
+              icon: Info,
+              isHidden: !installed,
+              onPress: () => onShowDetails({ name: plugin.name, registryId: installed?.registryId ?? 'npm' }),
+            },
+            {
+              key: 'manageVersion',
+              label: t('manageVersion'),
+              icon: History,
+              isHidden: !installed,
+              onPress: () => onManageVersion({ name: plugin.name, version: plugin.version }),
+              'data-cy': `plugins-list-manage-version-button-${plugin.id}`,
+            },
+            {
+              key: 'delete',
+              label: t('deleteTooltip'),
+              icon: Trash2,
+              tone: 'danger',
+              onPress: () => onDelete(plugin.id),
+              'data-cy': `plugins-list-delete-plugin-button-${plugin.id}`,
+            },
+          ]}
+        />
       </TableCell>
     </TableRow>
   );
