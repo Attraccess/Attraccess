@@ -8,7 +8,7 @@
     "controller": "Device",
     "runtime": "Software",
     "heartbeat": "Last seen",
-    "actions": "Actions",
+    "mainAction": "Main action",
     "claim": "Enroll",
     "configure": "Configure",
     "progress": "Setup progress",

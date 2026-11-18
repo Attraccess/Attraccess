@@ -1,4 +1,4 @@
-import type { TFunction } from '@attraccess/plugins-frontend-ui';
+import { TableActionsColumnHeader, type TFunction } from '@attraccess/plugins-frontend-ui';
 import {
   Chip,
   Table,
@@ -27,7 +27,7 @@ interface DevicesTableProps {
   setInfoDevice: (device: ShellyDevice) => void;
   setFirmwareDevice: (device: ShellyDevice) => void;
   setAuthDevice: (device: ShellyDevice) => void;
-  setDeleteTarget: (device: ShellyDevice) => void;
+  onDelete: (device: ShellyDevice) => Promise<void>;
   withRowBusy: (id: number, action: () => Promise<unknown>) => Promise<void>;
 }
 
@@ -35,15 +35,7 @@ type DeviceRowProps = Omit<DevicesTableProps, 'devices' | 'onAdd'>;
 
 function renderDeviceRow(
   device: ShellyDevice,
-  {
-    firmware,
-    rowBusyId,
-    setInfoDevice,
-    setFirmwareDevice,
-    setAuthDevice,
-    withRowBusy,
-    setDeleteTarget,
-  }: DeviceRowProps,
+  { firmware, rowBusyId, setInfoDevice, setFirmwareDevice, setAuthDevice, withRowBusy, onDelete }: DeviceRowProps,
   t: TFunction,
 ) {
   return (
@@ -86,13 +78,13 @@ function renderDeviceRow(
       </TableCell>
       <TableCell className="sh:whitespace-nowrap">
         <RowActions
-          deviceId={device.id}
+          device={device}
           isBusy={rowBusyId === device.id}
           onInfo={() => setInfoDevice(device)}
           onFirmware={() => setFirmwareDevice(device)}
           onAuth={() => setAuthDevice(device)}
           onReprobe={() => withRowBusy(device.id, () => reprobeDevice(device.id))}
-          onDelete={() => setDeleteTarget(device)}
+          onDelete={() => onDelete(device)}
         />
       </TableCell>
     </TableRow>
@@ -114,7 +106,9 @@ export function DevicesTable({ devices, onAdd, ...rowProps }: DevicesTableProps)
             <TableColumn className="sh:hidden sh:lg:table-cell">{t('devices.model')}</TableColumn>
             <TableColumn className="sh:hidden sh:sm:table-cell">{t('devices.auth')}</TableColumn>
             <TableColumn className="sh:hidden sh:xl:table-cell">{t('devices.firmware')}</TableColumn>
-            <TableColumn className="sh:text-end">{t('devices.actions')}</TableColumn>
+            <TableColumn id="actions" className="sh:text-end">
+              <TableActionsColumnHeader />
+            </TableColumn>
           </TableHeader>
           {/* `dependencies` is required: without it react-aria caches the rendered
               rows, and the row closure keeps the firmware/busy state it was first

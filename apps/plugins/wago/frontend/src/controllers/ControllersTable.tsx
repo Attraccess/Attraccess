@@ -9,6 +9,7 @@ import {
   TableScrollContainer,
   TextField,
 } from '@heroui/react';
+import { TableActionsColumnHeader } from '@attraccess/plugins-frontend-ui';
 import { useState } from 'react';
 import type { CommissioningSession } from '../api/client';
 import { useWagoTranslations } from '../i18n';
@@ -18,14 +19,7 @@ import { ControllerRow } from './ControllerRow';
 import { PAGE_SIZE, type ControllersTableProps, type TableRowData } from './controllersTableModel';
 import { EmptyControllers } from './EmptyControllers';
 
-export function ControllersTable({
-  controllers,
-  sessions,
-  onClaim,
-  onConfigure,
-  onRemove,
-  onResume,
-}: ControllersTableProps) {
+export function ControllersTable({ controllers, sessions, onClaim, onConfigure, onResume }: ControllersTableProps) {
   const { t } = useWagoTranslations();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -90,7 +84,12 @@ export function ControllersTable({
               <TableColumn>{t('controllers.status')}</TableColumn>
               <TableColumn>{t('controllers.runtime')}</TableColumn>
               <TableColumn className="wg:hidden wg:lg:table-cell">{t('controllers.heartbeat')}</TableColumn>
-              <TableColumn className="wg:text-end">{t('controllers.actions')}</TableColumn>
+              <TableColumn>
+                <span className="wg:sr-only">{t('controllers.mainAction')}</span>
+              </TableColumn>
+              <TableColumn id="actions" className="wg:text-end">
+                <TableActionsColumnHeader />
+              </TableColumn>
             </TableHeader>
             <TableBody items={visibleRows} renderEmptyState={() => <EmptyControllers searching={!!needle} />}>
               {(row) =>
@@ -145,7 +144,6 @@ export function ControllersTable({
           row={selectedRow}
           onClose={() => setSelectedKey(null)}
           onConfigure={onConfigure}
-          onRemove={onRemove}
           onResume={onResume}
         />
       )}
