@@ -163,6 +163,12 @@ in {
         example = lib.literalExpression ''{ "attractap-touch-v2" = ./attractap_touch_v2_park.bin; }'';
         description = "Parking images keyed by place `variant` tag, built with `pnpm nx run attractap-firmware:build-lab`. Places whose variant has no image are not managed. Places tagged `profile=secure-lab` (Secure Boot lab readers) need the lab-signed `.hex` image of a secure-lab park variant; the janitor writes it encrypted.";
       };
+      dsRecordsDir = mkOption {
+        type = types.nullOr types.path;
+        default = null;
+        example = lib.literalExpression ''"''${attraccess}/apps/attractap/firmware/lab/ds"'';
+        description = "Directory with one `<mac without colons>/ds-record.bin` per secure lab reader (apps/attractap/firmware/lab/ds in the repo). When parking a `profile=secure-lab` reader whose MAC has a record, the janitor writes it back, encrypted, in the same esptool call as the parking image: the wipe would otherwise destroy the reader's DS identity. Unset: the records of the source checkout the janitor runs from, if any.";
+      };
       priority = mkOption {
         type = types.ints.positive;
         default = 1000;
@@ -344,7 +350,8 @@ in {
       # Coordinator restarts drop all claims; restart to park every reader again.
       partOf = [ "attractap-lab-coordinator.service" ];
       path = tools;
-      environment = { PYTHONUNBUFFERED = "1"; HOME = "/var/lib/labgrid"; LG_COORDINATOR = cfg.coordinator.syncAddress; };
+      environment = { PYTHONUNBUFFERED = "1"; HOME = "/var/lib/labgrid"; LG_COORDINATOR = cfg.coordinator.syncAddress; }
+        // lib.optionalAttrs (janitor.dsRecordsDir != null) { ATTRACTAP_LAB_DS_DIR = toString janitor.dsRecordsDir; };
       startLimitIntervalSec = 0;
       serviceConfig = {
         User = "labgrid";

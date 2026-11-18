@@ -19,7 +19,7 @@ from labgrid.resource.common import Resource
 from labgrid.resource.remote import RemotePlace, RemotePlaceManager
 from pexpect import TIMEOUT
 
-from . import efuse
+from . import ds_record, efuse
 from .drivers import ESPToolDriver, NfcEmulatorDriver, ReaderPowerDriver, ScreenCaptureDriver, SwitchPowerDriver
 
 
@@ -367,7 +367,7 @@ _PARK_FAILED_LINE = re.compile(rb"ATTRACTAP_PARK_FAILED[^\n]*\n")
 
 
 def park(target, image, output, *, baseline_dir=None, marker_seconds=30.0, resource_seconds=30.0,
-         profile=efuse.PLAIN, cycle_power=False):
+         profile=efuse.PLAIN, cycle_power=False, ds_dir=None):
     """Check eFuses, erase the whole chip, flash a parking image and confirm it.
 
     ``cycle_power`` first cuts the reader's power (see power_cycle), logging to
@@ -377,7 +377,8 @@ def park(target, image, output, *, baseline_dir=None, marker_seconds=30.0, resou
     Raises efuse.EfuseViolation before erasing if the eFuses do not match the
     reader profile or changed since first seen; such a reader must not be
     reused. A ``secure-lab`` reader takes a lab-signed Intel HEX image, written
-    encrypted. Returns the chip MAC once the image reports ATTRACTAP_PARKED on
+    encrypted, together with its DS record when the repo holds one for its MAC
+    (``ds_dir``, see ds_record). Returns the chip MAC once the image reports ATTRACTAP_PARKED on
     the UART within marker_seconds; otherwise the last ATTRACTAP_PARK_FAILED
     line, which names the hardware and the I2C bus state, is the error.
     serial.log and efuse.txt stay in output.
@@ -397,7 +398,8 @@ def park(target, image, output, *, baseline_dir=None, marker_seconds=30.0, resou
     (output / "efuse.txt").write_text(report)
     mac = efuse.check(report, baseline_dir, profile=profile)
     if profile == efuse.SECURE_LAB:
-        flash.erase_and_flash_encrypted(str(image))
+        restore = ds_record.restore_files(mac, ds_dir)
+        flash.erase_and_flash_encrypted(str(image), **({"extra": restore} if restore else {}))
     else:
         flash.erase_and_flash(str(image))
     target.deactivate(flash)

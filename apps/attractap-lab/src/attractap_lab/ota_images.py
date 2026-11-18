@@ -48,6 +48,22 @@ def corrupt(image, out, position=0.5):
     return out
 
 
+def modified(signed_image, out, position=0.25):
+    """Copy a lab-signed image with one application byte changed after signing.
+
+    Unlike ``corrupt`` (any image, mid-file) this names the case the secure reader must refuse: a
+    genuinely signed image whose content no longer matches its signature block. It must be an
+    image ``lab_sign`` produced, and the byte lies before the signature sector at the end.
+    """
+    data = bytearray(Path(signed_image).read_bytes())
+    assert data[0] == IMAGE_MAGIC, "not an ESP application image"
+    assert len(data) % 4096 == 0 and data[-4096:-4096 + 1] == b"\xe7", "not a Secure Boot v2 signed image"
+    index = int(len(data[:-4096]) * position)
+    data[index] ^= 0xFF
+    Path(out).write_bytes(bytes(data))
+    return out
+
+
 def bad_magic(image, out):
     """Copy ``image`` with a wrong first byte: the reader refuses it from the first chunk on."""
     data = bytearray(Path(image).read_bytes())

@@ -443,6 +443,21 @@ READER_PROFILE=secure-lab pnpm nx run attractap-lab:hil
 - The reader's internal heap (before pairing, after the TLS session opened, at
   the end) is written to `reader-heap.jsonl` in the run's artifacts.
 
+**DS identity (ATT-1207).** The reader `attractap-touch-v2-secure-1` (chip
+`DC:B4:D9:21:71:C8`) got one approved burn: KEY3 as `HMAC_DOWN_DIGITAL_SIGNATURE`
+and RD_DIS write-protected. It pairs with an RSA-3072 key in the chip's Digital
+Signature peripheral. Every wipe erases the encrypted DS record at the start of
+the `spiffs` partition, so the suite (`write_secure_image`), `secure_lab_reader.py
+flash` and the janitor write the committed record
+(`apps/attractap/firmware/lab/ds/dcb4d92171c8/ds-record.bin`) back, encrypted, in
+the same esptool call; a chip without a record behaves as before. `test_ds_identity.py`
+covers the DS session, the identity upgrade (test hook `identity.force-p256`),
+re-pair, reboot and power cycle, and the `efuse.report`. The `modified` image kind in
+`test_ota.py` (lab-signed, a byte changed after signing) must be refused. Anti-rollback
+is not tested on this reader. Heap numbers with DS go to `reader-heap.jsonl`
+(label `ds session`); change `hil/heap_floors.py` only with measured values.
+See `apps/attractap/firmware/lab/ds/README.md`.
+
 If a run is killed before its own wipe, the janitor parks the reader on
 release; on a place without one, run the suite again. A branch that raises
 `CONFIG_BOOTLOADER_APP_SECURE_VERSION` burns the new version into the reader
@@ -733,7 +748,14 @@ the third digest slot revoked, JTAG off, flash encryption in development mode
 also compares every raw eFuse block with the first dump recorded for the chip
 (`/var/lib/attractap-lab-janitor/efuse-baselines`). On secure-lab readers the
 `SECURE_VERSION` bits of BLOCK0 are left out and may only grow (anti-rollback
-burns them when the reader boots an image with a higher secure version). A park image older than that version no
+burns them when the reader boots an image with a higher secure version). For MAC `dc:b4:d9:21:71:c8` only, exactly two eFuse states pass: the
+state before the DS burn and the state after it (KEY_PURPOSE_3 =
+`HMAC_DOWN_DIGITAL_SIGNATURE`, KEY3 read-protected, RD_DIS write-protected). The
+first time the janitor sees the burned state it records the baseline again and keeps
+the old one as `<mac>.pre-ds.json`; from then on only the exact burned state passes.
+Set `services.attractap-lab.janitor.dsRecordsDir` to
+`apps/attractap/firmware/lab/ds` of the pinned source so parking restores the DS
+record (nix-mac-setup). A park image older than that version no
 longer boots, so rebuild it from a branch with the new version. A mismatch
 quarantines the reader immediately, also on a `power=switch` or `power=button`
 place; other failures retry, then quarantine after `janitor.attempts`. On a

@@ -50,6 +50,7 @@ def images(ota, tmp_path):
         "corrupt": ota_images.corrupt(good, tmp_path / "corrupt.bin"),
     }
     if ota["secure"]:
+        kinds["modified"] = ota_images.modified(good, tmp_path / "modified-signed.bin")
         kinds["unsigned"] = ota["image"]
         kinds["wrong-signature"] = ota_images.foreign_sign(ota["image"], tmp_path / "foreign-signed.bin")
     return kinds
@@ -101,7 +102,7 @@ def boot_cleanly_on(target, reader, version, api, admin):
     return mark
 
 
-@pytest.mark.parametrize("kind", ["bad-magic", "corrupt", "unsigned", "wrong-signature"])
+@pytest.mark.parametrize("kind", ["bad-magic", "corrupt", "unsigned", "wrong-signature", "modified"])
 def test_rejected_image_leaves_the_reader_on_the_old_version(kind, target, reader, ota, images, api, admin, artifacts):
     if kind not in images:
         pytest.skip(f"{kind} images only exist for secure lab readers")

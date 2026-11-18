@@ -55,19 +55,23 @@ class ESPToolDriver(Driver, ResetProtocol):
         self._write(image, ["write-flash", "--erase-all", "0x0"])
 
     @Driver.check_active
-    def erase_and_flash_encrypted(self, image):
+    def erase_and_flash_encrypted(self, image, extra=()):
         """Erase the whole chip, then write a lab-signed Intel HEX image encrypted.
 
         For lab secure readers (ATT-1166): development-mode flash encryption lets
         the ROM encrypt writes, and --force lets esptool write the bootloader
         region while Secure Boot is on. HEX leaves the gaps between partitions
         (e.g. NVS) erased instead of filling them with encrypted 0xFF.
+
+        ``extra``: ``(flash offset, bytes)`` pairs written encrypted in the same call, e.g. the DS
+        record sector (ds_record.restore_sector) the erase would otherwise take from the reader.
         """
         with open(image, "rb") as file:
             if file.read(1) != b":":
                 raise ValueError(f"{image} is not an Intel HEX image; lab secure readers take only "
                                  "the signed .hex images of build_firmwares.py --lab")
-        self._write(image, ["write-flash", "--force", "--erase-all", "--encrypt", "0x0"], name="firmware.hex")
+        self._write(image, ["write-flash", "--force", "--erase-all", "--encrypt", "0x0"], name="firmware.hex",
+                    extra=extra)
 
     @Driver.check_active
     def reset(self):
@@ -80,7 +84,7 @@ class ESPToolDriver(Driver, ResetProtocol):
         return self._run([self.espefuse, *self._connection(), "dump", "summary", "--format", "json"],
                          capture=True)
 
-    def _write(self, image, arguments, name="firmware.bin"):
+    def _write(self, image, arguments, name="firmware.bin", extra=()):
         if not self.device.devnode:
             raise RuntimeError("The flash resource has no serial device node")
         with tempfile.TemporaryDirectory(prefix="attractap-flash-") as directory:
@@ -88,8 +92,14 @@ class ESPToolDriver(Driver, ResetProtocol):
             shutil.copyfile(image, staged)
             managed = ManagedFile(str(staged), self.device, detect_nfs=False)
             managed.sync_to_resource()
-            self._run([self.esptool, *self._connection(), "--after", "hard-reset",
-                       *arguments, managed.get_remote_path()])
+            parts = [managed.get_remote_path()]
+            for index, (offset, data) in enumerate(extra):
+                part = Path(directory) / f"extra-{index}.bin"
+                part.write_bytes(data)
+                extra_file = ManagedFile(str(part), self.device, detect_nfs=False)
+                extra_file.sync_to_resource()
+                parts += [hex(offset), extra_file.get_remote_path()]
+            self._run([self.esptool, *self._connection(), "--after", "hard-reset", *arguments, *parts])
 
     def _connection(self):
         if not self.device.devnode:

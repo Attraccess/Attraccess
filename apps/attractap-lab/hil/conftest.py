@@ -19,7 +19,7 @@ import urllib.error
 
 import pytest
 
-from attractap_lab import efuse, ota_images
+from attractap_lab import ds_record, efuse, ota_images
 from attractap_lab.hil_report import RunReport
 from attractap_lab.drivers import (
     ESPToolDriver, NfcEmulatorDriver, NfcEmulatorFlashDriver, ScreenCaptureDriver,
@@ -192,8 +192,11 @@ def write_secure_image(target):
     flash = target.get_driver(ESPToolDriver, activate=False)
     target.activate(flash)
     try:
-        efuse.check(flash.read_efuses(), profile=efuse.SECURE_LAB)
-        flash.erase_and_flash_encrypted(os.environ["READER_IMAGE"])
+        # Also accepts the DS lab reader after its approved burn (efuse.DS_MAC); the erase then takes
+        # the DS record with it, so it is written back in the same call.
+        mac = efuse.check(flash.read_efuses(), profile=efuse.SECURE_LAB)
+        restore = ds_record.restore_files(mac)
+        flash.erase_and_flash_encrypted(os.environ["READER_IMAGE"], **({"extra": restore} if restore else {}))
     finally:
         target.deactivate(flash)
 
