@@ -14,6 +14,8 @@ import { ResourceIntroductionRequiredException } from '../../exceptions/resource
 import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../exceptions/resource.maintenance.inUse.exception';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceUnhealthyException } from '../../exceptions/resource.unhealthy.exception';
+import { ExternalEffectFailureError } from '../../resources/flows/errors/external-effect-failure.error';
+import { FlowExecutionError } from '../../resources/flows/errors/flow-execution.error';
 import {
   ReaderAction,
   ReaderCapabilities,
@@ -56,8 +58,10 @@ function toReader(row: PluginReaderRecord): PluginReader {
 /**
  * Why the door action refused the card owner, or null for a host failure. The gate's exception types decide,
  * never their messages; any other refusal of the action means the resource changed since the reader's check.
+ * Flows run only once the action is stored, so their errors mean "recorded, but a flow failed" (`FLOW_FAILED`).
  */
 function gateRefusal(error: unknown): PluginReaderTapFailureReason | null {
+  if (error instanceof FlowExecutionError || error instanceof ExternalEffectFailureError) return 'FLOW_FAILED';
   if (error instanceof ResourceUsageImpossibleMaintenanceInProgressException) return 'MAINTENANCE';
   if (error instanceof ResourceUnhealthyException) return 'MAINTENANCE';
   if (error instanceof ResourceIntroductionRequiredException) return 'ACCESS_DENIED';
@@ -232,11 +236,13 @@ export class PluginReadersService {
       this.logger.warn(`Plugin ${pluginId} tapped a reader it has not registered`);
       return result;
     }
+    const reason = 'reason' in result ? result.reason : null;
     const details: AuditDetails = {
       pluginId,
       deviceId: reader.deviceId,
       subjectLabel: reader.name,
-      result: result.ok ? 'accepted' : 'refused',
+      // A failed flow did not undo the stored action.
+      result: reason === null || reason === 'FLOW_FAILED' ? 'accepted' : 'refused',
     };
     const resourceId = result.ok ? result.resourceId : reader.resourceId;
     if (resourceId !== null) details.resourceId = resourceId;
@@ -244,7 +250,7 @@ export class PluginReadersService {
       details.cardId = card.cardId;
       details.userId = card.userId;
     }
-    if ('reason' in result) details.reasonCode = result.reason;
+    if (reason) details.reasonCode = reason;
     try {
       await this.audit.record({
         domain: 'attractap',

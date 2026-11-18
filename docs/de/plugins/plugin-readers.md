@@ -108,16 +108,17 @@ versuchen Sie es später mit einer neuen Authentifizierung).
 
 `tap.reason` ist einer dieser stabilen Werte (`PluginReaderTapFailureReason`). Sie werden nie umbenannt oder entfernt.
 
-| Grund                    | Bedeutung                                                                                                               |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| `AUTHENTICATION_INVALID` | Die Authentifizierung ist unbekannt, bereits verwendet oder stammt von einem anderen Gerät oder Plugin.                 |
-| `AUTHENTICATION_EXPIRED` | Die Authentifizierung ist älter als 30 Sekunden. Authentifizieren Sie die Karte erneut.                                 |
-| `BUSY`                   | Ein anderer Tap an diesem Reader läuft noch. Versuchen Sie es mit einer neuen Authentifizierung erneut.                 |
-| `READER_NOT_FOUND`       | Ihr Plugin hat keinen Reader mit dieser Geräte-Id.                                                                      |
-| `NO_RESOURCE`            | Dem Reader ist keine Ressource zugewiesen.                                                                              |
-| `ACTION_NOT_ALLOWED`     | Keine Aktion des Readers ist auf seiner Ressource erlaubt, zum Beispiel ist die Tür nicht mehr „Nur Zutritt“.           |
-| `ACCESS_DENIED`          | Der Karteninhaber darf die Ressource nicht nutzen: keine Berechtigung, keine Einweisung oder das Konto ist deaktiviert. |
-| `MAINTENANCE`            | Die Ressource ist in Wartung oder als fehlerhaft gemeldet, und der Karteninhaber darf keine Wartung verwalten.          |
+| Grund                    | Bedeutung                                                                                                                    |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `AUTHENTICATION_INVALID` | Die Authentifizierung ist unbekannt, bereits verwendet oder stammt von einem anderen Gerät oder Plugin.                      |
+| `AUTHENTICATION_EXPIRED` | Die Authentifizierung ist älter als 30 Sekunden. Authentifizieren Sie die Karte erneut.                                      |
+| `BUSY`                   | Ein anderer Tap an diesem Reader läuft noch. Versuchen Sie es mit einer neuen Authentifizierung erneut.                      |
+| `READER_NOT_FOUND`       | Ihr Plugin hat keinen Reader mit dieser Geräte-Id.                                                                           |
+| `NO_RESOURCE`            | Dem Reader ist keine Ressource zugewiesen.                                                                                   |
+| `ACTION_NOT_ALLOWED`     | Keine Aktion des Readers ist auf seiner Ressource erlaubt, zum Beispiel ist die Tür nicht mehr „Nur Zutritt“.                |
+| `ACCESS_DENIED`          | Der Karteninhaber darf die Ressource nicht nutzen: keine Berechtigung, keine Einweisung oder das Konto ist deaktiviert.      |
+| `MAINTENANCE`            | Die Ressource ist in Wartung oder als fehlerhaft gemeldet, und der Karteninhaber darf keine Wartung verwalten.               |
+| `FLOW_FAILED`            | Die Aktion wurde gespeichert, aber ein daran hängender Flow ist fehlgeschlagen. Nicht wiederholen: Das speichert sie erneut. |
 
 Jeder Tap verbraucht seine Authentifizierung, auch ein abgelehnter. Jeder Tap an einem Reader mit bekannter Geräte-Id
 wird ins Audit-Log geschrieben („Karte an einen Plugin-Reader gehalten“), mit Plugin-Id, Geräte-Id, Ressource, Karte,

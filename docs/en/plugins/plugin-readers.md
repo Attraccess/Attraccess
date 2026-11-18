@@ -102,16 +102,17 @@ authentication) or on a host failure (a generic `Error`; retry later with a new 
 
 `tap.reason` is one of these stable strings (`PluginReaderTapFailureReason`). They are never renamed or removed.
 
-| Reason                   | Meaning                                                                                                 |
-| ------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `AUTHENTICATION_INVALID` | The authentication is unknown, already used, or from another device or plugin.                          |
-| `AUTHENTICATION_EXPIRED` | The authentication is older than 30 seconds. Authenticate the card again.                               |
-| `BUSY`                   | Another tap on this reader is still running. Retry with a new authentication.                           |
-| `READER_NOT_FOUND`       | Your plugin has no reader with this device id.                                                          |
-| `NO_RESOURCE`            | The reader has no resource assigned.                                                                    |
-| `ACTION_NOT_ALLOWED`     | None of the reader's actions is allowed on its resource, for example the door is no longer access only. |
-| `ACCESS_DENIED`          | The card owner may not use the resource: no permission, no introduction, or the account is disabled.    |
-| `MAINTENANCE`            | The resource is under maintenance or reported unhealthy, and the card owner may not manage maintenance. |
+| Reason                   | Meaning                                                                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `AUTHENTICATION_INVALID` | The authentication is unknown, already used, or from another device or plugin.                                                |
+| `AUTHENTICATION_EXPIRED` | The authentication is older than 30 seconds. Authenticate the card again.                                                     |
+| `BUSY`                   | Another tap on this reader is still running. Retry with a new authentication.                                                 |
+| `READER_NOT_FOUND`       | Your plugin has no reader with this device id.                                                                                |
+| `NO_RESOURCE`            | The reader has no resource assigned.                                                                                          |
+| `ACTION_NOT_ALLOWED`     | None of the reader's actions is allowed on its resource, for example the door is no longer access only.                       |
+| `ACCESS_DENIED`          | The card owner may not use the resource: no permission, no introduction, or the account is disabled.                          |
+| `MAINTENANCE`            | The resource is under maintenance or reported unhealthy, and the card owner may not manage maintenance.                       |
+| `FLOW_FAILED`            | The action was recorded for the card owner, but a flow attached to it failed. Do not retry: a retry records the action again. |
 
 Every tap consumes its authentication, also a refused one. Each tap on a reader with a known device id is written to
 the audit log ("Card held to a plugin reader") with your plugin id, the device id, the resource, the card, the owner,

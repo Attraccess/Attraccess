@@ -8,6 +8,8 @@ import {
   PluginReadersContext,
 } from '@attraccess/plugins-backend-sdk';
 import { projectAuditRow } from '../../audit/recorder/audit-row';
+import { ExternalEffectFailureError } from '../../resources/flows/errors/external-effect-failure.error';
+import { FlowExecutionError } from '../../resources/flows/errors/flow-execution.error';
 import { ResourceSessionStartedEvent } from '../../resources/usage/events/resource-usage.events';
 import { registerPluginModuleFixture } from '../plugin.module.plugin-module.test-fixture';
 import { PLUGIN_CARD_AUTHENTICATION_LIMITS } from './plugin-card-authentications';
@@ -420,6 +422,29 @@ describe('context.readers', () => {
       await expect(
         readers.tap({ deviceId: 'device-1', authentication: host.authenticate(PLUGIN_A, 'device-1', user.id) }),
       ).resolves.toMatchObject({ ok: true });
+    });
+
+    it.each([
+      ['a flow error', new FlowExecutionError('node failed')],
+      ['an external effect failure', new ExternalEffectFailureError('relay unreachable', null)],
+    ])('reports %s of the recorded open as FLOW_FAILED and audits it as accepted', async (_label, error) => {
+      const { door, user } = await setUp();
+      // The door-unlocked flows run from this event, after the door action is stored.
+      host.emitAsync.mockRejectedValueOnce(error);
+
+      const result = await readers.tap({
+        deviceId: 'device-1',
+        authentication: host.authenticate(PLUGIN_A, 'device-1', user.id),
+      });
+
+      expect(result).toEqual({ ok: false, reason: 'FLOW_FAILED' });
+      expect(await host.doorActions()).toEqual([
+        expect.objectContaining({ resourceId: door.id, userId: user.id, usageAction: ResourceUsageAction.DoorUnlock }),
+      ]);
+      expect(host.audited.map((event) => event.details)).toEqual([
+        expect.objectContaining({ result: 'accepted', resourceId: door.id, reasonCode: 'FLOW_FAILED' }),
+      ]);
+      expect(projectAuditRow(host.audited[0])).toMatchObject({ details: host.audited[0].details });
     });
 
     it('rejects an invalid request with a TypeError', async () => {

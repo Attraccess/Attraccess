@@ -110,8 +110,16 @@ export const PluginReaderTapFailureReason = {
   AUTHENTICATION_EXPIRED: 'AUTHENTICATION_EXPIRED',
   /** The authentication is unknown, already used, or from another device or plugin. */
   AUTHENTICATION_INVALID: 'AUTHENTICATION_INVALID',
-  /** Another tap on this reader is still running. Retry later. */
+  /**
+   * Another tap on this reader is still running. This tap consumed its authentication too: a retry needs a new
+   * `cards.authenticate`.
+   */
   BUSY: 'BUSY',
+  /**
+   * The action was recorded for the card owner, but a flow attached to it failed. Do not retry: a retry records the
+   * action again.
+   */
+  FLOW_FAILED: 'FLOW_FAILED',
 } as const;
 export type PluginReaderTapFailureReason =
   (typeof PluginReaderTapFailureReason)[keyof typeof PluginReaderTapFailureReason];
