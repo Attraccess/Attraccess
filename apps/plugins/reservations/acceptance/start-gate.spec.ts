@@ -40,7 +40,7 @@ const as = (id: number, via: 'session' | 'api-token'): Principal =>
 /**
  * The host's real start path with the real reservations plugin behind it: HTTP controller, PreStartService,
  * ReaderUiHooksService (timeout, breaker, validation), the web step store, and the plugin's own hook functions on a
- * real SQLite database. Only core's usage service (the session itself), the user lookup and the plugin registry
+ * in-memory fake of the plugin record port (the engine behind it is the host's and is covered by its conformance tests). Only core's usage service (the session itself), the user lookup and the plugin registry
  * wiring are stubbed.
  */
 describe.each([['session' as const], ['api-token' as const]])('host start gate with reservations (%s)', (via) => {

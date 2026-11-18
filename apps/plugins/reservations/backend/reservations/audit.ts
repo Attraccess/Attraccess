@@ -100,7 +100,7 @@ export class ReservationAudit {
       Object.entries(details).filter(([, value]) => value !== null && value !== undefined),
     );
     try {
-      // The host's audit store gives up after a few milliseconds when SQLite is busy and answers `unavailable`:
+      // The host's audit store gives up after a few milliseconds when the database is busy and answers `unavailable`:
       // that is transient, so try again a few times before giving up.
       let receipt: PluginAuditReceipt | undefined;
       for (const delayMs of RETRY_DELAYS_MS) {

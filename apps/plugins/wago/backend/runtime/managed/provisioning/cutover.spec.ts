@@ -601,7 +601,7 @@ describe('managed cutover and reboot evidence', () => {
           signal,
         ),
       ).rejects.toMatchObject({ failure: 'readiness' });
-      // SQLite completes outside the fake clock. Wait for the first readiness
+      // Storage completes outside the fake clock. Wait for the first readiness
       // observation before advancing the verification deadline.
       while (!observe.mock.calls.length) {
         await new Promise(setImmediate);

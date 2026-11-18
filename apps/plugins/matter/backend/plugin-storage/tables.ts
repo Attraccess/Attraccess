@@ -5,7 +5,7 @@
 // anything. Conventions of that layout, kept as they are:
 //   - Timestamps are ISO-8601 strings in varchar columns, so they are `string` fields (not `timestamp`).
 //   - JSON documents are JSON text in text columns (`text` fields); the code serializes them itself.
-//   - An unbounded legacy `varchar` that can receive more than 255 characters is a `text` field (SQLite stores both
+//   - An unbounded legacy `varchar` that can receive more than 255 characters is a `text` field (the 1.x SQLite database stored both
 //     as TEXT, so adoption is unaffected); the bounded `string` default would refuse the write.
 //   - Matter 64-bit IDs are decimal strings. There is no column that relates a Matter record to an Attraccess
 //     resource or user table; user IDs are plain integers.
