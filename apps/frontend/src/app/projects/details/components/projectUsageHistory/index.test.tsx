@@ -55,10 +55,9 @@ beforeEach(() => {
     },
   ];
 });
-afterEach(() => {
-  cleanup();
-  act(() => useTranslationState.getState().setLanguage('en'));
-});
+afterEach(cleanup);
+const originalLanguage = useTranslationState.getState().language;
+afterEach(() => useTranslationState.getState().setLanguage(originalLanguage));
 const rowOf = (resourceName: string) => screen.getByText(resourceName).closest('tr') as HTMLElement;
 it('loads the first page of the project history', () => {
   render(<ProjectUsageHistory projectId={5} />);
@@ -78,7 +77,7 @@ it('opens the usage details of the clicked row and closes them again', async () 
 it('opens the usage details when Enter is pressed on a focused row', async () => {
   render(<ProjectUsageHistory projectId={5} />);
   const row = rowOf('Laser cutter');
-  row.focus();
+  act(() => row.focus());
   fireEvent.keyDown(row, { key: 'Enter' });
   fireEvent.keyUp(row, { key: 'Enter' });
   await waitFor(() => expect(screen.getByRole('dialog')).toHaveTextContent('Resource 7 session 11'));
