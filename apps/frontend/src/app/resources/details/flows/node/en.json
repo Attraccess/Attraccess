@@ -787,7 +787,7 @@
             },
             "preview": {
               "baselineValue": "Baseline",
-              "source": "Meter"
+              "source": "Source"
             }
           },
           "report": {
