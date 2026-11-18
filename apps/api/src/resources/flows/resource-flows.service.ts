@@ -383,6 +383,7 @@ export class ResourceFlowsService {
   /** Pass the resource id for a resource flow; global flows have no resource and get every node, marked by scope. */
   public async getNodeSchemas(resourceId?: number): Promise<ResourceFlowNodeSchemaDto[]> {
     let resourceType: ResourceType | undefined;
+    let accessOnly = false;
     if (resourceId !== undefined) {
       const resource = await this.resources.find(resourceId);
 
@@ -390,9 +391,10 @@ export class ResourceFlowsService {
         throw new ResourceNotFoundException(resourceId);
       }
       resourceType = resource.type;
+      accessOnly = resource.accessOnly;
     }
 
-    const coreSchemas = getCoreNodeSchemas(resourceType);
+    const coreSchemas = getCoreNodeSchemas(resourceType, accessOnly);
 
     // Append plugin-contributed node schemas.
     const pluginSchemas = getRegisteredPluginFlowNodes().map((definition) => {

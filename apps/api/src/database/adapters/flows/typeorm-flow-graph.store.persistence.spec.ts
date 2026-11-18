@@ -303,6 +303,7 @@ describe('flow adapters on real SQLite', () => {
         id: resourceId,
         name: 'Laser',
         type: ResourceType.Machine,
+        accessOnly: false,
         metadata: null,
       });
       expect(await directory.find(404)).toBeNull();

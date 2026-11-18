@@ -76,5 +76,7 @@ export interface FlowResourceRecord {
   id: number;
   name: string;
   type: ResourceType;
+  /** A door that only opens: it fires door unlocked, never locked or unlatched. */
+  accessOnly: boolean;
   metadata: Record<string, unknown> | null;
 }

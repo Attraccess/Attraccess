@@ -8,6 +8,8 @@ interface NodePresentation {
   isOutput?: boolean;
   isInput?: boolean;
   resourceType?: ResourceType;
+  /** A door trigger an access-only door never fires: it only opens (door unlocked). */
+  notAccessOnly?: boolean;
   /** Acts on the world outside Attraccess (power, PCs, other systems); see the shared-machine flow warning. */
   hasExternalEffect?: boolean;
   /** The flow scopes the node can be used in; both when omitted. */
@@ -27,8 +29,16 @@ const presentations: Record<ResourceFlowNodeType, NodePresentation> = {
   [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED]: { outputs: ['output'], resourceType: ResourceType.Machine },
   [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER]: { outputs: ['output'], resourceType: ResourceType.Machine },
   [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED]: { outputs: ['output'], resourceType: ResourceType.Door },
-  [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED]: { outputs: ['output'], resourceType: ResourceType.Door },
-  [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED]: { outputs: ['output'], resourceType: ResourceType.Door },
+  [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED]: {
+    outputs: ['output'],
+    resourceType: ResourceType.Door,
+    notAccessOnly: true,
+  },
+  [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED]: {
+    outputs: ['output'],
+    resourceType: ResourceType.Door,
+    notAccessOnly: true,
+  },
   [ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED]: { outputs: ['output'] },
   [ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY]: {
     outputs: ['output'],
@@ -137,11 +147,20 @@ export function getCoreNodeFlowScopes(type: string): FlowScope[] | undefined {
   return presentation ? [...(presentation.flowScopes ?? ALL_FLOW_SCOPES)] : undefined;
 }
 
+/** Whether a trigger can fire for a resource of this type; an access-only door only fires door unlocked. */
+export function coreTriggerFiresFor(type: string, resourceType: ResourceType, accessOnly = false): boolean {
+  const presentation = presentations[type as ResourceFlowNodeType];
+  if (!presentation) return true;
+  if (presentation.resourceType !== undefined && presentation.resourceType !== resourceType) return false;
+  return !(accessOnly && presentation.notAccessOnly);
+}
+
 /**
- * The resource type only filters nodes for resource flows; pass it for those. Global flows have no resource,
- * so every node counts as supported by it (scope support is reported through `supportedFlowScopes`).
+ * The resource type (and whether the door is access only) only filters nodes for resource flows; pass it for
+ * those. Global flows have no resource, so every node counts as supported by it (scope support is reported through
+ * `supportedFlowScopes`).
  */
-export function getCoreNodeSchemas(resourceType?: ResourceType): ResourceFlowNodeSchemaDto[] {
+export function getCoreNodeSchemas(resourceType?: ResourceType, accessOnly = false): ResourceFlowNodeSchemaDto[] {
   return Object.values(ResourceFlowNodeType).map((type) => {
     const presentation = presentations[type];
     return {
@@ -149,10 +168,7 @@ export function getCoreNodeSchemas(resourceType?: ResourceType): ResourceFlowNod
       configSchema: z.toJSONSchema(getNodeDataSchema(type), { io: 'input' }),
       inputs: [...(presentation.inputs ?? [])],
       outputs: [...(presentation.outputs ?? [])],
-      supportedByResource:
-        resourceType === undefined ||
-        presentation.resourceType === undefined ||
-        presentation.resourceType === resourceType,
+      supportedByResource: resourceType === undefined || coreTriggerFiresFor(type, resourceType, accessOnly),
       supportedFlowScopes: [...(presentation.flowScopes ?? ALL_FLOW_SCOPES)],
       isOutput: presentation.isOutput ?? false,
       isInput: presentation.isInput ?? false,
