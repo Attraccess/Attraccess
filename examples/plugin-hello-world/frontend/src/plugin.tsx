@@ -64,8 +64,8 @@ export function CapabilitiesPage() {
   const items: { title: string; body: string; icon: ComponentType<{ className?: string }> }[] = [
     { title: 'Backend controller', body: 'Adds GET /hello-world/greetings to the host API.', icon: ServerIcon },
     {
-      title: 'Injected repository',
-      body: "Reads users via context.getRepository('User') (needs READ_USERS).",
+      title: 'Host data lookups',
+      body: 'Reads usernames via context.hostData.users (needs READ_USERS).',
       icon: DatabaseIcon,
     },
     {
@@ -126,7 +126,7 @@ export function HelloWorldPage() {
           <p className="hw:text-base hw:font-semibold hw:text-default-700">Greetings from the backend</p>
           <p className="hw:text-sm hw:text-default-500">
             Served by the plugin's NestJS controller at <code>GET /hello-world/greetings</code>, which reads host users
-            through an injected repository (needs the <code>READ_USERS</code> permission).
+            through the <code>context.hostData.users</code> lookup (needs the <code>READ_USERS</code> permission).
           </p>
         </Card.Header>
         <Card.Content>
@@ -201,12 +201,12 @@ export function MqttServerListBadge({ mqttServerId }: { mqttServerId: number }) 
 // the single copy it already ships, so the plugin bundle stays tiny and every
 // HeroUI component picks up the host's active theme automatically.
 import type {
-    AttraccessFrontendPlugin,
-    AttraccessFrontendPluginAuthData,
-    PluginSidebarGroup,
-    PluginSidebarItem,
-    PluginSlotContribution,
-    RouteConfig,
+  AttraccessFrontendPlugin,
+  AttraccessFrontendPluginAuthData,
+  PluginSidebarGroup,
+  PluginSidebarItem,
+  PluginSlotContribution,
+  RouteConfig,
 } from '@attraccess/plugins-frontend-sdk';
 import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
 import { Alert, AlertContent, AlertDescription, Button, Card, Chip, Spinner } from '@heroui/react';
