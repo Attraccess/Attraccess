@@ -59,6 +59,10 @@ describe('custom profile', () => {
     set(version, '3');
     expect(latest).toMatchObject({ id: 'boiler-v2', name: 'Boiler', version: 3 });
     expect(version.getAttribute('aria-invalid')).toBeNull();
+    // Incomplete text that still parses to the stored number stays as typed.
+    set(version, '3.');
+    expect((version as HTMLInputElement).value).toBe('3.');
+    expect(latest.version).toBe(3);
   });
 
   it('edits a measurement: name, register address, scale, offset and polling interval', () => {

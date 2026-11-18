@@ -104,6 +104,7 @@ describe('diagnostics isolation', () => {
     expect(screen.getByRole('alert').textContent).toContain('Diagnostics unavailable');
     expect(screen.queryByText('Controller: online')).toBeNull();
   });
+
   it('lists every configuration problem, fault and missing piece of evidence of a struggling controller', () => {
     const data = fixture();
     data.heartbeatAt = null;
@@ -137,7 +138,7 @@ describe('diagnostics isolation', () => {
     ] as WagoDiagnostics['faults'];
     render(<WagoStatus diagnostics={data} />);
     const page = document.body.textContent ?? '';
-    expect(page).toContain('Controller: ');
+    expect(page).toContain('Controller: offline');
     expect(page).toMatch(/Permanent heartbeat: Not seen yet/);
     expect(page).toContain('Draft: unpublished changes · Published: none (none) · Applied: none · Reported: unknown');
     expect(page).toContain(

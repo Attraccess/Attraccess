@@ -94,6 +94,18 @@ const impact = {
   references: [{ resourceId: 4, flowId: null, nodeId: 'node-1', nodeType: 'plugin.wago.command' }],
 };
 
+const reviewResult = {
+  draft,
+  previous: {
+    ...revision(3, 'applied'),
+    snapshot: JSON.stringify(oneChannel),
+    presetProvenance: draft.presetProvenance,
+  },
+  changed: true,
+  diff: [{ path: '$.logicalChannels[0].disconnectPolicy.mode', previous: 'hold', current: 'immediate' }],
+  impacts: [],
+};
+
 let client: QueryClient;
 function renderHistory(path = '/wago/controllers/1/configuration/history') {
   return render(
@@ -123,17 +135,7 @@ beforeEach(() => {
   api.preview.mockImplementation(async (_id: number, number: number) => previewOf(number));
   api.acknowledge.mockResolvedValue(revision(2, 'rejected', { rejectionAcknowledgedAt: '2026-09-30T10:02:00.000Z' }));
   api.rollback.mockResolvedValue(revision(4, 'pending'));
-  api.review.mockResolvedValue({
-    draft,
-    previous: {
-      ...revision(3, 'applied'),
-      snapshot: JSON.stringify(oneChannel),
-      presetProvenance: draft.presetProvenance,
-    },
-    changed: true,
-    diff: [{ path: '$.logicalChannels[0].disconnectPolicy.mode', previous: 'hold', current: 'immediate' }],
-    impacts: [],
-  });
+  api.review.mockResolvedValue(reviewResult);
   api.publish.mockResolvedValue(revision(4, 'pending'));
 });
 afterEach(() => {
@@ -192,21 +194,24 @@ describe('revision history page', () => {
   });
 
   it('acknowledges a rejection once and then shows who acknowledged it', async () => {
+    api.acknowledge.mockImplementation(async () => {
+      // The page must reload the list itself after a successful acknowledgement.
+      api.list.mockResolvedValue({
+        revisions: [
+          revision(2, 'rejected', {
+            rejectionErrors,
+            rejectionAcknowledgedAt: '2026-09-30T10:02:00.000Z',
+            rejectionAcknowledgedBy: 7,
+          }),
+        ],
+        offset: 0,
+        limit: 20,
+      });
+      return revision(2, 'rejected', { rejectionAcknowledgedAt: '2026-09-30T10:02:00.000Z' });
+    });
     renderHistory();
     fireEvent.click(await screen.findByRole('button', { name: 'Acknowledge rejection of revision 2' }));
     await waitFor(() => expect(api.acknowledge).toHaveBeenCalledWith(1, 2, 'hash-2', '2026-09-30T10:01:00.000Z'));
-    api.list.mockResolvedValue({
-      revisions: [
-        revision(2, 'rejected', {
-          rejectionErrors,
-          rejectionAcknowledgedAt: '2026-09-30T10:02:00.000Z',
-          rejectionAcknowledgedBy: 7,
-        }),
-      ],
-      offset: 0,
-      limit: 20,
-    });
-    await client.invalidateQueries();
     expect(await screen.findByText('Rejection acknowledged by user 7.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Acknowledge rejection of revision 2' })).toBeNull();
   });
@@ -301,15 +306,23 @@ describe('rollback from the history page', () => {
     );
     renderHistory();
     fireEvent.click(await (await revisionSection(1)).findByRole('button', { name: 'Preview rollback to revision 1' }));
-    expect(
-      await screen.findByText('This revision cannot be published again. Fix these fields in a new draft instead.'),
-    ).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Publish rollback as new revision' }).hasAttribute('disabled')).toBe(
-      true,
+    const title = await screen.findByText(
+      'This revision cannot be published again. Fix these fields in a new draft instead.',
     );
+    const alert = within(title.parentElement as HTMLElement);
+    // The field is named after the channel, never by its raw JSON path.
+    expect(alert.getByText(/Air assist/)).toBeTruthy();
+    expect(alert.getByText(/The controller cannot drive this channel\./)).toBeTruthy();
+    expect(alert.queryByText(/\$\.logicalChannels/)).toBeNull();
+    const publish = screen.getByRole('button', { name: 'Publish rollback as new revision' });
+    expect(publish.hasAttribute('disabled')).toBe(true);
+    fireEvent.click(publish);
+    expect(api.rollback).not.toHaveBeenCalled();
   });
 
-  it('reports a failed rollback and still refreshes the draft', async () => {
+  // The history page does not show the rollback error yet (HistoryPage ignores the failure passed to onRollback);
+  // this only pins the draft reconciliation that must happen either way.
+  it('still refreshes the draft after a failed rollback', async () => {
     api.rollback.mockRejectedValue(new Error('Controller offline'));
     renderHistory();
     fireEvent.click(await (await revisionSection(1)).findByRole('button', { name: 'Preview rollback to revision 1' }));
@@ -357,7 +370,7 @@ describe('review and publish view', () => {
   });
 
   it('keeps publication disabled until flow impacts are acknowledged', async () => {
-    api.review.mockResolvedValue({ ...(await api.review()), impacts: [impact] });
+    api.review.mockResolvedValue({ ...reviewResult, impacts: [impact] });
     renderReview();
     fireEvent.click(await screen.findByRole('button', { name: 'Review saved draft' }));
     const publish = await screen.findByRole('button', { name: 'Publish reviewed draft' });
@@ -369,7 +382,7 @@ describe('review and publish view', () => {
   });
 
   it('does not publish a draft whose review carries no hash', async () => {
-    api.review.mockResolvedValue({ ...(await api.review()), draft: { ...draft, reviewedHash: null } });
+    api.review.mockResolvedValue({ ...reviewResult, draft: { ...draft, reviewedHash: null } });
     renderReview();
     fireEvent.click(await screen.findByRole('button', { name: 'Review saved draft' }));
     expect((await screen.findByRole('button', { name: 'Publish reviewed draft' })).hasAttribute('disabled')).toBe(true);
