@@ -76,7 +76,9 @@ bestehende Tabelle übernehmen).
 generierte Feld. Fremdschlüssel dürfen nur auf **Tabellen desselben Plugins** zeigen. Kern-IDs (Benutzer, Ressource,
 Flow-Knoten) bleiben einfache `integer`- oder `uuid`-Felder ohne Fremdschlüssel. `physicalName` behält den Namen einer
 Tabelle, die in installierten Datenbanken schon existiert; ohne ihn leitet der Host `plugin_<plugin>_<logisch>` ab. Der
-Host lehnt Namen außerhalb des Namensraums des Plugins ab.
+Host lehnt Namen außerhalb des Namensraums des Plugins ab, ebenso Namen im Namensraum eines länger benannten
+installierten Plugins (ein Plugin `demo` darf `plugin_demo_extra_notes` nicht nutzen, solange `demo-extra` installiert
+ist, denn dieser Name gehört `demo-extra`).
 
 ### Neutrale Migrationen
 
@@ -281,8 +283,8 @@ wenn seine Deklaration die Regeln verletzt. Der Fehler nennt das Plugin, gibt de
 - das Plugin deklariert keine Mindest-Host-Version ab `2.0.0-0`;
 - es fordert die entfernte Berechtigung `DATABASE_ACCESS` an oder nutzt `context.storage` ohne `PLUGIN_STORAGE`;
 - es liefert noch einen TypeORM-Migrationseintrag, `persistence.backends` oder Entitätsdeklarationen mit;
-- ein Tabellen- oder physischer Name liegt außerhalb des Namensraums des Plugins, oder ein Fremdschlüssel zeigt aus dem
-  Plugin heraus;
+- ein Tabellen- oder physischer Name liegt außerhalb des Namensraums des Plugins (oder in dem eines länger benannten
+  installierten Plugins), oder ein Fremdschlüssel zeigt aus dem Plugin heraus;
 - die Migrationsversionen steigen nicht streng ab 1 an, oder ein Schritt ist ungültig;
 - in einer installierten Datenbank ist nur ein Teil von `adoption.legacyMigrations` angewendet.
 

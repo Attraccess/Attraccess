@@ -143,6 +143,9 @@ Compared with the contract before this change, AsyncAPI is identical and the HTT
 - Users embedded as actors (introducers, introductions, maintenance) use `ResourceActorUserDto` instead of the full
   `User` schema.
 - A few properties switch between `type: object` and `allOf`/`$ref` with the same referenced schema.
+- `LoadedPluginManifest.permissions` lists `PLUGIN_STORAGE` instead of `DATABASE_ACCESS` (SDK 2.0).
+- `RenameCompanionDeviceDto` now documents its required `name`; the old schema was an empty object and the global
+  whitelisting pipe stripped the field, so the rename answered 500.
 
 Two undocumented response details also changed; Swagger never described them and no client reads them:
 

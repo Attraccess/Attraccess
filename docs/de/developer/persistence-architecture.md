@@ -148,6 +148,9 @@ Gegenüber dem Vertrag vor dieser Änderung ist AsyncAPI identisch, und der HTTP
 - Als Akteure eingebettete Benutzer (Einweiser, Einweisungen, Wartung) nutzen `ResourceActorUserDto` statt des vollen
   `User`-Schemas.
 - Einige Eigenschaften wechseln zwischen `type: object` und `allOf`/`$ref` mit demselben referenzierten Schema.
+- `LoadedPluginManifest.permissions` nennt `PLUGIN_STORAGE` statt `DATABASE_ACCESS` (SDK 2.0).
+- `RenameCompanionDeviceDto` dokumentiert jetzt das Pflichtfeld `name`; das alte Schema war ein leeres Objekt, die globale
+  Whitelist-Pipe entfernte das Feld, und das Umbenennen antwortete mit 500.
 
 Zwei undokumentierte Antwortdetails haben sich ebenfalls geändert; Swagger hat sie nie beschrieben, und kein Client
 liest sie:

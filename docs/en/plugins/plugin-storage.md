@@ -75,7 +75,8 @@ sets the host-side column name when it differs from the field name (needed when 
 Foreign keys may reference **tables of the same plugin** only. Core ids (user, resource, flow node) stay plain
 `integer` or `uuid` fields without a foreign key. `physicalName` keeps the name of a table that already exists in
 installed databases; without it the host derives `plugin_<plugin>_<logical>`. The host rejects a name outside the
-plugin's own namespace.
+plugin's own namespace, and a name inside the namespace of a longer-named installed plugin (a plugin `demo` may not
+use `plugin_demo_extra_notes` while `demo-extra` is installed, because that name belongs to `demo-extra`).
 
 ### Neutral migrations
 
@@ -275,7 +276,8 @@ declaration breaks the rules. The error names the plugin, states the reason and 
 - the plugin declares no minimum host version of `2.0.0-0` or higher;
 - it requests the removed `DATABASE_ACCESS` permission, or uses `context.storage` without `PLUGIN_STORAGE`;
 - it still ships a TypeORM migrations entry, `persistence.backends` or entity declarations;
-- a table or physical name lies outside the plugin's namespace, or a foreign key points outside the plugin;
+- a table or physical name lies outside the plugin's namespace (or inside that of a longer-named installed plugin),
+  or a foreign key points outside the plugin;
 - migration versions are not strictly increasing from 1, or a step is invalid;
 - an installed database has only part of the `adoption.legacyMigrations` applied.
 
