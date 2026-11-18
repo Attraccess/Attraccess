@@ -185,6 +185,13 @@ describe('Matter endpoint state', () => {
     expect(await entry()).toMatchObject({ reported: { quality: 'good' }, fault: null });
   });
 
+  it('keeps a fault message of the full length the sidecar may report', async () => {
+    // matter-contract allows 256 characters; a bounded string field would refuse the write and drop the event.
+    const message = 'm'.repeat(256);
+    await h.state.ingestReport(report(true, 0, { fault: { code: 'overload', message } }), at(0));
+    expect(await entry()).toMatchObject({ fault: { code: 'overload', message } });
+  });
+
   it('computes freshness at read time: fresh, stale and unknown', async () => {
     const state = h.state;
     await state.recordRequest(

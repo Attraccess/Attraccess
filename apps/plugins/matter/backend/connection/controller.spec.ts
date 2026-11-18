@@ -15,6 +15,7 @@ import { matterStorage } from '../plugin-storage/access';
 import { MATTER_STORAGE } from '../plugin-storage/tables';
 import { CONNECTION_ROW_ID, type MatterConnection } from './entity';
 import { MatterSettingsService } from './settings.service';
+import { MAX_URL_LENGTH } from './validation';
 
 type Row = MatterConnection;
 
@@ -104,6 +105,15 @@ describe('Matter connection settings API', () => {
     await until(() => harness.controller.status().state === 'connected');
     expect(JSON.stringify(await harness.controller.get())).not.toContain(TOKEN);
     expect(JSON.stringify(harness.controller.status())).not.toContain(TOKEN);
+  });
+
+  it('stores a URL longer than 255 characters up to the validated maximum', async () => {
+    const harness = await setup();
+    service = harness.service;
+    // A reverse-proxy path prefix: the URL is valid (at most MAX_URL_LENGTH) but longer than a bounded string field.
+    const url = `http://127.0.0.1:1/${'p'.repeat(MAX_URL_LENGTH - 'http://127.0.0.1:1/'.length)}`;
+    await harness.controller.put({ url, credential: TOKEN }, request());
+    expect((await harness.getRow())?.url).toBe(url);
   });
 
   it('keeps the credential when it is omitted and the URL and CA stay the same', async () => {

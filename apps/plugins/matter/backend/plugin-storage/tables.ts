@@ -5,6 +5,8 @@
 // anything. Conventions of that layout, kept as they are:
 //   - Timestamps are ISO-8601 strings in varchar columns, so they are `string` fields (not `timestamp`).
 //   - JSON documents are JSON text in text columns (`text` fields); the code serializes them itself.
+//   - An unbounded legacy `varchar` that can receive more than 255 characters is a `text` field (SQLite stores both
+//     as TEXT, so adoption is unaffected); the bounded `string` default would refuse the write.
 //   - Matter 64-bit IDs are decimal strings. There is no column that relates a Matter record to an Attraccess
 //     resource or user table; user IDs are plain integers.
 //   - History is kept: nothing is deleted by cascade, so there are no foreign keys between the tables.
@@ -21,7 +23,8 @@ const iso = (column: string) => f.string({ column });
 const connection = table(
   {
     id: f.integer(),
-    url: f.string(),
+    // Validation allows URLs up to 2048 characters (connection/validation.ts); the legacy column is unbounded.
+    url: f.text(),
     encryptedCredential: f.text({ column: 'encrypted_credential' }),
     caCertificate: f.text({ column: 'ca_certificate' }).optional(),
     credentialUpdatedAt: iso('credential_updated_at'),
@@ -169,7 +172,8 @@ const endpointState = table(
     externalChangeAt: iso('external_change_at').optional(),
     externalChangeValue: f.text({ column: 'external_change_value' }).optional(),
     faultCode: f.string({ column: 'fault_code' }).optional(),
-    faultMessage: f.string({ column: 'fault_message' }).optional(),
+    // The sidecar reports fault messages of up to 256 characters (matter-contract `device.state`).
+    faultMessage: f.text({ column: 'fault_message' }).optional(),
     faultAt: iso('fault_at').optional(),
     updatedAt: iso('updated_at'),
   },

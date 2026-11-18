@@ -82,6 +82,14 @@ const sqlType = (field: PluginStorageField): string => {
   throw new Error(`the Matter layout has no ${field.type} column`);
 };
 
+/**
+ * A declared `text` field matches an unbounded legacy `varchar`: SQLite stores both as TEXT without a length check, so
+ * the adopted column is the same. The layout declares `text` where a value can exceed the 255 characters a `string`
+ * field enforces. A bounded `varchar(n)` still has to be a `string` of length n.
+ */
+const comparableType = (declared: string, legacy: string): string =>
+  declared === 'text' && legacy === 'varchar' ? legacy : declared;
+
 const defaultOf = (field: PluginStorageField): string | null => {
   if (field.default === undefined) return null;
   return typeof field.default === 'string' ? `'${field.default}'` : String(field.default);
@@ -109,7 +117,7 @@ describe('Matter storage baseline', () => {
         const deviation = (LEGACY_ONLY_CONSTRAINTS.columnTypeDeviations as Record<string, Record<string, string>>)[
           name
         ]?.[column];
-        const expectedType = deviation ? 'blob' : sqlType(field);
+        const expectedType = deviation ? 'blob' : comparableType(sqlType(field), old.type);
         expect({ column, type: deviation ? 'blob' : old.type }).toEqual({ column, type: expectedType });
         if (deviation) expect(sqlType(field)).toBe('text');
         // A primary key column is NOT NULL; a legacy column without NOT NULL is the nullable one.
