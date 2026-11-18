@@ -117,11 +117,20 @@ export interface PluginStorageForeignKey {
   readonly fields: readonly string[];
   /** A table of the same plugin (logical name). Core tables cannot be referenced. */
   readonly references: string;
+  /**
+   * Fields of the referenced table, paired with `fields` in order: its primary key or the fields of one of its unique
+   * indexes, each of the same type as the field that points at it.
+   */
   readonly referencedFields: readonly string[];
   readonly onDelete?: 'cascade' | 'restrict' | 'set-null';
 }
 
 export interface PluginStorageIndex {
+  /**
+   * Leave it out: the host names the index `idx_<table>_<fields>` (`uq_` when unique), and `step.dropIndex` takes
+   * that name. Only an index of a 1.x table that version 1 adopts (see `physicalName`) keeps its own name, which must
+   * start, after an optional `IDX_`/`UQ_`, with `plugin_<plugin>_` or `<plugin>_`.
+   */
   readonly name?: string;
   readonly fields: readonly string[];
   readonly unique?: boolean;
@@ -134,8 +143,10 @@ export interface PluginStorageTable<Fields extends Record<string, PluginStorageF
   readonly indexes: readonly PluginStorageIndex[];
   readonly foreignKeys: readonly PluginStorageForeignKey[];
   /**
-   * Host-side table name when it differs from the derived `plugin_<plugin>_<logical>` name. Used to adopt tables that
-   * exist in installed databases. The host rejects names outside the plugin's namespace.
+   * Host-side table name when it differs from the derived `plugin_<plugin>_<logical>` name, to adopt a table a 1.x
+   * release created. Allowed only on the tables version 1 of a definition with `adoption` creates; it must start with
+   * `plugin_<plugin>_` or `<plugin>_` and stay out of every other installed plugin's namespace. An adopted table may
+   * not declare `decimal` fields (1.x stored decimals as REAL or text).
    */
   readonly physicalName?: string;
 }
