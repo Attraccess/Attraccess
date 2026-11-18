@@ -44,7 +44,7 @@ export type SettingsMock = {
 async function packageTarball(
   name: string,
   permissions: string[] = [],
-  options: { version?: string; attraccess?: Record<string, unknown> } = {},
+  options: { version?: string; attraccess?: Record<string, unknown>; backendSource?: string } = {},
 ): Promise<Buffer> {
   const root = mkdtempSync(join(tmpdir(), 'npm-plugin-package-'));
   try {
@@ -66,7 +66,7 @@ async function packageTarball(
         },
       }),
     );
-    writeFileSync(join(root, 'package', 'dist', 'index.js'), 'module.exports = {};');
+    writeFileSync(join(root, 'package', 'dist', 'index.js'), options.backendSource ?? 'module.exports = {};');
 
     const archive = tar.c({ cwd: root, gzip: true }, ['package']);
     const chunks: Buffer[] = [];

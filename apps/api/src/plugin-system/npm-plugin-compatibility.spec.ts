@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { existsSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { NpmPluginService } from './npm-plugin.service';
 import { setupNpmPluginFixture } from './npm-plugin.test-fixture';
@@ -62,15 +62,67 @@ describe('NpmPluginService host compatibility', () => {
 
     await expect(install).rejects.toBeInstanceOf(BadRequestException);
     await expect(install).rejects.toThrow(/Plugin @attraccess\/legacy .*migrating-to-2/s);
+    await expect(install).rejects.toThrow(/declare an attraccess\.host range in package\.json/);
     expect(existsSync(join(fixture.root, '.npm-plugin-state.json'))).toBe(false);
     expect(visibleEntries()).toEqual([]);
     expect(service.listInstalled()).toEqual([]);
   });
 
+  it('refuses a package whose backend bundle imports TypeORM, before any state or file', async () => {
+    const tarball = await fixture.packageTarball(name, [], { backendSource: "const orm = require('typeorm');" });
+    const service = serviceServing({ '1.2.3': tarball });
+
+    const install = service.install(name, '1.2.3');
+
+    await expect(install).rejects.toBeInstanceOf(BadRequestException);
+    await expect(install).rejects.toThrow(
+      /Plugin @attraccess\/legacy imports "typeorm" \(in index\.js\).*Migration guide: .*migrating-to-2/s,
+    );
+    expect(existsSync(join(fixture.root, '.npm-plugin-state.json'))).toBe(false);
+    expect(visibleEntries()).toEqual([]);
+    expect(service.listInstalled()).toEqual([]);
+  });
+
+  it('refuses a package whose storage namespace another installed plugin has, before any state or file', async () => {
+    mkdirSync(join(fixture.root, 'attraccess-legacy'));
+    writeFileSync(
+      join(fixture.root, 'attraccess-legacy', 'plugin.json'),
+      JSON.stringify({
+        name: 'attraccess_legacy',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '2.0.0-0' },
+        permissions: ['PLUGIN_STORAGE'],
+      }),
+    );
+    const tarball = await fixture.packageTarball(name, ['PLUGIN_STORAGE']);
+    const service = serviceServing({ '1.2.3': tarball });
+
+    const install = service.install(name, '1.2.3');
+
+    await expect(install).rejects.toBeInstanceOf(BadRequestException);
+    await expect(install).rejects.toThrow(
+      /Plugin "@attraccess\/legacy" .*namespace "attraccess_legacy" is the one of the installed plugin "attraccess_legacy"/,
+    );
+    expect(existsSync(join(fixture.root, '.npm-plugin-state.json'))).toBe(false);
+    expect(visibleEntries()).toEqual(['attraccess-legacy']);
+    expect(service.listInstalled()).toEqual([]);
+  });
+
   it.each([
     ['requests the removed DATABASE_ACCESS permission', ['DATABASE_ACCESS'], {}, 'DATABASE_ACCESS permission'],
-    ['declares persistence.backends', [], { persistence: { backends: ['sqlite'] } }, 'persistence.backends'],
-    ['ships a TypeORM migrations entry', [], { migrations: 'dist/migrations.js' }, 'migrations entry'],
+    [
+      'declares persistence.backends',
+      [],
+      { persistence: { backends: ['sqlite'] } },
+      'declares attraccess.persistence in package.json',
+    ],
+    [
+      'ships a TypeORM migrations entry',
+      [],
+      { migrations: 'dist/migrations.js' },
+      'migrations entry (attraccess.migrations in package.json)',
+    ],
   ])(
     'refuses a package that %s with the plugin name and the migration guide, before any state or file',
     async (_case, permissions, attraccess, message) => {
@@ -82,6 +134,7 @@ describe('NpmPluginService host compatibility', () => {
       await expect(install).rejects.toBeInstanceOf(BadRequestException);
       await expect(install).rejects.toThrow(message);
       await expect(install).rejects.toThrow(/Plugin @attraccess\/legacy .*migrating-to-2/s);
+      await expect(install).rejects.not.toThrow(/plugin\.json|main\.migrations/);
       expect(existsSync(join(fixture.root, '.npm-plugin-state.json'))).toBe(false);
       expect(visibleEntries()).toEqual([]);
     },

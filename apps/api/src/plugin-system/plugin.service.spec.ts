@@ -377,6 +377,27 @@ describe('PluginService', () => {
       expect(fixture.restartSpy).not.toHaveBeenCalled();
     });
 
+    it('refuses a ZIP whose storage namespace another installed plugin has, before it moves anything', async () => {
+      mkdirSync(join(fixture.root, 'installed'), { recursive: true });
+      const storage = { permissions: ['PLUGIN_STORAGE'] };
+      writeFileSync(
+        join(fixture.root, 'installed', 'plugin.json'),
+        JSON.stringify({ ...fixture.VALID_MANIFEST, ...storage, name: 'Uploaded.Plugin' }),
+      );
+      const service = new PluginService();
+
+      const upload = service.uploadPlugin(
+        zipFileUpload({ 'plugin.json': JSON.stringify({ ...fixture.VALID_MANIFEST, ...storage }) }),
+      );
+
+      await expect(upload).rejects.toBeInstanceOf(BadRequestException);
+      await expect(upload).rejects.toThrow(
+        /Plugin "uploaded-plugin" .*namespace "uploaded_plugin" is the one of the installed plugin "Uploaded\.Plugin"/,
+      );
+      expect(existsSync(join(fixture.root, 'uploaded-plugin'))).toBe(false);
+      expect(fixture.restartSpy).not.toHaveBeenCalled();
+    });
+
     it('answers an invalid plugin.json with a client error that names the field', async () => {
       const service = new PluginService();
       const manifest = { ...fixture.VALID_MANIFEST, permissions: ['NOT_A_PERMISSION'] };
