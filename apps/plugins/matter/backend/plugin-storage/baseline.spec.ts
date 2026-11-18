@@ -3,7 +3,14 @@
 // the test builds the resulting schema from it and compares it with the declaration, column by column.
 import type { PluginStorageField } from '@attraccess/plugins-backend-sdk';
 import { LEGACY_MIGRATION_CLASS_NAMES, LEGACY_UP_STATEMENTS } from '../testing/legacy-migrations.fixture';
-import { LEGACY_MIGRATIONS, LEGACY_ONLY_CONSTRAINTS, MATTER_STORAGE, MATTER_TABLES } from './tables';
+import {
+  LEGACY_MIGRATIONS,
+  LEGACY_ONLY_CONSTRAINTS,
+  LOOKUP_INDEXES,
+  MATTER_BASELINE_TABLES,
+  MATTER_STORAGE,
+  MATTER_TABLES,
+} from './tables';
 
 type Column = { type: string; notNull: boolean; default: string | null };
 type Index = { columns: string[]; unique: boolean; partial: boolean };
@@ -97,7 +104,7 @@ const defaultOf = (field: PluginStorageField): string | null => {
 
 describe('Matter storage baseline', () => {
   const legacy = legacySchema();
-  const declared = Object.values(MATTER_TABLES);
+  const declared = Object.values(MATTER_BASELINE_TABLES);
 
   it('declares the same tables, under their existing physical names', () => {
     expect(declared.map((table) => table.physicalName).sort()).toEqual([...legacy.keys()].sort());
@@ -149,14 +156,44 @@ describe('Matter storage baseline', () => {
     expect(checks.sort()).toEqual([...LEGACY_ONLY_CONSTRAINTS.checkConstraints].sort());
   });
 
-  it('makes version 1 the baseline: it creates every declared table with its declared layout', () => {
-    const [baseline, ...later] = MATTER_STORAGE.migrations;
-    expect(later).toEqual([]);
+  it('makes version 1 the baseline: it creates every table with its legacy layout', () => {
+    const [baseline] = MATTER_STORAGE.migrations;
     expect(baseline.version).toBe(1);
     const created = Object.fromEntries(
       (baseline.steps ?? []).map((step) => (step.op === 'createTable' ? [step.table, step.definition] : ['', null])),
     );
-    expect(created).toEqual(MATTER_TABLES);
+    expect(created).toEqual(MATTER_BASELINE_TABLES);
+  });
+
+  it('adds the lookup indexes of the legacy partial unique indexes in version 2, as plain indexes', () => {
+    const [, lookup, ...later] = MATTER_STORAGE.migrations;
+    expect(later).toEqual([]);
+    expect(lookup.version).toBe(2);
+    expect(lookup.data).toBeUndefined();
+    const added = (lookup.steps ?? []).map((step) => (step.op === 'addIndex' ? [step.table, step.index] : step.op));
+    expect(added).toEqual(
+      Object.entries(LOOKUP_INDEXES).flatMap(([name, indexes]) => indexes.map((index) => [name, index])),
+    );
+    // The partial unique index each one stands in for, on the same columns in the same order.
+    const legacy = legacySchema();
+    for (const [name, indexes] of Object.entries(LOOKUP_INDEXES)) {
+      const table = MATTER_TABLES[name as keyof typeof LOOKUP_INDEXES];
+      const columnOf = (field: string) => table.fields[field as keyof typeof table.fields].column ?? field;
+      const partial = [...(legacy.get(table.physicalName as string)?.indexes.values() ?? [])].filter((i) => i.partial);
+      for (const index of indexes) {
+        expect('name' in index).toBe(false);
+        expect('unique' in index).toBe(false);
+        expect(partial.map((i) => i.columns)).toContainEqual(index.fields.map(columnOf));
+      }
+    }
+  });
+
+  it('declares the head as the baseline plus the version 2 indexes', () => {
+    for (const [name, table] of Object.entries(MATTER_TABLES)) {
+      const baseline = MATTER_BASELINE_TABLES[name as keyof typeof MATTER_BASELINE_TABLES];
+      const extra = LOOKUP_INDEXES[name as keyof typeof LOOKUP_INDEXES] ?? [];
+      expect(table).toEqual({ ...baseline, indexes: [...baseline.indexes, ...extra] });
+    }
   });
 
   it('adopts a database that ran all three legacy migrations, by the names the 1.x plugin recorded', () => {

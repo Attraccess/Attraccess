@@ -10,9 +10,17 @@
 //   - Matter 64-bit IDs are decimal strings. There is no column that relates a Matter record to an Attraccess
 //     resource or user table; user IDs are plain integers.
 //   - History is kept: nothing is deleted by cascade, so there are no foreign keys between the tables.
+// Later versions are listed in `MATTER_STORAGE.migrations`; `MATTER_TABLES` is the head shape after the last one.
 // What the neutral schema cannot express (and the code therefore enforces in its transactions) is listed in
 // `LEGACY_ONLY_CONSTRAINTS` at the end.
-import { definePluginStorage, f, step, table } from '@attraccess/plugins-backend-sdk';
+import {
+  definePluginStorage,
+  f,
+  step,
+  table,
+  type PluginStorageIndex,
+  type PluginStorageTable,
+} from '@attraccess/plugins-backend-sdk';
 
 /** Physical-name shorthand: the existing `plugin_matter_*` table. */
 const physical = (name: string) => `plugin_matter_${name}`;
@@ -267,7 +275,8 @@ const backups = table(
   },
 );
 
-export const MATTER_TABLES = {
+/** The tables as baseline version 1 creates them: exactly the 1.x layout. */
+export const MATTER_BASELINE_TABLES = {
   connection,
   fabrics,
   nodes,
@@ -279,6 +288,32 @@ export const MATTER_TABLES = {
   reconciliationStatus,
   recoveryKeys,
   backups,
+};
+
+/**
+ * Version 2: plain lookup indexes on the identity columns that telemetry and reconciliation query by. In the 1.x layout
+ * only the partial unique indexes (`LEGACY_ONLY_CONSTRAINTS`) covered these columns, so new installations scanned the
+ * tables. Installed databases keep the partial indexes and get these as well; the names are generated.
+ */
+export const LOOKUP_INDEXES = {
+  fabrics: [{ fields: ['fabricId'] }],
+  nodes: [{ fields: ['fabricRef', 'nodeId'] }],
+  endpoints: [{ fields: ['nodeRef', 'endpointId'] }],
+  endpointClusters: [{ fields: ['endpointRef', 'clusterId', 'role'] }],
+} as const satisfies Partial<Record<keyof typeof MATTER_BASELINE_TABLES, readonly PluginStorageIndex[]>>;
+
+const withIndexes = <T extends PluginStorageTable>(definition: T, indexes: readonly PluginStorageIndex[]): T => ({
+  ...definition,
+  indexes: [...definition.indexes, ...indexes],
+});
+
+/** Head shape of the Matter tables: the baseline plus the indexes of version 2. */
+export const MATTER_TABLES = {
+  ...MATTER_BASELINE_TABLES,
+  fabrics: withIndexes(fabrics, LOOKUP_INDEXES.fabrics),
+  nodes: withIndexes(nodes, LOOKUP_INDEXES.nodes),
+  endpoints: withIndexes(endpoints, LOOKUP_INDEXES.endpoints),
+  endpointClusters: withIndexes(endpointClusters, LOOKUP_INDEXES.endpointClusters),
 };
 
 /** Class names of every TypeORM migration the 1.x plugin shipped, in order. */
@@ -329,7 +364,14 @@ export const MATTER_STORAGE = definePluginStorage({
     {
       version: 1,
       name: 'baseline',
-      steps: Object.entries(MATTER_TABLES).map(([name, definition]) => step.createTable(name, definition)),
+      steps: Object.entries(MATTER_BASELINE_TABLES).map(([name, definition]) => step.createTable(name, definition)),
+    },
+    {
+      version: 2,
+      name: 'lookup-indexes',
+      steps: Object.entries(LOOKUP_INDEXES).flatMap(([name, indexes]) =>
+        indexes.map((index) => step.addIndex(name, index)),
+      ),
     },
   ],
   adoption: { legacyMigrations: LEGACY_MIGRATIONS },
