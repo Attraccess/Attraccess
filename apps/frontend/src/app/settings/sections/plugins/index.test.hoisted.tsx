@@ -51,14 +51,14 @@ vi.mock('@attraccess/react-query-client', async () => {
   const withRegistry = (registryId?: string, separator = '?') =>
     registryId ? `${separator}registryId=${encodeURIComponent(registryId)}` : '';
   return {
-    UsePluginsServicePluginControllerInstalledPackagesKeyFn: () => ['installed'],
-    UsePluginsServicePluginControllerListRegistriesKeyFn: () => ['registries'],
-    usePluginsServicePluginControllerInstalledPackages: (_key: unknown, options: object) =>
+    UsePluginControllerInstalledPackagesKeyFn: () => ['installed'],
+    UsePluginControllerListRegistriesKeyFn: () => ['registries'],
+    usePluginControllerInstalledPackages: (_clientOptions: unknown, _key: unknown, options: object) =>
       useQuery({ queryKey: ['installed'], queryFn: () => fetchJson('/api/plugins/installed'), ...options }),
-    usePluginsServicePluginControllerListRegistries: (_key: unknown, options: object) =>
+    usePluginControllerListRegistries: (_clientOptions: unknown, _key: unknown, options: object) =>
       useQuery({ queryKey: ['registries'], queryFn: () => fetchJson('/api/plugins/registries'), ...options }),
-    usePluginsServicePluginControllerSearchMarketplace: (
-      { query, registryId }: { query: string; registryId?: string },
+    usePluginControllerSearchMarketplace: (
+      { query: { query, registryId } }: { query: { query: string; registryId?: string } },
       _key: unknown,
       options: object,
     ) =>
@@ -70,8 +70,11 @@ vi.mock('@attraccess/react-query-client', async () => {
           ),
         ...options,
       }),
-    usePluginsServicePluginControllerMarketplacePackage: (
-      { packageName, registryId }: { packageName: string; registryId?: string },
+    usePluginControllerMarketplacePackage: (
+      {
+        path: { packageName },
+        query: { registryId } = {},
+      }: { path: { packageName: string }; query?: { registryId?: string } },
       _key: unknown,
       options: object,
     ) =>
@@ -81,8 +84,8 @@ vi.mock('@attraccess/react-query-client', async () => {
           fetchJson(`/api/plugins/marketplace/${encodeURIComponent(packageName)}${withRegistry(registryId)}`),
         ...options,
       }),
-    usePluginsServicePluginControllerInstalledPackageVersions: (
-      { packageName }: { packageName: string },
+    usePluginControllerInstalledPackageVersions: (
+      { path: { packageName } }: { path: { packageName: string } },
       _key: unknown,
       options: object,
     ) =>
@@ -91,49 +94,49 @@ vi.mock('@attraccess/react-query-client', async () => {
         queryFn: () => fetchJson(`/api/plugins/installed/${encodeURIComponent(packageName)}/versions`),
         ...options,
       }),
-    usePluginsServicePluginControllerDependencyPlan: () => ({
+    usePluginControllerDependencyPlan: () => ({
       data: hoisted.dependencyPlan,
       error: hoisted.dependencyPlanError,
       isFetching: false,
     }),
-    usePluginsServicePluginControllerRemovalPlan: () => ({ data: hoisted.removalPlan, isFetching: false }),
-    usePluginsServicePluginControllerRemovePackageGraph: () => ({
+    usePluginControllerRemovalPlan: () => ({ data: hoisted.removalPlan, isFetching: false }),
+    usePluginControllerRemovePackageGraph: () => ({
       mutateAsync: hoisted.removeGraphMock,
       isPending: false,
     }),
-    usePluginsServiceGetPlugins: () => ({ data: hoisted.plugins }),
-    usePluginsServiceGetPluginSystemStatus: () => ({
+    useGetPlugins: () => ({ data: hoisted.plugins }),
+    useGetPluginSystemStatus: () => ({
       data: hoisted.pluginSystemStatus,
       refetch: hoisted.statusRefetchMock,
     }),
-    usePluginsServicePluginControllerCheckAllInstalledPackages: () => ({
+    usePluginControllerCheckAllInstalledPackages: () => ({
       mutateAsync: hoisted.checkAllInstalledPackagesMock,
       isPending: false,
     }),
-    usePluginsServicePluginControllerAddRegistry: () => ({ mutateAsync: hoisted.addRegistryMock, isPending: false }),
-    usePluginsServicePluginControllerTestRegistry: () => ({ mutateAsync: hoisted.testRegistryMock, isPending: false }),
-    usePluginsServicePluginControllerRemoveRegistry: () => ({
+    usePluginControllerAddRegistry: () => ({ mutateAsync: hoisted.addRegistryMock, isPending: false }),
+    usePluginControllerTestRegistry: () => ({ mutateAsync: hoisted.testRegistryMock, isPending: false }),
+    usePluginControllerRemoveRegistry: () => ({
       mutateAsync: hoisted.removeRegistryMock,
       isPending: false,
     }),
-    usePluginsServicePluginControllerInstallPackage: () => ({
+    usePluginControllerInstallPackage: () => ({
       mutateAsync: hoisted.installPackageMock,
       isPending: false,
     }),
-    usePluginsServicePluginControllerReplaceInstalledPackage: () => ({
+    usePluginControllerReplaceInstalledPackage: () => ({
       mutateAsync: hoisted.replaceInstalledPackageMock,
       isPending: false,
     }),
-    usePluginsServicePluginControllerUpdateInstalledPackagePolicy: () => ({
+    usePluginControllerUpdateInstalledPackagePolicy: () => ({
       mutateAsync: hoisted.updateInstalledPackagePolicyMock,
       isPending: false,
     }),
-    usePluginsServiceRetryPlugin: () => ({ mutateAsync: hoisted.retryMutateAsyncMock, isPending: false }),
-    usePluginsServiceDeletePlugin: (options: DeleteOptions) => {
+    useRetryPlugin: () => ({ mutateAsync: hoisted.retryMutateAsyncMock, isPending: false }),
+    useDeletePlugin: (_mutationKey: unknown, options: DeleteOptions) => {
       hoisted.deleteOptions = options;
       return { mutate: hoisted.deleteMutateMock, isPending: false };
     },
-    usePluginsServiceUploadPlugin: () => ({ mutate: vi.fn(), isPending: false }),
+    useUploadPlugin: () => ({ mutate: vi.fn(), isPending: false }),
   };
 });
 

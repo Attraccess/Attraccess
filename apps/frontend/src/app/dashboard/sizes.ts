@@ -35,5 +35,4 @@ export const TILE_SPAN_CLASSES: Record<TileSize, string> = {
  */
 export const TILE_ROWS_CLASSES = 'auto-rows-[var(--dashboard-row)] gap-3 [--dashboard-row:11rem]';
 
-export const DASHBOARD_GRID_CLASSES =
-  `grid grid-cols-2 grid-flow-row-dense ${TILE_ROWS_CLASSES} @min-[40rem]:grid-cols-4 @min-[64rem]:grid-cols-6`;
+export const DASHBOARD_GRID_CLASSES = `grid grid-cols-2 grid-flow-row-dense ${TILE_ROWS_CLASSES} @min-[40rem]:grid-cols-4 @min-[64rem]:grid-cols-6`;

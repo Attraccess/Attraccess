@@ -3,12 +3,12 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  useResourceMeteringServiceListResourceMeters,
-  useBillingServiceGetBillingBalance,
-  useBillingServiceGetBillingConfiguration,
-  useBillingServiceGetResourceBillingConfiguration,
-  useLicenseServiceGetLicenseInformation,
-  useResourcesServiceGetOneResourceById,
+  useListResourceMeters,
+  useGetBillingBalance,
+  useGetBillingConfiguration,
+  useGetResourceBillingConfiguration,
+  useGetLicenseInformation,
+  useGetOneResourceById,
 } from '@attraccess/react-query-client';
 import { ResourceBillingInfo } from './index';
 import en from './en.json';
@@ -16,12 +16,12 @@ import en from './en.json';
 const auth = vi.hoisted(() => ({ canManageBilling: true }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourceMeteringServiceListResourceMeters: vi.fn(),
-  useBillingServiceGetBillingBalance: vi.fn(),
-  useBillingServiceGetBillingConfiguration: vi.fn(),
-  useBillingServiceGetResourceBillingConfiguration: vi.fn(),
-  useLicenseServiceGetLicenseInformation: vi.fn(),
-  useResourcesServiceGetOneResourceById: vi.fn(),
+  useListResourceMeters: vi.fn(),
+  useGetBillingBalance: vi.fn(),
+  useGetBillingConfiguration: vi.fn(),
+  useGetResourceBillingConfiguration: vi.fn(),
+  useGetLicenseInformation: vi.fn(),
+  useGetOneResourceById: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -68,27 +68,27 @@ vi.mock('./editor', () => ({
 }));
 
 function mockData() {
-  vi.mocked(useResourceMeteringServiceListResourceMeters).mockReturnValue({
+  vi.mocked(useListResourceMeters).mockReturnValue({
     data: [{ id: 1, name: 'Heartbeats', creditsPerUnit: 30 }],
   } as never);
-  vi.mocked(useBillingServiceGetBillingConfiguration).mockReturnValue({
+  vi.mocked(useGetBillingConfiguration).mockReturnValue({
     data: { currency: 'credits', minorUnit: 2 },
-  } as ReturnType<typeof useBillingServiceGetBillingConfiguration>);
-  vi.mocked(useBillingServiceGetResourceBillingConfiguration).mockReturnValue({
+  } as ReturnType<typeof useGetBillingConfiguration>);
+  vi.mocked(useGetResourceBillingConfiguration).mockReturnValue({
     data: {
       configuration: { creditsPerUsage: 100, creditsPerMinute: 200, creditsPerOperatingMinute: 300 },
       additionalItems: [],
     },
-  } as ReturnType<typeof useBillingServiceGetResourceBillingConfiguration>);
-  vi.mocked(useResourcesServiceGetOneResourceById).mockReturnValue({
+  } as ReturnType<typeof useGetResourceBillingConfiguration>);
+  vi.mocked(useGetOneResourceById).mockReturnValue({
     data: { type: 'machine' },
-  } as ReturnType<typeof useResourcesServiceGetOneResourceById>);
-  vi.mocked(useLicenseServiceGetLicenseInformation).mockReturnValue({
+  } as ReturnType<typeof useGetOneResourceById>);
+  vi.mocked(useGetLicenseInformation).mockReturnValue({
     data: { modules: ['billing'] },
-  } as ReturnType<typeof useLicenseServiceGetLicenseInformation>);
-  vi.mocked(useBillingServiceGetBillingBalance).mockReturnValue({
+  } as ReturnType<typeof useGetLicenseInformation>);
+  vi.mocked(useGetBillingBalance).mockReturnValue({
     data: { value: 10000 },
-  } as ReturnType<typeof useBillingServiceGetBillingBalance>);
+  } as ReturnType<typeof useGetBillingBalance>);
 }
 
 describe('ResourceBillingInfo operating-minute billing', () => {
@@ -100,12 +100,12 @@ describe('ResourceBillingInfo operating-minute billing', () => {
 
   it('keeps the live session visible to regular users after current meter prices are removed', async () => {
     auth.canManageBilling = false;
-    vi.mocked(useResourceMeteringServiceListResourceMeters).mockReturnValue({
+    vi.mocked(useListResourceMeters).mockReturnValue({
       data: [
         { id: 1, name: 'Renamed meter', creditsPerUnit: 0, session: { meterName: 'Heartbeats', creditsPerUnit: 30 } },
       ],
     } as never);
-    vi.mocked(useBillingServiceGetResourceBillingConfiguration).mockReturnValue({
+    vi.mocked(useGetResourceBillingConfiguration).mockReturnValue({
       data: {
         configuration: { creditsPerUsage: 0, creditsPerMinute: 0, creditsPerOperatingMinute: 0 },
         additionalItems: [],
@@ -118,7 +118,7 @@ describe('ResourceBillingInfo operating-minute billing', () => {
   });
 
   it('preserves the cents in a large configured meter rate', async () => {
-    vi.mocked(useResourceMeteringServiceListResourceMeters).mockReturnValue({
+    vi.mocked(useListResourceMeters).mockReturnValue({
       data: [{ id: 1, name: 'Heartbeats', creditsPerUnit: Number.MAX_SAFE_INTEGER }],
     } as never);
     render(<ResourceBillingInfo resourceId={1} />);
@@ -127,7 +127,7 @@ describe('ResourceBillingInfo operating-minute billing', () => {
 
   it('keeps captured skipped free meters visible to regular users', async () => {
     auth.canManageBilling = false;
-    vi.mocked(useResourceMeteringServiceListResourceMeters).mockReturnValue({
+    vi.mocked(useListResourceMeters).mockReturnValue({
       data: [
         {
           id: 1,
@@ -137,7 +137,7 @@ describe('ResourceBillingInfo operating-minute billing', () => {
         },
       ],
     } as never);
-    vi.mocked(useBillingServiceGetResourceBillingConfiguration).mockReturnValue({
+    vi.mocked(useGetResourceBillingConfiguration).mockReturnValue({
       data: {
         configuration: { creditsPerUsage: 0, creditsPerMinute: 0, creditsPerOperatingMinute: 0 },
         additionalItems: [],

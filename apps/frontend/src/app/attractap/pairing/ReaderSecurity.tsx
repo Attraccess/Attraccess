@@ -3,14 +3,14 @@ import { AttraccessUser, StatusDialog, useDateTimeFormatter, useTranslations } f
 import {
   Attractap,
   AttractapCredentialEvent,
-  useAttractapServiceGetPairings,
-  useAttractapServiceGetReaderCredentialHistory,
-  useAttractapServiceRevokeReader,
-  useAttractapServiceGetReadersKey,
-  useAttractapServiceGetReadersToPairKey,
-  useAttractapServiceGetReaderCredentialHistoryKey,
-  UseAttractapServiceGetReaderByIdKeyFn,
-  useUsersServiceGetOneUserById,
+  useGetPairings,
+  useGetReaderCredentialHistory,
+  useRevokeReader,
+  useGetReadersKey,
+  useGetReadersToPairKey,
+  useGetReaderCredentialHistoryKey,
+  UseGetReaderByIdKeyFn,
+  useGetOneUserById,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -24,7 +24,7 @@ import en from './en.json';
 /** The user behind a credential event; events without a user were caused by the reader or the system. */
 function EventActor(props: Readonly<{ actorId: number | null }>) {
   const { actorId } = props;
-  const { data: user, isError } = useUsersServiceGetOneUserById({ id: actorId ?? 0 }, undefined, {
+  const { data: user, isError } = useGetOneUserById({ path: { id: actorId ?? 0 } }, undefined, {
     enabled: actorId !== null,
   });
   if (actorId === null) return <span>-</span>;
@@ -70,21 +70,21 @@ export function ReaderSecurity(props: Readonly<{ reader: Attractap; onPairingRem
   const [pairAgainOpen, setPairAgainOpen] = useState(false);
   const [revokeOpen, setRevokeOpen] = useState(false);
 
-  const { data: history } = useAttractapServiceGetReaderCredentialHistory({ readerId: reader.id });
-  const { data: pairings } = useAttractapServiceGetPairings(undefined, { refetchInterval: 5000 });
+  const { data: history } = useGetReaderCredentialHistory({ path: { readerId: reader.id } });
+  const { data: pairings } = useGetPairings({}, undefined, { refetchInterval: 5000 });
 
   const showError = (titleKey: string) => (error: unknown) =>
     toast.error({ title: t(titleKey), description: apiErrorMessage(error) });
 
-  const revoke = useAttractapServiceRevokeReader({
+  const revoke = useRevokeReader(undefined, {
     onSuccess: () => {
       setRevokeOpen(false);
       toast.success({ title: t('security.revoked') });
       // The reader moves from the paired list to the one under Not paired.
-      queryClient.invalidateQueries({ queryKey: [useAttractapServiceGetReadersKey] });
-      queryClient.invalidateQueries({ queryKey: [useAttractapServiceGetReadersToPairKey] });
-      queryClient.invalidateQueries({ queryKey: [useAttractapServiceGetReaderCredentialHistoryKey] });
-      queryClient.invalidateQueries({ queryKey: UseAttractapServiceGetReaderByIdKeyFn({ readerId: reader.id }) });
+      queryClient.invalidateQueries({ queryKey: [useGetReadersKey] });
+      queryClient.invalidateQueries({ queryKey: [useGetReadersToPairKey] });
+      queryClient.invalidateQueries({ queryKey: [useGetReaderCredentialHistoryKey] });
+      queryClient.invalidateQueries({ queryKey: UseGetReaderByIdKeyFn({ path: { readerId: reader.id } }) });
       // A reader without pairing cannot be edited any more.
       onPairingRemoved();
     },
@@ -157,7 +157,7 @@ export function ReaderSecurity(props: Readonly<{ reader: Attractap; onPairingRem
         closeLabel={t('dialog.cancel')}
         action={{
           label: t('security.revoke'),
-          onPress: () => revoke.mutate({ readerId: reader.id }),
+          onPress: () => revoke.mutate({ path: { readerId: reader.id } }),
           isPending: revoke.isPending,
           'data-cy': 'attractap-security-revoke-confirm',
         }}

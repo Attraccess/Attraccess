@@ -39,7 +39,7 @@ export class SsoAccountLinkService {
 
   async link(linkPayload: SSOLinkTokenPayload, password: string, ip: string): Promise<{ OK: boolean }> {
     const email = linkPayload.email;
-    const user = await this.usersService.findOne({ email }, ['authenticationDetails']);
+    const user = await this.usersService.findOne({ email }, { authenticationDetails: true });
     if (!user) {
       await this.bruteForce.recordFailure('sso_link_account', ip, null, email);
       await this.authAudit.log({ type: 'sso_link_account', outcome: 'unknown_user', ip, username: email });

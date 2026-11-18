@@ -50,7 +50,7 @@ vi.mock('../../../utils/live-updates', async () => {
   };
 });
 vi.mock('@attraccess/react-query-client', () => ({
-  useMqttServiceMqttExplorerPublish: () => ({ mutateAsync: publish, isPending: false }),
+  useMqttExplorerPublish: () => ({ mutateAsync: publish, isPending: false }),
 }));
 vi.mock('./payload', async (importOriginal) => {
   const original = await importOriginal<typeof import('./payload')>();
@@ -384,8 +384,8 @@ describe('publish form', () => {
     expect(await screen.findByText('Message published.')).toBeTruthy();
     expect(screen.getByRole('status').textContent).toContain('Message published.');
     expect(publish).toHaveBeenCalledWith({
-      id: 11,
-      requestBody: { topic: 'a/b', payload: 'hi', qos: 0, retain: true },
+      path: { id: 11 },
+      body: { topic: 'a/b', payload: 'hi', qos: 0, retain: true },
     });
 
     // Editing the message clears the previous result.
@@ -409,8 +409,8 @@ describe('publish form', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
     await waitFor(() =>
       expect(publish).toHaveBeenCalledWith({
-        id: 11,
-        requestBody: { topic: 'a/b', payload: '', qos: 2, retain: false },
+        path: { id: 11 },
+        body: { topic: 'a/b', payload: '', qos: 2, retain: false },
       }),
     );
   });

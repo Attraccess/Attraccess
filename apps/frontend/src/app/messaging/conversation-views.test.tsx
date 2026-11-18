@@ -32,12 +32,12 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => state.client }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useResourcesServiceGetOneResourceById: () => ({ data: state.resource }),
-  useMessagingServiceMessagingListMessages: (args: unknown) => {
+  useGetOneResourceById: () => ({ data: state.resource }),
+  useMessagingListMessages: (args: unknown) => {
     state.list(args);
     return { data: state.data, isLoading: state.loading };
   },
-  useMessagingServiceMessagingSendMessage: ({ onSuccess }: { onSuccess: typeof state.success }) => {
+  useMessagingSendMessage: (_mutationKey: unknown, { onSuccess }: { onSuccess: typeof state.success }) => {
     state.success = onSuccess;
     return { mutate: state.send, isPending: state.sending };
   },
@@ -108,7 +108,7 @@ it('orders messages chronologically, displays references and requests older mess
   expect(screen.getByRole('link', { name: 'Lathe' })).toHaveAttribute('href', '/resources/7');
   expect(screen.getByRole('link', { name: 'Deleted resource' })).toHaveAttribute('href', '/');
   fireEvent.click(screen.getByRole('button', { name: 'thread.loadOlder' }));
-  expect(state.list).toHaveBeenLastCalledWith({ id: 8, page: 1, limit: 40 });
+  expect(state.list).toHaveBeenLastCalledWith({ path: { id: 8 }, query: { page: 1, limit: 40 } });
 });
 it('sends trimmed replies with a resource reference and clears the composer after success', () => {
   state.resource = { name: 'Saw' };
@@ -124,8 +124,8 @@ it('sends trimmed replies with a resource reference and clears the composer afte
   expect(state.send).not.toHaveBeenCalled();
   fireEvent.keyDown(input, { key: 'Enter' });
   expect(state.send).toHaveBeenCalledWith({
-    id: 8,
-    requestBody: { content: 'Hello', referenceType: MessageReferenceType.RESOURCE, referenceId: 7 },
+    path: { id: 8 },
+    body: { content: 'Hello', referenceType: MessageReferenceType.RESOURCE, referenceId: 7 },
   });
   const created = { id: 3 };
   act(() => state.success?.(created));
@@ -143,7 +143,7 @@ it('removes pending references and submits a plain reply', () => {
   fireEvent.click(screen.getByRole('button', { name: 'composer.removeReference' }));
   fireEvent.change(screen.getByPlaceholderText('composer.placeholder'), { target: { value: 'Plain' } });
   fireEvent.click(screen.getByRole('button', { name: 'composer.send' }));
-  expect(state.send).toHaveBeenCalledWith({ id: 8, requestBody: { content: 'Plain' } });
+  expect(state.send).toHaveBeenCalledWith({ path: { id: 8 }, body: { content: 'Plain' } });
 });
 it('shows empty threads and prevents duplicate sends while a request is pending', () => {
   state.sending = true;

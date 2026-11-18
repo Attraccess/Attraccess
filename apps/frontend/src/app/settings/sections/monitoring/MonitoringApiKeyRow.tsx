@@ -12,9 +12,9 @@ import { ClipboardCopyIcon, KeyIcon, RefreshCwIcon, Trash2Icon } from 'lucide-re
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertStatusIcon, Button, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  useSettingsServiceDeleteMetricsApiKey,
-  useSettingsServiceGenerateMetricsApiKey,
-  UseSettingsServiceGetMetricsSettingsKeyFn,
+  useDeleteMetricsApiKey,
+  useGenerateMetricsApiKey,
+  UseGetMetricsSettingsKeyFn,
 } from '@attraccess/react-query-client';
 import { SettingsRow } from '../../components/SettingsRow';
 import { useToastMessage } from '../../../../components/toastProvider';
@@ -45,19 +45,19 @@ export function MonitoringApiKeyRow({ apiKeyConfigured, generatedKey, setGenerat
   const rerollModal = useOverlayState();
   const removeModal = useOverlayState();
 
-  const { mutate: generateApiKey, isPending: isGenerating } = useSettingsServiceGenerateMetricsApiKey({
+  const { mutate: generateApiKey, isPending: isGenerating } = useGenerateMetricsApiKey(undefined, {
     onSuccess(data) {
       setGeneratedKey((data as { apiKey: string }).apiKey);
-      queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetMetricsSettingsKeyFn() });
+      queryClient.invalidateQueries({ queryKey: UseGetMetricsSettingsKeyFn() });
       toast.success({ title: t('keyGenerated.title'), description: t('keyGenerated.description') });
       rerollModal.close();
     },
   });
 
-  const { mutate: deleteApiKey, isPending: isDeleting } = useSettingsServiceDeleteMetricsApiKey({
+  const { mutate: deleteApiKey, isPending: isDeleting } = useDeleteMetricsApiKey(undefined, {
     onSuccess() {
       setGeneratedKey(null);
-      queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetMetricsSettingsKeyFn() });
+      queryClient.invalidateQueries({ queryKey: UseGetMetricsSettingsKeyFn() });
       toast.success({ title: t('keyRemoved.title'), description: t('keyRemoved.description') });
       removeModal.close();
     },

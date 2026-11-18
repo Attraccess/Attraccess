@@ -21,10 +21,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
 import {
-  useApiTokensServiceCreateApiToken,
-  useApiTokensServiceListApiTokens,
-  useApiTokensServiceRevokeApiToken,
-  useRbacServiceListPermissions,
+  useCreateApiToken,
+  useListApiTokens,
+  useRevokeApiToken,
+  useListPermissions,
 } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
@@ -55,7 +55,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
   const { t } = useTranslations({ en, de });
   const { showToast } = useToastMessage();
   const { permissionLabel, permissionDescription, permissionCategory } = useRbacCatalogTranslations();
-  const { data: allPermissions } = useRbacServiceListPermissions();
+  const { data: allPermissions } = useListPermissions();
   const [page, setPage] = useState(1);
   const [name, setName] = useState('');
   const [permissionKeys, setPermissionKeys] = useState<Set<string>>(() => new Set());
@@ -67,9 +67,9 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
     isPending: isLoadingTokens,
     isError: isTokenListError,
     refetch: refetchTokens,
-  } = useApiTokensServiceListApiTokens<ApiTokenPage>({ limit: PAGE_SIZE, page });
-  const { mutateAsync: createApiToken, isPending: isCreating } = useApiTokensServiceCreateApiToken<CreatedApiToken>();
-  const { mutateAsync: revokeApiToken, isPending: isRevoking } = useApiTokensServiceRevokeApiToken();
+  } = useListApiTokens<ApiTokenPage>({ query: { limit: PAGE_SIZE, page } });
+  const { mutateAsync: createApiToken, isPending: isCreating } = useCreateApiToken<CreatedApiToken>();
+  const { mutateAsync: revokeApiToken, isPending: isRevoking } = useRevokeApiToken();
   const availablePermissionDetails = useMemo(
     () => (allPermissions ?? []).filter((permission) => availablePermissions.includes(permission.key)),
     [allPermissions, availablePermissions],
@@ -83,7 +83,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
     if (!expiryValid) return;
     try {
       const created = await createApiToken({
-        requestBody: {
+        body: {
           name: name.trim(),
           permissionKeys: [...permissionKeys],
           expiresAt: expiresAt ? new Date(`${expiresAt}T00:00:00`).toISOString() : undefined,
@@ -103,7 +103,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
 
   const revokeToken = async (token: ApiToken) => {
     try {
-      await revokeApiToken({ id: token.id });
+      await revokeApiToken({ path: { id: token.id } });
       if (tokenPage?.data.length === 1 && page > 1) setPage(page - 1);
       else void refetchTokens();
       showToast({ title: t('success.revoked'), type: 'success' });

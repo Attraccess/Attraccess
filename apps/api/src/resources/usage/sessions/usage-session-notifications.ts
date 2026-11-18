@@ -196,7 +196,7 @@ export class UsageSessionNotifications {
 
     const usage = await resourceUsageRepository.findOne({
       where: { id: usageId },
-      relations: ['resource', 'user'],
+      relations: { resource: true, user: true },
     });
     // An ended usage session is announced by ResourceUsageSessionEndedEvent (or the take-over event), never as a
     // start. Door actions are stored already ended and still fire this event.

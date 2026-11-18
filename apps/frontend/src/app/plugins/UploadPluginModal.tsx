@@ -1,4 +1,4 @@
-import { usePluginsServiceUploadPlugin } from '@attraccess/react-query-client';
+import { useUploadPlugin } from '@attraccess/react-query-client';
 import { useState, useRef } from 'react';
 import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading } from '@heroui/react';
 import { Upload } from 'lucide-react';
@@ -19,7 +19,7 @@ export function UploadPluginModal({ isOpen, onClose }: UploadPluginModalProps) {
   const toast = useToastMessage();
   const { t } = useTranslations({ en, de });
 
-  const { mutate: uploadPlugin, isPending } = usePluginsServiceUploadPlugin({
+  const { mutate: uploadPlugin, isPending } = useUploadPlugin(undefined, {
     onSuccess: () => {
       setTimeout(() => {
         window.location.reload();
@@ -55,7 +55,7 @@ export function UploadPluginModal({ isOpen, onClose }: UploadPluginModalProps) {
     if (!selectedFile || isFileInvalid) return;
 
     uploadPlugin({
-      formData: {
+      body: {
         pluginZip: selectedFile,
       },
     });

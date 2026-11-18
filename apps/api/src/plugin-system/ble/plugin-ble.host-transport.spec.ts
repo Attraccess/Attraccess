@@ -204,7 +204,7 @@ describe('PluginBleService reader events through the real event bus', () => {
   beforeEach(async () => {
     clearPluginBleProfiles();
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: Object.values(entities),
       synchronize: true,

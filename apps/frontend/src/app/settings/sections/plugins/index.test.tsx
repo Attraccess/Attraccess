@@ -319,9 +319,8 @@ describe('PluginsSection', () => {
 
     await waitFor(() =>
       expect(hoisted.installPackageMock).toHaveBeenCalledWith({
-        packageName: '@private/plugin',
-        version: '2.3.4',
-        requestBody: { registryId: 'private' },
+        path: { packageName: '@private/plugin', version: '2.3.4' },
+        body: { registryId: 'private' },
       }),
     );
   });
@@ -431,7 +430,7 @@ describe('PluginsSection', () => {
     const secondTest = deferred<{ ok: boolean }>();
     const latestFirstTest = deferred<{ ok: boolean }>();
     let firstTestRequests = 0;
-    hoisted.testRegistryMock.mockImplementation(({ registryId }: { registryId: string }) => {
+    hoisted.testRegistryMock.mockImplementation(({ path: { registryId } }: { path: { registryId: string } }) => {
       if (registryId === 'first') {
         firstTestRequests += 1;
         return firstTestRequests === 1 ? firstTest.promise : latestFirstTest.promise;
@@ -760,7 +759,7 @@ describe('PluginsSection', () => {
     await user.click(screen.getByRole('button', { name: 'View load error for Cool Plugin' }));
     await user.click(screen.getByRole('button', { name: 'Retry and restart' }));
 
-    await waitFor(() => expect(hoisted.retryMutateAsyncMock).toHaveBeenCalledWith({ pluginId: 'plugin-1' }));
+    await waitFor(() => expect(hoisted.retryMutateAsyncMock).toHaveBeenCalledWith({ path: { pluginId: 'plugin-1' } }));
     expect(hoisted.successToast).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'The plugin will be retried when the app restarts.' }),
     );
@@ -852,7 +851,7 @@ describe('PluginsSection', () => {
     );
     await user.click(confirm as Element);
 
-    expect(hoisted.deleteMutateMock).toHaveBeenCalledWith({ pluginId: 'plugin-1' });
+    expect(hoisted.deleteMutateMock).toHaveBeenCalledWith({ path: { pluginId: 'plugin-1' } });
   });
 
   it('shows a success toast after a successful delete', () => {

@@ -12,12 +12,12 @@
 // Stop the API first and keep a copy of attraccess.sqlite.
 //
 // Plain Node only: the production image has no TypeScript sources, so nothing here may import a .ts
-// file. The only dependency is sqlite3, which the deployed API package ships.
+// file. The only dependency is better-sqlite3, which the deployed API package ships.
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto';
 import { existsSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import sqlite3pkg from 'sqlite3';
+import Database from 'better-sqlite3';
 
 const SALT = Buffer.from('attraccess.encryption.salt', 'utf8');
 const INFO = Buffer.from('attraccess|aes-256-gcm|content-encryption', 'utf8');
@@ -80,28 +80,22 @@ export function parseArgs(argv, env = process.env, cwd = process.cwd()) {
   return { dryRun, databasePath: db ? resolve(cwd, db) : resolveDatabasePath(env, cwd) };
 }
 
-const call = (db, method, sql, params = []) =>
-  new Promise((resolve, reject) =>
-    db[method](sql, params, (error, result) => (error ? reject(error) : resolve(result))),
-  );
-
-/** Returns how many values were re-encrypted per table (column). Throws (and rolls back) when any value does not decrypt with the old secret. */
+/** `db` is a better-sqlite3 Database. Returns how many values were re-encrypted per table (column). Throws (and rolls back) when any value does not decrypt with the old secret. */
 export async function reencryptCardKeys(db, oldSecret, newSecret, { dryRun = false } = {}) {
   if (!oldSecret || !newSecret) throw new Error('OLD_AUTH_SESSION_SECRET and NEW_AUTH_SESSION_SECRET are required');
   if (oldSecret.trim() === newSecret.trim()) throw new Error('the old and the new secret are the same');
   const oldKey = deriveKey(oldSecret);
   const newKey = deriveKey(newSecret);
   const counts = {};
-  await call(db, 'run', 'BEGIN IMMEDIATE');
+  db.exec('BEGIN IMMEDIATE');
   try {
     for (const { name, table, column } of TABLES) {
-      const exists = await call(db, 'get', "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", [table]);
+      const exists = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
       if (!exists) continue;
-      const rows = await call(
-        db,
-        'all',
-        `SELECT id, "${column}" AS value FROM "${table}" WHERE "${column}" IS NOT NULL AND "${column}" != ''`,
-      );
+      const rows = db
+        .prepare(`SELECT id, "${column}" AS value FROM "${table}" WHERE "${column}" IS NOT NULL AND "${column}" != ''`)
+        .all();
+      const update = db.prepare(`UPDATE "${table}" SET "${column}" = ? WHERE id = ?`);
       counts[name] = 0;
       for (const row of rows) {
         // Unencrypted legacy values are encrypted with the new secret as they are.
@@ -115,13 +109,13 @@ export async function reencryptCardKeys(db, oldSecret, newSecret, { dryRun = fal
             );
           }
         }
-        await call(db, 'run', `UPDATE "${table}" SET "${column}" = ? WHERE id = ?`, [encrypt(newKey, plain), row.id]);
+        update.run(encrypt(newKey, plain), row.id);
         counts[name]++;
       }
     }
-    await call(db, 'run', dryRun ? 'ROLLBACK' : 'COMMIT');
+    db.exec(dryRun ? 'ROLLBACK' : 'COMMIT');
   } catch (error) {
-    await call(db, 'run', 'ROLLBACK').catch(() => undefined);
+    if (db.inTransaction) db.exec('ROLLBACK');
     throw error;
   }
   return counts;
@@ -130,7 +124,7 @@ export async function reencryptCardKeys(db, oldSecret, newSecret, { dryRun = fal
 async function main() {
   const { dryRun, databasePath } = parseArgs(process.argv.slice(2));
   if (!existsSync(databasePath)) throw new Error(`database not found: ${databasePath}`);
-  const db = new (sqlite3pkg.verbose().Database)(databasePath);
+  const db = new Database(databasePath, { fileMustExist: true, timeout: 5000 });
   try {
     const counts = await reencryptCardKeys(
       db,

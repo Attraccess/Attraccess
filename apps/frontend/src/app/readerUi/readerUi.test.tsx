@@ -35,7 +35,7 @@ vi.mock('../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: api.toastSuccess, error: api.toastError }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useAttractapServiceGetReaders: () => ({ data: api.readers }),
+  useGetReaders: () => ({ data: api.readers }),
 }));
 vi.mock('./readerUiApi', () => ({
   useReaderUiAlerts: () => ({ data: api.alerts }),

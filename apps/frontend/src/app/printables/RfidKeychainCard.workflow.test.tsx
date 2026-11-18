@@ -45,7 +45,8 @@ beforeEach(() => {
 afterEach(cleanup);
 it('announces rendering and allows source downloads before a mesh exists', async () => {
   render(<RfidKeychainCard />);
-  expect(screen.getByRole('status')).toHaveTextContent('rendering');
+  // the rendering spinner is a status too (named "Loading"); the announcement is the unnamed live region
+  expect(screen.getByRole('status', { name: '' })).toHaveTextContent('rendering');
   expect(screen.getByRole('button', { name: 'download' })).toBeDisabled();
   fireEvent.change(screen.getByRole('textbox', { name: 'labelField' }), { target: { value: 'Workshop' } });
   expect(state.render).toHaveBeenLastCalledWith('Workshop');

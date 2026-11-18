@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { LoadedPluginManifest, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
+import { LoadedPluginManifest, useGetPlugins } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
 import { loadFrontendPlugin } from './loadFrontendPlugin';
 import usePluginState from './plugin.state';
@@ -10,7 +10,7 @@ import { pluginStore } from './pluginStore';
  * and rechecks whenever the tab regains focus.
  */
 export function usePluginLoading() {
-  const { refetch: refetchPlugins } = usePluginsServiceGetPlugins();
+  const { refetch: refetchPlugins } = useGetPlugins();
   const toast = useToastMessage();
   const toastRef = useRef(toast);
   toastRef.current = toast;

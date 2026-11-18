@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import { Alert, AlertContent, AlertDescription, AlertTitle, Card, Skeleton } from '@heroui/react';
 import { Button, StatusDialog, useTranslations, useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import {
-  useMcpOauthServiceApproveMcpOauthRequest,
-  useMcpOauthServiceDenyMcpOauthRequest,
-  useMcpOauthServiceGetMcpOauthRequest,
+  useApproveMcpOAuthRequest,
+  useDenyMcpOAuthRequest,
+  useGetMcpOAuthRequest,
 } from '@attraccess/react-query-client';
 import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
 import { PermissionChipGroups } from '../../components/permissionList';
@@ -50,7 +50,7 @@ export function McpOAuthAuthorizePage() {
   const [redirecting, setRedirecting] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(() => (isFramed() ? 'framed' : null));
 
-  const consent = useMcpOauthServiceGetMcpOauthRequest({ requestId: requestId ?? '' }, undefined, {
+  const consent = useGetMcpOAuthRequest({ path: { requestId: requestId ?? '' } }, undefined, {
     enabled: Boolean(requestId) && failure !== 'framed',
     retry: false,
   });
@@ -65,8 +65,8 @@ export function McpOAuthAuthorizePage() {
       setFailure(classify(error));
     },
   };
-  const approve = useMcpOauthServiceApproveMcpOauthRequest(handlers);
-  const deny = useMcpOauthServiceDenyMcpOauthRequest(handlers);
+  const approve = useApproveMcpOAuthRequest(undefined, handlers);
+  const deny = useDenyMcpOAuthRequest(undefined, handlers);
 
   const view = consent.data;
   const unavailableLabels = useMemo(() => {
@@ -77,7 +77,7 @@ export function McpOAuthAuthorizePage() {
   const decide = (decision: Decision) => {
     if (!requestId || decided) return;
     setDecided(decision);
-    (decision === 'approve' ? approve : deny).mutate({ requestId });
+    (decision === 'approve' ? approve : deny).mutate({ path: { requestId } });
   };
 
   const problem = !requestId ? 'missing' : (failure ?? (consent.isError ? classify(consent.error) : null));

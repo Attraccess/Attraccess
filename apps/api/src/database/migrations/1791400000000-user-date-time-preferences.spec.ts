@@ -3,7 +3,7 @@ import { UserDateTimePreferences1791400000000 } from './1791400000000-user-date-
 
 describe('UserDateTimePreferences migration', () => {
   it('preserves users and locale, supplies compatible defaults, and can be reverted', async () => {
-    const database = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    const database = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
     const runner = database.createQueryRunner();
     try {
       await runner.query(`CREATE TABLE "user" (id integer PRIMARY KEY, locale varchar(35))`);

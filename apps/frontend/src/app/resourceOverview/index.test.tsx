@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useResourcesServiceGetAllResourcesKey } from '@attraccess/react-query-client';
+import { useGetAllResourcesKey } from '@attraccess/react-query-client';
 import { ResourceOverview } from './index';
 
 const storageDescriptors = new Map(
@@ -30,11 +30,9 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/react-query-client')>()),
-  useResourcesServiceResourceGroupsGetMany: () => ({ data: state.groups }),
-  ResourcesService: {
-    getAllResources: (params: unknown) => state.getResources(params),
-    resourceGroupsResourcesExist: () => state.getExistence(),
-  },
+  useResourceGroupsGetMany: () => ({ data: state.groups }),
+  getAllResources: async ({ query }: { query: unknown }) => ({ data: await state.getResources(query) }),
+  resourceGroupsResourcesExist: async () => ({ data: await state.getExistence() }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -193,7 +191,7 @@ describe('ResourceOverview empty-state selection', () => {
     expect(await screen.findByRole('button', { name: 'First resource' })).toBeInTheDocument();
     state.resources = [{ id: 10, groupId: 1, permitted: false }];
     await act(async () => {
-      await client.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
+      await client.invalidateQueries({ queryKey: [useGetAllResourcesKey] });
     });
     expect(await screen.findByRole('button', { name: 'Reset filters' })).toBeInTheDocument();
     expect(state.getExistence).toHaveBeenCalledTimes(2);
@@ -207,7 +205,7 @@ describe('ResourceOverview empty-state selection', () => {
 
     state.resources = [{ id: 10, groupId: 1, permitted: true }];
     await act(async () => {
-      await client.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
+      await client.invalidateQueries({ queryKey: [useGetAllResourcesKey] });
     });
     await waitFor(() => expect(screen.queryByRole('button', { name: 'First resource' })).not.toBeInTheDocument());
     expect(screen.getByRole('dialog', { name: 'Create another' })).toBeInTheDocument();

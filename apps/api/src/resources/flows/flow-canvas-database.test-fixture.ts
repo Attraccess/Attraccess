@@ -17,7 +17,7 @@ import { ResourceFlowsService } from './resource-flows.service';
 /** A real SQLite schema (synchronized from the entities) with one machine and one enabled global flow. */
 export async function openFlowCanvasDatabase() {
   const source = await new DataSource({
-    type: 'sqlite',
+    type: 'better-sqlite3',
     database: ':memory:',
     entities: Object.values(entities),
     synchronize: true,

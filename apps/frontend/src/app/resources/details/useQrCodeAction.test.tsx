@@ -34,7 +34,7 @@ const state = vi.hoisted(() => ({
   callbacks: {} as Record<
     string,
     {
-      onSuccess: (data: unknown, variables: { requestBody: { forceTakeOver: boolean } }) => void;
+      onSuccess: (data: unknown, variables: { body: { forceTakeOver: boolean } }) => void;
       onError: (error: Error) => void;
     }
   >,
@@ -51,21 +51,21 @@ vi.mock('../../../components/toastProvider', () => ({
 }));
 vi.mock('@attraccess/react-query-client', async (original) => ({
   ApiError: (await original<typeof import('@attraccess/react-query-client')>()).ApiError,
-  useResourcesServiceResourceUsageStartBlockedKey: 'start-blocked',
+  useResourceUsageStartBlockedKey: 'start-blocked',
   // The shared start hook passes onSuccess/onError at hook level and plugin handling per call.
-  useResourcesServiceResourceUsageStartSession: (options: unknown) => ({
+  useResourceUsageStartSession: (_mutationKey: unknown, options: unknown) => ({
     mutate: (variables: unknown, callbacks: unknown) => {
       state.callbacks.start = state.bothCallbacks(options, callbacks, variables);
       state.start(variables);
     },
     isPending: false,
   }),
-  useResourcesServiceResourceUsageEndSession: (callbacks: (typeof state.callbacks)[string]) => {
+  useResourceUsageEndSession: (_mutationKey: unknown, callbacks: (typeof state.callbacks)[string]) => {
     state.callbacks.end = callbacks;
     return { mutate: state.end };
   },
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn: (params: unknown) => ['active', params],
-  UseResourcesServiceResourceUsageGetHistoryKeyFn: (params: unknown) => ['history', params],
+  UseResourceUsageGetActiveSessionKeyFn: (params: unknown) => ['active', params],
+  UseResourceUsageGetHistoryKeyFn: (params: unknown) => ['history', params],
 }));
 beforeEach(() => {
   vi.clearAllMocks();
@@ -88,12 +88,15 @@ it.each(['start', 'startAndTakeover', 'stop', 'view', 'unknown'])(
     expect(state.navigate).toHaveBeenCalledOnce();
     if (action === 'start' || action === 'startAndTakeover')
       expect(state.start).toHaveBeenCalledExactlyOnceWith({
-        resourceId: 7,
-        requestBody: { notes: '-- by QR-Code --', forceTakeOver: action === 'startAndTakeover' },
+        path: { resourceId: 7 },
+        body: { notes: '-- by QR-Code --', forceTakeOver: action === 'startAndTakeover' },
       });
     else expect(state.start).not.toHaveBeenCalled();
     if (action === 'stop')
-      expect(state.end).toHaveBeenCalledExactlyOnceWith({ resourceId: 7, requestBody: { notes: '-- by QR-Code --' } });
+      expect(state.end).toHaveBeenCalledExactlyOnceWith({
+        path: { resourceId: 7 },
+        body: { notes: '-- by QR-Code --' },
+      });
     else expect(state.end).not.toHaveBeenCalled();
   },
 );
@@ -105,23 +108,23 @@ it('does nothing without an action', () => {
 });
 it('invalidates only resource-specific history after start and resets the active session after stop', () => {
   setup('start');
-  act(() => state.callbacks.start.onSuccess({}, { requestBody: { forceTakeOver: false } }));
-  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['active', { resourceId: 7 }] });
+  act(() => state.callbacks.start.onSuccess({}, { body: { forceTakeOver: false } }));
+  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['active', { path: { resourceId: 7 } }] });
   expect(state.success).toHaveBeenCalledWith({
     title: 'Session started',
     description: 'The session was successfully started.',
   });
-  act(() => state.callbacks.end.onSuccess({}, { requestBody: { forceTakeOver: false } }));
-  expect(state.reset).toHaveBeenCalledWith({ queryKey: ['active', { resourceId: 7 }] });
+  act(() => state.callbacks.end.onSuccess({}, { body: { forceTakeOver: false } }));
+  expect(state.reset).toHaveBeenCalledWith({ queryKey: ['active', { path: { resourceId: 7 } }] });
   expect(state.success).toHaveBeenLastCalledWith({
     title: 'Session stopped',
     description: 'The session was successfully stopped.',
   });
   for (const [options] of state.invalidate.mock.calls) {
     if (!options.predicate) continue;
-    expect(options.predicate({ queryKey: ['history', { resourceId: 7, page: 2 }] })).toBe(true);
-    expect(options.predicate({ queryKey: ['history', { resourceId: 8 }] })).toBe(false);
-    expect(options.predicate({ queryKey: ['other', { resourceId: 7 }] })).toBe(false);
+    expect(options.predicate({ queryKey: ['history', { path: { resourceId: 7 }, query: { page: 2 } }] })).toBe(true);
+    expect(options.predicate({ queryKey: ['history', { path: { resourceId: 8 } }] })).toBe(false);
+    expect(options.predicate({ queryKey: ['other', { path: { resourceId: 7 } }] })).toBe(false);
     expect(options.predicate({ queryKey: ['history'] })).toBe(false);
   }
 });

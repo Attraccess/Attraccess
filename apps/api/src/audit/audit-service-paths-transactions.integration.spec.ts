@@ -43,7 +43,7 @@ describe('audit recorded by an owning service inside its transaction', () => {
   beforeAll(async () => {
     directory = await mkdtemp(join(tmpdir(), 'audit-service-transactions-'));
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: join(directory, 'audit.sqlite'),
       entities: Object.values(entities),
       migrations: Object.values(migrations),

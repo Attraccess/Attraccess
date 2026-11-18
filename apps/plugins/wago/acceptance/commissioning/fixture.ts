@@ -44,7 +44,7 @@ export async function commissioningFixture() {
   const second = releases.release('0.2.0');
   const catalog = new WagoRuntimeArtifactCatalog(join(directory, 'catalog'));
   const database = new DataSource({
-    type: 'sqlite',
+    type: 'better-sqlite3',
     database: ':memory:',
     entities: plugin.entities,
     synchronize: true,

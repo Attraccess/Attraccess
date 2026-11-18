@@ -12,11 +12,11 @@ vi.mock('../../../../hooks/useAuth', () => ({
   useAuth: () => ({ user: state.user, hasPermission: (permission: string) => state.permissions.includes(permission) }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useAccessControlServiceResourceIntroducersIsIntroducer: (...args: unknown[]) => {
+  useResourceIntroducersIsIntroducer: (...args: unknown[]) => {
     state.query(...args);
     return { data: { isIntroducer: state.introducer } };
   },
-  useResourceMaintenancesServiceCanManageMaintenance: () => ({ data: { canManage: state.maintenance } }),
+  useCanManageMaintenance: () => ({ data: { canManage: state.maintenance } }),
 }));
 beforeEach(() => {
   vi.clearAllMocks();
@@ -50,16 +50,24 @@ it.each([
     state.maintenance = maintenance;
     const { result } = renderHook(() => useResourceTabs(7));
     expect(result.current.tabs.map((tab) => tab.key)).toEqual(expected);
-    expect(state.query).toHaveBeenCalledWith({ resourceId: 7, userId: 1, includeGroups: true }, undefined, {
-      enabled: true,
-    });
+    expect(state.query).toHaveBeenCalledWith(
+      { path: { resourceId: 7, userId: 1 }, query: { includeGroups: true } },
+      undefined,
+      {
+        enabled: true,
+      },
+    );
     expect(result.current.canUpdateResources).toBe(permissions.includes('resources.update'));
   },
 );
 it('disables the introducer query when the viewer is not authenticated', () => {
   state.user = undefined;
   renderHook(() => useResourceTabs(7));
-  expect(state.query).toHaveBeenCalledWith({ resourceId: 7, userId: undefined, includeGroups: true }, undefined, {
-    enabled: false,
-  });
+  expect(state.query).toHaveBeenCalledWith(
+    { path: { resourceId: 7, userId: undefined }, query: { includeGroups: true } },
+    undefined,
+    {
+      enabled: false,
+    },
+  );
 });

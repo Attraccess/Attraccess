@@ -200,7 +200,7 @@ describe('ResourceIntroducersService', () => {
 
       expect(fixture.repository.find).toHaveBeenCalledWith(
         expect.objectContaining({
-          relations: ['user'],
+          relations: { user: true },
           where: expect.objectContaining({ type: ResourceIntroducerType.INTRODUCER }),
         }),
       );

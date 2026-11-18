@@ -27,10 +27,10 @@ vi.mock('../../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: state.success, error: state.error }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourceHealthServiceGetResourceHealthKey: 'health',
-  useResourceHealthServiceGetResourceHealth: () => ({ data: state.summary }),
-  useResourceMaintenancesServiceCanManageMaintenance: () => ({ data: { canManage: state.canManage } }),
-  useResourceHealthServiceClearResourceHealthEntry: (options: typeof state.options) => {
+  useGetResourceHealthKey: 'health',
+  useGetResourceHealth: () => ({ data: state.summary }),
+  useCanManageMaintenance: () => ({ data: { canManage: state.canManage } }),
+  useClearResourceHealthEntry: (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
     return { mutate: state.mutate };
   },
@@ -66,7 +66,7 @@ it('clears the selected entry for maintenance managers and handles outcomes', ()
   state.summary = { isHealthy: false, unhealthyEntries: [{ id: 42, lastReportedAt: '2026-09-01' }] };
   render(<ResourceHealthWarning resourceId={7} />);
   fireEvent.click(screen.getByRole('button', { name: 'actions.markHealthy' }));
-  expect(state.mutate).toHaveBeenCalledWith({ resourceId: 7, entryId: 42 });
+  expect(state.mutate).toHaveBeenCalledWith({ path: { resourceId: 7, entryId: 42 } });
   act(() => state.options.onError());
   expect(state.error).toHaveBeenCalledWith({ title: 'actions.markHealthyError' });
   expect(state.invalidate).not.toHaveBeenCalled();

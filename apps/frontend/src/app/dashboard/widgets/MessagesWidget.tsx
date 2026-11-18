@@ -3,8 +3,8 @@ import type { DashboardWidgetRenderProps } from '@attraccess/plugins-frontend-sd
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ConversationListItemDto,
-  useMessagingServiceMessagingGetUnreadCount,
-  useMessagingServiceMessagingListConversations,
+  useMessagingGetUnreadCount,
+  useMessagingListConversations,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../hooks/useAuth';
 import { BigNumber, itemsPerSize, WidgetEmpty, WidgetError, WidgetList, WidgetLoading } from './widgetParts';
@@ -28,7 +28,7 @@ function UnreadChip({ count }: Readonly<{ count: number }>) {
 
 /** The total unread count, the same as the sidebar badge. GlobalMessagingLive keeps it current. */
 export function MessagesUnreadChip({ size }: Readonly<Partial<DashboardWidgetRenderProps>>) {
-  const { data: unread } = useMessagingServiceMessagingGetUnreadCount();
+  const { data: unread } = useMessagingGetUnreadCount();
   // A small tile shows the count as its content already.
   if (!unread?.total || size === 'small') return null;
 
@@ -78,7 +78,7 @@ function ConversationRow({ conversation }: Readonly<{ conversation: Conversation
 function UnreadSummary({ conversations }: Readonly<{ conversations: ConversationListItemDto[] }>) {
   const { t } = useTranslations({ en, de });
   const { user } = useAuth();
-  const { data: unread } = useMessagingServiceMessagingGetUnreadCount();
+  const { data: unread } = useMessagingGetUnreadCount();
   // Skips conversations where the user's own reply is the latest message.
   const latest = conversations.find(
     (conversation) => conversation.lastMessage && conversation.lastMessage.senderId !== user?.id,
@@ -98,7 +98,7 @@ function UnreadSummary({ conversations }: Readonly<{ conversations: Conversation
  */
 export function MessagesWidget({ size }: Readonly<DashboardWidgetRenderProps>) {
   const { t } = useTranslations({ en, de });
-  const { data: conversations, isPending, isError } = useMessagingServiceMessagingListConversations();
+  const { data: conversations, isPending, isError } = useMessagingListConversations();
 
   if (isPending) return <WidgetLoading />;
   if (isError || !conversations) return <WidgetError title={t('loadError')} />;

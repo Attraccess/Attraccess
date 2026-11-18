@@ -2,10 +2,10 @@ import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  SSOProvider,
-  useAuthenticationServiceDeleteOneSsoProvider,
-  useAuthenticationServiceGetAllSsoProviders,
-  useAuthenticationServiceGetAllSsoProvidersKey,
+  SsoProvider,
+  useDeleteOneSsoProvider,
+  useGetAllSsoProviders,
+  useGetAllSsoProvidersKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { SSOProvidersTable } from './SSOProvidersTable';
@@ -19,18 +19,18 @@ export const SSOProvidersList = () => {
   const queryClient = useQueryClient();
   const { success, error: showError } = useToastMessage();
   const [providerToDelete, setProviderToDelete] = useState<number | null>(null);
-  const { data: providers, error } = useAuthenticationServiceGetAllSsoProviders();
+  const { data: providers, error } = useGetAllSsoProviders();
 
-  const deleteSSOProvider = useAuthenticationServiceDeleteOneSsoProvider({
+  const deleteSSOProvider = useDeleteOneSsoProvider(undefined, {
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [useAuthenticationServiceGetAllSsoProvidersKey],
+        queryKey: [useGetAllSsoProvidersKey],
       });
     },
   });
 
   const handleEdit = useCallback(
-    (provider: SSOProvider) => {
+    (provider: SsoProvider) => {
       navigate(`/settings/sso/providers/${provider.id}`);
     },
     [navigate],
@@ -41,7 +41,7 @@ export const SSOProvidersList = () => {
       return;
     }
     try {
-      await deleteSSOProvider.mutateAsync({ id: providerToDelete });
+      await deleteSSOProvider.mutateAsync({ path: { id: providerToDelete } });
       setProviderToDelete(null);
       success({
         title: t('providerDeleted'),

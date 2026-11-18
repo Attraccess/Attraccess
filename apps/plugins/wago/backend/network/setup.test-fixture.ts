@@ -43,7 +43,7 @@ type NetworkChangeFixture = {
 };
 export async function resetTestFixture(scope: NetworkChangeFixture) {
   scope.db = await new DataSource({
-    type: 'sqlite',
+    type: 'better-sqlite3',
     database: ':memory:',
     synchronize: true,
     entities: [

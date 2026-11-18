@@ -1,7 +1,7 @@
 import { memo, useEffect, useState } from 'react';
 import { Spinner } from '@heroui/react';
 import { ArrowLeft } from 'lucide-react';
-import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
+import { useGetOneResourceById } from '@attraccess/react-query-client';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './documentationEditor.en.json';
@@ -20,7 +20,7 @@ function DocumentationEditorComponent() {
     isError: isResourceError,
     error: resourceError,
     refetch: refetchResource,
-  } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  } = useGetOneResourceById({ path: { id: resourceId } });
   // The draft lives here, above the loading and error views, so a failed background refetch (error
   // view) and the Retry after it (loading) do not throw away what the operator typed. It follows the
   // server only when the resource itself changes.

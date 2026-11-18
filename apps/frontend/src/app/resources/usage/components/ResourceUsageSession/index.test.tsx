@@ -73,29 +73,29 @@ vi.mock('@attraccess/react-query-client', async () => ({
     SUPERVISION_REQUIRED: 'supervision_required',
   },
   ResourceType: { MACHINE: 'machine', DOOR: 'door' },
-  useResourcesServiceResourceUsageCanControl: () => ({
+  useResourceUsageCanControl: () => ({
     data: { canControl: canControl.value },
     isLoading: loading.canControl,
   }),
-  UseResourcesServiceResourceUsageCanControlKeyFn: ({ resourceId }: { resourceId: number }) => [
+  UseResourceUsageCanControlKeyFn: ({ path: { resourceId } }: { path: { resourceId: number } }) => [
     'canControl',
     { resourceId },
   ],
-  UseResourcesServiceResourceUsageStartBlockedKeyFn: ({ resourceId }: { resourceId: number }) => [
+  UseResourceUsageStartBlockedKeyFn: ({ path: { resourceId } }: { path: { resourceId: number } }) => [
     'startBlocked',
     { resourceId },
   ],
-  UseResourcesServiceGetAllResourcesKeyFn: (params: unknown) => ['allResources', params],
-  useAccessControlServiceResourceIntroducersGetNames: () => ({ data: [], isLoading: loading.introducers }),
-  useResourcesServiceResourceUsageGetActiveSession: () => ({
+  UseGetAllResourcesKeyFn: (params: unknown) => ['allResources', params],
+  useResourceIntroducersGetNames: () => ({ data: [], isLoading: loading.introducers }),
+  useResourceUsageGetActiveSession: () => ({
     data: parallel.value ?? { usage: activeSession.value },
     isLoading: loading.activeSession,
   }),
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn: ({ resourceId }: { resourceId: number }) => [
+  UseResourceUsageGetActiveSessionKeyFn: ({ path: { resourceId } }: { path: { resourceId: number } }) => [
     'activeSession',
     { resourceId },
   ],
-  useResourceMaintenancesServiceFindMaintenances: () => ({ data: { data: [] } }),
+  useFindMaintenances: () => ({ data: { data: [] } }),
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -247,7 +247,7 @@ describe('ResourceUsageSession routing', () => {
       expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['canControl', { resourceId: 7 }] });
       // The dashboard's "My sessions" list, by its exact key.
       expect(invalidateQueries).toHaveBeenCalledWith({
-        queryKey: ['allResources', { onlyInUseByMe: true, limit: 50, page: 1 }],
+        queryKey: ['allResources', { query: { onlyInUseByMe: true, limit: 50, page: 1 } }],
         exact: true,
       });
 

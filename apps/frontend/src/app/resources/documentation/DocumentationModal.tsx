@@ -3,7 +3,7 @@ import { ModalBody, ModalFooter, ModalHeader, ModalHeading, Spinner, useOverlayS
 import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Edit, ExternalLink, Maximize, Minimize, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
+import { useGetOneResourceById } from '@attraccess/react-query-client';
 import en from './documentationModal.en.json';
 import de from './documentationModal.de.json';
 import { useAuth } from '../../../hooks/useAuth';
@@ -31,7 +31,7 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
     error,
     refetch,
     isFetching,
-  } = useResourcesServiceGetOneResourceById({ id: resourceId }, undefined, { enabled: !!isOpen });
+  } = useGetOneResourceById({ path: { id: resourceId } }, undefined, { enabled: !!isOpen });
 
   // When modal opens, ensure we have fresh data
   useEffect(() => {

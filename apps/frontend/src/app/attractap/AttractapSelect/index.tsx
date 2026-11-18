@@ -1,8 +1,4 @@
-import {
-  AttractapCapabilities,
-  useAttractapServiceGetCardWriterSettings,
-  useAttractapServiceGetReaders,
-} from '@attraccess/react-query-client';
+import { AttractapCapabilities, useGetCardWriterSettings, useGetReaders } from '@attraccess/react-query-client';
 import { Alert } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useEffect, useMemo, useState } from 'react';
@@ -32,9 +28,9 @@ type EmptyReason = 'noConnectedReader' | 'firmwareUpdateRequired' | 'noCardEnrol
 
 export function AttractapSelect(props: Props) {
   const { t } = useTranslations({ en, de });
-  const { data: allReaders, isLoading: readersLoading } = useAttractapServiceGetReaders();
+  const { data: allReaders, isLoading: readersLoading } = useGetReaders();
   const readers = useMemo(() => pairedReadersOnly(allReaders), [allReaders]);
-  const { data: cardWriterSettings, isLoading: settingsLoading } = useAttractapServiceGetCardWriterSettings(undefined, {
+  const { data: cardWriterSettings, isLoading: settingsLoading } = useGetCardWriterSettings({}, undefined, {
     enabled: !!props.forCardWriting,
   });
   // Listing every reader before the setting arrives would offer readers the server then refuses.

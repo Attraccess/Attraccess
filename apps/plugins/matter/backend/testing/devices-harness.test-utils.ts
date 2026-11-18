@@ -118,7 +118,7 @@ export const timeoutError = () => new SidecarTimeoutError('timed out');
 
 export async function createHarness() {
   const dataSource = await new DataSource({
-    type: 'sqlite',
+    type: 'better-sqlite3',
     database: ':memory:',
     entities: [MatterConnection, ...DEVICE_ENTITIES, ...BACKUP_ENTITIES],
     migrations: Object.values(migrations),

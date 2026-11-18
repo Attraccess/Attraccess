@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { ResourceUsage, useAccessControlServiceResourceIntroducersGetNames } from '@attraccess/react-query-client';
+import { ResourceUsage, useResourceIntroducersGetNames } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../hooks/useAuth';
 
 /**
@@ -10,7 +10,7 @@ import { useAuth } from '../../../../hooks/useAuth';
 export function useCanEndOtherSessions(resourceId: number) {
   const { hasPermission, user } = useAuth();
   // The names list holds direct and group introducers and maintainers, the same set the server checks.
-  const { data: introducersAndMaintainers } = useAccessControlServiceResourceIntroducersGetNames({ resourceId });
+  const { data: introducersAndMaintainers } = useResourceIntroducersGetNames({ path: { resourceId } });
 
   const canEndAnySession =
     hasPermission('resources.update') ||

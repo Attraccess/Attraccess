@@ -96,7 +96,7 @@ describe('ResourceUsageService', () => {
           usageAction: ResourceUsageAction.Usage,
         },
         order: { startTime: 'ASC', id: 'ASC' },
-        relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
+        relations: { user: true, resource: true, billingTransaction: true, project: true, supervisorUser: true },
       });
     });
 

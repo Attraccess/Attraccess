@@ -13,8 +13,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { AlertStatusIcon, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   MessagingRateLimitSettingsDto,
-  UseSettingsServiceGetMessagingRateLimitSettingsKeyFn,
-  useSettingsServiceUpdateMessagingRateLimitSettings,
+  UseGetMessagingRateLimitSettingsKeyFn,
+  useUpdateMessagingRateLimitSettings,
 } from '@attraccess/react-query-client';
 import { SettingsRow } from '../../components/SettingsRow';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
@@ -42,10 +42,10 @@ export function MessagingRateLimits({ limits, children }: MessagingRateLimitsPro
   // cannot overwrite an unsaved edit (ATT-868).
   const [draft, setDraft] = useState<Partial<Record<LimitKey, number>>>({});
 
-  const { mutate: saveLimits, isPending: isSaving } = useSettingsServiceUpdateMessagingRateLimitSettings({
+  const { mutate: saveLimits, isPending: isSaving } = useUpdateMessagingRateLimitSettings(undefined, {
     onSuccess(data) {
       // Prime from the response and release the pin in the same tick — see MonitoringSection.
-      queryClient.setQueryData(UseSettingsServiceGetMessagingRateLimitSettingsKeyFn(), data);
+      queryClient.setQueryData(UseGetMessagingRateLimitSettingsKeyFn(), data);
       setDraft({});
       toast.success({ title: t('saved.title'), description: t('saved.description') });
     },
@@ -116,7 +116,7 @@ export function MessagingRateLimits({ limits, children }: MessagingRateLimitsPro
         onSave={() => {
           if (!isSavable) return;
           saveLimits({
-            requestBody: {
+            body: {
               sendMaxPerWindow: valueOf('sendMaxPerWindow'),
               sendWindowSeconds: valueOf('sendWindowSeconds'),
               contactMaxPerWindow: valueOf('contactMaxPerWindow'),

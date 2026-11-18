@@ -17,13 +17,13 @@ vi.mock('@attraccess/react-query-client', () => ({
     status = 0;
   },
   CsvExportType: { RESOURCE_USAGE_HOURS: 'resourceUsageHours', BILLING_TRANSACTIONS: 'billingTransactions' },
-  useAnalyticsServiceGetCsvExportTemplatesKey: 'templates',
-  useAnalyticsServiceGetCsvExportTemplates: () => ({ data: [] }),
-  useAnalyticsServiceCreateCsvExportTemplate: () => ({ mutate: vi.fn(), isPending: false }),
-  useAnalyticsServiceUpdateCsvExportTemplate: () => ({ mutate: vi.fn(), isPending: false }),
-  useAnalyticsServiceDeleteCsvExportTemplate: () => ({ mutate: vi.fn(), isPending: false }),
-  useBillingServiceGetBillingConfiguration: () => ({ data: { minorUnit: 2 }, status: 'success' }),
-  useAnalyticsServiceGetBillingTransactionsInDateRangeInfinite: (...args: unknown[]) => {
+  useGetCsvExportTemplatesKey: 'templates',
+  useGetCsvExportTemplates: () => ({ data: [] }),
+  useCreateCsvExportTemplate: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateCsvExportTemplate: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteCsvExportTemplate: () => ({ mutate: vi.fn(), isPending: false }),
+  useGetBillingConfiguration: () => ({ data: { minorUnit: 2 }, status: 'success' }),
+  useGetBillingTransactionsInDateRangeInfinite: (...args: unknown[]) => {
     state.query(...args);
     return {
       data: { pages: [{ data: state.rows }] },
@@ -100,7 +100,7 @@ it('offers user id, emails, external identifier and resource metadata fields aft
   await screen.findByRole('button', { name: 'Download CSV' });
 
   expect(state.query).toHaveBeenCalledWith(
-    { start: '2026-09-01T00:00:00.000Z', end: '2026-09-02T00:00:00.000Z' },
+    { query: { start: '2026-09-01T00:00:00.000Z', end: '2026-09-02T00:00:00.000Z' } },
     undefined,
     { refetchOnWindowFocus: false },
   );

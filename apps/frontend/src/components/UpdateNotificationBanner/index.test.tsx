@@ -64,7 +64,7 @@ vi.mock('../../hooks/useAuth', () => ({
 let updateStatusValue: UpdateStatusDto | undefined;
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useSystemServiceGetUpdateStatus: (_params: unknown, _queryKey: unknown, options?: { enabled?: boolean }) => ({
+  useGetUpdateStatus: (_params: unknown, _queryKey: unknown, options?: { enabled?: boolean }) => ({
     data: options?.enabled === false ? undefined : updateStatusValue,
     isLoading: false,
     error: null,

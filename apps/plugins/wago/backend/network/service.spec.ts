@@ -511,7 +511,7 @@ it.each(['192.168.1.10;reboot', '127.0.0.1', '8.8.8.8', '10.0.0.999', '10.0.00.1
   },
 );
 it('migrates recovery storage and refuses to discard pending device changes or previous broker identities', async () => {
-  const db = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+  const db = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
   const runner = db.createQueryRunner(),
     migration = new WagoNetworkChanges1780010660000();
   try {

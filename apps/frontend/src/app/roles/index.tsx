@@ -22,7 +22,7 @@ import {
   TooltipTrigger,
 } from '@heroui/react';
 import { LockIcon, PencilIcon, PlusIcon, ShieldIcon, Trash2Icon } from 'lucide-react';
-import { RoleWithUsageDto, useRbacServiceListRoles } from '@attraccess/react-query-client';
+import { RoleWithUsageDto, useListRoles } from '@attraccess/react-query-client';
 import { RoleFormDrawer } from './role-form-drawer';
 import { DeleteRoleModal } from './delete-role-modal';
 import { useRbacCatalogTranslations } from '../../hooks/useRbacCatalogTranslations';
@@ -34,7 +34,7 @@ export const RolesPage: React.FC = () => {
   const { t } = useTranslations({ en, de });
   const { roleName, roleDescription } = useRbacCatalogTranslations();
 
-  const { data: roles, isLoading } = useRbacServiceListRoles();
+  const { data: roles, isLoading } = useListRoles();
 
   const [formRole, setFormRole] = useState<RoleWithUsageDto | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);

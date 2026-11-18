@@ -20,16 +20,16 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourcesServiceResourceUsageGetActiveSession: () => ({
+  useResourceUsageGetActiveSession: () => ({
     data: { activeSessionCount: state.activeSessionCount },
   }),
   // Behaves like react-query: a disabled query has no data.
-  useResourceFlowsServiceGetSharedMachineFlowWarnings: (_: unknown, __: unknown, options: { enabled: boolean }) => {
+  useGetSharedMachineFlowWarnings: (_: unknown, __: unknown, options: { enabled: boolean }) => {
     state.warningsEnabled.push(options.enabled);
     if (!options.enabled) return { data: undefined, isError: false };
     return state.warningsFailed ? { data: undefined, isError: true } : { data: state.warnings, isError: false };
   },
-  useResourceFlowsServiceGetNodeSchemas: () => ({
+  useGetNodeSchemas: () => ({
     data: [{ type: 'plugin.lights.switch', label: 'Switch lights' }],
   }),
 }));
@@ -57,7 +57,6 @@ const stopWarning: Warning = {
     { nodeId: 'd', nodeType: 'plugin.unknown.node' },
   ],
 };
-
 
 function mount(maxParallelSessions: number) {
   const setField = vi.fn();

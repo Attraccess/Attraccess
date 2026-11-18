@@ -71,7 +71,7 @@ export class MessageEmailFallback1781100000000 implements MigrationInterface {
     await queryRunner.query(`ALTER TABLE "conversation_participant" ADD COLUMN "lastNotifiedAt" datetime`);
 
     await queryRunner.query(
-      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES ($1, $2, $3, $4)`,
+      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES (?, ?, ?, ?)`,
       [
         'message-received',
         'New message from {{message.senderName}}',

@@ -139,7 +139,12 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
     PluginService.configure({ PLUGIN_DIR: PLUGIN_PATH, RESTART_BY_EXIT: true });
     PluginModule.configure({ DISABLE_PLUGINS: false });
 
-    dataSource = new DataSource({ type: 'sqlite', database: ':memory:', synchronize: true, entities: [PocNote] });
+    dataSource = new DataSource({
+      type: 'better-sqlite3',
+      database: ':memory:',
+      synchronize: true,
+      entities: [PocNote],
+    });
     await dataSource.initialize();
     hostDataSource = dataSource;
     events = new EventEmitter2();

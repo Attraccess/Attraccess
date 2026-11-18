@@ -21,14 +21,14 @@ vi.mock('../../../components/toastProvider', () => ({
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('@attraccess/react-query-client', async (original) => ({
   ...(await original<typeof import('@attraccess/react-query-client')>()),
-  useAuthenticationServiceDiscoverAuthentikOidc: () => ({ data: undefined, isFetching: false }),
-  useAuthenticationServiceDiscoverKeycloakOidc: () => ({ data: undefined, isFetching: false }),
-  useLicenseServiceGetLicenseInformation: () => ({ data: { modules: state.modules } }),
-  useAuthenticationServiceGetOneSsoProviderById: () => ({ data: state.provider, isLoading: state.loading }),
-  useAuthenticationServiceCreateOneSsoProvider: () => ({ mutateAsync: state.create, isPending: false }),
-  useAuthenticationServiceUpdateOneSsoProvider: () => ({ mutateAsync: state.update, isPending: false }),
-  useRbacServiceListRoles: () => ({ data: [], isLoading: false }),
-  useSsoServiceGetSsoLogoutUrls: () => ({ data: undefined, isLoading: false }),
+  useDiscoverAuthentikOidc: () => ({ data: undefined, isFetching: false }),
+  useDiscoverKeycloakOidc: () => ({ data: undefined, isFetching: false }),
+  useGetLicenseInformation: () => ({ data: { modules: state.modules } }),
+  useGetOneSsoProviderById: () => ({ data: state.provider, isLoading: state.loading }),
+  useCreateOneSsoProvider: () => ({ mutateAsync: state.create, isPending: false }),
+  useUpdateOneSsoProvider: () => ({ mutateAsync: state.update, isPending: false }),
+  useListRoles: () => ({ data: [], isLoading: false }),
+  useGetSsoLogoutUrls: () => ({ data: undefined, isLoading: false }),
 }));
 beforeEach(() => {
   vi.clearAllMocks();
@@ -86,7 +86,7 @@ it('edits and saves an OIDC provider with credentials and claim lists through th
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   await waitFor(() =>
     expect(state.create).toHaveBeenCalledWith({
-      requestBody: expect.objectContaining({
+      body: expect.objectContaining({
         name: 'Company login',
         type: 'OIDC',
         oidcConfiguration: expect.objectContaining({
@@ -129,7 +129,7 @@ it('loads existing providers with a fixed protocol and saves updates', async () 
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   await waitFor(() =>
     expect(state.update).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 8, requestBody: expect.objectContaining({ name: 'Renamed' }) }),
+      expect.objectContaining({ path: { id: 8 }, body: expect.objectContaining({ name: 'Renamed' }) }),
     ),
   );
 });
@@ -162,7 +162,7 @@ it.each([
   await waitFor(() =>
     expect(mutation).toHaveBeenCalledWith(
       expect.objectContaining({
-        requestBody: expect.objectContaining({
+        body: expect.objectContaining({
           oidcConfiguration: expect.objectContaining({ signingAlgorithms: [...initial, added] }),
         }),
       }),
@@ -191,7 +191,7 @@ it('saves an entry that was typed but not added when Save is clicked right away'
   await waitFor(() =>
     expect(state.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        requestBody: expect.objectContaining({
+        body: expect.objectContaining({
           oidcConfiguration: expect.objectContaining({ roleClaimPaths: ['realm_access.roles'] }),
         }),
       }),
@@ -206,7 +206,7 @@ it('applies the RS256 default on save when the signing algorithm list is emptied
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   await waitFor(() =>
     expect(state.create).toHaveBeenCalledWith({
-      requestBody: expect.objectContaining({
+      body: expect.objectContaining({
         oidcConfiguration: expect.objectContaining({ signingAlgorithms: ['RS256'] }),
       }),
     }),

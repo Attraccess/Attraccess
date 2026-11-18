@@ -13,7 +13,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourcesServiceGetOneResourceById: () => ({ data: { id: 7, name: 'Laser Cutter' } }),
+  useGetOneResourceById: () => ({ data: { id: 7, name: 'Laser Cutter' } }),
 }));
 
 const baseRequest = {

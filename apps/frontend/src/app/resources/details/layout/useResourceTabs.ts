@@ -1,8 +1,5 @@
 import { useMemo } from 'react';
-import {
-  useAccessControlServiceResourceIntroducersIsIntroducer,
-  useResourceMaintenancesServiceCanManageMaintenance,
-} from '@attraccess/react-query-client';
+import { useResourceIntroducersIsIntroducer, useCanManageMaintenance } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../hooks/useAuth';
 
 export type ResourceTabKey = 'overview' | 'history' | 'people' | 'maintenance';
@@ -24,19 +21,14 @@ export function useResourceTabs(resourceId: number): {
   const canUpdateResources = hasPermission('resources.update');
   const canManageAccess = hasPermission('resources.access.manage');
 
-  const { data: introducerData } = useAccessControlServiceResourceIntroducersIsIntroducer(
-    {
-      resourceId,
-      userId: user?.id as number,
-      includeGroups: true,
-    },
+  const { data: introducerData } = useResourceIntroducersIsIntroducer(
+    { path: { resourceId, userId: user?.id as number }, query: { includeGroups: true } },
     undefined,
     { enabled: !!user?.id },
   );
   const isIntroducer = !!introducerData?.isIntroducer;
 
-  const { data: maintenancePermissions } =
-    useResourceMaintenancesServiceCanManageMaintenance({ resourceId });
+  const { data: maintenancePermissions } = useCanManageMaintenance({ path: { resourceId } });
   const canManageMaintenance = !!maintenancePermissions?.canManage;
 
   const tabs = useMemo<ResourceTabDescriptor[]>(() => {

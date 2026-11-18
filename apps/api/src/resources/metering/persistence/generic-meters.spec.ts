@@ -714,7 +714,7 @@ describe('Flow-defined metering', () => {
         Object.assign(email, { getBaseContext: async () => ({}), sendEmail });
         const storedUsage = await genericMetersScope.source
           .getRepository(ResourceUsage)
-          .findOneOrFail({ where: { id: started.id }, relations: ['resource'] });
+          .findOneOrFail({ where: { id: started.id }, relations: { resource: true } });
         await email.sendResourceUsageBillingSummaryEmail(
           Object.assign(genericMetersScope.users[0], { email: 'owner@example.com', locale }),
           Object.assign(bill.transaction, { items: bill.items }),

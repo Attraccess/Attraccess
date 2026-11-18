@@ -11,7 +11,7 @@ import {
   TableScrollContainer,
 } from '@heroui/react';
 import { DateTimeDisplay, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useProjectsServiceGetProjectUsageHistory, ResourceUsage } from '@attraccess/react-query-client';
+import { useGetProjectUsageHistory, ResourceUsage } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
 import { UsageNotesModal } from '../../../../resources/usage/components/UsageNotesModal';
@@ -30,11 +30,7 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
   const [selectedSession, setSelectedSession] = useState<ResourceUsage | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const { data } = useProjectsServiceGetProjectUsageHistory({
-    id: projectId,
-    page,
-    limit: ROWS_PER_PAGE,
-  });
+  const { data } = useGetProjectUsageHistory({ path: { id: projectId }, query: { page, limit: ROWS_PER_PAGE } });
 
   const handleRowAction = useCallback(
     (session: ResourceUsage) => {

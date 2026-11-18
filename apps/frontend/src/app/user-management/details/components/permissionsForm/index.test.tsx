@@ -66,14 +66,14 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useRbacServiceListRoles: () => ({ data: ROLES, isLoading: false }),
-  useUsersServiceGetUserRoleAssignments: () => ({
+  useListRoles: () => ({ data: ROLES, isLoading: false }),
+  useGetUserRoleAssignments: () => ({
     data: currentUserRoles,
     isLoading: false,
   }),
-  useUsersServiceAssignRoleToUser: () => ({ mutateAsync: assignRoleMock, isPending: false }),
-  useUsersServiceRevokeRoleFromUser: () => ({ mutateAsync: revokeRoleMock, isPending: false }),
-  useUsersServiceGetUserRoleAssignmentsKey: 'useUsersServiceGetUserRoleAssignmentsKey',
+  useAssignRoleToUser: () => ({ mutateAsync: assignRoleMock, isPending: false }),
+  useRevokeRoleFromUser: () => ({ mutateAsync: revokeRoleMock, isPending: false }),
+  useGetUserRoleAssignmentsKey: 'useGetUserRoleAssignmentsKey',
   ApiError: class ApiError extends Error {},
 }));
 
@@ -117,8 +117,8 @@ describe('UserPermissionForm', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
-      expect(assignRoleMock).toHaveBeenCalledWith({ id: user.id, requestBody: { roleId: 4 } });
-      expect(revokeRoleMock).toHaveBeenCalledWith({ id: user.id, roleId: 1 });
+      expect(assignRoleMock).toHaveBeenCalledWith({ path: { id: user.id }, body: { roleId: 4 } });
+      expect(revokeRoleMock).toHaveBeenCalledWith({ path: { id: user.id, roleId: 1 } });
     });
   });
 

@@ -38,7 +38,7 @@ import { editorHoldsFlowNodes, useMqttNodeUses } from './mqttExplorer/mqttNodes'
 import { useRememberedOpen } from './mqttExplorer/useRememberedOpen';
 import { useAuth } from '../../../../hooks/useAuth';
 import { MQTT_EXPLORER_PERMISSION } from '../../../mqtt/explorer/permission';
-import { useMqttServiceMqttServersGetAll } from '@attraccess/react-query-client';
+import { useMqttServersGetAll } from '@attraccess/react-query-client';
 
 const edgeTypes = { 'attraccess-edge': EdgeWithDeleteButton };
 
@@ -72,7 +72,7 @@ export function FlowEditorCanvas() {
   );
   const { hasPermission } = useAuth();
   const canUseMqttExplorer = hasPermission(MQTT_EXPLORER_PERMISSION);
-  const { data: mqttServers } = useMqttServiceMqttServersGetAll(undefined, { enabled: canUseMqttExplorer });
+  const { data: mqttServers } = useMqttServersGetAll({}, undefined, { enabled: canUseMqttExplorer });
   const [mqttExplorerOpen, setMqttExplorerOpen] = useRememberedOpen();
   const showMqttExplorer = canUseMqttExplorer && (mqttServers?.length ?? 0) > 0;
   // Stable props, so the explorer panel does not re-render on every canvas change (e.g. each drag frame).

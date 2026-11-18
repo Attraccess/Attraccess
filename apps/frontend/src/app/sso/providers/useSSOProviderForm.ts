@@ -1,16 +1,16 @@
 import { Dispatch, SetStateAction, useCallback, useEffect, useState } from 'react';
 import {
-  CreateSSOProviderDto,
+  CreateSsoProviderDtoWritable,
   Role,
-  SSOProvider,
-  SSOProviderType,
-  UpdateSSOProviderDto,
-  useAuthenticationServiceCreateOneSsoProvider,
-  useAuthenticationServiceGetOneSsoProviderById,
-  useAuthenticationServiceUpdateOneSsoProvider,
-  useAuthenticationServiceGetAllSsoProvidersKey,
-  useAuthenticationServiceGetOneSsoProviderByIdKey,
-  useRbacServiceListRoles,
+  SsoProvider,
+  SsoProviderType,
+  UpdateSsoProviderDtoWritable,
+  useCreateOneSsoProvider,
+  useGetOneSsoProviderById,
+  useUpdateOneSsoProvider,
+  useGetAllSsoProvidersKey,
+  useGetOneSsoProviderByIdKey,
+  useListRoles,
 } from '@attraccess/react-query-client';
 import {
   ensureOidcConfiguration,
@@ -39,8 +39,8 @@ import { listValue, oidcFormValues, samlFormValues } from './form-state/provider
  */
 export const SSO_PROVIDERS_LIST_PATH = '/settings/sso';
 
-type OidcField = keyof NonNullable<CreateSSOProviderDto['oidcConfiguration']>;
-type SamlField = keyof NonNullable<CreateSSOProviderDto['samlConfiguration']>;
+type OidcField = keyof NonNullable<CreateSsoProviderDtoWritable['oidcConfiguration']>;
+type SamlField = keyof NonNullable<CreateSsoProviderDtoWritable['samlConfiguration']>;
 type SetList = Dispatch<SetStateAction<string[]>>;
 type SetRoleMappings = Dispatch<SetStateAction<RoleMappingEntry[]>>;
 
@@ -48,9 +48,9 @@ type SetRoleMappings = Dispatch<SetStateAction<RoleMappingEntry[]>>;
 export interface SSOProviderFormApi {
   isEditing: boolean;
   isLoadingProvider: boolean;
-  providerDetails: SSOProvider | undefined;
-  formValues: CreateSSOProviderDto;
-  setFormValues: Dispatch<SetStateAction<CreateSSOProviderDto>>;
+  providerDetails: SsoProvider | undefined;
+  formValues: CreateSsoProviderDtoWritable;
+  setFormValues: Dispatch<SetStateAction<CreateSsoProviderDtoWritable>>;
   showClientSecret: boolean;
   setShowClientSecret: Dispatch<SetStateAction<boolean>>;
   showSamlProvisioningSecret: boolean;
@@ -81,7 +81,7 @@ export interface SSOProviderFormApi {
   setSaml: (field: SamlField, value: string) => void;
   copyValue: (value: string) => Promise<void>;
   handleSamlToggleChange: (field: SamlField, nextValue: boolean) => void;
-  handleSelectChange: (value: SSOProviderType) => void;
+  handleSelectChange: (value: SsoProviderType) => void;
   handleCancel: () => void;
   handleSubmit: () => Promise<void>;
 }
@@ -90,7 +90,7 @@ export function useSSOProviderForm(providerId?: number): SSOProviderFormApi {
   const { t } = useTranslations({ en, de });
   const navigate = useNavigate();
   const isEditing = providerId !== undefined;
-  const [formValues, setFormValues] = useState<CreateSSOProviderDto>(defaultProviderValues);
+  const [formValues, setFormValues] = useState<CreateSsoProviderDtoWritable>(defaultProviderValues);
   const [showClientSecret, setShowClientSecret] = useState(false);
   const [showSamlProvisioningSecret, setShowSamlProvisioningSecret] = useState(false);
   const [scopes, setScopes] = useState<string[]>([]);
@@ -102,35 +102,35 @@ export function useSSOProviderForm(providerId?: number): SSOProviderFormApi {
   const [oidcRoleMappingEntries, setOidcRoleMappingEntries] = useState<RoleMappingEntry[]>([]);
   const [samlRoleMappingEntries, setSamlRoleMappingEntries] = useState<RoleMappingEntry[]>([]);
   const queryClient = useQueryClient();
-  const { data: roles, isLoading: isLoadingRoles } = useRbacServiceListRoles();
+  const { data: roles, isLoading: isLoadingRoles } = useListRoles();
 
   const { success, error: showError } = useToastMessage();
-  const createSSOProvider = useAuthenticationServiceCreateOneSsoProvider({
+  const createSSOProvider = useCreateOneSsoProvider(undefined, {
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [useAuthenticationServiceGetAllSsoProvidersKey],
+        queryKey: [useGetAllSsoProvidersKey],
       });
     },
   });
-  const updateSSOProvider = useAuthenticationServiceUpdateOneSsoProvider({
+  const updateSSOProvider = useUpdateOneSsoProvider(undefined, {
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [useAuthenticationServiceGetAllSsoProvidersKey],
+        queryKey: [useGetAllSsoProvidersKey],
       });
       queryClient.invalidateQueries({
-        queryKey: [useAuthenticationServiceGetOneSsoProviderByIdKey],
+        queryKey: [useGetOneSsoProviderByIdKey],
       });
     },
   });
-  const { data: providerDetails, isLoading: isLoadingProvider } = useAuthenticationServiceGetOneSsoProviderById(
-    { id: providerId as number },
+  const { data: providerDetails, isLoading: isLoadingProvider } = useGetOneSsoProviderById(
+    { path: { id: providerId as number } },
     undefined,
     {
       enabled: isEditing,
     },
   );
 
-  const isSamlProvider = formValues.type === SSOProviderType.SAML;
+  const isSamlProvider = formValues.type === SsoProviderType.SAML;
   const isSamlSigningEnabled =
     isSamlProvider &&
     (!!formValues.samlConfiguration?.logoutURL || (formValues.samlConfiguration?.signRequest ?? false));
@@ -138,9 +138,7 @@ export function useSSOProviderForm(providerId?: number): SSOProviderFormApi {
   const samlSigningMaterialsReady = hasRequiredSamlSigningMaterial({
     isSigningEnabled: isSamlSigningEnabled,
     storedCertificate: providerDetails?.samlConfiguration?.spSigningCertificate,
-    storedKey:
-      providerDetails?.samlConfiguration?.spSigningKeyEncryptionKeyId ??
-      providerDetails?.samlConfiguration?.spSigningKeyEncrypted,
+    storedKey: providerDetails?.samlConfiguration?.spSigningKeyEncryptionKeyId,
     inputCertificate: formValues.samlConfiguration?.spSigningCertificate,
     inputPrivateKey: formValues.samlConfiguration?.spSigningPrivateKey,
   });
@@ -173,14 +171,14 @@ export function useSSOProviderForm(providerId?: number): SSOProviderFormApi {
     }
 
     const extendedProvider = providerDetails;
-    const updatedFormValues: CreateSSOProviderDto = {
+    const updatedFormValues: CreateSsoProviderDtoWritable = {
       name: extendedProvider.name,
-      type: extendedProvider.type as SSOProviderType,
+      type: extendedProvider.type as SsoProviderType,
       oidcConfiguration: getDefaultOidcConfiguration(),
       samlConfiguration: getDefaultSamlConfiguration(),
     };
 
-    const oidcConfiguration = extendedProvider.type === SSOProviderType.OIDC && extendedProvider.oidcConfiguration;
+    const oidcConfiguration = extendedProvider.type === SsoProviderType.OIDC && extendedProvider.oidcConfiguration;
     if (oidcConfiguration) {
       updatedFormValues.oidcConfiguration = oidcFormValues(oidcConfiguration);
       setScopes(listValue(oidcConfiguration.scopes));
@@ -198,7 +196,7 @@ export function useSSOProviderForm(providerId?: number): SSOProviderFormApi {
       setOidcRoleMappingEntries([]);
     }
 
-    const samlConfiguration = extendedProvider.type === SSOProviderType.SAML && extendedProvider.samlConfiguration;
+    const samlConfiguration = extendedProvider.type === SsoProviderType.SAML && extendedProvider.samlConfiguration;
     if (samlConfiguration) {
       updatedFormValues.samlConfiguration = samlFormValues(samlConfiguration);
       setEmailAttributeKeys(listValue(samlConfiguration.emailAttributeKeys));
@@ -227,7 +225,10 @@ export function useSSOProviderForm(providerId?: number): SSOProviderFormApi {
   ]);
 
   const setOidc = useCallback(
-    (field: keyof NonNullable<CreateSSOProviderDto['oidcConfiguration']>, value: string | string[] | number | null) => {
+    (
+      field: keyof NonNullable<CreateSsoProviderDtoWritable['oidcConfiguration']>,
+      value: string | string[] | number | null,
+    ) => {
       setFormValues((prev) => ({
         ...prev,
         oidcConfiguration: { ...ensureOidcConfiguration(prev.oidcConfiguration), [field]: value },
@@ -237,7 +238,7 @@ export function useSSOProviderForm(providerId?: number): SSOProviderFormApi {
   );
 
   const setSaml = useCallback(
-    (field: keyof NonNullable<CreateSSOProviderDto['samlConfiguration']>, value: string) => {
+    (field: keyof NonNullable<CreateSsoProviderDtoWritable['samlConfiguration']>, value: string) => {
       setFormValues((prev) => ({
         ...prev,
         samlConfiguration: { ...ensureSamlConfiguration(prev.samlConfiguration), [field]: value },
@@ -276,7 +277,7 @@ export function useSSOProviderForm(providerId?: number): SSOProviderFormApi {
   );
 
   const handleSamlToggleChange = useCallback(
-    (field: keyof NonNullable<CreateSSOProviderDto['samlConfiguration']>, nextValue: boolean) => {
+    (field: keyof NonNullable<CreateSsoProviderDtoWritable['samlConfiguration']>, nextValue: boolean) => {
       setFormValues((prev) => ({
         ...prev,
         samlConfiguration: {
@@ -289,14 +290,14 @@ export function useSSOProviderForm(providerId?: number): SSOProviderFormApi {
   );
 
   const handleSelectChange = useCallback(
-    (value: SSOProviderType) => {
+    (value: SsoProviderType) => {
       setFormValues((prev) => ({
         ...prev,
         type: value,
         oidcConfiguration:
-          value === SSOProviderType.OIDC ? ensureOidcConfiguration(prev.oidcConfiguration) : prev.oidcConfiguration,
+          value === SsoProviderType.OIDC ? ensureOidcConfiguration(prev.oidcConfiguration) : prev.oidcConfiguration,
         samlConfiguration:
-          value === SSOProviderType.SAML ? ensureSamlConfiguration(prev.samlConfiguration) : prev.samlConfiguration,
+          value === SsoProviderType.SAML ? ensureSamlConfiguration(prev.samlConfiguration) : prev.samlConfiguration,
       }));
     },
     [setFormValues],
@@ -316,11 +317,11 @@ export function useSSOProviderForm(providerId?: number): SSOProviderFormApi {
         return;
       }
       if (isEditing && providerId !== undefined) {
-        const requestBody: UpdateSSOProviderDto = {
+        const requestBody: UpdateSsoProviderDtoWritable = {
           name: formValues.name,
         };
 
-        if (formValues.type === SSOProviderType.OIDC) {
+        if (formValues.type === SsoProviderType.OIDC) {
           requestBody.oidcConfiguration = buildOidcPayload({
             formValues: formValues,
             scopes,
@@ -333,7 +334,7 @@ export function useSSOProviderForm(providerId?: number): SSOProviderFormApi {
           });
         }
 
-        if (formValues.type === SSOProviderType.SAML) {
+        if (formValues.type === SsoProviderType.SAML) {
           requestBody.samlConfiguration = buildSamlPayload({
             formValues: formValues,
             emailAttributeKeys,
@@ -344,21 +345,18 @@ export function useSSOProviderForm(providerId?: number): SSOProviderFormApi {
           });
         }
 
-        await updateSSOProvider.mutateAsync({
-          id: providerId,
-          requestBody: requestBody,
-        });
+        await updateSSOProvider.mutateAsync({ path: { id: providerId }, body: requestBody });
         success({
           title: t('providerUpdated'),
           description: t('providerUpdatedDesc'),
         });
       } else {
-        const requestBody: CreateSSOProviderDto = {
+        const requestBody: CreateSsoProviderDtoWritable = {
           name: formValues.name,
           type: formValues.type,
         };
 
-        if (formValues.type === SSOProviderType.OIDC) {
+        if (formValues.type === SsoProviderType.OIDC) {
           requestBody.oidcConfiguration = buildOidcPayload({
             formValues: formValues,
             scopes,
@@ -371,7 +369,7 @@ export function useSSOProviderForm(providerId?: number): SSOProviderFormApi {
           });
         }
 
-        if (formValues.type === SSOProviderType.SAML) {
+        if (formValues.type === SsoProviderType.SAML) {
           requestBody.samlConfiguration = buildSamlPayload({
             formValues: formValues,
             emailAttributeKeys,
@@ -382,7 +380,7 @@ export function useSSOProviderForm(providerId?: number): SSOProviderFormApi {
           });
         }
 
-        await createSSOProvider.mutateAsync({ requestBody });
+        await createSSOProvider.mutateAsync({ body: requestBody });
         success({
           title: t('providerCreated'),
           description: t('providerCreatedDesc'),

@@ -1,5 +1,5 @@
 import { Button } from '@attraccess/plugins-frontend-ui';
-import { usePluginsServiceGetPluginSystemStatus } from '@attraccess/react-query-client';
+import { useGetPluginSystemStatus } from '@attraccess/react-query-client';
 import type { MarketplacePluginDto } from '@attraccess/react-query-client';
 import { Alert, AlertContent, AlertDescription, AlertTitle } from '@heroui/react';
 import { BookOpen } from 'lucide-react';
@@ -30,7 +30,7 @@ const DOCS_URL = 'https://docs.attraccess.org/#/plugins/developing-plugins';
  */
 export function PluginsSection() {
   const { t } = usePluginsTranslations();
-  const { data: pluginSystemStatus } = usePluginsServiceGetPluginSystemStatus();
+  const { data: pluginSystemStatus } = useGetPluginSystemStatus();
   const { installed } = useInstalledNpmPlugins();
   const marketplace = useMarketplaceBrowserState();
   const [failedPlugin, setFailedPlugin] = useState<FailedPlugin | null>(null);

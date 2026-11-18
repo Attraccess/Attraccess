@@ -1,6 +1,6 @@
 import { Button, StandardModal } from '@attraccess/plugins-frontend-ui';
 import type { MarketplacePluginDto } from '@attraccess/react-query-client';
-import { usePluginsServicePluginControllerInstallPackage } from '@attraccess/react-query-client';
+import { usePluginControllerInstallPackage } from '@attraccess/react-query-client';
 import { ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { useState } from 'react';
 import { useToastMessage } from '../../../../../components/toastProvider';
@@ -18,7 +18,7 @@ interface Props {
 export function InstallPluginModal({ plugin, onClose }: Props) {
   const { t } = usePluginsTranslations();
   const toast = useToastMessage();
-  const { mutateAsync: installPluginPackage } = usePluginsServicePluginControllerInstallPackage();
+  const { mutateAsync: installPluginPackage } = usePluginControllerInstallPackage();
   const [approvedPlanToken, setApprovedPlanToken] = useState<string | null>(null);
   const [isInstalling, setIsInstalling] = useState(false);
   const [installFailure, setInstallFailure] = useState<string | null>(null);
@@ -55,9 +55,8 @@ export function InstallPluginModal({ plugin, onClose }: Props) {
     setInstallFailure(null);
     try {
       await installPluginPackage({
-        packageName: plugin.name,
-        version: plugin.version,
-        requestBody: {
+        path: { packageName: plugin.name, version: plugin.version },
+        body: {
           registryId: plugin.registry.id,
           ...(hasDependencies ? { planToken: dependencyPlan?.token } : {}),
         },

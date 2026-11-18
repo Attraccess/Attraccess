@@ -7,12 +7,7 @@ import { Alert, AlertContent, AlertDescription, AlertTitle, Card, Input, Label, 
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import {
-  useUsersServiceVerifyEmail,
-  useUsersServiceResendVerificationEmail,
-  useUsersServiceGetCurrentKey,
-  ApiError,
-} from '@attraccess/react-query-client';
+import { useVerifyEmail, useResendVerificationEmail, useGetCurrentKey, ApiError } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { getTranslationKeyForApiError } from '../../utils/apiError';
 
@@ -31,12 +26,12 @@ export function VerifyEmail() {
   const queryClient = useQueryClient();
   const didSendRequest = useRef(false);
 
-  const verifyEmail = useUsersServiceVerifyEmail({
+  const verifyEmail = useVerifyEmail(undefined, {
     onSuccess: () => {
       setIsSuccess(true);
       setError(null);
       queryClient.invalidateQueries({
-        queryKey: [useUsersServiceGetCurrentKey],
+        queryKey: [useGetCurrentKey],
       });
     },
     onError: (error) => {
@@ -52,7 +47,7 @@ export function VerifyEmail() {
     },
   });
 
-  const resendVerification = useUsersServiceResendVerificationEmail({
+  const resendVerification = useResendVerificationEmail(undefined, {
     onSuccess: () => {
       setResendSuccess(true);
     },
@@ -81,7 +76,7 @@ export function VerifyEmail() {
     }
 
     didSendRequest.current = true;
-    verifyEmail.mutate({ requestBody: { token, email } });
+    verifyEmail.mutate({ body: { token, email } });
   }, [token, email, t, verifyEmail]);
 
   useEffect(() => {
@@ -162,7 +157,7 @@ export function VerifyEmail() {
                 if (!isValidEmail(trimmed)) {
                   return;
                 }
-                resendVerification.mutate({ requestBody: { email: trimmed } });
+                resendVerification.mutate({ body: { email: trimmed } });
               }}
               isPending={resendVerification.isPending}
               isDisabled={!isValidEmail(resendEmail.trim()) || resendVerification.isPending}

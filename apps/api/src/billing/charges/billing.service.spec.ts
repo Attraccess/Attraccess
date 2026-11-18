@@ -55,7 +55,7 @@ describe('BillingService', () => {
     expect(await scope.service.getTransactionIdForUsage(8, 2)).toBe(transaction?.id ?? null);
     expect(scope.billingTransactionRepository.findOne).toHaveBeenCalledWith({
       where: { resourceUsageId: 8, userId: 2 },
-      select: ['id'],
+      select: { id: true },
     });
   });
 
@@ -170,7 +170,7 @@ describe('BillingService', () => {
           where: { userId: 7 },
           skip: 10,
           take: 10,
-          relations: expect.arrayContaining(['initiator', 'resourceUsage', 'resourceUsage.resource', 'refundOf']),
+          relations: expect.objectContaining({ initiator: true, resourceUsage: { resource: true }, refundOf: true }),
           order: { createdAt: 'DESC', id: 'DESC' },
         }),
       );

@@ -6,7 +6,7 @@ import { SupervisionTab } from './supervision';
 const query = vi.hoisted(() => vi.fn());
 vi.mock('@attraccess/react-query-client', async (original) => ({
   ...(await original<typeof import('@attraccess/react-query-client')>()),
-  useResourcesServiceResourceGroupsGetMany: (...args: unknown[]) => {
+  useResourceGroupsGetMany: (_clientOptions: unknown, ...args: unknown[]) => {
     query(...args);
     return { data: [{ id: 3, name: 'Workshop' }], isLoading: false };
   },

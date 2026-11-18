@@ -47,7 +47,7 @@ export class MaintenanceScheduleService {
     await this.ensureResourceExists(resourceId);
     return this.scheduleRepository.find({
       where: { resourceId },
-      relations: ['usageHoursConfig', 'usageCountConfig', 'timeIntervalConfig'],
+      relations: { usageHoursConfig: true, usageCountConfig: true, timeIntervalConfig: true },
       order: { id: 'ASC' },
     });
   }
@@ -55,7 +55,7 @@ export class MaintenanceScheduleService {
   async getOne(resourceId: number, scheduleId: number): Promise<ResourceMaintenanceSchedule> {
     const schedule = await this.scheduleRepository.findOne({
       where: { id: scheduleId, resourceId },
-      relations: ['usageHoursConfig', 'usageCountConfig', 'timeIntervalConfig'],
+      relations: { usageHoursConfig: true, usageCountConfig: true, timeIntervalConfig: true },
     });
     if (!schedule) {
       throw new NotFoundException('Maintenance schedule not found');

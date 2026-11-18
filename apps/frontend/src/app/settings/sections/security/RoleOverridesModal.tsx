@@ -13,9 +13,9 @@ import {
 import {
   PasswordPolicyDto,
   UpsertPasswordPolicyOverrideDto,
-  UsePasswordPolicyAdminServiceListPasswordPolicyOverridesKeyFn,
-  usePasswordPolicyAdminServiceDeletePasswordPolicyOverride,
-  usePasswordPolicyAdminServiceUpsertPasswordPolicyOverride,
+  UseListPasswordPolicyOverridesKeyFn,
+  useDeletePasswordPolicyOverride,
+  useUpsertPasswordPolicyOverride,
   PasswordPolicyOverrideDto,
   PasswordPolicyRole,
 } from '@attraccess/react-query-client';
@@ -81,27 +81,26 @@ export function RoleOverridesModal({ role, existing, globalPolicy, onClose }: Ro
     return value === null || Number.isInteger(value);
   });
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: UsePasswordPolicyAdminServiceListPasswordPolicyOverridesKeyFn() });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: UseListPasswordPolicyOverridesKeyFn() });
 
-  const { mutate: upsert, isPending: isUpserting } = usePasswordPolicyAdminServiceUpsertPasswordPolicyOverride({
+  const { mutate: upsert, isPending: isUpserting } = useUpsertPasswordPolicyOverride(undefined, {
     onSuccess: (_data, vars) => {
       invalidate();
       toast.success({
         title: t('overrides.saved.title'),
-        description: t('overrides.saved.description', { role: t(`overrides.roles.${vars.role}`) }),
+        description: t('overrides.saved.description', { role: t(`overrides.roles.${vars.path.role}`) }),
       });
       onClose();
     },
     onError: () => toast.error({ title: t('errorToast.title'), description: t('errorToast.description') }),
   });
 
-  const { mutate: remove, isPending: isRemoving } = usePasswordPolicyAdminServiceDeletePasswordPolicyOverride({
+  const { mutate: remove, isPending: isRemoving } = useDeletePasswordPolicyOverride(undefined, {
     onSuccess: (_data, vars) => {
       invalidate();
       toast.success({
         title: t('overrides.removed.title'),
-        description: t('overrides.removed.description', { role: t(`overrides.roles.${vars.role}`) }),
+        description: t('overrides.removed.description', { role: t(`overrides.roles.${vars.path.role}`) }),
       });
       onClose();
     },
@@ -118,7 +117,7 @@ export function RoleOverridesModal({ role, existing, globalPolicy, onClose }: Ro
     // state, and storing an all-null row would be a lie about intent.
     if (isAllInherit) {
       if (existing) {
-        remove({ role });
+        remove({ path: { role } });
       } else {
         onClose();
       }
@@ -129,7 +128,7 @@ export function RoleOverridesModal({ role, existing, globalPolicy, onClose }: Ro
     POLICY_FIELD_KEYS.forEach((key) => {
       (requestBody as Record<string, unknown>)[key as string] = valueOf(key as OverrideKey);
     });
-    upsert({ role, requestBody });
+    upsert({ path: { role }, body: requestBody });
   };
 
   return (

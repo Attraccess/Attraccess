@@ -1,12 +1,12 @@
 import { Chip } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { SSOProvider, UserRole } from '@attraccess/react-query-client';
+import { SsoProvider, UserRole } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
 
 interface SsoAssignmentBadgesProps {
   assignments: UserRole[];
-  providersById?: Map<number, SSOProvider>;
+  providersById?: Map<number, SsoProvider>;
 }
 
 export function SsoAssignmentBadges({ assignments, providersById }: SsoAssignmentBadgesProps) {

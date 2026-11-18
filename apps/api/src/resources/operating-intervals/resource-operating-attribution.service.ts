@@ -419,7 +419,7 @@ export class ResourceOperatingAttributionService {
       manager?.getRepository(ResourceUsageLifecycleAttempt) ?? this.lifecycleAttemptRepository
     ).find({
       where: { resourceId: In(resourceIds), kind: In(['end', 'takeover']) },
-      select: ['previousUsageId', 'transitionTime'],
+      select: { previousUsageId: true, transitionTime: true },
     });
     return new Map(
       attempts.flatMap((attempt) =>
@@ -460,14 +460,14 @@ export class ResourceOperatingAttributionService {
         ];
       });
       const [intervals, usages, pendingSessionEnds] = await Promise.all([
-        intervalRepository.find({ where, select: ['resourceId', 'startTime', 'endTime'] }),
+        intervalRepository.find({ where, select: { resourceId: true, startTime: true, endTime: true } }),
         usageRepository.find({
           where: where.map((condition) => ({
             ...condition,
             usageAction: ResourceUsageAction.Usage,
             lifecyclePending: false,
           })),
-          select: ['id', 'resourceId', 'startTime', 'endTime'],
+          select: { id: true, resourceId: true, startTime: true, endTime: true },
         }),
         this.getPendingSessionEnds(batchIds, manager),
       ]);

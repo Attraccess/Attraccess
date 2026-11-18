@@ -34,7 +34,7 @@ export class LiveNotificationsService {
 
     const transaction = await this.billingTransactionRepository.findOne({
       where: { id: transactionId },
-      relations: ['items'],
+      relations: { items: true },
     });
     if (!transaction) {
       throw new BadRequestException('Transaction not found');

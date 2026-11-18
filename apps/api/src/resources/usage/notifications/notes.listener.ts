@@ -35,7 +35,7 @@ export class ResourceUsageNoteNotificationListener {
     try {
       const resource = await this.resourceRepository.findOne({
         where: { id: event.resourceId },
-        relations: ['groups'],
+        relations: { groups: true },
       });
       if (!resource) {
         this.logger.warn(`Usage note for missing resource ${event.resourceId}; skipping notifications`);
@@ -89,7 +89,7 @@ export class ResourceUsageNoteNotificationListener {
     }
     const introducerRows = await this.resourceIntroducerRepository.find({
       where: introducerWhere,
-      relations: ['user'],
+      relations: { user: true },
     });
 
     const byId = new Map<number, User>();

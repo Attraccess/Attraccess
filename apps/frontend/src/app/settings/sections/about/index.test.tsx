@@ -1,17 +1,13 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  useSystemServiceGetCurrentVersion,
-  useSystemServiceGetSystemInfo,
-  useSystemServiceGetUpdateStatus,
-} from '@attraccess/react-query-client';
+import { useGetCurrentVersion, useGetSystemInfo, useGetUpdateStatus } from '@attraccess/react-query-client';
 import { AboutSection } from './index';
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useSystemServiceGetCurrentVersion: vi.fn(),
-  useSystemServiceGetUpdateStatus: vi.fn(),
-  useSystemServiceGetSystemInfo: vi.fn(),
+  useGetCurrentVersion: vi.fn(),
+  useGetUpdateStatus: vi.fn(),
+  useGetSystemInfo: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -24,14 +20,14 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 describe('AboutSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useSystemServiceGetCurrentVersion).mockReturnValue({
+    vi.mocked(useGetCurrentVersion).mockReturnValue({
       data: { version: '1.2.3', commitHash: 'abcdef1234567890' },
       isLoading: false,
-    } as ReturnType<typeof useSystemServiceGetCurrentVersion>);
-    vi.mocked(useSystemServiceGetUpdateStatus).mockReturnValue({
+    } as ReturnType<typeof useGetCurrentVersion>);
+    vi.mocked(useGetUpdateStatus).mockReturnValue({
       data: { checkSucceeded: true, isUpdateAvailable: false },
-    } as ReturnType<typeof useSystemServiceGetUpdateStatus>);
-    vi.mocked(useSystemServiceGetSystemInfo).mockReturnValue({
+    } as ReturnType<typeof useGetUpdateStatus>);
+    vi.mocked(useGetSystemInfo).mockReturnValue({
       data: {
         usersTotal: 12,
         resourcesTotal: 7,
@@ -41,7 +37,7 @@ describe('AboutSection', () => {
         uptimeSeconds: 7200,
         nodeVersion: 'v22.11.0',
       },
-    } as ReturnType<typeof useSystemServiceGetSystemInfo>);
+    } as ReturnType<typeof useGetSystemInfo>);
   });
 
   it('keeps the version and system totals reachable after the settings redesign', () => {
@@ -57,14 +53,14 @@ describe('AboutSection', () => {
   });
 
   it('surfaces an available update with a link to the release', () => {
-    vi.mocked(useSystemServiceGetUpdateStatus).mockReturnValue({
+    vi.mocked(useGetUpdateStatus).mockReturnValue({
       data: {
         checkSucceeded: true,
         isUpdateAvailable: true,
         latestVersion: '2.0.0',
         latestRelease: { htmlUrl: 'https://github.com/Attraccess/Attraccess/releases/tag/v2.0.0' },
       },
-    } as ReturnType<typeof useSystemServiceGetUpdateStatus>);
+    } as ReturnType<typeof useGetUpdateStatus>);
 
     render(<AboutSection />);
 

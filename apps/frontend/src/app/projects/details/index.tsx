@@ -7,12 +7,12 @@ import { ProjectUsageCharts } from './components/projectUsageCharts/index';
 import { ProjectUsageHistory } from './components/projectUsageHistory/index';
 import {
   ApiError,
-  useProjectsServiceArchiveProject,
-  useProjectsServiceDeleteOneProject,
-  useProjectsServiceFindManyProjectsKey,
-  useProjectsServiceFindOneProject,
-  useProjectsServiceFindOneProjectKey,
-  useProjectsServiceUnarchiveProject,
+  useArchiveProject,
+  useDeleteOneProject,
+  useFindManyProjectsKey,
+  useFindOneProject,
+  useFindOneProjectKey,
+  useUnarchiveProject,
 } from '@attraccess/react-query-client';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useCallback, useState } from 'react';
@@ -49,19 +49,19 @@ export function ProjectDetailsPage() {
     },
   });
 
-  const { data: project } = useProjectsServiceFindOneProject({ id: projectId }, undefined, {
+  const { data: project } = useFindOneProject({ path: { id: projectId } }, undefined, {
     enabled: hasValidProjectId,
   });
   const [showDeleteConfirmationModal, setShowDeleteConfirmationModal] = useState(false);
 
-  const { mutate: deleteProject } = useProjectsServiceDeleteOneProject({
+  const { mutate: deleteProject } = useDeleteOneProject(undefined, {
     onSuccess: () => {
       toast.success({
         title: t('actions.delete.success.title'),
         description: t('actions.delete.success.description', { name: project?.name ?? '' }),
       });
       queryClient.invalidateQueries({
-        queryKey: [useProjectsServiceFindManyProjectsKey],
+        queryKey: [useFindManyProjectsKey],
       });
       navigate('/projects');
     },
@@ -75,17 +75,17 @@ export function ProjectDetailsPage() {
     },
   });
 
-  const { mutate: archiveProject, isPending: isArchiving } = useProjectsServiceArchiveProject({
+  const { mutate: archiveProject, isPending: isArchiving } = useArchiveProject(undefined, {
     onSuccess: () => {
       toast.success({
         title: t('actions.archive.success.title'),
         description: t('actions.archive.success.description', { name: project?.name ?? '' }),
       });
       queryClient.invalidateQueries({
-        queryKey: [useProjectsServiceFindManyProjectsKey],
+        queryKey: [useFindManyProjectsKey],
       });
       queryClient.invalidateQueries({
-        queryKey: [useProjectsServiceFindOneProjectKey],
+        queryKey: [useFindOneProjectKey],
       });
     },
     onError: (error) => {
@@ -98,17 +98,17 @@ export function ProjectDetailsPage() {
     },
   });
 
-  const { mutate: unarchiveProject, isPending: isUnarchiving } = useProjectsServiceUnarchiveProject({
+  const { mutate: unarchiveProject, isPending: isUnarchiving } = useUnarchiveProject(undefined, {
     onSuccess: () => {
       toast.success({
         title: t('actions.unarchive.success.title'),
         description: t('actions.unarchive.success.description', { name: project?.name ?? '' }),
       });
       queryClient.invalidateQueries({
-        queryKey: [useProjectsServiceFindManyProjectsKey],
+        queryKey: [useFindManyProjectsKey],
       });
       queryClient.invalidateQueries({
-        queryKey: [useProjectsServiceFindOneProjectKey],
+        queryKey: [useFindOneProjectKey],
       });
     },
     onError: (error) => {
@@ -122,7 +122,7 @@ export function ProjectDetailsPage() {
   });
 
   const onDeleteProject = useCallback(() => {
-    deleteProject({ id: projectId });
+    deleteProject({ path: { id: projectId } });
   }, [deleteProject, projectId]);
 
   return (
@@ -177,14 +177,14 @@ export function ProjectDetailsPage() {
                       label: t('actions.unarchive.label'),
                       icon: <ArchiveRestoreIcon className="size-4" />,
                       isPending: isUnarchiving,
-                      onPress: () => unarchiveProject({ id: projectId }),
+                      onPress: () => unarchiveProject({ path: { id: projectId } }),
                     }
                   : {
                       key: 'archive',
                       label: t('actions.archive.label'),
                       icon: <ArchiveIcon className="size-4" />,
                       isPending: isArchiving,
-                      onPress: () => archiveProject({ id: projectId }),
+                      onPress: () => archiveProject({ path: { id: projectId } }),
                     },
                 {
                   key: 'delete',

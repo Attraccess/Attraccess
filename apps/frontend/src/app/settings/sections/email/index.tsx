@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Spinner } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useSettingsServiceGetSystemSettings } from '@attraccess/react-query-client';
+import { useGetSystemSettings } from '@attraccess/react-query-client';
 import { SettingsSection } from '../../components/SettingsSection';
 import { EmailSmtpForm, SmtpDraft } from './EmailSmtpForm';
 import { EmailStatusAside } from './EmailStatusAside';
@@ -16,7 +16,7 @@ export function EmailSection() {
   const { t } = useTranslations({ en, de });
   // One subscription, passed down: the form and the aside subscribing after the gate refetched the
   // settings on mount (the shared client has no `staleTime`).
-  const { data: settings, isLoading } = useSettingsServiceGetSystemSettings();
+  const { data: settings, isLoading } = useGetSystemSettings();
   // Above the gate, so a refetch after a failed load (back to loading, form unmounted) keeps the edit.
   const [draft, setDraft] = useState<SmtpDraft>({});
   const [hasAttemptedSave, setHasAttemptedSave] = useState(false);

@@ -270,7 +270,10 @@ describe('SsoController', () => {
 
         await fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }, linkRequest);
 
-        expect(usersService.findOne).toHaveBeenCalledWith({ email: 'user@example.com' }, ['authenticationDetails']);
+        expect(usersService.findOne).toHaveBeenCalledWith(
+          { email: 'user@example.com' },
+          { authenticationDetails: true },
+        );
       });
     });
 
@@ -601,7 +604,7 @@ describe('SsoController', () => {
         authenticationDetails: [{ type: AuthenticationType.SSO, providerType: SSOProviderType.OIDC, providerId: 1 }],
       });
       expect(await fixture.controller.oidcLogout('1', request, { email: ' user@example.com ' })).toEqual({ OK: true });
-      expect(users.findOne).toHaveBeenCalledWith({ email: 'user@example.com' }, ['authenticationDetails']);
+      expect(users.findOne).toHaveBeenCalledWith({ email: 'user@example.com' }, { authenticationDetails: true });
       (users.findOne as jest.Mock).mockResolvedValue({
         id: 55,
         authenticationDetails: [{ type: AuthenticationType.SSO, providerType: SSOProviderType.OIDC, providerId: 99 }],

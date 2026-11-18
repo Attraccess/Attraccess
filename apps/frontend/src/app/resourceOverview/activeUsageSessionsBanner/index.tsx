@@ -12,10 +12,7 @@ import { Check, CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  useResourcesServiceGetAllResources,
-  useResourcesServiceGetAllResourcesKey,
-} from '@attraccess/react-query-client';
+import { useGetAllResources, useGetAllResourcesKey } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { MY_SESSIONS_QUERY } from './mySessionsQuery';
 import { useEndOwnSession, useEndSessionErrorMessage } from './useEndOwnSession';
@@ -32,10 +29,8 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
   const toast = useToastMessage();
 
   // Fetch just the total count (1 item per page is sufficient)
-  const { data, isLoading, isFetching, refetch } = useResourcesServiceGetAllResources({
-    onlyInUseByMe: true,
-    page: 1,
-    limit: 1,
+  const { data, isLoading, isFetching, refetch } = useGetAllResources({
+    query: { onlyInUseByMe: true, page: 1, limit: 1 },
   });
 
   const activeCount = useMemo(() => data?.total ?? 0, [data?.total]);
@@ -53,7 +48,7 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
     data: activeResourcesResponse,
     isLoading: isLoadingActiveResources,
     isFetching: isFetchingActiveResources,
-  } = useResourcesServiceGetAllResources(MY_SESSIONS_QUERY, undefined, {
+  } = useGetAllResources(MY_SESSIONS_QUERY, undefined, {
     enabled: isModalOpen,
     refetchOnWindowFocus: false,
   });
@@ -133,7 +128,7 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
       );
 
       // Invalidate lists regardless of outcome
-      await queryClient.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
+      await queryClient.invalidateQueries({ queryKey: [useGetAllResourcesKey] });
 
       // If all succeeded -> show completion state and auto-close
       const rejectedResults = results.filter((r) => r.status === 'rejected');

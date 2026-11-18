@@ -33,12 +33,12 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey: 'schedules',
-  useResourceMaintenanceSchedulesServiceUpdateMaintenanceSchedule: ({ onSuccess }: { onSuccess: () => void }) => {
+  useFindMaintenanceSchedulesKey: 'schedules',
+  useUpdateMaintenanceSchedule: (_mutationKey: unknown, { onSuccess }: { onSuccess: () => void }) => {
     state.success = onSuccess;
     return { mutate: state.update };
   },
-  useResourceMaintenanceSchedulesServiceGetMaintenanceSchedule: (...args: unknown[]) => {
+  useGetMaintenanceSchedule: (...args: unknown[]) => {
     state.query(...args);
     return { data: state.existing };
   },
@@ -117,7 +117,7 @@ it.each([Trigger.USAGE_HOURS, Trigger.USAGE_COUNT, Trigger.TIME_INTERVAL])(
     fireEvent.click(screen.getByRole('button', { name: 'schedules.actions.edit' }));
     expect(edit).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole('button', { name: 'schedules.actions.pause' }));
-    expect(state.update).toHaveBeenCalledWith({ resourceId: 7, scheduleId: 4, requestBody: { enabled: false } });
+    expect(state.update).toHaveBeenCalledWith({ path: { resourceId: 7, scheduleId: 4 }, body: { enabled: false } });
     act(() => state.success?.());
     expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['schedules'] });
     fireEvent.click(screen.getByRole('button', { name: 'schedules.actions.delete' }));
@@ -137,13 +137,15 @@ it('resumes a paused unnamed schedule', () => {
     </Accordion>,
   );
   fireEvent.click(screen.getByRole('button', { name: 'schedules.actions.resume' }));
-  expect(state.update).toHaveBeenCalledWith({ resourceId: 7, scheduleId: 4, requestBody: { enabled: true } });
+  expect(state.update).toHaveBeenCalledWith({ path: { resourceId: 7, scheduleId: 4 }, body: { enabled: true } });
 });
 it('opens new and existing schedules and closes on form save or cancel', async () => {
   const close = vi.fn();
   const view = render(<ScheduleFormDrawer resourceId={7} supportsOperatingDuration isOpen onClose={close} />);
   expect(await screen.findByText('form.titleCreate')).toBeTruthy();
-  expect(state.query).toHaveBeenLastCalledWith({ resourceId: 7, scheduleId: 0 }, undefined, { enabled: false });
+  expect(state.query).toHaveBeenLastCalledWith({ path: { resourceId: 7, scheduleId: 0 } }, undefined, {
+    enabled: false,
+  });
   expect(state.form).toMatchObject({ resourceId: 7, supportsOperatingDuration: true, scheduleId: undefined });
   fireEvent.click(screen.getByText('Save form'));
   expect(close).toHaveBeenCalledOnce();
@@ -151,7 +153,9 @@ it('opens new and existing schedules and closes on form save or cancel', async (
   state.existing = { name: 'Inspection' };
   render(<ScheduleFormDrawer resourceId={7} scheduleId={4} supportsOperatingDuration={false} isOpen onClose={close} />);
   expect(await screen.findByText('form.titleEdit')).toBeTruthy();
-  expect(state.query).toHaveBeenLastCalledWith({ resourceId: 7, scheduleId: 4 }, undefined, { enabled: true });
+  expect(state.query).toHaveBeenLastCalledWith({ path: { resourceId: 7, scheduleId: 4 } }, undefined, {
+    enabled: true,
+  });
   fireEvent.click(screen.getByText('Cancel form'));
   expect(close).toHaveBeenCalledTimes(2);
 });

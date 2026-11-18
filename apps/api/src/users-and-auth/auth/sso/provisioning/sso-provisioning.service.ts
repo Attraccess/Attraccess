@@ -137,7 +137,7 @@ export class SsoProvisioningService {
     let user = subject ? await this.usersService.findOneBySSO(providerType, providerId, subject) : null;
 
     if (!user && email) {
-      user = await this.usersService.findOne({ email }, ['authenticationDetails']);
+      user = await this.usersService.findOne({ email }, { authenticationDetails: true });
       const isMatchingProvider = user?.authenticationDetails?.some(
         (detail) =>
           detail.type === AuthenticationType.SSO &&

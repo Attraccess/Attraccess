@@ -3,7 +3,7 @@ import { AttractapCardRelayCapability1792700000000 } from './1792700000000-attra
 
 describe('AttractapCardRelayCapability migration', () => {
   it('marks existing and new readers as not relaying card APDUs until they report it, and can be reverted', async () => {
-    const database = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    const database = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
     const runner = database.createQueryRunner();
     try {
       await runner.query(`CREATE TABLE "attractap" (id integer PRIMARY KEY, name varchar NOT NULL)`);
@@ -29,7 +29,7 @@ describe('AttractapCardRelayCapability migration', () => {
   });
 
   it('keeps an existing column and its values when the migration ran before under an earlier name', async () => {
-    const database = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    const database = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
     const runner = database.createQueryRunner();
     try {
       await runner.query(`CREATE TABLE "attractap" (id integer PRIMARY KEY, name varchar NOT NULL)`);

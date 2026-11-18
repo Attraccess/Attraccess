@@ -7,9 +7,9 @@ import { Button, StatusDialog, useTranslations } from '@attraccess/plugins-front
 import en from './registrationForm.en.json';
 import de from './registrationForm.de.json';
 import {
-  useUsersServiceCreateOneUser,
-  useUsersServiceFindManyKey,
-  usePasswordPolicyServiceGetPublicPasswordPolicy,
+  useCreateOneUser,
+  useFindManyKey,
+  useGetPublicPasswordPolicy,
   ApiError,
   AuthenticationType,
 } from '@attraccess/react-query-client';
@@ -58,7 +58,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
   const [passwordConfirmation, setPasswordConfirmation] = useState<string>('');
   const [serverErrors, setServerErrors] = useState<PolicyError[]>([]);
 
-  const { data: policyData } = usePasswordPolicyServiceGetPublicPasswordPolicy();
+  const { data: policyData } = useGetPublicPasswordPolicy();
   const policy = useMemo<PublicPasswordPolicy>(
     () => (policyData as PublicPasswordPolicy | undefined) ?? FALLBACK_POLICY,
     [policyData],
@@ -115,10 +115,10 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
     [isUsernameValid, trimmedEmail, password, passwordConfirmation, passwordsDontMatch, localPolicyResult.ok],
   );
 
-  const { mutate: createUserMutate, isPending } = useUsersServiceCreateOneUser({
+  const { mutate: createUserMutate, isPending } = useCreateOneUser(undefined, {
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [useUsersServiceFindManyKey],
+        queryKey: [useFindManyKey],
       });
       setServerErrors([]);
       open();
@@ -148,7 +148,7 @@ export function RegistrationForm({ onHasAccount }: RegisterFormProps) {
       setServerErrors([]);
       setRegisteredEmail(trimmedEmail);
       createUserMutate({
-        requestBody: {
+        body: {
           username: trimmedUsername,
           password,
           email: trimmedEmail,

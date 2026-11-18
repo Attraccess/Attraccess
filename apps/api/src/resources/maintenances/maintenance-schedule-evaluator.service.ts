@@ -111,7 +111,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
   private async persistTriggeredSchedules(
     toCreate: Array<{ resourceId: number; schedule: ResourceMaintenanceSchedule }>,
   ) {
-    if (this.scheduleRepository.manager.connection?.options.type === 'sqlite') {
+    if (this.scheduleRepository.manager.connection?.options.type === 'better-sqlite3') {
       // Revalidate bulk candidates through the independent snapshot reader. Each
       // resource gets a short write transaction, letting usage proceed between them.
       for (const { resourceId } of toCreate) {
@@ -200,7 +200,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
       // 1. All enabled schedules with trigger configs
       const allSchedules = await this.scheduleRepository.find({
         where: { enabled: true },
-        relations: ['usageHoursConfig', 'usageCountConfig', 'timeIntervalConfig'],
+        relations: { usageHoursConfig: true, usageCountConfig: true, timeIntervalConfig: true },
       });
 
       if (allSchedules.length === 0) return;
@@ -417,7 +417,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
     // 2. Resource createdAt — fallback baseline when no prior maintenance for a schedule
     const resources = await this.resourceRepository.find({
       where: { id: In(resourceIds) },
-      select: ['id', 'createdAt'],
+      select: { id: true, createdAt: true },
     });
     const resourceCreatedAtMap = new Map<number, Date>(resources.map((r) => [r.id, r.createdAt]));
 

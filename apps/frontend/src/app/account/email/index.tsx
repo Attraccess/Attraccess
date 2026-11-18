@@ -1,9 +1,4 @@
-import {
-  ApiError,
-  useUsersServiceChangeMyEmail,
-  useUsersServiceGetCurrent,
-  useUsersServiceGetCurrentKey,
-} from '@attraccess/react-query-client';
+import { ApiError, useChangeMyEmail, useGetCurrent, useGetCurrentKey } from '@attraccess/react-query-client';
 import { Input, Label, TextField, useOverlayState } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
@@ -15,7 +10,7 @@ import de from './de.json';
 export function EmailForm() {
   const { t } = useTranslations({ en, de });
 
-  const { data: me, isLoading: isLoadingMe } = useUsersServiceGetCurrent();
+  const { data: me, isLoading: isLoadingMe } = useGetCurrent();
   const [email, setEmail] = useState('');
   const { isOpen, open, close } = useOverlayState();
   const queryClient = useQueryClient();
@@ -23,10 +18,10 @@ export function EmailForm() {
   const isEmailValid = trimmedEmail.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail);
   const { success: showSuccess, error: showError } = useToastMessage();
 
-  const { mutate, isPending } = useUsersServiceChangeMyEmail({
+  const { mutate, isPending } = useChangeMyEmail(undefined, {
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [useUsersServiceGetCurrentKey],
+        queryKey: [useGetCurrentKey],
       });
       showSuccess({ title: t('messages.updated') });
       close();
@@ -54,9 +49,7 @@ export function EmailForm() {
   }, [isEmailValid, open]);
 
   const confirmEmailChange = useCallback(() => {
-    mutate({
-      requestBody: { email: trimmedEmail },
-    });
+    mutate({ body: { email: trimmedEmail } });
   }, [mutate, trimmedEmail]);
 
   return (

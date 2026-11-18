@@ -59,7 +59,7 @@ export class AnalyticsService {
         id: 'DESC',
         userId: 'DESC',
       },
-      relations: ['user', 'resource', 'supervisorUser'],
+      relations: { user: true, resource: true, supervisorUser: true },
       skip: (page - 1) * limit,
       take: limit,
     };
@@ -83,7 +83,7 @@ export class AnalyticsService {
         id: 'DESC',
         userId: 'DESC',
       },
-      relations: ['user', 'initiator', 'resourceUsage', 'resourceUsage.resource', 'items'],
+      relations: { user: true, initiator: true, resourceUsage: { resource: true }, items: true },
       skip: (page - 1) * limit,
       take: limit,
     };
@@ -236,7 +236,7 @@ export class AnalyticsService {
           { ...usage, endTime: MoreThan(start) },
         ],
         order: { startTime: 'ASC' },
-        select: ['id', 'startTime'],
+        select: { id: true, startTime: true },
       }),
       this.resourceRepository.manager.getRepository(ResourceOperatingInterval).findOne({
         where: [
@@ -244,7 +244,7 @@ export class AnalyticsService {
           { ...overlapping, endTime: MoreThan(start) },
         ],
         order: { startTime: 'ASC' },
-        select: ['id', 'startTime'],
+        select: { id: true, startTime: true },
       }),
     ]);
     const firstStarts = [firstUsage, firstInterval].flatMap((record) => (record ? [record.startTime.getTime()] : []));

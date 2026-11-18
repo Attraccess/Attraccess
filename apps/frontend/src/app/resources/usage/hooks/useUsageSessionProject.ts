@@ -3,10 +3,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ResourceUsage,
-  useResourcesServiceResourceUsageUpdateSessionProject,
-  UseResourcesServiceResourceUsageGetHistoryKeyFn,
-  UseResourcesServiceResourceUsageGetSessionKeyFn,
-  useProjectsServiceGetProjectUsageHistoryKey,
+  useResourceUsageUpdateSessionProject,
+  UseResourceUsageGetHistoryKeyFn,
+  UseResourceUsageGetSessionKeyFn,
+  useGetProjectUsageHistoryKey,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../../components/toastProvider';
 import en from '../components/HistoryTable/utils/translations/en.json';
@@ -21,7 +21,7 @@ export function useUsageSessionProject(resourceId: number) {
   const invalidateHistory = useCallback(() => {
     return queryClient.invalidateQueries({
       predicate: (query) => {
-        const baseHistoryKey = UseResourcesServiceResourceUsageGetHistoryKeyFn({ resourceId });
+        const baseHistoryKey = UseResourceUsageGetHistoryKeyFn({ path: { resourceId } });
         return (
           query.queryKey[0] === baseHistoryKey[0] &&
           query.queryKey.length > 1 &&
@@ -42,14 +42,14 @@ export function useUsageSessionProject(resourceId: number) {
     [projectOverrides],
   );
 
-  const { mutate: updateSessionProject } = useResourcesServiceResourceUsageUpdateSessionProject({
+  const { mutate: updateSessionProject } = useResourceUsageUpdateSessionProject(undefined, {
     onSuccess: async (updatedUsage) => {
       await Promise.all([
         invalidateHistory(),
         queryClient.invalidateQueries({
-          queryKey: UseResourcesServiceResourceUsageGetSessionKeyFn({ resourceId, usageId: updatedUsage.id }),
+          queryKey: UseResourceUsageGetSessionKeyFn({ path: { resourceId, usageId: updatedUsage.id } }),
         }),
-        queryClient.invalidateQueries({ queryKey: [useProjectsServiceGetProjectUsageHistoryKey] }),
+        queryClient.invalidateQueries({ queryKey: [useGetProjectUsageHistoryKey] }),
       ]);
       setProjectOverrides((prev) => {
         const next = { ...prev };
@@ -61,7 +61,7 @@ export function useUsageSessionProject(resourceId: number) {
     onError: (_error, variables) => {
       setProjectOverrides((prev) => {
         const next = { ...prev };
-        delete next[variables.usageId];
+        delete next[variables.path.usageId];
         return next;
       });
       toast.error({ title: tHistoryTable('rows.machine.project.updateError') });
@@ -73,7 +73,7 @@ export function useUsageSessionProject(resourceId: number) {
 
       setUpdatingSessionIds((prev) => {
         const next = { ...prev };
-        delete next[variables.usageId];
+        delete next[variables.path.usageId];
         return next;
       });
     },
@@ -97,11 +97,7 @@ export function useUsageSessionProject(resourceId: number) {
         [session.id]: true,
       }));
 
-      updateSessionProject({
-        resourceId,
-        usageId: session.id,
-        requestBody: { projectId: projectId ?? null },
-      });
+      updateSessionProject({ path: { resourceId, usageId: session.id }, body: { projectId: projectId ?? null } });
     },
     [resourceId, resolveProjectId, updateSessionProject],
   );

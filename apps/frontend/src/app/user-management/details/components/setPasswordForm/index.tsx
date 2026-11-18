@@ -2,7 +2,7 @@ import React, { HTMLAttributes, useCallback, useMemo, useState } from 'react';
 import { cn } from '@heroui/react';
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
-import { useUsersServiceSetUserPassword } from '@attraccess/react-query-client';
+import { useSetUserPassword } from '@attraccess/react-query-client';
 import { PasswordField } from '../../../../../components/PasswordField';
 import { PolicyError } from '@attraccess/shared';
 import { extractPolicyErrors } from '../../../../../utils/policyErrors';
@@ -29,7 +29,7 @@ export const SetPasswordForm: React.FC<SetPasswordFormProps & Omit<HTMLAttribute
   const [confirmPassword, setConfirmPassword] = useState('');
   const [serverErrors, setServerErrors] = useState<PolicyError[]>([]);
 
-  const { mutate: setPasswordMutate, isPending: isSettingPassword } = useUsersServiceSetUserPassword({
+  const { mutate: setPasswordMutate, isPending: isSettingPassword } = useSetUserPassword(undefined, {
     onSuccess: () => {
       showToast({
         title: t('passwordUpdated'),
@@ -58,10 +58,7 @@ export const SetPasswordForm: React.FC<SetPasswordFormProps & Omit<HTMLAttribute
 
   const handleSubmit = useCallback(() => {
     setServerErrors([]);
-    setPasswordMutate({
-      id: userId,
-      requestBody: { password },
-    });
+    setPasswordMutate({ path: { id: userId }, body: { password } });
   }, [password, setPasswordMutate, userId]);
 
   return (

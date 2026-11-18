@@ -8,10 +8,7 @@ import {
 import { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  UseSettingsServiceGetMetricsSettingsKeyFn,
-  useSettingsServiceUpdateMetricsSettings,
-} from '@attraccess/react-query-client';
+import { UseGetMetricsSettingsKeyFn, useUpdateMetricsSettings } from '@attraccess/react-query-client';
 import { SettingsRow } from '../../components/SettingsRow';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
 import { useToastMessage } from '../../../../components/toastProvider';
@@ -46,7 +43,7 @@ export function MonitoringSlowQueryThreshold({
   // even when there is nothing to show.
   const threshold = thresholdDraft ?? savedThreshold ?? NaN;
 
-  const { mutate: updateThreshold, isPending: isSavingThreshold } = useSettingsServiceUpdateMetricsSettings({
+  const { mutate: updateThreshold, isPending: isSavingThreshold } = useUpdateMetricsSettings(undefined, {
     onSuccess(data) {
       // Release the draft pin, or `threshold` would ignore the server for the lifetime of this
       // mount: a later change by someone else then shows a phantom "unsaved changes" bar holding a
@@ -57,7 +54,7 @@ export function MonitoringSlowQueryThreshold({
       // MetricsSettingsDto, so this is the authoritative post-write state and also covers the
       // server normalising what we sent (with the pin held, a normalised value would leave the bar
       // stuck dirty forever).
-      queryClient.setQueryData(UseSettingsServiceGetMetricsSettingsKeyFn(), data);
+      queryClient.setQueryData(UseGetMetricsSettingsKeyFn(), data);
       setThresholdDraft(undefined);
       toast.success({
         title: t('slowQueryThreshold.savedTitle'),
@@ -103,7 +100,7 @@ export function MonitoringSlowQueryThreshold({
           if (!isThresholdSavable) {
             return;
           }
-          updateThreshold({ requestBody: { slowQueryThresholdSeconds: threshold } });
+          updateThreshold({ body: { slowQueryThresholdSeconds: threshold } });
         }}
         onDiscard={() => setThresholdDraft(undefined)}
       />

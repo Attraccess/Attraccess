@@ -32,7 +32,7 @@ describe('SsoService', () => {
       expect(result).toEqual(fixture.mockSSOProviderWithOIDCConfig);
       expect(fixture.ssoProviderRepository.findOne).toHaveBeenCalledWith({
         where: { type: SSOProviderType.OIDC, id: 1 },
-        relations: ['oidcConfiguration'],
+        relations: { oidcConfiguration: true },
       });
     });
   });
@@ -43,7 +43,7 @@ describe('SsoService', () => {
       expect(result).toEqual(fixture.mockSSOProviderWithOIDCConfig);
       expect(fixture.ssoProviderRepository.findOne).toHaveBeenCalledWith({
         where: { id: 1 },
-        relations: ['oidcConfiguration', 'samlConfiguration'],
+        relations: { oidcConfiguration: true, samlConfiguration: true },
       });
     });
 

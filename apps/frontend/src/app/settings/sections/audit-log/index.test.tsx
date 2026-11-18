@@ -24,31 +24,32 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
   const original = await importOriginal<typeof import('@attraccess/react-query-client')>();
   // Route the generated hooks through the real react-query primitives into the test
   // doubles, so caching, retries and key-driven refetches behave as in production.
+  // `list` receives the query parameters of the list request.
   const { useMutation, useQuery } = await import('@tanstack/react-query');
   return {
     ...original,
-    AuditService: { auditControllerList: list },
-    useAuditServiceAuditControllerList: (params?: object, _queryKey?: unknown, options?: object) =>
+    auditControllerList: async ({ query }: { query?: object }) => ({ data: await list(query ?? {}) }),
+    useAuditControllerList: (params?: { query?: object }, _queryKey?: unknown, options?: object) =>
       useQuery({
-        queryKey: original.UseAuditServiceAuditControllerListKeyFn(params as never),
-        queryFn: () => list(params),
+        queryKey: original.UseAuditControllerListKeyFn(params as never),
+        queryFn: () => list(params?.query ?? {}),
         ...options,
       }),
-    useAuditServiceAuditControllerMeta: (_queryKey?: unknown, options?: object) =>
+    useAuditControllerMeta: (_clientOptions: unknown, _queryKey?: unknown, options?: object) =>
       useQuery({
-        queryKey: original.UseAuditServiceAuditControllerMetaKeyFn(),
+        queryKey: original.UseAuditControllerMetaKeyFn(),
         queryFn: () => getMeta(),
         ...options,
       }),
-    useSettingsServiceSettingsControllerGetAuditSettings: (_queryKey?: unknown, options?: object) =>
+    useSettingsControllerGetAuditSettings: (_clientOptions: unknown, _queryKey?: unknown, options?: object) =>
       useQuery({
-        queryKey: original.UseSettingsServiceSettingsControllerGetAuditSettingsKeyFn(),
+        queryKey: original.UseSettingsControllerGetAuditSettingsKeyFn(),
         queryFn: () => getSettings(),
         ...options,
       }),
-    useSettingsServiceSettingsControllerUpdateAuditSettings: (options?: object) =>
+    useSettingsControllerUpdateAuditSettings: (_mutationKey: unknown, options?: object) =>
       useMutation({
-        mutationFn: (variables: { requestBody: unknown }) => updateSettings(variables),
+        mutationFn: (variables: { body: unknown }) => updateSettings(variables),
         ...options,
       }),
   };
@@ -138,7 +139,7 @@ beforeEach(() => {
   list.mockResolvedValue({ items: [entry], nextCursor: 51 });
   getMeta.mockResolvedValue(meta);
   getSettings.mockResolvedValue(settings);
-  updateSettings.mockImplementation(async ({ requestBody }) => requestBody);
+  updateSettings.mockImplementation(async ({ body }) => body);
 });
 afterEach(() => {
   cleanup();
@@ -382,9 +383,7 @@ describe('audit admin workflows', () => {
     await userEvent.click(await screen.findByRole('switch', { name: 'Demo devices' }));
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() =>
-      expect(updateSettings).toHaveBeenCalledWith({
-        requestBody: { ...settings, plugin_domains_disabled: ['demo'] },
-      }),
+      expect(updateSettings).toHaveBeenCalledWith({ body: { ...settings, plugin_domains_disabled: ['demo'] } }),
     );
     expect(await screen.findByText('Logging settings saved.')).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Billing' })).toBeChecked();

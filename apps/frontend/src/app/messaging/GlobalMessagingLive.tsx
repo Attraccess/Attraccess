@@ -1,9 +1,6 @@
 // Keeps message caches current from the per-user messaging stream.
 // FEATURE: Messaging inbox live updates
-import {
-  Message,
-  useMessagingServiceMessagingMarkConversationRead,
-} from '@attraccess/react-query-client';
+import { Message, useMessagingMarkConversationRead } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -24,7 +21,7 @@ export function GlobalMessagingLive({ enabled = true }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const location = useLocation();
-  const { mutate: markConversationRead } = useMessagingServiceMessagingMarkConversationRead();
+  const { mutate: markConversationRead } = useMessagingMarkConversationRead();
 
   const handleLiveMessage = useCallback(
     (message: Message) => {
@@ -35,7 +32,7 @@ export function GlobalMessagingLive({ enabled = true }: Props) {
         location.pathname === '/messages' ? getConversationFromSearch(location.search) : null;
       if (message.conversationId === selectedConversationId) {
         markConversationRead(
-          { id: message.conversationId },
+          { path: { id: message.conversationId } },
           {
             onSuccess: ({ total }) => markConversationReadInCache(queryClient, message.conversationId, total),
           },

@@ -20,7 +20,7 @@ describe('visible resource existence', () => {
 
   beforeEach(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: [groupSchema, resourceSchema],
       synchronize: true,

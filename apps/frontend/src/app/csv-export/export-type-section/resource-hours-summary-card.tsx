@@ -1,7 +1,7 @@
 // Resource hours summary export card — fetches row count when range is set
 // FEATURE: CSV export — step 2 of new export flow
 import { DateValue, RangeValue } from '@heroui/react';
-import { useAnalyticsServiceGetResourceHoursSummaryInDateRange } from '@attraccess/react-query-client';
+import { useGetResourceHoursSummaryInDateRange } from '@attraccess/react-query-client';
 import { TimerIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { ExportTypeCard } from './export-type-card';
@@ -23,11 +23,9 @@ export function ResourceHoursSummaryCard(props: Props) {
     return { start: bounds.start.toISOString(), end: bounds.end.toISOString() };
   }, [range, hasRange]);
 
-  const { data, status } = useAnalyticsServiceGetResourceHoursSummaryInDateRange(
-    { start, end, limit: 1 },
-    [start, end],
-    { enabled: hasRange },
-  );
+  const { data, status } = useGetResourceHoursSummaryInDateRange({ query: { start, end, limit: 1 } }, [start, end], {
+    enabled: hasRange,
+  });
 
   return (
     <ExportTypeCard

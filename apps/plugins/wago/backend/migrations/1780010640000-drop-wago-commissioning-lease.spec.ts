@@ -3,7 +3,7 @@ import { WagoCommissioningLease1780000000011 } from '../commissioning/sessions/l
 import { DropWagoCommissioningLease1780010640000 } from './1780010640000-drop-wago-commissioning-lease';
 
 it('drops persisted interrupted coordinator state on upgrade', async () => {
-  const db = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+  const db = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
   const runner = db.createQueryRunner();
   try {
     await new WagoCommissioningLease1780000000011().up(runner);

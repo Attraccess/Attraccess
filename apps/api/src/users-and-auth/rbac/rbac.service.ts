@@ -160,7 +160,7 @@ export class RbacService {
   async getUserRoles(userId: number): Promise<UserRole[]> {
     return this.userRoleRepository.find({
       where: { userId },
-      relations: ['role'],
+      relations: { role: true },
     });
   }
 
@@ -260,7 +260,7 @@ export class RbacService {
 
     const role = await this.roleRepository.findOne({
       where: { id: roleId },
-      relations: ['rolePermissions'],
+      relations: { rolePermissions: true },
     });
 
     if (!role) {
@@ -299,7 +299,7 @@ export class RbacService {
 
     const role = await this.roleRepository.findOne({
       where: { id: roleId },
-      relations: ['rolePermissions'],
+      relations: { rolePermissions: true },
     });
     if (!role) {
       throw new NotFoundException(`Role ${roleId} not found`);
@@ -346,7 +346,7 @@ export class RbacService {
 
   /** Ceiling checks pass `includeUnavailable`: they must see dormant grants of unavailable plugin keys. */
   async getRoles(includeUnavailable = false): Promise<Role[]> {
-    const roles = await this.roleRepository.find({ relations: ['rolePermissions'] });
+    const roles = await this.roleRepository.find({ relations: { rolePermissions: true } });
     if (includeUnavailable) return roles;
     const unavailable = await this.getUnavailablePermissionKeys();
     return roles.map((role) => this.withoutUnavailable(role, unavailable));
@@ -358,7 +358,7 @@ export class RbacService {
 
   async getRolesWithUsage(): Promise<RoleWithUsageDto[]> {
     const roles = await this.roleRepository.find({
-      relations: ['rolePermissions'],
+      relations: { rolePermissions: true },
       order: { isSystemManaged: 'DESC', name: 'ASC' },
     });
     const counts = await this.userRoleRepository
@@ -448,7 +448,7 @@ export class RbacService {
         permissionKeys.map((permissionKey) => this.rolePermissionRepository.create({ roleId: role.id, permissionKey })),
       );
     }
-    const created = await this.roleRepository.findOne({ where: { id: role.id }, relations: ['rolePermissions'] });
+    const created = await this.roleRepository.findOne({ where: { id: role.id }, relations: { rolePermissions: true } });
     await this.audit.record(roleAuditEvent('role_created', created as Role, origin));
     return created as Role;
   }
@@ -459,7 +459,7 @@ export class RbacService {
     actorPermissions: Set<string>,
     origin: AuditOrigin,
   ): Promise<Role> {
-    const role = await this.roleRepository.findOne({ where: { id: roleId }, relations: ['rolePermissions'] });
+    const role = await this.roleRepository.findOne({ where: { id: roleId }, relations: { rolePermissions: true } });
     if (!role) throw new NotFoundException(`Role ${roleId} not found`);
     if (role.isSystemManaged) {
       throw new ForbiddenException('System-managed roles cannot be modified');
@@ -506,7 +506,7 @@ export class RbacService {
       await this.roleRepository.save({ id: role.id, name: role.name, description: role.description });
     }
 
-    const updated = await this.roleRepository.findOne({ where: { id: roleId }, relations: ['rolePermissions'] });
+    const updated = await this.roleRepository.findOne({ where: { id: roleId }, relations: { rolePermissions: true } });
     await this.audit.record(roleAuditEvent('role_updated', updated as Role, origin));
     return this.withoutUnavailable(updated as Role, await this.getUnavailablePermissionKeys());
   }
@@ -517,7 +517,7 @@ export class RbacService {
     origin: AuditOrigin,
     reassignToRoleId?: number,
   ): Promise<void> {
-    const role = await this.roleRepository.findOne({ where: { id: roleId }, relations: ['rolePermissions'] });
+    const role = await this.roleRepository.findOne({ where: { id: roleId }, relations: { rolePermissions: true } });
     if (!role) throw new NotFoundException(`Role ${roleId} not found`);
     if (role.isSystemManaged) {
       throw new ForbiddenException('System-managed roles cannot be deleted');
@@ -537,7 +537,7 @@ export class RbacService {
       }
       reassignTo = await this.roleRepository.findOne({
         where: { id: reassignToRoleId },
-        relations: ['rolePermissions'],
+        relations: { rolePermissions: true },
       });
       if (!reassignTo) throw new NotFoundException(`Role ${reassignToRoleId} not found`);
       this.assertActorHolds(

@@ -258,7 +258,7 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
 
   async function openDatabase(file: string): Promise<DataSource> {
     const database = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: file,
       entities: plugin.entities,
       synchronize: true,

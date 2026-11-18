@@ -16,13 +16,7 @@ import {
 import { KeyIcon, ShieldCheckIcon, ShieldOffIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  PaginatedUsersResponseDto,
-  SSOProvider,
-  useRbacServiceListRoles,
-  User,
-  UserRole,
-} from '@attraccess/react-query-client';
+import { PaginatedUsersResponseDto, SsoProvider, useListRoles, User, UserRole } from '@attraccess/react-query-client';
 import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
 import { useSsoProviders } from '../useSsoProviders';
 import en from '../en.json';
@@ -51,10 +45,10 @@ export function UserTable({ searchResult, roleIds, assignRoleId }: UserTableProp
   const { t } = useTranslations({ en, de });
   const { roleName } = useRbacCatalogTranslations();
   const navigate = useNavigate();
-  const { data: roles } = useRbacServiceListRoles();
+  const { data: roles } = useListRoles();
   const ssoProviders = useSsoProviders();
   const providersById = useMemo(
-    () => new Map((ssoProviders ?? []).map((provider: SSOProvider) => [provider.id, provider])),
+    () => new Map((ssoProviders ?? []).map((provider: SsoProvider) => [provider.id, provider])),
     [ssoProviders],
   );
 

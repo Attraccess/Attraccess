@@ -17,9 +17,9 @@ import { Save } from 'lucide-react';
 import {
   DocumentationType,
   Resource,
-  useResourcesServiceUpdateOneResource,
-  UseResourcesServiceGetOneResourceByIdKeyFn,
-  useResourcesServiceGetAllResourcesKey,
+  useUpdateOneResource,
+  UseGetOneResourceByIdKeyFn,
+  useGetAllResourcesKey,
 } from '@attraccess/react-query-client';
 import { Markdown } from '../../../components/markdown/index';
 import { useNavigate } from 'react-router-dom';
@@ -56,12 +56,12 @@ export function DocumentationEditorForm({
   const { documentationType, markdownContent, urlContent, selectedTab, validationErrors } = draft;
   const update = (patch: Partial<DocumentationDraft>) => onDraftChange((current) => ({ ...current, ...patch }));
 
-  const resourceQueryKey = UseResourcesServiceGetOneResourceByIdKeyFn({ id: resourceId });
+  const resourceQueryKey = UseGetOneResourceByIdKeyFn({ path: { id: resourceId } });
 
-  const updateResource = useResourcesServiceUpdateOneResource({
+  const updateResource = useUpdateOneResource(undefined, {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: resourceQueryKey });
-      queryClient.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
+      queryClient.invalidateQueries({ queryKey: [useGetAllResourcesKey] });
 
       success({
         title: t('notifications.saveSuccess.title'),
@@ -107,8 +107,8 @@ export function DocumentationEditorForm({
     }
 
     updateResource.mutate({
-      id: resourceId,
-      formData: {
+      path: { id: resourceId },
+      body: {
         documentationType: documentationType || undefined,
         documentationMarkdown: documentationType === DocumentationType.MARKDOWN ? markdownContent : undefined,
         documentationUrl: documentationType === DocumentationType.URL ? urlContent : undefined,

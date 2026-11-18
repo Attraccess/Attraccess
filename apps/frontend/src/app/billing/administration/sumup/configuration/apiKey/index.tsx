@@ -2,10 +2,10 @@ import { Button, PageHeader, PasswordInput, useTranslations } from '@attraccess/
 import en from './en.json';
 import de from './de.json';
 import {
-  useBillingServiceGetSumUpConfiguration,
-  useBillingServiceGetSumUpConfigurationKey,
-  useBillingServiceGetSumUpReadersKey,
-  useBillingServiceSetSumUpApiKey,
+  useGetSumUpConfiguration,
+  useGetSumUpConfigurationKey,
+  useGetSumUpReadersKey,
+  useSetSumUpApiKey,
 } from '@attraccess/react-query-client';
 import { Chip, Form, Link, Spinner } from '@heroui/react';
 import { ComponentPropsWithoutRef, useCallback, useRef, useState } from 'react';
@@ -31,9 +31,9 @@ export function ApiKeyCard(props: Omit<ComponentPropsWithoutRef<'section'>, 'chi
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { data: configuration, isLoading: isLoadingConfiguration } = useBillingServiceGetSumUpConfiguration();
+  const { data: configuration, isLoading: isLoadingConfiguration } = useGetSumUpConfiguration();
 
-  const { mutate: setSumUpApiKey, isPending: isPendingSetSumUpApiKey } = useBillingServiceSetSumUpApiKey({
+  const { mutate: setSumUpApiKey, isPending: isPendingSetSumUpApiKey } = useSetSumUpApiKey(undefined, {
     onError: (error: Error) => {
       toast.apiError({
         error,
@@ -49,10 +49,10 @@ export function ApiKeyCard(props: Omit<ComponentPropsWithoutRef<'section'>, 'chi
       });
 
       queryClient.invalidateQueries({
-        queryKey: [useBillingServiceGetSumUpConfigurationKey],
+        queryKey: [useGetSumUpConfigurationKey],
       });
       queryClient.invalidateQueries({
-        queryKey: [useBillingServiceGetSumUpReadersKey],
+        queryKey: [useGetSumUpReadersKey],
       });
     },
   });
@@ -68,7 +68,7 @@ export function ApiKeyCard(props: Omit<ComponentPropsWithoutRef<'section'>, 'chi
     }
 
     setSumUpApiKey({
-      requestBody: {
+      body: {
         apiKey,
       },
     });

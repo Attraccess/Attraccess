@@ -18,9 +18,12 @@ export function sqliteErrorCode(error: unknown): string | undefined {
   return candidates.find((code): code is string => typeof code === 'string' && /^SQLITE_[A-Z_]+$/.test(code));
 }
 
-/** A statement gave up waiting: for another connection's write lock, or for another flow's transaction. */
+/**
+ * A statement gave up waiting: for another connection's write lock, or for another flow's transaction. better-sqlite3
+ * reports extended result codes (SQLITE_BUSY_RECOVERY, ...), so any SQLITE_BUSY code counts.
+ */
 export function isSqliteBusyError(error: unknown): boolean {
-  return sqliteErrorCode(error) === 'SQLITE_BUSY';
+  return sqliteErrorCode(error)?.startsWith('SQLITE_BUSY') ?? false;
 }
 
 /** The 503 for a request whose database work gave up waiting. Warns at most once a minute, so bursts do not flood. */

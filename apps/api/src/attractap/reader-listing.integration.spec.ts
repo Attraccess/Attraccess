@@ -25,7 +25,7 @@ describe('reader listings and pairing state', () => {
 
   beforeAll(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: Object.values(entities),
     }).initialize();
@@ -55,7 +55,7 @@ describe('reader listings and pairing state', () => {
   });
 
   it('lists only paired readers', async () => {
-    const readers = await service.getPairedReaders({ relations: ['resources'] });
+    const readers = await service.getPairedReaders({ relations: { resources: true } });
     expect(readers.map((reader) => reader.name)).toEqual(['paired']);
     expect(readers[0].resources).toHaveLength(1);
   });

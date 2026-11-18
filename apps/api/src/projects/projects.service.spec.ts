@@ -262,7 +262,7 @@ describe('ProjectsService', () => {
     // Schema synchronization under CI coverage can exceed Jest's five-second default.
     it('rolls back SQLite usage detachment on a delete abort and records only the successful delete', async () => {
       const source = await new DataSource({
-        type: 'sqlite',
+        type: 'better-sqlite3',
         database: ':memory:',
         entities: Object.values(entities),
         synchronize: true,

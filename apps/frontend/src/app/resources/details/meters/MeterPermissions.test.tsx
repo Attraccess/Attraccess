@@ -21,10 +21,10 @@ vi.mock('../../../../hooks/useAuth', () => ({
   useAuth: () => ({ hasPermission: (permission: string) => state.permissions.has(permission) }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourceMeteringServiceListResourceMeters: () => ({ data: [state.meter] }),
-  useResourceMeteringServiceCreateResourceMeter: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useResourceMeteringServiceUpdateResourceMeter: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  UseResourceMeteringServiceListResourceMetersKeyFn: () => ['meters'],
+  useListResourceMeters: () => ({ data: [state.meter] }),
+  useCreateResourceMeter: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateResourceMeter: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  UseListResourceMetersKeyFn: () => ['meters'],
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({

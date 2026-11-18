@@ -82,7 +82,7 @@ export class UserRetrainingRequirement1780000000000 implements MigrationInterfac
     await queryRunner.query(`ALTER TABLE "resource_introduction" ADD COLUMN "retrainingNotifiedAt" datetime`);
 
     await queryRunner.query(
-      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES ($1, $2, $3, $4)`,
+      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES (?, ?, ?, ?)`,
       [
         'user-retraining-required',
         'Retraining required: {{resource.name}}',

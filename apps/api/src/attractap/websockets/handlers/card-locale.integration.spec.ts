@@ -16,7 +16,7 @@ describe('persisted web UI locale at card authentication', () => {
 
   beforeAll(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: Object.values(entities),
       migrations: Object.values(migrations),

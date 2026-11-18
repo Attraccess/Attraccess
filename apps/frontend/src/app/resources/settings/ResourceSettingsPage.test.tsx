@@ -25,8 +25,8 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/react-query-client')>()),
-  useResourcesServiceGetOneResourceById: () => ({ data: state.resource, isLoading: false, error: null }),
-  useResourcesServiceUpdateOneResource: (options: typeof state.options) => {
+  useGetOneResourceById: () => ({ data: state.resource, isLoading: false, error: null }),
+  useUpdateOneResource: (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
     return { mutate: state.mutate, isPending: false };
   },
@@ -65,7 +65,7 @@ it('keeps edits made during an in-flight save and allows saving them next', () =
   fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'Submitted' } });
   fireEvent.click(screen.getByRole('button', { name: 'save' }));
   expect(state.mutate).toHaveBeenCalledWith(
-    expect.objectContaining({ formData: expect.objectContaining({ name: 'Submitted' }) }),
+    expect.objectContaining({ body: expect.objectContaining({ name: 'Submitted' }) }),
   );
 
   fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'Later edit' } });
@@ -75,6 +75,6 @@ it('keeps edits made during an in-flight save and allows saving them next', () =
 
   fireEvent.click(screen.getByRole('button', { name: 'save' }));
   expect(state.mutate).toHaveBeenLastCalledWith(
-    expect.objectContaining({ formData: expect.objectContaining({ name: 'Later edit' }) }),
+    expect.objectContaining({ body: expect.objectContaining({ name: 'Later edit' }) }),
   );
 });

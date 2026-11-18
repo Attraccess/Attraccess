@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { UseUsersServiceGetCurrentKeyFn } from '@attraccess/react-query-client';
+import { UseGetCurrentKeyFn } from '@attraccess/react-query-client';
 import { usePluginLiveUpdates } from '@attraccess/plugins-frontend-sdk';
 import type { LivePacket, LiveSubscription } from '@attraccess/shared';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -89,7 +89,7 @@ it('replaces an active client on same-user login and ignores the former sessionâ
   const formerRequest = controls[0];
   const firstTransportUrl = requests[0];
   const newSessionUser = { id: 1, session: 'B' };
-  queryClient.setQueryData(UseUsersServiceGetCurrentKeyFn(), newSessionUser);
+  queryClient.setQueryData(UseGetCurrentKeyFn(), newSessionUser);
   const clear = vi.spyOn(queryClient, 'clear');
   await act(async () => {
     resumeLiveUpdates();
@@ -123,7 +123,7 @@ it('replaces an active client on same-user login and ignores the former sessionâ
     await flush();
   });
   expect(clear).not.toHaveBeenCalled();
-  expect(queryClient.getQueryData(UseUsersServiceGetCurrentKeyFn())).toEqual(newSessionUser);
+  expect(queryClient.getQueryData(UseGetCurrentKeyFn())).toEqual(newSessionUser);
   expect(streams[1].signal.aborted).toBe(false);
   expect(onUpdate).toHaveBeenCalledExactlyOnceWith({ session: 'B' });
   expect(onPluginUpdate).toHaveBeenCalledExactlyOnceWith({ eventType: 'snapshot', value: { session: 'B' } });
@@ -154,7 +154,7 @@ it('recovers cookie rotation without explicit login, retaining queries and only 
   resumeLiveUpdates();
   queryClient = new QueryClient();
   const authenticatedUser = { id: 1 };
-  queryClient.setQueryData(UseUsersServiceGetCurrentKeyFn(), authenticatedUser);
+  queryClient.setQueryData(UseGetCurrentKeyFn(), authenticatedUser);
   const clear = vi.spyOn(queryClient, 'clear');
   const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
   const onUpdate = vi.fn();
@@ -207,7 +207,7 @@ it('recovers cookie rotation without explicit login, retaining queries and only 
   expect(controls.at(-1)).toHaveLength(2);
   expect(invalidate).toHaveBeenCalledTimes(1);
   expect(clear).not.toHaveBeenCalled();
-  expect(queryClient.getQueryData(UseUsersServiceGetCurrentKeyFn())).toEqual(authenticatedUser);
+  expect(queryClient.getQueryData(UseGetCurrentKeyFn())).toEqual(authenticatedUser);
   expect(onUpdate).toHaveBeenCalledExactlyOnceWith({ id: 7 });
   expect(onPluginUpdate).toHaveBeenCalledExactlyOnceWith({ value: 8 });
   act(() => stopLiveUpdates());

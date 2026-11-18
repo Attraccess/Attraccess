@@ -14,7 +14,7 @@ import { useLiveTransactionUpdates } from '../../summary/live-updates';
 import {
   BillingTransaction,
   BillingTransactionStatus,
-  useBillingServiceGetBillingTransactions,
+  useGetBillingTransactions,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
 
@@ -33,15 +33,9 @@ export function TransactionProcessingCard(props: Props) {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   const { user: currentUser } = useAuth();
-  const { data: transactions } = useBillingServiceGetBillingTransactions(
-    {
-      userId: currentUser?.id ?? 0,
-    },
-    undefined,
-    {
-      refetchInterval: 10000,
-    },
-  );
+  const { data: transactions } = useGetBillingTransactions({ path: { userId: currentUser?.id ?? 0 } }, undefined, {
+    refetchInterval: 10000,
+  });
 
   const onUpdate = useCallback(
     (transaction: BillingTransaction) => {

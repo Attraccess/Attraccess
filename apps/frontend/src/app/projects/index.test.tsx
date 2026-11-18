@@ -34,31 +34,31 @@ const state = vi.hoisted(() => ({
   options: {} as Record<string, MutationOptions>,
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useProjectsServiceFindManyProjectsKey: 'projects',
-  UseProjectInvitationsServiceListMyProjectInvitationsKeyFn: () => ['invitations'],
-  UseProjectsServiceFindOneProjectKeyFn: ({ id }: { id: number }) => ['project', id],
-  useProjectsServiceFindManyProjects: (args: unknown) => {
+  useFindManyProjectsKey: 'projects',
+  UseListMyProjectInvitationsKeyFn: () => ['invitations'],
+  UseFindOneProjectKeyFn: ({ path: { id } }: { path: { id: number } }) => ['project', id],
+  useFindManyProjects: (args: unknown) => {
     state.list(args);
     return { data: state.projects, isLoading: state.loading };
   },
-  useProjectsServiceFindOneProject: () => ({ data: state.existing }),
-  useProjectInvitationsServiceListMyProjectInvitations: () => ({
+  useFindOneProject: () => ({ data: state.existing }),
+  useListMyProjectInvitations: () => ({
     data: state.invitations,
     isLoading: state.invitationsLoading,
   }),
-  useProjectInvitationsServiceAcceptProjectInvitation: (o: MutationOptions) => {
+  useAcceptProjectInvitation: (_mutationKey: unknown, o: MutationOptions) => {
     state.options.accept = o;
     return { mutateAsync: state.accept };
   },
-  useProjectInvitationsServiceDeclineProjectInvitation: (o: MutationOptions) => {
+  useDeclineProjectInvitation: (_mutationKey: unknown, o: MutationOptions) => {
     state.options.decline = o;
     return { mutateAsync: state.decline };
   },
-  useProjectsServiceCreateProject: (o: MutationOptions) => {
+  useCreateProject: (_mutationKey: unknown, o: MutationOptions) => {
     state.options.create = o;
     return { mutate: state.create };
   },
-  useProjectsServiceUpdateProject: (o: MutationOptions) => {
+  useUpdateProject: (_mutationKey: unknown, o: MutationOptions) => {
     state.options.update = o;
     return { mutate: state.update };
   },
@@ -107,7 +107,7 @@ it('shows project cards, archived state and switches the archive query filter', 
   expect(screen.getByAltText('Restoration')).toHaveAttribute('src', '/project-no-thumbnail.svg');
   expect(screen.getByText('filters.archivedBadge')).toBeTruthy();
   fireEvent.click(screen.getByRole('switch', { name: 'filters.includeArchived' }));
-  expect(state.list).toHaveBeenLastCalledWith({ page: 1, includeArchived: true });
+  expect(state.list).toHaveBeenLastCalledWith({ query: { page: 1, includeArchived: true } });
 });
 it('highlights a linked invitation, accepts it and refreshes both lists', async () => {
   state.invitations = [
@@ -122,7 +122,7 @@ it('highlights a linked invitation, accepts it and refreshes both lists', async 
   show('/projects?invitationId=7&keep=yes');
   expect(screen.getByText('?keep=yes')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'invitations.actions.accept' }));
-  expect(state.accept).toHaveBeenCalledWith({ invitationId: 7 });
+  expect(state.accept).toHaveBeenCalledWith({ path: { invitationId: 7 } });
   act(() => {
     state.options.accept.onSuccess({});
     state.options.accept.onSettled?.();
@@ -135,7 +135,7 @@ it('declines invitations and reports API failures without dropping the invitatio
   state.invitations = [{ id: 9, requestedRole: 'member', createdAt: '2026-01-01' }];
   show('/projects?invitationId=invalid');
   fireEvent.click(screen.getByRole('button', { name: 'invitations.actions.decline' }));
-  expect(state.decline).toHaveBeenCalledWith({ invitationId: 9 });
+  expect(state.decline).toHaveBeenCalledWith({ path: { invitationId: 9 } });
   const error = new Error('Denied');
   act(() => {
     state.options.decline.onError(error);
@@ -156,7 +156,7 @@ it('opens project creation and submits the form before refreshing cached details
   });
   fireEvent.click(screen.getByRole('button', { name: 'actions.create.label' }));
   expect(state.create).toHaveBeenCalledWith({
-    formData: { name: 'New project', description: 'Description', logo: undefined },
+    body: { name: 'New project', description: 'Description', logo: undefined },
   });
   act(() => state.options.create.onSuccess({ id: 8, name: 'New project' }));
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['project', 8] });
@@ -176,8 +176,8 @@ it('loads existing project fields and explicitly deletes the previous logo', asy
   );
   fireEvent.click(screen.getByRole('button', { name: 'actions.update.label' }));
   expect(state.update).toHaveBeenCalledWith({
-    id: 4,
-    formData: { name: 'Existing', description: 'Original', logo: undefined, deleteLogo: true },
+    path: { id: 4 },
+    body: { name: 'Existing', description: 'Original', logo: undefined, deleteLogo: true },
   });
   const error = new Error('Denied');
   act(() => state.options.update.onError(error));

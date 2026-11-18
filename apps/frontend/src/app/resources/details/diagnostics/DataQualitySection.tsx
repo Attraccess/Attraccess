@@ -1,7 +1,7 @@
 import { Alert, AlertContent, AlertDescription, AlertTitle, Spinner } from '@heroui/react';
 import { AlertTriangleIcon } from 'lucide-react';
 import { AlertStatusIcon, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useResourcesServiceResourceOperatingDiagnosticsGetDataQuality } from '@attraccess/react-query-client';
+import { useResourceOperatingDiagnosticsGetDataQuality } from '@attraccess/react-query-client';
 import { FlatSection } from '../../../../components/flatSection';
 import { OperatingTrackingNotice } from '../operating-readiness/index';
 import type { DiagnosticsRange } from './diagnosticsRange';
@@ -16,8 +16,10 @@ interface DataQualitySectionProps {
 /** Issues the operating-timeline data has in the selected range (or a notice when tracking is not set up). */
 export function DataQualitySection({ resourceId, range }: Readonly<DataQualitySectionProps>) {
   const { t } = useTranslations({ en, de });
-  const { data: dataQuality, isLoading: isLoadingDataQuality } =
-    useResourcesServiceResourceOperatingDiagnosticsGetDataQuality({ resourceId, ...range });
+  const { data: dataQuality, isLoading: isLoadingDataQuality } = useResourceOperatingDiagnosticsGetDataQuality({
+    path: { resourceId },
+    ...range,
+  });
 
   return (
     <FlatSection icon={<AlertTriangleIcon className="w-4 h-4" />} title={t('dataQuality.title')}>

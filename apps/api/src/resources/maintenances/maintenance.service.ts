@@ -126,7 +126,7 @@ export class ResourceMaintenanceService {
   async getMaintenanceById(maintenanceId: number): Promise<ResourceMaintenance> {
     const maintenance = await this.maintenanceRepository.findOne({
       where: { id: maintenanceId },
-      relations: ['createdByUser', 'completedByUser'],
+      relations: { createdByUser: true, completedByUser: true },
     });
 
     if (!maintenance) {
@@ -280,7 +280,7 @@ export class ResourceMaintenanceService {
       // If not a direct resource introducer, check if the user is an introducer for any group the resource belongs to
       const resource = await resourceRepository.findOne({
         where: { id: resourceId },
-        relations: ['groups'],
+        relations: { groups: true },
       });
 
       if (!resource) {

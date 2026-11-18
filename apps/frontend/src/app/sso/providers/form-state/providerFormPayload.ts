@@ -1,4 +1,8 @@
-import type { CreateOIDCConfigurationDto, CreateSSOProviderDto, SSOProvider } from '@attraccess/react-query-client';
+import type {
+  CreateOidcConfigurationDto,
+  CreateSsoProviderDtoWritable,
+  SsoProvider,
+} from '@attraccess/react-query-client';
 import {
   ensureOidcConfiguration,
   ensureSamlConfiguration,
@@ -31,17 +35,17 @@ export function buildOidcPayload({
   isEditing,
   providerDetails,
 }: {
-  formValues: CreateSSOProviderDto;
+  formValues: CreateSsoProviderDtoWritable;
   scopes: string[];
   usernameClaimPaths: string[];
   emailClaimPaths: string[];
   roleClaimPaths: string[];
   oidcRoleMappingEntries: RoleMappingEntry[];
   isEditing: boolean;
-  providerDetails: SSOProvider | undefined;
+  providerDetails: SsoProvider | undefined;
 }) {
   const base = ensureOidcConfiguration(formValues.oidcConfiguration);
-  const payload: CreateOIDCConfigurationDto = {
+  const payload: CreateOidcConfigurationDto = {
     issuer: base.issuer,
     endSessionURL: base.endSessionURL?.trim() || null,
     jwksURL: base.jwksURL?.trim() || null,
@@ -86,15 +90,15 @@ export function buildSamlPayload({
   isEditing,
   providerDetails,
 }: {
-  formValues: CreateSSOProviderDto;
+  formValues: CreateSsoProviderDtoWritable;
   emailAttributeKeys: string[];
   roleAttributeKeys: string[];
   samlRoleMappingEntries: RoleMappingEntry[];
   isEditing: boolean;
-  providerDetails: SSOProvider | undefined;
+  providerDetails: SsoProvider | undefined;
 }) {
   const base = ensureSamlConfiguration(formValues.samlConfiguration);
-  const payload: NonNullable<CreateSSOProviderDto['samlConfiguration']> = {
+  const payload: NonNullable<CreateSsoProviderDtoWritable['samlConfiguration']> = {
     ...base,
     idpIssuer: base.idpIssuer?.trim() || null,
     logoutURL: base.logoutURL?.trim() || null,

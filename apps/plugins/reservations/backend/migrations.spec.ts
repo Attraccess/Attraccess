@@ -19,7 +19,7 @@ describe('plugin migrations', () => {
   beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), 'reservations-migrations-'));
     dataSource = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: join(dir, 'db.sqlite'),
       migrations: Object.values(pluginMigrations),
     }).initialize();

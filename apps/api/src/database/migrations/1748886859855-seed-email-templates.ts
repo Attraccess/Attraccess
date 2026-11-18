@@ -209,7 +209,7 @@ export class SeedEmailTemplates1748886859854 implements MigrationInterface {
     ];
 
     for (const templateData of defaultTemplates) {
-      await queryRunner.query(`INSERT INTO "email_templates" ("type", "subject", "body") VALUES ($1, $2, $3)`, [
+      await queryRunner.query(`INSERT INTO "email_templates" ("type", "subject", "body") VALUES (?, ?, ?)`, [
         templateData.type,
         templateData.subject,
         templateData.body,

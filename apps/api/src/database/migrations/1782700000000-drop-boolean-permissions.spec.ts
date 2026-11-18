@@ -6,7 +6,7 @@ describe('boolean permission migration', () => {
   let runner: QueryRunner;
   const migration = new DropBooleanPermissions1782700000000();
   beforeEach(async () => {
-    source = await new DataSource({ type: 'sqlite', database: ':memory:', entities: [] }).initialize();
+    source = await new DataSource({ type: 'better-sqlite3', database: ':memory:', entities: [] }).initialize();
     runner = source.createQueryRunner();
     await runner.query(
       `CREATE TABLE user (id INTEGER PRIMARY KEY, createdAt TEXT, deletedAt TEXT, canManageResources BOOLEAN, canManageSystemConfiguration BOOLEAN, canManageUsers BOOLEAN, canManageBilling BOOLEAN)`,

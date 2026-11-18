@@ -7,14 +7,14 @@ import { StartBlockedGate } from '../StartBlockedGate';
 import { useCallback, useState } from 'react';
 import {
   StartUsageSessionDto,
-  useResourcesServiceUnlockDoor,
-  useResourcesServiceUnlatchDoor,
-  useResourcesServiceLockDoor,
+  useUnlockDoor,
+  useUnlatchDoor,
+  useLockDoor,
   ApiError,
   FormSubmissionRequestDto,
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
-  UseResourcesServiceResourceUsageGetHistoryKeyFn,
-  useResourcesServiceGetOneResourceById,
+  UseResourceUsageGetActiveSessionKeyFn,
+  UseResourceUsageGetHistoryKeyFn,
+  useGetOneResourceById,
   ResourceType,
   SupervisionMode,
 } from '@attraccess/react-query-client';
@@ -48,7 +48,7 @@ export function StartSessionControls(
 ) {
   const { resourceId, insufficientBalanceDesiredAmount, requiresSupervision, ...divProps } = props;
 
-  const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  const { data: resource } = useGetOneResourceById({ path: { id: resourceId } });
 
   // supervision_required forbids a solo start for everyone, introduced or not — the backend rejects
   // it outright. Deciding that here rather than at the call sites means no caller can forget it:
@@ -78,12 +78,12 @@ export function StartSessionControls(
 
     // Invalidate the active session query to refetch data
     queryClient.invalidateQueries({
-      queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId }),
+      queryKey: UseResourceUsageGetActiveSessionKeyFn({ path: { resourceId } }),
     });
     // Invalidate all history queries for this resource (regardless of pagination/user filters)
     queryClient.invalidateQueries({
       predicate: (query) => {
-        const baseHistoryKey = UseResourcesServiceResourceUsageGetHistoryKeyFn({ resourceId });
+        const baseHistoryKey = UseResourceUsageGetHistoryKeyFn({ path: { resourceId } });
         return (
           query.queryKey[0] === baseHistoryKey[0] &&
           query.queryKey.length > 1 &&
@@ -161,21 +161,21 @@ export function StartSessionControls(
     dialog: confirmationDialog,
   } = startSession;
 
-  const { mutate: unlockDoorMutate, isPending: unlockDoorIsPending } = useResourcesServiceUnlockDoor({
+  const { mutate: unlockDoorMutate, isPending: unlockDoorIsPending } = useUnlockDoor(undefined, {
     onSuccess: onStartSuccess,
     onError: (error) => {
       onStartError(error as ApiError);
     },
   });
 
-  const { mutate: lockDoorMutate, isPending: lockDoorIsPending } = useResourcesServiceLockDoor({
+  const { mutate: lockDoorMutate, isPending: lockDoorIsPending } = useLockDoor(undefined, {
     onSuccess: onStartSuccess,
     onError: (error) => {
       onStartError(error as ApiError);
     },
   });
 
-  const { mutate: unlatchDoorMutate, isPending: unlatchDoorIsPending } = useResourcesServiceUnlatchDoor({
+  const { mutate: unlatchDoorMutate, isPending: unlatchDoorIsPending } = useUnlatchDoor(undefined, {
     onSuccess: onStartSuccess,
     onError: (error) => {
       onStartError(error as ApiError);
@@ -271,13 +271,16 @@ export function StartSessionControls(
     setIsNotesModalOpen(true);
   };
 
-  const handleLockDoor = useCallback(() => lockDoorMutate({ resourceId: resourceId }), [lockDoorMutate, resourceId]);
+  const handleLockDoor = useCallback(
+    () => lockDoorMutate({ path: { resourceId: resourceId } }),
+    [lockDoorMutate, resourceId],
+  );
   const handleUnlockDoor = useCallback(
-    () => unlockDoorMutate({ resourceId: resourceId }),
+    () => unlockDoorMutate({ path: { resourceId: resourceId } }),
     [resourceId, unlockDoorMutate],
   );
   const handleUnlatchDoor = useCallback(
-    () => unlatchDoorMutate({ resourceId: resourceId }),
+    () => unlatchDoorMutate({ path: { resourceId: resourceId } }),
     [resourceId, unlatchDoorMutate],
   );
 

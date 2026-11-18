@@ -34,7 +34,7 @@ export function DashboardPinToggle({ item }: Readonly<{ item: DashboardPinItem }
       onChange={(pin) => {
         if (isPending) return;
         mutate(
-          { requestBody: { kind: pin ? DashboardPinOperationKind.ADD : DashboardPinOperationKind.REMOVE, item } },
+          { body: { kind: pin ? DashboardPinOperationKind.ADD : DashboardPinOperationKind.REMOVE, item } },
           { onError: () => toast.error({ title: t('pin.saveError') }) },
         );
       }}

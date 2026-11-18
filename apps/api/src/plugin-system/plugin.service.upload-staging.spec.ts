@@ -39,10 +39,38 @@ describe('PluginService.uploadPlugin staging cleanup', () => {
       'Zip file must contain a plugin.json, either at its root or in a single folder',
     ],
     [
+      'an empty zip',
+      () => zipFileUpload({}),
+      BadRequestException,
+      'File could not be extracted, it must be a valid zip file',
+    ],
+    [
       'an unextractable file',
       () => zipFileUpload({ 'plugin.json': '{}' }, { buffer: Buffer.from('nope') }),
       BadRequestException,
       'File could not be extracted, it must be a valid zip file',
+    ],
+    [
+      'a zip-slip entry',
+      () => zipFileUpload({ 'plugin.json': JSON.stringify(fixture.VALID_MANIFEST), '../../escaped.js': 'pwned' }),
+      BadRequestException,
+      'File could not be extracted: Unsafe zip entry "../../escaped.js": path leaves the target folder',
+    ],
+    [
+      'a duplicate entry',
+      () => zipFileUpload({ 'plugin.json': JSON.stringify(fixture.VALID_MANIFEST), './plugin.json': '{}' }),
+      BadRequestException,
+      'File could not be extracted: Unsafe zip entry "./plugin.json": the archive contains this path more than once',
+    ],
+    [
+      'a symlink entry',
+      () =>
+        zipFileUpload({
+          'plugin.json': JSON.stringify(fixture.VALID_MANIFEST),
+          'dist/index.js': { data: '/etc/passwd', mode: 0o120777 },
+        }),
+      BadRequestException,
+      'File could not be extracted: Unsafe zip entry "dist/index.js": only regular files and folders are allowed',
     ],
     [
       'a reserved name',

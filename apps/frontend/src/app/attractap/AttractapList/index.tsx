@@ -30,10 +30,10 @@ import {
 } from '@attraccess/plugins-frontend-ui';
 import {
   Attractap,
-  useAttractapServiceGetFirmwares,
-  useAttractapServiceGetReaders,
-  useAttractapServiceGetReadersToPair,
-  useLicenseServiceGetLicenseInformation,
+  useGetFirmwares,
+  useGetReaders,
+  useGetReadersToPair,
+  useGetLicenseInformation,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useNow } from '../../../hooks/useNow';
@@ -46,16 +46,16 @@ export function AttractapList() {
     en,
   });
 
-  const { data: license } = useLicenseServiceGetLicenseInformation();
+  const { data: license } = useGetLicenseInformation();
 
-  const { data: firmwares } = useAttractapServiceGetFirmwares();
+  const { data: firmwares } = useGetFirmwares();
 
-  const { data: allReaders, error: readersError } = useAttractapServiceGetReaders(undefined, {
+  const { data: allReaders, error: readersError } = useGetReaders({}, undefined, {
     refetchInterval: 5000,
   });
 
   // Readers that are not paired yet come from their own list and are shown in the pairing card only.
-  const { data: readersToPair } = useAttractapServiceGetReadersToPair(undefined, { refetchInterval: 5000 });
+  const { data: readersToPair } = useGetReadersToPair({}, undefined, { refetchInterval: 5000 });
 
   const toast = useToastMessage();
   const navigate = useNavigate();

@@ -30,20 +30,20 @@ const state = vi.hoisted(() => ({
 
 vi.mock('@attraccess/react-query-client', () => ({
   ApiError: state.ApiError,
-  useAnalyticsServiceGetCsvExportTemplatesKey: 'templates',
-  useAnalyticsServiceGetCsvExportTemplates: (...args: unknown[]) => {
+  useGetCsvExportTemplatesKey: 'templates',
+  useGetCsvExportTemplates: (...args: unknown[]) => {
     state.listArgs(...args);
     return state.list;
   },
-  useAnalyticsServiceCreateCsvExportTemplate: (options: unknown) => ({
+  useCreateCsvExportTemplate: (_mutationKey: unknown, options: unknown) => ({
     mutate: (vars: unknown) => state.create(vars, options),
     isPending: state.pending.create,
   }),
-  useAnalyticsServiceUpdateCsvExportTemplate: (options: unknown) => ({
+  useUpdateCsvExportTemplate: (_mutationKey: unknown, options: unknown) => ({
     mutate: (vars: unknown) => state.update(vars, options),
     isPending: state.pending.update,
   }),
-  useAnalyticsServiceDeleteCsvExportTemplate: (options: unknown) => ({
+  useDeleteCsvExportTemplate: (_mutationKey: unknown, options: unknown) => ({
     mutate: (vars: unknown) => state.remove(vars, options),
     isPending: state.pending.remove,
   }),
@@ -100,7 +100,7 @@ afterEach(cleanup);
 
 it('lists templates for the export type only and offers no update or delete without a selection', () => {
   renderSection();
-  expect(state.listArgs).toHaveBeenCalledWith({ exportType: 'resourceUsageHours' });
+  expect(state.listArgs).toHaveBeenCalledWith({ query: { exportType: 'resourceUsageHours' } });
   expect(byCy('csv-export-template-update')).toBeNull();
   expect(byCy('csv-export-template-delete')).toBeNull();
   expect(screen.getByRole('heading', { name: 'Templates' })).toBeInTheDocument();
@@ -126,7 +126,7 @@ it('saves the editor state as a new template with a trimmed name, the type and t
   press('csv-export-template-save-as-confirm');
   expect(state.create).toHaveBeenCalledWith(
     {
-      requestBody: {
+      body: {
         name: 'Upload',
         exportType: 'resourceUsageHours',
         columns: [
@@ -197,8 +197,8 @@ it('loads a selected template into the editor and updates it with the editor sta
   press('csv-export-template-update');
   expect(state.update).toHaveBeenCalledWith(
     {
-      id: 5,
-      requestBody: {
+      path: { id: 5 },
+      body: {
         name: 'Accounting 2',
         columns: [
           { type: 'field', header: 'Machine', fieldKey: 'resourceName' },
@@ -213,7 +213,7 @@ it('loads a selected template into the editor and updates it with the editor sta
 it('confirms a successful update', async () => {
   succeed(state.update, (vars) => ({
     ...template,
-    name: (vars as { requestBody: { name: string } }).requestBody.name,
+    name: (vars as { body: { name: string } }).body.name,
   }));
   renderSection();
   await selectTemplate('Accounting');
@@ -288,7 +288,7 @@ it('asks for a destructive confirmation before deleting and only deletes from th
   expect(state.remove).not.toHaveBeenCalled();
   press('csv-export-template-delete');
   press('csv-export-template-delete-confirm');
-  expect(state.remove).toHaveBeenCalledWith({ id: 5 }, expect.anything());
+  expect(state.remove).toHaveBeenCalledWith({ path: { id: 5 } }, expect.anything());
 });
 
 it('clears the selection, closes the dialog and confirms after deleting', async () => {

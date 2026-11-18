@@ -10,19 +10,19 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   ResourceIntroducerType: { INTRODUCER: 'introducer', MAINTAINER: 'maintainer' },
-  useAccessControlServiceResourceIntroducersGetMany: (...args: unknown[]) => {
+  useResourceIntroducersGetMany: (...args: unknown[]) => {
     state.calls('resourceIntroducers', ...args);
     return state.resourceIntroducers;
   },
-  useAccessControlServiceResourceIntroductionsGetPeople: (...args: unknown[]) => {
+  useResourceIntroductionsGetPeople: (...args: unknown[]) => {
     state.calls('resourceIntroductions', ...args);
     return state.resourceIntroductions;
   },
-  useAccessControlServiceResourceGroupIntroducersGetMany: (...args: unknown[]) => {
+  useResourceGroupIntroducersGetMany: (...args: unknown[]) => {
     state.calls('groupIntroducers', ...args);
     return state.groupIntroducers;
   },
-  useAccessControlServiceResourceGroupIntroductionsGetMany: (...args: unknown[]) => {
+  useResourceGroupIntroductionsGetMany: (...args: unknown[]) => {
     state.calls('groupIntroductions', ...args);
     return state.groupIntroductions;
   },
@@ -74,8 +74,12 @@ it('merges a person’s roles and introduction while sorting by latest activity'
     hasValidIntroduction: false,
     activityAt: '2024-04-01',
   });
-  expect(state.calls).toHaveBeenCalledWith('resourceIntroductions', { resourceId: 8 }, undefined, { enabled: true });
-  expect(state.calls).toHaveBeenCalledWith('groupIntroductions', { groupId: 8 }, undefined, { enabled: false });
+  expect(state.calls).toHaveBeenCalledWith('resourceIntroductions', { path: { resourceId: 8 } }, undefined, {
+    enabled: true,
+  });
+  expect(state.calls).toHaveBeenCalledWith('groupIntroductions', { path: { groupId: 8 } }, undefined, {
+    enabled: false,
+  });
 });
 it('uses group data and status independently of inactive resource query errors', () => {
   state.resourceIntroducers = { error: new Error('inactive'), isLoading: true };

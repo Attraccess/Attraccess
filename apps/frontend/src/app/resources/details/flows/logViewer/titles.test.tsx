@@ -11,21 +11,23 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
-vi.mock('../context/index', () => ({ useFlowContext: () => ({ liveLogs: state.logs, owner: { kind: 'resource', resourceId: 7 } }) }));
+vi.mock('../context/index', () => ({
+  useFlowContext: () => ({ liveLogs: state.logs, owner: { kind: 'resource', resourceId: 7 } }),
+}));
 vi.mock('@attraccess/react-query-client', () => ({
-  useGlobalFlowsServiceGetGlobalFlowCanvas: () => ({ data: undefined }),
-  useGlobalFlowsServiceGetGlobalFlowNodeSchemas: () => ({ data: undefined }),
-  useGlobalFlowsServiceGetGlobalFlowLogRecordingStatus: () => ({ data: undefined }),
-  useGlobalFlowsServiceGetGlobalFlowLogRecordingStatusKey: 'global-recording',
-  useGlobalFlowsServiceGetGlobalFlowLogs: () => ({ data: undefined }),
-  useGlobalFlowsServiceStartGlobalFlowLogRecording: () => ({ mutate: vi.fn() }),
-  useGlobalFlowsServiceStopGlobalFlowLogRecording: () => ({ mutate: vi.fn() }),
-  useResourceFlowsServiceGetResourceFlow: () => ({ data: { nodes: state.nodes } }),
-  useResourceFlowsServiceGetNodeSchemas: () => ({ data: state.schemas }),
-  useResourceFlowsServiceGetFlowLogRecordingStatus: () => ({ data: { isRecording: false } }),
-  useResourceFlowsServiceGetResourceFlowLogs: () => ({ data: { logs: [] } }),
-  useResourceFlowsServiceStartFlowLogRecording: () => ({ mutate: vi.fn() }),
-  useResourceFlowsServiceStopFlowLogRecording: () => ({ mutate: vi.fn() }),
+  useGetGlobalFlowCanvas: () => ({ data: undefined }),
+  useGetGlobalFlowNodeSchemas: () => ({ data: undefined }),
+  useGetGlobalFlowLogRecordingStatus: () => ({ data: undefined }),
+  useGetGlobalFlowLogRecordingStatusKey: 'global-recording',
+  useGetGlobalFlowLogs: () => ({ data: undefined }),
+  useStartGlobalFlowLogRecording: () => ({ mutate: vi.fn() }),
+  useStopGlobalFlowLogRecording: () => ({ mutate: vi.fn() }),
+  useGetResourceFlow: () => ({ data: { nodes: state.nodes } }),
+  useGetNodeSchemas: () => ({ data: state.schemas }),
+  useGetFlowLogRecordingStatus: () => ({ data: { isRecording: false } }),
+  useGetResourceFlowLogs: () => ({ data: { logs: [] } }),
+  useStartFlowLogRecording: () => ({ mutate: vi.fn() }),
+  useStopFlowLogRecording: () => ({ mutate: vi.fn() }),
 }));
 
 beforeEach(() => {

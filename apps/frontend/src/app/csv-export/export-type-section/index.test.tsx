@@ -9,10 +9,10 @@ vi.mock('../../../hooks/useAuth', () => ({
 vi.mock('@attraccess/react-query-client', () => {
   const rowCount = () => ({ data: { total: 3 }, status: 'success' });
   return {
-    useLicenseServiceGetLicenseInformation: () => ({ data: { modules: ['billing'] } }),
-    useAnalyticsServiceGetResourceUsageHoursInDateRange: rowCount,
-    useAnalyticsServiceGetResourceHoursSummaryInDateRange: rowCount,
-    useAnalyticsServiceGetBillingTransactionsInDateRange: rowCount,
+    useGetLicenseInformation: () => ({ data: { modules: ['billing'] } }),
+    useGetResourceUsageHoursInDateRange: rowCount,
+    useGetResourceHoursSummaryInDateRange: rowCount,
+    useGetBillingTransactionsInDateRange: rowCount,
   };
 });
 afterEach(cleanup);

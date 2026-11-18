@@ -23,10 +23,10 @@ vi.mock('./invite-user-modal', () => ({
   InviteUserModal: ({ children }: { children: (open: () => void) => ReactNode }) => children(() => undefined),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useRbacServiceListRoles: () => ({ data: roles }),
-  useLicenseServiceGetLicenseInformation: () => ({ data: { modules: ['sso'] } }),
-  useAuthenticationServiceGetAllSsoProviders: () => ({ data: [{ id: 8, name: 'Organization login' }] }),
-  useUsersServiceFindMany: (query: unknown) => {
+  useListRoles: () => ({ data: roles }),
+  useGetLicenseInformation: () => ({ data: { modules: ['sso'] } }),
+  useGetAllSsoProviders: () => ({ data: [{ id: 8, name: 'Organization login' }] }),
+  useFindMany: (query: unknown) => {
     state.query(query);
     return { data: { data: state.rows, total: state.total }, isFetched: true };
   },
@@ -51,8 +51,8 @@ function mount(search = '') {
 }
 it('restores role, email and SSO filters from the URL and removes only the selected category', () => {
   mount('?q=alex&roleId=2&roleId=invalid&roleMatch=all&emailVerified=false&ssoProviderId=8');
-  expect(state.query).toHaveBeenLastCalledWith(
-    expect.objectContaining({
+  expect(state.query).toHaveBeenLastCalledWith({
+    query: expect.objectContaining({
       search: 'alex',
       roleIds: [2],
       roleMatch: 'all',
@@ -60,25 +60,25 @@ it('restores role, email and SSO filters from the URL and removes only the selec
       ssoProviderIds: [8],
       includeRoles: true,
     }),
-  );
+  });
   const group = screen.getByRole('group', { name: 'filters.role' });
   fireEvent.click(within(group).getByRole('button', { name: 'filters.remove' }));
-  expect(state.query).toHaveBeenLastCalledWith(
-    expect.objectContaining({ roleIds: [], roleMatch: 'any', emailVerified: false, ssoProviderIds: [8] }),
-  );
+  expect(state.query).toHaveBeenLastCalledWith({
+    query: expect.objectContaining({ roleIds: [], roleMatch: 'any', emailVerified: false, ssoProviderIds: [8] }),
+  });
   expect(screen.getByTestId('location').textContent).not.toContain('roleId');
 });
 it('preserves exclusion filters and resets pagination when the search changes', () => {
   state.total = 21;
   mount('?excludeRoleId=3&roleOperator=none&excludeSsoProviderId=8&ssoProviderOperator=none&hasSsoProvider=true');
   fireEvent.click(screen.getByRole('button', { name: /next/i }));
-  expect(state.query).toHaveBeenLastCalledWith(
-    expect.objectContaining({ page: 2, excludeRoleIds: [3], excludeSsoProviderIds: [8], hasSsoProvider: true }),
-  );
+  expect(state.query).toHaveBeenLastCalledWith({
+    query: expect.objectContaining({ page: 2, excludeRoleIds: [3], excludeSsoProviderIds: [8], hasSsoProvider: true }),
+  });
   fireEvent.change(screen.getByLabelText('table.inputs.search'), { target: { value: 'new search' } });
-  expect(state.query).toHaveBeenLastCalledWith(
-    expect.objectContaining({ page: 1, search: 'new search', excludeRoleIds: [3], excludeSsoProviderIds: [8] }),
-  );
+  expect(state.query).toHaveBeenLastCalledWith({
+    query: expect.objectContaining({ page: 1, search: 'new search', excludeRoleIds: [3], excludeSsoProviderIds: [8] }),
+  });
 });
 it('renders elevated roles once, omits default roles, and supports user navigation', () => {
   state.rows = [
@@ -108,7 +108,7 @@ it('starts assigning a role from an empty filtered list without retaining member
   mount('?roleId=3&q=nobody');
   fireEvent.click(screen.getByRole('button', { name: 'empty.assignRole' }));
   expect(screen.getByTestId('location').textContent).toBe('/users?assignRoleId=3');
-  expect(state.query).toHaveBeenLastCalledWith(expect.objectContaining({ roleIds: [], search: '' }));
+  expect(state.query).toHaveBeenLastCalledWith({ query: expect.objectContaining({ roleIds: [], search: '' }) });
 });
 it('opens the mobile role chooser and applies selected memberships to the URL', async () => {
   const { container } = mount('?filter=role');
@@ -117,7 +117,7 @@ it('opens the mobile role chooser and applies selected memberships to the URL', 
   fireEvent.click(trigger);
   const dialog = await screen.findByRole('dialog');
   fireEvent.click(within(dialog).getByRole('option', { name: 'Operators' }));
-  expect(state.query).toHaveBeenLastCalledWith(expect.objectContaining({ roleIds: [2] }));
+  expect(state.query).toHaveBeenLastCalledWith({ query: expect.objectContaining({ roleIds: [2] }) });
   fireEvent.click(within(dialog).getByRole('button', { name: 'filters.done' }));
   expect(screen.getByTestId('location').textContent).toContain('roleId=2');
 });
@@ -125,12 +125,14 @@ it('switches role matching from inclusion to exclusion without losing selected r
   mount('?roleId=2&roleId=3');
   fireEvent.click(screen.getByRole('button', { name: /filters.roleMatch/ }));
   fireEvent.click(await screen.findByRole('option', { name: 'filters.isNoneOf' }));
-  expect(state.query).toHaveBeenLastCalledWith(expect.objectContaining({ roleIds: [], excludeRoleIds: [2, 3] }));
+  expect(state.query).toHaveBeenLastCalledWith({
+    query: expect.objectContaining({ roleIds: [], excludeRoleIds: [2, 3] }),
+  });
   fireEvent.click(screen.getByRole('button', { name: /filters.roleMatch/ }));
   fireEvent.click(await screen.findByRole('option', { name: 'filters.isAllOf' }));
-  expect(state.query).toHaveBeenLastCalledWith(
-    expect.objectContaining({ roleIds: [2, 3], excludeRoleIds: [], roleMatch: 'all' }),
-  );
+  expect(state.query).toHaveBeenLastCalledWith({
+    query: expect.objectContaining({ roleIds: [2, 3], excludeRoleIds: [], roleMatch: 'all' }),
+  });
 });
 it('treats excluding users without SSO as requiring an SSO provider', async () => {
   const { container } = mount('?filter=ssoProvider');
@@ -140,10 +142,10 @@ it('treats excluding users without SSO as requiring an SSO provider', async () =
   const dialog = await screen.findByRole('dialog');
   fireEvent.click(within(dialog).getByRole('option', { name: 'filters.none' }));
   fireEvent.click(within(dialog).getByRole('button', { name: 'filters.done' }));
-  expect(state.query).toHaveBeenLastCalledWith(expect.objectContaining({ ssoProviderNone: true }));
+  expect(state.query).toHaveBeenLastCalledWith({ query: expect.objectContaining({ ssoProviderNone: true }) });
   fireEvent.click(screen.getByRole('button', { name: /filters.ssoProviderMatch/ }));
   fireEvent.click(await screen.findByRole('option', { name: 'filters.isNoneOf' }));
-  expect(state.query).toHaveBeenLastCalledWith(
-    expect.objectContaining({ ssoProviderNone: undefined, hasSsoProvider: true }),
-  );
+  expect(state.query).toHaveBeenLastCalledWith({
+    query: expect.objectContaining({ ssoProviderNone: undefined, hasSsoProvider: true }),
+  });
 });

@@ -101,8 +101,11 @@ describe('Matter device ingestion over a real sidecar connection', () => {
     );
     // A payload that does not match its type is dropped by the contract check, not applied.
     fake.broadcast(fake.deviceState({ nodeId: '5' }));
-    await until(async () => (await h.dataSource.getRepository(MatterEndpointState).count()) === 1);
+    // The request already created the state row; wait for the report itself (better-sqlite3 answers the count before
+    // the WebSocket frames arrive).
+    await until(async () => (await state.read(endpointRow.id, Date.now() + 2_000))[0]?.confirmed === true);
     await ingestion.idle();
+    expect(await h.dataSource.getRepository(MatterEndpointState).count()).toBe(1);
     const [entry] = await state.read(endpointRow.id, Date.now() + 2_000);
     expect(entry).toMatchObject({ command: { state: 'reported' }, confirmed: true, reported: { value: true } });
     expect(h.audit).toHaveBeenCalledTimes(1);

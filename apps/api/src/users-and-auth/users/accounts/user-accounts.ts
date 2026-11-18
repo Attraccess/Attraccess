@@ -3,6 +3,7 @@ import { AuthenticationType, SSOProviderType, User } from '@attraccess/database-
 
 import {
   EntityManager,
+  FindOptionsRelations,
   FindOptionsWhere,
   In,
   FindOneOptions as TypeormFindOneOptions,
@@ -102,7 +103,11 @@ export class UserAccounts {
     private readonly rbacService: RbacService,
   ) {}
 
-  async findOne(options: FindOneOptions, relations?: string[], manager?: EntityManager): Promise<User | null> {
+  async findOne(
+    options: FindOneOptions,
+    relations?: FindOptionsRelations<User>,
+    manager?: EntityManager,
+  ): Promise<User | null> {
     const validatedOptions = FindOneOptionsSchema.parse(
       options.email === undefined ? options : { ...options, email: normalizeEmail(options.email) },
     );
@@ -401,6 +406,7 @@ export class UserAccounts {
       errorCode === '23505' ||
       errorCode === 'SQLITE_CONSTRAINT' ||
       errorCode === 'SQLITE_CONSTRAINT_UNIQUE' ||
+      errorCode === 'SQLITE_CONSTRAINT_PRIMARYKEY' ||
       errorCode === 'ER_DUP_ENTRY' ||
       errorCode === 1062
     ) {

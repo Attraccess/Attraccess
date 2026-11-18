@@ -8,7 +8,7 @@ import {
   DropdownPopover,
   DropdownTrigger,
 } from '@heroui/react';
-import { useRbacServiceListRoles } from '@attraccess/react-query-client';
+import { useListRoles } from '@attraccess/react-query-client';
 import { PlusIcon } from 'lucide-react';
 import { Select } from '../../../components/select/index';
 import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
@@ -45,7 +45,7 @@ export function UserManagementPageFiltersLabel({ filters }: UserManagementPageFi
   } = filters;
   const { t } = useTranslations({ en, de });
   const { roleName } = useRbacCatalogTranslations();
-  const { data: roles } = useRbacServiceListRoles();
+  const { data: roles } = useListRoles();
   const ssoProviders = useSsoProviders();
 
   const setRoleCondition = (condition: MultiValueCondition) =>

@@ -44,7 +44,7 @@ function writeMigrationPlugin(root: string, folder: string, name: string): void 
 }
 
 async function tableExists(dbFile: string, table: string): Promise<boolean> {
-  const probe = new DataSource({ type: 'sqlite', database: dbFile });
+  const probe = new DataSource({ type: 'better-sqlite3', database: dbFile });
   await probe.initialize();
   try {
     const rows: unknown[] = await probe.query(`SELECT name FROM sqlite_master WHERE type='table' AND name = ?`, [
@@ -65,7 +65,7 @@ describe('PluginMigrationService', () => {
     root = mkdtempSync(join(tmpdir(), 'plugin-migration-'));
     dbFile = join(root, 'test.sqlite');
     PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
-    PluginMigrationService.configureForTesting({ type: 'sqlite', database: dbFile });
+    PluginMigrationService.configureForTesting({ type: 'better-sqlite3', database: dbFile });
 
     writeMigrationPlugin(root, 'widgets', 'widgets');
     // getPlugins() rewrites the migrations directory to be plugin-folder relative

@@ -2,7 +2,7 @@ import { DataSource } from 'typeorm';
 import { GenericMeters1790100000000 } from './1790100000000-generic-meters';
 
 it('migrates energy definitions, readings and rates without changing historical bills', async () => {
-  const source = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+  const source = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
   const runner = source.createQueryRunner();
   try {
     await runner.query('CREATE TABLE resource(id integer PRIMARY KEY)');

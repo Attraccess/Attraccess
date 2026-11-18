@@ -1,12 +1,12 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
-import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
+import { useGetLicenseInformation } from '@attraccess/react-query-client';
 import { describe, expect, it, vi } from 'vitest';
 import { useAuth } from '../../../../hooks/useAuth';
 import { SsoSection } from './index';
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useLicenseServiceGetLicenseInformation: vi.fn(),
+  useGetLicenseInformation: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -24,9 +24,9 @@ vi.mock('../../../sso/providers/SSOProvidersList', () => ({
 }));
 
 function mockLicense(modules: string[] | undefined) {
-  vi.mocked(useLicenseServiceGetLicenseInformation).mockReturnValue({
+  vi.mocked(useGetLicenseInformation).mockReturnValue({
     data: modules !== undefined ? { modules } : undefined,
-  } as ReturnType<typeof useLicenseServiceGetLicenseInformation>);
+  } as ReturnType<typeof useGetLicenseInformation>);
 }
 
 function mockAuth(canManage: boolean) {

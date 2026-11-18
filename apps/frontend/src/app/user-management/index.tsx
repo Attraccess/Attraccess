@@ -1,6 +1,6 @@
 import { PageAction, PageHeader, useDebounce, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Button, TextField, InputGroup } from '@heroui/react';
-import { PaginatedUsersResponseDto, useUsersServiceFindMany } from '@attraccess/react-query-client';
+import { PaginatedUsersResponseDto, useFindMany } from '@attraccess/react-query-client';
 import { SearchIcon, UserPlusIcon, Users } from 'lucide-react';
 import { TableToolbar } from '../../components/TableToolbar/index';
 import { InviteUserModal } from './invite-user-modal/index';
@@ -35,20 +35,22 @@ export function UserManagementPage() {
   } = filters;
   const debouncedSearch = useDebounce(search, 500);
 
-  const { data: searchResult, isFetched: isFetchedSearchResult } = useUsersServiceFindMany<PaginatedUsersResponseDto>({
-    limit: PAGE_SIZE,
-    page,
-    search: debouncedSearch,
-    roleIds,
-    excludeRoleIds,
-    roleMatch,
-    emailVerified: emailVerified === null ? undefined : emailVerified === 'true',
-    ssoProviderIds,
-    excludeSsoProviderIds,
-    ssoProviderNone: ssoProviderNone || undefined,
-    hasSsoProvider: hasSsoProvider || undefined,
-    ssoProviderMatch,
-    includeRoles: true,
+  const { data: searchResult, isFetched: isFetchedSearchResult } = useFindMany<PaginatedUsersResponseDto>({
+    query: {
+      limit: PAGE_SIZE,
+      page,
+      search: debouncedSearch,
+      roleIds,
+      excludeRoleIds,
+      roleMatch,
+      emailVerified: emailVerified === null ? undefined : emailVerified === 'true',
+      ssoProviderIds,
+      excludeSsoProviderIds,
+      ssoProviderNone: ssoProviderNone || undefined,
+      hasSsoProvider: hasSsoProvider || undefined,
+      ssoProviderMatch,
+      includeRoles: true,
+    },
   });
 
   const totalPages = searchResult?.total ? Math.ceil(searchResult.total / PAGE_SIZE) : 1;

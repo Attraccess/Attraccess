@@ -14,7 +14,7 @@ import { BadRequestException, Injectable, Logger, ForbiddenException } from '@ne
 
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { DataSource, EntityManager, Repository, In, IsNull, Not } from 'typeorm';
+import { DataSource, EntityManager, FindOptionsRelations, Repository, In, IsNull, Not } from 'typeorm';
 
 import { EmailService } from '../../email/email.service';
 
@@ -69,7 +69,11 @@ export class UsersService {
 
   private readonly logger = new Logger(UsersService.name);
 
-  async findOne(options: FindOneOptions, relations?: string[], manager?: EntityManager): Promise<User | null> {
+  async findOne(
+    options: FindOneOptions,
+    relations?: FindOptionsRelations<User>,
+    manager?: EntityManager,
+  ): Promise<User | null> {
     return this.accounts.findOne(options, relations, manager);
   }
 
@@ -265,7 +269,7 @@ export class UsersService {
         if (roleKey) {
           const role = await roleRepo.findOne({
             where: { key: roleKey },
-            relations: ['rolePermissions'],
+            relations: { rolePermissions: true },
           });
           if (!role) {
             throw new BadRequestException(`Role with key '${roleKey}' not found`);

@@ -19,10 +19,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
-  useRbacServiceCreateRole,
-  useRbacServiceListPermissions,
-  useRbacServiceListRolesKey,
-  useRbacServiceUpdateRole,
+  useCreateRole,
+  useListPermissions,
+  useListRolesKey,
+  useUpdateRole,
   RoleWithUsageDto,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -55,7 +55,7 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
   const isReadOnly = !!role?.isSystemManaged;
   const mode = role === null ? 'create' : isReadOnly ? 'view' : 'edit';
 
-  const { data: permissions } = useRbacServiceListPermissions(undefined, { enabled: isOpen });
+  const { data: permissions } = useListPermissions({}, undefined, { enabled: isOpen });
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -91,7 +91,7 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
   const close = () => onOpenChange(false);
 
   const onMutationSuccess = (messageKey: string) => {
-    queryClient.invalidateQueries({ queryKey: [useRbacServiceListRolesKey] });
+    queryClient.invalidateQueries({ queryKey: [useListRolesKey] });
     toast.success({ title: t(messageKey) });
     close();
   };
@@ -100,11 +100,11 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
     toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api', fallbackKey: 'generic' });
   };
 
-  const { mutate: createRole, isPending: isCreating } = useRbacServiceCreateRole({
+  const { mutate: createRole, isPending: isCreating } = useCreateRole(undefined, {
     onSuccess: () => onMutationSuccess('messages.created'),
     onError: onMutationError,
   });
-  const { mutate: updateRole, isPending: isUpdating } = useRbacServiceUpdateRole({
+  const { mutate: updateRole, isPending: isUpdating } = useUpdateRole(undefined, {
     onSuccess: () => onMutationSuccess('messages.updated'),
     onError: onMutationError,
   });
@@ -117,9 +117,9 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
       permissionKeys: [...selectedKeys],
     };
     if (role === null) {
-      createRole({ requestBody });
+      createRole({ body: requestBody });
     } else {
-      updateRole({ id: role.id, requestBody });
+      updateRole({ path: { id: role.id }, body: requestBody });
     }
   };
 

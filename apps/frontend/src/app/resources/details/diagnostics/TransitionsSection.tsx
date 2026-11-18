@@ -2,7 +2,7 @@ import { Chip, Spinner, Table } from '@heroui/react';
 import { ActivityIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { useState } from 'react';
 import { Button, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useResourcesServiceResourceOperatingDiagnosticsGetTransitions } from '@attraccess/react-query-client';
+import { useResourceOperatingDiagnosticsGetTransitions } from '@attraccess/react-query-client';
 import { FlatSection } from '../../../../components/flatSection';
 import en from './en.json';
 import de from './de.json';
@@ -13,8 +13,10 @@ const PAGE_LIMIT = 10;
 export function TransitionsSection({ resourceId }: Readonly<{ resourceId: number }>) {
   const { t } = useTranslations({ en, de });
   const [page, setPage] = useState(1);
-  const { data: transitions, isLoading: isLoadingTransitions } =
-    useResourcesServiceResourceOperatingDiagnosticsGetTransitions({ resourceId, page, limit: PAGE_LIMIT });
+  const { data: transitions, isLoading: isLoadingTransitions } = useResourceOperatingDiagnosticsGetTransitions({
+    path: { resourceId },
+    query: { page, limit: PAGE_LIMIT },
+  });
   const totalPages = Math.max(1, Math.ceil((transitions?.totalIntervals ?? 0) / PAGE_LIMIT));
 
   return (

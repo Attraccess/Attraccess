@@ -7,7 +7,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordField } from '../../components/PasswordField';
 import en from './en.json';
 import de from './de.json';
-import { useUsersServiceChangePasswordViaResetToken } from '@attraccess/react-query-client';
+import { useChangePasswordViaResetToken } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
 import { PolicyError } from '@attraccess/shared';
 import { extractPolicyErrors } from '../../utils/policyErrors';
@@ -29,7 +29,7 @@ export function ResetPassword() {
     mutate: changeMutation,
     isPending,
     isSuccess,
-  } = useUsersServiceChangePasswordViaResetToken({
+  } = useChangePasswordViaResetToken(undefined, {
     onError: (error) => {
       const policyErrors = extractPolicyErrors(error);
       if (policyErrors) {
@@ -54,7 +54,7 @@ export function ResetPassword() {
     }
 
     setServerErrors([]);
-    changeMutation({ userId: parseInt(userId as string), requestBody: { token: token as string, password } });
+    changeMutation({ path: { userId: parseInt(userId as string) }, body: { token: token as string, password } });
   }, [password, confirmPassword, userId, token, t, changeMutation, toast]);
 
   if (isPending) {

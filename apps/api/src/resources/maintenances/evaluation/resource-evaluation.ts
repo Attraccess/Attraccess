@@ -74,7 +74,7 @@ export class MaintenanceResourceEvaluation {
     // Avoid opening a SQLite transaction alongside session writes when no
     // enabled schedule can produce maintenance. Re-read inside for correctness.
     if (!(await this.scheduleRepository.existsBy({ resourceId, enabled: true }))) return;
-    if (this.scheduleRepository.manager.connection?.options.type === 'sqlite') {
+    if (this.scheduleRepository.manager.connection?.options.type === 'better-sqlite3') {
       await this.evaluateResourceSnapshot(resourceId);
       return;
     }
@@ -83,7 +83,7 @@ export class MaintenanceResourceEvaluation {
       const scheduleRepo = transactionalEntityManager.getRepository(ResourceMaintenanceSchedule);
       const schedules = await scheduleRepo.find({
         where: { resourceId, enabled: true },
-        relations: ['usageHoursConfig', 'usageCountConfig', 'timeIntervalConfig'],
+        relations: { usageHoursConfig: true, usageCountConfig: true, timeIntervalConfig: true },
       });
 
       for (const schedule of schedules) {
@@ -128,7 +128,7 @@ export class MaintenanceResourceEvaluation {
     if (await this.maintenanceService.hasActiveMaintenance(resourceId, reader)) return;
     const schedules = await reader.getRepository(ResourceMaintenanceSchedule).find({
       where: { resourceId, enabled: true },
-      relations: ['usageHoursConfig', 'usageCountConfig', 'timeIntervalConfig'],
+      relations: { usageHoursConfig: true, usageCountConfig: true, timeIntervalConfig: true },
     });
     const candidates: Array<{
       schedule: ResourceMaintenanceSchedule;
@@ -155,7 +155,7 @@ export class MaintenanceResourceEvaluation {
       if (await this.maintenanceService.hasActiveMaintenance(resourceId, manager)) return;
       const currentSchedules = await manager.getRepository(ResourceMaintenanceSchedule).find({
         where: { resourceId, enabled: true },
-        relations: ['usageHoursConfig', 'usageCountConfig', 'timeIntervalConfig'],
+        relations: { usageHoursConfig: true, usageCountConfig: true, timeIntervalConfig: true },
       });
       for (const candidate of candidates) {
         const current = currentSchedules.find((schedule) => schedule.id === candidate.schedule.id);
@@ -346,7 +346,7 @@ export class MaintenanceResourceEvaluation {
 
     const resource = await resourceRepository.findOne({
       where: { id: resourceId },
-      select: ['id', 'createdAt'],
+      select: { id: true, createdAt: true },
     });
     return resource?.createdAt ?? new Date(0);
   }

@@ -108,7 +108,7 @@ export function WidgetGallery({
   );
   const add = (item: DashboardPinItem, size: TileSize) =>
     mutate(
-      { requestBody: { kind: DashboardPinOperationKind.ADD, item, size: size as DashboardPinSize } },
+      { body: { kind: DashboardPinOperationKind.ADD, item, size: size as DashboardPinSize } },
       { onError: () => toast.error({ title: t('pin.saveError') }) },
     );
 

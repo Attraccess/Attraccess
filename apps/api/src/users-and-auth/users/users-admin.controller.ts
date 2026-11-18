@@ -85,7 +85,7 @@ export class UsersAdminController {
       throw new ForbiddenException();
     }
 
-    const user = await this.usersService.findOne({ id }, ['authenticationDetails']);
+    const user = await this.usersService.findOne({ id }, { authenticationDetails: true });
     if (!user) {
       this.logger.debug(`User not found with ID: ${id}`);
       throw new UserNotFoundException(id);

@@ -1,0 +1,21 @@
+diff --git a/dist/lib/services/asyncapi.generator.js b/dist/lib/services/asyncapi.generator.js
+index d3d9a7a2dbee4a7b905219155d05ce8cc364b442..3355ac286096356724746422ad24ce9794450ce7 100644
+--- a/dist/lib/services/asyncapi.generator.js
++++ b/dist/lib/services/asyncapi.generator.js
+@@ -24,7 +24,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
+ };
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.AsyncapiGenerator = void 0;
+-const generator_1 = __importDefault(require("@asyncapi/generator"));
+ const promises_1 = __importDefault(require("fs/promises"));
+ const js_yaml_1 = __importDefault(require("js-yaml"));
+ const os_1 = __importDefault(require("os"));
+@@ -35,6 +34,8 @@ class AsyncapiGenerator {
+         const _a = templateOptions !== null && templateOptions !== void 0 ? templateOptions : {}, { singleFile = true, outFilename = 'index.html' } = _a, rest = __rest(_a, ["singleFile", "outFilename"]);
+         this.outDir = os_1.default.tmpdir();
+         this.outFilename = outFilename;
++        // Loaded on first use: only setup()/composeHtml() render HTML, createDocument() and the decorators do not.
++        const generator_1 = __importDefault(require("@asyncapi/generator"));
+         this.generator = new generator_1.default('@asyncapi/html-template', this.outDir, {
+             forceWrite: true,
+             entrypoint: 'index.html.js',

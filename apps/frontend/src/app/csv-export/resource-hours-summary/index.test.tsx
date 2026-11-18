@@ -4,7 +4,7 @@ import { ResourceHoursSummaryRow, useResourceHoursSummaryColumns } from '.';
 
 vi.mock('@attraccess/react-query-client', () => ({
   CsvExportType: { RESOURCE_HOURS_SUMMARY: 'resourceHoursSummary' },
-  useAnalyticsServiceGetResourceHoursSummaryInDateRangeInfinite: vi.fn(),
+  useGetResourceHoursSummaryInDateRangeInfinite: vi.fn(),
 }));
 
 const HOUR = 3_600_000;

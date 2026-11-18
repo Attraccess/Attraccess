@@ -4,7 +4,7 @@ import { Button, Chip, Link } from '@heroui/react';
 import { UserPlusIcon } from 'lucide-react';
 import type { DashboardWidgetRenderProps } from '@attraccess/plugins-frontend-sdk';
 import { useDebounce, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useUsersServiceFindMany } from '@attraccess/react-query-client';
+import { useFindMany } from '@attraccess/react-query-client';
 import { useAuth } from '../../../hooks/useAuth';
 import { InviteUserModal } from '../../user-management/invite-user-modal/index';
 import type { HeaderExtraProps } from './widgetsContext';
@@ -20,7 +20,7 @@ const RESULTS_PER_SIZE = { medium: 3, large: 7 };
  */
 export function UnverifiedUsersChip({ isEditing }: Readonly<Pick<HeaderExtraProps, 'isEditing'>>) {
   const { t } = useTranslations({ en, de });
-  const { data } = useUsersServiceFindMany({ emailVerified: false, limit: 1 });
+  const { data } = useFindMany({ query: { emailVerified: false, limit: 1 } });
   const count = data?.total ?? 0;
   if (count === 0) return null;
 
@@ -40,7 +40,7 @@ export function UnverifiedUsersChip({ isEditing }: Readonly<Pick<HeaderExtraProp
 
 function Results({ term, limit }: Readonly<{ term: string; limit: number }>) {
   const { t } = useTranslations({ en, de });
-  const { data, isPending, isError } = useUsersServiceFindMany({ search: term, limit });
+  const { data, isPending, isError } = useFindMany({ query: { search: term, limit } });
 
   if (isPending) return <WidgetLoading />;
   if (isError || !data) return <WidgetError title={t('loadError')} />;

@@ -1,8 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  useResourceMaintenancesServiceFindMaintenances,
-  useResourcesServiceResourceUsageGetActiveSession,
-} from '@attraccess/react-query-client';
+import { useFindMaintenances, useResourceUsageGetActiveSession } from '@attraccess/react-query-client';
 import { Chip } from '@heroui/react';
 import { useMemo } from 'react';
 import { isForbiddenError } from '../../../../api/isForbiddenError';
@@ -23,11 +20,8 @@ export function StatusChip(props: Readonly<Props>) {
     data: session,
     error: sessionError,
     isPending: isSessionPending,
-  } = useResourcesServiceResourceUsageGetActiveSession({ resourceId });
-  const { data: activeMaintenances } = useResourceMaintenancesServiceFindMaintenances({
-    resourceId,
-    includeActive: true,
-  });
+  } = useResourceUsageGetActiveSession({ path: { resourceId } });
+  const { data: activeMaintenances } = useFindMaintenances({ path: { resourceId }, query: { includeActive: true } });
 
   const maxSessions = session?.maxParallelSessions ?? 1;
   const sessionCount = session?.activeSessionCount ?? (session?.usage ? 1 : 0);

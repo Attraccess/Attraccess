@@ -42,7 +42,7 @@ export class ResourceFormsService {
     await this.ensureResourceExists(resourceId);
     const forms = await this.formRepository.find({
       where: { resourceId },
-      relations: ['fields'],
+      relations: { fields: true },
       order: { name: 'ASC', createdAt: 'ASC' },
     });
     return forms.map((form) => this.mapFormResponse(form));
@@ -93,7 +93,7 @@ export class ResourceFormsService {
     const repo = manager ? manager.getRepository(Form) : this.formRepository;
     const forms = await repo.find({
       where: { resourceId, [column]: true },
-      relations: ['fields'],
+      relations: { fields: true },
       order: { createdAt: 'ASC' },
     });
     return forms.map((form) => {
@@ -409,7 +409,7 @@ export class ResourceFormsService {
     const repo = manager ? manager.getRepository(Form) : this.formRepository;
     const form = await repo.findOne({
       where: { id: formId, resourceId },
-      relations: ['fields'],
+      relations: { fields: true },
     });
 
     if (!form) {

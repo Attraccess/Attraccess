@@ -52,7 +52,7 @@ interface AccessState {
 export async function createHarness() {
   const dir = mkdtempSync(join(tmpdir(), 'reservations-test-'));
   const dataSource = await new DataSource({
-    type: 'sqlite',
+    type: 'better-sqlite3',
     database: join(dir, 'db.sqlite'),
     entities: [ReservationEntity, ResourceSettingsEntity, GlobalSettingsEntity, IcalFeedEntity, NoticeEntity],
     // Every migration the plugin registers (migrations.ts), as the host would run them.

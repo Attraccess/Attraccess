@@ -1,7 +1,6 @@
 import { AuditLog } from '@attraccess/database-entities';
 import { DualAuthGuard } from '@attraccess/plugins-backend-sdk';
 import { Test } from '@nestjs/testing';
-import type { Database } from 'sqlite3';
 import request from 'supertest';
 import { MatterConnectionService } from '../backend/connection/connection.service';
 import plugin from '../backend/plugin';
@@ -104,24 +103,19 @@ describe('Matter plugin composed with the host', () => {
 
   // The flaky 500 of the credential rotation acceptance test: a reconnect starts fabric detection and a reconciliation,
   // which read on the main SQLite connection and write through the host's serialized queue on its own connection. A
-  // settings write on the main connection then needs the write lock while that connection is still reading, and SQLite
-  // fails it with SQLITE_BUSY at once instead of waiting (a wait could deadlock). Through the queue it waits its turn.
-  it('saves and removes the settings while a reconciliation holds the write lock and a read is in progress', async () => {
+  // settings write on the main connection then needs the write lock that connection's transaction holds. It waits for
+  // it (the connection guard's file lock) instead of failing with SQLITE_BUSY. (With node-sqlite3 a read could also be
+  // in progress on the main connection; better-sqlite3 reads run to completion synchronously.)
+  it('saves and removes the settings while a reconciliation holds the write lock', async () => {
     fake = await FakeSidecar.start();
     await api().put('/api/matter/connection').set(ADMIN).send({ url: fake.url, credential: TOKEN }).expect(200);
-    const sqlite = (host.db.driver as unknown as { databaseConnection: Database }).databaseConnection;
     const contended = async (send: () => Promise<unknown>) => {
-      // A read on the main connection that has returned its first row and not finished yet.
-      const reading = sqlite.prepare('SELECT * FROM migrations');
-      await new Promise<void>((resolve, reject) => reading.get((error) => (error ? reject(error) : resolve())));
       let locked!: () => void;
       const lockHeld = new Promise<void>((resolve) => (locked = resolve));
       const writing = host.context.runSerialized(async (manager) => {
         await manager.query("UPDATE migrations SET name = name WHERE name = ''");
         locked();
         await new Promise((resolve) => setTimeout(resolve, 200));
-        // The read ends before this transaction commits, as a status request's would.
-        await new Promise<void>((resolve) => reading.finalize(() => resolve()));
       });
       await lockHeld;
       // supertest only sends the request once it is awaited or then-ed.

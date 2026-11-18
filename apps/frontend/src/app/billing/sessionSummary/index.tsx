@@ -3,8 +3,8 @@ import { Button, ModalBody, ModalFooter, ModalHeader, ModalHeading, Spinner } fr
 import {
   BillingTransaction,
   BillingTransactionStatus,
-  useBillingServiceGetBillingConfiguration,
-  useBillingServiceGetBillingTransaction,
+  useGetBillingConfiguration,
+  useGetBillingTransaction,
 } from '@attraccess/react-query-client';
 import { StandardModal, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
@@ -25,8 +25,8 @@ export function SessionBillingSummary() {
   if (transaction) lastTransaction.current = transaction;
   const displayedTransaction = transaction ?? lastTransaction.current;
   // Live updates include the receipt fields but do not load the session/resource relations.
-  const { data: details } = useBillingServiceGetBillingTransaction(
-    { transactionId: displayedTransaction?.id ?? 0 },
+  const { data: details } = useGetBillingTransaction(
+    { path: { transactionId: displayedTransaction?.id ?? 0 } },
     undefined,
     {
       enabled: !!transaction,
@@ -36,7 +36,7 @@ export function SessionBillingSummary() {
     data: configuration,
     isError,
     refetch,
-  } = useBillingServiceGetBillingConfiguration(undefined, {
+  } = useGetBillingConfiguration({}, undefined, {
     enabled: !!transaction,
   });
 

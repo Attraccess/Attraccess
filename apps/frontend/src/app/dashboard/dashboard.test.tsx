@@ -4,13 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { PropsWithChildren } from 'react';
-import {
-  DashboardPinDto,
-  DashboardPinItemType,
-  DashboardService,
-  ResourcesService,
-  UseDashboardServiceDashboardGetPinsKeyFn,
-} from '@attraccess/react-query-client';
+import { DashboardPinDto, DashboardPinItemType, UseDashboardGetPinsKeyFn } from '@attraccess/react-query-client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardLanding, DashboardPage } from './index';
 import { DashboardPinHeaderAccessory, DashboardPinToggle } from './DashboardPinToggle';
@@ -19,6 +13,12 @@ import { PageHeader, PageHeaderAccessoryProvider } from '@attraccess/plugins-fro
 import { useDragAccessibility, usePinReorder } from './DashboardGrid';
 import { useDashboardPins } from './pins';
 import { PinnablePages } from './pinnablePagesContext';
+import * as sdk from '@attraccess/react-query-client/sdk';
+import { sdkResult } from '../../test-utils/sdk-mock';
+
+vi.mock('@attraccess/react-query-client/sdk', async (importOriginal) =>
+  (await import('../../test-utils/sdk-mock')).spyOnSdk(await importOriginal<object>()),
+);
 
 const state = vi.hoisted(() => ({
   pinnable: null as unknown as PinnablePages,
@@ -36,7 +36,9 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   }),
 }));
 vi.mock('../../components/toastProvider', () => ({ useToastMessage: () => ({ error: state.toastError }) }));
-vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 7 }, hasPermission: () => true, hasPermissionKey: () => true }) }));
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: () => ({ user: { id: 7 }, hasPermission: () => true, hasPermissionKey: () => true }),
+}));
 vi.mock('./pinnablePagesContext', () => ({ usePinnablePages: () => state.pinnable }));
 vi.mock('../resources/usage/components/ResourceUsageSession', () => ({
   ResourceUsageSession: ({ resourceId }: { resourceId: number }) => <div>Session controls {resourceId}</div>,
@@ -71,8 +73,8 @@ function renderAt(path: string, element: React.ReactNode) {
   );
 }
 
-const getPins = () => vi.spyOn(DashboardService, 'dashboardGetPins');
-const updatePins = () => vi.spyOn(DashboardService, 'dashboardUpdatePins');
+const getPins = () => vi.mocked(sdk.dashboardGetPins);
+const updatePins = () => vi.mocked(sdk.dashboardUpdatePins);
 
 beforeEach(() => {
   client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -89,7 +91,7 @@ describe('DashboardLanding', () => {
     ['/', '/resources'],
     ['/?enroll=K7P-3XQ#top', '/resources?enroll=K7P-3XQ#top'],
   ])('sends a user without pins from %s to %s', async (from, to) => {
-    getPins().mockResolvedValue([] as never);
+    getPins().mockResolvedValue(sdkResult([]));
     renderAt(from, <DashboardLanding />);
 
     expect(await screen.findByRole('status', { name: 'Current URL' })).toHaveTextContent(to);
@@ -104,8 +106,8 @@ describe('DashboardLanding', () => {
   });
 
   it('keeps the dashboard when the last pin is removed on the start page', async () => {
-    getPins().mockResolvedValue([page('/projects')] as never);
-    updatePins().mockResolvedValue([] as never);
+    getPins().mockResolvedValue(sdkResult([page('/projects')]));
+    updatePins().mockResolvedValue(sdkResult([]));
     renderAt('/', <DashboardLanding />);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Edit dashboard' }));
@@ -118,7 +120,7 @@ describe('DashboardLanding', () => {
   });
 
   it('shows the dashboard to a user with pins', async () => {
-    getPins().mockResolvedValue([page('/projects')] as never);
+    getPins().mockResolvedValue(sdkResult([page('/projects')]));
     renderAt('/', <DashboardLanding />);
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
@@ -133,7 +135,7 @@ describe('DashboardLanding', () => {
     const retry = await screen.findByRole('button', { name: 'Retry' });
     expect(screen.getByText('Could not load your dashboard')).toBeInTheDocument();
     expect(screen.queryByRole('status', { name: 'Current URL' })).toBeNull();
-    pins.mockResolvedValue([page('/projects')] as never);
+    pins.mockResolvedValue(sdkResult([page('/projects')]));
     await userEvent.click(retry);
 
     expect(await screen.findByRole('link', { name: /Projects/ })).toBeInTheDocument();
@@ -142,7 +144,7 @@ describe('DashboardLanding', () => {
 
 describe('DashboardPage', () => {
   it('explains how to pin and links to the resources when nothing is pinned', async () => {
-    getPins().mockResolvedValue([] as never);
+    getPins().mockResolvedValue(sdkResult([]));
     renderAt('/dashboard', <DashboardPage />);
 
     expect(await screen.findByRole('heading', { name: 'Nothing pinned yet' })).toBeInTheDocument();
@@ -150,7 +152,7 @@ describe('DashboardPage', () => {
   });
 
   it('shows page cards with their badge in the stored order', async () => {
-    getPins().mockResolvedValue([page('/messages'), page('/projects')] as never);
+    getPins().mockResolvedValue(sdkResult([page('/messages'), page('/projects')]));
     renderAt('/dashboard', <DashboardPage />);
 
     const links = await screen.findAllByRole('link', { name: /Messages|Projects/ });
@@ -160,8 +162,8 @@ describe('DashboardPage', () => {
 
   it('shows a removable placeholder for a page the user can no longer open', async () => {
     state.pinnable = { pages: [projects], titleOf: (path) => (path === '/users' ? 'Users' : undefined), isReady: true };
-    getPins().mockResolvedValue([page('/users'), page('/uninstalled-plugin')] as never);
-    const update = updatePins().mockResolvedValue([page('/uninstalled-plugin')] as never);
+    getPins().mockResolvedValue(sdkResult([page('/users'), page('/uninstalled-plugin')]));
+    const update = updatePins().mockResolvedValue(sdkResult([page('/uninstalled-plugin')]));
     renderAt('/dashboard', <DashboardPage />);
 
     expect(await screen.findByText('Users')).toBeInTheDocument();
@@ -170,17 +172,17 @@ describe('DashboardPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove Users from dashboard' }));
 
-    expect(update).toHaveBeenCalledWith({ requestBody: { kind: 'remove', item: page('/users') } });
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ body: { kind: 'remove', item: page('/users') } }));
     await waitFor(() => expect(screen.queryByText('Users')).toBeNull());
   });
 
   it('keeps the cards when a later refetch fails', async () => {
-    const pins = getPins().mockResolvedValue([page('/projects')] as never);
+    const pins = getPins().mockResolvedValue(sdkResult([page('/projects')]));
     renderAt('/dashboard', <DashboardPage />);
     expect(await screen.findByRole('link', { name: /Projects/ })).toBeInTheDocument();
 
     pins.mockRejectedValue(new Error('offline') as never);
-    await act(() => client.refetchQueries({ queryKey: UseDashboardServiceDashboardGetPinsKeyFn() }));
+    await act(() => client.refetchQueries({ queryKey: UseDashboardGetPinsKeyFn() }));
 
     expect(screen.getByRole('link', { name: /Projects/ })).toBeInTheDocument();
     expect(screen.queryByText('Could not load your dashboard')).toBeNull();
@@ -188,7 +190,7 @@ describe('DashboardPage', () => {
 
   it('waits for the plugins before calling a page inaccessible', async () => {
     state.pinnable = { pages: [], titleOf: () => undefined, isReady: false };
-    getPins().mockResolvedValue([page('/plugin-report')] as never);
+    getPins().mockResolvedValue(sdkResult([page('/plugin-report')]));
     renderAt('/dashboard', <DashboardPage />);
 
     expect(await screen.findByText('/plugin-report')).toBeInTheDocument();
@@ -196,11 +198,11 @@ describe('DashboardPage', () => {
   });
 
   it('shows a resource with its status, session controls and a link to its page', async () => {
-    getPins().mockResolvedValue([
-      { itemType: DashboardPinItemType.RESOURCE, itemId: '5', resourceName: 'Lathe' },
-    ] as never);
-    vi.spyOn(ResourcesService, 'getOneResourceById').mockResolvedValue({ id: 5, name: 'Lathe' } as never);
-    vi.spyOn(ResourcesService, 'resourceUsageGetActiveSession').mockResolvedValue({ usage: null } as never);
+    getPins().mockResolvedValue(
+      sdkResult([{ itemType: DashboardPinItemType.RESOURCE, itemId: '5', resourceName: 'Lathe' }]),
+    );
+    vi.mocked(sdk.getOneResourceById).mockResolvedValue(sdkResult({ id: 5, name: 'Lathe' }));
+    vi.mocked(sdk.resourceUsageGetActiveSession).mockResolvedValue(sdkResult({ usage: null }));
     renderAt('/dashboard', <DashboardPage />);
 
     const card = (await screen.findByRole('heading', { name: 'Lathe' })).closest('[data-cy="dashboard-card"]');
@@ -213,11 +215,11 @@ describe('DashboardPage', () => {
 });
 
 it('tells the user when a pinned resource cannot be loaded', async () => {
-  getPins().mockResolvedValue([
-    { itemType: DashboardPinItemType.RESOURCE, itemId: '5', resourceName: 'Lathe' },
-  ] as never);
-  vi.spyOn(ResourcesService, 'getOneResourceById').mockRejectedValue(new Error('gone') as never);
-  vi.spyOn(ResourcesService, 'resourceUsageGetActiveSession').mockResolvedValue({ usage: null } as never);
+  getPins().mockResolvedValue(
+    sdkResult([{ itemType: DashboardPinItemType.RESOURCE, itemId: '5', resourceName: 'Lathe' }]),
+  );
+  vi.mocked(sdk.getOneResourceById).mockRejectedValue(new Error('gone') as never);
+  vi.mocked(sdk.resourceUsageGetActiveSession).mockResolvedValue(sdkResult({ usage: null }));
   renderAt('/dashboard', <DashboardPage />);
 
   expect(await screen.findByText('This resource could not be loaded.')).toBeInTheDocument();
@@ -238,15 +240,15 @@ describe('DashboardPinToggle', () => {
 
     const toggle = screen.getByRole('button', { name: 'Pin to dashboard' });
     expect(toggle).toBeDisabled();
-    await waitFor(() => expect(DashboardService.dashboardGetPins).toHaveBeenCalled());
+    await waitFor(() => expect(sdk.dashboardGetPins).toHaveBeenCalled());
     expect(toggle).toBeDisabled();
   });
 
   it('pins and unpins the page', async () => {
-    getPins().mockResolvedValue([] as never);
+    getPins().mockResolvedValue(sdkResult([]));
     const update = updatePins()
-      .mockResolvedValueOnce([page('/projects')] as never)
-      .mockResolvedValueOnce([] as never);
+      .mockResolvedValueOnce(sdkResult([page('/projects')]))
+      .mockResolvedValueOnce(sdkResult([]));
     renderToggle();
 
     const toggle = await screen.findByRole('button', { name: 'Pin to dashboard' });
@@ -256,16 +258,20 @@ describe('DashboardPinToggle', () => {
 
     const pinned = await screen.findByRole('button', { name: 'Unpin from dashboard' });
     expect(pinned).toHaveAttribute('aria-pressed', 'true');
-    expect(update).toHaveBeenLastCalledWith({ requestBody: { kind: 'add', item: page('/projects') } });
+    expect(update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ body: { kind: 'add', item: page('/projects') } }),
+    );
     await waitFor(() => expect(pinned).toBeEnabled());
     await userEvent.click(pinned);
 
     expect(await screen.findByRole('button', { name: 'Pin to dashboard' })).toBeInTheDocument();
-    expect(update).toHaveBeenLastCalledWith({ requestBody: { kind: 'remove', item: page('/projects') } });
+    expect(update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ body: { kind: 'remove', item: page('/projects') } }),
+    );
   });
 
   it('tells the user when the pin could not be saved', async () => {
-    getPins().mockResolvedValue([] as never);
+    getPins().mockResolvedValue(sdkResult([]));
     updatePins().mockRejectedValue(new Error('offline') as never);
     renderToggle();
 
@@ -281,7 +287,7 @@ describe('DashboardPinToggle', () => {
 
 describe('DashboardPinHeaderAccessory', () => {
   function renderHeaderAt(path: string, header: React.ReactNode = <PageHeader title="Page" />) {
-    getPins().mockResolvedValue([] as never);
+    getPins().mockResolvedValue(sdkResult([]));
     return render(
       <QueryClientProvider client={client}>
         <MemoryRouter initialEntries={[path]}>
@@ -312,11 +318,11 @@ describe('DashboardPinHeaderAccessory', () => {
     renderHeaderAt(path);
     expect(await screen.findByRole('heading', { name: 'Page' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Pin to dashboard' })).toBeNull();
-    expect(DashboardService.dashboardGetPins).not.toHaveBeenCalled();
+    expect(sdk.dashboardGetPins).not.toHaveBeenCalled();
   });
 
   it('pins the resource of a resource page', async () => {
-    const update = updatePins().mockResolvedValue([] as never);
+    const update = updatePins().mockResolvedValue(sdkResult([]));
     renderHeaderAt(
       '/resources/5/history',
       <DashboardPinTargetContext.Provider value={resourcePinTarget(5)}>
@@ -328,7 +334,9 @@ describe('DashboardPinHeaderAccessory', () => {
     await waitFor(() => expect(toggle).toBeEnabled());
     await userEvent.click(toggle);
 
-    expect(update).toHaveBeenCalledWith({ requestBody: { kind: 'add', item: { itemType: 'resource', itemId: '5' } } });
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ body: { kind: 'add', item: { itemType: 'resource', itemId: '5' } } }),
+    );
   });
 });
 
@@ -337,48 +345,52 @@ describe('usePinReorder', () => {
   const wrapper = ({ children }: PropsWithChildren) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
-  const cached = () => client.getQueryData<DashboardPinDto[]>(UseDashboardServiceDashboardGetPinsKeyFn());
+  const cached = () => client.getQueryData<DashboardPinDto[]>(UseDashboardGetPinsKeyFn());
 
   it('shows the new order at once and saves it as a move', async () => {
-    client.setQueryData(UseDashboardServiceDashboardGetPinsKeyFn(), stored);
-    const update = updatePins().mockResolvedValue([page('/c'), page('/a'), page('/b')] as never);
+    client.setQueryData(UseDashboardGetPinsKeyFn(), stored);
+    const update = updatePins().mockResolvedValue(sdkResult([page('/c'), page('/a'), page('/b')]));
     const { result } = renderHook(() => usePinReorder(stored), { wrapper });
 
     act(() => result.current('page:/c', 'page:/a'));
 
     expect(cached()).toEqual([page('/c'), page('/a'), page('/b')]);
     await waitFor(() =>
-      expect(update).toHaveBeenCalledWith({
-        requestBody: { kind: 'move', item: page('/c'), before: page('/a') },
-      }),
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({ body: { kind: 'move', item: page('/c'), before: page('/a') } }),
+      ),
     );
   });
 
   it('moves a card down before the card that follows its new place', async () => {
-    client.setQueryData(UseDashboardServiceDashboardGetPinsKeyFn(), stored);
-    const update = updatePins().mockResolvedValue([page('/b'), page('/a'), page('/c')] as never);
+    client.setQueryData(UseDashboardGetPinsKeyFn(), stored);
+    const update = updatePins().mockResolvedValue(sdkResult([page('/b'), page('/a'), page('/c')]));
     const { result } = renderHook(() => usePinReorder(stored), { wrapper });
 
     act(() => result.current('page:/a', 'page:/b'));
 
     expect(cached()).toEqual([page('/b'), page('/a'), page('/c')]);
     await waitFor(() =>
-      expect(update).toHaveBeenCalledWith({ requestBody: { kind: 'move', item: page('/a'), before: page('/c') } }),
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({ body: { kind: 'move', item: page('/a'), before: page('/c') } }),
+      ),
     );
   });
 
   it('moves to the end without a before item', async () => {
-    const update = updatePins().mockResolvedValue([page('/b'), page('/c'), page('/a')] as never);
+    const update = updatePins().mockResolvedValue(sdkResult([page('/b'), page('/c'), page('/a')]));
     const { result } = renderHook(() => usePinReorder(stored), { wrapper });
 
     act(() => result.current('page:/a', 'page:/c'));
 
-    await waitFor(() => expect(update).toHaveBeenCalledWith({ requestBody: { kind: 'move', item: page('/a') } }));
+    await waitFor(() =>
+      expect(update).toHaveBeenCalledWith(expect.objectContaining({ body: { kind: 'move', item: page('/a') } })),
+    );
   });
 
   it('brings back the stored order and tells the user when saving fails', async () => {
-    client.setQueryData(UseDashboardServiceDashboardGetPinsKeyFn(), stored);
-    getPins().mockResolvedValue(stored as never);
+    client.setQueryData(UseDashboardGetPinsKeyFn(), stored);
+    getPins().mockResolvedValue(sdkResult(stored));
     updatePins().mockRejectedValue(new Error('offline') as never);
     // An active observer, as on the dashboard, so the invalidated list is fetched again.
     renderHook(() => useDashboardPins(), { wrapper });

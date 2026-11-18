@@ -6,7 +6,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { Repository, EntityManager } from 'typeorm';
+import { Repository, EntityManager, FindOptionsRelations } from 'typeorm';
 
 import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 
@@ -97,7 +97,7 @@ export class ResourceGroupsService {
 
   public async getOne(
     searchOptions: GetOneSearchOptions,
-    relations?: string[],
+    relations?: FindOptionsRelations<ResourceGroup>,
     visibility?: GroupVisibilityContext,
   ): Promise<ResourceGroup> {
     const group = await this.resourceGroupRepository.findOne({
@@ -230,7 +230,7 @@ export class ResourceGroupsService {
     groupId: number,
     actor?: { id: number; authenticationMethod?: AuthenticationMethod; apiTokenId?: number },
   ): Promise<void> {
-    const resourceGroup = await this.getOne({ id: groupId }, ['resources']);
+    const resourceGroup = await this.getOne({ id: groupId }, { resources: true });
     const result = await this.resourceGroupRepository.delete(groupId);
     if (result.affected === 0) {
       throw new ResourceGroupNotFoundException({ id: groupId });
@@ -289,7 +289,7 @@ export class ResourceGroupsService {
     resourceId: number,
     actor?: { id: number; authenticationMethod?: AuthenticationMethod; apiTokenId?: number },
   ): Promise<void> {
-    const resourceGroup = await this.getOne({ id: groupId }, ['resources']);
+    const resourceGroup = await this.getOne({ id: groupId }, { resources: true });
 
     const existingResource = resourceGroup.resources.find((resource) => resource.id === resourceId);
 
@@ -329,7 +329,7 @@ export class ResourceGroupsService {
     resourceId: number,
     actor?: { id: number; authenticationMethod?: AuthenticationMethod; apiTokenId?: number },
   ): Promise<void> {
-    const resourceGroup = await this.getOne({ id: groupId }, ['resources']);
+    const resourceGroup = await this.getOne({ id: groupId }, { resources: true });
     const resource = resourceGroup.resources.find((resource) => resource.id === resourceId);
 
     if (!resource) {

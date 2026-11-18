@@ -18,7 +18,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await (() => ({ useTranslations: () => ({ t: (key: string) => key }) }))()),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourcesServiceGetOneResourceById: () => ({
+  useGetOneResourceById: () => ({
     data: state.resource,
     isLoading: state.loading,
     isError: state.error,

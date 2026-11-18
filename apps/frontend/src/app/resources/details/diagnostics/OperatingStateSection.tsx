@@ -1,7 +1,7 @@
 import { Chip, Spinner } from '@heroui/react';
 import { ActivityIcon } from 'lucide-react';
 import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useResourcesServiceResourceOperatingDiagnosticsGetState } from '@attraccess/react-query-client';
+import { useResourceOperatingDiagnosticsGetState } from '@attraccess/react-query-client';
 import { FlatSection } from '../../../../components/flatSection';
 import en from './en.json';
 import de from './de.json';
@@ -9,9 +9,7 @@ import de from './de.json';
 /** Whether the machine is operating right now, since when, and the last state change. */
 export function OperatingStateSection({ resourceId }: Readonly<{ resourceId: number }>) {
   const { t } = useTranslations({ en, de });
-  const { data: state, isLoading: isLoadingState } = useResourcesServiceResourceOperatingDiagnosticsGetState({
-    resourceId,
-  });
+  const { data: state, isLoading: isLoadingState } = useResourceOperatingDiagnosticsGetState({ path: { resourceId } });
   return (
     <FlatSection icon={<ActivityIcon className="w-4 h-4" />} title={t('state.title')}>
       {isLoadingState ? (

@@ -66,7 +66,7 @@ describe('buildScheduleEvaluationQuery (real sqlite)', () => {
 
   beforeEach(async () => {
     dataSource = new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       synchronize: true,
       entities: [UsageSchema, MaintenanceSchema],

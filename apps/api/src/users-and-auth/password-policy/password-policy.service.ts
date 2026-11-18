@@ -323,7 +323,7 @@ export class PasswordPolicyService implements OnModuleInit {
       where: { userId },
       order: { createdAt: 'DESC' },
       take: historySize,
-      select: ['id'],
+      select: { id: true },
     });
     const keepIds = keep.map((row) => row.id);
     const builder = this.historyRepo.createQueryBuilder().delete().where('userId = :userId', { userId });

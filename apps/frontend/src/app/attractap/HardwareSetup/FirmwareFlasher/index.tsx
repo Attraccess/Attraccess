@@ -1,4 +1,4 @@
-import { AttractapFirmware, useAttractapServiceGetFirmwareBinary } from '@attraccess/react-query-client';
+import { AttractapFirmware, useGetFirmwareBinary } from '@attraccess/react-query-client';
 import { ESPTools, ESPToolsErrorType } from '../../../../utils/esp-tools';
 import {
   Accordion,
@@ -32,10 +32,8 @@ interface Props {
 }
 
 export function FirmwareFlasher(props: Props) {
-  const { data: firmwareBinary, isLoading: isDownloadingFirmware } = useAttractapServiceGetFirmwareBinary({
-    firmwareName: props.firmware.name,
-    variantName: props.firmware.variant,
-    filename: props.firmware.filename,
+  const { data: firmwareBinary, isLoading: isDownloadingFirmware } = useGetFirmwareBinary({
+    path: { firmwareName: props.firmware.name, variantName: props.firmware.variant, filename: props.firmware.filename },
   });
 
   const { t } = useTranslations({

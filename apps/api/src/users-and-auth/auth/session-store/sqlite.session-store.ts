@@ -72,8 +72,7 @@ export class SqliteSessionStore implements SessionStore {
     return (result.affected ?? 0) > 0;
   }
 
-  // Lowercase RETURNING statements use sqlite3.all in TypeORM's SQLite runner;
-  // its uppercase mutation path uses sqlite3.run and discards returned rows.
+  // better-sqlite3 marks RETURNING statements as readers, so TypeORM's runner returns their rows.
   async revokeSession(token: string): Promise<boolean> {
     const rows = (await this.sessionRepository.query(
       'delete FROM "session" WHERE ("token" = ? OR "token" = ?) RETURNING "expiresAt"',

@@ -5,7 +5,7 @@ import { DataSource } from 'typeorm';
 /** In-memory SQLite with the REAL host entities (synchronized), to run the plugin's host-table queries. */
 export async function createHostDb() {
   const dataSource = await new DataSource({
-    type: 'sqlite',
+    type: 'better-sqlite3',
     database: ':memory:',
     // The SDK's entity barrel also re-exports enums and schemas, which TypeORM's entity list type does not accept.
     entities: Object.values(entities) as never,

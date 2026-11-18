@@ -1,4 +1,4 @@
-import { useRbacServiceListRoles } from '@attraccess/react-query-client';
+import { useListRoles } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Select } from '../../../../components/select/index';
 import en from './en.json';
@@ -19,7 +19,7 @@ interface CsvFieldMappingProps {
 
 export function CsvFieldMapping({ csvHeaders, mapping, onChange }: Readonly<CsvFieldMappingProps>) {
   const { t } = useTranslations({ en, de });
-  const { data: availableRoles } = useRbacServiceListRoles();
+  const { data: availableRoles } = useListRoles();
   const headerItems = csvHeaders.map((header) => ({ label: header, key: header }));
 
   return (

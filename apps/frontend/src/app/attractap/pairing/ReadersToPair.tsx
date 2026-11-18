@@ -1,11 +1,7 @@
 import { Button, Card } from '@heroui/react';
 import { Trash2Icon } from 'lucide-react';
 import { PageHeader, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  Attractap,
-  useAttractapServiceGetPairings,
-  useAttractapServiceRequestReaderPairing,
-} from '@attraccess/react-query-client';
+import { Attractap, useGetPairings, useRequestReaderPairing } from '@attraccess/react-query-client';
 import { ReactNode, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { AttractapDeleteModal } from '../AttractapList/delete';
@@ -54,7 +50,7 @@ export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: 
   const toast = useToastMessage();
   const [dialog, setDialog] = useState<OpenDialog | null>(null);
 
-  const { data: pairings } = useAttractapServiceGetPairings(undefined, { refetchInterval: 3000 });
+  const { data: pairings } = useGetPairings({}, undefined, { refetchInterval: 3000 });
   const running = (pairings ?? []).filter((p) => isPairingRunning(p.state));
   const runningFor = (readerId: number) => running.find((p) => p.boundReaderId === readerId);
 
@@ -62,8 +58,8 @@ export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: 
   // Readers bound to a record are listed with that record.
   const devices = running.filter((p) => p.boundReaderId === null);
 
-  const requestPairing = useAttractapServiceRequestReaderPairing({
-    onSuccess: (result, { readerId }) => {
+  const requestPairing = useRequestReaderPairing(undefined, {
+    onSuccess: (result, { path: { readerId } }) => {
       if (result.requested) setDialog({ waitForReaderId: readerId });
       else toast.error({ title: t('toPair.notConnected') });
     },
@@ -81,7 +77,7 @@ export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: 
     if (pairing) setDialog({ pairingId: pairing.id });
     // A reader whose pairing was removed comes back as a new reader; the admin says which record it takes over.
     else if (reader.pairingState === 'revoked') setDialog({ presetTargetReaderId: reader.id });
-    else requestPairing.mutate({ readerId: reader.id });
+    else requestPairing.mutate({ path: { readerId: reader.id } });
   };
 
   return (
@@ -106,7 +102,7 @@ export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: 
                     pair={
                       <Button
                         size="sm"
-                        isPending={requestPairing.isPending && requestPairing.variables?.readerId === reader.id}
+                        isPending={requestPairing.isPending && requestPairing.variables?.path.readerId === reader.id}
                         onPress={() => pair(reader)}
                         data-cy={`attractap-pair-reader-${reader.id}`}
                       >

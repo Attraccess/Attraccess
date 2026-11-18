@@ -2,10 +2,10 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ApiError,
-  UseUsersServiceGetOneUserByIdKeyFn,
-  useUsersServiceGetCurrentKey,
-  useUsersServiceGetOneUserByIdKey,
-  useUsersServiceFindManyKey,
+  UseGetOneUserByIdKeyFn,
+  useGetCurrentKey,
+  useGetOneUserByIdKey,
+  useFindManyKey,
 } from '@attraccess/react-query-client';
 import { EmailForm } from './email';
 import { UsernameForm } from './username';
@@ -29,18 +29,18 @@ vi.mock('../../components/toastProvider', () => ({
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@attraccess/react-query-client')>();
-  const mutation = (options: typeof state.options) => {
+  const mutation = (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
     return { mutate: state.mutate };
   };
   return {
     ...actual,
-    useUsersServiceGetCurrent: () => ({ data: state.user }),
-    useUsersServiceGetOneUserById: () => ({ data: state.user }),
-    useUsersServiceChangeMyEmail: mutation,
-    useUsersServiceChangeMyUsername: mutation,
-    useUsersServiceChangeUserEmail: mutation,
-    useUsersServiceChangeUserUsername: mutation,
+    useGetCurrent: () => ({ data: state.user }),
+    useGetOneUserById: () => ({ data: state.user }),
+    useChangeMyEmail: mutation,
+    useChangeMyUsername: mutation,
+    useChangeUserEmail: mutation,
+    useChangeUserUsername: mutation,
   };
 });
 beforeEach(() => vi.clearAllMocks());
@@ -78,17 +78,17 @@ describe.each([
       fireEvent.click(await screen.findByRole('button', { name: 'actions.confirm' }));
     }
     expect(state.mutate).toHaveBeenCalledWith({
-      ...(admin ? { id: 7 } : {}),
-      requestBody: email ? { email: 'new@example.test' } : { username: 'new-name' },
+      ...(admin ? { path: { id: 7 } } : {}),
+      body: email ? { email: 'new@example.test' } : { username: 'new-name' },
     });
     act(() => state.options.onSuccess());
     expect(state.invalidate.mock.calls).toEqual(
       admin
         ? [
-            [{ queryKey: email ? UseUsersServiceGetOneUserByIdKeyFn({ id: 7 }) : [useUsersServiceGetOneUserByIdKey] }],
-            [{ queryKey: [useUsersServiceFindManyKey] }],
+            [{ queryKey: email ? UseGetOneUserByIdKeyFn({ path: { id: 7 } }) : [useGetOneUserByIdKey] }],
+            [{ queryKey: [useFindManyKey] }],
           ]
-        : [[{ queryKey: [useUsersServiceGetCurrentKey] }]],
+        : [[{ queryKey: [useGetCurrentKey] }]],
     );
     expect(state.success).toHaveBeenCalledWith({ title: 'messages.updated' });
   });

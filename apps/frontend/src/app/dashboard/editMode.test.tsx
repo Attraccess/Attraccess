@@ -4,17 +4,17 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
-import {
-  DashboardPinDto,
-  DashboardPinItemType,
-  DashboardPinSize,
-  DashboardService,
-  ResourcesService,
-} from '@attraccess/react-query-client';
+import { DashboardPinDto, DashboardPinItemType, DashboardPinSize } from '@attraccess/react-query-client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardPage } from './index';
 import { PinnablePages } from './pinnablePagesContext';
 import { DashboardWidget, DashboardWidgets } from './widgets/widgetsContext';
+import * as sdk from '@attraccess/react-query-client/sdk';
+import { sdkResult } from '../../test-utils/sdk-mock';
+
+vi.mock('@attraccess/react-query-client/sdk', async (importOriginal) =>
+  (await import('../../test-utils/sdk-mock')).spyOnSdk(await importOriginal<object>()),
+);
 
 const state = vi.hoisted(() => ({
   pinnable: null as unknown as PinnablePages,
@@ -33,7 +33,9 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   }),
 }));
 vi.mock('../../components/toastProvider', () => ({ useToastMessage: () => ({ error: state.toastError }) }));
-vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 7 }, hasPermission: () => true, hasPermissionKey: () => true }) }));
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: () => ({ user: { id: 7 }, hasPermission: () => true, hasPermissionKey: () => true }),
+}));
 vi.mock('./pinnablePagesContext', () => ({ usePinnablePages: () => state.pinnable }));
 vi.mock('./widgets/widgetsContext', () => ({ useDashboardWidgets: () => state.widgets }));
 vi.mock('../resources/usage/components/ResourceUsageSession', () => ({
@@ -83,7 +85,7 @@ const usersWidget: DashboardWidget = {
 let client: QueryClient;
 
 function renderDashboard(pins: DashboardPinDto[]) {
-  vi.spyOn(DashboardService, 'dashboardGetPins').mockResolvedValue(pins as never);
+  vi.mocked(sdk.dashboardGetPins).mockResolvedValue(sdkResult(pins));
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
@@ -93,7 +95,7 @@ function renderDashboard(pins: DashboardPinDto[]) {
   );
 }
 
-const updatePins = () => vi.spyOn(DashboardService, 'dashboardUpdatePins');
+const updatePins = () => vi.mocked(sdk.dashboardUpdatePins);
 const editToggle = (name: 'Edit dashboard' | 'Done') => screen.findByRole('button', { name });
 
 beforeEach(() => {
@@ -108,10 +110,10 @@ beforeEach(() => {
   };
   state.widgets = { widgets: [messagesWidget, usersWidget], titleOf: () => undefined, isReady: true };
   state.toastError.mockReset();
-  vi.spyOn(ResourcesService, 'getOneResourceById').mockResolvedValue({ id: 5, name: 'Lathe' } as never);
-  vi.spyOn(ResourcesService, 'resourceUsageGetActiveSession').mockResolvedValue({ usages: [] } as never);
+  vi.mocked(sdk.getOneResourceById).mockResolvedValue(sdkResult({ id: 5, name: 'Lathe' }));
+  vi.mocked(sdk.resourceUsageGetActiveSession).mockResolvedValue(sdkResult({ usages: [] }));
   // The gallery's Resource entry searches resources as soon as it opens.
-  vi.spyOn(ResourcesService, 'getAllResources').mockResolvedValue({ data: [], total: 0 } as never);
+  vi.mocked(sdk.getAllResources).mockResolvedValue(sdkResult({ data: [], total: 0 }));
 });
 
 afterEach(() => {
@@ -138,7 +140,7 @@ describe('dashboard edit mode', () => {
   });
 
   it('enters edit mode with handles, remove buttons, the Add button and the hint, and leaves it with Done', async () => {
-    const remove = updatePins().mockResolvedValue([widget('messages')] as never);
+    const remove = updatePins().mockResolvedValue(sdkResult([widget('messages')]));
     const { container } = renderDashboard([page('/projects'), resource('5', 'Lathe'), widget('messages')]);
 
     await userEvent.click(await editToggle('Edit dashboard'));
@@ -161,9 +163,9 @@ describe('dashboard edit mode', () => {
     await userEvent.keyboard('{Escape}');
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove Projects from dashboard' }));
-    expect(remove).toHaveBeenCalledWith({
-      requestBody: { kind: 'remove', item: { itemType: 'page', itemId: '/projects' } },
-    });
+    expect(remove).toHaveBeenCalledWith(
+      expect.objectContaining({ body: { kind: 'remove', item: { itemType: 'page', itemId: '/projects' } } }),
+    );
 
     await userEvent.click(done);
     expect(await editToggle('Edit dashboard')).toHaveFocus();
@@ -323,7 +325,7 @@ describe('widget pins', () => {
       ...state.pinnable,
       pages: [...state.pinnable.pages, { path: '/messages', title: 'Messages', icon: null, galleryGroup: 'other' }],
     };
-    const update = updatePins().mockResolvedValue([widget('messages')] as never);
+    const update = updatePins().mockResolvedValue(sdkResult([widget('messages')]));
     renderDashboard([page('/messages'), widget('messages')]);
     await userEvent.click(await editToggle('Edit dashboard'));
 
@@ -337,7 +339,7 @@ describe('widget pins', () => {
 
   it('moves focus to the next tile after removing an unavailable one outside edit mode', async () => {
     state.widgets = { ...state.widgets, titleOf: (id) => (id === 'readers' ? 'Readers' : undefined) };
-    updatePins().mockResolvedValue([widget('messages')] as never);
+    updatePins().mockResolvedValue(sdkResult([widget('messages')]));
     renderDashboard([widget('readers'), widget('messages')]);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Remove Readers widget from dashboard' }));
@@ -348,7 +350,7 @@ describe('widget pins', () => {
 
   it('moves focus to "Add widget" of the empty state after removing the last tile outside edit mode', async () => {
     state.widgets = { ...state.widgets, titleOf: (id) => (id === 'readers' ? 'Readers' : undefined) };
-    updatePins().mockResolvedValue([] as never);
+    updatePins().mockResolvedValue(sdkResult([]));
     renderDashboard([widget('readers')]);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Remove Readers widget from dashboard' }));
@@ -395,9 +397,11 @@ describe('tile sizes', () => {
     await userEvent.click(screen.getByRole('menuitemradio', { name: 'Large' }));
 
     expect(tileOf(container, 'Messages')).toHaveAttribute('data-size', 'large');
-    expect(save).toHaveBeenCalledWith({
-      requestBody: { kind: 'resize', item: { itemType: 'widget', itemId: 'messages' }, size: 'large' },
-    });
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: { kind: 'resize', item: { itemType: 'widget', itemId: 'messages' }, size: 'large' },
+      }),
+    );
   });
 
   it('keeps a working widget on resize and gives a crashed one another chance at the next size', async () => {

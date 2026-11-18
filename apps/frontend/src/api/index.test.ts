@@ -1,5 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { AuthenticationType, PluginsService, SettingsService, UsersService } from '@attraccess/react-query-client';
+import {
+  AuthenticationType,
+  pluginControllerInstallPackage,
+  getSystemLanguage,
+  createOneUser,
+} from '@attraccess/react-query-client';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { configureApiClient } from './index';
 
@@ -22,19 +27,20 @@ it.each(['getter', 'getItem'] as const)(
     };
     if (failure === 'getter') vi.spyOn(globalThis, 'localStorage', 'get').mockImplementation(unavailable);
     else vi.stubGlobal('localStorage', { getItem: unavailable });
-    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+    const fetchMock = vi.fn(async (_request: Request) => new Response('{}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     configureApiClient();
 
-    await UsersService.createOneUser({
-      requestBody: {
+    await createOneUser({
+      body: {
         username: 'registration-fixture',
         email: 'registration@example.com',
         password: 'fixture-password',
         strategy: AuthenticationType.LOCAL_PASSWORD,
       },
-    });
-    expect(new Headers(fetchMock.mock.calls[0][1].headers).get('Accept-Language')).toBe('de');
+      throwOnError: true,
+    }).then(({ data }) => data);
+    expect(fetchMock.mock.calls[0][0].headers.get('Accept-Language')).toBe('de');
   },
 );
 
@@ -48,35 +54,36 @@ it.each([
     localStorage.clear();
     sessionStorage.clear();
     vi.stubGlobal('navigator', { language: browser[0], languages: browser });
-    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+    const fetchMock = vi.fn(async (_request: Request) => new Response('{}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     configureApiClient();
     useTranslationState.setState({ language: 'de' });
     if (selection) useTranslationState.getState().setLanguage(selection);
-    await UsersService.createOneUser({
-      requestBody: {
+    await createOneUser({
+      body: {
         username: 'registration-fixture',
         email: 'registration@example.com',
         password: 'fixture-password',
         strategy: AuthenticationType.LOCAL_PASSWORD,
       },
-    });
-    expect(new Headers(fetchMock.mock.calls[0][1].headers).get('Accept-Language')).toBe(expected);
-    await SettingsService.getSystemLanguage();
-    expect(new Headers(fetchMock.mock.calls[1][1].headers).get('Accept-Language')).toBe(selection ?? 'de');
+      throwOnError: true,
+    }).then(({ data }) => data);
+    expect(fetchMock.mock.calls[0][0].headers.get('Accept-Language')).toBe(expected);
+    await getSystemLanguage({ throwOnError: true }).then(({ data }) => data);
+    expect(fetchMock.mock.calls[1][0].headers.get('Accept-Language')).toBe(selection ?? 'de');
   },
 );
 
 it('sends the current interface language, including changes after client configuration', async () => {
-  const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+  const fetchMock = vi.fn(async (_request: Request) => new Response('{}', { status: 200 }));
   vi.stubGlobal('fetch', fetchMock);
   configureApiClient();
   useTranslationState.setState({ language: 'de' });
-  await SettingsService.getSystemLanguage();
-  expect(new Headers(fetchMock.mock.calls[0][1].headers).get('Accept-Language')).toBe('de');
+  await getSystemLanguage({ throwOnError: true }).then(({ data }) => data);
+  expect(fetchMock.mock.calls[0][0].headers.get('Accept-Language')).toBe('de');
   useTranslationState.setState({ language: 'en' });
-  await SettingsService.getSystemLanguage();
-  expect(new Headers(fetchMock.mock.calls[1][1].headers).get('Accept-Language')).toBe('en');
+  await getSystemLanguage({ throwOnError: true }).then(({ data }) => data);
+  expect(fetchMock.mock.calls[1][0].headers.get('Accept-Language')).toBe('en');
 });
 
 it.each([
@@ -92,33 +99,34 @@ it.each([
       throw new Error('Storage unavailable');
     },
   });
-  const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+  const fetchMock = vi.fn(async (_request: Request) => new Response('{}', { status: 200 }));
   vi.stubGlobal('fetch', fetchMock);
   configureApiClient();
   useTranslationState.getState().setLanguage(choice);
-  await UsersService.createOneUser({
-    requestBody: {
+  await createOneUser({
+    body: {
       username: 'registration-fixture',
       email: 'registration@example.com',
       password: 'fixture-password',
       strategy: AuthenticationType.LOCAL_PASSWORD,
     },
-  });
-  expect(new Headers(fetchMock.mock.calls[0][1].headers).get('Accept-Language')).toBe(choice);
+    throwOnError: true,
+  }).then(({ data }) => data);
+  expect(fetchMock.mock.calls[0][0].headers.get('Accept-Language')).toBe(choice);
 });
 
 it('keeps a scoped npm package name in one API path segment', async () => {
-  const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+  const fetchMock = vi.fn(async (_request: Request) => new Response('{}', { status: 200 }));
   vi.stubGlobal('fetch', fetchMock);
   configureApiClient();
 
-  await PluginsService.pluginControllerInstallPackage({
-    packageName: '@attraccess/plugin-rabbitmq',
-    version: '0.1.0-nightly.925.2',
-    requestBody: { registryId: 'npm' },
-  });
+  await pluginControllerInstallPackage({
+    path: { packageName: '@attraccess/plugin-rabbitmq', version: '0.1.0-nightly.925.2' },
+    body: { registryId: 'npm' },
+    throwOnError: true,
+  }).then(({ data }) => data);
 
-  expect(fetchMock.mock.calls[0][0]).toContain(
+  expect(fetchMock.mock.calls[0][0].url).toContain(
     '/api/plugins/npm/%40attraccess%2Fplugin-rabbitmq/versions/0.1.0-nightly.925.2',
   );
 });

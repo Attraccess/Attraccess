@@ -5,10 +5,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { SquareIcon } from 'lucide-react';
 import { StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  useResourcesServiceGetAllResources,
-  useResourcesServiceGetAllResourcesKey,
-  useResourcesServiceResourceUsageGetActiveSession,
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
+  useGetAllResources,
+  useGetAllResourcesKey,
+  useResourceUsageGetActiveSession,
+  UseResourceUsageGetActiveSessionKeyFn,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useAuth } from '../../../hooks/useAuth';
@@ -48,7 +48,7 @@ function SessionRow({
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   // Shares its cache with the resource card and detail page.
-  const { data: activeSession } = useResourcesServiceResourceUsageGetActiveSession({ resourceId: resource.id });
+  const { data: activeSession } = useResourceUsageGetActiveSession({ path: { resourceId: resource.id } });
   // The resource need not be pinned, so the row follows its session itself, e.g. one ended at the reader.
   useLiveUpdates({
     topic: 'resource',
@@ -56,7 +56,7 @@ function SessionRow({
     onUpdate: (data) => {
       if (!data.eventType || !SESSION_EVENTS.has(data.eventType)) return;
       void queryClient.invalidateQueries({
-        queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId: resource.id }),
+        queryKey: UseResourceUsageGetActiveSessionKeyFn({ path: { resourceId: resource.id } }),
       });
       void queryClient.invalidateQueries({ queryKey: mySessionsQueryKey(), exact: true });
     },
@@ -73,7 +73,7 @@ function SessionRow({
       toast.error(endSessionErrorMessage(error));
     } finally {
       setIsStopping(false);
-      void queryClient.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
+      void queryClient.invalidateQueries({ queryKey: [useGetAllResourcesKey] });
     }
   };
 
@@ -127,7 +127,7 @@ function SessionRow({
  */
 export function MySessionsWidget({ size, isPreview }: Readonly<DashboardWidgetRenderProps>) {
   const { t } = useTranslations({ en, de });
-  const { data, isPending, isError } = useResourcesServiceGetAllResources(MY_SESSIONS_QUERY);
+  const { data, isPending, isError } = useGetAllResources(MY_SESSIONS_QUERY);
 
   if (isPending) return <WidgetLoading />;
   if (isError || !data) return <WidgetError title={t('loadError')} />;

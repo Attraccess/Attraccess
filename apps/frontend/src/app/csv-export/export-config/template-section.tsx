@@ -18,11 +18,11 @@ import {
   CsvExportTemplate,
   CsvExportTemplateColumnDto,
   CsvExportType,
-  useAnalyticsServiceCreateCsvExportTemplate,
-  useAnalyticsServiceDeleteCsvExportTemplate,
-  useAnalyticsServiceGetCsvExportTemplates,
-  useAnalyticsServiceGetCsvExportTemplatesKey,
-  useAnalyticsServiceUpdateCsvExportTemplate,
+  useCreateCsvExportTemplate,
+  useDeleteCsvExportTemplate,
+  useGetCsvExportTemplates,
+  useGetCsvExportTemplatesKey,
+  useUpdateCsvExportTemplate,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { SaveIcon, SaveAllIcon, Trash2Icon } from 'lucide-react';
@@ -62,7 +62,7 @@ export function TemplateSection(props: Props) {
     data: templates,
     isLoading: templatesLoading,
     isError: templatesFailed,
-  } = useAnalyticsServiceGetCsvExportTemplates({ exportType });
+  } = useGetCsvExportTemplates({ query: { exportType } });
 
   const [activeTemplateId, setActiveTemplateId] = useState<number | null>(null);
   // Mirrors activeTemplateId for mutation callbacks that resolve after the user may have switched templates.
@@ -99,11 +99,11 @@ export function TemplateSection(props: Props) {
     activeTemplate !== null && (columnsDirty || nameDirty) && trimmedName !== '' && currentColumns.length > 0;
 
   const invalidateTemplates = useCallback(
-    () => queryClient.invalidateQueries({ queryKey: [useAnalyticsServiceGetCsvExportTemplatesKey] }),
+    () => queryClient.invalidateQueries({ queryKey: [useGetCsvExportTemplatesKey] }),
     [queryClient],
   );
 
-  const createTemplate = useAnalyticsServiceCreateCsvExportTemplate({
+  const createTemplate = useCreateCsvExportTemplate(undefined, {
     onSuccess: async (created) => {
       createInFlight.current = false;
       await invalidateTemplates();
@@ -122,7 +122,7 @@ export function TemplateSection(props: Props) {
     },
   });
 
-  const updateTemplate = useAnalyticsServiceUpdateCsvExportTemplate({
+  const updateTemplate = useUpdateCsvExportTemplate(undefined, {
     onSuccess: async (updated) => {
       await invalidateTemplates();
       // the user may have switched to another template while the request was running
@@ -132,7 +132,7 @@ export function TemplateSection(props: Props) {
       }
       toast.success({ title: t('templates.toasts.updated', { name: updated.name }) });
     },
-    onError: (error, { id }) => {
+    onError: (error, { path: { id } }) => {
       const duplicate = isDuplicateError(error);
       if (duplicate && activeTemplateIdRef.current === id) setNameError(t('templates.errors.duplicate'));
       toast.error({
@@ -142,14 +142,14 @@ export function TemplateSection(props: Props) {
     },
   });
 
-  const deleteTemplate = useAnalyticsServiceDeleteCsvExportTemplate({
-    onSuccess: async (_result, { id }) => {
+  const deleteTemplate = useDeleteCsvExportTemplate(undefined, {
+    onSuccess: async (_result, { path: { id } }) => {
       await invalidateTemplates();
       if (activeTemplateIdRef.current === id) activate(null);
       setDeleteOpen(false);
       toast.success({ title: t('templates.toasts.deleted') });
     },
-    onError: (error, { id }) => {
+    onError: (error, { path: { id } }) => {
       setDeleteOpen(false);
       toast.error({ title: t('templates.errors.deleteFailed'), description: errorDescription(error) });
       // somebody else may have deleted it already: stop offering a template that no longer exists
@@ -194,7 +194,7 @@ export function TemplateSection(props: Props) {
     if (!name || currentColumns.length === 0 || createInFlight.current || createTemplate.isPending) return;
     createInFlight.current = true;
     setSaveAsError(null);
-    createTemplate.mutate({ requestBody: { name, exportType, columns: toRequestColumns(currentColumns) } });
+    createTemplate.mutate({ body: { name, exportType, columns: toRequestColumns(currentColumns) } });
   };
   const mutationPending = updateTemplate.isPending || deleteTemplate.isPending;
 
@@ -258,8 +258,8 @@ export function TemplateSection(props: Props) {
             isPending={updateTemplate.isPending}
             onPress={() =>
               updateTemplate.mutate({
-                id: activeTemplate.id,
-                requestBody: { name: trimmedName, columns: toRequestColumns(currentColumns) },
+                path: { id: activeTemplate.id },
+                body: { name: trimmedName, columns: toRequestColumns(currentColumns) },
               })
             }
             data-cy="csv-export-template-update"
@@ -341,7 +341,7 @@ export function TemplateSection(props: Props) {
         closeLabel={t('templates.cancel')}
         action={{
           label: t('templates.delete'),
-          onPress: () => activeTemplate && deleteTemplate.mutate({ id: activeTemplate.id }),
+          onPress: () => activeTemplate && deleteTemplate.mutate({ path: { id: activeTemplate.id } }),
           isPending: deleteTemplate.isPending,
           'data-cy': 'csv-export-template-delete-confirm',
         }}

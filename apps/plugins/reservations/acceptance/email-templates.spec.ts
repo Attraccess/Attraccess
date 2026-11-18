@@ -43,7 +43,7 @@ describe('reservations email templates in the host template store', () => {
 
   beforeEach(async () => {
     dataSource = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       synchronize: true,
       entities: [EmailTemplate, EmailTemplateTranslation],

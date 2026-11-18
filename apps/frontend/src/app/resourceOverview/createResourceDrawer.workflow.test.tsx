@@ -47,8 +47,8 @@ vi.mock('../../components/splitActionButton', () => ({
 }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/react-query-client')>()),
-  useResourcesServiceGetAllResourcesKey: 'resources',
-  useResourcesServiceCreateOneResource: (options: typeof state.createOptions) => {
+  useGetAllResourcesKey: 'resources',
+  useCreateOneResource: (_mutationKey: unknown, options: typeof state.createOptions) => {
     state.createOptions = options;
     return { mutate: state.create, isPending: false };
   },
@@ -70,7 +70,7 @@ it('creates another resource with only name and type, then resets the open form'
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Laser' } });
   fireEvent.click(screen.getByRole('radio', { name: 'door' }));
   fireEvent.click(screen.getByRole('button', { name: 'createAnother' }));
-  expect(state.create).toHaveBeenCalledWith({ formData: { name: 'Laser', type: 'door' } });
+  expect(state.create).toHaveBeenCalledWith({ body: { name: 'Laser', type: 'door' } });
 
   act(() => state.createOptions.onSuccess({ id: 4, name: 'Laser' } as Resource));
   expect(screen.getByRole('textbox')).toHaveValue('');
@@ -87,7 +87,7 @@ it('opens the created resource from the default action and keeps invalid names i
 
   fireEvent.change(screen.getByRole('textbox'), { target: { value: '  Saw  ' } });
   fireEvent.click(screen.getByRole('button', { name: 'createAndOpen' }));
-  expect(state.create).toHaveBeenCalledWith({ formData: { name: 'Saw', type: 'machine' } });
+  expect(state.create).toHaveBeenCalledWith({ body: { name: 'Saw', type: 'machine' } });
   act(() => state.createOptions.onSuccess({ id: 5, name: 'Saw' } as Resource));
   expect(state.navigate).toHaveBeenCalledWith(false);
   expect(state.navigate).toHaveBeenCalledWith('/resources/5');

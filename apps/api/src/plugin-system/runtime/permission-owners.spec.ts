@@ -10,7 +10,7 @@ describe('loadRecordedPermissionOwners', () => {
 
   beforeEach(() => {
     directory = mkdtempSync(join(tmpdir(), 'permission-owners-'));
-    options = { type: 'sqlite', database: join(directory, 'db.sqlite') };
+    options = { type: 'better-sqlite3', database: join(directory, 'db.sqlite') };
   });
 
   afterEach(() => rmSync(directory, { recursive: true, force: true }));

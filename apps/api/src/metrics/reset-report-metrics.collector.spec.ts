@@ -1,7 +1,11 @@
 import { DataSource } from 'typeorm';
 import { AttractapCrashReport, entities } from '@attraccess/database-entities';
 import { MetricsService } from './metrics.service';
-import { COUNT_SQL, RESET_REPORT_COUNT_DEADLINE_MS, ResetReportMetricsCollector } from './reset-report-metrics.collector';
+import {
+  COUNT_SQL,
+  RESET_REPORT_COUNT_DEADLINE_MS,
+  ResetReportMetricsCollector,
+} from './reset-report-metrics.collector';
 import {
   CRASH_WATCHDOG_REASONS,
   MAX_READERS_TEXT_LENGTH,
@@ -41,7 +45,7 @@ describe('ResetReportMetricsCollector', () => {
 
   beforeEach(async () => {
     jest.useFakeTimers({ now: NOW, doNotFake: ['setImmediate', 'nextTick', 'setTimeout', 'clearTimeout'] });
-    source = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    source = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
     await source.query(`CREATE TABLE attractap (id integer PRIMARY KEY, name text NOT NULL)`);
     await source.query(`CREATE TABLE attractap_crash_report (
       id integer PRIMARY KEY, attractapId integer NOT NULL, resetReason text NOT NULL,
@@ -50,7 +54,12 @@ describe('ResetReportMetricsCollector', () => {
     await source.query(`INSERT INTO attractap VALUES (1, 'Door'), (2, 'Laser')`);
     registry.clear();
     gauges = {
-      attractapResetReportsLastHour: new Gauge({ name: 'a', help: 'a', labelNames: ['category'], registers: [registry] }),
+      attractapResetReportsLastHour: new Gauge({
+        name: 'a',
+        help: 'a',
+        labelNames: ['category'],
+        registers: [registry],
+      }),
       attractapResetReportReadersLastHour: new Gauge({
         name: 'b',
         help: 'b',
@@ -175,7 +184,10 @@ describe('ResetReportMetricsCollector', () => {
   it('runs one count at a time', async () => {
     const query = jest.spyOn(source.getRepository(AttractapCrashReport), 'query');
     const repo = source.getRepository(AttractapCrashReport);
-    const shared = new ResetReportMetricsCollector({ ...gauges, registerRefresher: jest.fn() } as unknown as MetricsService, repo);
+    const shared = new ResetReportMetricsCollector(
+      { ...gauges, registerRefresher: jest.fn() } as unknown as MetricsService,
+      repo,
+    );
     await Promise.all([shared.refresh(), shared.refresh()]);
     expect(query).toHaveBeenCalledTimes(1);
   });
@@ -202,7 +214,7 @@ describe('reset report count query on the migrated schema', () => {
 
   beforeAll(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: Object.values(entities),
       migrations: Object.values(migrations),

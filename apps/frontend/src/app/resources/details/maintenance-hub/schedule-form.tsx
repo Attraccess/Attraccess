@@ -6,10 +6,10 @@ import { Select } from '../../../../components/select/index';
 import {
   ResourceMaintenanceScheduleTriggerType,
   UsageDurationUnit,
-  useResourceMaintenanceSchedulesServiceCreateMaintenanceSchedule,
-  useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey,
-  useResourceMaintenanceSchedulesServiceGetMaintenanceSchedule,
-  useResourceMaintenanceSchedulesServiceUpdateMaintenanceSchedule,
+  useCreateMaintenanceSchedule,
+  useFindMaintenanceSchedulesKey,
+  useGetMaintenanceSchedule,
+  useUpdateMaintenanceSchedule,
 } from '@attraccess/react-query-client';
 import { OperatingTrackingNotice, useOperatingTrackingReadiness } from '../operating-readiness/index';
 import { Button, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -61,8 +61,8 @@ export function ScheduleForm(props: Props) {
   const [timeIntervalUnit, setTimeIntervalUnit] = useState<UsageDurationUnit>(UsageDurationUnit.HOURS);
   const [enabled, setEnabled] = useState(true);
 
-  const { data: existing } = useResourceMaintenanceSchedulesServiceGetMaintenanceSchedule(
-    { resourceId, scheduleId: scheduleId ?? 0 },
+  const { data: existing } = useGetMaintenanceSchedule(
+    { path: { resourceId, scheduleId: scheduleId ?? 0 } },
     undefined,
     { enabled: scheduleId != null },
   );
@@ -85,7 +85,7 @@ export function ScheduleForm(props: Props) {
 
   const onDone = useCallback(() => {
     queryClient.invalidateQueries({
-      queryKey: [useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey],
+      queryKey: [useFindMaintenanceSchedulesKey],
     });
     onSaved();
   }, [queryClient, onSaved]);
@@ -94,12 +94,12 @@ export function ScheduleForm(props: Props) {
     mutate: create,
     isPending: isCreating,
     error: createError,
-  } = useResourceMaintenanceSchedulesServiceCreateMaintenanceSchedule({ onSuccess: onDone });
+  } = useCreateMaintenanceSchedule(undefined, { onSuccess: onDone });
   const {
     mutate: update,
     isPending: isUpdating,
     error: updateError,
-  } = useResourceMaintenanceSchedulesServiceUpdateMaintenanceSchedule({ onSuccess: onDone });
+  } = useUpdateMaintenanceSchedule(undefined, { onSuccess: onDone });
 
   const error = (createError ?? updateError) as Error | undefined;
 
@@ -132,9 +132,9 @@ export function ScheduleForm(props: Props) {
     if (!requestBody) return;
 
     if (scheduleId != null) {
-      update({ resourceId, scheduleId, requestBody: requestBody as never });
+      update({ path: { resourceId, scheduleId }, body: requestBody as never });
     } else {
-      create({ resourceId, requestBody: requestBody as never });
+      create({ path: { resourceId }, body: requestBody as never });
     }
   }, [
     name,

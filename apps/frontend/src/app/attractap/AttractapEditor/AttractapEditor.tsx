@@ -26,10 +26,10 @@ import { TextField, Label, Input } from '@heroui/react';
 import { useCallback, useEffect, useId, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  useAttractapServiceGetReaderById,
-  useAttractapServiceGetReadersKey,
-  useAttractapServiceUpdateReader,
-  UseAttractapServiceGetReaderByIdKeyFn,
+  useGetReaderById,
+  useGetReadersKey,
+  useUpdateReader,
+  UseGetReaderByIdKeyFn,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { ReaderSecurity } from '../pairing/ReaderSecurity';
@@ -50,7 +50,7 @@ export function AttractapEditor(props: Readonly<Props>) {
 
   const queryClient = useQueryClient();
 
-  const { data: reader } = useAttractapServiceGetReaderById({ readerId: props.readerId as number }, undefined, {
+  const { data: reader } = useGetReaderById({ path: { readerId: props.readerId as number } }, undefined, {
     enabled: props.readerId !== undefined,
   });
 
@@ -62,11 +62,11 @@ export function AttractapEditor(props: Readonly<Props>) {
   const allowPluginBleDescriptionId = useId();
   const [connectedResourceIds, setConnectedResourceIds] = useState<number[]>([]);
   const [selectedTab, setSelectedTab] = useState<'general' | 'resources' | 'readerUi' | 'security'>('general');
-  const updateReaderMutation = useAttractapServiceUpdateReader({
+  const updateReaderMutation = useUpdateReader(undefined, {
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: [useAttractapServiceGetReadersKey] });
+      queryClient.invalidateQueries({ queryKey: [useGetReadersKey] });
       queryClient.invalidateQueries({
-        queryKey: UseAttractapServiceGetReaderByIdKeyFn({ readerId: variables.readerId }),
+        queryKey: UseGetReaderByIdKeyFn({ path: { readerId: variables.path.readerId } }),
       });
       toast.success({
         title: t('readerUpdated'),
@@ -98,8 +98,8 @@ export function AttractapEditor(props: Readonly<Props>) {
     // can never switch plugin Bluetooth access off as a side effect (for example on a rename).
     const allowPluginBleChanged = reader !== undefined && allowPluginBle !== (reader.allowPluginBle ?? false);
     updateReaderMutation.mutate({
-      readerId: props.readerId,
-      requestBody: {
+      path: { readerId: props.readerId },
+      body: {
         name,
         connectedResourceIds,
         ledBrightness,

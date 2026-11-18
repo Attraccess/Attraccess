@@ -3,9 +3,9 @@ import type { DashboardWidgetRenderProps } from '@attraccess/plugins-frontend-sd
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   BillingTransaction,
-  useBillingServiceGetBillingBalance,
-  useBillingServiceGetBillingConfiguration,
-  useBillingServiceGetBillingTransactions,
+  useGetBillingBalance,
+  useGetBillingConfiguration,
+  useGetBillingTransactions,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../hooks/useAuth';
 import { useCreditsFormatter } from '../../../hooks/useCreditsFormatter';
@@ -26,13 +26,10 @@ function transactionKey(transaction: BillingTransaction): { key: string; name?: 
   return { key: 'other' };
 }
 
-function LatestTransactions({
-  userId,
-  format,
-}: Readonly<{ userId: number; format: (amount: number) => string }>) {
+function LatestTransactions({ userId, format }: Readonly<{ userId: number; format: (amount: number) => string }>) {
   const { t } = useTranslations({ en, de });
   const formatDateTime = useDateTimeFormatter();
-  const { data, isPending, isError } = useBillingServiceGetBillingTransactions({ userId, limit: TRANSACTIONS });
+  const { data, isPending, isError } = useGetBillingTransactions({ path: { userId }, query: { limit: TRANSACTIONS } });
 
   if (isPending) return <WidgetLoading />;
   if (isError || !data) return <WidgetError title={t('loadError')} />;
@@ -42,11 +39,13 @@ function LatestTransactions({
       {data.data.slice(0, TRANSACTIONS).map((transaction) => {
         const { key, name } = transactionKey(transaction);
         return (
-          <li key={transaction.id} className="flex min-w-0 items-center gap-2 text-xs" data-cy="dashboard-balance-transaction">
+          <li
+            key={transaction.id}
+            className="flex min-w-0 items-center gap-2 text-xs"
+            data-cy="dashboard-balance-transaction"
+          >
             <span className="shrink-0 text-muted">{formatDateTime(transaction.createdAt)}</span>
-            <span className="min-w-0 flex-1 truncate">
-              {t(`billing-balance.transaction.${key}`, { name })}
-            </span>
+            <span className="min-w-0 flex-1 truncate">{t(`billing-balance.transaction.${key}`, { name })}</span>
             <span className={cn('shrink-0 tabular-nums', transaction.amount < 0 && 'text-danger')}>
               {format(transaction.amount)}
             </span>
@@ -61,8 +60,8 @@ function LatestTransactions({
 export function BalanceWidget({ size }: Readonly<DashboardWidgetRenderProps>) {
   const { t } = useTranslations({ en, de });
   const { user } = useAuth();
-  const configuration = useBillingServiceGetBillingConfiguration();
-  const balance = useBillingServiceGetBillingBalance({ userId: user?.id ?? 0 }, undefined, { enabled: !!user });
+  const configuration = useGetBillingConfiguration();
+  const balance = useGetBillingBalance({ path: { userId: user?.id ?? 0 } }, undefined, { enabled: !!user });
   const formatCredits = useCreditsFormatter(configuration.data?.minorUnit ?? 2);
 
   if (configuration.isError || balance.isError) return <WidgetError title={t('loadError')} />;

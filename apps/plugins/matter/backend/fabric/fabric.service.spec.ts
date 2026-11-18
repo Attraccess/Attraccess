@@ -1,4 +1,5 @@
 import { ConflictException } from '@nestjs/common';
+import { IsNull } from 'typeorm';
 import { MatterRecoveryKey } from '../backup/entities';
 import { MatterFabric, MatterNode } from '../devices/entities';
 import { ADMIN, createFabricHarness, type FabricHarness } from '../testing/fabric-harness.test-utils';
@@ -500,7 +501,7 @@ describe('MatterFabricService', () => {
     });
 
     it('start-new detaches the old fabric nodes as a fabric mismatch, even after a run saw the empty sidecar', async () => {
-      const old = await h.dataSource.getRepository(MatterFabric).findOneByOrFail({ retiredAt: undefined });
+      const old = await h.dataSource.getRepository(MatterFabric).findOneByOrFail({ retiredAt: IsNull() });
       await h.dataSource.getRepository(MatterNode).save({
         id: 'n-1',
         fabricRef: old.id,
@@ -528,7 +529,7 @@ describe('MatterFabricService', () => {
     });
 
     it('no other reconciliation applies anything while recovery waits for the administrator', async () => {
-      const old = await h.dataSource.getRepository(MatterFabric).findOneByOrFail({ retiredAt: undefined });
+      const old = await h.dataSource.getRepository(MatterFabric).findOneByOrFail({ retiredAt: IsNull() });
       await h.dataSource.getRepository(MatterNode).save({
         id: 'n-1',
         fabricRef: old.id,

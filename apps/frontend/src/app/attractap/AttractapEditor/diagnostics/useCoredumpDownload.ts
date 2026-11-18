@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { OpenAPI } from '@attraccess/react-query-client';
+import { client } from '@attraccess/react-query-client';
 import { useCallback } from 'react';
 import { useToastMessage } from '../../../../components/toastProvider';
 import de from '../AttractapDiagnostics.de.json';
@@ -18,7 +18,7 @@ export function useCoredumpDownload(readerId: number | undefined) {
       try {
         // eslint-disable-next-line no-restricted-syntax -- Coredumps are streamed as binary downloads.
         const response = await fetch(
-          `${OpenAPI.BASE}/api/attractap/readers/${readerId}/crash-reports/${reportId}/coredump`,
+          `${client.getConfig().baseUrl}/api/attractap/readers/${readerId}/crash-reports/${reportId}/coredump`,
           {
             credentials: 'include',
           },

@@ -37,7 +37,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   }))()),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useProjectsServiceGetProjectUsageStats: () => ({ data: state.data, isLoading: state.loading }),
+  useGetProjectUsageStats: () => ({ data: state.data, isLoading: state.loading }),
 }));
 // Replace chart layout/hover machinery while exercising the actual supplied tooltip renderers and transformed data.
 vi.mock('recharts', () => ({

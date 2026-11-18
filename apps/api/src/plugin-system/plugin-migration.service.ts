@@ -237,7 +237,7 @@ export class PluginMigrationService {
    * driver a little patience rather than failing fast on a transient lock.
    */
   protected static async relaxBusyTimeout(dataSource: DataSource): Promise<void> {
-    if (dataSource.options.type === 'sqlite') {
+    if (dataSource.options.type === 'better-sqlite3') {
       await dataSource.query(`PRAGMA busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`);
     }
   }

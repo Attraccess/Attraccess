@@ -3,7 +3,7 @@ import { ResourceUsageLifecycleAttempt1789800000000 } from './1789800000000-reso
 
 describe('usage lifecycle reservation migration', () => {
   it('retains valid usage, hides reservations from the legacy view, and aborts reservations on downgrade', async () => {
-    const source = await new DataSource({ type: 'sqlite', database: ':memory:', entities: [] }).initialize();
+    const source = await new DataSource({ type: 'better-sqlite3', database: ':memory:', entities: [] }).initialize();
     const runner = source.createQueryRunner();
     try {
       await runner.query('CREATE TABLE resource (id integer PRIMARY KEY)');

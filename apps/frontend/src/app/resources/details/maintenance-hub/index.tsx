@@ -6,10 +6,10 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ResourceMaintenance,
   ResourceType,
-  useResourceMaintenancesServiceCanManageMaintenance,
-  useResourceMaintenanceSchedulesServiceFindMaintenanceSchedules,
-  useResourceMaintenancesServiceFindMaintenances,
-  useResourcesServiceGetOneResourceById,
+  useCanManageMaintenance,
+  useFindMaintenanceSchedules,
+  useFindMaintenances,
+  useGetOneResourceById,
 } from '@attraccess/react-query-client';
 import { useNow } from '../../../../hooks/useNow';
 import { StatStrip } from './stat-strip';
@@ -31,27 +31,33 @@ export function MaintenanceHubPage() {
 
   const now = useNow();
 
-  const { data: resource, isLoading: isLoadingResource, error: resourceError } =
-    useResourcesServiceGetOneResourceById({ id: resourceId });
+  const {
+    data: resource,
+    isLoading: isLoadingResource,
+    error: resourceError,
+  } = useGetOneResourceById({ path: { id: resourceId } });
 
-  const { data: permissions, isLoading: isLoadingPerms } =
-    useResourceMaintenancesServiceCanManageMaintenance({ resourceId });
+  const { data: permissions, isLoading: isLoadingPerms } = useCanManageMaintenance({ path: { resourceId } });
 
-  const { data: schedules, isLoading: isLoadingSchedules } =
-    useResourceMaintenanceSchedulesServiceFindMaintenanceSchedules({ resourceId });
+  const { data: schedules, isLoading: isLoadingSchedules } = useFindMaintenanceSchedules({ path: { resourceId } });
 
-  const { data: maintenancesEnvelope, isLoading: isLoadingMaintenances } =
-    useResourceMaintenancesServiceFindMaintenances(
-      { resourceId, includePast: true, includeActive: true, includeUpcoming: true },
-      undefined,
-      { refetchInterval: 10_000 },
-    );
+  const { data: maintenancesEnvelope, isLoading: isLoadingMaintenances } = useFindMaintenances(
+    { path: { resourceId }, query: { includePast: true, includeActive: true, includeUpcoming: true } },
+    undefined,
+    { refetchInterval: 10_000 },
+  );
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerScheduleId, setDrawerScheduleId] = useState<number | undefined>(undefined);
 
-  const openCreateDrawer = () => { setDrawerScheduleId(undefined); setDrawerOpen(true); };
-  const openEditDrawer = (id: number) => { setDrawerScheduleId(id); setDrawerOpen(true); };
+  const openCreateDrawer = () => {
+    setDrawerScheduleId(undefined);
+    setDrawerOpen(true);
+  };
+  const openEditDrawer = (id: number) => {
+    setDrawerScheduleId(id);
+    setDrawerOpen(true);
+  };
   const closeDrawer = () => setDrawerOpen(false);
 
   const partitioned = useMemo(() => {
@@ -71,7 +77,11 @@ export function MaintenanceHubPage() {
   }, [maintenancesEnvelope, now]);
 
   if (isLoadingResource || isLoadingPerms) {
-    return <div className="flex justify-center py-16"><Spinner /></div>;
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner />
+      </div>
+    );
   }
 
   if (resourceError || !resource) {
@@ -115,15 +125,9 @@ export function MaintenanceHubPage() {
         </Button>
       </div>
 
-      <StatStrip
-        schedules={schedules ?? []}
-        maintenances={maintenancesEnvelope?.data ?? []}
-        now={now}
-      />
+      <StatStrip schedules={schedules ?? []} maintenances={maintenancesEnvelope?.data ?? []} now={now} />
 
-      {isLoadingMaintenances ? null : (
-        <LiveSection resourceId={resourceId} liveMaintenances={partitioned.live} />
-      )}
+      {isLoadingMaintenances ? null : <LiveSection resourceId={resourceId} liveMaintenances={partitioned.live} />}
       <RequestsSection resourceId={resourceId} />
       <UpcomingSection upcomingMaintenances={partitioned.upcoming} />
       <SchedulesTab

@@ -5,7 +5,7 @@ import { useParams } from 'react-router-dom';
 import { useState } from 'react';
 import { ResourceUsageSession } from '../../usage/resourceUsageSession';
 import { ResourceBillingInfo } from '../resourceBillingInfo';
-import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
+import { useGetOneResourceById } from '@attraccess/react-query-client';
 import { RecentSessionsCard } from './RecentSessionsCard';
 import { ResourceDocsPreviewCard } from './ResourceDocsPreviewCard';
 import { PluginSlot } from '../../../plugins/PluginSlot';
@@ -18,7 +18,7 @@ export function ResourceOverviewTab() {
   const { id } = useParams<{ id: string }>();
   const resourceId = parseInt(id || '', 10);
 
-  const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  const { data: resource } = useGetOneResourceById({ path: { id: resourceId } });
   const [insufficientBalanceDesiredAmount, setInsufficientBalanceDesiredAmount] = useState(10);
 
   if (!resource) return null;

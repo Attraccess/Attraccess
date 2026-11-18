@@ -9,7 +9,7 @@ import {
 
 import { BadRequestException } from '@nestjs/common';
 
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, FindOptionsRelations, Repository } from 'typeorm';
 
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 
@@ -45,7 +45,12 @@ import { LiveNotificationsService } from '../live-notifications/live-notificatio
 
 /** Balances, transaction history, manual and refund transactions, and the billing configuration. */
 export class BillingLedger {
-  private readonly DEFAULT_RELATIONS = ['initiator', 'resourceUsage', 'resourceUsage.resource', 'refundOf', 'items'];
+  private readonly DEFAULT_RELATIONS: FindOptionsRelations<BillingTransaction> = {
+    initiator: true,
+    resourceUsage: { resource: true },
+    refundOf: true,
+    items: true,
+  };
 
   constructor(
     private readonly settingRepository: Repository<Setting>,
@@ -74,7 +79,7 @@ export class BillingLedger {
   async getTransactionIdForUsage(usageId: number, userId: number): Promise<number | null> {
     const transaction = await this.billingTransactionRepository.findOne({
       where: { resourceUsageId: usageId, userId },
-      select: ['id'],
+      select: { id: true },
     });
     return transaction?.id ?? null;
   }

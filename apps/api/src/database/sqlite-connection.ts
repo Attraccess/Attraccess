@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Logger } from '@nestjs/common';
 import { DataSource, DataSourceOptions, QueryRunner, TransactionNotStartedError } from 'typeorm';
+import { acquireFileLock, fileLockKey, releaseFileLock } from './sqlite-file-lock';
 
 /** How long every connection to the SQLite file waits for another connection's write lock before SQLITE_BUSY. */
 export const SQLITE_BUSY_TIMEOUT_MS = 5000;
@@ -14,27 +15,44 @@ const noTransaction = () => false;
 
 const logger = new Logger('SqliteConnection');
 
-/** The EntityManager methods that start transactions on the runner themselves (TypeORM 0.3.x EntityPersistExecutor). */
+/** The EntityManager methods that start transactions on the runner themselves (TypeORM EntityPersistExecutor). */
 const MANAGER_ENTRY_POINTS = ['transaction', 'save', 'remove', 'softRemove', 'recover'];
 
+export type CreateDataSourceOptions = {
+  /**
+   * Whether a statement of a flow that owns an open transaction on another guarded connection to the file runs inside
+   * that transaction (see guardSharedRunner), and whether this connection's transactions take in such statements.
+   * Off for a connection whose writes must stay independent of any caller transaction (the audit connection).
+   */
+  joinsOwnedTransactions?: boolean;
+};
+
 /**
- * Builds a DataSource whose SQLite connection waits for the write lock held by another connection to the same file
- * (the resource-lifecycle and audit connections) instead of failing with SQLITE_BUSY, and whose transactions belong
- * to the async flow that started them: statements of other flows wait for them, at most the busy timeout (see
- * guardSharedRunner). Other drivers are unchanged. Not for read-only connections: they cannot begin IMMEDIATE
- * transactions.
+ * Builds a better-sqlite3 DataSource whose connection waits asynchronously for the write lock held by another guarded
+ * connection to the same file (the resource-lifecycle, audit and plugin-migration connections) instead of busy-waiting
+ * on the event loop and failing with SQLITE_BUSY (see sqlite-file-lock), and whose transactions belong to the async
+ * flow that started them: statements of other flows wait for them, at most the busy timeout (see guardSharedRunner).
+ * Other drivers are unchanged. Not for read-only connections: they cannot begin IMMEDIATE transactions.
  */
-export function createDataSource(options: DataSourceOptions): DataSource {
-  if (options.type !== 'sqlite') return new DataSource(options);
-  const busyTimeout = options.busyTimeout ?? SQLITE_BUSY_TIMEOUT_MS;
-  const source = new DataSource({ ...options, busyTimeout });
+export function createDataSource(options: DataSourceOptions, guard: CreateDataSourceOptions = {}): DataSource {
+  if (options.type !== 'better-sqlite3') return new DataSource(options);
+  const busyTimeout = options.timeout ?? SQLITE_BUSY_TIMEOUT_MS;
+  const source = new DataSource({ ...options, timeout: busyTimeout });
   const isolation = createIsolation(busyTimeout);
-  const connection: Connection = { database: options.database, isolation };
+  const connection: Connection = {
+    lockKey: fileLockKey(options.database),
+    busyTimeout,
+    joins: guard.joinsOwnedTransactions ?? true,
+    isolation,
+    inTransaction: () => Boolean((source.driver as SqliteDriverInternals).databaseConnection?.inTransaction),
+    readsOnly: (sql) => isReadOnlyStatement((source.driver as SqliteDriverInternals).databaseConnection, sql),
+  };
   connections.add(connection);
   const destroy = source.destroy.bind(source);
   source.destroy = () => {
     connections.delete(connection);
-    return destroy();
+    // Closing ends any open transaction; a write lock it still held would make every other connection time out.
+    return destroy().finally(() => connection.lockKey !== undefined && releaseFileLock(connection.lockKey, connection));
   };
   // The SQLite driver hands every caller the same query runner, so patching it covers all work on the connection.
   const driver = source.driver;
@@ -63,10 +81,33 @@ const newFlow = (): Flow => ({ nested: 0 });
 /** Per DataSource: which flow owns the connection's open transaction, and the queue of flows waiting for it. */
 type Isolation = ReturnType<typeof createIsolation>;
 
-/** A guarded DataSource: its database file, its isolation and (once its runner exists) its guarded query. */
+/** better-sqlite3's Database, which the driver opens on initialize: SQLite's own view of the transaction state. */
+type SqliteDriverInternals = { databaseConnection?: SqliteDatabase };
+type SqliteDatabase = { inTransaction?: boolean; prepare?: (sql: string) => { readonly: boolean } };
+
+/** A SELECT, or a statement SQLite itself reports as read-only (`WITH … SELECT`): it needs no write lock. */
+function isReadOnlyStatement(database: SqliteDatabase | undefined, sql: string): boolean {
+  if (/^\s*SELECT\b/i.test(sql)) return true;
+  if (!/^\s*WITH\b/i.test(sql) || !database?.prepare) return false;
+  try {
+    return database.prepare(sql).readonly;
+  } catch {
+    return false; // Not preparable (syntax error, several statements): the real run reports it.
+  }
+}
+
+/**
+ * A guarded DataSource: its database file's lock key (none for in-memory databases), its busy timeout, whether it takes
+ * part in cross-connection routing, its isolation, whether SQLite has a transaction open on it, and (once its runner
+ * exists) its guarded query. It is also the holder of the file's write lock (see sqlite-file-lock).
+ */
 type Connection = {
-  database: unknown;
+  lockKey: string | undefined;
+  busyTimeout: number;
+  joins: boolean;
   isolation: Isolation;
+  inTransaction: () => boolean;
+  readsOnly: (sql: string) => boolean;
   query?: (sql: string, parameters?: unknown[], useStructuredResult?: boolean) => Promise<unknown>;
 };
 
@@ -78,9 +119,9 @@ const connections = new Set<Connection>();
  * transaction holds SQLite's write lock (BEGIN IMMEDIATE) until it ends, and it awaits the statement.
  */
 function transactionOwnedElsewhere(self: Connection): Connection | undefined {
-  if (typeof self.database !== 'string' || self.database === ':memory:') return undefined;
+  if (self.lockKey === undefined || !self.joins) return undefined;
   for (const other of connections) {
-    if (other === self || other.database !== self.database || !other.query) continue;
+    if (other === self || !other.joins || other.lockKey !== self.lockKey || !other.query) continue;
     const { owner, flows } = other.isolation;
     if (owner !== undefined && flows.getStore() === owner) return other;
   }
@@ -230,10 +271,19 @@ function nestedCall(isolation: Isolation, flow: Flow, call: () => unknown) {
 }
 
 /**
- * TypeORM 0.3.x exposes isolation levels but not SQLite BEGIN modes. A deferred BEGIN reserves the writer only at its
- * first write, and SQLite fails that upgrade at once with SQLITE_BUSY, without waiting for busy_timeout, while the
- * connection holds a read lock. BEGIN IMMEDIATE reserves the writer up front and waits through the busy handler.
- * TypeORM stays in charge of transaction depth, savepoints, subscribers and rollback.
+ * TypeORM exposes isolation levels but not SQLite BEGIN modes. A deferred BEGIN reserves the writer only at its first
+ * write, and SQLite fails that upgrade at once with SQLITE_BUSY, without waiting for busy_timeout, while the connection
+ * holds a read lock. BEGIN IMMEDIATE reserves the writer up front. TypeORM stays in charge of transaction depth,
+ * savepoints, subscribers and rollback.
+ *
+ * better-sqlite3 runs every statement synchronously, so SQLite's busy handler would wait on the event loop, where the
+ * connection holding the write lock can never finish. Every guarded connection to a file therefore first takes the
+ * file's asynchronous write lock (sqlite-file-lock): a top-level BEGIN takes it and keeps it until SQLite reports the
+ * transaction ended (COMMIT, ROLLBACK, a failed BEGIN, a reset), a write outside a transaction (any statement but a
+ * read-only one) takes it for the statement. Waiters queue in arrival order and give up after the busy timeout with code
+ * SQLITE_BUSY. SQLite's own busy handler is left for writers outside this process (and unguarded connections). Reads
+ * do not take the lock: in rollback-journal mode they only need SQLite's shared lock, which a writer holding the
+ * reserved lock allows, and a synchronous read holds it only while it runs.
  *
  * Concurrent flows share the runner, and so the connection, its locks and its transaction. A transaction therefore
  * belongs to the async flow (AsyncLocalStorage) that started it:
@@ -263,19 +313,22 @@ function nestedCall(isolation: Isolation, flow: Flow, call: () => unknown) {
  *   the transaction, a callback that lost the context) is such a waiter: it fails after the timeout instead of
  *   hanging, the transaction continues. DB metrics wrapped around runner.query count this wait as query time.
  * Remaining statements of a flow serialize on the connection:
- * - A statement still running for one flow holds a read lock that makes another flow's BEGIN or write outside a
+ * - A statement still running for one flow would hold a read lock that makes another flow's BEGIN or write outside a
  *   transaction fail at once. Those statements wait until no statement is running, and later statements wait for them.
+ *   (better-sqlite3 statements run synchronously, so this only orders them; it was needed with node-sqlite3.)
  * - A transaction start of the owner's flow that races the outermost COMMIT waits for it and then begins its own
  *   transaction. The outermost COMMIT or ROLLBACK waits for a nested start, and a start waits for it, so neither acts
  *   on a stale depth. Without that, a savepoint lands outside the committed transaction and leaves the runner in one
  *   that never ends. A failed outermost COMMIT rolls back before the gate opens, for the same reason.
- * Several guarded DataSources can open the same file (the main connection and runSerializedTransaction's
- * resource-lifecycle connection). A statement issued by the flow that owns an open transaction on another of them
- * (work inside that transaction that uses an injected repository instead of the transaction's manager) runs inside
- * that transaction, on that connection: it sees the transaction's writes and commits or rolls back with it. Here it
- * would queue behind another flow's write or BEGIN, which waits in SQLite for the write lock that transaction holds
- * until it ends, and both would wait out the busy timeout. A transaction start (transaction(), save()) from such work
- * is not moved: it still waits for that lock and fails after the busy timeout. Use the transaction's manager.
+ * Several guarded DataSources can open the same file (the main connection, runSerializedTransaction's
+ * resource-lifecycle connection, the audit and plugin-migration connections). A statement issued by the flow that owns
+ * an open transaction on another of them (work inside that transaction that uses an injected repository instead of
+ * the transaction's manager) runs inside that transaction, on that connection: it sees the transaction's writes and
+ * commits or rolls back with it. Here it would queue behind another flow's write or BEGIN, which waits for the file's
+ * write lock that transaction holds until it ends, and both would wait out the busy timeout. A transaction start
+ * (transaction(), save()) from such work is not moved: it still waits for that lock and fails after the busy timeout.
+ * Use the transaction's manager. A connection created with joinsOwnedTransactions: false (audit) neither moves its
+ * statements nor takes in others': its writes wait for the lock like any other connection's.
  * Subscribers run in the owner's flow. They must not start a transaction on this connection (including save()) from a
  * transaction event, nor run a query from a query event: they would wait for themselves. A transaction must not
  * await work that runs in another async context and needs this connection; that work waits for the timeout.
@@ -298,7 +351,28 @@ function guardSharedRunner(runner: QueryRunner, connection: Connection): QueryRu
     get: () => active && !isForeign(flows.getStore()),
     set: (value: boolean) => void (active = value),
   });
-  const query = runner.query.bind(runner);
+  const { lockKey, busyTimeout, inTransaction } = connection;
+  // The file's write lock follows SQLite's transaction: once the connection has none left, the lock goes on.
+  const syncFileLock = () => {
+    if (lockKey !== undefined && !inTransaction()) releaseFileLock(lockKey, connection);
+  };
+  const runnerQuery = runner.query.bind(runner);
+  const query = async (sql: string, parameters?: unknown[], useStructuredResult?: boolean) => {
+    try {
+      return await (useStructuredResult ? runnerQuery(sql, parameters, true) : runnerQuery(sql, parameters));
+    } finally {
+      syncFileLock();
+    }
+  };
+  // A BEGIN, or a write outside a transaction, first takes the file's write lock (held until the transaction ends).
+  const writeLocked = async <T>(statement: () => Promise<T>): Promise<T> => {
+    if (lockKey !== undefined) await acquireFileLock(lockKey, connection, busyTimeout);
+    try {
+      return await statement();
+    } finally {
+      syncFileLock();
+    }
+  };
   const startTransaction = runner.startTransaction.bind(runner);
   const commitTransaction = runner.commitTransaction.bind(runner);
   const rollbackTransaction = runner.rollbackTransaction.bind(runner);
@@ -329,11 +403,9 @@ function guardSharedRunner(runner: QueryRunner, connection: Connection): QueryRu
       open();
     }
   };
-  const run = (sql: string, parameters?: unknown[], useStructuredResult?: boolean) =>
-    useStructuredResult ? query(sql, parameters, true) : query(sql, parameters);
   const runAlone = async (sql: string, parameters?: unknown[], useStructuredResult?: boolean) => {
     while (running > 0) await settled;
-    return run(sql, parameters, useStructuredResult);
+    return query(sql, parameters, useStructuredResult);
   };
   runner.query = async (sql: string, parameters?: unknown[], useStructuredResult?: boolean) => {
     const flow = flows.getStore();
@@ -357,9 +429,9 @@ function guardSharedRunner(runner: QueryRunner, connection: Connection): QueryRu
   };
   connection.query = runner.query;
   const runOnConnection = async (sql: string, parameters?: unknown[], useStructuredResult?: boolean) => {
-    if (sql === 'BEGIN TRANSACTION' || (internals.transactionDepth === 0 && !/^\s*SELECT\b/i.test(sql))) {
+    if (sql === 'BEGIN TRANSACTION' || (internals.transactionDepth === 0 && !connection.readsOnly(sql))) {
       const statement = sql === 'BEGIN TRANSACTION' ? 'BEGIN IMMEDIATE TRANSACTION' : sql;
-      const alone = runAlone(statement, parameters, useStructuredResult);
+      const alone = writeLocked(() => runAlone(statement, parameters, useStructuredResult));
       exclusive = alone;
       try {
         return await alone;
@@ -369,7 +441,7 @@ function guardSharedRunner(runner: QueryRunner, connection: Connection): QueryRu
     }
     if (running++ === 0) settled = new Promise((resolve) => (settle = resolve));
     try {
-      return await run(sql, parameters, useStructuredResult);
+      return await query(sql, parameters, useStructuredResult);
     } finally {
       if (--running === 0) settle();
     }

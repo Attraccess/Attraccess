@@ -6,7 +6,7 @@ import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundEx
 
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { EntityManager, FindOneOptions, In, Repository } from 'typeorm';
+import { EntityManager, FindOneOptions, FindOptionsRelations, In, Repository } from 'typeorm';
 
 import { ProjectsService } from '../../../projects/projects.service';
 
@@ -29,14 +29,12 @@ export class UsageSessionRecords {
     private readonly projectsService: ProjectsService,
   ) {}
 
-  private readonly DETAIL_RELATIONS = [
-    'user',
-    'project',
-    'supervisorUser',
-    'formSubmissions',
-    'formSubmissions.form',
-    'formSubmissions.user',
-  ];
+  private readonly DETAIL_RELATIONS: FindOptionsRelations<ResourceUsage> = {
+    user: true,
+    project: true,
+    supervisorUser: true,
+    formSubmissions: { form: true, user: true },
+  };
 
   /**
    * The caller's own active session when `preferUserId` has one, otherwise the newest.
@@ -67,7 +65,7 @@ export class UsageSessionRecords {
     return await resourceUsageRepository.find({
       where: { resourceId, ...activeUsageWhere() },
       order: { startTime: 'ASC', id: 'ASC' },
-      relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
+      relations: { user: true, resource: true, billingTransaction: true, project: true, supervisorUser: true },
     });
   }
 
@@ -77,7 +75,7 @@ export class UsageSessionRecords {
     const sessions = await this.resourceUsageRepository.find({
       where: { resourceId: In(resourceIds), ...activeUsageWhere() },
       order: { startTime: 'ASC', id: 'ASC' },
-      relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
+      relations: { user: true, resource: true, billingTransaction: true, project: true, supervisorUser: true },
     });
     for (const session of sessions) map.get(session.resourceId)?.push(session);
     return map;
@@ -181,7 +179,7 @@ export class UsageSessionRecords {
 
     const usage = await this.resourceUsageRepository.findOne({
       where: { id: usageId, resourceId },
-      relations: ['user', 'project', 'resource'],
+      relations: { user: true, project: true, resource: true },
     });
 
     if (!usage) {
@@ -218,7 +216,7 @@ export class UsageSessionRecords {
 
     return await this.resourceUsageRepository.findOne({
       where: { id: usage.id },
-      relations: ['resource', 'user', 'project'],
+      relations: { resource: true, user: true, project: true },
     });
   }
 }

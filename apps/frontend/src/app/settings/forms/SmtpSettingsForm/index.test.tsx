@@ -23,14 +23,14 @@ vi.mock('../../../../components/toastProvider', () => ({
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('@attraccess/react-query-client', () => ({
   SmtpServiceType: { SMTP: 'smtp', OUTLOOK365: 'outlook365' },
-  useSettingsServiceGetSystemSettingsKey: 'settings',
-  UseSettingsServiceGetFirstTimeSetupStatusKeyFn: () => ['setup-status'],
-  useSettingsServiceGetSystemSettings: () => ({ data: state.settings, isLoading: state.loading }),
-  useSettingsServiceUpdateSystemSettings: (options: typeof state.options) => {
+  useGetSystemSettingsKey: 'settings',
+  UseGetFirstTimeSetupStatusKeyFn: () => ['setup-status'],
+  useGetSystemSettings: () => ({ data: state.settings, isLoading: state.loading }),
+  useUpdateSystemSettings: (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
     return { mutate: state.save };
   },
-  useSettingsServiceApplyFirstTimeSetupSettings: (options: typeof state.options) => {
+  useApplyFirstTimeSetupSettings: (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
     return { mutate: state.setup };
   },
@@ -55,7 +55,7 @@ it('loads stored settings and omits a blank password when saving', () => {
   expect(screen.getByLabelText('inputs.host.label')).toHaveValue('smtp.example');
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
   expect(state.save).toHaveBeenCalledWith({
-    requestBody: {
+    body: {
       smtp: {
         service: 'smtp',
         host: 'smtp.example',
@@ -96,7 +96,7 @@ it('validates wizard fields, saves through first-time setup, and advances only a
   fireEvent.click(screen.getByRole('button', { name: 'actions.next' }));
   await waitFor(() =>
     expect(state.setup).toHaveBeenCalledWith({
-      requestBody: {
+      body: {
         smtp: {
           service: 'smtp',
           host: 'mail.example',

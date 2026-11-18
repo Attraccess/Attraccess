@@ -35,7 +35,7 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
   beforeAll(async () => {
     const url = await prepareFleetHardware(state);
     state.database = new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: plugin.entities,
       synchronize: true,

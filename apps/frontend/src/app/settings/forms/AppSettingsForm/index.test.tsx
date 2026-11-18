@@ -25,16 +25,16 @@ vi.mock('../../../../components/toastProvider', () => ({
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('@attraccess/react-query-client', () => ({
-  UseSettingsServiceGetSystemSettingsKeyFn: () => ['settings'],
-  UseSettingsServiceGetSystemLanguageKeyFn: () => ['system-language'],
-  UseSettingsServiceGetFirstTimeSetupStatusKeyFn: () => ['setup-status'],
-  useSettingsServiceGetSystemLanguage: () => ({ data: state.systemLanguage }),
-  useSettingsServiceGetSystemSettings: () => ({ data: state.settings, isLoading: state.loading }),
-  useSettingsServiceUpdateSystemSettings: (options: typeof state.options) => {
+  UseGetSystemSettingsKeyFn: () => ['settings'],
+  UseGetSystemLanguageKeyFn: () => ['system-language'],
+  UseGetFirstTimeSetupStatusKeyFn: () => ['setup-status'],
+  useGetSystemLanguage: () => ({ data: state.systemLanguage }),
+  useGetSystemSettings: () => ({ data: state.settings, isLoading: state.loading }),
+  useUpdateSystemSettings: (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
     return { mutate: state.save, isPending: state.pending };
   },
-  useSettingsServiceApplyFirstTimeSetupSettings: (options: typeof state.options) => {
+  useApplyFirstTimeSetupSettings: (_mutationKey: unknown, options: typeof state.options) => {
     state.options = options;
     return { mutate: state.setup, isPending: state.pending };
   },
@@ -54,7 +54,7 @@ it('loads existing URLs and preserves the stored license when the secret field i
   fireEvent.change(screen.getByLabelText('inputs.publicInternetUrl.label'), { target: { value: '' } });
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
   expect(state.save).toHaveBeenCalledWith({
-    requestBody: {
+    body: {
       app: { url: 'https://app.example', publicInternetUrl: undefined, licenseKey: undefined, defaultLanguage: 'de' },
     },
   });
@@ -64,7 +64,7 @@ it('submits a new license and clears it only after successful save', () => {
   fireEvent.change(screen.getByLabelText('inputs.licenseKey.label'), { target: { value: ' new-license ' } });
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
   expect(state.save).toHaveBeenCalledWith({
-    requestBody: {
+    body: {
       app: {
         url: 'https://app.example',
         publicInternetUrl: 'https://public.example',
@@ -91,7 +91,7 @@ it('validates the wizard URL and advances after first-time setup succeeds', () =
   fireEvent.click(screen.getByRole('button', { name: 'actions.next' }));
   expect(state.setup).toHaveBeenCalledWith(
     expect.objectContaining({
-      requestBody: {
+      body: {
         app: {
           url: 'https://configured.example',
           publicInternetUrl: window.location.origin,
@@ -134,7 +134,7 @@ it('submits an explicit setup choice from the HeroUI selector', async () => {
   fireEvent.click(await screen.findByRole('option', { name: 'Deutsch' }));
   fireEvent.click(screen.getByRole('button', { name: 'actions.next' }));
   expect(state.setup).toHaveBeenCalledWith(
-    expect.objectContaining({ requestBody: { app: expect.objectContaining({ defaultLanguage: 'de' }) } }),
+    expect.objectContaining({ body: { app: expect.objectContaining({ defaultLanguage: 'de' }) } }),
   );
 });
 it('keeps an unsaved language choice during background refetches', async () => {
@@ -146,7 +146,7 @@ it('keeps an unsaved language choice during background refetches', async () => {
   expect(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ })).toHaveTextContent('English');
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
   expect(state.save).toHaveBeenCalledWith(
-    expect.objectContaining({ requestBody: { app: expect.objectContaining({ defaultLanguage: 'en' }) } }),
+    expect.objectContaining({ body: { app: expect.objectContaining({ defaultLanguage: 'en' }) } }),
   );
 });
 it('keeps all edited fields through refetch and a failed save, then accepts persisted values after success', async () => {
@@ -168,7 +168,7 @@ it('keeps all edited fields through refetch and a failed save, then accepts pers
   view.rerender(<AppSettingsForm variant="standalone" endpoint="settings" />);
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
   expect(state.save).toHaveBeenLastCalledWith({
-    requestBody: {
+    body: {
       app: {
         url: 'https://draft.example',
         publicInternetUrl: 'https://draft-public.example',
@@ -217,7 +217,7 @@ it.each(['de-Latn-DE', 'de-DE-u-co-phonebk', 'de-CH-1901'])(
       expect(screen.getByRole('button', { name: /inputs.defaultLanguage.label$/ })).toHaveTextContent('Deutsch');
       fireEvent.click(screen.getByRole('button', { name: 'actions.next' }));
       expect(state.setup).toHaveBeenCalledWith(
-        expect.objectContaining({ requestBody: { app: expect.objectContaining({ defaultLanguage: 'de' }) } }),
+        expect.objectContaining({ body: { app: expect.objectContaining({ defaultLanguage: 'de' }) } }),
       );
     } finally {
       if (original) Object.defineProperty(window.navigator, 'language', original);

@@ -7,10 +7,7 @@ import { UpdateNotificationBanner } from '../../components/UpdateNotificationBan
 import { ServerNotAvailable } from '../serverNotAvailable';
 import { useLiveTransactionUpdates } from '../billing/dashboard/summary/live-updates';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  UseBillingServiceGetBillingBalanceKeyFn,
-  useBillingServiceGetBillingTransactionsKey,
-} from '@attraccess/react-query-client';
+import { UseGetBillingBalanceKeyFn, useGetBillingTransactionsKey } from '@attraccess/react-query-client';
 import { useAuth } from '../../hooks/useAuth';
 import { GlobalMessagingLive } from '../messaging/GlobalMessagingLive';
 import { GlobalSystemNotificationsLive } from '../notifications/GlobalSystemNotificationsLive';
@@ -82,9 +79,9 @@ export function Layout({ children }: LayoutProps) {
   const queryClient = useQueryClient();
 
   const onLiveTransactionUpdate = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: [useBillingServiceGetBillingTransactionsKey] });
+    queryClient.invalidateQueries({ queryKey: [useGetBillingTransactionsKey] });
     queryClient.invalidateQueries({
-      queryKey: UseBillingServiceGetBillingBalanceKeyFn({ userId: currentUser?.id ?? 0 }),
+      queryKey: UseGetBillingBalanceKeyFn({ path: { userId: currentUser?.id ?? 0 } }),
     });
   }, [currentUser, queryClient]);
 

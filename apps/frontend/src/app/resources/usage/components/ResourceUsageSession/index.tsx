@@ -10,14 +10,14 @@ import { IntroductionRequiredDisplay } from '../IntroductionRequiredDisplay';
 import { RetrainingStatusBanner } from '../RetrainingStatusBanner';
 import { StartSessionControls } from '../StartSessionControls';
 import {
-  useAccessControlServiceResourceIntroducersGetNames,
-  useResourcesServiceResourceUsageGetActiveSession,
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
-  UseResourcesServiceResourceUsageCanControlKeyFn,
-  UseResourcesServiceResourceUsageStartBlockedKeyFn,
+  useResourceIntroducersGetNames,
+  useResourceUsageGetActiveSession,
+  UseResourceUsageGetActiveSessionKeyFn,
+  UseResourceUsageCanControlKeyFn,
+  UseResourceUsageStartBlockedKeyFn,
   Resource,
-  useResourcesServiceResourceUsageCanControl,
-  useResourceMaintenancesServiceFindMaintenances,
+  useResourceUsageCanControl,
+  useFindMaintenances,
   SupervisionMode,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -54,13 +54,13 @@ export function ResourceUsageSession({
 
   // The gate inside StartSessionControls reads this query; a session starting or ending can change its answer too.
   const invalidateStartBlocked = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: UseResourcesServiceResourceUsageStartBlockedKeyFn({ resourceId }) });
+    queryClient.invalidateQueries({ queryKey: UseResourceUsageStartBlockedKeyFn({ path: { resourceId } }) });
   }, [queryClient, resourceId]);
 
   const invalidateSessionQueries = useCallback(() => {
     // Only this resource: the dashboard renders one of these per pinned resource.
-    queryClient.invalidateQueries({ queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId }) });
-    queryClient.invalidateQueries({ queryKey: UseResourcesServiceResourceUsageCanControlKeyFn({ resourceId }) });
+    queryClient.invalidateQueries({ queryKey: UseResourceUsageGetActiveSessionKeyFn({ path: { resourceId } }) });
+    queryClient.invalidateQueries({ queryKey: UseResourceUsageCanControlKeyFn({ path: { resourceId } }) });
     // The dashboard's "My sessions" list; refetched only while it is shown.
     queryClient.invalidateQueries({ queryKey: mySessionsQueryKey(), exact: true });
     invalidateStartBlocked();
@@ -78,17 +78,17 @@ export function ResourceUsageSession({
     },
   });
 
-  const { data: access, isLoading: isLoadingIntroStatus } = useResourcesServiceResourceUsageCanControl(
-    { resourceId },
+  const { data: access, isLoading: isLoadingIntroStatus } = useResourceUsageCanControl(
+    { path: { resourceId } },
     undefined,
   );
 
-  const { data: introducers, isLoading: isLoadingIntroducers } = useAccessControlServiceResourceIntroducersGetNames({
-    resourceId,
+  const { data: introducers, isLoading: isLoadingIntroducers } = useResourceIntroducersGetNames({
+    path: { resourceId },
   });
 
-  const { data: activeSessionResponse, isLoading: isLoadingSession } = useResourcesServiceResourceUsageGetActiveSession(
-    { resourceId },
+  const { data: activeSessionResponse, isLoading: isLoadingSession } = useResourceUsageGetActiveSession(
+    { path: { resourceId } },
     undefined,
   );
 
@@ -126,10 +126,7 @@ export function ResourceUsageSession({
     resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED ||
     resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED;
 
-  const { data: activeMaintenances } = useResourceMaintenancesServiceFindMaintenances({
-    resourceId,
-    includeActive: true,
-  });
+  const { data: activeMaintenances } = useFindMaintenances({ path: { resourceId }, query: { includeActive: true } });
 
   const renderStartArea = () => {
     if (!canStartSession && !supervisionEnabled) {

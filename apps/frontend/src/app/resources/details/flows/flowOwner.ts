@@ -3,31 +3,31 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   ApiError,
   FlowLogRecordingDto,
-  GlobalFlowsService,
   ResourceFlowResponseDto,
   ResourceFlowSaveDto,
-  ResourceFlowsService,
-  UseGlobalFlowsServiceGetGlobalFlowCanvasKeyFn,
-  useGlobalFlowsServiceGetGlobalFlowLogRecordingStatusKey,
-  useResourceFlowsServiceGetFlowLogRecordingStatusKey,
-  UseResourceFlowsServiceGetResourceFlowKeyFn,
-  useGlobalFlowsServiceGetGlobalFlowCanvas,
-  useGlobalFlowsServiceGetGlobalFlowLogRecordingStatus,
-  useGlobalFlowsServiceGetGlobalFlowLogs,
-  useGlobalFlowsServiceGetGlobalFlowNodeSchemas,
-  useGlobalFlowsServiceResolveGlobalFlowNodeSchema,
-  useGlobalFlowsServiceSaveGlobalFlowCanvas,
-  useGlobalFlowsServiceStartGlobalFlowLogRecording,
-  useGlobalFlowsServiceStopGlobalFlowLogRecording,
-  useResourceFlowsServiceGetFlowLogRecordingStatus,
-  useResourceFlowsServiceGetNodeSchemas,
-  useResourceFlowsServiceGetResourceFlow,
-  useResourceFlowsServiceGetResourceFlowLogs,
-  useResourceFlowsServiceResolveNodeSchema,
-  useResourceFlowsServiceSaveResourceFlow,
-  useResourceFlowsServiceStartFlowLogRecording,
-  useResourceFlowsServiceStopFlowLogRecording,
+  UseGetGlobalFlowCanvasKeyFn,
+  useGetGlobalFlowLogRecordingStatusKey,
+  useGetFlowLogRecordingStatusKey,
+  UseGetResourceFlowKeyFn,
+  useGetGlobalFlowCanvas,
+  useGetGlobalFlowLogRecordingStatus,
+  useGetGlobalFlowLogs,
+  useGetGlobalFlowNodeSchemas,
+  useResolveGlobalFlowNodeSchema,
+  useSaveGlobalFlowCanvas,
+  useStartGlobalFlowLogRecording,
+  useStopGlobalFlowLogRecording,
+  useGetFlowLogRecordingStatus,
+  useGetNodeSchemas,
+  useGetResourceFlow,
+  useGetResourceFlowLogs,
+  useResolveNodeSchema,
+  useSaveResourceFlow,
+  useStartFlowLogRecording,
+  useStopFlowLogRecording,
   ResourceFlowNodeSchemaDto,
+  resolveGlobalFlowNodePreview,
+  resolveNodePreview,
 } from '@attraccess/react-query-client';
 
 /**
@@ -75,10 +75,10 @@ const resourceIdOf = (owner: FlowOwner) => (owner.kind === 'resource' ? owner.re
 const flowIdOf = (owner: FlowOwner) => (owner.kind === 'global' ? owner.flowId : ID_FALLBACK);
 
 export function useFlowCanvasQuery(owner: FlowOwner) {
-  const resource = useResourceFlowsServiceGetResourceFlow({ resourceId: resourceIdOf(owner) }, undefined, {
+  const resource = useGetResourceFlow({ path: { resourceId: resourceIdOf(owner) } }, undefined, {
     enabled: owner.kind === 'resource' && owner.resourceId > 0,
   });
-  const global = useGlobalFlowsServiceGetGlobalFlowCanvas({ flowId: flowIdOf(owner) }, undefined, {
+  const global = useGetGlobalFlowCanvas({ path: { flowId: flowIdOf(owner) } }, undefined, {
     enabled: owner.kind === 'global' && owner.flowId > 0,
   });
   return (owner.kind === 'resource' ? resource : global) as {
@@ -89,10 +89,10 @@ export function useFlowCanvasQuery(owner: FlowOwner) {
 }
 
 export function useFlowNodeSchemasQuery(owner: FlowOwner) {
-  const resource = useResourceFlowsServiceGetNodeSchemas({ resourceId: resourceIdOf(owner) }, undefined, {
+  const resource = useGetNodeSchemas({ path: { resourceId: resourceIdOf(owner) } }, undefined, {
     enabled: owner.kind === 'resource',
   });
-  const global = useGlobalFlowsServiceGetGlobalFlowNodeSchemas(undefined, {
+  const global = useGetGlobalFlowNodeSchemas({}, undefined, {
     enabled: owner.kind === 'global',
   });
   return (owner.kind === 'resource' ? resource : global) as {
@@ -111,20 +111,20 @@ export function useSaveFlowCanvas(
     void queryClient.invalidateQueries({
       queryKey:
         owner.kind === 'resource'
-          ? UseResourceFlowsServiceGetResourceFlowKeyFn({ resourceId: owner.resourceId })
-          : UseGlobalFlowsServiceGetGlobalFlowCanvasKeyFn({ flowId: owner.flowId }),
+          ? UseGetResourceFlowKeyFn({ path: { resourceId: owner.resourceId } })
+          : UseGetGlobalFlowCanvasKeyFn({ path: { flowId: owner.flowId } }),
     });
     options.onSuccess?.();
   };
   const onError = (error: unknown) => options.onError?.(error as ApiError);
-  const resource = useResourceFlowsServiceSaveResourceFlow({ onSuccess, onError });
-  const global = useGlobalFlowsServiceSaveGlobalFlowCanvas({ onSuccess, onError });
+  const resource = useSaveResourceFlow(undefined, { onSuccess, onError });
+  const global = useSaveGlobalFlowCanvas(undefined, { onSuccess, onError });
   const active = owner.kind === 'resource' ? resource : global;
 
   const save = useCallback(
     (requestBody: ResourceFlowSaveDto) => {
-      if (owner.kind === 'resource') resource.mutate({ resourceId: owner.resourceId, requestBody });
-      else global.mutate({ flowId: owner.flowId, requestBody });
+      if (owner.kind === 'resource') resource.mutate({ path: { resourceId: owner.resourceId }, body: requestBody });
+      else global.mutate({ path: { flowId: owner.flowId }, body: requestBody });
     },
     [owner, resource, global],
   );
@@ -133,39 +133,42 @@ export function useSaveFlowCanvas(
 
 /** Resolves a dynamic (plugin) node schema for a node configuration. */
 export function useResolveFlowNodeSchema(owner: FlowOwner) {
-  const resource = useResourceFlowsServiceResolveNodeSchema<ResourceFlowNodeSchemaDto>();
-  const global = useGlobalFlowsServiceResolveGlobalFlowNodeSchema<ResourceFlowNodeSchemaDto>();
+  const resource = useResolveNodeSchema<ResourceFlowNodeSchemaDto>();
+  const global = useResolveGlobalFlowNodeSchema<ResourceFlowNodeSchemaDto>();
   const resourceMutate = resource.mutateAsync;
   const globalMutate = global.mutateAsync;
   return useCallback(
     (nodeType: string, config: Record<string, unknown>) =>
       owner.kind === 'resource'
-        ? resourceMutate({ resourceId: owner.resourceId, nodeType, requestBody: { config } })
-        : globalMutate({ flowId: owner.flowId, nodeType, requestBody: { config } }),
+        ? resourceMutate({ path: { resourceId: owner.resourceId, nodeType }, body: { config } })
+        : globalMutate({ path: { flowId: owner.flowId, nodeType }, body: { config } }),
     [owner, resourceMutate, globalMutate],
   );
 }
 
 export function resolveFlowNodePreview(owner: FlowOwner, nodeType: string, config: Record<string, unknown>) {
   return owner.kind === 'resource'
-    ? ResourceFlowsService.resolveNodePreview({
-        resourceId: owner.resourceId,
-        nodeType,
-        requestBody: { config },
-      })
-    : GlobalFlowsService.resolveGlobalFlowNodePreview({ flowId: owner.flowId, nodeType, requestBody: { config } });
+    ? resolveNodePreview({
+        path: { resourceId: owner.resourceId, nodeType },
+        body: { config },
+        throwOnError: true,
+      }).then(({ data }) => data)
+    : resolveGlobalFlowNodePreview({
+        path: { flowId: owner.flowId, nodeType },
+        body: { config },
+        throwOnError: true,
+      }).then(({ data }) => data);
 }
 
 /** Recording status, buffered logs and start/stop of the log viewer. */
 export function useFlowLogRecording(owner: FlowOwner, opts: { isOpen: boolean }) {
   const queryClient = useQueryClient();
   const refetchInterval = opts.isOpen ? 10_000 : false;
-  const resourceStatus = useResourceFlowsServiceGetFlowLogRecordingStatus(
-    { resourceId: resourceIdOf(owner) },
-    undefined,
-    { enabled: owner.kind === 'resource', refetchInterval },
-  );
-  const globalStatus = useGlobalFlowsServiceGetGlobalFlowLogRecordingStatus({ flowId: flowIdOf(owner) }, undefined, {
+  const resourceStatus = useGetFlowLogRecordingStatus({ path: { resourceId: resourceIdOf(owner) } }, undefined, {
+    enabled: owner.kind === 'resource',
+    refetchInterval,
+  });
+  const globalStatus = useGetGlobalFlowLogRecordingStatus({ path: { flowId: flowIdOf(owner) } }, undefined, {
     enabled: owner.kind === 'global',
     refetchInterval,
   });
@@ -175,13 +178,13 @@ export function useFlowLogRecording(owner: FlowOwner, opts: { isOpen: boolean })
   const logsEnabled = opts.isOpen && isRecording;
 
   // The generated key defaults to [{ id }]; startedAt makes it per-recording.
-  const resourceLogs = useResourceFlowsServiceGetResourceFlowLogs(
-    { resourceId: resourceIdOf(owner) },
+  const resourceLogs = useGetResourceFlowLogs(
+    { path: { resourceId: resourceIdOf(owner) } },
     [{ resourceId: resourceIdOf(owner) }, recording?.startedAt],
     { enabled: owner.kind === 'resource' && logsEnabled, refetchInterval: false, staleTime: Infinity },
   );
-  const globalLogs = useGlobalFlowsServiceGetGlobalFlowLogs(
-    { flowId: flowIdOf(owner) },
+  const globalLogs = useGetGlobalFlowLogs(
+    { path: { flowId: flowIdOf(owner) } },
     [{ flowId: flowIdOf(owner) }, recording?.startedAt],
     { enabled: owner.kind === 'global' && logsEnabled, refetchInterval: false, staleTime: Infinity },
   );
@@ -192,31 +195,28 @@ export function useFlowLogRecording(owner: FlowOwner, opts: { isOpen: boolean })
   const invalidateStatus = useCallback(
     () =>
       queryClient.invalidateQueries({
-        queryKey: [
-          owner.kind === 'resource'
-            ? useResourceFlowsServiceGetFlowLogRecordingStatusKey
-            : useGlobalFlowsServiceGetGlobalFlowLogRecordingStatusKey,
-        ],
+        queryKey: [owner.kind === 'resource' ? useGetFlowLogRecordingStatusKey : useGetGlobalFlowLogRecordingStatusKey],
       }),
     [owner, queryClient],
   );
 
-  const resourceStart = useResourceFlowsServiceStartFlowLogRecording({ onSuccess: invalidateStatus });
-  const resourceStop = useResourceFlowsServiceStopFlowLogRecording({ onSuccess: invalidateStatus });
-  const globalStart = useGlobalFlowsServiceStartGlobalFlowLogRecording({ onSuccess: invalidateStatus });
-  const globalStop = useGlobalFlowsServiceStopGlobalFlowLogRecording({ onSuccess: invalidateStatus });
+  const resourceStart = useStartFlowLogRecording(undefined, { onSuccess: invalidateStatus });
+  const resourceStop = useStopFlowLogRecording(undefined, { onSuccess: invalidateStatus });
+  const globalStart = useStartGlobalFlowLogRecording(undefined, { onSuccess: invalidateStatus });
+  const globalStop = useStopGlobalFlowLogRecording(undefined, { onSuccess: invalidateStatus });
 
   const startRecording = useCallback(
     (durationMinutes: number) => {
       const requestBody = { durationMinutes };
-      if (owner.kind === 'resource') resourceStart.mutate({ resourceId: owner.resourceId, requestBody });
-      else globalStart.mutate({ flowId: owner.flowId, requestBody });
+      if (owner.kind === 'resource')
+        resourceStart.mutate({ path: { resourceId: owner.resourceId }, body: requestBody });
+      else globalStart.mutate({ path: { flowId: owner.flowId }, body: requestBody });
     },
     [owner, resourceStart, globalStart],
   );
   const stopRecording = useCallback(() => {
-    if (owner.kind === 'resource') resourceStop.mutate({ resourceId: owner.resourceId });
-    else globalStop.mutate({ flowId: owner.flowId });
+    if (owner.kind === 'resource') resourceStop.mutate({ path: { resourceId: owner.resourceId } });
+    else globalStop.mutate({ path: { flowId: owner.flowId } });
   }, [owner, resourceStop, globalStop]);
 
   return {

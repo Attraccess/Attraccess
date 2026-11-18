@@ -15,10 +15,10 @@ import {
 import { MessageSquareWarningIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import {
-  useLicenseServiceGetLicenseInformation,
-  useResourceMaintenancesServiceCanManageMaintenance,
-  useResourceMaintenancesServiceCreateMaintenanceRequest,
-  useResourceMaintenancesServiceListMaintenanceRequestsKey,
+  useGetLicenseInformation,
+  useCanManageMaintenance,
+  useCreateMaintenanceRequest,
+  useListMaintenanceRequestsKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import de from './de.json';
@@ -37,24 +37,19 @@ export function RequestMaintenanceButton(props: Props) {
   const [reason, setReason] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
-  const { data: license } = useLicenseServiceGetLicenseInformation();
-  const { data: permissions } = useResourceMaintenancesServiceCanManageMaintenance({ resourceId });
+  const { data: license } = useGetLicenseInformation();
+  const { data: permissions } = useCanManageMaintenance({ path: { resourceId } });
 
   const onSuccess = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: [useResourceMaintenancesServiceListMaintenanceRequestsKey] });
+    queryClient.invalidateQueries({ queryKey: [useListMaintenanceRequestsKey] });
     setSubmitted(true);
   }, [queryClient]);
 
-  const {
-    mutate: createRequest,
-    isPending,
-    error,
-    reset,
-  } = useResourceMaintenancesServiceCreateMaintenanceRequest({ onSuccess });
+  const { mutate: createRequest, isPending, error, reset } = useCreateMaintenanceRequest(undefined, { onSuccess });
 
   const onSubmit = useCallback(() => {
     if (reason.trim().length < 3) return;
-    createRequest({ resourceId, requestBody: { reason: reason.trim() } });
+    createRequest({ path: { resourceId }, body: { reason: reason.trim() } });
   }, [createRequest, resourceId, reason]);
 
   const onOpenChange = useCallback(

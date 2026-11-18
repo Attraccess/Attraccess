@@ -12,7 +12,7 @@ describe('RefreshDefaultEmailLayout1783700000000', () => {
   let originalLayout: string;
 
   beforeEach(async () => {
-    dataSource = new DataSource({ type: 'sqlite', database: ':memory:', synchronize: false, entities: [] });
+    dataSource = new DataSource({ type: 'better-sqlite3', database: ':memory:', synchronize: false, entities: [] });
     await dataSource.initialize();
     queryRunner = dataSource.createQueryRunner();
 

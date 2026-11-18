@@ -18,7 +18,7 @@ const BACKUP_TABLES = ['plugin_matter_recovery_keys', 'plugin_matter_backups'];
 const TABLES = [...DEVICE_TABLES, ...BACKUP_TABLES];
 
 const open = () =>
-  new DataSource({ type: 'sqlite', database: ':memory:', migrations: Object.values(migrations) }).initialize();
+  new DataSource({ type: 'better-sqlite3', database: ':memory:', migrations: Object.values(migrations) }).initialize();
 const tables = async (db: DataSource): Promise<string[]> =>
   (
     await db.query(`SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'plugin_matter_%' ORDER BY name`)
@@ -45,7 +45,7 @@ describe('Matter device model migrations', () => {
 
   it('upgrade a database that holds only the connection migration, keeping its data', async () => {
     const db = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       migrations: [CreateMatterConnection1793900000000],
     }).initialize();
@@ -76,7 +76,7 @@ describe('Matter device model migrations', () => {
 
   it('add the recorded fabric identity to existing fabric rows, keeping them', async () => {
     const db = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       migrations: [CreateMatterConnection1793900000000, CreateMatterDeviceModel1793900001000],
     }).initialize();

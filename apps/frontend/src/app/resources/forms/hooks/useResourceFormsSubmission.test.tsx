@@ -6,7 +6,7 @@ import { useResourceFormsSubmission } from './useResourceFormsSubmission';
 const { requirements, submitted } = vi.hoisted(() => ({ requirements: vi.fn(), submitted: vi.fn() }));
 vi.mock('@attraccess/react-query-client', async (original) => ({
   ...(await original<typeof import('@attraccess/react-query-client')>()),
-  ResourceFormsService: { resourceFormsGetRequirements: requirements },
+  resourceFormsGetRequirements: requirements,
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -64,7 +64,7 @@ async function enterAndSubmit() {
 }
 
 it('retains submitted answers for a failed operation retry, then clears them after success', async () => {
-  requirements.mockResolvedValue(forms);
+  requirements.mockResolvedValue({ data: forms });
   render(<Harness />);
   fireEvent.click(screen.getByText('Start'));
   await enterAndSubmit();
@@ -92,7 +92,7 @@ it('retains submitted answers for a failed operation retry, then clears them aft
 });
 
 it('does not reuse answers for another action or resource, and discards a cancelled retry', async () => {
-  requirements.mockResolvedValue(forms);
+  requirements.mockResolvedValue({ data: forms });
   const view = render(<Harness />);
   fireEvent.click(screen.getByText('Start'));
   await enterAndSubmit();
@@ -105,5 +105,7 @@ it('does not reuse answers for another action or resource, and discards a cancel
   view.rerender(<Harness resourceId={2} />);
   fireEvent.click(screen.getByText('Start'));
   expect(await screen.findByPlaceholderText('Notes')).toHaveValue('');
-  expect(requirements).toHaveBeenLastCalledWith({ resourceId: 2, action: 'start' });
+  expect(requirements).toHaveBeenLastCalledWith(
+    expect.objectContaining({ path: { resourceId: 2 }, query: { action: 'start' } }),
+  );
 });

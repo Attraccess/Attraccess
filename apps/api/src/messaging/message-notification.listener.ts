@@ -33,7 +33,7 @@ export class MessageNotificationListener {
     try {
       const participants = await this.participantRepository.find({
         where: { conversationId: message.conversationId },
-        relations: ['user'],
+        relations: { user: true },
       });
 
       const recipients = participants.filter((participant) => participant.userId !== message.senderId);
@@ -70,7 +70,9 @@ export class MessageNotificationListener {
     message: Message,
     senderName: string,
   ): Promise<void> {
-    const recipients = participants.map((participant) => participant.user).filter((user): user is User => Boolean(user));
+    const recipients = participants
+      .map((participant) => participant.user)
+      .filter((user): user is User => Boolean(user));
     if (recipients.length === 0) {
       return;
     }

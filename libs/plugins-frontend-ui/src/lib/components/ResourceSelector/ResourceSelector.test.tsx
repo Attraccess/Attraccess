@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ResourceSelector } from './ResourceSelector';
 import { useTranslationState } from '../../i18n';
 const mocks = vi.hoisted(() => ({ query: vi.fn() }));
-vi.mock('@attraccess/react-query-client', () => ({ useResourcesServiceGetAllResources: mocks.query }));
+vi.mock('@attraccess/react-query-client', () => ({ useGetAllResources: mocks.query }));
 beforeEach(() => {
   useTranslationState.setState({ language: 'en' });
   mocks.query.mockReturnValue({
@@ -36,7 +36,7 @@ it('searches resources and reports selected IDs', async () => {
   const selected = vi.fn();
   render(<ResourceSelector selection={[]} onSelectionChange={selected} />);
   await user.type(screen.getByRole('textbox', { name: 'Search resources' }), 'Laser');
-  expect(mocks.query).toHaveBeenLastCalledWith({ limit: 15, page: 1, search: 'Laser' });
+  expect(mocks.query).toHaveBeenLastCalledWith({ query: { limit: 15, page: 1, search: 'Laser' } });
   await user.click(screen.getByRole('row', { name: 'Laser' }));
   expect(selected).toHaveBeenLastCalledWith([1]);
 });

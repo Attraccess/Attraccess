@@ -19,7 +19,7 @@ import { AuditQueryService } from './audit-query.service';
 import { PluginAuditHost } from './plugin-audit-host';
 import { AuditService } from './audit.service';
 import { AUDIT_BUSY_RETRIES, MAX_PENDING_AUDIT_WRITES } from './persistence/audit-storage';
-import { SQLITE_BUSY_TIMEOUT_MS } from '../database/sqlite-connection';
+import { createDataSource, SQLITE_BUSY_TIMEOUT_MS } from '../database/sqlite-connection';
 import { AUDIT_DROP_REASONS } from '../metrics/definitions/audit.metrics';
 import { createTestAuditMetrics, droppedRecords, setupAuditDatabase } from './audit.test-fixture';
 describe('durable audit SQLite', () => {
@@ -532,7 +532,12 @@ describe('durable audit SQLite', () => {
 
   it('waits for a held SQLite write lock instead of dropping the write', async () => {
     expect(SQLITE_BUSY_TIMEOUT_MS).toBe(5000);
-    const lock = await new DataSource({ type: 'sqlite', database: fixture.source.options.database }).initialize();
+    // Guarded like the API's connections: an unguarded better-sqlite3 lock holder would make the audit write
+    // busy-wait on the event loop, so the ROLLBACK below could never run.
+    const lock = await createDataSource({
+      type: 'better-sqlite3',
+      database: fixture.source.options.database as string,
+    }).initialize();
     try {
       await lock.query('BEGIN IMMEDIATE');
       const receipts = Promise.all(Array.from({ length: 8 }, () => fixture.plugins.record(fixture.event())));
@@ -548,7 +553,7 @@ describe('durable audit SQLite', () => {
 
   it('logs and counts storage_unavailable when the audit connection cannot exist', async () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
-    const memory = new DataSource({ type: 'sqlite', database: ':memory:' });
+    const memory = new DataSource({ type: 'better-sqlite3', database: ':memory:' });
     const metrics = createTestAuditMetrics();
     const sink = new AuditService(memory, fixture.store, metrics);
     await sink.onModuleInit();
@@ -629,7 +634,12 @@ describe('durable audit SQLite', () => {
   });
 
   it('drops writes still queued when the shutdown drain runs out of time', async () => {
-    const lock = await new DataSource({ type: 'sqlite', database: fixture.source.options.database }).initialize();
+    // Guarded like the API's connections: an unguarded better-sqlite3 lock holder would make the audit write
+    // busy-wait on the event loop, so the ROLLBACK below could never run.
+    const lock = await createDataSource({
+      type: 'better-sqlite3',
+      database: fixture.source.options.database as string,
+    }).initialize();
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     try {
       await lock.query('BEGIN IMMEDIATE');
@@ -654,7 +664,11 @@ describe('durable audit SQLite', () => {
 
   it('creates zero series for registered plugin domains at startup', async () => {
     const metrics = createTestAuditMetrics();
-    const sink = new AuditService(new DataSource({ type: 'sqlite', database: ':memory:' }), fixture.store, metrics);
+    const sink = new AuditService(
+      new DataSource({ type: 'better-sqlite3', database: ':memory:' }),
+      fixture.store,
+      metrics,
+    );
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     try {
       await sink.onModuleInit();
@@ -679,7 +693,12 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       migration !== migrations.FullAuditDomains1784100000000,
   );
   const database = join(directory, 'upgrade.sqlite');
-  let source = new DataSource({ type: 'sqlite', database, entities: Object.values(entities), migrations: prior });
+  let source = new DataSource({
+    type: 'better-sqlite3',
+    database,
+    entities: Object.values(entities),
+    migrations: prior,
+  });
   try {
     await source.initialize();
     await source.runMigrations();
@@ -698,7 +717,7 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
     );
     await source.destroy();
     source = new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database,
       entities: Object.values(entities),
       migrations: Object.values(migrations),

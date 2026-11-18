@@ -17,10 +17,10 @@ export class SqliteReadonlyFilter extends BaseExceptionFilter {
       const errorCode = driverError?.code;
       const errorMessage = driverError?.message ?? exception.message;
 
-      if (errorCode === 'SQLITE_READONLY' || errorMessage?.includes('SQLITE_READONLY')) {
+      if (errorCode?.startsWith('SQLITE_READONLY') || errorMessage?.includes('SQLITE_READONLY')) {
         this.logger.error(
           'SQLite database is read-only. If you upgraded from a root-based container, ' +
-            'fix storage ownership by running as root: chown -R appuser:appuser /app/storage'
+            'fix storage ownership by running as root: chown -R appuser:appuser /app/storage',
         );
       }
     }

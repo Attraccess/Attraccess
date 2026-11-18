@@ -4,8 +4,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { BalenaPage } from './index';
 const state = vi.hoisted(() => ({ reboot: vi.fn(), shutdown: vi.fn() }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useSystemServiceRebootHost: () => ({ mutate: state.reboot }),
-  useSystemServiceShutdownHost: () => ({ mutate: state.shutdown }),
+  useRebootHost: () => ({ mutate: state.reboot }),
+  useShutdownHost: () => ({ mutate: state.shutdown }),
 }));
 beforeEach(() => {
   vi.clearAllMocks();

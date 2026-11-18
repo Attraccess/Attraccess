@@ -852,7 +852,7 @@ describe('ResourcesService', () => {
       expect(result).toEqual(mockResource);
       expect(getResourceByIdScope.resourceRepository.find).toHaveBeenCalledWith({
         where: { id: expect.anything() },
-        relations: ['introductions', 'usages', 'groups'],
+        relations: { introductions: true, usages: true, groups: true },
       });
     });
 

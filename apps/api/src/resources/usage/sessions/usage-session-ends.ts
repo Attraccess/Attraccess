@@ -200,7 +200,7 @@ export class UsageSessionEnds {
         if (result.affected === 0) throw new ConflictException('Usage session changed while ending');
         const endedSession = await manager.findOneOrFail(ResourceUsage, {
           where: { id: prepared.activeSession.id },
-          relations: ['user', 'resource'],
+          relations: { user: true, resource: true },
         });
         chargeTransactionId = await this.lifecycle.settleEndedSession(manager, endedSession, final);
         await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
@@ -371,7 +371,7 @@ export class UsageSessionEnds {
   ): Promise<ResourceUsage | null> {
     const session = await manager.findOne(ResourceUsage, {
       where: { id: usageId, resourceId, ...activeUsageWhere() },
-      relations: ['user'],
+      relations: { user: true },
     });
     if (!session) return null;
     const beingEnded = await manager.exists(ResourceUsageLifecycleAttempt, {

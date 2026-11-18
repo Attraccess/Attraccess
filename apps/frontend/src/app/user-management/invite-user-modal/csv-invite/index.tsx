@@ -2,12 +2,7 @@ import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { useCallback, useState } from 'react';
-import {
-  CsvInviteUploadDto,
-  useUsersServiceInviteUsersFromCsv,
-  ApiError,
-  useUsersServiceFindManyKey,
-} from '@attraccess/react-query-client';
+import { CsvInviteUploadDto, useInviteUsersFromCsv, ApiError, useFindManyKey } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import type { CsvRowError } from './csvRowErrors';
@@ -40,7 +35,7 @@ export function CsvInvite({ onSuccess, onError }: Readonly<Props>) {
   const [rowErrors, setRowErrors] = useState<CsvRowError[]>([]);
   const [ignoredRows, setIgnoredRows] = useState<number[]>([]);
 
-  const { mutate: inviteUsers, isPending } = useUsersServiceInviteUsersFromCsv({
+  const { mutate: inviteUsers, isPending } = useInviteUsersFromCsv(undefined, {
     onSuccess: () => {
       setRowErrors([]);
       setIgnoredRows([]);
@@ -49,7 +44,7 @@ export function CsvInvite({ onSuccess, onError }: Readonly<Props>) {
         description: t('success.description'),
       });
       queryClient.invalidateQueries({
-        queryKey: [useUsersServiceFindManyKey],
+        queryKey: [useFindManyKey],
       });
       onSuccess?.();
     },
@@ -90,9 +85,7 @@ export function CsvInvite({ onSuccess, onError }: Readonly<Props>) {
         },
       };
 
-      inviteUsers({
-        formData,
-      });
+      inviteUsers({ body: formData });
     },
     [ignoredRows, inviteUsers, mapping, rowErrors, selectedFile, t, toast],
   );

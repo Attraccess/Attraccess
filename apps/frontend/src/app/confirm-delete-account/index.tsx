@@ -4,8 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import en from './en.json';
 import de from './de.json';
 import {
-  useUsersServiceConfirmDeleteAccount,
-  useUsersServiceGetCurrentKey,
+  useConfirmDeleteAccount,
+  useGetCurrentKey,
+  UseGetCurrentKeyFn,
   ApiError,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -43,7 +44,7 @@ export function ConfirmDeleteAccount() {
   // `isPending` reaches the render only after react-query notifies, so a fast double press needs this guard.
   const isSending = useRef(false);
 
-  const confirmDelete = useUsersServiceConfirmDeleteAccount({
+  const confirmDelete = useConfirmDeleteAccount(undefined, {
     retry: false,
     onSettled: () => {
       isSending.current = false;
@@ -52,7 +53,7 @@ export function ConfirmDeleteAccount() {
       setIsSuccess(true);
       setError(null);
       queryClient.invalidateQueries({
-        queryKey: [useUsersServiceGetCurrentKey],
+        queryKey: [useGetCurrentKey],
       });
     },
     onError: (apiError) => {
@@ -77,9 +78,9 @@ export function ConfirmDeleteAccount() {
 
   const leaveDeletedAccount = () => {
     // A failed refetch keeps the deleted user cached; reset it unless another signed-in user was confirmed.
-    const currentUser = queryClient.getQueryState([useUsersServiceGetCurrentKey]);
+    const currentUser = queryClient.getQueryState(UseGetCurrentKeyFn());
     if (currentUser?.status !== 'success' || currentUser.fetchStatus !== 'idle') {
-      queryClient.resetQueries({ queryKey: [useUsersServiceGetCurrentKey] });
+      queryClient.resetQueries({ queryKey: [useGetCurrentKey] });
     }
     goToLogin();
   };
@@ -89,7 +90,7 @@ export function ConfirmDeleteAccount() {
       return;
     }
     isSending.current = true;
-    confirmDelete.mutate({ requestBody: { token, email } });
+    confirmDelete.mutate({ body: { token, email } });
   };
 
   if (!token || !email || !isPlausibleEmail(email)) {

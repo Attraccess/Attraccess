@@ -133,7 +133,12 @@ export class ResourceIntroductionsService {
       where: includeGroups
         ? [{ resource: { id: resourceId } }, { resourceGroup: { resources: { id: resourceId } } }]
         : { resource: { id: resourceId } },
-      relations: ['receiverUser', 'tutorUser', 'history', ...(includeGroups ? ['resourceGroup'] : [])],
+      relations: {
+        receiverUser: true,
+        tutorUser: true,
+        history: true,
+        ...(includeGroups ? { resourceGroup: true } : {}),
+      },
       cache: false,
     });
     this.logger.debug(`Found ${introductions.length} introductions for resource ${resourceId}`);

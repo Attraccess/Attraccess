@@ -48,7 +48,7 @@ describe('inherited introduction query', () => {
   let service: ResourceIntroductionsService;
   beforeEach(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: [user, resource, group, introduction, history],
       synchronize: true,

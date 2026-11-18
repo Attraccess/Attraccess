@@ -6,7 +6,7 @@ import { toMeterValue } from '../../resources/metering/quantity';
 describe('meter flow conversion migration', () => {
   let source: DataSource;
   beforeEach(async () => {
-    source = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    source = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
     await source.query('CREATE TABLE resource_flow_node(id varchar PRIMARY KEY, type varchar, data text)');
   });
   afterEach(() => source.destroy());

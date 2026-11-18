@@ -4,10 +4,10 @@ import { Chip, InputGroup, Spinner, TextField } from '@heroui/react';
 import { CheckIcon, EyeIcon, EyeOffIcon, XIcon } from 'lucide-react';
 import type { PolicyError } from '@attraccess/shared';
 import {
-  PasswordPolicyAdminService,
   PasswordPolicyDto,
   PreviewPasswordResultDto,
   UpdatePasswordPolicyDto,
+  previewAdminPasswordPolicy,
 } from '@attraccess/react-query-client';
 
 import en from './en.json';
@@ -63,10 +63,13 @@ export function PasswordPreview({ policy }: { policy: PasswordPolicyDto }) {
     setLoading(true);
     const timer = window.setTimeout(() => {
       inflight.current?.cancel();
-      const promise = PasswordPolicyAdminService.previewAdminPasswordPolicy({
-        requestBody: { password: candidate, draftPolicy: draft },
-      });
-      inflight.current = { cancel: () => promise.cancel() };
+      const controller = new AbortController();
+      inflight.current = { cancel: () => controller.abort() };
+      const promise = previewAdminPasswordPolicy({
+        body: { password: candidate, draftPolicy: draft },
+        signal: controller.signal,
+        throwOnError: true,
+      }).then(({ data }) => data);
       promise
         .then((next) => {
           if (id !== generation.current) return;

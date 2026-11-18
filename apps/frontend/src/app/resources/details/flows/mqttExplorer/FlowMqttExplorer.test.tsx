@@ -27,7 +27,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   useTranslations: () => ({ t: (key: string) => key }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useMqttServiceMqttServersGetAll: () => ({ data: state.servers, isLoading: false }),
+  useMqttServersGetAll: () => ({ data: state.servers, isLoading: false }),
 }));
 vi.mock('../../../../../components/select', () => ({
   Select: ({

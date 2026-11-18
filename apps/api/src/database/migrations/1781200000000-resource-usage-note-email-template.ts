@@ -69,7 +69,7 @@ export class ResourceUsageNoteEmailTemplate1781200000000 implements MigrationInt
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES ($1, $2, $3, $4)`,
+      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES (?, ?, ?, ?)`,
       [
         'resource-usage-note-added',
         'New usage note: {{resource.name}}',

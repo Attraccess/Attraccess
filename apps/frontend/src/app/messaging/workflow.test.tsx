@@ -23,11 +23,11 @@ vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ user: state.user, hasPermission: () => state.permission }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useMessagingServiceMessagingListConversations: () => ({ data: state.conversations, isLoading: false }),
-  useMessagingServiceMessagingMarkConversationRead: () => ({ mutate: state.mark }),
-  UseMessagingServiceMessagingListConversationsKeyFn: () => ['conversations'],
-  UseMessagingServiceMessagingGetUnreadCountKeyFn: () => ['unread'],
-  useMessagingServiceMessagingListMessagesKey: 'messages',
+  useMessagingListConversations: () => ({ data: state.conversations, isLoading: false }),
+  useMessagingMarkConversationRead: () => ({ mutate: state.mark }),
+  UseMessagingListConversationsKeyFn: () => ['conversations'],
+  UseMessagingGetUnreadCountKeyFn: () => ['unread'],
+  useMessagingListMessagesKey: 'messages',
 }));
 vi.mock('./useMessagingLive', () => ({
   useMessagingLive: (props: { onMessage: (message: Message) => void; enabled: boolean }) => {
@@ -93,7 +93,7 @@ it('opens deep links, marks them read and removes resource references when switc
   expect(screen.getByRole('status')).toHaveTextContent('"pendingResourceId":12');
   expect(screen.getByRole('status')).toHaveTextContent('"currentUserId":1');
   expect(screen.getByText('Alex')).toBeTruthy();
-  expect(state.mark).toHaveBeenCalledWith({ id: 7 }, expect.any(Object));
+  expect(state.mark).toHaveBeenCalledWith({ path: { id: 7 } }, expect.any(Object));
   expect(client.getQueryData(['conversations'])).toMatchObject([
     { id: 7, unreadCount: 0 },
     { id: 8, unreadCount: 1 },
@@ -134,7 +134,7 @@ it.each(['/messages?conversation=7', '/messages?conversation=bad', '/resources/7
       expect.arrayContaining([expect.objectContaining({ id: 7, lastMessage: message })]),
     );
     if (path === '/messages?conversation=7') {
-      expect(state.mark).toHaveBeenCalledWith({ id: 7 }, expect.any(Object));
+      expect(state.mark).toHaveBeenCalledWith({ path: { id: 7 } }, expect.any(Object));
       expect(client.getQueryData(['unread'])).toEqual({ total: 1 });
     } else {
       expect(state.mark).not.toHaveBeenCalled();

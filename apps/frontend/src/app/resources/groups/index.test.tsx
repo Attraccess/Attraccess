@@ -13,18 +13,18 @@ const state = vi.hoisted(() => ({
   ],
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  UseAccessControlServiceResourceIntroductionsGetPeopleKeyFn: (params: unknown) => ['introductions', params],
-  useResourcesServiceGetAllResourcesKey: 'resources',
-  UseResourcesServiceGetOneResourceByIdKeyFn: ({ id }: { id: number }) => ['resource', id],
-  useResourcesServiceGetOneResourceById: ({ id }: { id: number }) =>
+  UseResourceIntroductionsGetPeopleKeyFn: (params: unknown) => ['introductions', params],
+  useGetAllResourcesKey: 'resources',
+  UseGetOneResourceByIdKeyFn: ({ path: { id } }: { path: { id: number } }) => ['resource', id],
+  useGetOneResourceById: ({ path: { id } }: { path: { id: number } }) =>
     useQuery({
       queryKey: ['resource', id],
       staleTime: Infinity,
       queryFn: () => Promise.resolve({ id, name: 'Printer', groups: [state.groups[0]] }),
     }),
-  useResourcesServiceResourceGroupsGetMany: () => ({ data: state.groups }),
-  useResourcesServiceResourceGroupsAddResource: () => ({ mutateAsync: state.add }),
-  useResourcesServiceResourceGroupsRemoveResource: () => ({ mutateAsync: state.remove }),
+  useResourceGroupsGetMany: () => ({ data: state.groups }),
+  useResourceGroupsAddResource: () => ({ mutateAsync: state.add }),
+  useResourceGroupsRemoveResource: () => ({ mutateAsync: state.remove }),
 }));
 vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => ({ error: state.error }) }));
 vi.mock('../../resource-groups/upsertModal/resourceGroupUpsertModal', () => ({
@@ -66,14 +66,14 @@ it('optimistically adds membership, locks the pending row and invalidates both r
   const invalidate = vi.spyOn(client, 'invalidateQueries').mockResolvedValue();
   mount();
   fireEvent.click(screen.getByRole('button', { name: 'Add Printer to Workshop' }));
-  expect(state.add).toHaveBeenCalledWith({ groupId: 2, resourceId: 7 });
+  expect(state.add).toHaveBeenCalledWith({ path: { groupId: 2, resourceId: 7 } });
   expect(client.getQueryData(['resource', 7])).toMatchObject({ groups: [{ id: 1 }, { id: 2 }] });
   await waitFor(() => expect(screen.getByRole('button', { name: 'Remove Printer from Workshop' })).toBeDisabled());
   await act(async () => resolve());
   await waitFor(() => expect(screen.getByRole('button', { name: 'Remove Printer from Workshop' })).not.toBeDisabled());
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ['resources'] });
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ['resource', 7] });
-  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['introductions', { resourceId: 7 }] });
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['introductions', { path: { resourceId: 7 } }] });
   expect(screen.getByRole('link', { name: 'open: Workshop' })).toHaveAttribute('href', '/resource-groups/2');
 });
 it('removes existing membership and restores the previous cache on a rejected change', async () => {
@@ -81,7 +81,7 @@ it('removes existing membership and restores the previous cache on a rejected ch
   mount(true);
   fireEvent.click(screen.getByRole('button', { name: 'Remove Printer from Printers' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Add Printer to Printers' })).not.toBeDisabled());
-  expect(state.remove).toHaveBeenCalledWith({ groupId: 1, resourceId: 7 });
+  expect(state.remove).toHaveBeenCalledWith({ path: { groupId: 1, resourceId: 7 } });
   expect(client.getQueryData(['resource', 7])).toMatchObject({ groups: [] });
   state.add.mockRejectedValueOnce(new Error('offline'));
   fireEvent.click(screen.getByRole('button', { name: 'Add Printer to Workshop' }));
@@ -103,6 +103,6 @@ it('filters and searches groups and assigns a newly created group', async () => 
   fireEvent.change(screen.getByPlaceholderText('Search groups…'), { target: { value: 'unknown' } });
   expect(await screen.findByText('No groups match your search.')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'New group' }));
-  await waitFor(() => expect(state.add).toHaveBeenCalledWith({ groupId: 3, resourceId: 7 }));
+  await waitFor(() => expect(state.add).toHaveBeenCalledWith({ path: { groupId: 3, resourceId: 7 } }));
   expect(client.getQueryData(['resource', 7])).toMatchObject({ groups: [{ id: 1 }, { id: 3 }] });
 });

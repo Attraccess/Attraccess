@@ -40,7 +40,7 @@ describe('single-use reset and verification tokens (integration)', () => {
 
   beforeAll(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: Object.values(entities),
       migrations: Object.values(migrations),

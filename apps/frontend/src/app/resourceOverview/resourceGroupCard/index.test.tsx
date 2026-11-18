@@ -23,15 +23,15 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: () => state.manage, user: { id: 7 } }) }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourcesServiceResourceGroupsGetOne: (...args: unknown[]) => {
+  useResourceGroupsGetOne: (...args: unknown[]) => {
     state.groupQuery(...args);
     return { data: { name: ' Workshop ', description: ' Shared tools ' }, status: state.status };
   },
-  useResourcesServiceGetAllResources: (args: unknown) => {
+  useGetAllResources: (args: unknown) => {
     state.query(args);
     return { data: { data: state.resources, total: state.total }, status: state.status, isFetched: state.fetched };
   },
-  useAccessControlServiceResourceGroupIntroducersIsIntroducer: () => ({ data: { isIntroducer: state.introducer } }),
+  useResourceGroupIntroducersIsIntroducer: () => ({ data: { isIntroducer: state.introducer } }),
 }));
 vi.mock('../../../components/ResourceListItem', () => ({
   ResourceListItem: ({ resource, onPress }: { resource: { name: string }; onPress: () => void }) => (
@@ -69,18 +69,20 @@ it('passes filters and pagination to the query and opens a selected resource', (
     />,
   );
   expect(state.query).toHaveBeenLastCalledWith({
-    groupId: 3,
-    search: 'laser',
-    onlyInUseByMe: true,
-    onlyWithPermissions: true,
-    page: 1,
-    limit: 10,
+    query: {
+      groupId: 3,
+      search: 'laser',
+      onlyInUseByMe: true,
+      onlyWithPermissions: true,
+      page: 1,
+      limit: 10,
+    },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Laser cutter' }));
   expect(state.navigate).toHaveBeenCalledWith('/resources/9');
   const next = screen.getByRole('button', { name: /next/i });
   fireEvent.click(next);
-  expect(state.query).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }));
+  expect(state.query).toHaveBeenLastCalledWith({ query: expect.objectContaining({ page: 2 }) });
 });
 it('allows group introducers to open settings while keeping ungrouped resources separate', () => {
   state.introducer = true;
@@ -89,7 +91,7 @@ it('allows group introducers to open settings while keeping ungrouped resources 
   expect(state.navigate).toHaveBeenCalledWith('/resource-groups/3');
   view.rerender(<ResourceGroupCard groupId="none" hideIfEmpty={false} />);
   expect(screen.getByText('ungrouped')).toBeTruthy();
-  expect(state.groupQuery).toHaveBeenLastCalledWith({ id: 'none' }, undefined, { enabled: false });
-  expect(state.query).toHaveBeenLastCalledWith(expect.objectContaining({ groupId: -1 }));
+  expect(state.groupQuery).toHaveBeenLastCalledWith({ path: { id: 'none' } }, undefined, { enabled: false });
+  expect(state.query).toHaveBeenLastCalledWith({ query: expect.objectContaining({ groupId: -1 }) });
   expect(screen.queryByRole('button', { name: 'actions.openGroupSettings' })).toBeNull();
 });

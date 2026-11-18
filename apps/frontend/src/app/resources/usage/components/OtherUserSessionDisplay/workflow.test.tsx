@@ -56,33 +56,33 @@ vi.mock('../../../../../components/toastProvider', () => ({
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('@attraccess/react-query-client', async (original) => ({
   ApiError: (await original<typeof import('@attraccess/react-query-client')>()).ApiError,
-  useResourcesServiceResourceUsageGetActiveSession: () => ({ data: { usage: state.session } }),
-  useResourcesServiceResourceUsageCanControl: () => ({ data: { canControl: state.canControl } }),
-  useAccessControlServiceResourceIntroducersIsIntroducer: () => ({ data: { isIntroducer: state.introducer } }),
+  useResourceUsageGetActiveSession: () => ({ data: { usage: state.session } }),
+  useResourceUsageCanControl: () => ({ data: { canControl: state.canControl } }),
+  useResourceIntroducersIsIntroducer: () => ({ data: { isIntroducer: state.introducer } }),
   // Introducers and maintainers of the resource (the current user is id 1).
-  useAccessControlServiceResourceIntroducersGetNames: () => ({
+  useResourceIntroducersGetNames: () => ({
     data: state.introducer ? [{ userId: 1, username: 'me', role: 'introducer' }] : [],
   }),
-  useResourcesServiceGetOneResourceById: () => ({ data: { allowTakeOver: state.allowTakeover } }),
+  useGetOneResourceById: () => ({ data: { allowTakeOver: state.allowTakeover } }),
   // The shared start hook passes onSuccess/onError at hook level and plugin handling per call.
-  useResourcesServiceResourceUsageStartSession: (options: unknown) => ({
+  useResourceUsageStartSession: (_mutationKey: unknown, options: unknown) => ({
     mutate: (variables: unknown, callbacks: unknown) => {
       state.callbacks.start = state.bothCallbacks(options, callbacks, variables);
       state.start(variables);
     },
     isPending: false,
   }),
-  useResourcesServiceResourceUsageEndSession: (options: (typeof state.callbacks)[string]) => {
+  useResourceUsageEndSession: (_mutationKey: unknown, options: (typeof state.callbacks)[string]) => {
     state.callbacks.end = options;
     return { mutate: state.end, isPending: false };
   },
-  useMessagingServiceMessagingContactResourceHolder: (options: (typeof state.callbacks)[string]) => {
+  useMessagingContactResourceHolder: (_mutationKey: unknown, options: (typeof state.callbacks)[string]) => {
     state.callbacks.contact = options;
     return { mutate: state.contact, isPending: false };
   },
-  useResourcesServiceResourceUsageStartBlockedKey: 'start-blocked',
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn: (params: unknown) => ['active', params],
-  UseResourcesServiceResourceUsageGetHistoryKeyFn: (params: unknown) => ['history', params],
+  useResourceUsageStartBlockedKey: 'start-blocked',
+  UseResourceUsageGetActiveSessionKeyFn: (params: unknown) => ['active', params],
+  UseResourceUsageGetHistoryKeyFn: (params: unknown) => ['history', params],
 }));
 vi.mock('../../../forms/hooks/useResourceFormsSubmission', () => ({
   useResourceFormsSubmission: () => ({ requestForms: state.forms, modal: null, clearFormsDraft: vi.fn() }),
@@ -135,29 +135,29 @@ it('shows the holder and supervisor and sends scoped takeover and stop submissio
   fireEvent.click(screen.getByRole('button', { name: 'Takeover Resource' }));
   await waitFor(() =>
     expect(state.start).toHaveBeenCalledWith({
-      resourceId: 7,
-      requestBody: { forceTakeOver: true, formSubmissions: [{ formId: 7, data: { ack: true } }] },
+      path: { resourceId: 7 },
+      body: { forceTakeOver: true, formSubmissions: [{ formId: 7, data: { ack: true } }] },
     }),
   );
   expect(state.forms).toHaveBeenCalledWith('takeover');
   fireEvent.click(screen.getByRole('button', { name: 'Stop Other User Session' }));
   await waitFor(() =>
     expect(state.end).toHaveBeenCalledWith({
-      resourceId: 7,
-      requestBody: { usageId: 40, formSubmissions: [{ formId: 7, data: { ack: true } }] },
+      path: { resourceId: 7 },
+      body: { usageId: 40, formSubmissions: [{ formId: 7, data: { ack: true } }] },
     }),
   );
   expect(state.forms).toHaveBeenCalledWith('end');
   for (const action of ['start', 'end']) act(() => state.callbacks[action].onSuccess({ conversationId: 0 }));
-  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['active', { resourceId: 7 }] });
+  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['active', { path: { resourceId: 7 } }] });
   expect(state.success).toHaveBeenCalledWith(expect.objectContaining({ title: 'Takeover Successful' }));
   expect(state.success).toHaveBeenCalledWith(expect.objectContaining({ title: 'Other User Session Stopped' }));
   const historyInvalidations = state.invalidate.mock.calls.filter(([options]) => options.predicate);
   expect(historyInvalidations).toHaveLength(2);
   for (const [options] of historyInvalidations) {
-    expect(options.predicate({ queryKey: ['history', { resourceId: 7, page: 2 }] })).toBe(true);
-    expect(options.predicate({ queryKey: ['history', { resourceId: 8 }] })).toBe(false);
-    expect(options.predicate({ queryKey: ['other', { resourceId: 7 }] })).toBe(false);
+    expect(options.predicate({ queryKey: ['history', { path: { resourceId: 7 }, query: { page: 2 } }] })).toBe(true);
+    expect(options.predicate({ queryKey: ['history', { path: { resourceId: 8 } }] })).toBe(false);
+    expect(options.predicate({ queryKey: ['other', { path: { resourceId: 7 } }] })).toBe(false);
     expect(options.predicate({ queryKey: ['history'] })).toBe(false);
   }
 });
@@ -173,9 +173,7 @@ it('collects optional notes and allows cancelling without a mutation', async () 
   fireEvent.click(screen.getByText('Confirm notes'));
   await waitFor(() =>
     expect(state.start).toHaveBeenCalledWith(
-      expect.objectContaining({
-        requestBody: expect.objectContaining({ notes: 'Operator note', forceTakeOver: true }),
-      }),
+      expect.objectContaining({ body: expect.objectContaining({ notes: 'Operator note', forceTakeOver: true }) }),
     ),
   );
   act(() => state.callbacks.start.onSuccess({ conversationId: 0 }));
@@ -185,7 +183,7 @@ it('collects optional notes and allows cancelling without a mutation', async () 
   fireEvent.click(screen.getByText('Confirm notes'));
   await waitFor(() =>
     expect(state.end).toHaveBeenCalledWith(
-      expect.objectContaining({ requestBody: expect.objectContaining({ notes: 'Operator note', usageId: 40 }) }),
+      expect.objectContaining({ body: expect.objectContaining({ notes: 'Operator note', usageId: 40 }) }),
     ),
   );
 });
@@ -205,7 +203,7 @@ it('keeps cancelled forms from starting or stopping sessions and reports failed 
   expect(state.error).toHaveBeenCalledWith(expect.objectContaining({ title: 'Takeover Failed' }));
   expect(state.error).toHaveBeenCalledWith(expect.objectContaining({ title: 'Could not contact user' }));
   fireEvent.click(screen.getByRole('button', { name: 'Contact current user' }));
-  expect(state.contact).toHaveBeenCalledWith({ resourceId: 7, userId: 2 });
+  expect(state.contact).toHaveBeenCalledWith({ path: { resourceId: 7 }, query: { userId: 2 } });
   act(() => state.callbacks.contact.onSuccess({ conversationId: 10 }));
   expect(screen.getByText('Conversation opened')).toBeTruthy();
 });
@@ -269,8 +267,8 @@ it('asks a plugin confirmation on takeover and retries with the step id', async 
   expect(state.error).not.toHaveBeenCalled();
   fireEvent.click(await screen.findByRole('button', { name: 'Take over' }));
   expect(state.start).toHaveBeenLastCalledWith({
-    resourceId: 7,
-    requestBody: expect.objectContaining({ forceTakeOver: true, confirmedStepIds: ['s1'] }),
+    path: { resourceId: 7 },
+    body: expect.objectContaining({ forceTakeOver: true, confirmedStepIds: ['s1'] }),
   });
 });
 

@@ -9,7 +9,7 @@ const state = vi.hoisted(() => ({
 
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useLicenseServiceGetLicenseInformation: () => ({ data: state.license }),
+  useGetLicenseInformation: () => ({ data: state.license }),
 }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAuthenticated: true }) }));
 vi.mock('../../layout/sidebar/useShowNavItem', () => ({

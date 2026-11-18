@@ -13,10 +13,7 @@ import {
 } from '@heroui/react';
 import de from '../de.json';
 import en from '../en.json';
-import {
-  useResourceMaintenancesServiceFinishMaintenance,
-  useResourceMaintenancesServiceFindMaintenancesKey,
-} from '@attraccess/react-query-client';
+import { useFinishMaintenance, useFindMaintenancesKey } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
 
@@ -40,7 +37,7 @@ export function MarkDoneModal(props: Props) {
 
   const onSuccess = useCallback(() => {
     queryClient.invalidateQueries({
-      queryKey: [useResourceMaintenancesServiceFindMaintenancesKey],
+      queryKey: [useFindMaintenancesKey],
     });
     setNotes('');
     close();
@@ -50,16 +47,12 @@ export function MarkDoneModal(props: Props) {
     mutate: finishMaintenance,
     isPending,
     error,
-  } = useResourceMaintenancesServiceFinishMaintenance({
+  } = useFinishMaintenance(undefined, {
     onSuccess,
   });
 
   const onSubmit = useCallback(() => {
-    finishMaintenance({
-      resourceId,
-      maintenanceId,
-      requestBody: { notes: notes.trim() || undefined },
-    });
+    finishMaintenance({ path: { resourceId, maintenanceId }, body: { notes: notes.trim() || undefined } });
   }, [finishMaintenance, resourceId, maintenanceId, notes]);
 
   const onOpenChangeHandler = useCallback(

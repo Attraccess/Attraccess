@@ -48,7 +48,15 @@ const REPO_ROOT = findRepoRoot(__dirname);
 const PLUGIN_ENTRY = resolve(REPO_ROOT, 'examples/poc-backend-plugin/src/index.ts');
 const BUILD_DIR = join(REPO_ROOT, 'node_modules', '.cache', 'att-454-poc-plugin');
 
-const SHARED = ['@nestjs/common', '@nestjs/core', '@nestjs/event-emitter', 'eventemitter2', 'typeorm', 'reflect-metadata', '@attraccess/plugins-backend-sdk'];
+const SHARED = [
+  '@nestjs/common',
+  '@nestjs/core',
+  '@nestjs/event-emitter',
+  'eventemitter2',
+  'typeorm',
+  'reflect-metadata',
+  '@attraccess/plugins-backend-sdk',
+];
 const BAD_EXTERNALS = SHARED.filter((dep) => dep !== '@nestjs/event-emitter' && dep !== 'eventemitter2');
 
 async function buildArtifact(outfile: string, external: string[]): Promise<void> {
@@ -71,7 +79,12 @@ function loadDefaultExport(artifactPath: string): PluginBackendModule {
 }
 
 async function bootAndPing(artifactPath: string): Promise<PocPongPayload> {
-  const dataSource = new DataSource({ type: 'sqlite', database: ':memory:', synchronize: true, entities: [PocNote] });
+  const dataSource = new DataSource({
+    type: 'better-sqlite3',
+    database: ':memory:',
+    synchronize: true,
+    entities: [PocNote],
+  });
   await dataSource.initialize();
 
   const events = new EventEmitter2();
@@ -87,7 +100,8 @@ async function bootAndPing(artifactPath: string): Promise<PocPongPayload> {
       subscribe: () => ({ unsubscribe: () => undefined }),
       publish: () => Promise.resolve(),
     },
-    getRepository: <T extends ObjectLiteral>(entity: EntityTarget<T>): Repository<T> => dataSource.getRepository(entity),
+    getRepository: <T extends ObjectLiteral>(entity: EntityTarget<T>): Repository<T> =>
+      dataSource.getRepository(entity),
     get: <T>(token: import('@nestjs/common').Type<T> | string | symbol): T => {
       if (!moduleRefHolder.ref) throw new Error('host ModuleRef not ready');
       return moduleRefHolder.ref.get(token, { strict: false });

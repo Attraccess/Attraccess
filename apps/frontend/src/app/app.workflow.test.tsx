@@ -36,7 +36,9 @@ vi.mock('../utils/live-updates', () => ({
 vi.mock('../hooks/useLocaleSync', () => ({ useLocaleSync: state.sync }));
 vi.mock('../stores/ptr.store', () => ({ usePtrStore: () => ({ pullToRefreshIsEnabled: state.ptr }) }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
-vi.mock('@attraccess/react-query-client', () => ({ OpenAPI: {} }));
+vi.mock('@attraccess/react-query-client', () => ({
+  client: { setConfig: () => undefined, interceptors: { request: { use: () => 0 } } },
+}));
 vi.mock('./routes', () => ({ useAllRoutes: () => [{ path: '/', element: <p>Home route</p>, authRequired: false }] }));
 vi.mock('./layout/layout', () => ({ Layout: ({ children }: PropsWithChildren) => <main>{children}</main> }));
 vi.mock('../components/toastProvider', () => ({ ToastProvider: ({ children }: PropsWithChildren) => children }));

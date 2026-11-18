@@ -47,7 +47,7 @@ describe('global-flow references in a real database', () => {
 
   beforeAll(async () => {
     dataSource = new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: [...Object.values(entities).filter((value) => typeof value === 'function'), ...plugin.entities],
       synchronize: true,

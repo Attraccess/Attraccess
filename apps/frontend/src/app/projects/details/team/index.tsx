@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { filenameToUrl } from '../../../../api';
 import { FoldersIcon } from 'lucide-react';
-import { useProjectsServiceFindOneProject } from '@attraccess/react-query-client';
+import { useFindOneProject } from '@attraccess/react-query-client';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import en from '../components/projectTeam/en.json';
@@ -22,7 +22,7 @@ export function ProjectTeamPage() {
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
   });
 
-  const { data: project } = useProjectsServiceFindOneProject({ id: projectId }, undefined, {
+  const { data: project } = useFindOneProject({ path: { id: projectId } }, undefined, {
     enabled: hasValidProjectId,
   });
 

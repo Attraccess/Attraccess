@@ -52,16 +52,16 @@ vi.mock('../../../../../components/toastProvider', () => ({
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   // Introducers and maintainers of the resource; the current user is id 1.
-  useAccessControlServiceResourceIntroducersGetNames: () => ({
+  useResourceIntroducersGetNames: () => ({
     data: state.introducer ? [{ userId: 1, username: 'me', role: 'maintainer' }] : [],
   }),
-  useResourcesServiceResourceUsageEndSession: (options: typeof state.endOptions) => {
+  useResourceUsageEndSession: (_mutationKey: unknown, options: typeof state.endOptions) => {
     state.endOptions = options;
     return { mutate: state.end, isPending: false };
   },
-  useMessagingServiceMessagingContactResourceHolder: () => ({ mutate: state.contact, isPending: state.contactPending }),
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn: () => [],
-  UseResourcesServiceResourceUsageGetHistoryKeyFn: () => [],
+  useMessagingContactResourceHolder: () => ({ mutate: state.contact, isPending: state.contactPending }),
+  UseResourceUsageGetActiveSessionKeyFn: () => [],
+  UseResourceUsageGetHistoryKeyFn: () => [],
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('../../../forms/hooks/useResourceFormsSubmission', () => ({
@@ -190,8 +190,8 @@ describe('ParallelSessionsDisplay', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirm notes' }));
     await waitFor(() =>
       expect(state.end).toHaveBeenCalledWith({
-        resourceId: 7,
-        requestBody: { usageId: 11, notes: 'done', formSubmissions: [] },
+        path: { resourceId: 7 },
+        body: { usageId: 11, notes: 'done', formSubmissions: [] },
       }),
     );
   });
@@ -199,7 +199,7 @@ describe('ParallelSessionsDisplay', () => {
   it('contacts the chosen session user and shows the pending state on that row only', () => {
     const view = mount();
     fireEvent.click(screen.getByRole('button', { name: 'contact.ariaLabel Sam' }));
-    expect(state.contact).toHaveBeenCalledWith({ resourceId: 7, userId: 3 });
+    expect(state.contact).toHaveBeenCalledWith({ path: { resourceId: 7 }, query: { userId: 3 } });
     state.contactPending = true;
     view.rerender(
       <MemoryRouter>

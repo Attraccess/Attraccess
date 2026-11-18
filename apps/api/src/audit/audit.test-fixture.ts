@@ -114,7 +114,7 @@ export function setupAuditDatabase() {
     registerPluginAuditDomains({ name: 'audit-fixture-plugin', id: fixturePluginId }, [demoDomain]);
     directory = await mkdtemp(join(tmpdir(), 'audit-'));
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: join(directory, 'fixture.sqlite'),
       entities: [AuditLog, Setting],
     }).initialize();

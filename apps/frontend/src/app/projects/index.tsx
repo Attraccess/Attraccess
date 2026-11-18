@@ -4,14 +4,14 @@ import { UpsertProjectModal } from './upsertModal/index';
 import { ProjectCard } from './projectCard/index';
 import {
   ApiError,
-  ProjectInvitationsServiceAcceptProjectInvitationMutationResult,
-  ProjectInvitationsServiceDeclineProjectInvitationMutationResult,
-  UseProjectInvitationsServiceListMyProjectInvitationsKeyFn,
-  useProjectInvitationsServiceAcceptProjectInvitation,
-  useProjectInvitationsServiceDeclineProjectInvitation,
-  useProjectInvitationsServiceListMyProjectInvitations,
-  useProjectsServiceFindManyProjects,
-  useProjectsServiceFindManyProjectsKey,
+  AcceptProjectInvitationMutationResult,
+  DeclineProjectInvitationMutationResult,
+  UseListMyProjectInvitationsKeyFn,
+  useAcceptProjectInvitation,
+  useDeclineProjectInvitation,
+  useListMyProjectInvitations,
+  useFindManyProjects,
+  useFindManyProjectsKey,
 } from '@attraccess/react-query-client';
 import {
   Button,
@@ -34,11 +34,8 @@ export function ProjectsListPage() {
   const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const page = 1;
   const [includeArchived, setIncludeArchived] = useState(false);
-  const { data: projects, isLoading } = useProjectsServiceFindManyProjects({
-    page,
-    includeArchived,
-  });
-  const { data: invitations, isLoading: isLoadingInvitations } = useProjectInvitationsServiceListMyProjectInvitations();
+  const { data: projects, isLoading } = useFindManyProjects({ query: { page, includeArchived } });
+  const { data: invitations, isLoading: isLoadingInvitations } = useListMyProjectInvitations();
   const { t, tExists } = useTranslations({
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
@@ -54,32 +51,32 @@ export function ProjectsListPage() {
   const invalidateInvitations = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({
-        queryKey: UseProjectInvitationsServiceListMyProjectInvitationsKeyFn(),
+        queryKey: UseListMyProjectInvitationsKeyFn(),
       }),
       queryClient.invalidateQueries({
-        queryKey: [useProjectsServiceFindManyProjectsKey],
+        queryKey: [useFindManyProjectsKey],
       }),
     ]);
   }, [queryClient]);
 
-  const { mutateAsync: acceptInvitation } = useProjectInvitationsServiceAcceptProjectInvitation<
-    ProjectInvitationsServiceAcceptProjectInvitationMutationResult,
-    ApiError
-  >({
-    onSuccess: () => {
-      toast.success({ title: t('invitations.success.accept') });
-      invalidateInvitations();
+  const { mutateAsync: acceptInvitation } = useAcceptProjectInvitation<AcceptProjectInvitationMutationResult, ApiError>(
+    undefined,
+    {
+      onSuccess: () => {
+        toast.success({ title: t('invitations.success.accept') });
+        invalidateInvitations();
+      },
+      onError: (error) => {
+        toast.apiError({ error, t, tExists, baseTranslationKey: 'api' });
+      },
+      onSettled: () => setAcceptingInvitationId(null),
     },
-    onError: (error) => {
-      toast.apiError({ error, t, tExists, baseTranslationKey: 'api' });
-    },
-    onSettled: () => setAcceptingInvitationId(null),
-  });
+  );
 
-  const { mutateAsync: declineInvitation } = useProjectInvitationsServiceDeclineProjectInvitation<
-    ProjectInvitationsServiceDeclineProjectInvitationMutationResult,
+  const { mutateAsync: declineInvitation } = useDeclineProjectInvitation<
+    DeclineProjectInvitationMutationResult,
     ApiError
-  >({
+  >(undefined, {
     onSuccess: () => {
       toast.success({ title: t('invitations.success.decline') });
       invalidateInvitations();
@@ -93,7 +90,7 @@ export function ProjectsListPage() {
   const handleAccept = useCallback(
     async (invitationId: number) => {
       setAcceptingInvitationId(invitationId);
-      await acceptInvitation({ invitationId });
+      await acceptInvitation({ path: { invitationId } });
     },
     [acceptInvitation],
   );
@@ -101,7 +98,7 @@ export function ProjectsListPage() {
   const handleDecline = useCallback(
     async (invitationId: number) => {
       setDecliningInvitationId(invitationId);
-      await declineInvitation({ invitationId });
+      await declineInvitation({ path: { invitationId } });
     },
     [declineInvitation],
   );

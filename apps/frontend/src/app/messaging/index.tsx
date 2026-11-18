@@ -1,9 +1,6 @@
 // Inbox page combining conversation list, thread view and live SSE updates
 // FEATURE: Messaging inbox page
-import {
-  useMessagingServiceMessagingListConversations,
-  useMessagingServiceMessagingMarkConversationRead,
-} from '@attraccess/react-query-client';
+import { useMessagingListConversations, useMessagingMarkConversationRead } from '@attraccess/react-query-client';
 import { cn } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
@@ -35,7 +32,7 @@ export function MessagesPage() {
     }
   }, [conversationParam]);
 
-  const { data: conversations, isLoading } = useMessagingServiceMessagingListConversations();
+  const { data: conversations, isLoading } = useMessagingListConversations();
 
   const selectedConversation = conversations?.find((conversation) => conversation.id === selectedConversationId);
   const partnerName = selectedConversation?.otherParticipant?.username ?? t('conversations.unknownUser');
@@ -46,12 +43,12 @@ export function MessagesPage() {
       ? deepLinkResourceId
       : undefined;
 
-  const { mutate: markConversationRead } = useMessagingServiceMessagingMarkConversationRead();
+  const { mutate: markConversationRead } = useMessagingMarkConversationRead();
 
   const markRead = useCallback(
     (conversationId: number) => {
       markConversationRead(
-        { id: conversationId },
+        { path: { id: conversationId } },
         {
           onSuccess: ({ total }) => markConversationReadInCache(queryClient, conversationId, total),
         },

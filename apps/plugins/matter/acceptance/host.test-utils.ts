@@ -86,7 +86,7 @@ export async function bootHost(
   const directory = await mkdtemp(join(tmpdir(), 'matter-acceptance-'));
   // Built like the API's main connection: it shares the file with the resource-lifecycle and audit connections.
   const db = await createDataSource({
-    type: 'sqlite',
+    type: 'better-sqlite3',
     database: join(directory, 'host.sqlite'),
     entities: [...Object.values(entities), ...(plugin.entities ?? [])],
     migrations: [...Object.values(coreMigrations), ...(Object.values(matterMigrations) as (new () => never)[])],

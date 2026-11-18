@@ -1,7 +1,7 @@
 import { pairedReadersOnly } from '../attractap/cardWriting';
 import { Alert, AlertContent, AlertDescription, AlertTitle, Button } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useAttractapServiceGetReaders } from '@attraccess/react-query-client';
+import { useGetReaders } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
 import { useClearReaderUiAlert, useReaderUiAlerts, type ReaderUiAlert } from './readerUiApi';
 import en from './en.json';
@@ -47,7 +47,7 @@ export function ReaderUiAlerts({ readerId }: Readonly<{ readerId?: number }>) {
   const { data } = useReaderUiAlerts();
   const forReader = (data ?? []).filter((alert) => readerId === undefined || alert.readerId === readerId);
   const needsReaders = forReader.some((alert) => alert.readerId !== null);
-  const { data: allReaders } = useAttractapServiceGetReaders(undefined, { enabled: needsReaders });
+  const { data: allReaders } = useGetReaders({}, undefined, { enabled: needsReaders });
   const readers = allReaders ? pairedReadersOnly(allReaders) : undefined;
   const readerName = (id: number | null) => readers?.find((reader) => reader.id === id)?.name;
   // Readers that are not paired are only shown under Not paired, so their alerts are hidden here.

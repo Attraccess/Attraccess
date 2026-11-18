@@ -2,18 +2,14 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  useAttractapServiceGetCardWriterSettings,
-  useAttractapServiceGetReaders,
-  useAttractapServiceUpdateCardWriterSettings,
-} from '@attraccess/react-query-client';
+import { useGetCardWriterSettings, useGetReaders, useUpdateCardWriterSettings } from '@attraccess/react-query-client';
 import { AttractapSection } from './index';
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useAttractapServiceGetCardWriterSettings: vi.fn(),
-  UseAttractapServiceGetCardWriterSettingsKeyFn: () => ['card-writer-settings'],
-  useAttractapServiceGetReaders: vi.fn(),
-  useAttractapServiceUpdateCardWriterSettings: vi.fn(),
+  useGetCardWriterSettings: vi.fn(),
+  UseGetCardWriterSettingsKeyFn: () => ['card-writer-settings'],
+  useGetReaders: vi.fn(),
+  useUpdateCardWriterSettings: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -41,29 +37,29 @@ const reader = (
 });
 
 const readersQuery = (data: ReturnType<typeof reader>[] | undefined, isLoading = false) =>
-  vi.mocked(useAttractapServiceGetReaders).mockReturnValue({
+  vi.mocked(useGetReaders).mockReturnValue({
     data,
     isLoading,
-  } as unknown as ReturnType<typeof useAttractapServiceGetReaders>);
+  } as unknown as ReturnType<typeof useGetReaders>);
 
 const selectedMode = (readerIds: number[]) =>
-  vi.mocked(useAttractapServiceGetCardWriterSettings).mockReturnValue({
+  vi.mocked(useGetCardWriterSettings).mockReturnValue({
     data: { mode: 'selected', readerIds },
     isLoading: false,
-  } as ReturnType<typeof useAttractapServiceGetCardWriterSettings>);
+  } as ReturnType<typeof useGetCardWriterSettings>);
 
 describe('AttractapSection (which readers may write cards)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useAttractapServiceGetCardWriterSettings).mockReturnValue({
+    vi.mocked(useGetCardWriterSettings).mockReturnValue({
       data: { mode: 'all', readerIds: [] },
       isLoading: false,
-    } as ReturnType<typeof useAttractapServiceGetCardWriterSettings>);
+    } as ReturnType<typeof useGetCardWriterSettings>);
     readersQuery([reader(1, 'Entrance'), reader(2, 'Workshop')]);
-    vi.mocked(useAttractapServiceUpdateCardWriterSettings).mockReturnValue({
+    vi.mocked(useUpdateCardWriterSettings).mockReturnValue({
       mutate: save,
       isPending: false,
-    } as unknown as ReturnType<typeof useAttractapServiceUpdateCardWriterSettings>);
+    } as unknown as ReturnType<typeof useUpdateCardWriterSettings>);
   });
 
   it('defaults to all readers and offers nothing to save', () => {
@@ -83,7 +79,7 @@ describe('AttractapSection (which readers may write cards)', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: 'Workshop' }));
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
 
-    expect(save).toHaveBeenCalledWith({ requestBody: { mode: 'selected', readerIds: [2] } });
+    expect(save).toHaveBeenCalledWith({ body: { mode: 'selected', readerIds: [2] } });
   });
 
   it('discards an unsaved choice', async () => {

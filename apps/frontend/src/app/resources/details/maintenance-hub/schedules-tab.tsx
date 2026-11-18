@@ -3,8 +3,8 @@ import { Button, DeleteConfirmationModal, useTranslations } from '@attraccess/pl
 import { PlusIcon, CalendarClockIcon } from 'lucide-react';
 import { useState } from 'react';
 import {
-  useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey,
-  useResourceMaintenanceSchedulesServiceDeleteMaintenanceSchedule,
+  useFindMaintenanceSchedulesKey,
+  useDeleteMaintenanceSchedule,
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleTriggerType,
 } from '@attraccess/react-query-client';
@@ -36,15 +36,14 @@ export function SchedulesTab(props: Props) {
 
   const [deleteTarget, setDeleteTarget] = useState<ResourceMaintenanceSchedule | null>(null);
 
-  const { mutate: deleteSchedule, isPending: isDeleting } =
-    useResourceMaintenanceSchedulesServiceDeleteMaintenanceSchedule({
-      onSuccess: () => {
-        queryClient.invalidateQueries({
-          queryKey: [useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey],
-        });
-        setDeleteTarget(null);
-      },
-    });
+  const { mutate: deleteSchedule, isPending: isDeleting } = useDeleteMaintenanceSchedule(undefined, {
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [useFindMaintenanceSchedulesKey],
+      });
+      setDeleteTarget(null);
+    },
+  });
 
   const renderBody = () => {
     if (isLoading) {
@@ -102,7 +101,7 @@ export function SchedulesTab(props: Props) {
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => {
           if (deleteTarget) {
-            deleteSchedule({ resourceId, scheduleId: deleteTarget.id });
+            deleteSchedule({ path: { resourceId, scheduleId: deleteTarget.id } });
           }
         }}
         itemName={deleteTarget?.name ?? ''}

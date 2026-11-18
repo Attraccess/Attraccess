@@ -207,7 +207,7 @@ export class BillingService {
         where: {
           resourceUsageId: usage.id,
         },
-        relations: ['items'],
+        relations: { items: true },
       });
 
       if (grossCredits === BigInt(0) && !transaction) {
@@ -339,7 +339,7 @@ export class BillingService {
     try {
       const transaction = await this.billingTransactionRepository.findOne({
         where: { id: transactionId, status: BillingTransactionStatus.Completed },
-        relations: ['items', 'user', 'resourceUsage', 'resourceUsage.resource', 'resourceUsage.user'],
+        relations: { items: true, user: true, resourceUsage: { resource: true, user: true } },
       });
       if (!transaction) return;
 

@@ -7,9 +7,9 @@ import {
   Attractap,
   ResourceIntroducerType,
   ResourceUsage,
-  useAccessControlServiceResourceIntroducersGetNames,
-  useAttractapServiceGetReaders,
-  useResourcesServiceResourceUsageRequestSupervisedSession,
+  useResourceIntroducersGetNames,
+  useGetReaders,
+  useResourceUsageRequestSupervisedSession,
   RequestSupervisedSessionDto,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
@@ -52,9 +52,7 @@ export function SupervisedStartModal({
   const [waitingAtReader, setWaitingAtReader] = useState<string | null>(null);
 
   // Only introducers may supervise, excluding the requester themselves.
-  const { data: candidates, isLoading: isLoadingCandidates } = useAccessControlServiceResourceIntroducersGetNames({
-    resourceId,
-  });
+  const { data: candidates, isLoading: isLoadingCandidates } = useResourceIntroducersGetNames({ path: { resourceId } });
 
   const supervisors = useMemo(
     () =>
@@ -64,7 +62,7 @@ export function SupervisedStartModal({
     [candidates, user?.id],
   );
 
-  const { data: allReaders } = useAttractapServiceGetReaders();
+  const { data: allReaders } = useGetReaders();
 
   const { resourceReaders, otherReaders } = useMemo(() => {
     // Supervision runs on the reader's screen and relays the introducer's card, like card writing:
@@ -76,7 +74,7 @@ export function SupervisedStartModal({
     };
   }, [allReaders, resourceId]);
 
-  const { mutate: requestSupervisedSession } = useResourcesServiceResourceUsageRequestSupervisedSession();
+  const { mutate: requestSupervisedSession } = useResourceUsageRequestSupervisedSession();
 
   // Reset to the selection phase whenever the modal is (re)opened.
   useEffect(() => {
@@ -106,7 +104,7 @@ export function SupervisedStartModal({
       setWaitingAtReader(readerName ?? null);
       setPhase('waiting');
       requestSupervisedSession(
-        { resourceId, requestBody: { ...requestBody, ...channel } },
+        { path: { resourceId }, body: { ...requestBody, ...channel } },
         {
           onSuccess: (session) => {
             onApproved(session as ResourceUsage);

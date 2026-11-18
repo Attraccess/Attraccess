@@ -3,7 +3,7 @@ import * as migrations from './migrations';
 
 it('preserves interrupted credential revocation metadata through a full-registry blocked downgrade', async () => {
   const database = await new DataSource({
-    type: 'sqlite',
+    type: 'better-sqlite3',
     database: ':memory:',
     migrations: Object.values(migrations),
   }).initialize();

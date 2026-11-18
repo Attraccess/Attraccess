@@ -6,7 +6,7 @@ describe('legacy IoT to flow migration', () => {
   let runner: QueryRunner;
   const migration = new IotToFlow1752005121356();
   beforeEach(async () => {
-    source = await new DataSource({ type: 'sqlite', database: ':memory:', entities: [] }).initialize();
+    source = await new DataSource({ type: 'better-sqlite3', database: ':memory:', entities: [] }).initialize();
     runner = source.createQueryRunner();
     await runner.query(
       'CREATE TABLE mqtt_resource_config (resourceId INTEGER, serverId INTEGER, inUseTopic TEXT, inUseMessage TEXT, notInUseTopic TEXT, notInUseMessage TEXT, takeoverTopic TEXT, takeoverMessage TEXT, onTakeoverSendTakeover BOOLEAN, onTakeoverSendStart BOOLEAN, onTakeoverSendStop BOOLEAN)',

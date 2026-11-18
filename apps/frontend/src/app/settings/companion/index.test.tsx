@@ -18,15 +18,15 @@ const state = vi.hoisted(() => ({
   deleteOptions: {} as { onSuccess: () => void; onError: () => void },
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  UseCompanionDevicesServiceListCompanionDevicesKeyFn: () => ['devices'],
-  useCompanionDevicesServiceListCompanionDevices: () => ({ data: state.devices, isLoading: state.loading }),
-  useCompanionServiceGetCompanionVersions: () => ({ data: state.manifest, isLoading: state.manifestLoading }),
-  useCompanionDevicesServiceGetCompanionDevice: ({ id }: { id: number }) => ({ data: state.details[id] }),
-  useCompanionDevicesServiceRenameCompanionDevice: (options: typeof state.renameOptions) => {
+  UseListCompanionDevicesKeyFn: () => ['devices'],
+  useListCompanionDevices: () => ({ data: state.devices, isLoading: state.loading }),
+  useGetCompanionVersions: () => ({ data: state.manifest, isLoading: state.manifestLoading }),
+  useGetCompanionDevice: ({ path: { id } }: { path: { id: number } }) => ({ data: state.details[id] }),
+  useRenameCompanionDevice: (_mutationKey: unknown, options: typeof state.renameOptions) => {
     state.renameOptions = options;
     return { mutate: state.rename };
   },
-  useCompanionDevicesServiceDeleteCompanionDevice: (options: typeof state.deleteOptions) => {
+  useDeleteCompanionDevice: (_mutationKey: unknown, options: typeof state.deleteOptions) => {
     state.deleteOptions = options;
     return { mutate: state.remove };
   },
@@ -109,7 +109,7 @@ it('shows live connection/version status, trims renamed devices and refreshes th
   expect(state.rename).not.toHaveBeenCalled();
   fireEvent.change(input, { target: { value: '  Tool PC  ' } });
   fireEvent.keyDown(input, { key: 'Enter' });
-  expect(state.rename).toHaveBeenCalledWith({ id: 1, requestBody: { name: 'Tool PC' } });
+  expect(state.rename).toHaveBeenCalledWith({ path: { id: 1 }, body: { name: 'Tool PC' } });
   act(() => state.renameOptions.onError());
   expect(state.error).toHaveBeenCalledWith({ title: 'devices.rename.error' });
   act(() => state.renameOptions.onSuccess());
@@ -124,7 +124,7 @@ it('confirms removal, reports failures and ignores invalid version strings', asy
   fireEvent.click(screen.getByRole('button', { name: 'devices.actions.delete' }));
   expect(within(await screen.findByRole('alertdialog')).getByText('Old PC')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-  expect(state.remove).toHaveBeenCalledWith({ id: 3 });
+  expect(state.remove).toHaveBeenCalledWith({ path: { id: 3 } });
   act(() => state.deleteOptions.onError());
   expect(state.error).toHaveBeenCalledWith({ title: 'devices.delete.error' });
   act(() => state.deleteOptions.onSuccess());

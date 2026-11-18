@@ -1,4 +1,4 @@
-import { useMqttServiceMqttServersGetAll } from '@attraccess/react-query-client';
+import { useMqttServersGetAll } from '@attraccess/react-query-client';
 import { Select, Props as SelectProps } from '../select';
 
 interface Props {
@@ -11,13 +11,10 @@ interface Props {
 
 export function MqttServerSelect(
   props: Props &
-    Omit<
-      SelectProps,
-      'items' | 'label' | 'placeholder' | 'value' | 'onChange' | 'data-cy' | 'isLoading' | 'children'
-    >,
+    Omit<SelectProps, 'items' | 'label' | 'placeholder' | 'value' | 'onChange' | 'data-cy' | 'isLoading' | 'children'>,
 ) {
   const { selectedId, onSelectionChange, placeholder, ...selectProps } = props;
-  const { data: servers } = useMqttServiceMqttServersGetAll();
+  const { data: servers } = useMqttServersGetAll();
 
   return (
     <Select
