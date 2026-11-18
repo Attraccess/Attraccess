@@ -98,6 +98,17 @@ def test_a_damaged_record_stops_parking_before_the_erase(tmp_path, monkeypatch):
     assert not [event for event in events if isinstance(event, tuple) and event[0].startswith("erase")]
 
 
+def test_a_burned_reader_without_a_record_is_not_wiped(tmp_path, monkeypatch):
+    # A janitor that cannot find the committed record (no dsRecordsDir, no source checkout) must not erase the
+    # reader: the encrypted DS params in its flash are the only copy.
+    monkeypatch.setattr(workflow, "RESET_SETTLE_SECONDS", 0)
+    events = []
+    target = FakeTarget(FakeConsole([]), RestoringFlash(output(POST_WORDS, post=True), events))
+    with pytest.raises(ds_record.DsRecordError, match="refusing to erase"):
+        park(target, tmp_path / "park.hex", tmp_path / "run", profile="secure-lab", ds_dir=tmp_path / "none")
+    assert not [event for event in events if isinstance(event, tuple) and event[0].startswith("erase")]
+
+
 def signed_image(size=3 * 4096, signature_magic=0xE7):
     data = bytearray(size)
     data[0] = ota_images.IMAGE_MAGIC

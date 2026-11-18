@@ -280,6 +280,10 @@ def cmd_flash(args):
     with tempfile.TemporaryDirectory() as tmp:
         files = signed_images(images, tmp)
         sector = restore_sector(mac(efuses), ds_dir(args))
+        if sector is None and args.erase_all and value(efuses, "KEY_PURPOSE_3") == "HMAC_DOWN_DIGITAL_SIGNATURE":
+            # The encrypted DS params live only in this reader's flash; a wipe without a record loses the DS key for good.
+            raise LabReaderError(f"KEY3 of {mac(efuses)} holds a DS key but there is no committed DS record in "
+                                 f"{ds_dir(args)}; refusing to erase the reader")
         if sector:
             record = os.path.join(tmp, "ds-record-sector.bin")
             with open(record, "wb") as f:

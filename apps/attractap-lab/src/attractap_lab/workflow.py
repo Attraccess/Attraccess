@@ -398,6 +398,7 @@ def park(target, image, output, *, baseline_dir=None, marker_seconds=30.0, resou
     (output / "efuse.txt").write_text(report)
     mac = efuse.check(report, baseline_dir, profile=profile)
     if profile == efuse.SECURE_LAB:
+        ds_record.require_record_if_burned(mac, efuse.parse(report)[0], ds_dir)
         restore = ds_record.restore_files(mac, ds_dir)
         flash.erase_and_flash_encrypted(str(image), **({"extra": restore} if restore else {}))
     else:

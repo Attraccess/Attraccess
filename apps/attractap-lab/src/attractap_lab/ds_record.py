@@ -54,6 +54,21 @@ def restore_sector(mac, directory=None):
     return record[:_HEADER_SIZE + length].ljust(SECTOR_SIZE, b"\xff")
 
 
+def require_record_if_burned(mac, summary, directory=None):
+    """Refuse a wipe that would lose a DS key for good.
+
+    ``summary`` is the espefuse JSON summary. When KEY3 already is the DS key
+    (HMAC_DOWN_DIGITAL_SIGNATURE) the encrypted DS params in flash are the only way to use it
+    again, and the wipe erases them: without a committed record for this MAC the reader must not
+    be erased (a janitor without ``dsRecordsDir`` and without a source checkout finds none).
+    """
+    purpose = summary.get("KEY_PURPOSE_3", {}).get("value")
+    if purpose == "HMAC_DOWN_DIGITAL_SIGNATURE" and restore_sector(mac, directory) is None:
+        raise DsRecordError(
+            f"KEY3 of {mac} holds a DS key but no DS record is available in {ds_dir(directory)}; "
+            "refusing to erase the reader (set dsRecordsDir / ATTRACTAP_LAB_DS_DIR)")
+
+
 def restore_files(mac, directory=None):
     """``extra`` argument for ``erase_and_flash_encrypted``: the record sector for this chip, or []."""
     sector = restore_sector(mac, directory)
