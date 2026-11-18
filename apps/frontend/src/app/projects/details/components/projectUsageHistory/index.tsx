@@ -69,6 +69,7 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
                 </TableHeader>
                 <TableBody
                   items={data?.data ?? []}
+                  dependencies={[t]}
                   renderEmptyState={() => <EmptyState message={t('history.empty')} />}
                 >
                   {(session: ResourceUsage) => (

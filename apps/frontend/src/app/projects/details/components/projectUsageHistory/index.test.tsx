@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ProjectUsageHistory } from '.';
 
@@ -54,7 +55,10 @@ beforeEach(() => {
     },
   ];
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  act(() => useTranslationState.getState().setLanguage('en'));
+});
 const rowOf = (resourceName: string) => screen.getByText(resourceName).closest('tr') as HTMLElement;
 it('loads the first page of the project history', () => {
   render(<ProjectUsageHistory projectId={5} />);
@@ -78,4 +82,11 @@ it('opens the usage details when Enter is pressed on a focused row', async () =>
   fireEvent.keyDown(row, { key: 'Enter' });
   fireEvent.keyUp(row, { key: 'Enter' });
   await waitFor(() => expect(screen.getByRole('dialog')).toHaveTextContent('Resource 7 session 11'));
+});
+it('translates the row texts when the language changes', () => {
+  render(<ProjectUsageHistory projectId={5} />);
+  expect(rowOf('3D printer')).toHaveTextContent('In progress');
+  act(() => useTranslationState.getState().setLanguage('de'));
+  expect(rowOf('3D printer')).toHaveTextContent('Läuft');
+  expect(rowOf('Laser cutter')).toHaveTextContent('60 Min');
 });
