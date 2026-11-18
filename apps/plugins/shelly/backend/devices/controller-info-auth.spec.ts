@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { PluginStorageUniqueViolation } from '@attraccess/plugins-backend-sdk';
 import { ShellyController } from './controller';
 
 describe('ShellyController ATT-498 device info and auth', () => {
@@ -128,5 +129,14 @@ describe('ShellyController ATT-498 device info and auth', () => {
     });
     registry.findById.mockResolvedValue(null);
     await expect(controller.reprobe(7)).rejects.toBeInstanceOf(NotFoundException);
+  });
+  it('answers 409 when a concurrent add of the same address wins the unique key', async () => {
+    registry.findByIp.mockResolvedValue(null);
+    probe.probe.mockResolvedValue({ ok: false, error: 'offline' });
+    registry.create.mockRejectedValue(new PluginStorageUniqueViolation());
+
+    await expect(controller.add({ ipAddress: '10.0.0.9' })).rejects.toThrow(
+      new ConflictException('a device with IP 10.0.0.9 already exists'),
+    );
   });
 });
