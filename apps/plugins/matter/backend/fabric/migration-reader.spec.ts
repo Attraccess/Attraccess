@@ -25,4 +25,20 @@ describe('Matter storage schema identity (backup compatibility)', () => {
     };
     expect(schemaNameOf(withData)).toBe('v3:fill');
   });
+
+  it('names a migration that adds a unique index or drops an index, since rows must meet a new rule', () => {
+    const unique = {
+      ...MATTER_STORAGE,
+      migrations: [
+        ...MATTER_STORAGE.migrations,
+        { version: 3, name: 'unique', steps: [step.addIndex('nodes', { fields: ['nodeId'], unique: true })] },
+      ],
+    };
+    expect(schemaNameOf(unique)).toBe('v3:unique');
+    const dropped = {
+      ...MATTER_STORAGE,
+      migrations: [...MATTER_STORAGE.migrations, { version: 3, name: 'drop', steps: [step.dropIndex('nodes', 'x')] }],
+    };
+    expect(schemaNameOf(dropped)).toBe('v3:drop');
+  });
 });
