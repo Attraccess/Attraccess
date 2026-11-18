@@ -3,6 +3,7 @@ import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@attraccess/react-query-client';
 import type { AuditEntryDto, AuditMetaDto, AuditSettingsDto } from '@attraccess/react-query-client';
 import { AuditLogSection } from './index';
 import { auditLabel } from './components/auditLabel';
@@ -418,6 +419,64 @@ describe('audit admin workflows', () => {
     expect(screen.queryByText('No activity found')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByRole('button', { name: 'View event #52' })).toBeInTheDocument();
+  });
+
+  it.each(['foo', 'nonsense.created'])('rejects the unknown event prefix %s before requesting it', async (prefix) => {
+    const user = userEvent.setup();
+    mount();
+    await screen.findByRole('button', { name: 'View event #52' });
+    await waitFor(() => expect(getMeta).toHaveBeenCalled());
+    fireEvent.change(screen.getByLabelText('Event prefix'), { target: { value: prefix } });
+    await user.click(screen.getByRole('button', { name: 'Apply filters' }));
+    expect(await screen.findByText('Enter a valid event prefix.')).toBeInTheDocument();
+    expect(list).not.toHaveBeenCalledWith(expect.objectContaining({ eventPrefix: prefix }));
+    expect(screen.queryByText('Activity could not be loaded.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View event #52' })).toBeInTheDocument();
+  });
+
+  it('shows the prefix validation message with a clear action when the API rejects the prefix', async () => {
+    const user = userEvent.setup();
+    mount();
+    await screen.findByRole('button', { name: 'View event #52' });
+    // The demo plugin was unloaded after meta loaded: the API no longer knows its prefix.
+    list.mockRejectedValueOnce(
+      new ApiError(
+        { method: 'GET', url: '/api/audit' },
+        {
+          body: { message: ['eventPrefix must start with a recognized audit event prefix'], statusCode: 400 },
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          url: '/api/audit',
+        },
+        'Bad Request',
+      ),
+    );
+    fireEvent.change(screen.getByLabelText('Event prefix'), { target: { value: 'demo.' } });
+    await user.click(screen.getByRole('button', { name: 'Apply filters' }));
+    expect(await screen.findByText('Enter a valid event prefix.')).toBeInTheDocument();
+    expect(screen.queryByText('Activity could not be loaded.')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(await screen.findByRole('button', { name: 'View event #52' })).toBeInTheDocument();
+    expect(list.mock.lastCall?.[0]).not.toHaveProperty('eventPrefix');
+  });
+
+  it('does not fall back to an unfiltered list when applied filters turn invalid once meta loads', async () => {
+    const user = userEvent.setup();
+    let resolveMeta: (value: AuditMetaDto) => void = () => undefined;
+    getMeta.mockReturnValue(new Promise<AuditMetaDto>((resolve) => (resolveMeta = resolve)));
+    mount();
+    await screen.findByRole('button', { name: 'View event #52' });
+    fireEvent.change(screen.getByLabelText('Event prefix'), { target: { value: 'foo' } });
+    await user.click(screen.getByRole('button', { name: 'Apply filters' }));
+    await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ eventPrefix: 'foo' })));
+    const requestsBefore = list.mock.calls.length;
+    resolveMeta(meta);
+    expect(await screen.findByText('Enter a valid event prefix.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'View event #52' })).not.toBeInTheDocument();
+    expect(list).toHaveBeenCalledTimes(requestsBefore);
   });
 });
 

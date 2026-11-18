@@ -8,6 +8,7 @@ import {
   emptyFilters,
   exportAuditEntries,
   filterRequest,
+  filterVocabulary,
   pluginDomainLabel,
   pluginDomains,
   togglePluginDomain,
@@ -79,24 +80,43 @@ describe('audit export and filtering', () => {
     expect(filterRequest({ ...emptyFilters, eventPrefix: 'resource..updated' })).toEqual({
       error: 'invalidEventPrefix',
     });
-    expect(filterRequest({ ...emptyFilters, subjectType: 'transaction' }, subjectTypes)).toEqual({
+    expect(filterRequest({ ...emptyFilters, subjectType: 'transaction' }, { subjectTypes })).toEqual({
       error: 'invalidSubjectType',
     });
     expect(filterRequest({ ...emptyFilters, eventPrefix: 'billing.transaction.' })).toEqual({
       request: { eventPrefix: 'billing.transaction.' },
     });
-    expect(filterRequest({ ...emptyFilters, subjectType: 'billing.transaction' }, subjectTypes)).toEqual({
+    expect(filterRequest({ ...emptyFilters, subjectType: 'billing.transaction' }, { subjectTypes })).toEqual({
       request: { subjectType: 'billing.transaction' },
     });
   });
   it('accepts plugin subject types from meta and falls back to the API shape', () => {
-    expect(filterRequest({ ...emptyFilters, subjectType: 'demo.device' }, ['demo.device'])).toEqual({
+    expect(filterRequest({ ...emptyFilters, subjectType: 'demo.device' }, { subjectTypes: ['demo.device'] })).toEqual({
       request: { subjectType: 'demo.device' },
     });
     expect(filterRequest({ ...emptyFilters, subjectType: 'demo.device' })).toEqual({
       request: { subjectType: 'demo.device' },
     });
     expect(filterRequest({ ...emptyFilters, subjectType: 'Demo..Device' })).toEqual({ error: 'invalidSubjectType' });
+  });
+  it('accepts only event prefixes that start with a known action segment once meta loaded', () => {
+    const vocabulary = filterVocabulary({
+      domains: [],
+      subjectTypes: [],
+      actions: ['resource.updated', 'maintenance_schedule.created', 'demo.publication'],
+    });
+    expect(vocabulary.eventPrefixes).toEqual(['resource', 'maintenance_schedule', 'demo']);
+    for (const prefix of ['resource', 'resource.', 'maintenance_schedule', 'demo.publication'])
+      expect(filterRequest({ ...emptyFilters, eventPrefix: prefix }, vocabulary)).toEqual({
+        request: { eventPrefix: prefix },
+      });
+    for (const prefix of ['foo', 'nonsense.created', 'resources'])
+      expect(filterRequest({ ...emptyFilters, eventPrefix: prefix }, vocabulary)).toEqual({
+        error: 'invalidEventPrefix',
+      });
+    // Before meta loaded, only the API's shape check applies; the server still rejects unknown prefixes.
+    expect(filterVocabulary(undefined)).toEqual({});
+    expect(filterRequest({ ...emptyFilters, eventPrefix: 'foo' })).toEqual({ request: { eventPrefix: 'foo' } });
   });
   it('exposes plugin-contributed domains and localized labels from meta only', () => {
     const meta: AuditMetaDto = {

@@ -208,9 +208,24 @@ export async function exportAuditEntries(
   return entries;
 }
 
+/** Vocabulary the API validates free-text filters against; undefined until the meta endpoint loaded. */
+export type AuditFilterVocabulary = {
+  subjectTypes?: readonly string[];
+  eventPrefixes?: readonly string[];
+};
+
+/** Leading action segments, the same list the API checks an eventPrefix against. */
+export function knownEventPrefixes(actions: readonly string[]): string[] {
+  return [...new Set(actions.map((action) => action.split('.')[0]))];
+}
+
+export function filterVocabulary(meta: AuditMetaDto | undefined): AuditFilterVocabulary {
+  return meta ? { subjectTypes: meta.subjectTypes, eventPrefixes: knownEventPrefixes(meta.actions) } : {};
+}
+
 export function filterRequest(
   filters: AuditFilters,
-  subjectTypes?: readonly string[],
+  { subjectTypes, eventPrefixes }: AuditFilterVocabulary = {},
 ): { request: AuditListQuery; error?: never } | { error: string; request?: never } {
   const request: AuditListQuery = {};
   for (const key of ['actorId', 'subjectId'] as const) {
@@ -227,7 +242,13 @@ export function filterRequest(
   }
   if (request.from && request.to && request.from > request.to) return { error: 'invalidRange' };
   const prefix = filters.eventPrefix.trim();
-  if (prefix && (prefix.length > AuditQueryDtoSchema.properties.eventPrefix.maxLength || !eventPrefix.test(prefix)))
+  if (
+    prefix &&
+    (prefix.length > AuditQueryDtoSchema.properties.eventPrefix.maxLength ||
+      !eventPrefix.test(prefix) ||
+      // Once meta loaded, the leading segment must be a known one, as the API requires.
+      (eventPrefixes && !eventPrefixes.includes(prefix.split('.')[0])))
+  )
     return { error: 'invalidEventPrefix' };
   if (prefix) request.eventPrefix = prefix;
   const subjectType = filters.subjectType.trim();
