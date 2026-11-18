@@ -101,6 +101,9 @@ export class PluginStorageDeclarationError extends Error {
   }
 }
 
+/** What names a plugin's storage bookkeeping: enough to read it without the plugin's declaration. */
+export type PluginStorageOwner = Pick<CompiledPluginStorage, 'pluginName' | 'namespace'>;
+
 /** Bookkeeping table of a plugin's neutral migrations: one row per applied version. */
 export const versionsTableName = (namespace: string): string => `plugin_storage_migrations_${namespace}`;
 

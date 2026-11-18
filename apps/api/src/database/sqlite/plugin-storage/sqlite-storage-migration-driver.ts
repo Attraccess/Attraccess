@@ -9,6 +9,7 @@ import type {
 import {
   type CompiledPluginStorage,
   type CompiledSchema,
+  type PluginStorageOwner,
   type ResolvedStep,
   legacyMigrationsTableName,
   versionsTableName,
@@ -28,11 +29,11 @@ class SqliteMigrationSession implements PluginStorageMigrationSession {
 
   constructor(
     private readonly manager: EntityManager,
-    storage: CompiledPluginStorage,
+    owner: PluginStorageOwner,
   ) {
     this.executor = new ManagerExecutor(manager);
-    this.versions = versionsTableName(storage.namespace);
-    this.legacy = legacyMigrationsTableName(storage.pluginName);
+    this.versions = versionsTableName(owner.namespace);
+    this.legacy = legacyMigrationsTableName(owner.pluginName);
   }
 
   private async tableExists(name: string): Promise<boolean> {
@@ -104,17 +105,14 @@ export class SqliteStorageMigrationDriver implements PluginStorageMigrationDrive
     return readOnly ? new DataSource(options as DataSourceOptions) : createDataSource(options as DataSourceOptions);
   }
 
-  async read<T>(
-    storage: CompiledPluginStorage,
-    work: (session: PluginStorageMigrationReader) => Promise<T>,
-  ): Promise<T> {
+  async read<T>(owner: PluginStorageOwner, work: (session: PluginStorageMigrationReader) => Promise<T>): Promise<T> {
     const source = this.open(true);
     await source.initialize();
     try {
       await source.query(`PRAGMA busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`);
       await source.query('PRAGMA query_only = ON');
       // A deferred transaction: both reads see one consistent state without reserving the writer.
-      return await source.transaction((manager) => work(new SqliteMigrationSession(manager, storage)));
+      return await source.transaction((manager) => work(new SqliteMigrationSession(manager, owner)));
     } finally {
       await source.destroy();
     }

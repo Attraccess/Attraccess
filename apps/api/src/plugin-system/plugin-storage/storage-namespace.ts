@@ -11,6 +11,16 @@
 /** The prefixes of a namespace: the derived form and the short form of tables adopted from 1.x. */
 export const namespacePrefixes = (namespace: string): readonly string[] => [`plugin_${namespace}_`, `${namespace}_`];
 
+/**
+ * Whether two namespaces can contest a name: they are equal, or a prefix of one starts with a prefix of the other
+ * (`wago` and `plugin-wago` share `plugin_wago_`; `demo` contains `demo_extra`). Read from the names alone, so it
+ * holds whatever tables either plugin declares now or later.
+ */
+export function namespacesOverlap(a: string, b: string): boolean {
+  const theirs = namespacePrefixes(b);
+  return namespacePrefixes(a).some((mine) => theirs.some((other) => mine.startsWith(other) || other.startsWith(mine)));
+}
+
 /** The length of the longest prefix of `namespace` that `name` starts with (case-insensitive); 0 when none does. */
 export function namespaceMatch(name: string, namespace: string): number {
   const lowered = name.toLowerCase();

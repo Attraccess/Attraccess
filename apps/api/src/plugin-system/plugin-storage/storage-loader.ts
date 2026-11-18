@@ -4,8 +4,11 @@ import { PluginPermission, PluginPermissionError } from '@attraccess/plugins-bac
 import { resolveDatabaseBackend } from '../../database/backend';
 import type { LoadedPluginManifest } from '../plugin.manifest';
 import { loadPluginEntryExports } from '../runtime/module-loader';
+import { PLUGIN_MIGRATION_GUIDE_URL } from '../runtime/plugin-compatibility';
 import { type CompiledPluginStorage, PluginStorageDeclarationError } from './storage-model';
 import { namespaceOf } from './storage-compile';
+import { namespacesOverlap } from './storage-namespace';
+import { isEstablishedStorage } from './storage-precedence';
 import { assertNamespaceUnclaimed } from './storage-registry';
 import { compilePluginStorage } from './storage-schema';
 
@@ -43,12 +46,71 @@ export function assertDistinctNamespace(pluginName: string, installedPluginNames
   }
 }
 
-/** Storage namespaces of the other installed plugins (plugins whose name yields no namespace have none). */
+/** An installed plugin with storage and its namespace. */
+interface NamespaceHolder {
+  readonly name: string;
+  readonly namespace: string;
+}
+
+/**
+ * The first of `others` whose namespace overlaps `namespace` (see namespacesOverlap). Another release of the same
+ * plugin (the same name) never does.
+ */
+function overlappingPlugin(
+  pluginName: string,
+  namespace: string,
+  others: readonly string[],
+): NamespaceHolder | undefined {
+  for (const name of others) {
+    const theirs = name === pluginName ? undefined : namespaceOrNone(name);
+    if (theirs !== undefined && namespacesOverlap(namespace, theirs)) return { name, namespace: theirs };
+  }
+  return undefined;
+}
+
+function overlapRefusal(pluginName: string, namespace: string, other: NamespaceHolder, why: string): Error {
+  const relation = namespace === other.namespace ? 'is the one' : `overlaps the namespace "${other.namespace}"`;
+  return new PluginStorageDeclarationError(
+    pluginName,
+    `its storage namespace "${namespace}" ${relation} of the installed plugin "${other.name}"${why}, so a table ` +
+      `name of one would lie in the namespace of the other. Rename the plugin. Migration guide: ` +
+      PLUGIN_MIGRATION_GUIDE_URL,
+  );
+}
+
+/** Refuses a plugin without committed storage whose namespace overlaps the one of an established plugin. */
+function assertNoEstablishedOverlap(pluginName: string, established: readonly string[]): void {
+  const namespace = namespaceOrNone(pluginName);
+  if (namespace === undefined) return;
+  const other = overlappingPlugin(pluginName, namespace, established);
+  if (other !== undefined) throw overlapRefusal(pluginName, namespace, other, ', which already keeps data there');
+}
+
+/**
+ * The other installed plugins with storage whose namespaces the names of `pluginName` are checked against.
+ *
+ * Precedence (storage-precedence): an established plugin is checked only against established plugins, so a newcomer
+ * can never disable it; a newcomer whose namespace overlaps an established one is refused outright, before any of its
+ * names is compared. When both or neither are established, both are checked against each other: each plugin's names
+ * against the other's namespace (and an equal namespace refuses both, they share one bookkeeping). Every rule is
+ * symmetric or reads only names and committed state, so which plugin is refused never depends on the order plugins
+ * are discovered, migrated or loaded in.
+ */
+function rivalsOf(pluginName: string, installedPluginNames: readonly string[]): string[] {
+  const others = installedPluginNames.filter((name) => name !== pluginName);
+  const established = others.filter(isEstablishedStorage);
+  if (isEstablishedStorage(pluginName)) return established;
+  assertNoEstablishedOverlap(pluginName, established);
+  return others;
+}
+
+/** Storage namespaces of the rival plugins (see rivalsOf; plugins whose name yields no namespace have none). */
 function siblingNamespaces(pluginName: string, installedPluginNames: readonly string[]): Set<string> {
-  assertDistinctNamespace(pluginName, installedPluginNames);
+  const rivals = rivalsOf(pluginName, installedPluginNames);
+  assertDistinctNamespace(pluginName, rivals);
   const namespaces = new Set<string>();
-  for (const name of installedPluginNames) {
-    const namespace = name === pluginName ? undefined : namespaceOrNone(name);
+  for (const name of rivals) {
+    const namespace = namespaceOrNone(name);
     if (namespace !== undefined) namespaces.add(namespace);
   }
   return namespaces;
@@ -56,24 +118,29 @@ function siblingNamespaces(pluginName: string, installedPluginNames: readonly st
 
 /**
  * Whether a plugin about to be installed (ZIP upload, npm install or update) can keep storage beside the installed
- * plugins: its namespace is not another plugin's, and no loaded plugin keeps a table or index inside it. Read from
- * the name alone, before the plugin's code; the plugin's own names are checked when its storage is compiled.
- * `installed` is read only for a plugin that requests PLUGIN_STORAGE.
+ * plugins. Read from the names alone, before the plugin's code: its namespace may not overlap the one of any
+ * installed plugin that requests PLUGIN_STORAGE (loaded or not: license-blocked, quarantined, never booted), and no
+ * loaded plugin may keep a table or index inside it. Another release of the same plugin is no conflict; the plugin's
+ * own names are checked when its storage is compiled. `installed` is read only for a plugin that requests
+ * PLUGIN_STORAGE.
  */
 export function assertInstallableNamespace(
   manifest: Pick<LoadedPluginManifest, 'name' | 'permissions'>,
   installed: () => readonly Pick<LoadedPluginManifest, 'name' | 'permissions'>[],
 ): void {
   if (!(manifest.permissions ?? []).includes(PluginPermission.PLUGIN_STORAGE)) return;
-  assertDistinctNamespace(manifest.name, storagePluginNames(installed()));
   const namespace = namespaceOrNone(manifest.name);
-  if (namespace !== undefined) assertNamespaceUnclaimed(manifest.name, namespace);
+  if (namespace === undefined) return;
+  const other = overlappingPlugin(manifest.name, namespace, storagePluginNames(installed()));
+  if (other !== undefined) throw overlapRefusal(manifest.name, namespace, other, '');
+  assertNamespaceUnclaimed(manifest.name, namespace);
 }
 
 /**
  * Compiles the storage declaration of a loaded backend module. Returns null when the module declares none. A
  * declaration without PLUGIN_STORAGE fails like any other capability used without its permission. The names of the
- * other installed plugins with storage keep it out of their storage namespaces (see storagePluginNames).
+ * other installed plugins with storage keep it out of their storage namespaces (see storagePluginNames), subject to
+ * the precedence of established plugins (see rivalsOf).
  */
 export function compileModuleStorage(
   manifest: Pick<LoadedPluginManifest, 'name' | 'permissions'>,

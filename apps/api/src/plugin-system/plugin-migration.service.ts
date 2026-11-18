@@ -24,6 +24,10 @@ import { assertStorageNamesFree, claimStorageNames } from './plugin-storage/stor
 
 import type { CompiledPluginStorage } from './plugin-storage/storage-model';
 
+import { namespaceOf } from './plugin-storage/storage-compile';
+
+import { recordEstablishedStorage } from './plugin-storage/storage-precedence';
+
 function getImplementationClass(): typeof PluginMigrationService {
   return require('./plugin-migration.service').PluginMigrationService;
 }
@@ -78,11 +82,46 @@ export class PluginMigrationService {
   }
 
   /**
+   * Reads which installed plugins with storage are established (keep committed storage), whether or not they load,
+   * so a plugin without committed storage can never disable one that has it (see storage-precedence). Runs at boot
+   * before any plugin's storage is compiled.
+   */
+  public static async resolveStoragePrecedence(): Promise<void> {
+    const established: string[] = [];
+    for (const manifest of PluginService.getPlugins().filter((plugin) => getImplementationClass().hasStorage(plugin))) {
+      if (await getImplementationClass().isEstablished(manifest.name)) established.push(manifest.name);
+    }
+    recordEstablishedStorage(established);
+  }
+
+  /**
+   * Whether the plugin keeps committed storage. A name without a namespace owns none. A database that cannot be read
+   * counts as established: the plugin keeps its precedence rather than risk yielding its data to a newcomer.
+   */
+  protected static async isEstablished(pluginName: string): Promise<boolean> {
+    let namespace: string;
+    try {
+      namespace = namespaceOf(pluginName);
+    } catch {
+      return false;
+    }
+    try {
+      return await getImplementationClass().engine().hasCommittedStorage({ pluginName, namespace });
+    } catch (error) {
+      getImplementationClass().logger.warn(
+        `Could not read the storage bookkeeping of plugin "${pluginName}"; treating it as established: ${(error as Error).message}`,
+      );
+      return true;
+    }
+  }
+
+  /**
    * Runs pending migrations for every discovered plugin that declares storage. Per-plugin failures are isolated
    * and recorded as a load error (the plugin is quarantined and stays disabled) so one broken plugin can never
    * block host boot.
    */
   public static async runPendingUpMigrationsForAllPlugins(): Promise<void> {
+    await getImplementationClass().resolveStoragePrecedence();
     const { ordered: plugins, failures } = pluginActivationPlan(PluginService.getPlugins());
     for (const [name, error] of failures) {
       const manifest = PluginService.getPlugins().find((plugin) => plugin.name === name);

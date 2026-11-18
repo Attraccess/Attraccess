@@ -1,4 +1,4 @@
-import type { CompiledPluginStorage } from '../plugin-storage/storage-model';
+import type { CompiledPluginStorage, PluginStorageOwner } from '../plugin-storage/storage-model';
 
 /** Connection settings a test hands in to point the engine at its own database. Opaque to the plugin system. */
 export type PluginMigrationEngineConfig = object;
@@ -19,6 +19,11 @@ export interface PluginStorageMigrationPlan {
 export interface PluginMigrationEngine {
   /** What `migrate` would do. Changes nothing. Throws PluginStorageMigrationRefused for a state it will not touch. */
   assess(storage: CompiledPluginStorage): Promise<PluginStorageMigrationPlan>;
+  /**
+   * Whether the plugin keeps committed storage: a recorded version (an adopted 1.x baseline counts) or a 1.x
+   * migrations history. Read from the bookkeeping alone, without the plugin's declaration. Changes nothing.
+   */
+  hasCommittedStorage(owner: PluginStorageOwner): Promise<boolean>;
   /** Applies every pending version in one transaction (all or nothing). */
   migrate(storage: CompiledPluginStorage): Promise<PluginStorageMigrationPlan>;
   /**

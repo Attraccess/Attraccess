@@ -1,5 +1,11 @@
 import type { PluginTransactionScope } from '@attraccess/plugins-backend-sdk';
-import type { CompiledField, CompiledPluginStorage, CompiledTable, ResolvedStep } from './storage-model';
+import type {
+  CompiledField,
+  CompiledPluginStorage,
+  CompiledTable,
+  PluginStorageOwner,
+  ResolvedStep,
+} from './storage-model';
 
 /**
  * What differs between database engines for plugin storage. A backend provides one dialect (statement syntax, value
@@ -101,7 +107,8 @@ export interface PluginStorageMigrationDriver {
   ): Promise<T>;
   /**
    * Runs `work` in a read-only transaction on a connection of its own. It takes no write lock, so planning (an
-   * upgrade check while the server runs) neither waits behind writers nor blocks them.
+   * upgrade check while the server runs) neither waits behind writers nor blocks them. Reading needs only the names of
+   * the plugin's bookkeeping, not its declaration.
    */
-  read<T>(storage: CompiledPluginStorage, work: (session: PluginStorageMigrationReader) => Promise<T>): Promise<T>;
+  read<T>(owner: PluginStorageOwner, work: (session: PluginStorageMigrationReader) => Promise<T>): Promise<T>;
 }

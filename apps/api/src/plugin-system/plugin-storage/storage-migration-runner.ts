@@ -3,6 +3,7 @@ import { PLUGIN_MIGRATION_GUIDE_URL } from '../runtime/plugin-compatibility';
 import type { PluginStorageDdl, PluginStorageMigrationDriver } from './storage-dialect.port';
 import {
   type CompiledPluginStorage,
+  type PluginStorageOwner,
   PluginStorageMigrationFailed,
   PluginStorageMigrationRefused,
 } from './storage-model';
@@ -102,6 +103,18 @@ export class StorageMigrationRunner implements PluginMigrationEngine {
   assess(storage: CompiledPluginStorage): Promise<PluginStorageMigrationPlan> {
     return this.driver.read(storage, async (session) =>
       planStorageMigration(storage, await session.appliedVersions(), await session.legacyMigrationNames()),
+    );
+  }
+
+  /**
+   * A 1.x history counts whether or not it is complete: its tables hold the plugin's data either way (a partial one
+   * is refused by the plugin's own migration until it is completed).
+   */
+  hasCommittedStorage(owner: PluginStorageOwner): Promise<boolean> {
+    return this.driver.read(
+      owner,
+      async (session) =>
+        (await session.appliedVersions()).length > 0 || ((await session.legacyMigrationNames()) ?? []).length > 0,
     );
   }
 
