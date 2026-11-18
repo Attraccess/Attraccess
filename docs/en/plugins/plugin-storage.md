@@ -89,8 +89,13 @@ The host names your tables and indexes; you name only the logical tables and fie
 - **Forbidden names.** A physical name may not be a core table, start with a prefix the host reserves, or lie in the
   namespace of another installed plugin. This works in both directions: a plugin `demo` may not use
   `plugin_demo_extra_notes` while `demo-extra` is installed, and `demo-extra` may not use a name of `demo`.
-- **One namespace, one plugin.** Two plugins whose names give the same namespace (`foo-bar` and `foo_bar`) cannot be
-  installed together; the second one is refused.
+- **One namespace, one plugin.** Two plugins whose namespaces overlap cannot be installed together: the namespaces
+  are equal (`foo-bar` and `foo_bar`), or a table prefix of one starts with a prefix of the other (`demo` and
+  `demo-extra`; `wago` and `plugin-wago`, whose short prefix `plugin_wago_` holds every table of `wago`). An upload or
+  npm install is refused by name alone against every installed plugin with storage, loaded or not (license-blocked,
+  quarantined). Should such a plugin arrive anyway (a folder copied into the plugin directory), a plugin that already
+  keeps committed storage keeps loading and the newcomer is refused; when both or neither keep committed storage, the
+  plugin whose names lie in the other's namespace is refused, and two plugins with the same namespace are both refused.
 
 ### Neutral migrations
 
@@ -352,7 +357,7 @@ declaration breaks the rules. The error names the plugin, states the reason and 
 - it still ships a TypeORM migrations entry or `persistence.backends`, or its bundle imports TypeORM or a database
   driver;
 - a `physicalName` or index name is declared outside an adopting version 1, a physical name is forbidden (see
-  [Table and index names](#table-and-index-names)), another installed plugin has the same namespace, or a foreign key
+  [Table and index names](#table-and-index-names)), another installed plugin has the same or an overlapping namespace, or a foreign key
   points outside the plugin;
 - migration versions are not strictly increasing from 1, or a step is invalid;
 - an installed database has only part of the `adoption.legacyMigrations` applied.

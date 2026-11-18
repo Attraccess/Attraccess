@@ -91,8 +91,15 @@ Tabellen und Indizes benennt der Host; Sie benennen nur die logischen Tabellen u
   beginnen und nicht im Namensraum eines anderen installierten Plugins liegen. Das gilt in beide Richtungen: Ein
   Plugin `demo` darf `plugin_demo_extra_notes` nicht nutzen, solange `demo-extra` installiert ist, und `demo-extra`
   keinen Namen von `demo`.
-- **Ein Namensraum, ein Plugin.** Zwei Plugins, deren Namen denselben Namensraum ergeben (`foo-bar` und `foo_bar`),
-  können nicht gemeinsam installiert sein; das zweite wird abgelehnt.
+- **Ein Namensraum, ein Plugin.** Zwei Plugins, deren Namensräume sich überschneiden, können nicht gemeinsam
+  installiert sein: Die Namensräume sind gleich (`foo-bar` und `foo_bar`), oder ein Tabellenpräfix des einen beginnt
+  mit einem Präfix des anderen (`demo` und `demo-extra`; `wago` und `plugin-wago`, dessen kurzes Präfix
+  `plugin_wago_` jede Tabelle von `wago` enthält). Ein Upload oder eine npm-Installation wird allein anhand der Namen
+  gegen jedes installierte Plugin mit Speicher abgelehnt, ob geladen oder nicht (ohne Lizenz, in Quarantäne). Kommt
+  ein solches Plugin trotzdem hinzu (ein in das Plugin-Verzeichnis kopierter Ordner), lädt ein Plugin mit bereits
+  festgeschriebenem Speicher weiter und der Neuling wird abgelehnt; haben beide oder keines festgeschriebenen
+  Speicher, wird das Plugin abgelehnt, dessen Namen im Namensraum des anderen liegen, und zwei Plugins mit demselben
+  Namensraum werden beide abgelehnt.
 
 ### Neutrale Migrationen
 
@@ -365,7 +372,7 @@ wenn seine Deklaration die Regeln verletzt. Der Fehler nennt das Plugin, gibt de
   oder einen Datenbanktreiber;
 - ein `physicalName` oder Indexname steht außerhalb einer übernehmenden Version 1, ein physischer Name ist verboten
   (siehe [Tabellen- und Indexnamen](#tabellen-und-indexnamen)), ein anderes installiertes Plugin hat denselben
-  Namensraum, oder ein Fremdschlüssel zeigt aus dem Plugin heraus;
+  oder einen überschneidenden Namensraum, oder ein Fremdschlüssel zeigt aus dem Plugin heraus;
 - die Migrationsversionen steigen nicht streng ab 1 an, oder ein Schritt ist ungültig;
 - in einer installierten Datenbank ist nur ein Teil von `adoption.legacyMigrations` angewendet.
 
