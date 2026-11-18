@@ -9,8 +9,9 @@ const ack = (bytes, sequence) => {
   return out;
 };
 
-// The test peripheral in echo mode: every written chunk is acked a little later, in order. `mangle` rewrites an ack.
-function peripheral({ chunk, mangle = (value) => value, failWriteAt = 0 } = {}) {
+// The test peripheral in echo mode: every written chunk is acked a little later (or at once with `sync`), in order.
+// `mangle` rewrites an ack, `dropAt` loses one: the next ack wait then times out like the SDK's `next`.
+function peripheral({ chunk, mangle = (value) => value, failWriteAt = 0, sync = false, dropAt = 0 } = {}) {
   const acks = [];
   const waiters = [];
   let received = 0;
@@ -24,24 +25,39 @@ function peripheral({ chunk, mangle = (value) => value, failWriteAt = 0 } = {}) 
       inFlight += 1;
       device.maxInFlight = Math.max(device.maxInFlight, inFlight);
       const sequence = received;
-      setImmediate(() => {
+      const deliver = () => {
         inFlight -= 1;
+        if (sequence === dropAt) return;
         const value = mangle(ack(sequence * chunk, sequence), sequence);
         const waiter = waiters.shift();
         if (waiter) waiter.resolve(value);
         else acks.push(value);
-      });
+      };
+      if (sync) deliver();
+      else setImmediate(deliver);
     },
     nextAck(signal) {
       if (acks.length) return Promise.resolve(acks.shift());
       return new Promise((resolve, reject) => {
-        const waiter = { resolve };
+        const timer = dropAt ? setTimeout(() => leave(new Error('TIMEOUT')), 20) : undefined;
+        const leave = (error) => {
+          clearTimeout(timer);
+          const index = waiters.indexOf(waiter);
+          if (index >= 0) waiters.splice(index, 1);
+          reject(error);
+        };
+        const waiter = {
+          resolve: (value) => {
+            clearTimeout(timer);
+            resolve(value);
+          },
+        };
         waiters.push(waiter);
-        signal.addEventListener('abort', () => {
-          waiters.splice(waiters.indexOf(waiter), 1);
-          reject(new Error('aborted'));
-        });
+        signal.addEventListener('abort', () => leave(new Error('aborted')), { once: true });
       });
+    },
+    get waiting() {
+      return waiters.length;
     },
   };
   return device;
@@ -82,6 +98,48 @@ test('an ack out of order or with a wrong byte count fails the transfer', async 
 test('a failed write ends the transfer and stops waiting for acks', async () => {
   const device = peripheral({ chunk: 8, failWriteAt: 3 });
   await assert.rejects(windowedTransfer({ chunk: 8, bytes: 80, window: 8, ...device }), /write failed/);
+  assert.equal(device.waiting, 0);
+});
+
+test('acks that arrive before the last write resolves end the transfer at once', async () => {
+  const device = peripheral({ chunk: 8, sync: true });
+  const result = await windowedTransfer({ chunk: 8, bytes: 80, window: 4, ...device });
+  assert.equal(result.acked, 10);
+  assert.equal(device.waiting, 0);
+});
+
+test('a lost ack fails the transfer with the wait error instead of hanging', async () => {
+  for (const [window, dropAt] of [
+    [1, 5],
+    [8, 10],
+  ]) {
+    const device = peripheral({ chunk: 8, dropAt });
+    await assert.rejects(windowedTransfer({ chunk: 8, bytes: 80, window, ...device }), /TIMEOUT/);
+  }
+});
+
+test('the report measures throughput and ack latency on the given clock', async () => {
+  let clock = 0;
+  const device = peripheral({ chunk: 1024 });
+  // Every write takes 100 ms; its ack is read 100 ms later at window 1.
+  const result = await windowedTransfer({
+    chunk: 1024,
+    bytes: 4 * 1024,
+    write: async (value) => {
+      clock += 100;
+      await device.write(value);
+    },
+    nextAck: async (signal) => {
+      const value = await device.nextAck(signal);
+      clock += 100;
+      return value;
+    },
+    now: () => clock,
+  });
+  assert.equal(result.seconds, 0.8);
+  assert.equal(result.kibPerSecond, 5);
+  assert.equal(result.ackMedianMs, 200);
+  assert.equal(result.ackP95Ms, 200);
 });
 
 test('a minimum duration keeps the transfer going past its byte count', async () => {

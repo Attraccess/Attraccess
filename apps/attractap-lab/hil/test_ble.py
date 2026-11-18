@@ -251,20 +251,23 @@ def test_ble_bulk_throughput(ble, peripheral, artifacts):
                 control(0x01, 0x00),
             ], leaseMs=900_000, timeout=1200)
             results[window].append(result)
+    raw = {str(k): v for k, v in results.items()}
+    # A session that failed to open has no steps: keep its outcome in the artifact and fail on it below.
+    save(artifacts, "bulk-throughput", {"runs": raw})
     summary = {}
     for window, outcomes in results.items():
-        transfers = [outcome["steps"][3] for outcome in outcomes]
-        rates = sorted(t.get("kibPerSecond", 0) for t in transfers)
+        transfers = [outcome["steps"][3] for outcome in outcomes if len(outcome["steps"]) > 3]
         summary[f"window{window}"] = {
             "runs": len(transfers),
-            "kibPerSecond": rates,
-            "medianKibPerSecond": rates[len(rates) // 2],
-            "ackMedianMs": sorted(t.get("ackMedianMs") or 0 for t in transfers)[len(transfers) // 2],
-            "ackP95Ms": sorted(t.get("ackP95Ms") or 0 for t in transfers)[len(transfers) // 2],
+            "kibPerSecond": sorted(t.get("kibPerSecond", 0) for t in transfers),
+            "medianKibPerSecond": median(t.get("kibPerSecond") for t in transfers),
+            "ackMedianMs": median(t.get("ackMedianMs") for t in transfers),
+            "ackP95Ms": median(t.get("ackP95Ms") for t in transfers),
         }
-    windowed = summary[f"window{BULK_WINDOWS[-1]}"]["medianKibPerSecond"]
-    summary["meetsTarget"] = windowed >= BULK_TARGET_KIB_S
-    save(artifacts, "bulk-throughput", {"summary": summary, "runs": {str(k): v for k, v in results.items()}})
+    # The floor and the target apply to the largest window; a window-1-only run records its numbers only.
+    windowed = summary[f"window{BULK_WINDOWS[-1]}"]["medianKibPerSecond"] if BULK_WINDOWS[-1] > 1 else None
+    summary["meetsTarget"] = windowed is not None and windowed >= BULK_TARGET_KIB_S
+    save(artifacts, "bulk-throughput", {"summary": summary, "runs": raw})
     for outcomes in results.values():
         for outcome in outcomes:
             assert outcome["open"]["ok"] and all(step["ok"] for step in outcome["steps"]), outcome
@@ -272,7 +275,13 @@ def test_ble_bulk_throughput(ble, peripheral, artifacts):
             # Every chunk was acknowledged, in order and with its bytes counted (the step fails otherwise).
             assert transfer["acked"] == transfer["chunks"] and transfer["bytes"] >= BULK_BYTES, transfer
             assert outcome["closed"] == {"reason": "closed"}, outcome
-    assert windowed >= BULK_FLOOR_KIB_S, summary
+    assert windowed is None or windowed >= BULK_FLOOR_KIB_S, summary
+
+
+def median(values):
+    """The median of the values that are present, or None."""
+    present = sorted(v for v in values if v is not None)
+    return present[len(present) // 2] if present else None
 
 
 @pytest.mark.skipif(not SOLO_CODE, reason="set SOLO_USER_CODE (CRYPT_OFF lock)")
