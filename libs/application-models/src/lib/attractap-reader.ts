@@ -44,6 +44,8 @@ export type AttractapSecurityProblem = (typeof ATTRACTAP_SECURITY_PROBLEMS)[numb
 
 /** What the reader firmware can do, as reported by the reader. */
 export interface AttractapReaderCapabilities {
+  /** False for the Attractap BLE Bridge: no NFC reader, no resources or cards, only plugin Bluetooth traffic. */
+  nfc: boolean;
   resourceSelection: boolean;
   resourceActionSelection: boolean;
   cardEnrollment: boolean;

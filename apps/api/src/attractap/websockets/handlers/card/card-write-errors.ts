@@ -19,8 +19,12 @@ export const CARD_WRITE_START_ERRORS = {
 /**
  * Readers on firmware before 2.0.0 cannot relay card commands, so the server cannot check or write
  * a card through them. Every connection of the reader must relay: any of them may receive the card.
+ * A BLE Bridge has no NFC at all, which no update changes.
  */
 export function assertReaderRelaysCards(sockets: readonly AuthenticatedWebSocket[]): void {
+  if (sockets.some((socket) => socket.state.nfc === false)) {
+    throw new BadRequestException(CARD_WRITE_START_ERRORS.READER_CARD_ENROLLMENT_NOT_SUPPORTED);
+  }
   if (sockets.some((socket) => !socket.state.cardRelay)) {
     throw new BadRequestException(CARD_WRITE_START_ERRORS.READER_FIRMWARE_UPDATE_REQUIRED);
   }

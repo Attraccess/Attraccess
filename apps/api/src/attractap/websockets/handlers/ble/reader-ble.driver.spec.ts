@@ -92,6 +92,16 @@ describe('ReaderBleDriver (plugin BLE over the reader websocket)', () => {
       await later.close();
     });
 
+    it('serves a BLE Bridge (no NFC, no card relay) like any reader open for plugins', async () => {
+      socket().state.nfc = false;
+      socket().state.cardRelay = false;
+      expect(await ble.listReaders()).toEqual([{ readerId: 1, name: 'Workshop', available: true }]);
+      expect((await ble.scan(1, PROFILE.id)).map((found) => found.address)).toEqual([ADDRESS, OTHER]);
+      const session = await ble.openSession((await endpoint()).id);
+      expect(sent(AttractapEventType.BLE_SESSION_OPEN)).toHaveLength(1);
+      await session.close();
+    });
+
     it('refuses BLE work while the reader updates its firmware', async () => {
       socket().state.ota = { path: '/tmp/fw.bin', size: 2048, fd: 7 };
       await expect(ble.openSession((await endpoint()).id)).rejects.toMatchObject({

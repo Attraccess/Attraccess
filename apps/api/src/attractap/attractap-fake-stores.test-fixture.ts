@@ -38,6 +38,7 @@ export const FIRMWARE: AttractapFirmwareInfo = {
   variant: 'standard',
   version: '1.0',
   capabilities: {
+    nfc: true,
     resourceSelection: true,
     resourceActionSelection: false,
     cardEnrollment: true,

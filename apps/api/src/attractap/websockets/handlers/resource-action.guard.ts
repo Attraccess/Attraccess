@@ -3,8 +3,8 @@ import { AttractapService } from '../../attractap.service';
 import { UsersService } from '../../../users-and-auth/users/users.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
 import {
-  ATTRACTAP_READER_CAPABILITIES,
   ReaderAction,
+  attractapReaderCapabilities,
   readerActionRefusal,
 } from '../../../resources/reader-capabilities/reader-capabilities';
 
@@ -57,7 +57,7 @@ export class ResourceActionGuard {
     }
 
     const action = READER_ACTION_OF_EVENT[eventType];
-    const refusal = action ? readerActionRefusal(ATTRACTAP_READER_CAPABILITIES, resource, action) : null;
+    const refusal = action ? readerActionRefusal(attractapReaderCapabilities(reader), resource, action) : null;
     if (refusal) {
       await socket.sendMessage(new AttractapEvent(eventType, { ...correlation, error: refusal }));
       return false;

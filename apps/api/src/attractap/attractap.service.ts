@@ -49,7 +49,13 @@ import { ATTRACTAP_READER_STORE, type AttractapReaderStore } from './reader-stor
 import { isSecurableBuild } from './security/secured-eligibility';
 import type { ReportedBuild } from './security/session-security-state';
 
-import { ATTRACTAP_READER_CAPABILITIES, canAssign } from '../resources/reader-capabilities/reader-capabilities';
+import {
+  BLE_BRIDGE_MESSAGE,
+  BLE_BRIDGE_READER_CAPABILITIES,
+  attractapReaderCapabilities,
+  canAssign,
+  isBleBridge,
+} from '../resources/reader-capabilities/reader-capabilities';
 
 import { NotificationCategory } from '../notifications/notification-types';
 
@@ -287,6 +293,9 @@ export class AttractapService {
     const firmware = updateData.firmware ?? reader.firmware;
     if (updateData.firmware) {
       this.logger.debug('Updating reader firmware info', updateData.firmware);
+      // A BLE Bridge exists to carry plugin Bluetooth traffic, so it starts open for plugins. Only when the
+      // reader becomes a bridge: an administrator who turns it off later keeps it off across reconnects.
+      if (!isBleBridge(reader) && isBleBridge(updateData)) edit.allowPluginBle = true;
       edit.firmware = updateData.firmware;
     }
 
@@ -296,10 +305,13 @@ export class AttractapService {
       let resources = await this.readerStore.findResourcesByIds(updateData.connectedResourceIds);
 
       this.logger.debug('resources from db', resources);
-      const unserved = resources.filter((resource) => !canAssign(ATTRACTAP_READER_CAPABILITIES, resource));
+      const capabilities = attractapReaderCapabilities(reader);
+      const unserved = resources.filter((resource) => !canAssign(capabilities, resource));
       if (unserved.length > 0) {
         throw new BadRequestException(
-          `This reader cannot serve ${unserved.map((resource) => `"${resource.name}"`).join(', ')}`,
+          capabilities === BLE_BRIDGE_READER_CAPABILITIES
+            ? BLE_BRIDGE_MESSAGE
+            : `This reader cannot serve ${unserved.map((resource) => `"${resource.name}"`).join(', ')}`,
         );
       }
 
