@@ -88,18 +88,13 @@ jobs:
           NODE_ENV: production
         run: pnpm nx run-many --target=pack-test --parallel=3 --projects=tag:type:plugin
       # Outside the production env: React's production build has no `act`, so the frontend tests cannot run there.
-      # Packing comes first so the later steps reuse the builds and packs made in the production env from the cache.
+      # Packing comes first so the Hello World step reuses the plugins-backend-sdk build made in the production env from the cache.
       - name: Test official plugin apps
         run: pnpm nx run-many --target=test --parallel=3 --projects=tag:type:plugin
       - name: Test packed Hello World fixture
         run: pnpm --dir examples/plugin-hello-world run pack-test
-
-      - name: Publish changed official plugin packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          git diff --name-only "$(git describe --tags --abbrev=0 "${RELEASE_VERSION}^" 2>/dev/null || git rev-list --max-parents=0 HEAD)" "$GITHUB_SHA" -- . ':(exclude).github/workflows/**' |
-            pnpm nx affected --target=publish --parallel=3 --stdin --exclude='*,!tag:type:plugin'
+      # This release line does not publish plugins: they are unchanged and already on npm, and npm
+      # publishing has moved to trusted publishing on main, so there is no npm token here.
 
   build-companion:
     uses: ./.github/workflows/build-companion-binaries.yml
