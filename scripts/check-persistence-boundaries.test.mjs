@@ -8,6 +8,7 @@ import {
   findViolations,
   isChecked,
   isPluginZone,
+  isPluginZoneModule,
   pluginDebt,
   updatedBaseline,
   workingTreeSources,
@@ -120,12 +121,33 @@ test('plugin zone: every import form of every persistence package and SDK subpat
   ].join('\n');
   for (const file of [
     'apps/plugins/shelly/backend/service.ts',
-    'apps/plugins/shelly/backend/service.spec.ts',
     'examples/poc-backend-plugin/src/index.ts',
     'libs/plugins-backend-sdk/src/lib/x.ts',
   ]) {
     assert.equal(find(content, file).length, 17, file);
   }
+  // A test may open an engine (six of the lines above); the ORMs, host modules and SDK subpaths stay flagged.
+  assert.equal(find(content, 'apps/plugins/shelly/backend/service.spec.ts').length, 11);
+});
+
+test('plugin zone: the shared list adds the other SQL engines, ORMs and query builders', () => {
+  const content = [
+    "import { DatabaseSync } from 'node:sqlite';",
+    "import { open } from 'sqlite';",
+    "import postgres from 'postgres';",
+    "import pgp from 'pg-promise';",
+    "import { drizzle } from 'drizzle-orm/node-postgres';",
+    "import { MikroORM } from '@mikro-orm/core';",
+    "import { PrismaClient } from '@prisma/client';",
+    "import { Kysely } from 'kysely';",
+    "import { Sequelize } from 'sequelize';",
+  ].join('\n');
+  assert.equal(find(content, 'apps/plugins/shelly/backend/service.ts').length, 9);
+  // In a test, the engines (node:sqlite, sqlite, postgres, pg-promise) are allowed; the ORMs are not.
+  assert.equal(find(content, 'apps/plugins/wago/backend/storage/legacy-layout.spec.ts').length, 5);
+  assert.equal(find(content, 'apps/plugins/wago/backend/storage/layout.test-fixture.ts').length, 5);
+  assert.equal(isPluginZoneModule('@mikro-orm/sqlite'), true);
+  assert.equal(isPluginZoneModule('sqlite-helpers'), false);
 });
 
 test('plugin zone: the SDK root and its package.json stay allowed, lookalikes are not flagged', () => {
@@ -133,7 +155,7 @@ test('plugin zone: the SDK root and its package.json stay allowed, lookalikes ar
   assert.equal(find("import { PluginContext } from '@attraccess/plugins-backend-sdk';", file).length, 0);
   assert.equal(find("import pkg from '@attraccess/plugins-backend-sdk/package.json';", file).length, 0);
   assert.equal(
-    find("import x from 'pg-promise';\nimport y from 'knex-helpers';\nimport z from './pg';", file).length,
+    find("import x from 'pgp-helpers';\nimport y from 'knex-helpers';\nimport z from './pg';", file).length,
     0,
   );
   assert.equal(find("import { x } from '@attraccess/application-models';", file).length, 0);

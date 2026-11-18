@@ -141,12 +141,25 @@ test('rejects a backend bundle that imports TypeORM, host entities or an SDK sub
       'const { Module } = require("@nestjs/common"); import x from "@attraccess/plugins-backend-sdk";',
     );
     assert.doesNotThrow(() => assertNoForbiddenBackendImports(entry));
+    writeFileSync(
+      path.join(directory, 'chunk.js'),
+      'require("pgp-helper"); require("@attraccess/plugins-backend-sdk/package.json");',
+    );
+    assert.doesNotThrow(() => assertNoForbiddenBackendImports(entry));
     for (const source of [
       'const t = require("typeorm");',
       'import { Entity } from "typeorm";',
       'const t = await import("typeorm/driver/sqlite/SqliteDriver");',
       'const e = require("@attraccess/database-entities");',
       'import { Column } from "@attraccess/plugins-backend-sdk/sqlite";',
+      'const t = require("@nestjs/typeorm");',
+      'const d = require("sqlite3");',
+      'const d = require("better-sqlite3");',
+      'const d = require("pg");',
+      'const d = require("mysql2/promise");',
+      'const d = await import("node:sqlite");',
+      'import { MikroORM } from "@mikro-orm/core";',
+      'const x = require("@attraccess/plugins-backend-sdk/internal");',
     ]) {
       writeFileSync(path.join(directory, 'chunk.js'), source);
       assert.throws(() => assertNoForbiddenBackendImports(entry), /plugins have no database access/, source);

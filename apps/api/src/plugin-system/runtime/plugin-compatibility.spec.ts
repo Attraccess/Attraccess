@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import {
@@ -82,6 +82,12 @@ describe('plugin SDK 2.0 compatibility gate', () => {
       ["import('node:sqlite')", 'node:sqlite'],
       ["require('@attraccess/plugins-backend-sdk/sqlite')", '@attraccess/plugins-backend-sdk/sqlite'],
       ["require('@attraccess/database-entities')", '@attraccess/database-entities'],
+      ["require('sqlite')", 'sqlite'],
+      ["import { drizzle } from 'drizzle-orm/node-postgres'", 'drizzle-orm'],
+      ["require('@mikro-orm/sqlite')", '@mikro-orm/*'],
+      ["require('@prisma/client')", '@prisma/client'],
+      ["require('knex')", 'knex'],
+      ["require('postgres')", 'postgres'],
     ])('finds %s', (source, module) => {
       expect(findForbiddenImports(source)).toEqual([module]);
     });
@@ -91,6 +97,8 @@ describe('plugin SDK 2.0 compatibility gate', () => {
       "require('@attraccess/plugins-backend-sdk')",
       "require('pgp')",
       "require('typeorm-helper')",
+      "require('sqlite-helpers')",
+      "require('@mikro-orm-like/x')",
       "const text = 'we do not use pg here';",
     ])('lets %s pass', (source) => {
       expect(findForbiddenImports(source)).toEqual([]);
@@ -112,12 +120,42 @@ describe('plugin SDK 2.0 compatibility gate', () => {
         expect(run).toThrow(/db-plugin.*"typeorm".*a\.js.*migrating-to-2/s);
       });
 
-      it('accepts a clean bundle, ignores node_modules and a missing directory', () => {
+      it('accepts a clean bundle and a missing directory; reads no script under node_modules', () => {
         writeFileSync(join(root, 'index.js'), "require('@nestjs/common');");
-        mkdirSync(join(root, 'node_modules'));
-        writeFileSync(join(root, 'node_modules', 'vendored.js'), "require('pg');");
+        mkdirSync(join(root, 'node_modules', 'left-pad'), { recursive: true });
+        writeFileSync(join(root, 'node_modules', 'left-pad', 'index.js'), "require('pg');");
         expect(() => assertBundleCompatible('p', root)).not.toThrow();
         expect(() => assertBundleCompatible('p', join(root, 'missing'))).not.toThrow();
+      });
+
+      it.each([
+        ['an engine', ['node_modules', 'pg'], 'pg'],
+        ['a scoped ORM', ['node_modules', '@mikro-orm', 'core'], '@mikro-orm/*'],
+        ['a nested engine', ['node_modules', 'left-pad', 'node_modules', 'better-sqlite3'], 'better-sqlite3'],
+      ])('refuses a bundle that vendors %s under node_modules', (_label, path, module) => {
+        writeFileSync(join(root, 'index.js'), 'module.exports = {};');
+        mkdirSync(join(root, ...path), { recursive: true });
+        expect(() => assertBundleCompatible('p', root)).toThrow(new RegExp(`imports "${module.replace('*', '\\*')}"`));
+      });
+
+      it('follows symbolic links to scripts and directories, once each', () => {
+        const outside = mkdtempSync(join(tmpdir(), 'bundle-link-'));
+        try {
+          writeFileSync(join(outside, 'chunk.js'), "require('typeorm');");
+          writeFileSync(join(root, 'index.js'), 'module.exports = {};');
+          symlinkSync(root, join(root, 'loop'));
+          symlinkSync(join(outside, 'chunk.js'), join(root, 'linked.js'));
+          expect(() => assertBundleCompatible('p', root)).toThrow(/imports "typeorm" \(in linked\.js\)/);
+        } finally {
+          rmSync(outside, { recursive: true, force: true });
+        }
+      });
+
+      it('refuses a bundle too large to read completely instead of passing it', () => {
+        for (let index = 0; index <= 2000; index += 1) writeFileSync(join(root, `chunk-${index}.js`), '');
+        expect(() => assertBundleCompatible('big-plugin', root)).toThrow(
+          /big-plugin has a backend bundle too large to check \(more than 2000 scripts/,
+        );
       });
     });
   });

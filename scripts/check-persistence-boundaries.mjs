@@ -17,9 +17,12 @@ import { excludedDirectory, generatedClients, git } from './lib/repo-files.mjs';
  * (`@attraccess/plugins-backend-sdk/sqlite`) no longer exists and is flagged everywhere.
  *
  * Plugin zone (SDK 2.0: plugins have no database access): `apps/plugins/**`, `examples/**` and
- * `libs/plugins-backend-sdk/src/**` get no exemptions at all, tests and migrations included. Besides the packages
- * above they may not import `pg`, `mysql2`, `knex` or any subpath of `@attraccess/plugins-backend-sdk` (the package
- * root and its package.json are the whole public surface). Plugin data goes through `context.storage`.
+ * `libs/plugins-backend-sdk/src/**` get no exemptions, migrations included. Besides the packages above they may not
+ * import any module of apps/api/src/plugin-system/runtime/forbidden-plugin-modules.json (database engines, ORMs and
+ * query builders, host modules; the list the host, the packaging check and the lint share) or any subpath of
+ * `@attraccess/plugins-backend-sdk` (the package root and its package.json are the whole public surface). The one
+ * exception: spec and test-fixture files may open a database engine (the list's `engines`), for example to compare
+ * a declared schema with a 1.x one. A packed plugin never contains them. Plugin data goes through `context.storage`.
  *
  * Existing violations are recorded per file in scripts/persistence-boundaries.baseline.json. The baseline can only
  * shrink: a file that is not listed, or has more violations than listed, fails the check; a file that has fewer
@@ -38,8 +41,21 @@ export const forbiddenPackage =
 const sdkEngineSubpath = /^@attraccess\/plugins-backend-sdk\/sqlite(?:\/.*)?$/;
 // Plugin zone: no exemptions; a stricter package list and no SDK subpath (the package root is the public surface).
 const pluginZone = /^(?:apps\/plugins\/|examples\/|libs\/plugins-backend-sdk\/src\/)/;
-const pluginZonePackage =
-  /^(?:typeorm|@nestjs\/typeorm|sqlite3|better-sqlite3|pg|mysql2|knex|@attraccess\/database-entities)(?:\/.*)?$/;
+const forbiddenPluginModules = JSON.parse(
+  readFileSync(new URL('../apps/api/src/plugin-system/runtime/forbidden-plugin-modules.json', import.meta.url), 'utf8'),
+);
+/** Whether `specifier` is the list `entry` or one of its subpaths (or, for a `@scope/*` entry, in the scope). */
+const matchesModule = (specifier, entry) =>
+  entry.endsWith('/*')
+    ? specifier.startsWith(entry.slice(0, -1))
+    : specifier === entry || specifier.startsWith(`${entry}/`);
+const anyOf = (entries) => (specifier) => entries.some((entry) => matchesModule(specifier, entry));
+export const isPluginZoneModule = anyOf([
+  ...forbiddenPluginModules.engines,
+  ...forbiddenPluginModules.frameworks,
+  ...forbiddenPluginModules.host,
+]);
+const isEngine = anyOf(forbiddenPluginModules.engines);
 const sdkSubpath = /^@attraccess\/plugins-backend-sdk\/(?!package\.json$).+/;
 const adapterInternals =
   /^apps\/api\/src\/database\/(?:adapters|sqlite)(?:\/|$)|(?:^|\/)libs\/database-entities(?:\/|$)/;
@@ -126,9 +142,11 @@ export function findViolations(file, content) {
   collectSpecifiers(source, specifiers);
   const zone = isPluginZone(file);
   const mayWireAdapters = !zone && (compositionFile.test(file) || testFile.test(file));
+  const mayOpenEngine = zone && testFile.test(file);
   return specifiers.filter((specifier) => {
+    if (mayOpenEngine && isEngine(specifier)) return false;
     if (forbiddenPackage.test(specifier) || sdkEngineSubpath.test(specifier)) return true;
-    if (zone && (pluginZonePackage.test(specifier) || sdkSubpath.test(specifier))) return true;
+    if (zone && (isPluginZoneModule(specifier) || sdkSubpath.test(specifier))) return true;
     if (!specifier.startsWith('.') || mayWireAdapters) return false;
     const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier));
     return adapterInternals.test(resolved);

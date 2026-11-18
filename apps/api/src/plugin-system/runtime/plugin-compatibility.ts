@@ -1,6 +1,7 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'fs';
 import { join, relative } from 'path';
 import * as semver from 'semver';
+import forbiddenModules from './forbidden-plugin-modules.json';
 
 /** The first host version whose plugin SDK has no TypeORM surface and no database access (SDK 2.0). */
 export const MINIMUM_PLUGIN_HOST_VERSION = '2.0.0-0';
@@ -111,20 +112,21 @@ export function assertManifestCompatible(manifest: PluginCompatibilityManifest):
 }
 
 /**
- * Modules a plugin bundle may not import: database drivers and ORMs, the host's entities, and the removed SDK engine
- * subpath. A plugin has no database access; importing one is refused before the bundle is loaded.
+ * Modules a plugin bundle may not import: database engines and ORMs, the host's entities, and the removed SDK engine
+ * subpath (see forbidden-plugin-modules.json, shared with the lint and the packaging checks). A plugin has no database
+ * access; importing one is refused before the bundle is loaded.
  */
-export const FORBIDDEN_BUNDLE_MODULES = [
-  'typeorm',
-  '@nestjs/typeorm',
-  'sqlite3',
-  'better-sqlite3',
-  'node:sqlite',
-  'pg',
-  'mysql2',
-  '@attraccess/plugins-backend-sdk/sqlite',
-  '@attraccess/database-entities',
-] as const;
+export const FORBIDDEN_BUNDLE_MODULES: readonly string[] = [
+  ...forbiddenModules.engines,
+  ...forbiddenModules.frameworks,
+  ...forbiddenModules.host,
+];
+
+/** Whether `specifier` is the forbidden `entry` or one of its subpaths (or, for a `@scope/*` entry, in the scope). */
+export const matchesForbiddenModule = (specifier: string, entry: string): boolean =>
+  entry.endsWith('/*')
+    ? specifier.startsWith(entry.slice(0, -1))
+    : specifier === entry || specifier.startsWith(`${entry}/`);
 
 const IMPORT_PATTERN = /(?:\brequire\s*\(\s*|\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(["'`])([^"'`\s]+)\1/g;
 const SCANNED_EXTENSIONS = /\.(?:[cm]?js)$/;
@@ -136,41 +138,95 @@ export function findForbiddenImports(source: string): string[] {
   const found = new Set<string>();
   for (const match of source.matchAll(IMPORT_PATTERN)) {
     const specifier = match[2];
-    const hit = FORBIDDEN_BUNDLE_MODULES.find((module) => specifier === module || specifier.startsWith(`${module}/`));
+    const hit = FORBIDDEN_BUNDLE_MODULES.find((module) => matchesForbiddenModule(specifier, module));
     if (hit) found.add(hit);
   }
   return [...found];
 }
 
-function* bundleFiles(directory: string): Generator<string> {
+/** A script of the bundle to read, or a package it vendors under node_modules. */
+type BundleEntry =
+  | { readonly kind: 'script'; readonly path: string }
+  | { readonly kind: 'package'; readonly name: string; readonly path: string };
+
+/** The entries of a directory with symbolic links followed; each real directory is visited once. */
+function* children(
+  directory: string,
+  seen: Set<string>,
+): Generator<{ name: string; path: string; directory: boolean }> {
+  const real = realpathSync(directory);
+  if (seen.has(real)) return;
+  seen.add(real);
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    if (entry.name === 'node_modules') continue;
     const path = join(directory, entry.name);
-    if (entry.isDirectory()) yield* bundleFiles(path);
-    else if (entry.isFile() && SCANNED_EXTENSIONS.test(entry.name)) yield path;
+    const stats = entry.isSymbolicLink() ? statSync(path, { throwIfNoEntry: false }) : entry;
+    if (stats?.isDirectory()) yield { name: entry.name, path, directory: true };
+    else if (stats?.isFile()) yield { name: entry.name, path, directory: false };
   }
 }
 
+/** The packages vendored in a node_modules directory (and in theirs). They are judged by name, not read. */
+function* vendoredPackages(nodeModules: string, seen: Set<string>): Generator<BundleEntry> {
+  for (const entry of children(nodeModules, seen)) {
+    if (!entry.directory) continue;
+    const packages = entry.name.startsWith('@')
+      ? [...children(entry.path, seen)]
+          .filter((inner) => inner.directory)
+          .map((inner) => ({ ...inner, name: `${entry.name}/${inner.name}` }))
+      : [entry];
+    for (const vendored of packages) {
+      yield { kind: 'package', name: vendored.name, path: vendored.path };
+      const nested = join(vendored.path, 'node_modules');
+      if (existsSync(nested)) yield* vendoredPackages(nested, seen);
+    }
+  }
+}
+
+/** The scripts of a bundle and the packages it vendors. */
+function* bundleEntries(directory: string, seen = new Set<string>()): Generator<BundleEntry> {
+  for (const entry of children(directory, seen)) {
+    if (entry.directory) {
+      yield* entry.name === 'node_modules' ? vendoredPackages(entry.path, seen) : bundleEntries(entry.path, seen);
+    } else if (SCANNED_EXTENSIONS.test(entry.name)) {
+      yield { kind: 'script', path: entry.path };
+    }
+  }
+}
+
+function refuseImport(pluginName: string, module: string, where: string): PluginIncompatibleError {
+  return refuse(
+    pluginName,
+    `imports "${module}" (in ${where}), which plugins may not use: SDK 2.0 plugins have no database access`,
+    'Keep data through context.storage (permission PLUGIN_STORAGE) and read host data through context.hostData.',
+  );
+}
+
 /**
- * Refuses a backend bundle that imports a database package, the host's entities or the removed engine subpath. Reads
- * the JavaScript files of the backend directory (not node_modules) and never executes them. A missing directory
- * passes: the entry point check reports it.
+ * Refuses a backend bundle that imports a database package, the host's entities or the removed engine subpath, or
+ * vendors one under node_modules. Reads the JavaScript files of the backend directory and never executes them. A
+ * bundle too large to read completely is refused. A missing directory passes: the entry point check reports it.
  */
 export function assertBundleCompatible(pluginName: string, backendDirectory: string): void {
   if (!existsSync(backendDirectory)) return;
   let files = 0;
   let bytes = 0;
-  for (const file of bundleFiles(backendDirectory)) {
-    if (++files > MAX_SCANNED_FILES) break;
-    bytes += statSync(file).size;
-    if (bytes > MAX_SCANNED_BYTES) break;
-    const [module] = findForbiddenImports(readFileSync(file, 'utf8'));
-    if (module) {
+  for (const entry of bundleEntries(backendDirectory)) {
+    const where = relative(backendDirectory, entry.path);
+    if (entry.kind === 'package') {
+      const module = FORBIDDEN_BUNDLE_MODULES.find((candidate) => matchesForbiddenModule(entry.name, candidate));
+      if (module) throw refuseImport(pluginName, module, where);
+      continue;
+    }
+    bytes += statSync(entry.path).size;
+    if (++files > MAX_SCANNED_FILES || bytes > MAX_SCANNED_BYTES) {
       throw refuse(
         pluginName,
-        `imports "${module}" (in ${relative(backendDirectory, file)}), which plugins may not use: SDK 2.0 plugins have no database access`,
-        'Keep data through context.storage (permission PLUGIN_STORAGE) and read host data through context.hostData.',
+        `has a backend bundle too large to check (more than ${MAX_SCANNED_FILES} scripts or ` +
+          `${MAX_SCANNED_BYTES / 1024 / 1024} MB)`,
+        'Bundle the backend into fewer files.',
       );
     }
+    const [module] = findForbiddenImports(readFileSync(entry.path, 'utf8'));
+    if (module) throw refuseImport(pluginName, module, where);
   }
 }

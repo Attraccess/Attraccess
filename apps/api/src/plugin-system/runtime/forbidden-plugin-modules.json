@@ -1,0 +1,31 @@
+{
+  "$comment": "Modules plugin code may not import (SDK 2.0: plugins have no database access). The one list read by the host's bundle check (runtime/plugin-compatibility.ts), scripts/check-persistence-boundaries.mjs, apps/plugins/scripts/verify-packed-plugin.mjs and eslint.config.cjs. Each entry forbids the package and its subpaths; an entry ending in /* forbids every package of that scope. Plugin spec and test-fixture files may import the engines (to compare a schema); frameworks and host modules are forbidden everywhere.",
+  "engines": [
+    "node:sqlite",
+    "sqlite",
+    "sqlite3",
+    "better-sqlite3",
+    "pg",
+    "pg-promise",
+    "postgres",
+    "mysql",
+    "mysql2",
+    "mariadb",
+    "tedious",
+    "oracledb"
+  ],
+  "frameworks": [
+    "typeorm",
+    "@nestjs/typeorm",
+    "knex",
+    "kysely",
+    "drizzle-orm",
+    "sequelize",
+    "sequelize-typescript",
+    "objection",
+    "prisma",
+    "@prisma/client",
+    "@mikro-orm/*"
+  ],
+  "host": ["@attraccess/database-entities", "@attraccess/plugins-backend-sdk/sqlite"]
+}

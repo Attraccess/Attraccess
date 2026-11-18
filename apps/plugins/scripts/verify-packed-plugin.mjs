@@ -73,11 +73,27 @@ export async function verifyPackedPlugin(
 }
 
 /**
- * Plugins have no database access: their backend must not load TypeORM, the host entities or an SDK subpath. They
- * are not provided at runtime, so the check is on the bundle text, before the plugin gets imported.
+ * Plugins have no database access: their backend must not load a database engine, an ORM, the host entities or an
+ * SDK subpath. The list is the one the host refuses bundles by (apps/api/src/plugin-system/runtime/
+ * forbidden-plugin-modules.json). They are not provided at runtime, so the check is on the bundle text, before the
+ * plugin gets imported.
  */
-const FORBIDDEN_IMPORT =
-  /(?:require\(|\bfrom\s*|\bimport\(|\bimport\s*)\s*["'](typeorm(?:\/[^"']*)?|@attraccess\/database-entities(?:\/[^"']*)?|@attraccess\/plugins-backend-sdk\/[^"']+)["']/;
+const FORBIDDEN_MODULES = JSON.parse(
+  readFileSync(new URL('../../api/src/plugin-system/runtime/forbidden-plugin-modules.json', import.meta.url), 'utf8'),
+);
+const IMPORTED = /(?:require\(|\bfrom\s*|\bimport\(|\bimport\s*)\s*["']([^"']+)["']/g;
+const SDK_SUBPATH = /^@attraccess\/plugins-backend-sdk\/(?!package\.json$).+/;
+
+/** The forbidden module a specifier names: an entry of the shared list (with its subpaths or scope) or an SDK subpath. */
+export function forbiddenModuleOf(specifier) {
+  const entries = [...FORBIDDEN_MODULES.engines, ...FORBIDDEN_MODULES.frameworks, ...FORBIDDEN_MODULES.host];
+  const entry = entries.find((candidate) =>
+    candidate.endsWith('/*')
+      ? specifier.startsWith(candidate.slice(0, -1))
+      : specifier === candidate || specifier.startsWith(`${candidate}/`),
+  );
+  return entry ?? (SDK_SUBPATH.test(specifier) ? specifier : undefined);
+}
 
 export function assertNoForbiddenBackendImports(backendEntry) {
   const files = [backendEntry];
@@ -86,8 +102,11 @@ export function assertNoForbiddenBackendImports(backendEntry) {
     if (file !== backendEntry && /\.(?:c|m)?js$/.test(entry)) files.push(file);
   }
   for (const file of files) {
-    const match = FORBIDDEN_IMPORT.exec(readFileSync(file, 'utf8'));
-    if (match) throw new Error(`Packed plugin backend imports ${match[1]} in ${file}; plugins have no database access`);
+    for (const [, specifier] of readFileSync(file, 'utf8').matchAll(IMPORTED)) {
+      if (forbiddenModuleOf(specifier)) {
+        throw new Error(`Packed plugin backend imports ${specifier} in ${file}; plugins have no database access`);
+      }
+    }
   }
 }
 
