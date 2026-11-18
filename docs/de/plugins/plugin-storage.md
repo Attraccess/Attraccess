@@ -40,7 +40,7 @@ const widgets = table(
     note: f.text().optional(),
     createdAt: f.timestamp().withDefault({ now: true }),
   },
-  { indexes: [{ name: 'idx_widgets_owner', fields: ['ownerUserId'] }] },
+  { indexes: [{ fields: ['ownerUserId'] }] }, // den Indexnamen vergibt der Host
 );
 
 export const widgetStorage = definePluginStorage({
@@ -74,11 +74,25 @@ bestehende Tabelle übernehmen).
 
 `table(fields, { primaryKey, indexes, foreignKeys, physicalName })`: Der Primärschlüssel ist standardmäßig das
 generierte Feld. Fremdschlüssel dürfen nur auf **Tabellen desselben Plugins** zeigen. Kern-IDs (Benutzer, Ressource,
-Flow-Knoten) bleiben einfache `integer`- oder `uuid`-Felder ohne Fremdschlüssel. `physicalName` behält den Namen einer
-Tabelle, die in installierten Datenbanken schon existiert; ohne ihn leitet der Host `plugin_<plugin>_<logisch>` ab. Der
-Host lehnt Namen außerhalb des Namensraums des Plugins ab, ebenso Namen im Namensraum eines länger benannten
-installierten Plugins (ein Plugin `demo` darf `plugin_demo_extra_notes` nicht nutzen, solange `demo-extra` installiert
-ist, denn dieser Name gehört `demo-extra`).
+Flow-Knoten) bleiben einfache `integer`- oder `uuid`-Felder ohne Fremdschlüssel.
+
+### Tabellen- und Indexnamen
+
+Tabellen und Indizes benennt der Host; Sie benennen nur die logischen Tabellen und Felder.
+
+- **Namensraum.** Der Namensraum eines Plugins ist sein Name in Kleinbuchstaben, in dem jede Folge anderer Zeichen als
+  `a-z` und `0-9` durch `_` ersetzt ist, ohne `_` am Anfang oder Ende (`@example/foo-bar` → `example_foo_bar`). Eine
+  Tabelle ohne `physicalName` heißt `plugin_<namensraum>_<tabelle>`, mit dem logischen Namen in Snake Case.
+  Indexnamen werden aus Tabelle und Feldern erzeugt.
+- **Eigene Namen nur bei Übernahme.** `physicalName` und ein expliziter Index-`name` sind nur an Tabellen erlaubt, die
+  Version 1 einer Definition mit `adoption` anlegt, um die Tabellen eines 1.x-Release zu übernehmen (siehe
+  [Übernahme von 1.x-Installationen](#Übernahme-von-1x-installationen)). Überall sonst wird die Deklaration abgelehnt.
+- **Verbotene Namen.** Ein physischer Name darf keine Kerntabelle sein, nicht mit einem vom Host reservierten Präfix
+  beginnen und nicht im Namensraum eines anderen installierten Plugins liegen. Das gilt in beide Richtungen: Ein
+  Plugin `demo` darf `plugin_demo_extra_notes` nicht nutzen, solange `demo-extra` installiert ist, und `demo-extra`
+  keinen Namen von `demo`.
+- **Ein Namensraum, ein Plugin.** Zwei Plugins, deren Namen denselben Namensraum ergeben (`foo-bar` und `foo_bar`),
+  können nicht gemeinsam installiert sein; das zweite wird abgelehnt.
 
 ### Neutrale Migrationen
 
@@ -117,8 +131,9 @@ Der Host übersetzt jeden Schritt in der angegebenen Reihenfolge in DDL für die
 und sonst nichts: kein SQL, keine Host-Ports. Version `1` ist die **Baseline**: Sie muss genau das Layout beschreiben,
 das Ihr erstes Release angelegt hat.
 
-Jede Migration läuft zusammen mit dem Verlaufseintrag in einer Alles-oder-nichts-Transaktion. Es gibt keine
-`down`-Schritte: Der Host entfernt Ihre Tabellen beim Deinstallieren selbst.
+Alle ausstehenden Versionen laufen zusammen mit ihren Verlaufseinträgen in **einer** Alles-oder-nichts-Transaktion:
+Scheitert Version 3, wird auch Version 2 desselben Laufs zurückgerollt, und der nächste Start versucht beide erneut. Es
+gibt keine `down`-Schritte: Der Host entfernt Ihre Tabellen beim Deinstallieren selbst.
 
 ### Übernahme von 1.x-Installationen
 
@@ -133,6 +148,41 @@ Ist jede aufgeführte Migration in der Legacy-Migrationstabelle des Plugins als 
 die Baseline-Version 1 **ohne etwas auszuführen**: Tabellen und Daten bleiben bestehen, spätere Versionen setzen dort an.
 Sind nur einige angewendet, verweigert der Host das Plugin und ändert nichts. Die Portierungsschritte stehen in
 [Plugins auf SDK 2.0 umstellen](plugins/migrating-to-2.md#typeorm-entitäten-und-migrationen-portieren).
+
+Version 1 einer übernehmenden Definition nennt die bestehenden Tabellen und Indizes:
+
+```ts
+// Plugin "widgets". Sein 1.x-Release hat die Tabelle plugin_widgets_items mit dem Index idx_widgets_items_owner angelegt.
+const items = table(
+  { id: f.id(), label: f.string(), ownerUserId: f.integer({ column: 'owner_user_id' }) },
+  {
+    physicalName: 'plugin_widgets_items',
+    indexes: [{ name: 'idx_widgets_items_owner', fields: ['ownerUserId'] }],
+  },
+);
+
+export const widgetStorage = definePluginStorage({
+  tables: { items },
+  migrations: [{ version: 1, name: 'baseline', steps: [step.createTable('items', items)] }],
+  adoption: { legacyMigrations: ['CreateWidgetItems1700000000000'] },
+});
+```
+
+Grenzen übernommener Tabellen:
+
+- `f.decimal` ist an einer übernommenen Tabelle nicht erlaubt (1.x hat Dezimalzahlen anders gespeichert). Behalten Sie
+  eine solche Spalte so, wie sie gespeichert ist, etwa als `f.string()`, oder kopieren Sie sie in eine neue Tabelle
+  (siehe unten).
+- Unter SQLite darf eine spätere Version keinen `UNIQUE`-Constraint aus 1.x entfernen und keine Spalte, die ein
+  `UNIQUE`- oder `CHECK`-Constraint aus 1.x abdeckt: Dafür müsste die Tabelle neu aufgebaut werden, was der Host noch
+  nicht tut. Die Migration wird abgelehnt.
+
+**1.x-Namen, die der Host ablehnt.** Ist ein 1.x-Tabellenname einer der oben verbotenen Namen, lässt sich die Tabelle
+nicht deklarieren; ein 2.0-Build kann sie dann weder lesen noch übernehmen noch löschen. Wenden Sie sich an die
+Attraccess-Maintainer, bevor Sie ein solches Plugin veröffentlichen. Lässt sich eine 1.x-Tabelle übernehmen, Sie
+wollen ihr Layout aber hinter sich lassen: Übernehmen Sie sie in Version 1, legen Sie in Version 2 eine neue Tabelle
+(mit abgeleitetem Namen) an, kopieren Sie die Zeilen im Datenschritt und löschen Sie die übernommene Tabelle mit
+`step.dropTable`.
 
 ### Registrieren
 
@@ -179,6 +229,14 @@ Operatoren: `eq`, `ne`, `in`, `notIn`, `lt`, `lte`, `gt`, `gte`, `between: [a, b
 Groß-/Kleinschreibung beachtet). Kombinieren Sie mit `{ and: [...] }`, `{ or: [...] }` und `{ not: ... }`. Werte
 folgen den obigen Feldtypen: `Date` für Zeitstempel, Strings für Dezimalzahlen.
 
+- `in` und `notIn` nehmen kein `null`. NULL finden Sie mit `isNull` (oder `null`), bei Bedarf über `or` verknüpft:
+  `{ or: [{ note: { in: ['a', 'b'] } }, { note: { isNull: true } }] }`.
+- Ein leeres Operator-Objekt wie `{ status: {} }` wird abgelehnt (`PluginStorageInvalid`), damit ein vergessener
+  Operator nie alles trifft.
+- Ein leeres `where` auf oberster Ebene (`{}`) trifft **alle Zeilen**. Beachten Sie das bei `update` und `delete`.
+- Filterwerte werden nur auf den Typ des Feldes geprüft (ein String für ein String-Feld, ein `Date` für einen
+  Zeitstempel). Länge, Genauigkeit und andere Spaltengrenzen werden beim Schreiben geprüft, nicht in Filtern.
+
 Es gibt **keine Joins**. Lesen Sie über mehrere Tabellen mit mehreren Aufrufen und nutzen Sie einen `in`-Filter statt
 einer Abfrage je Zeile (kein N+1 auf heißen Pfaden):
 
@@ -203,20 +261,23 @@ Integer-Felder akzeptieren im Patch auch `increment(n)`: `update({ id }, { attem
 
 Die Fehler sind neutral und auf jeder Engine gleich; alle erweitern `PluginStorageError` und tragen einen `code`.
 
-| Fehler                         | `code`             | Bedeutung                                                                                                       |
-| ------------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------- |
-| `PluginStorageUniqueViolation` | `UNIQUE_VIOLATION` | Ein Unique-Schlüssel oder der Primärschlüssel war schon vergeben.                                               |
-| `PluginStorageConflict`        | `CONFLICT`         | Ein Wettlauf ging verloren oder die Datenbank war ausgelastet. Die ganze Transaktion zu wiederholen ist sicher. |
-| `PluginStorageNotFound`        | `NOT_FOUND`        | Eine benötigte Zeile existiert nicht.                                                                           |
-| `PluginStorageInvalid`         | `INVALID`          | Nicht deklarierte Tabelle oder Feld, ungültiger Wert oder nicht unterstützter Filter.                           |
+| Fehler                         | `code`             | Bedeutung                                                                                       |
+| ------------------------------ | ------------------ | ----------------------------------------------------------------------------------------------- |
+| `PluginStorageUniqueViolation` | `UNIQUE_VIOLATION` | Ein Unique-Schlüssel oder der Primärschlüssel war schon vergeben.                               |
+| `PluginStorageConflict`        | `CONFLICT`         | Ein Wettlauf ging verloren oder die Datenbank war ausgelastet. Zurückgerollt, nicht wiederholt. |
+| `PluginStorageNotFound`        | `NOT_FOUND`        | Eine benötigte Zeile existiert nicht.                                                           |
+| `PluginStorageInvalid`         | `INVALID`          | Nicht deklarierte Tabelle oder Feld, ungültiger Wert oder nicht unterstützter Filter.           |
 
 ## 3. Transaktionen
 
 `context.persistence.transaction(work)` führt `work(scope)` als eine atomare, isolierte Einheit aus. Sie wird
 committet, wenn `work` abschließt, und zurückgerollt, wenn es wirft. Geben Sie `{ scope }` an jeden Speicheraufruf (und
-an Host-Ports, die einen Scope annehmen, etwa `hostData.resources.get(id, scope)`), der teilnehmen soll. Ein
-Prüfen-dann-Schreiben-Ablauf innerhalb einer Transaktion lässt sich nicht überholen: Der Host ordnet die Transaktionen
-oder lässt eine scheitern, die dann zurückgerollt wird.
+an Host-Ports, die einen Scope annehmen, etwa `hostData.resources.get(id, scope)`), der teilnehmen soll.
+
+**Der Vertrag:** Der Host ordnet gleichzeitige Transaktionen oder lässt eine davon mit `PluginStorageConflict`
+scheitern, die dann zurückgerollt wird. Ein Prüfen-dann-Schreiben-Ablauf innerhalb einer Transaktion lässt sich daher
+nicht überholen. Der Host wiederholt **nicht**: Halten Sie externe Effekte in `scope.afterCommit`, damit der Aufrufer
+die ganze Transaktion nach einem Konflikt gefahrlos erneut ausführen kann.
 
 ```ts
 await context.persistence.transaction(async (scope) => {
@@ -233,30 +294,32 @@ Regeln:
 - `work` kurz halten und auf Speicherzugriffe und lesende Host-Port-Aufrufe beschränken. Keine HTTP-, MQTT-, E-Mail-
   oder andere Ein-/Ausgabe darin; solche Effekte registrieren Sie mit `scope.afterCommit`.
 - `transaction`-Aufrufe nicht verschachteln: Der Host weist das ab. Geben Sie den `scope` an Hilfsfunktionen weiter.
-- Ein Aufruf ohne `{ scope }` läuft in einer eigenen kurzen Transaktion und sieht die noch nicht committeten
-  Schreibvorgänge von `work` **nicht**. Vergessen Sie den Scope, lesen Sie veraltete Daten; geben Sie ihn deshalb
-  konsequent mit.
+- Geben Sie `{ scope }` an jeden Schreibaufruf in `work`. Ein Schreibaufruf ohne Scope wird mit `PluginStorageInvalid`
+  abgewiesen. Nur ein Lesezugriff ohne Scope läuft außerhalb der Transaktion, und er sieht die noch nicht committeten
+  Schreibvorgänge von `work` **nicht**.
 - In `work` nicht auf Kern-Vorgänge warten, die schreiben (Sitzungsstart oder -ende).
-- Transaktionen werden pro Host-Prozess serialisiert. Ausschluss über mehrere API-Instanzen braucht eine eigene Sperre;
-  das Reservierungs-Plugin läuft deshalb mit einer Instanz (siehe
-  [Reservierungen](plugins/reservations/administration.md#betrieb-mit-einer-instanz)).
+- Wie der Host Transaktionen ordnet, ist ein Detail der Engine. Unter SQLite führt er sie pro Host-Prozess nacheinander
+  aus; Ausschluss über mehrere API-Instanzen braucht daher eine eigene Sperre. Das Reservierungs-Plugin läuft deshalb
+  mit einer Instanz (siehe [Reservierungen](plugins/reservations/administration.md#betrieb-mit-einer-instanz)).
 
 Der Scope im `startCapacityHook` (`ctx.scope`) ist die Start-Transaktion des Kerns: Lesen Sie darüber mit
-`{ scope: ctx.scope }`, schreiben Sie nie und rufen Sie darauf nie `afterCommit` auf. Siehe
+`{ scope: ctx.scope }`, schreiben Sie nie und rufen Sie darauf nie `afterCommit` auf. In einem Host-Hook, der Ihnen
+einen Host-Scope übergibt, wird ein Schreibaufruf oder eine `transaction` ohne diesen Scope abgewiesen. Siehe
 [Start-Kapazität](plugins/developing-plugins.md#start-kapazität-auf-geteilten-maschinen).
 
 ## 4. Lebenszyklus
 
-| Ereignis                           | Was der Host tut                                                                                                                                                              |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Installation, Upgrade, Start       | Prüft die Deklaration und wendet dann ausstehende Migrationen an (jede in einer Transaktion), bevor Plugin-Code startet. Bereits angewendete Versionen werden übersprungen.   |
-| Bestehende 1.x-Installation        | Übernimmt die Baseline, wenn jeder Eintrag aus `adoption.legacyMigrations` angewendet ist; verweigert einen partiellen Verlauf, ohne etwas zu ändern.                         |
-| Austausch (Upgrade oder Downgrade) | Blockiert, wenn der gespeicherte Schemastand neuer ist als die Migrationen des Bundles, da der Rückschritt Daten verwerfen würde. Es ändert sich nichts.                      |
-| Deinstallation                     | Entfernt die deklarierten Tabellen des Plugins und seinen Schemastand in einer Transaktion. Die Dateien werden auch bei einem Fehler entfernt; der Fehler wird protokolliert. |
-| Backup und Restore                 | Plugin-Tabellen reisen mit dem Datenbank-Backup, zusammen mit dem Schemastand des Plugins. Ein Restore bringt beides als eine konsistente Einheit zurück.                     |
+| Ereignis                           | Was der Host tut                                                                                                                                                             |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Installation, Upgrade, Start       | Prüft die Deklaration und wendet dann alle ausstehenden Migrationen in einer Transaktion an, bevor Plugin-Code startet. Angewendete Versionen werden übersprungen.           |
+| Bestehende 1.x-Installation        | Übernimmt die Baseline, wenn jeder Eintrag aus `adoption.legacyMigrations` angewendet ist; verweigert einen partiellen Verlauf, ohne etwas zu ändern.                        |
+| Austausch (Upgrade oder Downgrade) | Blockiert, wenn der gespeicherte Schemastand neuer ist als die Migrationen des Bundles, da der Rückschritt Daten verwerfen würde. Es ändert sich nichts.                     |
+| Deinstallation                     | Entfernt die Tabellen der Versionen, die das Plugin committet hat, und seinen Schemastand. Die Dateien werden auch bei einem Fehler entfernt; der Fehler wird protokolliert. |
+| Backup und Restore                 | Plugin-Tabellen reisen mit dem Datenbank-Backup, zusammen mit dem Schemastand des Plugins. Ein Restore bringt beides als eine konsistente Einheit zurück.                    |
 
-Schlägt eine Migration fehl, wird die ganze Version zurückgerollt (keine Tabelle und kein Verlaufseintrag bleibt), das
-Plugin wird als fehlgeschlagen markiert und eine korrigierte Version installiert sich aus einem sauberen Zustand. Ein
+Schlägt eine Migration fehl, wird der ganze Lauf zurückgerollt (keine Tabelle und kein Verlaufseintrag dieses Laufs
+bleibt), das Plugin wird als fehlgeschlagen markiert und eine korrigierte Version setzt beim zuletzt committeten Stand
+an. Ein
 fehlschlagendes Plugin blockiert nie den Host-Start oder andere Plugins.
 
 ## 5. Testen
@@ -265,10 +328,11 @@ Das SDK liefert eine In-Memory-Umsetzung des Ports. Sie folgt demselben Vertrag 
 Fehler, Scopes) und braucht keine Datenbank:
 
 ```ts
-import { createInMemoryPluginStorage } from '@attraccess/plugins-backend-sdk/testing';
+import { createInMemoryPluginStorage } from '@attraccess/plugins-backend-sdk';
 
-const storage = createInMemoryPluginStorage();
-const context = { ...fakeContext, storage };
+const fake = createInMemoryPluginStorage(widgetStorage);
+const context = { ...fakeContext, storage: fake.storage, persistence: fake.persistence };
+// fake.rows('widgets') liefert die committeten Zeilen für Prüfungen; fake.reset() leert die Tabellen.
 ```
 
 Lassen Sie Ihren Service in Unit-Tests dagegen laufen. Verhalten, das nur eine echte Engine zeigt (Sperren, große
@@ -282,9 +346,11 @@ wenn seine Deklaration die Regeln verletzt. Der Fehler nennt das Plugin, gibt de
 
 - das Plugin deklariert keine Mindest-Host-Version ab `2.0.0-0`;
 - es fordert die entfernte Berechtigung `DATABASE_ACCESS` an oder nutzt `context.storage` ohne `PLUGIN_STORAGE`;
-- es liefert noch einen TypeORM-Migrationseintrag, `persistence.backends` oder Entitätsdeklarationen mit;
-- ein Tabellen- oder physischer Name liegt außerhalb des Namensraums des Plugins (oder in dem eines länger benannten
-  installierten Plugins), oder ein Fremdschlüssel zeigt aus dem Plugin heraus;
+- es liefert noch einen TypeORM-Migrationseintrag oder `persistence.backends` mit, oder sein Bundle importiert TypeORM
+  oder einen Datenbanktreiber;
+- ein `physicalName` oder Indexname steht außerhalb einer übernehmenden Version 1, ein physischer Name ist verboten
+  (siehe [Tabellen- und Indexnamen](#tabellen-und-indexnamen)), ein anderes installiertes Plugin hat denselben
+  Namensraum, oder ein Fremdschlüssel zeigt aus dem Plugin heraus;
 - die Migrationsversionen steigen nicht streng ab 1 an, oder ein Schritt ist ungültig;
 - in einer installierten Datenbank ist nur ein Teil von `adoption.legacyMigrations` angewendet.
 

@@ -1,4 +1,5 @@
 # Reservierungen administrieren
+
 <!-- llms-description: Wie Administratoren das Plugin Reservierungen installieren, konfigurieren und betreiben: Zeitzone, E-Mail-Vorlagen, Startprüfung und Audit-Log. -->
 
 > [!NOTE]
@@ -26,7 +27,7 @@
 | `SEND_NOTIFICATIONS` | Benachrichtigungen in der App, per Push und per E-Mail.                                               |
 | `READER_UI`          | Buchungshinweise und Rückfragen auf den Bildschirmen der Attractap-Reader.                            |
 
-3. Das Plugin benötigt Attraccess 1.11.0 oder neuer.
+3. Das Plugin benötigt Attraccess 2.0 oder neuer.
 
 E-Mail-Hinweise benötigen eine funktionierende [SMTP-Konfiguration](setup/smtp-email.md). Ohne sie funktionieren
 Benachrichtigungen in der App und per Push weiterhin.
@@ -109,17 +110,17 @@ Jede E-Mail des Plugins ist eine **E-Mail-Vorlage**, die Sie wie die E-Mails des
 **Einstellungen → E-Mail → Vorlagen**. Die Vorlagen des Plugins stehen nach den Systemvorlagen und sind mit „Plugin:
 reservations“ gekennzeichnet:
 
-| Vorlage                                                                                                                        | Gesendet, wenn                                                                                |
-| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| Reservierungsanfrage wartet auf Genehmigung                                                                                    | Eine Buchung wartet auf Genehmigung (an die Verwaltenden).                                    |
-| Reservierung bestätigt                                                                                                         | Eine Buchung bestätigt oder genehmigt wurde, mit den Check-in-Regeln.                         |
-| Reservierung abgelehnt / Reservierungsanfrage abgelaufen                                                                       | Eine Anfrage abgelehnt wurde oder bis zu ihrem Beginn niemand entschied.                      |
+| Vorlage                                                                                                                                                             | Gesendet, wenn                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Reservierungsanfrage wartet auf Genehmigung                                                                                                                         | Eine Buchung wartet auf Genehmigung (an die Verwaltenden).                                                                       |
+| Reservierung bestätigt                                                                                                                                              | Eine Buchung bestätigt oder genehmigt wurde, mit den Check-in-Regeln.                                                            |
+| Reservierung abgelehnt / Reservierungsanfrage abgelaufen                                                                                                            | Eine Anfrage abgelehnt wurde oder bis zu ihrem Beginn niemand entschied.                                                         |
 | Reservierung von Verwaltung storniert / Laufende Reservierung vorzeitig beendet / Reservierung entfernt (Reservierungen deaktiviert oder Maschinenplätze reduziert) | Verwaltende eine Buchung geändert oder entfernt haben, Reservierungen deaktiviert wurden oder eine Maschine Plätze verloren hat. |
-| Nicht eingecheckt, Reservierung verfallen                                                                                      | Eine Buchung als Nichterscheinen freigegeben wurde.                                           |
-| Erinnerung 48 Std. vorher: noch benötigt? / Erinnerung 24 Std. vorher                                                          | Die Erinnerungen vor einer Buchung.                                                           |
-| Wartung betrifft eine Reservierung / Ressource hat ein Problem / Ressource funktioniert wieder                                 | Wartung oder der Zustand der Ressource eine Buchung betrifft.                                 |
-| Bald reserviert (an die aktuelle Person) / Reservierung begonnen, Ressource noch belegt / Reservierung begonnen, bitte beenden | Übergabe- und Überschreitungshinweise.                                                        |
-| Start trotz Reservierung (an die Buchenden / an die Verwaltung)                                                                | Verwaltende während einer Buchung gestartet haben.                                            |
+| Nicht eingecheckt, Reservierung verfallen                                                                                                                           | Eine Buchung als Nichterscheinen freigegeben wurde.                                                                              |
+| Erinnerung 48 Std. vorher: noch benötigt? / Erinnerung 24 Std. vorher                                                                                               | Die Erinnerungen vor einer Buchung.                                                                                              |
+| Wartung betrifft eine Reservierung / Ressource hat ein Problem / Ressource funktioniert wieder                                                                      | Wartung oder der Zustand der Ressource eine Buchung betrifft.                                                                    |
+| Bald reserviert (an die aktuelle Person) / Reservierung begonnen, Ressource noch belegt / Reservierung begonnen, bitte beenden                                      | Übergabe- und Überschreitungshinweise.                                                                                           |
+| Start trotz Reservierung (an die Buchenden / an die Verwaltung)                                                                                                     | Verwaltende während einer Buchung gestartet haben.                                                                               |
 
 - Bearbeiten Sie Betreff und Text im visuellen Editor und die deutschen und englischen Texte im Dialog
   **Übersetzungen**. **Variablen** zeigt, was Sie verwenden können, etwa `{{reservation.when}}` oder

@@ -22,14 +22,17 @@ Plugins, die ihre eigene Persistenz mitbringen (eigene Verbindung, eigenen Treib
   wird beim Hochladen, Installieren oder Starten abgelehnt.
 - **Keine Datenbank-Berechtigung.** `DATABASE_ACCESS` entfällt. Eigene Daten brauchen `PLUGIN_STORAGE`, das nur Ihre
   eigenen deklarierten Tabellen abdeckt.
-- **Keine Legacy-Persistenzdeklaration.** Der Eintrag `persistence.backends`, der TypeORM-Eintrag `migrations`
-  (`main.migrations` / `attraccess.migrations`) und Entitätsdeklarationen am Backend-Modul gehören nicht mehr zu 2.0.
-- **Namensraum.** Tabellen heißen `plugin_<plugin>_<tabelle>`. Ein Name außerhalb des Namensraums des Plugins oder ein
-  Fremdschlüssel auf eine Tabelle eines anderen Plugins oder des Kerns wird abgelehnt.
+- **Keine Legacy-Persistenzdeklaration.** Der Eintrag `persistence.backends` und der TypeORM-Eintrag `migrations`
+  (`main.migrations` / `attraccess.migrations`) gehören nicht mehr zu 2.0. Entitätsklassen werden nirgends mehr
+  deklariert; ein Bundle, das für sie noch TypeORM importiert, lehnt der Import-Scan ab.
+- **Namensraum.** Tabellen heißen `plugin_<namensraum>_<tabelle>`. Eigene physische und Indexnamen sind nur erlaubt,
+  um 1.x-Tabellen in Version 1 zu übernehmen. Ein verbotener Name oder ein Fremdschlüssel auf eine Tabelle eines
+  anderen Plugins oder des Kerns wird abgelehnt (siehe
+  [Tabellen- und Indexnamen](plugins/plugin-storage.md#tabellen-und-indexnamen)).
 
 Ein abgelehntes Plugin wird nicht entpackt, installiert, registriert, migriert oder gestartet, und die Datenbank bleibt
-unberührt. Der Fehler nennt das Plugin, gibt den Grund an und verweist auf diese Anleitung (siehe
-[Ablehnungen](#ablehnungen)).
+unberührt. Der Fehler nennt das Plugin, gibt den Grund an und verweist bei den meisten Ablehnungen auf diese Anleitung
+(siehe [Ablehnungen](#ablehnungen)).
 
 ## Checkliste
 
@@ -88,9 +91,12 @@ ihre Daten behält.
 2. **Das Tabellenlayout beschreiben, das diese Migrationen erzeugen.** Lesen Sie die Migrationen (nicht die Entitäten:
    Sie können abgewichen sein) und schreiben Sie je Tabelle ein `table(...)` mit denselben Spalten, Typen,
    Standardwerten, Nullbarkeiten, Indizes und Fremdschlüsseln. Nutzen Sie `physicalName` für den bestehenden
-   Tabellennamen und `column`, wo der Spaltenname vom Feldnamen abweicht. Fremdschlüssel dürfen nur auf Tabellen Ihres
-   eigenen Plugins zeigen; eine Spalte, die eine Kerntabelle referenzierte (`userId`, `resourceId`, ...), wird ein
-   einfaches `f.integer()` ohne Fremdschlüssel.
+   Tabellennamen, die bestehenden Indexnamen und `column`, wo der Spaltenname vom Feldnamen abweicht. Diese eigenen
+   Namen sind nur hier erlaubt, in einer übernehmenden Version 1, und dürfen keine
+   [verbotenen Namen](plugins/plugin-storage.md#tabellen-und-indexnamen) sein. Fremdschlüssel dürfen nur auf Tabellen
+   Ihres eigenen Plugins zeigen; eine Spalte, die eine Kerntabelle referenzierte (`userId`, `resourceId`, ...), wird
+   ein einfaches `f.integer()` ohne Fremdschlüssel. Eine Dezimalspalte aus 1.x lässt sich an einer übernommenen Tabelle
+   nicht als `f.decimal` deklarieren.
 3. **Version 1 zur Baseline machen.** Deklarieren Sie eine neutrale Migration `{ version: 1, ... }`, deren Schritte genau
    dieses Layout anlegen. Neuinstallationen führen sie aus; bestehende überspringen sie.
 4. **Die Übernahme deklarieren.** Ergänzen Sie `adoption: { legacyMigrations: [...] }` mit der Liste aus Schritt 1.
@@ -103,8 +109,8 @@ ihre Daten behält.
    Manifest durch `PLUGIN_STORAGE`.
 
 ```ts
-// 1.x Entität + Migration
-@Entity({ name: 'plugin_widgets' })
+// 1.x Entität + Migration des Plugins "widgets"
+@Entity({ name: 'plugin_widgets_items' })
 class Widget {
   @PrimaryGeneratedColumn() id!: number;
   @Column({ type: 'varchar', name: 'label' }) label!: string;
@@ -113,14 +119,17 @@ class Widget {
 
 ```ts
 // 2.0 Deklaration
-const widgets = table({ id: f.id(), label: f.string() }, { physicalName: 'plugin_widgets' });
+const items = table({ id: f.id(), label: f.string() }, { physicalName: 'plugin_widgets_items' });
 
 export const widgetStorage = definePluginStorage({
-  tables: { widgets },
-  migrations: [{ version: 1, name: 'baseline', steps: [step.createTable('widgets', widgets)] }],
-  adoption: { legacyMigrations: ['CreateWidgets1700000000000'] },
+  tables: { items },
+  migrations: [{ version: 1, name: 'baseline', steps: [step.createTable('items', items)] }],
+  adoption: { legacyMigrations: ['CreateWidgetItems1700000000000'] },
 });
 ```
+
+Ist ein 1.x-Tabellenname verboten, lässt sich die Tabelle nicht übernehmen; siehe
+[1.x-Namen, die der Host ablehnt](plugins/plugin-storage.md#Übernahme-von-1x-installationen).
 
 ### Die Baseline- und Übernahmeregel
 
@@ -130,8 +139,10 @@ Beim ersten Start des 2.0-Builds prüft der Host die Legacy-Migrationstabelle de
   macht mit späteren Versionen weiter.
 - **Keine** angewendet (Neuinstallation): Version 1 läuft wie üblich.
 - **Nur einige** angewendet: Das Plugin wird **abgelehnt** und nichts wird geändert. Ein partieller Legacy-Verlauf
-  bedeutet, dass die Datenbank älter ist als Ihr letztes 1.x-Release: **Installieren Sie zuerst das letzte
-  1.x-Release**, lassen Sie es seine Migrationen abschließen und aktualisieren Sie dann auf den 2.0-Build.
+  bedeutet, dass die Datenbank älter ist als das letzte 1.x-Release des Plugins. Die (englische) Meldung sagt, dass
+  Attraccess 2.0 die Daten des Plugins nur vom letzten 1.x-Release (1.11) übernimmt, und fordert den Betreiber auf, das
+  Backup von vor dem Upgrade zurückzuspielen, auf Attraccess 1.11 zu aktualisieren, es einmal zu starten, damit die
+  Migrationen des Plugins abschließen, und dann auf 2.0 zu aktualisieren.
 
 Version 1 muss das Legacy-Ergebnis daher exakt treffen. Eine Abweichung wird bei der Übernahme nicht erkannt, sie zeigt
 sich später als fehlschlagende Abfrage; vergleichen Sie deshalb Spalte für Spalte.
@@ -172,9 +183,10 @@ Hinweise zur Portierung:
   Sperren mit Compare-and-Set-`update`.
 - **Zeitstempel** sind `Date` hinein und heraus (UTC), **Dezimalzahlen** sind Strings, JSON-Felder halten jeden
   JSON-Wert.
-- **Transaktionen.** Geben Sie `{ scope }` an jeden Aufruf, der teilnehmen soll; Effekte gehören in
-  `scope.afterCommit`. Die Regeln (kurzer Callback, kein Verschachteln, keine Kern-Sitzungsschreibvorgänge darin)
-  bleiben.
+- **Transaktionen.** Geben Sie `{ scope }` an jeden Aufruf, der teilnehmen soll; ein Schreibaufruf ohne Scope wird in
+  `work` abgewiesen. Effekte gehören in `scope.afterCommit`. Der Host ordnet Transaktionen oder lässt eine mit
+  `PluginStorageConflict` scheitern; er wiederholt nicht für Sie. Die Regeln (kurzer Callback, kein Verschachteln,
+  keine Kern-Sitzungsschreibvorgänge darin) bleiben.
 - `context.persistence` hat nur `transaction`. `persistence.backend`, `supports(...)` und jede Engine-Naht entfallen.
 
 ### Start-Kapazitäts-Hook
@@ -193,9 +205,10 @@ const slots = await heldSlots.find({ where: { resourceId: ctx.resourceId } }, { 
 
 ## Tests
 
-Plugin-Tests brauchen keine Datenbank. Bauen Sie den Fake-Kontext mit `createInMemoryPluginStorage()` aus dem SDK und
-setzen Sie ihn als `storage` (und seinen Transaktions-Runner als `persistence`). Er folgt dem Vertrag des Record-Ports:
-Filter, Compare-and-Set, neutrale Fehler und Transaktions-Scopes. Siehe [Plugin-Speicher](plugins/plugin-storage.md#_5-testen).
+Plugin-Tests brauchen keine Datenbank. Rufen Sie `createInMemoryPluginStorage(definition)` aus dem SDK-Root auf und
+setzen Sie dessen `storage` und `persistence` in den Fake-Kontext:
+`{ ...fakeContext, storage: fake.storage, persistence: fake.persistence }`. Der Fake folgt dem Vertrag des
+Record-Ports: Filter, Compare-and-Set, neutrale Fehler und Transaktions-Scopes. Siehe [Plugin-Speicher](plugins/plugin-storage.md#_5-testen).
 
 ## Bundling
 
@@ -210,26 +223,29 @@ Es gibt kein Migrations-Bundle mehr: Die Migrationen stehen in Ihrer Deklaration
 
 ## Ablehnungen
 
-Jede Ablehnung geschieht vor jeder Änderung, nennt das Plugin, gibt den Grund an und verweist auf diese Anleitung:
+Jede Ablehnung geschieht vor jeder Änderung, nennt das Plugin und gibt den Grund an. Die mit "Anleitung" markierten
+Ablehnungen enden zusätzlich mit einem Link auf diese Anleitung; die übrigen beschreiben die Abhilfe in eigenen Worten.
 
-| Grund                                                    | Was die Meldung sagt                                                                                                                                                                                                                     |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| SDK 1.x (kein oder zu niedriges `attraccessVersion.min`) | Das Plugin zielt auf das SDK 1.x, das dieser Host nicht mehr unterstützt; neu bauen und `>= 2.0.0-0` deklarieren.                                                                                                                        |
-| `DATABASE_ACCESS` angefordert                            | Die Berechtigung wurde entfernt; Plugins haben keinen Datenbankzugriff; `PLUGIN_STORAGE` deklarieren und `context.storage` nutzen.                                                                                                       |
-| Legacy-Persistenzdeklaration                             | `persistence.backends`, ein TypeORM-Migrationseintrag oder Entitäten werden nicht unterstützt; stattdessen `storage` deklarieren.                                                                                                        |
-| Datenbank-Import im Backend-Bundle                       | Das Bundle importiert `typeorm`, `@nestjs/typeorm`, `sqlite3`, `better-sqlite3`, `node:sqlite`, `pg`, `mysql2`, `@attraccess/plugins-backend-sdk/sqlite` oder `@attraccess/database-entities`; die Meldung nennt Modul und Bundle-Datei. |
-| Datenbank-Handle zur Laufzeit angefordert                | `context.get('DataSource')` (oder Entity-Manager, Repository-Token) wirft: Die Host-Verbindung ist nicht verfügbar; `context.storage` nutzen.                                                                                            |
-| Speicher ohne `PLUGIN_STORAGE`                           | Das Plugin deklariert Speicher, aber nicht die Berechtigung `PLUGIN_STORAGE`.                                                                                                                                                            |
-| Name außerhalb des Namensraums / Fremdschlüssel          | Tabelle, physischer Name oder Fremdschlüssel zeigt aus den eigenen Tabellen des Plugins heraus.                                                                                                                                          |
-| Ungültige Migrationsliste                                | Versionen steigen nicht streng ab 1 an, oder ein Schritt oder Feld ist ungültig.                                                                                                                                                         |
-| Name im Namensraum eines anderen Plugins                 | Ein Tabellenname liegt im Speicher-Namensraum eines länger benannten installierten Plugins (`demo` darf `plugin_demo_extra_x` nicht belegen, solange `demo-extra` installiert ist).                                                      |
-| Partieller Legacy-Verlauf                                | Nur einige `adoption.legacyMigrations` sind angewendet; zuerst das letzte 1.x-Release installieren. Nichts wurde geändert.                                                                                                               |
-| Unbekannter Legacy-Verlauf                               | Es sind Legacy-Migrationen angewendet, die dieses Release nicht kennt; Plugin aktualisieren. Nichts wurde geändert.                                                                                                                      |
+| Grund                                                    | Anleitung | Was die Meldung sagt                                                                                                                                                                                                                                                   |
+| -------------------------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SDK 1.x (kein oder zu niedriges `attraccessVersion.min`) | Anleitung | Das Plugin zielt auf das SDK 1.x, das dieser Host nicht mehr unterstützt; neu bauen und `>= 2.0.0-0` deklarieren.                                                                                                                                                      |
+| `DATABASE_ACCESS` angefordert                            | Anleitung | Die Berechtigung wurde entfernt; Plugins haben keinen Datenbankzugriff; `PLUGIN_STORAGE` deklarieren und `context.storage` nutzen.                                                                                                                                     |
+| Legacy-Persistenzdeklaration                             | Anleitung | `persistence.backends` oder ein TypeORM-Migrationseintrag wird nicht unterstützt; stattdessen `storage` deklarieren.                                                                                                                                                   |
+| Datenbank-Import im Backend-Bundle                       | Anleitung | Das Bundle importiert `typeorm`, `@nestjs/typeorm`, `sqlite3`, `better-sqlite3`, `node:sqlite`, `pg`, `mysql2`, `@attraccess/plugins-backend-sdk/sqlite` oder `@attraccess/database-entities`; die Meldung nennt Modul und Bundle-Datei.                               |
+| Datenbank-Handle zur Laufzeit angefordert                | Anleitung | `context.get('DataSource')` (oder Entity-Manager, Repository-Token) wirft: Die Host-Verbindung ist nicht verfügbar; `context.storage` nutzen.                                                                                                                          |
+| Speicher ohne `PLUGIN_STORAGE`                           |           | Das Plugin deklariert Speicher, aber nicht die Berechtigung `PLUGIN_STORAGE`.                                                                                                                                                                                          |
+| Verbotener oder eigener Name, Fremdschlüssel             |           | Ein physischer oder Indexname steht außerhalb einer übernehmenden Version 1, ein Name ist eine Kerntabelle, nutzt ein reserviertes Präfix oder liegt im Namensraum eines anderen installierten Plugins, oder ein Fremdschlüssel zeigt aus den eigenen Tabellen heraus. |
+| Gemeinsamer Namensraum                                   |           | Ein anderes installiertes Plugin hat denselben Speicher-Namensraum (`foo-bar` und `foo_bar`).                                                                                                                                                                          |
+| Ungültige Migrationsliste                                |           | Versionen steigen nicht streng ab 1 an, ein Schritt oder Feld ist ungültig, eine übernommene Tabelle deklariert `f.decimal`, oder ein Schritt an einer übernommenen SQLite-Tabelle bräuchte einen Neuaufbau der Tabelle.                                               |
+| Partieller Legacy-Verlauf                                |           | Attraccess 2.0 übernimmt die Daten des Plugins nur vom letzten 1.x-Release (1.11): Backup zurückspielen, auf 1.11 aktualisieren, einmal starten, dann auf 2.0 aktualisieren. Nichts wurde geändert.                                                                    |
+| Unbekannter Legacy-Verlauf                               |           | Es sind Legacy-Migrationen angewendet, die dieses Release nicht kennt; Plugin aktualisieren. Nichts wurde geändert.                                                                                                                                                    |
 
-Die Ablehnungen bei der Installation (die ersten vier Zeilen) enden mit `Migration guide: https://docs.attraccess.org/#/en/plugins/migrating-to-2`;
-die Speicher-Ablehnungen beim Start beschreiben die Abhilfe in eigenen Worten. Ein abgelehntes
-Plugin bleibt mit dem Fehler in der Plugin-Liste und seine Daten bleiben unverändert; das Löschen entfernt seine Dateien,
-ohne seinen Code auszuführen.
+Der Link lautet `Migration guide: https://docs.attraccess.org/#/en/plugins/migrating-to-2`. Entitätsklassen sind keine
+eigene Deklaration mehr: Sie fallen auf, weil sie TypeORM importieren.
+
+Ein abgelehntes Plugin bleibt mit dem Fehler in der Plugin-Liste, und seine Daten bleiben unverändert. Das Löschen
+entfernt seine Dateien, ohne seinen Code auszuführen; **seine Tabellen bleiben** in der Datenbank. Ein 2.0-Build
+desselben Plugins übernimmt sie später, oder der Betreiber löscht sie von Hand.
 
 ## Frontend-SDK
 

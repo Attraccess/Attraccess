@@ -72,7 +72,7 @@ Jede Folge von 32–512 druckbaren ASCII-Zeichen (ohne Leerzeichen) funktioniert
 
 ## Attraccess mit dem Sidecar verbinden
 
-1. Installieren Sie das Matter-Plugin (es braucht Attraccess 1.11.0 oder neuer). Es fordert die Berechtigungen `PLUGIN_STORAGE` und `MANAGE_SECRETS` an.
+1. Installieren Sie das Matter-Plugin (es braucht Attraccess 2.0 oder neuer). Es fordert die Berechtigungen `PLUGIN_STORAGE` und `MANAGE_SECRETS` an.
 2. Öffnen Sie **Geräte → Matter** (sichtbar für Benutzer mit `matter.devices.read` oder `thread.network.read`; die Einstellungen zu ändern erfordert `matter.devices.manage`, siehe [Berechtigungen](plugins/matter/permissions.md)).
 3. Geben Sie die **Sidecar-URL** (zum Beispiel `http://127.0.0.1:8581`) und das **Token** ein und klicken Sie auf **Speichern**. Tragen Sie ein **CA-Zertifikat** nur ein, wenn der Sidecar eine private CA verwendet. Es wird dem Standard-Truststore von Node.js hinzugefügt (den mitgelieferten Stammzertifikaten plus etwaigen `NODE_EXTRA_CA_CERTS`) und ersetzt ihn nicht.
 
@@ -137,7 +137,7 @@ Eine `/v1/`-Anfrage oder ein WebSocket-Upgrade auf `/v1/events` mit nicht unters
       "supported": [
         {
           "wireVersion": 1,
-          "attraccess": "^1.11.0",
+          "attraccess": "^2.0.0-0",
           "plugin": "0.4.0-alpha.0",
           "sidecar": "0.4.0-alpha.0",
           "matterJs": "0.18.0"

@@ -1,4 +1,5 @@
 # Reservations
+
 <!-- llms-description: The Reservations plugin lets members book a resource for a time window; overview, prerequisites and links to member, administrator and API pages. -->
 
 > [!NOTE]
@@ -21,7 +22,9 @@ are not enabled, nothing changes.
   key with the module, Attraccess restarts and loads the plugin. See
   [Installing Plugins](plugins/installing-plugins.md#license-missing). Licenses:
   [contact@attraccess.org](mailto:contact@attraccess.org).
-- Attraccess 1.11.0 or newer.
+- Attraccess 2.0 or newer.
+- Upgrading from 1.x: the plugin's 1.x tables and data are kept and adopted in place. Update to Attraccess 1.11
+  first (see [Upgrading to Attraccess 2.0](installation/updating.md#upgrading-to-attraccess-20)).
 - The `reservations` plugin, installed as described in [Installing Plugins](plugins/installing-plugins.md). The
   permissions it requests are listed in [Administering Reservations](plugins/reservations/administration.md#installing-the-plugin).
 - Optional: a working [SMTP configuration](setup/smtp-email.md) for email notices. Without it, in-app and push
@@ -38,11 +41,11 @@ are not enabled, nothing changes.
 
 ## In this section
 
-| Page                                                                 | For             | Covers                                                                    |
-| -------------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------- |
-| [Using Reservations](plugins/reservations/using-reservations.md)     | Members         | Booking, check-in, approval, start protection, readers, feeds             |
-| [Administering Reservations](plugins/reservations/administration.md) | Administrators  | Installation, per-resource settings, timezone, email templates, audit log |
-| [Reservations API](plugins/reservations/api.md)                      | Integrators     | REST endpoints and error codes                                            |
+| Page                                                                 | For            | Covers                                                                    |
+| -------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------- |
+| [Using Reservations](plugins/reservations/using-reservations.md)     | Members        | Booking, check-in, approval, start protection, readers, feeds             |
+| [Administering Reservations](plugins/reservations/administration.md) | Administrators | Installation, per-resource settings, timezone, email templates, audit log |
+| [Reservations API](plugins/reservations/api.md)                      | Integrators    | REST endpoints and error codes                                            |
 
 ## See also
 

@@ -24,15 +24,15 @@ Es gibt genau **eine** Wire-Protokollversion: `1`. Es gibt keine Schemas früher
 
 Eine passende Wire-Version genügt nicht. Attraccess, das Matter-Plugin und der Sidecar müssen eine **unterstützte Kombination** bilden. Die einzige maßgebliche Tabelle ist `COMPATIBILITY_TABLE` in `libs/matter-contract/src/compatibility.ts`:
 
-| Komponente     | Unterstützt                                                          |
-| -------------- | -------------------------------------------------------------------- |
-| Wire-Version   | `1`                                                                  |
-| Attraccess     | `^1.11.0` (Vorabversionen einer passenden Version werden akzeptiert) |
-| Matter-Plugin  | genau `0.4.0-alpha.0`                                                |
-| Matter-Sidecar | genau `0.4.0-alpha.0`                                                |
-| matter.js      | genau `0.18.0` (Plugin und Sidecar teilen sich ein Release)          |
+| Komponente     | Unterstützt                                                           |
+| -------------- | --------------------------------------------------------------------- |
+| Wire-Version   | `1`                                                                   |
+| Attraccess     | `^2.0.0-0` (Vorabversionen einer passenden Version werden akzeptiert) |
+| Matter-Plugin  | genau `0.4.0-alpha.0`                                                 |
+| Matter-Sidecar | genau `0.4.0-alpha.0`                                                 |
+| matter.js      | genau `0.18.0` (Plugin und Sidecar teilen sich ein Release)           |
 
-`attraccess.host` (`package.json`) und `attraccessVersion.min` (`plugin.json`) des Plugins werden aus derselben Tabelle abgeleitet; ein Test prüft, dass sie übereinstimmen. Jedes neue Plugin- oder Sidecar-Release braucht eine Tabellenaktualisierung, sonst lehnt der Sidecar es ab. Der Attraccess-Bereich ist bewusst ein Bereich: Ein neues Attraccess-1.x-Release erfordert nicht automatisch ein Sidecar-Release.
+`attraccess.host` (`package.json`) und `attraccessVersion.min` (`plugin.json`) des Plugins werden aus derselben Tabelle abgeleitet; ein Test prüft, dass sie übereinstimmen. Jedes neue Plugin- oder Sidecar-Release braucht eine Tabellenaktualisierung, sonst lehnt der Sidecar es ab. Der Attraccess-Bereich ist bewusst ein Bereich: Ein neues Attraccess-2.x-Release erfordert nicht automatisch ein Sidecar-Release.
 
 Release-Header sind Kompatibilitätsinformationen, **keine Authentifizierung**; die Authentifizierung ist das Service-Token (siehe [Sicherheitsmodell](#sicherheitsmodell)). Ein nicht passender Sidecar braucht ein Update oder Downgrade.
 

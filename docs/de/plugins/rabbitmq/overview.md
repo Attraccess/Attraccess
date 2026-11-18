@@ -9,7 +9,7 @@ Mit dem Plugin **RabbitMQ** verwalten Sie einen RabbitMQ-Broker aus Attraccess. 
 
 ## Voraussetzungen
 
-- Attraccess 1.11.0 oder neuer und das Plugin `rabbitmq`, installiert wie unter [Plugins installieren](plugins/installing-plugins.md) beschrieben. Es benötigt die Berechtigung `ACCESS_MQTT_SERVERS`.
+- Attraccess 2.0 oder neuer und das Plugin `rabbitmq`, installiert wie unter [Plugins installieren](plugins/installing-plugins.md) beschrieben. Es benötigt die Berechtigung `ACCESS_MQTT_SERVERS`.
 - Ein in Attraccess eingerichteter [MQTT-Server](mqtt/server-setup.md), der auf einen RabbitMQ-Broker zeigt. Für das MQTT-Protokoll aktivieren Sie das Plugin `rabbitmq_mqtt` am Broker, siehe [RabbitMQ mit MQTT-Plugin](mqtt/server-setup.md#rabbitmq-mit-mqtt-plugin).
 - Das RabbitMQ-Management-Plugin mit seiner HTTP-API, von Attraccess aus erreichbar.
 

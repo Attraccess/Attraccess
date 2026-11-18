@@ -1,4 +1,5 @@
 # Shelly
+
 <!-- llms-description: The Shelly plugin keeps a registry of Shelly devices on your network, with discovery, device info, admin password management and firmware updates. -->
 
 > [!NOTE]
@@ -9,8 +10,10 @@ The registry does not change the devices when you add or remove an entry.
 
 ## Prerequisites
 
-- Attraccess 1.11.0 or newer and the `shelly` plugin, installed as described in
+- Attraccess 2.0 or newer and the `shelly` plugin, installed as described in
   [Installing Plugins](plugins/installing-plugins.md). It needs the `PLUGIN_STORAGE` permission for its own tables.
+- Upgrading from 1.x: the plugin's 1.x tables and data are kept and adopted in place. Update to Attraccess 1.11
+  first (see [Upgrading to Attraccess 2.0](installation/updating.md#upgrading-to-attraccess-20)).
 - Shelly devices that the Attraccess server can reach over the network by IP address.
 - Users need the **Manage Resources** permission (`resources.update`) to open the page.
 - If Attraccess runs in a container, its network is not your LAN. Enter the subnet of your devices when you

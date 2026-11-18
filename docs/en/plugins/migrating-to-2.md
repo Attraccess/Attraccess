@@ -22,13 +22,15 @@ Plugins that bring their own persistence (their own connection, driver or ORM) a
   is refused when it is uploaded, installed or started.
 - **No database permission.** `DATABASE_ACCESS` is gone. Data of your own needs `PLUGIN_STORAGE`, which covers your own
   declared tables only.
-- **No legacy persistence declaration.** The `persistence.backends` entry, the TypeORM `migrations` entry
-  (`main.migrations` / `attraccess.migrations`) and entity declarations on the backend module are not part of 2.0.
-- **Namespace.** Tables are named `plugin_<plugin>_<table>`. A name outside the plugin's namespace, or a foreign key
-  to a table of another plugin or the core, is refused.
+- **No legacy persistence declaration.** The `persistence.backends` entry and the TypeORM `migrations` entry
+  (`main.migrations` / `attraccess.migrations`) are not part of 2.0. Entity classes are not declared anywhere any more;
+  a bundle that still imports TypeORM for them is refused by the import scan.
+- **Namespace.** Tables are named `plugin_<namespace>_<table>`. Explicit physical and index names are allowed only to
+  adopt 1.x tables in version 1. A forbidden name, or a foreign key to a table of another plugin or the core, is
+  refused (see [Table and index names](plugins/plugin-storage.md#table-and-index-names)).
 
 A refused plugin is not extracted, installed, registered, migrated or started, and the database is not touched. The
-error names the plugin, states the reason and links this guide (see [Refusals](#refusals)).
+error names the plugin, states the reason and, for most refusals, links this guide (see [Refusals](#refusals)).
 
 ## Checklist
 
@@ -84,9 +86,11 @@ The result of the port: the physical tables stay where they are, so an upgrading
    last 1.x release shipped, in order, for example `CreateWidgets1700000000000`.
 2. **Describe the table layout those migrations produce.** Read the migrations (not the entities: they may have
    drifted) and write one `table(...)` per table with the same columns, types, defaults, nullability, indexes and
-   foreign keys. Use `physicalName` for the existing table name and `column` where the column name differs from the
-   field name. Foreign keys may point to tables of your own plugin only; a column that referenced a core table
-   (`userId`, `resourceId`, ...) becomes a plain `f.integer()` without a foreign key.
+   foreign keys. Use `physicalName` for the existing table name, the existing index names, and `column` where the
+   column name differs from the field name. These explicit names are allowed only here, in an adopting version 1, and
+   must not be [forbidden names](plugins/plugin-storage.md#table-and-index-names). Foreign keys may point to tables of
+   your own plugin only; a column that referenced a core table (`userId`, `resourceId`, ...) becomes a plain
+   `f.integer()` without a foreign key. A 1.x decimal column cannot be declared as `f.decimal` on an adopted table.
 3. **Make version 1 the baseline.** Declare one neutral migration `{ version: 1, ... }` whose steps create exactly that
    layout. Fresh installations run it; existing ones skip it.
 4. **Declare the adoption.** Add `adoption: { legacyMigrations: [...] }` with the list from step 1.
@@ -98,8 +102,8 @@ The result of the port: the physical tables stay where they are, so an upgrading
    `PLUGIN_STORAGE` in the manifest.
 
 ```ts
-// 1.x entity + migration
-@Entity({ name: 'plugin_widgets' })
+// 1.x entity + migration of the plugin "widgets"
+@Entity({ name: 'plugin_widgets_items' })
 class Widget {
   @PrimaryGeneratedColumn() id!: number;
   @Column({ type: 'varchar', name: 'label' }) label!: string;
@@ -108,14 +112,17 @@ class Widget {
 
 ```ts
 // 2.0 declaration
-const widgets = table({ id: f.id(), label: f.string() }, { physicalName: 'plugin_widgets' });
+const items = table({ id: f.id(), label: f.string() }, { physicalName: 'plugin_widgets_items' });
 
 export const widgetStorage = definePluginStorage({
-  tables: { widgets },
-  migrations: [{ version: 1, name: 'baseline', steps: [step.createTable('widgets', widgets)] }],
-  adoption: { legacyMigrations: ['CreateWidgets1700000000000'] },
+  tables: { items },
+  migrations: [{ version: 1, name: 'baseline', steps: [step.createTable('items', items)] }],
+  adoption: { legacyMigrations: ['CreateWidgetItems1700000000000'] },
 });
 ```
+
+If a 1.x table name is forbidden, the table cannot be adopted; see
+[1.x names the host refuses](plugins/plugin-storage.md#adoption-of-1x-installations).
 
 ### The baseline and adoption rule
 
@@ -125,8 +132,9 @@ On the first start of the 2.0 build the host looks at the plugin's legacy migrat
   with later versions.
 - **None** applied (a fresh installation): version 1 runs as usual.
 - **Only some** applied: the plugin is **refused** and nothing is changed. A partial legacy history means the
-  database predates your last 1.x release: **install the last 1.x release first**, let it finish its migrations, then
-  upgrade to the 2.0 build.
+  database predates the plugin's last 1.x release. The message tells the operator: "Attraccess 2.0 adopts the data of
+  plugin "<name>" only from the last 1.x release (1.11). Restore the backup taken before this upgrade, update to
+  Attraccess 1.11 and start it once so the plugin's migrations finish, then update to 2.0."
 
 Version 1 must therefore match the legacy result exactly. A mismatch is not detected on adoption, it surfaces later as
 a failing query, so compare column by column.
@@ -165,8 +173,9 @@ Porting notes:
 - **No query builder, no raw SQL.** Express aggregates with `aggregate`, counters with `increment(n)` and locks with
   compare-and-set `update`.
 - **Timestamps** are `Date` in and out (UTC), **decimals** are strings, JSON fields hold any JSON value.
-- **Transactions.** Pass `{ scope }` to every call that must take part; effects go into `scope.afterCommit`. The rules
-  (short callback, no nesting, no core session writes inside) are unchanged.
+- **Transactions.** Pass `{ scope }` to every call that must take part; a write without it inside `work` is rejected.
+  Effects go into `scope.afterCommit`. The host orders transactions or fails one with `PluginStorageConflict`; it
+  does not retry for you. The rules (short callback, no nesting, no core session writes inside) are unchanged.
 - `context.persistence` has only `transaction`. `persistence.backend`, `supports(...)` and every engine seam are gone.
 
 ### Start capacity hook
@@ -185,9 +194,11 @@ const slots = await heldSlots.find({ where: { resourceId: ctx.resourceId } }, { 
 
 ## Tests
 
-Plugin tests do not need a database. Build the fake context with `createInMemoryPluginStorage()` from the SDK and set
-it as `storage` (and its transaction runner as `persistence`). It follows the contract of the record port: filters,
-compare-and-set, neutral errors and transaction scopes. See [Plugin Storage](plugins/plugin-storage.md#_5-testing).
+Plugin tests do not need a database. Call `createInMemoryPluginStorage(definition)` from the SDK root and put its
+`storage` and `persistence` into the fake context:
+`{ ...fakeContext, storage: fake.storage, persistence: fake.persistence }`. It follows the contract of the record
+port: filters, compare-and-set, neutral errors and transaction scopes. See
+[Plugin Storage](plugins/plugin-storage.md#_5-testing).
 
 ## Bundling
 
@@ -202,26 +213,29 @@ There is no migrations bundle any more: the migrations live in your declaration 
 
 ## Refusals
 
-Each refusal happens before any mutation, names the plugin, states the reason and links this guide:
+Each refusal happens before any mutation, names the plugin and states the reason. The refusals marked "guide" also end
+with a link to this guide; the others describe the fix in their own words.
 
-| Reason                                            | What the message says                                                                                                                                                                                                                       |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| SDK 1.x (no or too low `attraccessVersion.min`)   | The plugin targets the SDK 1.x, which this host no longer supports; rebuild it and declare `>= 2.0.0-0`.                                                                                                                                    |
-| `DATABASE_ACCESS` requested                       | The permission was removed; plugins have no database access; declare `PLUGIN_STORAGE` and use `context.storage`.                                                                                                                            |
-| Legacy persistence declaration                    | `persistence.backends`, a TypeORM migrations entry or entities are not supported; declare `storage` instead.                                                                                                                                |
-| Database import in the backend bundle             | The bundle imports `typeorm`, `@nestjs/typeorm`, `sqlite3`, `better-sqlite3`, `node:sqlite`, `pg`, `mysql2`, `@attraccess/plugins-backend-sdk/sqlite` or `@attraccess/database-entities`; the message names the module and the bundle file. |
-| Database handle requested at runtime              | `context.get('DataSource')` (or the entity manager, a repository token) throws: the host connection is not available; use `context.storage`.                                                                                                |
-| Storage without `PLUGIN_STORAGE`                  | The plugin declares storage but not the `PLUGIN_STORAGE` permission.                                                                                                                                                                        |
-| Name outside the plugin's namespace / foreign key | The table, physical name or foreign key points outside the plugin's own tables.                                                                                                                                                             |
-| Invalid migration list                            | Versions are not strictly increasing from 1, or a step or field is invalid.                                                                                                                                                                 |
-| Name inside another plugin's namespace            | A table name lies in the storage namespace of a longer-named installed plugin (`demo` may not take `plugin_demo_extra_x` while `demo-extra` is installed).                                                                                  |
-| Partial legacy history                            | Only some `adoption.legacyMigrations` are applied; install the last 1.x release first. Nothing was changed.                                                                                                                                 |
-| Unknown legacy history                            | Legacy migrations are applied that this release does not know; update the plugin. Nothing was changed.                                                                                                                                      |
+| Reason                                          | Guide | What the message says                                                                                                                                                                                                                       |
+| ----------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SDK 1.x (no or too low `attraccessVersion.min`) | guide | The plugin targets the SDK 1.x, which this host no longer supports; rebuild it and declare `>= 2.0.0-0`.                                                                                                                                    |
+| `DATABASE_ACCESS` requested                     | guide | The permission was removed; plugins have no database access; declare `PLUGIN_STORAGE` and use `context.storage`.                                                                                                                            |
+| Legacy persistence declaration                  | guide | `persistence.backends` or a TypeORM migrations entry is not supported; declare `storage` instead.                                                                                                                                           |
+| Database import in the backend bundle           | guide | The bundle imports `typeorm`, `@nestjs/typeorm`, `sqlite3`, `better-sqlite3`, `node:sqlite`, `pg`, `mysql2`, `@attraccess/plugins-backend-sdk/sqlite` or `@attraccess/database-entities`; the message names the module and the bundle file. |
+| Database handle requested at runtime            | guide | `context.get('DataSource')` (or the entity manager, a repository token) throws: the host connection is not available; use `context.storage`.                                                                                                |
+| Storage without `PLUGIN_STORAGE`                |       | The plugin declares storage but not the `PLUGIN_STORAGE` permission.                                                                                                                                                                        |
+| Forbidden or explicit name, foreign key         |       | A physical or index name is declared outside an adopting version 1, a name is a core table, uses a reserved prefix or lies in another installed plugin's namespace, or a foreign key points outside the plugin's own tables.                |
+| Shared namespace                                |       | Another installed plugin has the same storage namespace (`foo-bar` and `foo_bar`).                                                                                                                                                          |
+| Invalid migration list                          |       | Versions are not strictly increasing from 1, a step or field is invalid, an adopted table declares `f.decimal`, or a step on an adopted SQLite table would need a table rebuild.                                                            |
+| Partial legacy history                          |       | Attraccess 2.0 adopts the data of the plugin only from the last 1.x release (1.11): restore the backup, update to 1.11, start it once, then update to 2.0. Nothing was changed.                                                             |
+| Unknown legacy history                          |       | Legacy migrations are applied that this release does not know; update the plugin. Nothing was changed.                                                                                                                                      |
 
-The refusals at install time (the first four rows) end with `Migration guide: https://docs.attraccess.org/#/en/plugins/migrating-to-2`;
-the storage refusals at startup describe the fix in their own words. A refused plugin
-stays in the plugin list with the error and its data is left untouched; deleting it removes its files without running
-its code.
+The guide link reads `Migration guide: https://docs.attraccess.org/#/en/plugins/migrating-to-2`. Entity classes are not
+a declaration of their own any more: they are caught because they import TypeORM.
+
+A refused plugin stays in the plugin list with the error, and its data is left untouched. Deleting it removes its
+files without running its code; **its tables stay** in the database. A 2.0 build of the same plugin adopts them later,
+or the operator drops them by hand.
 
 ## Frontend SDK
 

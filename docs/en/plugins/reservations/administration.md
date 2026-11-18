@@ -1,4 +1,5 @@
 # Administering Reservations
+
 <!-- llms-description: How administrators install, configure and operate the Reservations plugin: timezone, email templates, start checks and audit log. -->
 
 > [!NOTE]
@@ -26,7 +27,7 @@
 | `SEND_NOTIFICATIONS` | In-app, push and email notifications.                                              |
 | `READER_UI`          | Booking notes and follow-up questions on Attractap reader displays.                |
 
-3. The plugin needs Attraccess 1.11.0 or newer.
+3. The plugin needs Attraccess 2.0 or newer.
 
 Email notices need a working [SMTP configuration](setup/smtp-email.md). Without it, in-app and push notifications
 still work.
@@ -107,17 +108,17 @@ Every email of the plugin is an **email template** that you edit like the system
 **Settings → Email → Templates**. The plugin's templates are listed after the system templates, marked "Plugin:
 reservations":
 
-| Template                                                                                                      | Sent when                                                                  |
-| ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Booking request awaiting approval                                                                             | A booking waits for approval (to the managers).                            |
-| Booking confirmed                                                                                             | A booking is confirmed or approved, with the check-in rules.               |
-| Booking rejected / Booking request expired                                                                    | A request was rejected, or nobody decided before its start.                |
+| Template                                                                                                                               | Sent when                                                                                        |
+| -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Booking request awaiting approval                                                                                                      | A booking waits for approval (to the managers).                                                  |
+| Booking confirmed                                                                                                                      | A booking is confirmed or approved, with the check-in rules.                                     |
+| Booking rejected / Booking request expired                                                                                             | A request was rejected, or nobody decided before its start.                                      |
 | Booking cancelled by a manager / Running booking ended early / Booking removed (reservations switched off or machine capacity reduced) | A manager changed or removed a booking, reservations were switched off, or a machine lost slots. |
-| Not checked in, booking released                                                                              | A booking was released as a no-show.                                       |
-| Reminder 48 h before: still needed? / Reminder 24 h before                                                    | The reminders before a booking.                                            |
-| Maintenance affects a booking / Resource has a problem / Resource works again                                 | Maintenance or the health of the resource affects a booking.               |
-| Reserved soon (to the current user) / Booking started, resource still in use / Booking started, please finish | Handover and overrun notices.                                              |
-| Started during a booking (to the holder / to the managers)                                                    | A manager started during a booking.                                        |
+| Not checked in, booking released                                                                                                       | A booking was released as a no-show.                                                             |
+| Reminder 48 h before: still needed? / Reminder 24 h before                                                                             | The reminders before a booking.                                                                  |
+| Maintenance affects a booking / Resource has a problem / Resource works again                                                          | Maintenance or the health of the resource affects a booking.                                     |
+| Reserved soon (to the current user) / Booking started, resource still in use / Booking started, please finish                          | Handover and overrun notices.                                                                    |
+| Started during a booking (to the holder / to the managers)                                                                             | A manager started during a booking.                                                              |
 
 - Edit the subject and the body in the visual editor, and the German and English texts in the **Translations**
   dialog. **Variables** lists what you can use, for example `{{reservation.when}}` or `{{resource.name}}`.

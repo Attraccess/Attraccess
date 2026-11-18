@@ -342,7 +342,7 @@ Liefern Sie einen **CommonJS**-Einstiegspunkt (`index.js`) aus, kein ES-Modul (`
   "name": "my-plugin",
   "version": "1.0.0",
   "main": { "backend": { "directory": "dist", "entryPoint": "index.js" } },
-  "attraccessVersion": { "min": "1.0.0" }
+  "attraccessVersion": { "min": "2.0.0-0" }
 }
 ```
 
@@ -376,27 +376,27 @@ nennt.
   "name": "my-plugin",
   "version": "1.0.0",
   "main": { "backend": { "directory": "dist", "entryPoint": "index.js" } },
-  "attraccessVersion": { "min": "1.0.0" },
+  "attraccessVersion": { "min": "2.0.0-0" },
   "permissions": ["READ_USERS", "EMIT_EVENTS"]
 }
 ```
 
-| Berechtigung             | Gewährt Zugriff auf                                                                                                                                                                                                                                         |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `READ_USERS`             | `context.hostData.users` -- Benutzernamen, Sprachen, Kontostatus und Inhaber von Berechtigungen lesen.                                                                                                                                                      |
-| `ACCESS_RESOURCES`       | `context.hostData.resources` -- Ressourcen lesen -- sowie die lesenden `context.resourceAccess`-Abfragen. Siehe [Ressourcen-Zugriff](#ressourcen-zugriff-abfragen).                                                                                         |
-| `READ_SETTINGS`          | `context.hostData.settings` -- Anwendungseinstellungen lesen.                                                                                                                                                                                               |
-| `PLUGIN_STORAGE`         | `context.storage` und `context.persistence`: die deklarierten Tabellen Ihres eigenen Plugins und Transaktionen darüber. Kein Zugriff auf Kerntabellen. Siehe [Plugin-Speicher](plugins/plugin-storage.md).                                                  |
-| `TRIGGER_FLOWS`          | `context.flows.trigger(...)` und `context.hostData.flows` (Flow-Knoten-Abfragen).                                                                                                                                                                           |
-| `EMIT_EVENTS`            | `context.emitEvent(...)` und `context.events.emit(...)` / `emitAsync(...)` -- auf dem geteilten Event-Bus senden.                                                                                                                                           |
-| `LISTEN_EVENTS`          | `context.onEvent(...)` und `context.events.on(...)` / `once(...)` / ... -- den geteilten Event-Bus abonnieren.                                                                                                                                              |
-| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` -- beliebige Host-Dienste per Injection-Token auflösen.                                                                                                                                                                                |
-| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)` -- Verbindungskonfiguration und aufgelöste (entschlüsselte) Zugangsdaten eines MQTT-Servers lesen.                                                                                                                  |
-| `READER_UI`              | `context.readerUi.invalidate(...)` und der `readerUi`-Provider -- Widgets auf Attractap-Reader-Bildschirmen anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks).                                                                                        |
-| `ACCESS_HOOKS`           | `preStartHook`, `sessionEndHook`, `startBlockedQuery` und `startCapacityHook` -- eine Bestätigung verlangen oder einen Sitzungsstart blockieren und einen blockierten Start in der Oberfläche anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks).      |
-| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` -- Benachrichtigungen in der App, per Push und per E-Mail unter vom Plugin deklarierten Kategorien senden und bearbeitbare E-Mail-Vorlagen deklarieren. Siehe [Benachrichtigungen](#benachrichtigungen).              |
-| `BLE_TRANSPORT`          | `context.ble` -- die Bluetooth-Funkverbindung von Attractap-Readern nutzen, die ein Administrator für Plugins freigegeben hat, begrenzt auf die BLE-Profile, die das Plugin registriert. Siehe [Bluetooth-Transport für Plugins](plugins/ble-transport.md). |
-| `CARD_AUTHENTICATION`    | `context.cards` -- NFC-Karten an eigenen Geräten des Plugins mit den Attraccess-Kartenschlüsseln authentifizieren; das Plugin erhält die Karte und ihren Besitzer, nie die Schlüssel. Siehe [Kartenauthentifizierung für Plugins](plugins/card-authentication.md).                                                |
+| Berechtigung             | Gewährt Zugriff auf                                                                                                                                                                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `READ_USERS`             | `context.hostData.users` -- Benutzernamen, Sprachen, Kontostatus und Inhaber von Berechtigungen lesen.                                                                                                                                                             |
+| `ACCESS_RESOURCES`       | `context.hostData.resources` -- Ressourcen lesen -- sowie die lesenden `context.resourceAccess`-Abfragen. Siehe [Ressourcen-Zugriff](#ressourcen-zugriff-abfragen).                                                                                                |
+| `READ_SETTINGS`          | `context.hostData.settings` -- Anwendungseinstellungen lesen.                                                                                                                                                                                                      |
+| `PLUGIN_STORAGE`         | `context.storage` und `context.persistence`: die deklarierten Tabellen Ihres eigenen Plugins und Transaktionen darüber. Kein Zugriff auf Kerntabellen. Siehe [Plugin-Speicher](plugins/plugin-storage.md).                                                         |
+| `TRIGGER_FLOWS`          | `context.flows.trigger(...)` und `context.hostData.flows` (Flow-Knoten-Abfragen).                                                                                                                                                                                  |
+| `EMIT_EVENTS`            | `context.emitEvent(...)` und `context.events.emit(...)` / `emitAsync(...)` -- auf dem geteilten Event-Bus senden.                                                                                                                                                  |
+| `LISTEN_EVENTS`          | `context.onEvent(...)` und `context.events.on(...)` / `once(...)` / ... -- den geteilten Event-Bus abonnieren.                                                                                                                                                     |
+| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` -- beliebige Host-Dienste per Injection-Token auflösen.                                                                                                                                                                                       |
+| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)` -- Verbindungskonfiguration und aufgelöste (entschlüsselte) Zugangsdaten eines MQTT-Servers lesen.                                                                                                                         |
+| `READER_UI`              | `context.readerUi.invalidate(...)` und der `readerUi`-Provider -- Widgets auf Attractap-Reader-Bildschirmen anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks).                                                                                               |
+| `ACCESS_HOOKS`           | `preStartHook`, `sessionEndHook`, `startBlockedQuery` und `startCapacityHook` -- eine Bestätigung verlangen oder einen Sitzungsstart blockieren und einen blockierten Start in der Oberfläche anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks).             |
+| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` -- Benachrichtigungen in der App, per Push und per E-Mail unter vom Plugin deklarierten Kategorien senden und bearbeitbare E-Mail-Vorlagen deklarieren. Siehe [Benachrichtigungen](#benachrichtigungen).                     |
+| `BLE_TRANSPORT`          | `context.ble` -- die Bluetooth-Funkverbindung von Attractap-Readern nutzen, die ein Administrator für Plugins freigegeben hat, begrenzt auf die BLE-Profile, die das Plugin registriert. Siehe [Bluetooth-Transport für Plugins](plugins/ble-transport.md).        |
+| `CARD_AUTHENTICATION`    | `context.cards` -- NFC-Karten an eigenen Geräten des Plugins mit den Attraccess-Kartenschlüsseln authentifizieren; das Plugin erhält die Karte und ihren Besitzer, nie die Schlüssel. Siehe [Kartenauthentifizierung für Plugins](plugins/card-authentication.md). |
 
 `context.manifest` und `context.logger` sind immer verfügbar und benötigen
 keine Berechtigung. Dasselbe gilt für `context.hostVersion`: die Version des
@@ -860,8 +860,8 @@ const startCapacityHook: StartCapacityHook = async (ctx) => {
   lehnt der Kern mit seinem allgemeinen „nicht verfügbar“-Text ab und protokolliert ein ungültiges Ergebnis.
 - **Lesen Sie nur über `ctx.scope`, verschachteln Sie nie `persistence.transaction`.** `ctx.scope` ist ein
   `PluginTransactionScope` der Start-Transaktion des Kerns (Ihre eigenen Tabellen lesen Sie mit `{ scope: ctx.scope }`):
-  Schreiben Sie nie darüber und rufen Sie darauf nie `scope.afterCommit` auf. Die Start-Transaktion ist bereits
-  serialisiert; eine weitere im Hook zu starten, lässt sie auf sich selbst warten. Beschränken Sie den Hook auf eine
+  Schreiben Sie nie darüber und rufen Sie darauf nie `scope.afterCommit` auf. Ein Speicher-Schreibaufruf oder eine
+  `persistence.transaction` im Hook, die `ctx.scope` nicht nutzt, wird abgewiesen. Beschränken Sie den Hook auf eine
   indizierte Abfrage.
 - **Ausfälle.** Fehler, Timeout und ein offener Circuit Breaker folgen der Ausfallrichtlinie pro Ressource und
   Plugin (fail open oder fail closed, siehe [Ausfälle und Vertrauen](#ausfälle-und-vertrauen)) und werden
@@ -1132,8 +1132,8 @@ const plugin: PluginBackendModule = {
 in einer atomaren Transaktion aus: Commit, wenn `work` abschließt, Rollback, wenn es wirft. `scope.afterCommit(callback)`
 läuft erst nach dem Commit. Es legt keine Verbindung, kein Repository, keine Abfrage-API und keine Engine-Information offen.
 
-Ein Plugin, dessen Deklaration die Regeln verletzt (ein TypeORM-Migrationseintrag, `persistence.backends`, Entitäten,
-die entfernte Berechtigung `DATABASE_ACCESS`, eine Tabelle außerhalb des eigenen Namensraums), wird verweigert, bevor
+Ein Plugin, dessen Deklaration die Regeln verletzt (ein TypeORM-Migrationseintrag, `persistence.backends`, ein Bundle,
+das TypeORM importiert, die entfernte Berechtigung `DATABASE_ACCESS`, ein verbotener Tabellenname), wird verweigert, bevor
 etwas davon registriert, migriert oder gestartet wird; es ändern sich keine Daten. Siehe
 [Plugins auf SDK 2.0 umstellen](plugins/migrating-to-2.md#ablehnungen).
 
@@ -1157,8 +1157,8 @@ erreichen Plugin-Code nie.
 
 ### Transaktionen
 
-`persistence.transaction(work)` (Berechtigung `PLUGIN_STORAGE`) führt `work(scope)` in einer Transaktion aus, die der
-Host nacheinander ausführt. Die Transaktion wird committet, wenn `work` abschließt, und zurückgerollt, wenn `work`
+`persistence.transaction(work)` (Berechtigung `PLUGIN_STORAGE`) führt `work(scope)` in einer Transaktion aus. Die
+Transaktion wird committet, wenn `work` abschließt, und zurückgerollt, wenn `work`
 wirft. Damit sind Prüfen-dann-Schreiben-Abläufe wie Überschneidungsprüfungen frei von Race Conditions. Geben Sie
 `{ scope }` an jeden Speicheraufruf, der teilnehmen soll:
 
@@ -1173,20 +1173,22 @@ await context.persistence.transaction(async (scope) => {
 });
 ```
 
-Die Warteschlange teilt sich die Transaktion mit jedem Sitzungsstart und -ende des Kerns. Deshalb:
+Der Host ordnet gleichzeitige Transaktionen oder lässt eine davon mit `PluginStorageConflict` scheitern; er wiederholt
+nicht. Halten Sie Effekte in `afterCommit`, damit der Aufrufer die ganze Transaktion erneut ausführen kann. Deshalb:
 
 - `work` kurz halten und auf Speicherzugriffe und lesende Host-Port-Aufrufe beschränken; keine HTTP-, MQTT-, E-Mail-
   oder andere Nicht-Datenbank-Ein-/Ausgabe darin. Solche Effekte registrieren Sie mit `scope.afterCommit`;
 - Aufrufe nicht verschachteln. Eine in `work` gestartete Transaktion würde auf `work` selbst warten; der Host weist
   sie deshalb mit einem Fehler ab, statt zu hängen. Geben Sie stattdessen den `scope` an Hilfsfunktionen weiter und
-  warten Sie in `work` nicht auf Kern-Vorgänge, die über dieselbe Warteschlange schreiben (etwa Sitzungsstart oder
-  -ende);
-- in `work` jeden Aufruf mit `{ scope }` ausführen. Ein Aufruf ohne läuft für sich und sieht die noch nicht
-  committeten Schreibvorgänge von `work` nicht.
+  warten Sie in `work` nicht auf Kern-Vorgänge, die schreiben (etwa Sitzungsstart oder -ende);
+- in `work` jeden Schreibaufruf mit `{ scope }` ausführen. Ein Schreibaufruf ohne Scope wird mit `PluginStorageInvalid`
+  abgewiesen; nur ein Lesezugriff ohne Scope läuft außerhalb der Transaktion und sieht die noch nicht committeten
+  Schreibvorgänge von `work` nicht.
 
-Die Serialisierung gilt pro Host-Prozess. Plugins, die Ausschluss über mehrere API-Instanzen brauchen, benötigen eine
-eigene instanzübergreifende Sperre; das Reservierungs-Plugin läuft deshalb mit einer Instanz (siehe
-[Reservierungen](plugins/reservations/administration.md#betrieb-mit-einer-instanz)).
+Wie der Host Transaktionen ordnet, ist ein Detail der Engine. Unter SQLite führt er sie pro Host-Prozess nacheinander
+aus, in derselben Warteschlange wie Sitzungsstart und -ende des Kerns. Plugins, die Ausschluss über mehrere
+API-Instanzen brauchen, benötigen daher eine eigene instanzübergreifende Sperre; das Reservierungs-Plugin läuft deshalb
+mit einer Instanz (siehe [Reservierungen](plugins/reservations/administration.md#betrieb-mit-einer-instanz)).
 
 ### Flow-Knoten
 
@@ -1311,9 +1313,9 @@ Teile **`@attraccess/plugins-frontend-ui` über Module Federation** mit
 `requiredVersion: '*'`, `import: false` und `generate: false`. Eine eigene Kopie
 würde einen separaten Sprachzustand erzeugen. Die gemeinsame Konfiguration
 `createPluginFederationConfig` enthält diesen Eintrag bereits. Deklariere die
-Bibliothek als Peer-Abhängigkeit und setze `attraccess.host` beziehungsweise
-`attraccessVersion.min` auf mindestens Version **1.11.0**, da ältere Hosts diese
-Bibliothek noch nicht teilen.
+Bibliothek als Peer-Abhängigkeit (`^2.0.0-0`). Jedes Plugin mit SDK 2.0 verlangt
+ohnehin Attraccess ab `2.0.0-0` in `attraccess.host` und `attraccessVersion.min`,
+und diese Hosts teilen die Bibliothek.
 
 ## Gemeinsame UI-Komponenten
 
@@ -1340,11 +1342,10 @@ Die Exporte `StandardModal` und `StandardDrawer` aus
 `@attraccess/plugins-frontend-sdk` sind **veraltet** (Re-Exports der obigen
 Komponenten); importiere sie aus `@attraccess/plugins-frontend-ui`.
 
-Diese Komponenten setzen einen Host und ein `@attraccess/plugins-frontend-ui`
-voraus, die sie bereits enthalten (**ab 1.11.0**, also dem Release, das sie
-einführt). Ein Plugin, das sie nutzt, schlägt auf älteren Hosts zur Laufzeit
-fehl; hebe daher `attraccess.host`, `attraccessVersion.min` und die
-Peer-Abhängigkeit entsprechend an.
+Jeder Host ab Attraccess 2.0 und `@attraccess/plugins-frontend-ui` 2.0 enthalten
+diese Komponenten; das Minimum `2.0.0-0`, das ein Plugin mit SDK 2.0 ohnehin
+deklariert, genügt also. Für Komponenten aus einem späteren Release hebe
+`attraccess.host`, `attraccessVersion.min` und die Peer-Abhängigkeit entsprechend an.
 
 ## Live-Updates
 

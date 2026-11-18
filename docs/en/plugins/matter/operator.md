@@ -72,7 +72,7 @@ Any 32–512 printable ASCII characters work (no spaces). Treat the token like a
 
 ## Connect Attraccess to the sidecar
 
-1. Install the Matter plugin (it needs Attraccess 1.11.0 or newer). It asks for the `PLUGIN_STORAGE` and `MANAGE_SECRETS` permissions.
+1. Install the Matter plugin (it needs Attraccess 2.0 or newer). It asks for the `PLUGIN_STORAGE` and `MANAGE_SECRETS` permissions.
 2. Open **Devices → Matter** (visible to users with `matter.devices.read` or `thread.network.read`; changing the settings needs `matter.devices.manage`, see [Permissions](plugins/matter/permissions.md)).
 3. Enter the **sidecar URL** (for example `http://127.0.0.1:8581`) and the **token**, then **Save**. Add the **CA certificate** only if the sidecar uses a private CA. It is added to Node.js's default trust store (the bundled root certificates plus any `NODE_EXTRA_CA_CERTS`), not used instead of it.
 
@@ -137,7 +137,7 @@ A `/v1/` request, or a WebSocket upgrade to `/v1/events`, with an unsupported re
       "supported": [
         {
           "wireVersion": 1,
-          "attraccess": "^1.11.0",
+          "attraccess": "^2.0.0-0",
           "plugin": "0.4.0-alpha.0",
           "sidecar": "0.4.0-alpha.0",
           "matterJs": "0.18.0"

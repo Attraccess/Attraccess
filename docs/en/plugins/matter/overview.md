@@ -1,4 +1,5 @@
 # Matter
+
 <!-- llms-description: The Matter plugin connects Attraccess to a separate Matter sidecar that holds the Matter fabric; overview, prerequisites and links to the guides. -->
 
 > [!NOTE]
@@ -11,9 +12,11 @@ control or list devices yet, so there is no device UI.
 
 ## Prerequisites
 
-- Attraccess 1.11.0 or newer and the `matter` plugin, installed as described in
+- Attraccess 2.0 or newer and the `matter` plugin, installed as described in
   [Installing Plugins](plugins/installing-plugins.md). It needs the `PLUGIN_STORAGE` and `MANAGE_SECRETS`
   permissions.
+- Upgrading from 1.x: the plugin's 1.x tables and data are kept and adopted in place. Update to Attraccess 1.11
+  first (see [Upgrading to Attraccess 2.0](installation/updating.md#upgrading-to-attraccess-20)).
 - The **Matter sidecar**, a separate Node.js process or container (Node.js `>=26.13.0 <27`) that you build, secure
   and run yourself. Attraccess talks to it with a service token. See the [Operator Guide](plugins/matter/operator.md).
 - Network access from the sidecar to your Matter devices (mDNS and UDP) once a fabric exists.

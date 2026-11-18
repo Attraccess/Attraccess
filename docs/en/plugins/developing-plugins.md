@@ -57,18 +57,18 @@ keyword and an `attraccess` object:
   "version": "1.0.0",
   "keywords": ["attraccess-plugin"],
   "peerDependencies": {
-    "@attraccess/plugins-backend-sdk": "^1.9.0",
-    "@attraccess/plugins-frontend-sdk": "^1.9.0"
+    "@attraccess/plugins-backend-sdk": "^2.0.0-0",
+    "@attraccess/plugins-frontend-sdk": "^2.0.0-0"
   },
   "attraccess": {
     "displayName": "Hello World",
-    "host": "^1.9.0",
+    "host": "^2.0.0-0",
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
     "styles": "frontend/style.css",
     "dashboardPaths": ["/hello-world"],
     "permissions": ["READ_USERS", "LISTEN_EVENTS"],
-    "sdk": { "backend": "^1.9.0", "frontend": "^1.9.0" }
+    "sdk": { "backend": "^2.0.0-0", "frontend": "^2.0.0-0" }
   }
 }
 ```
@@ -304,22 +304,22 @@ array. At runtime the host hands your plugin a **guarded** `PluginContext`:
 accessing a capability whose permission you did not declare throws a clear error
 naming the missing permission.
 
-| Permission               | Grants access to                                                                                                                                                                                                      |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `READ_USERS`             | `context.hostData.users` — read user names, languages, account state and role-based permission holders.                                                                                                               |
-| `ACCESS_RESOURCES`       | `context.hostData.resources` — read resources — and the read-only `context.resourceAccess` queries. See [Resource access](#resource-access-queries).                                                                  |
-| `READ_SETTINGS`          | `context.hostData.settings` — read application settings.                                                                                                                                                              |
-| `PLUGIN_STORAGE`         | `context.storage` and `context.persistence`: the declared tables of your own plugin and transactions over them. No access to core tables. See [Plugin Storage](plugins/plugin-storage.md).                            |
-| `TRIGGER_FLOWS`          | `context.flows.trigger(...)` and `context.hostData.flows` (flow node lookups).                                                                                                                                        |
-| `EMIT_EVENTS`            | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`.                                                                                                                                           |
-| `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                                                                                                                               |
-| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                                                                                                                                      |
-| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)`, `context.mqtt.subscribe(...)`, and `context.mqtt.publish(...)` — access an MQTT server through the host's pooled connection.                                                 |
-| `READER_UI`              | `context.readerUi.invalidate(...)` and the `readerUi` provider — show widgets on Attractap reader screens. See [Reader UI](#reader-ui-and-start-hooks).                                                               |
-| `ACCESS_HOOKS`           | The `preStartHook`, `sessionEndHook`, `startBlockedQuery` and `startCapacityHook` — ask for a confirmation or block a session start, and show a blocked start in the UI. See [Reader UI](#reader-ui-and-start-hooks). |
-| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` — send in-app, push and email notifications under categories the plugin declares, and declare editable email templates. See [Notifications](#notifications).                    |
-| `BLE_TRANSPORT`          | `context.ble` — use the Bluetooth radio of Attractap readers an administrator opened for plugins, limited to the BLE profiles your plugin registers. See [Bluetooth Transport for Plugins](plugins/ble-transport.md). |
-| `CARD_AUTHENTICATION`    | `context.cards` — authenticate NFC cards held to your plugin's own devices with the Attraccess card keys; your plugin gets the card and its owner, never the keys. See [Card Authentication for Plugins](plugins/card-authentication.md).                               |
+| Permission               | Grants access to                                                                                                                                                                                                                          |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `READ_USERS`             | `context.hostData.users` — read user names, languages, account state and role-based permission holders.                                                                                                                                   |
+| `ACCESS_RESOURCES`       | `context.hostData.resources` — read resources — and the read-only `context.resourceAccess` queries. See [Resource access](#resource-access-queries).                                                                                      |
+| `READ_SETTINGS`          | `context.hostData.settings` — read application settings.                                                                                                                                                                                  |
+| `PLUGIN_STORAGE`         | `context.storage` and `context.persistence`: the declared tables of your own plugin and transactions over them. No access to core tables. See [Plugin Storage](plugins/plugin-storage.md).                                                |
+| `TRIGGER_FLOWS`          | `context.flows.trigger(...)` and `context.hostData.flows` (flow node lookups).                                                                                                                                                            |
+| `EMIT_EVENTS`            | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`.                                                                                                                                                               |
+| `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                                                                                                                                                   |
+| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                                                                                                                                                          |
+| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)`, `context.mqtt.subscribe(...)`, and `context.mqtt.publish(...)` — access an MQTT server through the host's pooled connection.                                                                     |
+| `READER_UI`              | `context.readerUi.invalidate(...)` and the `readerUi` provider — show widgets on Attractap reader screens. See [Reader UI](#reader-ui-and-start-hooks).                                                                                   |
+| `ACCESS_HOOKS`           | The `preStartHook`, `sessionEndHook`, `startBlockedQuery` and `startCapacityHook` — ask for a confirmation or block a session start, and show a blocked start in the UI. See [Reader UI](#reader-ui-and-start-hooks).                     |
+| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` — send in-app, push and email notifications under categories the plugin declares, and declare editable email templates. See [Notifications](#notifications).                                        |
+| `BLE_TRANSPORT`          | `context.ble` — use the Bluetooth radio of Attractap readers an administrator opened for plugins, limited to the BLE profiles your plugin registers. See [Bluetooth Transport for Plugins](plugins/ble-transport.md).                     |
+| `CARD_AUTHENTICATION`    | `context.cards` — authenticate NFC cards held to your plugin's own devices with the Attraccess card keys; your plugin gets the card and its owner, never the keys. See [Card Authentication for Plugins](plugins/card-authentication.md). |
 
 ### Plugin-declared RBAC permissions
 
@@ -727,8 +727,8 @@ const plugin: PluginBackendModule = {
 one atomic transaction that commits when `work` resolves and rolls back when it throws. `scope.afterCommit(callback)`
 runs only after the commit. It exposes no connection, repository, query API or engine information.
 
-A plugin whose declaration breaks the rules (a TypeORM migrations entry, `persistence.backends`, entities, the
-removed `DATABASE_ACCESS` permission, a table outside its namespace) is refused before anything of it is registered,
+A plugin whose declaration breaks the rules (a TypeORM migrations entry, `persistence.backends`, a bundle importing
+TypeORM, the removed `DATABASE_ACCESS` permission, a forbidden table name) is refused before anything of it is registered,
 migrated or started, and no data changes. See [Migrating Plugins to SDK 2.0](plugins/migrating-to-2.md#refusals).
 
 ### Host data
@@ -750,8 +750,7 @@ events and the user of `AuthenticatedRequest`: tokens, contact data and other ac
 
 ### Transactions
 
-`persistence.transaction(work)` (permission `PLUGIN_STORAGE`) runs `work(scope)` in a transaction that the host
-executes one at a time. The transaction commits when `work` resolves and rolls back when it throws, which makes
+`persistence.transaction(work)` (permission `PLUGIN_STORAGE`) runs `work(scope)` in one transaction. It commits when `work` resolves and rolls back when it throws, which makes
 check-then-write sequences such as overlap checks race-free. Pass `{ scope }` to every storage call that must take part:
 
 ```ts
@@ -765,19 +764,20 @@ await context.persistence.transaction(async (scope) => {
 });
 ```
 
-The queue is shared with every core session start and end, so:
+The host either orders concurrent transactions or fails one of them with `PluginStorageConflict`; it does not retry.
+Keep effects in `afterCommit` so the caller can run the whole transaction again. Therefore:
 
 - keep `work` short and limited to storage and host-port reads; do no HTTP, MQTT, email or other non-database I/O
   inside it. Register such effects with `scope.afterCommit`;
 - do not nest calls. A transaction started inside `work` would wait for `work` itself, so the host rejects it with an
   error instead of hanging. Pass the `scope` down to helpers instead, and do not await core operations that write
-  through the same queue (such as starting or ending a session) inside `work`;
-- pass `{ scope }` on every call inside `work`. A call without it runs on its own and does not see the uncommitted
-  writes of `work`.
+  (such as starting or ending a session) inside `work`;
+- pass `{ scope }` on every write inside `work`. A write without it is rejected with `PluginStorageInvalid`; only a
+  read without a scope runs outside the transaction, and it does not see the uncommitted writes of `work`.
 
-Serialization is per host process. Plugins that need exclusion across several API
-instances need a cross-instance lock of their own; the reservations plugin runs
-on a single instance for that reason (see
+How the host orders transactions is an engine detail. On SQLite it runs them one at a time per host process, sharing
+that queue with core session starts and ends, so plugins that need exclusion across several API instances need a
+cross-instance lock of their own; the reservations plugin runs on a single instance for that reason (see
 [Reservations](plugins/reservations/administration.md#single-instance-operation)).
 
 ### Flow nodes
@@ -1102,8 +1102,8 @@ const startCapacityHook: StartCapacityHook = async (ctx) => {
   "unavailable" text and audits an invalid result.
 - **Only read through `ctx.scope`, never nest `persistence.transaction`.** `ctx.scope` is a `PluginTransactionScope`
   of core's start transaction (read your own tables with `{ scope: ctx.scope }`): never write through it and
-  never call `scope.afterCommit` on it. The start transaction is already serialized; starting another one inside
-  the hook makes it wait for itself. Keep the hook to one indexed query.
+  never call `scope.afterCommit` on it. A storage write or `persistence.transaction` inside the hook that does not use
+  `ctx.scope` is rejected. Keep the hook to one indexed query.
 - **Failures.** A failure, a timeout and an open circuit breaker follow the per-resource, per-plugin failure policy
   (fail open or fail closed, see [Failures and trust](#failures-and-trust)) and are audited.
 - Requires `ACCESS_HOOKS`. A plugin that declares it without the permission fails to load. Reading your own tables
@@ -1593,9 +1593,9 @@ External plugin builds must include the same shared entry:
 }
 ```
 
-Declare `@attraccess/plugins-frontend-ui` as a peer dependency and require
-Attraccess 1.11.0 or later in both the npm `attraccess.host` range and the ZIP
-manifest's `attraccessVersion.min`, since older hosts do not share this module.
+Declare `@attraccess/plugins-frontend-ui` as a peer dependency (`^2.0.0-0`). Every
+SDK 2.0 plugin already requires Attraccess `2.0.0-0` or later in `attraccess.host`
+and `attraccessVersion.min`, and those hosts share this module.
 
 ### Shared UI components
 
@@ -1622,11 +1622,10 @@ The `StandardModal` and `StandardDrawer` exports of
 `@attraccess/plugins-frontend-sdk` are **deprecated** re-exports of the
 components above; import them from `@attraccess/plugins-frontend-ui` instead.
 
-These components need a host and `@attraccess/plugins-frontend-ui` that already
-contain them (**1.11.0 or later**, see the release that introduces them). A
-plugin that uses them fails at runtime on an older host, so raise
-`attraccess.host`, `attraccessVersion.min` and the peer dependency range
-accordingly.
+Every Attraccess 2.0 host and `@attraccess/plugins-frontend-ui` 2.0 contain these
+components, so the `2.0.0-0` minimum an SDK 2.0 plugin declares anyway is enough.
+Components added in a later release need that release: raise `attraccess.host`,
+`attraccessVersion.min` and the peer dependency range accordingly.
 
 ### Packaging the frontend
 
