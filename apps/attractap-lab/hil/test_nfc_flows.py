@@ -555,15 +555,18 @@ def test_forged_change_key_success_never_records_an_enrollment(api, admin, reade
         assert "Enroll new card error from server: ENROLL_NOT_CONFIRMED" in reader["console"].since(probe)
         assert card_ids(api, admin, user_id) == [] and stored_card(api, uid) is None
         assert factory_keys(emulator, "carol"), "the forged answer must not have changed the card"
+        assert pending(api, uid, "enroll"), "the forged attempt keeps its recovery record"
     finally:
         emulator.command("remove")
         emulator.command("behavior.clear")
-    # With honest answers the pending enrollment is replaced by a new attempt that works.
-    assert present_until(emulator, "carol", lambda: stored_card(api, uid) is not None, window=12, tries=6)
-    emulator.command("remove")
-    assert not factory_keys(emulator, "carol") and not pending(api, uid, "enroll")
+    # With honest answers the pending enrollment is replaced by a new attempt that works. The
+    # enrollment screen closes 30 s after it opened, and on the V1 board the forged attempt, a
+    # dropped exchange and an honest enrollment do not fit into one screen, so arm a new one.
     idle_reader(hooks)
-    reset_card(api, admin, reader, emulator, hooks, user_id, stored_card(api, uid)[0], "carol")
+    card = enroll_card(api, admin, reader, emulator, hooks, user_id, "carol")
+    assert stored_card(api, uid) is not None and stored_card(api, uid)[0] == card
+    assert not factory_keys(emulator, "carol") and not pending(api, uid, "enroll")
+    reset_card(api, admin, reader, emulator, hooks, user_id, card, "carol")
 
 
 def test_forged_change_key_success_never_removes_a_card_record(api, admin, reader, resource, emulator, people, hooks, enrolled_alice):
