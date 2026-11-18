@@ -32,6 +32,8 @@ UPDATE_TIMEOUT = 900
 RESPONSE_LIMIT_SECONDS = 10
 UNDERRUN = re.compile(r"LCD underrun")
 CAMERA_EVERY_SECONDS = 8
+# Image kinds whose checksum and appended SHA-256 are intact, so the reader refuses them for the signature.
+SIGNATURE_ONLY = ("modified", "wrong-signature")
 
 
 def version_pattern(version):
@@ -115,6 +117,10 @@ def test_rejected_image_leaves_the_reader_on_the_old_version(kind, target, reade
     (artifacts / f"ota-rejected-{kind}.txt").write_text(refusal + "\n")
     expected = "Invalid firmware image header magic" if kind == "bad-magic" else r"esp_ota_end failed"
     assert re.search(expected, refusal), refusal
+    if kind in SIGNATURE_ONLY:
+        # esp_image_format.c: the image passed its checksum and appended hash; only the signature failed.
+        log = console.since(mark)
+        assert "Secure boot signature verification failed" in log and "image valid, signature bad" in log, kind
     assert "Firmware update complete" not in console.since(mark)
     # The reader restarts itself a few seconds after the refusal; a clean boot then shows the version it kept.
     time.sleep(10)

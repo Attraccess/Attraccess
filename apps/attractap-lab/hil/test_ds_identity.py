@@ -8,9 +8,11 @@ committed for the chip.
 Anti-rollback is not tested here (raising the lab reader's SECURE_VERSION beyond lab images is not
 allowed); it is covered on the spare unit (ATT-1207 follow-up, T4).
 
-The firmware console lines used (secure-lab test image): ``ds.status`` ->
-``DS_STATUS available=<0|1> record=<0|1> key3=<purpose> fe=<mode>``, and ``identity.force-p256``
-(test hooks only: the next boot pairs with a fresh P-256 software key even though DS is available).
+The firmware console lines used (secure-lab test image), each sent as ``CMND <topic> [payload]`` (the
+serial handler drops anything else): ``CMND ds.status`` -> ``DS_STATUS available=<0|1> record=<0|1>
+key3=<purpose> fe=<mode> spki=<hex|->``, and ``CMND identity.force-p256 {"authCode": ...}`` -> ``RESP
+identity.force-p256 {"restarting":true}`` (test hooks only: the reader forgets its pairing and restarts,
+and that boot pairs with a fresh P-256 software key even though DS is available).
 """
 
 import re
@@ -21,7 +23,7 @@ import pytest
 from attractap_lab import ds_record, efuse
 from attractap_lab.drivers import SwitchPowerDriver
 
-from conftest import PROFILE, read_heap, reboot_reader, record_heap
+from conftest import PIN, PROFILE, read_heap, record_heap
 from heap_floors import floors
 from test_pairing import (POWER_OFF_SECONDS, close_console, credentials, expect_still_paired, reopen_console,
                           repair, revoke, status_of, switchable_power, wait_status)  # noqa: F401
@@ -29,7 +31,12 @@ from test_pairing import (POWER_OFF_SECONDS, close_console, credentials, expect_
 pytestmark = pytest.mark.skipif(PROFILE != efuse.SECURE_LAB, reason="DS identity needs the secure-lab reader")
 
 SESSION_UP = r"Secure session established"
-SOFTWARE_KEY_DELETED = r"(?i)(software|p-?256)[^\r\n]{0,60}(delet|eras|remov)"
+# reader_link_identity.cpp, after the first session with the DS key
+SOFTWARE_KEY_DELETED = r"Software key removed after a successful DS session"
+# EfuseSnapshot::purposeName of KEY3 after the approved burn
+DS_PURPOSE = "HMAC_DOWN_DIGITAL_SIGNATURE"
+# EfuseReportService.eligibilityProblems for a build whose profile is not `secure` (here secure-lab)
+PROFILE_PROBLEM = "profile-not-secure"
 
 
 @pytest.fixture(scope="module")
@@ -40,10 +47,10 @@ def ds_fingerprint():
     return fingerprint
 
 
-def lab_command(console, line, pattern, timeout=20):
-    """Send a plain firmware console line and return the reply line matching ``pattern``."""
+def lab_command(console, topic, pattern, timeout=20):
+    """Send ``CMND <topic>`` (a lab DS command: raw argument, own reply line) and return the line matching ``pattern``."""
     mark = console.mark()
-    console.driver._write(f"\n{line}\n".encode())
+    console.driver._write(f"\nCMND {topic}\n".encode())
     return console.expect(pattern, mark, timeout).group(0).decode()
 
 
@@ -78,7 +85,8 @@ def current_key(api, admin, reader):
 def test_ds_key_is_available_and_carries_the_session(api, admin, reader, hooks, ds_fingerprint):
     status = ds_status(reader["console"])
     assert status["available"] == "1" and status["record"] == "1", status
-    assert status["key3"] != "unused", status
+    assert status["key3"] == DS_PURPOSE, status
+    assert status["spki"] == ds_fingerprint, "the key loaded for signing must be the committed record's"
     wait_status(hooks, "authenticated", 30)
     assert current_key(api, admin, reader) == ds_fingerprint, "the session must use the DS key of the committed record"
 
@@ -91,6 +99,8 @@ def test_api_shows_the_lab_profile_and_never_secured(api, admin, reader):
     record = wait_for(reported, "the eFuse report to be checked")
     assert record["firmwareProfile"] == "secure-lab", record
     assert record["secured"] is False and record.get("securedAt") is None, record
+    # The verdict came from the profile check, not from a report the API failed to read.
+    assert PROFILE_PROBLEM in (record.get("securityReportProblems") or []), record
     assert isinstance(record.get("efuseSecureVersion"), int), record
     assert isinstance(record.get("secureVersion"), int), record
 
@@ -100,10 +110,14 @@ def test_identity_upgrade_from_the_software_key(target, api, admin, reader, hook
     console = reader["console"]
     revoke(api, admin, reader)
     wait_status(hooks, "pending_approval", 30)
-    console.driver._write(b"\nidentity.force-p256\n")  # one-shot flag in NVS; the command has no reply line
-    time.sleep(1)
-    mark = console.mark()
-    reboot_reader(target, reader)
+    # One-shot flag in NVS; the reader answers, then restarts itself 300 ms later. No hardware reset on top:
+    # the boot after the restart consumes the flag, and another boot before the P-256 pairing completed
+    # would pair with the DS key directly (ReaderLink identity selection).
+    reply = console.command("identity.force-p256", {"authCode": PIN}, attempts=1, timeout=10)
+    assert '"restarting":true' in reply.replace(" ", ""), reply
+    close_console(target, reader)
+    time.sleep(3)
+    mark = reopen_console(target, reader)
     try:
         repair(api, admin, reader, mark)
         # First the P-256 session, then the upgrade and a second session with the DS key.

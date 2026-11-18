@@ -20,8 +20,9 @@ LAYOUT = {
     "SECURE_VERSION": {"block": 0, "word": 4, "pos": 14, "bit_len": 16},
 }
 PRE_WORDS = ["0b801700", "000f0c14", "a984d1f5", "00500804", "00004102", "00000000"]
-# The burn: RD_DIS 20 -> 28, purpose 3 = 7, three more WR_DIS bits (0, 26, 28).
-POST_WORDS = ["1f801701", "000f0c1c", "a984d1f5", "00500804", "00004102", "00000007"]
+# The burn: RD_DIS 20 -> 28, purpose 3 = 7, and exactly the WR_DIS bits of RD_DIS (0), KEY_PURPOSE_3 (11)
+# and BLOCK_KEY3 (26).
+POST_WORDS = ["0f801f01", "000f0c1c", "a984d1f5", "00500804", "00004102", "00000007"]
 KEY3_ZERO = " ".join(["00000000"] * 8)
 
 
@@ -68,12 +69,13 @@ def test_pre_burn_state_passes_as_today(tmp_path):
     assert "ds" not in json.loads(baseline(tmp_path).read_text())
 
 
-def test_first_sight_of_the_burn_rerecords_and_keeps_the_old_baseline(tmp_path):
+def test_first_sight_of_the_burn_rerecords_and_keeps_the_old_baseline(tmp_path, caplog):
     check(output(), tmp_path)
     old = baseline(tmp_path).read_text()
     assert check(output(POST_WORDS, post=True), tmp_path) == DS_MAC
     kept = tmp_path / f"{DS_MAC.replace(':', '')}.pre-ds.json"
     assert kept.read_text() == old
+    assert f"{DS_MAC}: recorded post-DS baseline; previous kept as dcb4d92171c8.pre-ds.json" in caplog.text
     new = json.loads(baseline(tmp_path).read_text())
     assert new["ds"] == "post" and new["blocks"]["BLOCK0"] == " ".join(POST_WORDS)
     assert check(output(POST_WORDS, post=True), tmp_path) == DS_MAC
@@ -117,9 +119,9 @@ def test_burned_state_needs_purpose_key_and_locks_together(tmp_path):
 
 @pytest.mark.parametrize("words,message", [
     # SPI_BOOT_CRYPT_CNT 1 -> 7 hides behind "Enable" in the summary
-    (["1f801701", "000f0c1c", "a99cd1f5", "00500804", "00004102", "00000007"], "besides the DS burn"),
+    (["0f801f01", "000f0c1c", "a99cd1f5", "00500804", "00004102", "00000007"], "besides the DS burn"),
     # any other word, here word 3
-    (["1f801701", "000f0c1c", "a984d1f5", "00500805", "00004102", "00000007"], "besides the DS burn"),
+    (["0f801f01", "000f0c1c", "a984d1f5", "00500805", "00004102", "00000007"], "besides the DS burn"),
 ])
 def test_other_block0_bits_change_in_the_transition_is_a_violation(tmp_path, words, message):
     check(output(), tmp_path)
@@ -130,17 +132,27 @@ def test_other_block0_bits_change_in_the_transition_is_a_violation(tmp_path, wor
 
 def test_rd_dis_may_gain_key3_only(tmp_path):
     check(output(), tmp_path)
-    words = ["1f801701", "000f0c3c", "a984d1f5", "00500804", "00004102", "00000007"]  # + KEY5 read protection
+    words = ["0f801f01", "000f0c3c", "a984d1f5", "00500804", "00004102", "00000007"]  # + KEY5 read protection
     with pytest.raises(efuse.EfuseViolation, match="RD_DIS changed by more than"):
         check(output(words, post=True, overrides={"RD_DIS": {"value": 60}}), tmp_path)
 
 
-def test_wr_dis_may_only_gain_a_few_bits(tmp_path):
+def test_wr_dis_may_only_gain_the_bits_of_the_burn(tmp_path):
     check(output(), tmp_path)
-    for word, message in (("1fbf1701", "WR_DIS changed"), ("0a801701", "WR_DIS changed")):
+    assert efuse.WR_DIS_ADDED_BY_BURN == 0x04000801
+    # bit 28 (another field) instead of 26; one more bit besides the three; a bit cleared; many bits
+    for word in ("1b801f01", "1f801f01", "0f801e01", "0fbf1f01"):
         words = [word, *POST_WORDS[1:]]
-        with pytest.raises(efuse.EfuseViolation, match=message):
+        with pytest.raises(efuse.EfuseViolation, match="WR_DIS changed"):
             check(output(words, post=True), tmp_path)
+    assert not list(tmp_path.glob("*.pre-ds.json"))
+
+
+def test_wr_dis_may_gain_a_subset_of_the_burn_bits(tmp_path):
+    # The summary's own checks (RD_DIS write-protected, KEY3 read-protected) pin the post state; the raw
+    # comparison only bounds which WR_DIS bits may appear.
+    check(output(), tmp_path)
+    assert check(output(["0b801f01", *POST_WORDS[1:]], post=True), tmp_path) == DS_MAC
 
 
 def test_purpose_3_must_have_been_unused(tmp_path):
@@ -163,9 +175,9 @@ def test_key3_content_is_pinned_once_burned(tmp_path):
 
 def test_burned_state_is_strict_after_the_first_sight(tmp_path):
     burned(tmp_path)
-    for words, message in ((["1f801701", "000f0c1c", "a99cd1f5", "00500804", "00004102", "00000007"],
+    for words, message in ((["0f801f01", "000f0c1c", "a99cd1f5", "00500804", "00004102", "00000007"],
                             "BLOCK0 \\(besides SECURE_VERSION\\)"),
-                           (["1f801701", "000f0c1c", "a984d1f5", "00500804", "00004102", "0000000f"],
+                           (["0f801f01", "000f0c1c", "a984d1f5", "00500804", "00004102", "0000000f"],
                             "BLOCK0 \\(besides SECURE_VERSION\\)")):
         with pytest.raises(efuse.EfuseViolation, match=message):
             check(output(words, post=True), tmp_path)

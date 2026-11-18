@@ -19,7 +19,7 @@ from labgrid.resource.common import Resource
 from labgrid.resource.remote import RemotePlace, RemotePlaceManager
 from pexpect import TIMEOUT
 
-from . import ds_record, efuse
+from . import efuse
 from .drivers import ESPToolDriver, NfcEmulatorDriver, ReaderPowerDriver, ScreenCaptureDriver, SwitchPowerDriver
 
 
@@ -398,9 +398,8 @@ def park(target, image, output, *, baseline_dir=None, marker_seconds=30.0, resou
     (output / "efuse.txt").write_text(report)
     mac = efuse.check(report, baseline_dir, profile=profile)
     if profile == efuse.SECURE_LAB:
-        ds_record.require_record_if_burned(mac, efuse.parse(report)[0], ds_dir)
-        restore = ds_record.restore_files(mac, ds_dir)
-        flash.erase_and_flash_encrypted(str(image), **({"extra": restore} if restore else {}))
+        # Refuses a DS reader without its committed record, else writes the record back (ds_record.wipe_restore).
+        flash.erase_and_flash_encrypted(str(image), report=report, ds_dir=ds_dir)
     else:
         flash.erase_and_flash(str(image))
     target.deactivate(flash)

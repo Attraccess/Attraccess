@@ -2,11 +2,16 @@
 
 One 4096-byte flash sector at DS_RECORD_OFFSET, little-endian, unused bytes 0xFF:
 
-  0   magic "ATDS"            4   u16 version (1)        6   u16 reserved
+  0   magic "ATDS"            4   u16 version (1)        6   u16 reserved (0)
   8   u32 payload length      12  sha256(payload)        44  payload
 
-  payload = u8 keyBlock | u8 reserved | u16 rsaLengthField | u8 iv[16]
-            | u16 cLen | u8 c[cLen] | u16 spkiLen | u8 spki[spkiLen]
+  payload = u8 keyBlock (3) | u8 reserved (0) | u16 rsaLengthField (95) | u8 iv[16]
+            | u16 cLen (1584) | u8 c[cLen] | u16 spkiLen (422) | u8 spki[spkiLen]
+
+`parse` refuses everything the firmware's DsRecord::parse refuses (src/api/security/ds_record.cpp), plus a
+key block other than KEY3: a lab restore must never write a record the reader would not load.
+attractap_lab/ds_record.py (the janitor's copy, packaged without this file) applies the same checks;
+test_create_ds.py (LabParserAgrees) keeps the two in step.
 
 The payload holds the encrypted DS parameters (useless without the HMAC key in the chip's
 KEY3 eFuse block) and the public key (SubjectPublicKeyInfo DER, RSA-3072). Nothing in it
@@ -22,6 +27,9 @@ SECTOR_SIZE = 4096
 MAGIC = b"ATDS"
 VERSION = 1
 HEADER_SIZE = 44
+DS_KEY_BLOCK = 3
+RSA_LENGTH_FIELD = 95
+CIPHERTEXT_LENGTH = 1584
 
 # SubjectPublicKeyInfo of an RSA-3072 key with e = 65537: fixed framing around a 384-byte modulus.
 _SPKI_PREFIX = bytes.fromhex("308201a2300d06092a864886f70d01010105000382018f003082018a0282018100")
@@ -53,16 +61,16 @@ def parse(record):
         raise DsRecordError(f"record length {len(record)} is not between {HEADER_SIZE} and {SECTOR_SIZE}")
     if record[:4] != MAGIC:
         raise DsRecordError("bad magic")
-    version, _, length = struct.unpack_from("<HHI", record, 4)
-    if version != VERSION:
-        raise DsRecordError(f"unsupported record version {version}")
+    version, reserved, length = struct.unpack_from("<HHI", record, 4)
+    if version != VERSION or reserved != 0:
+        raise DsRecordError(f"unsupported record version {version} (reserved {reserved})")
     payload = record[HEADER_SIZE:HEADER_SIZE + length]
     if len(payload) != length:
         raise DsRecordError("the record is shorter than its payload length")
     if hashlib.sha256(payload).digest() != record[12:44]:
         raise DsRecordError("payload checksum mismatch")
     try:
-        key_block, _, rsa_length, iv = struct.unpack_from("<BBH16s", payload, 0)
+        key_block, reserved, rsa_length, iv = struct.unpack_from("<BBH16s", payload, 0)
         (c_len,) = struct.unpack_from("<H", payload, 20)
         ciphertext = payload[22:22 + c_len]
         (spki_len,) = struct.unpack_from("<H", payload, 22 + c_len)
@@ -71,6 +79,10 @@ def parse(record):
         raise DsRecordError("payload is truncated") from error
     if len(ciphertext) != c_len or len(spki) != spki_len or 24 + c_len + spki_len != length:
         raise DsRecordError("payload lengths are inconsistent")
+    if key_block != DS_KEY_BLOCK or reserved != 0:
+        raise DsRecordError(f"key block {key_block} is not KEY{DS_KEY_BLOCK} (reserved {reserved})")
+    if rsa_length != RSA_LENGTH_FIELD or c_len != CIPHERTEXT_LENGTH:
+        raise DsRecordError(f"not RSA-3072 DS parameters (length field {rsa_length}, ciphertext {c_len} bytes)")
     check_spki(spki)
     return {"keyBlock": key_block, "rsaLength": rsa_length, "iv": iv, "ciphertext": ciphertext, "spki": spki}
 

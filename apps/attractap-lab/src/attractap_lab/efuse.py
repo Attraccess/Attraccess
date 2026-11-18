@@ -24,6 +24,7 @@ output of ``ESPToolDriver.read_efuses()``:
 """
 
 import json
+import logging
 import re
 from pathlib import Path
 
@@ -81,9 +82,15 @@ DS_MAC = "dc:b4:d9:21:71:c8"
 DS_PURPOSE = "HMAC_DOWN_DIGITAL_SIGNATURE"
 DS_KEY_BLOCK = "BLOCK_KEY3"
 RD_DIS_KEY3 = 1 << 3
-# WR_DIS bits the burn may add: KEY3 purpose, KEY3 block and RD_DIS write protection, plus one spare (layout variance).
-WR_DIS_BITS_ADDED_BY_BURN = 4
+# The WR_DIS bits the burn sets, and only those (espefuse's summary JSON does not carry the wr_dis
+# index). ESP32-S3 eFuse table (esp-idf components/efuse/esp32s3/esp_efuse_table.c, also espefuse's
+# efuse_defs/esp32s3.yaml): bit 0 write-protects RD_DIS (the firmware burns it after the key), bit 11
+# KEY_PURPOSE_3 and bit 26 BLOCK_KEY3; esp_efuse_write_key() sets those two with the key
+# (esp_efuse_set_keypurpose_dis_write, esp_efuse_set_key_dis_write).
+WR_DIS_ADDED_BY_BURN = (1 << 0) | (1 << 11) | (1 << 26)
 DS_STATE_MARKER = "ds"
+
+log = logging.getLogger(__name__)
 
 _DUMP_LINE = re.compile(r"^(\S+)\s+\(.*?\)\s+\[\s*\d+\s*\]\s+dump:\s+([0-9a-fA-F ]+?)\s*$")
 
@@ -112,6 +119,11 @@ def parse(output):
     return summary, blocks
 
 
+def chip_mac(summary):
+    """The factory MAC of an espefuse summary as aa:bb:cc:dd:ee:ff (espefuse appends " (OK)")."""
+    return str(summary.get("MAC", {}).get("value", "")).split(" ")[0].lower()
+
+
 def check(output, baseline_dir=None, profile=PLAIN):
     """Raise EfuseViolation unless the reader is safe to erase and reuse.
 
@@ -133,7 +145,7 @@ def check(output, baseline_dir=None, profile=PLAIN):
             fused = "".join(str(summary.get(name, {}).get("value", "")).split()).lower()
             if fused != digest:
                 problems.append(f"{name} does not hold the lab key digest")
-    mac = str(summary.get("MAC", {}).get("value", "")).split(" ")[0].lower()
+    mac = chip_mac(summary)
     if not re.fullmatch(r"([0-9a-f]{2}:){5}[0-9a-f]{2}", mac):
         problems.append(f"Unreadable chip MAC {mac!r}")
     ds_state = None
@@ -176,6 +188,7 @@ def _check_baseline(path, mac, blocks, summary, profile, ds_state, problems):
         if not changes:
             path.replace(pre_ds)
             _write_baseline(path, mac, blocks, ds_state)
+            log.warning("%s: recorded post-DS baseline; previous kept as %s", mac, pre_ds.name)
         return
     problems += _changes(recorded["blocks"], blocks, summary, profile)
 
@@ -231,8 +244,8 @@ def _burn_bits_only(before, now, summary):
     if _get(before, purpose) != 0 or _get(now, purpose) == 0:
         problems.append("KEY_PURPOSE_3 was not unused before the burn")
     old_wr, new_wr = _get(before, wr_dis), _get(now, wr_dis)
-    if old_wr & ~new_wr or bin(new_wr & ~old_wr).count("1") > WR_DIS_BITS_ADDED_BY_BURN:
-        problems.append("WR_DIS changed by more than the DS burn's bits")
+    if old_wr & ~new_wr or new_wr & ~old_wr & ~WR_DIS_ADDED_BY_BURN:
+        problems.append(f"WR_DIS changed by more than the DS burn's bits (0x{old_wr:08x} -> 0x{new_wr:08x})")
     for layout in (purpose, rd_dis, wr_dis):
         before, now = _clear(before, layout), _clear(now, layout)
     if before != now:

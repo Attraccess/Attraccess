@@ -23,13 +23,17 @@ erases the flash, and with it the record at the start of the `spiffs` partition 
 sector; layout in `apps/attractap/firmware/README.md`). Without the record the DS key is lost for good,
 because KEY3 cannot be burned twice. The tools therefore write the committed record back, encrypted
 (development-mode flash encryption), in the same esptool call as the image. A chip whose MAC has no
-directory here is treated as before.
+directory here is treated as before, unless its KEY3 already holds the DS key: a wipe of such a reader
+without its record is refused (`flash --erase-all`, the janitor, which then quarantines the reader, and
+the HIL suite), because it would lose the DS key for good.
 
-- `secure_lab_reader.py flash` adds the record automatically; `hex --mac <mac>` merges it into the HEX.
+- `secure_lab_reader.py flash` adds the record automatically; `hex --mac <mac>` merges it into the HEX
+  (any MAC spelling; it says whether it found a record).
 - Janitor and HIL (`attractap_lab.ds_record`): `ATTRACTAP_LAB_DS_DIR` (set by the NixOS option
-  `services.attractap-lab.janitor.dsRecordsDir`) or this directory of the source checkout.
-- A record that fails its checksum stops the wipe: the tools refuse to erase a reader whose record they
-  cannot restore.
+  `services.attractap-lab.janitor.dsRecordsDir`) or this directory of the source checkout. The check runs
+  inside `ESPToolDriver.erase_and_flash_encrypted`, so no caller can skip it.
+- A record that fails validation (the same checks as the firmware's own parser) stops the wipe: the tools
+  refuse to erase a reader whose record they cannot restore.
 
 ## The one-time burn (done once; do not repeat)
 
@@ -50,10 +54,15 @@ never retries a burn. Order of the runbook:
    ```
 
 4. After explicit go-ahead from Jan Jaap, the same command with `--burn-efuses`. It saves the eFuse dump
-   before and after (`efuse-before.txt`, `efuse-after.txt` in `--dump-dir`), sends `ds.create`, checks the
-   burned state, exports the record (`ds.export`), validates it and writes `ds-record.bin` and
-   `ds-public-key.pem` here (and a backup into `--dump-dir`). It stops at the first surprise and never
-   retries.
+   before and after (`efuse-before.txt`, `efuse-after.txt` in `--dump-dir`; each dump ends with a hard
+   reset, and the tool waits until the app answers `ds.status` again), sends `ds.create` once, checks the
+   burned state, exports the record (`ds.export`, raw reply kept as `ds-export.txt`), validates it,
+   checks that its public key is the one the firmware generated (the `spki` of `DS_CREATE_RESULT` and of
+   `DS_STATUS` after the reboot) and writes `ds-record.bin` and `ds-public-key.pem` here (default:
+   `$ATTRACTAP_LAB_DS_DIR/dcb4d92171c8` or this directory; a backup goes into `--dump-dir`). A record
+   whose key does not match is saved to `--dump-dir` only. If creation fails after KEY3 was burned, the
+   tool still exports and saves the record before it reports the error. It stops at the first surprise
+   and never retries.
 5. **Commit the two files immediately.** If the record is lost, DS on that reader is gone for good.
 6. The credential fingerprint the server shows for the reader is the sha256 of the SPKI in the record
    (printed by the tool; the HIL suite compares it).

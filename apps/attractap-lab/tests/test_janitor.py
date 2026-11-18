@@ -148,7 +148,8 @@ class FakeFlash:
     def erase_and_flash(self, image):
         self.events.append(("erase-and-flash", Path(image).name))
 
-    def erase_and_flash_encrypted(self, image):
+    def erase_and_flash_encrypted(self, image, **options):
+        # The real driver also restores a DS record (see test_ds_restore.DriverFlash).
         self.events.append(("erase-and-flash-encrypted", Path(image).name))
 
     def flash(self, image):

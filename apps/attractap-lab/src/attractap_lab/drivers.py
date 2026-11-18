@@ -29,6 +29,8 @@ from labgrid.util.managedfile import ManagedFile
 from labgrid.util.proxy import proxymanager
 from pexpect import TIMEOUT
 
+from . import ds_record, efuse
+
 
 @target_factory.reg_driver
 @attr.s(eq=False)
@@ -55,7 +57,7 @@ class ESPToolDriver(Driver, ResetProtocol):
         self._write(image, ["write-flash", "--erase-all", "0x0"])
 
     @Driver.check_active
-    def erase_and_flash_encrypted(self, image, extra=()):
+    def erase_and_flash_encrypted(self, image, *, report=None, ds_dir=None):
         """Erase the whole chip, then write a lab-signed Intel HEX image encrypted.
 
         For lab secure readers (ATT-1166): development-mode flash encryption lets
@@ -63,13 +65,17 @@ class ESPToolDriver(Driver, ResetProtocol):
         region while Secure Boot is on. HEX leaves the gaps between partitions
         (e.g. NVS) erased instead of filling them with encrypted 0xFF.
 
-        ``extra``: ``(flash offset, bytes)`` pairs written encrypted in the same call, e.g. the DS
-        record sector (ds_record.restore_sector) the erase would otherwise take from the reader.
+        The erase would also take the chip's DS record (ATT-1207), so the committed one for its MAC
+        (``ds_dir``, see ds_record) is written back, encrypted, in the same call; a chip whose KEY3
+        holds the DS key but has no record is not erased (ds_record.DsRecordError). ``report``: the
+        ``read_efuses()`` output the caller just checked; read again when omitted.
         """
         with open(image, "rb") as file:
             if file.read(1) != b":":
                 raise ValueError(f"{image} is not an Intel HEX image; lab secure readers take only "
                                  "the signed .hex images of build_firmwares.py --lab")
+        summary, _ = efuse.parse(self.read_efuses() if report is None else report)
+        extra = ds_record.wipe_restore(efuse.chip_mac(summary), summary, ds_dir)
         self._write(image, ["write-flash", "--force", "--erase-all", "--encrypt", "0x0"], name="firmware.hex",
                     extra=extra)
 
