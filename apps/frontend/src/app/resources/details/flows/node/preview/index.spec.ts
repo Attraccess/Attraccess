@@ -43,8 +43,15 @@ describe('flow node previews', () => {
     for (const type of Object.values(Type)) getNodePreviewRows(type, translate, { data });
   });
 
-  it.each([en, de])('labels the meter-ready rows differently from the meter row', (translations) => {
-    const translate = (key: string) => String(get(translations, key));
+  it.each([
+    ['en', en],
+    ['de', de],
+  ])('labels the meter-ready rows differently from the meter row (%s)', (_, translations) => {
+    const translate = (key: string) => {
+      const value = get(translations, key);
+      expect(typeof value, key).toBe('string');
+      return String(value);
+    };
     const rows = getNodePreviewRows(Type.OUTPUT_RESOURCE_METERING_READY, translate, {
       data: { baselineValue: '100', source: 'Main meter' },
     });

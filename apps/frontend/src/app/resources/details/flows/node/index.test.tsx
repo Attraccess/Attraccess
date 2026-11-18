@@ -9,7 +9,7 @@ import {
 } from '@attraccess/react-query-client';
 import type { NodeProps } from '@xyflow/react';
 import { AttraccessNode } from './index';
-import { useNodePreviewRows } from './preview';
+import { useNodePreviewRows, type NodePreviewData } from './preview';
 
 const flowContext = vi.hoisted(() => ({
   addLiveLogReceiver: vi.fn<(receiver: (log: ResourceFlowLog) => void) => void>(),
@@ -125,7 +125,7 @@ describe('AttraccessNode', () => {
 
   it('renders preview rows and entry fields with repeated labels without duplicate keys', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    vi.mocked(useNodePreviewRows).mockReturnValueOnce([
+    let rows: NodePreviewData = [
       { label: 'Meter', value: 'Main meter' },
       { label: 'Meter', value: 'Spare meter' },
       {
@@ -139,21 +139,40 @@ describe('AttraccessNode', () => {
           },
         ],
       },
-    ]);
+    ];
+    vi.mocked(useNodePreviewRows).mockImplementation(() => rows);
 
-    render(<AttraccessNode schema={schema} tNodeTranslations={tStub} />);
+    try {
+      const { rerender } = render(<AttraccessNode schema={schema} tNodeTranslations={tStub} />);
 
-    const duplicateKeyErrors = consoleError.mock.calls.filter((args) =>
-      args.some((arg) => typeof arg === 'string' && arg.includes('same key')),
-    );
-    consoleError.mockRestore();
-    expect(duplicateKeyErrors).toEqual([]);
-    expect(screen.getAllByText('Meter')).toHaveLength(2);
-    expect(screen.getByText('Main meter')).toBeInTheDocument();
-    expect(screen.getByText('Spare meter')).toBeInTheDocument();
-    expect(screen.getAllByText('Key')).toHaveLength(2);
-    expect(screen.getByText('first')).toBeInTheDocument();
-    expect(screen.getByText('second')).toBeInTheDocument();
+      expect(screen.getAllByText('Meter')).toHaveLength(2);
+      expect(screen.getByText('Main meter')).toBeInTheDocument();
+      expect(screen.getByText('Spare meter')).toBeInTheDocument();
+      expect(screen.getAllByText('Key')).toHaveLength(2);
+      expect(screen.getByText('first')).toBeInTheDocument();
+      expect(screen.getByText('second')).toBeInTheDocument();
+
+      rows = [
+        { label: 'Meter', value: 'Spare meter' },
+        { label: 'Variables', entries: [{ fields: [{ label: 'Key', value: 'second' }] }] },
+      ];
+      rerender(<AttraccessNode schema={schema} tNodeTranslations={tStub} />);
+
+      expect(screen.getAllByText('Meter')).toHaveLength(1);
+      expect(screen.queryByText('Main meter')).not.toBeInTheDocument();
+      expect(screen.getByText('Spare meter')).toBeInTheDocument();
+      expect(screen.getAllByText('Key')).toHaveLength(1);
+      expect(screen.queryByText('first')).not.toBeInTheDocument();
+      expect(screen.getByText('second')).toBeInTheDocument();
+
+      const duplicateKeyErrors = consoleError.mock.calls.filter((args) =>
+        args.some((arg) => typeof arg === 'string' && arg.includes('same key')),
+      );
+      expect(duplicateKeyErrors).toEqual([]);
+    } finally {
+      consoleError.mockRestore();
+      vi.mocked(useNodePreviewRows).mockImplementation(() => []);
+    }
   });
 
   it('uses the brand accent only while an idle node is selected', () => {
