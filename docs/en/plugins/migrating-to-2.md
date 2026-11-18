@@ -204,17 +204,22 @@ There is no migrations bundle any more: the migrations live in your declaration 
 
 Each refusal happens before any mutation, names the plugin, states the reason and links this guide:
 
-| Reason                                            | What the message says                                                                                            |
-| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| SDK 1.x (no or too low `attraccessVersion.min`)   | The plugin targets the SDK 1.x, which this host no longer supports; rebuild it and declare `>= 2.0.0-0`.         |
-| `DATABASE_ACCESS` requested                       | The permission was removed; plugins have no database access; declare `PLUGIN_STORAGE` and use `context.storage`. |
-| Legacy persistence declaration                    | `persistence.backends`, a TypeORM migrations entry or entities are not supported; declare `storage` instead.     |
-| Storage without `PLUGIN_STORAGE`                  | The plugin declares storage but not the `PLUGIN_STORAGE` permission.                                             |
-| Name outside the plugin's namespace / foreign key | The table, physical name or foreign key points outside the plugin's own tables.                                  |
-| Invalid migration list                            | Versions are not strictly increasing from 1, or a step or field is invalid.                                      |
-| Partial legacy history                            | Only some `adoption.legacyMigrations` are applied; install the last 1.x release first. Nothing was changed.      |
+| Reason                                            | What the message says                                                                                                                                                                                                                       |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SDK 1.x (no or too low `attraccessVersion.min`)   | The plugin targets the SDK 1.x, which this host no longer supports; rebuild it and declare `>= 2.0.0-0`.                                                                                                                                    |
+| `DATABASE_ACCESS` requested                       | The permission was removed; plugins have no database access; declare `PLUGIN_STORAGE` and use `context.storage`.                                                                                                                            |
+| Legacy persistence declaration                    | `persistence.backends`, a TypeORM migrations entry or entities are not supported; declare `storage` instead.                                                                                                                                |
+| Database import in the backend bundle             | The bundle imports `typeorm`, `@nestjs/typeorm`, `sqlite3`, `better-sqlite3`, `node:sqlite`, `pg`, `mysql2`, `@attraccess/plugins-backend-sdk/sqlite` or `@attraccess/database-entities`; the message names the module and the bundle file. |
+| Database handle requested at runtime              | `context.get('DataSource')` (or the entity manager, a repository token) throws: the host connection is not available; use `context.storage`.                                                                                                |
+| Storage without `PLUGIN_STORAGE`                  | The plugin declares storage but not the `PLUGIN_STORAGE` permission.                                                                                                                                                                        |
+| Name outside the plugin's namespace / foreign key | The table, physical name or foreign key points outside the plugin's own tables.                                                                                                                                                             |
+| Invalid migration list                            | Versions are not strictly increasing from 1, or a step or field is invalid.                                                                                                                                                                 |
+| Name inside another plugin's namespace            | A table name lies in the storage namespace of a longer-named installed plugin (`demo` may not take `plugin_demo_extra_x` while `demo-extra` is installed).                                                                                  |
+| Partial legacy history                            | Only some `adoption.legacyMigrations` are applied; install the last 1.x release first. Nothing was changed.                                                                                                                                 |
+| Unknown legacy history                            | Legacy migrations are applied that this release does not know; update the plugin. Nothing was changed.                                                                                                                                      |
 
-Each message ends with `Migration guide: https://docs.attraccess.org/#/en/plugins/migrating-to-2`. A refused plugin
+The refusals at install time (the first four rows) end with `Migration guide: https://docs.attraccess.org/#/en/plugins/migrating-to-2`;
+the storage refusals at startup describe the fix in their own words. A refused plugin
 stays in the plugin list with the error and its data is left untouched; deleting it removes its files without running
 its code.
 

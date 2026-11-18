@@ -212,17 +212,22 @@ Es gibt kein Migrations-Bundle mehr: Die Migrationen stehen in Ihrer Deklaration
 
 Jede Ablehnung geschieht vor jeder Änderung, nennt das Plugin, gibt den Grund an und verweist auf diese Anleitung:
 
-| Grund                                                    | Was die Meldung sagt                                                                                                               |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| SDK 1.x (kein oder zu niedriges `attraccessVersion.min`) | Das Plugin zielt auf das SDK 1.x, das dieser Host nicht mehr unterstützt; neu bauen und `>= 2.0.0-0` deklarieren.                  |
-| `DATABASE_ACCESS` angefordert                            | Die Berechtigung wurde entfernt; Plugins haben keinen Datenbankzugriff; `PLUGIN_STORAGE` deklarieren und `context.storage` nutzen. |
-| Legacy-Persistenzdeklaration                             | `persistence.backends`, ein TypeORM-Migrationseintrag oder Entitäten werden nicht unterstützt; stattdessen `storage` deklarieren.  |
-| Speicher ohne `PLUGIN_STORAGE`                           | Das Plugin deklariert Speicher, aber nicht die Berechtigung `PLUGIN_STORAGE`.                                                      |
-| Name außerhalb des Namensraums / Fremdschlüssel          | Tabelle, physischer Name oder Fremdschlüssel zeigt aus den eigenen Tabellen des Plugins heraus.                                    |
-| Ungültige Migrationsliste                                | Versionen steigen nicht streng ab 1 an, oder ein Schritt oder Feld ist ungültig.                                                   |
-| Partieller Legacy-Verlauf                                | Nur einige `adoption.legacyMigrations` sind angewendet; zuerst das letzte 1.x-Release installieren. Nichts wurde geändert.         |
+| Grund                                                    | Was die Meldung sagt                                                                                                                                                                                                                     |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SDK 1.x (kein oder zu niedriges `attraccessVersion.min`) | Das Plugin zielt auf das SDK 1.x, das dieser Host nicht mehr unterstützt; neu bauen und `>= 2.0.0-0` deklarieren.                                                                                                                        |
+| `DATABASE_ACCESS` angefordert                            | Die Berechtigung wurde entfernt; Plugins haben keinen Datenbankzugriff; `PLUGIN_STORAGE` deklarieren und `context.storage` nutzen.                                                                                                       |
+| Legacy-Persistenzdeklaration                             | `persistence.backends`, ein TypeORM-Migrationseintrag oder Entitäten werden nicht unterstützt; stattdessen `storage` deklarieren.                                                                                                        |
+| Datenbank-Import im Backend-Bundle                       | Das Bundle importiert `typeorm`, `@nestjs/typeorm`, `sqlite3`, `better-sqlite3`, `node:sqlite`, `pg`, `mysql2`, `@attraccess/plugins-backend-sdk/sqlite` oder `@attraccess/database-entities`; die Meldung nennt Modul und Bundle-Datei. |
+| Datenbank-Handle zur Laufzeit angefordert                | `context.get('DataSource')` (oder Entity-Manager, Repository-Token) wirft: Die Host-Verbindung ist nicht verfügbar; `context.storage` nutzen.                                                                                            |
+| Speicher ohne `PLUGIN_STORAGE`                           | Das Plugin deklariert Speicher, aber nicht die Berechtigung `PLUGIN_STORAGE`.                                                                                                                                                            |
+| Name außerhalb des Namensraums / Fremdschlüssel          | Tabelle, physischer Name oder Fremdschlüssel zeigt aus den eigenen Tabellen des Plugins heraus.                                                                                                                                          |
+| Ungültige Migrationsliste                                | Versionen steigen nicht streng ab 1 an, oder ein Schritt oder Feld ist ungültig.                                                                                                                                                         |
+| Name im Namensraum eines anderen Plugins                 | Ein Tabellenname liegt im Speicher-Namensraum eines länger benannten installierten Plugins (`demo` darf `plugin_demo_extra_x` nicht belegen, solange `demo-extra` installiert ist).                                                      |
+| Partieller Legacy-Verlauf                                | Nur einige `adoption.legacyMigrations` sind angewendet; zuerst das letzte 1.x-Release installieren. Nichts wurde geändert.                                                                                                               |
+| Unbekannter Legacy-Verlauf                               | Es sind Legacy-Migrationen angewendet, die dieses Release nicht kennt; Plugin aktualisieren. Nichts wurde geändert.                                                                                                                      |
 
-Jede Meldung endet mit `Migration guide: https://docs.attraccess.org/#/en/plugins/migrating-to-2`. Ein abgelehntes
+Die Ablehnungen bei der Installation (die ersten vier Zeilen) enden mit `Migration guide: https://docs.attraccess.org/#/en/plugins/migrating-to-2`;
+die Speicher-Ablehnungen beim Start beschreiben die Abhilfe in eigenen Worten. Ein abgelehntes
 Plugin bleibt mit dem Fehler in der Plugin-Liste und seine Daten bleiben unverändert; das Löschen entfernt seine Dateien,
 ohne seinen Code auszuführen.
 
