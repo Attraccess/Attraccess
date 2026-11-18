@@ -120,7 +120,11 @@
     "close": "Close",
     "retry": "Retry and restart",
     "retrySuccess": "The plugin will be retried when the app restarts.",
-    "retryError": "Could not retry the plugin."
+    "retryError": "Could not retry the plugin.",
+    "refused": "Refused",
+    "refusedTitle": "Attraccess refused {{pluginName}}",
+    "refusedDescription": "This plugin is not compatible with this Attraccess version (for example it was built for an older plugin SDK) and is never loaded, so it cannot be retried. Install a compatible version or remove it; removing keeps its stored data. The server reported:",
+    "remove": "Remove plugin"
   },
   "noPermissions": "None requested",
   "updatePolicy": {
@@ -155,9 +159,11 @@
   },
   "deleteConfirmation": {
     "title": "Remove plugin?",
-    "message": "Remove the plugin {{pluginName}}? Its code and runtime registrations will be removed and the app will reload. Plugin data and secrets are retained for recovery.",
     "cancel": "Cancel",
-    "delete": "Remove"
+    "delete": "Remove",
+    "messageRegistry": "Remove the plugin {{pluginName}}? Its code and runtime registrations will be removed and the app will reload. Its data and secrets are kept, so installing it again continues with them.",
+    "messageUploaded": "Remove the plugin {{pluginName}}? Its code, runtime registrations and all of its stored data will be deleted permanently, and the app will reload. Create a backup first if you might need the data.",
+    "messageRefused": "Remove the refused plugin {{pluginName}}? Its files will be removed without running its code, and the app will reload. Its stored data stays in the database until a compatible version takes it over."
   },
   "error": {
     "versions": {

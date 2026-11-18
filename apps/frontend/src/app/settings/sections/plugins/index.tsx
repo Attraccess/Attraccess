@@ -97,7 +97,14 @@ export function PluginsSection() {
 
         <ReaderUiAlerts />
 
-        <PluginErrorModal failedPlugin={failedPlugin} onClose={() => setFailedPlugin(null)} />
+        <PluginErrorModal
+          failedPlugin={failedPlugin}
+          onClose={() => setFailedPlugin(null)}
+          onRemove={(pluginId) => {
+            setFailedPlugin(null);
+            setPluginToDelete(pluginId);
+          }}
+        />
 
         <MarketplaceBrowser
           isOpen={marketplace.isOpen}

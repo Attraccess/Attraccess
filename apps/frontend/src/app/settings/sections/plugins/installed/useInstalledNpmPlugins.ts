@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
 /**
- * The npm-installed plugins by name, plus a way to merge fresher records (update checks, policy saves) into the cache.
+ * The npm-installed plugins by name and by install directory, plus a way to merge fresher records (update checks, policy saves) into the cache.
  * The list is loaded once per visit of the section and a failed load reads as no installed packages: within a visit it
  * only changes through this section, which merges the records it gets back or reloads the page after an install,
  * replacement or removal. Leaving the section drops the cache (gcTime 0), so the next visit loads it again.
@@ -27,6 +27,12 @@ export function useInstalledNpmPlugins() {
     () => new Map(installed.map((plugin) => [plugin.name, plugin] as const)),
     [installed],
   );
+  // A listed plugin is the npm package installed in its directory. Matching by name would mistake a ZIP copy (such
+  // as a refused 1.x build) for the npm package of the same name, and its removal would remove that package.
+  const installedByDirectory = useMemo(
+    () => new Map(installed.map((plugin) => [plugin.installPath, plugin] as const)),
+    [installed],
+  );
 
   const mergeInstalled = useCallback(
     (updated: InstalledNpmPluginDto[]) => {
@@ -42,5 +48,5 @@ export function useInstalledNpmPlugins() {
     [queryClient],
   );
 
-  return { installed, installedByName, mergeInstalled };
+  return { installed, installedByName, installedByDirectory, mergeInstalled };
 }
