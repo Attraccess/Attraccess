@@ -2,16 +2,16 @@ import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { createHash, X509Certificate } from 'node:crypto';
 import { rootCertificates } from 'node:tls';
 import { fw31IdentityOutput } from '../../fixtures/fw31-identity';
-import { WagoCommissioningSession } from './session.entity';
+import { controllerRow, sessionRow } from '../../rows.test-utils';
+import { spyOnWagoStorage } from '../../storage-spy.test-utils';
+import { createWagoTestStorage } from '../../storage/testing';
 import { WagoCommissioningService } from '../service';
-import { WagoController } from '../../controllers/entity';
+import { securityHarness, verifier } from '../harness.test-utils';
 import { WagoRecoveryError } from '../../runtime/recovery-error';
 import { runtimeBundleStagingCapacityPreflightScript } from '../../runtime/install';
 import { WagoService } from '../../controllers/service';
 
 jest.mock('node:child_process', () => ({ spawn: jest.fn() }));
-
-const verifier = 'v'.repeat(43);
 
 const secrets = {
   encrypt: jest.fn().mockReturnValue('opaque-ciphertext'),
@@ -19,50 +19,8 @@ const secrets = {
 };
 
 describe('WagoCommissioningService security and lifecycle', () => {
-  function securityHarness(overrides: Partial<WagoCommissioningSession> = {}, Service = WagoCommissioningService) {
-    const session = {
-      id: 1,
-      hardwareId: 'cc100-test',
-      mqttServerId: 2,
-      enrollmentId: null,
-      pairingCode: 'encrypted:v1:opaque-ciphertext',
-      deliveryToken: 'a'.repeat(32),
-      state: 'awaiting_delivery',
-      controllerName: 'Test',
-      auditLog: '[]',
-      ...overrides,
-    } as WagoCommissioningSession;
-    const repository = {
-      find: jest.fn().mockResolvedValue([]),
-      findOneBy: jest.fn().mockResolvedValue(session),
-      save: jest.fn(async (value) => value),
-    };
-    const wago = {
-      registerCommissioningDiscoveryHandler: jest.fn(),
-      revokeEnrollmentById: jest.fn().mockResolvedValue(undefined),
-      createEnrollment: jest.fn(),
-      claim: jest.fn(),
-    };
-    const context = {
-      getRepository: jest.fn().mockReturnValue(repository),
-      getMqttServerConfig: jest.fn().mockResolvedValue({ host: 'mock.invalid', port: 8883, useTls: true }),
-      getMqttCredentialProvisioning: jest
-        .fn()
-        .mockReturnValue({ availableProviders: jest.fn().mockResolvedValue([{ providerId: 'mock' }]) }),
-      secrets: { encrypt: jest.fn().mockReturnValue('ciphertext'), decrypt: jest.fn().mockReturnValue(verifier) },
-      logger: { warn: jest.fn() },
-    };
-    const service = new Service(context as unknown as PluginContext, wago as unknown as WagoService);
-    service['sessions'] = repository as never;
-    const inspect = jest.fn().mockRejectedValue(new Error('arbitrary-secret'));
-    const sudo = jest.fn().mockResolvedValue('');
-    service['inspect'] = inspect;
-    service['sudoRun'] = sudo;
-    return { service, session, repository, wago, context, inspect, sudo };
-  }
-
   it.each([undefined, false, 'true', 1])('requires literal installation consent (%p)', async (confirmInstall) => {
-    const { service, inspect, sudo, wago } = securityHarness();
+    const { service, inspect, sudo, wago } = await securityHarness();
     await expect(
       service.deliver(1, { confirmInstall, temporarySsh: { username: 'root', password: 'explicit' } } as never),
     ).rejects.toThrow('explicit installation confirmation');
@@ -85,7 +43,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
     { username: 'root', password: 'x\ninjected' },
     { username: 'root', password: 'x\0' },
   ])('rejects missing or invalid explicit credentials (%p)', async (temporarySsh) => {
-    const { service, inspect, sudo } = securityHarness();
+    const { service, inspect, sudo } = await securityHarness();
     await expect(service.deliver(1, { confirmInstall: true, temporarySsh } as never)).rejects.toThrow(
       'explicit valid SSH',
     );
@@ -94,14 +52,12 @@ describe('WagoCommissioningService security and lifecycle', () => {
   });
 
   it('never resumes SSH at startup and makes interrupted sessions retryable', async () => {
-    const { service, session, repository, wago, inspect } = securityHarness({
+    const { service, stored, wago, inspect } = await securityHarness({
       state: 'delivering',
       enrollmentId: 7,
     });
-    repository.find.mockResolvedValue([session]);
     await service.onApplicationBootstrap();
-    expect(session.state).toBe('delivery_failed');
-    expect(session.enrollmentId).toBeNull();
+    expect(await stored()).toMatchObject({ state: 'delivery_failed', enrollmentId: null });
     expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(7, expect.any(Function));
     expect(inspect).not.toHaveBeenCalled();
     expect(wago.registerCommissioningDiscoveryHandler).toHaveBeenCalledTimes(1);
@@ -109,12 +65,11 @@ describe('WagoCommissioningService security and lifecycle', () => {
   });
 
   it('does not require an enrolled controller lease just to read its saved state at startup', async () => {
-    const { service, session, repository } = securityHarness({
+    const { service } = await securityHarness({
       state: 'awaiting_verification',
       pairingCode: null,
       dockerProvisionState: 'started',
     });
-    repository.find.mockResolvedValue([session]);
     const lock = jest.fn().mockRejectedValue(new Error('Background check holds lease'));
     service['withControllerLock'] = lock;
     await expect(service['recoverSessions']()).resolves.toBeUndefined();
@@ -122,26 +77,40 @@ describe('WagoCommissioningService security and lifecycle', () => {
   });
 
   it('revokes and clears legacy plaintext before registering discovery, using bounded pages', async () => {
-    const { service, session, repository, wago, context } = securityHarness({
+    const { service, storage, spied, wago, context } = await securityHarness({
       id: 101,
       state: 'awaiting_discovery',
       enrollmentId: 7,
       pairingCode: 'legacy-secret',
     });
-    const firstPage = Array.from({ length: 100 }, (_, i) => ({ ...session, id: i + 1 }));
-    repository.findOneBy.mockImplementation(async ({ id }) =>
-      id === session.id ? session : firstPage.find((entry) => entry.id === id),
+    await storage.tables.commissioningSessions.insertMany(
+      Array.from({ length: 100 }, (_, i) =>
+        sessionRow({
+          id: i + 1,
+          state: 'awaiting_discovery',
+          enrollmentId: 7,
+          pairingCode: 'legacy-secret',
+          controllerName: 'Test',
+        }),
+      ),
     );
-    repository.find.mockResolvedValueOnce(firstPage).mockResolvedValueOnce([session]);
     wago.revokeEnrollmentById.mockImplementation(async () => {
       expect(wago.registerCommissioningDiscoveryHandler).not.toHaveBeenCalled();
     });
     await service.onApplicationBootstrap();
-    expect(repository.find).toHaveBeenNthCalledWith(1, { order: { id: 'ASC' }, take: 100, skip: 0 });
-    expect(repository.find).toHaveBeenNthCalledWith(2, { order: { id: 'ASC' }, take: 100, skip: 100 });
-    expect(session.state).toBe('revoked');
-    expect(session.pairingCode).toBeNull();
-    expect(firstPage.every((entry) => entry.pairingCode === null && entry.state === 'revoked')).toBe(true);
+    expect(spied.commissioningSessions.find).toHaveBeenNthCalledWith(1, {
+      orderBy: [{ field: 'id' }],
+      limit: 100,
+      offset: 0,
+    });
+    expect(spied.commissioningSessions.find).toHaveBeenNthCalledWith(2, {
+      orderBy: [{ field: 'id' }],
+      limit: 100,
+      offset: 100,
+    });
+    const rows = await storage.tables.commissioningSessions.find();
+    expect(rows).toHaveLength(101);
+    expect(rows.every((entry) => entry.pairingCode === null && entry.state === 'revoked')).toBe(true);
     expect(wago.revokeEnrollmentById).toHaveBeenCalledTimes(101);
     expect(context.secrets.decrypt).not.toHaveBeenCalled();
     expect(wago.registerCommissioningDiscoveryHandler).toHaveBeenCalledTimes(1);
@@ -150,14 +119,13 @@ describe('WagoCommissioningService security and lifecycle', () => {
   it.each(['broker', 'database', 'decrypt'])(
     'fails closed with safe errors during %s recovery failure',
     async (failure) => {
-      const { service, session, repository, wago, context } = securityHarness({
+      const { service, stored, spied, wago, context } = await securityHarness({
         state: 'awaiting_discovery',
         enrollmentId: 7,
       });
-      repository.find.mockResolvedValue([session]);
-      if (failure === 'database') repository.find.mockRejectedValue(new Error('unlabelled-secret'));
+      if (failure === 'database') spied.commissioningSessions.find.mockRejectedValue(new Error('unlabelled-secret'));
       else {
-        if (failure === 'broker') session.pairingCode = 'plaintext';
+        if (failure === 'broker') await spied.commissioningSessions.update({ id: 1 }, { pairingCode: 'plaintext' });
         else
           context.secrets.decrypt.mockImplementation(() => {
             throw new Error('unlabelled-secret');
@@ -167,89 +135,87 @@ describe('WagoCommissioningService security and lifecycle', () => {
       await service.onApplicationBootstrap();
       expect(wago.registerCommissioningDiscoveryHandler).not.toHaveBeenCalled();
       expect(JSON.stringify(context.logger.warn.mock.calls)).not.toContain('unlabelled-secret');
-      if (failure !== 'database') {
-        expect(session.pairingCode).toBeNull();
-        expect(session.state).toBe('revoked');
-        expect(session.enrollmentId).toBe(7);
-      }
+      if (failure !== 'database')
+        expect(await stored()).toMatchObject({ pairingCode: null, state: 'revoked', enrollmentId: 7 });
     },
   );
 
   it('invalidates every plaintext verifier even when the first broker revocation fails', async () => {
-    const { service, session, repository, wago } = securityHarness({ pairingCode: 'legacy', enrollmentId: 7 });
-    const later = { ...session, id: 2, enrollmentId: 8 };
-    repository.find.mockResolvedValue([session, later]);
-    repository.findOneBy.mockImplementation(async ({ id }) => (id === later.id ? later : session));
+    const { service, stored, storage, wago } = await securityHarness({ pairingCode: 'legacy', enrollmentId: 7 });
+    await storage.tables.commissioningSessions.insert(
+      sessionRow({ id: 2, enrollmentId: 8, pairingCode: 'legacy', state: 'awaiting_delivery' }),
+    );
     wago.revokeEnrollmentById.mockRejectedValueOnce(new Error('broker unavailable'));
     await service.onApplicationBootstrap();
-    expect(session).toMatchObject({ state: 'revoked', pairingCode: null, enrollmentId: 7 });
+    expect(await stored(1)).toMatchObject({ state: 'revoked', pairingCode: null, enrollmentId: 7 });
+    const later = await stored(2);
     expect(later).toMatchObject({ state: 'revoked', pairingCode: null, enrollmentId: null });
-    expect(later.progressStep).toBe('Commissioning session revoked');
+    expect(later?.progressStep).toBe('Commissioning session revoked');
     expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(8, expect.any(Function));
     expect(wago.registerCommissioningDiscoveryHandler).not.toHaveBeenCalled();
   });
 
   it('rejects a legacy verifier on direct discovery without passing it to claim', async () => {
-    const { service, session, wago } = securityHarness({
+    const { service, session, stored, wago } = await securityHarness({
       state: 'awaiting_discovery',
       enrollmentId: 7,
       pairingCode: 'plaintext',
     });
     await service.claimDiscovered({ id: 4, hardwareId: session.hardwareId, mqttServerId: 2, enrollmentId: 7 });
     expect(wago.claim).not.toHaveBeenCalled();
-    expect(session.state).toBe('revoked');
+    expect((await stored())?.state).toBe('revoked');
     expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(7, expect.any(Function));
   });
 
   it('does not emit arbitrary broker claim errors', async () => {
-    const { service, session, wago } = securityHarness({ state: 'awaiting_discovery', enrollmentId: 7 });
+    const { service, session, stored, wago } = await securityHarness({ state: 'awaiting_discovery', enrollmentId: 7 });
     wago.claim.mockRejectedValue(new Error('unlabelled-secret'));
     await service.claimDiscovered({ id: 4, hardwareId: session.hardwareId, mqttServerId: 2, enrollmentId: 7 });
-    expect(session.failureReason).toBe('Automatic claim failed.');
+    expect((await stored())?.failureReason).toBe('Automatic claim failed.');
   });
 
   it('reconciles a persisted claim after restart without revoking or reinstalling', async () => {
-    const { service, session, repository, context, wago, inspect } = securityHarness({
+    const { service, session, stored, storage, wago, inspect } = await securityHarness({
       state: 'awaiting_claim',
       enrollmentId: 7,
     });
-    repository.find.mockResolvedValue([session]);
-    context.getRepository.mockImplementation((entity) =>
-      entity === WagoController ? { findOneBy: jest.fn().mockResolvedValue({ trustState: 'claimed' }) } : repository,
+    await storage.tables.controllers.insert(
+      controllerRow({
+        hardwareId: session.hardwareId,
+        mqttServerId: 2,
+        enrollmentId: 7,
+        trustState: 'claimed',
+      }),
     );
     await service.onApplicationBootstrap();
-    expect(session.state).toBe('claim_interrupted');
-    expect(session.pairingCode).not.toBeNull();
+    const reconciled = await stored();
+    expect(reconciled?.state).toBe('claim_interrupted');
+    expect(reconciled?.pairingCode).not.toBeNull();
     expect(wago.revokeEnrollmentById).not.toHaveBeenCalled();
     expect(inspect).not.toHaveBeenCalled();
   });
 
   it('replays saved early discovery after handler registration', async () => {
-    const { service, session, repository, context, wago } = securityHarness({
+    const { service, session, stored, storage, wago } = await securityHarness({
       state: 'awaiting_discovery',
       enrollmentId: 7,
     });
-    repository.find.mockResolvedValue([session]);
-    context.getRepository.mockImplementation((entity) =>
-      entity === WagoController
-        ? {
-            findOneBy: jest.fn().mockResolvedValue({
-              id: 4,
-              hardwareId: session.hardwareId,
-              mqttServerId: 2,
-              enrollmentId: 7,
-              trustState: 'untrusted',
-            }),
-          }
-        : repository,
+    await storage.tables.controllers.insert(
+      controllerRow({
+        id: 4,
+        hardwareId: session.hardwareId,
+        mqttServerId: 2,
+        enrollmentId: 7,
+        trustState: 'untrusted',
+      }),
     );
     await service['reconcileDiscovery']();
     expect(wago.claim).toHaveBeenCalledWith(4, 'Test', verifier, 2, expect.any(Function));
-    expect(session.state).toBe('awaiting_verification');
+    expect((await stored())?.state).toBe('awaiting_verification');
   });
 
   it('queues early discovery until delivery finishes and does not report verified success', async () => {
-    const { service, session, wago, repository } = securityHarness({ state: 'delivering', enrollmentId: 7 });
+    const { service, session, stored, wago, spied } = await securityHarness({ state: 'delivering', enrollmentId: 7 });
     let release!: () => void;
     const locked = service['withDeliveryLock'](
       1,
@@ -262,21 +228,19 @@ describe('WagoCommissioningService security and lifecycle', () => {
     const claim = service.claimDiscovered({ id: 4, hardwareId: session.hardwareId, mqttServerId: 2, enrollmentId: 7 });
     await Promise.resolve();
     expect(wago.claim).not.toHaveBeenCalled();
-    expect(repository.findOneBy).toHaveBeenCalledWith({
-      hardwareId: session.hardwareId,
-      mqttServerId: 2,
-      enrollmentId: 7,
+    expect(spied.commissioningSessions.findOne).toHaveBeenCalledWith({
+      where: { hardwareId: session.hardwareId, mqttServerId: 2, enrollmentId: 7 },
     });
-    session.state = 'awaiting_discovery';
+    await spied.commissioningSessions.update({ id: 1 }, { state: 'awaiting_discovery' });
     release();
     await locked;
     await claim;
     expect(wago.claim).toHaveBeenCalledTimes(1);
-    expect(session.state).toBe('awaiting_verification');
+    expect((await stored())?.state).toBe('awaiting_verification');
   });
 
-  it('reports crypto errors safely and never substitutes plaintext for encryption', () => {
-    const { service, context } = securityHarness();
+  it('reports crypto errors safely and never substitutes plaintext for encryption', async () => {
+    const { service, context } = await securityHarness();
     context.secrets.encrypt.mockImplementation(() => {
       throw new Error('unlabelled-crypto-secret');
     });
@@ -304,7 +268,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
   }
 
   it('rejects invalid artifacts before inspection, provisioning or revoking prior enrollment', async () => {
-    const { service, session, wago, inspect, sudo } = securityHarness(
+    const { service, stored, wago, inspect, sudo } = await securityHarness(
       { state: 'delivery_failed', enrollmentId: 7 },
       configuredService(),
     );
@@ -313,7 +277,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
       confirmInstall: true,
       temporarySsh: { username: 'root', password: 'provided' },
     });
-    expect(session.enrollmentId).toBe(7);
+    expect((await stored())?.enrollmentId).toBe(7);
     expect(inspect).not.toHaveBeenCalled();
     expect(sudo).not.toHaveBeenCalled();
     expect(wago.createEnrollment).not.toHaveBeenCalled();
@@ -323,7 +287,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
   });
 
   it('blocks unavailable provisioning before SSH mutations', async () => {
-    const { service, context, sudo, inspect, wago } = securityHarness({}, configuredService());
+    const { service, context, sudo, inspect, wago } = await securityHarness({}, configuredService());
     context.getMqttCredentialProvisioning().availableProviders.mockResolvedValue([]);
     const result = await service.deliver(1, {
       confirmInstall: true,
@@ -352,7 +316,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
         return bundle;
       }) as never);
       try {
-        const { service, session, repository, wago, inspect, sudo, context } = securityHarness(
+        const { service, stored, storage, spied, wago, inspect, sudo, context } = await securityHarness(
           { firmwareBaseline: '31', deliveryToken: null },
           configuredService(),
         );
@@ -405,9 +369,9 @@ describe('WagoCommissioningService security and lifecycle', () => {
           broker: { host: 'mock.invalid', port: 1883, useTls: false },
         });
         const persisted: string[] = [];
-        repository.save.mockImplementation(async (value) => {
-          persisted.push(JSON.stringify(value));
-          return value;
+        spied.commissioningSessions.update.mockImplementation(async (where, patch, options) => {
+          persisted.push(JSON.stringify(patch));
+          return storage.tables.commissioningSessions.update(where, patch, options);
         });
         const result = await service.deliver(1, {
           confirmInstall: true,
@@ -420,8 +384,8 @@ describe('WagoCommissioningService security and lifecycle', () => {
           expect(wago.createEnrollment).not.toHaveBeenCalled();
           expect(sudo).not.toHaveBeenCalled();
           expect(result.failureReason).toContain('permanently disabled');
-          expect(result.dockerProvisionState).toBeUndefined();
-          expect(session.dockerProvisionToken).toBeFalsy();
+          expect(result.dockerProvisionState).toBeNull();
+          expect((await stored())?.dockerProvisionToken).toBeFalsy();
           expect(install).toHaveBeenCalledTimes(1);
           expect(install.mock.calls[0][3]).toBe(runtimeBundleStagingCapacityPreflightScript(bundle.length));
           return;
@@ -430,7 +394,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
         expect(sudo).not.toHaveBeenCalled();
         expect(copy).toHaveBeenCalledTimes(1);
         expect(install).toHaveBeenCalledTimes(5);
-        expect(session.codesysState).toBe('disabled');
+        expect((await stored())?.codesysState).toBe('disabled');
         expect(install.mock.calls[0][3]).toBe(runtimeBundleStagingCapacityPreflightScript(bundle.length));
         expect(install.mock.calls[1][3]).toContain('runtime-version=0');
         expect(copy.mock.calls[0][4]).toContain('flock -n 9');
@@ -449,7 +413,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
           ).toString('base64'),
         );
         if (caCert) expect(copy.mock.calls[0][4]).toContain(Buffer.from(caCert).toString('base64'));
-        expect(session.pairingCode).toBe('encrypted:v1:opaque-ciphertext');
+        expect((await stored())?.pairingCode).toBe('encrypted:v1:opaque-ciphertext');
         for (const value of persisted) {
           expect(value).not.toContain(verifier);
           expect(value).not.toMatch(/mqtt-password|claim-secret|explicit-ssh/);
@@ -461,7 +425,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
   );
 
   it.each([false, undefined])('requires recovery confirmation %p', async (confirmInstall) => {
-    const { service, sudo } = securityHarness({ state: 'delivery_failed' });
+    const { service, sudo } = await securityHarness({ state: 'delivery_failed' });
     await expect(
       service.recover(1, { confirmInstall, temporarySsh: { username: 'root', password: 'secret' } }),
     ).rejects.toThrow('explicit installation confirmation');
@@ -469,7 +433,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
   });
 
   it('explicitly recovers without new artifacts, broker provisioning or acceptance', async () => {
-    const { service, wago } = securityHarness({ state: 'awaiting_verification', pairingCode: null });
+    const { service, wago } = await securityHarness({ state: 'awaiting_verification', pairingCode: null });
     const script = jest.fn().mockResolvedValue('');
     service['sudoRunScript'] = script;
     const result = await service.recover(1, {
@@ -485,7 +449,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
   });
 
   it('reports recovery failure safely and does not revoke credentials when remote recovery fails', async () => {
-    const { service, wago } = securityHarness({ state: 'delivery_failed', enrollmentId: 7 });
+    const { service, wago } = await securityHarness({ state: 'delivery_failed', enrollmentId: 7 });
     service['sudoRunScript'] = jest.fn().mockRejectedValue(new Error('secret remote output'));
     const result = await service.recover(1, {
       confirmInstall: true,
@@ -497,7 +461,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
   });
 
   it('reports bounded lock contention as cleanup guidance instead of a credential failure', async () => {
-    const { service, wago } = securityHarness({ state: 'delivery_failed', enrollmentId: 7 });
+    const { service, wago } = await securityHarness({ state: 'delivery_failed', enrollmentId: 7 });
     service['sudoRunScript'] = jest.fn().mockRejectedValue(new WagoRecoveryError('busy'));
     const result = await service.recover(1, {
       confirmInstall: true,
@@ -511,19 +475,18 @@ describe('WagoCommissioningService security and lifecycle', () => {
   });
 
   it('keeps interrupted claims blocked after failed recovery and requires a new session after restoration', async () => {
-    const { service, session } = securityHarness({ state: 'claim_interrupted', enrollmentId: 7 });
+    const { service, stored } = await securityHarness({ state: 'claim_interrupted', enrollmentId: 7 });
     service['sudoRunScript'] = jest.fn().mockRejectedValueOnce(new Error('SSH unavailable')).mockResolvedValue('');
     const input = { confirmInstall: true, temporarySsh: { username: 'root', password: 'fixture' } };
     await service.recover(1, input);
-    expect(session.state).toBe('claim_interrupted');
+    expect((await stored())?.state).toBe('claim_interrupted');
     await expect(service.deliver(1, input)).rejects.toThrow('cannot be delivered');
     await service.recover(1, input);
-    expect(session.state).toBe('revoked');
-    expect(session.pairingCode).toBeNull();
+    expect(await stored()).toMatchObject({ state: 'revoked', pairingCode: null });
   });
 
   it('retries only revocation after restoration succeeds, including after restart', async () => {
-    const { service, session, repository, wago } = securityHarness({
+    const { service, stored, wago } = await securityHarness({
       state: 'awaiting_verification',
       pairingCode: null,
       enrollmentId: 7,
@@ -533,19 +496,18 @@ describe('WagoCommissioningService security and lifecycle', () => {
     wago.revokeEnrollmentById.mockRejectedValueOnce(new Error('Broker unavailable')).mockResolvedValue(undefined);
     const input = { confirmInstall: true, temporarySsh: { username: 'root', password: 'fixture' } };
     await service.recover(1, input);
-    expect(session.state).toBe('recovery_revocation_pending');
-    repository.find.mockResolvedValue([session]);
+    expect((await stored())?.state).toBe('recovery_revocation_pending');
     await service.onApplicationBootstrap();
-    expect(session.state).toBe('recovery_revocation_pending');
+    expect((await stored())?.state).toBe('recovery_revocation_pending');
     await service.recover(1, input);
     expect(remote).toHaveBeenCalledTimes(3);
     expect(wago.revokeEnrollmentById).toHaveBeenCalledTimes(2);
-    expect(session.state).toBe('revoked');
+    expect((await stored())?.state).toBe('revoked');
   });
 
   it('serializes different sessions for the same controller within this service process', async () => {
-    const { service, repository, session } = securityHarness({ hostKeyFingerprint: 'SHA256:controller' });
-    repository.findOneBy.mockImplementation(async ({ id }) => ({ ...session, id }));
+    const { service, storage } = await securityHarness({ hostKeyFingerprint: 'SHA256:controller' });
+    await storage.tables.commissioningSessions.insert(sessionRow({ id: 2, hostKeyFingerprint: 'SHA256:controller' }));
     let release!: () => void;
     const pending = new Promise<void>((resolve) => {
       release = resolve;
@@ -560,155 +522,113 @@ describe('WagoCommissioningService security and lifecycle', () => {
     expect(secondWork).toHaveBeenCalledTimes(1);
   });
 
-  {
-    it('defers repository access until plugin module initialization', async () => {
-      const repository = { find: jest.fn().mockResolvedValue([]) };
-      const context = {
-        getRepository: jest.fn().mockReturnValue(repository),
-      } as unknown as PluginContext;
-
-      const service = new WagoCommissioningService(context, {
-        registerCommissioningDiscoveryHandler: jest.fn(),
-      } as unknown as WagoService);
-
-      expect(context.getRepository).not.toHaveBeenCalled();
-
-      await service.onApplicationBootstrap();
-
-      expect(context.getRepository).toHaveBeenCalledWith(WagoCommissioningSession);
-    });
+  /** A service over in-memory storage holding `rows`, with its session table opened as plugin start-up would. */
+  async function standalone(rows: Record<string, unknown>[], wago: Record<string, unknown> = {}) {
+    const storage = createWagoTestStorage();
+    const spy = spyOnWagoStorage(storage);
+    if (rows.length) await storage.tables.commissioningSessions.insertMany(rows.map((row) => sessionRow(row)));
+    const context = { ...spy.context, secrets } as unknown as PluginContext;
+    const gateway = { registerCommissioningDiscoveryHandler: jest.fn(), ...wago } as unknown as WagoService;
+    const service = new WagoCommissioningService(context, gateway);
+    service['sessions'] = spy.spied.commissioningSessions as never;
+    return { service, storage, spied: spy.spied, wago: gateway };
   }
 
-  {
-    it('serializes revocation with in-progress delivery work for the same session', async () => {
-      const session = {
+  it('defers opening the storage until plugin module initialization', async () => {
+    const storage = createWagoTestStorage();
+    const open = jest.spyOn(storage.storage, 'open');
+    const context = { storage: storage.storage, persistence: storage.persistence } as unknown as PluginContext;
+    const service = new WagoCommissioningService(context, {
+      registerCommissioningDiscoveryHandler: jest.fn(),
+    } as unknown as WagoService);
+
+    expect(open).not.toHaveBeenCalled();
+
+    await service.onApplicationBootstrap();
+
+    expect(open).toHaveBeenCalled();
+  });
+
+  it('serializes revocation with in-progress delivery work for the same session', async () => {
+    const { service, storage, spied, wago } = await standalone(
+      [{ id: 1, enrollmentId: 2, state: 'awaiting_identity_confirmation' }],
+      { revokeEnrollmentById: jest.fn().mockResolvedValue(undefined) },
+    );
+    let releaseDelivery!: () => void;
+    const delivery = new Promise<void>((resolve) => (releaseDelivery = resolve));
+
+    const inProgressDelivery = service['withDeliveryLock'](1, () => delivery);
+    await Promise.resolve();
+    const revoke = service.revoke(1);
+    await Promise.resolve();
+
+    expect(wago.revokeEnrollmentById).not.toHaveBeenCalled();
+
+    releaseDelivery();
+    await inProgressDelivery;
+    await revoke;
+
+    expect(spied.commissioningSessions.get).toHaveBeenCalledWith(1);
+    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(2, expect.any(Function));
+    expect((await storage.tables.commissioningSessions.get(1))?.state).toBe('revoked');
+  });
+
+  it('does not expose stored commissioning verifiers in session lists', async () => {
+    const { service } = await standalone([
+      {
         id: 1,
-        enrollmentId: 2,
-        state: 'awaiting_identity_confirmation',
-        failureReason: null,
-        auditLog: '[]',
-        updatedAt: '',
-      } as WagoCommissioningSession;
-      const repository = {
-        findOneBy: jest.fn().mockResolvedValue(session),
-        save: jest.fn().mockImplementation(async (value) => value),
-      };
-      const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
-      let releaseDelivery!: () => void;
-      const delivery = new Promise<void>((resolve) => (releaseDelivery = resolve));
-      const wago = { revokeEnrollmentById: jest.fn().mockResolvedValue(undefined) } as unknown as WagoService;
-      const service = new WagoCommissioningService(context, {
-        ...wago,
-        registerCommissioningDiscoveryHandler: jest.fn(),
-      } as unknown as WagoService);
-      service.onApplicationBootstrap();
+        controllerName: 'Boiler room',
+        pairingCode: '482931',
+        deliveryToken: 'delivery-secret',
+        initiatingPrincipal: '{"userId":1}',
+        dockerProvisionToken: 'docker-secret',
+      },
+    ]);
 
-      const inProgressDelivery = service['withDeliveryLock'](session.id, () => delivery);
-      await Promise.resolve();
-      const revoke = service.revoke(session.id);
-      await Promise.resolve();
+    const [listed] = await service.list();
 
-      expect(wago.revokeEnrollmentById).not.toHaveBeenCalled();
+    expect(listed).toMatchObject({ id: 1, controllerName: 'Boiler room', operationDeadlineAt: null });
+    for (const secret of ['pairingCode', 'deliveryToken', 'initiatingPrincipal', 'dockerProvisionToken'])
+      expect(listed).not.toHaveProperty(secret);
+  });
 
-      releaseDelivery();
-      await inProgressDelivery;
-      await revoke;
-
-      expect(repository.findOneBy).toHaveBeenCalledWith({ id: session.id });
-      expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(2, expect.any(Function));
-      expect(session.state).toBe('revoked');
-    });
-  }
-
-  {
-    it('does not expose stored commissioning verifiers in session lists', async () => {
-      const repository = {
-        find: jest
-          .fn()
-          .mockResolvedValue([
-            { id: 1, controllerName: 'Boiler room', pairingCode: '482931' } as WagoCommissioningSession,
-          ]),
-      };
-      const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
-      const service = new WagoCommissioningService(context, {
-        registerCommissioningDiscoveryHandler: jest.fn(),
-      } as unknown as WagoService);
-      service['sessions'] = repository as never;
-
-      const [listed] = await service.list();
-
-      expect(listed).toEqual({ id: 1, controllerName: 'Boiler room', operationDeadlineAt: null });
-      expect(listed).not.toHaveProperty('pairingCode');
-    });
-  }
-
-  {
-    it('requires the administrator to confirm the scanned host key before delivery', async () => {
-      const session = {
+  it('requires the administrator to confirm the scanned host key before delivery', async () => {
+    const { service } = await standalone([
+      {
         id: 1,
         hostKeyFingerprint: 'SHA256:test',
         state: 'awaiting_identity_confirmation',
         progressPercent: 0,
         progressStep: 'Confirm controller identity',
         progressDetail: '',
-        auditLog: '[]',
-        updatedAt: '',
-      } as WagoCommissioningSession;
-      const repository = {
-        findOneBy: jest.fn().mockResolvedValue(session),
-        save: jest.fn().mockImplementation(async (value) => value),
-      };
-      const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
-      const service = new WagoCommissioningService(context, {
-        registerCommissioningDiscoveryHandler: jest.fn(),
-      } as unknown as WagoService);
-      service.onApplicationBootstrap();
+      },
+    ]);
 
-      await expect(service.confirmHostKey(session.id, 'SHA256:other')).rejects.toThrow('does not match');
-      await expect(service.confirmHostKey(session.id, session.hostKeyFingerprint)).resolves.toMatchObject({
-        state: 'awaiting_delivery',
-        progressStep: 'Identity confirmed',
-      });
+    await expect(service.confirmHostKey(1, 'SHA256:other')).rejects.toThrow('does not match');
+    await expect(service.confirmHostKey(1, 'SHA256:test')).resolves.toMatchObject({
+      state: 'awaiting_delivery',
+      progressStep: 'Identity confirmed',
     });
-  }
+  });
 
-  {
-    it('rejects direct delivery before the scanned host key is confirmed', async () => {
-      const session = { id: 1, state: 'awaiting_identity_confirmation' } as WagoCommissioningSession;
-      const repository = { findOneBy: jest.fn().mockResolvedValue(session) };
-      const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
-      const service = new WagoCommissioningService(context, {
-        registerCommissioningDiscoveryHandler: jest.fn(),
-      } as unknown as WagoService);
-      service.onApplicationBootstrap();
+  it('rejects direct delivery before the scanned host key is confirmed', async () => {
+    const { service } = await standalone([{ id: 1, state: 'awaiting_identity_confirmation' }]);
 
-      await expect(service.deliver(session.id)).rejects.toThrow('cannot be delivered in its current state');
+    await expect(service.deliver(1)).rejects.toThrow('cannot be delivered in its current state');
+  });
+
+  it('revokes and removes an enrollment session without retaining its records', async () => {
+    const { service, storage, wago } = await standalone([{ id: 1, enrollmentId: 2 }], {
+      revokeEnrollmentById: jest.fn().mockResolvedValue(undefined),
+      deleteEnrollmentById: jest.fn().mockResolvedValue(undefined),
     });
-  }
 
-  {
-    it('revokes and removes an enrollment session without retaining its records', async () => {
-      const session = { id: 1, enrollmentId: 2 } as WagoCommissioningSession;
-      const repository = {
-        findOneBy: jest.fn().mockResolvedValue(session),
-        delete: jest.fn(),
-      };
-      const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
-      const wago = {
-        registerCommissioningDiscoveryHandler: jest.fn(),
-        revokeEnrollmentById: jest.fn().mockResolvedValue(undefined),
-        deleteEnrollmentById: jest.fn().mockResolvedValue(undefined),
-      } as unknown as WagoService;
-      const service = new WagoCommissioningService(context, wago);
-      service.onApplicationBootstrap();
+    await service.remove(1);
 
-      await service.remove(session.id);
-
-      expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(session.enrollmentId, expect.any(Function));
-      expect(wago.deleteEnrollmentById).toHaveBeenCalledWith(session.enrollmentId, expect.any(Function));
-      expect(repository.delete).toHaveBeenCalledWith(session.id);
-    });
-  }
+    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(2, expect.any(Function));
+    expect(wago.deleteEnrollmentById).toHaveBeenCalledWith(2, expect.any(Function));
+    expect(await storage.tables.commissioningSessions.get(1)).toBeNull();
+  });
 
   it('automatically claims each concurrent session only for its bound discovery', async () => {
     const first = {
@@ -719,10 +639,7 @@ describe('WagoCommissioningService security and lifecycle', () => {
       controllerName: 'Boiler room',
       pairingCode: 'encrypted:v1:first',
       state: 'awaiting_discovery',
-      failureReason: null,
-      auditLog: '[]',
-      updatedAt: '',
-    } as WagoCommissioningSession;
+    };
     const second = {
       ...first,
       id: 2,
@@ -731,32 +648,11 @@ describe('WagoCommissioningService security and lifecycle', () => {
       controllerName: 'Pump room',
       pairingCode: 'encrypted:v1:second',
     };
-    const sessions = [first, second];
-    const repository = {
-      find: jest.fn().mockResolvedValue([]),
-      findOneBy: jest.fn().mockImplementation(async (where) => {
-        if ('id' in where) return sessions.find((session) => session.id === where.id) ?? null;
-        return (
-          sessions.find(
-            (session) =>
-              session.hardwareId === where.hardwareId &&
-              session.mqttServerId === where.mqttServerId &&
-              session.enrollmentId === where.enrollmentId,
-          ) ?? null
-        );
-      }),
-      save: jest.fn().mockImplementation(async (value) => value),
-    };
     const registerCommissioningDiscoveryHandler = jest.fn();
-    const wago = {
+    const { service, storage, wago } = await standalone([first, second], {
       registerCommissioningDiscoveryHandler,
       claim: jest.fn().mockResolvedValue(undefined),
-    } as unknown as WagoService;
-    const context = {
-      getRepository: jest.fn().mockReturnValue(repository),
-      secrets: secrets,
-    } as unknown as PluginContext;
-    const service = new WagoCommissioningService(context, wago);
+    });
     await service.onApplicationBootstrap();
 
     const handler = registerCommissioningDiscoveryHandler.mock.calls[0][0] as (controller: {
@@ -782,13 +678,10 @@ describe('WagoCommissioningService security and lifecycle', () => {
 
     expect(wago.claim).toHaveBeenCalledWith(9, 'Boiler room', verifier, 2, expect.any(Function));
     expect(wago.claim).toHaveBeenCalledWith(10, 'Pump room', verifier, 2, expect.any(Function));
-    expect(first.state).toBe('awaiting_verification');
-    expect(second.state).toBe('awaiting_verification');
-    expect(first.pairingCode).toBeNull();
-    expect(second.pairingCode).toBeNull();
-    expect(repository.save).toHaveBeenCalledWith(
-      expect.objectContaining({ auditLog: expect.stringContaining('automatic_claim_completed') }),
-    );
+    const rows = await storage.tables.commissioningSessions.find({ orderBy: [{ field: 'id' }] });
+    expect(rows.map((row) => row.state)).toEqual(['awaiting_verification', 'awaiting_verification']);
+    expect(rows.map((row) => row.pairingCode)).toEqual([null, null]);
+    expect(rows[0].auditLog).toContain('automatic_claim_completed');
 
     await handler({ id: 11, hardwareId: first.hardwareId, mqttServerId: 4, enrollmentId: 5 });
     expect(wago.claim).toHaveBeenCalledTimes(2);

@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { Resource, ResourceGroup, ResourceIntroducer, ResourceIntroduction } from '@attraccess/database-entities';
+import { GroupsPersistenceModule } from '../../database/adapters/resources/groups-persistence.module';
 import { ResourceGroupsService } from './resourceGroups.service';
 
 /**
@@ -8,7 +7,7 @@ import { ResourceGroupsService } from './resourceGroups.service';
  * retraining, so both import this module instead of each other.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Resource, ResourceGroup, ResourceIntroduction, ResourceIntroducer])],
+  imports: [GroupsPersistenceModule],
   providers: [ResourceGroupsService],
   exports: [ResourceGroupsService],
 })

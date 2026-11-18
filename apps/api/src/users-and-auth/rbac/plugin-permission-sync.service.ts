@@ -1,8 +1,7 @@
-import { Permission } from '@attraccess/database-entities';
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { Inject, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { UNIT_OF_WORK, type TransactionScope, type UnitOfWork } from '../../database/unit-of-work';
 import { DeclaredPluginPermission, getDeclaredPluginPermissions } from '../../plugin-system/runtime/plugin-permissions';
+import { PLUGIN_PERMISSION_CATALOG_STORE, type PluginPermissionCatalogStore } from './plugin-permission-catalog.port';
 import { RbacService } from './rbac.service';
 
 export interface PluginPermissionSyncResult {
@@ -26,7 +25,8 @@ export class PluginPermissionSyncService implements OnApplicationBootstrap {
   private readonly logger = new Logger(PluginPermissionSyncService.name);
 
   constructor(
-    @InjectRepository(Permission) private readonly permissionRepository: Repository<Permission>,
+    @Inject(PLUGIN_PERMISSION_CATALOG_STORE) private readonly catalog: PluginPermissionCatalogStore,
+    @Inject(UNIT_OF_WORK) private readonly uow: UnitOfWork,
     private readonly rbacService: RbacService,
   ) {}
 
@@ -40,7 +40,7 @@ export class PluginPermissionSyncService implements OnApplicationBootstrap {
   }
 
   async sync(declared: readonly DeclaredPluginPermission[]): Promise<PluginPermissionSyncResult> {
-    const result = await this.permissionRepository.manager.transaction((manager) => this.syncIn(manager, declared));
+    const result = await this.uow.run((scope) => this.syncIn(scope, declared));
     if (result.registered.length + result.madeAvailable.length + result.madeUnavailable.length > 0) {
       this.logger.log(
         `Plugin permissions: registered [${result.registered.join(', ')}], available again [${result.madeAvailable.join(', ')}], unavailable [${result.madeUnavailable.join(', ')}]`,
@@ -51,10 +51,10 @@ export class PluginPermissionSyncService implements OnApplicationBootstrap {
   }
 
   private async syncIn(
-    manager: EntityManager,
+    scope: TransactionScope,
     declared: readonly DeclaredPluginPermission[],
   ): Promise<PluginPermissionSyncResult> {
-    const existing = new Map((await manager.find(Permission)).map((row) => [row.key, row]));
+    const existing = new Map((await this.catalog.listCatalog(scope)).map((row) => [row.key, row]));
     const result: PluginPermissionSyncResult = { registered: [], madeAvailable: [], madeUnavailable: [] };
     const active = new Set<string>();
 
@@ -78,36 +78,22 @@ export class PluginPermissionSyncService implements OnApplicationBootstrap {
         categoryLabelDe: permission.category.de,
       };
       if (!row) {
-        await manager.insert(Permission, {
-          key: permission.key,
-          pluginName: permission.pluginName,
-          ...texts,
-          available: true,
-        });
-        await this.grant(manager, permission.key, [...permission.defaultRoles, 'administrator']);
+        await this.catalog.registerPluginPermission(permission.key, permission.pluginName, texts, scope);
+        await this.catalog.grantToSystemRoles(permission.key, [...permission.defaultRoles, 'administrator'], scope);
         result.registered.push(permission.key);
         continue;
       }
       if (!row.available) result.madeAvailable.push(permission.key);
-      await manager.update(Permission, { key: permission.key }, { ...texts, available: true });
-      await this.grant(manager, permission.key, ['administrator']);
+      await this.catalog.refreshPluginPermission(permission.key, texts, scope);
+      await this.catalog.grantToSystemRoles(permission.key, ['administrator'], scope);
     }
 
     for (const row of existing.values()) {
       if (row.pluginName !== null && row.available && !active.has(row.key)) {
-        await manager.update(Permission, { key: row.key }, { available: false });
+        await this.catalog.markUnavailable(row.key, scope);
         result.madeUnavailable.push(row.key);
       }
     }
     return result;
-  }
-
-  private async grant(manager: EntityManager, permissionKey: string, roleKeys: readonly string[]): Promise<void> {
-    const keys = [...new Set(roleKeys)];
-    await manager.query(
-      `INSERT OR IGNORE INTO "role_permission" ("roleId", "permissionKey")
-       SELECT "id", ? FROM "role" WHERE "isSystemManaged" = 1 AND "key" IN (${keys.map(() => '?').join(', ')})`,
-      [permissionKey, ...keys],
-    );
   }
 }

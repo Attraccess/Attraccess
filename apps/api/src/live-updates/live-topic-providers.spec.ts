@@ -1,5 +1,5 @@
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
-import { Message } from '@attraccess/database-entities';
+import type { MessageRecord } from '@attraccess/application-models';
 import { LiveTopic } from '@attraccess/shared';
 import { Test } from '@nestjs/testing';
 import { Subject } from 'rxjs';
@@ -25,7 +25,7 @@ it.each(['billing', 'messaging', 'notifications', 'supervision'] as const)(
     const release = jest.fn();
     const services = {
       billing: { getTransactionSubject: getSubject, deleteSubjectIfUnobserved: release },
-      messaging: new MessagingLiveService(undefined, undefined),
+      messaging: new MessagingLiveService(undefined),
       notifications: { getUserSubject: getSubject, deleteSubjectIfUnobserved: release },
       supervision: { getSupervisorSubject: getSubject, deleteSubjectIfUnobserved: release },
     };
@@ -58,7 +58,7 @@ it.each(['billing', 'messaging', 'notifications', 'supervision'] as const)(
         second.push(value),
       );
       const firstSubject = topic === 'messaging' ? services.messaging.getUserMessageSubject(1) : subjects.get(1);
-      firstSubject.next({ data: Object.assign(new Message(), { id: 5 }) });
+      firstSubject.next({ data: { id: 5 } as MessageRecord });
       expect(first).toEqual([{ data: { id: 5 } }]);
       expect(second).toEqual([]);
       if (topic === 'messaging') expect(services.messaging.isOnline(1)).toBe(true);

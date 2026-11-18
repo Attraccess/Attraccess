@@ -1,6 +1,12 @@
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 import { BadRequestException } from '@nestjs/common';
 import * as semver from 'semver';
+import {
+  assertHostRangeTargetsSdk2,
+  assertManifestCompatible,
+  assertNoRemovedContract,
+  NPM_PACKAGE_FIELDS,
+} from '../runtime/plugin-compatibility';
 import { z } from 'zod';
 import { PluginDependenciesSchema } from '../runtime/dependencies';
 import { dashboardPathsSchema, dashboardWidgetsSchema } from '../runtime/manifest-schema';
@@ -32,11 +38,10 @@ const packageSchema = z
       host: z.string().min(1),
       backend: entryPath.optional(),
       frontend: entryPath.optional(),
-      migrations: entryPath.optional(),
       styles: entryPath.optional(),
       dashboardPaths: dashboardPathsSchema.optional(),
       dashboardWidgets: dashboardWidgetsSchema.optional(),
-      permissions: z.array(z.nativeEnum(PluginPermission)).default([]),
+      permissions: z.array(z.nativeEnum(PluginPermission, { message: 'unknown plugin permission' })).default([]),
       // npm installs get a synthesized plugin.json, so the license requirement travels in package.json.
       license: PluginLicenseDeclarationSchema.optional(),
       sdk: z
@@ -55,6 +60,7 @@ export function parseNpmPluginPackage(
   value: unknown,
   hostVersion: string,
 ): { pkg: NpmPluginPackage; manifest: PluginManifest } {
+  refuseRemovedContract(value);
   const pkg = packageSchema.parse(value);
   if (
     Object.keys(pkg.scripts ?? {}).some((name) =>
@@ -66,6 +72,8 @@ export function parseNpmPluginPackage(
   if (!pkg.keywords.includes('attraccess-plugin')) {
     throw new BadRequestException('Package must include the attraccess-plugin keyword');
   }
+  // The SDK 2.0 check first: an SDK 1.x package gets the message naming it and the migration guide.
+  refuseIncompatible(() => assertHostRangeTargetsSdk2(pkg.name, pkg.attraccess.host));
   if (!semver.satisfies(hostVersion, pkg.attraccess.host, { includePrerelease: true })) {
     throw new BadRequestException(`Plugin is not compatible with Attraccess ${hostVersion}`);
   }
@@ -98,23 +106,57 @@ export function parseNpmPluginPackage(
           },
         }
       : {}),
-    ...(pkg.attraccess.migrations ? { migrations: splitEntry(pkg.attraccess.migrations) } : {}),
   };
   if (!main.backend && !main.frontend) {
     throw new BadRequestException('Package must declare a backend or frontend entry point');
   }
-  return {
-    pkg,
-    manifest: PluginManifestSchema.parse({
-      name: pkg.name,
-      version: pkg.version,
-      main,
-      attraccessVersion: { exact: hostVersion },
-      permissions: pkg.attraccess.permissions,
-      dependencies: pkg.attraccess.dependencies,
-      license: pkg.attraccess.license,
-    }),
-  };
+  const manifest = PluginManifestSchema.parse({
+    name: pkg.name,
+    version: pkg.version,
+    main,
+    attraccessVersion: { min: semver.minVersion(pkg.attraccess.host)?.version, exact: hostVersion },
+    permissions: pkg.attraccess.permissions,
+    dependencies: pkg.attraccess.dependencies,
+    license: pkg.attraccess.license,
+  });
+  // The SDK 2.0 contract at parse time: before any file move, state row or plugin code load, exactly as a ZIP upload
+  // and discovery check it.
+  refuseIncompatible(() => assertManifestCompatible(manifest, NPM_PACKAGE_FIELDS));
+  return { pkg, manifest };
+}
+
+/**
+ * The removed SDK 1.x database contract of a raw package.json (`attraccess.permissions`, `attraccess.persistence`,
+ * `attraccess.migrations`), refused with the message that names it before the schema's generic errors can hide it.
+ */
+function refuseRemovedContract(value: unknown): void {
+  const root = value as { name?: unknown; attraccess?: Record<string, unknown> } | null;
+  if (typeof root !== 'object' || root === null || typeof root.attraccess !== 'object' || root.attraccess === null)
+    return;
+  const attraccess = root.attraccess;
+  refuseIncompatible(() => {
+    if (typeof root.name === 'string' && typeof attraccess.host === 'string') {
+      assertHostRangeTargetsSdk2(root.name, attraccess.host);
+    }
+    assertNoRemovedContract(
+      typeof root.name === 'string' ? root.name : '',
+      {
+        permissions: Array.isArray(attraccess.permissions) ? attraccess.permissions : undefined,
+        persistence: attraccess.persistence,
+        migrations: attraccess.migrations,
+      },
+      NPM_PACKAGE_FIELDS,
+    );
+  });
+}
+
+/** A host compatibility refusal is the client's problem: answered with 400 and its message (incl. the guide). */
+function refuseIncompatible(check: () => void): void {
+  try {
+    check();
+  } catch (error) {
+    throw new BadRequestException((error as Error).message);
+  }
 }
 
 function validateSdkPeerDependency(

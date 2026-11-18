@@ -1,16 +1,18 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
-import { WagoController } from './controllers/entity';
-import { WagoEnrollment } from './controllers/enrollment.entity';
+import type { WagoController } from './controllers/entity';
+import type { WagoEnrollment } from './controllers/enrollment.entity';
 import { WagoService } from './controllers/service';
-import { WagoSettings } from './controllers/settings.entity';
-import { WagoConfigurationDraft } from './configuration/draft.entity';
-import { WagoConfigurationRevision } from './configuration/revision.entity';
+import { hostDataWithFlows } from './persistence.test-utils';
+import { createWagoTestStorage } from './storage/testing';
+
 export const controller = (): WagoController => ({
   id: 1,
   hardwareId: 'cc100-01',
   trustState: 'untrusted',
   name: null,
   mqttServerId: 2,
+  credentialMqttServerId: null,
+  credentialEpoch: null,
   enrollmentId: 3,
   pairingCodeHash: 'pairing-hash',
   fingerprint: '',
@@ -24,82 +26,30 @@ export const controller = (): WagoController => ({
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 });
-export function createWagoServiceFixture(
+
+/**
+ * A WagoService over the in-memory record port. The rows are seeded through the port; tests assert the stored state
+ * with `tables` (the port) or `test.rows(name)`.
+ */
+export async function createWagoServiceFixture(
   services: WagoService[],
-  controllers = [controller()],
+  controllers: WagoController[] = [controller()],
   enrollments: WagoEnrollment[] = [],
   defaultMqttServerId: number | null = null,
 ) {
-  const controllerRepository = {
-    find: jest.fn().mockResolvedValue(controllers),
-    findOneBy: jest
-      .fn()
-      .mockImplementation(
-        async (where) =>
-          controllers.find((item) => ('id' in where ? item.id === where.id : item.hardwareId === where.hardwareId)) ??
-          null,
-      ),
-    save: jest.fn().mockImplementation(async (value) => value),
-    delete: jest.fn(),
-  };
-  const enrollmentQuery = {
-    where: jest.fn().mockReturnThis(),
-    andWhere: jest.fn().mockReturnThis(),
-    getMany: jest.fn().mockResolvedValue(enrollments),
-  };
-  const enrollmentRepository = {
-    find: jest.fn().mockResolvedValue(enrollments),
-    findOneBy: jest.fn(),
-    create: jest.fn((value) => value),
-    save: jest.fn().mockImplementation(async (value) => value),
-    delete: jest.fn(),
-    createQueryBuilder: jest.fn().mockReturnValue(enrollmentQuery),
-  };
-  const settingsRepository = {
-    findOneBy: jest.fn().mockResolvedValue({ id: 1, defaultMqttServerId, operationalPrefix: 'attraccess/wago' }),
-    save: jest.fn(),
-    findOneByOrFail: jest.fn(),
-    createQueryBuilder: jest.fn(),
-  };
-  const draftRepository = {
-    findOneBy: jest.fn().mockResolvedValue(null),
-    create: jest.fn((value) => value),
-    save: jest.fn().mockImplementation(async (value) => value),
-    delete: jest.fn(),
-  };
-  const revisionRepository = {
-    find: jest.fn().mockResolvedValue([]),
-    findOneBy: jest.fn().mockResolvedValue(null),
-    create: jest.fn((value) => value),
-    save: jest.fn().mockImplementation(async (value) => value),
-    delete: jest.fn(),
-  };
-  const settingsQuery = {
-    insert: jest.fn().mockReturnThis(),
-    values: jest.fn().mockReturnThis(),
-    orIgnore: jest.fn().mockReturnThis(),
-    execute: jest.fn(),
-  };
-  settingsRepository.createQueryBuilder.mockReturnValue(settingsQuery);
+  const test = createWagoTestStorage();
+  const tables = test.tables;
+  await tables.settings.insert({ id: 1, defaultMqttServerId, operationalPrefix: 'attraccess/wago' });
+  for (const row of controllers) await tables.controllers.insert(row);
+  for (const row of enrollments) await tables.enrollments.insert(row);
   const subscriptions: Array<{ unsubscribe: jest.Mock }> = [];
-  const flowQuery = {
-    select: jest.fn().mockReturnThis(),
-    leftJoin: jest.fn().mockReturnThis(),
-    addSelect: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    andWhere: jest.fn().mockReturnThis(),
-    getMany: jest.fn().mockResolvedValue([]),
-  };
+  const findNodes = jest.fn().mockResolvedValue([]);
+  const open = jest.fn(() => tables);
   const context = {
-    dataSource: { getRepository: () => ({ createQueryBuilder: () => flowQuery }) },
-    getRepository: jest.fn((entity) => {
-      if (entity === WagoController) return controllerRepository;
-      if (entity === WagoEnrollment) return enrollmentRepository;
-      if (entity === WagoSettings) return settingsRepository;
-      if (entity === WagoConfigurationDraft) return draftRepository;
-      if (entity === WagoConfigurationRevision) return revisionRepository;
-      throw new Error('unexpected repository');
-    }),
+    hostData: hostDataWithFlows(findNodes),
+    // Production services open the port from the context; the same typed tables serve every call.
+    storage: { open },
+    persistence: test.persistence,
     logger: { warn: jest.fn() },
     mqtt: {
       subscribe: jest.fn().mockImplementation(async () => {
@@ -115,21 +65,12 @@ export function createWagoServiceFixture(
   services.push(service);
   // Unit tests invoke service methods directly, outside Nest's module lifecycle.
   Object.assign(service, {
-    controllers: controllerRepository,
-    settings: settingsRepository,
-    enrollments: enrollmentRepository,
-    drafts: draftRepository,
-    revisions: revisionRepository,
+    storage: tables,
+    controllers: tables.controllers,
+    settings: tables.settings,
+    enrollments: tables.enrollments,
+    drafts: tables.configurationDrafts,
+    revisions: tables.configurationRevisions,
   });
-  return {
-    service,
-    controllerRepository,
-    enrollmentRepository,
-    settingsRepository,
-    settingsQuery,
-    draftRepository,
-    revisionRepository,
-    context,
-    subscriptions,
-  };
+  return { service, test, tables, context, subscriptions, open };
 }

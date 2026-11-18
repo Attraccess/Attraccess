@@ -1,4 +1,4 @@
-import { EmailTemplateType } from '@attraccess/database-entities';
+import { EmailTemplateType } from '@attraccess/application-models';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { accessChangeTranslations } from './defaults/accounts-translations';

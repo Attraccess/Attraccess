@@ -174,7 +174,7 @@
       ],
       "dependsOn": ["test-scripts"],
       "options": {
-        "testMatch": "\"**/*.spec.ts\" \"!**/*.e2e.spec.ts\" \"!**/*.real-api.spec.ts\" \"!**/*.alerting.spec.ts\" \"!**/*.browser.spec.ts\"",
+        "testMatch": "\"**/*.spec.ts\" \"!**/*.e2e.spec.ts\" \"!**/*.real-api.spec.ts\" \"!**/*.alerting.spec.ts\" \"!**/*.browser.spec.ts\" \"!**/database/conformance/**\"",
         "passWithNoTests": true
       }
     },
@@ -210,6 +210,23 @@
         "passWithNoTests": false
       }
     },
+    "test-conformance": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/jest.preset.js",
+        "{workspaceRoot}/apps/plugins/*/backend/**/*.ts"
+      ],
+      "options": {
+        "command": "jest -c apps/api/jest.config.ts --coverage=false --testPathPatterns=src/database/conformance",
+        "cwd": ".",
+        "env": {
+          "NODE_OPTIONS": "--experimental-vm-modules"
+        }
+      }
+    },
     "browser-e2e": {
       "executor": "nx:run-commands",
       "cache": false,
@@ -235,7 +252,12 @@
     "build-migration-datasource": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["typeorm", "{projectRoot}/src/config/storage-path.ts"],
+      "inputs": [
+        "typeorm",
+        "{projectRoot}/src/config/storage-path.ts",
+        "{projectRoot}/migration-tracks.cjs",
+        { "env": "DATABASE_TYPE" }
+      ],
       "outputs": ["{workspaceRoot}/dist/apps/migrations"],
       "options": {
         "cwd": "apps/api",

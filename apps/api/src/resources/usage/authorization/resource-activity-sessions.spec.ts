@@ -1,3 +1,4 @@
+import { supervisionModesFrom } from './supervision-modes.test-fixture';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { ResourceActivityVisibilityService } from './resource-activity-visibility.service';
 
@@ -5,7 +6,7 @@ describe('ResourceActivityVisibilityService.resolveSessions', () => {
   const build = (mode: 'all' | 'introduced', canControl: boolean) =>
     new ResourceActivityVisibilityService(
       { getResourceActivityVisibility: jest.fn(async () => mode) } as never,
-      { find: jest.fn(async () => []) } as never,
+      supervisionModesFrom(async () => []) as never,
       { canControllResource: jest.fn(async () => canControl) } as never,
     );
   const user = (...permissions: string[]) =>

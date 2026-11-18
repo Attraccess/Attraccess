@@ -1,4 +1,10 @@
-import { Permission, Role, RolePermission, User, UserRole, UserRoleSource } from '@attraccess/database-entities';
+import {
+  type PermissionRecord,
+  type RoleRecord,
+  type RoleWithUserCount,
+  type SsoRoleChanges,
+  type UserRoleRecord,
+} from '@attraccess/application-models';
 import {
   Inject,
   Injectable,
@@ -10,37 +16,28 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
 import { type Redis } from 'ioredis';
-import { EntityManager, Repository, In } from 'typeorm';
 import { VALKEY_CLIENT } from '../../valkey/valkey.module';
 import { describeValkeyError } from '../../valkey/valkey-outage-logging';
 import { AUDIT_RECORDER, AuditOrigin, AuditRecorder } from '../../audit/recorder/audit-event';
+import type { TransactionContext } from '../../database/transaction-context';
+import { UNIT_OF_WORK, type UnitOfWork } from '../../database/unit-of-work';
 import { roleAuditEvent } from './role-audit';
-import { syncSsoRolesInTransaction } from './sso-role-sync';
 import {
   AUTHORIZATION_CACHE_INVALIDATION_CHANNEL,
   authorizationCacheInvalidationSource,
 } from './authorization-cache-invalidation';
 import { UserPermissionsChangedEvent } from './events/user-permissions-changed.event';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
-import { RoleWithUsageDto } from './dtos/role-with-usage.dto';
 import { CreateRoleDto } from './dtos/create-role.dto';
 import { UpdateRoleDto } from './dtos/update-role.dto';
+import { RBAC_STORE, type RbacStore } from './rbac.port';
 
 @Injectable()
 export class RbacService {
   constructor(
-    @InjectRepository(UserRole)
-    protected readonly userRoleRepository: Repository<UserRole>,
-    @InjectRepository(Role)
-    protected readonly roleRepository: Repository<Role>,
-    @InjectRepository(Permission)
-    protected readonly permissionRepository: Repository<Permission>,
-    @InjectRepository(User)
-    protected readonly userRepository: Repository<User>,
-    @InjectRepository(RolePermission)
-    protected readonly rolePermissionRepository: Repository<RolePermission>,
+    @Inject(RBAC_STORE) protected readonly store: RbacStore,
+    @Inject(UNIT_OF_WORK) protected readonly uow: UnitOfWork,
     protected readonly eventEmitter: EventEmitter2,
     // optional: Valkey is an optional deployment component; the service works without a cache
     @Optional() @Inject(VALKEY_CLIENT) protected readonly valkeyClient: Redis | null,
@@ -93,28 +90,13 @@ export class RbacService {
    * hidden from every catalog, grant nothing, and survive edits made by clients that cannot see them.
    */
   async getUnavailablePermissionKeys(): Promise<Set<string>> {
-    const rows = await this.permissionRepository.findBy({ available: false });
-    return new Set(rows.map((row) => row.key));
+    return new Set(await this.store.listUnavailablePermissionKeys());
   }
 
   /** The role with its grants of unavailable plugin keys left out, as clients see it. */
-  protected withoutUnavailable<T extends Role>(role: T, unavailable: Set<string>): T {
+  protected withoutUnavailable<T extends RoleRecord>(role: T, unavailable: Set<string>): T {
     if (unavailable.size === 0 || !role.rolePermissions) return role;
-    role.rolePermissions = role.rolePermissions.filter((rp) => !unavailable.has(rp.permissionKey));
-    return role;
-  }
-
-  protected async rolePermissionKeysOf(userId: number, available: boolean): Promise<Set<string>> {
-    const rows = await this.userRoleRepository
-      .createQueryBuilder('ur')
-      .innerJoin('ur.role', 'r')
-      .innerJoin('r.rolePermissions', 'rp')
-      .innerJoin('rp.permission', 'p', 'p.available = :available', { available: available ? 1 : 0 })
-      .select('rp.permissionKey', 'permissionKey')
-      .distinct(true)
-      .where('ur.userId = :userId', { userId })
-      .getRawMany<{ permissionKey: string }>();
-    return new Set(rows.map((r) => r.permissionKey));
+    return { ...role, rolePermissions: role.rolePermissions.filter((rp) => !unavailable.has(rp.permissionKey)) };
   }
 
   /**
@@ -133,7 +115,7 @@ export class RbacService {
     const ceiling = new Set(actor.effectivePermissions ?? []);
     const scoped = actor.authenticationMethod === 'api-token' || actor.authenticationMethod === 'mcp-oauth';
     const scope = new Set(actor.permissionScope ?? []);
-    for (const key of await this.rolePermissionKeysOf(actor.id, false)) {
+    for (const key of await this.store.dormantPermissionKeysOf(actor.id)) {
       if (!scoped || scope.has(key)) ceiling.add(key);
     }
     return ceiling;
@@ -144,7 +126,7 @@ export class RbacService {
     if (!bypassCache && entry && Date.now() - entry.ts < this.CACHE_TTL_MS) return new Set(entry.permissions);
 
     // unavailable plugin keys grant nothing while their plugin is not loaded
-    const permissions = await this.rolePermissionKeysOf(userId, true);
+    const permissions = new Set(await this.store.permissionKeysOf(userId));
     // FIFO eviction: drop the oldest entry when the cache is full
     if (this.permissionsCache.size >= this.MAX_CACHE_SIZE) {
       const oldestKey = this.permissionsCache.keys().next().value;
@@ -154,45 +136,16 @@ export class RbacService {
     return new Set(permissions);
   }
 
-  // pass `manager` to count against uncommitted in-transaction state (permissions table itself is never
-  // modified by role CRUD, so the total always comes from the plain repository)
-
-  async getUserRoles(userId: number): Promise<UserRole[]> {
-    return this.userRoleRepository.find({
-      where: { userId },
-      relations: { role: true },
-    });
+  async getUserRoles(userId: number): Promise<UserRoleRecord[]> {
+    return this.store.findUserRoles(userId);
   }
 
-  async isLastAdministrator(userId: number, manager?: EntityManager): Promise<boolean> {
-    const roleRepo = manager ? manager.getRepository(Role) : this.roleRepository;
-    const urRepo = manager ? manager.getRepository(UserRole) : this.userRoleRepository;
-    const administratorRole = await roleRepo.findOne({ where: { key: 'administrator' } });
-    if (!administratorRole) return false;
-    const isAdministrator = await urRepo.findOne({ where: { userId, roleId: administratorRole.id } });
-    if (!isAdministrator) return false;
-    const qb = manager ? manager.createQueryBuilder(UserRole, 'ur') : this.userRoleRepository.createQueryBuilder('ur');
-    const otherAdministratorCount = await qb
-      .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
-      .where('ur.roleId = :roleId', { roleId: administratorRole.id })
-      .andWhere('ur.userId != :userId', { userId })
-      .getCount();
-    return otherAdministratorCount === 0;
+  async isLastAdministrator(userId: number, context?: TransactionContext): Promise<boolean> {
+    return this.store.isLastAdministrator(userId, context);
   }
 
   async getUserIdsWithPermission(permissionKey: string): Promise<number[]> {
-    const rows = await this.userRoleRepository
-      .createQueryBuilder('ur')
-      .innerJoin('role_permission', 'rp', 'rp.roleId = ur.roleId')
-      // Soft-deleted users keep their user_role rows (anonymizeAndSoftDelete only drops auth
-      // details and sessions), so without this a deleted admin still counts as a permission
-      // holder forever — e.g. as a supervisor who provably cannot supervise (ATT-867).
-      .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
-      .innerJoin('permission', 'p', 'p.key = rp.permissionKey AND p.available = 1')
-      .select('DISTINCT ur.userId', 'userId')
-      .where('rp.permissionKey = :permKey', { permKey: permissionKey })
-      .getRawMany<{ userId: number }>();
-    return rows.map((r) => r.userId);
+    return this.store.userIdsWithPermission(permissionKey);
   }
 
   async syncSsoRoles(
@@ -200,14 +153,9 @@ export class RbacService {
     roles: Array<{ roleKey: string; externalValue?: string | null }>,
     ssoProviderType: string,
     ssoProviderId: number,
-  ): Promise<{ added: string[]; removed: string[]; updated: string[] }> {
-    const changes = await this.userRoleRepository.manager.transaction(async (manager) =>
-      syncSsoRolesInTransaction(
-        { userId, roles, ssoProviderType, ssoProviderId },
-        manager.getRepository(UserRole),
-        manager.getRepository(Role),
-        this.logger,
-      ),
+  ): Promise<SsoRoleChanges> {
+    const changes = await this.uow.run((scope) =>
+      this.store.syncSsoAssignments(userId, roles, ssoProviderType, ssoProviderId, scope),
     );
     // Periodic session re-syncs usually find no delta; skip invalidation fan-out for those.
     if (changes.added.length + changes.removed.length + changes.updated.length > 0) {
@@ -217,51 +165,35 @@ export class RbacService {
     return changes;
   }
 
-  async assignRoleByKey(userId: number, roleKey: string, em?: EntityManager): Promise<UserRole | null> {
-    const roleRepo = em ? em.getRepository(Role) : this.roleRepository;
-    const urRepo = em ? em.getRepository(UserRole) : this.userRoleRepository;
-
-    const role = await roleRepo.findOne({ where: { key: roleKey } });
+  async assignRoleByKey(userId: number, roleKey: string, context?: TransactionContext): Promise<UserRoleRecord | null> {
+    const role = await this.store.findRoleByKey(roleKey, context);
     if (!role) return null;
-    const existing = await urRepo.findOne({
-      where: { userId, roleId: role.id, source: UserRoleSource.MANUAL },
-    });
+    const existing = await this.store.findManualAssignment(userId, role.id, context);
     if (existing) return existing;
-    const result = await urRepo.save(urRepo.create({ userId, roleId: role.id, source: UserRoleSource.MANUAL }));
-    if (!em) {
+    const result = await this.store.addManualAssignment(userId, role.id, context);
+    if (!context) {
       this.permissionsCache.delete(userId);
       await this.permissionsChanged(userId);
     }
     return result;
   }
 
-  async assignDefaultRoles(userId: number, em?: EntityManager): Promise<void> {
-    const roleRepo = em ? em.getRepository(Role) : this.roleRepository;
-    const urRepo = em ? em.getRepository(UserRole) : this.userRoleRepository;
-
-    const defaultRoles = await roleRepo.find({ where: { isDefault: true } });
-    for (const role of defaultRoles) {
-      const existing = await urRepo.findOne({
-        where: { userId, roleId: role.id, source: UserRoleSource.MANUAL },
-      });
-      if (!existing) {
-        await urRepo.save(urRepo.create({ userId, roleId: role.id, source: UserRoleSource.MANUAL }));
+  async assignDefaultRoles(userId: number, context?: TransactionContext): Promise<void> {
+    for (const role of await this.store.findDefaultRoles(context)) {
+      if (!(await this.store.findManualAssignment(userId, role.id, context))) {
+        await this.store.addManualAssignment(userId, role.id, context);
       }
     }
-    if (!em) {
+    if (!context) {
       this.permissionsCache.delete(userId);
       await this.permissionsChanged(userId);
     }
   }
 
-  async assignRole(userId: number, roleId: number, actorPermissions: Set<string>): Promise<UserRole> {
-    const userExists = await this.userRepository.existsBy({ id: userId });
-    if (!userExists) throw new UserNotFoundException(userId);
+  async assignRole(userId: number, roleId: number, actorPermissions: Set<string>): Promise<UserRoleRecord> {
+    if (!(await this.store.userExists(userId))) throw new UserNotFoundException(userId);
 
-    const role = await this.roleRepository.findOne({
-      where: { id: roleId },
-      relations: { rolePermissions: true },
-    });
+    const role = await this.store.findRoleById(roleId);
 
     if (!role) {
       throw new NotFoundException(`Role ${roleId} not found`);
@@ -269,63 +201,44 @@ export class RbacService {
 
     // cannot-grant-what-you-don't-have: actor must hold every permission the role grants, dormant grants of
     // unavailable plugin keys included (callers pass getGrantCeiling)
-    const rolePermKeys = role.rolePermissions.map((rp) => rp.permissionKey);
-    const missing = rolePermKeys.filter((k) => !actorPermissions.has(k));
+    const missing = this.permissionKeysOf(role).filter((k) => !actorPermissions.has(k));
     if (missing.length > 0) {
       throw new ForbiddenException('You cannot grant a role whose permissions exceed your own');
     }
 
-    const existing = await this.userRoleRepository.findOne({
-      where: { userId, roleId, source: UserRoleSource.MANUAL },
-    });
+    const existing = await this.store.findManualAssignment(userId, roleId);
     if (existing) {
       return existing;
     }
 
-    const userRole = this.userRoleRepository.create({
-      userId,
-      roleId,
-      source: UserRoleSource.MANUAL,
-    });
-    const saved = await this.userRoleRepository.save(userRole);
+    const saved = await this.store.addManualAssignment(userId, roleId);
     this.permissionsCache.delete(userId);
     await this.permissionsChanged(userId);
     return saved;
   }
 
   async revokeRole(userId: number, roleId: number, actorPermissions: Set<string>): Promise<void> {
-    const userExists = await this.userRepository.existsBy({ id: userId });
-    if (!userExists) throw new UserNotFoundException(userId);
+    if (!(await this.store.userExists(userId))) throw new UserNotFoundException(userId);
 
-    const role = await this.roleRepository.findOne({
-      where: { id: roleId },
-      relations: { rolePermissions: true },
-    });
+    const role = await this.store.findRoleById(roleId);
     if (!role) {
       throw new NotFoundException(`Role ${roleId} not found`);
     }
 
     // cannot-revoke-what-you-don't-have: actor must hold every permission the role grants
-    const rolePermKeys = role.rolePermissions.map((rp) => rp.permissionKey);
-    const missing = rolePermKeys.filter((k) => !actorPermissions.has(k));
+    const missing = this.permissionKeysOf(role).filter((k) => !actorPermissions.has(k));
     if (missing.length > 0) {
       throw new ForbiddenException('You cannot revoke a role whose permissions exceed your own');
     }
 
     if (role.key === 'administrator') {
-      // ponytail: wrap count+delete in a transaction to close the TOCTOU race where two concurrent
+      // ponytail: wrap count+delete in a unit of work to close the TOCTOU race where two concurrent
       // revocations could both see administratorCount=2, both pass the guard, and both proceed to delete
-      await this.userRoleRepository.manager.transaction(async (manager) => {
-        const administratorCount = await manager
-          .createQueryBuilder(UserRole, 'ur')
-          .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
-          .where('ur.roleId = :roleId', { roleId })
-          .getCount();
-        if (administratorCount <= 1) {
+      await this.uow.run(async (scope) => {
+        if ((await this.store.countActiveRoleHolders(roleId, scope)) <= 1) {
           throw new ForbiddenException('Cannot remove the last administrator from the system');
         }
-        const result = await manager.delete(UserRole, { userId, roleId, source: UserRoleSource.MANUAL });
-        if (!result.affected) {
+        if (!(await this.store.revokeManualAssignment(userId, roleId, scope))) {
           throw new ConflictException(
             'Role is not manually assigned to this user and cannot be revoked via this endpoint',
           );
@@ -336,8 +249,7 @@ export class RbacService {
       return;
     }
 
-    const result = await this.userRoleRepository.delete({ userId, roleId, source: UserRoleSource.MANUAL });
-    if (!result.affected) {
+    if (!(await this.store.revokeManualAssignment(userId, roleId))) {
       throw new ConflictException('Role is not manually assigned to this user and cannot be revoked via this endpoint');
     }
     this.permissionsCache.delete(userId);
@@ -345,73 +257,42 @@ export class RbacService {
   }
 
   /** Ceiling checks pass `includeUnavailable`: they must see dormant grants of unavailable plugin keys. */
-  async getRoles(includeUnavailable = false): Promise<Role[]> {
-    const roles = await this.roleRepository.find({ relations: { rolePermissions: true } });
+  async getRoles(includeUnavailable = false): Promise<RoleRecord[]> {
+    const roles = await this.store.listRoles();
     if (includeUnavailable) return roles;
     const unavailable = await this.getUnavailablePermissionKeys();
     return roles.map((role) => this.withoutUnavailable(role, unavailable));
   }
 
   async getRoleKey(roleId: number): Promise<string | null> {
-    return (await this.roleRepository.findOne({ where: { id: roleId }, select: { key: true } }))?.key ?? null;
+    return this.store.roleKeyOf(roleId);
   }
 
-  async getRolesWithUsage(): Promise<RoleWithUsageDto[]> {
-    const roles = await this.roleRepository.find({
-      relations: { rolePermissions: true },
-      order: { isSystemManaged: 'DESC', name: 'ASC' },
-    });
-    const counts = await this.userRoleRepository
-      .createQueryBuilder('ur')
-      .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
-      .select('ur.roleId', 'roleId')
-      .addSelect('COUNT(DISTINCT ur.userId)', 'userCount')
-      .groupBy('ur.roleId')
-      .getRawMany<{ roleId: number; userCount: string }>();
-    const countByRoleId = new Map(counts.map((c) => [Number(c.roleId), Number(c.userCount)]));
+  async getRolesWithUsage(): Promise<RoleWithUserCount[]> {
+    const roles = await this.store.listRolesWithUserCounts();
     const unavailable = await this.getUnavailablePermissionKeys();
-    return roles.map((role) =>
-      Object.assign(new RoleWithUsageDto(), this.withoutUnavailable(role, unavailable), {
-        userCount: countByRoleId.get(role.id) ?? 0,
-      }),
-    );
+    return roles.map((role) => this.withoutUnavailable(role, unavailable));
   }
 
   // only available keys can be granted; an unavailable plugin key is reported as unknown, like it looks to clients
   protected async resolvePermissionKeys(keys: string[]): Promise<string[]> {
     const unique = [...new Set(keys)];
     if (unique.length === 0) return [];
-    const found = await this.permissionRepository.find({ where: { key: In(unique), available: true } });
+    const found = await this.store.findKnownPermissionKeys(unique);
     if (found.length !== unique.length) {
-      const known = new Set(found.map((p) => p.key));
+      const known = new Set(found);
       const unknown = unique.filter((k) => !known.has(k));
       throw new BadRequestException(`Unknown permission keys: ${unknown.join(', ')}`);
     }
     return unique;
   }
 
-  // pass `manager` to count against uncommitted in-transaction state (permissions table itself is never
-  // modified by role CRUD, so the total always comes from the plain repository)
-  // Only available keys count: an unloaded plugin's keys grant nothing, so they cannot make anyone less of an admin.
-  protected async countAdministratorEquivalentUsers(excludeRoleId?: number, manager?: EntityManager): Promise<number> {
-    const totalPermissions = await this.permissionRepository.count({ where: { available: true } });
-    if (totalPermissions === 0) return 0;
-    const qb = (manager ? manager.createQueryBuilder(UserRole, 'ur') : this.userRoleRepository.createQueryBuilder('ur'))
-      .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
-      .innerJoin('role_permission', 'rp', 'rp.roleId = ur.roleId')
-      .innerJoin('permission', 'p', 'p.key = rp.permissionKey AND p.available = 1')
-      .select('ur.userId', 'userId')
-      .groupBy('ur.userId')
-      .having('COUNT(DISTINCT rp.permissionKey) = :totalPermissions', { totalPermissions });
-    if (excludeRoleId !== undefined) {
-      qb.where('ur.roleId != :excludeRoleId', { excludeRoleId });
-    }
-    const rows = await qb.getRawMany();
-    return rows.length;
+  async getPermissions(): Promise<PermissionRecord[]> {
+    return this.store.listPermissions();
   }
 
-  async getPermissions(): Promise<Permission[]> {
-    return this.permissionRepository.find({ where: { available: true }, order: { category: 'ASC', key: 'ASC' } });
+  protected permissionKeysOf(role: RoleRecord): string[] {
+    return (role.rolePermissions ?? []).map((rp) => rp.permissionKey);
   }
 
   protected async generateRoleKey(name: string): Promise<string> {
@@ -424,33 +305,26 @@ export class RbacService {
         .replace(/-$/, '')
         .slice(0, 80) || 'role';
     let candidate = base;
-    for (let suffix = 2; await this.roleRepository.existsBy({ key: candidate }); suffix++) {
+    for (let suffix = 2; await this.store.roleKeyTaken(candidate); suffix++) {
       candidate = `${base}-${suffix}`;
     }
     return candidate;
   }
 
-  async createRole(dto: CreateRoleDto, actorPermissions: Set<string>, origin: AuditOrigin): Promise<Role> {
+  async createRole(dto: CreateRoleDto, actorPermissions: Set<string>, origin: AuditOrigin): Promise<RoleRecord> {
     const permissionKeys = await this.resolvePermissionKeys(dto.permissionKeys ?? []);
     this.assertActorHolds(actorPermissions, permissionKeys, 'grant');
 
-    const role = await this.roleRepository.save(
-      this.roleRepository.create({
+    const created = await this.store.createRole(
+      {
         key: await this.generateRoleKey(dto.name),
         name: dto.name.trim(),
         description: dto.description?.trim() ?? '',
-        isSystemManaged: false,
-        isDefault: false,
-      }),
+      },
+      permissionKeys,
     );
-    if (permissionKeys.length > 0) {
-      await this.rolePermissionRepository.save(
-        permissionKeys.map((permissionKey) => this.rolePermissionRepository.create({ roleId: role.id, permissionKey })),
-      );
-    }
-    const created = await this.roleRepository.findOne({ where: { id: role.id }, relations: { rolePermissions: true } });
-    await this.audit.record(roleAuditEvent('role_created', created as Role, origin));
-    return created as Role;
+    await this.audit.record(roleAuditEvent('role_created', created, origin));
+    return created;
   }
 
   async updateRole(
@@ -458,42 +332,41 @@ export class RbacService {
     dto: UpdateRoleDto,
     actorPermissions: Set<string>,
     origin: AuditOrigin,
-  ): Promise<Role> {
-    const role = await this.roleRepository.findOne({ where: { id: roleId }, relations: { rolePermissions: true } });
+  ): Promise<RoleRecord> {
+    const role = await this.store.findRoleById(roleId);
     if (!role) throw new NotFoundException(`Role ${roleId} not found`);
     if (role.isSystemManaged) {
       throw new ForbiddenException('System-managed roles cannot be modified');
     }
 
-    if (dto.name !== undefined) role.name = dto.name.trim();
-    if (dto.description !== undefined) role.description = dto.description.trim();
+    const name = dto.name !== undefined ? dto.name.trim() : role.name;
+    const description = dto.description !== undefined ? dto.description.trim() : role.description;
 
     if (dto.permissionKeys !== undefined) {
       // Grants of unavailable plugin keys are invisible to the editor, so a full-set update must keep them.
       const hidden = await this.getUnavailablePermissionKeys();
-      const keptHidden = role.rolePermissions.map((rp) => rp.permissionKey).filter((key) => hidden.has(key));
+      const keptHidden = this.permissionKeysOf(role).filter((key) => hidden.has(key));
       const targetKeys = [
         ...(await this.resolvePermissionKeys(dto.permissionKeys.filter((key) => !keptHidden.includes(key)))),
         ...keptHidden,
       ];
-      const currentKeys = new Set(role.rolePermissions.map((rp) => rp.permissionKey));
+      const currentKeys = new Set(this.permissionKeysOf(role));
       const added = targetKeys.filter((k) => !currentKeys.has(k));
       const removed = [...currentKeys].filter((k) => !targetKeys.includes(k));
       this.assertActorHolds(actorPermissions, added, 'grant');
       this.assertActorHolds(actorPermissions, removed, 'revoke');
 
-      await this.roleRepository.manager.transaction(async (manager) => {
-        const adminsBefore = removed.length > 0 ? await this.countAdministratorEquivalentUsers(undefined, manager) : 0;
-        await manager.save(Role, { id: role.id, name: role.name, description: role.description });
+      await this.uow.run(async (scope) => {
+        const adminsBefore =
+          removed.length > 0 ? await this.store.countAdministratorEquivalentUsers(undefined, scope) : 0;
+        await this.store.updateRoleDetails(role.id, { name, description }, scope);
         if (removed.length > 0) {
-          await manager.delete(RolePermission, { roleId: role.id, permissionKey: In(removed) });
+          await this.store.removeRolePermissions(role.id, removed, scope);
         }
-        for (const permissionKey of added) {
-          await manager.save(RolePermission, manager.create(RolePermission, { roleId: role.id, permissionKey }));
-        }
+        await this.store.addRolePermissions(role.id, added, scope);
         // same lockout guard as deleteRole: a permission removal must not drop the
         // administrator-equivalent user count from >0 to 0 (rolls back via the thrown exception)
-        if (adminsBefore > 0 && (await this.countAdministratorEquivalentUsers(undefined, manager)) === 0) {
+        if (adminsBefore > 0 && (await this.store.countAdministratorEquivalentUsers(undefined, scope)) === 0) {
           throw new ForbiddenException(
             'Updating this role would leave no active user with full administrative permissions',
           );
@@ -503,12 +376,12 @@ export class RbacService {
       this.permissionsCache.clear();
       await this.permissionsChanged();
     } else {
-      await this.roleRepository.save({ id: role.id, name: role.name, description: role.description });
+      await this.store.updateRoleDetails(role.id, { name, description });
     }
 
-    const updated = await this.roleRepository.findOne({ where: { id: roleId }, relations: { rolePermissions: true } });
-    await this.audit.record(roleAuditEvent('role_updated', updated as Role, origin));
-    return this.withoutUnavailable(updated as Role, await this.getUnavailablePermissionKeys());
+    const updated = (await this.store.findRoleById(roleId)) as RoleRecord;
+    await this.audit.record(roleAuditEvent('role_updated', updated, origin));
+    return this.withoutUnavailable(updated, await this.getUnavailablePermissionKeys());
   }
 
   async deleteRole(
@@ -517,63 +390,40 @@ export class RbacService {
     origin: AuditOrigin,
     reassignToRoleId?: number,
   ): Promise<void> {
-    const role = await this.roleRepository.findOne({ where: { id: roleId }, relations: { rolePermissions: true } });
+    const role = await this.store.findRoleById(roleId);
     if (!role) throw new NotFoundException(`Role ${roleId} not found`);
     if (role.isSystemManaged) {
       throw new ForbiddenException('System-managed roles cannot be deleted');
     }
 
     // deleting a role revokes its permissions from every assigned user — same rule as updateRole/revokeRole
-    this.assertActorHolds(
-      actorPermissions,
-      role.rolePermissions.map((rp) => rp.permissionKey),
-      'revoke',
-    );
+    this.assertActorHolds(actorPermissions, this.permissionKeysOf(role), 'revoke');
 
-    let reassignTo: Role | null = null;
+    let reassignTo: RoleRecord | null = null;
     if (reassignToRoleId !== undefined) {
       if (reassignToRoleId === roleId) {
         throw new BadRequestException('Cannot reassign users to the role being deleted');
       }
-      reassignTo = await this.roleRepository.findOne({
-        where: { id: reassignToRoleId },
-        relations: { rolePermissions: true },
-      });
+      reassignTo = await this.store.findRoleById(reassignToRoleId);
       if (!reassignTo) throw new NotFoundException(`Role ${reassignToRoleId} not found`);
-      this.assertActorHolds(
-        actorPermissions,
-        reassignTo.rolePermissions.map((rp) => rp.permissionKey),
-        'grant',
-      );
+      this.assertActorHolds(actorPermissions, this.permissionKeysOf(reassignTo), 'grant');
     }
 
     // ponytail: conservative — ignores that a reassignment target could restore administrator-equivalence.
     // Delete blocks only if it would reduce the administrator-equivalent user count from >0 to 0.
-    const adminsWithoutRole = await this.countAdministratorEquivalentUsers(roleId);
-    if (adminsWithoutRole === 0 && (await this.countAdministratorEquivalentUsers()) > 0) {
+    const adminsWithoutRole = await this.store.countAdministratorEquivalentUsers(roleId);
+    if (adminsWithoutRole === 0 && (await this.store.countAdministratorEquivalentUsers()) > 0) {
       throw new ForbiddenException(
         'Deleting this role would leave no active user with full administrative permissions',
       );
     }
 
-    await this.roleRepository.manager.transaction(async (manager) => {
+    await this.uow.run(async (scope) => {
       if (reassignTo) {
-        const assignments = await manager.find(UserRole, { where: { roleId } });
-        const affectedUserIds = [...new Set(assignments.map((a) => a.userId))];
-        for (const userId of affectedUserIds) {
-          const existing = await manager.findOne(UserRole, {
-            where: { userId, roleId: reassignTo.id, source: UserRoleSource.MANUAL },
-          });
-          if (!existing) {
-            await manager.save(
-              UserRole,
-              manager.create(UserRole, { userId, roleId: reassignTo.id, source: UserRoleSource.MANUAL }),
-            );
-          }
-        }
+        await this.store.reassignRoleHolders(roleId, reassignTo.id, scope);
       }
       // FK cascades remove role_permission and user_role rows
-      await manager.delete(Role, { id: roleId });
+      await this.store.deleteRole(roleId, scope);
     });
     this.permissionsCache.clear();
     await this.permissionsChanged();

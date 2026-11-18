@@ -1,5 +1,4 @@
 import plugin from '../plugin';
-import { ReservationEntity } from '../entities/reservation.entity';
 import { Harness, createHarness } from '../testing/harness.test-utils';
 import { BackgroundServices, createBackgroundServices } from '../testing/background-services.test-utils';
 import { renderEmail } from '../testing/email-render.test-utils';
@@ -20,7 +19,7 @@ describe('ReservationNotifications', () => {
   let h: Harness;
   let p: BackgroundServices;
   const calls = (): Request[] => h.dispatch.mock.calls.map(([request]) => request as Request);
-  const load = (id: number) => h.dataSource.getRepository(ReservationEntity).findOneByOrFail({ id });
+  const load = (id: number) => h.reservation({ id });
 
   beforeEach(async () => {
     h = await createHarness();
@@ -46,7 +45,7 @@ describe('ReservationNotifications', () => {
     it('notifies the managers except the holder, each in their language, with times in the plugin timezone', async () => {
       p.info.languages.set(99, 'de');
       const booking = await load((await p.book(10, 1, '2026-06-01T12:00:00', '2026-06-01T13:30:00')).id);
-      await h.dataSource.getRepository(ReservationEntity).update({ id: booking.id }, { note: '<b>Rush</b> job' });
+      await h.tables.reservations.update({ id: booking.id }, { note: '<b>Rush</b> job' });
       await p.notifications.onPending(await load(booking.id));
       const requests = calls();
       expect(requests).toHaveLength(2);
@@ -90,7 +89,7 @@ describe('ReservationNotifications', () => {
     it('goes through approvals when a manager approved, and quotes the comment', async () => {
       p.info.languages.set(10, 'de');
       const booking = await load((await p.book(10, 1, '2026-06-01T12:00:00', '2026-06-01T13:00:00')).id);
-      await h.dataSource.getRepository(ReservationEntity).update({ id: booking.id }, { decisionReason: 'Viel Spaß' });
+      await h.tables.reservations.update({ id: booking.id }, { decisionReason: 'Viel Spaß' });
       await p.notifications.onConfirmed(await load(booking.id), { viaApproval: true });
       expect(calls()[0].category).toBe('approvals');
       expect(calls()[0].title).toBe('Reservierung bestätigt: Resource 1');
@@ -105,9 +104,10 @@ describe('ReservationNotifications', () => {
 
   it('tells holders about rejection, manager cancellation, early end by a manager and removal', async () => {
     const booking = await load((await p.book(10, 1, '2026-06-01T12:00:00', '2026-06-01T13:00:00')).id);
-    await h.dataSource
-      .getRepository(ReservationEntity)
-      .update({ id: booking.id }, { decisionReason: 'no budget', cancelReason: 'maintenance' });
+    await h.tables.reservations.update(
+      { id: booking.id },
+      { decisionReason: 'no budget', cancelReason: 'maintenance' },
+    );
     const fresh = await load(booking.id);
     await p.notifications.onRejected(fresh);
     await p.notifications.onCancelled(fresh, { byUserId: 99, byHolder: false });

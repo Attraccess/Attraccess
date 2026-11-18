@@ -1,11 +1,13 @@
 import { LoggerService, Type } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DataSource, EntityManager, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
 import type { MqttCredentialProvisioningHostProvider } from './mqtt-credential-provisioning';
 import type { PluginAuditContext } from './plugin-audit';
 import type { PluginReaderUiApi, PluginStartBlockedApi } from './reader-ui';
 import type { PluginNotificationsContext } from './plugin-notifications';
 import type { PluginResourceAccessContext } from './plugin-resource-access';
+import type { PluginHostDataContext } from './plugin-host-data';
+import type { PluginPersistenceContext } from './plugin-persistence';
+import type { PluginStorageContext } from './plugin-storage';
 import type { PluginLiveUpdatesContext } from './plugin-live-updates';
 import type { PluginLicenseContext } from './plugin-license';
 import type { PluginBleContext } from './plugin-ble';
@@ -161,17 +163,11 @@ export interface PluginContext {
   /** Shared application event bus — the same EventEmitter2 instance the host uses. */
   readonly events: EventEmitter2;
 
-  /** Shared TypeORM connection. Plugins must never re-initialise TypeOrmModule. */
-  readonly dataSource: DataSource;
-
   /** Scoped logger, prefixed with the plugin name. */
   readonly logger: LoggerService;
 
   /** Shared MQTT connection access. Requires ACCESS_MQTT_SERVERS. */
   readonly mqtt: PluginMqttClient;
-
-  /** Typed repository accessor over the shared DataSource. */
-  getRepository<T extends ObjectLiteral>(entity: EntityTarget<T>): Repository<T>;
 
   /**
    * Escape hatch to resolve an arbitrary host provider by token. Privileged:
@@ -220,17 +216,19 @@ export interface PluginContext {
   readonly resourceAccess: PluginResourceAccessContext;
 
   /**
-   * Run `fn` in a serialized database transaction. Concurrent callers (core lifecycle writes included)
-   * run one at a time on SQLite, so check-then-write sequences such as overlap checks are race-free.
-   * The transaction commits when `fn` resolves and rolls back when it throws. Requires DATABASE_ACCESS.
-   *
-   * The queue is shared with every core session start and end, so keep `fn` short and limited to database
-   * work through the given manager: no HTTP, MQTT, email or other I/O inside. Do not nest calls: a
-   * runSerialized started inside `fn` would wait for `fn` itself, so the host rejects it with an error;
-   * pass the manager down instead. Core services that write through the same queue (session start/end)
-   * must not be awaited inside `fn` either.
+   * Atomic transactions with a post-commit hook. A transaction scope joins `storage` and host port calls into one
+   * unit. Requires PLUGIN_STORAGE.
    */
-  runSerialized<T>(fn: (manager: EntityManager) => Promise<T>): Promise<T>;
+  readonly persistence: PluginPersistenceContext;
+
+  /** Record port for the plugin's own declared tables. Requires PLUGIN_STORAGE. See `plugin-storage.ts`. */
+  readonly storage: PluginStorageContext;
+
+  /**
+   * Read-only lookups of host data (resources, users, settings, flow nodes) as neutral models. Each group has its own
+   * permission (ACCESS_RESOURCES, READ_USERS, READ_SETTINGS, TRIGGER_FLOWS).
+   */
+  readonly hostData: PluginHostDataContext;
 
   /**
    * Query the license at runtime (see {@link PluginLicenseContext}). Needs no permission. Optional because hosts

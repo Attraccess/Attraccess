@@ -3,6 +3,8 @@
 set -e
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
+# Nothing below (dependencies, .env, storage directory, migrations) may run for an unsupported DATABASE_TYPE.
+"$REPO_ROOT/scripts/check-database-type.sh" > /dev/null
 . "$REPO_ROOT/scripts/setup-host-dependencies.sh"
 check_node || { echo "Run scripts/setup-host-dependencies.sh to install Node.js $NODE_VERSION." >&2; exit 1; }
 resolve_pnpm_version

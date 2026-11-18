@@ -73,7 +73,7 @@ describe('plugin BLE through the plugin module', () => {
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
         permissions: [PluginPermission.BLE_TRANSPORT],
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       }),
     );
     writeFileSync(join(fixture.root, directory, 'dist', 'index.js'), pluginSource(name));
@@ -166,9 +166,9 @@ describe('plugin BLE through the plugin module', () => {
     writePlugin('alpha');
     const loaded = () => PluginService.getPluginsWithLoadStatus().find((plugin) => plugin.name === 'alpha');
 
-    expect(PluginModule.forRoot().imports).toHaveLength(4);
+    expect(PluginModule.forRoot().imports).toHaveLength(5);
     PluginModule.resetHostReferences();
-    expect(PluginModule.forRoot().imports).toHaveLength(4);
+    expect(PluginModule.forRoot().imports).toHaveLength(5);
     expect(loaded()?.status).not.toBe('error');
   });
 
@@ -181,7 +181,7 @@ describe('plugin BLE through the plugin module', () => {
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
         permissions: [PluginPermission.BLE_TRANSPORT],
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       }),
     );
     const service = (limit: number) =>
@@ -191,7 +191,7 @@ describe('plugin BLE through the plugin module', () => {
       `module.exports = { default: { register: (context) => { ${service(1)} ${service(2)} return { module: class M {} }; } } };`,
     );
 
-    expect(PluginModule.forRoot().imports).toHaveLength(3);
+    expect(PluginModule.forRoot().imports).toHaveLength(4);
     expect(PluginService.getPluginsWithLoadStatus().find((plugin) => plugin.name === 'clash')?.status).toBe('error');
   });
 

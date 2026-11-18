@@ -22,7 +22,7 @@ function frontendPlugin(name: string): LoadedPluginManifest {
     pluginDirectory: name,
     permissions: [],
     main: { frontend: { directory: join(name, 'frontend'), entryPoint: 'index.mjs' } },
-    attraccessVersion: { min: '1.0.0' },
+    attraccessVersion: { min: '2.0.0-0' },
   } as LoadedPluginManifest;
 }
 
@@ -72,9 +72,9 @@ describe('PluginController', () => {
 
   it('returns every discovered plugin enriched with load status', () => {
     const plugins = [frontendPlugin('a'), frontendPlugin('b')];
-    jest.spyOn(PluginService, 'getPlugins').mockReturnValue(plugins);
+    jest.spyOn(PluginService, 'getDiscoveredPlugins').mockReturnValue(plugins);
     expect(controller.getAllPlugins()).toEqual(
-      plugins.map((plugin) => ({ ...plugin, status: 'unknown', error: null })),
+      plugins.map((plugin) => ({ ...plugin, refused: false, status: 'unknown', error: null })),
     );
   });
 
@@ -367,7 +367,7 @@ describe('PluginController', () => {
 
   it('uses the data-preserving npm removal flow for an installed npm package', async () => {
     const plugin = frontendPlugin('@attraccess/plugin');
-    jest.spyOn(PluginService, 'getPlugins').mockReturnValue([plugin]);
+    jest.spyOn(PluginService, 'getDiscoveredPlugins').mockReturnValue([plugin]);
     npmService.listInstalled.mockReturnValue([{ name: '@attraccess/plugin', installPath: plugin.pluginDirectory }]);
 
     await controller.deletePlugin(plugin.id, req);

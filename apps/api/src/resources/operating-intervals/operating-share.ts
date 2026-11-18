@@ -1,4 +1,4 @@
-import { BillingItemAllocationSegment } from '@attraccess/database-entities';
+import type { OperatingBreakdownSegment } from '@attraccess/application-models';
 
 import { ExactSum, roundHalfUp, ShareParticipant, splitSegment } from '../metering/shared-allocation';
 
@@ -123,7 +123,7 @@ export function computeOperatingShare(
 }
 
 /** The segments a person was in with others, as shown on receipts. */
-export function operatingBreakdown(share: OperatingShare): BillingItemAllocationSegment[] {
+export function operatingBreakdown(share: OperatingShare): OperatingBreakdownSegment[] {
   return share.segments.map((segment) => ({
     startedAt: segment.startedAt.toISOString(),
     endedAt: segment.endedAt.toISOString(),

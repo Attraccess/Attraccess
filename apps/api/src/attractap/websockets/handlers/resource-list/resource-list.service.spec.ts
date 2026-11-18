@@ -2,7 +2,7 @@ import { zoneOffsetMinutes } from '../../reader-time-zone';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { registerResourceListServiceFixture } from './service.test-fixture';
-import { SupervisionMode, ResourceFlowNodeType, ResourceIntroducerType } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceIntroducerType, SupervisionMode } from '@attraccess/application-models';
 import { AttractapEvent, AttractapEventType } from '../../websocket.types';
 
 describe('ResourceListService', () => {

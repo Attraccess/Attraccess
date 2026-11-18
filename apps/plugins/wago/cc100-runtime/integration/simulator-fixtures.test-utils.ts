@@ -48,30 +48,6 @@ export function outputCommand(id: string) {
   };
 }
 
-// Only persistence and host SDK boundaries are substituted. All wire decoding,
-// commissioning, report reconciliation and simulator execution are production code.
-export function repository(initial: Array<Record<string, any>> = []) {
-  const rows = initial;
-  const query = {
-    where: () => query,
-    andWhere: () => query,
-    innerJoin: () => query,
-    getMany: async () => rows,
-  };
-  return {
-    rows,
-    create: (value: object) => ({ id: rows.length + 1, ...value }),
-    save: async (value: Record<string, any>) => {
-      if (!rows.includes(value)) rows.push(value);
-      return value;
-    },
-    find: async () => rows,
-    findOneBy: async (where: object) =>
-      rows.find((row) => Object.entries(where).every(([key, value]) => row[key] === value)) ?? null,
-    createQueryBuilder: () => query,
-  };
-}
-
 export async function eventually(assertion: () => void | Promise<void>, label: string, timeout = 6000): Promise<void> {
   const deadline = Date.now() + timeout;
   let last: unknown;

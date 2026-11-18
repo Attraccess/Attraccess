@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { ExecutionContextHost } from '@nestjs/core/helpers/execution-context-host';
 import { ForbiddenException, Logger } from '@nestjs/common';
-import { SSOProviderType } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { SSOSamlGuard } from './saml.guard';
 import { SSOService } from '../sso.service';
 import { SettingsService } from '../../../../settings/settings.service';

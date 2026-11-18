@@ -9,30 +9,29 @@ const validPackage = {
   version: '1.2.3',
   keywords: ['attraccess-plugin'],
   peerDependencies: {
-    '@attraccess/plugins-backend-sdk': '^1.9.0',
-    '@attraccess/plugins-frontend-sdk': '^1.9.0',
+    '@attraccess/plugins-backend-sdk': '^2.0.0',
+    '@attraccess/plugins-frontend-sdk': '^2.0.0',
   },
   attraccess: {
     displayName: 'Example',
-    host: '^1.9.0',
+    host: '^2.0.0',
     backend: 'dist/index.js',
     frontend: 'frontend/remoteEntry.js',
-    migrations: 'dist/migrations.js',
     styles: 'frontend/style.css',
     dashboardPaths: ['/plugin-report'],
     dashboardWidgets: ['plugin-report-summary'],
-    permissions: [PluginPermission.DATABASE_ACCESS],
-    sdk: { backend: '^1.9.0', frontend: '^1.9.0' },
+    permissions: [PluginPermission.PLUGIN_STORAGE],
+    sdk: { backend: '^2.0.0', frontend: '^2.0.0' },
   },
 };
 
 describe('parseNpmPluginPackage', () => {
   it('maps the npm contract into the existing loader manifest', () => {
-    const { manifest } = parseNpmPluginPackage(validPackage, '1.9.0');
+    const { manifest } = parseNpmPluginPackage(validPackage, '2.0.0');
     expect(manifest).toMatchObject({
       name: '@attraccess/plugin-example',
       version: '1.2.3',
-      permissions: [PluginPermission.DATABASE_ACCESS],
+      permissions: [PluginPermission.PLUGIN_STORAGE],
       main: {
         backend: { directory: 'dist', entryPoint: 'index.js' },
         frontend: {
@@ -50,10 +49,10 @@ describe('parseNpmPluginPackage', () => {
     const license = { required: true, modules: ['wago'] };
     const { manifest } = parseNpmPluginPackage(
       { ...validPackage, attraccess: { ...validPackage.attraccess, license } },
-      '1.9.0',
+      '2.0.0',
     );
     expect(manifest.license).toEqual(license);
-    expect(parseNpmPluginPackage(validPackage, '1.9.0').manifest.license).toBeUndefined();
+    expect(parseNpmPluginPackage(validPackage, '2.0.0').manifest.license).toBeUndefined();
   });
 
   it.each(['wago', 'reservations'])('keeps the paid %s module required in both manifests', (name) => {
@@ -86,7 +85,7 @@ describe('parseNpmPluginPackage', () => {
     expect(() =>
       parseNpmPluginPackage(
         { ...validPackage, attraccess: { ...validPackage.attraccess, license: { modules: 'wago' } } },
-        '1.9.0',
+        '2.0.0',
       ),
     ).toThrow();
   });
@@ -96,7 +95,7 @@ describe('parseNpmPluginPackage', () => {
       expect(() =>
         parseNpmPluginPackage(
           { ...validPackage, attraccess: { ...validPackage.attraccess, dashboardPaths: [path] } },
-          '1.9.0',
+          '2.0.0',
         ),
       ).toThrow();
     }
@@ -107,7 +106,7 @@ describe('parseNpmPluginPackage', () => {
       expect(() =>
         parseNpmPluginPackage(
           { ...validPackage, attraccess: { ...validPackage.attraccess, dashboardWidgets: [id] } },
-          '1.9.0',
+          '2.0.0',
         ),
       ).toThrow();
     }
@@ -125,28 +124,48 @@ describe('parseNpmPluginPackage', () => {
           dependencies: { lodash: '^4.17.21' },
           engines: { node: '>=20' },
         },
-        '1.9.0',
+        '2.0.0',
       ),
     ).not.toThrow();
   });
 
   it('accepts prerelease hosts covered by the declared compatibility ranges', () => {
-    expect(() => parseNpmPluginPackage(validPackage, '1.9.1-beta.1')).not.toThrow();
+    expect(() => parseNpmPluginPackage(validPackage, '2.0.1-beta.1')).not.toThrow();
+  });
+
+  it('names the plugin and the migration guide for an SDK 1.x host range, before the host version check', () => {
+    const legacy = { ...validPackage, attraccess: { ...validPackage.attraccess, host: '>=1.0.0' } };
+    expect(() => parseNpmPluginPackage(legacy, '2.0.0')).toThrow(
+      /Plugin @attraccess\/plugin-example .*migrating-to-2/s,
+    );
+    // A range the host does not even satisfy still gets the SDK 1.x explanation, not a generic one.
+    const old = { ...validPackage, attraccess: { ...validPackage.attraccess, host: '^1.11.0' } };
+    expect(() => parseNpmPluginPackage(old, '2.0.0')).toThrow(/migrating-to-2/);
+  });
+
+  it.each([
+    [{ permissions: ['DATABASE_ACCESS'] }, 'DATABASE_ACCESS permission'],
+    [{ persistence: { backends: ['sqlite'] } }, 'attraccess.persistence in package.json'],
+    [{ migrations: 'dist/migrations.js' }, 'migrations entry (attraccess.migrations in package.json)'],
+  ])('refuses a package that still uses the SDK 1.x database contract', (override, message) => {
+    const pkg = { ...validPackage, attraccess: { ...validPackage.attraccess, ...override } };
+    expect(() => parseNpmPluginPackage(pkg, '2.0.0')).toThrow(message);
+    expect(() => parseNpmPluginPackage(pkg, '2.0.0')).toThrow(/Plugin @attraccess\/plugin-example .*migrating-to-2/s);
   });
 
   it.each([
     [{ ...validPackage, keywords: [] }],
     [{ ...validPackage, version: '1.2' }],
-    [{ ...validPackage, attraccess: { ...validPackage.attraccess, host: '^2.0.0' } }],
+    [{ ...validPackage, attraccess: { ...validPackage.attraccess, host: '^3.0.0' } }],
     [{ ...validPackage, scripts: { postinstall: 'node setup.js' } }],
     [{ ...validPackage, attraccess: { ...validPackage.attraccess, backend: '../index.js' } }],
     [
       {
         ...validPackage,
-        peerDependencies: { ...validPackage.peerDependencies, '@attraccess/plugins-backend-sdk': '^2.0.0' },
+        peerDependencies: { ...validPackage.peerDependencies, '@attraccess/plugins-backend-sdk': '^3.0.0' },
       },
     ],
   ])('rejects an unsafe or incompatible package', (pkg) => {
-    expect(() => parseNpmPluginPackage(pkg, '1.9.0')).toThrow();
+    expect(() => parseNpmPluginPackage(pkg, '2.0.0')).toThrow();
   });
 });

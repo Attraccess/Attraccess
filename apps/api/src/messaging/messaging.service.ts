@@ -1,19 +1,8 @@
-import {
-  Conversation,
-  ConversationParticipant,
-  Message,
-  Resource,
-  User,
-  MessageReferenceType,
-} from '@attraccess/database-entities';
+import { ConversationRecord, MessageRecord, MessageReferenceType, MessagingUser } from '@attraccess/application-models';
 
-import { ForbiddenException, Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
-
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { DataSource, Repository, MoreThan, Not } from 'typeorm';
 
 import { ResourceUsageService } from '../resources/usage/sessions/resource-usage.service';
 
@@ -25,6 +14,8 @@ import { MessageCreatedEvent } from './events/message-created.event';
 
 import { ConversationListItemDto } from './dtos/conversationListItem.dto';
 
+import { CONVERSATION_STORE, ConversationStore } from './conversation-store.port';
+
 export interface MessageReference {
   referenceType: MessageReferenceType;
   referenceId: number;
@@ -33,17 +24,8 @@ export interface MessageReference {
 @Injectable()
 export class MessagingService {
   constructor(
-    @InjectRepository(Conversation)
-    protected readonly conversationRepository: Repository<Conversation>,
-    @InjectRepository(ConversationParticipant)
-    protected readonly participantRepository: Repository<ConversationParticipant>,
-    @InjectRepository(Message)
-    protected readonly messageRepository: Repository<Message>,
-    @InjectRepository(User)
-    protected readonly userRepository: Repository<User>,
-    @InjectRepository(Resource)
-    protected readonly resourceRepository: Repository<Resource>,
-    protected readonly dataSource: DataSource,
+    @Inject(CONVERSATION_STORE)
+    protected readonly store: ConversationStore,
     protected readonly resourceUsageService: ResourceUsageService,
     protected readonly eventEmitter: EventEmitter2,
     protected readonly messagingLiveService: MessagingLiveService,
@@ -52,12 +34,12 @@ export class MessagingService {
 
   public async markConversationRead(conversationId: number, userId: number): Promise<number> {
     await this.assertParticipant(conversationId, userId);
-    await this.participantRepository.update({ conversationId, userId }, { lastReadAt: new Date() });
+    await this.store.markRead(conversationId, userId, new Date());
     return this.getTotalUnreadCount(userId);
   }
 
   public async getTotalUnreadCount(userId: number): Promise<number> {
-    const participations = await this.participantRepository.find({ where: { userId } });
+    const participations = await this.store.listParticipations(userId);
     const counts = await Promise.all(
       participations.map((participation) =>
         this.countUnread(participation.conversationId, userId, participation.lastReadAt),
@@ -67,56 +49,28 @@ export class MessagingService {
   }
 
   protected async assertParticipant(conversationId: number, userId: number): Promise<void> {
-    const participant = await this.participantRepository.findOne({ where: { conversationId, userId } });
-    if (!participant) {
+    if (!(await this.store.isParticipant(conversationId, userId))) {
       throw new ForbiddenException('You are not a participant of this conversation');
     }
   }
 
-  public async getOrCreateConversation(currentUserId: number, targetUserId: number): Promise<Conversation> {
+  public async getOrCreateConversation(currentUserId: number, targetUserId: number): Promise<ConversationRecord> {
     await this.messageRateLimitService.assertWithinLimit('contact', currentUserId);
 
     if (currentUserId === targetUserId) {
       throw new BadRequestException('Cannot start a conversation with yourself');
     }
 
-    const targetUser = await this.userRepository.findOne({ where: { id: targetUserId } });
-    if (!targetUser) {
+    if (!(await this.store.userExists(targetUserId))) {
       throw new NotFoundException(`User with ID ${targetUserId} not found`);
     }
 
-    const existing = await this.findOneToOneConversation(currentUserId, targetUserId);
+    const existing = await this.store.findOneToOneConversation(currentUserId, targetUserId);
     if (existing) {
       return existing;
     }
 
-    return await this.dataSource.transaction(async (manager) => {
-      const conversation = await manager.save(manager.create(Conversation, {}));
-      await manager.save([
-        manager.create(ConversationParticipant, { conversationId: conversation.id, userId: currentUserId }),
-        manager.create(ConversationParticipant, { conversationId: conversation.id, userId: targetUserId }),
-      ]);
-      return conversation;
-    });
-  }
-
-  protected async findOneToOneConversation(userIdA: number, userIdB: number): Promise<Conversation | null> {
-    const row = await this.participantRepository
-      .createQueryBuilder('participant')
-      .select('participant.conversationId', 'conversationId')
-      .groupBy('participant.conversationId')
-      .having('COUNT(*) = 2')
-      .andHaving('SUM(CASE WHEN participant.userId IN (:...ids) THEN 1 ELSE 0 END) = 2', {
-        ids: [userIdA, userIdB],
-      })
-      .orderBy('participant.conversationId', 'ASC')
-      .getRawOne<{ conversationId: number }>();
-
-    if (!row) {
-      return null;
-    }
-
-    return await this.conversationRepository.findOne({ where: { id: row.conversationId } });
+    return await this.store.createOneToOneConversation(currentUserId, targetUserId);
   }
 
   public async sendMessage(
@@ -124,26 +78,22 @@ export class MessagingService {
     senderId: number,
     content: string,
     reference?: MessageReference,
-  ): Promise<Message> {
+  ): Promise<MessageRecord> {
     await this.messageRateLimitService.assertWithinLimit('send_message', senderId);
 
     await this.assertParticipant(conversationId, senderId);
 
     const decoration = await this.resolveReferenceDecoration(reference);
 
-    const message = await this.messageRepository.save(
-      this.messageRepository.create({
-        conversationId,
-        senderId,
-        content,
-        referenceType: reference?.referenceType ?? null,
-        referenceId: reference?.referenceId ?? null,
-        referenceLabel: decoration.referenceLabel,
-        referenceUrl: decoration.referenceUrl,
-      }),
-    );
-
-    await this.conversationRepository.update({ id: conversationId }, { updatedAt: new Date() });
+    const message = await this.store.appendMessage({
+      conversationId,
+      senderId,
+      content,
+      referenceType: reference?.referenceType ?? null,
+      referenceId: reference?.referenceId ?? null,
+      referenceLabel: decoration.referenceLabel,
+      referenceUrl: decoration.referenceUrl,
+    });
 
     this.eventEmitter.emit(MessageCreatedEvent.EVENT_NAME, new MessageCreatedEvent(message));
 
@@ -151,18 +101,11 @@ export class MessagingService {
   }
 
   public async listConversations(userId: number): Promise<ConversationListItemDto[]> {
-    const participations = await this.participantRepository.find({
-      where: { userId },
-      relations: { conversation: true },
-    });
+    const participations = await this.store.listParticipations(userId);
 
     const items = await Promise.all(
       participations.map(async (participation) => {
-        const lastMessage = await this.messageRepository.findOne({
-          where: { conversationId: participation.conversationId },
-          relations: { sender: true },
-          order: { createdAt: 'DESC' },
-        });
+        const lastMessage = await this.store.findLastMessage(participation.conversationId);
 
         const otherParticipant = await this.resolveOtherParticipant(participation.conversationId, userId);
 
@@ -171,7 +114,7 @@ export class MessagingService {
           otherParticipant,
           otherParticipantOnline: otherParticipant ? this.messagingLiveService.isOnline(otherParticipant.id) : false,
           lastMessage,
-          updatedAt: participation.conversation.updatedAt,
+          updatedAt: participation.conversationUpdatedAt,
           unreadCount: await this.countUnread(participation.conversationId, userId, participation.lastReadAt),
         };
       }),
@@ -189,48 +132,29 @@ export class MessagingService {
     userId: number,
     page = 1,
     limit = 20,
-  ): Promise<{ data: Message[]; total: number; page: number; limit: number }> {
+  ): Promise<{ data: MessageRecord[]; total: number; page: number; limit: number }> {
     await this.assertParticipant(conversationId, userId);
 
-    const [data, total] = await this.messageRepository.findAndCount({
-      where: { conversationId },
-      relations: { sender: true },
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const { data, total } = await this.store.pageMessages(conversationId, page, limit);
 
     return { data, total, page, limit };
   }
 
   protected async countUnread(conversationId: number, userId: number, lastReadAt: Date | null): Promise<number> {
-    return this.messageRepository.count({
-      where: {
-        conversationId,
-        senderId: Not(userId),
-        ...(lastReadAt ? { createdAt: MoreThan(lastReadAt) } : {}),
-      },
-    });
+    return this.store.countUnread(conversationId, userId, lastReadAt);
   }
 
-  protected async resolveOtherParticipant(conversationId: number, userId: number): Promise<User | null> {
-    const other = await this.participantRepository
-      .createQueryBuilder('participant')
-      .leftJoinAndSelect('participant.user', 'user')
-      .where('participant.conversationId = :conversationId', { conversationId })
-      .andWhere('participant.userId != :userId', { userId })
-      .getOne();
-
-    return other?.user ?? null;
+  protected async resolveOtherParticipant(conversationId: number, userId: number): Promise<MessagingUser | null> {
+    return this.store.findOtherParticipant(conversationId, userId);
   }
 
   protected async resolveReferenceDecoration(
     reference?: MessageReference,
   ): Promise<{ referenceLabel: string | null; referenceUrl: string | null }> {
     if (reference?.referenceType === MessageReferenceType.RESOURCE) {
-      const resource = await this.resourceRepository.findOne({ where: { id: reference.referenceId } });
-      if (resource) {
-        return { referenceLabel: resource.name, referenceUrl: `/resources/${resource.id}` };
+      const resourceName = await this.store.findResourceName(reference.referenceId);
+      if (resourceName !== null) {
+        return { referenceLabel: resourceName, referenceUrl: `/resources/${reference.referenceId}` };
       }
     }
 
@@ -238,7 +162,7 @@ export class MessagingService {
   }
 
   /** With several parallel sessions the sender must pick whose session they mean (`userId`). */
-  public async resolveResourceHolder(resourceId: number, userId?: number): Promise<User | null> {
+  public async resolveResourceHolder(resourceId: number, userId?: number): Promise<{ id: number } | null> {
     const sessions = await this.resourceUsageService.getActiveSessionsForResource(resourceId);
     if (userId !== undefined) return sessions.find((session) => session.userId === userId)?.user ?? null;
     if (sessions.length > 1) {

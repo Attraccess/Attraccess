@@ -1,18 +1,9 @@
-import {
-  Project,
-  Resource,
-  ResourceFlowNodeType,
-  ResourceType,
-  ResourceUsage,
-  ResourceUsageAction,
-  User,
-} from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceType, ResourceUsageAction } from '@attraccess/application-models';
+import type { UsageSessionUser } from '@attraccess/application-models';
 
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-
-import { SelectQueryBuilder } from 'typeorm';
 
 import { InsufficientBalanceError } from '../../../billing/errors/insufficient-balance.error';
 
@@ -20,7 +11,7 @@ import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../../
 
 import { ResourceNotFoundException } from '../../../exceptions/resource.notFound.exception';
 
-import { inheritTestScope } from '../../../test-utils/inherit-test-scope';
+import { ResourceUnhealthyException } from '../../../exceptions/resource.unhealthy.exception';
 
 import { ExternalEffectFailureError } from '../../flows/errors/external-effect-failure.error';
 
@@ -30,344 +21,222 @@ import { ResourceInUseError } from '../errors/resource-in-use.error';
 
 import { ResourceSessionStartedEvent, ResourceUsageSessionTakenOverEvent } from '../events/resource-usage.events';
 
-import { resetTestFixture } from './fixtures/setup.test-fixture';
+import { arrangeIntroducedUser, InMemoryUsageScope, runningSession } from './fixtures/arrangements.test-fixture';
 
-import { createEndSessionFixture } from './fixtures/end-session.test-fixture';
-
-import { createResourceUsageServiceFixture } from './fixtures/service.test-fixture';
-
-import { createStartSessionFixture } from './fixtures/start-session.test-fixture';
-
-import { createSupervisedStartFixture } from './fixtures/supervised-start.test-fixture';
-
-import { mockRbacService } from './fixtures/rbac.test-fixture';
-
-import { captureTransactions, CapturedTransaction } from './fixtures/transaction-capture.test-fixture';
-
-export type ResourceUsageServiceTestScope = ReturnType<typeof createResourceUsageServiceFixture>;
-
-export type EndSessionTestScope = ReturnType<typeof createEndSessionFixture>;
-
-export type StartSessionTestScope = ReturnType<typeof createStartSessionFixture>;
-
-export type SupervisedStartTestScope = ReturnType<typeof createSupervisedStartFixture>;
-
-/** Exactly one transaction wrote audit rows; returns it so callers can check the manager identity. */
-function onlyAuditTransaction(transactions: CapturedTransaction[]): CapturedTransaction {
-  const auditing = transactions.filter((transaction) => transaction.auditCalls.length > 0);
-  expect(auditing).toHaveLength(1);
-  return auditing[0];
-}
+const BASE_FLOW_ARGS = { lifecycleAttemptId: expect.any(String), actorUserId: 1 };
 
 describe('ResourceUsageService', () => {
-  // Expose transactional entity manager for assertions
-  const scope = createResourceUsageServiceFixture();
+  describe('the project of a completed session', () => {
+    let scope: InMemoryUsageScope;
+    const owner: UsageSessionUser = { id: 7 };
 
-  beforeEach(async () => {
-    await resetTestFixture(scope);
-  });
+    beforeEach(async () => {
+      ({ scope } = await arrangeIntroducedUser({ id: 1 }, owner));
+      scope.projects.findOneById.mockImplementation(async (_userId: number, projectId: number) => ({ id: projectId }));
+    });
 
-  afterEach(() => {
-    jest.clearAllMocks();
-    mockRbacService.getEffectivePermissions.mockResolvedValue(new Set<string>());
-  });
+    const ended = (fields: Record<string, unknown> = {}) =>
+      scope.store.addSession({ id: 8, resourceId: 1, userId: 7, endTime: new Date(), ...fields });
 
-  it('assigns and clears a completed session project through the owning user', async () => {
-    const usage = {
-      id: 8,
-      resourceId: 1,
-      userId: 7,
-      endTime: new Date(),
-      usageAction: ResourceUsageAction.Usage,
-    } as ResourceUsage;
-    scope.resourceUsageRepository.findOne.mockResolvedValue(usage);
-    const user = { id: 7 } as User;
-    expect(await scope.service.updateSessionProject(1, 8, user, { projectId: 9 })).toBe(usage);
-    expect(scope.projectsService.findOneById).toHaveBeenCalledWith(7, 9);
-    expect(scope.resourceUsageRepository.save).toHaveBeenCalledWith(expect.objectContaining({ projectId: 9 }));
-    await scope.service.updateSessionProject(1, 8, user, { projectId: null });
-    expect(scope.resourceUsageRepository.save).toHaveBeenLastCalledWith(
-      expect.objectContaining({ projectId: null, project: null }),
-    );
-  });
+    it('assigns and clears the project of a completed session through the owning user', async () => {
+      ended();
 
-  it('rejects invalid or unauthorized project assignments without writing the session', async () => {
-    const user = { id: 7 } as User;
-    scope.resourceUsageRepository.findOne.mockResolvedValue(null);
-    await expect(scope.service.updateSessionProject(1, 8, user, { projectId: 9 })).rejects.toThrow('not found');
-    const usage = {
-      id: 8,
-      resourceId: 1,
-      userId: 7,
-      endTime: null,
-      usageAction: ResourceUsageAction.Usage,
-    } as ResourceUsage;
-    scope.resourceUsageRepository.findOne.mockResolvedValue(usage);
-    await expect(scope.service.updateSessionProject(1, 8, user, { projectId: 9 })).rejects.toThrow('still active');
-    usage.endTime = new Date();
-    usage.usageAction = ResourceUsageAction.DoorUnlock;
-    await expect(scope.service.updateSessionProject(1, 8, user, { projectId: 9 })).rejects.toThrow(
-      'Only usage sessions',
-    );
-    usage.usageAction = ResourceUsageAction.Usage;
-    usage.userId = 99;
-    await expect(scope.service.updateSessionProject(1, 8, user, { projectId: 9 })).rejects.toThrow('not authorized');
-    usage.userId = 7;
-    await expect(scope.service.updateSessionProject(1, 8, user, {} as never)).rejects.toThrow('required');
-    expect(scope.resourceUsageRepository.save).not.toHaveBeenCalled();
+      const assigned = await scope.service.updateSessionProject(1, 8, owner, { projectId: 9 });
+      expect(scope.projects.findOneById).toHaveBeenCalledWith(7, 9);
+      expect(assigned).toMatchObject({ id: 8, projectId: 9 });
+      expect(scope.store.sessionById(8)).toMatchObject({ projectId: 9 });
+
+      const cleared = await scope.service.updateSessionProject(1, 8, owner, { projectId: null });
+      expect(cleared).toMatchObject({ id: 8, projectId: null, project: null });
+      expect(scope.store.sessionById(8)).toMatchObject({ projectId: null, project: null });
+    });
+
+    it('rejects invalid or unauthorized project assignments without writing the session', async () => {
+      const assign = jest.spyOn(scope.store, 'assignProject');
+      await expect(scope.service.updateSessionProject(1, 8, owner, { projectId: 9 })).rejects.toThrow('not found');
+
+      scope.store.addSession({ id: 8, resourceId: 1, userId: 7 });
+      await expect(scope.service.updateSessionProject(1, 8, owner, { projectId: 9 })).rejects.toThrow('still active');
+
+      scope.store.sessions = [];
+      ended({ usageAction: ResourceUsageAction.DoorUnlock });
+      await expect(scope.service.updateSessionProject(1, 8, owner, { projectId: 9 })).rejects.toThrow(
+        'Only usage sessions',
+      );
+
+      scope.store.sessions = [];
+      ended({ userId: 99 });
+      await expect(scope.service.updateSessionProject(1, 8, owner, { projectId: 9 })).rejects.toThrow('not authorized');
+
+      scope.store.sessions = [];
+      ended();
+      await expect(scope.service.updateSessionProject(1, 8, owner, {} as never)).rejects.toThrow('required');
+
+      expect(assign).not.toHaveBeenCalled();
+      expect(scope.store.sessionById(8)).toMatchObject({ projectId: null });
+    });
   });
 
   describe('getSessionDetails', () => {
     const requester = { id: 1, effectivePermissions: new Set<string>() } as AuthenticatedUser;
-    const getSessionDetailsScope = inheritTestScope(
-      {
-        get resourceUsageRepository() {
-          return scope.resourceUsageRepository;
-        },
-        set resourceUsageRepository(value: typeof scope.resourceUsageRepository) {
-          scope.resourceUsageRepository = value;
-        },
-        get service() {
-          return scope.service;
-        },
-        set service(value: typeof scope.service) {
-          scope.service = value;
-        },
-        get requester() {
-          return requester;
-        },
-        get projectsService() {
-          return scope.projectsService;
-        },
-        set projectsService(value: typeof scope.projectsService) {
-          scope.projectsService = value;
-        },
-      },
-      scope,
-    );
+    let scope: InMemoryUsageScope;
 
-    it('loads the requested visible session and its usage details for the owner', async () => {
-      const usage = { id: 8, userId: 1, resourceId: 5 } as ResourceUsage;
-      getSessionDetailsScope.resourceUsageRepository.findOne.mockResolvedValue(usage);
-      expect(await getSessionDetailsScope.service.getSessionDetails(5, 8, getSessionDetailsScope.requester)).toBe(
-        usage,
-      );
-      expect(getSessionDetailsScope.resourceUsageRepository.findOne).toHaveBeenCalledWith({
-        where: { id: 8, resourceId: 5, lifecyclePending: false },
-        relations: expect.objectContaining({
-          project: true,
-          supervisorUser: true,
-          formSubmissions: expect.objectContaining({ form: true }),
-        }),
-      });
-      expect(getSessionDetailsScope.projectsService.findOneById).not.toHaveBeenCalled();
+    beforeEach(async () => {
+      ({ scope } = await arrangeIntroducedUser({ id: 5 }));
+    });
+
+    it('loads the requested session for the owner without checking any project', async () => {
+      scope.store.addSession({ id: 8, resourceId: 5, userId: 1 });
+      const read = jest.spyOn(scope.store, 'findPublishedSession');
+
+      expect(await scope.service.getSessionDetails(5, 8, requester)).toMatchObject({ id: 8, userId: 1 });
+
+      expect(read).toHaveBeenCalledWith(5, 8);
+      expect(scope.projects.findOneById).not.toHaveBeenCalled();
     });
 
     it('skips the project check when the viewer’s activity access covers other users', async () => {
-      getSessionDetailsScope.resourceUsageRepository.findOne.mockResolvedValue({ id: 8, userId: 2 } as ResourceUsage);
-      expect(
-        await getSessionDetailsScope.service.getSessionDetails(5, 8, getSessionDetailsScope.requester, true),
-      ).toEqual({ id: 8, userId: 2 });
-      expect(getSessionDetailsScope.projectsService.findOneById).not.toHaveBeenCalled();
+      scope.store.addSession({ id: 8, resourceId: 5, userId: 2 });
+
+      expect(await scope.service.getSessionDetails(5, 8, requester, true)).toMatchObject({ id: 8, userId: 2 });
+      expect(scope.projects.findOneById).not.toHaveBeenCalled();
     });
 
     it('requires project access before returning another member’s usage', async () => {
-      const usage = { id: 8, userId: 2, projectId: 3 } as ResourceUsage;
-      getSessionDetailsScope.resourceUsageRepository.findOne.mockResolvedValue(usage);
-      getSessionDetailsScope.projectsService.findOneById.mockResolvedValue({ id: 3 } as Project);
-      expect(await getSessionDetailsScope.service.getSessionDetails(5, 8, getSessionDetailsScope.requester)).toBe(
-        usage,
-      );
-      expect(getSessionDetailsScope.projectsService.findOneById).toHaveBeenCalledWith(1, 3);
-      getSessionDetailsScope.projectsService.findOneById.mockRejectedValue(new NotFoundException('Project not found'));
-      await expect(
-        getSessionDetailsScope.service.getSessionDetails(5, 8, getSessionDetailsScope.requester),
-      ).rejects.toThrow(NotFoundException);
+      scope.store.addSession({ id: 8, resourceId: 5, userId: 2, projectId: 3 });
+      scope.projects.findOneById.mockResolvedValue({ id: 3 });
+
+      expect(await scope.service.getSessionDetails(5, 8, requester)).toMatchObject({ id: 8, projectId: 3 });
+      expect(scope.projects.findOneById).toHaveBeenCalledWith(1, 3);
+
+      scope.projects.findOneById.mockRejectedValue(new NotFoundException('Project not found'));
+      await expect(scope.service.getSessionDetails(5, 8, requester)).rejects.toThrow(NotFoundException);
     });
 
-    it.each([null, { id: 8, userId: 2, projectId: null }])(
-      'rejects missing or inaccessible sessions (%s)',
-      async (usage) => {
-        getSessionDetailsScope.resourceUsageRepository.findOne.mockResolvedValue(usage as ResourceUsage);
-        await expect(
-          getSessionDetailsScope.service.getSessionDetails(5, 8, getSessionDetailsScope.requester),
-        ).rejects.toThrow(NotFoundException);
-      },
-    );
+    it.each([
+      ['a session that does not exist', undefined],
+      ['another member’s session without a project', { id: 8, userId: 2, projectId: null }],
+    ])('rejects %s', async (_name, stored) => {
+      if (stored) scope.store.addSession({ resourceId: 5, ...stored });
+      await expect(scope.service.getSessionDetails(5, 8, requester)).rejects.toThrow(NotFoundException);
+    });
+
+    it('does not show a session of another machine or one that is still a pending reservation', async () => {
+      scope.store.addSession({ id: 8, resourceId: 6, userId: 1 });
+      scope.store.addSession({ id: 9, resourceId: 5, userId: 1, isFinalized: false, lifecyclePending: true });
+
+      await expect(scope.service.getSessionDetails(5, 8, requester)).rejects.toThrow(NotFoundException);
+      await expect(scope.service.getSessionDetails(5, 9, requester)).rejects.toThrow(NotFoundException);
+    });
   });
 
   describe('startSession', () => {
-    const startSessionScope = createStartSessionFixture(scope);
+    let scope: InMemoryUsageScope;
+    let user: UsageSessionUser;
+    const dto: StartUsageSessionDto = { notes: 'Test session' };
+    const takeOver: StartUsageSessionDto = { notes: 'Test session', forceTakeOver: true };
 
-    it('should roll back the start when an HTTP transport failure is propagated', async () => {
-      const dto: StartUsageSessionDto = { notes: 'Test session' };
-      let transactionCommitted = false;
+    const arrange = async (resource: Parameters<typeof arrangeIntroducedUser>[0] = {}) => {
+      ({ scope, user } = await arrangeIntroducedUser(resource));
+    };
+    const outgoingUser = { id: 9, username: 'previous', billingFactor: 100 };
+    /** The machine allows take-overs and user 9 is working on it. */
+    const arrangeTakeOver = async () => {
+      await arrange({ allowTakeOver: true });
+      scope.store.addUser(outgoingUser);
+      return runningSession(scope, { id: 10, userId: 9 });
+    };
+    const startedSession = () => scope.store.sessions.find((stored) => stored.userId === user.id);
 
-      startSessionScope.flowExecutorService.runFlow.mockRejectedValueOnce(
-        new ExternalEffectFailureError('HTTP dispatch failed', new Error('HTTP dispatch failed'), 'transport-dispatch'),
-      );
-
-      // Mock resourceRepository.findOne to return the resource
-      startSessionScope.resourceRepository.findOne.mockResolvedValue(startSessionScope.mockResource);
-      startSessionScope.resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
-      startSessionScope.resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
-      startSessionScope.resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
-      startSessionScope.resourceIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
-
-      const createdSession = {
-        id: 1,
-        resourceId: 1,
-        userId: 1,
-        usageAction: ResourceUsageAction.Usage,
-        endTime: null,
-        startTime: new Date(),
-        isFinalized: false,
-        user: { id: 1 } as User,
-        resource: { id: 1 } as Resource,
-      } as ResourceUsage;
-      const finalizedSession = { ...createdSession, isFinalized: true };
-
-      // Mock getActiveSession to return null (no active session)
-      startSessionScope.resourceUsageRepository.findOne
-        .mockResolvedValueOnce(null) // 1) getActiveSession
-        .mockResolvedValueOnce(createdSession) // 2) fetch newly created session
-        .mockResolvedValueOnce(finalizedSession) // 3) fetch finalized session for return
-        .mockResolvedValueOnce(finalizedSession); // 4) emitUsageEvent fetch by id
-
-      const mockQueryBuilder = startSessionScope.createMockQueryBuilder(null);
-      // Service uses transactionalEntityManager.createQueryBuilder, not repo
-      (startSessionScope.transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
-        mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
-      );
-      (startSessionScope.resourceUsageRepository.manager.transaction as jest.Mock).mockImplementationOnce(
-        async (callback) => {
-          const result = await callback(startSessionScope.transactionalEntityManager);
-          transactionCommitted = true;
-          return result;
-        },
-      );
-
-      await expect(startSessionScope.service.startSession(1, startSessionScope.mockUser, dto)).rejects.toThrow(
-        'HTTP dispatch failed',
-      );
-      expect(transactionCommitted).toBe(true);
-      expect(startSessionScope.lifecycleAttempts.size).toBe(0);
-      expect(startSessionScope.transactionalEntityManager.delete).toHaveBeenCalledWith(
-        ResourceUsage,
-        expect.objectContaining({ lifecyclePending: true }),
-      );
-      expect(startSessionScope.transactionalEntityManager.createQueryBuilder).toHaveBeenCalled();
-      expect(mockQueryBuilder.insert).toHaveBeenCalled();
-      expect(mockQueryBuilder.into).toHaveBeenCalledWith(ResourceUsage);
-      expect(mockQueryBuilder.values).toHaveBeenCalledWith({
-        resourceId: 1,
-        usageAction: ResourceUsageAction.Usage,
-        userId: 1,
-        startNotes: 'Test session',
-        startTime: expect.any(Date),
-        endTime: null,
-        endNotes: null,
-        isFinalized: false,
-        lifecyclePending: true,
-        sessionDurationCreditsPerMinute: 0,
-        operatingDurationCreditsPerMinute: 0,
-        creditsPerUsage: 0,
-        meterRates: [],
+    it('rolls back the start when an HTTP transport failure is propagated', async () => {
+      await arrange();
+      const reserved: Array<{ pending: number; attempts: number; inTransaction: boolean }> = [];
+      scope.flows.runFlow.mockImplementationOnce(async () => {
+        reserved.push({
+          pending: scope.store.sessions.filter((stored) => stored.lifecyclePending).length,
+          attempts: scope.store.attempts.size,
+          inTransaction: scope.store.inTransaction,
+        });
+        throw new ExternalEffectFailureError(
+          'HTTP dispatch failed',
+          new Error('HTTP dispatch failed'),
+          'transport-dispatch',
+        );
       });
-      expect(mockQueryBuilder.execute).toHaveBeenCalled();
-      expect(startSessionScope.eventEmitter.emitAsync).not.toHaveBeenCalled();
-      expect(startSessionScope.flowExecutorService.trackResourceActivity).not.toHaveBeenCalled();
-      expect(startSessionScope.flowExecutorService.runFlow).toHaveBeenCalledWith(
-        createdSession.resourceId,
+      const reserve = jest.spyOn(scope.store, 'createPendingSession');
+
+      await expect(scope.service.startSession(1, user, dto)).rejects.toThrow('HTTP dispatch failed');
+
+      // The machine was reserved (committed, outside of any transaction) while the flow ran ...
+      expect(reserved).toEqual([{ pending: 1, attempts: 1, inTransaction: false }]);
+      expect(reserve).toHaveBeenCalledWith(
+        {
+          resourceId: 1,
+          userId: 1,
+          startNotes: 'Test session',
+          startTime: expect.any(Date),
+          sessionDurationCreditsPerMinute: 0,
+          operatingDurationCreditsPerMinute: 0,
+          creditsPerUsage: 0,
+          meterRates: [],
+        },
+        expect.anything(),
+      );
+      // ... and a failed start leaves neither the tentative session nor the reservation behind.
+      expect(scope.store.sessions).toEqual([]);
+      expect(scope.store.attempts.size).toBe(0);
+      expect(scope.events.emitAsync).not.toHaveBeenCalled();
+      expect(scope.flows.trackResourceActivity).not.toHaveBeenCalled();
+      expect(scope.flows.runFlow).toHaveBeenCalledWith(
+        1,
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
         expect.any(Object),
         undefined,
-        { lifecycleAttemptId: expect.any(String), actorUserId: 1 },
+        BASE_FLOW_ARGS,
       );
     });
 
     it('should throw error when resource does not exist', async () => {
-      const dto: StartUsageSessionDto = { notes: 'Test session' };
+      await arrange();
+      scope.store.resources.clear();
 
-      // Mock resourceRepository.findOne to return null (resource not found)
-      startSessionScope.resourceRepository.findOne.mockResolvedValue(null);
-
-      await expect(startSessionScope.service.startSession(1, startSessionScope.mockUser, dto)).rejects.toThrow(
-        ResourceNotFoundException,
-      );
+      await expect(scope.service.startSession(1, user, dto)).rejects.toThrow(ResourceNotFoundException);
     });
 
     it('should throw error when user has not completed introduction', async () => {
-      const dto: StartUsageSessionDto = { notes: 'Test session' };
+      await arrange();
+      scope.introductions.hasValidIntroduction.mockResolvedValue(false);
 
-      // Mock resourceRepository.findOne to return the resource
-      startSessionScope.resourceRepository.findOne.mockResolvedValue(startSessionScope.mockResource);
-      startSessionScope.resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
-      startSessionScope.resourceIntroductionService.hasValidIntroduction.mockResolvedValue(false);
-      startSessionScope.resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
-      startSessionScope.resourceIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
+      await expect(scope.service.startSession(1, user, dto)).rejects.toThrow(BadRequestException);
 
-      await expect(startSessionScope.service.startSession(1, startSessionScope.mockUser, dto)).rejects.toThrow(
-        BadRequestException,
-      );
-      expect(startSessionScope.resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledWith(
-        1,
-        1,
-        expect.anything(),
-      );
+      expect(scope.introductions.hasValidIntroduction).toHaveBeenCalledWith(1, 1, expect.anything());
+      expect(scope.store.sessions).toEqual([]);
+      expect(scope.store.attempts.size).toBe(0);
     });
 
     it('should throw error when active session exists and no takeover requested', async () => {
-      const dto: StartUsageSessionDto = { notes: 'Test session' };
+      await arrange();
+      runningSession(scope, { id: 1, userId: 2 });
 
-      // Mock resourceRepository.findOne to return the resource
-      startSessionScope.resourceRepository.findOne.mockResolvedValue(startSessionScope.mockResource);
-      startSessionScope.resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
-      startSessionScope.resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
-      startSessionScope.resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
-      startSessionScope.resourceIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
+      await expect(scope.service.startSession(1, user, dto)).rejects.toBeInstanceOf(ResourceInUseError);
 
-      const mockActiveSession = { id: 1, userId: 2, user: { id: 2 } as User } as ResourceUsage;
-      // Mock getActiveSession to return an active session
-      startSessionScope.resourceUsageRepository.findOne.mockResolvedValue(mockActiveSession);
-
-      await expect(startSessionScope.service.startSession(1, startSessionScope.mockUser, dto)).rejects.toBeInstanceOf(
-        ResourceInUseError,
-      );
+      expect(scope.store.sessions).toHaveLength(1);
+      expect(scope.store.attempts.size).toBe(0);
     });
 
     it('should throw error when takeover requested but resource does not allow it', async () => {
-      const dto: StartUsageSessionDto = { notes: 'Test session', forceTakeOver: true };
+      await arrange({ allowTakeOver: false });
+      runningSession(scope, { id: 1, userId: 2 });
 
-      // Mock resourceRepository.findOne to return the resource (allowTakeOver: false)
-      startSessionScope.resourceRepository.findOne.mockResolvedValue(startSessionScope.mockResource);
-      startSessionScope.resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
-      startSessionScope.resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
-      startSessionScope.resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
-      startSessionScope.resourceIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
-
-      const mockActiveSession = { id: 1, userId: 2, user: { id: 2 } as User } as ResourceUsage;
-      // Mock getActiveSession to return an active session
-      startSessionScope.resourceUsageRepository.findOne.mockResolvedValue(mockActiveSession);
-
-      await expect(startSessionScope.service.startSession(1, startSessionScope.mockUser, dto)).rejects.toThrow(
+      await expect(scope.service.startSession(1, user, takeOver)).rejects.toThrow(
         new BadRequestException('This resource does not allow overtaking'),
       );
+      expect(scope.store.sessionById(1)).toMatchObject({ endTime: null });
     });
 
-    it('should roll back the takeover when an MQTT controller rejection is propagated', async () => {
-      const dto: StartUsageSessionDto = { notes: 'Test session', forceTakeOver: true };
-      let transactionCommitted = false;
-
-      startSessionScope.flowExecutorService.runFlow.mockRejectedValueOnce(
+    it('rolls back the takeover when an MQTT controller rejection is propagated', async () => {
+      const previous = await arrangeTakeOver();
+      scope.flows.runFlow.mockRejectedValueOnce(
         new ExternalEffectFailureError(
           'MQTT controller rejected takeover',
           new Error('MQTT controller rejected takeover'),
@@ -375,516 +244,205 @@ describe('ResourceUsageService', () => {
         ),
       );
 
-      // Mock resourceRepository.findOne to return the resource (allowTakeOver: true)
-      startSessionScope.resourceRepository.findOne.mockResolvedValue(startSessionScope.mockResourceWithTakeOver);
-      startSessionScope.resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
-      startSessionScope.resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
-      startSessionScope.resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
-      startSessionScope.resourceIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
+      await expect(scope.service.startSession(1, user, takeOver)).rejects.toThrow('MQTT controller rejected takeover');
 
-      const mockActiveSession = {
-        id: 1,
-        resourceId: 1,
-        userId: 2,
-        startTime: new Date(),
-        user: { id: 2 } as User,
-      } as ResourceUsage;
-      const updatedEndedSession = {
-        ...mockActiveSession,
-        endTime: new Date(),
-        endNotes: 'Session ended due to takeover by user 1',
-      } as ResourceUsage;
-      const mockNewUsage = {
-        id: 2,
-        resourceId: 1,
-        userId: 1,
-        usageAction: ResourceUsageAction.Usage,
-        startTime: new Date(),
-        endTime: null,
-        isFinalized: false,
-        user: { id: 1 } as User,
-      } as ResourceUsage;
-      const finalizedNewUsage = { ...mockNewUsage, isFinalized: true };
-
-      // Mock getActiveSession to return an active session, then mock findOne for new session
-      startSessionScope.resourceUsageRepository.findOne
-        .mockResolvedValueOnce(mockActiveSession) // 1) getActiveSession
-        .mockResolvedValueOnce(mockNewUsage) // candidate in prepare
-        .mockResolvedValueOnce(updatedEndedSession) // previous session at finish
-        .mockResolvedValueOnce(finalizedNewUsage) // 4) fetch finalized new session (in-transaction)
-        .mockResolvedValueOnce(updatedEndedSession) // 5) emitUsageEvent fetch for ended session (after commit)
-        .mockResolvedValueOnce(finalizedNewUsage) // 6) emitUsageEvent fetch for newly created session (after commit)
-        .mockResolvedValueOnce(finalizedNewUsage); // 7) safeguard for any additional fetches
-
-      const mockUpdateQueryBuilder = startSessionScope.createMockQueryBuilder(null);
-      const mockInsertQueryBuilder = startSessionScope.createMockQueryBuilder(null);
-
-      // Service uses transactionalEntityManager.createQueryBuilder
-      (startSessionScope.transactionalEntityManager.createQueryBuilder as jest.Mock)
-        .mockReturnValueOnce(mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>) // For ending session
-        .mockReturnValueOnce(mockInsertQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>); // For creating new session
-      (startSessionScope.resourceUsageRepository.manager.transaction as jest.Mock).mockImplementationOnce(
-        async (callback) => {
-          const result = await callback(startSessionScope.transactionalEntityManager);
-          transactionCommitted = true;
-          return result;
-        },
-      );
-
-      await expect(startSessionScope.service.startSession(1, startSessionScope.mockUser, dto)).rejects.toThrow(
-        'MQTT controller rejected takeover',
-      );
-      expect(transactionCommitted).toBe(true);
-      expect(startSessionScope.lifecycleAttempts.size).toBe(0);
-      expect(startSessionScope.transactionalEntityManager.delete).toHaveBeenCalledWith(
-        ResourceUsage,
-        expect.objectContaining({ lifecyclePending: true }),
-      );
-      expect(startSessionScope.billingService.chargeForResourceUsage).not.toHaveBeenCalled();
-      expect(startSessionScope.billingService.handleResourceUsageStart).not.toHaveBeenCalled();
-      expect(startSessionScope.eventEmitter.emitAsync).not.toHaveBeenCalled();
-      expect(startSessionScope.eventEmitter.emit).not.toHaveBeenCalledWith(
+      // The previous user keeps working, nobody was charged or announced, and the reservation is gone.
+      expect(scope.store.sessions).toHaveLength(1);
+      expect(scope.store.sessionById(previous.id)).toMatchObject({ endTime: null, userId: 9 });
+      expect(scope.store.attempts.size).toBe(0);
+      expect(scope.billing.chargeForResourceUsage).not.toHaveBeenCalled();
+      expect(scope.billing.handleResourceUsageStart).not.toHaveBeenCalled();
+      expect(scope.events.emitAsync).not.toHaveBeenCalled();
+      expect(scope.events.emit).not.toHaveBeenCalledWith(
         ResourceUsageSessionTakenOverEvent.EVENT_NAME,
         expect.any(Object),
       );
-      expect(startSessionScope.flowExecutorService.trackResourceActivity).not.toHaveBeenCalled();
-      expect(startSessionScope.flowExecutorService.runFlow).toHaveBeenCalledWith(
-        mockActiveSession.resourceId,
+      expect(scope.flows.trackResourceActivity).not.toHaveBeenCalled();
+      expect(scope.flows.runFlow).toHaveBeenCalledWith(
+        1,
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
         expect.any(Object),
         undefined,
-        { lifecycleAttemptId: expect.any(String), actorUserId: 1 },
+        BASE_FLOW_ARGS,
       );
     });
 
-    it('should trigger only TAKEOVER flow on takeover and not STARTED/STOPPED; billing unchanged', async () => {
-      const dto: StartUsageSessionDto = { notes: 'Test session', forceTakeOver: true };
+    it('triggers only the TAKEOVER flow on a takeover and not STARTED/STOPPED; billing unchanged', async () => {
+      const previous = await arrangeTakeOver();
 
-      startSessionScope.resourceRepository.findOne.mockResolvedValue(startSessionScope.mockResourceWithTakeOver);
-      startSessionScope.resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
-      startSessionScope.resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
-      startSessionScope.resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
-      startSessionScope.resourceIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
+      await scope.service.startSession(1, user, takeOver);
 
-      const mockActiveSession = {
-        id: 10,
-        resourceId: 1,
-        userId: 9,
-        startTime: new Date(),
-        user: { id: 9 } as User,
-      } as ResourceUsage;
-      const updatedEndedSession = {
-        ...mockActiveSession,
-        endTime: new Date(),
-        endNotes: 'Session ended due to takeover by user 1',
-      } as ResourceUsage;
-      const mockNewUsage = { id: 11, resourceId: 1, userId: 1, user: { id: 1, billingFactor: 100 } } as ResourceUsage;
-
-      startSessionScope.resourceUsageRepository.findOne
-        .mockResolvedValueOnce(mockActiveSession) // getActiveSession
-        .mockResolvedValueOnce(mockNewUsage) // candidate in prepare
-        .mockResolvedValueOnce(updatedEndedSession) // previous session at finish
-        .mockResolvedValueOnce(mockNewUsage) // finalized candidate
-        .mockResolvedValueOnce(updatedEndedSession) // emitUsageEvent for ended
-        .mockResolvedValueOnce(mockNewUsage); // emitUsageEvent for started
-
-      const mockUpdateQueryBuilder = startSessionScope.createMockQueryBuilder(null);
-      const mockInsertQueryBuilder = startSessionScope.createMockQueryBuilder(null);
-
-      (startSessionScope.transactionalEntityManager.createQueryBuilder as jest.Mock)
-        .mockReturnValueOnce(mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>)
-        .mockReturnValueOnce(mockInsertQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>);
-
-      await startSessionScope.service.startSession(1, startSessionScope.mockUser, dto);
-
-      // Only one flow call and it must be TAKEOVER
-      expect(startSessionScope.flowExecutorService.runFlow).toHaveBeenCalledTimes(1);
-      const [resId, nodeType, payload] = startSessionScope.flowExecutorService.runFlow.mock.calls[0];
-      expect(resId).toBe(mockActiveSession.resourceId ?? 1);
+      expect(scope.flows.runFlow).toHaveBeenCalledTimes(1);
+      const [resourceId, nodeType, payload] = scope.flows.runFlow.mock.calls[0];
+      expect(resourceId).toBe(1);
       expect(nodeType).toBe(ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER);
-      expect(payload).toMatchObject({
-        newUser: { id: startSessionScope.mockUser.id },
-        oldUser: { id: mockActiveSession.user.id },
-      });
+      expect(payload).toMatchObject({ newUser: { id: user.id }, oldUser: { id: previous.user.id } });
 
-      // Billing start should still be called exactly once for the new session
-      expect(startSessionScope.billingService.handleResourceUsageStart).toHaveBeenCalledTimes(1);
-      // Billing charge should occur for previous ended session exactly once
-      expect(startSessionScope.billingService.chargeForResourceUsage).toHaveBeenCalledTimes(1);
-      const chargedArg = (startSessionScope.billingService.chargeForResourceUsage as unknown as jest.Mock).mock
-        .calls[0][0] as ResourceUsage;
-      expect(chargedArg.user?.id).toBe(mockActiveSession.user.id);
-      const chargedIds = (
-        startSessionScope.billingService.chargeForResourceUsage as unknown as jest.Mock
-      ).mock.calls.map((c) => c[0]?.id);
-      expect(chargedIds).not.toContain(mockNewUsage.id);
-      expect(startSessionScope.flowExecutorService.trackResourceActivity).toHaveBeenCalledTimes(1);
-      expect(startSessionScope.flowExecutorService.trackResourceActivity).toHaveBeenCalledWith(mockNewUsage.resourceId);
+      // The new session is billed once, the outgoing one is charged once (and the new one never is).
+      expect(scope.billing.handleResourceUsageStart).toHaveBeenCalledTimes(1);
+      expect(scope.billing.chargeForResourceUsage).toHaveBeenCalledTimes(1);
+      const charged = scope.billing.chargeForResourceUsage.mock.calls[0][0];
+      expect(charged).toMatchObject({ id: previous.id, user: { id: 9 } });
+      expect(charged.endTime).toBeInstanceOf(Date);
+      expect(scope.flows.trackResourceActivity).toHaveBeenCalledTimes(1);
+      expect(scope.flows.trackResourceActivity).toHaveBeenCalledWith(1);
+
+      // The old session ended because of the takeover, the new one is the only running session.
+      expect(scope.store.sessionById(previous.id)).toMatchObject({
+        endNotes: 'Session ended due to takeover by user 1',
+      });
+      expect(scope.store.sessionById(previous.id)?.endTime).toBeInstanceOf(Date);
+      expect(startedSession()).toMatchObject({ isFinalized: true, lifecyclePending: false, endTime: null });
+      expect(await scope.service.getActiveSession(1)).toMatchObject({ userId: 1 });
+      expect(scope.store.attempts.size).toBe(0);
     });
 
     it('audits the take-over as the old session ending and the new one starting, inside the start transaction', async () => {
-      const dto: StartUsageSessionDto = { notes: 'Test session', forceTakeOver: true };
+      const previous = await arrangeTakeOver();
+      const publish = jest.spyOn(scope.store, 'publishSession');
+      const end = jest.spyOn(scope.store, 'endSessionIfOpen');
 
-      startSessionScope.resourceRepository.findOne.mockResolvedValue(startSessionScope.mockResourceWithTakeOver);
-      startSessionScope.resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
-      startSessionScope.resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
-      startSessionScope.resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
-      startSessionScope.resourceIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
+      await scope.service.startSession(1, user, takeOver);
 
-      const mockActiveSession = {
-        id: 10,
-        resourceId: 1,
-        userId: 9,
-        startTime: new Date(),
-        user: { id: 9 } as User,
-      } as ResourceUsage;
-      const updatedEndedSession = {
-        ...mockActiveSession,
-        endTime: new Date(),
-        endNotes: 'Session ended due to takeover by user 1',
-      } as ResourceUsage;
-      const mockNewUsage = { id: 11, resourceId: 1, userId: 1, user: { id: 1, billingFactor: 100 } } as ResourceUsage;
-
-      startSessionScope.resourceUsageRepository.findOne
-        .mockResolvedValueOnce(mockActiveSession) // getActiveSession
-        .mockResolvedValueOnce(mockNewUsage) // candidate in prepare
-        .mockResolvedValueOnce(updatedEndedSession) // previous session at finish
-        .mockResolvedValueOnce(mockNewUsage) // finalized candidate
-        .mockResolvedValueOnce(updatedEndedSession) // emitUsageEvent for ended
-        .mockResolvedValueOnce(mockNewUsage); // emitUsageEvent for started
-
-      (startSessionScope.transactionalEntityManager.createQueryBuilder as jest.Mock)
-        .mockReturnValueOnce(
-          startSessionScope.createMockQueryBuilder(null) as unknown as SelectQueryBuilder<ResourceUsage>,
-        )
-        .mockReturnValueOnce(
-          startSessionScope.createMockQueryBuilder(null) as unknown as SelectQueryBuilder<ResourceUsage>,
-        );
-
-      const transactions = captureTransactions(
-        startSessionScope.resourceUsageRepository.manager as unknown as { transaction: jest.Mock },
-        startSessionScope.transactionalEntityManager,
-        startSessionScope.mockAuditService.record,
-      );
-
-      await startSessionScope.service.startSession(1, startSessionScope.mockUser, dto);
-
-      // Both rows are written in the transaction that ends the old session and finalizes the new one,
-      // so the take-over and its audit trail commit or roll back together.
-      const auditTransaction = onlyAuditTransaction(transactions);
-      expect(startSessionScope.mockAuditService.record).toHaveBeenCalledTimes(2);
-      expect(auditTransaction.auditCalls).toEqual([
-        [
-          {
-            domain: 'resource',
-            action: 'usage_session.ended',
-            actor: { id: 1, authenticationMethod: 'session' },
-            subject: { type: 'resource', id: 1 },
-            details: { usageId: 10, usageUserId: 9 },
-          },
-          expect.anything(),
-        ],
-        [
-          {
-            domain: 'resource',
-            action: 'usage_session.started',
-            actor: { id: 1, authenticationMethod: 'session' },
-            subject: { type: 'resource', id: 1 },
-            details: { usageId: 11, usageUserId: 1 },
-          },
-          expect.anything(),
-        ],
+      const newId = startedSession()?.id;
+      const actor = { id: 1, authenticationMethod: 'session' };
+      expect(scope.audit.record.mock.calls.map(([event]) => event)).toEqual([
+        {
+          domain: 'resource',
+          action: 'usage_session.ended',
+          actor,
+          subject: { type: 'resource', id: 1 },
+          details: { usageId: previous.id, usageUserId: 9 },
+        },
+        {
+          domain: 'resource',
+          action: 'usage_session.started',
+          actor,
+          subject: { type: 'resource', id: 1 },
+          details: { usageId: newId, usageUserId: 1 },
+        },
       ]);
-      expect(auditTransaction.auditCalls[0][1]).toBe(auditTransaction.manager);
-      expect(auditTransaction.auditCalls[1][1]).toBe(auditTransaction.manager);
+      // Both rows are written in the transaction that ends the old session and publishes the new one, so the
+      // take-over and its audit trail commit or roll back together.
+      const transaction = publish.mock.calls[0][1];
+      expect(transaction).toBeDefined();
+      expect(end.mock.calls[0][2]).toBe(transaction);
+      expect(scope.audit.record.mock.calls.map(([, writtenIn]) => writtenIn)).toEqual([transaction, transaction]);
     });
 
     it('should throw ResourceMaintenanceInUseException when resource is under maintenance and user cannot manage maintenance', async () => {
-      const dto: StartUsageSessionDto = { notes: 'Test session' };
+      await arrange();
+      scope.maintenance.hasActiveMaintenance.mockResolvedValue(true);
+      scope.maintenance.canManageMaintenance.mockResolvedValue(false);
 
-      // Mock resourceRepository.findOne to return the resource
-      startSessionScope.resourceRepository.findOne.mockResolvedValue(startSessionScope.mockResource);
-
-      // Mock maintenance service to indicate active maintenance
-      startSessionScope.resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(true);
-      startSessionScope.resourceMaintenanceService.canManageMaintenance.mockResolvedValue(false);
-
-      await expect(startSessionScope.service.startSession(1, startSessionScope.mockUser, dto)).rejects.toThrow(
+      await expect(scope.service.startSession(1, user, dto)).rejects.toThrow(
         ResourceUsageImpossibleMaintenanceInProgressException,
       );
-      expect(startSessionScope.resourceMaintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(
-        1,
-        expect.anything(),
-      );
-      expect(startSessionScope.resourceMaintenanceService.canManageMaintenance).toHaveBeenCalledWith(
-        startSessionScope.mockUser,
-        1,
-        expect.anything(),
-      );
+      expect(scope.maintenance.hasActiveMaintenance).toHaveBeenCalledWith(1, expect.anything());
+      expect(scope.maintenance.canManageMaintenance).toHaveBeenCalledWith(user, 1, expect.anything());
+      expect(scope.store.sessions).toEqual([]);
     });
 
     it('should block non-maintenance users when active maintenance exists including schedule-triggered (same as manual)', async () => {
-      const dto: StartUsageSessionDto = { notes: 'Test session' };
-
-      startSessionScope.resourceRepository.findOne.mockResolvedValue(startSessionScope.mockResource);
+      await arrange();
       // hasActiveMaintenance does not filter by origin: schedule-created maintenances use the same
       // table and criteria (startTime <= now, endTime IS NULL), so they block the same as manual ones
-      startSessionScope.resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(true);
-      startSessionScope.resourceMaintenanceService.canManageMaintenance.mockResolvedValue(false);
+      scope.maintenance.hasActiveMaintenance.mockResolvedValue(true);
+      scope.maintenance.canManageMaintenance.mockResolvedValue(false);
 
-      await expect(startSessionScope.service.startSession(1, startSessionScope.mockUser, dto)).rejects.toThrow(
+      await expect(scope.service.startSession(1, user, dto)).rejects.toThrow(
         ResourceUsageImpossibleMaintenanceInProgressException,
       );
-      expect(startSessionScope.resourceMaintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(
-        1,
-        expect.anything(),
-      );
-      expect(startSessionScope.resourceMaintenanceService.canManageMaintenance).toHaveBeenCalledWith(
-        startSessionScope.mockUser,
-        1,
-        expect.anything(),
-      );
+      expect(scope.maintenance.hasActiveMaintenance).toHaveBeenCalledWith(1, expect.anything());
+      expect(scope.maintenance.canManageMaintenance).toHaveBeenCalledWith(user, 1, expect.anything());
     });
 
     it('should throw ResourceUnhealthyException when resource is unhealthy and user cannot manage maintenance', async () => {
-      const dto: StartUsageSessionDto = { notes: 'Test session' };
+      await arrange();
+      scope.health.isResourceUnhealthy.mockResolvedValueOnce(true);
+      scope.maintenance.canManageMaintenance.mockResolvedValue(false);
 
-      startSessionScope.resourceRepository.findOne.mockResolvedValue(startSessionScope.mockResource);
-      startSessionScope.resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
-      startSessionScope.mockResourceHealthService.isResourceUnhealthy.mockResolvedValueOnce(true);
-      startSessionScope.resourceMaintenanceService.canManageMaintenance.mockResolvedValue(false);
-
-      const { ResourceUnhealthyException } = require('../../../exceptions/resource.unhealthy.exception');
-
-      await expect(startSessionScope.service.startSession(1, startSessionScope.mockUser, dto)).rejects.toBeInstanceOf(
-        ResourceUnhealthyException,
-      );
+      await expect(scope.service.startSession(1, user, dto)).rejects.toBeInstanceOf(ResourceUnhealthyException);
       // Reads through the start's transaction, not the main connection that may wait for its lock.
-      expect(startSessionScope.mockResourceHealthService.isResourceUnhealthy).toHaveBeenCalledWith(
-        1,
-        expect.anything(),
-      );
-      expect(startSessionScope.resourceMaintenanceService.canManageMaintenance).toHaveBeenCalled();
+      expect(scope.health.isResourceUnhealthy).toHaveBeenCalledWith(1, expect.anything());
+      expect(scope.maintenance.canManageMaintenance).toHaveBeenCalled();
     });
 
     it('should allow maintenance users to start a session even when resource is unhealthy', async () => {
-      const dto: StartUsageSessionDto = { notes: 'Test session' };
+      await arrange();
+      scope.health.isResourceUnhealthy.mockResolvedValueOnce(true);
+      scope.maintenance.canManageMaintenance.mockResolvedValue(true);
 
-      startSessionScope.resourceRepository.findOne.mockResolvedValue(startSessionScope.mockResource);
-      startSessionScope.resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
-      startSessionScope.mockResourceHealthService.isResourceUnhealthy.mockResolvedValueOnce(true);
-      startSessionScope.resourceMaintenanceService.canManageMaintenance.mockResolvedValue(true);
+      const result = await scope.service.startSession(1, user, dto);
 
-      startSessionScope.resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
-      startSessionScope.resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
-      startSessionScope.resourceIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
-
-      const createdSession = {
-        id: 1,
-        resourceId: 1,
-        userId: 1,
-        usageAction: ResourceUsageAction.Usage,
-        startTime: new Date(),
-        endTime: null,
-        isFinalized: false,
-        user: { id: 1, billingFactor: 100 } as User,
-      } as ResourceUsage;
-      const finalizedSession = { ...createdSession, isFinalized: true };
-
-      startSessionScope.resourceUsageRepository.findOne
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(createdSession)
-        .mockResolvedValueOnce(finalizedSession)
-        .mockResolvedValueOnce(finalizedSession);
-
-      const mockQueryBuilder = startSessionScope.createMockQueryBuilder(null);
-      (startSessionScope.transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
-        mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
-      );
-
-      const result = await startSessionScope.service.startSession(1, startSessionScope.mockUser, dto);
-      expect(result).toEqual(finalizedSession);
+      expect(result).toMatchObject({ resourceId: 1, userId: 1, isFinalized: true, endTime: null });
+      expect(scope.store.sessionById(result.id)).toMatchObject({ lifecyclePending: false });
     });
 
     it('should allow usage when resource is under maintenance but user can manage maintenance', async () => {
-      const dto: StartUsageSessionDto = { notes: 'Test session' };
+      await arrange();
+      scope.maintenance.hasActiveMaintenance.mockResolvedValue(true);
+      scope.maintenance.canManageMaintenance.mockResolvedValue(true);
 
-      // Mock resourceRepository.findOne to return the resource
-      startSessionScope.resourceRepository.findOne.mockResolvedValue(startSessionScope.mockResource);
+      const result = await scope.service.startSession(1, user, dto);
 
-      // Mock maintenance service to indicate active maintenance but user can manage
-      startSessionScope.resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(true);
-      startSessionScope.resourceMaintenanceService.canManageMaintenance.mockResolvedValue(true);
-
-      // Mock other required services
-      startSessionScope.resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
-      startSessionScope.resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
-      startSessionScope.resourceIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
-
-      const createdSession = {
-        id: 1,
-        resourceId: 1,
-        userId: 1,
-        usageAction: ResourceUsageAction.Usage,
-        startTime: new Date(),
-        endTime: null,
-        isFinalized: false,
-        user: { id: 1, billingFactor: 100 } as User,
-      } as ResourceUsage;
-      const finalizedSession = { ...createdSession, isFinalized: true };
-
-      // Mock getActiveSession to return null (no active session)
-      startSessionScope.resourceUsageRepository.findOne
-        .mockResolvedValueOnce(null) // For getActiveSession
-        .mockResolvedValueOnce(createdSession) // For finding new session
-        .mockResolvedValueOnce(finalizedSession) // Fetch finalized session for return
-        .mockResolvedValueOnce(finalizedSession); // Emit event after commit
-
-      const mockQueryBuilder = startSessionScope.createMockQueryBuilder(null);
-      (startSessionScope.transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
-        mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
-      );
-
-      const result = await startSessionScope.service.startSession(1, startSessionScope.mockUser, dto);
-
-      expect(result).toEqual(finalizedSession);
-      expect(startSessionScope.resourceMaintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(
-        1,
-        expect.anything(),
-      );
-      expect(startSessionScope.resourceMaintenanceService.canManageMaintenance).toHaveBeenCalledWith(
-        startSessionScope.mockUser,
-        1,
-        expect.anything(),
-      );
-      expect(startSessionScope.flowExecutorService.trackResourceActivity).toHaveBeenCalledWith(
-        createdSession.resourceId,
-      );
+      expect(result).toMatchObject({ resourceId: 1, userId: 1, isFinalized: true });
+      expect(scope.maintenance.hasActiveMaintenance).toHaveBeenCalledWith(1, expect.anything());
+      expect(scope.maintenance.canManageMaintenance).toHaveBeenCalledWith(user, 1, expect.anything());
+      expect(scope.flows.trackResourceActivity).toHaveBeenCalledWith(1);
     });
 
     it('should reject start when billing is enabled and balance is insufficient', async () => {
-      const dto: StartUsageSessionDto = { notes: 'Test session' };
+      await arrange();
+      scope.billing.handleResourceUsageStart.mockRejectedValue(new InsufficientBalanceError());
 
-      startSessionScope.resourceRepository.findOne.mockResolvedValue({
-        id: 1,
-        name: 'Test Resource',
-        allowTakeOver: false,
-        type: ResourceType.Machine,
-      } as Resource);
-      startSessionScope.resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
-      startSessionScope.resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
-      startSessionScope.resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
-      startSessionScope.resourceIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
+      await expect(scope.service.startSession(1, user, dto)).rejects.toBeInstanceOf(InsufficientBalanceError);
 
-      startSessionScope.billingService.handleResourceUsageStart.mockRejectedValue(new InsufficientBalanceError());
-
-      // getActiveSession -> null, then fetch newly created session
-      startSessionScope.resourceUsageRepository.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce({
-        id: 1,
-        resourceId: 1,
-        userId: 1,
-        usageAction: ResourceUsageAction.Usage,
-        endTime: null,
-        user: { id: 1 } as User,
-        resource: { id: 1 } as Resource,
-      } as ResourceUsage);
-
-      await expect(startSessionScope.service.startSession(1, { id: 1 } as User, dto)).rejects.toBeInstanceOf(
-        InsufficientBalanceError,
-      );
-
-      expect(startSessionScope.billingService.handleResourceUsageStart).toHaveBeenCalled();
+      expect(scope.billing.handleResourceUsageStart).toHaveBeenCalled();
+      // Not even the tentative session survives, and nobody is told about a start.
+      expect(scope.store.sessions).toEqual([]);
+      expect(scope.store.attempts.size).toBe(0);
+      expect(scope.events.emitAsync).not.toHaveBeenCalled();
     });
 
     it('should start when billing is enabled and balance is sufficient', async () => {
-      const dto: StartUsageSessionDto = { notes: 'Test session' };
+      await arrange();
+      const publish = jest.spyOn(scope.store, 'publishSession');
 
-      const mockResource: Resource = {
-        id: 1,
-        name: 'Test Resource',
-        allowTakeOver: false,
-        type: ResourceType.Machine,
-      } as Resource;
+      const result = await scope.service.startSession(1, user, dto);
 
-      startSessionScope.resourceRepository.findOne.mockResolvedValue(mockResource);
-      startSessionScope.resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
-      startSessionScope.resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
-      startSessionScope.resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
-      startSessionScope.resourceIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
-      startSessionScope.resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
-
-      startSessionScope.billingService.handleResourceUsageStart.mockResolvedValue(undefined);
-
-      const createdSession = {
-        id: 1,
-        resourceId: 1,
-        userId: 1,
-        usageAction: ResourceUsageAction.Usage,
-        startTime: new Date(),
-        endTime: null,
-        isFinalized: false,
-        user: { id: 1, billingFactor: 100 } as User,
-      } as ResourceUsage;
-      const finalizedSession = { ...createdSession, isFinalized: true };
-
-      startSessionScope.resourceUsageRepository.findOne
-        .mockResolvedValueOnce(null) // For getActiveSession
-        .mockResolvedValueOnce(createdSession) // For finding new session
-        .mockResolvedValueOnce(finalizedSession) // For fetching finalized session to return
-        .mockResolvedValueOnce(finalizedSession); // For emitUsageEvent
-
-      const mockQueryBuilder = startSessionScope.createMockQueryBuilder(null);
-      (startSessionScope.transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
-        mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
+      expect(result).toMatchObject({ resourceId: 1, userId: 1, endTime: null, isFinalized: true });
+      expect(scope.billing.handleResourceUsageStart).toHaveBeenCalledWith(
+        1,
+        expect.anything(),
+        user,
+        expect.anything(),
       );
-
-      const transactions = captureTransactions(
-        startSessionScope.resourceUsageRepository.manager as unknown as { transaction: jest.Mock },
-        startSessionScope.transactionalEntityManager,
-        startSessionScope.mockAuditService.record,
-      );
-
-      const result = await startSessionScope.service.startSession(1, { id: 1 } as User, dto);
-
-      expect(result).toMatchObject({ id: 1, resourceId: 1, userId: 1, endTime: null, isFinalized: true });
-      expect(startSessionScope.billingService.handleResourceUsageStart).toHaveBeenCalled();
-      expect(mockQueryBuilder.insert).toHaveBeenCalled();
-      expect(startSessionScope.eventEmitter.emitAsync).toHaveBeenCalledWith(
-        ResourceSessionStartedEvent.EVENT_NAME,
-        expect.any(Object),
-      );
-      expect(startSessionScope.flowExecutorService.trackResourceActivity).toHaveBeenCalledWith(
-        createdSession.resourceId,
-      );
+      expect(scope.store.sessionById(result.id)).toMatchObject({ isFinalized: true, lifecyclePending: false });
+      expect(scope.store.attempts.size).toBe(0);
+      expect(scope.events.emitAsync).toHaveBeenCalledWith(ResourceSessionStartedEvent.EVENT_NAME, expect.any(Object));
+      expect(scope.flows.trackResourceActivity).toHaveBeenCalledWith(1);
       // Written inside the session's transaction, so the row commits or rolls back with it.
-      const auditTransaction = onlyAuditTransaction(transactions);
-      expect(startSessionScope.mockAuditService.record).toHaveBeenCalledTimes(1);
-      expect(auditTransaction.auditCalls).toEqual([
-        [
-          {
-            domain: 'resource',
-            action: 'usage_session.started',
-            actor: { id: 1, authenticationMethod: 'session' },
-            subject: { type: 'resource', id: 1 },
-            details: { usageId: 1, usageUserId: 1 },
-          },
-          expect.anything(),
-        ],
-      ]);
-      expect(auditTransaction.auditCalls[0][1]).toBe(auditTransaction.manager);
+      expect(scope.audit.record).toHaveBeenCalledTimes(1);
+      expect(scope.audit.record).toHaveBeenCalledWith(
+        {
+          domain: 'resource',
+          action: 'usage_session.started',
+          actor: { id: 1, authenticationMethod: 'session' },
+          subject: { type: 'resource', id: 1 },
+          details: { usageId: result.id, usageUserId: 1 },
+        },
+        publish.mock.calls[0][1],
+      );
+    });
+
+    it('starts a machine as a usage session of the user that can be found as the machine’s only active session', async () => {
+      await arrange();
+
+      const result = await scope.service.startSession(1, user, dto);
+
+      expect(await scope.service.getActiveSession(1)).toMatchObject({ id: result.id, userId: 1 });
+      expect(result.resource).toMatchObject({ type: ResourceType.Machine });
     });
   });
 });

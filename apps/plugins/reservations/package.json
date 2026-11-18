@@ -23,17 +23,16 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@attraccess/plugins-backend-sdk": "^1.9.0",
-    "@attraccess/plugins-frontend-sdk": "^1.9.0",
-    "@attraccess/plugins-frontend-ui": "^1.11.0-0"
+    "@attraccess/plugins-backend-sdk": "^2.0.0-0",
+    "@attraccess/plugins-frontend-sdk": "^2.0.0-0",
+    "@attraccess/plugins-frontend-ui": "^2.0.0-0"
   },
   "attraccess": {
     "displayName": "Reservations",
     "description": "Reserve a resource for a specific time window.",
-    "host": "^1.11.0-beta.3",
+    "host": "^2.0.0-0",
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
-    "migrations": "dist/migrations.js",
     "styles": "frontend/style.css",
     "dashboardPaths": [
       "/reservations",
@@ -43,7 +42,7 @@
       "reservations-upcoming"
     ],
     "permissions": [
-      "DATABASE_ACCESS",
+      "PLUGIN_STORAGE",
       "ACCESS_HOOKS",
       "LISTEN_EVENTS",
       "ACCESS_RESOURCES",
@@ -58,8 +57,8 @@
       ]
     },
     "sdk": {
-      "backend": "^1.9.0",
-      "frontend": "^1.9.0"
+      "backend": "^2.0.0-0",
+      "frontend": "^2.0.0-0"
     }
   }
 }

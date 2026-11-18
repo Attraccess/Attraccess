@@ -2,10 +2,10 @@ import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { InternalServerErrorException, type HttpException } from '@nestjs/common';
 import type { MatterConnectionService } from '../connection/connection.service';
 import type { AuditActor, DeviceAuditService } from '../devices/audit.service';
-import { runTransaction } from '../fabric/db';
 import { conflict, sidecarCode } from '../fabric/errors';
 import { factsOf, recordFacts, recordedFabricRow, type FabricFacts } from '../fabric/facts';
 import type { MatterFabricGuard } from '../fabric/guard';
+import { matterStorage } from '../plugin-storage/access';
 import { BACKUP_TIMEOUT_MS } from './backup.service';
 import { LEFT_UNCHANGED, type Pending, type RestorePreflight } from './restore.types';
 import { replaceTables, tablesAreAcceptable } from './tables';
@@ -120,10 +120,10 @@ export class RestoreCommitter {
   private async replaceTables(staged: StagedRestore, facts: FabricFacts, actor: AuditActor): Promise<void> {
     const ref = staged.header.backupId;
     try {
-      await runTransaction(this.context, async (manager) => {
-        if (!tablesAreAcceptable(manager, staged.body.tables)) throw new Error('unacceptable tables');
-        await replaceTables(manager, staged.body.tables);
-        if (staged.header.consistent !== false) await recordFacts(manager, facts);
+      await matterStorage(this.context).transaction(async (tables) => {
+        if (!tablesAreAcceptable(staged.body.tables)) throw new Error('unacceptable tables');
+        await replaceTables(tables, staged.body.tables);
+        if (staged.header.consistent !== false) await recordFacts(tables, facts);
       });
     } catch {
       // The sidecar committed, so `not_committed` here means it lost track of the restore: not "unchanged" either.
@@ -225,9 +225,9 @@ export class RestoreCommitter {
   private async recordRolledBack(facts: FabricFacts | null): Promise<void> {
     if (!facts) return;
     try {
-      await runTransaction(this.context, async (manager) => {
-        const recorded = await recordedFabricRow(manager);
-        if (recorded?.fabricId === facts.fabricId) await recordFacts(manager, facts);
+      await matterStorage(this.context).transaction(async (tables) => {
+        const recorded = await recordedFabricRow(tables);
+        if (recorded?.fabricId === facts.fabricId) await recordFacts(tables, facts);
       });
     } catch {
       // The next comparison reports the generation the plugin missed as a mismatch.

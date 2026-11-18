@@ -1,4 +1,3 @@
-import type { EntityTarget, ObjectLiteral } from '@attraccess/plugins-backend-sdk';
 import {
   MqttCredentialProvisioningHostProvider,
   MqttServerConnectionConfig,
@@ -6,6 +5,9 @@ import {
   PluginCardsContext,
   PluginContext,
   PluginFlowsContext,
+  PluginHostDataContext,
+  PluginPersistenceContext,
+  PluginStorageContext,
   PluginNotificationsContext,
   PluginResourceAccessContext,
   PluginPermission,
@@ -19,13 +21,46 @@ import {
   SystemEventSubscription,
 } from '@attraccess/plugins-backend-sdk';
 import { Type } from '@nestjs/common';
-import type { EntityManager } from 'typeorm';
 import type { PluginSandboxService } from '../plugin-sandbox.service';
+import { assertNotDatabaseHandle, assertNotDatabaseToken } from './database-tokens';
 
 interface PluginSandboxServicePluginGuardedContextContext {
   guardEvents: (typeof PluginSandboxService)['guardEvents'];
-  assertRepositoryPermission: (typeof PluginSandboxService)['assertRepositoryPermission'];
 }
+
+/** The permission that guards each group of `hostData`. */
+const HOST_DATA_PERMISSIONS: Record<keyof PluginHostDataContext, PluginPermission> = {
+  resources: PluginPermission.ACCESS_RESOURCES,
+  users: PluginPermission.READ_USERS,
+  settings: PluginPermission.READ_SETTINGS,
+  flows: PluginPermission.TRIGGER_FLOWS,
+};
+
+/**
+ * Wraps one host data group so every method checks the group's permission when it is called.
+ * Builds a fresh object: the host groups are frozen, and a Proxy over a frozen target must return the target's own
+ * property values, so it could not return the guarded wrappers.
+ */
+function guardDirectory<T extends object>(
+  group: T,
+  groupName: string,
+  permission: PluginPermission,
+  require: (permission: PluginPermission, capability: string) => void,
+): T {
+  const guarded = Object.fromEntries(
+    Object.entries(group).map(([name, value]) => [
+      name,
+      typeof value === 'function'
+        ? (...args: unknown[]) => {
+            require(permission, `hostData.${groupName}.${name}()`);
+            return value.apply(group, args);
+          }
+        : value,
+    ]),
+  );
+  return Object.freeze(guarded) as T;
+}
+
 export function createGuardedContext(
   context: PluginSandboxServicePluginGuardedContextContext,
   base: PluginContext,
@@ -66,17 +101,11 @@ export function createGuardedContext(
       },
     },
     events: guardedEvents,
-    get dataSource() {
-      require(PluginPermission.DATABASE_ACCESS, 'dataSource');
-      return base.dataSource;
-    },
-    getRepository<T extends ObjectLiteral>(entity: EntityTarget<T>) {
-      context.assertRepositoryPermission(base, declared, entity);
-      return base.getRepository(entity);
-    },
     get<T>(token: Type<T> | string | symbol): T {
       require(PluginPermission.RESOLVE_HOST_PROVIDERS, `get(${String(token)})`);
-      return base.get<T>(token);
+      // No permission opens the database: plugin data goes through `storage`, never through a connection.
+      assertNotDatabaseToken(pluginName, token);
+      return assertNotDatabaseHandle(pluginName, token, base.get<T>(token));
     },
     onEvent<E extends SystemEvent>(event: E, handler: SystemEventHandler<E>): SystemEventSubscription {
       require(PluginPermission.LISTEN_EVENTS, `onEvent(${event})`);
@@ -129,9 +158,22 @@ export function createGuardedContext(
       require(PluginPermission.ACCESS_RESOURCES, 'resourceAccess');
       return base.resourceAccess;
     },
-    runSerialized<T>(fn: (manager: EntityManager) => Promise<T>): Promise<T> {
-      require(PluginPermission.DATABASE_ACCESS, 'runSerialized()');
-      return base.runSerialized(fn);
+    get persistence(): PluginPersistenceContext {
+      require(PluginPermission.PLUGIN_STORAGE, 'persistence');
+      return base.persistence;
+    },
+    get storage(): PluginStorageContext {
+      require(PluginPermission.PLUGIN_STORAGE, 'storage');
+      return base.storage;
+    },
+    get hostData(): PluginHostDataContext {
+      const hostData = base.hostData;
+      return {
+        resources: guardDirectory(hostData.resources, 'resources', HOST_DATA_PERMISSIONS.resources, require),
+        users: guardDirectory(hostData.users, 'users', HOST_DATA_PERMISSIONS.users, require),
+        settings: guardDirectory(hostData.settings, 'settings', HOST_DATA_PERMISSIONS.settings, require),
+        flows: guardDirectory(hostData.flows, 'flows', HOST_DATA_PERMISSIONS.flows, require),
+      };
     },
   };
 }

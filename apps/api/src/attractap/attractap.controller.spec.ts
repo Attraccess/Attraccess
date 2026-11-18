@@ -1,3 +1,5 @@
+import { makeReader } from './attractap-fake-stores.test-fixture';
+import { toReaderDto } from './dtos/reader.dto';
 import { CardAccessService } from './card-access.service';
 import { AttractapController } from './attractap.controller';
 import { AttractapService } from './attractap.service';
@@ -31,20 +33,18 @@ describe('AttractapController', () => {
   it('loads the resources relation when listing readers', async () => {
     await controller.getReaders();
 
-    expect(attractapService.getPairedReaders).toHaveBeenCalledWith(
-      expect.objectContaining({ relations: { resources: true } }),
-    );
+    expect(attractapService.getPairedReaders).toHaveBeenCalledWith(expect.objectContaining({ withResources: true }));
   });
 
   // Readers that are not paired yet exist for the pairing session only.
   it('lists only paired readers; the unpaired ones come from the pairing session list', async () => {
-    const paired = [{ id: 1, pairingState: 'paired' }];
-    const unpaired = [{ id: 2, pairingState: 'unpaired' }];
+    const paired = [makeReader({ id: 1, pairingState: 'paired' })];
+    const unpaired = [makeReader({ id: 2, pairingState: 'unpaired' })];
     attractapService.getPairedReaders.mockResolvedValueOnce(paired);
     attractapService.getReadersToPair.mockResolvedValueOnce(unpaired);
 
-    await expect(controller.getReaders()).resolves.toBe(paired);
-    await expect(controller.getReadersToPair()).resolves.toBe(unpaired);
+    await expect(controller.getReaders()).resolves.toEqual(paired.map(toReaderDto));
+    await expect(controller.getReadersToPair()).resolves.toEqual(unpaired.map(toReaderDto));
   });
 
   it.each(['unpaired', 'revoked'])('does not show a %s reader by id', async (pairingState) => {
@@ -53,9 +53,25 @@ describe('AttractapController', () => {
   });
 
   it('shows a paired reader by id', async () => {
-    const reader = { id: 4, pairingState: 'paired' };
+    const reader = makeReader({ id: 4, pairingState: 'paired' });
     attractapService.findReaderById.mockResolvedValueOnce(reader);
-    await expect(controller.getReaderById(4)).resolves.toBe(reader);
+    await expect(controller.getReaderById(4)).resolves.toEqual(toReaderDto(reader));
+  });
+
+  // The token hash is an internal field: no reader response may carry it, however the reader was loaded.
+  it('never puts the token hash or other internal fields into a reader response', async () => {
+    const reader = makeReader({ id: 4, apiTokenHash: 'secret-hash', resources: [] });
+    attractapService.findReaderById.mockResolvedValueOnce(reader);
+    attractapService.getPairedReaders.mockResolvedValueOnce([reader]);
+    const byId = await controller.getReaderById(4);
+    const listed = await controller.getReaders();
+    expect(JSON.stringify([byId, listed])).not.toContain('secret-hash');
+    expect(Object.keys(byId)).not.toContain('apiTokenHash');
+  });
+
+  it('leaves the resources out of a reader that was read without them, as before', async () => {
+    attractapService.getPairedReaders.mockResolvedValueOnce([makeReader({ id: 4 })]);
+    expect(Object.keys((await controller.getReaders())[0])).not.toContain('resources');
   });
 
   // A rename or a resource assignment through the API would make a reader that is not paired appear in
@@ -72,12 +88,12 @@ describe('AttractapController', () => {
   });
 
   it('updates a paired reader', async () => {
-    const reader = { id: 4, pairingState: 'paired' };
+    const reader = makeReader({ id: 4, pairingState: 'paired' });
     attractapService.findReaderById.mockResolvedValueOnce(reader);
     attractapService.updateReader.mockResolvedValueOnce(reader);
     await expect(controller.updateReader(4, { name: 'x', connectedResourceIds: [1] })).resolves.toEqual({
       message: 'Reader updated successfully',
-      reader,
+      reader: toReaderDto(reader),
     });
   });
 

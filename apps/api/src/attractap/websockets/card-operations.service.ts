@@ -1,7 +1,9 @@
-import { NFCCard, NFCCardPendingChange, User } from '@attraccess/database-entities';
+import type {
+  AttractapCardOwner,
+  AttractapNfcCard,
+  AttractapNfcCardPendingChange,
+} from '@attraccess/application-models';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 import { EncryptionService } from '../../encryption/encryption.service';
 import { UsersService } from '../../users-and-auth/users/users.service';
@@ -17,9 +19,10 @@ import {
   findFreeKeyNo,
 } from '../card-crypto/card-operations';
 import { AttractapService } from '../attractap.service';
+import { ATTRACTAP_CARD_STORE, type AttractapCardStore } from '../card-store.port';
 import { CardConversationFailure, CardConversationService, PluginCardExchange } from './card-conversation.service';
 import { AuthenticatedWebSocket, CardDetection } from './websocket.types';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
 import type { PluginCardAuthenticationResult, PluginCardFailureReason } from '@attraccess/plugins-backend-sdk';
 
 export type AuditPrincipal = {
@@ -83,16 +86,16 @@ export class CardOperationsService {
   @Inject(AUDIT_RECORDER)
   private readonly audit: AuditRecorder;
 
-  @InjectRepository(NFCCardPendingChange)
-  private readonly pendingRepository: Repository<NFCCardPendingChange>;
+  @Inject(ATTRACTAP_CARD_STORE)
+  private readonly cardStore: AttractapCardStore;
 
-  private pendingKey(change: NFCCardPendingChange): Buffer | null {
+  private pendingKey(change: AttractapNfcCardPendingChange): Buffer | null {
     if (!change.key) return null;
     const plain = this.encryption.decryptIfEncrypted(change.key) ?? change.key;
     return /^[0-9a-f]{32}$/i.test(plain) ? Buffer.from(plain, 'hex') : null;
   }
 
-  private cardKey(card: NFCCard): Buffer | null {
+  private cardKey(card: AttractapNfcCard): Buffer | null {
     return /^[0-9a-f]{32}$/i.test(card.key) ? Buffer.from(card.key, 'hex') : null;
   }
 
@@ -105,11 +108,11 @@ export class CardOperationsService {
     socket: AuthenticatedWebSocket,
     purpose: 'tap' | 'supervisor' | 'mass-introduction',
     detection: CardDetection,
-  ): Promise<CardOutcome<{ card: NFCCard }>> {
+  ): Promise<CardOutcome<{ card: AttractapNfcCard }>> {
     const verification = await this.prepareVerification(detection.uid, { readerId: socket.readerId });
     if (typeof verification !== 'function') return verification;
 
-    const result = await this.conversations.run<CardOutcome<{ card: NFCCard }>>(
+    const result = await this.conversations.run<CardOutcome<{ card: AttractapNfcCard }>>(
       socket,
       purpose,
       detection,
@@ -138,7 +141,7 @@ export class CardOperationsService {
     // Before any database work, as for reader detections.
     if (this.conversations.atLimit) return { ok: false, reason: 'BUSY' };
 
-    const result = await this.conversations.runForPlugin<CardOutcome<{ card: NFCCard }>>(
+    const result = await this.conversations.runForPlugin<CardOutcome<{ card: AttractapNfcCard }>>(
       { pluginId, device },
       uid,
       exchange,
@@ -163,12 +166,12 @@ export class CardOperationsService {
   private async prepareVerification(
     uid: string,
     origin: CardCheckOrigin,
-  ): Promise<CardOutcome<{ card: NFCCard }> | ((channel: CardChannel) => Promise<CardOutcome<{ card: NFCCard }>>)> {
+  ): Promise<CardOutcome<{ card: AttractapNfcCard }> | ((channel: CardChannel) => Promise<CardOutcome<{ card: AttractapNfcCard }>>)> {
     const card = await this.attractapService.getNFCCardByUID(uid);
-    const pendingEnroll = card ? null : await this.pendingRepository.findOne({ where: { uid, kind: 'enroll' } });
+    const pendingEnroll = card ? null : await this.cardStore.findPendingEnroll(uid);
     if (!card && !pendingEnroll) return { ok: false, error: 'CARD_NOT_FOUND' };
     if (card && !card.isActive) return { ok: false, error: 'CARD_NOT_ACTIVE' };
-    const pendingResets = card ? await this.pendingRepository.find({ where: { uid, kind: 'reset' } }) : [];
+    const pendingResets = card ? await this.cardStore.listPendingResets(uid) : [];
     const pendingReset = pendingResets.find((change) => change.cardId === card?.id) ?? null;
 
     return async (channel) => {
@@ -180,7 +183,7 @@ export class CardOperationsService {
         const key = this.cardKey(card);
         if (key && (await authenticate(channel, kind, card.keyNo, key))) {
           // The card still holds its key: no reset of it got through, so no record of one is needed.
-          if (pendingResets.length) await this.pendingRepository.delete({ uid, kind: 'reset' });
+          if (pendingResets.length) await this.cardStore.deletePendingByUid(uid, 'reset');
           return { ok: true, card };
         }
         if (pendingReset && (await authenticate(channel, kind, card.keyNo, FACTORY_KEY))) {
@@ -208,9 +211,9 @@ export class CardOperationsService {
   private async finishPendingEnroll(
     channel: CardChannel,
     kind: CardKind,
-    pending: NFCCardPendingChange,
+    pending: AttractapNfcCardPendingChange,
     origin: CardCheckOrigin,
-  ): Promise<NFCCard | null> {
+  ): Promise<AttractapNfcCard | null> {
     const key = this.pendingKey(pending);
     if (!key || pending.userId == null) return null;
     if (!(await authenticate(channel, kind, pending.keyNo, key))) return null;
@@ -231,15 +234,15 @@ export class CardOperationsService {
   }
 
   private async recordEnrollment(
-    user: User,
+    user: AttractapCardOwner,
     uid: string,
-    pending: NFCCardPendingChange,
+    pending: AttractapNfcCardPendingChange,
     keyHex: string,
     source: string,
     auditPrincipal?: AuditPrincipal,
     activate = true,
     origin?: { pluginId: string },
-  ): Promise<NFCCard> {
+  ): Promise<AttractapNfcCard> {
     const card = await this.attractapService.createNFCCard(
       user,
       { key: keyHex, keyNo: pending.keyNo, uid },
@@ -247,8 +250,8 @@ export class CardOperationsService {
     );
     // This UID now belongs to this card record: no other enrollment may be recovered onto it later
     // (e.g. after a reset). Records for other UIDs stay; their key may be on another card.
-    await this.pendingRepository.delete(pending.id);
-    await this.pendingRepository.delete({ uid, kind: 'enroll' });
+    await this.cardStore.deletePendingById(pending.id);
+    await this.cardStore.deletePendingByUid(uid, 'enroll');
     await this.audit.record({
       domain: 'attractap',
       action: 'attractap.card.linked',
@@ -281,7 +284,7 @@ export class CardOperationsService {
       const kind = detected.kind;
 
       // An earlier attempt for this card may have reached the card although nobody heard back.
-      const stale = await this.pendingRepository.find({ where: { uid, kind: 'enroll' } });
+      const stale = await this.cardStore.listPendingEnrolls(uid);
       for (const change of stale) {
         const key = this.pendingKey(change);
         if (key && change.userId === user.id && (await authenticate(channel, kind, change.keyNo, key))) {
@@ -299,13 +302,13 @@ export class CardOperationsService {
       // This user's records were not for this card. Other users' records stay: their key may be on
       // this card (an interrupted enrollment for them), and only their record can recover it.
       const ownStale = stale.filter((change) => change.userId === user.id);
-      if (ownStale.length) await this.pendingRepository.delete(ownStale.map((change) => change.id));
+      if (ownStale.length) await this.cardStore.deletePendingById(ownStale.map((change) => change.id));
 
       const keyNo = await findFreeKeyNo(channel, kind);
       if (keyNo == null) return { ok: false, error: 'NO_FREE_KEY_SLOT' };
 
       const keyHex = this.attractapService.generateCardKey();
-      let pending: NFCCardPendingChange | null = null;
+      let pending: AttractapNfcCardPendingChange | null = null;
       const outcome = await changeKeyAndVerify(
         channel,
         kind,
@@ -319,7 +322,7 @@ export class CardOperationsService {
           // Saved once the card accepted the master key, right before the key write, so an
           // interruption from here on can be finished later. A refused login leaves no record.
           beforeWrite: async () => {
-            pending = await this.pendingRepository.save({
+            pending = await this.cardStore.savePending({
               uid,
               kind: 'enroll',
               userId: user.id,
@@ -373,8 +376,8 @@ export class CardOperationsService {
             // Saved once the card accepted the master key, right before the key write. One record
             // per card: an earlier attempt's record is replaced, not duplicated.
             beforeWrite: async () => {
-              await this.pendingRepository.delete({ uid, kind: 'reset' });
-              await this.pendingRepository.save({
+              await this.cardStore.deletePendingByUid(uid, 'reset');
+              await this.cardStore.savePending({
                 uid,
                 kind: 'reset',
                 userId: null,
@@ -406,10 +409,10 @@ export class CardOperationsService {
     pluginId?: string,
   ): Promise<void> {
     const deleted = await this.attractapService.deleteNFCCard(cardId);
-    await this.pendingRepository.delete({ uid, kind: 'reset' });
+    await this.cardStore.deletePendingByUid(uid, 'reset');
     // A reset card must not come back as someone's card from an older interrupted enrollment.
-    await this.pendingRepository.delete({ uid, kind: 'enroll' });
-    if (deleted.affected && auditPrincipal) {
+    await this.cardStore.deletePendingByUid(uid, 'enroll');
+    if (deleted && auditPrincipal) {
       await this.audit.record({
         domain: 'attractap',
         action: 'attractap.card.unlinked',

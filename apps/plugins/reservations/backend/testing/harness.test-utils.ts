@@ -1,14 +1,13 @@
-import type { PluginAccessPrincipal, PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { DataSource, EntityManager } from 'typeorm';
-import { GlobalSettingsEntity } from '../entities/global-settings.entity';
-import { IcalFeedEntity } from '../entities/ical-feed.entity';
-import { NoticeEntity } from '../entities/notice.entity';
-import { ReservationEntity } from '../entities/reservation.entity';
-import { ResourceSettingsEntity } from '../entities/resource-settings.entity';
-import * as pluginMigrations from '../migrations';
+import {
+  createInMemoryPluginStorage,
+  type InMemoryPluginStorage,
+  type PluginAccessPrincipal,
+  type PluginAuditPrincipal,
+  type PluginContext,
+  type PluginStorageContext,
+} from '@attraccess/plugins-backend-sdk';
+import { reservationsStorage, tablesOf } from '../storage';
+import type { ReservationRow, ReservationWhere } from '../storage/reservation-table';
 import { AccessService } from '../reservations/access.service';
 import type { ReservationActor } from '../reservations/actor';
 import type { VisibilityService } from '../ical/visibility.service';
@@ -48,18 +47,34 @@ interface AccessState {
   hidden: Set<number>; // resourceIds only in hidden groups (invisible to everyone in these tests)
 }
 
-/** Real SQLite (temp file), real services, scripted host facade. Time is controlled via `setNow`. */
-export async function createHarness() {
-  const dir = mkdtempSync(join(tmpdir(), 'reservations-test-'));
-  const dataSource = await new DataSource({
-    type: 'better-sqlite3',
-    database: join(dir, 'db.sqlite'),
-    entities: [ReservationEntity, ResourceSettingsEntity, GlobalSettingsEntity, IcalFeedEntity, NoticeEntity],
-    // Every migration the plugin registers (migrations.ts), as the host would run them.
-    migrations: Object.values(pluginMigrations),
-    synchronize: false,
-  }).initialize();
-  await dataSource.runMigrations();
+/**
+ * The in-memory record port (the SDK's fake of the host's storage), real services, scripted host facade. Time is
+ * controlled via `setNow`. Pass another harness as `share` to run a second, independent host (own services, own
+ * in-process mutex) on the same storage: only the port's transactions then keep concurrent creates apart.
+ */
+export async function createHarness(options: { share?: { memory: InMemoryPluginStorage } } = {}) {
+  const memory: InMemoryPluginStorage = options.share?.memory ?? createInMemoryPluginStorage(reservationsStorage);
+  // Records every record-port call the services make (the unwrapped `tables` below are for test setup and asserts).
+  const storageCalls: string[] = [];
+  const countingStorage: PluginStorageContext = {
+    open: ((definition) => {
+      const opened = memory.storage.open(definition);
+      return Object.fromEntries(
+        Object.entries(opened).map(([table, api]) => [
+          table,
+          Object.fromEntries(
+            Object.entries(api).map(([method, call]) => [
+              method,
+              (...args: unknown[]) => {
+                storageCalls.push(`${table}.${method}`);
+                return (call as (...a: unknown[]) => unknown)(...args);
+              },
+            ]),
+          ),
+        ]),
+      );
+    }) as unknown as PluginStorageContext['open'],
+  };
 
   let now = new Date('2026-06-01T08:00:00.000Z');
   const state: AccessState = {
@@ -89,14 +104,6 @@ export async function createHarness() {
     onRemoved: jest.fn(),
   } satisfies ReservationNotifier;
 
-  // Mirrors the host: concurrent callers run one at a time inside a transaction.
-  let tail: Promise<unknown> = Promise.resolve();
-  const runSerialized = <T>(work: (manager: EntityManager) => Promise<T>): Promise<T> => {
-    const next = tail.catch(() => undefined).then(() => dataSource.transaction(work));
-    tail = next;
-    return next;
-  };
-
   // Like the host: a principal with effectivePermissions (a request's user) only uses the permissions inside that
   // scope; a plain id uses the user's full permissions. Maintainer roles and introductions are not permissions.
   const idOf = (subject: PluginAccessPrincipal) => (typeof subject === 'number' ? subject : subject.id);
@@ -109,8 +116,9 @@ export async function createHarness() {
 
   const context = {
     audit,
-    dataSource,
     logger: console,
+    persistence: memory.persistence,
+    storage: countingStorage,
     notifications: { dispatch },
     startBlocked: { invalidate: invalidateStartBlocked },
     readerUi: { invalidate: invalidateReaderUi },
@@ -124,8 +132,6 @@ export async function createHarness() {
           ),
       };
     },
-    runSerialized,
-    getRepository: (entity: never) => dataSource.getRepository(entity),
     resourceAccess: {
       // Core's rule for the current user's name; scripted per user and resource. Like core, a request scope without
       // resources.read (or update / access.manage) sees nobody's name.
@@ -208,8 +214,21 @@ export async function createHarness() {
   const admin = new SettingsAdminService(settings, globalSettings, reservations, access, directory);
   await globalSettings.setTimezone('Europe/Berlin');
 
+  const tables = tablesOf({ storage: memory.storage } as PluginContext);
+
   return {
-    dataSource,
+    memory,
+    /** The plugin's tables on the record port, uncounted: for arranging and asserting state in tests. */
+    tables,
+    /** `table.method` of every record-port call the plugin services made so far (reset with `length = 0`). */
+    storageCalls,
+    /** The booking matching `where` (an id, or a field filter); fails when there is none. */
+    async reservation(where: number | ReservationWhere): Promise<ReservationRow> {
+      const row =
+        typeof where === 'number' ? await tables.reservations.get(where) : await tables.reservations.findOne({ where });
+      if (!row) throw new Error(`No reservation for ${JSON.stringify(where)}`);
+      return row as ReservationRow;
+    },
     context,
     state,
     audit,
@@ -258,8 +277,6 @@ export async function createHarness() {
     },
     async close() {
       await reservations.flushNotifications();
-      await dataSource.destroy();
-      rmSync(dir, { recursive: true, force: true });
     },
   };
 }

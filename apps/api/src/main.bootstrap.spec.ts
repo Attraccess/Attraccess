@@ -1,6 +1,6 @@
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
-import { DataSource } from 'typeorm';
+import { DATABASE_LIFECYCLE } from './database/database-lifecycle';
 import { SwaggerModule } from '@nestjs/swagger';
 import { Body, Controller, Logger, Post } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -93,7 +93,7 @@ describe('API bootstrap ordering and configuration', () => {
     get: jest.fn((token: unknown) => {
       if (token === ConfigService) return config;
       if (token === SettingsService) return settings;
-      if (token === DataSource) return datasource;
+      if (token === DATABASE_LIFECYCLE) return datasource;
       if (token === HttpAdapterHost) return { httpAdapter: {} };
       return {};
     }),
@@ -153,7 +153,7 @@ describe('API bootstrap ordering and configuration', () => {
         providers: [
           { provide: ConfigService, useValue: config },
           { provide: SettingsService, useValue: settings },
-          { provide: DataSource, useValue: datasource },
+          { provide: DATABASE_LIFECYCLE, useValue: datasource },
         ],
       }).compile();
       httpApp = module.createNestApplication<NestExpressApplication>({ logger: false });

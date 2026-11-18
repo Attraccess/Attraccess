@@ -1,5 +1,4 @@
 import { Logger } from '@nestjs/common';
-import { ReservationEntity } from '../entities/reservation.entity';
 import { Harness, createHarness } from '../testing/harness.test-utils';
 import { BackgroundServices, createBackgroundServices } from '../testing/background-services.test-utils';
 import { renderEmail } from '../testing/email-render.test-utils';
@@ -21,7 +20,7 @@ describe('ReservationScheduler', () => {
     h.dispatch.mock.calls
       .map(([request]) => request as Dispatched)
       .filter((r) => r.dedupeKey.startsWith(`reservations:${prefix}`));
-  const row = (id: number) => h.dataSource.getRepository(ReservationEntity).findOneByOrFail({ id });
+  const row = (id: number) => h.reservation({ id });
   const status = async (id: number) => (await row(id)).status;
   const manager = { userId: 99, authenticationMethod: 'session' as const };
   const holder = { userId: 10, authenticationMethod: 'session' as const };
@@ -378,7 +377,7 @@ describe('ReservationScheduler', () => {
       expect(mails[0].body).toContain('not ended automatically');
       expect(mails[1].body).toContain('not ended automatically');
       expect(JSON.stringify(h.state.sessions)).toBe(before);
-      expect(await h.dataSource.getRepository(ReservationEntity).count({ where: { status: 'confirmed' } })).toBe(1);
+      expect(await h.tables.reservations.count({ status: 'confirmed' })).toBe(1);
       // the plugin context offers no way to end a session: only dispatches are possible
       expect(Object.keys(h.context.resourceAccess)).not.toEqual(expect.arrayContaining(['endSession']));
     });

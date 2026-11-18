@@ -1,13 +1,12 @@
-import { User } from '@attraccess/database-entities';
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import type { AuthenticatedSessionUser } from '@attraccess/application-models';
+import { Inject, Injectable } from '@nestjs/common';
 import { FixedWindowCounterStore } from '../../common/rate-limiting/fixed-window-counter';
 import { SettingsService } from '../../settings/settings.service';
 import {
   recordFailure as recordFailureImplementation,
   recordIpFailure as recordIpFailureImplementation,
 } from './brute-force-failure';
+import { ACCOUNT_LOCKOUT_STORE, type AccountLockoutStore } from './account-lockout.port';
 import { AccountLockedException, TooManyAuthAttemptsException } from './exceptions';
 import {
   type CounterEntry,
@@ -27,8 +26,8 @@ export class BruteForceProtectionService {
   private readonly nowFn: () => number = () => Date.now();
 
   constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    @Inject(ACCOUNT_LOCKOUT_STORE)
+    private readonly lockoutStore: AccountLockoutStore,
     private readonly settingsService: SettingsService,
   ) {}
 
@@ -49,7 +48,7 @@ export class BruteForceProtectionService {
     }
   }
 
-  async assertAccountAllowed(user: User): Promise<void> {
+  async assertAccountAllowed(user: Pick<AuthenticatedSessionUser, 'id' | 'lockedUntil'>): Promise<void> {
     const entry = this.accountCounters.get(user.id);
     if (entry) {
       const remaining = this.remainingLockoutSeconds(entry);
@@ -110,7 +109,7 @@ export class BruteForceProtectionService {
       ipCounters: this.ipCounters,
       ipCoarseCounters: this.ipCoarseCounters,
       accountCounters: this.accountCounters,
-      userRepository: this.userRepository,
+      lockoutStore: this.lockoutStore,
     };
   }
 
@@ -125,26 +124,12 @@ export class BruteForceProtectionService {
       return;
     }
     this.accountCounters.delete(userId);
-    await this.userRepository.update(
-      { id: userId },
-      {
-        lockedUntil: null,
-        failedLoginAttempts: 0,
-        firstFailedLoginAt: null,
-      },
-    );
+    await this.lockoutStore.clearLockout(userId);
   }
 
   async unlockAccount(userId: number): Promise<void> {
     this.accountCounters.delete(userId);
-    await this.userRepository.update(
-      { id: userId },
-      {
-        lockedUntil: null,
-        failedLoginAttempts: 0,
-        firstFailedLoginAt: null,
-      },
-    );
+    await this.lockoutStore.clearLockout(userId);
   }
 
   private upsertCounter<K>(

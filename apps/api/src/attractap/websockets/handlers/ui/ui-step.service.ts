@@ -1,11 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { randomBytes } from 'crypto';
-import { ResourceFormAction } from '@attraccess/database-entities';
-import {
-  READER_UI_TIMING,
-  type PluginChoice,
-  type PluginConfirmation,
-} from '@attraccess/plugins-backend-sdk';
+import { ResourceFormAction } from '@attraccess/application-models';
+import { READER_UI_TIMING, type PluginChoice, type PluginConfirmation } from '@attraccess/plugins-backend-sdk';
 import { validateStepRequest } from '../../../../resources/forms/reader-ui.validation';
 import { AttractapEvent, AttractapEventType, type AuthenticatedWebSocket } from '../../websocket.types';
 import { AttractapFormsHandler } from '../forms/forms.handler';
@@ -277,10 +273,7 @@ export class UiStepService {
       timer: null,
     };
     // A post-stop question is closed on the reader too, in case its own expiry tick does not run.
-    step.timer = setTimeout(
-      () => this.cancel(socket, step, 'expired', step.kind === 'post-stop'),
-      step.deadline - now,
-    );
+    step.timer = setTimeout(() => this.cancel(socket, step, 'expired', step.kind === 'post-stop'), step.deadline - now);
     step.timer.unref?.();
     (socket.state.uiSteps ??= new Map()).set(step.stepId, step);
     return step;

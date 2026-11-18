@@ -1,17 +1,11 @@
 import {
-  Project,
-  ProjectInvitation,
-  ProjectMember,
   ProjectMemberRole,
-  ResourceUsage,
-  User,
-} from '@attraccess/database-entities';
+  type ProjectInvitationRecord,
+  type ProjectMemberRecord,
+  type ProjectRecord,
+} from '@attraccess/application-models';
 
 import { Injectable, NotFoundException, Inject } from '@nestjs/common';
-
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { IsNull, Not, Repository, SelectQueryBuilder } from 'typeorm';
 
 import { AUDIT_RECORDER, AuditRecorder } from '../audit/recorder/audit-event';
 
@@ -23,11 +17,11 @@ import { MetricsService } from '../metrics/metrics.service';
 
 import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
 
+import { UNIT_OF_WORK, type UnitOfWork } from '../database/unit-of-work';
+
 import { FindManyProjectsQueryDto } from './dto/find-many-query.dto';
 
-import { ProjectWithAccessDto } from './dto/project-access.dto';
-
-import { ProjectAccessService } from './project-access.service';
+import { ProjectAccessService, type ProjectWithAccess } from './project-access.service';
 
 import { FileUpload } from '../common/types/file-upload.types';
 
@@ -36,23 +30,23 @@ import { CreateProjectDto } from './dto/create.dto';
 import { UpdateProjectDto } from './dto/update.dto';
 
 import { ProjectInvitations } from './invitations/project-invitations';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuthenticationMethod } from '@attraccess/application-models';
+
+import {
+  PROJECT_INVITATION_STORE,
+  PROJECT_STORE,
+  type ProjectInvitationStore,
+  type ProjectStore,
+} from './project.port';
 
 @Injectable()
 export class ProjectsService {
   private readonly invitations: ProjectInvitations;
 
   constructor(
-    @InjectRepository(Project)
-    private readonly projectRepository: Repository<Project>,
-    @InjectRepository(ProjectMember)
-    private readonly projectMemberRepository: Repository<ProjectMember>,
-    @InjectRepository(ProjectInvitation)
-    private readonly projectInvitationRepository: Repository<ProjectInvitation>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-    @InjectRepository(ResourceUsage)
-    private readonly resourceUsageRepository: Repository<ResourceUsage>,
+    @Inject(PROJECT_STORE) private readonly projects: ProjectStore,
+    @Inject(PROJECT_INVITATION_STORE) private readonly invitationStore: ProjectInvitationStore,
+    @Inject(UNIT_OF_WORK) private readonly uow: UnitOfWork,
     private readonly fileStorageService: FileStorageService,
     private readonly projectAccessService: ProjectAccessService,
     private readonly emailService: EmailService,
@@ -63,28 +57,15 @@ export class ProjectsService {
     this.invitations = new ProjectInvitations(
       this.audit,
       this.projectAccessService,
-      this.userRepository,
-      this.projectMemberRepository,
-      this.projectInvitationRepository,
+      this.projects,
+      this.invitationStore,
       this.notifications,
       this.emailService,
     );
   }
 
-  public async findMany(userId: number, query: FindManyProjectsQueryDto): Promise<ProjectWithAccessDto[]> {
-    const { page, limit: take } = query;
-    const skip = (page - 1) * take;
-
-    const qb = this.projectRepository.createQueryBuilder('project').leftJoinAndSelect('project.owner', 'owner');
-    this.applyAccessibleProjectFilters(qb, userId, query);
-
-    const projects = await qb
-      .orderBy('project.name', 'ASC')
-      .addOrderBy('project.createdAt', 'DESC')
-      .skip(skip)
-      .take(take)
-      .getMany();
-
+  public async findMany(userId: number, query: FindManyProjectsQueryDto): Promise<ProjectWithAccess[]> {
+    const projects = await this.projects.listAccessible(userId, query);
     return this.projectAccessService.addAccessMetadata(userId, projects);
   }
 
@@ -92,35 +73,10 @@ export class ProjectsService {
     userId: number,
     query: { includeArchived?: boolean; search?: string } = {},
   ): Promise<number> {
-    const qb = this.projectRepository.createQueryBuilder('project').leftJoin('project.owner', 'owner');
-    this.applyAccessibleProjectFilters(qb, userId, query);
-
-    return await qb.getCount();
+    return await this.projects.countAccessible(userId, query);
   }
 
-  /** Restricts to projects the user owns or is a member of, excluding archived and non-matching ones. */
-  private applyAccessibleProjectFilters(
-    qb: SelectQueryBuilder<Project>,
-    userId: number,
-    query: { includeArchived?: boolean; search?: string },
-  ): void {
-    qb.leftJoin('project.members', 'member', 'member.userId = :userId', { userId }).where(
-      '(owner.id = :userId OR member.id IS NOT NULL)',
-      { userId },
-    );
-
-    if (query.includeArchived !== true) {
-      qb.andWhere('project.archivedAt IS NULL');
-    }
-
-    const search = query.search?.trim();
-    if (search) {
-      const pattern = `%${search.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
-      qb.andWhere("LOWER(project.name) LIKE LOWER(:search) ESCAPE '\\'", { search: pattern });
-    }
-  }
-
-  public async findOneById(userId: number, id: number): Promise<Project> {
+  public async findOneById(userId: number, id: number): Promise<ProjectWithAccess> {
     return this.projectAccessService.getAccessOrThrow(userId, id);
   }
 
@@ -129,20 +85,19 @@ export class ProjectsService {
     id: number,
     authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
-  ): Promise<Project> {
+  ): Promise<ProjectRecord> {
     const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
     const archivedAt = new Date();
-    const result = await this.projectRepository.update({ id, archivedAt: IsNull() }, { archivedAt });
-    if (result.affected !== 1) return await this.projectRepository.findOneByOrFail({ id });
-    project.archivedAt = archivedAt;
+    if (!(await this.projects.archive(id, archivedAt))) return await this.projects.getById(id);
+    const archived = { ...project, archivedAt };
     await this.audit.record({
       domain: 'project',
       action: 'project.archived',
       actor: { id: ownerUserId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
-      subject: { type: 'project', id: project.id },
-      details: { ...this.projectDetails(project, 'after'), 'after.archived': 1 },
+      subject: { type: 'project', id: archived.id },
+      details: { ...this.projectDetails(archived, 'after'), 'after.archived': 1 },
     });
-    return project;
+    return archived;
   }
 
   public async unarchiveOne(
@@ -150,27 +105,22 @@ export class ProjectsService {
     id: number,
     authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
-  ): Promise<Project> {
+  ): Promise<ProjectRecord> {
     const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
-    const result = await this.projectRepository.update({ id, archivedAt: Not(IsNull()) }, { archivedAt: null });
-    if (result.affected !== 1) return await this.projectRepository.findOneByOrFail({ id });
-    project.archivedAt = null;
+    if (!(await this.projects.unarchive(id))) return await this.projects.getById(id);
+    const unarchived = { ...project, archivedAt: null };
     await this.audit.record({
       domain: 'project',
       action: 'project.unarchived',
       actor: { id: ownerUserId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
-      subject: { type: 'project', id: project.id },
-      details: { ...this.projectDetails(project, 'after'), 'after.archived': 0 },
+      subject: { type: 'project', id: unarchived.id },
+      details: { ...this.projectDetails(unarchived, 'after'), 'after.archived': 0 },
     });
-    return project;
+    return unarchived;
   }
 
-  public async listMembers(projectId: number): Promise<ProjectMember[]> {
-    return await this.projectMemberRepository.find({
-      where: { project: { id: projectId } },
-      relations: { user: true },
-      order: { joinedAt: 'ASC' },
-    });
+  public async listMembers(projectId: number): Promise<ProjectMemberRecord[]> {
+    return await this.projects.listMembers(projectId);
   }
 
   public async removeMember(
@@ -181,16 +131,13 @@ export class ProjectsService {
     apiTokenId?: number,
   ): Promise<void> {
     await this.projectAccessService.ensureOwner(actorId, projectId);
-    const member = await this.projectMemberRepository.findOne({
-      where: { id: memberId, project: { id: projectId } },
-    });
+    const member = await this.projects.findMember(projectId, memberId);
 
     if (!member) {
       throw new NotFoundException('Project member not found');
     }
 
-    const result = await this.projectMemberRepository.delete(member.id);
-    if (result.affected !== 1) return;
+    if (!(await this.projects.removeMember(member.id))) return;
     await this.audit.record({
       domain: 'project',
       action: 'project.member.removed',
@@ -200,15 +147,11 @@ export class ProjectsService {
     });
   }
 
-  public async listProjectInvitations(projectId: number): Promise<ProjectInvitation[]> {
-    return await this.projectInvitationRepository.find({
-      where: { project: { id: projectId } },
-      relations: { invitedUser: true, inviter: true, project: { owner: true } },
-      order: { createdAt: 'DESC' },
-    });
+  public async listProjectInvitations(projectId: number): Promise<ProjectInvitationRecord[]> {
+    return await this.invitationStore.listForProject(projectId);
   }
 
-  private projectDetails(project: Project, state: 'before' | 'after'): Record<string, string | number> {
+  private projectDetails(project: ProjectRecord, state: 'before' | 'after'): Record<string, string | number> {
     const details: Record<string, string | number> = {
       projectId: project.id,
       [`${state}.hasLogo`]: project.logo ? 1 : 0,
@@ -227,9 +170,9 @@ export class ProjectsService {
     };
   }
 
-  private async setLogo(project: Project, logo: FileUpload) {
+  private async setLogo(project: ProjectRecord, logo: FileUpload): Promise<ProjectRecord> {
     const logoFilename = await this.fileStorageService.saveFile(logo, `projects/${project.id}`);
-    project.logo = logoFilename;
+    return { ...project, logo: logoFilename };
   }
 
   public async create(
@@ -237,11 +180,11 @@ export class ProjectsService {
     data: CreateProjectDto,
     authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
-  ): Promise<Project> {
-    const project = await this.projectRepository.save({
-      owner: { id: ownerUserId },
+  ): Promise<ProjectRecord> {
+    let project = await this.projects.create({
+      ownerId: ownerUserId,
       name: data.name,
-      description: data.description,
+      description: data.description ?? null,
     });
 
     await this.audit.record({
@@ -255,8 +198,12 @@ export class ProjectsService {
 
     if (data.logo) {
       const before = this.projectDetails(project, 'before');
-      await this.setLogo(project, data.logo);
-      await this.projectRepository.save(project);
+      project = await this.setLogo(project, data.logo);
+      project = await this.projects.updateDetails(project.id, {
+        name: project.name,
+        description: project.description,
+        logo: project.logo,
+      });
       await this.audit.record({
         domain: 'project',
         action: 'project.updated',
@@ -276,10 +223,8 @@ export class ProjectsService {
   ): Promise<void> {
     const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
     const details = this.projectDetails(project, 'before');
-    await this.projectRepository.manager.transaction(async (manager) => {
-      await manager.getRepository(ResourceUsage).update({ projectId: id }, { projectId: null });
-      const result = await manager.getRepository(Project).delete(id);
-      if (result.affected !== 1) throw new NotFoundException('Project not found');
+    await this.uow.run(async (scope) => {
+      if (!(await this.projects.deleteProject(id, scope))) throw new NotFoundException('Project not found');
       await this.audit.record(
         {
           domain: 'project',
@@ -288,7 +233,7 @@ export class ProjectsService {
           subject: { type: 'project', id: id },
           details: details,
         },
-        manager,
+        scope,
       );
     });
     this.metricsService.projectsTotal.dec();
@@ -300,12 +245,13 @@ export class ProjectsService {
     data: UpdateProjectDto,
     authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
-  ): Promise<Project> {
-    const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
-    const before = this.projectDetails(project, 'before');
-    const beforeName = project.name;
-    const beforeDescription = project.description;
-    const beforeLogo = project.logo;
+  ): Promise<ProjectRecord> {
+    const existing = await this.projectAccessService.ensureOwner(ownerUserId, id);
+    const before = this.projectDetails(existing, 'before');
+    const beforeName = existing.name;
+    const beforeDescription = existing.description;
+    const beforeLogo = existing.logo;
+    let project = { ...existing };
 
     if (data.description !== undefined) {
       project.description = data.description;
@@ -322,11 +268,15 @@ export class ProjectsService {
       }
 
       if (data.logo) {
-        await this.setLogo(project, data.logo);
+        project = await this.setLogo(project, data.logo);
       }
     }
 
-    const saved = await this.projectRepository.save(project);
+    const saved = await this.projects.updateDetails(project.id, {
+      name: project.name,
+      description: project.description,
+      logo: project.logo,
+    });
     const changedFields = [
       ...(beforeName !== saved.name ? ['name'] : []),
       ...(data.description !== undefined && data.description !== beforeDescription ? ['description'] : []),
@@ -351,7 +301,7 @@ export class ProjectsService {
     return saved;
   }
 
-  async listPendingInvitationsForUser(userId: number): Promise<ProjectInvitation[]> {
+  async listPendingInvitationsForUser(userId: number): Promise<ProjectInvitationRecord[]> {
     return this.invitations.listPendingInvitationsForUser(userId);
   }
 
@@ -360,7 +310,7 @@ export class ProjectsService {
     invitationId: number,
     authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
-  ): Promise<ProjectInvitation> {
+  ): Promise<ProjectInvitationRecord> {
     return this.invitations.acceptInvitation(userId, invitationId, authenticationMethod, apiTokenId);
   }
 
@@ -369,7 +319,7 @@ export class ProjectsService {
     invitationId: number,
     authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
-  ): Promise<ProjectInvitation> {
+  ): Promise<ProjectInvitationRecord> {
     return this.invitations.declineInvitation(userId, invitationId, authenticationMethod, apiTokenId);
   }
 
@@ -380,7 +330,7 @@ export class ProjectsService {
     role: ProjectMemberRole = ProjectMemberRole.VIEWER,
     authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
-  ): Promise<ProjectInvitation> {
+  ): Promise<ProjectInvitationRecord> {
     return this.invitations.createProjectInvitation(
       ownerId,
       projectId,
@@ -397,7 +347,7 @@ export class ProjectsService {
     invitationId: number,
     authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
-  ): Promise<ProjectInvitation> {
+  ): Promise<ProjectInvitationRecord> {
     return this.invitations.resendProjectInvitation(ownerId, projectId, invitationId, authenticationMethod, apiTokenId);
   }
 
@@ -407,7 +357,7 @@ export class ProjectsService {
     invitationId: number,
     authenticationMethod: AuthenticationMethod = 'session',
     apiTokenId?: number,
-  ): Promise<ProjectInvitation> {
+  ): Promise<ProjectInvitationRecord> {
     return this.invitations.cancelProjectInvitation(ownerId, projectId, invitationId, authenticationMethod, apiTokenId);
   }
 }

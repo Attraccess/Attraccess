@@ -19,32 +19,27 @@ import { SettingsService } from '../../../settings/settings.service';
  */
 
 import type { SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
-import {
-  AuthenticationDetail,
-  Permission,
-  ResourceUsage,
-  Role,
-  RolePermission,
-  SSOProviderType,
-  Session,
-  User,
-  UserRole,
-  entities,
-} from '@attraccess/database-entities';
+import { AuthenticationDetail, ResourceUsage, Session, User } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import type { ConfigService } from '@nestjs/config';
 import type { ModuleRef } from '@nestjs/core';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { promises as fs } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import type { Repository } from 'typeorm';
-import { DataSource } from 'typeorm';
+import type { DataSource, Repository } from 'typeorm';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import type { AppConfigType } from '../../../config/app.config';
 import type { EmailService } from '../../../email/email.service';
 import { TokenHashService } from '../../../encryption/token-hash.service';
 import type { LicenseService } from '../../../license/license.service';
 import { MetricsService } from '../../../metrics/metrics.service';
 import { AuthService } from '../../../users-and-auth/auth/auth.service';
+import { PasswordPolicyService } from '../../../users-and-auth/password-policy/password-policy.service';
+import { TypeOrmRbacStore } from '../../../database/adapters/users/typeorm-rbac.store';
+import { unitOfWorkFor } from '../../../database/adapters/shared-unit-of-work';
+import { TransactionContextResolver } from '../../../database/adapters/transaction-context';
+import { TypeOrmCredentialStore } from '../../../database/adapters/auth/typeorm-credential.store';
 import { SsoAccountResolver } from '../../../users-and-auth/auth/sso/account-resolution/sso-account-resolver.service';
 import { SSOSamlStrategy } from '../../../users-and-auth/auth/sso/saml/saml.strategy';
 import type { SSOSamlRequest } from '../../../users-and-auth/auth/sso/saml/saml.types';
@@ -118,23 +113,13 @@ beforeAll(async () => {
   const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'att-sso-saml-e2e-'));
   process.env.AUTH_SESSION_SECRET = 'sso-saml-e2e-test-secret-must-be-long';
 
-  dataSource = new DataSource({
-    type: 'better-sqlite3',
-    database: path.join(tmpRoot, 'attraccess.sqlite'),
-    entities: Object.values(entities),
-    synchronize: true,
-  });
-  await dataSource.initialize();
+  dataSource = await createTestDataSource({ location: path.join(tmpRoot, 'attraccess.sqlite'), synchronize: true });
 
   // ── Build real services backed by SQLite ────────────────────────────────────
   userRepo = dataSource.getRepository(User);
   const authDetailRepo = dataSource.getRepository(AuthenticationDetail);
   const sessionRepo = dataSource.getRepository(Session);
   const resourceUsageRepo = dataSource.getRepository(ResourceUsage);
-  const userRoleRepo = dataSource.getRepository(UserRole);
-  const roleRepo = dataSource.getRepository(Role);
-  const permissionRepo = dataSource.getRepository(Permission);
-  const rolePermissionRepo = dataSource.getRepository(RolePermission);
 
   const mockConfigService = {
     get: (key: string): AppConfigType | undefined => {
@@ -169,15 +154,13 @@ beforeAll(async () => {
 
   const tokenHashService = new TokenHashService(mockConfigService);
   rbacService = new RbacService(
-    userRoleRepo,
-    roleRepo,
-    permissionRepo,
-    userRepo,
-    rolePermissionRepo,
+    new TypeOrmRbacStore(dataSource, new TransactionContextResolver(dataSource, unitOfWorkFor(dataSource))),
+    unitOfWorkFor(dataSource),
     new EventEmitter2(),
     null,
     { record: jest.fn().mockResolvedValue({ status: 'recorded' }) } as never,
   );
+
   usersService = composeUsersService(
     userRepo,
     authDetailRepo,
@@ -191,9 +174,16 @@ beforeAll(async () => {
     rbacService,
     { getDefaultLanguage: async () => 'en' } as SettingsService,
   );
-  authService = new AuthService(mockEmailService, authDetailRepo, usersService, tokenHashService, mockMetricsService);
+  authService = new AuthService(
+    mockEmailService,
+    new TypeOrmCredentialStore(authDetailRepo, new TransactionContextResolver(dataSource, unitOfWorkFor(dataSource))),
+    usersService,
+    tokenHashService,
+    mockMetricsService,
+    { getPolicy: async () => ({ historySize: 0 }) } as unknown as PasswordPolicyService,
+  );
 
-  const resolver = new SsoAccountResolver(usersService, authService, dataSource);
+  const resolver = new SsoAccountResolver(usersService, authService);
 
   mockModuleRef = {
     get: (token: unknown): unknown => {
@@ -209,7 +199,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (dataSource?.isInitialized) {
-    await dataSource.destroy();
+    await closeTestDataSource(dataSource);
   }
 });
 export function registerSsoSamlStrategyValidateIntegrationE2eFixture() {

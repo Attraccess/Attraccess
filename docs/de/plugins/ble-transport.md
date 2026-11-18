@@ -27,7 +27,7 @@ Plugin-Bluetooth funktioniert nur an [gekoppelten Readern](attractap/pairing.md)
 Administratoren behalten die Kontrolle: Ein Reader ist für Plugins standardmäßig gesperrt. Ein Administrator aktiviert **Bluetooth-Nutzung durch Plugins erlauben** im Reader-Editor (Tab Allgemein). Beim Ausschalten enden alle BLE-Sitzungen von Plugins auf diesem Reader sofort; vorhandene Endpunkte bleiben bestehen, aber Scans, neue Endpunkte und Sitzungen scheitern mit `READER_ACCESS_DENIED`.
 
 > [!WARNING]
-> `BLE_TRANSPORT` sperrt die Hintertüren anderer Berechtigungen nicht. `DATABASE_ACCESS` umgeht das Eigentum, weil es jede Tabelle lesen kann, und `RESOLVE_HOST_PROVIDERS` (`context.get`) erreicht interne Host-Dienste. Installieren Sie nur Plugins, denen Sie diese Berechtigungen anvertrauen, und lesen oder ändern Sie die Zeilen von `plugin_ble_endpoint` nie darüber: Nutzen Sie `context.ble`. Nutzen Sie `context.get` auch nie, um an den BLE-Transport zu gelangen: Damit umgehen Sie alle Prüfungen dieser Seite.
+> `BLE_TRANSPORT` sperrt die Hintertüren anderer Berechtigungen nicht. Ein Plugin hat keinen Datenbankzugriff und kann die Endpunkt-Tabelle daher nicht direkt lesen, aber `RESOLVE_HOST_PROVIDERS` (`context.get`) erreicht interne Host-Dienste. Installieren Sie nur Plugins, denen Sie diese Berechtigung anvertrauen. Die Zeilen von `plugin_ble_endpoint` gehören dem Host: Nutzen Sie `context.ble` und keinen anderen Weg. Nutzen Sie `context.get` auch nie, um an den BLE-Transport zu gelangen: Damit umgehen Sie alle Prüfungen dieser Seite.
 
 ## Lebenszyklus
 

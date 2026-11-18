@@ -1,42 +1,31 @@
 import {
-  BillingTransaction,
+  EmailTemplateRecord,
   EmailTemplateType,
-  Project,
-  ProjectInvitation,
-  ResourceUsage,
-  User,
-  Resource,
+  NotificationRecipient,
   ResourceHealthStatus,
-  EmailTemplate,
-} from '@attraccess/database-entities';
-
+} from '@attraccess/application-models';
 import { formatCredits, toExactCredits, getSupportedDeviceLanguage } from '@attraccess/shared';
-
-import { Injectable, Logger } from '@nestjs/common';
-
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { Repository, EntityManager } from 'typeorm';
-
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EmailLayoutService } from '../email-layout/email-layout.service';
-
 import { EmailTemplateKey, EmailTemplateService } from '../email-template/email-template.service';
-
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
-
 import { MetricsService } from '../metrics/metrics.service';
-
 import { SettingsService } from '../settings/settings.service';
-
 import { describeAllocation, receiptFormatters } from './usage-receipt-allocation';
-
+import { EMAIL_RECIPIENT_DIRECTORY, EmailRecipientDirectory } from './email-recipient-directory.port';
+import {
+  EmailResourceRef,
+  InvitedProject,
+  ProjectInvitationDetails,
+  ReceiptRecipient,
+  ReceiptTransaction,
+  ReceiptUsage,
+} from './email-receipt.types';
 import * as Handlebars from 'handlebars';
-
 import { createTransport } from 'nodemailer';
-
 import { existsSync } from 'node:fs';
-
 import { join } from 'node:path';
+import type { TransactionScope } from '../database/unit-of-work';
 
 export const EMAIL_LOGO_CID = 'attraccess-logo';
 
@@ -52,8 +41,8 @@ export class EmailService {
     protected readonly emailLayoutService: EmailLayoutService,
     protected readonly metricsService: MetricsService,
     protected readonly externalCallTimer: ExternalCallTimer,
-    @InjectRepository(User)
-    protected readonly userRepository: Repository<User>,
+    @Inject(EMAIL_RECIPIENT_DIRECTORY)
+    protected readonly recipients: EmailRecipientDirectory,
   ) {
     this.logger.debug('Initializing EmailService');
     this.logger.debug('EmailService initialized');
@@ -61,7 +50,11 @@ export class EmailService {
 
   protected readonly logger = new Logger(EmailService.name);
 
-  async sendProjectInvitationEmail(invitedUser: User, project: Project, invitation: ProjectInvitation) {
+  async sendProjectInvitationEmail(
+    invitedUser: NotificationRecipient,
+    project: InvitedProject,
+    invitation: ProjectInvitationDetails,
+  ) {
     const url = await this.settingsService.getUrl();
     if (!url) throw new Error('Application URL not configured');
     const invitationUrl = `${url}/projects?invitationId=${invitation.id}`;
@@ -88,9 +81,9 @@ export class EmailService {
   }
 
   public async sendResourceUsageBillingSummaryEmail(
-    user: User,
-    transaction: BillingTransaction,
-    usage: ResourceUsage,
+    user: ReceiptRecipient,
+    transaction: ReceiptTransaction,
+    usage: ReceiptUsage,
     currencyMinorUnit: number,
   ) {
     if (!user?.email) {
@@ -159,8 +152,8 @@ export class EmailService {
   }
 
   async sendResourceUsageNoteEmail(
-    recipient: User,
-    resource: Pick<Resource, 'id' | 'name'>,
+    recipient: NotificationRecipient,
+    resource: EmailResourceRef,
     note: { content: string; phase: 'start' | 'end'; authorName: string },
   ) {
     if (!recipient?.email) {
@@ -188,8 +181,8 @@ export class EmailService {
   }
 
   async sendResourceTakeoverEmail(
-    recipient: User,
-    resource: Pick<Resource, 'id' | 'name'>,
+    recipient: NotificationRecipient,
+    resource: EmailResourceRef,
     takeover: { actorName: string },
   ) {
     if (!recipient?.email) {
@@ -212,7 +205,10 @@ export class EmailService {
     await this.sendEmail(recipient, EmailTemplateType.RESOURCE_TAKEOVER, context);
   }
 
-  async sendNewMessageEmail(recipient: User, message: { conversationId: number; senderName: string; preview: string }) {
+  async sendNewMessageEmail(
+    recipient: NotificationRecipient,
+    message: { conversationId: number; senderName: string; preview: string },
+  ) {
     if (!recipient?.email) {
       return;
     }
@@ -234,8 +230,8 @@ export class EmailService {
   }
 
   async sendResourceSessionEndedEmail(
-    recipient: User,
-    resource: Pick<Resource, 'id' | 'name'>,
+    recipient: NotificationRecipient,
+    resource: EmailResourceRef,
     session: { id: number; endedAt: Date | string | null; endedBy: string },
   ) {
     if (!recipient?.email) {
@@ -263,8 +259,8 @@ export class EmailService {
   }
 
   async sendResourceHealthChangedEmail(
-    user: User,
-    resource: Pick<Resource, 'id' | 'name'>,
+    user: NotificationRecipient,
+    resource: EmailResourceRef,
     change: {
       status: ResourceHealthStatus;
       previousStatus: ResourceHealthStatus | null;
@@ -301,7 +297,7 @@ export class EmailService {
   }
 
   async sendUserRetrainingEmail(
-    user: User,
+    user: NotificationRecipient,
     target: { id: number; name: string; isGroup: boolean },
     info: { reason: 'age' | 'inactivity' | null; blocksAccess: boolean },
   ) {
@@ -331,8 +327,8 @@ export class EmailService {
   }
 
   async sendMaintenanceRequestedEmail(
-    recipient: User,
-    resource: Pick<Resource, 'id' | 'name'>,
+    recipient: NotificationRecipient,
+    resource: EmailResourceRef,
     request: { id: number; reason: string; requestedBy: string },
   ) {
     if (!recipient?.email) {
@@ -359,10 +355,11 @@ export class EmailService {
     await this.sendEmail(recipient, EmailTemplateType.MAINTENANCE_REQUEST_CREATED, context);
   }
 
-  async sendAccessChangeEmail(recipient: User, accessChange: { title: string; body: string; url?: string }) {
-    const resolvedRecipient = recipient?.email
-      ? recipient
-      : await this.userRepository.findOne({ where: { id: recipient.id } });
+  async sendAccessChangeEmail(
+    recipient: NotificationRecipient,
+    accessChange: { title: string; body: string; url?: string },
+  ) {
+    const resolvedRecipient = recipient?.email ? recipient : await this.recipients.findById(recipient.id);
 
     if (!resolvedRecipient?.email) {
       return;
@@ -383,7 +380,7 @@ export class EmailService {
     await this.sendEmail(resolvedRecipient, EmailTemplateType.ACCESS_CHANGE, context);
   }
 
-  async sendVerificationEmail(user: User, verificationToken: string) {
+  async sendVerificationEmail(user: NotificationRecipient, verificationToken: string) {
     const url = await this.settingsService.getUrl();
     if (!url) throw new Error('Application URL not configured');
     const verificationUrl = `${url}/verify-email?email=${encodeURIComponent(user.email)}&token=${verificationToken}`;
@@ -396,7 +393,11 @@ export class EmailService {
     await this.sendEmail(user, EmailTemplateType.VERIFY_EMAIL, context);
   }
 
-  async sendUserInvitationEmail(user: User, verificationToken: string, manager?: EntityManager) {
+  async sendUserInvitationEmail(
+    user: NotificationRecipient,
+    verificationToken: string,
+    transaction?: TransactionScope,
+  ) {
     const url = await this.settingsService.getUrl();
     if (!url) throw new Error('Application URL not configured');
     const verificationUrl = `${url}/accept-invitation?email=${encodeURIComponent(
@@ -408,10 +409,10 @@ export class EmailService {
       url: verificationUrl,
     };
 
-    await this.sendEmail(user, EmailTemplateType.USER_INVITATION, context, manager);
+    await this.sendEmail(user, EmailTemplateType.USER_INVITATION, context, transaction);
   }
 
-  async sendPasswordResetEmail(user: User, resetToken: string) {
+  async sendPasswordResetEmail(user: NotificationRecipient, resetToken: string) {
     const url = await this.settingsService.getUrl();
     if (!url) throw new Error('Application URL not configured');
     const resetUrl = `${url}/reset-password?userId=${user.id}&token=${encodeURIComponent(resetToken)}`;
@@ -424,7 +425,7 @@ export class EmailService {
     await this.sendEmail(user, EmailTemplateType.RESET_PASSWORD, context);
   }
 
-  async sendDeleteAccountConfirmationEmail(user: User, token: string) {
+  async sendDeleteAccountConfirmationEmail(user: NotificationRecipient, token: string) {
     const url = await this.settingsService.getUrl();
     if (!url) throw new Error('Application URL not configured');
     const confirmUrl = `${url}/confirm-delete-account?email=${encodeURIComponent(
@@ -439,7 +440,7 @@ export class EmailService {
     await this.sendEmail(user, EmailTemplateType.DELETE_ACCOUNT_CONFIRMATION, context);
   }
 
-  async sendUsernameChangedEmail(user: User, previousUsername: string) {
+  async sendUsernameChangedEmail(user: NotificationRecipient, previousUsername: string) {
     const base = (await this.getBaseContext(user)) as unknown as {
       user: { username: string; email: string; id: number };
       host: { frontend: string; backend: string };
@@ -458,12 +459,12 @@ export class EmailService {
     await this.sendEmail(user, EmailTemplateType.USERNAME_CHANGED, context);
   }
 
-  async sendPasswordChangedEmail(user: User) {
+  async sendPasswordChangedEmail(user: NotificationRecipient) {
     const context = await this.getBaseContext(user);
     await this.sendEmail(user, EmailTemplateType.PASSWORD_CHANGED, context);
   }
 
-  protected async convertTemplate(template: EmailTemplate, context: Record<string, unknown>, locale: string) {
+  protected async convertTemplate(template: EmailTemplateRecord, context: Record<string, unknown>, locale: string) {
     const fallback = await this.settingsService.getDefaultLanguage();
     let requested: string = fallback;
     let originalLocale: string | undefined;
@@ -513,14 +514,14 @@ export class EmailService {
   }
 
   async sendEmail(
-    user: User,
+    user: NotificationRecipient,
     templateType: EmailTemplateKey,
     context: Record<string, unknown>,
-    manager?: EntityManager,
+    transaction?: TransactionScope,
   ) {
     try {
       const locale = user.locale || (await this.settingsService.getDefaultLanguage());
-      const dbTemplate = await this.emailTemplateService.findOne(templateType, manager);
+      const dbTemplate = await this.emailTemplateService.findOne(templateType, transaction);
 
       const { subject, body } = await this.convertTemplate(dbTemplate, context, locale);
       this.logger.debug(
@@ -537,7 +538,7 @@ export class EmailService {
   }
 
   /** Hands one rendered email to the SMTP transport, with the layout's inline logo attached. */
-  async deliverEmail(user: User, subject: string, html: string, text?: string): Promise<void> {
+  async deliverEmail(user: NotificationRecipient, subject: string, html: string, text?: string): Promise<void> {
     const { transporter, from } = await this.createTransporter();
     await this.externalCallTimer.time('smtp', 'send', () =>
       transporter.sendMail({
@@ -554,7 +555,7 @@ export class EmailService {
     }
   }
 
-  async getBaseContext(user: User) {
+  async getBaseContext(user: NotificationRecipient) {
     const url = await this.settingsService.getUrl();
     if (!url) {
       throw new Error('Application URL not configured');

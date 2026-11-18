@@ -3,42 +3,23 @@ import { registerSumUpServiceFixture } from './service.test-fixture';
 import { SumupTransactionEventType } from '../dto/sumup/sumup-transaction-callback.dto';
 import { BadRequestException } from '@nestjs/common';
 import { SUMUP_TOPUP_TRANSACTION_PREFIX } from './sumup.service';
-import { BillingTransactionStatus, BillingTransaction } from '@attraccess/database-entities';
+import { BillingTransactionStatus } from '@attraccess/application-models';
 
 describe('SumUpService', () => {
   const fixture = registerSumUpServiceFixture();
 
   describe('setApiKey', () => {
-    it('stores encrypted API key and merchant code via update when existing', async () => {
+    it('stores the encrypted API key and the merchant code together', async () => {
       fixture.mockSumUpGet.mockResolvedValue({ merchant_profile: { merchant_code: 'M123' } });
-      fixture.settingRepository.findOneBy.mockResolvedValue({ id: 1, value: 'enc' });
       fixture.encryptionService.encrypt.mockReturnValue('encrypted');
 
       await fixture.service.setApiKey('token');
 
-      expect(fixture.settingRepository.update).toHaveBeenCalledWith(1, { value: 'encrypted' });
-      expect(fixture.settingRepository.update).toHaveBeenCalledWith(1, { value: 'M123' });
-      expect(fixture.settingRepository.insert).not.toHaveBeenCalled();
-    });
-
-    it('stores encrypted API key and merchant code via insert when missing', async () => {
-      fixture.mockSumUpGet.mockResolvedValue({ merchant_profile: { merchant_code: 'M123' } });
-      fixture.settingRepository.findOneBy.mockResolvedValue(null);
-      fixture.encryptionService.encrypt.mockReturnValue('encrypted');
-
-      await fixture.service.setApiKey('token');
-
-      expect(fixture.settingRepository.insert).toHaveBeenCalledWith({
-        parent: 'sumup',
-        key: 'apiKey',
-        value: 'encrypted',
+      expect(fixture.credentialStore.saveCredentials).toHaveBeenCalledTimes(1);
+      expect(fixture.credentialStore.saveCredentials).toHaveBeenCalledWith({
+        encryptedApiKey: 'encrypted',
+        merchantCode: 'M123',
       });
-      expect(fixture.settingRepository.insert).toHaveBeenCalledWith({
-        parent: 'sumup',
-        key: 'merchantCode',
-        value: 'M123',
-      });
-      expect(fixture.settingRepository.update).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -49,31 +30,28 @@ describe('SumUpService', () => {
       ],
     ])('throws and stores nothing when %s', async (_case, meResponse) => {
       fixture.mockSumUpGet.mockResolvedValue(meResponse);
-      fixture.settingRepository.findOneBy.mockResolvedValue(null);
 
       await expect(fixture.service.setApiKey('token')).rejects.toBeInstanceOf(BadRequestException);
-      expect(fixture.settingRepository.insert).not.toHaveBeenCalled();
-      expect(fixture.settingRepository.update).not.toHaveBeenCalled();
+      expect(fixture.credentialStore.saveCredentials).not.toHaveBeenCalled();
     });
 
     it('throws BadRequestException on invalid API key', async () => {
       fixture.mockSumUpGet.mockRejectedValue(new Error('invalid'));
 
       await expect(fixture.service.setApiKey('bad')).rejects.toBeInstanceOf(BadRequestException);
-      expect(fixture.settingRepository.insert).not.toHaveBeenCalled();
-      expect(fixture.settingRepository.update).not.toHaveBeenCalled();
+      expect(fixture.credentialStore.saveCredentials).not.toHaveBeenCalled();
     });
   });
 
   describe('getIsEnabled', () => {
     it('returns false when key missing', async () => {
-      fixture.settingRepository.findOneBy.mockResolvedValue(null);
+      fixture.credentialStore.getEncryptedApiKey.mockResolvedValue(null);
 
       await expect(fixture.service.getIsEnabled()).resolves.toBe(false);
     });
 
     it('returns false when decryption fails', async () => {
-      fixture.settingRepository.findOneBy.mockResolvedValue({ value: 'enc' });
+      fixture.credentialStore.getEncryptedApiKey.mockResolvedValue('enc');
       fixture.encryptionService.decrypt.mockImplementation(() => {
         throw new Error('bad');
       });
@@ -82,7 +60,7 @@ describe('SumUpService', () => {
     });
 
     it('returns true when decryption succeeds', async () => {
-      fixture.settingRepository.findOneBy.mockResolvedValue({ value: 'enc' });
+      fixture.credentialStore.getEncryptedApiKey.mockResolvedValue('enc');
       fixture.encryptionService.decrypt.mockReturnValue('token');
 
       await expect(fixture.service.getIsEnabled()).resolves.toBe(true);
@@ -162,7 +140,7 @@ describe('SumUpService', () => {
       fixture.withApiKey();
       fixture.billingService.getConfiguration.mockResolvedValue({ currency: 'EUR', minorUnit: 2 });
       fixture.mockReadersCreateCheckout.mockResolvedValue({ data: { client_transaction_id: 'tx123' } });
-      fixture.billingTransactionRepository.save.mockImplementation(async (t: BillingTransaction) => ({ id: 1, ...t }));
+      fixture.ledgerStore.insertTransaction.mockImplementation(async (t: object) => ({ id: 1, ...t }));
 
       const tx = await fixture.service.topUpWithReader(42, 'reader-1', 500);
 
@@ -175,7 +153,7 @@ describe('SumUpService', () => {
           return_url: 'https://example.com/api/billing/top-up/sumup/callback',
         }),
       );
-      expect(fixture.billingTransactionRepository.save).toHaveBeenCalledWith({
+      expect(fixture.ledgerStore.insertTransaction).toHaveBeenCalledWith({
         userId: 42,
         amount: 500,
         externalReference: `${SUMUP_TOPUP_TRANSACTION_PREFIX}:tx123`,
@@ -244,7 +222,7 @@ describe('SumUpService', () => {
     });
 
     it('throws when transaction not found', async () => {
-      fixture.billingTransactionRepository.findOneBy.mockResolvedValue(null);
+      fixture.ledgerStore.findTransactionByExternalReference.mockResolvedValue(null);
       await expect(callPrivate('tx1')).rejects.toEqual(new BadRequestException('Sumup transaction not found'));
     });
 
@@ -256,16 +234,15 @@ describe('SumUpService', () => {
         externalReference: `${SUMUP_TOPUP_TRANSACTION_PREFIX}:tx1`,
         status: BillingTransactionStatus.Pending,
       };
-      fixture.billingTransactionRepository.findOneBy.mockResolvedValue(transaction);
+      fixture.ledgerStore.findTransactionByExternalReference.mockResolvedValue(transaction);
       fixture.mockTransactionsGet.mockResolvedValue({ status: 'SUCCESSFUL' });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      fixture.billingTransactionRepository.save.mockImplementation(async (t: any) => t);
+      const completed = { ...transaction, status: BillingTransactionStatus.Completed };
+      fixture.ledgerStore.updateTransactionStatus.mockResolvedValue(completed);
 
       await callPrivate('tx1');
 
-      expect(transaction.status).toBe(BillingTransactionStatus.Completed);
-      expect(fixture.billingTransactionRepository.save).toHaveBeenCalledWith(transaction);
-      expect(fixture.liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(transaction);
+      expect(fixture.ledgerStore.updateTransactionStatus).toHaveBeenCalledWith(10, BillingTransactionStatus.Completed);
+      expect(fixture.liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(completed);
       expect(fixture.mockAuditService.record).toHaveBeenCalledWith(
         billingTransactionAuditEvent({
           transactionId: 10,
@@ -284,13 +261,28 @@ describe('SumUpService', () => {
         externalReference: `${SUMUP_TOPUP_TRANSACTION_PREFIX}:tx2`,
         status: BillingTransactionStatus.Pending,
       };
-      fixture.billingTransactionRepository.findOneBy.mockResolvedValue(transaction);
+      fixture.ledgerStore.findTransactionByExternalReference.mockResolvedValue(transaction);
       fixture.mockTransactionsGet.mockResolvedValue({ status: 'FAILED' });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      fixture.billingTransactionRepository.save.mockImplementation(async (t: any) => t);
+      fixture.ledgerStore.updateTransactionStatus.mockResolvedValue({
+        ...transaction,
+        status: BillingTransactionStatus.Failed,
+      });
 
       await callPrivate('tx2');
-      expect(transaction.status).toBe(BillingTransactionStatus.Failed);
+      expect(fixture.ledgerStore.updateTransactionStatus).toHaveBeenCalledWith(11, BillingTransactionStatus.Failed);
+    });
+
+    it('keeps a transaction whose status SumUp reports unchanged', async () => {
+      fixture.ledgerStore.findTransactionByExternalReference.mockResolvedValue({
+        id: 12,
+        status: BillingTransactionStatus.Pending,
+      });
+      fixture.mockTransactionsGet.mockResolvedValue({ status: 'PENDING' });
+
+      await callPrivate('tx3');
+
+      expect(fixture.ledgerStore.updateTransactionStatus).not.toHaveBeenCalled();
+      expect(fixture.liveNotificationsService.notifyTransactionUpdate).not.toHaveBeenCalled();
     });
   });
 
@@ -307,19 +299,20 @@ describe('SumUpService', () => {
         status: BillingTransactionStatus.Pending,
       };
       const otherTx = { id: 3, externalReference: `other:xyz`, status: BillingTransactionStatus.Pending };
-      fixture.billingTransactionRepository.findBy.mockResolvedValue([badRefTx, okTx, otherTx]);
+      fixture.ledgerStore.listPendingTransactions.mockResolvedValue([badRefTx, okTx, otherTx]);
       const spyUpdate = jest
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .spyOn<any, any>(fixture.service as any, 'updateTransactionStatusBySumupServer')
         .mockResolvedValue(undefined);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      fixture.billingTransactionRepository.save.mockImplementation(async (t: any) => t);
+      fixture.ledgerStore.updateTransactionStatus.mockImplementation(async (id: number, status: string) => ({
+        id,
+        status,
+      }));
 
       await fixture.service.processPendingTransactions();
 
-      expect(fixture.billingTransactionRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 1, status: BillingTransactionStatus.Failed }),
-      );
+      expect(fixture.ledgerStore.updateTransactionStatus).toHaveBeenCalledTimes(1);
+      expect(fixture.ledgerStore.updateTransactionStatus).toHaveBeenCalledWith(1, BillingTransactionStatus.Failed);
       expect(spyUpdate).toHaveBeenCalledWith('abc');
       expect(spyUpdate).toHaveBeenCalledTimes(1);
     });

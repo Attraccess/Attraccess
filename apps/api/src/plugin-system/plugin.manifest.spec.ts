@@ -1,4 +1,5 @@
 import { PluginManifestSchema } from './plugin.manifest';
+import { LoadedPluginManifest } from './runtime/manifest';
 
 const BASE = {
   name: 'demo',
@@ -7,31 +8,36 @@ const BASE = {
     frontend: { directory: 'frontend', entryPoint: 'index.mjs' },
     backend: { directory: 'dist', entryPoint: 'index.js' },
   },
-  attraccessVersion: { min: '1.0.0' },
+  attraccessVersion: { min: '2.0.0-0' },
   permissions: [],
 };
 
-describe('PluginManifestSchema migrations entry', () => {
-  it('accepts a manifest without a migrations entry', () => {
-    const parsed = PluginManifestSchema.parse(BASE);
-    expect(parsed.main.migrations).toBeUndefined();
+describe('PluginManifestSchema SDK 2.0 contract', () => {
+  it('knows PLUGIN_STORAGE and no longer knows the removed database permissions', () => {
+    expect(PluginManifestSchema.parse({ ...BASE, permissions: ['PLUGIN_STORAGE'] }).permissions).toEqual([
+      'PLUGIN_STORAGE',
+    ]);
+    for (const removed of ['DATABASE_ACCESS', 'PLUGIN_ENGINE_ACCESS']) {
+      expect(() => PluginManifestSchema.parse({ ...BASE, permissions: [removed] })).toThrow();
+    }
   });
 
-  it('accepts and parses a migrations entry', () => {
+  it('has no migrations entry and no persistence field: they are dropped, never parsed', () => {
     const parsed = PluginManifestSchema.parse({
       ...BASE,
       main: { ...BASE.main, migrations: { directory: 'dist', entryPoint: 'migrations.js' } },
+      persistence: { backends: ['sqlite'] },
     });
-    expect(parsed.main.migrations).toEqual({ directory: 'dist', entryPoint: 'migrations.js' });
+    expect(parsed.main).not.toHaveProperty('migrations');
+    expect(parsed).not.toHaveProperty('persistence');
   });
+});
 
-  it('rejects a malformed migrations entry', () => {
-    expect(() =>
-      PluginManifestSchema.parse({
-        ...BASE,
-        main: { ...BASE.main, migrations: { directory: 'dist' } },
-      }),
-    ).toThrow();
+describe('LoadedPluginManifest API contract', () => {
+  it('documents no persistence field: SDK 2.0 removed the engine list, so the API never returns one', () => {
+    const documented: string[] = Reflect.getMetadata('swagger/apiModelPropertiesArray', LoadedPluginManifest.prototype);
+    expect(documented).toContain(':permissions');
+    expect(documented).not.toContain(':persistence');
   });
 });
 

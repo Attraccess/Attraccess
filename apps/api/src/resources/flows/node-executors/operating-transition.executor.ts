@@ -1,4 +1,4 @@
-import { ResourceFlowNode } from '@attraccess/database-entities';
+import { FlowNodeRecord } from '@attraccess/application-models';
 import {
   ResourceOperatingIntervalService,
   ResourceOperatingState,
@@ -13,7 +13,7 @@ export class OperatingTransitionExecutor implements NodeExecutor {
     private readonly state: ResourceOperatingState,
   ) {}
 
-  async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
+  async execute(node: FlowNodeRecord, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
     const resourceId = await requireRunMachineId(node, ctx);
     try {
       await this.operatingIntervals.transition(resourceId, this.state, {

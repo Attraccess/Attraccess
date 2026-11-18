@@ -1,97 +1,75 @@
-import { ResourceOperatingInterval } from '@attraccess/database-entities';
-import { EntityManager, QueryFailedError, Repository } from 'typeorm';
-import { OperatingMetricsRecorder } from '../../metrics/instrumentation/operating/operating.helper';
+import { ConflictException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import type { OperatingIntervalRecord } from '@attraccess/application-models';
+import { OperatingMetricsRecorder } from '../../metrics/instrumentation/operating/operating.helper';
+import { OperatingClockRegressionError, OperatingTimelineStore } from './operating-timeline.port';
 import { ResourceOperatingIntervalService } from './resource-operating-interval.service';
 
+const interval = (resourceId: number, startTime: Date): OperatingIntervalRecord => ({
+  id: 1,
+  resourceId,
+  startTime,
+  endTime: null,
+  startFlowNodeId: null,
+  startFlowRunId: null,
+  endFlowNodeId: null,
+  endFlowRunId: null,
+});
+
+/** The storing side is a fake: what it records is verified against a real database in the persistence spec. */
 describe('ResourceOperatingIntervalService', () => {
-  let openInterval: ResourceOperatingInterval | null;
-  let latestInterval: ResourceOperatingInterval | null;
-  let repository: jest.Mocked<Pick<Repository<ResourceOperatingInterval>, 'findOne' | 'create' | 'save'>>;
+  let timeline: { recordTransition: jest.Mock };
   let operatingMetrics: jest.Mocked<OperatingMetricsRecorder>;
-  let service: ResourceOperatingIntervalService;
   let eventEmitter: EventEmitter2;
-  let transaction: jest.Mock;
+  let service: ResourceOperatingIntervalService;
 
   beforeEach(() => {
-    openInterval = null;
-    latestInterval = null;
+    timeline = { recordTransition: jest.fn() };
     operatingMetrics = {
       recordTransition: jest.fn(),
       setResourceState: jest.fn(),
       recordDataQualityFailures: jest.fn(),
     };
-    repository = {
-      findOne: jest.fn(async () => openInterval ?? latestInterval),
-      create: jest.fn((value) => value as ResourceOperatingInterval),
-      save: jest.fn(async (interval) => {
-        latestInterval = interval;
-        openInterval = interval.endTime === null ? interval : null;
-        return interval;
-      }),
-    };
-    transaction = jest.fn((callback) => callback(manager));
-    const manager = {
-      getRepository: jest.fn(() => repository),
-      transaction,
-      query: jest.fn(),
-    } as unknown as EntityManager;
     eventEmitter = new EventEmitter2();
     service = new ResourceOperatingIntervalService(
-      { manager } as Repository<ResourceOperatingInterval>,
+      timeline as unknown as OperatingTimelineStore,
       operatingMetrics,
       eventEmitter,
     );
   });
 
-  afterEach(() => jest.useRealTimers());
+  it('hands the transition and its provenance to the store and returns what it recorded', async () => {
+    const recorded = interval(3, new Date('2026-08-27T12:34:56.789Z'));
+    timeline.recordTransition.mockResolvedValue(recorded);
 
-  it('starts idle and ignores an idle transition', async () => {
+    await expect(service.transition(3, 'operating', { flowNodeId: 'node', flowRunId: 'run' })).resolves.toBe(recorded);
+
+    expect(timeline.recordTransition).toHaveBeenCalledWith(3, 'operating', { flowNodeId: 'node', flowRunId: 'run' });
+  });
+
+  it('ignores an idle transition of a resource that is not operating', async () => {
+    timeline.recordTransition.mockResolvedValue(null);
+    const changed = jest.fn();
+    eventEmitter.on('resource.operating.state.changed', changed);
+
     await expect(service.transition(1, 'idle')).resolves.toBeNull();
-    expect(repository.save).not.toHaveBeenCalled();
+
+    expect(changed).not.toHaveBeenCalled();
   });
 
-  it('creates an open interval at the server timestamp with millisecond precision', async () => {
-    const now = new Date('2026-08-27T12:34:56.789Z');
-    jest.useFakeTimers().setSystemTime(now);
-
-    await service.transition(3, 'operating');
-
-    expect(repository.create).toHaveBeenCalledWith({
-      resourceId: 3,
-      startTime: now,
-      endTime: null,
-      startFlowNodeId: null,
-      startFlowRunId: null,
-      endFlowNodeId: null,
-      endFlowRunId: null,
-    });
-    expect(repository.save).toHaveBeenCalledTimes(1);
-  });
-
-  it('publishes state changes only after its transaction commits', async () => {
-    let finishCommit: () => void;
-    let finishWrite: () => void;
-    const written = new Promise<void>((resolve) => {
-      finishWrite = resolve;
-    });
-    const commit = new Promise<void>((resolve) => {
-      finishCommit = resolve;
-    });
-    const executeTransaction = transaction.getMockImplementation();
-    transaction.mockImplementation(async (callback) => {
-      const result = await executeTransaction(callback);
-      finishWrite();
-      await commit;
-      return result;
-    });
+  it('publishes state changes only after the store committed the transition', async () => {
+    let commit!: () => void;
+    timeline.recordTransition.mockImplementationOnce(
+      () => new Promise((resolve) => (commit = () => resolve(interval(3, new Date())))),
+    );
+    timeline.recordTransition.mockResolvedValue(null);
     const changed = jest.fn();
     eventEmitter.on('resource.operating.state.changed', changed);
 
     const transition = service.transition(3, 'operating');
-    await written;
+    await new Promise((resolve) => setImmediate(resolve));
     expect(changed).not.toHaveBeenCalled();
-    finishCommit();
+    commit();
     await transition;
 
     expect(changed).toHaveBeenCalledWith(expect.objectContaining({ resourceId: 3, state: 'operating' }));
@@ -100,7 +78,7 @@ describe('ResourceOperatingIntervalService', () => {
   });
 
   it('does not publish an uncommitted transition or update its metrics', async () => {
-    transaction.mockRejectedValueOnce(new Error('commit failed'));
+    timeline.recordTransition.mockRejectedValueOnce(new Error('commit failed'));
     const changed = jest.fn();
     eventEmitter.on('resource.operating.state.changed', changed);
 
@@ -110,123 +88,43 @@ describe('ResourceOperatingIntervalService', () => {
     expect(operatingMetrics.recordTransition).not.toHaveBeenCalled();
   });
 
-  it('is idempotent for duplicate operating transitions', async () => {
-    await service.transition(3, 'operating');
-    await service.transition(3, 'operating');
+  it('answers a clock regression with a conflict and leaves metrics and events alone', async () => {
+    timeline.recordTransition.mockRejectedValueOnce(new OperatingClockRegressionError());
+    const changed = jest.fn();
+    eventEmitter.on('resource.operating.state.changed', changed);
 
-    expect(repository.create).toHaveBeenCalledTimes(1);
-    expect(repository.save).toHaveBeenCalledTimes(1);
-  });
+    const result = service.transition(9, 'idle');
 
-  it('closes a persisted open interval without requiring a usage session', async () => {
-    openInterval = {
-      id: 4,
-      resourceId: 9,
-      startTime: new Date('2026-08-27T12:00:00.000Z'),
-      endTime: null,
-    } as ResourceOperatingInterval;
-    const now = new Date('2026-08-27T12:34:56.789Z');
-    jest.useFakeTimers().setSystemTime(now);
-
-    await service.transition(9, 'idle');
-
-    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ endTime: now }));
-  });
-
-  it('rejects an idle transition before the persisted operating boundary without changing state', async () => {
-    openInterval = {
-      id: 4,
-      resourceId: 9,
-      startTime: new Date('2026-08-27T12:00:00.001Z'),
-      endTime: null,
-    } as ResourceOperatingInterval;
-    jest.useFakeTimers().setSystemTime(new Date('2026-08-27T12:00:00.000Z'));
-
-    await expect(service.transition(9, 'idle')).rejects.toThrow('Server clock precedes the last operating transition');
-
-    expect(openInterval.endTime).toBeNull();
-    expect(repository.save).not.toHaveBeenCalled();
+    await expect(result).rejects.toThrow(ConflictException);
+    await expect(result).rejects.toThrow('Server clock precedes the last operating transition');
+    expect(changed).not.toHaveBeenCalled();
     expect(operatingMetrics.recordTransition).not.toHaveBeenCalled();
   });
 
-  it.each(['idle', 'operating'] as const)(
-    'rejects %s before a persisted idle boundary and accepts it once the clock catches up',
-    async (state) => {
-      latestInterval = {
-        id: 4,
-        resourceId: 9,
-        startTime: new Date('2026-08-27T12:00:00.000Z'),
-        endTime: new Date('2026-08-27T12:10:00.001Z'),
-      } as ResourceOperatingInterval;
-      jest.useFakeTimers().setSystemTime(new Date('2026-08-27T12:10:00.000Z'));
-
-      await expect(service.transition(9, state)).rejects.toThrow('Server clock precedes the last operating transition');
-      expect(repository.save).not.toHaveBeenCalled();
-
-      jest.setSystemTime(new Date('2026-08-27T12:10:00.001Z'));
-      const result = await service.transition(9, state);
-      if (state === 'operating') {
-        expect(result.startTime).toEqual(new Date('2026-08-27T12:10:00.001Z'));
-      } else {
-        expect(result).toBeNull();
-      }
-    },
-  );
-
-  it('retains the accepted flow provenance on both boundaries and ignores duplicate provenance', async () => {
-    jest.useFakeTimers().setSystemTime(new Date('2026-08-27T12:00:00.000Z'));
-    const start = await service.transition(9, 'operating', { flowNodeId: 'start-node', flowRunId: 'start-run' });
-    await service.transition(9, 'operating', { flowNodeId: 'duplicate-node', flowRunId: 'duplicate-run' });
-
-    expect(start).toMatchObject({
-      startFlowNodeId: 'start-node',
-      startFlowRunId: 'start-run',
-      endFlowNodeId: null,
-      endFlowRunId: null,
+  it('serializes transitions of the same resource in arrival order, and lets other resources pass', async () => {
+    const order: string[] = [];
+    let releaseFirst!: () => void;
+    timeline.recordTransition.mockImplementation(async (resourceId: number, state: string) => {
+      order.push(`${resourceId}:${state}:start`);
+      if (resourceId === 3 && state === 'operating') await new Promise<void>((resolve) => (releaseFirst = resolve));
+      order.push(`${resourceId}:${state}:end`);
+      return null;
     });
 
-    jest.setSystemTime(new Date('2026-08-27T12:10:00.000Z'));
-    const end = await service.transition(9, 'idle', { flowNodeId: 'stop-node', flowRunId: 'stop-run' });
-    await service.transition(9, 'idle', { flowNodeId: 'duplicate-stop', flowRunId: 'duplicate-run' });
+    const first = service.transition(3, 'operating');
+    const second = service.transition(3, 'idle');
+    const other = service.transition(4, 'operating');
+    await other;
+    expect(order).toEqual(['3:operating:start', '4:operating:start', '4:operating:end']);
+    releaseFirst();
+    await Promise.all([first, second]);
 
-    expect(end).toMatchObject({
-      startFlowNodeId: 'start-node',
-      startFlowRunId: 'start-run',
-      endFlowNodeId: 'stop-node',
-      endFlowRunId: 'stop-run',
-    });
-  });
-
-  it('serializes conflicting transitions for the same resource in arrival order', async () => {
-    await Promise.all([service.transition(3, 'operating'), service.transition(3, 'idle')]);
-
-    expect(repository.create).toHaveBeenCalledTimes(1);
-    expect(repository.save).toHaveBeenCalledTimes(2);
-    expect(openInterval).toBeNull();
-  });
-
-  it('can close an interval opened before the service instance started', async () => {
-    openInterval = {
-      id: 4,
-      resourceId: 9,
-      startTime: new Date('2026-08-27T12:00:00.000Z'),
-      endTime: null,
-    } as ResourceOperatingInterval;
-
-    await service.transition(9, 'idle');
-
-    expect(repository.save).toHaveBeenCalledTimes(1);
-  });
-
-  it('treats an open-interval unique conflict as a duplicate operating transition', async () => {
-    repository.save.mockRejectedValueOnce(
-      Object.assign(new QueryFailedError('', [], new Error('UNIQUE constraint failed')), { code: 'SQLITE_CONSTRAINT' }),
-    );
-
-    await expect(service.transition(3, 'operating')).resolves.toBeNull();
+    expect(order.slice(3)).toEqual(['3:operating:end', '3:idle:start', '3:idle:end']);
   });
 
   it('records applied transitions and the resulting state for observability', async () => {
+    timeline.recordTransition.mockResolvedValue(interval(3, new Date()));
+
     await service.transition(3, 'operating');
 
     expect(operatingMetrics.recordTransition).toHaveBeenCalledWith('operating', true);
@@ -234,6 +132,8 @@ describe('ResourceOperatingIntervalService', () => {
   });
 
   it('records duplicate transitions as noop while the state still reflects the signal', async () => {
+    timeline.recordTransition.mockResolvedValueOnce(interval(3, new Date())).mockResolvedValueOnce(null);
+
     await service.transition(3, 'operating');
     await service.transition(3, 'operating');
 

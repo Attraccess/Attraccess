@@ -1,7 +1,7 @@
 import type { PreStartContext, ReaderUiContext, StartBlockedContext } from '@attraccess/plugins-backend-sdk';
 import { READER_UI_CAPABILITIES_NONE, SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { CAPACITY_REDUCED_REASON } from './constants';
-import { ReservationEntity } from './entities/reservation.entity';
+import { ReservationRow } from './storage/reservation-table';
 import { overrideStepKey, reservationStepKey } from './hooks/pre-start.service';
 import { ReservationError } from './reservations/errors';
 import { BackgroundServices, createBackgroundServices } from './testing/background-services.test-utils';
@@ -34,8 +34,7 @@ describe('shared machine reservations', () => {
       startTime: at(start.includes('T') ? start : `2026-06-02T${start}:00`),
       endTime: at(end.includes('T') ? end : `2026-06-02T${end}:00`),
     });
-  const statusOf = async (id: number) =>
-    (await h.dataSource.getRepository(ReservationEntity).findOneByOrFail({ id })).status;
+  const statusOf = async (id: number) => (await h.reservation({ id })).status;
   const session = (userId: number, usageId = userId) => ({
     usageId,
     resourceId: 1,
@@ -171,7 +170,7 @@ describe('shared machine reservations', () => {
       expect(await statusOf(c.id)).toBe('cancelled');
       expect(await statusOf(a.id)).toBe('confirmed');
       expect(await statusOf(b.id)).toBe('confirmed');
-      const row = await h.dataSource.getRepository(ReservationEntity).findOneByOrFail({ id: c.id });
+      const row = await h.reservation({ id: c.id });
       expect(row).toMatchObject({ cancelledBy: 99, cancelReason: CAPACITY_REDUCED_REASON });
       expect(h.audit.record).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -275,7 +274,7 @@ describe('shared machine reservations', () => {
     });
 
     describe('running bookings', () => {
-      let bob: ReservationEntity;
+      let bob: ReservationRow;
       beforeEach(async () => {
         bob = await book(11, 8, 10);
         h.setNow('2026-06-02T08:30:00Z');
@@ -322,7 +321,7 @@ describe('shared machine reservations', () => {
       it('does not hold a slot for a running pending request', async () => {
         h.setLimit(1, 2);
         h.state.sessions.push(session(20));
-        await h.dataSource.getRepository(ReservationEntity).update(bob.id, { status: 'pending' });
+        await h.tables.reservations.update({ id: bob.id }, { status: 'pending' });
         expect(await p.preStart.evaluate(ctx(10))).toEqual({ decision: 'allow' });
         expect(await p.preStart.evaluateStartBlocked(blocked(10))).toBeNull();
       });
@@ -400,23 +399,26 @@ describe('shared machine reservations', () => {
   });
 
   describe('atomic start capacity hook', () => {
+    // The host calls the hook inside its serialized start transaction: here, a transaction of the record port.
     const capacity = (userId: number, occupiedSlots: number, patch: Record<string, unknown> = {}) =>
-      p.startCapacity.evaluate({
-        resourceId: 1,
-        userId,
-        principal: userId,
-        manager: h.dataSource.manager,
-        action: 'start',
-        origin: 'web',
-        sessionLimit: 2,
-        occupiedSlots,
-        usersInSession: [],
-        confirmedStepKeys: [],
-        language: 'en',
-        now: h.clock(),
-        ...patch,
-      });
-    let bob: ReservationEntity;
+      h.memory.persistence.transaction((scope) =>
+        p.startCapacity.evaluate({
+          resourceId: 1,
+          userId,
+          principal: userId,
+          scope,
+          action: 'start',
+          origin: 'web',
+          sessionLimit: 2,
+          occupiedSlots,
+          usersInSession: [],
+          confirmedStepKeys: [],
+          language: 'en',
+          now: h.clock(),
+          ...patch,
+        }),
+      );
+    let bob: ReservationRow;
 
     beforeEach(async () => {
       h.setLimit(1, 2);
@@ -440,15 +442,21 @@ describe('shared machine reservations', () => {
       expect(await capacity(10, 1)).toEqual({ heldSlots: 0 });
     });
 
-    it('reads bookings through the given manager, in one query', async () => {
+    it('reads bookings through the given scope, in one query', async () => {
       const read = jest.spyOn(h.store, 'findRunningConfirmed');
+      h.storageCalls.length = 0;
       await capacity(10, 0);
       expect(read).toHaveBeenCalledTimes(1);
-      expect(read).toHaveBeenCalledWith(h.dataSource.manager, 1, expect.any(Date));
+      const [scope, resourceId, now] = read.mock.calls[0];
+      // a scope of the start transaction (it is closed again once the transaction ended)
+      expect(scope).toEqual(expect.objectContaining({ afterCommit: expect.any(Function) }));
+      expect([resourceId, now]).toEqual([1, expect.any(Date)]);
+      // and the one booking query is the only record-port call the hook made
+      expect(h.storageCalls.filter((call) => call.startsWith('reservations.'))).toEqual(['reservations.find']);
     });
 
     it('holds no slot for a running pending request', async () => {
-      await h.dataSource.getRepository(ReservationEntity).update(bob.id, { status: 'pending' });
+      await h.tables.reservations.update({ id: bob.id }, { status: 'pending' });
       expect(await capacity(10, 1)).toEqual({ heldSlots: 0 });
     });
   });
@@ -467,7 +475,7 @@ describe('shared machine reservations', () => {
       (h.audit.record.mock.calls as unknown as [{ action: string; subject: { id: number } }][])
         .map(([call]) => call)
         .filter((call) => call.action === 'reservations.override_start');
-    let carol: ReservationEntity;
+    let carol: ReservationRow;
 
     beforeEach(async () => {
       p.events.subscribe();

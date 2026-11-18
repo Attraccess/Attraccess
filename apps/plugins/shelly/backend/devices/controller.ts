@@ -1,4 +1,4 @@
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth, PluginStorageUniqueViolation } from '@attraccess/plugins-backend-sdk';
 import {
   BadGatewayException,
   BadRequestException,
@@ -21,7 +21,7 @@ import { InvalidCidrError } from './discovery/network-scan';
 import { validateShellyAddress } from '../communication/address';
 import type { ShellyDeviceInfo } from '../communication/device-api.service';
 import { ShellyDeviceApiService } from '../communication/device-api.service';
-import { ShellyDevice } from './registry/device.entity';
+import type { ShellyDevice } from './registry/storage';
 import type { FirmwareStage, FirmwareStatus } from '../firmware/service.service';
 import { ShellyFirmwareService } from '../firmware/service.service';
 import { ShellyProbeService } from './discovery/probe.service';
@@ -264,15 +264,23 @@ export class ShellyController {
     // persisted (with the probe error recorded) so the operator can re-probe
     // it later instead of losing the entry.
     const probed = await this.tryProbe(ipAddress);
-    return this.registry.create({
-      name,
-      ipAddress,
-      generation: probed.result?.generation ?? null,
-      model: probed.result?.model ?? null,
-      authState: probed.result?.authState ?? 'unknown',
-      lastProbeAt: probed.at,
-      lastProbeError: probed.error,
-    });
+    try {
+      return await this.registry.create({
+        name,
+        ipAddress,
+        generation: probed.result?.generation ?? null,
+        model: probed.result?.model ?? null,
+        authState: probed.result?.authState ?? 'unknown',
+        lastProbeAt: probed.at,
+        lastProbeError: probed.error,
+      });
+    } catch (error) {
+      // A concurrent add of the same address passed the check above and lost the unique key.
+      if (error instanceof PluginStorageUniqueViolation) {
+        throw new ConflictException(`a device with IP ${ipAddress} already exists`);
+      }
+      throw error;
+    }
   }
 
   @Get('devices')

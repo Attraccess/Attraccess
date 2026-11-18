@@ -16,5 +16,7 @@ module.exports = {
   // Backend fixtures spawn shell and utility subprocesses; avoid multiplying
   // that fan-out across several Jest workers on constrained validation hosts.
   maxWorkers: 1,
-  moduleNameMapper: { '^@attraccess/(.*)$': '<rootDir>/../../../libs/$1/src/index.ts' },
+  moduleNameMapper: {
+    '^@attraccess/(.*)$': '<rootDir>/../../../libs/$1/src/index.ts',
+  },
 };

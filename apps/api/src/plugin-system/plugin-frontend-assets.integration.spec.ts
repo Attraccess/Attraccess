@@ -93,7 +93,7 @@ describe('plugin frontend module-federation route', () => {
         version: '0.1.0',
         description: MANIFEST_MARKER,
         main: { frontend: { directory: 'frontend', entryPoint: 'remoteEntry.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
         permissions: [],
       }),
     );
@@ -109,7 +109,13 @@ describe('plugin frontend module-federation route', () => {
     PluginService.configure({ PLUGIN_DIR: PLUGIN_PATH, RESTART_BY_EXIT: true });
     PluginModule.configure({ DISABLE_PLUGINS: false });
 
-    dataSource = new DataSource({ type: 'better-sqlite3', database: ':memory:', synchronize: true, entities: [] });
+    dataSource = new DataSource({
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database: ':memory:',
+      synchronize: true,
+      entities: [],
+    });
     await dataSource.initialize();
     hostDataSource = dataSource;
 

@@ -1,26 +1,23 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
 import { Observable, Subject } from 'rxjs';
-import { Repository } from 'typeorm';
-import { ConversationParticipant, Message } from '@attraccess/database-entities';
+import type { MessageRecord } from '@attraccess/application-models';
+import { CONVERSATION_STORE, ConversationStore } from './conversation-store.port';
 import { MessageCreatedEvent } from './events/message-created.event';
 
 @Injectable()
 export class MessagingLiveService {
-  private readonly messageSubjects: Map<number, Subject<{ data: Message }>> = new Map();
+  private readonly messageSubjects: Map<number, Subject<{ data: MessageRecord }>> = new Map();
   private readonly connectionCounts: Map<number, number> = new Map();
 
   public constructor(
-    @InjectRepository(ConversationParticipant)
-    private readonly participantRepository: Repository<ConversationParticipant>,
-    @InjectRepository(Message)
-    private readonly messageRepository: Repository<Message>,
+    @Inject(CONVERSATION_STORE)
+    private readonly store: ConversationStore,
   ) {}
 
-  public getUserMessageSubject(userId: number): Subject<{ data: Message }> {
+  public getUserMessageSubject(userId: number): Subject<{ data: MessageRecord }> {
     if (!this.messageSubjects.has(userId)) {
-      this.messageSubjects.set(userId, new Subject<{ data: Message }>());
+      this.messageSubjects.set(userId, new Subject<{ data: MessageRecord }>());
     }
     return this.messageSubjects.get(userId);
   }
@@ -65,21 +62,15 @@ export class MessagingLiveService {
   @OnEvent(MessageCreatedEvent.EVENT_NAME)
   public async notifyNewMessage(event: MessageCreatedEvent): Promise<void> {
     const message = event.message;
-    const messageWithSender =
-      (await this.messageRepository.findOne({
-        where: { id: message.id },
-        relations: { sender: true },
-      })) ?? message;
+    const messageWithSender = (await this.store.findMessageWithSender(message.id)) ?? message;
 
-    const participants = await this.participantRepository.find({
-      where: { conversationId: message.conversationId },
-    });
+    const participantUserIds = await this.store.participantUserIds(message.conversationId);
 
-    for (const participant of participants) {
-      if (participant.userId === message.senderId) {
+    for (const userId of participantUserIds) {
+      if (userId === message.senderId) {
         continue;
       }
-      this.messageSubjects.get(participant.userId)?.next({ data: messageWithSender });
+      this.messageSubjects.get(userId)?.next({ data: messageWithSender });
     }
   }
 }

@@ -10,11 +10,11 @@ import {
   ParseIntPipe,
   UseInterceptors,
   ClassSerializerInterceptor,
-  SerializeOptions,
 } from '@nestjs/common';
-import { Auth, AuthenticatedRequest, NFCCard } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ApiOperation, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { AttractapService } from './attractap.service';
+import { NfcCardDto, toNfcCardDto } from './dtos/nfc-card.dto';
 import { NfcCardSetActiveStateDto } from './dtos/rfid-card-set-active-state.dto';
 import { RequiresLicense } from '../license/require-license.decorator';
 import { LicenseModuleType } from '../license/license.service';
@@ -43,35 +43,34 @@ export class AttractapNfcCardsController {
   @ApiResponse({
     status: 200,
     description: 'The list of all cards',
-    type: [NFCCard],
+    type: [NfcCardDto],
   })
   async getCards(
     @Req() req: AuthenticatedRequest,
     @Query('userId', new ParseIntPipe({ optional: true })) userId?: number,
-  ): Promise<NFCCard[]> {
+  ): Promise<NfcCardDto[]> {
     const ownerId = await this.cardAccess.resolveUserId(req.user, userId);
-    return await this.attractapService.getNFCCardsByUserId(ownerId);
+    return (await this.attractapService.getNFCCardsByUserId(ownerId)).map(toNfcCardDto);
   }
 
   @Patch('/:id/active')
   @Auth()
-  @SerializeOptions({ type: NFCCard })
   @ApiOperation({ summary: 'Activate or deactivate an NFC card', operationId: 'toggleCardActive' })
   @ApiResponse({
     status: 200,
     description: 'The updated NFC card',
-    type: NFCCard,
+    type: NfcCardDto,
   })
   async toggleCardActive(
     @Param('id', ParseIntPipe) id: number,
     @Body() data: NfcCardSetActiveStateDto,
     @Req() req: AuthenticatedRequest,
-  ): Promise<NFCCard> {
+  ): Promise<NfcCardDto> {
     await this.cardAccess.getCardForManagement(id, req.user);
     if (data.active) {
-      return await this.attractapService.activateNFCCard(id);
+      return toNfcCardDto(await this.attractapService.activateNFCCard(id));
     } else {
-      return await this.attractapService.deactivateNFCCard(id);
+      return toNfcCardDto(await this.attractapService.deactivateNFCCard(id));
     }
   }
 }

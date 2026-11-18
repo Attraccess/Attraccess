@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { SettingsService } from '../../../../settings/settings.service';
 import { SSOService } from '../sso.service';
-import { SSOProviderType } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import {
   InvalidSSOProviderIdException,
   InvalidSSOProviderTypeException,
@@ -75,9 +75,7 @@ export class SSOSamlGuard implements CanActivate {
     let redirectTo: string;
 
     try {
-      redirectTo = rawRedirect
-        ? new URL(rawRedirect, url).toString()
-        : url;
+      redirectTo = rawRedirect ? new URL(rawRedirect, url).toString() : url;
     } catch {
       this.logger.warn(`Invalid redirectTo provided: ${rawRedirect ?? 'undefined'}`);
       recordSsoLoginFailure(this.metricsService, SSOProviderType.SAML, 'guard_rejected', this.logger);

@@ -7,7 +7,8 @@ import {
   ListMaintenanceRequestsDto,
   PaginatedMaintenanceRequestResponse,
 } from './dtos';
-import { ResourceMaintenanceRequest } from '@attraccess/database-entities';
+import { ResourceMaintenanceRequest } from './dtos/maintenance-records.dto';
+import { toMaintenanceRequestDto } from './dtos/maintenance-records.mapper';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { CanManageMaintenance } from './canManageMaintenance.decorator';
 import { LicenseModuleType } from '../../license/license.service';
@@ -36,7 +37,7 @@ export class MaintenanceRequestController {
     @Body() dto: CreateMaintenanceRequestDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<ResourceMaintenanceRequest> {
-    return await this.requestService.createRequest(resourceId, request.user.id, dto.reason);
+    return toMaintenanceRequestDto(await this.requestService.createRequest(resourceId, request.user.id, dto.reason));
   }
 
   @Get()
@@ -55,7 +56,8 @@ export class MaintenanceRequestController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Query() query: ListMaintenanceRequestsDto,
   ): Promise<PaginatedMaintenanceRequestResponse> {
-    return await this.requestService.listRequests(resourceId, query);
+    const page = await this.requestService.listRequests(resourceId, query);
+    return { ...page, data: page.data.map(toMaintenanceRequestDto) };
   }
 
   @Post(':requestId/resolve')
@@ -79,6 +81,8 @@ export class MaintenanceRequestController {
     @Body() dto: ResolveMaintenanceRequestDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<ResourceMaintenanceRequest> {
-    return await this.requestService.resolveRequest(resourceId, requestId, request.user.id, dto.action, dto.reason);
+    return toMaintenanceRequestDto(
+      await this.requestService.resolveRequest(resourceId, requestId, request.user.id, dto.action, dto.reason),
+    );
   }
 }

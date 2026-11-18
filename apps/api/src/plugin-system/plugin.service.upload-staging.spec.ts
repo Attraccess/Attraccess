@@ -18,9 +18,9 @@ describe('PluginService.uploadPlugin staging cleanup', () => {
   it.each([
     [
       'an invalid manifest',
-      () => zipFileUpload({ 'plugin.json': JSON.stringify({ name: 'x' }) }),
+      () => zipFileUpload({ 'plugin.json': JSON.stringify({ name: 'x', attraccessVersion: { min: '2.0.0-0' } }) }),
       BadRequestException,
-      'Invalid plugin.json',
+      'Invalid plugin.json: ',
     ],
     [
       'a missing plugin.json',

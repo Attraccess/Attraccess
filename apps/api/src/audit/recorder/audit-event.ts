@@ -1,5 +1,5 @@
 import type { PluginAuditReceipt } from '@attraccess/plugins-backend-sdk';
-import type { EntityManager } from 'typeorm';
+import type { TransactionScope } from '../../database/unit-of-work';
 import type { AttractapAuditAction } from '../policies/attractap';
 import type { AdministrationAuditAction, PreviousAuditSettings } from '../policies/administration';
 import type {
@@ -11,7 +11,7 @@ import type {
 } from '../policies/domains';
 import type { IdentityAuditAction } from '../policies/identity';
 import type { RESOURCE_AUDIT_ACTIONS } from '../policies/resources';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 /**
  * The persisted action strings of every core audit domain. The envelope carries the stored action exactly as it
@@ -110,12 +110,20 @@ export interface AuditRecordOptions {
   previousAuditSettings?: PreviousAuditSettings;
 }
 
+/** The caller's transaction: the `TransactionScope` of the unit of work the business write runs in. */
+export type AuditTransactionRef = TransactionScope;
+
 /**
- * Records one audit event. Never rejects, except with AuditTransactionAbortedError when SQLite discarded the
- * caller's whole transaction. With `manager` inside an active transaction the row commits or rolls back with it.
+ * Records one audit event. Never rejects, except with AuditTransactionAbortedError when the database discarded the
+ * caller's whole transaction. With `transaction` inside an active transaction the row commits or rolls back with it;
+ * without one the row is written durably before the promise resolves.
  */
 export interface AuditRecorder {
-  record(event: AuditEvent, manager?: EntityManager, options?: AuditRecordOptions): Promise<PluginAuditReceipt>;
+  record(
+    event: AuditEvent,
+    transaction?: AuditTransactionRef,
+    options?: AuditRecordOptions,
+  ): Promise<PluginAuditReceipt>;
 }
 
 export const AUDIT_RECORDER = Symbol('AUDIT_RECORDER');

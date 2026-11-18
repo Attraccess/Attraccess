@@ -23,7 +23,7 @@ describe('PluginModule plugin-declared permissions', () => {
         name,
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
       }),
     );
     const permissions = keys.map((key) => ({

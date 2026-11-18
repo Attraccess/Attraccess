@@ -31,7 +31,7 @@ const signIn = (...effectivePermissions: string[]) =>
 
 const entry = {
   wireVersion: 1,
-  attraccess: '^1.11.0',
+  attraccess: '^2.0.0',
   plugin: '0.4.0-alpha.0',
   sidecar: '0.4.0-alpha.0',
   matterJs: '0.18.0',
@@ -151,7 +151,7 @@ describe('MatterPage', () => {
           message: 'Not a supported combination.',
           correlationId: null,
           details: {
-            received: { attraccess: '1.11.0', plugin: '0.4.0-alpha.0', sidecar: '9.9.9', matterJs: '0.18.0' },
+            received: { attraccess: '2.0.0', plugin: '0.4.0-alpha.0', sidecar: '9.9.9', matterJs: '0.18.0' },
           },
         },
       },
@@ -166,7 +166,7 @@ describe('MatterPage', () => {
 
   it('says to upgrade Attraccess when the host version is unavailable', async () => {
     renderPage({ state: 'degraded', reason: 'incompatible', reasonDetail: 'host version unavailable' }, configured);
-    expect(await screen.findByText(/Upgrade Attraccess to 1\.11\.0/)).toBeInTheDocument();
+    expect(await screen.findByText(/Upgrade Attraccess to 2\.0\.0/)).toBeInTheDocument();
   });
 
   it('warns about an insecure transport', async () => {

@@ -1,9 +1,12 @@
 import 'reflect-metadata';
-import { Attractap, entities } from '@attraccess/database-entities';
+import type { AttractapReader } from '@attraccess/application-models';
 import { PluginBleError, type PluginBleContext } from '@attraccess/plugins-backend-sdk';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { Test, type TestingModule } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
+import {
+  createPluginBleTestDatabase,
+  type PluginBleTestDatabase,
+} from '../../database/adapters/plugins/plugin-ble-database.test-fixture';
 import { AttractapService } from '../../attractap/attractap.service';
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../../attractap/events';
 import { createHostBleHarness, type HostBleHarness } from './__test__/ble-host-harness.test-fixture';
@@ -11,6 +14,7 @@ import { BleTestDriver, ManualClock } from './__test__/ble-test-driver.test-fixt
 import { BLE_TRANSPORT_DRIVER } from './ble-transport-driver';
 import { createPluginBleContext } from './plugin-ble-context';
 import { clearPluginBleProfiles } from './plugin-ble-profile-registry';
+import { PLUGIN_BLE_STORE } from './plugin-ble-store.port';
 import { PluginBleService } from './plugin-ble.service';
 
 const PROFILE = {
@@ -194,7 +198,7 @@ describe('PluginBleService with a misbehaving transport', () => {
 });
 
 describe('PluginBleService reader events through the real event bus', () => {
-  let source: DataSource;
+  let database: PluginBleTestDatabase;
   let module: TestingModule;
   let events: EventEmitter2;
   let attractap: AttractapService;
@@ -203,18 +207,13 @@ describe('PluginBleService reader events through the real event bus', () => {
 
   beforeEach(async () => {
     clearPluginBleProfiles();
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      database: ':memory:',
-      entities: Object.values(entities),
-      synchronize: true,
-    }).initialize();
+    database = await createPluginBleTestDatabase({ fullSchema: true });
     driver = new BleTestDriver(new ManualClock());
     module = await Test.createTestingModule({
       imports: [EventEmitterModule.forRoot()],
       providers: [
         PluginBleService,
-        { provide: DataSource, useValue: source },
+        { provide: PLUGIN_BLE_STORE, useValue: database.store },
         { provide: BLE_TRANSPORT_DRIVER, useValue: driver },
       ],
     }).compile();
@@ -224,7 +223,7 @@ describe('PluginBleService reader events through the real event bus', () => {
     // The real reader service emits the events; only the collaborators it does not touch here are stubs.
     attractap = new AttractapService(
       {} as never,
-      source.getRepository(Attractap),
+      database.readerStore,
       {} as never,
       events,
       {} as never,
@@ -239,12 +238,7 @@ describe('PluginBleService reader events through the real event bus', () => {
     ble = createPluginBleContext({ id: 'plugin-a', logger: silent() }, () => service);
     ble.registerProfile(PROFILE as never);
     for (const id of [1, 2]) {
-      await source.getRepository(Attractap).insert({
-        id,
-        name: `Reader ${id}`,
-        apiTokenHash: 'hash',
-        allowPluginBle: true,
-      } as Attractap);
+      await database.addReader({ id, name: `Reader ${id}`, allowPluginBle: true });
     }
     driver.addPeripheral({
       readerIds: [1, 2],
@@ -257,7 +251,7 @@ describe('PluginBleService reader events through the real event bus', () => {
 
   afterEach(async () => {
     await module.close();
-    await source.destroy();
+    await database.dispose();
   });
 
   const session = async (readerId: number) => {
@@ -292,7 +286,7 @@ describe('PluginBleService reader events through the real event bus', () => {
     const one = await session(1);
     await events.emitAsync(
       ReaderUpdatedEvent.EVENT_NAME,
-      new ReaderUpdatedEvent({ id: 1, allowPluginBle: false } as Attractap),
+      new ReaderUpdatedEvent({ id: 1, allowPluginBle: false } as AttractapReader),
     );
     await expect(one.read('info')).resolves.toEqual(Uint8Array.of(1));
     expect(disconnectsOf(1)).toBe(0);

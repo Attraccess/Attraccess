@@ -6,8 +6,6 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Redis, ReplyError } from 'ioredis';
-import { Repository } from 'typeorm';
-import type { User } from '@attraccess/database-entities';
 import { TokenHashService } from '../encryption/token-hash.service';
 import { ValkeySessionStore } from '../users-and-auth/auth/session-store/valkey.session-store';
 import { unreachableValkeyUrl } from '../valkey/unreachable-valkey.test-fixture';
@@ -35,7 +33,7 @@ describe('ValkeyUnavailableFilter', () => {
     client.on('error', () => undefined);
     const store = new ValkeySessionStore(
       client,
-      {} as Repository<User>,
+      {} as never,
       {
         hashToken: (token: string) => `hashed:${token}`,
       } as TokenHashService,

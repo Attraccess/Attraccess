@@ -1,8 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
+import type { DashboardPinItemType, DashboardPinSize } from '@attraccess/application-models';
 import { User } from './user.entity';
-
-export type DashboardPinItemType = 'page' | 'resource' | 'widget';
-export type DashboardPinSize = 'small' | 'medium' | 'large';
 
 /** One entry on a user's personal dashboard: a page path, a resource id or a widget id, in the user's order. */
 @Entity()

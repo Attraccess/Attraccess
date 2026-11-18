@@ -4,7 +4,7 @@ import {
   MassIntroductionTargetType,
 } from './dtos/massIntroductionSession.dto';
 import { MassIntroductionEndReason } from './dtos/massIntroductionLiveEvent.dto';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 export interface MassIntroductionTarget {
   type: MassIntroductionTargetType;

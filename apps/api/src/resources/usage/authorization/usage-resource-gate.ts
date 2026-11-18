@@ -1,12 +1,12 @@
-import { Resource, ResourceUsage, User, SupervisionMode } from '@attraccess/database-entities';
+import type { UsageSessionResource } from '@attraccess/application-models';
+import { SupervisionMode } from '@attraccess/application-models';
+import type { UsageSession, UsageSessionUser } from '@attraccess/application-models';
 
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { EntityManager, Repository } from 'typeorm';
+import { USAGE_SESSION_STORE, UsageSessionStore } from '../usage-session-store.port';
 
 import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../../exceptions/resource.maintenance.inUse.exception';
 
@@ -22,6 +22,7 @@ import { ResourceIntroducersService } from '../../introducers/resourceIntroducer
 
 import { ResourceMaintenanceService } from '../../maintenances/maintenance.service';
 
+import type { TransactionScope } from '../../../database/unit-of-work';
 import { RESOURCE_USAGE_LOG_CONTEXT } from '../lifecycle/usage-lifecycle';
 
 import { UsageAccessCache } from './usage-access-cache';
@@ -32,10 +33,7 @@ export class UsageResourceGate {
   private readonly logger = new Logger(RESOURCE_USAGE_LOG_CONTEXT);
 
   constructor(
-    @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    @Inject(USAGE_SESSION_STORE) private readonly sessions: UsageSessionStore,
     private readonly resourceMaintenanceService: ResourceMaintenanceService,
     private readonly resourceHealthService: ResourceHealthService,
     private readonly resourceIntroducersService: ResourceIntroducersService,
@@ -45,17 +43,13 @@ export class UsageResourceGate {
 
   async getResource(
     resourceId: number,
-    user: User,
+    user: UsageSessionUser,
     opts: { checkMaintenance: boolean; checkControlPermission: boolean },
-    transactionalEntityManager?: EntityManager,
-  ): Promise<Resource> {
+    scope?: TransactionScope,
+  ): Promise<UsageSessionResource> {
     const { checkMaintenance, checkControlPermission } = opts;
 
-    const resourceRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(Resource)
-      : this.resourceRepository;
-
-    const resource = await resourceRepository.findOne({ where: { id: resourceId } });
+    const resource = await this.sessions.findResource(resourceId, scope);
     if (!resource) {
       this.logger.warn(`Resource ${resourceId} not found`);
       throw new ResourceNotFoundException(resourceId);
@@ -66,16 +60,13 @@ export class UsageResourceGate {
       // Single enforcement point for maintenance mode: only users who can manage maintenance
       // may start a session (or lock/unlock door, etc.). Applies to both manual and
       // schedule-triggered maintenances (see hasActiveMaintenance).
-      const hasActiveMaintenance = await this.resourceMaintenanceService.hasActiveMaintenance(
-        resourceId,
-        transactionalEntityManager,
-      );
+      const hasActiveMaintenance = await this.resourceMaintenanceService.hasActiveMaintenance(resourceId, scope);
       if (hasActiveMaintenance) {
         // Check if user can manage maintenance (which allows them to use during maintenance)
         const canManageMaintenance = await this.resourceMaintenanceService.canManageMaintenance(
           user,
           resourceId,
-          transactionalEntityManager,
+          scope,
         );
 
         if (!canManageMaintenance) {
@@ -90,12 +81,12 @@ export class UsageResourceGate {
 
       // Health gate: block non-maintenance users when any health entry is unhealthy.
       // Users that can manage maintenance are intentionally allowed through so they can investigate/repair.
-      const isUnhealthy = await this.resourceHealthService.isResourceUnhealthy(resourceId, transactionalEntityManager);
+      const isUnhealthy = await this.resourceHealthService.isResourceUnhealthy(resourceId, scope);
       if (isUnhealthy) {
         const canManageMaintenance = await this.resourceMaintenanceService.canManageMaintenance(
           user,
           resourceId,
-          transactionalEntityManager,
+          scope,
         );
         if (!canManageMaintenance) {
           this.logger.warn(`User ${user.id} blocked from resource ${resourceId} because it is currently unhealthy`);
@@ -108,7 +99,7 @@ export class UsageResourceGate {
     }
 
     if (checkControlPermission) {
-      const canStartSession = await this.access.canControllResource(resourceId, user, transactionalEntityManager);
+      const canStartSession = await this.access.canControllResource(resourceId, user, scope);
 
       if (!canStartSession) {
         this.logger.warn(`User ${user.id} cannot control resource ${resourceId} - missing introduction`);
@@ -133,23 +124,18 @@ export class UsageResourceGate {
    */
   public async validateSupervisedStart(
     resourceId: number,
-    requester: User,
+    requester: UsageSessionUser,
     supervisorUserId: number,
-    transactionalEntityManager?: EntityManager,
-    preloadedResource?: Resource,
+    scope?: TransactionScope,
+    preloadedResource?: UsageSessionResource,
   ): Promise<void> {
-    await this.assertSupportsSupervision(resourceId, transactionalEntityManager, preloadedResource);
+    await this.assertSupportsSupervision(resourceId, scope, preloadedResource);
 
     if (supervisorUserId === requester.id) {
       throw new BadRequestException('You cannot supervise your own session');
     }
 
-    const userRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(User)
-      : this.userRepository;
-
-    const supervisor = await userRepository.findOne({ where: { id: supervisorUserId } });
-    if (!supervisor) {
+    if (!(await this.sessions.userExists(supervisorUserId, scope))) {
       throw new NotFoundException(`Supervisor with ID ${supervisorUserId} not found`);
     }
 
@@ -157,7 +143,7 @@ export class UsageResourceGate {
       resourceId,
       supervisorUserId,
       true,
-      transactionalEntityManager,
+      scope,
     );
 
     if (!supervisorIsIntroducer) {
@@ -172,14 +158,10 @@ export class UsageResourceGate {
    */
   public async assertSupportsSupervision(
     resourceId: number,
-    transactionalEntityManager?: EntityManager,
-    preloadedResource?: Resource,
-  ): Promise<Resource> {
-    const resourceRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(Resource)
-      : this.resourceRepository;
-
-    const resource = preloadedResource ?? (await resourceRepository.findOne({ where: { id: resourceId } }));
+    scope?: TransactionScope,
+    preloadedResource?: UsageSessionResource,
+  ): Promise<UsageSessionResource> {
+    const resource = preloadedResource ?? (await this.sessions.findResource(resourceId, scope));
     if (!resource) {
       throw new ResourceNotFoundException(resourceId);
     }
@@ -195,7 +177,7 @@ export class UsageResourceGate {
   }
 
   /** Owners, supervisors, resource managers and maintainers may end a session; returns whether `user` owns it. */
-  async assertMayEndSession(activeSession: ResourceUsage, user: User): Promise<boolean> {
+  async assertMayEndSession(activeSession: UsageSession, user: UsageSessionUser): Promise<boolean> {
     // Prefer already-populated effectivePermissions on the request-bound user (set by SessionStrategy)
     const userPermissions =
       (user as AuthenticatedUser).effectivePermissions ?? (await this.rbacService.getEffectivePermissions(user.id));

@@ -183,7 +183,7 @@ reads WAGO secrets; a plugin sends more than it declared.
 
 **Current protections**
 
-- Declared permissions (`plugin.json`: `DATABASE_ACCESS`, `ACCESS_MQTT_SERVERS`, `TRIGGER_FLOWS`, `MANAGE_SECRETS`) are enforced by the host's guarded context.
+- Declared permissions (`plugin.json`: `PLUGIN_STORAGE`, `ACCESS_MQTT_SERVERS`, `TRIGGER_FLOWS`, `MANAGE_SECRETS`) are enforced by the host's guarded context.
 - Plugin secrets are encrypted with a key derived per plugin ID from the server secret (`apps/api/src/encryption/encryption.service.ts` `getPluginEncryptionKey`).
 - A lint rule and a module-boundary script keep the plugin from importing host internals or other plugins (`@nx/enforce-module-boundaries`, `scripts/lint-module-boundaries.mjs`).
 

@@ -1,10 +1,11 @@
+import { controllerRow, revisionRow } from '../rows.test-utils';
+import { spyOnWagoStorage } from '../storage-spy.test-utils';
+import { createWagoTestStorage } from '../storage/testing';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import plugin from '../plugin';
-import { WagoConfigurationRevision } from '../configuration/revision.entity';
-import { WagoController } from '../controllers/entity';
+import type { WagoConfigurationRevision } from '../configuration/revision.entity';
 import { WagoFlowService } from './service';
 import { STREAM_A, STREAM_B } from './model';
-import { WagoSettings } from '../controllers/settings.entity';
 
 describe('WagoFlowService schemas and dispatch', () => {
   beforeEach(() => {
@@ -14,7 +15,7 @@ describe('WagoFlowService schemas and dispatch', () => {
 
   afterEach(() => jest.useRealTimers());
 
-  const controller = { id: 1, hardwareId: 'cc100-01', trustState: 'claimed', mqttServerId: null } as WagoController;
+  const controller = { id: 1, hardwareId: 'cc100-01', trustState: 'claimed', mqttServerId: null };
 
   const revision = {
     controllerId: 1,
@@ -24,50 +25,37 @@ describe('WagoFlowService schemas and dispatch', () => {
     snapshot: JSON.stringify({ logicalChannels: [{ id: 'door', capabilities: ['output'] }] }),
   } as WagoConfigurationRevision;
 
-  function createService() {
+  async function createService() {
     const trigger = jest.fn().mockResolvedValue(undefined);
-    const controllerRepository = { find: jest.fn().mockResolvedValue([controller]), findOneBy: jest.fn() };
-    const revisionQuery = {
-      innerJoin: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      getMany: jest.fn().mockResolvedValue([revision]),
+    const storage = createWagoTestStorage();
+    await storage.tables.controllers.insertMany([
+      controllerRow({ ...controller }),
+      // Only previews of another controller read this one.
+      controllerRow({ id: 2, hardwareId: 'controller-2', trustState: 'claimed' }),
+    ]);
+    await storage.tables.settings.insert({ id: 1, defaultMqttServerId: 2, operationalPrefix: 'attraccess/wago' });
+    /** Replaces the first controller's applied revisions, as a newly applied configuration does. */
+    const setApplied = async (revisions: WagoConfigurationRevision[]) => {
+      await storage.tables.configurationRevisions.delete({ controllerId: 1 });
+      await storage.tables.configurationRevisions.insertMany(revisions.map((item) => revisionRow({ ...item })));
     };
-    const revisionRepository = {
-      find: jest.fn().mockResolvedValue([revision]),
-      createQueryBuilder: jest.fn().mockReturnValue(revisionQuery),
-    };
-    const settingsRepository = {
-      findOneBy: jest
-        .fn()
-        .mockResolvedValue({ id: 1, defaultMqttServerId: 2, operationalPrefix: 'attraccess/wago' } as WagoSettings),
-    };
+    await setApplied([revision]);
+    const spy = spyOnWagoStorage(storage);
     const context = {
-      getRepository: jest.fn((entity) =>
-        entity === WagoController
-          ? controllerRepository
-          : entity === WagoConfigurationRevision
-            ? revisionRepository
-            : settingsRepository,
-      ),
+      ...spy.context,
       logger: { warn: jest.fn() },
       flows: { trigger },
       mqtt: { subscribe: jest.fn().mockResolvedValue({ unsubscribe: jest.fn() }) },
     } as unknown as PluginContext;
-    return {
-      service: new WagoFlowService(context),
-      trigger,
-      context,
-      revisionQuery,
-      revisionRepository,
-      controllerRepository,
-    };
+    return { service: new WagoFlowService(context), trigger, context, setApplied, tables: spy.spied };
   }
 
   it('isolates filtered preview controller lookups in a shared context', async () => {
-    const { service, controllerRepository } = createService();
-    controllerRepository.find.mockImplementation(async ({ where }: { where: { id: number } }) => [
-      { ...controller, id: where.id, hardwareId: `controller-${where.id}` },
-    ]);
+    const { service, tables } = await createService();
+    await tables.configurationRevisions.insert(
+      revisionRow({ controllerId: 2, revision: 1, state: 'applied', snapshot: revision.snapshot }),
+    );
+    tables.controllers.find.mockClear();
     const context = new Map<string, unknown>();
     const first = await service.resolveConfigSchema(
       { controllerId: 1, channelId: 'door', category: 'state' },
@@ -82,7 +70,7 @@ describe('WagoFlowService schemas and dispatch', () => {
       true,
     );
     expect(first.preview).toMatchObject([
-      { label: 'Device', value: 'controller-1' },
+      { label: 'Device', value: 'cc100-01' },
       { label: 'Channel', value: 'door' },
       { label: 'Read', value: 'Output state' },
     ]);
@@ -91,13 +79,30 @@ describe('WagoFlowService schemas and dispatch', () => {
       { label: 'Channel', value: 'door' },
       { label: 'Read', value: 'Output state' },
     ]);
-    expect(controllerRepository.find).toHaveBeenCalledTimes(2);
+    expect(tables.controllers.find).toHaveBeenCalledTimes(2);
     await service.resolveConfigSchema({ controllerId: 1, channelId: 'door' }, 'read', context, true);
-    expect(controllerRepository.find).toHaveBeenCalledTimes(2);
+    expect(tables.controllers.find).toHaveBeenCalledTimes(2);
   });
 
+  it.each([1.5, Number.NaN, Number.POSITIVE_INFINITY, '1'])(
+    'previews a node whose controller id %p is not an integer as one without a controller',
+    async (controllerId) => {
+      const { service, tables } = await createService();
+      tables.controllers.find.mockClear();
+      const preview = service.resolveConfigSchema({ controllerId, channelId: 'door' }, 'read', new Map(), true);
+      await expect(preview).resolves.toEqual(expect.any(Object));
+      // No lookup at all, like for a missing id: the integer filter would refuse the value.
+      expect(tables.controllers.find).not.toHaveBeenCalled();
+      // Outside a preview the claimed controllers are listed, and none is selected.
+      await expect(
+        service.resolveConfigSchema({ controllerId, channelId: 'door' }, 'read', new Map()),
+      ).resolves.toEqual(expect.any(Object));
+      service.onModuleDestroy();
+    },
+  );
+
   it('starts with an unavailable MQTT broker and retries flow subscriptions', async () => {
-    const { service, context } = createService();
+    const { service, context } = await createService();
     const subscribe = context.mqtt.subscribe as jest.Mock;
     subscribe.mockRejectedValueOnce(new Error('broker unavailable'));
 
@@ -110,34 +115,32 @@ describe('WagoFlowService schemas and dispatch', () => {
   });
 
   it('still fails startup when flow settings cannot be read', async () => {
-    const { service, context } = createService();
-    const settings = context.getRepository(WagoSettings) as unknown as { findOneBy: jest.Mock };
-    settings.findOneBy.mockRejectedValueOnce(new Error('settings unavailable'));
+    const { service, tables } = await createService();
+    tables.settings.get.mockRejectedValueOnce(new Error('settings unavailable'));
 
     await expect(service.onModuleInit()).rejects.toThrow('settings unavailable');
   });
 
   it('rejects an invalid operational prefix before attempting MQTT subscriptions', async () => {
-    const { service, context } = createService();
-    const settings = context.getRepository(WagoSettings) as unknown as { findOneBy: jest.Mock };
-    settings.findOneBy.mockResolvedValueOnce({ id: 1, defaultMqttServerId: 2, operationalPrefix: 'bad/#' });
+    const { service, context, tables } = await createService();
+    tables.settings.get.mockResolvedValueOnce({ id: 1, defaultMqttServerId: 2, operationalPrefix: 'bad/#' });
 
     await expect(service.onModuleInit()).rejects.toThrow();
     expect(context.mqtt.subscribe).not.toHaveBeenCalled();
   });
 
-  it('registers the plugin before the host datasource is available', () => {
-    const { context } = createService();
-    const getRepository = jest.spyOn(context, 'getRepository').mockImplementation(() => {
-      throw new Error('Host DataSource is not available yet');
+  it('registers the plugin before the host storage is available', async () => {
+    const { context } = await createService();
+    const open = jest.spyOn(context.storage, 'open').mockImplementation(() => {
+      throw new Error('Host storage is not available yet');
     });
-    getRepository.mockClear();
+    open.mockClear();
     expect(() => plugin.register(context)).not.toThrow();
-    expect(getRepository).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
   });
 
   it.each(['event', 'read', 'wait'] as const)('validates applied channels for %s nodes', async (kind) => {
-    const { service } = createService();
+    const { service } = await createService();
     const config = { controllerId: 1, channelId: 'door', category: 'state', equals: false };
     await expect(service.validateConfig(config, kind)).resolves.toEqual([]);
     await expect(service.validateConfig({ ...config, channelId: 'removed' }, kind)).resolves.toEqual(
@@ -149,7 +152,7 @@ describe('WagoFlowService schemas and dispatch', () => {
   });
 
   it.each(['event', 'read', 'wait'] as const)('provides a concise %s preview for the selected output', async (kind) => {
-    const { service } = createService();
+    const { service } = await createService();
     const schema = await service.resolveConfigSchema(
       {
         controllerId: 1,
@@ -175,8 +178,8 @@ describe('WagoFlowService schemas and dispatch', () => {
   });
 
   it('identifies an external meter and keeps a zero-valued wait condition visible', async () => {
-    const { service, revisionRepository } = createService();
-    revisionRepository.find.mockResolvedValue([
+    const { service, setApplied } = await createService();
+    await setApplied([
       {
         ...revision,
         snapshot: JSON.stringify({
@@ -206,9 +209,9 @@ describe('WagoFlowService schemas and dispatch', () => {
   });
 
   it('uses current applied channel names in the form even when the runtime cache is populated', async () => {
-    const { service, revisionRepository } = createService();
+    const { service, setApplied } = await createService();
     await service.refresh();
-    revisionRepository.find.mockResolvedValue([
+    await setApplied([
       {
         ...revision,
         snapshot: JSON.stringify({ logicalChannels: [{ id: 'new-input', capabilities: ['input'] }] }),
@@ -223,7 +226,7 @@ describe('WagoFlowService schemas and dispatch', () => {
   });
 
   it('rejects invalid wait conditions and event filters', async () => {
-    const { service } = createService();
+    const { service } = await createService();
     const config = { controllerId: 1, channelId: 'door', category: 'state' };
     await expect(service.validateConfig({ ...config, equals: 'true', timeoutMs: 0 }, 'wait')).resolves.toEqual(
       expect.arrayContaining([
@@ -237,7 +240,7 @@ describe('WagoFlowService schemas and dispatch', () => {
   });
 
   it('shares applied configuration lookups while validating a flow', async () => {
-    const { service, revisionRepository } = createService();
+    const { service, tables } = await createService();
     const config = { controllerId: 1, channelId: 'door', category: 'state', equals: false };
     const context = new Map<string, unknown>();
     await Promise.all([
@@ -245,11 +248,11 @@ describe('WagoFlowService schemas and dispatch', () => {
       service.validateConfig(config, 'read', context),
       service.validateConfig(config, 'wait', context),
     ]);
-    expect(revisionRepository.find).toHaveBeenCalledTimes(1);
+    expect(tables.configurationRevisions.find).toHaveBeenCalledTimes(1);
   });
 
   it('serializes concurrent controller messages before asynchronous channel resolution', async () => {
-    const { service } = createService();
+    const { service } = await createService();
     await service.refresh();
     let release!: () => void;
     const held = new Promise<void>((resolve) => {
@@ -288,7 +291,7 @@ describe('WagoFlowService schemas and dispatch', () => {
   });
 
   it('caches a validated retained state and dispatches matching trigger nodes', async () => {
-    const { service, trigger, context } = createService();
+    const { service, trigger, tables } = await createService();
     await service.refresh();
     await service['onMessage'](
       2,
@@ -312,11 +315,11 @@ describe('WagoFlowService schemas and dispatch', () => {
       expect.any(Function),
       expect.objectContaining({ wago: expect.objectContaining({ channelId: 'door', value: true }) }),
     );
-    expect(context.getRepository(WagoController).findOneBy).not.toHaveBeenCalled();
+    expect(tables.controllers.get).not.toHaveBeenCalled();
   });
 
   it('ignores duplicate sequences and resolves waiters from later state', async () => {
-    const { service, trigger } = createService();
+    const { service, trigger } = await createService();
     await service.refresh();
     const topic = 'attraccess/wago/v1/controllers/cc100-01/state';
     const event = (sequence: number, value: boolean) =>
@@ -346,7 +349,7 @@ describe('WagoFlowService schemas and dispatch', () => {
   });
 
   it('only evaluates waiters for the updated channel state', async () => {
-    const { service } = createService();
+    const { service } = await createService();
     await service.refresh();
     const topic = 'attraccess/wago/v1/controllers/cc100-01/state';
     const event = (outputs: Record<string, boolean>) =>
@@ -378,7 +381,7 @@ describe('WagoFlowService schemas and dispatch', () => {
   });
 
   it('cancels pending state waits during shutdown', async () => {
-    const { service } = createService();
+    const { service } = await createService();
     const waiting = service.wait({
       controllerId: 1,
       channelId: 'door',
@@ -392,7 +395,7 @@ describe('WagoFlowService schemas and dispatch', () => {
   });
 
   it('loads only the latest applied revision per controller and prunes removed channel state', async () => {
-    const { service, revisionQuery, revisionRepository } = createService();
+    const { service, setApplied, tables } = await createService();
     await service.refresh();
     await service['onMessage'](
       2,
@@ -410,22 +413,26 @@ describe('WagoFlowService schemas and dispatch', () => {
         }),
       ),
     );
-    revisionQuery.getMany.mockResolvedValueOnce([]);
+    tables.configurationRevisions.aggregate.mockClear();
+    tables.configurationRevisions.find.mockClear();
+    await setApplied([]);
 
     await service.refresh();
 
-    expect(revisionRepository.find).not.toHaveBeenCalled();
-    expect(revisionRepository.createQueryBuilder).toHaveBeenCalledTimes(2);
-    expect(revisionQuery.innerJoin).toHaveBeenCalledWith(
-      expect.any(Function),
-      'latest',
-      'latest.controllerId = revision.controllerId AND latest.revision = revision.revision',
-    );
+    // The newest revision number is one aggregate per controller (no snapshots move); with no applied revision left
+    // there is nothing to read, and the per-controller channel lookup is never used.
+    expect(tables.configurationRevisions.aggregate).toHaveBeenCalledTimes(2);
+    for (const controllerId of [1, 2])
+      expect(tables.configurationRevisions.aggregate).toHaveBeenCalledWith('revision', {
+        controllerId,
+        state: 'applied',
+      });
+    expect(tables.configurationRevisions.find).not.toHaveBeenCalled();
     expect(service.read({ controllerId: 1, channelId: 'door' })).toBeNull();
   });
 
   it('isolates messages from another MQTT server and accepts a newer controller restart', async () => {
-    const { service } = createService();
+    const { service } = await createService();
     await service.refresh();
     const topic = 'attraccess/wago/v1/controllers/cc100-01/state';
     const event = (sequence: number, timestamp: string, value: boolean, streamId = STREAM_A) =>
@@ -451,7 +458,7 @@ describe('WagoFlowService schemas and dispatch', () => {
   });
 
   it('uses source timestamps for stale state and returns node-specific schemas', async () => {
-    const { service } = createService();
+    const { service } = await createService();
     await service.refresh();
     const topic = 'attraccess/wago/v1/controllers/cc100-01/state';
     await service['onMessage'](
@@ -486,7 +493,7 @@ describe('WagoFlowService schemas and dispatch', () => {
   });
 
   it.each(['event', 'read', 'wait'] as const)('offers state for input-only channels in the %s editor', async (kind) => {
-    const { service } = createService();
+    const { service } = await createService();
     const originalSnapshot = revision.snapshot;
     revision.snapshot = JSON.stringify({ logicalChannels: [{ id: 'door', capabilities: ['input'] }] });
     try {
@@ -517,9 +524,8 @@ describe('WagoFlowService schemas and dispatch', () => {
     } as WagoConfigurationRevision;
     const measurementTopic = 'attraccess/wago/v1/controllers/cc100-01/measurements';
     async function prepared() {
-      const setup = createService();
-      setup.revisionRepository.find.mockResolvedValue([disabledRevision]);
-      setup.revisionQuery.getMany.mockResolvedValue([disabledRevision]);
+      const setup = await createService();
+      await setup.setApplied([disabledRevision]);
       await setup.service.refresh();
       const message = (topic: string, body: Record<string, unknown>) =>
         setup.service['onMessage'](
@@ -573,7 +579,7 @@ describe('WagoFlowService schemas and dispatch', () => {
     });
 
     it('drops samples cached before a channel was disabled', async () => {
-      const { service, revisionRepository, revisionQuery } = createService();
+      const { service, setApplied } = await createService();
       const message = (topic: string, body: Record<string, unknown>) =>
         service['onMessage'](
           2,
@@ -585,8 +591,7 @@ describe('WagoFlowService schemas and dispatch', () => {
         ...disabledRevision,
         snapshot: disabledRevision.snapshot.replace(',"enabled":false', ''),
       } as WagoConfigurationRevision;
-      revisionRepository.find.mockResolvedValue([enabledRevision]);
-      revisionQuery.getMany.mockResolvedValue([enabledRevision]);
+      await setApplied([enabledRevision]);
       await service.refresh();
       await message('attraccess/wago/v1/controllers/cc100-01/state', {
         sequence: 1,
@@ -604,15 +609,14 @@ describe('WagoFlowService schemas and dispatch', () => {
       });
       const config = { controllerId: 1, channelId: 'power', category: 'measurement' };
       expect(service.read(config)).toMatchObject({ value: 1000 });
-      revisionRepository.find.mockResolvedValue([{ ...disabledRevision, revision: 2 }]);
-      revisionQuery.getMany.mockResolvedValue([{ ...disabledRevision, revision: 2 }]);
+      await setApplied([{ ...disabledRevision, revision: 2 }]);
       await service.refresh();
       expect(service.read(config)).toBeNull();
       expect(service['cache'].size).toBe(0);
     });
 
     it('reads a channel again once a later revision enables it, from a per-controller set of disabled IDs', async () => {
-      const { service, revisionRepository, revisionQuery, message } = await prepared();
+      const { service, setApplied, message } = await prepared();
       const config = { controllerId: 1, channelId: 'power', category: 'measurement' };
       expect(service['disabledChannelCache'].get(1)).toEqual(new Set(['power']));
       const enabledRevision = {
@@ -620,8 +624,7 @@ describe('WagoFlowService schemas and dispatch', () => {
         revision: 2,
         snapshot: disabledRevision.snapshot.replace(',"enabled":false', ''),
       } as WagoConfigurationRevision;
-      revisionRepository.find.mockResolvedValue([enabledRevision]);
-      revisionQuery.getMany.mockResolvedValue([enabledRevision]);
+      await setApplied([enabledRevision]);
       await service.refresh();
       expect(service['disabledChannelCache'].get(1)).toEqual(new Set());
       await message('attraccess/wago/v1/controllers/cc100-01/state', {
@@ -637,13 +640,12 @@ describe('WagoFlowService schemas and dispatch', () => {
   });
 
   it('keeps an on-change measurement available across 30 s keepalive gaps', async () => {
-    const { service, revisionRepository, revisionQuery } = createService();
+    const { service, setApplied } = await createService();
     const meterRevision = {
       ...revision,
       snapshot: JSON.stringify({ logicalChannels: [{ id: 'energy', capabilities: ['measurement'] }] }),
     } as WagoConfigurationRevision;
-    revisionRepository.find.mockResolvedValue([meterRevision]);
-    revisionQuery.getMany.mockResolvedValue([meterRevision]);
+    await setApplied([meterRevision]);
     await service.refresh();
     const sequences: Record<string, number> = {};
     const send = (category: string, body: Record<string, unknown>) =>
@@ -674,8 +676,8 @@ describe('WagoFlowService schemas and dispatch', () => {
     }
   });
 
-  it('resets minimum-change comparisons when units, kinds or boot streams change', () => {
-    const { service } = createService();
+  it('resets minimum-change comparisons when units, kinds or boot streams change', async () => {
+    const { service } = await createService();
     const config = { controllerId: 1, channelId: 'power', category: 'measurement', minimumChange: 10 };
     const previous = {
       controllerId: 1,
@@ -698,8 +700,8 @@ describe('WagoFlowService schemas and dispatch', () => {
     expect(service['matchesEvent'](config, 'node', { ...previous, streamId: STREAM_B }, previous)).toBe(true);
   });
 
-  it('applies minimum intervals from the last dispatch for each trigger node', () => {
-    const { service } = createService();
+  it('applies minimum intervals from the last dispatch for each trigger node', async () => {
+    const { service } = await createService();
     const config = { controllerId: 1, channelId: 'door', category: 'state', minimumIntervalMs: 75 };
     const state = (receivedAt: number) =>
       ({

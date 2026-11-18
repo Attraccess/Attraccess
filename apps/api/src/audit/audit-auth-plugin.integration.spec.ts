@@ -37,8 +37,9 @@ import { AUDIT_RECORDER } from './recorder/audit-event';
 import { SettingsAdministrationService } from '../settings/settings-administration.service';
 import { AuditModule } from './audit.module';
 import { AUDIT_METRICS } from '../metrics/definitions/tokens';
-import { demoDomain, setupAuditDatabase } from './audit.test-fixture';
+import { demoDomain, setupAuditDatabase } from '../database/adapters/audit/audit.test-fixture';
 import { SessionPermissionSync } from '../users-and-auth/auth/sso/session-permission-sync';
+import { TypeOrmSettingsRows } from '../database/adapters/settings/typeorm-settings-rows';
 describe('durable audit SQLite', () => {
   const fixture = setupAuditDatabase();
   it('enforces HTTP session permissions, token ceilings, query validation and persisted settings updates', async () => {
@@ -174,7 +175,7 @@ describe('durable audit SQLite', () => {
       }
       ownerPermissions.delete('users.api-tokens.manage');
       await request(server).get('/api/settings/audit').set('Authorization', 'Bearer settings-token').expect(401);
-      const restartedStore = new SettingsStoreService(fixture.source.getRepository(Setting), null);
+      const restartedStore = new SettingsStoreService(TypeOrmSettingsRows.forRepository(fixture.source.getRepository(Setting)), null);
       expect(await readAuditSettings(restartedStore)).toEqual({
         enabled: false,
         retention_days: 4,
@@ -375,7 +376,7 @@ describe('audit authorization and query validation', () => {
         { type: 'query', metatype: AuditQueryDto },
       ),
     ).resolves.toMatchObject({ domain: 'resource', subjectType: 'flow', action: 'flow.canvas_updated' });
-    const meta = new AuditQueryService({} as never, {} as never, {} as never).meta();
+    const meta = new AuditQueryService({} as never, {} as never).meta();
     expect(meta.subjectTypes).toContain('flow');
     expect(meta.actions).toEqual(
       expect.arrayContaining([

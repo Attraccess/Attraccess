@@ -1,5 +1,3 @@
-import { User } from '@attraccess/database-entities';
-
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
 import {
@@ -35,6 +33,7 @@ import { PaginatedUserSummariesResponseDto, PaginatedUsersResponseDto } from './
 
 import { UsersService } from './users.service';
 import { UserAdministrationService } from './user-administration.service';
+import { UserDto, toUserAccountDto } from './dtos/user.dto';
 
 import { ChangeBillingFactorDto } from './dtos/changeBillingFactor.dto';
 
@@ -63,7 +62,7 @@ export class UsersAdminController {
   @ApiResponse({
     status: 200,
     description: 'The user with the specified ID.',
-    type: User,
+    type: UserDto,
   })
   @ApiResponse({
     status: 403,
@@ -74,7 +73,7 @@ export class UsersAdminController {
     description: 'User not found.',
     type: UserNotFoundException,
   })
-  async getOneById(@Param('id', ParseIntPipe) id: number, @Req() request: AuthenticatedRequest): Promise<User> {
+  async getOneById(@Param('id', ParseIntPipe) id: number, @Req() request: AuthenticatedRequest): Promise<UserDto> {
     const authenticatedUser = request.user;
 
     // Allow access if the user is requesting their own data or has users.read permission
@@ -85,13 +84,13 @@ export class UsersAdminController {
       throw new ForbiddenException();
     }
 
-    const user = await this.usersService.findOne({ id }, { authenticationDetails: true });
+    const user = await this.usersService.findOne({ id }, ['authenticationDetails']);
     if (!user) {
       this.logger.debug(`User not found with ID: ${id}`);
       throw new UserNotFoundException(id);
     }
 
-    return user;
+    return toUserAccountDto(user);
   }
 
   @Delete(':id')
@@ -172,7 +171,9 @@ export class UsersAdminController {
     this.logger.debug(`Found ${result.total} users total, returning ${result.data.length} users`);
     return {
       ...result,
-      data: canReadUsers ? result.data : result.data.map(({ id, username }) => ({ id, username })),
+      data: canReadUsers
+        ? result.data.map(toUserAccountDto)
+        : result.data.map(({ id, username }) => ({ id, username })),
       nextPage: computeNextPage(result.page, result.limit, result.total),
     };
   }
@@ -210,26 +211,30 @@ export class UsersAdminController {
   @Patch(':id/username')
   @Auth('users.update')
   @ApiOperation({ summary: "Admin: Change a user's username (no limit)", operationId: 'changeUserUsername' })
-  @ApiResponse({ status: 200, description: 'Username changed.', type: User })
+  @ApiResponse({ status: 200, description: 'Username changed.', type: UserDto })
   async changeUserUsername(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: ChangeUsernameDto,
     @Req() request: AuthenticatedRequest,
-  ): Promise<User> {
-    return this.administration.changeUsername(id, body.username, request.user, auditOriginOf(request));
+  ): Promise<UserDto> {
+    return toUserAccountDto(
+      await this.administration.changeUsername(id, body.username, request.user, auditOriginOf(request)),
+    );
   }
 
   @Patch(':id/email')
   @Auth('users.update')
   @ApiOperation({ summary: "Admin: Change a user's email address", operationId: 'changeUserEmail' })
-  @ApiResponse({ status: 200, description: 'Email changed.', type: User })
+  @ApiResponse({ status: 200, description: 'Email changed.', type: UserDto })
   async changeUserEmail(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: ChangeEmailDto,
     @Req() request: AuthenticatedRequest,
-  ): Promise<User> {
+  ): Promise<UserDto> {
     try {
-      return await this.administration.changeEmail(id, body.email, request.user, auditOriginOf(request));
+      return toUserAccountDto(
+        await this.administration.changeEmail(id, body.email, request.user, auditOriginOf(request)),
+      );
     } catch (error) {
       throw mapEmailSendError(error);
     }
@@ -238,12 +243,14 @@ export class UsersAdminController {
   @Patch(':id/billing-factor')
   @Auth('billing.manage')
   @ApiOperation({ summary: "Change a user's billing factor", operationId: 'changeUserBillingFactor' })
-  @ApiResponse({ status: 200, description: 'Billing factor changed.', type: User })
+  @ApiResponse({ status: 200, description: 'Billing factor changed.', type: UserDto })
   async changeUserBillingFactor(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: ChangeBillingFactorDto,
     @Req() request: AuthenticatedRequest,
-  ): Promise<User> {
-    return this.administration.changeBillingFactor(id, body.billingFactor, auditOriginOf(request));
+  ): Promise<UserDto> {
+    return toUserAccountDto(
+      await this.administration.changeBillingFactor(id, body.billingFactor, auditOriginOf(request)),
+    );
   }
 }

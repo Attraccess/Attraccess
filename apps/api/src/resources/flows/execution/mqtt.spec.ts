@@ -1,17 +1,8 @@
-import {
-  BillingTransactionItem,
-  Resource,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-  ResourceType,
-} from '@attraccess/database-entities';
+import { FlowNodeRecord, ResourceFlowNodeType, ResourceType } from '@attraccess/application-models';
 
 import { Logger } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
-
-import { Repository } from 'typeorm';
 
 import { CompanionGatewayService } from '../../../companion/companion-gateway.service';
 
@@ -35,56 +26,18 @@ import { ResourceFlowsExecutorService } from './resource-flows-executor.service'
 
 import { createNode } from './fixtures/node.test-fixture';
 
-import { Edge } from './fixtures/edge.test-fixture';
+import { createFakeFlowTriggerStore, FakeFlowTriggerStore } from './fixtures/fake-flow-trigger-store.test-fixture';
+
+import type { TransactionScope, UnitOfWork } from '../../../database/unit-of-work';
 
 jest.mock('axios');
-
-export type ResourceFlowsExecutorServiceRunFlowTestScope = {
-  initialNodes: ResourceFlowNode[];
-  createNode: typeof createNode;
-  mqttClientService: MqttClientService;
-  service: ResourceFlowsExecutorService;
-  resourceUsageService: ResourceUsageService;
-  nodesById: Record<string, ResourceFlowNode>;
-  errorShapeIndex: number;
-  edgesBySourceAndHandle: Record<string, Edge[]>;
-  flowLogs: FlowLogRecorderService;
-  operatingIntervals: { transition: jest.Mock };
-  flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
-  flowEdgeRepository: Partial<Repository<Edge>>;
-  resourceRepository: Partial<Repository<Resource>>;
-  eventEmitter: EventEmitter2;
-  resourceHealthService: ResourceHealthService;
-  variablesService: ResourceFlowVariablesService;
-};
-
-export type ResourceFlowsExecutorServiceMqttTestScope = {
-  initialNodes: ResourceFlowNode[];
-  service: ResourceFlowsExecutorService;
-  nodesById: Record<string, ResourceFlowNode>;
-  edgesBySourceAndHandle: Record<string, { source: string; target: string; sourceHandle?: string | null }[]>;
-  eventEmitter: EventEmitter2;
-  mqttClientService: MqttClientService;
-  flowLogs: FlowLogRecorderService;
-  createNode: typeof createNode;
-  flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
-  flowEdgeRepository: Partial<Repository<ResourceFlowEdge>>;
-  resourceRepository: Partial<Repository<Resource>>;
-  resourceUsageService: ResourceUsageService;
-  resourceHealthService: ResourceHealthService;
-  variablesService: ResourceFlowVariablesService;
-};
 
 describe('ResourceFlowsExecutorService MQTT', () => {
   let service: ResourceFlowsExecutorService;
 
-  let flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
-
-  let flowEdgeRepository: Partial<Repository<ResourceFlowEdge>>;
+  let flowStore: FakeFlowTriggerStore;
 
   let flowLogs: FlowLogRecorderService;
-
-  let resourceRepository: Partial<Repository<Resource>>;
 
   let mqttClientService: MqttClientService;
 
@@ -96,9 +49,9 @@ describe('ResourceFlowsExecutorService MQTT', () => {
 
   let variablesService: ResourceFlowVariablesService;
 
-  let nodesById: Record<string, ResourceFlowNode>;
+  let nodesById: Record<string, FlowNodeRecord>;
 
-  let initialNodes: ResourceFlowNode[];
+  let initialNodes: FlowNodeRecord[];
 
   let edgesBySourceAndHandle: Record<string, { source: string; target: string; sourceHandle?: string | null }[]>;
 
@@ -148,23 +101,8 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     get createNode() {
       return createNode;
     },
-    get flowNodeRepository() {
-      return flowNodeRepository;
-    },
-    set flowNodeRepository(value: typeof flowNodeRepository) {
-      flowNodeRepository = value;
-    },
-    get flowEdgeRepository() {
-      return flowEdgeRepository;
-    },
-    set flowEdgeRepository(value: typeof flowEdgeRepository) {
-      flowEdgeRepository = value;
-    },
-    get resourceRepository() {
-      return resourceRepository;
-    },
-    set resourceRepository(value: typeof resourceRepository) {
-      resourceRepository = value;
+    get flowStore() {
+      return flowStore;
     },
     get resourceUsageService() {
       return resourceUsageService;
@@ -196,42 +134,9 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     initialNodes = [];
     edgesBySourceAndHandle = {};
 
-    flowNodeRepository = {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      find: jest.fn(async ({ where }: any) => {
-        const clauses = Array.isArray(where) ? where : [where || {}];
-        return initialNodes.filter((n) =>
-          clauses.some(
-            ({ resourceId, type }: { resourceId?: number; type?: string }) =>
-              (resourceId ? n.resourceId === resourceId : true) && n.type === type,
-          ),
-        );
-      }),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      findOne: jest.fn(async ({ where }: any) => {
-        return nodesById[where.id] ?? null;
-      }),
-    };
-
-    flowEdgeRepository = {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      find: jest.fn(async ({ where }: any) => {
-        const key = `${where.source}|${where.sourceHandle ?? ''}`;
-        return edgesBySourceAndHandle[key] ?? [];
-      }),
-    } as unknown as Repository<ResourceFlowEdge>;
+    flowStore = createFakeFlowTriggerStore(scope);
 
     flowLogs = new FlowLogRecorderService();
-
-    resourceRepository = {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      findOne: jest.fn(async ({ where }: any) => ({
-        id: where?.id ?? 1,
-        name: `Resource ${where?.id ?? 1}`,
-        type: ResourceType.Machine,
-        metadata: { zone: 'A' },
-      })),
-    } as unknown as Repository<Resource>;
 
     mqttClientService = {
       publish: jest.fn(async () => undefined),
@@ -260,22 +165,20 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       listForResource: jest.fn(async () => []),
     } as unknown as ResourceFlowVariablesService;
 
-    const billingItemRepoMock = {
-      manager: {
-        findOne: jest.fn().mockResolvedValue({ id: 1, resourceUsageId: 'ru-1' }),
-        findOneBy: jest.fn(),
-        save: jest.fn(async (_e: unknown, data: unknown) => data),
-        update: jest.fn(),
-      },
-    } as unknown as Repository<BillingTransactionItem>;
+    const billingItems = { addToPendingBill: jest.fn().mockResolvedValue(true) };
+    const unitOfWork = {
+      run: jest.fn(async (work: (scope: TransactionScope) => Promise<unknown>) =>
+        work({ isOpen: true, afterCommit: () => undefined }),
+      ),
+      current: jest.fn(),
+    };
 
     service = new ResourceFlowsExecutorService(
-      flowNodeRepository as Repository<ResourceFlowNode>,
-      flowEdgeRepository as unknown as Repository<ResourceFlowEdge>,
-      resourceRepository as Repository<Resource>,
+      flowStore,
       flowLogs,
       mqttClientService,
-      billingItemRepoMock,
+      billingItems,
+      unitOfWork as unknown as UnitOfWork,
       eventEmitter,
       resourceHealthService,
       variablesService,
@@ -303,7 +206,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       data: { serverId: 5, topic: 'sensors/+/temp' },
       createdAt: new Date(),
       updatedAt: new Date(),
-    } as unknown as ResourceFlowNode;
+    } as unknown as FlowNodeRecord;
     const nodeB = {
       id: 'mqtt-b',
       type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED,
@@ -312,7 +215,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       data: { serverId: 5, topic: 'sensors/#' },
       createdAt: new Date(),
       updatedAt: new Date(),
-    } as unknown as ResourceFlowNode;
+    } as unknown as FlowNodeRecord;
 
     scope.initialNodes = [nodeA, nodeB];
 
@@ -324,7 +227,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     );
 
     expect(startFlowSpy).toHaveBeenCalled();
-    const calledWith = (startFlowSpy.mock.calls[0] as unknown[])[0] as ResourceFlowNode[];
+    const calledWith = (startFlowSpy.mock.calls[0] as unknown[])[0] as FlowNodeRecord[];
     const nodeIds = (Array.isArray(calledWith) ? calledWith : [calledWith]).map((n) => n.id);
     expect(new Set(nodeIds)).toEqual(new Set(['mqtt-a', 'mqtt-b']));
   });
@@ -339,7 +242,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       data: {},
       createdAt: new Date(),
       updatedAt: new Date(),
-    } as unknown as ResourceFlowNode;
+    } as unknown as FlowNodeRecord;
 
     const waitNode = {
       id: 'wait-1',
@@ -349,12 +252,12 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       data: { serverId: 7, topic: 'devices/+/state', timeoutSeconds: 2 },
       createdAt: new Date(),
       updatedAt: new Date(),
-    } as unknown as ResourceFlowNode;
+    } as unknown as FlowNodeRecord;
 
     scope.initialNodes = [inputNode];
     scope.nodesById = { [inputNode.id]: inputNode, [waitNode.id]: waitNode } as unknown as Record<
       string,
-      ResourceFlowNode
+      FlowNodeRecord
     >;
     scope.edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: waitNode.id }];
     scope.edgesBySourceAndHandle[`${waitNode.id}|`] = []; // terminal after wait
@@ -387,7 +290,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       data: {},
       createdAt: new Date(),
       updatedAt: new Date(),
-    } as unknown as ResourceFlowNode;
+    } as unknown as FlowNodeRecord;
 
     const waitNode = {
       id: 'wait-1',
@@ -397,12 +300,12 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       data: { serverId: 8, topic: 'foo/#', timeoutSeconds: 1, failureBehavior: 'fail-flow' },
       createdAt: new Date(),
       updatedAt: new Date(),
-    } as unknown as ResourceFlowNode;
+    } as unknown as FlowNodeRecord;
 
     scope.initialNodes = [inputNode];
     scope.nodesById = { [inputNode.id]: inputNode, [waitNode.id]: waitNode } as unknown as Record<
       string,
-      ResourceFlowNode
+      FlowNodeRecord
     >;
     scope.edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: waitNode.id }];
     scope.edgesBySourceAndHandle[`${waitNode.id}|`] = [];

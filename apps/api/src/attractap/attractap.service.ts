@@ -1,19 +1,20 @@
-import {
-  Attractap,
-  AttractapCrashReport,
-  NFCCard,
-  Resource,
-  User,
-  AttractapFirmwareVersion,
-} from '@attraccess/database-entities';
-
+import type { AuditAuthenticationMethod } from '@attraccess/application-models';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { Repository, FindManyOptions, In, Not, DeleteResult } from 'typeorm';
+import type {
+  AttractapCrashReportRecord,
+  AttractapCardOwner,
+  AttractapFirmwareInfo,
+  AttractapNfcCard,
+  AttractapReader,
+  AttractapReaderEdit,
+  AttractapReaderFilter,
+  AttractapReaderWithResources,
+  NewAttractapNfcCard,
+  NotificationRecipient,
+} from '@attraccess/application-models';
 
 import { AUDIT_RECORDER, AuditRecorder } from '../audit/recorder/audit-event';
 
@@ -28,6 +29,7 @@ import { CoredumpSymbolicationService } from './coredump-symbolication.service';
 import { AttractapFirmwareService } from './firmware.service';
 
 import { AttractapCrashReportDto } from './dtos/crash-report.dto';
+
 import { toCrashReportDto } from './dtos/crash-report.mapper';
 
 import { ReaderCrashReportPayload } from './websockets/websocket.types';
@@ -40,6 +42,12 @@ import { ReaderDeletedEvent, ReaderUpdatedEvent } from './events';
 
 import { securelyHashToken } from './websockets/websocket.utils';
 
+import { ATTRACTAP_CARD_STORE, type AttractapCardStore } from './card-store.port';
+
+import { ATTRACTAP_CRASH_REPORT_STORE, type AttractapCrashReportStore } from './crash-report-store.port';
+
+import { ATTRACTAP_READER_STORE, type AttractapReaderStore } from './reader-store.port';
+
 import { NotificationCategory } from '../notifications/notification-types';
 
 import { createTranslator } from '../i18n/translate';
@@ -47,7 +55,6 @@ import { createTranslator } from '../i18n/translate';
 import * as de from './rfid-card-notification.de.json';
 
 import * as en from './rfid-card-notification.en.json';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 export const t = createTranslator({ en, de });
 
@@ -57,31 +64,17 @@ export const t = createTranslator({ en, de });
  */
 export const SYMBOLICATION_CONCURRENCY = 2;
 
-/** Written only by the credential registry; general reader updates must leave them alone. */
-const CREDENTIAL_COLUMNS = [
-  'pairingState',
-  'credentialFingerprint',
-  'pairedAt',
-  'certificateNotAfter',
-  'certificateSerial',
-  'apiTokenHash',
-] as const satisfies ReadonlyArray<keyof Attractap>;
-
 @Injectable()
 export class AttractapService {
   public constructor(
-    @InjectRepository(NFCCard)
-    protected readonly nfcCardRepository: Repository<NFCCard>,
-    @InjectRepository(Attractap)
-    protected readonly readerRepository: Repository<Attractap>,
-    @InjectRepository(AttractapCrashReport)
-    protected readonly crashReportRepository: Repository<AttractapCrashReport>,
+    @Inject(ATTRACTAP_CARD_STORE)
+    protected readonly cardStore: AttractapCardStore,
+    @Inject(ATTRACTAP_READER_STORE)
+    protected readonly readerStore: AttractapReaderStore,
+    @Inject(ATTRACTAP_CRASH_REPORT_STORE)
+    protected readonly crashReportStore: AttractapCrashReportStore,
     @Inject(EventEmitter2)
     protected readonly eventEmitter: EventEmitter2,
-    @InjectRepository(Resource)
-    protected readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(User)
-    protected readonly userRepository: Repository<User>,
     protected readonly encryptionService: EncryptionService,
     protected readonly metricsService: MetricsService,
     protected readonly coredumpSymbolicationService: CoredumpSymbolicationService,
@@ -105,7 +98,7 @@ export class AttractapService {
     payload: ReaderCrashReportPayload,
     expectedCoredump: { size: number; crc32: number } | null = null,
     rejectedCoredump: { size: number | null } | null = null,
-  ): Promise<AttractapCrashReport> {
+  ): Promise<AttractapCrashReportRecord> {
     const coredump =
       typeof payload.coredumpBase64 === 'string' && payload.coredumpBase64.length > 0
         ? Buffer.from(payload.coredumpBase64, 'base64')
@@ -113,7 +106,7 @@ export class AttractapService {
     const awaiting = !coredump && expectedCoredump !== null;
     const rejected = !coredump && !awaiting && rejectedCoredump !== null;
 
-    const report = await this.crashReportRepository.save({
+    const report = await this.crashReportStore.create({
       attractapId: readerId,
       resetReason: payload.resetReason,
       rebootReason: payload.rebootReason || null,
@@ -140,8 +133,8 @@ export class AttractapService {
   }
 
   /** The report a reader uploads a coredump to; null unless that reader owns it. */
-  public async findCrashReportOfReader(reportId: number, readerId: number): Promise<AttractapCrashReport | null> {
-    return this.crashReportRepository.findOne({ where: { id: reportId, attractapId: readerId } });
+  public async findCrashReportOfReader(reportId: number, readerId: number): Promise<AttractapCrashReportRecord | null> {
+    return this.crashReportStore.findOfReader(reportId, readerId);
   }
 
   /**
@@ -151,28 +144,16 @@ export class AttractapService {
   public async findAwaitingCrashReport(
     readerId: number,
     expectedCoredump: { size: number; crc32: number },
-  ): Promise<AttractapCrashReport | null> {
-    return this.crashReportRepository.findOne({
-      where: {
-        attractapId: readerId,
-        coredumpStatus: 'awaiting',
-        coredumpExpectedSize: expectedCoredump.size,
-        coredumpExpectedCrc32: expectedCoredump.crc32,
-      },
-      order: { createdAt: 'DESC', id: 'DESC' },
-    });
+  ): Promise<AttractapCrashReportRecord | null> {
+    return this.crashReportStore.findAwaiting(readerId, expectedCoredump);
   }
 
   /**
    * Saves a verified chunked upload to its waiting report and symbolicates it like an inline dump.
    * False when the report no longer waits for a dump (already stored, or deleted meanwhile).
    */
-  public async storeUploadedCoredump(report: AttractapCrashReport, coredump: Buffer): Promise<boolean> {
-    const result = await this.crashReportRepository.update(
-      { id: report.id, attractapId: report.attractapId, coredumpStatus: 'awaiting' },
-      { coredump, coredumpSize: coredump.length, coredumpStatus: 'stored', symbolicationStatus: 'pending' },
-    );
-    if (!result.affected) return false;
+  public async storeUploadedCoredump(report: AttractapCrashReportRecord, coredump: Buffer): Promise<boolean> {
+    if (!(await this.crashReportStore.storeAwaitedCoredump(report, coredump))) return false;
     report.coredumpSize = coredump.length;
     report.coredumpStatus = 'stored';
     report.symbolicationStatus = 'pending';
@@ -181,18 +162,18 @@ export class AttractapService {
   }
 
   protected async symbolicateCrashReport(
-    report: AttractapCrashReport,
+    report: AttractapCrashReportRecord,
     readerId: number,
     coredump: Buffer,
   ): Promise<void> {
     try {
-      const reader = await this.readerRepository.findOne({ where: { id: readerId } });
+      const reader = await this.readerStore.findById(readerId);
       // No explicit buildId: the symbolication service extracts the truncated app ELF
       // SHA256 from the coredump itself and matches it against published firmware ELFs.
       const result = await this.symbolicationSlots.runExclusive(() =>
         this.coredumpSymbolicationService.symbolicate(coredump, { variant: reader?.firmware?.variant ?? null }),
       );
-      await this.crashReportRepository.update(report.id, {
+      await this.crashReportStore.updateSymbolication(report.id, {
         coredumpBuildId: result.buildId,
         symbolicationStatus: result.status,
         symbolizedBacktrace: result.backtrace,
@@ -203,8 +184,8 @@ export class AttractapService {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Failed to symbolicate coredump for report ${report.id}: ${message}`);
-      await this.crashReportRepository
-        .update(report.id, { symbolicationStatus: 'failed', symbolizedBacktrace: message })
+      await this.crashReportStore
+        .updateSymbolication(report.id, { symbolicationStatus: 'failed', symbolizedBacktrace: message })
         .catch(() => undefined);
       report.symbolicationStatus = 'failed';
       report.symbolizedBacktrace = message;
@@ -213,11 +194,8 @@ export class AttractapService {
 
   public async getCrashReportsForReader(readerId: number): Promise<AttractapCrashReportDto[]> {
     const [reader, reports] = await Promise.all([
-      this.readerRepository.findOne({ where: { id: readerId } }),
-      this.crashReportRepository.find({
-        where: { attractapId: readerId },
-        order: { createdAt: 'DESC' },
-      }),
+      this.readerStore.findById(readerId),
+      this.crashReportStore.listForReader(readerId),
     ]);
 
     const currentReaderFirmwareVersion = reader?.firmware?.version ?? null;
@@ -236,19 +214,16 @@ export class AttractapService {
   public async getCrashReportCoredump(
     readerId: number,
     reportId: number,
-  ): Promise<{ filename: string; coredump: Buffer } | null> {
-    const report = await this.crashReportRepository.findOne({
-      where: { id: reportId, attractapId: readerId },
-      select: { id: true, attractapId: true, coredump: true },
-    });
+  ): Promise<{ filename: string; coredump: Uint8Array } | null> {
+    const coredump = await this.crashReportStore.findCoredump(readerId, reportId);
 
-    if (!report?.coredump) {
+    if (!coredump) {
       return null;
     }
 
     return {
       filename: `reader-${readerId}-crash-${reportId}.coredump`,
-      coredump: report.coredump,
+      coredump,
     };
   }
 
@@ -259,22 +234,19 @@ export class AttractapService {
     return Math.trunc(value);
   }
 
-  public async updateLastReaderConnection(id: number) {
-    return await this.readerRepository.update(id, { lastConnection: new Date() });
+  public async updateLastReaderConnection(id: number): Promise<void> {
+    await this.readerStore.recordConnection(id, new Date());
   }
 
-  public async findReaderById(id: number): Promise<Attractap | undefined> {
-    return await this.readerRepository.findOne({
-      where: { id },
-      relations: { resources: { billingConfigurations: true, introducers: { user: true } } },
-    });
+  public async findReaderById(id: number): Promise<AttractapReaderWithResources | undefined> {
+    return await this.readerStore.findById(id);
   }
 
-  public async createNewReader(firmware?: AttractapFirmwareVersion): Promise<{ reader: Attractap; token: string }> {
+  public async createNewReader(firmware?: AttractapFirmwareInfo): Promise<{ reader: AttractapReader; token: string }> {
     const token = randomBytes(12).toString('base64url').slice(0, 16);
     const apiTokenHash = await securelyHashToken(token);
 
-    const reader = await this.readerRepository.save({
+    const reader = await this.readerStore.create({
       apiTokenHash,
       name: randomBytes(3).toString('base64url').slice(0, 4),
       firmware,
@@ -291,50 +263,46 @@ export class AttractapService {
     updateData: {
       name?: string;
       connectedResourceIds?: number[];
-      firmware?: AttractapFirmwareVersion;
+      firmware?: AttractapFirmwareInfo;
       ledBrightness?: number;
       allowPluginBle?: boolean;
     },
     emitEvent = true,
-  ): Promise<Attractap> {
+  ): Promise<AttractapReaderWithResources> {
     const reader = await this.findReaderById(id);
 
     if (!reader) {
       throw new Error(`Reader with ID ${id} not found`);
     }
 
+    const edit: AttractapReaderEdit = {};
+
     if (updateData.name) {
-      reader.name = updateData.name;
+      edit.name = updateData.name;
     }
 
     if (updateData.ledBrightness !== undefined) {
-      reader.ledBrightness = updateData.ledBrightness;
+      edit.ledBrightness = updateData.ledBrightness;
     }
 
     if (updateData.allowPluginBle !== undefined) {
-      reader.allowPluginBle = updateData.allowPluginBle;
+      edit.allowPluginBle = updateData.allowPluginBle;
     }
 
+    const firmware = updateData.firmware ?? reader.firmware;
     if (updateData.firmware) {
       this.logger.debug('Updating reader firmware info', updateData.firmware);
-      reader.firmware = updateData.firmware;
+      edit.firmware = updateData.firmware;
     }
 
     this.logger.debug('updateData', updateData);
     if (updateData.connectedResourceIds) {
       this.logger.debug('attaching resources to reader', updateData.connectedResourceIds);
-      let resources: Resource[] = [];
-      if (updateData.connectedResourceIds.length > 0) {
-        resources = await this.resourceRepository.find({
-          where: {
-            id: In(updateData.connectedResourceIds),
-          },
-        });
+      let resources = await this.readerStore.findResourcesByIds(updateData.connectedResourceIds);
 
-        this.logger.debug('resources from db', resources);
-      }
+      this.logger.debug('resources from db', resources);
 
-      if (!reader.firmware.capabilities.resourceSelection && resources.length > 1) {
+      if (!firmware.capabilities.resourceSelection && resources.length > 1) {
         this.logger.warn(
           'More than one resource selected for reader, but resource selection is not supported by the firmware, selecting only the first one',
         );
@@ -342,14 +310,12 @@ export class AttractapService {
       }
 
       this.logger.debug('resources for reader', resources);
-      reader.resources = resources;
+      edit.resourceIds = resources.map((resource) => resource.id);
     }
 
     // Credential columns are owned by the credential registry and change concurrently (pairing,
-    // revoke). Saving the stale copies loaded above would undo those changes.
-    const editable: Partial<Attractap> = { ...reader };
-    for (const column of CREDENTIAL_COLUMNS) delete editable[column];
-    await this.readerRepository.save(editable);
+    // revoke): the store never writes them from here.
+    await this.readerStore.applyEdit(id, edit);
     const response = (await this.findReaderById(id)) ?? reader;
 
     if (emitEvent) {
@@ -360,8 +326,7 @@ export class AttractapService {
   }
 
   public async deleteReader(id: number): Promise<boolean> {
-    const result = await this.readerRepository.delete(id);
-    if (!result.affected) return false;
+    if (!(await this.readerStore.delete(id))) return false;
 
     this.eventEmitter.emit(ReaderDeletedEvent.EVENT_NAME, new ReaderDeletedEvent(id));
     return true;
@@ -369,7 +334,7 @@ export class AttractapService {
 
   public async recordReaderDeregistration(
     readerId: number,
-    principal: { userId: number; authenticationMethod: AuthenticationMethod; apiTokenId?: number },
+    principal: { userId: number; authenticationMethod: AuditAuthenticationMethod; apiTokenId?: number },
   ): Promise<void> {
     await this.audit.record({
       domain: 'attractap',
@@ -387,16 +352,14 @@ export class AttractapService {
   /**
    * Updates the firmware version and type for a reader
    * @param id The reader ID
-   * @param firmwareVersion The firmware version
-   * @param firmwareType The firmware type
-   * @returns Promise<Attractap>
+   * @param firmware The firmware the reader reported
    */
-  public async updateReaderFirmware(id: number, firmware: AttractapFirmwareVersion) {
+  public async updateReaderFirmware(id: number, firmware: AttractapFirmwareInfo) {
     await this.updateReader(id, { firmware }, false);
   }
 
-  public async getAllReaders(options?: FindManyOptions<Attractap>): Promise<Attractap[]> {
-    return await this.readerRepository.find(options);
+  public async getAllReaders(filter?: AttractapReaderFilter): Promise<AttractapReader[]> {
+    return await this.readerStore.list(filter);
   }
 
   /**
@@ -404,19 +367,13 @@ export class AttractapService {
    * pickers, resource assignment, card writer setting) uses this one; unpaired readers belong to
    * the pairing session only.
    */
-  public async getPairedReaders(options: FindManyOptions<Attractap> = {}): Promise<Attractap[]> {
-    const where = options.where;
-    return await this.readerRepository.find({
-      ...options,
-      where: Array.isArray(where)
-        ? where.map((clause) => ({ ...clause, pairingState: 'paired' as const }))
-        : { ...(where ?? {}), pairingState: 'paired' as const },
-    });
+  public async getPairedReaders(filter: AttractapReaderFilter = {}): Promise<AttractapReader[]> {
+    return await this.readerStore.list({ ...filter, paired: true });
   }
 
   /** Readers that must be paired before they can be used: the pairing session's list. */
-  public async getReadersToPair(): Promise<Attractap[]> {
-    return await this.readerRepository.find({ where: { pairingState: Not('paired') }, relations: { resources: true } });
+  public async getReadersToPair(): Promise<AttractapReader[]> {
+    return await this.readerStore.listUnpaired();
   }
 
   /** A new card key: 16 random bytes from the system CSPRNG, hex encoded. Nothing about it is derivable. */
@@ -425,73 +382,66 @@ export class AttractapService {
   }
 
   protected notifyNfcCardChange(
-    card: NFCCard | undefined,
+    card: AttractapNfcCard | undefined,
     action: 'registered' | 'activated' | 'deactivated' | 'deleted',
   ): void {
     if (!card?.user) {
       return;
     }
+    const owner = card.user;
 
     void this.notifications
       .dispatch({
         category: NotificationCategory.NFC_CARDS,
-        recipients: [card.user],
-        title: (recipient) => t(recipient.locale, `${action}Title`),
-        body: (recipient) => t(recipient.locale, `${action}Body`, { cardId: card.id }),
+        // A card owner carries the id, address and locale the dispatcher reads.
+        recipients: [owner],
+        title: (recipient: NotificationRecipient) => t(recipient.locale, `${action}Title`),
+        body: (recipient: NotificationRecipient) => t(recipient.locale, `${action}Body`, { cardId: card.id }),
         url: '/attractap/nfc-cards',
         dedupeKey: `nfc-card-${card.id}-${action}`,
       })
       .catch((error) => {
-        this.logger.error(
-          `Failed to notify user ${card.user.id} about RFID card ${action}: ${(error as Error).message}`,
-        );
+        this.logger.error(`Failed to notify user ${owner.id} about RFID card ${action}: ${(error as Error).message}`);
       });
   }
 
-  public async getNFCCardByID(id: number): Promise<NFCCard | undefined> {
-    const card = await this.nfcCardRepository.findOne({ where: { id }, relations: { user: true } });
-    return this.decryptCardKey(card);
+  public async getNFCCardByID(id: number): Promise<AttractapNfcCard | undefined> {
+    return this.decryptCardKey(await this.cardStore.findById(id));
   }
 
-  public async getNFCCardsByUserId(userId: number): Promise<NFCCard[]> {
-    const cards = await this.nfcCardRepository.find({ where: { user: { id: userId } } });
+  public async getNFCCardsByUserId(userId: number): Promise<AttractapNfcCard[]> {
+    const cards = await this.cardStore.listForUser(userId);
     cards.forEach((card) => this.decryptCardKey(card));
     return cards;
   }
 
-  public async getAllNFCCards(): Promise<NFCCard[]> {
-    const cards = await this.nfcCardRepository.find();
+  public async getAllNFCCards(): Promise<AttractapNfcCard[]> {
+    const cards = await this.cardStore.listAll();
     cards.forEach((card) => this.decryptCardKey(card));
     return cards;
   }
 
-  public async getNFCCardByUID(uid: string): Promise<NFCCard | undefined> {
-    const card = await this.nfcCardRepository.findOne({ where: { uid }, relations: { user: true } });
-    return this.decryptCardKey(card);
+  public async getNFCCardByUID(uid: string): Promise<AttractapNfcCard | undefined> {
+    return this.decryptCardKey(await this.cardStore.findByUid(uid));
   }
 
   public async createNFCCard(
-    user: User,
-    data: Omit<NFCCard, 'id' | 'createdAt' | 'updatedAt' | 'user' | 'lastSeen' | 'isActive'>,
+    user: AttractapCardOwner,
+    data: NewAttractapNfcCard,
     options: { activate?: boolean } = {},
-  ): Promise<NFCCard> {
+  ): Promise<AttractapNfcCard> {
     const activate = options.activate ?? true;
-    const card = await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
-      if (activate) await transactionalEntityManager.update(NFCCard, { user }, { isActive: false });
-
-      return await transactionalEntityManager.save(NFCCard, {
-        ...data,
-        key: this.encryptionService.encrypt(data.key),
-        user,
-        isActive: activate,
-      });
-    });
+    const card = await this.cardStore.create(
+      user,
+      { uid: data.uid, keyNo: data.keyNo, key: this.encryptionService.encrypt(data.key) },
+      activate,
+    );
     this.notifyNfcCardChange(card, 'registered');
     return card;
   }
 
   public async userHasActiveNFCCard(userId: number): Promise<boolean> {
-    return (await this.nfcCardRepository.count({ where: { user: { id: userId }, isActive: true } })) > 0;
+    return await this.cardStore.userHasActiveCard(userId);
   }
 
   /**
@@ -499,26 +449,8 @@ export class AttractapService {
    * @param id The ID of the RFID card to activate
    * @returns The activated RFID card
    */
-  public async activateNFCCard(id: number): Promise<NFCCard> {
-    const card = await this.nfcCardRepository.manager.transaction(async (transactionalEntityManager) => {
-      const card = await transactionalEntityManager.findOne(NFCCard, { where: { id }, relations: { user: true } });
-
-      if (!card) {
-        throw new Error(`Card with ID ${id} not found`);
-      }
-
-      await transactionalEntityManager
-        .createQueryBuilder()
-        .update(NFCCard)
-        .set({ isActive: false })
-        .where({ user: { id: card.user.id } })
-        .execute();
-
-      return await transactionalEntityManager.save(NFCCard, {
-        ...card,
-        isActive: true,
-      });
-    });
+  public async activateNFCCard(id: number): Promise<AttractapNfcCard> {
+    const card = await this.cardStore.activateExclusively(id);
     this.notifyNfcCardChange(card, 'activated');
     return card;
   }
@@ -528,18 +460,19 @@ export class AttractapService {
    * @param id The ID of the RFID card to deactivate
    * @returns The deactivated RFID card
    */
-  public async deactivateNFCCard(id: number): Promise<NFCCard> {
-    await this.nfcCardRepository.update(id, { isActive: false });
+  public async deactivateNFCCard(id: number): Promise<AttractapNfcCard> {
+    await this.cardStore.deactivate(id);
     const card = await this.getNFCCardByID(id);
     this.notifyNfcCardChange(card, 'deactivated');
     return card;
   }
 
-  public async deleteNFCCard(id: number): Promise<DeleteResult> {
+  /** True when a card was deleted. */
+  public async deleteNFCCard(id: number): Promise<boolean> {
     const card = await this.getNFCCardByID(id);
-    const result = await this.nfcCardRepository.delete(id);
+    const deleted = await this.cardStore.delete(id);
     this.notifyNfcCardChange(card, 'deleted');
-    return result;
+    return deleted;
   }
 
   public async updateNFCCardLastSeen(uid: string): Promise<null | true> {
@@ -549,7 +482,7 @@ export class AttractapService {
       return null;
     }
 
-    await this.nfcCardRepository.update(card.id, { lastSeen: new Date() });
+    await this.cardStore.recordSeen(card.id, new Date());
     return true;
   }
 
@@ -557,7 +490,7 @@ export class AttractapService {
    * Decrypts card key in place for use in the app. Assumes stored values are
    * already encrypted (see migration EncryptSensitiveData).
    */
-  protected decryptCardKey(card?: NFCCard | null): NFCCard | undefined {
+  protected decryptCardKey(card?: AttractapNfcCard | null): AttractapNfcCard | undefined {
     if (!card?.key) {
       return card ?? undefined;
     }

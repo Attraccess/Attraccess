@@ -1,10 +1,10 @@
 import {
-  ResourceFlowNode,
+  FlowNodeRecord,
   ResourceFlowNodeType,
   ResourceHealthSource,
   ResourceHealthStatus,
   ResourceType,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 import { registerPluginFlowNodes } from '../../../plugin-system/flows/node-registry';
 import { ResourceHealthChangedEvent } from '../../health/events/resource-health-changed.event';
 import { registerResourceHealthServiceFixture } from '../../health/resource-health.service.resource-health-service.test-fixture';
@@ -12,25 +12,25 @@ import { FlowEventTriggersService } from './flow-event-triggers.service';
 import { ExternalEffectFailureError } from '../errors/external-effect-failure.error';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { settleFlowBranches } from './flow-execution-engine';
-import { Edge } from './fixtures/edge.test-fixture';
+import type { FakeFlowEdge } from './fixtures/fake-flow-trigger-store.test-fixture';
 import { createNode } from './fixtures/node.test-fixture';
 import { resetTestFixture } from './fixtures/setup.test-fixture';
-import type { ResourceFlowsExecutorServiceRunFlowTestScope } from './resource-flows-executor.service.spec';
+import type { FlowExecutionTestScope as ResourceFlowsExecutorServiceRunFlowTestScope } from './fixtures/flow-test-scope.test-fixture';
 
 jest.mock('axios');
 
-// The fixture wires the executor service with in-memory repositories and a machine as every resource.
+// The fixture wires the executor service with an in-memory flow store and a machine as every resource.
 const scope = {
   createNode,
-  edgesBySourceAndHandle: {} as Record<string, Edge[]>,
+  edgesBySourceAndHandle: {} as Record<string, FakeFlowEdge[]>,
 } as unknown as ResourceFlowsExecutorServiceRunFlowTestScope;
 
 beforeEach(() => resetTestFixture(scope));
 
 describe('global flows', () => {
-  const globalNode = (partial: Partial<ResourceFlowNode>) =>
+  const globalNode = (partial: Partial<FlowNodeRecord>) =>
     scope.createNode({ resourceId: null, flowId: 5, ...partial });
-  const wire = (...nodes: ResourceFlowNode[]) => {
+  const wire = (...nodes: FlowNodeRecord[]) => {
     scope.initialNodes = nodes;
     for (const node of nodes) scope.nodesById[node.id] = node;
   };
@@ -68,7 +68,7 @@ describe('global flows', () => {
       id: 'off',
       type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
       flow: { enabled: false },
-    } as Partial<ResourceFlowNode>);
+    } as Partial<FlowNodeRecord>);
     wire(disabled);
     const start = jest.spyOn(scope.service, 'startFlow').mockResolvedValue([]);
 
@@ -88,7 +88,12 @@ describe('global flows', () => {
     await scope.service.runFlow(3, ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED, {});
     expect(start).not.toHaveBeenCalled();
 
-    scope.resourceRepository.findOne = jest.fn(async () => ({ id: 3, type: ResourceType.Door })) as never;
+    scope.flowStore.findResource.mockResolvedValue({
+      id: 3,
+      name: 'Door',
+      type: ResourceType.Door,
+      metadata: null,
+    });
     await scope.service.runFlow(3, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {});
     expect(start).not.toHaveBeenCalled();
     await scope.service.runFlow(3, ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED, {});
@@ -195,7 +200,12 @@ describe('global flows', () => {
   it('fails a machine-only node of a global flow when the triggering resource is a door', async () => {
     const activity = globalNode({ id: 'track', type: ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY });
     wire(activity);
-    scope.resourceRepository.findOne = jest.fn(async () => ({ id: 3, type: ResourceType.Door })) as never;
+    scope.flowStore.findResource.mockResolvedValue({
+      id: 3,
+      name: 'Door',
+      type: ResourceType.Door,
+      metadata: null,
+    });
 
     await expect(
       scope.service.startFlow(activity, { payload: {} }, undefined, new Map(), { triggeringResourceId: 3 }),
@@ -221,9 +231,7 @@ describe('global flows', () => {
     await scope.service.runFlow(3, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {});
 
     expect(scope.resourceHealthService.reportHealth).not.toHaveBeenCalled();
-    expect(scope.flowNodeRepository.findOne).toHaveBeenCalledWith({
-      where: { id: 'x-foreign', resourceId: 3, flowId: expect.objectContaining({ _type: 'isNull' }) },
-    });
+    expect(scope.flowStore.findNodeOnCanvasOf).toHaveBeenCalledWith(own, 'x-foreign', undefined);
   });
 
   it("does not follow another owner's edge from a global node", async () => {
@@ -241,9 +249,7 @@ describe('global flows', () => {
     await scope.service.runFlow(3, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {});
 
     expect(scope.resourceHealthService.reportHealth).not.toHaveBeenCalled();
-    expect(scope.flowEdgeRepository.find).toHaveBeenCalledWith({
-      where: { source: 'y-trigger', sourceHandle: undefined, flowId: 5 },
-    });
+    expect(scope.flowStore.findOutgoingEdges).toHaveBeenCalledWith(trigger, undefined, undefined);
   });
 
   it("lets a resource flow's Error node abort the run even when a global flow fails first with a plain error", async () => {
@@ -264,14 +270,14 @@ describe('global flows', () => {
     scope.edgesBySourceAndHandle['e-own|'] = [{ source: 'e-own', target: 'e-error' }];
     scope.edgesBySourceAndHandle['e-global|'] = [{ source: 'e-global', target: 'e-broken' }];
     // The resource flow reaches its Error node only after the global flow has failed.
-    const findOne = scope.flowNodeRepository.findOne as jest.Mock;
-    const original = findOne.getMockImplementation() as (args: { where: { id: string } }) => Promise<unknown>;
+    const findNode = scope.flowStore.findNodeOnCanvasOf;
+    const original = findNode.getMockImplementation() as (node: FlowNodeRecord, id: string) => Promise<unknown>;
     const reachedOrder: string[] = [];
-    findOne.mockImplementation(async (args: { where: { id: string } }) => {
-      if (args.where.id === 'e-error') await new Promise((resolve) => setTimeout(resolve, 20));
-      reachedOrder.push(args.where.id);
-      return original(args);
-    });
+    findNode.mockImplementation((async (node: FlowNodeRecord, id: string) => {
+      if (id === 'e-error') await new Promise((resolve) => setTimeout(resolve, 20));
+      reachedOrder.push(id);
+      return original(node, id);
+    }) as never);
 
     await expect(
       scope.service.runFlow(3, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {}),

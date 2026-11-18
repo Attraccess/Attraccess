@@ -7,7 +7,7 @@ import {
   ResourceUsageSessionEndedEvent,
 } from './../usage/events/resource-usage.events';
 
-import { ResourceUsage } from '@attraccess/database-entities';
+import type { UsageSession } from '@attraccess/application-models';
 
 import { ResourceOperatingStateChangedEvent } from './../operating-intervals/events/resource-operating-state-changed.event';
 
@@ -54,7 +54,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       fixture.service.onResourceUsageEnded(
         new ResourceUsageSessionEndedEvent(
-          { id: 1, resourceId: fixture.resourceId, endTime: new Date() } as ResourceUsage,
+          { id: 1, resourceId: fixture.resourceId, endTime: new Date() } as UsageSession,
           null,
         ),
       );

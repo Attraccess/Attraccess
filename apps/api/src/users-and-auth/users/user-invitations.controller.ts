@@ -1,13 +1,13 @@
 import { Body, Controller, ForbiddenException, Post, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { User } from '@attraccess/database-entities';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
 import { InviteUserDto } from './dtos/inviteUser.dto';
 import { CsvInviteConfigDto, CsvInviteErrorResponseDto, CsvInviteUploadDto } from './dtos/csvInvite.dto';
 import { FileUpload } from '../../common/types/file-upload.types';
 import { UserInvitationService } from './user-invitation.service';
+import { UserDto, toUserAccountDto } from './dtos/user.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -20,7 +20,7 @@ export class UserInvitationsController {
   @ApiResponse({
     status: 200,
     description: 'The user has been successfully invited.',
-    type: User,
+    type: UserDto,
   })
   @ApiResponse({
     status: 400,
@@ -32,8 +32,8 @@ export class UserInvitationsController {
       'Forbidden - missing users.create permission, or the license does not allow another user (e.g. the licensed user limit is reached; the message carries the license reason).',
   })
   @Auth('users.create')
-  async inviteUser(@Req() request: AuthenticatedRequest, @Body() body: InviteUserDto): Promise<User> {
-    return this.invitationService.inviteUser(body, request.user.locale);
+  async inviteUser(@Req() request: AuthenticatedRequest, @Body() body: InviteUserDto): Promise<UserDto> {
+    return toUserAccountDto(await this.invitationService.inviteUser(body, request.user.locale));
   }
 
   @Post('/invite-csv')
@@ -45,7 +45,7 @@ export class UserInvitationsController {
   @ApiResponse({
     status: 200,
     description: 'Users have been successfully invited.',
-    type: User,
+    type: UserDto,
     isArray: true,
   })
   @ApiResponse({
@@ -62,7 +62,7 @@ export class UserInvitationsController {
     @Req() request: AuthenticatedRequest,
     @UploadedFile() file: FileUpload | undefined,
     @Body('config') rawConfig: string | CsvInviteConfigDto,
-  ): Promise<User[]> {
+  ): Promise<UserDto[]> {
     let hasRoleKeyColumn = false;
     try {
       const configObj = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
@@ -75,6 +75,7 @@ export class UserInvitationsController {
       throw new ForbiddenException('users.roles.manage is required to assign roles via CSV import');
     }
 
-    return this.invitationService.inviteUsersFromCsv(file, rawConfig, request.user.locale, request.user);
+    const invited = await this.invitationService.inviteUsersFromCsv(file, rawConfig, request.user.locale, request.user);
+    return invited.map(toUserAccountDto);
   }
 }

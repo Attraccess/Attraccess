@@ -1,23 +1,16 @@
-import { SettingsService } from '../../settings/settings.service';
-import { AuthenticationDetail, ResourceUsage, Session, User } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
 import { EmailService } from '../../email/email.service';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { LicenseService } from '../../license/license.service';
 import { MetricsService } from '../../metrics/metrics.service';
+import { UNIT_OF_WORK } from '../../database/unit-of-work';
 import { RbacService } from '../rbac/rbac.service';
+import { RBAC_STORE } from '../rbac/rbac.port';
 import { UsersService } from './users.service';
 import { UserAccounts } from './accounts/user-accounts';
 import { UserDirectory } from './directory/user-directory';
-
-const settingsService = {
-  getDefaultLanguage: jest.fn().mockResolvedValue('en'),
-  resolveLanguage: jest.fn(
-    async (locale: string | undefined) => locale?.trim() || settingsService.getDefaultLanguage(),
-  ),
-};
+import { USER_STORE } from './user-store.port';
+import { FakeUnitOfWork, InMemoryUserStore } from './fakes/in-memory-user-store.test-fixture';
 
 const mockMetricsService = {
   usersRegisteredTotal: { inc: jest.fn() },
@@ -36,118 +29,58 @@ const mockRbacService = {
   ),
   isLastAdministrator: jest.fn().mockResolvedValue(false),
 };
+
 export function registerUsersServiceFixture() {
   let service: UsersService;
-
-  let userRepository: jest.Mocked<Repository<User>>;
-
-  let dataSource: jest.Mocked<DataSource>;
-
-  let licenseService: jest.Mocked<Pick<LicenseService, 'verifyLicense'>>;
-
-  let emailService: { sendUsernameChangedEmail: jest.Mock; sendVerificationEmail: jest.Mock };
-
+  let store: InMemoryUserStore;
+  let uow: FakeUnitOfWork;
+  let rbacStore: { findRoleByKey: jest.Mock };
+  let licenseService: { verifyLicense: jest.Mock };
+  let emailService: {
+    sendUsernameChangedEmail: jest.Mock;
+    sendVerificationEmail: jest.Mock;
+    sendDeleteAccountConfirmationEmail: jest.Mock;
+  };
   let accounts: UserAccounts;
+
   beforeEach(async () => {
-    settingsService.getDefaultLanguage.mockResolvedValue('en');
-    mockRbacService.assignRoleByKey.mockClear();
-    mockRbacService.assignDefaultRoles.mockClear();
-    mockRbacService.isLastAdministrator.mockClear();
+    for (const mock of Object.values(mockRbacService)) mock.mockClear();
+    for (const gauge of Object.values(mockMetricsService)) for (const fn of Object.values(gauge)) fn.mockClear();
     mockRbacService.isLastAdministrator.mockResolvedValue(false);
+    store = new InMemoryUserStore();
+    uow = new FakeUnitOfWork();
+    rbacStore = { findRoleByKey: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
         UserAccounts,
         UserDirectory,
-        { provide: SettingsService, useValue: settingsService },
-        {
-          provide: LicenseService,
-          useValue: {
-            verifyLicense: jest.fn().mockResolvedValue(undefined),
-          },
-        },
+        { provide: USER_STORE, useValue: store },
+        { provide: UNIT_OF_WORK, useValue: uow },
+        { provide: RBAC_STORE, useValue: rbacStore },
+        { provide: LicenseService, useValue: { verifyLicense: jest.fn().mockResolvedValue(undefined) } },
         {
           provide: EmailService,
           useValue: {
             sendUsernameChangedEmail: jest.fn(),
             sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
+            sendDeleteAccountConfirmationEmail: jest.fn().mockResolvedValue(undefined),
           },
         },
-        {
-          provide: DataSource,
-          useValue: {
-            // Call the callback with a mock EntityManager that delegates save() to
-            // userRepository.save so per-test mocks on the repository still apply.
-            transaction: jest.fn().mockImplementation(async (cb: (em: unknown) => Promise<unknown>) => {
-              const em = {
-                save: jest.fn().mockImplementation((entity: unknown) => userRepository.save(entity as User)),
-              };
-              return cb(em);
-            }),
-          },
-        },
-        {
-          provide: TokenHashService,
-          useValue: {
-            hashToken: jest.fn((token: string) => `hashed:${token}`),
-          },
-        },
-        {
-          provide: getRepositoryToken(User),
-          useValue: {
-            findOne: jest.fn(),
-            find: jest.fn(),
-            save: jest.fn(),
-            update: jest.fn(),
-            findAndCount: jest.fn(),
-            createQueryBuilder: jest.fn(),
-            count: jest.fn(),
-          },
-        },
-        {
-          provide: getRepositoryToken(AuthenticationDetail),
-          useValue: {
-            delete: jest.fn(),
-          },
-        },
-        {
-          provide: getRepositoryToken(Session),
-          useValue: {
-            delete: jest.fn(),
-          },
-        },
-        {
-          provide: getRepositoryToken(ResourceUsage),
-          useValue: {
-            count: jest.fn(),
-          },
-        },
-        {
-          provide: MetricsService,
-          useValue: mockMetricsService,
-        },
-        {
-          provide: RbacService,
-          useValue: mockRbacService,
-        },
+        { provide: TokenHashService, useValue: { hashToken: jest.fn((token: string) => `hashed:${token}`) } },
+        { provide: MetricsService, useValue: mockMetricsService },
+        { provide: RbacService, useValue: mockRbacService },
       ],
     }).compile();
 
-    service = module.get<UsersService>(UsersService);
+    service = module.get(UsersService);
     accounts = module.get(UserAccounts);
-    userRepository = module.get(getRepositoryToken(User)) as jest.Mocked<Repository<User>>;
-    dataSource = module.get(DataSource) as jest.Mocked<DataSource>;
-    licenseService = module.get(LicenseService) as jest.Mocked<Pick<LicenseService, 'verifyLicense'>>;
-    emailService = module.get(EmailService) as unknown as {
-      sendUsernameChangedEmail: jest.Mock;
-      sendVerificationEmail: jest.Mock;
-    };
+    licenseService = module.get(LicenseService);
+    emailService = module.get(EmailService);
   });
+
   return {
-    get settingsService() {
-      return settingsService;
-    },
     get mockMetricsService() {
       return mockMetricsService;
     },
@@ -160,11 +93,14 @@ export function registerUsersServiceFixture() {
     get service() {
       return service;
     },
-    get userRepository() {
-      return userRepository;
+    get store() {
+      return store;
     },
-    get dataSource() {
-      return dataSource;
+    get uow() {
+      return uow;
+    },
+    get rbacStore() {
+      return rbacStore;
     },
     get licenseService() {
       return licenseService;

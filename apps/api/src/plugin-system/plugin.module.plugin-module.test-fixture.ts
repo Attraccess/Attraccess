@@ -21,7 +21,7 @@ function manifest(overrides: Partial<LoadedPluginManifest> = {}): LoadedPluginMa
     pluginDirectory: 'ctx-plugin',
     permissions: [],
     main: { backend: { directory: 'ctx-plugin/dist', entryPoint: 'index.js' } },
-    attraccessVersion: { min: '1.0.0' },
+    attraccessVersion: { min: '2.0.0-0' },
     ...overrides,
   } as LoadedPluginManifest;
 }

@@ -1,4 +1,5 @@
-import { AuthenticationType, SSOProvider, SSOProviderType, User } from '@attraccess/database-entities';
+import type { AuthenticatedSessionUser, SsoProviderRecord } from '@attraccess/application-models';
+import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
 
 import { BadRequestException, Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 
@@ -30,7 +31,7 @@ import { SSOService } from '../sso.service';
 export interface SsoProvisioningTarget {
   type: SSOProviderType;
   providerId: number;
-  provider: SSOProvider;
+  provider: SsoProviderRecord;
 }
 
 /**
@@ -49,7 +50,7 @@ export class SsoProvisioningService {
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
 
-  async loadProvider(type: SSOProviderType, providerId: number): Promise<SSOProvider> {
+  async loadProvider(type: SSOProviderType, providerId: number): Promise<SsoProviderRecord> {
     const provider = await this.ssoService.getProviderByTypeAndIdWithConfiguration(type, providerId);
     if (!provider) {
       throw new SSOProviderNotFoundException();
@@ -66,7 +67,12 @@ export class SsoProvisioningService {
   }
 
   /** Only a failed secret check counts against the IP and provider, never what the call does afterwards. */
-  async verifySecret(provider: SSOProvider, ip: string, username: string, provided: string | null): Promise<void> {
+  async verifySecret(
+    provider: SsoProviderRecord,
+    ip: string,
+    username: string,
+    provided: string | null,
+  ): Promise<void> {
     try {
       this.compareSecret(provider, provided);
     } catch (error) {
@@ -103,7 +109,7 @@ export class SsoProvisioningService {
     if (changes) await recordSsoProvisioningAudit(this.audit, 'permissions_synced', user.id, target.provider, changes);
   }
 
-  private compareSecret(provider: SSOProvider, provided: string | null): void {
+  private compareSecret(provider: SsoProviderRecord, provided: string | null): void {
     const secret =
       provider.type === SSOProviderType.SAML
         ? provider.samlConfiguration?.provisioningSecret
@@ -126,7 +132,7 @@ export class SsoProvisioningService {
   private async resolveUser(
     { type: providerType, providerId }: SsoProvisioningTarget,
     payload: SSOProvisioningUserDto,
-  ): Promise<User> {
+  ): Promise<AuthenticatedSessionUser> {
     const subject = payload.subject?.trim();
     const email = payload.email?.trim();
 
@@ -137,7 +143,7 @@ export class SsoProvisioningService {
     let user = subject ? await this.usersService.findOneBySSO(providerType, providerId, subject) : null;
 
     if (!user && email) {
-      user = await this.usersService.findOne({ email }, { authenticationDetails: true });
+      user = await this.usersService.findOne({ email }, ['authenticationDetails']);
       const isMatchingProvider = user?.authenticationDetails?.some(
         (detail) =>
           detail.type === AuthenticationType.SSO &&
@@ -158,7 +164,7 @@ export class SsoProvisioningService {
 
   private async applyPermissions(
     userId: number,
-    provider: SSOProvider,
+    provider: SsoProviderRecord,
     payload: SSOProvisioningPermissionsDto,
   ): Promise<{ added: string[]; removed: string[]; updated: string[] } | undefined> {
     const mapping =

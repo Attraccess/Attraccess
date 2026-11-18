@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
-import { AuthenticationType, SSOProviderType, User } from '@attraccess/database-entities';
+import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
+import type { TransactionContext } from '../../../../database/transaction-context';
 import { UsersService } from '../../../users/users.service';
 import { AuthService } from '../../auth.service';
 import { AccountLinkingRequiredException } from '../oidc/exceptions/account-linking-required.exception';
@@ -59,14 +59,13 @@ export class SsoAccountResolver {
   constructor(
     private readonly usersService: UsersService,
     private readonly authService: AuthService,
-    private readonly dataSource: DataSource,
     // optional: extension point; without a hook, defaultSsoProvisioningHook keeps the standard create-on-first-login rule
     @Optional()
     @Inject(SSO_PROVISIONING_HOOK)
     private readonly provisioningHook: SsoProvisioningHook = defaultSsoProvisioningHook,
   ) {}
 
-  async resolveSsoUser(rawInput: SsoAccountResolutionInput): Promise<{ user: User; created: boolean }> {
+  async resolveSsoUser(rawInput: SsoAccountResolutionInput) {
     const input = { ...rawInput, email: rawInput.email.trim() };
     const { providerType, providerId, subject, email } = input;
 
@@ -87,25 +86,25 @@ export class SsoAccountResolver {
     const decision = await (this.provisioningHook ?? defaultSsoProvisioningHook)({ ...input, emailTrusted });
     if (decision === 'reject') throw new UnauthorizedException();
 
-    const user = await this.dataSource.transaction((manager) => this.createBoundUser(input, manager));
+    const user = await this.usersService.withTransaction((transaction) => this.createBoundUser(input, transaction));
     // createOne skips metrics when it runs inside a caller-owned transaction; record them once it has committed.
     this.usersService.recordCreatedUser(user);
     this.logger.log(`Created user ${user.id} for ${providerType} provider ${providerId}`);
     return { user, created: true };
   }
 
-  private async createBoundUser(input: SsoAccountResolutionInput, manager: EntityManager): Promise<User> {
+  private async createBoundUser(input: SsoAccountResolutionInput, transaction: TransactionContext) {
     const { providerType, providerId, subject, email } = input;
     const username = this.usersService.buildUsernameFromSSOClaim(input.usernameClaim || email, email);
     const user = await this.usersService.createOne(
       { username, email, externalIdentifier: null, isEmailVerified: input.emailVerified !== false },
-      manager,
+      transaction,
     );
     if (!user) throw new UnauthorizedException();
     await this.authService.addAuthenticationDetails(
       user.id,
       { type: AuthenticationType.SSO, details: { providerId, providerType, subject } },
-      manager,
+      transaction,
     );
     return user;
   }

@@ -7,15 +7,14 @@
 // apps/plugins/scripts for the shared esbuild/Vite/zip recipe.
 //
 // The plugin registers a NestJS module whose controller is mounted into the host
-// API and whose services share the host's TypeORM connection via a real
-// repository over an owned, namespaced entity (see device-registry.service.ts).
-// The `entities` export below tells the host to register that entity's metadata
-// into the shared DataSource so getRepository(ShellyDevice) resolves.
+// API. Its device registry lives in plugin storage: the `storage` declaration below
+// (see devices/registry/storage.ts) is created and migrated by the host, and the
+// registry service reads and writes it through the record port (`context.storage`).
 import type { PluginBackendModule, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { DynamicModule } from '@nestjs/common';
 import { DeviceRegistryService } from './devices/registry/service';
 import { DiscoveryService } from './devices/discovery/service';
-import { ShellyDevice } from './devices/registry/device.entity';
+import { shellyStorage } from './devices/registry/storage';
 import { ShellyProbeService } from './devices/discovery/probe.service';
 import { ShellyController } from './devices/controller';
 import { ShellyDeviceApiService } from './communication/device-api.service';
@@ -32,9 +31,8 @@ const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 class ShellyPluginModule {}
 
 const plugin: PluginBackendModule = {
-  // Host registers these into the shared DataSource at load time (gated on
-  // DATABASE_ACCESS) so the registry service can use a real repository.
-  entities: [ShellyDevice],
+  // The host creates/adopts the declared tables at load time (gated on PLUGIN_STORAGE).
+  storage: shellyStorage,
   register(context: PluginContext): DynamicModule {
     return {
       module: ShellyPluginModule,

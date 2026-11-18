@@ -37,15 +37,18 @@ export abstract class WagoManagedRuntimeReconciliation extends WagoManagedRuntim
   }
 
   protected async finishSession(id: number) {
-    await this.sessions.update(id, {
-      deliveryToken: null,
-      dockerProvisionToken: null,
-      dockerProvisionState: null,
-      state: 'completed',
-      progressStep: 'Controller enrolled',
-      progressDetail: 'Permanent runtime verified; encrypted managed SSH credentials retained for automatic updates.',
-      failureReason: null,
-    });
+    await this.sessions.update(
+      { id },
+      {
+        deliveryToken: null,
+        dockerProvisionToken: null,
+        dockerProvisionState: null,
+        state: 'completed',
+        progressStep: 'Controller enrolled',
+        progressDetail: 'Permanent runtime verified; encrypted managed SSH credentials retained for automatic updates.',
+        failureReason: null,
+      },
+    );
   }
 
   protected async enrolmentWaitReason(
@@ -82,9 +85,9 @@ export abstract class WagoManagedRuntimeReconciliation extends WagoManagedRuntim
     for (let skip = 0; !this.destroyed; skip += 50) {
       const controllers = await this.controllers.find({
         where: { trustState: 'claimed' },
-        order: { id: 'ASC' },
-        skip,
-        take: 50,
+        orderBy: [{ field: 'id', direction: 'asc' }],
+        offset: skip,
+        limit: 50,
       });
       for (let index = 0; index < controllers.length && !this.destroyed; index += 2)
         await Promise.all(
@@ -115,7 +118,7 @@ export abstract class WagoManagedRuntimeReconciliation extends WagoManagedRuntim
     await this.assertNetworkSettled(id);
     const heartbeat = await this.refreshRuntimePolicy(id);
     if (!heartbeat) return;
-    const controller = await this.controllers.findOneBy({ id, trustState: 'claimed' });
+    const controller = await this.controllers.findOne({ where: { id, trustState: 'claimed' } });
     if (controller && (await this.completeEnrolment(controller)))
       await this.coordinator.reconcile(id, true, heartbeat.imageId);
   }
@@ -130,12 +133,12 @@ export abstract class WagoManagedRuntimeReconciliation extends WagoManagedRuntim
     }
     const heartbeat = this.heartbeats.get(id);
     if (!heartbeat || this.destroyed) return;
-    const access = await this.access.findOne({ where: { controllerId: id }, order: { sessionId: 'DESC' } });
+    const access = await this.latestAccess(id);
     // Verified enrollment needs a ready runtime before management can be hardened.
     // Confirm its running image during bootstrap; the server still blocks commands
     // until management is complete and the bundled image policy can be enforced.
     const enrolling = access?.state === 'verified' || access?.state === 'recovery_required';
-    const controller = await this.controllers.findOneBy({ id, trustState: 'claimed' });
+    const controller = await this.controllers.findOne({ where: { id, trustState: 'claimed' } });
     await this.wago.setRuntimePolicy?.(
       id,
       enrolling

@@ -1,4 +1,5 @@
-import { SSOProvider, SSOProviderType } from '@attraccess/database-entities';
+import type { SsoProviderRecord } from '@attraccess/application-models';
+import { SSOProviderType } from '@attraccess/application-models';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { AuditActor, AuditEvent, AuditRecorder } from '../../../../audit/recorder/audit-event';
@@ -69,7 +70,7 @@ function auditSamlEntityId(value: string | null | undefined, field: string, omit
 }
 
 /** Safe, stable SSO configuration projection for audit before/after comparisons. */
-export function ssoAuditSnapshot(provider: SSOProvider): string {
+export function ssoAuditSnapshot(provider: SsoProviderRecord): string {
   const omitted: OmittedFields = {};
   const configuration =
     provider.type === SSOProviderType.OIDC
@@ -147,7 +148,7 @@ export async function recordSsoProvisioningAudit(
   audit: AuditRecorder,
   action: 'user_created' | 'user_deleted' | 'permissions_synced' | 'sessions_revoked',
   userId: number,
-  provider: SSOProvider,
+  provider: SsoProviderRecord,
   changes: unknown,
 ): Promise<void> {
   await audit.record({
@@ -161,7 +162,7 @@ export async function recordSsoProvisioningAudit(
 }
 
 /** Names of the provider fields an update changed, plus the secrets it rotated; never their values. */
-export function ssoProviderChanges(before: SSOProvider, after: SSOProvider, rotated: string[]): string {
+export function ssoProviderChanges(before: SsoProviderRecord, after: SsoProviderRecord, rotated: string[]): string {
   const beforeConfiguration = (before.type === SSOProviderType.OIDC
     ? before.oidcConfiguration
     : before.samlConfiguration) as unknown as Record<string, unknown> | undefined;
@@ -205,7 +206,7 @@ export function ssoProviderChanges(before: SSOProvider, after: SSOProvider, rota
 }
 
 /** The provider secrets and key material an update replaced. */
-export function ssoProviderRotations(before: SSOProvider, after: SSOProvider): string[] {
+export function ssoProviderRotations(before: SsoProviderRecord, after: SsoProviderRecord): string[] {
   const rotated: string[] = [];
   if (before.oidcConfiguration?.clientSecret !== after.oidcConfiguration?.clientSecret) rotated.push('clientSecret');
   if (before.samlConfiguration?.provisioningSecret !== after.samlConfiguration?.provisioningSecret)
@@ -226,19 +227,19 @@ export function ssoProviderRotations(before: SSOProvider, after: SSOProvider): s
 export function ssoProviderAuditEvent(
   action: 'created' | 'deleted',
   actor: AuditActor,
-  provider: SSOProvider,
+  provider: SsoProviderRecord,
 ): AuditEvent<'sso'>;
 export function ssoProviderAuditEvent(
   action: 'updated',
   actor: AuditActor,
-  provider: SSOProvider,
-  before: SSOProvider,
+  provider: SsoProviderRecord,
+  before: SsoProviderRecord,
 ): AuditEvent<'sso'> | null;
 export function ssoProviderAuditEvent(
   action: 'created' | 'updated' | 'deleted',
   actor: AuditActor,
-  provider: SSOProvider,
-  before?: SSOProvider,
+  provider: SsoProviderRecord,
+  before?: SsoProviderRecord,
 ): AuditEvent<'sso'> | null {
   const snapshot = ssoAuditSnapshot(provider);
   const previous = before ?? provider;

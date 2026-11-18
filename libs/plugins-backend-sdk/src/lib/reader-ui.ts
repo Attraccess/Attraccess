@@ -7,7 +7,7 @@
  * parity test keeps both in sync.
  */
 
-import type { EntityManager } from 'typeorm';
+import type { PluginTransactionScope } from './plugin-persistence';
 import type { PluginAccessPrincipal } from './plugin-resource-access';
 
 export type ReaderUiTone = 'primary' | 'success' | 'warning' | 'danger';
@@ -304,10 +304,10 @@ export interface StartCapacityContext {
   /** The starter as a `resourceAccess` principal (see {@link PreStartContext.principal}). */
   principal: PluginAccessPrincipal;
   /**
-   * The host's serialized start transaction. Read through it and never start `runSerialized` inside the hook: the
-   * transaction would wait for itself.
+   * The host's serialized start transaction. Read your own tables through it (`context.storage`, passing `{ scope }`)
+   * and never start `persistence.transaction` inside the hook: the transaction would wait for itself.
    */
-  manager: EntityManager;
+  scope: PluginTransactionScope;
   /** Always `start` for now: the hook only runs when a start adds a session (shared machines have no takeover). */
   action: 'start' | 'takeover';
   origin: PreStartOrigin;
@@ -335,9 +335,9 @@ export interface StartCapacityResult {
  * Atomic capacity counterpart of `preStartHook`: on machines with more than one parallel session the host calls it
  * INSIDE the serialized start transaction, after its own capacity check. The host refuses the start with the plugin's
  * block reason when `occupiedSlots + heldSlots >= sessionLimit`, so simultaneous starts can never take a held slot.
- * Keep it to one indexed query on `ctx.manager`. Failure, timeout and an open breaker follow the per-resource failure
- * policy of the plugin, like `preStartHook`. Requires ACCESS_HOOKS and DATABASE_ACCESS (it is handed the host's
- * transaction).
+ * Keep it to one indexed read of your own storage with `{ scope: ctx.scope }`. Failure, timeout and an open breaker follow the per-resource failure
+ * policy of the plugin, like `preStartHook`. Requires ACCESS_HOOKS (it is handed the host's transaction scope;
+ * reading storage with it also needs PLUGIN_STORAGE).
  */
 export type StartCapacityHook = (ctx: StartCapacityContext) => StartCapacityResult | Promise<StartCapacityResult>;
 

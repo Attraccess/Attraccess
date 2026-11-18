@@ -1,6 +1,6 @@
 import { SettingsService } from '../../../../settings/settings.service';
 import { WebSocket } from 'ws';
-import type { Attractap } from '@attraccess/database-entities';
+import type { AttractapReader } from '@attraccess/application-models';
 import { WebsocketService } from '../../websocket.service';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AttractapService } from '../../../attractap.service';
@@ -12,7 +12,8 @@ import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../.
 import { ReaderTimeZoneService } from '../../reader-time-zone.service';
 
 /** The reader's resource ids from the sign-in lookup, so the zone resolve needs no second one. */
-const resourceIdsOf = (reader: Attractap): number[] | undefined => reader.resources?.map((resource) => resource.id);
+const resourceIdsOf = (reader: AttractapReader): number[] | undefined =>
+  reader.resources?.map((resource) => resource.id);
 
 @Injectable()
 export class AttractapAuthHandler {
@@ -144,7 +145,7 @@ export class AttractapAuthHandler {
    */
   private async resolveTimeZone(
     socket: AuthenticatedWebSocket,
-    reader: Attractap,
+    reader: AttractapReader,
     resourceGeneration: number,
     attempt: symbol,
     isCurrentAttempt: () => boolean,

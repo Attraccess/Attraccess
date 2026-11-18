@@ -1,0 +1,1 @@
+export const PASSWORD_POLICY_SINGLETON_ID = 1;

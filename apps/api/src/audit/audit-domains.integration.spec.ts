@@ -1,3 +1,4 @@
+import { createSqliteAuditService } from '../database/adapters/audit/sqlite-audit-service.test-fixture';
 import { AUDIT_RECORDER } from './recorder/audit-event';
 import { billingTransactionAuditEvent } from './policies/billing';
 import { AuditLog, entities, Setting } from '@attraccess/database-entities';
@@ -36,12 +37,13 @@ import {
   pluginDomain,
   scenarioEntries,
   scenarios,
-} from './audit-domain-scenarios.test-fixture';
+} from '../database/adapters/audit/audit-domain-scenarios.test-fixture';
 import { CORE_AUDIT_DOMAINS } from './policies/domains';
 import { AuditController } from './audit.controller';
 import { AuditService } from './audit.service';
-import { createTestAuditMetrics } from './audit.test-fixture';
+import { createTestAuditMetrics } from '../database/adapters/audit/audit.test-fixture';
 import { SessionPermissionSync } from '../users-and-auth/auth/sso/session-permission-sync';
+import { TypeOrmSettingsRows } from '../database/adapters/settings/typeorm-settings-rows';
 
 describe('audit domains through migrated storage and the admin HTTP API', () => {
   let directory: string;
@@ -81,13 +83,14 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
     directory = await mkdtemp(join(tmpdir(), 'audit-domains-'));
     source = await new DataSource({
       type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: join(directory, 'audit.sqlite'),
       entities: Object.values(entities),
       migrations: Object.values(migrations),
     }).initialize();
     await source.runMigrations();
-    store = new SettingsStoreService(source.getRepository(Setting), null);
-    audit = new AuditService(source, store, createTestAuditMetrics());
+    store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(source.getRepository(Setting)), null);
+    audit = createSqliteAuditService(source, store, createTestAuditMetrics());
     settings = new SettingsService(null, store, { getSettings: async () => ({}) } as never, null, events);
     const module = await Test.createTestingModule({
       controllers: [AuditController, SettingsController],
@@ -96,7 +99,7 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
         { provide: SessionPermissionSync, useValue: { syncIfDue: async () => 'skipped' } },
         { provide: AuditService, useValue: audit },
         { provide: AUDIT_RECORDER, useValue: audit },
-        { provide: AuditQueryService, useFactory: () => new AuditQueryService(audit, source, store) },
+        { provide: AuditQueryService, useFactory: () => new AuditQueryService(audit, store) },
         SettingsAdministrationService,
         {
           provide: SettingsService,
@@ -203,7 +206,7 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
     const repository = source.getRepository(Setting);
     await repository.delete({ parent: 'app', key: 'default_language' });
     if (value !== null) await repository.save(repository.create({ parent: 'app', key: 'default_language', value }));
-    const persistedStore = new SettingsStoreService(repository, null);
+    const persistedStore = new SettingsStoreService(TypeOrmSettingsRows.forRepository(repository), null);
     const settings = new SettingsService(null, persistedStore, null);
     expect((await settings.getAppSettings()).defaultLanguage).toBe(expected);
     expect(await settings.getDefaultLanguage()).toBe(expected);

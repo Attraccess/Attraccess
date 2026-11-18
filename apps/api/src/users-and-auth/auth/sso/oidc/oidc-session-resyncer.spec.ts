@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { SSOProvider, SSOProviderType, SsoSessionContext } from '@attraccess/database-entities';
+import type { SsoProviderRecord } from '@attraccess/application-models';
+import { SSOProviderType, SsoSessionContext } from '@attraccess/application-models';
 import { OidcSessionResyncer } from './oidc-session-resyncer';
 import { SessionRejectedError } from '../session-permission-sync';
 import { SSOService } from '../sso.service';
@@ -28,7 +29,7 @@ const provider = {
     roleMappings: { 'resource-manager': ['fab-staff'] },
     permissionSyncTtlMinutes: 60,
   },
-} as unknown as SSOProvider;
+} as unknown as SsoProviderRecord;
 
 const context = (lastSsoSyncAt = now - 2 * HOUR): SsoSessionContext => ({
   protocol: 'OIDC',

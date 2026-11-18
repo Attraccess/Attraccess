@@ -81,7 +81,7 @@ const policy = {
       provide: BruteForceProtectionService,
       useFactory: () =>
         new BruteForceProtectionService(
-          { update: jest.fn().mockResolvedValue(undefined) } as never,
+          { recordFailureStreak: jest.fn(), lockAccount: jest.fn(), clearLockout: jest.fn() },
           { getRateLimitPolicy: async () => policy } as SettingsService,
         ),
     },

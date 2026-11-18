@@ -14,7 +14,7 @@
     }
   },
   "attraccessVersion": {
-    "min": "1.0.0"
+    "min": "2.0.0-0"
   },
   "permissions": ["READ_USERS", "LISTEN_EVENTS", "ACCESS_MQTT_SERVERS", "TRIGGER_FLOWS"]
 }

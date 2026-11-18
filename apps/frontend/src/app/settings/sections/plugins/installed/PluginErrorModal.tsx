@@ -9,9 +9,15 @@ import { usePluginsTranslations } from '../usePluginsTranslations';
 interface Props {
   failedPlugin: FailedPlugin | null;
   onClose: () => void;
+  /** Opens the removal of a refused plugin, which cannot be retried. */
+  onRemove: (pluginId: string) => void;
 }
 
-export function PluginErrorModal({ failedPlugin, onClose }: Props) {
+/**
+ * The server error of a plugin. A plugin that failed to load can be retried; a refused one (for example built for SDK
+ * 1.x) never loads, so the dialog explains that and offers to remove it instead.
+ */
+export function PluginErrorModal({ failedPlugin, onClose, onRemove }: Props) {
   const { t } = usePluginsTranslations();
   const toast = useToastMessage();
   const { refetch: refetchPluginSystemStatus } = useGetPluginSystemStatus();
@@ -37,22 +43,32 @@ export function PluginErrorModal({ failedPlugin, onClose }: Props) {
     }
   };
 
+  const refused = failedPlugin?.refused === true;
+  const pluginName = failedPlugin?.name ?? '';
+  const action = refused
+    ? {
+        label: t('status.remove'),
+        onPress: () => failedPlugin && onRemove(failedPlugin.id),
+        'data-cy': 'plugins-list-remove-refused-button',
+      }
+    : {
+        label: t('status.retry'),
+        onPress: retryPlugin,
+        isPending: isRetrying,
+        'data-cy': 'plugins-list-retry-load-button',
+      };
+
   return (
     <StatusDialog
       isOpen={failedPlugin !== null}
       onClose={onClose}
       status="error"
-      title={t('status.errorTitle', { pluginName: failedPlugin?.name ?? '' })}
+      title={t(refused ? 'status.refusedTitle' : 'status.errorTitle', { pluginName })}
       closeLabel={t('status.close')}
-      action={{
-        label: t('status.retry'),
-        onPress: retryPlugin,
-        isPending: isRetrying,
-        'data-cy': 'plugins-list-retry-load-button',
-      }}
+      action={action}
       data-cy="plugins-list-load-error-modal"
     >
-      <p className="text-sm text-muted">{t('status.errorDescription')}</p>
+      <p className="text-sm text-muted">{t(refused ? 'status.refusedDescription' : 'status.errorDescription')}</p>
       <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-medium border border-divider p-3 text-sm text-danger">
         {failedPlugin?.error}
       </pre>

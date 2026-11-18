@@ -1,12 +1,8 @@
+import { IntroductionHistoryAction } from '@attraccess/application-models';
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { ResourceIntroduction } from './resourceIntroduction.entity';
 import { User } from './user.entity';
-
-export enum IntroductionHistoryAction {
-  REVOKE = 'revoke',
-  GRANT = 'grant',
-}
 
 @Entity()
 export class ResourceIntroductionHistoryItem {

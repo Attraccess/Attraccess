@@ -11,7 +11,7 @@
 
 Matter wird in zwei zusammenarbeitenden Teilen ausgeliefert, nicht als eingebauter Attraccess-Code:
 
-- **Das Matter-Plugin** (`apps/plugins/matter`) ist ein installierbares Attraccess-Plugin. In diesem Release verbindet es sich mit dem Sidecar und bietet eine Admin-Seite (**Geräte → Matter**) für die Verbindungseinstellungen sowie für Fabric, ihre verschlüsselten Backups und die Wiederherstellung. Es führt das [Gerätedatenmodell](plugins/matter/data-model.md) (Nodes, Endpoints, Zustand, Lebenszyklus) und gleicht es mit dem Sidecar ab, sobald dieser Nodes auflisten kann; eine Geräte-Oberfläche gibt es noch nicht. Es braucht die Berechtigungen `DATABASE_ACCESS` und `MANAGE_SECRETS`.
+- **Das Matter-Plugin** (`apps/plugins/matter`) ist ein installierbares Attraccess-Plugin. In diesem Release verbindet es sich mit dem Sidecar und bietet eine Admin-Seite (**Geräte → Matter**) für die Verbindungseinstellungen sowie für Fabric, ihre verschlüsselten Backups und die Wiederherstellung. Es führt das [Gerätedatenmodell](plugins/matter/data-model.md) (Nodes, Endpoints, Zustand, Lebenszyklus) und gleicht es mit dem Sidecar ab, sobald dieser Nodes auflisten kann; eine Geräte-Oberfläche gibt es noch nicht. Es braucht die Berechtigungen `PLUGIN_STORAGE` und `MANAGE_SECRETS`.
 - **Der Matter-Sidecar** (`apps/matter-sidecar`) ist ein eigener Node.js-Prozess. Nur er lädt [matter.js](https://github.com/project-chip/matter.js) (`@matter/main`, auf ein exaktes Release festgelegt). Er startet und läuft ohne die Attraccess-API, ohne Datenbank, ohne Matter-Fabric und ohne in Betrieb genommenes Gerät. Sobald ein Administrator die Fabric erzeugt, legt der Sidecar sie in seinem eigenen Speicherverzeichnis (`MATTER_SIDECAR_STORAGE_DIR`) ab und öffnet das Matter-Netzwerk (mDNS und UDP). Er erzeugt, stellt wieder her oder überschreibt nie von sich aus eine Fabric.
 
 Eine gemeinsame Bibliothek, `libs/matter-contract`, definiert jede Anfrage, Antwort und jedes Event genau einmal, mit Laufzeitvalidierung (Zod). Sidecar und Plugin verwenden sie beide. Sie importiert niemals matter.js, Core-Code, Datenbank-Entitäten oder Plugins.
@@ -24,15 +24,15 @@ Es gibt genau **eine** Wire-Protokollversion: `1`. Es gibt keine Schemas früher
 
 Eine passende Wire-Version genügt nicht. Attraccess, das Matter-Plugin und der Sidecar müssen eine **unterstützte Kombination** bilden. Die einzige maßgebliche Tabelle ist `COMPATIBILITY_TABLE` in `libs/matter-contract/src/compatibility.ts`:
 
-| Komponente     | Unterstützt                                                          |
-| -------------- | -------------------------------------------------------------------- |
-| Wire-Version   | `1`                                                                  |
-| Attraccess     | `^1.11.0` (Vorabversionen einer passenden Version werden akzeptiert) |
-| Matter-Plugin  | genau `0.4.0-alpha.0`                                                |
-| Matter-Sidecar | genau `0.4.0-alpha.0`                                                |
-| matter.js      | genau `0.18.0` (Plugin und Sidecar teilen sich ein Release)          |
+| Komponente     | Unterstützt                                                           |
+| -------------- | --------------------------------------------------------------------- |
+| Wire-Version   | `1`                                                                   |
+| Attraccess     | `^2.0.0-0` (Vorabversionen einer passenden Version werden akzeptiert) |
+| Matter-Plugin  | genau `0.4.0-alpha.0`                                                 |
+| Matter-Sidecar | genau `0.4.0-alpha.0`                                                 |
+| matter.js      | genau `0.18.0` (Plugin und Sidecar teilen sich ein Release)           |
 
-`attraccess.host` (`package.json`) und `attraccessVersion.min` (`plugin.json`) des Plugins werden aus derselben Tabelle abgeleitet; ein Test prüft, dass sie übereinstimmen. Jedes neue Plugin- oder Sidecar-Release braucht eine Tabellenaktualisierung, sonst lehnt der Sidecar es ab. Der Attraccess-Bereich ist bewusst ein Bereich: Ein neues Attraccess-1.x-Release erfordert nicht automatisch ein Sidecar-Release.
+`attraccess.host` (`package.json`) und `attraccessVersion.min` (`plugin.json`) des Plugins werden aus derselben Tabelle abgeleitet; ein Test prüft, dass sie übereinstimmen. Jedes neue Plugin- oder Sidecar-Release braucht eine Tabellenaktualisierung, sonst lehnt der Sidecar es ab. Der Attraccess-Bereich ist bewusst ein Bereich: Ein neues Attraccess-2.x-Release erfordert nicht automatisch ein Sidecar-Release.
 
 Release-Header sind Kompatibilitätsinformationen, **keine Authentifizierung**; die Authentifizierung ist das Service-Token (siehe [Sicherheitsmodell](#sicherheitsmodell)). Ein nicht passender Sidecar braucht ein Update oder Downgrade.
 
@@ -141,7 +141,7 @@ Der Sidecar steuert physische Anlagen und vertraut deshalb einem Aufrufer nie al
 
 ## Das Plugin verbindet sich mit dem Sidecar
 
-Ein Administrator richtet die Verbindung in der Weboberfläche ein (**Geräte → Matter**): Sidecar-URL, Service-Token und optional ein CA-Zertifikat. Diese CA wird dem Standard-Truststore von Node.js hinzugefügt (den mitgelieferten Stammzertifikaten plus etwaigen `NODE_EXTRA_CA_CERTS`) und ersetzt ihn nicht. Die URL darf `http` oder `https` sein und ein Pfadpräfix für einen Reverse-Proxy tragen (`https://host/prefix` führt zu `/prefix/v1/...`). Das Token wird vom Host verschlüsselt gespeichert (`MANAGE_SECRETS`), in einer Plugin-Tabelle (`DATABASE_ACCESS`), nie wieder angezeigt und erscheint nie in Logs, Fehlern, Statusantworten oder Audit-Einträgen. Nur Benutzer mit der Berechtigung `matter.devices.manage` können die Einstellungen lesen oder ändern; `matter.devices.read` zeigt den Verbindungsstatus (siehe [Berechtigungen](plugins/matter/permissions.md)). Jede Änderung wird ohne Geheimnisse im Audit-Log festgehalten.
+Ein Administrator richtet die Verbindung in der Weboberfläche ein (**Geräte → Matter**): Sidecar-URL, Service-Token und optional ein CA-Zertifikat. Diese CA wird dem Standard-Truststore von Node.js hinzugefügt (den mitgelieferten Stammzertifikaten plus etwaigen `NODE_EXTRA_CA_CERTS`) und ersetzt ihn nicht. Die URL darf `http` oder `https` sein und ein Pfadpräfix für einen Reverse-Proxy tragen (`https://host/prefix` führt zu `/prefix/v1/...`). Das Token wird vom Host verschlüsselt gespeichert (`MANAGE_SECRETS`), in einer Tabelle seines [Plugin-Speichers](plugins/plugin-storage.md) (`PLUGIN_STORAGE`), nie wieder angezeigt und erscheint nie in Logs, Fehlern, Statusantworten oder Audit-Einträgen. Nur Benutzer mit der Berechtigung `matter.devices.manage` können die Einstellungen lesen oder ändern; `matter.devices.read` zeigt den Verbindungsstatus (siehe [Berechtigungen](plugins/matter/permissions.md)). Jede Änderung wird ohne Geheimnisse im Audit-Log festgehalten.
 
 Das Plugin startet die Verbindung, ohne auf den Sidecar zu warten. **Ein fehlender, neu startender, ablehnender oder inkompatibler Sidecar hindert weder Attraccess noch das Plugin am Laden**; stattdessen zeigt das Plugin einen eindeutigen Zustand:
 

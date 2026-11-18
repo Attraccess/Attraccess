@@ -1,6 +1,7 @@
 import { ExecutionContext, INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { AuthenticatedRequest, DualAuthGuard, NFCCard, User } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, DualAuthGuard } from '@attraccess/plugins-backend-sdk';
+import type { AttractapNfcCard, PluginUserModel } from '@attraccess/application-models';
 import request from 'supertest';
 import { AttractapController } from './attractap.controller';
 import { AttractapNfcCardsController } from './card.controller';
@@ -13,12 +14,17 @@ import { LicenseGuard } from '../license/license.guard';
 
 describe('RFID card management authorization', () => {
   let app: INestApplication;
-  const card = Object.assign(new NFCCard(), {
+  const card = {
     id: 7,
-    user: Object.assign(new User(), { id: 2 }),
+    uid: '04aabbcc',
+    user: { id: 2 },
     key: 'secret',
     keyNo: 1,
-  });
+    isActive: true,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    lastSeen: new Date(0),
+  } as unknown as AttractapNfcCard;
   const service = {
     getNFCCardByID: jest.fn(),
     getNFCCardsByUserId: jest.fn().mockResolvedValue([card]),
@@ -46,7 +52,7 @@ describe('RFID card management authorization', () => {
       .useValue({
         canActivate: (context: ExecutionContext) => {
           const req = context.switchToHttp().getRequest<AuthenticatedRequest>();
-          req.user = Object.assign(new User(), {
+          req.user = Object.assign({} as PluginUserModel, {
             id: Number(req.headers['actor-id'] ?? 1),
             jwtTokenId: 'test',
             authenticationMethod: 'api-token',

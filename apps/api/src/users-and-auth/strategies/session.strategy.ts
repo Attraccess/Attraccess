@@ -10,9 +10,9 @@ import { ApiTokenService } from '../auth/api-token/api-token.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
 import { SessionPermissionSync } from '../auth/sso/session-permission-sync';
 import { resolveIp } from '../rate-limiting/login.rate-limit.guard';
-import { User } from '@attraccess/database-entities';
+import type { AuthenticatedSessionUser } from '@attraccess/application-models';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
-import { databaseBusyException, isSqliteBusyError } from '../../database/sqlite-errors';
+import { databaseBusyException, isDatabaseBusyError } from '../../database/persistence-errors';
 import { isValkeyUnavailableError, valkeyUnavailableException } from '../../valkey/valkey-unavailable';
 import { getMcpDelegation, McpDelegation } from './mcp-delegation';
 
@@ -40,7 +40,7 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     super();
   }
 
-  async validate(req: Request & { authSession?: LogoutSession }): Promise<User> {
+  async validate(req: Request & { authSession?: LogoutSession }): Promise<AuthenticatedSessionUser> {
     try {
       return await this.resolveUser(req);
     } catch (error) {
@@ -48,12 +48,12 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
       if (isValkeyUnavailableError(error)) throw valkeyUnavailableException(error as Error);
       // Neither is a busy database (a request that waited too long for another request's transaction): answering 401
       // would make clients drop a valid session.
-      if (isSqliteBusyError(error)) throw databaseBusyException();
+      if (isDatabaseBusyError(error)) throw databaseBusyException();
       throw error;
     }
   }
 
-  private async resolveUser(req: Request & { authSession?: LogoutSession }): Promise<User> {
+  private async resolveUser(req: Request & { authSession?: LogoutSession }): Promise<AuthenticatedSessionUser> {
     // An MCP OAuth tool call: the principal was attached in-process after the access token was verified.
     const delegation = getMcpDelegation(req);
     if (delegation) return this.validateMcpDelegation(req, delegation);
@@ -108,34 +108,36 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
       throw new UnauthorizedException('Session was ended by the identity provider');
     }
 
+    // The stored account becomes the plugin SDK's authenticated principal (same object, more fields attached)
+    const principal = user as unknown as AuthenticatedUser;
     // Attach effectivePermissions before 2FA check so isPrivilegedUser() can use them
-    (user as AuthenticatedUser).effectivePermissions = new SerializablePermissionSet(
+    principal.effectivePermissions = new SerializablePermissionSet(
       await this.rbacService.getEffectivePermissions(user.id),
     );
-    (user as AuthenticatedUser).authenticationMethod = 'session';
+    principal.authenticationMethod = 'session';
 
-    await this.assertTwoFactorSetup(req, user);
+    await this.assertTwoFactorSetup(req, principal);
 
-    return user;
+    return principal;
   }
 
   /**
    * MCP OAuth principal: the permissions the user approved, intersected with what they hold right now, so a role
    * removed in Attraccess disappears from MCP on the next call. No session exists for it.
    */
-  private async validateMcpDelegation(req: Request, delegation: McpDelegation): Promise<User> {
-    const { user } = delegation;
-    const current = await this.rbacService.getEffectivePermissions(user.id, true);
-    (user as AuthenticatedUser).effectivePermissions = new SerializablePermissionSet(
+  private async validateMcpDelegation(req: Request, delegation: McpDelegation): Promise<AuthenticatedSessionUser> {
+    const principal = delegation.user as unknown as AuthenticatedUser;
+    const current = await this.rbacService.getEffectivePermissions(principal.id, true);
+    principal.effectivePermissions = new SerializablePermissionSet(
       delegation.permissionKeys.filter((permission) => current.has(permission)),
     );
-    (user as AuthenticatedUser).authenticationMethod = 'mcp-oauth';
-    (user as AuthenticatedUser).permissionScope = delegation.permissionKeys;
-    await this.assertTwoFactorSetup(req, user);
-    return user;
+    principal.authenticationMethod = 'mcp-oauth';
+    principal.permissionScope = delegation.permissionKeys;
+    await this.assertTwoFactorSetup(req, principal);
+    return delegation.user;
   }
 
-  private async assertTwoFactorSetup(req: Request, user: User): Promise<void> {
+  private async assertTwoFactorSetup(req: Request, user: AuthenticatedUser): Promise<void> {
     if (this.isTwoFactorSetupAllowedPath(req)) return;
     const status = await this.twoFactorService.getStatus(user);
     if (status.required && !status.enabled) {

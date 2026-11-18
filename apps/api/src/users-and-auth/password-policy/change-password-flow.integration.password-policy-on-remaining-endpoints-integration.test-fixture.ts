@@ -1,18 +1,12 @@
 import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
-import {
-  AuthenticationDetail,
-  AuthenticationType,
-  PasswordHistory,
-  PasswordPolicy,
-  PasswordPolicyOverride,
-  Setting,
-} from '@attraccess/database-entities';
+import { SETTINGS_ROWS } from '../../settings/settings-rows.port';
+import type { PasswordPolicyValues } from '@attraccess/application-models';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { UNIT_OF_WORK } from '../../database/unit-of-work';
 import { EmailService } from '../../email/email.service';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { AuthService } from '../auth/auth.service';
+import { CREDENTIAL_STORE } from '../auth/credentials/credential-store.port';
 import { SSOService } from '../auth/sso/sso.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
 import { BruteForceProtectionService } from '../rate-limiting/brute-force.service';
@@ -22,6 +16,7 @@ import { UserPasswordService } from '../users/user-password.service';
 import { UserRegistrationService } from '../users/user-registration.service';
 import { UsersService } from '../users/users.service';
 import { HibpClient } from './hibp.client';
+import { PASSWORD_POLICY_STORE } from './password-policy-store.port';
 import { PasswordPolicyService } from './password-policy.service';
 import { ZxcvbnService } from './zxcvbn.service';
 
@@ -31,8 +26,7 @@ const ANOTHER_STRONG_PASSWORD = 'Diff3rent-Hummingbird-9!plate';
 
 const WEAK_PASSWORD = 'password';
 
-const buildPolicyRow = (overrides: Partial<PasswordPolicy> = {}): PasswordPolicy => ({
-  id: 1,
+const buildPolicyRow = (overrides: Partial<PasswordPolicyValues> = {}): PasswordPolicyValues => ({
   minLength: 12,
   maxLength: 128,
   allowAllUnicode: true,
@@ -45,14 +39,11 @@ const buildPolicyRow = (overrides: Partial<PasswordPolicy> = {}): PasswordPolicy
   minZxcvbnScore: 3,
   historySize: 0,
   rotationDays: 0,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  version: 1,
   ...overrides,
 });
 
 interface BuildOpts {
-  policy?: Partial<PasswordPolicy>;
+  policy?: Partial<PasswordPolicyValues>;
   zxcvbnScore?: number;
   hibpPwned?: boolean;
   currentPasswordHash?: string | null;
@@ -80,34 +71,31 @@ async function buildController(opts: BuildOpts = {}) {
 
   const usersFindOne = jest.fn(async () => user);
   const usersUpdateOne = jest.fn(async () => undefined);
+  const consumePasswordResetToken = jest.fn(async () => true);
   const changePassword = jest.fn(async () => undefined);
   const addAuthenticationDetails = jest.fn(async () => ({ id: 1, password: 'hashed-new' }));
   const verifyEmail = jest.fn(async () => undefined);
   const sendVerificationEmail = jest.fn(async () => undefined);
   const isSSOUser = jest.fn(async () => Boolean(opts.isSSOUser));
-  const deleteBuilder = {
-    delete: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    andWhere: jest.fn().mockReturnThis(),
-    execute: jest.fn(async () => ({ affected: 0 })),
+  const policyStore = {
+    findPolicy: jest.fn(async () => buildPolicyRow(opts.policy ?? {})),
+    seedPolicy: jest.fn(),
+    savePolicy: jest.fn(),
+    listOverrides: jest.fn(async () => []),
+    findOverride: jest.fn(async () => null),
+    saveOverride: jest.fn(),
+    deleteOverride: jest.fn(),
+    recentHistoryHashes: jest.fn(async () => (opts.history ?? []).map((entry) => entry.passwordHash)),
+    recordHistory: jest.fn(),
   };
-  const historyRepo = {
-    find: jest.fn(async () => opts.history ?? []),
-    save: jest.fn(async (row) => row),
-    create: jest.fn((row) => row),
-    createQueryBuilder: jest.fn(() => deleteBuilder),
-  };
-  const authDetailRepo = {
-    findOne: jest.fn(async () =>
-      opts.currentPasswordHash === undefined
-        ? null
-        : { password: opts.currentPasswordHash, type: AuthenticationType.LOCAL_PASSWORD },
+  const credentialStore = {
+    findLocalPasswordHash: jest.fn(async () =>
+      opts.currentPasswordHash === undefined ? null : opts.currentPasswordHash,
     ),
   };
-  const policyRepo = {
-    findOne: jest.fn(async () => buildPolicyRow(opts.policy ?? {})),
-    create: jest.fn((row) => row),
-    save: jest.fn(async (row) => row),
+  const unitOfWork = {
+    current: () => undefined,
+    run: async <T>(work: (scope: unknown) => Promise<T>) => work({ isOpen: true, afterCommit: jest.fn() }),
   };
 
   const module: TestingModule = await Test.createTestingModule({
@@ -135,42 +123,15 @@ async function buildController(opts: BuildOpts = {}) {
           })),
         },
       },
-      { provide: getRepositoryToken(PasswordPolicy), useValue: policyRepo },
-      {
-        provide: getRepositoryToken(PasswordPolicyOverride),
-        useValue: {
-          find: jest.fn(async () => []),
-          findOne: jest.fn(async () => null),
-          save: jest.fn(async (row) => row),
-          create: jest.fn((row) => row),
-          merge: jest.fn((a, b) => Object.assign(a, b)),
-          delete: jest.fn(async () => ({ affected: 0 })),
-          remove: jest.fn(async (row) => row),
-        },
-      },
-      {
-        provide: DataSource,
-        useValue: {
-          transaction: jest.fn(async (cb: never) =>
-            (cb as unknown as (m: { getRepository: () => unknown }) => Promise<unknown>)({
-              getRepository: () => ({
-                findOne: jest.fn(),
-                find: jest.fn(async () => []),
-                save: jest.fn(),
-                create: jest.fn(),
-                remove: jest.fn(),
-              }),
-            }),
-          ),
-        },
-      },
-      { provide: getRepositoryToken(PasswordHistory), useValue: historyRepo },
-      { provide: getRepositoryToken(AuthenticationDetail), useValue: authDetailRepo },
+      { provide: PASSWORD_POLICY_STORE, useValue: policyStore },
+      { provide: CREDENTIAL_STORE, useValue: credentialStore },
+      { provide: UNIT_OF_WORK, useValue: unitOfWork },
       {
         provide: UsersService,
         useValue: {
           findOne: usersFindOne,
           updateOne: usersUpdateOne,
+          consumePasswordResetToken,
           isSSOUser,
           findMany: jest.fn(async () => ({ data: [], total: 0 })),
           countUsers: jest.fn(async () => 1),
@@ -199,8 +160,8 @@ async function buildController(opts: BuildOpts = {}) {
         useValue: { hashToken: (t: string) => `hashed:${t}` },
       },
       {
-        provide: getRepositoryToken(Setting),
-        useValue: { findOne: jest.fn(async () => null), insert: jest.fn(), update: jest.fn() },
+        provide: SETTINGS_ROWS,
+        useValue: { findValue: jest.fn(async () => null), upsertValue: jest.fn(), remove: jest.fn() },
       },
       {
         provide: BruteForceProtectionService,
@@ -224,8 +185,9 @@ async function buildController(opts: BuildOpts = {}) {
     changePassword,
     addAuthenticationDetails,
     usersUpdateOne,
-    historyRepo,
-    authDetailRepo,
+    consumePasswordResetToken,
+    policyStore,
+    credentialStore,
     user,
     verifyEmail,
   };

@@ -1,4 +1,10 @@
-import { isLicenseGated, missingLicenseReason, PluginLicenseDeclarationSchema } from './plugin-license';
+import {
+  isLicenseGated,
+  missingLicenseReason,
+  parseManifestLicense,
+  PluginLicenseDeclarationSchema,
+  withRequiringPlugins,
+} from './plugin-license';
 import { PluginManifestSchema } from '../runtime/manifest-schema';
 
 describe('PluginLicenseDeclarationSchema', () => {
@@ -72,5 +78,37 @@ describe('missingLicenseReason', () => {
     expect(missingLicenseReason({ required: true }, { valid: false, modules: [] })).toBe(
       'Requires a valid Attraccess license',
     );
+  });
+});
+
+describe('parseManifestLicense', () => {
+  it('passes a missing block through and returns a valid one parsed', () => {
+    expect(parseManifestLicense('p', undefined)).toBeUndefined();
+    expect(parseManifestLicense('p', { modules: [' wago '] })).toEqual({ modules: ['wago'] });
+  });
+
+  it('throws with the plugin name and the offending field for a malformed block', () => {
+    expect(() => parseManifestLicense('p', { required: 'yes' })).toThrow(
+      /^Plugin p declares an invalid license block \(required: /,
+    );
+  });
+});
+
+describe('withRequiringPlugins', () => {
+  const plugin = (name: string, ...requires: string[]) => ({
+    name,
+    dependencies: requires.map((dependency) => ({ name: dependency, required: true })),
+  });
+
+  it('adds every plugin that requires a blocked one, transitively, but not optional dependants', () => {
+    const plugins = [
+      plugin('c', 'b'),
+      plugin('b', 'a'),
+      plugin('a'),
+      plugin('free'),
+      { name: 'optional', dependencies: [{ name: 'a', required: false }] },
+    ];
+    expect([...withRequiringPlugins(plugins, new Set(['a']))].sort()).toEqual(['a', 'b', 'c']);
+    expect(withRequiringPlugins(plugins, new Set())).toEqual(new Set());
   });
 });

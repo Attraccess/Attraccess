@@ -1,8 +1,6 @@
-import { User } from '@attraccess/database-entities';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Observable } from 'rxjs';
-import { DeepPartial } from 'typeorm';
 import { LicenseService } from '../license/license.service';
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
 import { ResourceFlowsService } from '../resources/flows/resource-flows.service';
@@ -11,7 +9,7 @@ import { BillingService } from './charges/billing.service';
 import { LiveNotificationsService } from './live-notifications/live-notifications.service';
 import { SumUpService } from './sumup/sumup.service';
 
-const baseReq = (userOverrides: DeepPartial<User> & { effectivePermissions?: Set<string> } = {}) =>
+const baseReq = (userOverrides: { id?: number; effectivePermissions?: Set<string> } = {}) =>
   ({
     user: {
       id: 1,

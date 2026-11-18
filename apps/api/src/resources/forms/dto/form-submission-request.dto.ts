@@ -28,4 +28,3 @@ export class FormSubmissionRequestDto {
   @Type(() => FormSubmissionFieldAnswerDto)
   answers!: FormSubmissionFieldAnswerDto[];
 }
-

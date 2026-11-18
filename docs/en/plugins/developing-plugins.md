@@ -57,18 +57,18 @@ keyword and an `attraccess` object:
   "version": "1.0.0",
   "keywords": ["attraccess-plugin"],
   "peerDependencies": {
-    "@attraccess/plugins-backend-sdk": "^1.9.0",
-    "@attraccess/plugins-frontend-sdk": "^1.9.0"
+    "@attraccess/plugins-backend-sdk": "^2.0.0-0",
+    "@attraccess/plugins-frontend-sdk": "^2.0.0-0"
   },
   "attraccess": {
     "displayName": "Hello World",
-    "host": "^1.9.0",
+    "host": "^2.0.0-0",
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
     "styles": "frontend/style.css",
     "dashboardPaths": ["/hello-world"],
     "permissions": ["READ_USERS", "LISTEN_EVENTS"],
-    "sdk": { "backend": "^1.9.0", "frontend": "^1.9.0" }
+    "sdk": { "backend": "^2.0.0-0", "frontend": "^2.0.0-0" }
   }
 }
 ```
@@ -81,7 +81,6 @@ keyword and an `attraccess` object:
 | `attraccess.styles`                          | no           | Stylesheet alongside the frontend entry point.                                                              |
 | `attraccess.dashboardPaths`                  | no           | Sidebar paths users may pin to their dashboard. See [Dashboard pins](#dashboard-pins).                      |
 | `attraccess.dashboardWidgets`                | no           | Ids of the dashboard widgets the plugin offers. See [Dashboard widgets](#dashboard-widgets).                |
-| `attraccess.migrations`                      | no           | Module exporting TypeORM migration classes. See [Database Migrations](plugins/database-migrations.md).      |
 | `attraccess.host`                            | yes          | Compatible Attraccess host semver range.                                                                    |
 | `attraccess.permissions`                     | no           | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`.           |
 | `attraccess.license`                         | no           | License modules or a valid license the plugin requires (see [License requirements](#license-requirements)). |
@@ -139,7 +138,8 @@ dependency on an unlicensed plugin does not load either; it shows the usual depe
 
 Not loading for license reasons is not a failure: the plugin is not quarantined, and it loads after the next restart
 once the license covers it. An invalid `license` block (wrong types, unknown keys) is a manifest error: the plugin does
-not load, and a ZIP upload is rejected with HTTP 400. Hosts older than the plugin license support ignore the block. For
+not load (**Settings → Plugins** lists it with the error, so it can be deleted), and a ZIP upload is rejected with
+HTTP 400. Hosts older than the plugin license support ignore the block. For
 npm plugins, set `attraccess.host` to the first version that enforces it; the host checks that range on install. A ZIP
 plugin's `attraccessVersion` is not compared with the host version, so an old host loads a ZIP plugin without the
 gate.
@@ -212,18 +212,13 @@ import { Controller, DynamicModule, Get, Inject, Injectable, OnModuleInit } from
 
 // The host hands each plugin its PluginContext under this token. Recreate it
 // locally (do not import the value) so the artifact has no runtime dependency on
-// the SDK: Symbol.for() resolves against the process-global registry, so this is
-// the exact same symbol the host uses.
+// the SDK root: Symbol.for() resolves against the process-global registry, so
+// this is the exact same symbol the host uses.
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 
 // SystemEvent is imported as a TYPE only (erased at build time); supply the enum
 // value as a string-literal cast to keep the artifact SDK-free at runtime.
 const RESOURCE_USAGE_STARTED = 'RESOURCE_USAGE_STARTED' as SystemEvent;
-
-interface UserRow {
-  id: number;
-  username: string;
-}
 
 @Injectable()
 class HelloWorldService implements OnModuleInit {
@@ -237,12 +232,10 @@ class HelloWorldService implements OnModuleInit {
   }
 
   async greetUsers(): Promise<string[]> {
-    // Injected repository over the shared connection. Addressing the entity by
-    // NAME ('User') means we don't import the entity class; the host resolves it
-    // and gates the call behind READ_USERS.
-    const users = this.context.getRepository<UserRow>('User');
-    const rows = await users.find({ take: 5 });
-    return rows.map((row) => `Hello, ${row.username}!`);
+    // Host data is read through context.hostData as neutral values, never as
+    // entities. The users group is gated behind READ_USERS.
+    const names = await this.context.hostData.users.getUsernames([1, 2, 3, 4, 5]);
+    return [...names.values()].map((username) => `Hello, ${username}!`);
   }
 }
 
@@ -280,8 +273,9 @@ export default plugin;
 | `context.manifest`                                        | Your plugin's name, version, id, directory.                                                                                                                       | none                     |
 | `context.hostVersion`                                     | Version of the running Attraccess host (the one plugin compatibility is checked against). Optional: hosts older than 1.11.0 do not set it, so handle `undefined`. | none                     |
 | `context.logger`                                          | Logger prefixed with your plugin name.                                                                                                                            | none                     |
-| `context.getRepository(entity)`                           | TypeORM repository over the shared connection.                                                                                                                    | per-entity (see below)   |
-| `context.dataSource`                                      | The raw shared TypeORM `DataSource`.                                                                                                                              | `DATABASE_ACCESS`        |
+| `context.storage`                                         | Record port for the tables your plugin declares. See [Plugin Storage](plugins/plugin-storage.md).                                                                 | `PLUGIN_STORAGE`         |
+| `context.persistence`                                     | Atomic transactions over your storage and host ports, with a post-commit hook. See [Persistence](#persistence).                                                   | `PLUGIN_STORAGE`         |
+| `context.hostData`                                        | Read-only lookups of host data (resources, users, settings, flow nodes) as neutral models. See [Host data](#host-data).                                           | per group (see below)    |
 | `context.onEvent(event, handler)`                         | Subscribe to a typed `SystemEvent`.                                                                                                                               | `LISTEN_EVENTS`          |
 | `context.emitEvent(event, payload)`                       | Emit a typed `SystemEvent`.                                                                                                                                       | `EMIT_EVENTS`            |
 | `context.events`                                          | The raw shared event bus (restricted surface).                                                                                                                    | per-method               |
@@ -292,15 +286,15 @@ export default plugin;
 | `context.notifications.dispatch(request)`                 | Notify users under a category your plugin declared. See [Notifications](#notifications).                                                                          | `SEND_NOTIFICATIONS`     |
 | `context.startBlocked.invalidate({ resourceId })`         | Tell open resource pages that your `startBlockedQuery` answer changed. See [Start-blocked state](#start-blocked-state).                                           | `ACCESS_HOOKS`           |
 | `context.resourceAccess`                                  | Read-only authorization, maintenance and session queries. See [Resource access](#resource-access-queries).                                                        | `ACCESS_RESOURCES`       |
-| `context.runSerialized(fn)`                               | Run database work in one serialized transaction. See [Serialized transactions](#serialized-transactions).                                                         | `DATABASE_ACCESS`        |
 | `context.license`                                         | Query the license (`getLicense`, `hasModule`, `verify`). Optional: older hosts do not provide it. See [License requirements](#license-requirements).              | none                     |
 | `context.ble`                                             | Bluetooth transport through Attractap readers: profiles, endpoints, sessions. See [Bluetooth Transport for Plugins](plugins/ble-transport.md).                    | `BLE_TRANSPORT`          |
 | `context.cards`                                           | Authenticate NFC cards held to your plugin's own devices. See [Card Authentication for Plugins](plugins/card-authentication.md).                                  | `CARD_AUTHENTICATION`    |
 
 > [!IMPORTANT]
-> Resolve services and repositories through `context`, never by re-initialising
-> TypeORM or instantiating a second `EventEmitter`. The whole point is that you
-> share the host's single database connection and event bus.
+> A plugin has no database access. Keep data of your own in declared tables through `context.storage`
+> (see [Plugin Storage](plugins/plugin-storage.md)) and read host data through the host ports. Never open your own
+> database connection or instantiate a second `EventEmitter`. The SDK has no TypeORM, no `DataSource`, no
+> `Repository`, no raw SQL and no host entity classes.
 
 ### Backend plugin permissions
 
@@ -310,21 +304,22 @@ array. At runtime the host hands your plugin a **guarded** `PluginContext`:
 accessing a capability whose permission you did not declare throws a clear error
 naming the missing permission.
 
-| Permission               | Grants access to                                                                                                                                                                                                                                                        |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `READ_USERS`             | `context.getRepository('User')` — read user accounts.                                                                                                                                                                                                                   |
-| `ACCESS_RESOURCES`       | `context.getRepository('Resource')` — read and write resources — and the read-only `context.resourceAccess` queries. See [Resource access](#resource-access-queries).                                                                                                   |
-| `READ_SETTINGS`          | `context.getRepository('Setting')` — read application settings.                                                                                                                                                                                                         |
-| `DATABASE_ACCESS`        | `context.dataSource`, `context.getRepository(...)` for any other entity and `context.runSerialized(...)`.                                                                                                                                                               |
-| `EMIT_EVENTS`            | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`.                                                                                                                                                                                             |
-| `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                                                                                                                                                                                 |
-| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                                                                                                                                                                                        |
-| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)`, `context.mqtt.subscribe(...)`, and `context.mqtt.publish(...)` — access an MQTT server through the host's pooled connection.                                                                                                   |
-| `READER_UI`              | `context.readerUi.invalidate(...)` and the `readerUi` provider — show widgets on Attractap reader screens. See [Reader UI](#reader-ui-and-start-hooks).                                                                                                                 |
-| `ACCESS_HOOKS`           | The `preStartHook`, `sessionEndHook`, `startBlockedQuery` and `startCapacityHook` — ask for a confirmation or block a session start, and show a blocked start in the UI. `startCapacityHook` also needs `DATABASE_ACCESS`. See [Reader UI](#reader-ui-and-start-hooks). |
-| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` — send in-app, push and email notifications under categories the plugin declares, and declare editable email templates. See [Notifications](#notifications).                                                                      |
-| `BLE_TRANSPORT`          | `context.ble` — use the Bluetooth radio of Attractap readers an administrator opened for plugins, limited to the BLE profiles your plugin registers. See [Bluetooth Transport for Plugins](plugins/ble-transport.md).                                                   |
-| `CARD_AUTHENTICATION`    | `context.cards` — authenticate NFC cards held to your plugin's own devices with the Attraccess card keys; your plugin gets the card and its owner, never the keys. See [Card Authentication for Plugins](plugins/card-authentication.md).                               |
+| Permission               | Grants access to                                                                                                                                                                                                                          |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `READ_USERS`             | `context.hostData.users` — read user names, languages, account state and role-based permission holders.                                                                                                                                   |
+| `ACCESS_RESOURCES`       | `context.hostData.resources` — read resources — and the read-only `context.resourceAccess` queries. See [Resource access](#resource-access-queries).                                                                                      |
+| `READ_SETTINGS`          | `context.hostData.settings` — read application settings.                                                                                                                                                                                  |
+| `PLUGIN_STORAGE`         | `context.storage` and `context.persistence`: the declared tables of your own plugin and transactions over them. No access to core tables. See [Plugin Storage](plugins/plugin-storage.md).                                                |
+| `TRIGGER_FLOWS`          | `context.flows.trigger(...)` and `context.hostData.flows` (flow node lookups).                                                                                                                                                            |
+| `EMIT_EVENTS`            | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`.                                                                                                                                                               |
+| `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                                                                                                                                                   |
+| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                                                                                                                                                          |
+| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)`, `context.mqtt.subscribe(...)`, and `context.mqtt.publish(...)` — access an MQTT server through the host's pooled connection.                                                                     |
+| `READER_UI`              | `context.readerUi.invalidate(...)` and the `readerUi` provider — show widgets on Attractap reader screens. See [Reader UI](#reader-ui-and-start-hooks).                                                                                   |
+| `ACCESS_HOOKS`           | The `preStartHook`, `sessionEndHook`, `startBlockedQuery` and `startCapacityHook` — ask for a confirmation or block a session start, and show a blocked start in the UI. See [Reader UI](#reader-ui-and-start-hooks).                     |
+| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` — send in-app, push and email notifications under categories the plugin declares, and declare editable email templates. See [Notifications](#notifications).                                        |
+| `BLE_TRANSPORT`          | `context.ble` — use the Bluetooth radio of Attractap readers an administrator opened for plugins, limited to the BLE profiles your plugin registers. See [Bluetooth Transport for Plugins](plugins/ble-transport.md).                     |
+| `CARD_AUTHENTICATION`    | `context.cards` — authenticate NFC cards held to your plugin's own devices with the Attraccess card keys; your plugin gets the card and its owner, never the keys. See [Card Authentication for Plugins](plugins/card-authentication.md). |
 
 ### Plugin-declared RBAC permissions
 
@@ -334,8 +329,8 @@ your live topics. A plugin can declare its own keys instead of reusing broad cor
 `system.plugins.manage`. The host adds them to the permission catalog, so administrators see them in the role editor
 and the API-token picker, grouped under the plugin's name.
 
-Plugin-declared keys need host **1.11.0-beta.1** or newer. Older hosts ignore the field, so nobody would hold your
-keys there: raise `attraccessVersion.min` (and the SDK peer range) when you start using them.
+Every host that loads SDK 2 plugins supports plugin-declared keys, so the `attraccessVersion.min` of `2.0.0-0` that
+SDK 2 requires already covers them.
 
 #### Declaring keys
 
@@ -418,9 +413,9 @@ longer declares a key, its keys become **unavailable**:
 - The role and API-token grants stay in the database. Saving a role or a token in the UI keeps the hidden grants.
 - When the plugin loads again, the keys and all their grants come back.
 
-Uninstalling an uploaded plugin deletes the plugin's own data (its down-migrations run) but keeps its permission
-rows and grants. Your migrations must not write to the core RBAC tables (`permission`, `role_permission`,
-`api_token_permission`); the host manages them.
+Uninstalling an uploaded plugin deletes the plugin's own data (the host drops its declared tables) but keeps its permission
+rows and grants. A plugin cannot write to the core RBAC tables (`permission`, `role_permission`,
+`api_token_permission`): it has no access to core tables, the host manages them.
 
 #### Using the keys
 
@@ -509,10 +504,9 @@ also removed automatically when the plugin module is destroyed.
 
 A few notes on the boundary:
 
-- `DATABASE_ACCESS` is the broad grant: it covers the raw `dataSource` and a
-  repository for **any** entity, so it implicitly includes what `READ_USERS`,
-  `ACCESS_RESOURCES` and `READ_SETTINGS` grant. Prefer the narrow per-entity
-  permissions when you only need one of those tables.
+- `PLUGIN_STORAGE` covers your **own** declared tables only. It does not include `READ_USERS`,
+  `ACCESS_RESOURCES`, `READ_SETTINGS` or `TRIGGER_FLOWS`: each `hostData` group checks its own permission when a
+  method is called. There is no way to read arbitrary host tables.
 - The event bus is exposed as a **restricted** surface. Only `emit`/`emitAsync`
   (under `EMIT_EVENTS`) and the listener methods `on`, `once`, `addListener`,
   `prependListener`, `prependOnceListener`, `many`, `prependMany`, `onAny`,
@@ -704,37 +698,86 @@ resources yield negative answers (`false`, all-false, `[]`) rather than errors.
 | `getMaintenanceWindows(resourceId, from, to)`   | Windows overlapping `[from, to)` as `{ maintenanceId, resourceId, startTime, endTime \| null, reason \| null }`. Open-ended maintenance counts until it is finished.                                                                                                                                                                                                                                                                                                             |
 | `getActiveSessions(resourceId)`                 | Running sessions `{ usageId, userId, startTime }`, earliest first.                                                                                                                                                                                                                                                                                                                                                                                                               |
 
-### Serialized transactions
+### Persistence
 
-`context.runSerialized(fn)` (permission `DATABASE_ACCESS`) runs `fn(manager)` in
-a transaction that the host executes one at a time on SQLite. The transaction
-commits when `fn` resolves and rolls back when it throws, which makes
-check-then-write sequences such as overlap checks race-free:
+A plugin has no database access. Data of your own lives in tables the plugin declares and reads and writes through
+`context.storage` (permission `PLUGIN_STORAGE`); the host owns the engine, the DDL, the migrations and the backups.
+Declaring the tables, writing the neutral migrations and the full port are described in
+[Plugin Storage](plugins/plugin-storage.md). In short:
 
 ```ts
-await context.runSerialized(async (manager) => {
-  const clash = await manager.getRepository(Booking).count({ where: {/* overlapping window */} });
+import { definePluginStorage, f, step, table } from '@attraccess/plugins-backend-sdk';
+
+const bookings = table({ id: f.id(), slot: f.string(), userId: f.integer() });
+const storage = definePluginStorage({
+  tables: { bookings },
+  migrations: [{ version: 1, name: 'create-bookings', steps: [step.createTable('bookings', bookings)] }],
+});
+
+const plugin: PluginBackendModule = {
+  storage,
+  register(context) {
+    const { bookings } = context.storage.open(storage);
+    /* ... */
+  },
+};
+```
+
+`context.persistence` (permission `PLUGIN_STORAGE`) has a single member, `transaction(work)`. It runs `work(scope)` in
+one atomic transaction that commits when `work` resolves and rolls back when it throws. `scope.afterCommit(callback)`
+runs only after the commit. It exposes no connection, repository, query API or engine information.
+
+A plugin whose declaration breaks the rules (a TypeORM migrations entry, `persistence.backends`, a bundle importing
+TypeORM, the removed `DATABASE_ACCESS` permission, a forbidden table name) is refused before anything of it is registered,
+migrated or started, and no data changes. See [Migrating Plugins to SDK 2.0](plugins/migrating-to-2.md#refusals).
+
+### Host data
+
+`context.hostData` answers read-only questions about host data with neutral models and plain values, never entities or
+query handles. Each group checks its own permission when a method is called.
+
+| Group                | Permission         | Methods                                                                                                                                                                                                                                                                                                 |
+| -------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hostData.resources` | `ACCESS_RESOURCES` | `get(id, scope?)` (a `PluginResourceModel` or `null`; with a transaction scope it reads inside that transaction), `getNames(ids)`, `filterVisible(userId, ids, { seeAll? })`, `filterRequiringSupervision(ids)`, `listIdsInGroups(groupIds)`, `countUnhealthyEntries(id)`, `listIntroducerUserIds(id)`. |
+| `hostData.users`     | `READ_USERS`       | `getUsernames(ids)`, `getLocales(ids)`, `isActive(id)` (exists, not deleted, not disabled), `listIdsWithAnyPermission(keys)`.                                                                                                                                                                           |
+| `hostData.settings`  | `READ_SETTINGS`    | `getApp(key)`: the trimmed value of an application setting, or `null`.                                                                                                                                                                                                                                  |
+| `hostData.flows`     | `TRIGGER_FLOWS`    | `findNodes(query)`: flow nodes by `type`, `typePrefix`, `dataEquals`, `dataIn`, `resourceId`, `excludeResourceId`, `excludeFlowId`, `orderById` and `limit`, as `{ id, type, resourceId, resourceName, flowId, flowName, data }`.                                                                       |
+
+`PluginUserModel` (`id`, `username`, `locale`, `isDisabled`) and `PluginResourceModel` (`id`, `name`, `type`,
+`description`, `allowTakeOver`, `maxParallelSessions`, `supervisionMode`) come from `@attraccess/application-models` and
+are re-exported by the SDK root. They are also the payload of the `RESOURCE_USAGE_STARTED` and `RESOURCE_USAGE_ENDED`
+events and the user of `AuthenticatedRequest`: tokens, contact data and other account fields never reach plugin code.
+
+### Transactions
+
+`persistence.transaction(work)` (permission `PLUGIN_STORAGE`) runs `work(scope)` in one transaction. It commits when `work` resolves and rolls back when it throws, which makes
+check-then-write sequences such as overlap checks race-free. Pass `{ scope }` to every storage call that must take part:
+
+```ts
+const { bookings } = context.storage.open(storage);
+await context.persistence.transaction(async (scope) => {
+  const clash = await bookings.count({ slot: { gte: from, lt: to } }, { scope });
   if (clash > 0) throw new ConflictException('OVERLAP');
-  await manager.getRepository(Booking).save(newBooking);
+  await bookings.insert(newBooking, { scope });
+  // Runs only after the commit, never on rollback. Failing callbacks are logged and do not undo the commit.
+  scope.afterCommit(() => context.mqtt.publish(1, 'bookings/created', '{}'));
 });
 ```
 
-The queue is shared with every core session start and end, so:
+The host either orders concurrent transactions or fails one of them with `PluginStorageConflict`; it does not retry.
+Keep effects in `afterCommit` so the caller can run the whole transaction again. Therefore:
 
-- keep `fn` short and limited to database work through the given `manager`; do
-  no HTTP, MQTT, email or other non-database I/O inside it;
-- do not nest calls. A `runSerialized` started inside `fn` would wait for `fn`
-  itself, so the host rejects it with an error instead of hanging. Pass the
-  `manager` down to helpers instead, and do not await core operations that write
-  through the same queue (such as starting or ending a session) inside `fn`;
-- read and write only through `manager` inside `fn`, not through
-  `context.getRepository(...)` or `context.dataSource`. Their connection waits
-  for the lock `fn` holds: a write there fails with `SQLITE_BUSY` after about
-  5 seconds, and it stalls other queries on that connection meanwhile.
+- keep `work` short and limited to storage and host-port reads; do no HTTP, MQTT, email or other non-database I/O
+  inside it. Register such effects with `scope.afterCommit`;
+- do not nest calls. A transaction started inside `work` would wait for `work` itself, so the host rejects it with an
+  error instead of hanging. Pass the `scope` down to helpers instead, and do not await core operations that write
+  (such as starting or ending a session) inside `work`;
+- pass `{ scope }` on every write inside `work`. A write without it is rejected with `PluginStorageInvalid`; only a
+  read without a scope runs outside the transaction, and it does not see the uncommitted writes of `work`.
 
-Serialization is per host process. Plugins that need exclusion across several API
-instances need a cross-instance lock of their own; the reservations plugin runs
-on a single instance for that reason (see
+How the host orders transactions is an engine detail. On SQLite it runs them one at a time per host process, sharing
+that queue with core session starts and ends, so plugins that need exclusion across several API instances need a
+cross-instance lock of their own; the reservations plugin runs on a single instance for that reason (see
 [Reservations](plugins/reservations/administration.md#single-instance-operation)).
 
 ### Flow nodes
@@ -775,15 +818,15 @@ Plugins that do not opt in to global flows never see `null` in `resourceId`. Nod
 
 ### Packaging the backend
 
-A backend plugin shares the host's NestJS runtime, event bus and database
-connection. For dependency-injection identities to line up, your build must use
+A backend plugin shares the host's NestJS runtime and event bus. For dependency-injection identities to line up, your build must use
 the _same_ copies of those packages the host already loaded — it must **not**
 bundle its own. Split dependencies into two groups:
 
-| Dependency                                                                                                                                                           | How to declare it                                  | Why                                                                                                                                                  |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata`, `@nestjs/swagger`, `class-validator`, `class-transformer` | `peerDependencies`, **externalized** at build time | They carry the DI identities, the shared event bus and the single DB connection. A bundled copy is a _different_ type and silently fails to connect. |
-| `@attraccess/plugins-backend-sdk` and your own code                                                                                                                  | bundle normally                                    | Safe — the SDK's runtime surface is `Symbol.for()`, identity-safe across copies.                                                                     |
+| Dependency                                                                                                                                                | How to declare it                                  | Why                                                                                                                                           |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `reflect-metadata`, `@nestjs/swagger`, `class-validator`, `class-transformer` | `peerDependencies`, **externalized** at build time | They carry the DI identities and the shared event bus. A bundled copy is a _different_ type and silently fails to connect.                    |
+| `@attraccess/plugins-backend-sdk`                                                                                                                         | **externalized** at build time                     | The host serves its own instance to the plugin loader. Do not add `typeorm` or any database driver yourself: plugins have no database access. |
+| Your own code                                                                                                                                             | bundle normally                                    | -                                                                                                                                             |
 
 Ship a **CommonJS** entry point (`index.js`), not an ES module. A minimal
 [esbuild](https://esbuild.github.io/) build that follows the rule:
@@ -793,14 +836,14 @@ esbuild backend/plugin.ts \
   --bundle --platform=node --format=cjs --outfile=dist/index.js \
   --external:@nestjs/common --external:@nestjs/core \
   --external:@nestjs/event-emitter --external:eventemitter2 \
-  --external:typeorm --external:reflect-metadata \
+  --external:reflect-metadata \
   --external:@nestjs/swagger --external:class-validator --external:class-transformer \
   --external:@attraccess/plugins-backend-sdk
 ```
 
 > [!WARNING]
 > If you bundle any of the externalized packages, your plugin may load without
-> errors but quietly fail to receive events, share the database, or resolve host
+> errors but quietly fail to receive events or resolve host
 > services. When in doubt, keep the list above external.
 
 ## Reader UI and start hooks
@@ -810,14 +853,14 @@ A plugin only describes **data** (a "Reader UI schema v1" node tree). No plugin 
 host validates, sanitizes and renders it. Admins configure this under **Reader display**, see
 [Reader display](attractap/reader-ui.md).
 
-| What                | Declared as                                                               | Permission                           |
-| ------------------- | ------------------------------------------------------------------------- | ------------------------------------ |
-| Slot widgets        | `readerUi` (provider or `(context) => provider`)                          | `READER_UI`                          |
-| Pre-start hook      | `preStartHook`                                                            | `ACCESS_HOOKS`                       |
-| Advisory after-stop | `sessionEndHook`                                                          | `ACCESS_HOOKS`                       |
-| Start-blocked state | `startBlockedQuery` and `context.startBlocked.invalidate({ resourceId })` | `ACCESS_HOOKS`                       |
-| Start capacity      | `startCapacityHook`                                                       | `ACCESS_HOOKS` and `DATABASE_ACCESS` |
-| Re-render on change | `context.readerUi.invalidate({ resourceId?, readerId? })`                 | `READER_UI`                          |
+| What                | Declared as                                                               | Permission     |
+| ------------------- | ------------------------------------------------------------------------- | -------------- |
+| Slot widgets        | `readerUi` (provider or `(context) => provider`)                          | `READER_UI`    |
+| Pre-start hook      | `preStartHook`                                                            | `ACCESS_HOOKS` |
+| Advisory after-stop | `sessionEndHook`                                                          | `ACCESS_HOOKS` |
+| Start-blocked state | `startBlockedQuery` and `context.startBlocked.invalidate({ resourceId })` | `ACCESS_HOOKS` |
+| Start capacity      | `startCapacityHook`                                                       | `ACCESS_HOOKS` |
+| Re-render on change | `context.readerUi.invalidate({ resourceId?, readerId? })`                 | `READER_UI`    |
 
 A plugin that declares `readerUi` or a hook without the matching permission **fails to load** and is quarantined.
 The first-party [Reservations](plugins/reservations/overview.md) plugin is a real-world user of both hooks: its pre-start hook blocks or confirms starts around bookings, and its session-end hook asks the holder to keep or free the rest of a booking.
@@ -1031,8 +1074,8 @@ simultaneous starts could both pass and take the same slot.
 
 ```ts
 const startCapacityHook: StartCapacityHook = async (ctx) => {
-  // ctx.manager is the host's start transaction: only read through it
-  const held = await countSlotsHeldForOthers(ctx.manager, ctx.resourceId, ctx.userId, ctx.now); // your own query
+  // ctx.scope is the host's start transaction: only read through it
+  const held = await countSlotsHeldForOthers(ctx.scope, ctx.resourceId, ctx.userId, ctx.now); // reads your own tables with { scope }
   if (!held) return { heldSlots: 0 };
   return {
     heldSlots: held,
@@ -1057,13 +1100,14 @@ const startCapacityHook: StartCapacityHook = async (ctx) => {
   `occupiedSlots + heldSlots >= sessionLimit`, so simultaneous starts can never take a held slot.
 - **Always return a `reason` when your held slots can fill the machine.** Without one core refuses with its generic
   "unavailable" text and audits an invalid result.
-- **Only read through `ctx.manager`, never nest `runSerialized`.** `ctx.manager` is core's transactional
-  `EntityManager`: never write through it. The start transaction is already serialized; starting another one inside
-  the hook makes it wait for itself. Keep the hook to one indexed query.
+- **Only read through `ctx.scope`, never nest `persistence.transaction`.** `ctx.scope` is a `PluginTransactionScope`
+  of core's start transaction (read your own tables with `{ scope: ctx.scope }`): never write through it and
+  never call `scope.afterCommit` on it. A storage write or `persistence.transaction` inside the hook that does not use
+  `ctx.scope` is rejected. Keep the hook to one indexed query.
 - **Failures.** A failure, a timeout and an open circuit breaker follow the per-resource, per-plugin failure policy
   (fail open or fail closed, see [Failures and trust](#failures-and-trust)) and are audited.
-- Requires `ACCESS_HOOKS` and `DATABASE_ACCESS` (the hook is handed core's transaction). A plugin that declares it
-  without both fails to load. Without a registered hook nothing changes.
+- Requires `ACCESS_HOOKS`. A plugin that declares it without the permission fails to load. Reading your own tables
+  through `ctx.scope` additionally needs `PLUGIN_STORAGE`. Without a registered hook nothing changes.
 
 ### After-stop question
 
@@ -1549,9 +1593,9 @@ External plugin builds must include the same shared entry:
 }
 ```
 
-Declare `@attraccess/plugins-frontend-ui` as a peer dependency and require
-Attraccess 1.11.0 or later in both the npm `attraccess.host` range and the ZIP
-manifest's `attraccessVersion.min`, since older hosts do not share this module.
+Declare `@attraccess/plugins-frontend-ui` as a peer dependency (`^2.0.0-0`). Every
+SDK 2.0 plugin already requires Attraccess `2.0.0-0` or later in `attraccess.host`
+and `attraccessVersion.min`, and those hosts share this module.
 
 ### Shared UI components
 
@@ -1578,11 +1622,10 @@ The `StandardModal` and `StandardDrawer` exports of
 `@attraccess/plugins-frontend-sdk` are **deprecated** re-exports of the
 components above; import them from `@attraccess/plugins-frontend-ui` instead.
 
-These components need a host and `@attraccess/plugins-frontend-ui` that already
-contain them (**1.11.0 or later**, see the release that introduces them). A
-plugin that uses them fails at runtime on an older host, so raise
-`attraccess.host`, `attraccessVersion.min` and the peer dependency range
-accordingly.
+Every Attraccess 2.0 host and `@attraccess/plugins-frontend-ui` 2.0 contain these
+components, so the `2.0.0-0` minimum an SDK 2.0 plugin declares anyway is enough.
+Components added in a later release need that release: raise `attraccess.host`,
+`attraccessVersion.min` and the peer dependency range accordingly.
 
 ### Packaging the frontend
 

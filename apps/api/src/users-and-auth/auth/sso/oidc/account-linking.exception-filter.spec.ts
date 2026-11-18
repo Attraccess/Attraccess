@@ -1,5 +1,5 @@
 import { ArgumentsHost } from '@nestjs/common';
-import { SSOProviderType } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { AccountLinkingExceptionFilter } from './account-linking.exception-filter';
 import { AccountLinkingRequiredException } from './exceptions/account-linking-required.exception';
 import { SSOLinkTokenService } from '../link-token.service';

@@ -3,33 +3,33 @@ import { Logger } from '@nestjs/common';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 import { ModuleRef } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
-import { Column, DataSource, Entity, EntityTarget, ObjectLiteral, PrimaryGeneratedColumn, Repository } from 'typeorm';
-import { PluginContext, SystemEvent, SystemEventHandler, SystemEventPayload } from '@attraccess/plugins-backend-sdk';
+import { DataSource } from 'typeorm';
+import {
+  PluginBackendModule,
+  PluginContext,
+  SystemEvent,
+  SystemEventHandler,
+  SystemEventPayload,
+} from '@attraccess/plugins-backend-sdk';
+import { PluginPermission } from '@attraccess/plugins-backend-sdk';
+import {
+  createSqlitePluginMigrationEngine,
+  createSqlitePluginPersistenceHost,
+} from '../../database/sqlite/plugin-storage/sqlite-plugin-storage';
+import { loadPluginEntryExports } from '../runtime/module-loader';
+import { compileModuleStorage } from '../plugin-storage/storage-loader';
 import { PluginEventsService } from '../plugin-events.service';
 import { build } from 'esbuild';
-import { createRequire } from 'module';
-import { existsSync, mkdirSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
 import { dirname, join, resolve } from 'path';
-
-@Entity()
-class PocNote {
-  @PrimaryGeneratedColumn()
-  id!: number;
-
-  @Column()
-  message!: string;
-}
 
 interface PocPongPayload {
   eventsInstanceMatch: boolean;
-  dataSourceInstanceMatch: boolean;
+  entityMetadataResolved: boolean;
   savedId: number;
   savedMessage: string;
   hostGreeting: string;
-}
-
-interface PluginBackendModule {
-  register(context: PluginContext): import('@nestjs/common').DynamicModule;
 }
 
 const PONG_EVENT = 'poc.plugin.pong';
@@ -53,7 +53,6 @@ const SHARED = [
   '@nestjs/core',
   '@nestjs/event-emitter',
   'eventemitter2',
-  'typeorm',
   'reflect-metadata',
   '@attraccess/plugins-backend-sdk',
 ];
@@ -74,18 +73,32 @@ async function buildArtifact(outfile: string, external: string[]): Promise<void>
 }
 
 function loadDefaultExport(artifactPath: string): PluginBackendModule {
-  const pluginRequire = createRequire(__filename);
-  return pluginRequire(artifactPath).default as PluginBackendModule;
+  // The host's own loader: the SDK root resolves to the host's single instance, as for an installed plugin.
+  return loadPluginEntryExports(artifactPath).default as PluginBackendModule;
 }
 
 async function bootAndPing(artifactPath: string): Promise<PocPongPayload> {
-  const dataSource = new DataSource({
+  const plugin = loadDefaultExport(artifactPath);
+  // The host creates the declared tables before the plugin runs, then serves them through the record port.
+  const directory = mkdtempSync(join(tmpdir(), 'poc-plugin-'));
+  const database = join(directory, 'host.sqlite');
+  const compiled = compileModuleStorage(
+    { name: 'poc-backend-plugin', permissions: [PluginPermission.PLUGIN_STORAGE] },
+    plugin,
+  );
+  expect(compiled?.ownedTables).toEqual(['plugin_poc_backend_plugin_notes']);
+  if (!compiled) throw new Error('the poc plugin declares storage');
+  await createSqlitePluginMigrationEngine(
+    { type: 'better-sqlite3', invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' }, database },
+    () => ({ type: 'better-sqlite3', database }),
+  ).migrate(compiled);
+  const dataSource = await new DataSource({
     type: 'better-sqlite3',
-    database: ':memory:',
-    synchronize: true,
-    entities: [PocNote],
-  });
-  await dataSource.initialize();
+    invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+    database,
+    entities: [],
+  }).initialize();
+  const contexts = createSqlitePluginPersistenceHost(() => dataSource).createContexts('poc-backend-plugin', compiled);
 
   const events = new EventEmitter2();
   const moduleRefHolder: { ref: ModuleRef | null } = { ref: null };
@@ -94,14 +107,13 @@ async function bootAndPing(artifactPath: string): Promise<PocPongPayload> {
   const context: PluginContext = {
     manifest: { id: 'poc', name: 'poc-backend-plugin', version: '1.0.0', pluginDirectory: 'poc-backend-plugin' },
     events,
-    dataSource,
     logger: new Logger('poc-backend-plugin'),
+    persistence: contexts.persistence,
+    storage: contexts.storage,
     mqtt: {
       subscribe: () => ({ unsubscribe: () => undefined }),
       publish: () => Promise.resolve(),
     },
-    getRepository: <T extends ObjectLiteral>(entity: EntityTarget<T>): Repository<T> =>
-      dataSource.getRepository(entity),
     get: <T>(token: import('@nestjs/common').Type<T> | string | symbol): T => {
       if (!moduleRefHolder.ref) throw new Error('host ModuleRef not ready');
       return moduleRefHolder.ref.get(token, { strict: false });
@@ -125,7 +137,6 @@ async function bootAndPing(artifactPath: string): Promise<PocPongPayload> {
     },
   };
 
-  const plugin = loadDefaultExport(artifactPath);
   const app: TestingModule = await Test.createTestingModule({
     imports: [EventEmitterModule.forRoot(), plugin.register(context)],
     providers: [{ provide: 'POC_HOST_GREETER', useValue: { greet: () => 'hello from host' } }],
@@ -143,6 +154,7 @@ async function bootAndPing(artifactPath: string): Promise<PocPongPayload> {
 
   await app.close();
   await dataSource.destroy();
+  rmSync(directory, { recursive: true, force: true });
   return payload;
 }
 
@@ -161,21 +173,21 @@ describe('Backend plugin PoC — separately-built plugin loaded via createRequir
     rmSync(BUILD_DIR, { recursive: true, force: true });
   });
 
-  it('externalized build: shares host EventEmitter2 + DataSource and round-trips through the host', async () => {
+  it('externalized build: shares the host EventEmitter2 and stores through the record port', async () => {
     const payload = await bootAndPing(goodArtifact);
 
     expect(payload.eventsInstanceMatch).toBe(true);
-    expect(payload.dataSourceInstanceMatch).toBe(true);
+    expect(payload.entityMetadataResolved).toBe(true);
     expect(payload.savedId).toBeGreaterThan(0);
     expect(payload.savedMessage).toBe('poc-backend-plugin:hello');
     expect(payload.hostGreeting).toBe('hello from host');
   }, 60000);
 
-  it('mis-bundled build: loses EventEmitter2 token identity while the host-owned DataSource still matches', async () => {
+  it('mis-bundled build: loses EventEmitter2 token identity while the record port still serves the declared table', async () => {
     const payload = await bootAndPing(badArtifact);
 
     expect(payload.eventsInstanceMatch).toBe(false);
-    expect(payload.dataSourceInstanceMatch).toBe(true);
+    expect(payload.entityMetadataResolved).toBe(true);
     expect(payload.savedId).toBeGreaterThan(0);
     expect(payload.hostGreeting).toBe('hello from host');
   }, 60000);

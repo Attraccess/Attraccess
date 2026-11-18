@@ -1,7 +1,8 @@
-import { ResourceMaintenance, ResourceUsage, SupervisionMode, User } from '@attraccess/database-entities';
+import { supervisionModesFrom } from '../../resources/usage/authorization/supervision-modes.test-fixture';
+import type { PluginCoreUser } from '../persistence/plugin-host-data.port';
+import { SupervisionMode } from '@attraccess/application-models';
 import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
-import { createResourceUsageServiceFixture } from '../../resources/usage/sessions/fixtures/service.test-fixture';
-import { resetTestFixture } from '../../resources/usage/sessions/fixtures/setup.test-fixture';
+import { createFakeStoreUsageScope } from '../../resources/usage/sessions/fixtures/fake-store.test-fixture';
 import { ResourceActivityVisibilityService } from '../../resources/usage/authorization/resource-activity-visibility.service';
 import { createResourceAccessContext, ResourceAccessDeps } from './resource-access';
 
@@ -11,8 +12,8 @@ import { createResourceAccessContext, ResourceAccessDeps } from './resource-acce
  * introduction, group introduction, retraining and maintainer rules exercised here are core's, not a copy.
  */
 describe('plugin resourceAccess', () => {
-  const scope = createResourceUsageServiceFixture();
-  const user = { id: 5 } as User;
+  let scope: Awaited<ReturnType<typeof createFakeStoreUsageScope>>;
+  const user = { id: 5 } as PluginCoreUser;
   const resources = new Map<number, { id: number; supervisionMode: SupervisionMode }>();
   let permissions: Set<string>;
   let maintainerOf: Set<number>;
@@ -22,33 +23,31 @@ describe('plugin resourceAccess', () => {
   let activityVisibility: 'all' | 'introduced';
 
   beforeEach(async () => {
-    await resetTestFixture(scope as never);
+    scope = await createFakeStoreUsageScope();
     permissions = new Set();
     resources.clear();
     resources.set(1, { id: 1, supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED });
-    scope.mockRbacService.getEffectivePermissions.mockImplementation(async () => permissions);
-    scope.mockResourceIntroductionService.hasValidIntroduction.mockResolvedValue(false);
-    scope.mockResourceIntroducersService.canMaintain.mockResolvedValue(false);
-    scope.mockResourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
-    scope.mockResourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
-    scope.mockResourceRetrainingService.isResourceIntroductionBlocked.mockResolvedValue(false);
-    scope.mockResourceRetrainingService.isGroupIntroductionBlocked.mockResolvedValue(false);
-    scope.mockResourceRetrainingService.getResourceRetrainingStatus.mockResolvedValue({
+    scope.rbac.getEffectivePermissions.mockImplementation(async () => permissions);
+    scope.introductions.hasValidIntroduction.mockResolvedValue(false);
+    scope.introducers.canMaintain.mockResolvedValue(false);
+    scope.groupIntroductions.hasValidIntroduction.mockResolvedValue(false);
+    scope.groups.getGroupsOfResource.mockResolvedValue([]);
+    scope.retraining.isResourceIntroductionBlocked.mockResolvedValue(false);
+    scope.retraining.isGroupIntroductionBlocked.mockResolvedValue(false);
+    scope.retraining.getResourceRetrainingStatus.mockResolvedValue({
       blocksAccess: false,
       dueAt: null,
     });
     maintainerOf = new Set();
     groupMaintainer = false;
     const maintenanceService = new ResourceMaintenanceService(
-      null as never,
-      { findOne: async ({ where }) => ({ id: where.id, groups: [{ id: 9 }] }) } as never,
       {
-        findOne: async ({ where }) =>
-          (where.resource ? maintainerOf.has(where.resource.id) : groupMaintainer) ? { id: 1 } : null,
+        lookupMaintenanceAccess: async (_userId: number, resourceId: number) =>
+          maintainerOf.has(resourceId) ? 'direct' : groupMaintainer ? 'group' : 'none',
       } as never,
       null as never,
       null as never,
-      scope.mockRbacService as never,
+      scope.rbac as never,
     );
     maintenance = {
       canManageMaintenance: jest.fn((target, resourceId) =>
@@ -60,14 +59,14 @@ describe('plugin resourceAccess', () => {
     activityVisibility = 'introduced';
     const visibility = new ResourceActivityVisibilityService(
       { getResourceActivityVisibility: async () => activityVisibility } as never,
-      { find: async () => [...resources.values()] } as never,
+      supervisionModesFrom(async () => [...resources.values()]) as never,
       scope.service,
     );
     access = createResourceAccessContext(() => ({
       usage: scope.service,
       visibility,
       maintenance,
-      rbac: scope.mockRbacService as never,
+      rbac: scope.rbac as never,
       findUser: async (id) => (id === user.id ? user : null),
       findResource: async (id) => resources.get(id) ?? null,
       listResourceIds: async () => [...resources.keys()],
@@ -77,7 +76,7 @@ describe('plugin resourceAccess', () => {
   describe('canSeeUsageAttribution', () => {
     it('follows core: full activity access sees who uses the machine', async () => {
       permissions = new Set(['resources.read']);
-      scope.mockResourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+      scope.introductions.hasValidIntroduction.mockResolvedValue(true);
       await expect(access.canSeeUsageAttribution(user.id, 1)).resolves.toBe(true);
     });
 
@@ -94,7 +93,7 @@ describe('plugin resourceAccess', () => {
 
     it('denies a user without read access, who sees no activity at all (hidden resource)', async () => {
       permissions = new Set();
-      scope.mockResourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+      scope.introductions.hasValidIntroduction.mockResolvedValue(true);
       await expect(access.canSeeUsageAttribution(user.id, 1)).resolves.toBe(false);
     });
 
@@ -134,37 +133,37 @@ describe('plugin resourceAccess', () => {
     });
 
     it('allows a user with a valid direct introduction', async () => {
-      scope.mockResourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+      scope.introductions.hasValidIntroduction.mockResolvedValue(true);
       await expect(access.canStart(user.id, 1)).resolves.toMatchObject({ allowed: true, requiresSupervision: false });
     });
 
     it('allows a user whose group introduction is valid', async () => {
-      scope.mockResourceGroupsService.getGroupsOfResource.mockResolvedValue([{ id: 9 } as never]);
-      scope.mockResourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(true);
+      scope.groups.getGroupsOfResource.mockResolvedValue([{ id: 9 } as never]);
+      scope.groupIntroductions.hasValidIntroduction.mockResolvedValue(true);
       await expect(access.canStart(user.id, 1)).resolves.toMatchObject({ allowed: true });
-      expect(scope.mockResourceGroupsIntroductionsService.hasValidIntroduction).toHaveBeenCalledWith(
+      expect(scope.groupIntroductions.hasValidIntroduction).toHaveBeenCalledWith(
         { groupId: 9, userId: user.id },
         undefined,
       );
     });
 
     it('blocks a valid direct introduction that is pending retraining', async () => {
-      scope.mockResourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
-      scope.mockResourceRetrainingService.isResourceIntroductionBlocked.mockResolvedValue(true);
+      scope.introductions.hasValidIntroduction.mockResolvedValue(true);
+      scope.retraining.isResourceIntroductionBlocked.mockResolvedValue(true);
       await expect(access.canStart(user.id, 1)).resolves.toMatchObject({ allowed: false });
     });
 
     it('blocks a valid group introduction that is pending retraining', async () => {
-      scope.mockResourceGroupsService.getGroupsOfResource.mockResolvedValue([{ id: 9 } as never]);
-      scope.mockResourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(true);
-      scope.mockResourceRetrainingService.isGroupIntroductionBlocked.mockResolvedValue(true);
+      scope.groups.getGroupsOfResource.mockResolvedValue([{ id: 9 } as never]);
+      scope.groupIntroductions.hasValidIntroduction.mockResolvedValue(true);
+      scope.retraining.isGroupIntroductionBlocked.mockResolvedValue(true);
       await expect(access.canStart(user.id, 1)).resolves.toMatchObject({ allowed: false });
     });
 
     it('allows introducers, maintainers and resource managers', async () => {
-      scope.mockResourceIntroducersService.canMaintain.mockResolvedValue(true);
+      scope.introducers.canMaintain.mockResolvedValue(true);
       await expect(access.canStart(user.id, 1)).resolves.toMatchObject({ allowed: true });
-      scope.mockResourceIntroducersService.canMaintain.mockResolvedValue(false);
+      scope.introducers.canMaintain.mockResolvedValue(false);
       permissions = new Set(['resources.update']);
       await expect(access.canStart(user.id, 1)).resolves.toMatchObject({ allowed: true });
     });
@@ -180,7 +179,7 @@ describe('plugin resourceAccess', () => {
 
     it('lets an introduced user start alone when supervision is merely allowed', async () => {
       resources.set(1, { id: 1, supervisionMode: SupervisionMode.SUPERVISION_ALLOWED });
-      scope.mockResourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+      scope.introductions.hasValidIntroduction.mockResolvedValue(true);
       await expect(access.canStart(user.id, 1)).resolves.toEqual({
         allowed: true,
         requiresSupervision: false,
@@ -190,7 +189,7 @@ describe('plugin resourceAccess', () => {
 
     it('requires supervision for everyone when the resource mandates it', async () => {
       resources.set(1, { id: 1, supervisionMode: SupervisionMode.SUPERVISION_REQUIRED });
-      scope.mockResourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+      scope.introductions.hasValidIntroduction.mockResolvedValue(true);
       await expect(access.canStart(user.id, 1)).resolves.toEqual({
         allowed: false,
         requiresSupervision: true,
@@ -273,7 +272,7 @@ describe('plugin resourceAccess', () => {
       const token = tokenWith();
       maintainerOf.add(1);
       await expect(access.canMaintain(token, 1)).resolves.toBe(true);
-      scope.mockResourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+      scope.introductions.hasValidIntroduction.mockResolvedValue(true);
       await expect(access.canStart(token, 1)).resolves.toMatchObject({ allowed: true });
     });
 
@@ -306,18 +305,14 @@ describe('plugin resourceAccess', () => {
     });
 
     it('lists resources the user is introduced to, excluding retraining-blocked ones', async () => {
-      scope.mockResourceIntroductionService.hasValidIntroduction.mockImplementation(async (id: number) => id !== 3);
-      scope.mockResourceRetrainingService.isResourceIntroductionBlocked.mockImplementation(
-        async (id: number) => id === 2,
-      );
+      scope.introductions.hasValidIntroduction.mockImplementation(async (id: number) => id !== 3);
+      scope.retraining.isResourceIntroductionBlocked.mockImplementation(async (id: number) => id === 2);
       await expect(access.listResourceIdsIntroduced(user.id)).resolves.toEqual([1]);
     });
 
     it('includes resources reachable through a valid group introduction', async () => {
-      scope.mockResourceGroupsService.getGroupsOfResource.mockImplementation(async (id: number) =>
-        id === 3 ? [{ id: 9 } as never] : [],
-      );
-      scope.mockResourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(true);
+      scope.groups.getGroupsOfResource.mockImplementation(async (id: number) => (id === 3 ? [{ id: 9 } as never] : []));
+      scope.groupIntroductions.hasValidIntroduction.mockResolvedValue(true);
       await expect(access.listResourceIdsIntroduced(user.id)).resolves.toEqual([3]);
     });
 
@@ -344,14 +339,14 @@ describe('plugin resourceAccess', () => {
           startTime: new Date('2029-12-31T00:00:00Z'),
           endTime: null,
           reason: 'open',
-        } as ResourceMaintenance,
+        } as never,
         {
           id: 2,
           resourceId: 1,
           startTime: new Date('2030-01-01T10:00:00Z'),
           endTime: new Date('2030-01-01T12:00:00Z'),
           reason: undefined,
-        } as ResourceMaintenance,
+        } as never,
       ]);
       await expect(access.getMaintenanceWindows(1, from, to)).resolves.toEqual([
         { maintenanceId: 1, resourceId: 1, startTime: new Date('2029-12-31T00:00:00Z'), endTime: null, reason: 'open' },
@@ -370,7 +365,7 @@ describe('plugin resourceAccess', () => {
       const startTime = new Date('2030-01-01T10:00:00Z');
       jest
         .spyOn(scope.service, 'getActiveSessionsForResource')
-        .mockResolvedValue([{ id: 8, userId: 5, startTime, resourceId: 1 } as ResourceUsage]);
+        .mockResolvedValue([{ id: 8, userId: 5, startTime, resourceId: 1 } as never]);
       await expect(access.getActiveSessions(1)).resolves.toEqual([{ usageId: 8, userId: 5, startTime }]);
     });
   });

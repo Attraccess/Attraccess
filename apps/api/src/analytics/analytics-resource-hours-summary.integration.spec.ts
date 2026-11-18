@@ -1,15 +1,16 @@
+import { createOperatingTimelineStore } from '../database/adapters/operating-intervals/typeorm-operating-timeline.store';
 import {
   BillingTransaction,
   entities,
   Resource,
   ResourceOperatingInterval,
   ResourceUsage,
-  ResourceUsageAction,
-  ResourceUsageLifecycleAttempt,
 } from '@attraccess/database-entities';
+import { ResourceUsageAction } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
 import { ResourceOperatingAttributionService } from '../resources/operating-intervals/resource-operating-attribution.service';
 import { AnalyticsService } from './analytics.service';
+import { TypeOrmAnalyticsReader } from '../database/adapters/analytics/typeorm-analytics-reader';
 
 const HOUR = 3_600_000;
 const FEBRUARY = { start: new Date('2024-02-01T00:00:00Z'), end: new Date('2024-03-01T00:00:00Z') };
@@ -45,21 +46,20 @@ describe('AnalyticsService resource hours summary (SQLite)', () => {
   beforeEach(async () => {
     source = await new DataSource({
       type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: ':memory:',
       entities: Object.values(entities),
       synchronize: true,
     }).initialize();
     await source.query('PRAGMA foreign_keys = OFF');
     await source.query("INSERT INTO user (username, email) VALUES ('owner', 'owner@example.test')");
-    attribution = new ResourceOperatingAttributionService(
-      source.getRepository(ResourceOperatingInterval),
-      source.getRepository(ResourceUsage),
-      source.getRepository(ResourceUsageLifecycleAttempt),
-    );
+    attribution = new ResourceOperatingAttributionService(createOperatingTimelineStore(source));
     service = new AnalyticsService(
-      source.getRepository(ResourceUsage),
-      source.getRepository(BillingTransaction),
-      source.getRepository(Resource),
+      new TypeOrmAnalyticsReader(
+        source.getRepository(ResourceUsage),
+        source.getRepository(BillingTransaction),
+        source.getRepository(Resource),
+      ),
       attribution,
     );
   }, 30_000);

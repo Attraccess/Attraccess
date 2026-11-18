@@ -1,4 +1,4 @@
-import type { ReservationEntity } from '../entities/reservation.entity';
+import type { ReservationRow } from '../storage/reservation-table';
 
 /**
  * Event sink for reservation state changes. Called by ReservationService in the background AFTER the
@@ -7,17 +7,17 @@ import type { ReservationEntity } from '../entities/reservation.entity';
  */
 export interface ReservationNotifier {
   /** A booking now waits for approval: notify the managers of the resource. */
-  onPending(reservation: ReservationEntity): Promise<void> | void;
+  onPending(reservation: ReservationRow): Promise<void> | void;
   /** A booking became confirmed (directly on creation, or by approval when `viaApproval`). */
-  onConfirmed(reservation: ReservationEntity, context: { viaApproval: boolean }): Promise<void> | void;
-  onRejected(reservation: ReservationEntity): Promise<void> | void;
+  onConfirmed(reservation: ReservationRow, context: { viaApproval: boolean }): Promise<void> | void;
+  onRejected(reservation: ReservationRow): Promise<void> | void;
   /** `byUserId` is the holder or a manager; `byHolder` tells which. */
-  onCancelled(reservation: ReservationEntity, context: { byUserId: number; byHolder: boolean }): Promise<void> | void;
+  onCancelled(reservation: ReservationRow, context: { byUserId: number; byHolder: boolean }): Promise<void> | void;
   /** Ended early by the holder or, when `byUserId` differs from the holder, by a manager. */
-  onEndedEarly(reservation: ReservationEntity, context: { byUserId: number }): Promise<void> | void;
+  onEndedEarly(reservation: ReservationRow, context: { byUserId: number }): Promise<void> | void;
   /**
    * Cancelled by the system: the plugin was disabled for the resource (reason `reservations disabled`) or the
    * machine lost slots (reason `machine capacity reduced`, `byUserId` null when no user changed the limit).
    */
-  onRemoved(reservation: ReservationEntity, context: { byUserId: number | null; reason: string }): Promise<void> | void;
+  onRemoved(reservation: ReservationRow, context: { byUserId: number | null; reason: string }): Promise<void> | void;
 }

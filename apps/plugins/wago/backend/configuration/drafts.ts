@@ -4,7 +4,7 @@ import { WagoAudit, wagoAuditSummary } from '../audit/index';
 
 import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 
-import { type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
+import { type PluginAuditPrincipal, type PluginTransactionScope } from '@attraccess/plugins-backend-sdk';
 
 import {
   applyPreset,
@@ -25,7 +25,7 @@ import {
   type ConfigurationEditorMetadata,
 } from './editor';
 
-import { WagoConfigurationDraft } from './draft.entity';
+import type { WagoConfigurationDraft, WagoConfigurationDraftInput } from './draft.entity';
 
 import { applySelectedChanges, parsePresetProvenance } from '../controllers/model';
 
@@ -40,24 +40,16 @@ export abstract class WagoDrafts extends WagoRegistry {
     await this.claimedController(controllerId);
     const pageOffset = Number.isSafeInteger(offset) && offset > 0 ? offset : 0;
     const pageLimit = Number.isSafeInteger(limit) && limit > 0 ? Math.min(limit, 100) : 20;
-    const revisions = await this.revisions.find({
+    const rows = await this.revisions.find({
       where: { controllerId },
-      order: { revision: 'DESC' },
-      select: {
-        id: true,
-        controllerId: true,
-        revision: true,
-        contentHash: true,
-        state: true,
-        rejectionErrors: true,
-        rejectionAcknowledgedAt: true,
-        rejectionAcknowledgedBy: true,
-        publishedAt: true,
-        reportedAt: true,
-        presetProvenance: true,
-      },
-      skip: pageOffset,
-      take: pageLimit,
+      orderBy: [{ field: 'revision', direction: 'desc' }],
+      offset: pageOffset,
+      limit: pageLimit,
+    });
+    // The record port returns whole rows; the editor's history list never carries the snapshots.
+    const revisions = rows.map(({ snapshot: _snapshot, ...summary }) => {
+      void _snapshot;
+      return summary;
     });
     return { revisions, offset: pageOffset, limit: pageLimit };
   }
@@ -135,7 +127,7 @@ export abstract class WagoDrafts extends WagoRegistry {
               },
             ]);
         draft.updatedAt = new Date().toISOString();
-        return this.drafts.save(draft);
+        return this.storeDraft(draft);
       };
       // Classification and before/after evidence belong to this same configuration lock.
       return principal
@@ -153,7 +145,7 @@ export abstract class WagoDrafts extends WagoRegistry {
 
   protected async draftForPreset(controllerId: number): Promise<WagoConfigurationDraft> {
     await this.claimedController(controllerId);
-    const draft = await this.drafts.findOneBy({ controllerId });
+    const draft = await this.drafts.findOne({ where: { controllerId } });
     if (!draft) throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
     return draft;
   }
@@ -272,14 +264,26 @@ export abstract class WagoDrafts extends WagoRegistry {
     await this.claimedController(controllerId);
     const [revision] = await this.revisions.find({
       where: { controllerId, state: 'applied' },
-      order: { revision: 'DESC' },
-      take: 1,
+      orderBy: [{ field: 'revision', direction: 'desc' }],
+      limit: 1,
     });
     return revision ?? null;
   }
 
+  /** Stores the draft: one per controller, created on first save. */
+  protected storeDraft(
+    draft: WagoConfigurationDraftInput,
+    scope?: PluginTransactionScope,
+  ): Promise<WagoConfigurationDraft> {
+    return this.drafts.upsert(draft, {
+      conflictOn: ['controllerId'],
+      update: ['snapshot', 'reviewedHash', 'presetProvenance', 'updatedAt'],
+      scope,
+    });
+  }
+
   async getDraft(controllerId: number): Promise<WagoConfigurationDraft | null> {
     await this.claimedController(controllerId);
-    return this.drafts.findOneBy({ controllerId });
+    return this.drafts.findOne({ where: { controllerId } });
   }
 }

@@ -7,10 +7,14 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { firstValueFrom, of, Subject } from 'rxjs';
 import supertest from 'supertest';
-import { Resource, ResourceIntroducerType, ResourceUsage, SupervisionMode } from '@attraccess/database-entities';
+import {
+  ResourceIntroducerType,
+  SupervisionMode,
+  type ResourceRecord as Resource,
+  type UsageSession as ResourceUsage,
+} from '@attraccess/application-models';
 import { AuthenticatedUser, DualAuthGuard } from '@attraccess/plugins-backend-sdk';
 import { ResourceActivityVisibility } from '../settings/constants';
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
@@ -27,9 +31,12 @@ import { SSEController } from './sse/sse.controller';
 import { ResourceEventsService } from './sse/resource-events.service';
 import { ResourceUsageController } from './usage/sessions/resource-usage.controller';
 import { ResourceUsageService } from './usage/sessions/resource-usage.service';
+import { USAGE_SESSION_STORE } from './usage/usage-session-store.port';
+import { supervisionModesFrom } from './usage/authorization/supervision-modes.test-fixture';
 import { ResourceActivityVisibilityService } from './usage/authorization/resource-activity-visibility.service';
 import { PreStartService } from './usage/pre-start/pre-start.service';
 import { SessionEndNotifier } from './usage/pre-start/session-end-notifier.service';
+import { RESOURCE_STORE } from './resource-store.port';
 import { ResourceLiveTopicsProvider } from './resource-live-topics.provider';
 import { LiveTopicsService } from '../live-updates/live-topics.service';
 import { FlowLogRecorderService } from './flows/logs/flow-log-recorder.service';
@@ -65,6 +72,14 @@ const PERSONAS: Record<string, Persona> = {
   'manage resources': { permissions: ['resources.read', 'resources.update'] },
   'manage access': { permissions: ['resources.read', 'resources.access.manage'] },
 };
+
+const supervisionFind = jest.fn(async ({ where }: { where: { id: { _value: number[] } } }) =>
+  where.id._value.map((id) => ({
+    id,
+    supervisionMode:
+      id === SUPERVISED_MACHINE ? SupervisionMode.SUPERVISION_ALLOWED : SupervisionMode.INTRODUCTION_REQUIRED,
+  })),
+);
 
 describe('reads of equipment activity and access lists (ATT-1149)', () => {
   let app: INestApplication;
@@ -193,20 +208,8 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
         { provide: ResourceEventsService, useValue: eventsService },
         { provide: SseInstrumentation, useValue: { wrap: (_name: string, source: unknown) => source } },
         { provide: SettingsService, useValue: { getResourceActivityVisibility: jest.fn(async () => mode) } },
-        {
-          provide: getRepositoryToken(Resource),
-          useValue: {
-            find: jest.fn(async ({ where }: { where: { id: { _value: number[] } } }) =>
-              where.id._value.map((id) => ({
-                id,
-                supervisionMode:
-                  id === SUPERVISED_MACHINE
-                    ? SupervisionMode.SUPERVISION_ALLOWED
-                    : SupervisionMode.INTRODUCTION_REQUIRED,
-              })),
-            ),
-          },
-        },
+        { provide: USAGE_SESSION_STORE, useValue: supervisionModesFrom(supervisionFind) },
+        { provide: RESOURCE_STORE, useValue: { existingIds: jest.fn(async (ids: number[]) => ids) } },
         { provide: LiveTopicsService, useValue: { register: jest.fn() } },
         { provide: FlowLogRecorderService, useValue: {} },
         { provide: PreStartService, useValue: { gateHttp: jest.fn() } },

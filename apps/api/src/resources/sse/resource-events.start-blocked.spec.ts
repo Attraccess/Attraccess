@@ -4,9 +4,12 @@ import { ResourceEventsService } from './resource-events.service';
 describe('ResourceEventsService start-blocked bridge', () => {
   const resource = { id: 3, type: 'machine', maxParallelSessions: 1 };
   const build = () => {
-    const resources = { findOne: jest.fn().mockResolvedValue(resource) };
-    const usages = { count: jest.fn().mockResolvedValue(0) };
-    return new ResourceEventsService(resources as never, usages as never);
+    const store = {
+      existingIds: jest.fn().mockResolvedValue([resource.id]),
+      findCapacity: jest.fn().mockResolvedValue(resource),
+      countActiveSessions: jest.fn().mockResolvedValue(0),
+    };
+    return new ResourceEventsService(store as never);
   };
 
   it("pushes a plugin's start-blocked change to open pages of that resource as a live event", async () => {

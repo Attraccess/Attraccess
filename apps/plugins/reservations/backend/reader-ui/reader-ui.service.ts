@@ -7,7 +7,7 @@ import type {
 import { READER_UI_SLOTS } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import { Clock, READER_HORIZON_MS, RESERVATION_CLOCK } from '../constants';
-import type { ReservationEntity } from '../entities/reservation.entity';
+import type { ReservationRow } from '../storage/reservation-table';
 import { hookDeadline, waitUntil } from '../hooks/runtime';
 import { AccessService } from '../reservations/access.service';
 import { heldBookings } from '../reservations/capacity';
@@ -165,15 +165,15 @@ export class ReaderUiService {
    */
   private async sharedSlots(
     ctx: ReaderUiContext,
-    bookings: ReservationEntity[],
+    bookings: ReservationRow[],
     limit: number,
     now: Date,
   ): Promise<{
-    ownRunning: ReservationEntity | undefined;
-    blocker: ReservationEntity | undefined;
+    ownRunning: ReservationRow | undefined;
+    blocker: ReservationRow | undefined;
     reserved: number;
-    nextLacking: ReservationEntity | undefined;
-    lacksSlotWith: (booking: ReservationEntity, viewerId: number | undefined) => boolean;
+    nextLacking: ReservationRow | undefined;
+    lacksSlotWith: (booking: ReservationRow, viewerId: number | undefined) => boolean;
   }> {
     const nowMs = now.getTime();
     const sessions = await this.directory.getActiveSessions(ctx.resourceId);
@@ -184,7 +184,7 @@ export class ReaderUiService {
     const ownRunning = running.find((r) => r.userId === viewerId);
     const free = limit - sessions.length - held.length;
     // A viewer not in session takes one more slot by starting (a signed-out reader has no starter yet).
-    const lacksSlotWith = (booking: ReservationEntity, viewer: number | undefined) =>
+    const lacksSlotWith = (booking: ReservationRow, viewer: number | undefined) =>
       sessions.length +
         (viewer === undefined || inSession.has(viewer) ? 0 : 1) +
         heldBookings({ confirmed: bookings, starterId: viewer ?? -1, inSession, at: booking.startTime }).length >
@@ -204,7 +204,7 @@ export class ReaderUiService {
   private reservedCount(
     reserved: number,
     limit: number,
-    bookings: ReservationEntity[],
+    bookings: ReservationRow[],
     nowMs: number,
     clock: ReaderClock,
   ): { row: string; body: string[]; tone: ReaderUiTone; boundary: number } {
@@ -223,11 +223,11 @@ export class ReaderUiService {
    * none of these a short count replaces it (no subject).
    */
   private subjectOf(
-    own: ReservationEntity | undefined,
-    running: ReservationEntity | undefined,
-    upcoming: ReservationEntity[],
-    shared: { blocker?: ReservationEntity; nextLacking?: ReservationEntity } | null,
-  ): ReservationEntity | undefined {
+    own: ReservationRow | undefined,
+    running: ReservationRow | undefined,
+    upcoming: ReservationRow[],
+    shared: { blocker?: ReservationRow; nextLacking?: ReservationRow } | null,
+  ): ReservationRow | undefined {
     if (!shared) return own ?? running ?? upcoming[0];
     return own ?? shared.blocker ?? shared.nextLacking;
   }
@@ -239,14 +239,14 @@ export class ReaderUiService {
   private sessionCountdown(
     ctx: ReaderUiContext,
     settings: ResourceSettings,
-    upcoming: ReservationEntity[],
-    shared: { lacksSlotWith(booking: ReservationEntity, viewerId: number | undefined): boolean } | null,
+    upcoming: ReservationRow[],
+    shared: { lacksSlotWith(booking: ReservationRow, viewerId: number | undefined): boolean } | null,
     nowMs: number,
-  ): { next?: ReservationEntity; opensAt?: number } {
+  ): { next?: ReservationRow; opensAt?: number } {
     const userId = ctx.userId;
     if (ctx.sessionActive !== true || userId === undefined || settings.confirmWindowMinutes <= 0) return {};
     const window = settings.confirmWindowMinutes * MINUTE_MS;
-    const needsSlot = (r: ReservationEntity) => r.userId !== userId && (!shared || shared.lacksSlotWith(r, userId));
+    const needsSlot = (r: ReservationRow) => r.userId !== userId && (!shared || shared.lacksSlotWith(r, userId));
     const next = upcoming.find((r) => needsSlot(r) && r.startTime.getTime() - nowMs <= window);
     if (next) return { next };
     const opens = upcoming.find(needsSlot);
@@ -255,7 +255,7 @@ export class ReaderUiService {
 
   /** The session-area row: the booking's range and a countdown to its start. */
   private sessionTree(
-    next: ReservationEntity,
+    next: ReservationRow,
     clock: ReaderClock,
     holder: string | undefined,
   ): { tree: ReaderUiNode; text: string } {
@@ -280,12 +280,12 @@ export class ReaderUiService {
    */
   private ownBooking(
     userId: number,
-    running: ReservationEntity | undefined,
-    upcoming: ReservationEntity[],
+    running: ReservationRow | undefined,
+    upcoming: ReservationRow[],
     nowMs: number,
     early: number,
-    shared: { ownRunning?: ReservationEntity; blocker?: ReservationEntity } | null,
-  ): ReservationEntity | undefined {
+    shared: { ownRunning?: ReservationRow; blocker?: ReservationRow } | null,
+  ): ReservationRow | undefined {
     const soon = () => upcoming.find((r) => r.userId === userId && r.startTime.getTime() - nowMs <= early);
     if (shared) return shared.ownRunning ?? (shared.blocker ? undefined : soon());
     if (running?.userId === userId) return running;
@@ -300,7 +300,7 @@ export class ReaderUiService {
    * check runs once per evaluation and only when another user's booking is shown; each holder's name is looked
    * up at most once.
    */
-  private nameResolver(ctx: ReaderUiContext): (booking: ReservationEntity) => Promise<string | undefined> {
+  private nameResolver(ctx: ReaderUiContext): (booking: ReservationRow) => Promise<string | undefined> {
     const userId = ctx.userId;
     if (userId === undefined) return async () => undefined;
     const { resourceId } = ctx;
@@ -323,7 +323,7 @@ export class ReaderUiService {
 
   /** Texts, tone and next state boundary (epoch ms) of the subject booking. */
   private describe(
-    booking: ReservationEntity,
+    booking: ReservationRow,
     isRunning: boolean,
     settings: ResourceSettings,
     clock: ReaderClock,

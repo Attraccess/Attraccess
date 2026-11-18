@@ -136,7 +136,7 @@ export interface PluginAuditPrincipal {
 /**
  * An event no user started, such as a scheduled job or a reconciliation the plugin ran on its own. The audit log
  * shows "System" as the actor. Never attribute such an event to a user instead, and do not audit state changes the
- * plugin merely observed. Requires host 1.11.0-beta.1 or newer; older hosts drop these events.
+ * plugin merely observed.
  */
 export interface PluginAuditSystemPrincipal {
   kind: 'system';

@@ -2,23 +2,25 @@ import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import {
   Resource,
-  ResourceType,
   Attractap,
   User,
   NFCCard,
   ResourceIntroduction,
   ResourceIntroductionHistoryItem,
-  IntroductionHistoryAction,
   Project,
   ProjectMember,
   Form,
   FormField,
-  FormFieldType,
   FormSubmission,
   ResourceUsage,
-  SupervisionMode,
   ResourceIntroducer,
 } from '@attraccess/database-entities';
+import {
+  FormFieldType,
+  IntroductionHistoryAction,
+  ResourceType,
+  SupervisionMode,
+} from '@attraccess/application-models';
 import { SettingsService } from '../settings/settings.service';
 import { AttractapGateway } from '../attractap/websockets/websocket.gateway';
 import { WebsocketService } from '../attractap/websockets/websocket.service';

@@ -27,7 +27,7 @@ Plugin Bluetooth works only on [paired readers](attractap/pairing.md), which tal
 Administrators stay in control: a reader is closed to plugins by default. An administrator enables **Allow plugins to use Bluetooth** in the reader editor (General tab). Turning it off ends all plugin BLE sessions on that reader immediately; existing endpoints stay, but scans, new endpoints and sessions fail with `READER_ACCESS_DENIED`.
 
 > [!WARNING]
-> `BLE_TRANSPORT` does not fence off the escape hatches of other permissions. `DATABASE_ACCESS` bypasses ownership because it reads every table, and `RESOLVE_HOST_PROVIDERS` (`context.get`) can reach internal host services. Only install plugins you trust with those permissions, and never use them to read or change the `plugin_ble_endpoint` rows: use `context.ble` instead. Never use `context.get` to reach the BLE transport either: that skips every check on this page.
+> `BLE_TRANSPORT` does not fence off the escape hatches of other permissions. A plugin has no database access, so it cannot read the endpoint table directly, but `RESOLVE_HOST_PROVIDERS` (`context.get`) can reach internal host services. Only install plugins you trust with that permission. The `plugin_ble_endpoint` rows belong to the host: use `context.ble` instead of any other route. Never use `context.get` to reach the BLE transport either: that skips every check on this page.
 
 ## Lifecycle
 

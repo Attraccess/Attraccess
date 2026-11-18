@@ -1,4 +1,4 @@
-import { SSOProviderType } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { UnauthorizedException } from '@nestjs/common';
 import { AccountLinkingRequiredException } from '../oidc/exceptions/account-linking-required.exception';
 import { SSOSamlStrategy } from './saml.strategy';

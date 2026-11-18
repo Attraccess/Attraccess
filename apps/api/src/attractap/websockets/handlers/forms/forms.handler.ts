@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ResourceFormAction } from '@attraccess/database-entities';
+import { ResourceFormAction } from '@attraccess/application-models';
 import { AttractapService } from '../../../attractap.service';
 import { ResourceFormsService } from '../../../../resources/forms/forms.service';
 import { FormSubmissionRequestDto } from '../../../../resources/forms/dto/form-submission-request.dto';

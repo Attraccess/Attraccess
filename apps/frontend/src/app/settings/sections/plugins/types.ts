@@ -4,11 +4,13 @@ export interface VersionPlugin {
   version: string;
 }
 
-/** A plugin whose backend failed to load, shown in the load-error dialog. */
+/** A plugin whose backend failed to load or that the host refused, shown in the load-error dialog. */
 export interface FailedPlugin {
   id: string;
   name: string;
   error: string;
+  /** Refused at discovery (for example built for SDK 1.x): it cannot be retried, only removed or replaced. */
+  refused: boolean;
 }
 
 /** Identifies a marketplace package whose detail page should be opened. */

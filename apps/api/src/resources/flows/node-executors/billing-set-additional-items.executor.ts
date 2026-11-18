@@ -1,28 +1,24 @@
 import { Logger } from '@nestjs/common';
-import { EntityManager, Repository } from 'typeorm';
-import {
-  ResourceFlowNode,
-  BillingTransaction,
-  BillingTransactionItem,
-  BillingTransactionItemCreateSchema,
-  BillingTransactionStatus,
-} from '@attraccess/database-entities';
+import { BillingTransactionItemCreateSchema, FlowNodeRecord } from '@attraccess/application-models';
 import type { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 import { resolveTriggeringUsage, triggeringUsageId } from './triggering-usage';
 import { requireRunMachineId } from './flow.utils';
-import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
+import type { UnitOfWork } from '../../../database/unit-of-work';
+import type { TransactionContext } from '../../../database/transaction-context';
+import type { FlowBillingItemStore } from '../flow-billing-item-store.port';
 
 export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
   private readonly logger = new Logger(BillingSetAdditionalItemsExecutor.name);
 
   constructor(
     private readonly resourceUsageService: ResourceUsageService,
-    private readonly billingTransactionItemRepository: Repository<BillingTransactionItem>,
+    private readonly billingItems: FlowBillingItemStore,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
+  async execute(node: FlowNodeRecord, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
     const resourceId = await requireRunMachineId(node, ctx);
     const usageId = triggeringUsageId(input);
     const data = BillingTransactionItemCreateSchema.parse(node.data);
@@ -65,44 +61,27 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
       return { payload: item };
     }
 
-    const savePendingItem = async (manager: EntityManager): Promise<void> => {
+    const savePendingItem = async (context: TransactionContext): Promise<void> => {
       // The triggering session, else the newest; nothing when the triggering session ended on a shared machine.
-      const { session } = await resolveTriggeringUsage(this.resourceUsageService, resourceId, input, manager);
+      const { session } = await resolveTriggeringUsage(this.resourceUsageService, resourceId, input, context);
       if (!session) {
         throw new NoUsageSessionError();
       }
 
-      const billingTransaction = await manager.findOne(BillingTransaction, {
-        where: {
-          // A named session keeps its own pending transaction on a single-session machine, as before.
-          resourceUsageId: usageId ?? session.id,
-          resourceUsage: { resourceId: resourceId },
-          status: BillingTransactionStatus.Pending,
+      // A named session keeps its own pending transaction on a single-session machine, as before.
+      const added = await this.billingItems.addToPendingBill(
+        { usageId: usageId ?? session.id, resourceId },
+        {
+          name: data.name,
+          description: data.description,
+          externalReference,
+          unitPrice: data.unitPrice,
+          quantity,
         },
-      });
-
-      if (!billingTransaction) {
+        context,
+      );
+      if (!added) {
         throw new NoUsageSessionError();
-      }
-
-      const dedupData = {
-        billingTransactionId: billingTransaction.id,
-        name: data.name,
-        description: data.description,
-        externalReference,
-        unitPrice: data.unitPrice,
-      };
-
-      const existingItem = await manager.findOne(BillingTransactionItem, {
-        where: dedupData,
-      });
-
-      if (existingItem) {
-        await manager.update(BillingTransactionItem, existingItem.id, {
-          quantity: existingItem.quantity + quantity,
-        });
-      } else {
-        await manager.save(BillingTransactionItem, { ...dedupData, quantity });
       }
     };
 
@@ -111,7 +90,7 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
     } else {
       // Share finalization's write queue so a delayed event cannot pass the status check
       // before finalization and then change its completed items afterward.
-      await runSerializedTransaction(this.billingTransactionItemRepository.manager, savePendingItem);
+      await this.unitOfWork.run((scope) => savePendingItem(scope));
     }
 
     return { payload: item };

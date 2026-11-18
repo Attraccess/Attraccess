@@ -1,4 +1,4 @@
-import { ResourceFlowNode, CompanionLockNodeDataSchema } from '@attraccess/database-entities';
+import { CompanionLockNodeDataSchema, FlowNodeRecord } from '@attraccess/application-models';
 import { CompanionGatewayService } from '../../../companion/companion-gateway.service';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NodeExecutor, NodeProcessingResult } from './node-executor.interface';
@@ -6,7 +6,7 @@ import { NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 export class CompanionLockPcExecutor implements NodeExecutor {
   constructor(private readonly companionGateway: CompanionGatewayService) {}
 
-  async execute(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
+  async execute(node: FlowNodeRecord, input: object): Promise<NodeProcessingResult> {
     const parsed = CompanionLockNodeDataSchema.safeParse(node.data ?? {});
     if (!parsed.success) {
       throw new FlowExecutionError(`Invalid companion-lock-pc node data: ${parsed.error.message}`);

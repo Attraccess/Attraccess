@@ -3,8 +3,6 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { WagoController } from '../../backend/controllers/entity';
-
 import { discoveryTopic } from '../../backend/protocol/index';
 
 import { temporary } from './simulator-fixtures.test-utils';
@@ -66,10 +64,10 @@ describe('isolated broker / executable simulator', () => {
         WAGO_ENROLLMENT_USERNAME: enrollment.username,
         WAGO_ENROLLMENT_PASSWORD: enrollment.password,
       });
-      const controllers = fixture.repositories.get(WagoController)!;
-      await eventually(() => expect(controllers.rows).toHaveLength(1), 'main discovers simulator');
+      const controllers = fixture.storage.tables.controllers;
+      await eventually(async () => expect(await controllers.count()).toBe(1), 'main discovers simulator');
       if (failSave) await mkdir(`${statePath}.next`);
-      await fixture.service.claim(controllers.rows[0].id, 'Main claim simulator', '482931');
+      await fixture.service.claim((await controllers.find())[0].id, 'Main claim simulator', '482931');
       const claim = JSON.parse(
         fixture.messages.find((message) => message.topic === `${discoveryTopic(hardwareId)}/claim`)!.payload.toString(),
       );

@@ -5,10 +5,36 @@ import {
   SystemEventResponse,
   SystemEventSubscription,
 } from '@attraccess/plugins-backend-sdk';
+import type { PluginResourceModel, PluginUserModel } from '@attraccess/application-models';
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 const SYSTEM_EVENT_PREFIX = 'plugin.system.';
+
+/** Only the fields of the neutral model reach plugins: host records carry tokens and contact data. */
+function toUserModel(user: PluginUserModel | undefined): PluginUserModel | undefined {
+  if (!user) return user;
+  return { id: user.id, username: user.username, locale: user.locale, isDisabled: user.isDisabled };
+}
+
+function toResourceModel(resource: PluginResourceModel | undefined): PluginResourceModel | undefined {
+  if (!resource) return resource;
+  return {
+    id: resource.id,
+    name: resource.name,
+    type: resource.type,
+    description: resource.description,
+    allowTakeOver: resource.allowTakeOver,
+    maxParallelSessions: resource.maxParallelSessions,
+    supervisionMode: resource.supervisionMode,
+  };
+}
+
+function toPluginPayload<E extends SystemEvent>(event: E, payload: SystemEventPayload[E]): SystemEventPayload[E] {
+  if (event !== SystemEvent.RESOURCE_USAGE_STARTED && event !== SystemEvent.RESOURCE_USAGE_ENDED) return payload;
+  const usage = payload as SystemEventPayload[SystemEvent.RESOURCE_USAGE_STARTED];
+  return { resource: toResourceModel(usage.resource), user: toUserModel(usage.user) } as SystemEventPayload[E];
+}
 
 function busName(event: SystemEvent): string {
   return `${SYSTEM_EVENT_PREFIX}${event}`;
@@ -32,7 +58,7 @@ export class PluginEventsService {
    * installed in onEvent, so emitting is always safe for the caller.
    */
   public emit<E extends SystemEvent>(event: E, payload: SystemEventPayload[E]): void {
-    this.events.emit(busName(event), payload);
+    this.events.emit(busName(event), toPluginPayload(event, payload));
   }
 
   /**
@@ -43,7 +69,9 @@ export class PluginEventsService {
     event: E,
     payload: SystemEventPayload[E],
   ): Promise<Array<SystemEventResponse[E] | void>> {
-    return (await this.events.emitAsync(busName(event), payload)) as Array<SystemEventResponse[E] | void>;
+    return (await this.events.emitAsync(busName(event), toPluginPayload(event, payload))) as Array<
+      SystemEventResponse[E] | void
+    >;
   }
 
   /**

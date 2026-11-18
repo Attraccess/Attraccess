@@ -1,4 +1,3 @@
-import { ReservationEntity } from '../entities/reservation.entity';
 import { Harness, createHarness } from '../testing/harness.test-utils';
 import { BackgroundServices, createBackgroundServices } from '../testing/background-services.test-utils';
 import { READER_UI_CAPABILITIES_NONE, READER_UI_LIMITS, type SessionEndContext } from '@attraccess/plugins-backend-sdk';
@@ -27,7 +26,7 @@ describe('SessionEndService', () => {
   });
   afterEach(() => h.close());
 
-  const reservation = () => h.dataSource.getRepository(ReservationEntity).findOneByOrFail({ userId: 10 });
+  const reservation = () => h.reservation({ userId: 10 });
 
   it('offers keep/free with default keep to the holder during their own booking', async () => {
     const result = await p.sessionEnd.evaluate(ctx(10));

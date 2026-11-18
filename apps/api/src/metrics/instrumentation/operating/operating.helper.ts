@@ -9,10 +9,7 @@ import { MetricsToggleService } from '../../settings/metrics-toggle.service';
 export type OperatingStateLabel = 'operating' | 'idle';
 
 export type OperatingDataQualityFailureKind =
-  | 'stale-signal'
-  | 'overlapping-intervals'
-  | 'negative-duration'
-  | 'multiple-open-intervals';
+  'stale-signal' | 'overlapping-intervals' | 'negative-duration' | 'multiple-open-intervals';
 
 @Injectable()
 export class OperatingMetricsRecorder {

@@ -17,7 +17,7 @@ import { WagoEnrollment } from './enrollment.entity';
 
 import { WagoAudit } from '../audit/index';
 
-import { type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
+import { type PluginAuditPrincipal, type PluginStoragePatch } from '@attraccess/plugins-backend-sdk';
 
 import { WagoCredentialOperationUncertainError } from './model';
 
@@ -41,6 +41,10 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
     assertOwned: () => Promise<void> = async () => undefined,
   ): Promise<void> {
     await assertOwned();
+    // Another claim that took over the controller owns the broker identity now: revoking it or resetting the row
+    // would undo that claim. Only the claim whose credential epoch the row still carries rolls back.
+    const epoch = controller.credentialEpoch;
+    if (!epoch || (await this.claimTakenOver(controller, epoch))) return;
     const manual = await this.context
       .getMqttCredentialProvisioning()
       .revoke({ mqttServerId, identity, username: identity, vhost: '/' });
@@ -50,11 +54,31 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
     controller.credentialEpoch = null;
     Object.assign(controller, previousController);
     await assertOwned();
-    await this.controllers.save(controller).catch((rollbackError) => {
-      this.context.logger.warn(
-        `Could not restore WAGO controller ${controller.id} after claim failure: ${String(rollbackError)}`,
-      );
+    await this.controllers
+      .update(
+        { id: controller.id, credentialEpoch: epoch },
+        { credentialMqttServerId: null, credentialEpoch: null, ...previousController },
+      )
+      .catch((rollbackError) => {
+        this.context.logger.warn(
+          `Could not restore WAGO controller ${controller.id} after claim failure: ${String(rollbackError)}`,
+        );
+      });
+  }
+
+  /**
+   * Whether another claim owns the broker identity now. When the row is gone (removed while this claim ran), the
+   * identity this claim provisioned is still revoked, unless a new registration of the hardware already carries a
+   * claim of its own.
+   */
+  private async claimTakenOver(controller: WagoController, epoch: string): Promise<boolean> {
+    const current = await this.controllers.get(controller.id);
+    if (current) return current.credentialEpoch !== epoch;
+    const reclaimed = await this.controllers.count({
+      hardwareId: controller.hardwareId,
+      credentialEpoch: { isNull: false },
     });
+    return reclaimed > 0;
   }
 
   protected async restoreUnclaimedController(
@@ -84,6 +108,20 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
     );
   }
 
+  /**
+   * Writes claim fields of a controller that is still untrusted and still carries `credentialEpoch` (the epoch this
+   * claim read, or the one it wrote). A controller claimed meanwhile, or taken over by a concurrent claim on another
+   * instance, is a conflict; the caller then owns nothing to roll back.
+   */
+  private async requireUnclaimedUpdate(
+    id: number,
+    credentialEpoch: string | null,
+    patch: PluginStoragePatch<WagoController>,
+  ): Promise<void> {
+    if (!(await this.controllers.update({ id, trustState: 'untrusted', credentialEpoch }, patch)))
+      throw new ConflictException('controller has already been claimed');
+  }
+
   protected async prepareClaim(
     id: number,
     name: string,
@@ -101,7 +139,7 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
     previousController: Pick<WagoController, 'trustState' | 'name' | 'mqttServerId' | 'updatedAt'>;
     credentialDelivered: boolean;
   }> {
-    const controller = await this.controllers.findOneBy({ id });
+    const controller = await this.controllers.get(id);
     if (!controller) throw new NotFoundException(`WAGO controller ${id} not found`);
     if (controller.trustState === 'claimed') throw new ConflictException('controller has already been claimed');
     if (!name.trim()) throw new ConflictException('a controller name is required');
@@ -140,9 +178,13 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
     // Persist the exact broker before provisioning. Discovery may later update
     // mqttServerId; removal must still revoke this identity on its original broker.
     await assertOwned();
+    const readEpoch = controller.credentialEpoch;
     controller.credentialMqttServerId = selectedServerId;
     controller.credentialEpoch = randomUUID();
-    await this.controllers.save(controller);
+    await this.requireUnclaimedUpdate(controller.id, readEpoch, {
+      credentialMqttServerId: controller.credentialMqttServerId,
+      credentialEpoch: controller.credentialEpoch,
+    });
     await assertOwned();
     const provisioned =
       manualCredentials ??
@@ -176,7 +218,12 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
       controller.name = name.trim();
       controller.mqttServerId = selectedServerId;
       controller.updatedAt = new Date().toISOString();
-      await this.controllers.save(controller);
+      await this.requireUnclaimedUpdate(controller.id, controller.credentialEpoch, {
+        trustState: 'claimed',
+        name: controller.name,
+        mqttServerId: controller.mqttServerId,
+        updatedAt: controller.updatedAt,
+      });
       return {
         controller,
         enrollment,
@@ -278,7 +325,7 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
     principal: PluginAuditPrincipal,
     assertOwned: () => Promise<void> = async () => undefined,
   ): Promise<{ controllerId: number; result: 'acknowledged' }> {
-    const controller = await this.controllers.findOneBy({ id });
+    const controller = await this.controllers.get(id);
     if (!controller) throw new NotFoundException('controller not found');
     if (
       input.username !== `wago-controller-${controller.hardwareId}` ||
@@ -349,7 +396,7 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
   async remove(id: number, assertOwned: () => Promise<void> = async () => undefined): Promise<string> {
     return this.withClaimLock(id, () =>
       this.withClaimConfigurationLock(async () => {
-        const controller = await this.controllers.findOneBy({ id });
+        const controller = await this.controllers.get(id);
         if (!controller) throw new NotFoundException(`WAGO controller ${id} not found`);
 
         const credentialServerId =
@@ -369,9 +416,12 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
 
         if (controller.enrollmentId) await this.revokeEnrollmentById(controller.enrollmentId, assertOwned);
         await assertOwned();
-        await Promise.all([this.drafts.delete({ controllerId: id }), this.revisions.delete({ controllerId: id })]);
-        await assertOwned();
-        await this.controllers.delete(id);
+        // One atomic unit: no half-removed controller, and the declared cascades clear its other rows.
+        await this.context.persistence.transaction(async (scope) => {
+          await this.drafts.delete({ controllerId: id }, { scope });
+          await this.revisions.delete({ controllerId: id }, { scope });
+          await this.controllers.delete({ id }, { scope });
+        });
         this.configurationReportQueues.delete(id);
         await this.subscribeConfiguredServers().catch((error) => {
           this.context.logger.warn(
@@ -386,12 +436,12 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
 
   async deleteEnrollmentById(id: number, assertOwned: () => Promise<void> = async () => undefined): Promise<void> {
     await assertOwned();
-    await this.enrollments.delete(id);
+    await this.enrollments.delete({ id });
   }
 
   /** Server-side commissioning revokes the enrollment it created without exposing credentials to a browser. */
   async revokeEnrollmentById(id: number, assertOwned: () => Promise<void> = async () => undefined): Promise<void> {
-    const enrollment = await this.enrollments.findOneBy({ id });
+    const enrollment = await this.enrollments.get(id);
     // Expiry limits enrollment use but does not revoke the provisioned broker credential.
     if (enrollment && !enrollment.consumedAt) await this.revokeEnrollment(enrollment, assertOwned);
   }
@@ -424,16 +474,14 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
     // Persist the broker identity before its external creation so expiry recovery can revoke an
     // ambiguous provision result if coordinator ownership disappears mid-request.
     await assertOwned();
-    const enrollment = await this.enrollments.save(
-      this.enrollments.create({
-        mqttServerId: selectedServerId,
-        hardwareId: normalizedHardwareId,
-        secretHash: hash(claimSecret),
-        identity,
-        createdAt: new Date().toISOString(),
-        expiresAt,
-      }),
-    );
+    const enrollment = await this.enrollments.insert({
+      mqttServerId: selectedServerId,
+      hardwareId: normalizedHardwareId,
+      secretHash: hash(claimSecret),
+      identity,
+      createdAt: new Date().toISOString(),
+      expiresAt,
+    });
     this.scheduleEnrollmentExpiry(enrollment);
     await assertOwned();
     const provisionedCredential = await this.context.getMqttCredentialProvisioning().provision({
@@ -451,7 +499,7 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
       const timer = this.enrollmentExpiryTimers.get(enrollment.id);
       if (timer) clearTimeout(timer);
       this.enrollmentExpiryTimers.delete(enrollment.id);
-      await this.enrollments.delete(enrollment.id);
+      await this.enrollments.delete({ id: enrollment.id });
       throw new ConflictException(
         `Manual discovery credentials are required: ${provisionedCredential.instructions.join(' ')}`,
       );
@@ -462,7 +510,7 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
     await assertOwned();
     if (!('password' in provisionedCredential)) {
       enrollment.identity = credential.username;
-      await this.enrollments.save(enrollment);
+      await this.enrollments.update({ id: enrollment.id }, { identity: enrollment.identity });
     }
     await this.subscribeConfiguredServers().catch((error) => {
       this.context.logger.warn(`Could not refresh WAGO MQTT subscriptions after enrollment: ${String(error)}`);

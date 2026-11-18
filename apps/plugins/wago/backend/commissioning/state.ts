@@ -2,7 +2,8 @@ import { Inject, Optional } from '@nestjs/common';
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { PLUGIN_CONTEXT, PluginContext, Repository } from '@attraccess/plugins-backend-sdk';
+import { PLUGIN_CONTEXT, PluginContext } from '@attraccess/plugins-backend-sdk';
+import { type WagoStorage } from '../storage';
 
 import { WagoCommissioningSession } from './sessions/session.entity';
 
@@ -53,7 +54,7 @@ export abstract class WagoCommissioningServiceState {
     @Optional() @Inject(WagoManagedRuntimeService) protected readonly managedRuntime?: WagoManagedRuntimeService,
   ) {}
 
-  protected sessions!: Repository<WagoCommissioningSession>;
+  protected sessions!: WagoStorage['commissioningSessions'];
 
   protected management!: WagoManagementService;
 

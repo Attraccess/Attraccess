@@ -147,7 +147,10 @@ describe('plugin dependency confirmations', () => {
     hoisted.plugins = [makePlugin({ name: core.name, id: 'core-id' })];
     hoisted.removalPlan = [core, provider];
     hoisted.apiMock.mockImplementation((url: string) =>
-      Promise.resolve({ ok: true, json: async () => (url.endsWith('/installed') ? [core] : []) }),
+      Promise.resolve({
+        ok: true,
+        json: async () => (url.endsWith('/installed') ? [{ ...core, installPath: '/plugins/cool' }] : []),
+      }),
     );
     const user = userEvent.setup();
     const view = renderWithQuery(<PluginsSection />);
@@ -174,7 +177,13 @@ describe('plugin version management', () => {
   it('reports a failed version load once per opening and not again for the cached failure', async () => {
     hoisted.plugins = [makePlugin()];
     hoisted.errorToast.mockClear();
-    const installed = { name: 'Cool Plugin', version: '1.2.3', registryId: 'npm', requestedSpec: 'latest' };
+    const installed = {
+      name: 'Cool Plugin',
+      version: '1.2.3',
+      installPath: '/plugins/cool',
+      registryId: 'npm',
+      requestedSpec: 'latest',
+    };
     let versionsResponse: { ok: boolean; data: unknown } = { ok: false, data: null };
     hoisted.apiMock.mockImplementation((url: string) => {
       if (url.endsWith('/versions'))
@@ -210,6 +219,7 @@ describe('plugin version management', () => {
     const installed = {
       name: 'Cool Plugin',
       version: '1.2.3',
+      installPath: '/plugins/cool',
       registryId: 'npm',
       requestedSpec: 'latest',
       updateOverride: 'inherit',
@@ -295,6 +305,7 @@ describe('plugin version management', () => {
     const installed = {
       name: 'Cool Plugin',
       version: '1.2.3',
+      installPath: '/plugins/cool',
       registryId: 'npm',
       requestedSpec: 'latest',
       updateOverride: 'inherit',
@@ -330,7 +341,13 @@ describe('plugin version management', () => {
 
   it('requires approval of newly installed dependencies before switching versions', async () => {
     hoisted.plugins = [makePlugin()];
-    const installed = { name: 'Cool Plugin', version: '1.2.3', registryId: 'npm', updateOverride: 'inherit' };
+    const installed = {
+      name: 'Cool Plugin',
+      version: '1.2.3',
+      installPath: '/plugins/cool',
+      registryId: 'npm',
+      updateOverride: 'inherit',
+    };
     const core = {
       name: '@vendor/core',
       displayName: '3D Printer Core',
@@ -398,7 +415,7 @@ describe('plugin version management', () => {
         ok: true,
         json: async () =>
           url.endsWith('/installed')
-            ? [{ ...details, registryId: 'private' }]
+            ? [{ ...details, installPath: '/plugins/cool', registryId: 'private' }]
             : url.includes('/marketplace/Cool%20Plugin')
               ? details
               : url.includes('/marketplace/search')
@@ -419,7 +436,9 @@ describe('plugin version management', () => {
     hoisted.plugins = [makePlugin()];
     hoisted.apiMock.mockImplementation((url: string) => {
       if (url.includes('/marketplace/Cool%20Plugin')) return Promise.resolve({ ok: false });
-      const installed = [{ name: 'Cool Plugin', version: '1.2.3', registryId: 'private' }];
+      const installed = [
+        { name: 'Cool Plugin', version: '1.2.3', installPath: '/plugins/cool', registryId: 'private' },
+      ];
       return Promise.resolve({ ok: true, json: async () => (url.endsWith('/installed') ? installed : []) });
     });
     const user = userEvent.setup();

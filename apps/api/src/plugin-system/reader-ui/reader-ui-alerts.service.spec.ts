@@ -1,37 +1,12 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ReaderUiAlertsService } from './reader-ui-alerts.service';
+import { InMemoryReaderUiAlertStore } from './reader-ui-stores.test-fixture';
 
 function setup() {
-  const rows: any[] = [];
-  const repository = {
-    find: jest.fn(async ({ where }: any) =>
-      rows.filter((r) =>
-        Object.entries(where).every(([k, v]: any) => (v?._type === 'isNull' ? r[k] == null : r[k] === v)),
-      ),
-    ),
-    findOne: jest.fn(
-      async ({ where }: any) =>
-        rows.find((r) =>
-          Object.entries(where).every(([k, v]: any) => (v?._type === 'isNull' ? r[k] == null : r[k] === v)),
-        ) ?? null,
-    ),
-    create: (x: any) => ({ clearedAt: null, clearedByUserId: null, plugin: null, readerId: null, ...x }),
-    save: jest.fn(async (x: any) => {
-      if (!x.id) {
-        x.id = rows.length + 1;
-        rows.push(x);
-      }
-      return x;
-    }),
-  };
+  const store = new InMemoryReaderUiAlertStore();
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
   const gauge = { set: jest.fn() };
-  const service = new ReaderUiAlertsService(
-    repository as never,
-    audit as never,
-    { readerUiOpenAlerts: gauge } as never,
-  );
-  return { service, rows, audit, gauge };
+  const service = new ReaderUiAlertsService(store, audit as never, { readerUiOpenAlerts: gauge } as never);
+  return { service, rows: store.rows, audit, gauge };
 }
 
 describe('ReaderUiAlertsService', () => {
@@ -87,9 +62,10 @@ describe('ReaderUiAlertsService', () => {
   it('keeps the original crash-loop deadline across a restart and drops an alert that already lapsed', async () => {
     const { service, rows } = setup();
     const now = Date.now();
+    const seed = { plugin: null, clearedAt: null, clearedByUserId: null, message: 'PANIC' } as const;
     rows.push(
-      { id: 1, kind: 'crash-loop', readerId: 5, plugin: null, clearedAt: null, createdAt: new Date(now - 20 * 60_000) },
-      { id: 2, kind: 'crash-loop', readerId: 6, plugin: null, clearedAt: null, createdAt: new Date(now - 40 * 60_000) },
+      { ...seed, id: 1, kind: 'crash-loop', readerId: 5, createdAt: new Date(now - 20 * 60_000) },
+      { ...seed, id: 2, kind: 'crash-loop', readerId: 6, createdAt: new Date(now - 40 * 60_000) },
     );
     await service.onModuleInit();
     expect(service.isReaderSuspended(5)).toBe(true);

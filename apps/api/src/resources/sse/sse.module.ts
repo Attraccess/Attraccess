@@ -1,12 +1,11 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { Resource, ResourceUsage } from '@attraccess/database-entities';
 import { ResourceEventsService } from './resource-events.service';
 import { SSEController } from './sse.controller';
 import { ResourceUsageModule } from '../usage/resourceUsage.module';
+import { ResourcesPersistenceModule } from '../../database/adapters/resources/resources-persistence.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Resource, ResourceUsage]), ResourceUsageModule],
+  imports: [ResourcesPersistenceModule, ResourceUsageModule],
   controllers: [SSEController],
   providers: [ResourceEventsService],
   exports: [ResourceEventsService],

@@ -65,7 +65,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card audit records (%s)', (kind
   it('records nothing when the reset deleted no card (it was already gone)', async () => {
     const { operations, cards, card, conversations, audit, attractapService } = await enrolledBy(session);
     audit.mockClear();
-    attractapService.deleteNFCCard.mockResolvedValueOnce({ affected: 0 });
+    attractapService.deleteNFCCard.mockResolvedValueOnce(false);
     const reader = createRelayReader(card, conversations);
 
     expect((await operations.reset(reader.socket, detect(), { cardId: cards[0].id, auditPrincipal: session })).ok).toBe(

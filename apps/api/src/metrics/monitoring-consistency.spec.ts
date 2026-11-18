@@ -306,7 +306,8 @@ describe('Monitoring configuration consistency', () => {
       const crash = grafanaRules.match(/title: AttractapReaderCrashes[\s\S]*?(?=\n\s+- uid:|\n\s*$)/)?.[0] ?? '';
       // The reasons named in the warning text must be the ones the collector counts.
       expect(crash).toContain(`(${CRASH_WATCHDOG_REASONS.join(', ')})`);
-      const powerOn = grafanaRules.match(/title: AttractapReaderPowerOnResets[\s\S]*?(?=\n\s+- uid:|\n\s*$)/)?.[0] ?? '';
+      const powerOn =
+        grafanaRules.match(/title: AttractapReaderPowerOnResets[\s\S]*?(?=\n\s+- uid:|\n\s*$)/)?.[0] ?? '';
       expect(powerOn).toContain('does not confirm a reader fault');
       expect(powerOn).not.toMatch(/crash/i);
     });

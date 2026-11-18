@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync 
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import {
+  assertNoForbiddenBackendImports,
   resolvePluginTestHostVersion,
   validateLicenseFile,
   validatePackageContract,
@@ -95,7 +96,7 @@ test('verifies actual packed entries and removes archives after success or failu
     for (const directory of [
       'plugin/frontend',
       'dist/libs/plugins-backend-sdk',
-      'dist/libs/database-entities',
+      'dist/libs/application-models',
       'dist/libs/shared',
       'node_modules',
     ])
@@ -128,5 +129,42 @@ test('verifies actual packed entries and removes archives after success or failu
     assert.ok(existsSync(path.join(packageDir, 'frontend/index.js')));
   } finally {
     rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
+test('rejects a backend bundle that imports TypeORM, host entities or an SDK subpath', () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'attraccess-backend-imports-'));
+  try {
+    const entry = path.join(directory, 'index.js');
+    writeFileSync(
+      entry,
+      'const { Module } = require("@nestjs/common"); import x from "@attraccess/plugins-backend-sdk";',
+    );
+    assert.doesNotThrow(() => assertNoForbiddenBackendImports(entry));
+    writeFileSync(
+      path.join(directory, 'chunk.js'),
+      'require("pgp-helper"); require("@attraccess/plugins-backend-sdk/package.json");',
+    );
+    assert.doesNotThrow(() => assertNoForbiddenBackendImports(entry));
+    for (const source of [
+      'const t = require("typeorm");',
+      'import { Entity } from "typeorm";',
+      'const t = await import("typeorm/driver/sqlite/SqliteDriver");',
+      'const e = require("@attraccess/database-entities");',
+      'import { Column } from "@attraccess/plugins-backend-sdk/sqlite";',
+      'const t = require("@nestjs/typeorm");',
+      'const d = require("sqlite3");',
+      'const d = require("better-sqlite3");',
+      'const d = require("pg");',
+      'const d = require("mysql2/promise");',
+      'const d = await import("node:sqlite");',
+      'import { MikroORM } from "@mikro-orm/core";',
+      'const x = require("@attraccess/plugins-backend-sdk/internal");',
+    ]) {
+      writeFileSync(path.join(directory, 'chunk.js'), source);
+      assert.throws(() => assertNoForbiddenBackendImports(entry), /plugins have no database access/, source);
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 });

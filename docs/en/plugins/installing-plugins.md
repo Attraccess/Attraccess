@@ -31,7 +31,7 @@ To try a nightly, open **Settings → Plugins**, choose **Manage version** on th
 
 Once a plugin has had a release, the marketplace offers only released versions. Until then:
 
-- The WAGO, Shelly and RabbitMQ `latest` versions stay at a nightly build (`0.1.0-nightly.925.2`, for hosts `^1.9.0`) until Attraccess 1.11.0 publishes them as stable versions. Current plugin code requires Attraccess 1.11 or newer, so `0.1.0-nightly.925.2` stays the version for older hosts.
+- The WAGO, Shelly and RabbitMQ `latest` versions stay at a nightly build (`0.1.0-nightly.925.2`, for hosts `^1.9.0`) until Attraccess 1.11.0 publishes them as stable versions. The current plugin code is built for Attraccess 2.0 (`attraccessVersion.min` `2.0.0-0`) and does not run on 1.x hosts, so 1.x hosts keep the 1.x builds.
 - npm sets `latest` automatically on a package's first publish. A plugin first published by a nightly (like Matter) therefore has a nightly `latest` until its first release. The release treats a nightly `latest` as never released and publishes the plugin.
 
 ## Uploading a Plugin
@@ -85,8 +85,37 @@ restart Attraccess.
 3. Click the **Remove** or **Delete** button
 4. Confirm the removal
 
+What happens to the plugin's data depends on how it was installed. The confirmation dialog says which case applies.
+
+| Installed                                 | Files and registrations | Tables and data                                                                                        |
+| ----------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| From a registry (marketplace, npm)        | Removed                 | **Kept**, together with the plugin's secrets. Installing it again continues with the data.             |
+| Uploaded as ZIP or placed in the folder   | Removed                 | **Deleted permanently.**                                                                               |
+| Refused (for example a 1.x plugin on 2.0) | Removed, code never run | **Kept.** A 2.0 build of the plugin adopts them later, or you drop the tables in the database by hand. |
+
 > [!WARNING]
-> Removing a plugin permanently deletes it from the system. You will need to re-upload the plugin file if you want to use it again.
+> Removing an uploaded plugin deletes its data permanently. Create a [backup](installation/backup-restore.md) first if
+> you might need it again, and re-upload the plugin file to use the plugin again.
+
+## Upgrading to Attraccess 2.0
+
+Attraccess 2.0 changed the plugin SDK: plugins have no database access any more and keep their own data in tables the
+host manages (see [Plugin Storage](plugins/plugin-storage.md)). Plugins built for 1.x are not loaded: they stay in the
+plugin list with an error that names the plugin, states the reason and links the
+[migration guide](plugins/migrating-to-2.md), and their data is left untouched. Typical reasons:
+
+- the plugin targets the SDK 1.x (it declares no minimum host version of `2.0.0-0` or higher);
+- it requests the removed `DATABASE_ACCESS` permission (2.0 plugins ask for `PLUGIN_STORAGE`);
+- it still declares `persistence.backends` or a TypeORM migrations entry, or its bundle imports TypeORM or a database
+  driver;
+- the database holds only part of the plugin's old (1.x) migrations: the data comes from a release older than
+  Attraccess 1.11. Attraccess 2.0 adopts plugin data only from the last 1.x release (1.11). Restore the backup taken
+  before the upgrade, update to Attraccess 1.11 and start it once so the plugin's migrations finish, then update to
+  2.0. Nothing was changed (see [Upgrading to Attraccess 2.0](installation/updating.md#upgrading-to-attraccess-20)).
+
+Before or right after upgrading, install the 2.0 build of each plugin (upload or marketplace), or delete the old plugin
+from the list. Deleting a refused plugin removes its files without running its code; its tables stay in the database
+until a 2.0 build adopts them or you drop them by hand.
 
 ## Troubleshooting
 

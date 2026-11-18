@@ -1,16 +1,14 @@
+import { createSqliteAuditService } from '../../database/adapters/audit/sqlite-audit-service.test-fixture';
 import {
   AuditLog,
   entities,
   Flow,
   Resource,
-  ResourceFlowEdge,
   ResourceFlowNode,
-  ResourceFlowNodeType,
   ResourceFlowVariable,
-  ResourceFlowVariableScope,
-  ResourceType,
   Setting,
 } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceFlowVariableScope, ResourceType } from '@attraccess/application-models';
 import { BadRequestException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -18,15 +16,20 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import { AuditService } from '../../audit/audit.service';
-import { createTestAuditMetrics } from '../../audit/audit.test-fixture';
+import { createTestAuditMetrics } from '../../database/adapters/audit/audit.test-fixture';
 import { auditActorOf } from '../../audit/recorder/audit-event';
 import * as migrations from '../../database/migrations';
 import { SettingsStoreService } from '../../settings/settings-store.service';
 import { ResourceFlowSaveDto } from './dto/index';
-import { startToHttpCanvas, testActor } from './flow-canvas-database.test-fixture';
+import { startToHttpCanvas, testActor } from '../../database/adapters/flows/flow-canvas-database.test-fixture';
+import { unitOfWorkFor } from '../../database/adapters/shared-unit-of-work';
+import { TypeOrmFlowGraphStore } from '../../database/adapters/flows/typeorm-flow-graph.store';
+import { TypeOrmFlowResourceDirectory } from '../../database/adapters/flows/typeorm-flow-resource-directory';
+import { TypeOrmFlowVariableStore } from '../../database/adapters/flows/typeorm-flow-variable.store';
 import { GlobalFlowsService } from './global-flows.service';
 import { ResourceFlowsService } from './resource-flows.service';
 import { ResourceFlowVariablesService } from './variables/resource-flow-variables.service';
+import { TypeOrmSettingsRows } from '../../database/adapters/settings/typeorm-settings-rows';
 
 const T = ResourceFlowNodeType;
 const tokenActor = auditActorOf({ id: 3, authenticationMethod: 'api-token', apiTokenId: 12 });
@@ -69,33 +72,26 @@ describe('flow audit rows in migrated storage', () => {
     directory = await mkdtemp(join(tmpdir(), 'flow-audit-'));
     source = await new DataSource({
       type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: join(directory, 'flow-audit.sqlite'),
       entities: Object.values(entities),
       migrations: Object.values(migrations),
     }).initialize();
     await source.runMigrations();
-    const store = new SettingsStoreService(source.getRepository(Setting), null);
+    const store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(source.getRepository(Setting)), null);
     await store.setPlainSetting('audit', 'domains', JSON.stringify(['resource']));
-    audit = new AuditService(source, store, createTestAuditMetrics());
+    audit = createSqliteAuditService(source, store, createTestAuditMetrics());
     await audit.onModuleInit();
-    const [nodes, edges, flows] = [ResourceFlowNode, ResourceFlowEdge, Flow].map((entity) =>
-      source.getRepository(entity),
-    );
+    const graph = new TypeOrmFlowGraphStore(source, unitOfWorkFor(source), audit);
     resourceFlows = new ResourceFlowsService(
-      nodes as never,
-      edges as never,
-      source.getRepository(Resource),
+      graph,
+      new TypeOrmFlowResourceDirectory(source),
       { subscribe: jest.fn().mockResolvedValue(undefined) } as never,
       new EventEmitter2(),
-      flows as never,
       audit,
     );
-    globalFlows = new GlobalFlowsService(flows as never, nodes as never, edges as never, resourceFlows, audit);
-    variables = new ResourceFlowVariablesService(
-      source.getRepository(ResourceFlowVariable),
-      new EventEmitter2(),
-      audit,
-    );
+    globalFlows = new GlobalFlowsService(graph, resourceFlows, audit);
+    variables = new ResourceFlowVariablesService(new TypeOrmFlowVariableStore(source), new EventEmitter2(), audit);
   });
 
   afterAll(async () => {
@@ -197,20 +193,20 @@ describe('flow audit rows in migrated storage', () => {
     it('rolls the recorded row back with the canvas when a later step of the save fails', async () => {
       await resourceFlows.saveResourceFlow(resource.id, startToHttpCanvas(`r${resource.id}`), testActor);
       const before = await rows();
+      const recordInTransaction = audit.record.bind(audit);
       const record = jest.spyOn(audit, 'record');
-      const transaction = source.manager.transaction.bind(source.manager);
-      jest.spyOn(source.manager, 'transaction').mockImplementationOnce(((work: never) =>
-        transaction(async (manager) => {
-          await (work as (manager: unknown) => Promise<unknown>)(manager);
-          throw new Error('later step failed');
-        })) as never);
+      // The audit row is the last write of the unit; failing right after it must roll it back too.
+      record.mockImplementationOnce(async (...args) => {
+        await recordInTransaction(...args);
+        throw new Error('later step failed');
+      });
 
       await expect(resourceFlows.saveResourceFlow(resource.id, { nodes: [], edges: [] }, testActor)).rejects.toThrow(
         'later step failed',
       );
 
       // The row was written inside the transaction, then rolled back with it.
-      await expect(record.mock.results[0].value).resolves.toEqual({ status: 'recorded' });
+      expect(record).toHaveBeenCalledTimes(1);
       expect(await rows()).toEqual(before);
       expect(await resourceNodeIds()).toEqual([`r${resource.id}-http`, `r${resource.id}-start`]);
     });

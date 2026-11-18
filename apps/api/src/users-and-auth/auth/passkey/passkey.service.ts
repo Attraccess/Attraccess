@@ -1,4 +1,4 @@
-import { Passkey, PasskeyChallenge, User } from '@attraccess/database-entities';
+import type { AuthenticatedSessionUser, PasskeyRecord } from '@attraccess/application-models';
 
 import {
   BadRequestException,
@@ -8,10 +8,6 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { LessThan, Repository } from 'typeorm';
 
 import { SettingsService } from '../../../settings/settings.service';
 import { identityAuditEvent } from '../../../audit/policies/identity';
@@ -29,6 +25,7 @@ import {
   verifyRegistrationResponse,
 } from '@simplewebauthn/server';
 
+import { PASSKEY_STORE, type PasskeyStore } from './passkey.port';
 import { UserEmailNotVerifiedException } from '../errors/userEmailNotVerified.exception';
 import type { AuthenticatorTransport } from '@simplewebauthn/server';
 
@@ -83,12 +80,8 @@ export function hostnameOf(url: string | null | undefined): string | null {
 @Injectable()
 export class PasskeyService {
   constructor(
-    @InjectRepository(Passkey)
-    protected readonly passkeyRepository: Repository<Passkey>,
-    @InjectRepository(PasskeyChallenge)
-    protected readonly challengeRepository: Repository<PasskeyChallenge>,
-    @InjectRepository(User)
-    protected readonly userRepository: Repository<User>,
+    @Inject(PASSKEY_STORE)
+    protected readonly store: PasskeyStore,
     protected readonly settingsService: SettingsService,
     protected readonly bruteForce: BruteForceProtectionService,
     protected readonly authAudit: AuthAuditLogger,
@@ -106,8 +99,12 @@ export class PasskeyService {
   }
 
   /** Verifies a passkey sign-in, counting and auditing the attempt like a password login. */
-  async signIn(response: AuthenticationResponseJSON, requestOrigin: string | undefined, ip: string): Promise<User> {
-    let user: User;
+  async signIn(
+    response: AuthenticationResponseJSON,
+    requestOrigin: string | undefined,
+    ip: string,
+  ): Promise<AuthenticatedSessionUser> {
+    let user: AuthenticatedSessionUser;
     try {
       user = await this.verifyAuthentication(response, requestOrigin);
     } catch (error) {
@@ -151,37 +148,28 @@ export class PasskeyService {
     return { rpID, expectedOrigin: [...new Set(expectedOrigin)] };
   }
 
-  async listForUser(userId: number): Promise<Passkey[]> {
-    return this.passkeyRepository.find({ where: { userId }, order: { createdAt: 'DESC' } });
+  async listForUser(userId: number): Promise<PasskeyRecord[]> {
+    return this.store.listForUser(userId);
   }
 
   async delete(userId: number, passkeyId: number, origin: AuditOrigin): Promise<void> {
-    const result = await this.passkeyRepository.delete({ id: passkeyId, userId });
-    if (!result.affected) {
+    if (!(await this.store.deleteOwned(userId, passkeyId))) {
       throw new NotFoundException('PasskeyNotFound');
     }
     await this.recordPasskeyChange('passkey_deleted', userId, origin);
   }
 
-  async rename(userId: number, passkeyId: number, name: string, origin: AuditOrigin): Promise<Passkey> {
-    const passkey = await this.passkeyRepository.findOneBy({ id: passkeyId, userId });
-    if (!passkey) {
+  async rename(userId: number, passkeyId: number, name: string, origin: AuditOrigin): Promise<PasskeyRecord> {
+    const saved = await this.store.renameOwned(userId, passkeyId, name);
+    if (!saved) {
       throw new NotFoundException('PasskeyNotFound');
     }
-    passkey.name = name;
-    const saved = await this.passkeyRepository.save(passkey);
     await this.recordPasskeyChange('passkey_renamed', userId, origin);
     return saved;
   }
 
   protected async storeChallenge(challenge: string, userId: number | null): Promise<void> {
-    // ponytail: opportunistic sweep instead of a cron; challenges live 5 minutes so the table stays tiny
-    await this.challengeRepository.delete({ expiresAt: LessThan(new Date()) });
-    await this.challengeRepository.insert({
-      challenge,
-      userId,
-      expiresAt: new Date(Date.now() + CHALLENGE_TTL_MS),
-    });
+    await this.store.issueChallenge({ challenge, userId, expiresAt: new Date(Date.now() + CHALLENGE_TTL_MS) });
   }
 
   /**
@@ -194,8 +182,8 @@ export class PasskeyService {
       throw new BadRequestException('PasskeyChallengeInvalid');
     }
 
-    const stored = await this.challengeRepository.findOneBy({ challenge });
-    await this.challengeRepository.delete({ challenge });
+    // Burns the challenge atomically: of concurrent attempts with the same assertion only one gets it.
+    const stored = await this.store.consumeChallenge(challenge);
 
     if (!stored || stored.expiresAt.getTime() < Date.now() || stored.userId !== userId) {
       throw new BadRequestException('PasskeyChallengeInvalid');
@@ -215,11 +203,14 @@ export class PasskeyService {
     return options;
   }
 
-  async verifyAuthentication(response: AuthenticationResponseJSON, requestOrigin?: string): Promise<User> {
+  async verifyAuthentication(
+    response: AuthenticationResponseJSON,
+    requestOrigin?: string,
+  ): Promise<AuthenticatedSessionUser> {
     const { rpID, expectedOrigin } = await this.resolveRelyingParty(requestOrigin);
     const expectedChallenge = await this.consumeChallenge(response.response.clientDataJSON, null);
 
-    const passkey = await this.passkeyRepository.findOneBy({ credentialId: response.id });
+    const passkey = await this.store.findByCredentialId(response.id);
     if (!passkey) {
       throw new UnauthorizedException('PasskeyUnknownCredential');
     }
@@ -242,13 +233,13 @@ export class PasskeyService {
       throw new UnauthorizedException('PasskeyAuthenticationFailed');
     }
 
-    await this.passkeyRepository.update(passkey.id, {
+    await this.store.recordUse(passkey.id, {
       counter: verification.authenticationInfo.newCounter,
       backedUp: verification.authenticationInfo.credentialBackedUp,
-      lastUsedAt: new Date(),
+      usedAt: new Date(),
     });
 
-    const user = await this.userRepository.findOneBy({ id: passkey.userId });
+    const user = await this.store.findSignInUser(passkey.userId);
     if (!user) {
       throw new UnauthorizedException('PasskeyUnknownCredential');
     }
@@ -263,7 +254,10 @@ export class PasskeyService {
     return user;
   }
 
-  async createRegistrationOptions(user: User, requestOrigin?: string): Promise<PublicKeyCredentialCreationOptionsJSON> {
+  async createRegistrationOptions(
+    user: Pick<AuthenticatedSessionUser, 'id' | 'username'>,
+    requestOrigin?: string,
+  ): Promise<PublicKeyCredentialCreationOptionsJSON> {
     const { rpID } = await this.resolveRelyingParty(requestOrigin);
     const existing = await this.listForUser(user.id);
 
@@ -291,12 +285,12 @@ export class PasskeyService {
   }
 
   async verifyRegistration(
-    user: User,
+    user: Pick<AuthenticatedSessionUser, 'id' | 'username'>,
     response: RegistrationResponseJSON,
     name: string | undefined,
     requestOrigin: string | undefined,
     origin: AuditOrigin,
-  ): Promise<Passkey> {
+  ): Promise<PasskeyRecord> {
     const { rpID, expectedOrigin } = await this.resolveRelyingParty(requestOrigin);
     const expectedChallenge = await this.consumeChallenge(response.response.clientDataJSON, user.id);
 
@@ -314,17 +308,15 @@ export class PasskeyService {
 
     const { credential, credentialBackedUp } = verification.registrationInfo;
 
-    const passkey = await this.passkeyRepository.save(
-      this.passkeyRepository.create({
-        userId: user.id,
-        credentialId: credential.id,
-        publicKey: Buffer.from(credential.publicKey).toString('base64url'),
-        counter: credential.counter,
-        transports: credential.transports?.join(',') ?? null,
-        name: name?.trim() || 'Passkey',
-        backedUp: credentialBackedUp,
-      }),
-    );
+    const passkey = await this.store.register({
+      userId: user.id,
+      credentialId: credential.id,
+      publicKey: Buffer.from(credential.publicKey).toString('base64url'),
+      counter: credential.counter,
+      transports: credential.transports?.join(',') ?? null,
+      name: name?.trim() || 'Passkey',
+      backedUp: credentialBackedUp,
+    });
     await this.recordPasskeyChange('passkey_created', user.id, origin);
     return passkey;
   }

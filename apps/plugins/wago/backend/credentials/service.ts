@@ -1,8 +1,5 @@
 import {
-  Column,
-  Entity,
   PLUGIN_CONTEXT,
-  PrimaryColumn,
   type PluginAuditPrincipal,
   type PluginContext,
   type PluginMqttSubscription,
@@ -13,7 +10,7 @@ import { CONTROLLER_CLOCK_TOLERANCE_MS } from '../../shared/clock';
 import { sourceTime } from '../diagnostics/envelope';
 import { normalizeOperationalPrefix, parseControllerJson } from '../protocol/index';
 import { WagoAudit } from '../audit/index';
-import { WagoController } from '../controllers/entity';
+import { openWagoStorage, type WagoControllerRow, type WagoCredentialRotationRow } from '../storage';
 import { type CommissioningOperationGuard } from '../runtime/operation-guard';
 
 export class WagoCredentialRotationUncertainError extends ConflictException {
@@ -22,19 +19,8 @@ export class WagoCredentialRotationUncertainError extends ConflictException {
   }
 }
 
-/** Never expose this recovery record through an API. */
-@Entity({ name: 'plugin_wago_credential_rotations' })
-export class WagoCredentialRotationEntity {
-  @PrimaryColumn({ type: 'integer', name: 'controller_id' }) controllerId!: number;
-  @Column({ type: 'integer' }) revision!: number;
-  @Column({ type: 'varchar', name: 'credential_epoch' }) credentialEpoch!: string;
-  @Column({ type: 'varchar' }) phase!: 'provisioning' | 'pending' | 'completed';
-  @Column({ type: 'integer', name: 'mqtt_server_id' }) mqttServerId!: number;
-  @Column({ type: 'varchar' }) prefix!: string;
-  @Column({ type: 'varchar' }) token!: string;
-  @Column({ type: 'text', name: 'encrypted_credentials', nullable: true, select: false }) encryptedCredentials!:
-    string | null;
-}
+/** Rotation recovery record. Never expose it (or its encrypted credentials) through an API. */
+export type WagoCredentialRotationEntity = WagoCredentialRotationRow;
 
 export const CAPABILITY = 'credential-rotation-v1';
 
@@ -43,9 +29,9 @@ export const WAIT_MS = 30_000;
 export type Credential = { username: string; password: string };
 
 export function assertRotationController(
-  controller: WagoController,
+  controller: WagoControllerRow,
   retry: boolean,
-): asserts controller is WagoController & { mqttServerId: number } {
+): asserts controller is WagoControllerRow & { mqttServerId: number } {
   if (controller.trustState !== 'claimed' || !controller.mqttServerId || controller.compatibilityError)
     throw new ConflictException('A compatible claimed controller is required.');
   if (
@@ -184,14 +170,10 @@ export class WagoCredentialRotationService {
     retry = false,
   ) {
     await guard.assertOwned();
-    const controller = await this.context.getRepository(WagoController).findOneBy({ id: controllerId });
+    const controller = await this.tables.controllers.get(controllerId);
     if (!controller) throw new NotFoundException('WAGO controller not found');
     assertRotationController(controller, retry);
-    const [epochRow] = await this.repository.query(
-      'SELECT credential_epoch AS epoch FROM plugin_wago_controllers WHERE id = ?',
-      [controllerId],
-    );
-    const credentialEpoch: unknown = epochRow?.epoch;
+    const credentialEpoch: unknown = controller.credentialEpoch;
     if (
       typeof credentialEpoch !== 'string' ||
       !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(credentialEpoch)
@@ -199,11 +181,7 @@ export class WagoCredentialRotationService {
       throw new ConflictException('Re-enroll this controller with a credential epoch before rotating credentials.');
     prefix = normalizeOperationalPrefix(prefix);
     const identity = `wago-controller-${controller.hardwareId}`;
-    const previous = await this.repository
-      .createQueryBuilder('rotation')
-      .addSelect('rotation.encryptedCredentials')
-      .where('rotation.controllerId = :controllerId', { controllerId })
-      .getOne();
+    const previous = await this.tables.credentialRotations.get(controllerId);
     const completed = checkPendingRotation(previous, credentialEpoch, retry, controller.mqttServerId, prefix);
     if (completed) return completed;
     const lifecycle = new WagoAudit(this.context).begin(principal, controllerId, 'credential_rotation');
@@ -214,7 +192,7 @@ export class WagoCredentialRotationService {
       if (!retry) {
         const revision = (previous?.revision ?? 0) + 1;
         if (!Number.isSafeInteger(revision)) throw new ConflictException('Credential rotation revision exhausted.');
-        row = this.repository.create({
+        row = {
           controllerId,
           revision,
           credentialEpoch,
@@ -223,9 +201,9 @@ export class WagoCredentialRotationService {
           prefix,
           token: randomBytes(32).toString('base64url'),
           encryptedCredentials: null,
-        });
+        };
         await guard.assertOwned();
-        await this.repository.save(row);
+        await this.tables.credentialRotations.upsert(row, { conflictOn: ['controllerId'] });
         await guard.assertOwned();
         const root = `${prefix}/v1/controllers/${controller.hardwareId}`;
         uncertain = true;
@@ -243,8 +221,8 @@ export class WagoCredentialRotationService {
         if (!('password' in credential)) {
           uncertain = false;
           // The manual-provider response is instructions only, not a completed broker mutation.
-          if (previous) await this.repository.save(previous);
-          else await this.repository.delete(controllerId);
+          if (previous) await this.tables.credentialRotations.upsert(previous, { conflictOn: ['controllerId'] });
+          else await this.tables.credentialRotations.delete({ controllerId });
           throw new ConflictException('Automatic broker credential rotation is unavailable.');
         }
         if (credential.username !== identity || !credential.password || credential.password.length > 4096)
@@ -253,10 +231,14 @@ export class WagoCredentialRotationService {
         const encrypted = this.context.secrets.encrypt(plaintext);
         if (!encrypted || encrypted === plaintext || this.context.secrets.decrypt(encrypted) !== plaintext)
           throw new ConflictException('Credential recovery storage is unavailable.');
-        row.encryptedCredentials = encrypted;
-        row.phase = 'pending';
+        row = { ...row, encryptedCredentials: encrypted, phase: 'pending' };
         await guard.assertOwned();
-        await this.repository.save(row);
+        // Compare-and-set: only the rotation that provisioned this revision may publish its recovery record.
+        const stored = await this.tables.credentialRotations.update(
+          { controllerId, revision: row.revision, phase: 'provisioning' },
+          { encryptedCredentials: encrypted, phase: 'pending' },
+        );
+        if (!stored) throw new ConflictException('Credential recovery storage is unavailable.');
       }
       if (!row?.encryptedCredentials) throw new ConflictException('Credential recovery storage is unavailable.');
       const credential = JSON.parse(this.context.secrets.decrypt(row.encryptedCredentials)) as Credential;
@@ -269,9 +251,12 @@ export class WagoCredentialRotationService {
         throw new ConflictException('Credential recovery storage is unavailable.');
       await this.handoff(controller.hardwareId, row, credential, guard);
       await guard.assertOwned();
-      row.phase = 'completed';
-      row.encryptedCredentials = null;
-      await this.repository.save(row);
+      const completed = await this.tables.credentialRotations.update(
+        { controllerId, revision: row.revision, phase: 'pending', token: row.token },
+        { phase: 'completed', encryptedCredentials: null },
+      );
+      if (!completed) throw new ConflictException('Credential rotation changed during the handoff.');
+      row = { ...row, phase: 'completed', encryptedCredentials: null };
       await guard.assertOwned();
       await lifecycle.finish('succeeded');
       return { state: 'completed' as const, revision: row.revision };
@@ -286,17 +271,17 @@ export class WagoCredentialRotationService {
 
   /** Call inside guarded removal, before its existing broker revocation; deletion then cascades this row. */
   async assertRemovalBroker(controllerId: number, mqttServerId: number): Promise<void> {
-    const row = await this.repository.findOneBy({ controllerId });
+    const row = await this.tables.credentialRotations.get(controllerId);
     if (row && row.mqttServerId !== mqttServerId)
       throw new ConflictException('Revoke the original rotation broker identity before removing this controller.');
   }
 
   async status(controllerId: number) {
-    const row = await this.repository.findOne({ where: { controllerId }, select: { phase: true, revision: true } });
+    const row = await this.tables.credentialRotations.get(controllerId);
     return row ? { state: row.phase, revision: row.revision } : { state: 'none' as const };
   }
 
-  protected get repository() {
-    return this.context.getRepository(WagoCredentialRotationEntity);
+  protected get tables() {
+    return openWagoStorage(this.context);
   }
 }

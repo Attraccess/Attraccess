@@ -1,5 +1,5 @@
+import { createWagoTestStorage } from '../storage/testing';
 import { Test, TestingModule } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,21 +10,16 @@ import { WagoCommissioningService } from './service';
 
 it('boots the commissioning plugin and empty artifact catalog without privileged host-provider resolution', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'wago-startup-fixture-'));
-  const storage = process.env.STORAGE_ROOT;
+  const storageRoot = process.env.STORAGE_ROOT;
   process.env.STORAGE_ROOT = directory;
-  const dataSource = new DataSource({
-    type: 'better-sqlite3',
-    database: ':memory:',
-    entities: plugin.entities,
-    synchronize: true,
-  });
+  const wagoStorage = createWagoTestStorage();
   const get = jest.fn(() => {
     throw new Error('RESOLVE_HOST_PROVIDERS not granted');
   });
   const registerLiveTopic = jest.fn((_topic: PluginLiveTopic) => () => undefined);
   const context = {
-    dataSource,
-    getRepository: (entity) => dataSource.getRepository(entity),
+    storage: wagoStorage.storage,
+    persistence: wagoStorage.persistence,
     get,
     secrets: { encrypt: (value: string) => `fixture:${value}`, decrypt: (value: string) => value.slice(8) },
     mqtt: { subscribe: jest.fn().mockResolvedValue({ unsubscribe: jest.fn() }), publish: jest.fn() },
@@ -40,7 +35,6 @@ it('boots the commissioning plugin and empty artifact catalog without privileged
       'plugin.wago.read-state',
       'plugin.wago.wait-for-state',
     ]);
-    await dataSource.initialize();
     module = await Test.createTestingModule({ imports: [plugin.register(context)] }).compile();
     await module.init();
     expect(registerLiveTopic.mock.calls.map(([topic]) => topic.topic)).toEqual([
@@ -83,9 +77,8 @@ it('boots the commissioning plugin and empty artifact catalog without privileged
     expect(context.mqtt.subscribe).not.toHaveBeenCalled();
   } finally {
     await module?.close();
-    if (dataSource.isInitialized) await dataSource.destroy();
-    if (storage === undefined) delete process.env.STORAGE_ROOT;
-    else process.env.STORAGE_ROOT = storage;
+    if (storageRoot === undefined) delete process.env.STORAGE_ROOT;
+    else process.env.STORAGE_ROOT = storageRoot;
     await rm(directory, { recursive: true, force: true });
   }
 });

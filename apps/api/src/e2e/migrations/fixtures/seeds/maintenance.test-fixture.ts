@@ -1,20 +1,22 @@
 import type { DataSource } from 'typeorm';
 import {
-  MaintenanceRequestStatus,
   Resource,
-  ResourceHealthSource,
   ResourceHealthState,
-  ResourceHealthStatus,
   ResourceMaintenance,
   ResourceMaintenanceRequest,
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleTimeIntervalConfig,
-  ResourceMaintenanceScheduleTriggerType,
   ResourceMaintenanceScheduleUsageCountConfig,
   ResourceMaintenanceScheduleUsageHoursConfig,
-  UsageDurationUnit,
   User,
 } from '@attraccess/database-entities';
+import {
+  MaintenanceRequestStatus,
+  ResourceHealthSource,
+  ResourceHealthStatus,
+  ResourceMaintenanceScheduleTriggerType,
+  UsageDurationUnit,
+} from '@attraccess/application-models';
 import { ensureEntity } from '../seed-storage.test-fixture';
 export async function migrationMaintenanceSeeds(
   dataSource: DataSource,

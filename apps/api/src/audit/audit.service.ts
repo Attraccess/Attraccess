@@ -1,23 +1,12 @@
-import { AuditLog } from '@attraccess/database-entities';
-
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 
 import { PluginAuditReceipt } from '@attraccess/plugins-backend-sdk';
 
-import { DataSource, EntityManager } from 'typeorm';
-
 import { SettingsStoreService } from '../settings/settings-store.service';
 
-import {
-  AUDIT_SHUTDOWN_DRAIN_MS,
-  auditCutoff,
-  AuditStorage,
-  AuditStorageState,
-  hasPasswordPolicyOverflow,
-  sqliteErrorCode,
-} from './persistence/audit-storage';
+import { AUDIT_SHUTDOWN_DRAIN_MS, auditCutoff, AuditStorage, AuditStorageState } from './persistence/audit-storage';
 
-import { createDataSource, SQLITE_BUSY_TIMEOUT_MS } from '../database/sqlite-connection';
+import { AUDIT_STORE, AuditEntryReader, AuditStore } from './audit-persistence.port';
 
 import { getRegisteredPluginAuditDomains } from '../plugin-system/audit/audit-registry';
 
@@ -29,7 +18,7 @@ import { Interval } from '@nestjs/schedule';
 
 import { readAuditSettings } from './audit.config';
 
-import { AuditEvent, AuditRecorder, AuditRecordOptions } from './recorder/audit-event';
+import { AuditEvent, AuditRecorder, AuditRecordOptions, AuditTransactionRef } from './recorder/audit-event';
 
 /** The audit storage engine and the implementation of the AuditRecorder port (bound as AUDIT_RECORDER). */
 @Injectable()
@@ -38,63 +27,34 @@ export class AuditService implements AuditRecorder, OnModuleInit, OnModuleDestro
 
   private readonly state = new AuditStorageState();
 
-  private readonly store: AuditStorage;
+  private readonly storage: AuditStorage;
 
   private shutdownDrainMs = AUDIT_SHUTDOWN_DRAIN_MS;
 
   constructor(
-    private readonly source: DataSource,
+    @Inject(AUDIT_STORE) private readonly store: AuditStore,
     private readonly settings: SettingsStoreService,
     @Inject(AUDIT_METRICS) private readonly metrics: AuditMetrics,
   ) {
-    this.store = new AuditStorage(settings, metrics, this.logger, this.state);
-  }
-
-  /** The audit connection, once initialized. */
-  private get storage(): DataSource | undefined {
-    return this.state.storage;
+    this.storage = new AuditStorage(store, settings, metrics, this.logger, this.state);
   }
 
   async onModuleInit(): Promise<void> {
     // Plugin domains are registered while modules are built, before this runs. Zero series let the alert see a first drop.
     for (const { domain } of getRegisteredPluginAuditDomains())
       for (const reason of AUDIT_DROP_REASONS) this.metrics.recordsDropped.inc({ domain, reason }, 0);
-    if (this.storage?.isInitialized || this.state.stopping) return;
-    // A separate connection guarantees that a write without a caller transaction follows autocommit,
-    // never a savepoint in another request's shared SQLite transaction. No schema sync.
-    if (this.source.options.type !== 'better-sqlite3' || this.source.options.database === ':memory:') {
+    if (this.store.isOpen || this.state.stopping) return;
+    const opened = await this.store.open();
+    if (opened.status === 'unsupported') {
       this.logger.warn('Audit storage unavailable: requires a file-backed SQLite database');
       return;
     }
-    // Guarded like the main connection, so its writes wait asynchronously for the file's write lock (better-sqlite3
-    // would busy-wait on the event loop). It never joins a caller's transaction on another connection.
-    const storage = createDataSource(
-      {
-        type: 'better-sqlite3',
-        database: this.source.options.database,
-        entities: [AuditLog],
-        synchronize: false,
-        migrationsRun: false,
-        logging: false,
-        timeout: SQLITE_BUSY_TIMEOUT_MS,
-      },
-      { joinsOwnedTransactions: false },
-    );
-    try {
-      await storage.initialize();
-      await storage.query(`PRAGMA busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`);
-      await storage.query('PRAGMA synchronous = FULL');
-      this.state.storage = storage;
-      await this.cleanup();
-    } catch (error) {
-      // Only the SQLite code or error name: the driver message may contain the database path.
-      this.logger.error(
-        `Audit storage initialization failed: ${
-          sqliteErrorCode(error) ?? (error instanceof Error ? error.name : 'unknown error')
-        }`,
-      );
-      if (storage.isInitialized) await storage.destroy().catch(() => undefined);
+    if (opened.status === 'failed') {
+      // Only the driver code or error name: the driver message may contain the database path.
+      this.logger.error(`Audit storage initialization failed: ${opened.code ?? opened.errorName ?? 'unknown error'}`);
+      return;
     }
+    await this.cleanup();
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -105,44 +65,18 @@ export class AuditService implements AuditRecorder, OnModuleInit, OnModuleDestro
       if (!this.state.drainExpired && Date.now() >= drainDeadline) this.state.drainExpired = true;
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
-    const storage = this.storage;
-    this.state.storage = undefined;
-    if (storage?.isInitialized) await storage.destroy().catch(() => undefined);
+    await this.store.close();
   }
 
   @Interval(60 * 60 * 1000)
   async cleanup(): Promise<void> {
-    const storage = this.storage;
-    if (this.state.stopping || !storage?.isInitialized || this.state.cleaning) return;
+    if (this.state.stopping || !this.store.isOpen || this.state.cleaning) return;
     this.state.cleaning = true;
     try {
       const config = await readAuditSettings(this.settings);
-      const cutoff = this.store.sqliteDate(auditCutoff(config.retention_days));
+      const cutoff = auditCutoff(config.retention_days);
       while (!this.state.stopping) {
-        const hasOverflow = await hasPasswordPolicyOverflow(storage);
-        const count = await this.store.serializeStorageWrite(async () => {
-          if (this.state.stopping) return 0;
-          return storage.transaction(async (manager) => {
-            const rows = await manager.query<{ id: number }[]>(
-              'SELECT id FROM audit_log WHERE at < ? ORDER BY at, id LIMIT 1000',
-              [cutoff],
-            );
-            if (rows.length === 0) return 0;
-            const ids = rows.map(({ id }) => id);
-            const placeholders = ids.map(() => '?').join(', ');
-            if (hasOverflow) {
-              await manager.query(
-                `DELETE FROM password_policy_audit_overflow
-                WHERE legacyAuditId IN (
-                  SELECT json_extract(details, '$.legacyAuditId') FROM audit_log WHERE id IN (${placeholders})
-                )`,
-                ids,
-              );
-            }
-            await manager.query(`DELETE FROM audit_log WHERE id IN (${placeholders})`, ids);
-            return rows.length;
-          });
-        });
+        const count = await this.store.deleteExpired(cutoff, 1000, () => this.state.stopping);
         if (count > 0) this.logger.log(`Deleted ${count} expired audit rows`);
         if (count < 1000) break;
         await new Promise<void>((resolve) => setImmediate(resolve));
@@ -155,12 +89,16 @@ export class AuditService implements AuditRecorder, OnModuleInit, OnModuleDestro
   }
 
   /** The AuditRecorder port; see AuditStorage.record. */
-  async record(event: AuditEvent, manager?: EntityManager, options?: AuditRecordOptions): Promise<PluginAuditReceipt> {
-    return this.store.record(event, manager, options);
+  async record(
+    event: AuditEvent,
+    transaction?: AuditTransactionRef,
+    options?: AuditRecordOptions,
+  ): Promise<PluginAuditReceipt> {
+    return this.storage.record(event, transaction, options);
   }
 
   /** Runs a read on the audit connection; shutdown waits for it. */
-  async read<T>(query: (storage: DataSource) => Promise<T>): Promise<T> {
-    return this.store.read(query);
+  async read<T>(query: (reader: AuditEntryReader) => Promise<T>): Promise<T> {
+    return this.storage.read(query);
   }
 }

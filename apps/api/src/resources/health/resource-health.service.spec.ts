@@ -1,7 +1,8 @@
 import { registerResourceHealthServiceFixture } from './resource-health.service.resource-health-service.test-fixture';
 import { NotFoundException } from '@nestjs/common';
-import { ResourceHealthSource, ResourceHealthStatus, ResourceHealthState } from '@attraccess/database-entities';
+import { ResourceHealthSource, ResourceHealthStatus, type ResourceHealthRecord } from '@attraccess/application-models';
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
+import { fakeTransactionScope } from '../../database/fake-transaction-scope.test-fixture';
 
 describe('ResourceHealthService', () => {
   const fixture = registerResourceHealthServiceFixture();
@@ -50,9 +51,7 @@ describe('ResourceHealthService', () => {
         reason: 'broken',
         source: ResourceHealthSource.MANUAL,
         lastReportedAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as ResourceHealthState);
+      } as ResourceHealthRecord);
 
       const result = await fixture.service.reportHealth({
         resourceId: 1,
@@ -204,12 +203,11 @@ describe('ResourceHealthService', () => {
       expect(await fixture.service.isResourceUnhealthy(1)).toBe(false);
     });
 
-    it('counts through the given transaction manager', async () => {
-      const count = jest.fn().mockResolvedValue(1);
-      const manager = { getRepository: jest.fn().mockReturnValue({ count }) };
-      expect(await fixture.service.isResourceUnhealthy(1, manager as never)).toBe(true);
-      expect(manager.getRepository).toHaveBeenCalledWith(ResourceHealthState);
-      expect(count).toHaveBeenCalledWith({ where: { resourceId: 1, status: ResourceHealthStatus.UNHEALTHY } });
+    it('asks the store through the given transaction context', async () => {
+      const context = fakeTransactionScope();
+      fixture.store.hasUnhealthyEntry.mockResolvedValueOnce(true);
+      expect(await fixture.service.isResourceUnhealthy(1, context)).toBe(true);
+      expect(fixture.store.hasUnhealthyEntry).toHaveBeenCalledWith(1, context);
     });
   });
 

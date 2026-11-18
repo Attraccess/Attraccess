@@ -1,13 +1,4 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import {
-  Resource,
-  ResourceUsage,
-  ResourceIntroduction,
-  ResourceIntroducer,
-  ResourceIntroductionHistoryItem,
-  User,
-} from '@attraccess/database-entities';
 import { ResourcesController } from './resources.controller';
 import { ScheduleModule } from '@nestjs/schedule';
 import { FileStorageModule } from '../common/modules/file-storage.module';
@@ -30,18 +21,12 @@ import { ResourceFormsModule } from './forms/forms.module';
 import { ResourceHealthModule } from './health/resource-health.module';
 import { LicenseModule } from '../license/license.module';
 import { LiveTopicsModule } from '../live-updates/live-topics.module';
+import { ResourcesPersistenceModule } from '../database/adapters/resources/resources-persistence.module';
 import { ResourceLiveTopicsProvider } from './resource-live-topics.provider';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      Resource,
-      ResourceUsage,
-      ResourceIntroduction,
-      ResourceIntroducer,
-      ResourceIntroductionHistoryItem,
-      User,
-    ]),
+    ResourcesPersistenceModule,
     ScheduleModule.forRoot(),
     FileStorageModule,
     UsersAndAuthModule,

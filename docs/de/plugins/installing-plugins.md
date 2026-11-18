@@ -31,7 +31,7 @@ Um ein Nightly zu testen, öffne **Einstellungen → Plugins**, wähle beim inst
 
 Sobald ein Plugin einmal released wurde, bietet der Marktplatz nur noch released Versionen an. Bis dahin gilt:
 
-- Bei WAGO, Shelly und RabbitMQ bleibt `latest` auf einem Nightly-Build (`0.1.0-nightly.925.2`, für Hosts `^1.9.0`), bis Attraccess 1.11.0 stabile Versionen veröffentlicht. Der aktuelle Plugin-Code benötigt Attraccess 1.11 oder neuer, daher bleibt `0.1.0-nightly.925.2` die Version für ältere Hosts.
+- Bei WAGO, Shelly und RabbitMQ bleibt `latest` auf einem Nightly-Build (`0.1.0-nightly.925.2`, für Hosts `^1.9.0`), bis Attraccess 1.11.0 stabile Versionen veröffentlicht. Der aktuelle Plugin-Code ist für Attraccess 2.0 gebaut (`attraccessVersion.min` `2.0.0-0`) und läuft nicht auf 1.x-Hosts; 1.x-Hosts behalten daher die 1.x-Builds.
 - npm setzt `latest` bei der ersten Veröffentlichung eines Pakets automatisch. Ein Plugin, das zuerst von einem Nightly veröffentlicht wird (wie Matter), hat deshalb bis zu seinem ersten Release ein Nightly als `latest`. Das Release behandelt ein Nightly-`latest` als „noch nie released" und veröffentlicht das Plugin.
 
 ## Plugin hochladen
@@ -85,8 +85,40 @@ trotz gültiger Lizenz **Lizenz fehlt**, konnte die Lizenz beim Start nicht gepr
 3. Klicken Sie auf die Schaltflaeche **Entfernen** oder **Loeschen**
 4. Bestaetigen Sie die Entfernung
 
+Was mit den Daten des Plugins geschieht, hängt davon ab, wie es installiert wurde. Der Bestätigungsdialog nennt den
+zutreffenden Fall.
+
+| Installiert                                   | Dateien und Registrierungen        | Tabellen und Daten                                                                                                   |
+| --------------------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Aus einer Registry (Marktplatz, npm)          | Entfernt                           | **Bleiben erhalten**, zusammen mit den Geheimnissen des Plugins. Eine erneute Installation setzt mit den Daten fort. |
+| Als ZIP hochgeladen oder in den Ordner gelegt | Entfernt                           | **Werden dauerhaft gelöscht.**                                                                                       |
+| Abgelehnt (etwa ein 1.x-Plugin unter 2.0)     | Entfernt, Code wird nie ausgeführt | **Bleiben erhalten.** Ein 2.0-Build des Plugins übernimmt sie später, oder Sie löschen die Tabellen von Hand.        |
+
 > [!WARNING]
-> Das Entfernen eines Plugins loescht es dauerhaft aus dem System. Sie muessen die Plugin-Datei erneut hochladen, wenn Sie es wieder verwenden moechten.
+> Das Entfernen eines hochgeladenen Plugins löscht seine Daten dauerhaft. Erstellen Sie vorher ein
+> [Backup](installation/backup-restore.md), wenn Sie sie noch brauchen könnten, und laden Sie die Plugin-Datei erneut
+> hoch, um das Plugin wieder zu verwenden.
+
+## Upgrade auf Attraccess 2.0
+
+Attraccess 2.0 hat das Plugin-SDK geändert: Plugins haben keinen Datenbankzugriff mehr und halten ihre eigenen Daten in
+Tabellen, die der Host verwaltet (siehe [Plugin-Speicher](plugins/plugin-storage.md)). Für 1.x gebaute Plugins werden
+nicht geladen: Sie bleiben mit einem Fehler in der Plugin-Liste, der das Plugin nennt, den Grund angibt und auf die
+[Umstellungsanleitung](plugins/migrating-to-2.md) verweist, und ihre Daten bleiben unverändert. Typische Gründe:
+
+- das Plugin zielt auf das SDK 1.x (es deklariert keine Mindest-Host-Version ab `2.0.0-0`);
+- es fordert die entfernte Berechtigung `DATABASE_ACCESS` an (2.0-Plugins fordern `PLUGIN_STORAGE`);
+- es deklariert noch `persistence.backends` oder einen TypeORM-Migrationseintrag, oder sein Bundle importiert TypeORM
+  oder einen Datenbanktreiber;
+- die Datenbank enthält nur einen Teil der alten (1.x-)Migrationen des Plugins: Die Daten stammen aus einem Release vor
+  Attraccess 1.11. Attraccess 2.0 übernimmt Plugin-Daten nur vom letzten 1.x-Release (1.11). Spielen Sie das Backup
+  von vor dem Upgrade zurück, aktualisieren Sie auf Attraccess 1.11 und starten Sie es einmal, damit die Migrationen
+  des Plugins abschließen, und aktualisieren Sie dann auf 2.0. Es wurde nichts geändert (siehe
+  [Upgrade auf Attraccess 2.0](installation/updating.md#upgrade-auf-attraccess-20)).
+
+Installieren Sie vor oder direkt nach dem Upgrade den 2.0-Build jedes Plugins (Upload oder Marktplatz) oder löschen Sie
+das alte Plugin aus der Liste. Das Löschen eines abgelehnten Plugins entfernt seine Dateien, ohne seinen Code
+auszuführen; seine Tabellen bleiben in der Datenbank, bis ein 2.0-Build sie übernimmt oder Sie sie von Hand löschen.
 
 ## Fehlerbehebung
 

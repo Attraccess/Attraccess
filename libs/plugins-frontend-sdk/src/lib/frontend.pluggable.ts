@@ -1,4 +1,4 @@
-import { User } from '@attraccess/database-entities';
+import type { PluginUserModel } from '@attraccess/application-models';
 import { ReactNode } from 'react';
 import { IPlugin } from 'react-pluggable';
 import { RouteConfig } from './frontend.routing';
@@ -85,10 +85,10 @@ export const getPluginFunctionName = (pluginName: string, func: FRONTEND_FUNCTIO
 
 export interface AttraccessFrontendPluginAuthData {
   authToken: string;
-  user: User;
+  user: PluginUserModel;
   /**
-   * The signed-in user's effective permission keys, core and plugin-declared. Hosts older than 1.11.0-beta.1 leave
-   * it out; read it through {@link hasPluginAuthPermission}.
+   * The signed-in user's effective permission keys, core and plugin-declared. Read it through
+   * {@link hasPluginAuthPermission}.
    */
   effectivePermissions?: readonly string[];
 }

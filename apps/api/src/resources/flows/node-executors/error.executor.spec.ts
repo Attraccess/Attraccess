@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
+import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 import { ErrorExecutor } from './error.executor';
 import { NodeExecutionContext } from './node-executor.interface';
 import { FlowExecutionError } from '../errors/flow-execution.error';
@@ -14,13 +14,13 @@ function createCtx(overrides: Partial<NodeExecutionContext> = {}): NodeExecution
   } as unknown as NodeExecutionContext;
 }
 
-function createNode(data: object): ResourceFlowNode {
+function createNode(data: object): FlowNodeRecord {
   return {
     id: 'n1',
     type: ResourceFlowNodeType.PROCESSING_ERROR,
     resourceId: 1,
     data,
-  } as unknown as ResourceFlowNode;
+  } as unknown as FlowNodeRecord;
 }
 
 describe('ErrorExecutor', () => {
@@ -64,9 +64,7 @@ describe('ErrorExecutor', () => {
     const ctx = createCtx(); // echo compileTemplate
     const node = createNode({ message: 'plain failure message' });
 
-    await expect(executor.execute(node, {}, ctx)).rejects.toThrow(
-      'FLOW_EXECUTION_ERROR: plain failure message'
-    );
+    await expect(executor.execute(node, {}, ctx)).rejects.toThrow('FLOW_EXECUTION_ERROR: plain failure message');
     expect(ctx.compileTemplate).toHaveBeenCalledWith('plain failure message', {});
   });
 

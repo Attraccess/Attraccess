@@ -1,4 +1,4 @@
-import type { ReservationEntity } from '../../entities/reservation.entity';
+import type { ReservationRow } from '../../storage/reservation-table';
 import type { ResourceSettings } from '../../settings/settings.model';
 import { formatRange, formatTime, minutesText, TimeContext } from '../format';
 import type { EmailTemplateId } from './build';
@@ -20,7 +20,7 @@ export interface EmailTimeContext extends TimeContext {
  */
 export function slotVariables(
   m: EmailTimeContext,
-  r: Pick<ReservationEntity, 'startTime' | 'endTime'>,
+  r: Pick<ReservationRow, 'startTime' | 'endTime'>,
 ): { resource: { name: string }; reservation: Record<string, unknown> } {
   return {
     resource: { name: m.resourceName },
@@ -35,7 +35,7 @@ export function slotVariables(
 /** Variables every mail to the holder or a manager shares: the slot plus the booking's own fields. */
 export function bookingVariables(
   m: EmailTimeContext,
-  r: ReservationEntity,
+  r: ReservationRow,
   options: { viaApproval?: boolean } = {},
 ): Record<string, unknown> {
   const slot = slotVariables(m, r);

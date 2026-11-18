@@ -1,4 +1,10 @@
-import { ResourceUsage } from '@attraccess/database-entities';
+import type {
+  PluginResourceModel,
+  PluginUserModel,
+  ResourceRecord,
+  UsageSession,
+  UserProfile,
+} from '@attraccess/application-models';
 import { SystemEvent, SystemEventPayload } from '@attraccess/plugins-backend-sdk';
 import type { Logger } from '@nestjs/common';
 import type { PluginEventsService } from '../../../plugin-system/plugin-events.service';
@@ -21,11 +27,30 @@ function emitSafely<E extends PluginUsageEvent>(
   }
 }
 
+/** The resource and user of a RESOURCE_USAGE_STARTED/ENDED event, as the plugin SDK models them (nothing else). */
+export function pluginUsageParties(
+  resource: ResourceRecord,
+  user: UserProfile,
+): { resource: PluginResourceModel; user: PluginUserModel } {
+  return {
+    resource: {
+      id: resource.id,
+      name: resource.name,
+      type: resource.type,
+      description: resource.description,
+      allowTakeOver: resource.allowTakeOver,
+      maxParallelSessions: resource.maxParallelSessions,
+      supervisionMode: resource.supervisionMode,
+    },
+    user: { id: user.id, username: user.username, locale: user.locale, isDisabled: user.isDisabled },
+  };
+}
+
 /** Emits RESOURCE_USAGE_SESSION_ENDED for a finished (or taken-over) session. Never throws. */
 export function emitPluginSessionEnded(
   pluginEvents: Pick<PluginEventsService, 'emit'>,
   logger: Pick<Logger, 'error'>,
-  session: Pick<ResourceUsage, 'id' | 'resourceId' | 'userId' | 'startTime'>,
+  session: Pick<UsageSession, 'id' | 'resourceId' | 'userId' | 'startTime'>,
   endTime: Date | null,
   reason: 'ended' | 'taken_over',
 ): void {
@@ -48,8 +73,8 @@ export function emitPluginSessionStart(
   pluginEvents: Pick<PluginEventsService, 'emit'>,
   logger: Pick<Logger, 'error'>,
   options: {
-    newSession: Pick<ResourceUsage, 'id' | 'resourceId' | 'userId' | 'startTime'>;
-    replacedSession: Pick<ResourceUsage, 'id' | 'resourceId' | 'userId' | 'startTime'> | null;
+    newSession: Pick<UsageSession, 'id' | 'resourceId' | 'userId' | 'startTime'>;
+    replacedSession: Pick<UsageSession, 'id' | 'resourceId' | 'userId' | 'startTime'> | null;
     transitionTime: Date;
     supervisorUserId: number | null;
   },

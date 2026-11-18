@@ -1,14 +1,7 @@
 import type { PluginBackendModule, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { DynamicModule } from '@nestjs/common';
 import { WagoControllerApi } from './controllers/controller';
-import { WagoController } from './controllers/entity';
 import { WagoService } from './controllers/service';
-import { WagoSettings } from './controllers/settings.entity';
-import { WagoEnrollment } from './controllers/enrollment.entity';
-import { WagoConfigurationDraft } from './configuration/draft.entity';
-import { WagoConfigurationRevision } from './configuration/revision.entity';
-import { WagoCredentialRotationEntity } from './credentials/service';
-import { WagoCommissioningSession } from './commissioning/sessions/session.entity';
 import { WagoCommissioningService } from './commissioning/service';
 import { WagoCredentialRotationService } from './credentials/service';
 import { WagoRuntimeArtifactsService } from './runtime/artifacts/service';
@@ -16,17 +9,15 @@ import { WagoArtifactsController } from './runtime/artifacts/controller';
 import { WagoDiagnosticsController } from './diagnostics/service';
 import { WagoDiagnosticsService } from './diagnostics/service';
 import { WagoCommissioningReadiness } from './commissioning/readiness/readiness';
-import { WagoManagementEntity } from './management/entity';
 import { createWagoCommandNode } from './flow/command-node';
 import { WagoFlowService } from './flow/service';
 import { createWagoStateNodes } from './flow/state-nodes';
 import { WAGO_AUDIT_DOMAIN } from './audit/policy';
-import { WagoManagedAccess, WagoRuntimeUpdateEntity, WagoDeviceOperation } from './runtime/managed/access.entity';
 import { WagoManagedRuntimeService } from './runtime/managed/service';
 import { WagoUpdatesController } from './runtime/update/controller';
-import { WagoNetworkChange, WagoMqttCredentialRetirement } from './network/entity';
 import { WagoNetworkChangeService } from './network/service';
 import { WagoLiveUpdatesService } from './wago-live-updates.service';
+import { wagoStorage } from './storage';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 class WagoPluginModule {}
@@ -41,21 +32,7 @@ function services(context: PluginContext) {
 }
 
 const plugin: PluginBackendModule = {
-  entities: [
-    WagoController,
-    WagoSettings,
-    WagoEnrollment,
-    WagoConfigurationDraft,
-    WagoConfigurationRevision,
-    WagoCredentialRotationEntity,
-    WagoCommissioningSession,
-    WagoManagementEntity,
-    WagoManagedAccess,
-    WagoRuntimeUpdateEntity,
-    WagoDeviceOperation,
-    WagoNetworkChange,
-    WagoMqttCredentialRetirement,
-  ],
+  storage: wagoStorage,
   flowNodes: (context) => [
     createWagoCommandNode(() => services(context).command),
     ...createWagoStateNodes(() => services(context).state),

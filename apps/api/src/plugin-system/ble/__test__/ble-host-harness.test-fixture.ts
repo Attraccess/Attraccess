@@ -1,4 +1,3 @@
-import { Attractap, entities } from '@attraccess/database-entities';
 import {
   normalizeBleAddress,
   type FakeBleHost,
@@ -6,9 +5,9 @@ import {
   type FakeBleOperation,
   type PluginBleContext,
 } from '@attraccess/plugins-backend-sdk';
+import type { AttractapReader } from '@attraccess/application-models';
 import type { ModuleRef } from '@nestjs/core';
-import { DataSource, Table } from 'typeorm';
-import { PluginBleTransport1793300000000 } from '../../../database/migrations/1793300000000-plugin-ble-transport';
+import { createPluginBleTestDatabase } from '../../../database/adapters/plugins/plugin-ble-database.test-fixture';
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../../../attractap/events';
 import { BLE_TRANSPORT_DRIVER } from '../ble-transport-driver';
 import { createPluginBleContext } from '../plugin-ble-context';
@@ -53,19 +52,7 @@ export async function createHostBleHarness(
   } = {},
 ): Promise<HostBleHarness> {
   clearPluginBleProfiles();
-  const source = await new DataSource({
-    type: 'better-sqlite3',
-    database: ':memory:',
-    entities: Object.values(entities),
-  }).initialize();
-  const queryRunner = source.createQueryRunner();
-  try {
-    await queryRunner.createTable(Table.create(source.getMetadata(Attractap), source.driver));
-    // The real migration creates the endpoint table, including its cascading foreign key to the reader.
-    await new PluginBleTransport1793300000000().up(queryRunner);
-  } finally {
-    await queryRunner.release();
-  }
+  const database = await createPluginBleTestDatabase();
 
   const clock = new ManualClock();
   const driver = new BleTestDriver(clock);
@@ -105,7 +92,7 @@ export async function createHostBleHarness(
       throw new Error('not found');
     },
   } as unknown as ModuleRef;
-  const service = new PluginBleService(source, moduleRef);
+  const service = new PluginBleService(database.store, moduleRef);
   service.clock = clock;
 
   const host: HostBleHarness = {
@@ -121,7 +108,7 @@ export async function createHostBleHarness(
     transcript: driver.transcript,
     dispose: async () => {
       await service.onModuleDestroy();
-      await source.destroy();
+      await database.dispose();
     },
     contextFor(pluginId): PluginBleContext {
       return createPluginBleContext({ id: pluginId, logger: silentLogger }, () => {
@@ -130,23 +117,24 @@ export async function createHostBleHarness(
       });
     },
     addReader: (async (reader: { readerId: number; name: string; allowPluginBle?: boolean; available?: boolean }) => {
-      await source.getRepository(Attractap).insert({
+      await database.addReader({
         id: reader.readerId,
         name: reader.name,
-        apiTokenHash: 'hash',
         allowPluginBle: reader.allowPluginBle ?? false,
-      } as Attractap);
+      });
       driver.available.set(reader.readerId, reader.available ?? true);
       if (reader.available ?? true) connectReader(reader.readerId);
     }) as FakeBleHost['addReader'],
     async removeReader(readerId) {
-      await source.getRepository(Attractap).delete(readerId);
+      await database.deleteReader(readerId);
       // AttractapService emits this after the delete; the row cascade already removed the endpoints.
       await service.onReaderDeleted(new ReaderDeletedEvent(readerId));
     },
     async setReaderAccess(readerId, allowed) {
-      await source.getRepository(Attractap).update(readerId, { allowPluginBle: allowed });
-      await service.onReaderUpdated(new ReaderUpdatedEvent({ id: readerId, allowPluginBle: allowed } as Attractap));
+      await database.setReaderAccess(readerId, allowed);
+      await service.onReaderUpdated(
+        new ReaderUpdatedEvent({ id: readerId, allowPluginBle: allowed } as AttractapReader),
+      );
     },
     setReaderAvailable: (readerId, available) => {
       driver.available.set(readerId, available);

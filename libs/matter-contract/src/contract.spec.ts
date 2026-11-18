@@ -355,7 +355,7 @@ describe('compatibility table', () => {
   it('lists exactly one combination for wire version 1', () => {
     expect(COMPATIBILITY_TABLE).toHaveLength(1);
     expect(COMPATIBILITY_TABLE[0].wireVersion).toBe(WIRE_VERSION);
-    expect(minimumAttraccessVersion()).toBe('1.11.0-0');
+    expect(minimumAttraccessVersion()).toBe('2.0.0-0');
     expect(minimumAttraccessVersion({ ...COMPATIBILITY_TABLE[0], attraccess: '>=1.12.0 <2' })).toBe('1.12.0');
     expect(() => minimumAttraccessVersion({ ...COMPATIBILITY_TABLE[0], attraccess: 'not a range' })).toThrow();
     expect(() => minimumAttraccessVersion({ ...COMPATIBILITY_TABLE[0], attraccess: '<0.0.0' })).toThrow();
@@ -376,24 +376,24 @@ describe('client helpers', () => {
     const entry = COMPATIBILITY_TABLE[0];
     expect(expectedSidecarVersion(entry.plugin)).toBe(entry.sidecar);
     expect(expectedSidecarVersion('9.9.9')).toBeUndefined();
-    expect(isHostSupported(entry.plugin, '1.11.0')).toBe(true);
-    expect(isHostSupported(entry.plugin, '1.11.0-beta.1')).toBe(true);
-    // Development builds report the last released version until the next release, so every 1.11.0 prerelease counts.
-    expect(isHostSupported(entry.plugin, '1.11.0-beta.0')).toBe(true);
+    expect(isHostSupported(entry.plugin, '2.0.0')).toBe(true);
+    expect(isHostSupported(entry.plugin, '2.0.0-beta.1')).toBe(true);
+    // Development builds report the last released version until the next release, so every 2.0.0 prerelease counts.
+    expect(isHostSupported(entry.plugin, '2.0.0-beta.0')).toBe(true);
     expect(isHostSupported(entry.plugin, '1.10.0')).toBe(false);
     expect(isHostSupported('9.9.9', '1.11.0')).toBe(false);
   });
 
   it('builds the full header set with a bearer token only when given', () => {
     const base = {
-      attraccessVersion: '1.11.0',
+      attraccessVersion: '2.0.0',
       pluginVersion: '0.4.0-alpha.0',
       sidecarVersion: '0.4.0-alpha.0',
       correlationId: id,
     };
     expect(buildRequestHeaders({ ...base, deadlineMs: 1500.2, token: 'x'.repeat(32) })).toEqual({
       'x-matter-wire-version': '1',
-      'x-attraccess-version': '1.11.0',
+      'x-attraccess-version': '2.0.0',
       'x-matter-plugin-version': '0.4.0-alpha.0',
       'x-matter-sidecar-version': '0.4.0-alpha.0',
       'x-correlation-id': id,

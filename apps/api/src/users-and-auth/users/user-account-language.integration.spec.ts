@@ -1,7 +1,11 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createMock } from '@golevelup/ts-jest';
 import { entities, Setting, User } from '@attraccess/database-entities';
 import { DataSource } from 'typeorm';
 import * as migrations from '../../database/migrations';
+import { closeResourceTransactionConnection } from '../../database/sqlite/run-serialized-transaction';
 import { EncryptionService } from '../../encryption/encryption.service';
 import { LicenseService } from '../../license/license.service';
 import { MetricsService } from '../../metrics/metrics.service';
@@ -11,22 +15,30 @@ import { SettingsService } from '../../settings/settings.service';
 import { RbacService } from '../rbac/rbac.service';
 import { UsersService } from './users.service';
 import { composeUsersService } from './fixtures/compose.test-fixture';
+import { TypeOrmSettingsRows } from '../../database/adapters/settings/typeorm-settings-rows';
 
 describe('new account language persistence', () => {
   let source: DataSource;
+  let directory: string;
   let users: UsersService;
   let settings: SettingsService;
   let store: SettingsStoreService;
 
   beforeAll(async () => {
+    // The unit of work commits on its own connection, so the database must be a file.
+    directory = await mkdtemp(join(tmpdir(), 'account-language-'));
     source = await new DataSource({
       type: 'better-sqlite3',
-      database: ':memory:',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database: join(directory, 'language.sqlite'),
       entities: Object.values(entities),
       migrations: Object.values(migrations),
     }).initialize();
     await source.runMigrations();
-    store = new SettingsStoreService(source.getRepository(Setting), createMock<EncryptionService>());
+    store = new SettingsStoreService(
+      TypeOrmSettingsRows.forRepository(source.getRepository(Setting)),
+      createMock<EncryptionService>(),
+    );
     settings = Object.assign(Object.create(SettingsService.prototype), { settingsStore: store });
     // Execute production creation, transactions, persistence and language resolution.
     // Licensing, roles and metrics are unrelated collaborators for this regression.
@@ -46,7 +58,9 @@ describe('new account language persistence', () => {
   }, 60_000);
 
   afterAll(async () => {
+    if (source) await closeResourceTransactionConnection(source);
     if (source?.isInitialized) await source.destroy();
+    if (directory) await rm(directory, { recursive: true, force: true });
   });
 
   it.each(['single', 'bulk'] as const)(

@@ -105,7 +105,7 @@ export class WebSocketEventService {
   private async refreshResourcesForGroup(resourceGroupId: number) {
     let group;
     try {
-      group = await this.resourceGroupsService.getOne({ id: resourceGroupId }, { resources: true });
+      group = await this.resourceGroupsService.getOne({ id: resourceGroupId }, ['resources']);
     } catch (error) {
       if (error instanceof ResourceGroupNotFoundException) {
         return;

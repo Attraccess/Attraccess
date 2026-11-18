@@ -1,16 +1,8 @@
 import { SettingsService } from '../../../settings/settings.service';
 import { OidcTokenVerifier } from '../../../users-and-auth/auth/sso/oidc/oidc-token-verifier.service';
 import { EncryptionService } from '../../../encryption/encryption.service';
-import {
-  AuthenticationDetail,
-  Permission,
-  ResourceUsage,
-  Role,
-  SSOProviderType,
-  Session,
-  User,
-  UserRole,
-} from '@attraccess/database-entities';
+import { AuthenticationDetail, ResourceUsage, Session, User } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import type { ConfigService } from '@nestjs/config';
 import type { ModuleRef } from '@nestjs/core';
 import { DataSource } from 'typeorm';
@@ -20,6 +12,12 @@ import { TokenHashService } from '../../../encryption/token-hash.service';
 import type { LicenseService } from '../../../license/license.service';
 import { MetricsService } from '../../../metrics/metrics.service';
 import { AuthService } from '../../../users-and-auth/auth/auth.service';
+import { PasswordPolicyService } from '../../../users-and-auth/password-policy/password-policy.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { TypeOrmRbacStore } from '../../../database/adapters/users/typeorm-rbac.store';
+import { unitOfWorkFor } from '../../../database/adapters/shared-unit-of-work';
+import { TransactionContextResolver } from '../../../database/adapters/transaction-context';
+import { TypeOrmCredentialStore } from '../../../database/adapters/auth/typeorm-credential.store';
 import { SsoAccountResolver } from '../../../users-and-auth/auth/sso/account-resolution/sso-account-resolver.service';
 import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 import { UsersService } from '../../../users-and-auth/users/users.service';
@@ -30,9 +28,6 @@ export function createOidcTestServices(dataSource: DataSource) {
   const authDetailRepo = dataSource.getRepository(AuthenticationDetail);
   const sessionRepo = dataSource.getRepository(Session);
   const resourceUsageRepo = dataSource.getRepository(ResourceUsage);
-  const userRoleRepo = dataSource.getRepository(UserRole);
-  const roleRepo = dataSource.getRepository(Role);
-  const permissionRepo = dataSource.getRepository(Permission);
 
   const mockConfigService = {
     get: (key: string): AppConfigType | undefined => {
@@ -66,7 +61,13 @@ export function createOidcTestServices(dataSource: DataSource) {
   } as unknown as LicenseService;
 
   const tokenHashService = new TokenHashService(mockConfigService);
-  const rbacService = new RbacService(userRoleRepo, roleRepo, permissionRepo);
+  const rbacService = new RbacService(
+    new TypeOrmRbacStore(dataSource, new TransactionContextResolver(dataSource, unitOfWorkFor(dataSource))),
+    unitOfWorkFor(dataSource),
+    new EventEmitter2(),
+    null,
+    { record: jest.fn().mockResolvedValue({ status: 'recorded' }) } as never,
+  );
   const usersService = composeUsersService(
     userRepo,
     authDetailRepo,
@@ -82,15 +83,16 @@ export function createOidcTestServices(dataSource: DataSource) {
   );
   const authService = new AuthService(
     mockEmailService,
-    authDetailRepo,
+    new TypeOrmCredentialStore(authDetailRepo, new TransactionContextResolver(dataSource, unitOfWorkFor(dataSource))),
     usersService,
     tokenHashService,
     mockMetricsService,
+    { getPolicy: async () => ({ historySize: 0 }) } as unknown as PasswordPolicyService,
   );
 
   const verifier = new OidcTokenVerifier();
   const encryption = new EncryptionService(mockConfigService);
-  const resolver = new SsoAccountResolver(usersService, authService, dataSource);
+  const resolver = new SsoAccountResolver(usersService, authService);
   const mockModuleRef = {
     get: (token: unknown): unknown => {
       if (token === SsoAccountResolver) return resolver;

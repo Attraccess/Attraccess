@@ -68,6 +68,12 @@ test('workspace-only bootstrap skips host installation and keeps firmware opt-in
   mkdirSync(path.join(root, 'scripts'));
   mkdirSync(path.join(root, 'apps/attractap/firmware/tools'), { recursive: true });
   copyFileSync('scripts/setup-dev-dependencies.sh', path.join(root, 'scripts/setup-dev-dependencies.sh'));
+  mkdirSync(path.join(root, 'apps/api/scripts/lib'), { recursive: true });
+  copyFileSync('scripts/check-database-type.sh', path.join(root, 'scripts/check-database-type.sh'));
+  copyFileSync(
+    'apps/api/scripts/lib/database-provider.mjs',
+    path.join(root, 'apps/api/scripts/lib/database-provider.mjs'),
+  );
   const log = path.join(root, 'calls');
   for (const [file, label] of [
     ['scripts/setup-host-dependencies.sh', 'host'],
@@ -85,11 +91,11 @@ test('workspace-only bootstrap skips host installation and keeps firmware opt-in
     '#!/bin/sh\necho workspace >> "$BOOTSTRAP_TEST_LOG"\nif [ "${HOST_SETUP_TEST_READY:-}" = 1 ]; then echo host-env >> "$BOOTSTRAP_TEST_LOG"; fi\n',
     { mode: 0o755 },
   );
-  const run = (args, firmware = 'false') => {
+  const run = (args, firmware = 'false', extraEnv = {}) => {
     writeFileSync(log, '');
     const result = spawnSync('bash', [path.join(root, 'scripts/setup-dev-dependencies.sh'), ...args], {
       encoding: 'utf8',
-      env: { ...process.env, INSTALL_ESP_IDF: firmware, BOOTSTRAP_TEST_LOG: log },
+      env: { ...process.env, INSTALL_ESP_IDF: firmware, BOOTSTRAP_TEST_LOG: log, ...extraEnv },
     });
     return { ...result, calls: readFileSync(log, 'utf8').trim().split('\n').filter(Boolean) };
   };
@@ -101,6 +107,54 @@ test('workspace-only bootstrap skips host installation and keeps firmware opt-in
     assert.equal(result.status, 1);
     assert.deepEqual(result.calls, []);
   }
+  // An unsupported database stops the bootstrap before host, workspace or firmware setup changes anything.
+  const unsupported = run([], 'true', { DATABASE_TYPE: 'oracle' });
+  assert.equal(unsupported.status, 1);
+  assert.match(unsupported.stderr, /Unsupported DATABASE_TYPE "oracle"/);
+  assert.deepEqual(unsupported.calls, []);
+  assert.deepEqual(run(['--workspace-only'], 'false', { DATABASE_TYPE: 'sqlite' }).calls, ['workspace']);
+  // The repository .env selects the backend too, and the environment wins over it.
+  writeFileSync(path.join(root, '.env'), 'DATABASE_TYPE=oracle\n');
+  assert.equal(run(['--workspace-only'], 'false', { DATABASE_TYPE: undefined }).status, 1);
+  assert.deepEqual(run(['--workspace-only'], 'false', { DATABASE_TYPE: 'sqlite' }).calls, ['workspace']);
+});
+
+test('worktree creation refuses an unsupported DATABASE_TYPE before creating the worktree', (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'worktree-database-type-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const repo = path.join(root, 'repo');
+  mkdirSync(path.join(repo, 'scripts'), { recursive: true });
+  mkdirSync(path.join(repo, 'apps/api/scripts/lib'), { recursive: true });
+  for (const file of [
+    'scripts/create-worktree.sh',
+    'scripts/check-database-type.sh',
+    'apps/api/scripts/lib/database-provider.mjs',
+  ]) {
+    copyFileSync(file, path.join(repo, file));
+  }
+  const git = (...args) => spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+  writeFileSync(path.join(repo, 'scripts/setup-dev-dependencies.sh'), '#!/bin/sh\ntouch "$PWD/bootstrapped"\n', {
+    mode: 0o755,
+  });
+  git('init', '-q', '-b', 'main');
+  git('add', '-A');
+  git('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '-m', 'init');
+  const create = (name, databaseType) =>
+    spawnSync('sh', [path.join(repo, 'scripts/create-worktree.sh'), path.join(root, name), name, 'main'], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: { ...process.env, DATABASE_TYPE: databaseType },
+    });
+
+  const refused = create('wt-bad', 'oracle');
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /Unsupported DATABASE_TYPE "oracle"/);
+  assert.equal(existsSync(path.join(root, 'wt-bad')), false);
+  assert.doesNotMatch(git('branch', '--list', 'wt-bad').stdout, /wt-bad/);
+
+  const created = create('wt-ok', 'sqlite');
+  assert.equal(created.status, 0, created.stderr);
+  assert.equal(existsSync(path.join(root, 'wt-ok/.worktree-bootstrap-complete')), true);
 });
 
 test('ESP-IDF repairs tagged partial installations and verifies readiness', (t) => {

@@ -2,7 +2,7 @@ import { isIP } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import type { AuditDetails, AuditEvent, AuditOrigin } from '../recorder/audit-event';
 import { dataFields, positive, uuid, oneOf, isAuthenticationMethod } from './projection';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 export const identityPolicies = {
   login: ['reason'],

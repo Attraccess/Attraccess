@@ -2,9 +2,7 @@ import { readFile } from 'node:fs/promises';
 
 import { join } from 'node:path';
 
-import { WagoController } from '../../backend/controllers/entity';
-
-import { WagoConfigurationRevision } from '../../backend/configuration/revision.entity';
+import { revisionRow } from '../../backend/rows.test-utils';
 import { parseAnnouncement, parseHeartbeat, discoveryTopic } from '../../backend/protocol/index';
 import { hash } from '../src/runtime';
 import { temporary } from './simulator-fixtures.test-utils';
@@ -37,8 +35,8 @@ describe('isolated broker / executable simulator', () => {
       WAGO_ENROLLMENT_USERNAME: enrollment.username,
       WAGO_ENROLLMENT_PASSWORD: enrollment.password!,
     });
-    const controllers = fixture.repositories.get(WagoController)!;
-    await eventually(() => expect(controllers.rows).toHaveLength(1), 'discovery');
+    const controllers = fixture.storage.tables.controllers;
+    await eventually(async () => expect(await controllers.count()).toBe(1), 'discovery');
     const announcement = fixture.messages.find((item) => item.topic === discoveryTopic(hardwareId))!;
     expect(parseAnnouncement(announcement.payload).hardwareId).toBe(hardwareId);
     expect(announcement.username).toBe(enrollment.username);
@@ -53,30 +51,36 @@ describe('isolated broker / executable simulator', () => {
         ),
       'enrollment reconnect republishes fixed-root discovery',
     );
-    const controller = controllers.rows[0];
+    const [controller] = await controllers.find();
     await expect(fixture.service.claim(controller.id, 'Isolated simulator', 'wrong-code')).rejects.toThrow(
       'physical pairing',
     );
     await fixture.service.claim(controller.id, 'Isolated simulator', '482931');
-    await eventually(() => expect(controller.lastHeartbeatAt).toBeTruthy(), 'backend accepted permanent heartbeat');
+    await eventually(
+      async () => expect((await controllers.get(controller.id))?.lastHeartbeatAt).toBeTruthy(),
+      'backend accepted permanent heartbeat',
+    );
     const heartbeat = fixture.messages.find((item) => item.topic === `${base}/heartbeat`)!;
     expect(parseHeartbeat(heartbeat.payload).hardwareId).toBe(hardwareId);
     expect(heartbeat.username).toBe(`wago-controller-${hardwareId}`);
-    const revision = {
+    const revision = revisionRow({
       id: 1,
       controllerId: controller.id,
       revision: 1,
       state: 'published',
       contentHash: hash(snapshot),
       snapshot: JSON.stringify(snapshot),
-    };
-    fixture.repositories.get(WagoConfigurationRevision)!.rows.push(revision);
+    });
+    await fixture.storage.tables.configurationRevisions.insert(revision);
     await fixture.mqtt.publishAsync(
       `${base}/configuration/desired`,
       JSON.stringify({ protocolVersion: 1, revision: 1, contentHash: revision.contentHash, snapshot }),
       { qos: 1, retain: true },
     );
-    await eventually(() => expect(revision.state).toBe('applied'), 'backend applied configuration');
+    await eventually(
+      async () => expect((await fixture.storage.tables.configurationRevisions.get(1))?.state).toBe('applied'),
+      'backend applied configuration',
+    );
     await fixture.mqtt.publishAsync(`${base}/commands`, JSON.stringify(outputCommand('output-1')), { qos: 1 });
     await eventually(
       () =>

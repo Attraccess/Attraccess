@@ -5,7 +5,6 @@ import { FakeSidecar, TOKEN } from '../testing/fake-sidecar.test-utils';
 import { createHarness, endpoint, node, type Harness } from '../testing/devices-harness.test-utils';
 import { MatterFabricGuard } from '../fabric/guard';
 import { DeviceAuditService } from './audit.service';
-import { MatterEndpoint, MatterEndpointState } from './entities';
 import { MAX_PENDING_EVENTS, MatterIngestionService } from './ingestion.service';
 import { MatterReconciliationService } from './reconciliation.service';
 import { MatterStateService } from './state.service';
@@ -65,7 +64,7 @@ describe('Matter device ingestion over a real sidecar connection', () => {
   it('reconciles when connected and applies device.state and command.outcome events', async () => {
     await start({ authoritative: true, fabricId: '1', nodes: [node('5', { endpoints: [endpoint(1, [0x0006])] })] });
     await until(async () => (await reconciliation.status()).lastResult === 'applied');
-    const endpointRow = await h.dataSource.getRepository(MatterEndpoint).findOneByOrFail({ endpointId: 1 });
+    const endpointRow = await h.one('endpoints', { endpointId: 1 });
     await until(() => fake.sockets.size > 0);
 
     const requestId = randomUUID();
@@ -101,11 +100,9 @@ describe('Matter device ingestion over a real sidecar connection', () => {
     );
     // A payload that does not match its type is dropped by the contract check, not applied.
     fake.broadcast(fake.deviceState({ nodeId: '5' }));
-    // The request already created the state row; wait for the report itself (better-sqlite3 answers the count before
-    // the WebSocket frames arrive).
-    await until(async () => (await state.read(endpointRow.id, Date.now() + 2_000))[0]?.confirmed === true);
+    // The state row exists from the request on; wait for the events to resolve the command.
+    await until(async () => (await state.read(endpointRow.id))[0]?.command.state === 'reported');
     await ingestion.idle();
-    expect(await h.dataSource.getRepository(MatterEndpointState).count()).toBe(1);
     const [entry] = await state.read(endpointRow.id, Date.now() + 2_000);
     expect(entry).toMatchObject({ command: { state: 'reported' }, confirmed: true, reported: { value: true } });
     expect(h.audit).toHaveBeenCalledTimes(1);
@@ -121,7 +118,7 @@ describe('Matter device ingestion over a real sidecar connection', () => {
     fake.inventory = { authoritative: true, fabricId: '1', nodes: [node('5'), node('6')] };
     fake.broadcast(fake.nextEvent({ type: 'commissioning.progress', payload: { state: 'running' } }));
     fake.broadcast(fake.nextEvent({ type: 'commissioning.progress', payload: { state: 'succeeded' } }));
-    await until(async () => (await h.dataSource.getRepository('plugin_matter_nodes').count()) === 2);
+    await until(async () => (await h.tables.nodes.count()) === 2);
     expect(lists()).toBe(before + 1);
   });
 
@@ -142,7 +139,7 @@ describe('Matter device ingestion over a real sidecar connection', () => {
       );
     };
     fake.killSockets();
-    await until(async () => (await h.dataSource.getRepository('plugin_matter_nodes').count()) === 2, 10_000);
+    await until(async () => (await h.tables.nodes.count()) === 2, 10_000);
   });
 
   it('drops events beyond the queue bound and counts them', async () => {
@@ -179,6 +176,6 @@ describe('Matter device ingestion over a real sidecar connection', () => {
     fake.inventory = { authoritative: true, fabricId: '1', nodes: [node('5'), node('6')] };
     // A dropped stream reconnects, and every reconnect reconciles.
     fake.killSockets();
-    await until(async () => (await h.dataSource.getRepository('plugin_matter_nodes').count()) === 2, 10_000);
+    await until(async () => (await h.tables.nodes.count()) === 2, 10_000);
   });
 });

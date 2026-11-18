@@ -5,9 +5,10 @@ import {
   Resource,
   User,
   ResourceIntroductionHistoryItem,
-  IntroductionHistoryAction,
 } from '@attraccess/database-entities';
+import { IntroductionHistoryAction } from '@attraccess/application-models';
 import { ResourceIntroductionsService } from './resouceIntroductions.service';
+import { TypeOrmResourceIntroductionStore } from '../../database/adapters/resources/resource-introduction-store.adapter';
 import { ResourceGroupsIntroductionsService } from '../groups/introductions/resourceGroups.introductions.service';
 import { ResourceRetrainingService } from '../retraining/resourceRetraining.service';
 
@@ -49,13 +50,13 @@ describe('inherited introduction query', () => {
   beforeEach(async () => {
     source = await new DataSource({
       type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: ':memory:',
       entities: [user, resource, group, introduction, history],
       synchronize: true,
     }).initialize();
     service = new ResourceIntroductionsService(
-      source.getRepository(ResourceIntroduction),
-      source.getRepository(ResourceIntroductionHistoryItem),
+      new TypeOrmResourceIntroductionStore(source),
       {} as never,
       {} as never,
       {} as never,
@@ -92,8 +93,7 @@ describe('inherited introduction query', () => {
   ])('uses the newest event ID when %s %s history timestamps match', async (id, kind) => {
     const historyRepository = source.getRepository(ResourceIntroductionHistoryItem);
     const groups = new ResourceGroupsIntroductionsService(
-      source.getRepository(ResourceIntroduction),
-      historyRepository,
+      new TypeOrmResourceIntroductionStore(source),
       {} as never,
       {} as never,
       {} as never,
@@ -101,10 +101,7 @@ describe('inherited introduction query', () => {
     );
     const retraining = new RetrainingValidityProbe(
       {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      historyRepository,
+      new TypeOrmResourceIntroductionStore(source),
       {} as never,
       {} as never,
       {} as never,
@@ -135,7 +132,7 @@ describe('inherited introduction query', () => {
     expect(
       rows
         .find((intro) => intro.id === 10)
-        ?.history.map((event) => event.action)
+        ?.history?.map((event) => event.action)
         .sort(),
     ).toEqual(['grant', 'revoke']);
     await source.getRepository(Resource).save({ id: 2, groups: [{ id: 11 }] });

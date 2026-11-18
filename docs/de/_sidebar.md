@@ -82,7 +82,9 @@
   - [Überblick](plugins/overview.md)
   - [Plugins installieren](plugins/installing-plugins.md)
   - [Plugins entwickeln](plugins/developing-plugins.md)
+  - [Plugins auf SDK 2.0 umstellen](plugins/migrating-to-2.md)
   - [Bluetooth-Transport für Plugins](plugins/ble-transport.md)
+  - [Plugin-Speicher](plugins/plugin-storage.md)
   - [Kartenauthentifizierung für Plugins](plugins/card-authentication.md)
   - **Reservierungen**
     - [Überblick](plugins/reservations/overview.md)
@@ -123,6 +125,9 @@
 - **Für Entwickler**
   - [Überblick](developer/overview.md)
   - [Architektur](developer/architecture.md)
+  - [Persistenz-Architektur](developer/persistence-architecture.md)
+  - [Persistenz-Garantien](developer/persistence-guarantees.md)
+  - [Datenbank-Backend hinzufügen](developer/adding-a-database-backend.md)
   - [API-Log-Ziele](developer/logging.md)
   - [API-Referenz](developer/api-reference.md)
   - [MCP-Server (KI-Clients)](developer/mcp.md)

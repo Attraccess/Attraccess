@@ -2,7 +2,7 @@ import { Controller, Delete, Get, HttpCode, HttpStatus, Post, Body, Patch, Param
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { auditActorOf } from '../audit/recorder/audit-event';
-import { EmailTemplate } from '@attraccess/database-entities';
+import { EmailTemplate } from './dto/email-template.dto';
 import {
   EmailTemplateKey,
   EmailTemplateService,

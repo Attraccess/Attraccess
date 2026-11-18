@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode, MqttWaitForMessageNodeDataSchema } from '@attraccess/database-entities';
+import { FlowNodeRecord, MqttWaitForMessageNodeDataSchema } from '@attraccess/application-models';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import z from 'zod';
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
@@ -15,7 +15,7 @@ export class MqttWaitForMessageExecutor implements NodeExecutor {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  async execute(node: ResourceFlowNode): Promise<NodeProcessingResult> {
+  async execute(node: FlowNodeRecord): Promise<NodeProcessingResult> {
     const { serverId, topic, timeoutSeconds, subscribeQos } = node.data as z.infer<
       typeof MqttWaitForMessageNodeDataSchema
     >;

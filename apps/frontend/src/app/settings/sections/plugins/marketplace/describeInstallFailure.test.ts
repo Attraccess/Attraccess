@@ -10,6 +10,16 @@ describe('describeInstallFailure', () => {
     ).toBe('Plugin is not compatible with Attraccess 1.9.0 [marketplace.installCompatibilityHelp]');
   });
 
+  it('maps an SDK 1.x refusal to the compatibility remedy instead of a registry retry', () => {
+    const reason =
+      'Plugin legacy targets Attraccess 1.9.0 and the plugin SDK 1.x, which this host no longer supports. ' +
+      'Rebuild it for SDK 2.0 and declare attraccessVersion.min >= 2.0.0-0. ' +
+      'Migration guide: https://docs.attraccess.org/#/en/plugins/migrating-to-2';
+    expect(describeInstallFailure({ status: 400, body: { message: reason } }, t)).toBe(
+      `${reason} [marketplace.installCompatibilityHelp]`,
+    );
+  });
+
   it('joins validation message lists', () => {
     expect(describeInstallFailure({ status: 400, body: { message: ['a', 'b'] } }, t)).toBe(
       'a; b [marketplace.installRetryHelp]',

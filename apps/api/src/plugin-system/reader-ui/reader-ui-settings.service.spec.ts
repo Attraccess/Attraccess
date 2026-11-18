@@ -1,37 +1,13 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { projectAuditRow } from '../../audit/recorder/audit-row';
 import { ReaderUiSettingsService } from './reader-ui-settings.service';
-
-function repo<T extends Record<string, any>>(keys: string[]) {
-  const rows: T[] = [];
-  const matches = (row: any, where: any) => Object.entries(where).every(([k, v]) => row[k] === v);
-  return {
-    rows,
-    findOne: jest.fn(async ({ where }: any) => rows.find((r) => matches(r, where)) ?? null),
-    find: jest.fn(async ({ where }: any) => rows.filter((r) => matches(r, where))),
-    save: jest.fn(async (x: any) => {
-      const existing = rows.find((r) => keys.every((k) => (r as any)[k] === x[k]));
-      if (existing) Object.assign(existing, x);
-      else rows.push(x);
-      return x;
-    }),
-  };
-}
+import { InMemoryReaderUiSettingsStore } from './reader-ui-stores.test-fixture';
 
 function setup(loadedPlugins: string[] = []) {
-  const resources = repo(['resourceId']);
-  const plugins = repo(['resourceId', 'plugin']);
-  const readers = repo(['readerId']);
+  const store = new InMemoryReaderUiSettingsStore();
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
   const registry = { pluginNames: () => [...loadedPlugins].sort() };
-  const service = new ReaderUiSettingsService(
-    resources as never,
-    plugins as never,
-    readers as never,
-    audit as never,
-    registry as never,
-  );
-  return { service, audit };
+  const service = new ReaderUiSettingsService(store, audit as never, registry as never);
+  return { service, audit, store };
 }
 
 describe('ReaderUiSettingsService', () => {

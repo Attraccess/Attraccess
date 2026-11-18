@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ResourceMaintenanceRequest } from '@attraccess/database-entities';
+import { ResourceMaintenanceRequest } from './maintenance-records.dto';
 
 export class PaginatedMaintenanceRequestResponse {
   @ApiProperty({

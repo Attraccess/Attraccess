@@ -1,7 +1,7 @@
 import type { ResourceMeteringService } from '../../metering/resource-metering.service';
 import { MeteringOperationError } from '../../metering/metering-readings';
 import { MeteringValueError } from '../../metering/quantity';
-import { MeteringReportNodeDataSchema, ResourceFlowNode } from '@attraccess/database-entities';
+import { FlowNodeRecord, MeteringReportNodeDataSchema } from '@attraccess/application-models';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 import { requireRunResourceId } from './flow.utils';
@@ -9,7 +9,7 @@ import { requireRunResourceId } from './flow.utils';
 export class MeteringReportExecutor implements NodeExecutor {
   constructor(private readonly metering: ResourceMeteringService) {}
 
-  async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
+  async execute(node: FlowNodeRecord, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
     if (ctx.metering?.kind === 'start') throw new FlowExecutionError('Report meter cannot acknowledge a start request');
     const data = MeteringReportNodeDataSchema.parse(node.data ?? {});
     const render = (template?: string) =>
@@ -38,7 +38,8 @@ export class MeteringReportExecutor implements NodeExecutor {
           requireRunResourceId(node, ctx),
           data.meterId,
           report,
-          ctx.transactionManager,
+          // Metering takes the engine's own transaction handle until it moves to scopes.
+          ctx.transactionManager as Parameters<ResourceMeteringService['report']>[3],
           ctx.lifecycleAttemptId,
           ctx.flowRunId ? `flow:${ctx.flowRunId}:${node.id}` : undefined,
           usageId === undefined ? undefined : Number(usageId),

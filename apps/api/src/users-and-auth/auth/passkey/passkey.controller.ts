@@ -3,16 +3,18 @@ import { Request, Response } from 'express';
 import { ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk';
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
-import { Passkey } from '@attraccess/database-entities';
 import { PasskeyService } from './passkey.service';
 import {
   PasskeyOptionsResponseDto,
+  PasskeyResponseDto,
   PasskeySessionDto,
   RenamePasskeyDto,
   VerifyPasskeyRegistrationDto,
+  toPasskeyResponse,
 } from './passkey.dto';
 import { SessionService } from '../session.service';
 import { CreateSessionResponse } from '../auth.types';
+import { toUserDto } from '../../users/dtos/user.dto';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 import { resolveIp, setRetryAfter } from '../../rate-limiting/login.rate-limit.guard';
 import { auditOriginOf } from '../../../audit/recorder/audit-event';
@@ -29,9 +31,9 @@ export class PasskeyController {
   @SessionAuth()
   @Get('/passkey')
   @ApiOperation({ summary: 'List the passkeys of the current user', operationId: 'listPasskeys' })
-  @ApiOkResponse({ description: 'The passkeys of the current user', type: [Passkey] })
-  async list(@Req() request: AuthenticatedRequest): Promise<Passkey[]> {
-    return this.passkeyService.listForUser(request.user.id);
+  @ApiOkResponse({ description: 'The passkeys of the current user', type: [PasskeyResponseDto] })
+  async list(@Req() request: AuthenticatedRequest): Promise<PasskeyResponseDto[]> {
+    return (await this.passkeyService.listForUser(request.user.id)).map(toPasskeyResponse);
   }
 
   @SessionAuth()
@@ -46,31 +48,33 @@ export class PasskeyController {
   @SessionAuth()
   @Post('/passkey/register/verify')
   @ApiOperation({ summary: 'Finish registering a new passkey', operationId: 'verifyPasskeyRegistration' })
-  @ApiOkResponse({ description: 'The newly registered passkey', type: Passkey })
+  @ApiOkResponse({ description: 'The newly registered passkey', type: PasskeyResponseDto })
   @ApiResponse({ status: 400, description: 'The registration could not be verified' })
   async verifyRegistration(
     @Req() request: AuthenticatedRequest,
     @Body() body: VerifyPasskeyRegistrationDto,
-  ): Promise<Passkey> {
-    return this.passkeyService.verifyRegistration(
-      request.user,
-      body.response as unknown as RegistrationResponseJSON,
-      body.name,
-      requestOrigin(request),
-      auditOriginOf(request),
+  ): Promise<PasskeyResponseDto> {
+    return toPasskeyResponse(
+      await this.passkeyService.verifyRegistration(
+        request.user,
+        body.response as unknown as RegistrationResponseJSON,
+        body.name,
+        requestOrigin(request),
+        auditOriginOf(request),
+      ),
     );
   }
 
   @SessionAuth()
   @Patch('/passkey/:id')
   @ApiOperation({ summary: 'Rename one of the current users passkeys', operationId: 'renamePasskey' })
-  @ApiOkResponse({ description: 'The renamed passkey', type: Passkey })
+  @ApiOkResponse({ description: 'The renamed passkey', type: PasskeyResponseDto })
   async rename(
     @Req() request: AuthenticatedRequest,
     @Param('id', ParseIntPipe) id: number,
     @Body() body: RenamePasskeyDto,
-  ): Promise<Passkey> {
-    return this.passkeyService.rename(request.user.id, id, body.name, auditOriginOf(request));
+  ): Promise<PasskeyResponseDto> {
+    return toPasskeyResponse(await this.passkeyService.rename(request.user.id, id, body.name, auditOriginOf(request)));
   }
 
   @SessionAuth()
@@ -117,10 +121,10 @@ export class PasskeyController {
 
     if (body.tokenLocation === 'cookie') {
       await this.cookieConfigService.setAuthCookie(response, sessionToken);
-      return { user, authToken: '' };
+      return { user: toUserDto(user), authToken: '' };
     }
 
-    return { user, authToken: sessionToken };
+    return { user: toUserDto(user), authToken: sessionToken };
   }
 
   private async assertNotThrottled(request: Request): Promise<void> {

@@ -244,6 +244,8 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
+      # Runs every test target, api:test-conformance included: the backend-parameterised persistence contract
+      # (ATT-1146) on real SQLite files with independent connections. api:test leaves those specs to it.
       - name: Test all core projects
         run: node scripts/ci-test-projects.mjs --group=core
 

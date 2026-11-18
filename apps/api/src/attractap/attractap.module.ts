@@ -1,13 +1,12 @@
 import { Module } from '@nestjs/common';
+import { AttractapPersistenceModule } from '../database/adapters/attractap/attractap-persistence.module';
 import { AttractapController } from './attractap.controller';
 import { ResourceAttractapsController } from './resource-attractaps.controller';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { AttractapService } from './attractap.service';
 import { WebsocketService } from './websockets/websocket.service';
 import { AttractapGateway } from './websockets/websocket.gateway';
 import { AttractapNfcCardsController } from './card.controller';
 import { CardAccessService } from './card-access.service';
-import '@nestjs/common';
 import { WebSocketEventService } from './websockets/websocket-event.service';
 import { ResourceListService } from './websockets/handlers/resource-list/resource-list.service';
 import { ResourceActionGuard } from './websockets/handlers/resource-action.guard';
@@ -22,18 +21,6 @@ import { AttractapBillingHandler } from './websockets/handlers/billing/billing.h
 import { AttractapProjectsHandler } from './websockets/handlers/projects/projects.handler';
 import { AttractapSupervisionHandler } from './websockets/handlers/supervision/supervision.handler';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import {
-  Attractap,
-  AttractapCrashReport,
-  AttractapCredentialEvent,
-  AttractapInstallation,
-  AttractapSecureBootKey,
-  NFCCard,
-  NFCCardPendingChange,
-  Resource,
-  ResourceUsage,
-  User,
-} from '@attraccess/database-entities';
 import { AttractapPairingController } from './pairing.controller';
 import { CredentialRegistryService } from './security/credential-registry.service';
 import { HandshakeLimiter } from './security/handshake-limiter';
@@ -90,18 +77,7 @@ import { BLE_TRANSPORT_DRIVER } from '../plugin-system/ble/ble-transport-driver'
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
-    TypeOrmModule.forFeature([
-      Attractap,
-      AttractapCrashReport,
-      AttractapCredentialEvent,
-      AttractapInstallation,
-      AttractapSecureBootKey,
-      NFCCard,
-      NFCCardPendingChange,
-      Resource,
-      ResourceUsage,
-      User,
-    ]),
+    AttractapPersistenceModule,
     UsersAndAuthModule,
     ResourcesModule,
     ResourceUsageModule,

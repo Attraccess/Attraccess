@@ -1,7 +1,7 @@
 import type { PluginActiveSession, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Clock, PLUGIN_CONTEXT, READER_HORIZON_MS, RESERVATION_CLOCK } from '../constants';
-import type { ReservationEntity } from '../entities/reservation.entity';
+import type { ReservationRow } from '../storage/reservation-table';
 import { ReservationNotifications } from '../notifications/notifier.service';
 import { heldBookings } from '../reservations/capacity';
 import { DirectoryService } from '../reservations/directory.service';
@@ -28,7 +28,7 @@ export const NO_SHOW_NOTICE_WINDOW_MS = 5 * TICK_INTERVAL_MS;
 export const CAPACITY_RECONCILE_MS = HOUR_MS;
 
 /** When the booking became confirmed: the approval of a request, otherwise its creation. */
-const confirmedAt = (r: ReservationEntity): number => (r.decidedAt ?? r.createdAt).getTime();
+const confirmedAt = (r: ReservationRow): number => (r.decidedAt ?? r.createdAt).getTime();
 
 /**
  * The plugin's minute loop: expiry, no-show, completion, reminders, handover and overrun notices.
@@ -147,12 +147,12 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private isEnabled(r: ReservationEntity): boolean {
+  private isEnabled(r: ReservationRow): boolean {
     return this.settings.getCachedSettings(r.resourceId).enabled;
   }
 
   /** Runs `work` for each item; one failing item does not stop the others. */
-  private async each(items: ReservationEntity[], work: (item: ReservationEntity) => Promise<void>): Promise<void> {
+  private async each(items: ReservationRow[], work: (item: ReservationRow) => Promise<void>): Promise<void> {
     for (const item of items) {
       try {
         await work(item);
@@ -224,7 +224,7 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
    * own back-to-back booking) is checked in here, at the no-show deadline, instead of being released.
    * True when such a session runs (the booking must then not become a no-show).
    */
-  private async checkInRunningSession(r: ReservationEntity, now: Date): Promise<boolean> {
+  private async checkInRunningSession(r: ReservationRow, now: Date): Promise<boolean> {
     const session = (await this.context.resourceAccess.getActiveSessions(r.resourceId)).find(
       (candidate) => candidate.userId === r.userId && candidate.startTime.getTime() < r.endTime.getTime(),
     );
@@ -266,7 +266,7 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Slots held at the booking's start by other people's confirmed bookings (holders in session count as sessions). */
-  private async heldAtStart(r: ReservationEntity, sessions: PluginActiveSession[]): Promise<number> {
+  private async heldAtStart(r: ReservationRow, sessions: PluginActiveSession[]): Promise<number> {
     const confirmed = await this.store.findConfirmedOverlapping(
       r.resourceId,
       r.startTime,
@@ -278,7 +278,7 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
 
   /** Shared machine: the holder is in session, or a slot was free for them at the start besides the lingering ones. */
   private async holderHadSlot(
-    r: ReservationEntity,
+    r: ReservationRow,
     sessions: PluginActiveSession[],
     lingering: number,
     limit: number,

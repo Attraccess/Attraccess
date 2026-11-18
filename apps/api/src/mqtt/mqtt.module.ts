@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { MqttServer } from '@attraccess/database-entities';
+import { MqttPersistenceModule } from '../database/adapters/mqtt/mqtt-persistence.module';
 import { MQTT_CREDENTIAL_PROVISIONING_HOST_PROVIDER, MQTT_SERVER_HOST_PROVIDER } from '@attraccess/plugins-backend-sdk';
 import { MqttServerController } from './servers/mqtt-server.controller';
 import { MqttServerService } from './servers/mqtt-server.service';
@@ -15,7 +14,7 @@ import { MqttExplorerService } from './explorer/mqtt-explorer.service';
 import { MqttCredentialProvisioningService } from './mqtt-credential-provisioning.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([MqttServer]), ConfigModule, LiveTopicsModule],
+  imports: [MqttPersistenceModule, ConfigModule, LiveTopicsModule],
   controllers: [MqttServerController, MqttExplorerController],
   providers: [
     MqttServerService,

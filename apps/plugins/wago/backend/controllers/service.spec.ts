@@ -1,6 +1,6 @@
-import type { PluginContext } from '@attraccess/plugins-backend-sdk';
-import { WagoController } from './entity';
-import { WagoEnrollment } from './enrollment.entity';
+import { PluginStorageUniqueViolation, type PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { WagoController } from './entity';
+import type { WagoEnrollment } from './enrollment.entity';
 import { controller, createWagoServiceFixture } from '../wago-service.test-fixture';
 import { MqttSubscriptionError } from './model';
 import { WagoService } from './service';
@@ -26,7 +26,7 @@ describe('WagoService connection monitoring', () => {
       trustState: 'claimed' as const,
       lastHeartbeatAt: new Date(Date.now() - 5 * 60_000).toISOString(),
     };
-    const { service } = createService([claimed]);
+    const { service } = await createService([claimed]);
     service.registerRuntimeStatusHandler(() => undefined);
 
     expect(service.isRuntimeUpdateRequired(claimed.id)).toBe(true);
@@ -44,7 +44,7 @@ describe('WagoService connection monitoring', () => {
 
   it('subscribes a migrated controller directly without contacting its unreachable previous broker', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const, mqttServerId: 3 };
-    const { service, context } = createService([claimed], [], 2);
+    const { service, context } = await createService([claimed], [], 2);
     const handlers = new Map<
       string,
       (message: { serverId: number; topic: string; payload: Buffer }) => Promise<void>
@@ -70,7 +70,7 @@ describe('WagoService connection monitoring', () => {
 
   it('replays retained state after installing migrated subscriptions and routes live diagnostics', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const, mqttServerId: 3 };
-    const { service, context } = createService([claimed], [], 2);
+    const { service, context } = await createService([claimed], [], 2);
     const root = 'attraccess/wago/v1/controllers/cc100-01';
     type Handler = (message: { serverId: number; topic: string; payload: Buffer }) => Promise<void>;
     const handlers = new Map<string, Handler>();
@@ -115,7 +115,7 @@ describe('WagoService connection monitoring', () => {
 
   it('releases partial migrated subscriptions when one subscription fails', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const, mqttServerId: 3 };
-    const { service, context } = createService([claimed], [], 2);
+    const { service, context } = await createService([claimed], [], 2);
     const installed = { unsubscribe: jest.fn() };
     jest
       .mocked(context.mqtt.subscribe)
@@ -132,7 +132,7 @@ describe('WagoService connection monitoring', () => {
       trustState: 'claimed' as const,
       lastHeartbeatAt: new Date().toISOString(),
     };
-    const { service } = createService([claimed]);
+    const { service } = await createService([claimed]);
     service.registerRuntimeStatusHandler(() => undefined);
 
     expect(service.isRuntimeUpdateRequired(claimed.id)).toBe(true);
@@ -146,7 +146,7 @@ describe('WagoService connection monitoring', () => {
 
   it('restores migrated controller subscriptions after API restart while the previous default broker is unreachable', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const, mqttServerId: 3 };
-    const { service, context } = createService([claimed], [], 2);
+    const { service, context } = await createService([claimed], [], 2);
     const handlers = new Map<
       string,
       (message: { serverId: number; topic: string; payload: Buffer }) => Promise<void>
@@ -171,7 +171,7 @@ describe('WagoService connection monitoring', () => {
 
   it('keeps the migrated broker active when an overlapping rebuild captured its previous association', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
-    const { service, context } = createService([claimed], [], 2);
+    const { service, context, tables } = await createService([claimed], [], 2);
     const rebuild = (Reflect.get(service, 'subscribeConfiguredServers') as () => Promise<void>).bind(service);
     await rebuild();
     let finish!: () => void;
@@ -193,7 +193,7 @@ describe('WagoService connection monitoring', () => {
     const heartbeat = jest
       .spyOn(service as unknown as { onHeartbeat(id: string, payload: Buffer): Promise<void> }, 'onHeartbeat')
       .mockResolvedValue(undefined);
-    claimed.mqttServerId = 3;
+    await tables.controllers.update({ id: 1 }, { mqttServerId: 3 });
     await service.refreshNetworkConnection(1);
     finish();
     await overlapping;
@@ -213,12 +213,17 @@ describe('WagoService connection monitoring', () => {
       trustState: 'claimed' as const,
       lastHeartbeatAt: new Date().toISOString(),
     };
-    const { service, context, revisionRepository } = createService([claimed]);
+    const { service, context, tables } = await createService([claimed]);
     service.registerRuntimeStatusHandler(() => undefined);
     expect((await service.list())[0].connectivity).toBe('runtime_check');
-    revisionRepository.find.mockResolvedValueOnce([
-      { revision: 1, snapshot: JSON.stringify({ logicalChannels: [{ id: 'load', capabilities: ['output'] }] }) },
-    ]);
+    await tables.configurationRevisions.insert({
+      controllerId: 1,
+      revision: 1,
+      snapshot: JSON.stringify({ logicalChannels: [{ id: 'load', capabilities: ['output'] }] }),
+      contentHash: 'hash',
+      state: 'applied',
+      publishedAt: '2026-01-01T00:00:00.000Z',
+    });
     await expect(
       service.executeCommand({
         controllerId: 1,
@@ -245,9 +250,16 @@ describe('WagoService connection monitoring', () => {
   it.each([1, 2])(
     'retries runtime policy after publication %s fails without unblocking commands',
     async (failedPublication) => {
-      const { service, context, revisionRepository } = createService([{ ...controller(), trustState: 'claimed' }]);
+      const { service, context, tables } = await createService([{ ...controller(), trustState: 'claimed' }]);
       service.registerRuntimeStatusHandler(() => undefined);
-      revisionRepository.find.mockResolvedValue([{ revision: 1, state: 'published', snapshot: '{}' }]);
+      await tables.configurationRevisions.insert({
+        controllerId: 1,
+        revision: 1,
+        snapshot: '{}',
+        contentHash: 'hash',
+        state: 'published',
+        publishedAt: '2026-01-01T00:00:00.000Z',
+      });
       const publish = jest.mocked(context.mqtt.publish);
       if (failedPublication === 2) publish.mockResolvedValueOnce(undefined);
       publish.mockRejectedValueOnce(new Error('broker unavailable'));
@@ -262,7 +274,9 @@ describe('WagoService connection monitoring', () => {
   );
 
   it('lists heartbeat times and connectivity without deep-copying each controller diagnostics', async () => {
-    const { service } = createService([{ ...controller(), trustState: 'claimed' as const, lastHeartbeatAt: null }]);
+    const { service } = await createService([
+      { ...controller(), trustState: 'claimed' as const, lastHeartbeatAt: null },
+    ]);
     const read = jest.spyOn(service.diagnostics, 'read');
     jest.spyOn(service.diagnostics, 'heartbeatAt').mockReturnValue(new Date().toISOString());
     const [listed] = await service.list();
@@ -272,7 +286,7 @@ describe('WagoService connection monitoring', () => {
   });
 
   it('does not expose physical-verification secrets in controller listings', async () => {
-    const { service } = createService();
+    const { service } = await createService();
 
     const [listed] = await service.list();
 
@@ -280,15 +294,26 @@ describe('WagoService connection monitoring', () => {
     expect(listed).not.toHaveProperty('pairingCodeHash');
   });
 
-  it('resolves repositories only after the host module initializes', async () => {
-    const context = { getRepository: jest.fn() } as unknown as PluginContext;
-    new WagoService(context);
+  it('opens the record port only after the host module initializes', async () => {
+    const { service, context, open } = await createService([], [], 2);
+    open.mockClear();
+    (context.mqtt.subscribe as jest.Mock).mockResolvedValue({ unsubscribe: jest.fn() });
 
-    expect(context.getRepository).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
+    await service.onApplicationBootstrap();
+    expect(open).toHaveBeenCalledTimes(1);
+    service.onModuleDestroy();
+  });
+
+  it('opens nothing while the service is constructed', () => {
+    const open = jest.fn();
+    new WagoService({ storage: { open } } as unknown as PluginContext);
+
+    expect(open).not.toHaveBeenCalled();
   });
 
   it('retries MQTT subscriptions instead of failing module startup', async () => {
-    const { service, context } = createService([], [], 2);
+    const { service, context } = await createService([], [], 2);
     (context.mqtt.subscribe as jest.Mock).mockRejectedValueOnce(new Error('broker unavailable'));
 
     await expect(service.onApplicationBootstrap()).resolves.toBeUndefined();
@@ -300,36 +325,25 @@ describe('WagoService connection monitoring', () => {
   });
 
   it('creates default settings when none have been persisted', async () => {
-    const { service, settingsRepository, settingsQuery } = createService();
-    settingsRepository.findOneBy.mockResolvedValue(null);
-    settingsRepository.findOneByOrFail.mockResolvedValue({
-      id: 1,
-      defaultMqttServerId: null,
-      operationalPrefix: 'attraccess/wago',
-    });
+    const { service, tables, test } = await createService();
+    await tables.settings.delete({ id: 1 });
 
     await expect(service.getSettings()).resolves.toEqual({
       id: 1,
       defaultMqttServerId: null,
       operationalPrefix: 'attraccess/wago',
     });
-    expect(settingsQuery.values).toHaveBeenCalledWith({
-      id: 1,
-      defaultMqttServerId: null,
-      operationalPrefix: 'attraccess/wago',
-    });
-    expect(settingsQuery.orIgnore).toHaveBeenCalled();
+    expect(test.rows('settings')).toEqual([{ id: 1, defaultMqttServerId: null, operationalPrefix: 'attraccess/wago' }]);
   });
 
   it('does not overwrite a default MQTT server configured while settings are initialized', async () => {
-    const { service, settingsRepository, settingsQuery } = createService();
-    settingsRepository.findOneBy.mockResolvedValue(null);
-    settingsQuery.execute.mockImplementation(async () => {
-      settingsRepository.findOneByOrFail.mockResolvedValue({
-        id: 1,
-        defaultMqttServerId: 2,
-        operationalPrefix: 'attraccess/wago',
-      });
+    const { service, tables, test } = await createService();
+    await tables.settings.delete({ id: 1 });
+    const insert = tables.settings.insert.bind(tables.settings);
+    jest.spyOn(tables.settings, 'insert').mockImplementationOnce(async () => {
+      // Another caller creates the single settings row, with a default broker, just before this insert.
+      await insert({ id: 1, defaultMqttServerId: 2, operationalPrefix: 'attraccess/wago' });
+      throw new PluginStorageUniqueViolation();
     });
 
     await expect(service.getSettings()).resolves.toEqual({
@@ -337,11 +351,11 @@ describe('WagoService connection monitoring', () => {
       defaultMqttServerId: 2,
       operationalPrefix: 'attraccess/wago',
     });
-    expect(settingsQuery.orIgnore).toHaveBeenCalled();
+    expect(test.rows('settings')).toHaveLength(1);
   });
 
   it('keeps the host running when initial WAGO MQTT subscriptions fail', async () => {
-    const { service, context } = createService([], [], 2);
+    const { service, context } = await createService([], [], 2);
     (context.mqtt.subscribe as jest.Mock).mockRejectedValue(new Error('broker unavailable'));
 
     await expect(service.onApplicationBootstrap()).resolves.toBeUndefined();
@@ -353,8 +367,8 @@ describe('WagoService connection monitoring', () => {
   });
 
   it('fails startup when WAGO subscription configuration cannot be read', async () => {
-    const { service, context, settingsRepository } = createService([], [], 2);
-    settingsRepository.findOneBy.mockRejectedValue(new Error('settings unavailable'));
+    const { service, context, tables } = await createService([], [], 2);
+    jest.spyOn(tables.settings, 'get').mockRejectedValue(new Error('settings unavailable'));
 
     await expect(service.onApplicationBootstrap()).rejects.toThrow('settings unavailable');
 
@@ -363,17 +377,15 @@ describe('WagoService connection monitoring', () => {
   });
 
   it('preserves the MQTT server during a prefix-only settings update', async () => {
-    const { service, settingsRepository } = createService([], [], 2);
+    const { service, test } = await createService([], [], 2);
 
     await service.setSettings(undefined, 'customer/wago');
 
-    expect(settingsRepository.save).toHaveBeenCalledWith(
-      expect.objectContaining({ defaultMqttServerId: 2, operationalPrefix: 'customer/wago' }),
-    );
+    expect(test.rows('settings')[0]).toMatchObject({ defaultMqttServerId: 2, operationalPrefix: 'customer/wago' });
   });
 
-  it('requires a non-empty matching fingerprint', () => {
-    const { service } = createService();
+  it('requires a non-empty matching fingerprint', async () => {
+    const { service } = await createService();
     const matchesVerifier = Reflect.get(service, 'matchesVerifier') as (item: WagoController, value: string) => boolean;
 
     expect(matchesVerifier(controller(), '')).toBe(false);
@@ -381,7 +393,7 @@ describe('WagoService connection monitoring', () => {
 
   it('accepts a heartbeat that omits the optional sequence', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
-    const { service, controllerRepository } = createService([claimed]);
+    const { service, test } = await createService([claimed]);
     const onHeartbeat = (
       Reflect.get(service, 'onHeartbeat') as (hardwareId: string, payload: Buffer) => Promise<void>
     ).bind(service);
@@ -399,19 +411,17 @@ describe('WagoService connection monitoring', () => {
       ),
     );
 
-    expect(controllerRepository.save).toHaveBeenCalledWith(expect.objectContaining({ lastSequence: 4 }));
+    expect(test.rows('controllers')[0]).toMatchObject({ lastSequence: 4, lastHeartbeatAt: expect.any(String) });
   });
 
   it('does not overwrite newly committed broker or credential bindings with an in-flight old heartbeat', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const, credentialEpoch: 'old-epoch' };
-    const { service, controllerRepository } = createService([claimed]);
-    controllerRepository.findOneBy.mockResolvedValue({ ...claimed });
-    controllerRepository.save.mockImplementation(async (snapshot) => {
-      // The SSH transaction commits after the heartbeat read and before its save.
-      claimed.mqttServerId = 3;
-      claimed.credentialEpoch = 'new-epoch';
-      Object.assign(claimed, snapshot);
-      return claimed;
+    const { service, tables, test } = await createService([claimed]);
+    const update = tables.controllers.update.bind(tables.controllers);
+    jest.spyOn(tables.controllers, 'update').mockImplementationOnce(async (where, patch, options) => {
+      // The SSH transaction commits after the heartbeat read and before its write.
+      await update({ id: claimed.id }, { mqttServerId: 3, credentialEpoch: 'new-epoch' });
+      return update(where, patch, options);
     });
     const onHeartbeat = (Reflect.get(service, 'onHeartbeat') as (id: string, payload: Buffer) => Promise<void>).bind(
       service,
@@ -427,14 +437,42 @@ describe('WagoService connection monitoring', () => {
         }),
       ),
     );
-    expect(claimed.mqttServerId).toBe(3);
-    expect(claimed.credentialEpoch).toBe('new-epoch');
-    expect(claimed.lastHeartbeatAt).toBeTruthy();
+    expect(test.rows('controllers')[0]).toMatchObject({
+      mqttServerId: 3,
+      credentialEpoch: 'new-epoch',
+      lastHeartbeatAt: expect.any(String),
+    });
+  });
+
+  it('records a heartbeat whose versions are longer than 255 characters, so the controller stays online', async () => {
+    const stale = new Date(Date.now() - 5 * 60_000).toISOString();
+    const claimed = { ...controller(), trustState: 'claimed' as const, lastHeartbeatAt: stale, lastSeenAt: stale };
+    const { service, test } = await createService([claimed]);
+    const onHeartbeat = (Reflect.get(service, 'onHeartbeat') as (id: string, payload: Buffer) => Promise<void>).bind(
+      service,
+    );
+    // The controller reports its versions without a length limit; the columns are unbounded text.
+    const runtimeVersion = `1.0.0+${'r'.repeat(300)}`;
+    const protocolVersion = `1.0.0+${'p'.repeat(300)}`;
+    await onHeartbeat(
+      claimed.hardwareId,
+      Buffer.from(
+        JSON.stringify({
+          hardwareId: claimed.hardwareId,
+          protocolVersion,
+          runtimeVersion,
+          capabilities: ['heartbeat'],
+        }),
+      ),
+    );
+    const [row] = test.rows('controllers');
+    expect(row).toMatchObject({ runtimeVersion, protocolVersion });
+    expect(row.lastSeenAt > stale).toBe(true);
   });
 
   it('persists a valid canonical heartbeat when the bounded diagnostics cache is full', async () => {
     const claimed = { ...controller(), id: 257, trustState: 'claimed' as const };
-    const { service, controllerRepository } = createService([claimed]);
+    const { service, test } = await createService([claimed]);
     const updateEvidence = jest.fn();
     service.registerRuntimeStatusHandler(updateEvidence);
     const timestamp = new Date().toISOString();
@@ -468,9 +506,7 @@ describe('WagoService connection monitoring', () => {
       claimed.id,
       expect.objectContaining({ imageId: `sha256:${'a'.repeat(64)}`, streamId, sequence: 1 }),
     );
-    expect(controllerRepository.save).toHaveBeenCalledWith(
-      expect.objectContaining({ lastHeartbeatAt: timestamp, lastSeenAt: expect.any(String) }),
-    );
+    expect(test.rows('controllers')[0]).toMatchObject({ lastHeartbeatAt: timestamp, lastSeenAt: expect.any(String) });
   });
 
   it('does not regress a persisted heartbeat with an older canonical heartbeat when the diagnostics cache is full', async () => {
@@ -482,7 +518,7 @@ describe('WagoService connection monitoring', () => {
       lastHeartbeatAt: new Date(Date.now()).toISOString(),
       lastSeenAt: new Date(Date.now() - 31_000).toISOString(),
     };
-    const { service, controllerRepository } = createService([claimed]);
+    const { service, test } = await createService([claimed]);
     const streamId = '00000000-0000-4000-8000-000000000001';
     for (let id = 1; id <= 256; id++) {
       service.diagnostics.ingest(id, 'heartbeat', Buffer.from(JSON.stringify({ timestamp, streamId, sequence: 1 })));
@@ -507,12 +543,15 @@ describe('WagoService connection monitoring', () => {
       ),
     );
 
-    expect(controllerRepository.save).not.toHaveBeenCalled();
-    expect(claimed.lastHeartbeatAt).not.toBe(timestamp);
+    expect(test.rows('controllers')[0]).toMatchObject({
+      lastHeartbeatAt: claimed.lastHeartbeatAt,
+      lastSeenAt: claimed.lastSeenAt,
+    });
+    expect(test.rows('controllers')[0].lastHeartbeatAt).not.toBe(timestamp);
   });
 
   it('keeps replacement subscriptions inert until they replace the active generation', async () => {
-    const { service, context, subscriptions } = createService([], [], 2);
+    const { service, context, subscriptions } = await createService([], [], 2);
     const subscribeConfiguredServers = (Reflect.get(service, 'subscribeConfiguredServers') as () => Promise<void>).bind(
       service,
     );
@@ -554,7 +593,7 @@ describe('WagoService connection monitoring', () => {
 
   it('preserves retained state delivered before replacement subscriptions activate', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
-    const { service, context } = createService([claimed], [], 2);
+    const { service, context } = await createService([claimed], [], 2);
     const subscribeConfiguredServers = (Reflect.get(service, 'subscribeConfiguredServers') as () => Promise<void>).bind(
       service,
     );
@@ -582,7 +621,7 @@ describe('WagoService connection monitoring', () => {
 
   it('unsubscribes an in-flight replacement when the module is destroyed', async () => {
     let finishSubscribe!: () => void;
-    const { service, context, subscriptions } = createService([], [], 2);
+    const { service, context, subscriptions } = await createService([], [], 2);
     (context.mqtt.subscribe as jest.Mock).mockImplementation(
       () =>
         new Promise((resolve) => {

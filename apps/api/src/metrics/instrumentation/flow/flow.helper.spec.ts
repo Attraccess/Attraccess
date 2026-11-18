@@ -24,9 +24,7 @@ describe('FlowTimer', () => {
 
       expect(result).toBe('ok');
       const text = await registry.metrics();
-      expect(text).toContain(
-        'attraccess_flow_executions_total{trigger_type="input.button",status="success"} 1',
-      );
+      expect(text).toContain('attraccess_flow_executions_total{trigger_type="input.button",status="success"} 1');
       expect(text).toContain(
         'attraccess_flow_execution_duration_seconds_count{trigger_type="input.button",status="success"} 1',
       );

@@ -11,7 +11,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { catchError, from, mergeMap, Observable, throwError } from 'rxjs';
 import { Request, Response } from 'express';
-import { isSqliteBusyError } from '../../database/sqlite-errors';
+import { isDatabaseBusyError } from '../../database/persistence-errors';
 import { BruteForceProtectionService } from './brute-force.service';
 import type { RateLimitScope } from './brute-force-policy';
 import { AuthAuditLogger, AuthAuditOutcome, AuthAuditType } from './auth-audit.logger';
@@ -68,7 +68,7 @@ export class AuthRateLimitInterceptor implements NestInterceptor {
       }),
       catchError((err: unknown) => {
         // A database that stayed busy says nothing about the attempt: it must not count toward a lockout.
-        if (!isSqliteBusyError(err)) {
+        if (!isDatabaseBusyError(err)) {
           this.bruteForce
             .recordFailure(scope, ip, userId)
             .catch((recErr) => this.logger.error(`recordFailure failed for scope=${scope}`, recErr as Error));
@@ -119,7 +119,7 @@ function classifyOutcome(error: unknown): AuthAuditOutcome {
   if (error instanceof AccountLockedException) return 'account_locked';
   if (error instanceof UnauthorizedException) return 'invalid_credentials';
   if (error instanceof ForbiddenException) return 'invalid_token';
-  if (error instanceof ServiceUnavailableException || isSqliteBusyError(error)) return 'dependency_failure';
+  if (error instanceof ServiceUnavailableException || isDatabaseBusyError(error)) return 'dependency_failure';
   return 'invalid_input';
 }
 

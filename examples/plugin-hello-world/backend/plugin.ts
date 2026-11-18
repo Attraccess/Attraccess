@@ -2,7 +2,7 @@
 //
 // Demonstrates the three core backend capabilities a real plugin needs:
 //   1. A NestJS controller that adds a REST endpoint to the host API.
-//   2. A service that reads from the host database through an injected repository.
+//   2. A service that reads host data through the neutral hostData lookups.
 //   3. A handler subscribed to a typed host SystemEvent.
 //
 // It is built in isolation (own bundler, own node_modules resolution) exactly
@@ -26,12 +26,6 @@ const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
  */
 const RESOURCE_USAGE_STARTED = 'RESOURCE_USAGE_STARTED' as SystemEvent;
 
-/** Minimal shape of the host `User` row we read — declared locally, no import. */
-interface UserRow {
-  id: number;
-  username: string;
-}
-
 @Injectable()
 class HelloWorldService implements OnModuleInit {
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
@@ -54,14 +48,11 @@ class HelloWorldService implements OnModuleInit {
     await this.context.mqtt.publish(1, 'hello-world/ping', 'Hello from the plugin!');
   }
 
-  // Read from the host DB through an injected repository. We address the entity
-  // by NAME ('User') rather than importing the class, which keeps the artifact
-  // dependency-free; the host resolves the name to its own User entity and gates
-  // the call behind the READ_USERS permission.
+  // Read host data through the neutral `hostData` lookups: no repository, no entity, no database engine in
+  // sight. The call is gated behind the READ_USERS permission.
   async greetUsers(): Promise<string[]> {
-    const users = this.context.getRepository<UserRow>('User');
-    const rows = await users.find({ take: 5 });
-    return rows.map((row) => `Hello, ${row.username}!`);
+    const names = await this.context.hostData.users.getUsernames([1, 2, 3, 4, 5]);
+    return [...names.values()].map((username) => `Hello, ${username}!`);
   }
 }
 

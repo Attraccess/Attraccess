@@ -8,7 +8,7 @@ import type {
 } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import { Clock, RESERVATION_CLOCK } from '../constants';
-import type { ReservationEntity } from '../entities/reservation.entity';
+import type { ReservationRow } from '../storage/reservation-table';
 import { VisibilityService } from '../ical/visibility.service';
 import { formatTime, pick } from '../notifications/format';
 import { readerName, readerTime } from '../reader-ui/texts';
@@ -104,7 +104,7 @@ export class PreStartService {
    */
   private async evaluateShared(
     ctx: PreStartContext,
-    confirmed: ReservationEntity[],
+    confirmed: ReservationRow[],
     limit: number,
     now: Date,
   ): Promise<PreStartResult> {
@@ -132,7 +132,7 @@ export class PreStartService {
   }
 
   /** The "Reserved soon ... Start anyway?" question for an upcoming booking of someone else. */
-  private async askReservedSoon(ctx: PreStartContext, upcoming: ReservationEntity, now: Date): Promise<PreStartResult> {
+  private async askReservedSoon(ctx: PreStartContext, upcoming: ReservationRow, now: Date): Promise<PreStartResult> {
     const nowMs = now.getTime();
     const { language: lang } = ctx;
     const minutes = Math.max(1, Math.ceil((upcoming.startTime.getTime() - nowMs) / MINUTE_MS));
@@ -209,7 +209,7 @@ export class PreStartService {
    */
   async reservedBlockReason(
     ctx: { principal: PreStartContext['principal']; language: 'en' | 'de'; origin: PreStartOrigin },
-    booking: ReservationEntity,
+    booking: ReservationRow,
     now: Date,
   ): Promise<PluginBlockReason> {
     const starter = subjectOfPrincipal(ctx.principal);
@@ -223,7 +223,7 @@ export class PreStartService {
    * The booking holder's name for a viewer who may see who uses the machine (core's usage attribution rule, the
    * same one that decides who sees the current user of a running session); null for everyone else.
    */
-  private async holderNameFor(viewer: AccessSubject, booking: ReservationEntity): Promise<string | null> {
+  private async holderNameFor(viewer: AccessSubject, booking: ReservationRow): Promise<string | null> {
     if (!(await this.access.attributionResourceIds(viewer, [booking.resourceId])).has(booking.resourceId)) return null;
     return shorten((await this.directory.getUserNames([booking.userId])).get(booking.userId) ?? null);
   }
@@ -234,7 +234,7 @@ export class PreStartService {
    * reader. Starts are made by an identified user, so this is always "after the card tap". Web and API starts keep
    * the nameless ATT-881 question (no lookup).
    */
-  private async holderForReader(ctx: PreStartContext, booking: ReservationEntity): Promise<string | undefined> {
+  private async holderForReader(ctx: PreStartContext, booking: ReservationRow): Promise<string | undefined> {
     if (ctx.origin !== 'reader') return undefined;
     const name = (await this.access.isManager(subjectOfPrincipal(ctx.principal), ctx.resourceId))
       ? (await this.directory.getUserNames([booking.userId])).get(booking.userId)
@@ -250,11 +250,7 @@ export class PreStartService {
   }
 
   /** Block for non-managers; for managers the next unconfirmed override, or null when all are confirmed. */
-  private async whenActive(
-    ctx: PreStartContext,
-    active: ReservationEntity[],
-    now: Date,
-  ): Promise<PreStartResult | null> {
+  private async whenActive(ctx: PreStartContext, active: ReservationRow[], now: Date): Promise<PreStartResult | null> {
     const { language: lang } = ctx;
     // The starter's request scope applies: a token without `resources.update` gets no manager override.
     const starter = subjectOfPrincipal(ctx.principal);

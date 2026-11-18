@@ -4,16 +4,10 @@ import { PluginEmailService } from './plugin-email.service';
 import { EmailTemplateModule } from '../email-template/email-template.module';
 import { EmailLayoutModule } from '../email-layout/email-layout.module';
 import { SettingsModule } from '../settings/settings.module';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from '@attraccess/database-entities';
+import { EmailPersistenceModule } from '../database/adapters/email/email-persistence.module';
 
 @Module({
-  imports: [
-    EmailTemplateModule,
-    EmailLayoutModule,
-    SettingsModule,
-    TypeOrmModule.forFeature([User]),
-  ],
+  imports: [EmailTemplateModule, EmailLayoutModule, SettingsModule, EmailPersistenceModule],
   providers: [EmailService, PluginEmailService],
   exports: [EmailService, PluginEmailService],
 })

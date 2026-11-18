@@ -2,7 +2,7 @@ import { ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/com
 import { Request, Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { Observable } from 'rxjs';
-import { isSqliteBusyError } from '../../database/sqlite-errors';
+import { isDatabaseBusyError } from '../../database/persistence-errors';
 import { UsersService } from '../users/users.service';
 import { AuthAuditLogger, AuthAuditOutcome } from './auth-audit.logger';
 import { BruteForceProtectionService } from './brute-force.service';
@@ -95,7 +95,7 @@ function classifyLoginFailure(error: unknown): AuthAuditOutcome {
   if (name === 'TooManyAuthAttemptsException' || error instanceof TooManyAuthAttemptsException) {
     return 'rate_limited';
   }
-  if (isSqliteBusyError(error)) return 'dependency_failure';
+  if (isDatabaseBusyError(error)) return 'dependency_failure';
   const message = errorMessage(error);
   if (message === 'TwoFactorRequired') return 'two_factor_required';
   if (message === 'TwoFactorInvalidCode') return 'two_factor_invalid';

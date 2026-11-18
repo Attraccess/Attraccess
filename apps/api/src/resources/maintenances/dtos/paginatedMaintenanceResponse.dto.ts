@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { PaginatedResponse } from '../../../types/response';
-import { ResourceMaintenance } from '@attraccess/database-entities';
+import { ResourceMaintenance } from './maintenance-records.dto';
 
 export class PaginatedMaintenanceResponse extends PaginatedResponse<ResourceMaintenance> {
   @ApiProperty({

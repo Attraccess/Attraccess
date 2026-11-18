@@ -28,13 +28,12 @@ describe('plugin license gate', () => {
       JSON.stringify({
         name,
         version: '1.0.0',
-        attraccessVersion: { min: '1.0.0' },
+        attraccessVersion: { min: '2.0.0-0' },
         dependencies: dependencies.map((dependency) => ({ name: dependency, version: '^1.0.0', required: true })),
         ...(license === undefined ? {} : { license }),
-        main: {
-          backend: { directory: 'dist', entryPoint: 'index.js' },
-          ...(migrations ? { migrations: { directory: 'dist', entryPoint: 'migrations.js' } } : {}),
-        },
+        // A plugin with storage asks for PLUGIN_STORAGE; the host migrates its declared tables.
+        ...(migrations ? { permissions: ['PLUGIN_STORAGE'] } : {}),
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
       }),
     );
     writeFileSync(
@@ -201,13 +200,28 @@ describe('plugin license gate', () => {
     expect(status('addon-extra')?.error).toContain('Required plugin addon failed to load');
   });
 
-  it('does not load a plugin with an invalid license block', () => {
+  it('refuses a plugin with an invalid license block: listed with the error, never loaded', () => {
     fixture('broken', { required: 'yes' });
     fixture('plain', undefined);
     PluginService.setLicenseSnapshot(wagoLicense);
     PluginModule.forRoot();
     expect(loaded()).toEqual(['plain']);
-    expect(status('broken')).toBeUndefined();
+    expect(PluginService.isPluginRefused({ pluginDirectory: 'broken' })).toBe(true);
+    expect(status('broken')).toMatchObject({
+      status: 'error',
+      error: expect.stringContaining('Plugin broken declares an invalid license block (required:'),
+    });
+  });
+
+  it('reports the refusal, not a missing license, for a refused license-gated plugin', () => {
+    fixture('wago', { required: true, modules: ['wago'] });
+    const manifestPath = join(root, 'wago', 'plugin.json');
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    writeFileSync(manifestPath, JSON.stringify({ ...manifest, attraccessVersion: { min: '1.11.0' } }));
+    PluginService.setLicenseSnapshot(nonProfit);
+    PluginModule.forRoot();
+    expect(loaded()).toEqual([]);
+    expect(status('wago')).toMatchObject({ status: 'error', error: expect.stringContaining('2.0') });
   });
 
   it('shows plugins as unknown rather than license_missing while plugins are disabled', () => {

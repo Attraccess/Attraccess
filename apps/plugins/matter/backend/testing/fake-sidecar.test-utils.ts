@@ -19,7 +19,7 @@ import { FakeFabricBackend, FakeSidecarError } from './fake-fabric.test-utils';
 
 export const TOKEN = 'plugin-test-token-0123456789abcdef0123456789';
 export const entry = COMPATIBILITY_TABLE[0];
-export const HOST_VERSION = '1.11.0';
+export const HOST_VERSION = '2.0.0';
 
 const reportBody = (inventoryAvailable: boolean, fabricAvailable: boolean) => ({
   capabilities: FEATURE_FAMILIES.map((family) => {

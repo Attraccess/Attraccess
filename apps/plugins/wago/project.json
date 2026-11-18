@@ -115,7 +115,7 @@
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/wago",
-        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js"
+        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js"
       }
     },
     "build-frontend": {
@@ -185,9 +185,9 @@
       ],
       "options": {
         "cwd": "apps/plugins/wago",
-        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js dist/migrations.js frontend/remoteEntry.js frontend/style.css",
+        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js frontend/remoteEntry.js frontend/style.css",
         "env": {
-          "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "1.11.0"
+          "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "2.0.0"
         }
       }
     },
@@ -477,7 +477,7 @@
       "inputs": ["default"],
       "outputs": ["{workspaceRoot}/coverage/apps/plugins/wago/test-scripts"],
       "options": {
-        "command": "node scripts/crap-score/node-test.mjs apps/plugins/wago coverage/apps/plugins/wago/test-scripts apps/plugins/wago/scripts/check-acceptance.test.mjs"
+        "command": "node scripts/crap-score/node-test.mjs apps/plugins/wago coverage/apps/plugins/wago/test-scripts apps/plugins/wago/scripts/check-acceptance.test.mjs apps/plugins/wago/scripts/legacy-sdk-persistence.test.mjs"
       }
     }
   }

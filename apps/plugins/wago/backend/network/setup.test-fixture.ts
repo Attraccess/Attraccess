@@ -1,13 +1,8 @@
 import { createHash } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
-import { DataSource } from 'typeorm';
 import type { PluginContext, PluginMqttMessage } from '@attraccess/plugins-backend-sdk';
 import { WagoNetworkChangeService } from './service';
-import { WagoNetworkChange, WagoMqttCredentialRetirement } from './entity';
-import { WagoManagedAccess, WagoRuntimeUpdateEntity, WagoDeviceOperation } from '../runtime/managed/access.entity';
-import { WagoController } from '../controllers/entity';
-import { WagoCommissioningSession } from '../commissioning/sessions/session.entity';
-import { WagoCredentialRotationEntity } from '../credentials/service';
+import { createWagoTestStorage, type WagoTestStorage } from '../storage/testing';
 import { WagoManagedRuntimeService } from '../runtime/managed/service';
 import { WagoService } from '../controllers/service';
 import { WagoRuntimeArtifactsService } from '../runtime/artifacts/service';
@@ -19,7 +14,7 @@ import { MANAGED_HELPER_PROTOCOL } from '../runtime/managed/provisioning/install
 import type { BuildRuntimeArtifact } from '../runtime/artifacts/build';
 
 type NetworkChangeFixture = {
-  db: DataSource;
+  test: WagoTestStorage;
   managed: WagoManagedRuntimeService;
   service: WagoNetworkChangeService;
   context: PluginContext;
@@ -42,21 +37,7 @@ type NetworkChangeFixture = {
   };
 };
 export async function resetTestFixture(scope: NetworkChangeFixture) {
-  scope.db = await new DataSource({
-    type: 'better-sqlite3',
-    database: ':memory:',
-    synchronize: true,
-    entities: [
-      WagoNetworkChange,
-      WagoMqttCredentialRetirement,
-      WagoManagedAccess,
-      WagoRuntimeUpdateEntity,
-      WagoDeviceOperation,
-      WagoController,
-      WagoCommissioningSession,
-      WagoCredentialRotationEntity,
-    ],
-  }).initialize();
+  scope.test = createWagoTestStorage();
   scope.payloads = [];
   scope.failure = null;
   scope.allowEvidence = true;
@@ -79,7 +60,8 @@ export async function resetTestFixture(scope: NetworkChangeFixture) {
   });
   scope.audit = jest.fn(async () => ({ status: 'recorded' }));
   scope.context = {
-    getRepository: (entity: never) => scope.db.getRepository(entity),
+    storage: scope.test.storage,
+    persistence: scope.test.persistence,
     secrets: {
       encrypt: (s: string) => Buffer.from(s).toString('base64'),
       decrypt: (s: string) => Buffer.from(s, 'base64').toString(),
@@ -117,7 +99,7 @@ export async function resetTestFixture(scope: NetworkChangeFixture) {
   jest.spyOn(scope.managed as unknown as { scan(): Promise<void> }, 'scan').mockResolvedValue(undefined);
   scope.managed.onApplicationBootstrap();
   scope.managed.registerRootProbe(async () => true);
-  const session = await scope.db.getRepository(WagoCommissioningSession).save({
+  const session = await scope.test.tables.commissioningSessions.insert({
     id: 1,
     hardwareId: 'cc100-1',
     mqttServerId: 1,
@@ -136,8 +118,8 @@ export async function resetTestFixture(scope: NetworkChangeFixture) {
     );
   await scope.managed.enrol(session, async () => 'OK\n', new AbortController().signal);
   await scope.managed.bind(1, 1);
-  await scope.db.getRepository(WagoManagedAccess).update(1, { state: 'managed' });
-  await scope.db.getRepository(WagoController).save({
+  await scope.test.tables.managedAccess.update({ sessionId: 1 }, { state: 'managed' });
+  await scope.test.tables.controllers.insert({
     id: 1,
     hardwareId: 'cc100-1',
     trustState: 'claimed',

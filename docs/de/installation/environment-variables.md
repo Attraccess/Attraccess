@@ -1,6 +1,6 @@
 # Umgebungsvariablen
 
-<!-- llms-description: Referenz aller Umgebungsvariablen zur Konfiguration von Attraccess: Pflichteinstellungen, Anwendung, Logs, Speicher, SMTP und TLS. -->
+<!-- llms-description: Referenz aller Umgebungsvariablen zur Konfiguration von Attraccess: Pflichteinstellungen, Anwendung, Logs, Datenbank, Speicher, SMTP und TLS. -->
 
 Alle Konfigurationsoptionen für Attraccess, die über Umgebungsvariablen gesetzt werden können.
 
@@ -46,6 +46,14 @@ Alle Ziele verwenden den bisherigen Nest-11-Filter für `LOG_LEVELS`. Explizit a
 Änderungen werden nach einem API-Neustart wirksam. Gepufferte Startmeldungen verwenden dasselbe Routing. Beim regulären Herunterfahren (SIGINT/SIGTERM) werden ausstehende Schreibvorgänge abgeschlossen und Ziele geschlossen; erzwungenes Beenden garantiert dies nicht. Ein Ziel, das bei Initialisierung oder Betrieb ausfällt, wird für den restlichen Prozess deaktiviert und einmal über den direkten stderr-Pfad gemeldet. Funktionierende Ziele laufen weiter. Fallen alle Ziele aus, läuft die API ohne Zustellung von Anwendungslogs weiter. Nach Beheben der Ursache startet ein Neustart das Ziel erneut. Startfehler vor der Routing-Konfiguration bleiben auf der Konsole sichtbar.
 
 In Containern benötigt die API Schreibrechte für den Pfad. Mounten Sie das Verzeichnis, wenn Logs einen Containerwechsel überleben sollen. Rotation, Aufbewahrungsregeln, Remote-Treiber, Ebenen pro Ziel und Live-Konfiguration sind nicht enthalten. Das Routing betrifft nur API-Anwendungs- und Framework-Logs. Persistierte Audit-Einträge, optionale Flow-Aufzeichnungen sowie Frontend-, Firmware-, Companion- und Dev-Launcher-Ausgaben behalten ihr eigenes Verhalten. Generierte Dateien unter `storage/` und `log/` sind gitignored. Entwickler können [weitere Transports registrieren](developer/logging.md).
+
+## Datenbank
+
+| Variable        | Standard | Beschreibung                                                                                                                               |
+| --------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_TYPE` | `sqlite` | Datenbank-Engine. Nur `sqlite` wird unterstützt; jeder andere Wert bricht den Start ab, bevor eine Datenbank oder ein Plugin berührt wird. |
+
+Zur Engine-Naht siehe [Datenbank-Backend hinzufügen](developer/adding-a-database-backend.md).
 
 ## Speicher
 

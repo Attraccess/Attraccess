@@ -1,11 +1,9 @@
-import { MqttServer } from '@attraccess/database-entities';
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { MQTT_SERVER_STORE, type MqttServerStore } from '../mqtt-server-store.port';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
 import { randomBytes } from 'node:crypto';
 import * as mqtt from 'mqtt';
 import { MqttClient } from 'mqtt';
-import { Repository } from 'typeorm';
 import { buildMqttConnectionSettings } from '../mqtt-connection-options';
 import { MqttClientService } from '../mqtt-client.service';
 import { MqttServerChangedEvent } from '../mqtt-server-changed.event';
@@ -69,7 +67,7 @@ export class MqttExplorerConnectionsService implements OnModuleDestroy {
   private readonly connections = new Map<string, ExplorerConnection>();
 
   constructor(
-    @InjectRepository(MqttServer) private readonly servers: Repository<MqttServer>,
+    @Inject(MQTT_SERVER_STORE) private readonly servers: MqttServerStore,
     private readonly mqttClient: MqttClientService,
   ) {}
 
@@ -168,7 +166,7 @@ export class MqttExplorerConnectionsService implements OnModuleDestroy {
   }
 
   private async connect(connection: ExplorerConnection): Promise<void> {
-    const server = await this.servers.findOneBy({ id: connection.serverId });
+    const server = await this.servers.findServer(connection.serverId);
     if (!server) throw new Error(`MQTT server with ID ${connection.serverId} not found`);
     const password = await this.mqttClient.resolveServerPassword(server);
     if (connection.closed) return;

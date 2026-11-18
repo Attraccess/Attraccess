@@ -1,10 +1,15 @@
-import { AuthenticationDetail, AuthenticationType, SSOProviderType, User } from '@attraccess/database-entities';
+import {
+  AuthenticationType,
+  SSOProviderType,
+  type AuthenticatedSessionUser,
+  type CredentialRecord,
+  type NotificationRecipient,
+  type SsoCredentialRecord,
+} from '@attraccess/application-models';
 
-import { Injectable, Logger, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, Logger, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { Repository, EntityManager } from 'typeorm';
+import type { TransactionContext } from '../../database/transaction-context';
 
 import { EmailService } from '../../email/email.service';
 
@@ -13,6 +18,10 @@ import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
 
 import { UsersService } from '../users/users.service';
+
+import { PasswordPolicyService } from '../password-policy/password-policy.service';
+
+import { CREDENTIAL_STORE, CredentialStore } from './credentials/credential-store.port';
 
 import { randomBytes } from 'crypto';
 
@@ -59,11 +68,11 @@ export class UserEmailVerificationTokenExpiredException extends UnauthorizedExce
 export class AuthService {
   constructor(
     protected emailService: EmailService,
-    @InjectRepository(AuthenticationDetail)
-    protected authenticationDetailRepository: Repository<AuthenticationDetail>,
+    @Inject(CREDENTIAL_STORE) protected readonly credentials: CredentialStore,
     protected usersService: UsersService,
     protected readonly tokenHashService: TokenHashService,
     protected readonly metricsService: MetricsService,
+    protected readonly passwordPolicy: PasswordPolicyService,
   ) {
     this.logger.debug('AuthService initialized');
   }
@@ -73,33 +82,19 @@ export class AuthService {
   protected readonly logger = new Logger(AuthService.name);
 
   async findUserIdBySSO(providerType: SSOProviderType, providerId: number, subject: string): Promise<number | null> {
-    const detail = await this.authenticationDetailRepository.findOne({
-      where: {
-        type: AuthenticationType.SSO,
-        providerType,
-        providerId,
-        ssoSubject: subject,
-      },
-    });
-
-    return detail?.userId ?? null;
+    return this.credentials.findUserIdBySso(providerType, providerId, subject);
   }
 
   async userHasSSOAuthentication(userId: number): Promise<boolean> {
-    const count = await this.authenticationDetailRepository.count({
-      where: { userId, type: AuthenticationType.SSO },
-    });
-    return count > 0;
+    return (await this.credentials.findSso(userId)) !== null;
   }
 
-  async findSSOAuthenticationDetail(userId: number): Promise<AuthenticationDetail | null> {
-    return this.authenticationDetailRepository.findOne({
-      where: { userId, type: AuthenticationType.SSO },
-    });
+  async findSSOAuthenticationDetail(userId: number): Promise<SsoCredentialRecord | null> {
+    return this.credentials.findSso(userId);
   }
 
   async updateSSOSubject(detailId: number, ssoSubject: string): Promise<void> {
-    await this.authenticationDetailRepository.update(detailId, { ssoSubject });
+    await this.credentials.updateSsoSubject(detailId, ssoSubject);
   }
 
   async generatePasswordResetToken(email: string): Promise<string> {
@@ -119,38 +114,23 @@ export class AuthService {
     return token;
   }
 
-  async changePassword(user: User, password: string): Promise<void> {
+  async changePassword(user: NotificationRecipient, password: string): Promise<void> {
     const isSSOUser = await this.usersService.isSSOUser(user.id);
     if (isSSOUser) {
       throw new ForbiddenException('You cannot change the password of an SSO user');
     }
 
-    const authenticationDetail = await this.getAuthenticationDetail(AuthenticationType.LOCAL_PASSWORD, user.id).catch(
-      (error) => {
-        if (error instanceof NotFoundException) {
-          return null;
-        }
-        throw error;
-      },
-    );
-
-    if (authenticationDetail) {
-      authenticationDetail.password = await this.hashPassword(password);
-      await this.authenticationDetailRepository.save(authenticationDetail);
-    } else {
-      await this.addAuthenticationDetails(user.id, {
-        type: AuthenticationType.LOCAL_PASSWORD,
-        details: {
-          password,
-        },
-      });
-    }
+    // Hashing is slow and needs no transaction. The change and the archiving of the replaced password happen
+    // atomically in the store.
+    const passwordHash = await this.hashPassword(password);
+    const { historySize } = await this.passwordPolicy.getPolicy();
+    await this.credentials.replaceLocalPassword(user.id, passwordHash, { rememberPrevious: historySize });
 
     // Notify user about password change
     await this.emailService.sendPasswordChangedEmail(user);
   }
 
-  async generateEmailVerificationToken(user: User, manager?: EntityManager): Promise<string> {
+  async generateEmailVerificationToken(user: { id: number }, manager?: TransactionContext): Promise<string> {
     const token = randomBytes(16).toString('base64url').slice(0, 21);
     const storedToken = this.tokenHashService.hashToken(token);
 
@@ -189,59 +169,41 @@ export class AuthService {
     }
 
     this.logger.debug(`Marking email as verified for user ID: ${user.id}`);
-    await this.usersService.updateOne(user.id, {
-      isEmailVerified: true,
-      emailVerificationToken: null,
-      emailVerificationTokenExpiresAt: null,
-    });
+    // Exactly one of any number of concurrent requests with the same token gets to consume it.
+    if (!(await this.usersService.consumeEmailVerificationToken(user.id, user.emailVerificationToken))) {
+      this.logger.debug(`Verification token of user ID ${user.id} was already consumed`);
+      throw new UserEmailInvalidVerificationTokenException();
+    }
     this.logger.debug(`Email successfully verified for user ID: ${user.id}`);
   }
 
-  protected async getAuthenticationDetail(
-    authenticationType: AuthenticationType,
-    userId: number,
-  ): Promise<AuthenticationDetail> {
-    const details = await this.authenticationDetailRepository.findOne({
-      where: { userId, type: authenticationType },
-    });
-
-    if (!details) {
-      this.logger.debug(`Authentication details not found for user ID: ${userId}`);
-      throw new NotFoundException(`Authentication details for user ${userId} not found`);
-    }
-
-    return details;
-  }
-
   async validateAuthenticationDetails(userId: number, options: AuthenticationOptions): Promise<boolean> {
-    const authenticationDetails = await this.getAuthenticationDetail(options.type, userId).catch((error) => {
-      if (error instanceof NotFoundException) {
-        return null;
-      }
-      throw error;
-    });
-
-    if (!authenticationDetails) {
-      this.logger.debug(`No authentication details of type ${options.type} found for user ID: ${userId}`);
-      return false;
-    }
-
     let isValid: boolean;
     switch (options.type) {
       case AuthenticationType.LOCAL_PASSWORD: {
+        const passwordHash = await this.credentials.findLocalPasswordHash(userId);
+        if (passwordHash === null) {
+          this.logger.debug(`No authentication details of type ${options.type} found for user ID: ${userId}`);
+          return false;
+        }
         const isSSOUser = await this.usersService.isSSOUser(userId);
         if (isSSOUser) {
           throw new LocalLoginForSSOForbiddenException();
         }
-        isValid = await bcrypt.compare(options.details.password, authenticationDetails.password || '');
+        isValid = await bcrypt.compare(options.details.password, passwordHash);
         break;
       }
 
       case AuthenticationType.SSO: {
+        const sso = await this.credentials.findSso(userId);
+        if (!sso) {
+          this.logger.debug(`No authentication details of type ${options.type} found for user ID: ${userId}`);
+          return false;
+        }
         isValid =
-          authenticationDetails.providerType === options.details.providerType &&
-          authenticationDetails.providerId === options.details.providerId &&
-          authenticationDetails.ssoSubject === options.details.subject;
+          sso.providerType === options.details.providerType &&
+          sso.providerId === options.details.providerId &&
+          sso.ssoSubject === options.details.subject;
         break;
       }
 
@@ -261,48 +223,38 @@ export class AuthService {
   async addAuthenticationDetails(
     userId: number,
     options: AuthenticationOptions,
-    manager?: EntityManager,
+    manager?: TransactionContext,
     hashedPassword?: string,
-  ): Promise<AuthenticationDetail> {
-    const authenticationDetail = new AuthenticationDetail();
-    authenticationDetail.userId = userId;
-    authenticationDetail.type = options.type;
-
+  ): Promise<CredentialRecord> {
     if (options.type === AuthenticationType.LOCAL_PASSWORD) {
       this.logger.debug(`Adding local password authentication for user ID: ${userId}`);
-      authenticationDetail.password = hashedPassword ?? (await this.hashPassword(options.details.password));
-    } else if (options.type === AuthenticationType.SSO) {
-      authenticationDetail.providerType = options.details.providerType;
-      authenticationDetail.providerId = options.details.providerId;
-      authenticationDetail.ssoSubject = options.details.subject;
+      const passwordHash = hashedPassword ?? (await this.hashPassword(options.details.password));
+      return this.credentials.add(userId, { type: AuthenticationType.LOCAL_PASSWORD, passwordHash }, manager);
     }
-
-    const saved = manager
-      ? await manager.save(authenticationDetail)
-      : await this.authenticationDetailRepository.save(authenticationDetail);
-    return saved;
+    return this.credentials.add(
+      userId,
+      {
+        type: AuthenticationType.SSO,
+        providerType: options.details.providerType,
+        providerId: options.details.providerId,
+        subject: options.details.subject,
+      },
+      manager,
+    );
   }
 
   async removeLocalPasswordAuthentication(userId: number): Promise<void> {
-    const detail = await this.authenticationDetailRepository.findOne({
-      where: { userId, type: AuthenticationType.LOCAL_PASSWORD },
-    });
-
-    if (detail) {
-      await this.removeAuthenticationDetails(detail.id);
-    }
+    await this.credentials.removeLocalPassword(userId);
   }
 
   async removeAuthenticationDetails(authenticationDetailsId: number): Promise<void> {
-    await this.authenticationDetailRepository.delete({
-      id: authenticationDetailsId,
-    });
+    await this.credentials.remove(authenticationDetailsId);
   }
 
   async getUserByLoginIdentifierAndAuthenticationDetails(
     identifier: string,
     options: AuthenticationOptions,
-  ): Promise<User | null> {
+  ): Promise<AuthenticatedSessionUser | null> {
     const method = options.type === AuthenticationType.LOCAL_PASSWORD ? 'local' : 'sso';
 
     const user = await this.usersService.findByLoginIdentifier(identifier);

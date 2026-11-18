@@ -1,11 +1,11 @@
-import { ResourceFlowNode, IfNodeDataSchema } from '@attraccess/database-entities';
+import { FlowNodeRecord, IfNodeDataSchema } from '@attraccess/application-models';
 import { get } from 'lodash-es';
 import z from 'zod';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 
 export class IfExecutor implements NodeExecutor {
-  async execute(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
+  async execute(node: FlowNodeRecord, input: object): Promise<NodeProcessingResult> {
     const {
       path,
       comparisonOperator,

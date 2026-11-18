@@ -16,7 +16,7 @@ interface Props {
 export function PluginsTable({ onShowError, onShowDetails, onManageVersion, onDelete }: Props) {
   const { t } = usePluginsTranslations();
   const { data: plugins } = useGetPlugins();
-  const { installedByName } = useInstalledNpmPlugins();
+  const { installedByDirectory } = useInstalledNpmPlugins();
 
   return (
     <Table data-cy="plugins-list-table">
@@ -35,13 +35,13 @@ export function PluginsTable({ onShowError, onShowDetails, onManageVersion, onDe
           </TableHeader>
           <TableBody
             items={plugins ?? []}
-            dependencies={[installedByName, onShowError, onShowDetails, onManageVersion, onDelete]}
+            dependencies={[installedByDirectory, onShowError, onShowDetails, onManageVersion, onDelete]}
             renderEmptyState={() => <EmptyState />}
           >
             {(plugin) => (
               <PluginRow
                 plugin={plugin}
-                installed={installedByName.get(plugin.name)}
+                installed={installedByDirectory.get(plugin.pluginDirectory)}
                 onShowError={onShowError}
                 onShowDetails={onShowDetails}
                 onManageVersion={onManageVersion}

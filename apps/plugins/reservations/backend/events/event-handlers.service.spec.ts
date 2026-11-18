@@ -1,6 +1,6 @@
 import { type ResourceHealthChangedPayload, SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { PendingDecisionService } from '../hooks/pending-decision.service';
-import { ReservationEntity } from '../entities/reservation.entity';
+import { ReservationRow } from '../storage/reservation-table';
 import { ReservationQueryService } from '../reservations/reservation-query.service';
 import { Harness, createHarness } from '../testing/harness.test-utils';
 import { BackgroundServices, createBackgroundServices } from '../testing/background-services.test-utils';
@@ -14,7 +14,7 @@ describe('ReservationEventHandlers', () => {
     h.dispatch.mock.calls
       .map(([request]) => request as Dispatched)
       .filter((request) => request.dedupeKey.startsWith(`reservations:${prefix}`));
-  const row = (id: number) => h.dataSource.getRepository(ReservationEntity).findOneByOrFail({ id });
+  const row = (id: number) => h.reservation({ id });
   const started = (userId: number, usageId = 100, supervisorUserId: number | null = null) => ({
     resourceId: 1,
     usageId,
@@ -162,7 +162,7 @@ describe('ReservationEventHandlers', () => {
   });
 
   describe('override detection', () => {
-    let booking: ReservationEntity;
+    let booking: ReservationRow;
     beforeEach(async () => {
       booking = await p.book(10, 1, '2026-06-01T08:00:00', '2026-06-01T10:00:00');
       h.setNow('2026-06-01T08:30:00Z');
@@ -247,7 +247,7 @@ describe('ReservationEventHandlers', () => {
 
     it('drops the question once the booking is gone', async () => {
       await h.emit(SystemEvent.RESOURCE_USAGE_SESSION_ENDED, ended(10));
-      const [reservation] = await h.dataSource.getRepository(ReservationEntity).find();
+      const [reservation] = await h.tables.reservations.find();
       await h.reservations.endEarly(actor(10), reservation.id);
       expect(await decisionService.get(actor(10), 1)).toBeNull();
     });

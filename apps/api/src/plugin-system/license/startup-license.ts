@@ -1,17 +1,19 @@
-import { Setting } from '@attraccess/database-entities';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { existsSync } from 'fs';
-import { DataSource, DataSourceOptions } from 'typeorm';
 import { AppConfigType } from '../../config/app.config';
-import { dataSourceConfig } from '../../database/datasource';
-import { createDataSource } from '../../database/sqlite-connection';
+import { resolveDatabaseBackend } from '../../database/backend';
 import { EncryptionService } from '../../encryption/encryption.service';
 import { resolveLicenseData } from '../../license/license.service';
 import { APP_KEYS, APP_PARENT } from '../../settings/constants';
+import type { StandaloneSettingsRows } from '../../settings/settings-rows.port';
 import { SettingsStoreService } from '../../settings/settings-store.service';
 import { isLicenseGated, type PluginLicenseSnapshot } from './plugin-license';
 import { PluginService } from '../plugin.service';
+
+/** Opens the settings on a short-lived connection; null when the database does not exist yet (a fresh install). */
+export type OpenStartupSettings = () => Promise<StandaloneSettingsRows | null>;
+
+const openBackendStartupSettings: OpenStartupSettings = () => resolveDatabaseBackend().plugins.openStartupSettings();
 
 /**
  * Opening SQLite can wait on a lock (busy timeout) and verifying the key is CPU work. Either way, startup waits a
@@ -28,7 +30,8 @@ function fromEnv(value: string | undefined): string | null {
 /**
  * Determines the license once at startup, before AppModule (and so PluginModule.forRoot()) is imported, because
  * forRoot() decides synchronously which plugins load. The container does not exist yet, so this reads the license key
- * through a short-lived standalone connection, the way plugin migrations do, and reuses the core license resolution.
+ * through a short-lived connection the database backend opens (`openSettings`), the way plugin migrations do, and
+ * reuses the core license resolution.
  * On a fresh install the database does not exist yet; the seed migration will store `LICENSE_KEY` from the
  * environment, so that is the key this startup uses.
  *
@@ -40,13 +43,14 @@ export async function evaluateStartupLicense(
   appConfig: AppConfigType,
   logger: Logger,
   timeoutMs = STARTUP_LICENSE_TIMEOUT_MS,
+  openSettings: OpenStartupSettings = openBackendStartupSettings,
 ): Promise<PluginLicenseSnapshot> {
   if (!PluginService.getPlugins().some((manifest) => isLicenseGated(manifest.license))) return null;
 
   let timer: NodeJS.Timeout | undefined;
-  let dataSource: DataSource | undefined;
+  let settings: StandaloneSettingsRows | undefined;
   let settled = false;
-  const work = resolveStartupLicense(appConfig, logger, (created) => (dataSource = created)).finally(() => {
+  const work = resolveStartupLicense(appConfig, logger, openSettings, (opened) => (settings = opened)).finally(() => {
     settled = true;
   });
   const timeout = new Promise<never>((_, reject) => {
@@ -54,7 +58,7 @@ export async function evaluateStartupLicense(
   });
   const close = async () => {
     try {
-      if (dataSource?.isInitialized) await dataSource.destroy();
+      await settings?.close();
     } catch (error) {
       logger.warn(`Could not close the startup license connection: ${String(error)}`);
     }
@@ -76,11 +80,12 @@ export async function evaluateStartupLicense(
 async function resolveStartupLicense(
   appConfig: AppConfigType,
   logger: Logger,
-  onDataSource: (dataSource: DataSource) => void,
+  openSettings: OpenStartupSettings,
+  onOpened: (settings: StandaloneSettingsRows) => void,
 ) {
-  const database = (dataSourceConfig as { database?: unknown }).database;
-  // A fresh install has no database yet. Do not create an empty file for it here.
-  if (typeof database !== 'string' || !existsSync(database)) {
+  const rows = await openSettings();
+  // A fresh install has no database yet; the backend does not create an empty one for it here.
+  if (!rows) {
     return resolveLicenseData(
       fromEnv(process.env.LICENSE_KEY),
       async () => fromEnv(process.env.ATTRACCESS_URL ?? process.env.VITE_ATTRACCESS_URL),
@@ -89,19 +94,8 @@ async function resolveStartupLicense(
     );
   }
 
-  const dataSource = createDataSource({
-    ...dataSourceConfig,
-    entities: [Setting],
-    migrations: [],
-    migrationsRun: false,
-    synchronize: false,
-  } as DataSourceOptions);
-  onDataSource(dataSource);
-  await dataSource.initialize();
-  const settings = new SettingsStoreService(
-    dataSource.getRepository(Setting),
-    new EncryptionService(new ConfigService({ app: appConfig })),
-  );
+  onOpened(rows);
+  const settings = new SettingsStoreService(rows, new EncryptionService(new ConfigService({ app: appConfig })));
   const licenseKey = (await settings.getSecretSetting(APP_PARENT, APP_KEYS.licenseKey)).value;
   return resolveLicenseData(
     licenseKey,

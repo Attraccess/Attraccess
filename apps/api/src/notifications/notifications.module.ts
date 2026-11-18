@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { NotificationPreference } from '@attraccess/database-entities';
+import { NotificationsPersistenceModule } from '../database/adapters/notifications/notifications-persistence.module';
 import { NotificationPreferenceService } from './notification-preference.service';
 import { NotificationsController } from './notifications.controller';
 import { NotificationLiveService } from './notification-live.service';
@@ -11,10 +10,12 @@ import { EmailModule } from '../email/email.module';
 import { LiveTopicsModule } from '../live-updates/live-topics.module';
 import { NotificationLiveTopicsProvider } from './notification-live-topics.provider';
 import { SettingsModule } from '../settings/settings.module';
+import { EmailPersistenceModule } from '../database/adapters/email/email-persistence.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([NotificationPreference]),
+    NotificationsPersistenceModule,
+    EmailPersistenceModule,
     PushModule,
     MetricsModule,
     EmailModule,

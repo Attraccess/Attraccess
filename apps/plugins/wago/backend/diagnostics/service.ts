@@ -1,4 +1,4 @@
-import { Auth, type PluginContext, Resource, ResourceFlowNode } from '@attraccess/plugins-backend-sdk';
+import { Auth, type PluginContext, type PluginFlowNodeReference } from '@attraccess/plugins-backend-sdk';
 import { Controller, Get, Inject, Injectable, NotFoundException, Param, ParseIntPipe } from '@nestjs/common';
 import type { WagoDiagnostics } from '../../diagnostics-types';
 import { type WagoResourceDiagnostics } from '../../diagnostics-types';
@@ -7,7 +7,8 @@ import { freshness } from './store';
 import { safeValidationSummaries } from './validation';
 import { WagoConfigurationDraft } from '../configuration/draft.entity';
 import { WagoConfigurationRevision } from '../configuration/revision.entity';
-import { WagoController } from '../controllers/entity';
+import { openWagoStorage } from '../storage';
+import { loadLatestAppliedRevisions } from '../configuration/latest-applied';
 import { WagoService } from '../controllers/service';
 import { channelEnabled, MAX_CONFIGURATION_ITEMS } from '../../shared/configuration-limits';
 import { MAX_CHANNELS } from './store';
@@ -69,6 +70,14 @@ export function own<T>(values: Record<string, T>, key: string): T | undefined {
 function referenceOwner(node: { resourceId: number | null; flowId?: number | null }): string {
   return node.flowId != null ? `flow ${node.flowId}` : `resource ${node.resourceId}`;
 }
+
+/** A host flow node in the shape the reference diagnostics read: the global flow's name rides along as `flow`. */
+type DiagnosticNode = PluginFlowNodeReference & { flow: { name: string } | null };
+
+const withFlow = (node: PluginFlowNodeReference): DiagnosticNode => ({
+  ...node,
+  flow: node.flowName ? { name: node.flowName } : null,
+});
 
 export function diagnosticReferences(
   nodes: Array<{
@@ -150,25 +159,24 @@ export class WagoDiagnosticsService {
   ) {}
 
   async get(controllerId: number): Promise<WagoDiagnostics> {
-    const controller = await this.context.getRepository(WagoController).findOneBy({ id: controllerId });
+    const tables = openWagoStorage(this.context);
+    const controller = await tables.controllers.get(controllerId);
     if (!controller) throw new NotFoundException('WAGO controller not found');
     const [draft, latest, applied, nodes] = await Promise.all([
-      this.context.getRepository(WagoConfigurationDraft).findOneBy({ controllerId }),
-      this.context
-        .getRepository(WagoConfigurationRevision)
-        .findOne({ where: { controllerId }, order: { revision: 'DESC' } }),
-      this.context
-        .getRepository(WagoConfigurationRevision)
-        .findOne({ where: { controllerId, state: 'applied' }, order: { revision: 'DESC' } }),
-      this.context.dataSource
-        .getRepository(ResourceFlowNode)
-        .createQueryBuilder('node')
-        .leftJoin('node.flow', 'flow')
-        .addSelect(['flow.id', 'flow.name'])
-        .where('node.type LIKE :type', { type: 'plugin.wago.%' })
-        .andWhere("node.data ->> 'controllerId' = :controllerId", { controllerId })
-        .take(1001)
-        .getMany(),
+      tables.configurationDrafts.findOne({ where: { controllerId } }),
+      tables.configurationRevisions.findOne({
+        where: { controllerId },
+        orderBy: [{ field: 'revision', direction: 'desc' }],
+      }),
+      tables.configurationRevisions.findOne({
+        where: { controllerId, state: 'applied' },
+        orderBy: [{ field: 'revision', direction: 'desc' }],
+      }),
+      this.context.hostData.flows.findNodes({
+        typePrefix: 'plugin.wago.',
+        dataEquals: { controllerId },
+        limit: 1001,
+      }),
     ]);
     const runtime = this.wago.diagnostics.read(controllerId);
     const runtimeUpdate = this.wago.isRuntimeUpdateRequired?.(controllerId) ?? false;
@@ -200,7 +208,7 @@ export class WagoDiagnosticsService {
         availability: 'disabled' as const,
       }));
     const references = diagnosticReferences(
-      nodes.slice(0, 1000),
+      nodes.slice(0, 1000).map(withFlow),
       appliedSnapshot?.logicalChannels.map((channel) => channel.id) ?? [],
       applied?.revision ?? null,
       Object.fromEntries(appliedSnapshot?.logicalChannels.map((channel) => [channel.id, channel.capabilities]) ?? []),
@@ -301,14 +309,14 @@ export class WagoDiagnosticsService {
   }
 
   async getResource(resourceId: number): Promise<WagoResourceDiagnostics> {
-    const nodes = await this.context.dataSource
-      .getRepository(ResourceFlowNode)
-      .createQueryBuilder('node')
-      .where('node.resourceId = :resourceId', { resourceId })
-      .andWhere('node.type LIKE :type', { type: 'plugin.wago.%' })
-      .orderBy('node.id', 'ASC')
-      .take(1001)
-      .getMany();
+    const nodes = (
+      await this.context.hostData.flows.findNodes({
+        typePrefix: 'plugin.wago.',
+        resourceId,
+        orderById: true,
+        limit: 1001,
+      })
+    ).map(withFlow);
     const controllerIds = new Set<number>();
     let invalidControllerReferences = 0;
     for (const node of nodes.slice(0, 1000)) {
@@ -332,71 +340,40 @@ export class WagoDiagnosticsService {
       ),
     ];
     const controllerIdsForQuery = selectedControllerIds;
-    const [controllers, appliedRevisions, conflictNodes] = await Promise.all([
-      this.context
-        .getRepository(WagoController)
-        .createQueryBuilder('controller')
-        .select(['controller.id', 'controller.name', 'controller.hardwareId'])
-        .where('controller.id IN (:...controllerIds)', { controllerIds: selectedControllerIds })
-        .getMany(),
-      this.context
-        .getRepository(WagoConfigurationRevision)
-        .createQueryBuilder('revision')
-        .select(['revision.controllerId', 'revision.revision', 'revision.snapshot'])
-        .where('revision.controllerId IN (:...controllerIds)', { controllerIds: selectedControllerIds })
-        .andWhere('revision.state = :state', { state: 'applied' })
-        .andWhere(
-          'revision.revision = (SELECT MAX(applied.revision) FROM plugin_wago_configuration_revisions applied WHERE applied.controller_id = revision.controller_id AND applied.state = :state)',
-        )
-        .orderBy('revision.controllerId', 'ASC')
-        .addOrderBy('revision.revision', 'DESC')
-        .getMany(),
+    const tables = openWagoStorage(this.context);
+    const [controllers, appliedRows, conflictNodes] = await Promise.all([
+      tables.controllers.find({ where: { id: { in: selectedControllerIds } } }),
+      // Only the newest applied revision of each controller; older snapshots are never loaded.
+      loadLatestAppliedRevisions(tables.configurationRevisions, selectedControllerIds),
       localChannelIds.length
-        ? this.context.dataSource
-            .getRepository(ResourceFlowNode)
-            .createQueryBuilder('node')
-            .leftJoin('node.flow', 'flow')
-            .addSelect(['flow.id', 'flow.name'])
-            .where("node.data ->> 'controllerId' IN (:...controllerIds)", { controllerIds: controllerIdsForQuery })
-            .andWhere("node.data ->> 'channelId' IN (:...channelIds)", { channelIds: localChannelIds })
-            .andWhere('node.type = :type', { type: 'plugin.wago.command' })
-            .take(1001)
-            .getMany()
+        ? this.context.hostData.flows.findNodes({
+            type: 'plugin.wago.command',
+            dataIn: { controllerId: controllerIdsForQuery, channelId: localChannelIds },
+            limit: 1001,
+          })
         : Promise.resolve([]),
     ]);
     const controllersById = new Map(controllers.map((controller) => [controller.id, controller]));
-    const appliedByControllerId = new Map(appliedRevisions.map((revision) => [revision.controllerId, revision]));
+    const appliedByControllerId = new Map(appliedRows.map((revision) => [revision.controllerId, revision]));
     const referencesTruncated = conflictNodes.length > 1000;
-    const conflictNodesByControllerId = new Map<number, ResourceFlowNode[]>();
+    const conflictNodesByControllerId = new Map<number, DiagnosticNode[]>();
     for (const node of conflictNodes.slice(0, 1000)) {
       // This resource's own nodes are already in localNodes; including them again duplicates every reference.
       if (node.resourceId === resourceId) continue;
       const controllerId = node.data.controllerId;
       if (typeof controllerId !== 'number') continue;
       const matchingNodes = conflictNodesByControllerId.get(controllerId) ?? [];
-      matchingNodes.push(node);
+      matchingNodes.push(withFlow(node));
       conflictNodesByControllerId.set(controllerId, matchingNodes);
     }
-    const conflictResourceIds = [
-      ...new Set(
-        [...conflictNodesByControllerId.values()]
-          .flat()
-          .map((n) => n.resourceId)
-          .filter((id): id is number => id != null),
-      ),
-    ];
-    const conflictResources = conflictResourceIds.length
-      ? await this.context.dataSource
-          .getRepository(Resource)
-          .createQueryBuilder('resource')
-          .select(['resource.id', 'resource.name'])
-          .where('resource.id IN (:...ids)', { ids: conflictResourceIds })
-          .getMany()
-      : [];
-    const resourceNames = new Map(conflictResources.map((resource) => [resource.id, resource.name]));
+    // The lookup names the owner of every node, so conflicting resources need no query of their own.
+    const resourceNames = new Map<number, string>();
+    for (const node of conflictNodes) {
+      if (node.resourceId != null && node.resourceName != null) resourceNames.set(node.resourceId, node.resourceName);
+    }
     const flowNames = new Map<number, string>();
     for (const node of conflictNodes) {
-      if (node.flowId != null && node.flow?.name) flowNames.set(node.flowId, node.flow.name);
+      if (node.flowId != null && node.flowName) flowNames.set(node.flowId, node.flowName);
     }
     const controllersResult = selectedControllerIds.map((controllerId) => {
       const controller = controllersById.get(controllerId);

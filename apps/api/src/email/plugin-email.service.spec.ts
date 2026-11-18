@@ -1,6 +1,5 @@
-import { User } from '@attraccess/database-entities';
+import type { NotificationRecipient } from '@attraccess/application-models';
 import { createTransport } from 'nodemailer';
-import { Repository } from 'typeorm';
 import { EmailLayoutService } from '../email-layout/email-layout.service';
 import { EmailTemplateService } from '../email-template/email-template.service';
 import { MjmlService } from '../email-template/mjml.service';
@@ -10,6 +9,7 @@ import { SettingsStoreService } from '../settings/settings-store.service';
 import { SettingsService } from '../settings/settings.service';
 import { PluginEmailService } from './plugin-email.service';
 import { EmailService } from './email.service';
+import { EmailRecipientDirectory } from './email-recipient-directory.port';
 
 jest.mock('nodemailer', () => ({
   createTransport: jest.fn(),
@@ -21,7 +21,7 @@ const LAYOUT_MJML =
   '{{content}}</mj-body></mjml>';
 
 describe('PluginEmailService', () => {
-  const alice = { id: 1, username: 'alice', email: 'alice@example.com' } as User;
+  const alice = { id: 1, username: 'alice', email: 'alice@example.com' } as NotificationRecipient;
 
   const setup = () => {
     const sendMail = jest.fn().mockResolvedValue(undefined);
@@ -37,7 +37,7 @@ describe('PluginEmailService', () => {
       new MjmlService(),
     );
     const metricsService = { emailSentTotal: { inc: jest.fn() } };
-    const userRepository = { findOne: jest.fn() };
+    const recipients = { findById: jest.fn() };
     const service = new PluginEmailService(
       new EmailService(
         settingsService as unknown as SettingsService,
@@ -45,13 +45,13 @@ describe('PluginEmailService', () => {
         layout,
         metricsService as unknown as MetricsService,
         { time: <T>(_target: string, _operation: string, fn: () => Promise<T>) => fn() } as ExternalCallTimer,
-        userRepository as unknown as Repository<User>,
+        recipients as unknown as EmailRecipientDirectory,
       ),
       layout,
       metricsService as unknown as MetricsService,
-      userRepository as unknown as Repository<User>,
+      recipients as unknown as EmailRecipientDirectory,
     );
-    return { service, sendMail, settingsService, metricsService, userRepository };
+    return { service, sendMail, settingsService, metricsService, recipients };
   };
 
   const sentMail = (sendMail: jest.Mock) => sendMail.mock.calls[0][0];
@@ -96,21 +96,29 @@ describe('PluginEmailService', () => {
   });
 
   it('resolves a recipient without an email address by id', async () => {
-    const { service, sendMail, userRepository } = setup();
-    userRepository.findOne.mockResolvedValue(alice);
-    await service.sendPluginEmail({ id: 1 } as User, { subject: 'S', text: 'T' });
+    const { service, sendMail, recipients } = setup();
+    recipients.findById.mockResolvedValue(alice);
+    await service.sendPluginEmail({ id: 1 } as NotificationRecipient, { subject: 'S', text: 'T' });
 
-    expect(userRepository.findOne).toHaveBeenCalledWith({ where: { id: 1 } });
+    expect(recipients.findById).toHaveBeenCalledWith(1);
     expect(sentMail(sendMail).to).toBe('alice@example.com');
   });
 
   it('skips recipients that have no email address or no longer exist', async () => {
-    const { service, sendMail, userRepository, metricsService } = setup();
-    userRepository.findOne.mockResolvedValueOnce({ id: 2, username: 'noaddress', email: null } as unknown as User);
-    userRepository.findOne.mockResolvedValueOnce(null);
+    const { service, sendMail, recipients, metricsService } = setup();
+    recipients.findById.mockResolvedValueOnce({
+      id: 2,
+      username: 'noaddress',
+      email: null,
+    } as unknown as NotificationRecipient);
+    recipients.findById.mockResolvedValueOnce(null);
 
-    await expect(service.sendPluginEmail({ id: 2 } as User, { subject: 'S', text: 'T' })).resolves.toBeUndefined();
-    await expect(service.sendPluginEmail({ id: 3 } as User, { subject: 'S', text: 'T' })).resolves.toBeUndefined();
+    await expect(
+      service.sendPluginEmail({ id: 2 } as NotificationRecipient, { subject: 'S', text: 'T' }),
+    ).resolves.toBeUndefined();
+    await expect(
+      service.sendPluginEmail({ id: 3 } as NotificationRecipient, { subject: 'S', text: 'T' }),
+    ).resolves.toBeUndefined();
 
     expect(sendMail).not.toHaveBeenCalled();
     expect(metricsService.emailSentTotal.inc).not.toHaveBeenCalled();

@@ -1,4 +1,4 @@
-import { MqttServer } from '@attraccess/database-entities';
+import type { MqttServerRecord } from '@attraccess/application-models';
 import * as mqtt from 'mqtt';
 
 export interface MqttConnectionSettings {
@@ -10,7 +10,7 @@ export interface MqttConnectionSettings {
 
 /** Host, TLS and credential handling shared by every connection opened for a configured server. */
 export function buildMqttConnectionSettings(
-  server: MqttServer,
+  server: MqttServerRecord,
   password: string | null,
   overrides: Pick<mqtt.IClientOptions, 'clientId' | 'clean' | 'reconnectPeriod' | 'resubscribe'>,
 ): MqttConnectionSettings {

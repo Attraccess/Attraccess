@@ -6,9 +6,7 @@ import { INSTALLATION_URI_PREFIX, READER_URI_PREFIX, generateKeyPair, uriSanValu
 class MemoryRepository {
   public row: Record<string, unknown> | null = null;
   public saves = 0;
-  public findOneBy = async () => this.row;
-  public findOneByOrFail = async () => this.row as Record<string, unknown>;
-  public create = (value: Record<string, unknown>) => value;
+  public find = async () => this.row;
   public save = async (value: Record<string, unknown>) => {
     this.saves++;
     this.row = value;

@@ -3,7 +3,7 @@ import { TokenHashService } from '../encryption/token-hash.service';
 import { McpOAuthGrant } from '@attraccess/database-entities';
 import { McpOAuthService } from './mcp-oauth.service';
 import { McpRateLimitGuard } from './mcp-rate-limit.guard';
-import { McpTestApp, startMcpTestApp } from './mcp-app.test-fixture';
+import { McpTestApp, startMcpTestApp } from '../test-utils/mcp-app.test-fixture';
 
 const PUBLIC_URL = 'http://localhost:3000';
 const RESOURCE = `${PUBLIC_URL}/api/mcp`;

@@ -3,14 +3,15 @@
 // and locations never. Nothing is deleted; vanished endpoints and clusters get `removed_at`.
 import type { NodeView } from './sidecar-types';
 import { randomUUID } from 'node:crypto';
-import type { EntityManager } from 'typeorm';
-import {
+import type { PluginStorageWhere } from '@attraccess/plugins-backend-sdk';
+import type { MatterTable, MatterTables } from '../plugin-storage/access';
+import type {
+  EndpointRemovalReason,
+  LifecycleState,
   MatterEndpoint,
   MatterEndpointCapability,
   MatterEndpointCluster,
   MatterNode,
-  type EndpointRemovalReason,
-  type LifecycleState,
 } from './entities';
 import { deriveCapabilities, deriveProfile } from './profile';
 
@@ -76,17 +77,13 @@ export const ENDPOINT_PROTOCOL_COLUMNS = [
   'lastSeenAt',
 ] as const satisfies readonly (keyof MatterEndpoint)[];
 
-/** Rows of `entity` whose `column` equals `value` and that are not removed. */
+/** Rows of `table` whose `column` equals `value` and that are not removed. */
 export function findLive<T extends { removedAt: string | null }>(
-  manager: EntityManager,
-  entity: new () => T,
+  table: MatterTable<T>,
   column: keyof T & string,
   value: string,
 ): Promise<T[]> {
-  return manager
-    .createQueryBuilder(entity, 'e')
-    .where(`e.${column} = :value AND e.removedAt IS NULL`, { value })
-    .getMany();
+  return table.find({ where: { [column]: value, removedAt: null } as PluginStorageWhere<T> });
 }
 
 /** The state a detached node returns to when it is attached again: claimed if it ever was, unclaimed otherwise. */
@@ -136,26 +133,21 @@ export function assignChanged<T extends object>(target: T, patch: Partial<T>): P
  * are dropped. The state rows stay, so the state of a retired endpoint can still be read.
  */
 export async function retireEndpoint(
-  manager: EntityManager,
+  tables: MatterTables,
   endpoint: MatterEndpoint,
   reason: EndpointRemovalReason,
   now: string,
 ): Promise<void> {
   endpoint.removedAt = now;
   endpoint.removalReason = reason;
-  await manager.update(MatterEndpoint, { id: endpoint.id }, { removedAt: now, removalReason: reason });
-  await manager
-    .createQueryBuilder()
-    .update(MatterEndpointCluster)
-    .set({ removedAt: now })
-    .where('endpoint_ref = :endpointRef AND removed_at IS NULL', { endpointRef: endpoint.id })
-    .execute();
-  await manager.delete(MatterEndpointCapability, { endpointRef: endpoint.id });
+  await tables.endpoints.update({ id: endpoint.id }, { removedAt: now, removalReason: reason });
+  await tables.endpointClusters.update({ endpointRef: endpoint.id, removedAt: null }, { removedAt: now });
+  await tables.endpointCapabilities.delete({ endpointRef: endpoint.id });
 }
 
 /** Refreshes a node's identity and its endpoint tree from `view`. */
 export async function syncNode(
-  manager: EntityManager,
+  tables: MatterTables,
   node: MatterNode,
   view: NodeView,
   now: string,
@@ -164,17 +156,17 @@ export async function syncNode(
   const changed = assignChanged(node, identityOf(view, node.lastSeenAt));
   if (changed) {
     node.updatedAt = now;
-    await manager.update(MatterNode, { id: node.id }, { ...changed, updatedAt: now });
+    await tables.nodes.update({ id: node.id }, { ...changed, updatedAt: now });
     counters.nodesUpdated += 1;
   }
-  await syncEndpoints(manager, node, view, now, counters);
+  await syncEndpoints(tables, node, view, now, counters);
 }
 
 function endpointPatch(
   view: NodeView['endpoints'][number],
   previous: MatterEndpoint | null,
   seenAt: string,
-): Partial<MatterEndpoint> {
+): Pick<MatterEndpoint, (typeof ENDPOINT_PROTOCOL_COLUMNS)[number]> {
   const clusters = view.clusters.map((cluster) => ({
     clusterId: cluster.clusterId,
     role: cluster.role,
@@ -214,13 +206,13 @@ function uniqueBy<T>(items: readonly T[], key: (item: T) => string | number): T[
 }
 
 async function syncEndpoints(
-  manager: EntityManager,
+  tables: MatterTables,
   node: MatterNode,
   view: NodeView,
   now: string,
   counters: Counters,
 ): Promise<void> {
-  const live = await findLive(manager, MatterEndpoint, 'nodeRef', node.id);
+  const live = await findLive(tables.endpoints, 'nodeRef', node.id);
   const liveById = new Map(live.map((row) => [row.endpointId, row]));
   const seen = new Set<number>();
   // The sidecar's observation time, like the node's `lastSeenAt`: reruns on the same answer change nothing.
@@ -232,12 +224,12 @@ async function syncEndpoints(
     const newUniqueId = endpoint.bridged?.uniqueId ?? null;
     if (row && row.bridgedUniqueId !== null && newUniqueId !== null && row.bridgedUniqueId !== newUniqueId) {
       // Other hardware behind the same endpoint ID: a flow reference must never silently follow it.
-      await retireEndpoint(manager, row, 'replaced', now);
+      await retireEndpoint(tables, row, 'replaced', now);
       counters.endpointsReplaced += 1;
       row = null;
     }
     if (!row) {
-      row = manager.create(MatterEndpoint, {
+      row = {
         id: randomUUID(),
         nodeRef: node.id,
         endpointId: endpoint.endpointId,
@@ -248,34 +240,34 @@ async function syncEndpoints(
         removedAt: null,
         removalReason: null,
         ...endpointPatch(endpoint, null, seenAt ?? now),
-      });
-      await manager.insert(MatterEndpoint, row);
+      };
+      await tables.endpoints.insert(row);
       counters.endpointsAdded += 1;
     } else {
       const changed = assignChanged(row, endpointPatch(endpoint, row, seenAt ?? row.lastSeenAt));
       if (changed) {
-        await manager.update(MatterEndpoint, { id: row.id }, changed);
+        await tables.endpoints.update({ id: row.id }, changed);
         counters.endpointsUpdated += 1;
       }
     }
-    await syncClusters(manager, row, endpoint, now, counters);
+    await syncClusters(tables, row, endpoint, now, counters);
   }
 
   for (const row of live) {
     if (seen.has(row.endpointId) || row.removedAt !== null) continue;
-    await retireEndpoint(manager, row, 'absent_from_sidecar', now);
+    await retireEndpoint(tables, row, 'absent_from_sidecar', now);
     counters.endpointsRemoved += 1;
   }
 }
 
 async function syncClusters(
-  manager: EntityManager,
+  tables: MatterTables,
   endpoint: MatterEndpoint,
   view: NodeView['endpoints'][number],
   now: string,
   counters: Counters,
 ): Promise<void> {
-  const live = await findLive(manager, MatterEndpointCluster, 'endpointRef', endpoint.id);
+  const live = await findLive(tables.endpointClusters, 'endpointRef', endpoint.id);
   const key = (clusterId: number, role: string) => `${clusterId}:${role}`;
   const liveByKey = new Map(live.map((row) => [key(row.clusterId, row.role), row]));
   const clusters = uniqueBy(view.clusters, (cluster) => key(cluster.clusterId, cluster.role));
@@ -285,7 +277,7 @@ async function syncClusters(
   for (const cluster of clusters) {
     const k = key(cluster.clusterId, cluster.role);
     seen.add(k);
-    const patch: Partial<MatterEndpointCluster> = {
+    const patch: Pick<MatterEndpointCluster, 'revision' | 'featureMap' | 'attributeIds' | 'acceptedCommandIds'> = {
       revision: cluster.revision,
       featureMap: cluster.featureMap,
       attributeIds: sorted(cluster.attributeIds),
@@ -293,40 +285,36 @@ async function syncClusters(
     };
     const row = liveByKey.get(k);
     if (!row) {
-      added.push(
-        manager.create(MatterEndpointCluster, {
-          id: randomUUID(),
-          endpointRef: endpoint.id,
-          clusterId: cluster.clusterId,
-          role: cluster.role,
-          removedAt: null,
-          ...patch,
-        }),
-      );
+      added.push({
+        id: randomUUID(),
+        endpointRef: endpoint.id,
+        clusterId: cluster.clusterId,
+        role: cluster.role,
+        removedAt: null,
+        ...patch,
+      });
       counters.clustersChanged += 1;
       continue;
     }
     const changed = assignChanged(row, patch);
     if (changed) {
-      await manager.update(MatterEndpointCluster, { id: row.id }, changed);
+      await tables.endpointClusters.update({ id: row.id }, changed);
       counters.clustersChanged += 1;
     }
   }
-  // In chunks: an endpoint may list up to 128 clusters, and SQLite limits the bound variables per statement.
-  for (let start = 0; start < added.length; start += 50) {
-    await manager.insert(MatterEndpointCluster, added.slice(start, start + 50));
-  }
+  // One insert for all new clusters (an endpoint may list up to 128): the host splits it as its engine requires.
+  if (added.length > 0) await tables.endpointClusters.insertMany(added);
   for (const row of live) {
     if (seen.has(key(row.clusterId, row.role))) continue;
     row.removedAt = now;
-    await manager.update(MatterEndpointCluster, { id: row.id }, { removedAt: now });
+    await tables.endpointClusters.update({ id: row.id }, { removedAt: now });
     counters.clustersChanged += 1;
   }
-  await syncCapabilities(manager, endpoint.id, clusters);
+  await syncCapabilities(tables, endpoint.id, clusters);
 }
 
 async function syncCapabilities(
-  manager: EntityManager,
+  tables: MatterTables,
   endpointRef: string,
   clusters: NodeView['endpoints'][number]['clusters'],
 ): Promise<void> {
@@ -338,32 +326,31 @@ async function syncCapabilities(
     })),
   );
   const existing = new Map(
-    (await manager.findBy(MatterEndpointCapability, { endpointRef })).map((row) => [row.capability, row]),
+    (await tables.endpointCapabilities.find({ where: { endpointRef } })).map((row) => [row.capability, row]),
   );
   const added: MatterEndpointCapability[] = [];
   for (const capability of wanted) {
     const details = JSON.stringify(capability.details);
     const row = existing.get(capability.capability);
     if (!row) {
-      added.push(
-        manager.create(MatterEndpointCapability, {
-          id: randomUUID(),
-          endpointRef,
-          capability: capability.capability,
-          sourceClusterId: capability.sourceClusterId,
-          details,
-        }),
-      );
+      added.push({
+        id: randomUUID(),
+        endpointRef,
+        capability: capability.capability,
+        sourceClusterId: capability.sourceClusterId,
+        details,
+      });
     } else if (row.sourceClusterId !== capability.sourceClusterId || row.details !== details) {
-      await manager.update(
-        MatterEndpointCapability,
+      await tables.endpointCapabilities.update(
         { id: row.id },
         { sourceClusterId: capability.sourceClusterId, details },
       );
     }
     existing.delete(capability.capability);
   }
-  if (added.length > 0) await manager.insert(MatterEndpointCapability, added);
+  if (added.length > 0) await tables.endpointCapabilities.insertMany(added);
   // Capabilities are derived on every sync, so one that no longer follows from the clusters is just dropped.
-  for (const row of existing.values()) await manager.delete(MatterEndpointCapability, { id: row.id });
+  if (existing.size > 0) {
+    await tables.endpointCapabilities.delete({ id: { in: [...existing.values()].map((row) => row.id) } });
+  }
 }

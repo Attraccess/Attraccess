@@ -1,6 +1,6 @@
 import { Body, Controller, ForbiddenException, Get, Param, ParseIntPipe, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ResourceIntroducer } from '@attraccess/database-entities';
+import { ResourceIntroducer, toResourceIntroducerDto } from '../../introducers/dtos/resource-introducer.dto';
 import { ResourceGroupsIntroducersService } from './resourceGroups.introducers.service';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { IsResourceGroupIntroducerResponseDto } from './dtos/isIntroducer.response.dto';
@@ -37,7 +37,7 @@ export class ResourceGroupsIntroducersController {
     ) {
       throw new ForbiddenException('User cannot view the introducers of this resource group');
     }
-    return await this.resourceGroupsIntroducersService.getMany(groupId);
+    return (await this.resourceGroupsIntroducersService.getMany(groupId)).map(toResourceIntroducerDto);
   }
 
   @Get('/:userId/is-introducer')
@@ -89,7 +89,7 @@ export class ResourceGroupsIntroducersController {
     @Param('groupId', ParseIntPipe) groupId: number,
     @Body() body?: GrantIntroducerDto,
   ): Promise<ResourceIntroducer> {
-    return await this.resourceGroupsIntroducersService.grant(groupId, userId, body?.type);
+    return toResourceIntroducerDto(await this.resourceGroupsIntroducersService.grant(groupId, userId, body?.type));
   }
 
   @Post('/:userId/revoke')
@@ -109,6 +109,7 @@ export class ResourceGroupsIntroducersController {
     @Param('groupId', ParseIntPipe) groupId: number,
     @Body() body?: GrantIntroducerDto,
   ): Promise<ResourceIntroducer> {
-    return this.resourceGroupsIntroducersService.revoke(groupId, userId, body?.type);
+    const revoked = await this.resourceGroupsIntroducersService.revoke(groupId, userId, body?.type);
+    return revoked && toResourceIntroducerDto(revoked);
   }
 }

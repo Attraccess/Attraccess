@@ -6,14 +6,15 @@ import { MatterBackupSchedulerService, type SchedulerTiming } from '../backup/sc
 import { MatterFabricService } from '../fabric/fabric.service';
 import { MatterFabricGuard } from '../fabric/guard';
 import { RecoveryKeyService } from '../fabric/recovery-key.service';
+import { storageSchemaReader } from '../fabric/migration-reader';
 import type { PluginMigrationReader } from '../fabric/tokens';
 import type { MatterConnectionService } from '../connection/connection.service';
 import { DeviceAuditService } from '../devices/audit.service';
 import { MatterReconciliationService } from '../devices/reconciliation.service';
-import { createHarness, ADMIN } from './devices-harness.test-utils';
+import { createHarness, ADMIN, nodeRow } from './devices-harness.test-utils';
 import { FakeFabricBackend, FakeFabricConnection } from './fake-fabric.test-utils';
 
-export { ADMIN };
+export { ADMIN, nodeRow };
 
 /** Rollback retries short enough for a test, still several attempts before the outcome counts as unknown. */
 export const TEST_ROLLBACK_TIMING: RollbackTiming = { windowMs: 300, firstRetryMs: 5, maxRetryMs: 40 };
@@ -28,10 +29,8 @@ export async function createFabricHarness(
   const guard = new MatterFabricGuard();
   const audit = new DeviceAuditService(h.context);
   const keys = new RecoveryKeyService(h.context, audit);
-  /** The last applied plugin migration, from the table the test database records them in. */
-  const migrationReader: PluginMigrationReader = async () =>
-    ((await h.dataSource.query('SELECT name FROM migrations ORDER BY timestamp DESC LIMIT 1')) as { name: string }[])[0]
-      ?.name ?? null;
+  /** The identity of the layout the plugin's storage definition ends at. */
+  const migrationReader: PluginMigrationReader = storageSchemaReader();
   const reconciliation = new MatterReconciliationService(h.context, connectionService, audit, guard);
   const backups = new MatterBackupService(h.context, connectionService, keys, audit, guard, migrationReader);
   const fabric = new MatterFabricService(h.context, connectionService, guard, keys, backups, audit, reconciliation);

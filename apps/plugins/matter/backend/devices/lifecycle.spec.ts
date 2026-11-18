@@ -1,6 +1,5 @@
 import { ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { MatterCommand, MatterEndpoint, MatterEndpointCluster, MatterEndpointState, MatterNode } from './entities';
 import { auditSubjectId } from './audit.service';
 import { metadataSchema } from './schemas';
 import {
@@ -13,13 +12,7 @@ import {
   type Harness,
 } from '../testing/devices-harness.test-utils';
 
-const findNode = (h: Harness, nodeId: string, fabricId = '1') =>
-  h.dataSource
-    .getRepository(MatterNode)
-    .createQueryBuilder('n')
-    .innerJoin('plugin_matter_fabrics', 'f', 'f.id = n.fabric_ref')
-    .where('n.nodeId = :nodeId AND f.fabric_id = :fabricId AND n.removedAt IS NULL', { nodeId, fabricId })
-    .getOneOrFail();
+const findNode = (h: Harness, nodeId: string, fabricId = '1') => h.liveNode(nodeId, fabricId);
 
 describe('Matter lifecycle actions', () => {
   let h: Harness;
@@ -92,7 +85,7 @@ describe('Matter lifecycle actions', () => {
     expect(await h.lifecycle.restore(id, ADMIN)).toMatchObject({ lifecycleState: 'detached', archivedAt: null });
     expect(lastAudit()).toMatchObject({ action: 'matter.node_restored' });
     await h.reconcile(inventory('1', [node('5')]));
-    expect(await h.dataSource.getRepository(MatterNode).findOneByOrFail({ id })).toMatchObject({
+    expect(await h.one('nodes', { id })).toMatchObject({
       lifecycleState: 'claimed',
     });
   });
@@ -110,7 +103,7 @@ describe('Matter lifecycle actions', () => {
       detachedReason: 'fabric_mismatch',
     });
     await h.reconcile(inventory('1', [node('5')]));
-    expect((await h.dataSource.getRepository(MatterNode).findOneByOrFail({ id })).lifecycleState).toBe('detached');
+    expect((await h.one('nodes', { id })).lifecycleState).toBe('detached');
   });
 
   it('archives an unclaimed node', async () => {
@@ -128,12 +121,10 @@ describe('Matter lifecycle actions', () => {
       const removed = await h.lifecycle.forceRemove(id, ADMIN);
       expect(removed).toMatchObject({ lifecycleState: 'removed', removalReason: 'force_removed', removedBy: 7 });
       expect(removed.removedAt).not.toBeNull();
-      const endpoints = await h.dataSource.getRepository(MatterEndpoint).find();
+      const endpoints = await h.tables.endpoints.find();
       expect(endpoints).toHaveLength(2);
       expect(endpoints.every((e) => e.removedAt !== null && e.removalReason === 'force_removed')).toBe(true);
-      expect((await h.dataSource.getRepository(MatterEndpointCluster).find()).every((c) => c.removedAt !== null)).toBe(
-        true,
-      );
+      expect((await h.tables.endpointClusters.find()).every((c) => c.removedAt !== null)).toBe(true);
       expect(h.sidecar.requests).toEqual([]);
       expect(lastAudit()).toMatchObject({
         action: 'matter.node_force_removed',
@@ -151,7 +142,7 @@ describe('Matter lifecycle actions', () => {
       const fresh = await findNode(h, '5');
       expect(fresh.id).not.toBe(old.id);
       expect(fresh).toMatchObject({ lifecycleState: 'unclaimed', displayName: null });
-      expect(await h.dataSource.getRepository(MatterNode).count()).toBe(2);
+      expect(await h.tables.nodes.count()).toBe(2);
     });
   });
 
@@ -161,9 +152,7 @@ describe('Matter lifecycle actions', () => {
       const target = await findNode(h, '5');
       await h.lifecycle.claim(target.id, { displayName: 'Press' }, ADMIN);
       await h.lifecycle.updateNode(target.id, { location: 'Hall' }, ADMIN);
-      const targetEndpoint = await h.dataSource
-        .getRepository(MatterEndpoint)
-        .findOneByOrFail({ nodeRef: target.id, endpointId: 1 });
+      const targetEndpoint = await h.one('endpoints', { nodeRef: target.id, endpointId: 1 });
       await h.lifecycle.updateEndpoint(targetEndpoint.id, { displayName: 'Socket' }, ADMIN);
       await h.reconcile(inventory('1', []));
       return { target, targetEndpoint };
@@ -181,9 +170,7 @@ describe('Matter lifecycle actions', () => {
         ]),
       );
       const source = await findNode(h, '9');
-      const sourceEndpoint = await h.dataSource
-        .getRepository(MatterEndpoint)
-        .findOneByOrFail({ nodeRef: source.id, endpointId: 1 });
+      const sourceEndpoint = await h.one('endpoints', { nodeRef: source.id, endpointId: 1 });
       await h.state.ingestReport(
         {
           nodeId: '9',
@@ -209,12 +196,12 @@ describe('Matter lifecycle actions', () => {
         displayName: 'Press',
         location: 'Hall',
       });
-      expect(await h.dataSource.getRepository(MatterNode).findOneByOrFail({ id: source.id })).toMatchObject({
+      expect(await h.one('nodes', { id: source.id })).toMatchObject({
         lifecycleState: 'removed',
         removalReason: 'merged',
         mergedInto: target.id,
       });
-      const endpoints = await h.dataSource.getRepository(MatterEndpoint).find();
+      const endpoints = await h.tables.endpoints.find({ where: { removedAt: null as never } });
       const liveEndpoints = endpoints.filter((e) => e.removedAt === null);
       expect(
         liveEndpoints
@@ -224,15 +211,13 @@ describe('Matter lifecycle actions', () => {
       ).toEqual([0, 1, 2]);
       const kept = liveEndpoints.find((e) => e.nodeRef === target.id && e.endpointId === 1);
       expect(kept).toMatchObject({ id: targetEndpoint.id, displayName: 'Socket' });
-      expect(await h.dataSource.getRepository(MatterEndpoint).findOneByOrFail({ id: sourceEndpoint.id })).toMatchObject(
-        {
-          removalReason: 'merged',
-        },
-      );
-      const states = await h.dataSource.getRepository(MatterEndpointState).find();
+      expect(await h.one('endpoints', { id: sourceEndpoint.id })).toMatchObject({
+        removalReason: 'merged',
+      });
+      const states = await h.tables.endpointState.find();
       expect(states).toHaveLength(1);
       expect(states[0]).toMatchObject({ endpointRef: targetEndpoint.id, reportedValue: 'true' });
-      const clusters = (await h.dataSource.getRepository(MatterEndpointCluster).find()).filter(
+      const clusters = (await h.tables.endpointClusters.find()).filter(
         (c) => c.endpointRef === targetEndpoint.id && c.removedAt === null,
       );
       expect(clusters.map((c) => c.clusterId).sort()).toEqual([6, 8]);
@@ -262,9 +247,7 @@ describe('Matter lifecycle actions', () => {
       await expect(h.lifecycle.relink(target.id, { sourceNodeId: source.id }, ADMIN)).rejects.toThrow(
         /productId, serialNumber/,
       );
-      expect((await h.dataSource.getRepository(MatterNode).findOneByOrFail({ id: source.id })).lifecycleState).toBe(
-        'unclaimed',
-      );
+      expect((await h.one('nodes', { id: source.id })).lifecycleState).toBe('unclaimed');
       await h.lifecycle.relink(target.id, { sourceNodeId: source.id, confirmIdentityMismatch: true }, ADMIN);
       expect(lastAudit()).toMatchObject({ details: { identityMismatchConfirmed: true } });
     });
@@ -288,9 +271,7 @@ describe('Matter lifecycle actions', () => {
     it('leaves a never-claimed target unclaimed, and keeps the state of the endpoints it retires', async () => {
       await h.reconcile(inventory('1', [node('5', { endpoints: [endpoint(1, [0x0006]), endpoint(2, [0x0006])] })]));
       const target = await findNode(h, '5');
-      const retiring = await h.dataSource
-        .getRepository(MatterEndpoint)
-        .findOneByOrFail({ nodeRef: target.id, endpointId: 2 });
+      const retiring = await h.one('endpoints', { nodeRef: target.id, endpointId: 2 });
       await h.state.ingestReport(
         {
           nodeId: '5',
@@ -310,7 +291,7 @@ describe('Matter lifecycle actions', () => {
       const source = await findNode(h, '9');
       const relinked = await h.lifecycle.relink(target.id, { sourceNodeId: source.id }, ADMIN);
       expect(relinked).toMatchObject({ lifecycleState: 'unclaimed', claimedAt: null, claimedBy: null });
-      expect(await h.dataSource.getRepository(MatterEndpoint).findOneByOrFail({ id: retiring.id })).toMatchObject({
+      expect(await h.one('endpoints', { id: retiring.id })).toMatchObject({
         removalReason: 'absent_from_sidecar',
       });
       expect(await h.state.read(retiring.id)).toHaveLength(1);
@@ -333,7 +314,7 @@ describe('Matter lifecycle actions', () => {
       await h.reconcile(inventory('1', [node('9', { endpoints: [bridged('B')] })]));
       const source = await findNode(h, '9');
       await h.lifecycle.relink(target.id, { sourceNodeId: source.id, confirmIdentityMismatch: true }, ADMIN);
-      const rows = await h.dataSource.getRepository(MatterEndpoint).find();
+      const rows = await h.tables.endpoints.find();
       const liveRows = rows.filter((row) => row.removedAt === null);
       expect(liveRows).toHaveLength(1);
       expect(liveRows[0]).toMatchObject({ nodeRef: target.id, bridgedUniqueId: 'B' });
@@ -352,7 +333,7 @@ describe('Matter lifecycle actions', () => {
       const repaired = await h.lifecycle.repair(id, ADMIN);
       expect(repaired).toMatchObject({ lifecycleState: 'unclaimed', detachedReason: null, softwareVersion: 9 });
       expect(lastAudit()).toMatchObject({ action: 'matter.node_repaired', details: { reattached: true } });
-      const profiles = (await h.dataSource.getRepository(MatterEndpoint).find()).filter((e) => e.removedAt === null);
+      const profiles = (await h.tables.endpoints.find()).filter((e) => e.removedAt === null);
       expect(profiles.map((e) => [e.endpointId, e.profile])).toEqual([[1, 'contact_sensor']]);
     });
 
@@ -376,7 +357,7 @@ describe('Matter lifecycle actions', () => {
       await expect(h.lifecycle.repair(id, ADMIN)).rejects.toThrow(/Run a reconciliation first/);
       expect(await h.rows('plugin_matter_nodes')).toEqual(before);
       await h.reconcile(inventory('1', [node('5')]));
-      expect((await h.dataSource.getRepository(MatterNode).findOneByOrFail({ id })).lifecycleState).toBe('unclaimed');
+      expect((await h.one('nodes', { id })).lifecycleState).toBe('unclaimed');
     });
 
     it('changes nothing when the sidecar cannot answer, or runs another fabric, or does not list the node', async () => {
@@ -426,9 +407,7 @@ describe('Matter lifecycle actions', () => {
       await h.lifecycle.updateNode(original.id, { displayName: 'Press' }, ADMIN);
       expect(h.audit).not.toHaveBeenCalled();
 
-      const target = await h.dataSource
-        .getRepository(MatterEndpoint)
-        .findOneByOrFail({ nodeRef: original.id, endpointId: 1 });
+      const target = await h.one('endpoints', { nodeRef: original.id, endpointId: 1 });
       const patched = await h.lifecycle.updateEndpoint(target.id, { location: 'Bench' }, ADMIN);
       expect(patched).toMatchObject({
         location: 'Bench',
@@ -457,6 +436,6 @@ describe('Matter lifecycle actions', () => {
     expect(detail.endpoints[1].capabilities.map((c) => c.capability).sort()).toEqual(['levelControl', 'onOff']);
     expect(detail.endpoints[1].clusters.map((c) => c.clusterId).sort()).toEqual([6, 8]);
     expect(detail.fabric?.fabricId).toBe('1');
-    expect(await h.dataSource.getRepository(MatterCommand).count()).toBe(0);
+    expect(await h.tables.commands.count()).toBe(0);
   });
 });

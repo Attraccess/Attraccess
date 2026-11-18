@@ -3,13 +3,14 @@ import * as os from 'os';
 import * as path from 'path';
 import { ExecutionContext, INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import type { DataSource } from 'typeorm';
 import { CsvExportTemplate } from '@attraccess/database-entities';
 import { DualAuthGuard, EffectivePermissionsGuard } from '@attraccess/plugins-backend-sdk';
 import { CsvExportTemplatesController } from '../analytics/csv-export-templates.controller';
 import { CsvExportTemplatesService } from '../analytics/csv-export-templates.service';
+import { CSV_EXPORT_TEMPLATE_STORE } from '../analytics/csv-export-template-store.port';
+import { TypeOrmCsvExportTemplateStore } from '../database/adapters/analytics/typeorm-csv-export-template-store';
 
 jest.setTimeout(120_000);
 
@@ -39,7 +40,10 @@ describe('CSV export templates API (e2e)', () => {
       controllers: [CsvExportTemplatesController],
       providers: [
         CsvExportTemplatesService,
-        { provide: getRepositoryToken(CsvExportTemplate), useValue: dataSource.getRepository(CsvExportTemplate) },
+        {
+          provide: CSV_EXPORT_TEMPLATE_STORE,
+          useValue: new TypeOrmCsvExportTemplateStore(dataSource.getRepository(CsvExportTemplate)),
+        },
         DualAuthGuard,
         EffectivePermissionsGuard,
       ],

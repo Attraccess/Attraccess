@@ -1,6 +1,12 @@
 import { Injectable, Logger, Inject, OnModuleInit } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Session, SsoSessionContext, User } from '@attraccess/database-entities';
+import type {
+  AuthenticatedSessionUser,
+  SessionStats,
+  SsoLogoutReceipt,
+  SsoSessionContext,
+  UserSessionSummary,
+} from '@attraccess/application-models';
 import { randomBytes } from 'crypto';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
@@ -13,6 +19,9 @@ import { isValkeyUnavailableError } from '../../valkey/valkey-unavailable';
 import { SsoSessionSelector } from './session-store/sso-session-selector';
 
 export type { SessionMetadata } from './session-store/session-store';
+
+/** The part of an account a session is created for. */
+export type SessionOwner = Pick<AuthenticatedSessionUser, 'id' | 'username'>;
 
 const DEFAULT_EXPIRATION_HOURS = 24;
 const MAX_EXPIRATION_HOURS = 168; // 7 days
@@ -45,7 +54,7 @@ export class SessionService implements OnModuleInit {
     );
   }
 
-  async createSession(user: User, metadata?: SessionMetadata): Promise<string> {
+  async createSession(user: SessionOwner, metadata?: SessionMetadata): Promise<string> {
     const token = this.generateSessionToken();
     const hashedToken = this.tokenHashService.hashToken(token);
     const expiresIn = Math.min(metadata?.expiresIn || DEFAULT_EXPIRATION_HOURS * 3600, MAX_EXPIRATION_HOURS * 3600);
@@ -57,7 +66,7 @@ export class SessionService implements OnModuleInit {
     return token;
   }
 
-  async validateSession(token: string): Promise<User | null> {
+  async validateSession(token: string): Promise<AuthenticatedSessionUser | null> {
     if (!token) return null;
     return this.store.validateSession(token);
   }
@@ -102,7 +111,7 @@ export class SessionService implements OnModuleInit {
 
   /** Starts the session of an SSO sign-in; a sign-in through a provider is audited as `sso_login`. */
   async createSsoSession(
-    user: User,
+    user: SessionOwner,
     metadata: SessionMetadata,
     origin: AuditOrigin,
     providerId?: number,
@@ -137,10 +146,7 @@ export class SessionService implements OnModuleInit {
     return this.store.compareAndSetSsoContext(id, expected, next);
   }
 
-  async revokeSsoSessionsOnce(
-    selector: SsoSessionSelector,
-    receipt: { key: string; expiresAt: number; requireMatch?: boolean },
-  ): Promise<boolean> {
+  async revokeSsoSessionsOnce(selector: SsoSessionSelector, receipt: SsoLogoutReceipt): Promise<boolean> {
     const result = await this.store.revokeSsoSessionsOnce(selector, receipt);
     if (result.count) this.metricsService.authActiveSessions.dec(result.count);
     return result.fresh;
@@ -152,11 +158,11 @@ export class SessionService implements OnModuleInit {
     return count;
   }
 
-  async getUserSessions(userId: number): Promise<Session[]> {
+  async getUserSessions(userId: number): Promise<UserSessionSummary[]> {
     return this.store.getUserSessions(userId);
   }
 
-  async getSessionStats(): Promise<{ totalActiveSessions: number; expiredSessions: number }> {
+  async getSessionStats(): Promise<SessionStats> {
     return this.store.getStats();
   }
 

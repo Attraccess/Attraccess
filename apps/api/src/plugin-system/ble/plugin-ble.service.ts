@@ -1,4 +1,4 @@
-import { Attractap, PluginBleEndpointEntity } from '@attraccess/database-entities';
+import type { PluginBleEndpointRecord, PluginBleReaderAccess } from '@attraccess/application-models';
 import {
   matchesBleAdvertisement,
   normalizeBleAdvertisement,
@@ -27,7 +27,7 @@ import { Inject, Injectable, Logger, LoggerService, OnModuleDestroy, Optional } 
 import { ModuleRef } from '@nestjs/core';
 import { OnEvent } from '@nestjs/event-emitter';
 import { randomUUID } from 'crypto';
-import { DataSource } from 'typeorm';
+import { classifyPersistenceError, isUniqueViolation } from '../../database/persistence-errors';
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../../attractap/events';
 import { bleStreamOutcome, type PluginBleMetrics } from '../../metrics/definitions/plugin-ble.metrics';
 import { PLUGIN_BLE_METRICS } from '../../metrics/definitions/tokens';
@@ -38,6 +38,7 @@ import {
   type BleTransportDriver,
 } from './ble-transport-driver';
 import { getPluginBleProfile } from './plugin-ble-profile-registry';
+import { PLUGIN_BLE_STORE, type PluginBleStore } from './plugin-ble-store.port';
 
 /** Who is calling: the plugin's stable manifest id and its scoped logger. */
 export interface PluginBleCaller {
@@ -77,7 +78,7 @@ const realClock: BleSessionClock = {
   },
 };
 
-function toEndpoint(row: PluginBleEndpointEntity): PluginBleEndpoint {
+function toEndpoint(row: PluginBleEndpointRecord): PluginBleEndpoint {
   return {
     id: row.id,
     readerId: row.readerId,
@@ -90,15 +91,7 @@ function toEndpoint(row: PluginBleEndpointEntity): PluginBleEndpoint {
   };
 }
 
-function isUniqueViolation(error: unknown): boolean {
-  const text = `${(error as { code?: string })?.code ?? ''} ${(error as Error)?.message ?? ''}`;
-  return /UNIQUE constraint failed|SQLITE_CONSTRAINT_UNIQUE/i.test(text);
-}
-
-function isForeignKeyViolation(error: unknown): boolean {
-  const text = `${(error as { code?: string })?.code ?? ''} ${(error as Error)?.message ?? ''}`;
-  return /FOREIGN KEY constraint failed|SQLITE_CONSTRAINT_FOREIGNKEY/i.test(text);
-}
+const isForeignKeyViolation = (error: unknown): boolean => classifyPersistenceError(error) === 'foreign-key-violation';
 
 /**
  * Host side of `context.ble`: persisted endpoints, reader opt-in, ownership, profile enforcement and the session
@@ -115,7 +108,7 @@ export class PluginBleService implements OnModuleDestroy {
   public clock: BleSessionClock = realClock;
 
   constructor(
-    private readonly dataSource: DataSource,
+    @Inject(PLUGIN_BLE_STORE) private readonly store: PluginBleStore,
     private readonly moduleRef: ModuleRef,
     @Optional() @Inject(PLUGIN_BLE_METRICS) private readonly metrics?: PluginBleMetrics,
   ) {}
@@ -133,7 +126,7 @@ export class PluginBleService implements OnModuleDestroy {
 
   /** Plugin uninstall: closes sessions and deletes every endpoint the plugin owns. */
   async deleteAllForPlugin(pluginId: string): Promise<void> {
-    await this.serializeEndpointWrite(() => this.endpoints().delete({ pluginId }));
+    await this.serializeEndpointWrite(() => this.store.deleteEndpointsOfPlugin(pluginId));
     await this.closeWhere((scope) => scope.pluginId === pluginId, 'endpoint-deleted');
   }
 
@@ -165,9 +158,7 @@ export class PluginBleService implements OnModuleDestroy {
 
   async listReaders(): Promise<PluginBleReader[]> {
     const driver = this.driver();
-    const readers = await this.dataSource
-      .getRepository(Attractap)
-      .find({ where: { allowPluginBle: true }, select: { id: true, name: true }, order: { id: 'ASC' } });
+    const readers = await this.store.listOpenReaders();
     return Promise.all(
       readers.map(async (reader) => ({
         readerId: reader.id,
@@ -281,9 +272,11 @@ export class PluginBleService implements OnModuleDestroy {
     await this.requireReader(normalized.readerId);
     const row = await this.serializeEndpointWrite(async () => {
       await this.assertNoConflict(caller.pluginId, normalized.readerId, normalized.address);
-      return this.saveEndpoint(this.endpoints().create({ id: randomUUID(), pluginId: caller.pluginId, ...normalized }));
+      return this.writeEndpoint(normalized.readerId, () =>
+        this.store.createEndpoint({ id: randomUUID(), pluginId: caller.pluginId, ...normalized }),
+      );
     });
-    return toEndpoint((await this.endpoints().findOneBy({ id: row.id })) ?? row);
+    return toEndpoint(row);
   }
 
   async getEndpoint(caller: PluginBleCaller, id: string): Promise<PluginBleEndpoint> {
@@ -291,10 +284,7 @@ export class PluginBleService implements OnModuleDestroy {
   }
 
   async listEndpoints(caller: PluginBleCaller): Promise<PluginBleEndpoint[]> {
-    const rows = await this.endpoints().find({
-      where: { pluginId: caller.pluginId },
-      order: { createdAt: 'ASC', id: 'ASC' },
-    });
+    const rows = await this.store.listEndpoints(caller.pluginId);
     return rows.map(toEndpoint);
   }
 
@@ -315,18 +305,20 @@ export class PluginBleService implements OnModuleDestroy {
         readerId !== current.readerId ||
         address !== current.address ||
         (changes.addressType ?? current.addressType) !== current.addressType;
-      Object.assign(current, changes);
-      return { row: await this.saveEndpoint(current), moved: hasMoved };
+      const saved = await this.writeEndpoint(readerId, () => this.store.updateEndpoint(current.id, changes));
+      // Deleted between the ownership check and the write: the endpoint is gone.
+      if (!saved) throw this.endpointNotFound();
+      return { row: saved, moved: hasMoved };
     });
     // Saved first: an open that read the old row is still pending and gets revoked here, a later one sees the new row.
     if (moved) await this.closeWhere((scope) => scope.endpointId === row.id, 'endpoint-deleted');
-    return toEndpoint((await this.endpoints().findOneBy({ id: row.id })) ?? row);
+    return toEndpoint(row);
   }
 
   async deleteEndpoint(caller: PluginBleCaller, id: string): Promise<void> {
     const row = await this.findOwned(caller.pluginId, id);
     // Serialized with updates, so a concurrent update cannot re-insert the row it read before the delete.
-    await this.serializeEndpointWrite(() => this.endpoints().delete({ id: row.id }));
+    await this.serializeEndpointWrite(() => this.store.deleteEndpoint(row.id));
     await this.closeWhere((scope) => scope.endpointId === row.id, 'endpoint-deleted');
   }
 
@@ -429,10 +421,6 @@ export class PluginBleService implements OnModuleDestroy {
 
   // ------------------------------------------------------------- helpers
 
-  private endpoints() {
-    return this.dataSource.getRepository(PluginBleEndpointEntity);
-  }
-
   private driver(): BleTransportDriver | undefined {
     try {
       return this.moduleRef.get<BleTransportDriver>(BLE_TRANSPORT_DRIVER, { strict: false }) ?? undefined;
@@ -501,17 +489,21 @@ export class PluginBleService implements OnModuleDestroy {
     return result;
   }
 
-  private async saveEndpoint(row: PluginBleEndpointEntity): Promise<PluginBleEndpointEntity> {
+  private async writeEndpoint<T>(readerId: number, write: () => Promise<T>): Promise<T> {
     try {
-      return await this.endpoints().save(row);
+      return await write();
     } catch (error) {
       if (isUniqueViolation(error)) throw this.conflict();
       // The reader was deleted between the reader check and the write.
       if (isForeignKeyViolation(error)) {
-        throw new PluginBleError('READER_NOT_FOUND', `Reader ${row.readerId} does not exist`, { detail: 'readerId' });
+        throw new PluginBleError('READER_NOT_FOUND', `Reader ${readerId} does not exist`, { detail: 'readerId' });
       }
       throw error;
     }
+  }
+
+  private endpointNotFound(): PluginBleError {
+    return new PluginBleError('ENDPOINT_NOT_FOUND', 'Endpoint not found', { detail: 'endpointId' });
   }
 
   private async requireAvailableDriver(readerId: number): Promise<BleTransportDriver> {
@@ -541,10 +533,8 @@ export class PluginBleService implements OnModuleDestroy {
     return profile;
   }
 
-  private findReader(readerId: number): Promise<Pick<Attractap, 'id' | 'allowPluginBle'> | null> {
-    return this.dataSource
-      .getRepository(Attractap)
-      .findOne({ where: { id: readerId }, select: { id: true, allowPluginBle: true } });
+  private findReader(readerId: number): Promise<PluginBleReaderAccess | null> {
+    return this.store.findReader(readerId);
   }
 
   private async requireReader(readerId: number): Promise<void> {
@@ -559,9 +549,9 @@ export class PluginBleService implements OnModuleDestroy {
   }
 
   /** Another plugin's endpoint is indistinguishable from a missing one. */
-  private async findOwned(pluginId: string, id: unknown): Promise<PluginBleEndpointEntity> {
-    const row = await this.endpoints().findOneBy({ id: validateBleEndpointId(id), pluginId });
-    if (!row) throw new PluginBleError('ENDPOINT_NOT_FOUND', 'Endpoint not found', { detail: 'endpointId' });
+  private async findOwned(pluginId: string, id: unknown): Promise<PluginBleEndpointRecord> {
+    const row = await this.store.findEndpoint(pluginId, validateBleEndpointId(id));
+    if (!row) throw this.endpointNotFound();
     return row;
   }
 
@@ -576,10 +566,7 @@ export class PluginBleService implements OnModuleDestroy {
     address: string,
     ignoreId?: string,
   ): Promise<void> {
-    const rows = await this.endpoints().find({
-      where: { address },
-      select: { id: true, pluginId: true, readerId: true },
-    });
+    const rows = await this.store.listEndpointsAtAddress(address);
     for (const other of rows) {
       if (other.id === ignoreId) continue;
       if (other.pluginId !== pluginId || other.readerId === readerId) throw this.conflict();

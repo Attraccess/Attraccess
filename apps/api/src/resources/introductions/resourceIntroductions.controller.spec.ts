@@ -62,8 +62,23 @@ describe('ResourceIntroductionsController', () => {
   it.each(['grant', 'revoke'] as const)('delegates the authenticated user on introduction %s', async (action) => {
     const data = { comment: 'Approved' };
     const req = { user: { id: 9 } } as AuthenticatedRequest;
+    const history = {
+      id: 5,
+      introductionId: 10,
+      action: 'grant',
+      performedByUserId: 9,
+      comment: 'Approved',
+      createdAt: new Date(),
+    };
+    resourceIntroductionsService[action].mockResolvedValue({ ...history, performedByUser: { id: 9, email: 'x@y.z' } });
 
-    await controller[action](7, 3, data, req);
+    const response = await controller[action](7, 3, data, req);
+
+    // Only the documented response fields leave the controller.
+    expect(response).toEqual({
+      ...history,
+      performedByUser: expect.not.objectContaining({ email: expect.anything() }),
+    });
 
     expect(resourceIntroductionsService[action]).toHaveBeenCalledWith(7, 3, data, {
       performedByUserId: 9,

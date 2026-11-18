@@ -2,7 +2,7 @@ import { auditCommissioning, commissioningPrincipal, CommissioningPrincipal } fr
 
 import { ConflictException, NotFoundException } from '@nestjs/common';
 
-import { WagoController } from '../../controllers/entity';
+import { openWagoStorage } from '../../storage';
 
 import { type CommissioningOperationGuard } from '../../runtime/operation-guard';
 
@@ -18,16 +18,18 @@ export abstract class WagoCommissioningOwnership extends WagoCommissioningRecove
     enrollmentId: number | null;
   }): Promise<void> {
     if (!controller.mqttServerId || !controller.enrollmentId) return;
-    const session = await this.sessions.findOneBy({
-      hardwareId: controller.hardwareId,
-      mqttServerId: controller.mqttServerId,
-      enrollmentId: controller.enrollmentId,
+    const session = await this.sessions.findOne({
+      where: {
+        hardwareId: controller.hardwareId,
+        mqttServerId: controller.mqttServerId,
+        enrollmentId: controller.enrollmentId,
+      },
     });
     if (!session) return;
 
     await this.withControllerLock(session.id, () =>
       this.withDeliveryLock(session.id, async () => {
-        const current = await this.sessions.findOneBy({ id: session.id });
+        const current = await this.sessions.get(session.id);
         if (
           !current ||
           current.state !== 'awaiting_discovery' ||
@@ -103,9 +105,12 @@ export abstract class WagoCommissioningOwnership extends WagoCommissioningRecove
     id: number,
     remove: (assertOwned: () => Promise<void>) => Promise<string>,
   ): Promise<void> {
-    const controller = await this.context.getRepository(WagoController).findOneBy({ id });
+    const controller = await openWagoStorage(this.context).controllers.get(id);
     if (!controller) throw new NotFoundException('controller not found');
-    const sessions = await this.sessions.find({ where: { hardwareId: controller.hardwareId }, order: { id: 'DESC' } });
+    const sessions = await this.sessions.find({
+      where: { hardwareId: controller.hardwareId },
+      orderBy: [{ field: 'id', direction: 'desc' }],
+    });
     if (!sessions.length) {
       await remove(async () => undefined);
       return;
@@ -120,7 +125,7 @@ export abstract class WagoCommissioningOwnership extends WagoCommissioningRecove
       await this.managedRuntime?.retire(id);
       for (const candidate of await this.sessions.find({ where: { hardwareId } })) {
         await this.withDeliveryLock(candidate.id, async () => {
-          const session = await this.sessions.findOneBy({ id: candidate.id });
+          const session = await this.sessions.get(candidate.id);
           if (!session) return;
           await this.revokeSessionEnrollment(session);
           if (session.managementControllerId) {
@@ -142,7 +147,7 @@ export abstract class WagoCommissioningOwnership extends WagoCommissioningRecove
             await this.save(session, 'controller_removed_recovery_retained');
           } else {
             await assertOwned();
-            await this.sessions.delete(session.id);
+            await this.sessions.delete({ id: session.id });
           }
         });
       }
@@ -154,9 +159,12 @@ export abstract class WagoCommissioningOwnership extends WagoCommissioningRecove
     operation: (assertOwned: () => Promise<void>, guard: CommissioningOperationGuard) => Promise<T>,
     requireCommissioningSession = false,
   ): Promise<T> {
-    const controller = await this.context.getRepository(WagoController).findOneBy({ id });
+    const controller = await openWagoStorage(this.context).controllers.get(id);
     if (!controller) throw new NotFoundException('controller not found');
-    const sessions = await this.sessions.find({ where: { hardwareId: controller.hardwareId }, order: { id: 'DESC' } });
+    const sessions = await this.sessions.find({
+      where: { hardwareId: controller.hardwareId },
+      orderBy: [{ field: 'id', direction: 'desc' }],
+    });
     if (!sessions.length) {
       if (requireCommissioningSession)
         throw new ConflictException('A commissioning session must remain pinned while rotating credentials.');
@@ -190,7 +198,7 @@ export abstract class WagoCommissioningOwnership extends WagoCommissioningRecove
   async remove(id: number): Promise<void> {
     await this.withControllerLock(id, () =>
       this.withDeliveryLock(id, async () => {
-        const session = await this.sessions.findOneBy({ id });
+        const session = await this.sessions.get(id);
         if (!session) throw new NotFoundException('commissioning session not found');
         if (session.deliveryToken)
           throw new ConflictException('Clean up the retained runtime installation before deleting this session.');
@@ -214,7 +222,7 @@ export abstract class WagoCommissioningOwnership extends WagoCommissioningRecove
           }
         }
         await this.operationContext.getStore()?.assertOwned();
-        await this.sessions.delete(id);
+        await this.sessions.delete({ id: id });
       }),
     );
   }
@@ -222,7 +230,7 @@ export abstract class WagoCommissioningOwnership extends WagoCommissioningRecove
   async revoke(id: number): Promise<CommissioningSessionResponse> {
     return this.withControllerLock(id, () =>
       this.withDeliveryLock(id, async () => {
-        const session = await this.sessions.findOneBy({ id });
+        const session = await this.sessions.get(id);
         if (!session) throw new NotFoundException('commissioning session not found');
         await this.revokeSessionEnrollment(session);
         session.state = 'revoked';

@@ -2,9 +2,9 @@ import { WagoCommissioningSession } from './session.entity';
 
 import { CommissioningSessionResponse } from '../model';
 
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 
-import { WagoController } from '../../controllers/entity';
+import { openWagoStorage } from '../../storage';
 
 import { VERIFIER_PREFIX } from '../model';
 
@@ -51,7 +51,12 @@ export abstract class WagoCommissioningProgress extends WagoCommissioningTranspo
 
   protected async retireSupersededSessions(hardwareId: string, completedSessionId: number): Promise<void> {
     for (let skip = 0; ; skip += 100) {
-      const sessions = await this.sessions.find({ where: { hardwareId }, order: { id: 'ASC' }, take: 100, skip });
+      const sessions = await this.sessions.find({
+        where: { hardwareId },
+        orderBy: [{ field: 'id' }],
+        limit: 100,
+        offset: skip,
+      });
       await Promise.all(
         sessions
           .filter(
@@ -60,7 +65,7 @@ export abstract class WagoCommissioningProgress extends WagoCommissioningTranspo
           )
           .map((session) =>
             this.withDeliveryLock(session.id, async () => {
-              const current = await this.sessions.findOneBy({ id: session.id });
+              const current = await this.sessions.get(session.id);
               if (!current || current.state === 'completed' || current.state === 'revoked') return;
               await this.revokeSessionEnrollment(current);
               current.state = 'revoked';
@@ -78,7 +83,12 @@ export abstract class WagoCommissioningProgress extends WagoCommissioningTranspo
 
   protected async reconcileCompletedSessions(): Promise<void> {
     for (let skip = 0; ; skip += 100) {
-      const page = await this.sessions.find({ where: { state: 'completed' }, order: { id: 'ASC' }, take: 100, skip });
+      const page = await this.sessions.find({
+        where: { state: 'completed' },
+        orderBy: [{ field: 'id' }],
+        limit: 100,
+        offset: skip,
+      });
       for (const session of page) {
         if (session.state === 'completed')
           await this.withControllerLock(session.id, () =>
@@ -93,7 +103,7 @@ export abstract class WagoCommissioningProgress extends WagoCommissioningTranspo
     let recoveryFailed = false;
     // Page the entire stable ID ordering: changing states must not skip rows.
     for (let skip = 0; ; skip += 100) {
-      const page = await this.sessions.find({ order: { id: 'ASC' }, take: 100, skip });
+      const page = await this.sessions.find({ orderBy: [{ field: 'id' }], limit: 100, offset: skip });
       for (const candidate of page) {
         // An enrolled session needs no startup mutation. A background managed
         // check can legitimately hold its lease; do not disable discovery for it.
@@ -105,7 +115,7 @@ export abstract class WagoCommissioningProgress extends WagoCommissioningTranspo
           continue;
         try {
           await this.withControllerLock(candidate.id, async () => {
-            const session = await this.sessions.findOneBy({ id: candidate.id });
+            const session = await this.sessions.get(candidate.id);
             if (!session || session.state === 'recovery_revocation_pending') return;
             if (
               session.dockerProvisionToken &&
@@ -135,10 +145,12 @@ export abstract class WagoCommissioningProgress extends WagoCommissioningTranspo
               const controller =
                 session.enrollmentId === null
                   ? null
-                  : await this.context.getRepository(WagoController).findOneBy({
-                      hardwareId: session.hardwareId,
-                      mqttServerId: session.mqttServerId,
-                      enrollmentId: session.enrollmentId,
+                  : await openWagoStorage(this.context).controllers.findOne({
+                      where: {
+                        hardwareId: session.hardwareId,
+                        mqttServerId: session.mqttServerId,
+                        enrollmentId: session.enrollmentId,
+                      },
                     });
               // A persisted claim may already have reached the device. Do not reinstall
               // or rotate its permanent identity merely because the API restarted.
@@ -234,7 +246,7 @@ export abstract class WagoCommissioningProgress extends WagoCommissioningTranspo
     const write = (this.transferWrites.get(session.id) ?? Promise.resolve())
       .then(async () => {
         await this.operationContext.getStore()?.assertOwned();
-        await this.sessions.update(session.id, update);
+        await this.sessions.update({ id: session.id }, update);
       })
       .catch(() => this.context.logger?.warn('Could not update WAGO controller preparation progress.'));
     this.transferWrites.set(session.id, write);
@@ -257,7 +269,7 @@ export abstract class WagoCommissioningProgress extends WagoCommissioningTranspo
     const write = (this.transferWrites.get(session.id) ?? Promise.resolve())
       .then(async () => {
         await this.operationContext.getStore()?.assertOwned();
-        await this.sessions.update(session.id, update);
+        await this.sessions.update({ id: session.id }, update);
       })
       .catch(() => this.context.logger?.warn('Could not update WAGO runtime transfer progress.'));
     this.transferWrites.set(session.id, write);
@@ -284,6 +296,13 @@ export abstract class WagoCommissioningProgress extends WagoCommissioningTranspo
     audit.push({ at: new Date().toISOString(), event });
     session.auditLog = JSON.stringify(audit.slice(-50));
     session.updatedAt = new Date().toISOString();
-    return this.sessions.save(session);
+    return this.persist(session);
+  }
+
+  /** Writes the whole session row. A removed session is never brought back. */
+  protected async persist(session: WagoCommissioningSession): Promise<WagoCommissioningSession> {
+    const { id, ...patch } = session;
+    if (!(await this.sessions.update({ id }, patch))) throw new NotFoundException('commissioning session not found');
+    return session;
   }
 }

@@ -23,7 +23,7 @@ export const simulatedPlatform = async () => ({ version: SIMULATED_MATTER_VERSIO
 export function validHeaders(overrides: Record<string, string | undefined> = {}): Record<string, string> {
   const headers: Record<string, string | undefined> = {
     [HEADER_WIRE_VERSION]: '1',
-    [HEADER_ATTRACCESS_VERSION]: '1.11.0',
+    [HEADER_ATTRACCESS_VERSION]: '2.0.0',
     [HEADER_PLUGIN_VERSION]: entry.plugin,
     [HEADER_SIDECAR_VERSION]: entry.sidecar,
     [HEADER_AUTHORIZATION]: `Bearer ${TEST_TOKEN}`,

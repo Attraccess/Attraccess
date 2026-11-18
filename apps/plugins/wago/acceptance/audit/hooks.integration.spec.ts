@@ -1,28 +1,28 @@
-import { AuditLog, Setting, entities } from '@attraccess/database-entities';
+import { hostDataWithFlows } from '../../backend/persistence.test-utils';
 import httpRequest from 'supertest';
-import { AuditService } from '../../../../api/src/audit/audit.service';
-import { AuditQueryService } from '../../../../api/src/audit/audit-query.service';
 import { PluginAuditHost } from '../../../../api/src/audit/plugin-audit-host';
-import { createTestAuditMetrics } from '../../../../api/src/audit/audit.test-fixture';
-import { SettingsStoreService } from '../../../../api/src/settings/settings-store.service';
-import { WagoCommissioningSession } from '../../backend/commissioning/sessions/session.entity';
+import { sessionRow } from '../../backend/rows.test-utils';
+import { spyOnWagoStorage } from '../../backend/storage-spy.test-utils';
+import { createWagoTestStorage } from '../../backend/storage/testing';
 import { WagoCommissioningService } from '../../backend/commissioning/service';
-import { WagoConfigurationRevision } from '../../backend/configuration/revision.entity';
-import { WagoController } from '../../backend/controllers/entity';
-import { WagoCredentialRotationEntity } from '../../backend/credentials/service';
 import { WagoService } from '../../backend/controllers/service';
-import { AuditFixtureState, privateValue, snapshot, verifier, pluginId, FixtureMqtt } from './fixture.test-utils';
+import {
+  AuditFixtureState,
+  AuditSink,
+  privateValue,
+  snapshot,
+  verifier,
+  pluginId,
+  FixtureMqtt,
+} from './fixture.test-utils';
 import type { PluginAuditDomainDeclaration, PluginContext } from '@attraccess/plugins-backend-sdk';
-import { mkdtemp, rm, copyFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DataSource } from 'typeorm';
-import * as coreMigrations from '../../../../api/src/database/migrations';
 import {
   registerPluginAuditDomains,
   resetPluginAuditRegistry,
 } from '../../../../api/src/plugin-system/audit/audit-registry';
-import * as wagoMigrations from '../../backend/migrations';
 import plugin from '../../backend/plugin';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -34,50 +34,25 @@ import { WAGO_HARDWARE_PROFILE } from '../../backend/host/hardware-deployment';
 import { type RuntimeArtifactManifest } from '../../backend/runtime/artifacts/catalog';
 import { WagoRuntimeArtifactsService } from '../../backend/runtime/artifacts/service';
 
-describe('composed WAGO hooks through the host bridge and durable SQLite provider', () => {
+describe('composed WAGO hooks through the host audit bridge and the plugin record port', () => {
   const state = new AuditFixtureState();
-  beforeAll(async () => {
+  beforeAll(() => {
     // Mirrors PluginModule loading: the host bridge admits only what the plugin registered.
     registerPluginAuditDomains(
       { name: '@attraccess/plugin-wago', id: pluginId },
       plugin.auditDomains as PluginAuditDomainDeclaration[],
     );
-    state.schemaDirectory = await mkdtemp(join(tmpdir(), 'wago-audit-schema-'));
-    const schema = await new DataSource({
-      type: 'better-sqlite3',
-      database: join(state.schemaDirectory, 'schema.sqlite'),
-      entities: [...Object.values(entities), ...plugin.entities],
-      migrations: [...Object.values(coreMigrations), ...Object.values(wagoMigrations)],
-      synchronize: false,
-    }).initialize();
-    try {
-      await schema.runMigrations();
-    } finally {
-      await schema.destroy();
-    }
-  }, 30_000);
+  });
 
-  afterAll(async () => {
+  afterAll(() => {
     resetPluginAuditRegistry();
-    await rm(state.schemaDirectory, { recursive: true, force: true });
   });
 
   beforeEach(async () => {
     state.directory = await mkdtemp(join(tmpdir(), 'wago-audit-hooks-'));
-    // Each case gets an independent copy of the fully migrated fixture schema.
-    await copyFile(join(state.schemaDirectory, 'schema.sqlite'), join(state.directory, 'fixture.sqlite'));
-    state.db = await new DataSource({
-      type: 'better-sqlite3',
-      database: join(state.directory, 'fixture.sqlite'),
-      entities: [...Object.values(entities), ...plugin.entities],
-      synchronize: false,
-    }).initialize();
-    state.audit = new AuditService(
-      state.db,
-      new SettingsStoreService(state.db.getRepository(Setting), null),
-      createTestAuditMetrics(),
-    );
-    await state.audit.onModuleInit();
+    state.storage = createWagoTestStorage();
+    state.spy = spyOnWagoStorage(state.storage);
+    state.sink = new AuditSink();
     state.mqtt = new FixtureMqtt();
     state.revoke.mockReset().mockResolvedValue(undefined);
     const provision: ReturnType<PluginContext['getMqttCredentialProvisioning']>['provision'] = async (input) => ({
@@ -90,10 +65,10 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     );
     state.context = {
       manifest: { id: pluginId, name: 'wago-fixture', version: '1.0.0', pluginDirectory: state.directory },
-      dataSource: state.db,
-      getRepository: (entity) => state.db.getRepository(entity),
-      // The SDK host provider, mapping onto the current audit service's recorder port.
-      audit: createPluginAuditContext(pluginId, () => new PluginAuditHost(state.audit)),
+      ...state.spy.context,
+      hostData: hostDataWithFlows(async () => []),
+      // The SDK host provider, mapping onto the audit recorder port.
+      audit: createPluginAuditContext(pluginId, () => new PluginAuditHost(state.sink)),
       mqtt: state.mqtt,
       events: new EventEmitter2(),
       logger: { log: jest.fn(), error: jest.fn(), warn: jest.fn() },
@@ -114,7 +89,6 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
           throw new Error('Unexpected fixture resource access query');
         },
       }),
-      runSerialized: (fn) => state.db.transaction((manager) => fn(manager)),
       secrets: {
         encrypt: (value) => encryption.encryptForPlugin(pluginId, value),
         decrypt: (value) => encryption.decryptForPlugin(pluginId, value),
@@ -184,27 +158,27 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     state.commissioning['copyTo'] = jest.fn(async () => undefined);
     await state.commissioning.onApplicationBootstrap();
     await state.mountApi();
-    state.session = await state.db.getRepository(WagoCommissioningSession).save({
-      hardwareId: 'audit-fixture',
-      mqttServerId: 1,
-      targetHost: '10.99.0.1',
-      hostKeyFingerprint: `SHA256:${'A'.repeat(43)}`,
-      firmwareBaseline: '31',
-      controllerName: 'Fixture',
-      state: 'awaiting_delivery',
-      pairingCode: `encrypted:v1:${state.context.secrets.encrypt(verifier)}`,
-      auditLog: '[]',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      runtimeArtifactDigest: 'a'.repeat(64),
-    });
+    state.session = await state.storage.tables.commissioningSessions.insert(
+      sessionRow({
+        hardwareId: 'audit-fixture',
+        mqttServerId: 1,
+        targetHost: '10.99.0.1',
+        hostKeyFingerprint: `SHA256:${'A'.repeat(43)}`,
+        firmwareBaseline: '31',
+        controllerName: 'Fixture',
+        state: 'awaiting_delivery',
+        pairingCode: `encrypted:v1:${state.context.secrets.encrypt(verifier)}`,
+        auditLog: '[]',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        runtimeArtifactDigest: 'a'.repeat(64),
+      }),
+    );
   });
 
   afterEach(async () => {
     await state.app?.close();
     state.wago?.onModuleDestroy();
-    await state.audit?.onModuleDestroy();
-    if (state.db?.isInitialized) await state.db.destroy();
     await rm(state.directory, { recursive: true, force: true });
     jest.restoreAllMocks();
   });
@@ -217,20 +191,21 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     await state.post(path, { confirm: true, retry: 'yes' }).expect(400);
     // Successful discovery/claim alone cannot establish permanent runtime readiness.
     await state.post(path, { confirm: true }).expect(409);
-    expect(
-      JSON.parse((await state.db.getRepository(WagoController).findOneByOrFail({ id: controller.id })).capabilities),
-    ).not.toContain('credential-rotation-v1');
+    expect(JSON.parse((await state.controllerById(controller.id)).capabilities)).not.toContain(
+      'credential-rotation-v1',
+    );
     await state.rotationReady(controller);
-    await state.db
-      .getRepository(WagoController)
-      .update(controller.id, { lastHeartbeatAt: new Date(Date.now() - 91_000).toISOString() });
+    await state.storage.tables.controllers.update(
+      { id: controller.id },
+      { lastHeartbeatAt: new Date(Date.now() - 91_000).toISOString() },
+    );
     await state.post(path, { confirm: true }).expect(409);
-    await state.db.getRepository(WagoController).update(controller.id, { lastHeartbeatAt: new Date().toISOString() });
-    await state.db.getRepository(WagoCommissioningSession).delete(state.session.id);
+    await state.storage.tables.controllers.update({ id: controller.id }, { lastHeartbeatAt: new Date().toISOString() });
+    await state.storage.tables.commissioningSessions.delete({ id: state.session.id });
     await state.post(path, { confirm: true }).expect(409);
     expect(rotate).not.toHaveBeenCalled();
     expect(await state.rows('credential_rotation')).toHaveLength(0);
-    expect(await state.db.getRepository(WagoCredentialRotationEntity).count()).toBe(0);
+    expect(await state.storage.tables.credentialRotations.count()).toBe(0);
   });
 
   it('completes rotation only on the correlated reconnect, redacts recovery status and preserves audit through original-broker removal', async () => {
@@ -309,13 +284,13 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     expect(rotate).toHaveBeenCalledTimes(1);
     expect(await state.rows('credential_rotation')).toHaveLength(2);
     // Discovery broker changes must not redirect revocation of the original credential identity.
-    await state.db.getRepository(WagoController).update(controller.id, { mqttServerId: 2 });
+    await state.storage.tables.controllers.update({ id: controller.id }, { mqttServerId: 2 });
     state.revoke.mockClear();
     await state.remove(controller.id).expect(200);
     expect(state.revoke).toHaveBeenCalledWith(
       expect.objectContaining({ mqttServerId: 1, identity: `wago-controller-${controller.hardwareId}` }),
     );
-    expect(await state.db.getRepository(WagoCredentialRotationEntity).count()).toBe(0);
+    expect(await state.storage.tables.credentialRotations.count()).toBe(0);
     expect(await state.rows('credential_rotation')).toEqual(evidence);
     await state.lifecycle('unclaim', controller.id);
   }, 30_000);
@@ -336,15 +311,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     const failedEvidence = await state.lifecycle('credential_rotation', controller.id, 'failed');
     await state.app.close();
     state.wago.onModuleDestroy();
-    await state.audit.onModuleDestroy();
-    await state.db.destroy();
-    await state.db.initialize();
-    state.audit = new AuditService(
-      state.db,
-      new SettingsStoreService(state.db.getRepository(Setting), null),
-      createTestAuditMetrics(),
-    );
-    await state.audit.onModuleInit();
+    // A restart keeps the stored rows and the audit evidence; only the services are new.
     state.wago = new WagoService(state.context);
     state.commissioning = new WagoCommissioningService(state.context, state.wago, state.artifacts);
     state.commissioning['run'] = jest.fn(async () => '');
@@ -353,9 +320,10 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     expect(await state.rotationRecord(controller.id)).toEqual(pending);
     expect(await state.rows('credential_rotation')).toEqual(failedEvidence);
     // Broker credentials have already changed: recovery remains possible without fresh runtime liveness.
-    await state.db
-      .getRepository(WagoController)
-      .update(controller.id, { lastHeartbeatAt: new Date(Date.now() - 91_000).toISOString() });
+    await state.storage.tables.controllers.update(
+      { id: controller.id },
+      { lastHeartbeatAt: new Date(Date.now() - 91_000).toISOString() },
+    );
     state.mqtt.publish.mockImplementation(async (_serverId, topic, payload) => {
       const packet = JSON.parse(String(payload));
       expect(packet).toMatchObject({
@@ -400,37 +368,21 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
       .post(`/wago/commissioning/sessions/${state.session.id}/deliver`)
       .send({ confirmInstall: true, temporarySsh: { username: 'root', password: privateValue } })
       .expect(401);
-    expect(await state.db.getRepository(AuditLog).count()).toBe(0);
+    expect(await state.sink.rows.length).toBe(0);
     expect(jest.mocked(state.wago.createEnrollment)).not.toHaveBeenCalled();
   });
 
-  it('persists initiating token identity through actual delivery and discovery automatic claim, then survives reopen', async () => {
+  it('persists initiating token identity through actual delivery and discovery automatic claim', async () => {
     const controller = await state.deliverAndClaim();
     await state.lifecycle('commissioning.install', state.session.id);
     await state.lifecycle('claim', controller.id);
     await state.mqtt.announce(state.session.hardwareId, 'invalid-replay');
     expect(await state.rows('claim')).toHaveLength(2);
-    const before = await state.db.getRepository(AuditLog).find({ order: { id: 'ASC' } });
+    const before = state.sink.rows.map((row) => ({ ...row }));
     expect(JSON.stringify(before)).not.toContain(privateValue);
     expect(JSON.stringify(before)).not.toContain(verifier);
     expect(JSON.stringify(before)).not.toContain('WAGO_ENROLLMENT_SECRET');
-    state.wago.onModuleDestroy();
-    await state.audit.onModuleDestroy();
-    await state.db.destroy();
-    await state.db.initialize();
-    state.audit = new AuditService(
-      state.db,
-      new SettingsStoreService(state.db.getRepository(Setting), null),
-      createTestAuditMetrics(),
-    );
-    await state.audit.onModuleInit();
-    expect(await state.db.getRepository(AuditLog).find({ order: { id: 'ASC' } })).toEqual(before);
-    const query = new AuditQueryService(
-      state.audit,
-      state.db,
-      new SettingsStoreService(state.db.getRepository(Setting), null),
-    );
-    expect((await query.list({ limit: 100 })).items).toHaveLength(4);
+    expect(state.sink.rows).toHaveLength(4);
   });
 
   it('persists publication, forced publication, rollback and idempotent rejection acknowledgement revisions', async () => {
@@ -467,9 +419,10 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
         }),
       ),
     );
-    const rejected = await state.db
-      .getRepository(WagoConfigurationRevision)
-      .findOneByOrFail({ controllerId: controller.id, revision: restored.revision });
+    const rejected = await state.storage.tables.configurationRevisions.findOne({
+      where: { controllerId: controller.id, revision: restored.revision },
+    });
+    if (!rejected) throw new Error('the restored revision is gone');
     expect(rejected.state).toBe('rejected');
     expect(await state.rows('rejection_acknowledgement')).toHaveLength(0);
     const expected = { contentHash: rejected.contentHash, reportedAt: rejected.reportedAt };
@@ -480,31 +433,30 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
       .post(`controllers/${controller.id}/configuration/revisions/${rejected.revision}/acknowledge-rejection`, expected)
       .expect(201);
     await state.lifecycle('rejection_acknowledgement', controller.id, 'succeeded', { revision: rejected.revision });
-    expect(
-      (await state.db.getRepository(WagoConfigurationRevision).findOneByOrFail({ id: rejected.id }))
-        .rejectionAcknowledgedBy,
-    ).toBe(42);
+    expect((await state.storage.tables.configurationRevisions.get(rejected.id))?.rejectionAcknowledgedBy).toBe(42);
     expect(await state.rows('publication')).toHaveLength(2); // Rollback must not nest publication lifecycles.
-    expect(JSON.stringify(await state.db.getRepository(AuditLog).find())).not.toContain(privateValue);
+    expect(JSON.stringify(state.sink.rows)).not.toContain(privateValue);
   });
 
   it('records exactly one unclaim and retains success after session cleanup fails', async () => {
     const controller = await state.deliverAndClaim();
-    const original = state.audit.record.bind(state.audit);
-    jest.spyOn(state.audit, 'record').mockImplementation(async (event) => {
+    const original = state.sink.record.bind(state.sink);
+    jest.spyOn(state.sink, 'record').mockImplementation(async (event) => {
       if (event.action === 'wago.unclaim') {
-        const persisted = await state.db.getRepository(WagoController).findOneBy({ id: controller.id });
+        const persisted = await state.storage.tables.controllers.get(controller.id);
         expect(Boolean(persisted)).toBe(event.outcome === 'attempted');
       }
       return original(event);
     });
     // Actual removal succeeds; the subsequent commissioning history write fails.
-    await state.db.query(
-      "CREATE TRIGGER fixture_cleanup_failure BEFORE UPDATE ON plugin_wago_commissioning_sessions WHEN NEW.state = 'revoked' BEGIN SELECT RAISE(ABORT, 'fixture cleanup failed'); END",
-    );
+    const sessions = state.spy.spied.commissioningSessions;
+    sessions.update.mockImplementation(async (where, patch, options) => {
+      if (patch.state === 'revoked') throw new Error('fixture cleanup failed');
+      return state.storage.tables.commissioningSessions.update(where, patch, options);
+    });
     await state.remove(controller.id).expect(500);
     await state.lifecycle('unclaim', controller.id);
-    expect(await state.db.getRepository(WagoController).findOneBy({ id: controller.id })).toBeNull();
+    expect(await state.storage.tables.controllers.get(controller.id)).toBeNull();
   });
 
   it('records failed unclaim on credential revocation failure without deleting the controller', async () => {
@@ -512,7 +464,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     state.revoke.mockRejectedValueOnce(new Error(privateValue));
     await state.remove(controller.id).expect(500);
     await state.lifecycle('unclaim', controller.id, 'failed');
-    expect(await state.db.getRepository(WagoController).findOneBy({ id: controller.id })).not.toBeNull();
+    expect(await state.storage.tables.controllers.get(controller.id)).not.toBeNull();
     expect(JSON.stringify(await state.rows('unclaim'))).not.toContain(privateValue);
   });
 
@@ -524,9 +476,9 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     await state
       .post(`controllers/${controller.id}/configuration/publish`, { reviewedHash: review.contentHash })
       .expect(500);
-    const revision = await state.db
-      .getRepository(WagoConfigurationRevision)
-      .findOneByOrFail({ controllerId: controller.id });
+    const [revision] = await state.storage.tables.configurationRevisions.find({
+      where: { controllerId: controller.id },
+    });
     expect(revision).toMatchObject({ revision: 1, state: 'pending' });
     const records = await state.rows('publication');
     expect(records.map((row) => row.outcome)).toEqual(['attempted', 'failed']);
@@ -551,9 +503,10 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
         draftHash: preview.draftHash,
       })
       .expect(500);
-    const pending = await state.db
-      .getRepository(WagoConfigurationRevision)
-      .findOneByOrFail({ controllerId: controller.id, state: 'pending' });
+    const pending = await state.storage.tables.configurationRevisions.findOne({
+      where: { controllerId: controller.id, state: 'pending' },
+    });
+    if (!pending) throw new Error('no pending revision was retained');
     expect(pending.revision).toBe(source.revision + 1);
     await state.lifecycle('rollback', controller.id, 'failed', {
       sourceRevision: source.revision,
@@ -572,9 +525,9 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     await state.post(`controllers/${controller.id}/configuration/publish`, { force: true }).expect(500);
     await state.post(`controllers/${controller.id}/configuration/review`).expect(201);
     await state.post(`controllers/${controller.id}/configuration/publish`, { force: true }).expect(500);
-    const revisions = await state.db
-      .getRepository(WagoConfigurationRevision)
-      .find({ where: { controllerId: controller.id } });
+    const revisions = await state.storage.tables.configurationRevisions.find({
+      where: { controllerId: controller.id },
+    });
     expect(revisions).toHaveLength(1);
     const records = await state.rows('forced_publication');
     expect(records.map((row) => row.outcome)).toEqual(['attempted', 'failed', 'attempted', 'failed']);
@@ -681,9 +634,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     });
     await state.lifecycle('manual_credential_fallback', controller.id);
     expect(provision).not.toHaveBeenCalled();
-    expect((await state.db.getRepository(WagoController).findOneByOrFail({ id: controller.id })).trustState).toBe(
-      'claimed',
-    );
+    expect((await state.controllerById(controller.id)).trustState).toBe('claimed');
     expect(JSON.stringify(await state.rows('manual_credential_fallback'))).not.toContain(privateValue);
   });
 
@@ -701,18 +652,17 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     await state.lifecycle('manual_credential_fallback', controller.id, 'failed');
     expect(provision).not.toHaveBeenCalled();
     expect(state.mqtt.publish).not.toHaveBeenCalled();
-    expect((await state.db.getRepository(WagoController).findOneByOrFail({ id: controller.id })).trustState).toBe(
-      'untrusted',
-    );
+    expect((await state.controllerById(controller.id)).trustState).toBe('untrusted');
     expect(JSON.stringify(await state.rows('manual_credential_fallback'))).not.toContain(privateValue);
   });
 
   it('preserves acknowledged credentials when the later publish receipt fails', async () => {
     const { controller, provision } = await state.manuallyEnrolledController();
     // Associate the manually enrolled controller with a real pinned commissioning session.
-    await state.db.getRepository(WagoCommissioningSession).update(state.session.id, {
-      hardwareId: controller.hardwareId,
-    });
+    await state.storage.tables.commissioningSessions.update(
+      { id: state.session.id },
+      { hardwareId: controller.hardwareId },
+    );
     state.mqtt.publish.mockImplementation(async (_server, topic, payload) => {
       if (!topic.endsWith('/claim')) return;
       const credentials = JSON.parse(payload.toString());
@@ -732,17 +682,16 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     expect(state.revoke.mock.calls).not.toContainEqual([
       expect.objectContaining({ identity: 'wago-controller-manual-fixture' }),
     ]);
-    expect((await state.db.getRepository(WagoController).findOneByOrFail({ id: controller.id })).trustState).toBe(
-      'claimed',
-    );
+    expect((await state.controllerById(controller.id)).trustState).toBe('claimed');
     expect(JSON.stringify(await state.rows('manual_credential_fallback'))).not.toContain(privateValue);
   });
 
   it('rejects a manual handoff to a runtime without expiry support before dispatch or audit admission', async () => {
     const { controller } = await state.manuallyEnrolledController();
-    await state.db
-      .getRepository(WagoController)
-      .update(controller.id, { capabilities: '["claim","configuration-v1"]' });
+    await state.storage.tables.controllers.update(
+      { id: controller.id },
+      { capabilities: '["claim","configuration-v1"]' },
+    );
     state.mqtt.publish.mockClear();
     await state
       .post(`controllers/${controller.id}/credentials/manual/complete`, {

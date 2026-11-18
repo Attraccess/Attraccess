@@ -8,7 +8,7 @@
     }
   },
   "attraccessVersion": {
-    "min": "1.0.0-0"
+    "min": "2.0.0-0"
   },
   "permissions": ["BLE_TRANSPORT"]
 }

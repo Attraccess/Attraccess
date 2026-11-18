@@ -1,10 +1,16 @@
-import type { AuthenticationMethod } from '@attraccess/database-entities';
-import { User } from '@attraccess/database-entities';
-
-export type { AuthenticationMethod };
+import type { AuthenticationMethod, PluginUserModel } from '@attraccess/application-models';
 import { Request as BaseRequest } from 'express';
 
-export interface AuthenticatedUser extends User {
+export type { AuthenticationMethod };
+
+/**
+ * Extension point of the host application: the core augments it with its own user record. Plugins see only the
+ * neutral {@link PluginUserModel} fields.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-interface, @typescript-eslint/no-empty-object-type
+export interface AuthenticatedUserExtensions {}
+
+export interface AuthenticatedUser extends PluginUserModel, AuthenticatedUserExtensions {
   jwtTokenId: string;
   authenticationMethod?: AuthenticationMethod;
   apiTokenId?: number;

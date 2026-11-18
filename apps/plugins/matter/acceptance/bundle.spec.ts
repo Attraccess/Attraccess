@@ -2,13 +2,12 @@ import {
   validatePluginPermissionsDeclaration,
   type PluginPermissionsDeclaration,
 } from '@attraccess/plugins-backend-sdk';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { builtinModules } from 'node:module';
 import { join } from 'node:path';
 
 // Needs `build-backend` first (the e2e target depends on it).
 const bundle = readFileSync(join(__dirname, '../package/dist/index.js'), 'utf8');
-const migrations = readFileSync(join(__dirname, '../package/dist/migrations.js'), 'utf8');
 
 const requiredModules = (source: string) => [...source.matchAll(/require\("([^"]+)"\)/g)].map((match) => match[1]);
 const nodeBuiltins = new Set([...builtinModules, ...builtinModules.map((name) => `node:${name}`)]);
@@ -18,7 +17,6 @@ const hostShared = new Set([
   '@nestjs/core',
   '@nestjs/event-emitter',
   'eventemitter2',
-  'typeorm',
   'reflect-metadata',
   '@attraccess/plugins-backend-sdk',
 ]);
@@ -78,7 +76,7 @@ describe('Matter plugin bundle', () => {
     }
     const expectUsable = (plugin: ReturnType<typeof loadWith>['plugin']) => {
       expect(plugin.register({}).controllers).toHaveLength(4);
-      expect((plugin as unknown as { entities: unknown[] }).entities).toHaveLength(11);
+      expect(Object.keys((plugin as unknown as { storage: { tables: object } }).storage.tables)).toHaveLength(11);
       expect((plugin as unknown as { auditDomains: { domain: string }[] }).auditDomains[0].domain).toBe('matter');
     };
 
@@ -116,8 +114,9 @@ describe('Matter plugin bundle', () => {
     });
   });
 
-  it('ships the migration as a separate entry', () => {
-    expect(migrations).toContain('CreateMatterConnection1793900000000');
-    expect(requiredModules(migrations).filter((name) => !nodeBuiltins.has(name) && !hostShared.has(name))).toEqual([]);
+  it('has no database access of its own: no TypeORM, no engine subpath, no migrations entry', () => {
+    expect(requiredModules(bundle)).not.toContain('typeorm');
+    expect(bundle).not.toMatch(/plugins-backend-sdk\/sqlite|database-entities|sqlite3|better-sqlite3/);
+    expect(existsSync(join(__dirname, '../package/dist/migrations.js'))).toBe(false);
   });
 });

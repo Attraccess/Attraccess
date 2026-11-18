@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
-import { User } from '@attraccess/database-entities';
+import type { UserRecord } from '@attraccess/application-models';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { UsersService } from './users.service';
 import { AuthService } from '../auth/auth.service';
@@ -86,19 +86,20 @@ export class UserPasswordService {
 
     // Consume the token before changing the password: changePassword sends a notification email afterwards, and a
     // failed send must not leave the link usable again.
-    await this.usersService.updateOne(userId, {
-      passwordResetToken: null,
-      passwordResetTokenExpiresAt: null,
-    });
+    // The consumption is a single conditional write, so exactly one of any number of concurrent requests with the
+    // same token gets to change the password.
+    if (!(await this.usersService.consumePasswordResetToken(userId, user.passwordResetToken))) {
+      this.logger.debug(`Reset token of user ID ${userId} was already consumed`);
+      throw new ForbiddenException('Invalid token');
+    }
 
-    await this.passwordPolicyService.archiveCurrentPasswordToHistory(user.id);
     await this.authService.changePassword(user, body.password);
   }
 
   public async setUserPassword(
     id: number,
     body: SetUserPasswordDto,
-    requestUser: User | AuthenticatedUser,
+    requestUser: UserRecord | AuthenticatedUser,
   ): Promise<void> {
     this.logger.debug(`Setting password for user ID: ${id}, by user ID: ${requestUser.id}`);
 
@@ -123,7 +124,6 @@ export class UserPasswordService {
       throw new PasswordPolicyViolationException(policyResult.errors);
     }
 
-    await this.passwordPolicyService.archiveCurrentPasswordToHistory(user.id);
     await this.authService.changePassword(user, body.password);
 
     this.logger.debug(`Password successfully updated for user ID: ${id}`);

@@ -16,6 +16,7 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "paths": {
+      "@attraccess/application-models": ["./libs/application-models/src/index.ts"],
       "@attraccess/api-client": ["./libs/api-client/src/index.ts"],
       "@attraccess/attracces": ["./tools/attracces/src/index.ts"],
       "@attraccess/database-entities": ["./libs/database-entities/src/index.ts"],

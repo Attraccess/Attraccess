@@ -6,10 +6,6 @@
       "directory": "dist",
       "entryPoint": "index.js"
     },
-    "migrations": {
-      "directory": "dist",
-      "entryPoint": "migrations.js"
-    },
     "frontend": {
       "directory": "frontend",
       "entryPoint": "remoteEntry.js",
@@ -19,10 +15,10 @@
     }
   },
   "attraccessVersion": {
-    "min": "1.11.0-beta.3"
+    "min": "2.0.0-0"
   },
   "permissions": [
-    "DATABASE_ACCESS",
+    "PLUGIN_STORAGE",
     "ACCESS_HOOKS",
     "LISTEN_EVENTS",
     "ACCESS_RESOURCES",

@@ -1,5 +1,6 @@
-import { BillingTransactionItem, ResourceFlowNodeType } from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
+import { ResourceFlowNodeType } from '@attraccess/application-models';
+import type { UnitOfWork } from '../../../database/unit-of-work';
+import type { FlowBillingItemStore } from '../flow-billing-item-store.port';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
 import type { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
@@ -127,12 +128,14 @@ export function buildNodeExecutorRegistry(
 
 export function usageNodeExecutors(
   resourceUsageService: ResourceUsageService,
-  billingTransactionItemRepository: Repository<BillingTransactionItem>,
+  billingItems: FlowBillingItemStore,
+  unitOfWork: UnitOfWork,
 ): Pick<Record<ResourceFlowNodeType, NodeExecutor>, UsageNodeType> {
   return {
     [ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS]: new BillingSetAdditionalItemsExecutor(
       resourceUsageService,
-      billingTransactionItemRepository,
+      billingItems,
+      unitOfWork,
     ),
     [ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION]: new EndUsageSessionExecutor(resourceUsageService),
   };

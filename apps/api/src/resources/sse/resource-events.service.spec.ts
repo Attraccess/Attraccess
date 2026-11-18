@@ -1,12 +1,11 @@
-import { FindOperator, Repository } from 'typeorm';
 import {
-  Resource,
   ResourceHealthStatus,
   ResourceType,
-  ResourceUsage,
   ResourceUsageAction,
-  User,
-} from '@attraccess/database-entities';
+  type ResourceRecord as Resource,
+  type UsageSession as ResourceUsage,
+  type UserRecord as User,
+} from '@attraccess/application-models';
 import { ResourceEventsService } from './resource-events.service';
 import {
   ResourceSessionStartedEvent,
@@ -14,7 +13,7 @@ import {
   ResourceUsageSessionTakenOverEvent,
 } from '../usage/events/resource-usage.events';
 import { ResourceHealthChangedEvent } from '../health/events/resource-health-changed.event';
-import { activeUsageWhere } from '../usage/sessions/active-usage';
+import { isActiveUsage } from '../usage/sessions/active-usage';
 
 const flush = () => new Promise<void>((done) => setImmediate(done));
 
@@ -29,37 +28,28 @@ const row = (overrides: Partial<ResourceUsage> = {}) =>
     ...overrides,
   }) as ResourceUsage;
 
-/** Applies a TypeORM where object to in-memory rows, enough for equality and IsNull(). */
-const matches = (usage: ResourceUsage, where: Record<string, unknown>) =>
-  Object.entries(where).every(([column, expected]) => {
-    const value = usage[column as keyof ResourceUsage];
-    if (expected instanceof FindOperator) {
-      if (expected.type !== 'isNull') throw new Error(`Unsupported operator ${expected.type}`);
-      return value == null;
-    }
-    return value === expected;
-  });
-
 const createService = (options: { resource?: Partial<Resource>; usages?: ResourceUsage[] } = {}) => {
   const resource = { id: 1, type: ResourceType.Machine, maxParallelSessions: 1, ...options.resource };
   const usages = options.usages ?? [];
-  const resourceRepository = { findOne: jest.fn(async () => resource) };
-  const usageRepository = {
-    count: jest.fn(
-      async ({ where }: { where: Record<string, unknown> }) => usages.filter((usage) => matches(usage, where)).length,
+  const store = {
+    existingIds: jest.fn(async (ids: number[]) => ids.filter((id) => id === resource.id)),
+    findCapacity: jest.fn(async () => resource),
+    countActiveSessions: jest.fn(
+      async (resourceId: number) =>
+        usages.filter((usage) => usage.resourceId === resourceId && isActiveUsage(usage)).length,
     ),
   };
-  const service = new ResourceEventsService(
-    resourceRepository as unknown as Repository<Resource>,
-    usageRepository as unknown as Repository<ResourceUsage>,
-  );
-  return { service, resourceRepository, usageRepository };
+  const service = new ResourceEventsService(store as never);
+  // The capacity read and the session count, under the names the tests below use.
+  return {
+    service,
+    resourceRepository: { findOne: store.findCapacity },
+    usageRepository: { count: store.countActiveSessions },
+  };
 };
 
 const startedEvent = (overrides: Partial<ResourceUsage> = {}) =>
-  new ResourceSessionStartedEvent(
-    Object.assign(new ResourceUsage(), { resource: Object.assign(new Resource(), { id: 1 }), ...overrides }),
-  );
+  new ResourceSessionStartedEvent({ resource: { id: 1 }, ...overrides } as ResourceUsage);
 
 describe('resource initial state and subject cleanup', () => {
   it('delivers initial state only to the new consumer and releases the subject immediately', async () => {
@@ -156,7 +146,7 @@ describe('slot state reads', () => {
     const callback = jest.fn();
     const sub = (await service.subscribeResource(1)).subscribe(callback);
     await flush();
-    expect(usageRepository.count).toHaveBeenCalledWith({ where: { resourceId: 1, ...activeUsageWhere() } });
+    expect(usageRepository.count).toHaveBeenCalledWith(1);
     expect(callback).toHaveBeenCalledWith({
       data: expect.objectContaining({ inUse: true, activeSessionCount: 1, maxParallelSessions: 5 }),
     });
@@ -228,6 +218,18 @@ describe('session and health events', () => {
       inUse: false,
       activeSessionCount: 0,
     });
+    sub.unsubscribe();
+  });
+
+  it('carries the started session with its user as the public profile, never the mail address', async () => {
+    const { service, callback, sub } = await open();
+    const user = { id: 7, username: 'ada', locale: 'en', email: 'ada@example.test' } as User;
+    service.handleResourceUsage(startedEvent({ id: 3, userId: 7, user }));
+    await flush();
+    const { usage } = callback.mock.calls[0][0].data;
+    expect(usage).toMatchObject({ id: 3, user: { id: 7, username: 'ada' } });
+    expect(JSON.stringify(usage)).not.toContain('ada@example.test');
+    expect(usage.user).not.toHaveProperty('email');
     sub.unsubscribe();
   });
 

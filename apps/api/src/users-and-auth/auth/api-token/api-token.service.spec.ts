@@ -1,95 +1,139 @@
-import { ForbiddenException } from '@nestjs/common';
-import { ApiToken } from '@attraccess/database-entities';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import type { ApiTokenRecord, AuthenticatedSessionUser } from '@attraccess/application-models';
 import { ApiTokenService } from './api-token.service';
-import { IsNull } from 'typeorm';
+import type { ApiTokenStore } from './api-token.port';
+
+const record = (overrides: Partial<ApiTokenRecord> = {}): ApiTokenRecord => ({
+  id: 1,
+  userId: 3,
+  name: 'Script',
+  createdAt: new Date('2026-01-01T00:00:00Z'),
+  lastUsedAt: null,
+  expiresAt: null,
+  revokedAt: null,
+  permissionKeys: ['resources.read'],
+  ...overrides,
+});
 
 describe('ApiTokenService', () => {
-  const repository = {
-    create: jest.fn((value) => value),
-    save: jest.fn(),
-    find: jest.fn(),
-    findAndCount: jest.fn(),
-    findOne: jest.fn(),
-    findOneBy: jest.fn(),
-    createQueryBuilder: jest.fn(),
-    manager: {
-      getRepository: jest.fn(),
-      transaction: jest.fn(),
-    },
-  };
-  const userRepository = { findOneBy: jest.fn() };
-  const apiTokenPermissionRepository = { create: jest.fn((value) => value), save: jest.fn(), delete: jest.fn() };
+  const store = {
+    listActive: jest.fn(),
+    create: jest.fn(),
+    findActiveOwned: jest.fn(),
+    findByHash: jest.fn(),
+    update: jest.fn(),
+    revoke: jest.fn(),
+    touchLastUsed: jest.fn(),
+  } satisfies Record<keyof ApiTokenStore, jest.Mock>;
+  const users = { findSessionUser: jest.fn() };
   const tokenHashService = { hashApiToken: jest.fn((token) => `hashed:${token}`) };
   const rbacService = {
     getEffectivePermissions: jest.fn(),
     getUnavailablePermissionKeys: jest.fn(async () => new Set<string>()),
   };
-  const service = new ApiTokenService(
-    repository as never,
-    userRepository as never,
-    tokenHashService as never,
-    rbacService as never,
-  );
+  const service = new ApiTokenService(store, users, tokenHashService as never, rbacService as never);
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
+    tokenHashService.hashApiToken.mockImplementation((token) => `hashed:${token}`);
     rbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.read']));
-    repository.manager.getRepository.mockImplementation((entity) =>
-      entity === ApiToken ? repository : apiTokenPermissionRepository,
+    rbacService.getUnavailablePermissionKeys.mockResolvedValue(new Set());
+    store.create.mockImplementation(async ({ userId, name, expiresAt, permissionKeys }) =>
+      record({ userId, name, expiresAt, permissionKeys }),
     );
-    repository.manager.transaction.mockImplementation((callback) => callback(repository.manager));
+    store.touchLastUsed.mockResolvedValue(true);
   });
 
   it('stores only the hash and returns the secret once on creation', async () => {
-    repository.save.mockImplementation(async (value) => ({ ...value, id: 1, createdAt: new Date() }));
-    apiTokenPermissionRepository.save.mockImplementation(async (value) => value);
-
-    const result = await service.create(3, {
-      name: 'Script',
-      permissionKeys: ['resources.read'],
-    });
+    const result = await service.create(3, { name: ' Script ', permissionKeys: ['resources.read', 'resources.read'] });
 
     expect(result.token).toHaveLength(43);
-    expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({ tokenHash: `hashed:${result.token}` }));
+    expect(store.create).toHaveBeenCalledWith({
+      userId: 3,
+      name: 'Script',
+      tokenHash: `hashed:${result.token}`,
+      expiresAt: null,
+      permissionKeys: ['resources.read'],
+    });
+    expect(JSON.stringify(result.apiToken)).not.toContain(result.token);
     expect(result.apiToken).not.toHaveProperty('token');
+    expect(result.apiToken).not.toHaveProperty('tokenHash');
   });
 
-  it('creates the token and its permissions through one transaction', async () => {
-    repository.save.mockImplementation(async (value) => ({ ...value, id: 1, createdAt: new Date() }));
-    apiTokenPermissionRepository.save.mockResolvedValue([]);
-
-    await service.create(3, { name: 'Script', permissionKeys: ['resources.read'] });
-
-    expect(repository.manager.transaction).toHaveBeenCalledTimes(1);
-    expect(apiTokenPermissionRepository.save).toHaveBeenCalledWith([
-      expect.objectContaining({ apiTokenId: 1, permissionKey: 'resources.read' }),
-    ]);
+  it('rejects an expiry in the past without storing anything', async () => {
+    await expect(
+      service.create(3, { name: 'Script', permissionKeys: [], expiresAt: new Date(Date.now() - 1000) }),
+    ).rejects.toThrow(BadRequestException);
+    expect(store.create).not.toHaveBeenCalled();
   });
 
-  it('replaces permissions and token metadata through one transaction', async () => {
-    repository.findOne.mockResolvedValue({ id: 1, userId: 3, name: 'Old', revokedAt: null, apiTokenPermissions: [] });
-    repository.save.mockImplementation(async (value) => value);
-    apiTokenPermissionRepository.save.mockResolvedValue([]);
+  it('replaces permissions and token metadata through one store update', async () => {
+    store.findActiveOwned.mockResolvedValue(record({ name: 'Old' }));
+    store.update.mockResolvedValue(record({ name: 'New' }));
 
-    await service.update(3, 1, { name: 'New', permissionKeys: ['resources.read'] });
+    await expect(service.update(3, 1, { name: ' New ', permissionKeys: ['resources.read'] })).resolves.toMatchObject({
+      name: 'New',
+    });
 
-    expect(repository.manager.transaction).toHaveBeenCalledTimes(1);
-    expect(apiTokenPermissionRepository.delete).toHaveBeenCalledWith({ apiTokenId: 1 });
-    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ name: 'New' }));
+    expect(store.update).toHaveBeenCalledTimes(1);
+    expect(store.update).toHaveBeenCalledWith(1, {
+      name: 'New',
+      permissionKeys: ['resources.read'],
+      expiresAt: undefined,
+    });
   });
 
-  it('paginates active tokens and their permission rows', async () => {
-    repository.findAndCount.mockResolvedValue([[], 12]);
+  it('keeps and hides grants of unavailable plugin keys on update and in the list', async () => {
+    rbacService.getUnavailablePermissionKeys.mockResolvedValue(new Set(['acme.widgets.read']));
+    store.findActiveOwned.mockResolvedValue(record({ permissionKeys: ['acme.widgets.read', 'resources.read'] }));
+    store.update.mockImplementation(async (_id, changes) => record({ permissionKeys: changes.permissionKeys }));
+
+    const updated = await service.update(3, 1, { permissionKeys: ['resources.read'] });
+
+    // the client cannot see the dormant grant, so its full-set update must not drop it
+    expect(store.update).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        permissionKeys: ['resources.read', 'acme.widgets.read'],
+      }),
+    );
+    expect(updated.permissionKeys).toEqual(['resources.read']);
+    store.listActive.mockResolvedValue({ data: [record({ permissionKeys: ['acme.widgets.read'] })], total: 1 });
+    expect((await service.list(3, 1, 10)).data[0].permissionKeys).toEqual([]);
+  });
+
+  it('clears the expiry when null is given', async () => {
+    store.findActiveOwned.mockResolvedValue(record({ expiresAt: new Date(Date.now() + 60_000) }));
+    store.update.mockResolvedValue(record());
+
+    await service.update(3, 1, { expiresAt: null });
+
+    expect(store.update).toHaveBeenCalledWith(1, { name: undefined, permissionKeys: undefined, expiresAt: null });
+  });
+
+  it('refuses to change tokens that are revoked or belong to someone else', async () => {
+    store.findActiveOwned.mockResolvedValue(null);
+
+    await expect(service.update(3, 2, { name: 'x' })).rejects.toThrow(new NotFoundException('ApiTokenNotFound'));
+    await expect(service.revoke(3, 2)).rejects.toThrow(new NotFoundException('ApiTokenNotFound'));
+    expect(store.update).not.toHaveBeenCalled();
+    expect(store.revoke).not.toHaveBeenCalled();
+  });
+
+  it('revokes an owned token', async () => {
+    store.findActiveOwned.mockResolvedValue(record());
+
+    await service.revoke(3, 1);
+
+    expect(store.revoke).toHaveBeenCalledWith(1, expect.any(Date));
+  });
+
+  it('paginates active tokens', async () => {
+    store.listActive.mockResolvedValue({ data: [], total: 12 });
 
     await expect(service.list(3, 2, 10)).resolves.toEqual({ data: [], total: 12, page: 2, limit: 10 });
 
-    expect(repository.findAndCount).toHaveBeenCalledWith({
-      where: { userId: 3, revokedAt: IsNull() },
-      order: { createdAt: 'DESC', id: 'DESC' },
-      relations: { apiTokenPermissions: true },
-      skip: 10,
-      take: 10,
-    });
+    expect(store.listActive).toHaveBeenCalledWith(3, 2, 10);
   });
 
   it('refuses permissions no longer held by the owner', async () => {
@@ -97,65 +141,61 @@ describe('ApiTokenService', () => {
       ForbiddenException,
     );
     expect(rbacService.getEffectivePermissions).toHaveBeenCalledWith(3, true);
+    expect(store.create).not.toHaveBeenCalled();
   });
 
-  it('rejects revoked and expired tokens before loading their owner', async () => {
-    repository.findOne.mockResolvedValueOnce({ revokedAt: new Date(), expiresAt: null });
+  it('rejects unknown, revoked and expired tokens before loading their owner', async () => {
+    store.findByHash.mockResolvedValueOnce(null);
     await expect(service.authenticate('secret')).resolves.toBeNull();
 
-    repository.findOne.mockResolvedValueOnce({ revokedAt: null, expiresAt: new Date(Date.now() - 1) });
+    store.findByHash.mockResolvedValueOnce(record({ revokedAt: new Date() }));
     await expect(service.authenticate('secret')).resolves.toBeNull();
-    expect(userRepository.findOneBy).not.toHaveBeenCalled();
+
+    store.findByHash.mockResolvedValueOnce(record({ expiresAt: new Date(Date.now() - 1) }));
+    await expect(service.authenticate('secret')).resolves.toBeNull();
+    expect(users.findSessionUser).not.toHaveBeenCalled();
+    expect(store.findByHash).toHaveBeenCalledWith('hashed:secret');
   });
 
   it('rejects a token when its soft-deleted owner cannot be loaded', async () => {
-    repository.findOne.mockResolvedValue({ id: 1, userId: 3, revokedAt: null, expiresAt: null });
-    userRepository.findOneBy.mockResolvedValue(null);
+    store.findByHash.mockResolvedValue(record());
+    users.findSessionUser.mockResolvedValue(null);
 
     await expect(service.authenticate('secret')).resolves.toBeNull();
   });
 
   it('rejects a token when its owner is disabled', async () => {
-    repository.findOne.mockResolvedValue({ id: 1, userId: 3, revokedAt: null, expiresAt: null });
-    userRepository.findOneBy.mockResolvedValue({ id: 3, isDisabled: true });
+    store.findByHash.mockResolvedValue(record());
+    users.findSessionUser.mockResolvedValue({ id: 3, isDisabled: true } as AuthenticatedSessionUser);
 
     await expect(service.authenticate('secret')).resolves.toBeNull();
+    expect(store.touchLastUsed).not.toHaveBeenCalled();
   });
 
-  it('only updates last used time while the token remains active', async () => {
-    const queryBuilder = {
-      update: jest.fn().mockReturnThis(),
-      set: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      execute: jest.fn().mockResolvedValue({ affected: 1 }),
-    };
-    repository.createQueryBuilder.mockReturnValue(queryBuilder);
-    repository.findOne.mockResolvedValue({ id: 1, userId: 3, revokedAt: null, expiresAt: null, lastUsedAt: null });
-    userRepository.findOneBy.mockResolvedValue({ id: 3 });
+  it('returns the owner and the token metadata, and records the use', async () => {
+    const owner = { id: 3, isDisabled: false } as AuthenticatedSessionUser;
+    store.findByHash.mockResolvedValue(record());
+    users.findSessionUser.mockResolvedValue(owner);
 
-    await service.authenticate('secret');
+    const principal = await service.authenticate('secret');
 
-    expect(queryBuilder.update).toHaveBeenCalledWith(ApiToken);
-    expect(queryBuilder.where).toHaveBeenCalledWith('id = :id', { id: 1 });
-    expect(queryBuilder.andWhere).toHaveBeenCalledWith('revokedAt IS NULL');
-    expect(queryBuilder.andWhere).toHaveBeenCalledWith('(expiresAt IS NULL OR expiresAt > :now)', {
-      now: expect.any(Date),
-    });
-    expect(repository.save).not.toHaveBeenCalled();
+    expect(principal).toEqual({ user: owner, apiToken: record() });
+    expect(store.touchLastUsed).toHaveBeenCalledWith(1, expect.any(Date));
+  });
+
+  it('does not write the last used time again within a minute', async () => {
+    store.findByHash.mockResolvedValue(record({ lastUsedAt: new Date(Date.now() - 1000) }));
+    users.findSessionUser.mockResolvedValue({ id: 3, isDisabled: false } as AuthenticatedSessionUser);
+
+    await expect(service.authenticate('secret')).resolves.not.toBeNull();
+
+    expect(store.touchLastUsed).not.toHaveBeenCalled();
   });
 
   it('rejects a token revoked or expired while updating its last used time', async () => {
-    const queryBuilder = {
-      update: jest.fn().mockReturnThis(),
-      set: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      execute: jest.fn().mockResolvedValue({ affected: 0 }),
-    };
-    repository.createQueryBuilder.mockReturnValue(queryBuilder);
-    repository.findOne.mockResolvedValue({ id: 1, userId: 3, revokedAt: null, expiresAt: null, lastUsedAt: null });
-    userRepository.findOneBy.mockResolvedValue({ id: 3 });
+    store.findByHash.mockResolvedValue(record());
+    users.findSessionUser.mockResolvedValue({ id: 3, isDisabled: false } as AuthenticatedSessionUser);
+    store.touchLastUsed.mockResolvedValue(false);
 
     await expect(service.authenticate('secret')).resolves.toBeNull();
   });

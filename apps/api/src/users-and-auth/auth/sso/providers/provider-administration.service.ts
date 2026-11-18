@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 
-import { SSOProvider } from '@attraccess/database-entities';
+import type { SsoProviderRecord } from '@attraccess/application-models';
 
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
@@ -39,18 +39,18 @@ export class SsoProviderAdministrationService {
     private readonly rbacService: RbacService,
   ) {}
 
-  async getAll(): Promise<SSOProvider[]> {
+  async getAll(): Promise<SsoProviderRecord[]> {
     return this.ssoService.getAllProviders();
   }
 
-  async getOneWithConfiguration(providerId: number): Promise<SSOProvider> {
+  async getOneWithConfiguration(providerId: number): Promise<SsoProviderRecord> {
     const provider = await this.ssoService.getProviderById(providerId);
     const withConfig = await this.ssoService.getProviderByTypeAndIdWithConfiguration(provider.type, providerId);
     if (!withConfig) throw new SSOProviderNotFoundException();
     return withConfig;
   }
 
-  async create(createDto: CreateSSOProviderDto, actor: AuthenticatedUser): Promise<SSOProvider> {
+  async create(createDto: CreateSSOProviderDto, actor: AuthenticatedUser): Promise<SsoProviderRecord> {
     const oidcMappings = createDto.oidcConfiguration?.roleMappings;
     const samlMappings = createDto.samlConfiguration?.roleMappings;
     if (oidcMappings !== undefined || samlMappings !== undefined) {
@@ -69,7 +69,11 @@ export class SsoProviderAdministrationService {
     return this.ssoService.createProvider(createDto, auditActorOf(actor));
   }
 
-  async update(providerId: number, updateDto: UpdateSSOProviderDto, actor: AuthenticatedUser): Promise<SSOProvider> {
+  async update(
+    providerId: number,
+    updateDto: UpdateSSOProviderDto,
+    actor: AuthenticatedUser,
+  ): Promise<SsoProviderRecord> {
     const before = await this.ssoService.getProviderById(providerId);
 
     const oidcMappings = updateDto.oidcConfiguration?.roleMappings;

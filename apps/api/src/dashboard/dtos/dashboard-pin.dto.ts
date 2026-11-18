@@ -13,7 +13,7 @@ import {
   ValidatorConstraint,
   ValidatorConstraintInterface,
 } from 'class-validator';
-import type { DashboardPinItemType, DashboardPinSize } from '@attraccess/database-entities';
+import type { DashboardPinItemType, DashboardPinSize } from '@attraccess/application-models';
 import { DASHBOARD_WIDGET_ID_PATTERN } from '../../plugin-system/runtime/manifest-schema';
 
 export const DASHBOARD_PIN_ITEM_TYPES: DashboardPinItemType[] = ['page', 'resource', 'widget'];
@@ -100,7 +100,8 @@ export class UpdateDashboardPinsDto {
     enum: DASHBOARD_PIN_SIZES,
     enumName: 'DashboardPinSize',
     required: false,
-    description: 'For add: the tile size (omit for the default). For resize: the new size, required. Ignored otherwise.',
+    description:
+      'For add: the tile size (omit for the default). For resize: the new size, required. Ignored otherwise.',
   })
   @ValidateIf((dto: UpdateDashboardPinsDto) => dto.kind === 'resize' || dto.size !== undefined)
   @IsIn(DASHBOARD_PIN_SIZES)

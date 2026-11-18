@@ -1,3 +1,4 @@
+import { ResourceHealthSource, ResourceHealthStatus } from '@attraccess/application-models';
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -11,17 +12,6 @@ import {
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
-
-export enum ResourceHealthStatus {
-  HEALTHY = 'healthy',
-  UNHEALTHY = 'unhealthy',
-}
-
-export enum ResourceHealthSource {
-  PAYLOAD = 'payload',
-  HEARTBEAT = 'heartbeat',
-  MANUAL = 'manual',
-}
 
 @Entity()
 @Unique('UQ_resource_health_resource_identifier', ['resourceId', 'identifier'])
@@ -52,7 +42,8 @@ export class ResourceHealthState {
 
   @Column({ type: 'text', default: '' })
   @ApiProperty({
-    description: 'Identifier for the source reporting health (e.g. "ir-bridge", "internal-temp"). Empty string for the resource default.',
+    description:
+      'Identifier for the source reporting health (e.g. "ir-bridge", "internal-temp"). Empty string for the resource default.',
     example: 'ir-bridge',
   })
   identifier!: string;

@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { existsSync } from 'fs';
 import { readFile, rename, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 export interface PendingNpmPluginAudit {
   operationId: string;

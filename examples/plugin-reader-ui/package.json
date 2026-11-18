@@ -12,24 +12,35 @@
   "homepage": "https://attraccess.org",
   "scripts": {
     "build": "node build.mjs",
-    "pack-test": "pnpm --dir=../.. exec nx run plugins-backend-sdk:build && npm run build && node ../../apps/plugins/scripts/verify-packed-plugin.mjs package package.json dist/index.js"
+    "pack-test": "pnpm --dir=../.. exec nx run plugins-backend-sdk:build && npm run build && ATTRACCESS_PLUGIN_TEST_HOST_VERSION=2.0.0 node ../../apps/plugins/scripts/verify-packed-plugin.mjs package package.json dist/index.js"
   },
-  "keywords": ["attraccess-plugin", "attraccess", "example"],
-  "files": ["dist"],
+  "keywords": [
+    "attraccess-plugin",
+    "attraccess",
+    "example"
+  ],
+  "files": [
+    "dist"
+  ],
   "peerDependencies": {
-    "@attraccess/plugins-backend-sdk": "^1.9.0",
+    "@attraccess/plugins-backend-sdk": "^2.0.0-0",
     "@nestjs/common": "^11.0.0"
   },
   "attraccess": {
     "displayName": "Reader UI example",
     "description": "Example: reader slot widget and start confirmation.",
-    "host": "^1.9.0",
+    "host": "^2.0.0-0",
     "backend": "dist/index.js",
-    "permissions": ["READER_UI", "ACCESS_HOOKS"],
-    "sdk": { "backend": "^1.9.0" }
+    "permissions": [
+      "READER_UI",
+      "ACCESS_HOOKS"
+    ],
+    "sdk": {
+      "backend": "^2.0.0-0"
+    }
   },
   "devDependencies": {
-    "@attraccess/plugins-backend-sdk": "^1.0.0",
+    "@attraccess/plugins-backend-sdk": "^2.0.0-0",
     "esbuild": "^0.28.0"
   }
 }

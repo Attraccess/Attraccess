@@ -1,10 +1,5 @@
-import {
-  BillingTransaction,
-  BillingTransactionItem,
-  EmailTemplateType,
-  Resource,
-  ResourceUsage,
-} from '@attraccess/database-entities';
+import { ReceiptItem } from './email-receipt.types';
+import { EmailTemplateType } from '@attraccess/application-models';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -53,29 +48,35 @@ describe('EmailService shipped usage receipt', () => {
         ),
       );
       const user = scope.makeUser({ creditBalance: 1234, locale, billingFactor: 20 });
-      const usage = Object.assign(new ResourceUsage(), {
-        startTime: new Date('2026-09-20T10:00:00Z'),
-        endTime: new Date('2026-09-20T10:01:01.001Z'),
-        usageInMinutes: 999,
-        billingFactor: 80,
-        resource: Object.assign(new Resource(), { id: 3, name: 'Laser <script>unsafe</script>' }),
-      });
-      const item = (values: Partial<BillingTransactionItem>) => Object.assign(new BillingTransactionItem(), values);
-      const transaction = Object.assign(new BillingTransaction(), {
-        amount: -94,
-        items: [
-          item({ name: 'PER_SESSION', quantity: 1, unitPrice: 100 }),
-          item({ name: 'PER_MINUTE', quantity: 2, unitPrice: 5, durationMs: 61001 }),
-          item({ name: 'PER_ATTRIBUTABLE_OPERATING_MINUTE', quantity: 1, unitPrice: 7, durationMs: 60000 }),
-          item({ name: 'BILLING_FACTOR', quantity: 1, unitPrice: -23, description: '80%' }),
-          item({
-            name: 'Custom <strong>item</strong>',
-            description: '<script>item description</script>',
-            quantity: 1,
-            unitPrice: 0,
-          }),
-        ],
-      });
+      const usage = Object.assign(
+        {},
+        {
+          startTime: new Date('2026-09-20T10:00:00Z'),
+          endTime: new Date('2026-09-20T10:01:01.001Z'),
+          usageInMinutes: 999,
+          billingFactor: 80,
+          resource: Object.assign({}, { id: 3, name: 'Laser <script>unsafe</script>' }),
+        },
+      );
+      const item = (values: Partial<ReceiptItem>) => Object.assign({}, values);
+      const transaction = Object.assign(
+        {},
+        {
+          amount: -94,
+          items: [
+            item({ name: 'PER_SESSION', quantity: 1, unitPrice: 100 }),
+            item({ name: 'PER_MINUTE', quantity: 2, unitPrice: 5, durationMs: 61001 }),
+            item({ name: 'PER_ATTRIBUTABLE_OPERATING_MINUTE', quantity: 1, unitPrice: 7, durationMs: 60000 }),
+            item({ name: 'BILLING_FACTOR', quantity: 1, unitPrice: -23, description: '80%' }),
+            item({
+              name: 'Custom <strong>item</strong>',
+              description: '<script>item description</script>',
+              quantity: 1,
+              unitPrice: 0,
+            }),
+          ],
+        },
+      );
       return { ...harness, user, usage, transaction };
     };
     const shippedUsageReceiptScope = inheritTestScope(
@@ -146,7 +147,7 @@ describe('EmailService shipped usage receipt', () => {
     });
 
     const sharedItems = () => {
-      const item = (values: Partial<BillingTransactionItem>) => Object.assign(new BillingTransactionItem(), values);
+      const item = (values: Partial<ReceiptItem>) => Object.assign({}, values);
       const segment = (startedAt: string, endedAt: string, participants: number) => ({
         startedAt,
         endedAt,
@@ -319,15 +320,18 @@ describe('EmailService shipped usage receipt', () => {
       const { service, sendMail, user, usage, transaction } = shippedUsageReceiptScope.setupReceipt(locale);
       transaction.amount = -100;
       transaction.items = [
-        Object.assign(new BillingTransactionItem(), { name: 'PER_SESSION', quantity: 1, unitPrice: 100 }),
-        Object.assign(new BillingTransactionItem(), {
-          name: 'Energy',
-          quantity: 1,
-          unitPrice: 0,
-          meterQuantity: null,
-          meterCreditsPerUnit: 30,
-          allocation: { kind: 'meter', segments: [], pending: true },
-        }),
+        Object.assign({}, { name: 'PER_SESSION', quantity: 1, unitPrice: 100 }),
+        Object.assign(
+          {},
+          {
+            name: 'Energy',
+            quantity: 1,
+            unitPrice: 0,
+            meterQuantity: null,
+            meterCreditsPerUnit: 30,
+            allocation: { kind: 'meter', segments: [], pending: true },
+          },
+        ),
       ];
       const render = jest.spyOn(service as never, 'sendEmail');
 
@@ -402,20 +406,26 @@ describe('EmailService shipped usage receipt', () => {
       const { service, sendMail, user, usage, transaction } = shippedUsageReceiptScope.setupReceipt('en');
       transaction.amount = -45;
       transaction.items = [
-        Object.assign(new BillingTransactionItem(), {
-          name: 'Energy (kWh)',
-          quantity: 1,
-          unitPrice: 45,
-          meterQuantity: '1.5',
-          meterCreditsPerUnit: 30,
-        }),
-        Object.assign(new BillingTransactionItem(), {
-          name: 'PER_MINUTE',
-          quantity: 1,
-          unitPrice: 0,
-          meterQuantity: '9007199254740993.123456789',
-          meterCreditsPerUnit: 0,
-        }),
+        Object.assign(
+          {},
+          {
+            name: 'Energy (kWh)',
+            quantity: 1,
+            unitPrice: 45,
+            meterQuantity: '1.5',
+            meterCreditsPerUnit: 30,
+          },
+        ),
+        Object.assign(
+          {},
+          {
+            name: 'PER_MINUTE',
+            quantity: 1,
+            unitPrice: 0,
+            meterQuantity: '9007199254740993.123456789',
+            meterCreditsPerUnit: 0,
+          },
+        ),
       ];
       await service.sendResourceUsageBillingSummaryEmail(user, transaction, usage, 2);
       const { html } = sendMail.mock.calls[0][0];
@@ -432,13 +442,16 @@ describe('EmailService shipped usage receipt', () => {
     it('preserves every cent of a large captured meter rate in receipts', async () => {
       const { service, sendMail, user, usage, transaction } = shippedUsageReceiptScope.setupReceipt('en');
       transaction.items = [
-        Object.assign(new BillingTransactionItem(), {
-          name: 'Heartbeats',
-          quantity: 1,
-          unitPrice: 0,
-          meterQuantity: '0',
-          meterCreditsPerUnit: Number.MAX_SAFE_INTEGER,
-        }),
+        Object.assign(
+          {},
+          {
+            name: 'Heartbeats',
+            quantity: 1,
+            unitPrice: 0,
+            meterQuantity: '0',
+            meterCreditsPerUnit: Number.MAX_SAFE_INTEGER,
+          },
+        ),
       ];
       await service.sendResourceUsageBillingSummaryEmail(user, transaction, usage, 2);
       expect(sendMail.mock.calls[0][0].html).toContain('90071992547409.91');
@@ -449,13 +462,16 @@ describe('EmailService shipped usage receipt', () => {
       user.creditBalance = Number.MAX_SAFE_INTEGER;
       transaction.amount = -Number.MAX_SAFE_INTEGER;
       transaction.items = [
-        Object.assign(new BillingTransactionItem(), {
-          name: 'Heartbeats',
-          quantity: 1,
-          unitPrice: Number.MAX_SAFE_INTEGER,
-          meterQuantity: '1',
-          meterCreditsPerUnit: Number.MAX_SAFE_INTEGER,
-        }),
+        Object.assign(
+          {},
+          {
+            name: 'Heartbeats',
+            quantity: 1,
+            unitPrice: Number.MAX_SAFE_INTEGER,
+            meterQuantity: '1',
+            meterCreditsPerUnit: Number.MAX_SAFE_INTEGER,
+          },
+        ),
       ];
       await service.sendResourceUsageBillingSummaryEmail(user, transaction, usage, 2);
       const { html } = sendMail.mock.calls[0][0];

@@ -1,4 +1,4 @@
-import { AuthenticationType } from '@attraccess/database-entities';
+import { AuthenticationType } from '@attraccess/application-models';
 
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 
@@ -39,7 +39,7 @@ export class SsoAccountLinkService {
 
   async link(linkPayload: SSOLinkTokenPayload, password: string, ip: string): Promise<{ OK: boolean }> {
     const email = linkPayload.email;
-    const user = await this.usersService.findOne({ email }, { authenticationDetails: true });
+    const user = await this.usersService.findOne({ email }, ['authenticationDetails']);
     if (!user) {
       await this.bruteForce.recordFailure('sso_link_account', ip, null, email);
       await this.authAudit.log({ type: 'sso_link_account', outcome: 'unknown_user', ip, username: email });

@@ -37,6 +37,7 @@ export const checks = {
     ['-p', 'apps/plugins/wago/acceptance/tsconfig.json'],
   ],
   'libs/api-client': [['-p', 'libs/api-client/tsconfig.lib.json']],
+  'libs/application-models': [['-p', 'libs/application-models/tsconfig.lib.json']],
   'libs/database-entities': [['-p', 'libs/database-entities/tsconfig.lib.json']],
   'libs/env': [['-p', 'libs/env/tsconfig.lib.json']],
   'libs/matter-contract': [

@@ -1,13 +1,9 @@
 // Generic Web Push (VAPID) sender. VAPID keys live in the settings table and are
 // auto-generated on first use; admins can override them (which invalidates all subscriptions).
 // FEATURE: Push notification foundation
-import { PushSubscription } from '@attraccess/database-entities';
+import type { PushSubscriptionRecord } from '@attraccess/application-models';
 
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { Repository } from 'typeorm';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 
 import * as webpush from 'web-push';
 
@@ -20,6 +16,8 @@ import { SettingsService } from '../settings/settings.service';
 import { CreatePushSubscriptionDto } from './dtos/createPushSubscription.dto';
 
 import { sendToSubscription as sendToSubscriptionImplementation } from './push-delivery';
+
+import { PUSH_SUBSCRIPTION_STORE, PushSubscriptionStore } from './push-subscription-store.port';
 
 // Generic Web Push (VAPID) sender. VAPID keys live in the settings table and are
 // auto-generated on first use; admins can override them (which invalidates all subscriptions).
@@ -59,8 +57,8 @@ export class PushService {
   private vapidKeysPromise: Promise<VapidKeys> | null = null;
 
   constructor(
-    @InjectRepository(PushSubscription)
-    private readonly subscriptionRepository: Repository<PushSubscription>,
+    @Inject(PUSH_SUBSCRIPTION_STORE)
+    private readonly subscriptions: PushSubscriptionStore,
     private readonly settingsStore: SettingsStoreService,
     private readonly settingsService: SettingsService,
   ) {}
@@ -81,7 +79,7 @@ export class PushService {
   }
 
   public async getSubscriptionCount(): Promise<number> {
-    return this.subscriptionRepository.count();
+    return this.subscriptions.count();
   }
 
   /**
@@ -91,8 +89,8 @@ export class PushService {
   public async replaceVapidKeys(override?: VapidKeys): Promise<{ keys: VapidKeys; deletedSubscriptions: number }> {
     const keys = override ? this.validateVapidKeys(override) : (webpush.generateVAPIDKeys() as VapidKeys);
 
-    const deletedSubscriptions = await this.subscriptionRepository.count();
-    await this.subscriptionRepository.createQueryBuilder().delete().execute();
+    const deletedSubscriptions = await this.subscriptions.count();
+    await this.subscriptions.deleteAll();
 
     await this.persistVapidKeys(keys);
     this.vapidKeysPromise = Promise.resolve(keys);
@@ -104,31 +102,24 @@ export class PushService {
     return { keys, deletedSubscriptions };
   }
 
-  public async upsertSubscription(userId: number, dto: CreatePushSubscriptionDto): Promise<PushSubscription> {
+  public async upsertSubscription(userId: number, dto: CreatePushSubscriptionDto): Promise<PushSubscriptionRecord> {
     // The endpoint uniquely identifies a device/browser subscription. Re-subscribing (possibly as a
     // different user on the same browser) replaces the existing entry instead of failing the unique index.
-    const existing = await this.subscriptionRepository.findOne({ where: { endpoint: dto.endpoint } });
-    const subscription =
-      existing ??
-      this.subscriptionRepository.create({
-        endpoint: dto.endpoint,
-      });
-
-    subscription.userId = userId;
-    subscription.p256dh = dto.keys.p256dh;
-    subscription.auth = dto.keys.auth;
-    subscription.userAgent = dto.userAgent ?? subscription.userAgent ?? null;
-    subscription.lastSeenAt = new Date();
-
-    return this.subscriptionRepository.save(subscription);
+    return this.subscriptions.upsertByEndpoint({
+      userId,
+      endpoint: dto.endpoint,
+      p256dh: dto.keys.p256dh,
+      auth: dto.keys.auth,
+      userAgent: dto.userAgent,
+    });
   }
 
   public async deleteSubscription(userId: number, endpoint: string): Promise<void> {
-    await this.subscriptionRepository.delete({ userId, endpoint });
+    await this.subscriptions.deleteForUser(userId, endpoint);
   }
 
   public async sendToUser(userId: number, payload: PushNotificationPayload): Promise<void> {
-    const subscriptions = await this.subscriptionRepository.find({ where: { userId } });
+    const subscriptions = await this.subscriptions.findForUser(userId);
     if (subscriptions.length === 0) {
       return;
     }
@@ -196,7 +187,7 @@ export class PushService {
   }
 
   private async sendToSubscription(
-    subscription: PushSubscription,
+    subscription: PushSubscriptionRecord,
     serializedPayload: string,
     vapidDetails: { subject: string; publicKey: string; privateKey: string },
   ): Promise<void> {
@@ -204,7 +195,7 @@ export class PushService {
     return sendToSubscriptionImplementation(
       {
         logger: getContextOwner().logger,
-        subscriptionRepository: getContextOwner().subscriptionRepository,
+        subscriptions: getContextOwner().subscriptions,
       },
       subscription,
       serializedPayload,

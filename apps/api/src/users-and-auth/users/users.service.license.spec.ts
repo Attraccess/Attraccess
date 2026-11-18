@@ -16,7 +16,7 @@ describe('UsersService license checks', () => {
       });
       fixture.licenseService.verifyLicense.mockImplementation((requirements) => license.verifyLicense(requirements));
     };
-    const withUsers = (count: number) => jest.spyOn(fixture.userRepository, 'count').mockResolvedValue(count);
+    const withUsers = (count: number) => jest.spyOn(fixture.store, 'countUsers').mockResolvedValue(count);
 
     it('allows an invite that brings the total exactly to the limit', async () => {
       withLimit(10);

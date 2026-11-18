@@ -1,8 +1,8 @@
-import { User } from '@attraccess/database-entities';
+import type { UsageSessionUser } from '@attraccess/application-models';
 
 import { Injectable, Logger } from '@nestjs/common';
 
-import { EntityManager } from 'typeorm';
+import type { TransactionScope } from '../../../database/unit-of-work';
 
 import { ResourceGroupsIntroductionsService } from '../../groups/introductions/resourceGroups.introductions.service';
 
@@ -31,15 +31,15 @@ export class UsageAccessRules {
 
   async canControl(
     resourceId: number,
-    user: User,
+    user: UsageSessionUser,
     canUpdateResource: boolean,
-    transactionalEntityManager?: EntityManager,
+    scope?: TransactionScope,
   ): Promise<boolean> {
     if (canUpdateResource) {
       return true;
     }
 
-    if (await this.resourceIntroductionService.hasValidIntroduction(resourceId, user.id, transactionalEntityManager)) {
+    if (await this.resourceIntroductionService.hasValidIntroduction(resourceId, user.id, scope)) {
       if (!(await this.resourceRetrainingService.isResourceIntroductionBlocked(resourceId, user.id))) {
         this.logger.debug(`User ${user.id} has valid introduction for resource ${resourceId}`);
         return true;
@@ -47,20 +47,17 @@ export class UsageAccessRules {
       this.logger.debug(`User ${user.id} introduction for resource ${resourceId} is blocked pending retraining`);
     }
 
-    if (await this.resourceIntroducersService.canMaintain(resourceId, user.id, true, transactionalEntityManager)) {
+    if (await this.resourceIntroducersService.canMaintain(resourceId, user.id, true, scope)) {
       this.logger.debug(`User ${user.id} is an introducer or maintainer for resource ${resourceId}`);
       return true;
     }
 
-    const groupsOfResource = await this.resourceGroupsService.getGroupsOfResource(
-      resourceId,
-      transactionalEntityManager,
-    );
+    const groupsOfResource = await this.resourceGroupsService.getGroupsOfResource(resourceId, scope);
     for (const group of groupsOfResource) {
       if (
         await this.resourceGroupsIntroductionsService.hasValidIntroduction(
           { groupId: group.id, userId: user.id },
-          transactionalEntityManager,
+          scope,
         )
       ) {
         if (!(await this.resourceRetrainingService.isGroupIntroductionBlocked(group.id, user.id))) {

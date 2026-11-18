@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { ResourceFlowNode, HttpRequestNodeDataSchema } from '@attraccess/database-entities';
+import { FlowNodeRecord, HttpRequestNodeDataSchema } from '@attraccess/application-models';
 import axios from 'axios';
 import z from 'zod';
 import { FlowFailureKind, NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
@@ -9,7 +9,7 @@ const DEFAULT_DISPATCH_TIMEOUT_MS = 30_000;
 export class HttpSendRequestExecutor implements NodeExecutor {
   private readonly logger = new Logger(HttpSendRequestExecutor.name);
 
-  async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
+  async execute(node: FlowNodeRecord, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
     const data = node.data as z.infer<typeof HttpRequestNodeDataSchema>;
 
     const url = ctx.compileTemplate(data.url ?? '', input);

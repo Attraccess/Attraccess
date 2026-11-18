@@ -11,7 +11,7 @@
 
 Matter ships as two cooperating parts, not as built-in Attraccess code:
 
-- **The Matter plugin** (`apps/plugins/matter`) is an installable Attraccess plugin. In this release it connects to the sidecar and offers an admin page (**Devices → Matter**) for the connection settings and for the fabric, its encrypted backups and recovery. It keeps the [device data model](plugins/matter/data-model.md) (nodes, endpoints, state, lifecycle) and reconciles it with the sidecar once the sidecar can list nodes; there is no device UI yet. It needs the `DATABASE_ACCESS` and `MANAGE_SECRETS` permissions.
+- **The Matter plugin** (`apps/plugins/matter`) is an installable Attraccess plugin. In this release it connects to the sidecar and offers an admin page (**Devices → Matter**) for the connection settings and for the fabric, its encrypted backups and recovery. It keeps the [device data model](plugins/matter/data-model.md) (nodes, endpoints, state, lifecycle) and reconciles it with the sidecar once the sidecar can list nodes; there is no device UI yet. It needs the `PLUGIN_STORAGE` and `MANAGE_SECRETS` permissions.
 - **The Matter sidecar** (`apps/matter-sidecar`) is a separate Node.js process. It is the only code that loads [matter.js](https://github.com/project-chip/matter.js) (`@matter/main`, pinned to one exact release). It can start and run without the Attraccess API, a database, a Matter fabric or any commissioned device. Once an administrator creates the fabric, the sidecar persists it in its own storage directory (`MATTER_SIDECAR_STORAGE_DIR`) and opens Matter networking (mDNS and UDP). It never creates, restores or overwrites a fabric on its own.
 
 A shared library, `libs/matter-contract`, defines every request, response and event once, with runtime validation (Zod). The sidecar and the plugin both use it. It never imports matter.js, core code, database entities or plugins.
@@ -24,15 +24,15 @@ There is exactly **one** wire-protocol version: `1`. There are no previous-versi
 
 A matching wire version is not enough. Attraccess, the Matter plugin and the sidecar must form a **supported combination**. The single authoritative table is `COMPATIBILITY_TABLE` in `libs/matter-contract/src/compatibility.ts`:
 
-| Component      | Supported                                                  |
-| -------------- | ---------------------------------------------------------- |
-| Wire version   | `1`                                                        |
-| Attraccess     | `^1.11.0` (prereleases of a matching version are accepted) |
-| Matter plugin  | exactly `0.4.0-alpha.0`                                    |
-| Matter sidecar | exactly `0.4.0-alpha.0`                                    |
-| matter.js      | exactly `0.18.0` (plugin and sidecar share one release)    |
+| Component      | Supported                                                   |
+| -------------- | ----------------------------------------------------------- |
+| Wire version   | `1`                                                         |
+| Attraccess     | `^2.0.0-0` (prereleases of a matching version are accepted) |
+| Matter plugin  | exactly `0.4.0-alpha.0`                                     |
+| Matter sidecar | exactly `0.4.0-alpha.0`                                     |
+| matter.js      | exactly `0.18.0` (plugin and sidecar share one release)     |
 
-The plugin's `attraccess.host` (`package.json`) and `attraccessVersion.min` (`plugin.json`) are derived from the same table, and a test checks that they match. Every new plugin or sidecar release needs a table update; otherwise the sidecar rejects it. The Attraccess range is deliberately a range, so a new Attraccess 1.x release does not by itself require a sidecar release.
+The plugin's `attraccess.host` (`package.json`) and `attraccessVersion.min` (`plugin.json`) are derived from the same table, and a test checks that they match. Every new plugin or sidecar release needs a table update; otherwise the sidecar rejects it. The Attraccess range is deliberately a range, so a new Attraccess 2.x release does not by itself require a sidecar release.
 
 Release headers are compatibility information, **not authentication**; authentication is the service token (see [Security model](#security-model)). A mismatched sidecar must be upgraded or downgraded.
 
@@ -141,7 +141,7 @@ The sidecar controls physical equipment, so it never trusts a caller by network 
 
 ## The plugin connects to the sidecar
 
-An administrator configures the connection in the web UI (**Devices → Matter**): the sidecar URL, the service token and, optionally, a CA certificate. That CA is added to Node.js's default trust store (the bundled root certificates plus any `NODE_EXTRA_CA_CERTS`); it does not replace it. The URL may be `http` or `https` and may carry a path prefix for a reverse proxy (`https://host/prefix` leads to `/prefix/v1/...`). The token is stored encrypted by the host (`MANAGE_SECRETS`) in a plugin table (`DATABASE_ACCESS`), is never shown again and never appears in logs, errors, status responses or audit entries. Only users with the `matter.devices.manage` permission can read or change the settings; `matter.devices.read` shows the connection status (see [Permissions](plugins/matter/permissions.md)). Every change is recorded in the audit log without secrets.
+An administrator configures the connection in the web UI (**Devices → Matter**): the sidecar URL, the service token and, optionally, a CA certificate. That CA is added to Node.js's default trust store (the bundled root certificates plus any `NODE_EXTRA_CA_CERTS`); it does not replace it. The URL may be `http` or `https` and may carry a path prefix for a reverse proxy (`https://host/prefix` leads to `/prefix/v1/...`). The token is stored encrypted by the host (`MANAGE_SECRETS`) in a table of its [plugin storage](plugins/plugin-storage.md) (`PLUGIN_STORAGE`), is never shown again and never appears in logs, errors, status responses or audit entries. Only users with the `matter.devices.manage` permission can read or change the settings; `matter.devices.read` shows the connection status (see [Permissions](plugins/matter/permissions.md)). Every change is recorded in the audit log without secrets.
 
 The plugin starts the connection without waiting for the sidecar. **A missing, restarting, rejecting or incompatible sidecar never stops Attraccess or the plugin from loading**; the plugin shows an explicit state instead:
 

@@ -1,15 +1,4 @@
-import { User, AuthenticationDetail, AuthenticationType, UserRole } from '@attraccess/database-entities';
-
-import {
-  Brackets,
-  DataSource,
-  FindOptionsWhere,
-  ILike,
-  In,
-  Repository,
-  SelectQueryBuilder,
-  EntityManager,
-} from 'typeorm';
+import type { UserAccount } from '@attraccess/application-models';
 
 import { PaginationOptionsSchema } from '../../../types/request';
 
@@ -19,9 +8,7 @@ import { UserListOptions, UpdateUserData, FindOneOptionsSchema } from '../accoun
 
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
-import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
-
-import { InjectRepository } from '@nestjs/typeorm';
+import { BadRequestException, ForbiddenException, Inject, Injectable, Logger } from '@nestjs/common';
 
 import { isEmail } from 'class-validator';
 
@@ -38,21 +25,25 @@ import { normalizeEmail } from '../accounts/normalize-email';
 
 import { EmailService } from '../../../email/email.service';
 
+import type { TransactionContext } from '../../../database/transaction-context';
+import { isUniqueViolation } from '../../../database/persistence-errors';
+import { UNIT_OF_WORK, type UnitOfWork } from '../../../database/unit-of-work';
+import { USER_STORE, type UserStore } from '../user-store.port';
+
 /** Listing and searching users, and changes to an existing account's identity. */
 @Injectable()
 export class UserDirectory {
   private readonly logger = new Logger('UsersService');
 
   constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    @Inject(USER_STORE) private readonly store: UserStore,
     private readonly accounts: UserAccounts,
     private readonly emailService: EmailService,
-    private readonly dataSource: DataSource,
+    @Inject(UNIT_OF_WORK) private readonly uow: UnitOfWork,
   ) {}
 
   /** Resolve the identifier accepted by local login without ambiguous username/email queries. */
-  async findByLoginIdentifier(identifier: string): Promise<User | null> {
+  async findByLoginIdentifier(identifier: string): Promise<UserAccount | null> {
     const value = identifier.trim();
     if (!value) return null;
 
@@ -63,210 +54,20 @@ export class UserDirectory {
     return this.accounts.findOne(parsed.data);
   }
 
-  async findMany(options: UserListOptions): Promise<PaginatedResponse<User>> {
+  async findMany(options: UserListOptions): Promise<PaginatedResponse<UserAccount>> {
     this.logger.debug(`Finding all users with options: ${JSON.stringify(options)}`);
-    const paginationOptions = PaginationOptionsSchema.parse(options);
-    const { search } = options;
-    const { page, limit } = paginationOptions;
-    const skip = (page - 1) * limit;
+    const { page, limit } = PaginationOptionsSchema.parse(options);
 
     if (Array.isArray(options.ids) && options.ids.length === 0) {
-      return {
-        data: [],
-        total: 0,
-        page: paginationOptions.page,
-        limit: paginationOptions.limit,
-      };
+      return { data: [], total: 0, page, limit };
     }
 
-    const hasAdvancedFilters =
-      options.roleIds !== undefined ||
-      options.excludeRoleIds !== undefined ||
-      options.emailVerified !== undefined ||
-      options.ssoProviderIds !== undefined ||
-      options.excludeSsoProviderIds !== undefined ||
-      options.ssoProviderNone !== undefined ||
-      options.hasSsoProvider !== undefined;
-
-    if (hasAdvancedFilters) {
-      const query = this.userRepository.createQueryBuilder('user');
-      query.leftJoinAndSelect('user.authenticationDetails', 'authenticationDetails');
-
-      if (options.includeRoles) {
-        query.leftJoinAndSelect('user.userRoles', 'userRoles').leftJoinAndSelect('userRoles.role', 'role');
-      }
-
-      if (options.ids) {
-        query.andWhere('user.id IN (:...ids)', { ids: options.ids });
-      }
-
-      if (options.emailVerified !== undefined) {
-        query.andWhere('user.isEmailVerified = :emailVerified', { emailVerified: options.emailVerified });
-      }
-
-      this.applyRoleFilters(query, options);
-
-      this.applySsoFilters(query, options);
-
-      if (search) {
-        this.logger.debug(`Searching for users with query: ${search}`);
-        query.andWhere(
-          new Brackets((where) =>
-            where.where('LOWER(user.username) LIKE LOWER(:search)').orWhere('LOWER(user.email) LIKE :emailSearch'),
-          ),
-          // SQLite LOWER() only folds ASCII, so fold the email term in JS like the stored value.
-          { search: `%${search}%`, emailSearch: `%${normalizeEmail(search)}%` },
-        );
-      }
-
-      const [users, total] = await query.orderBy('user.username', 'ASC').skip(skip).take(limit).getManyAndCount();
-      return { data: users, total, page, limit };
-    }
-
-    let whereCondition: FindOptionsWhere<User>[] | FindOptionsWhere<User> = {};
-
-    if (Array.isArray(options.ids)) {
-      whereCondition = { id: In(options.ids) };
-    }
-
-    if (options.roleId !== undefined) {
-      whereCondition = { ...whereCondition, userRoles: { roleId: options.roleId } };
-    }
-
-    if (search) {
-      this.logger.debug(`Searching for users with query: ${search}`);
-      whereCondition = [
-        { ...whereCondition, username: ILike(`%${search}%`) },
-        { ...whereCondition, email: ILike(`%${normalizeEmail(search)}%`) },
-      ];
-    }
-
-    this.logger.debug(`Executing find with skip: ${skip}, take: ${limit}`);
-    const [users, total] = await this.userRepository.findAndCount({
-      skip,
-      take: limit,
-      where: whereCondition,
-      relations: options.includeRoles
-        ? { authenticationDetails: true, userRoles: { role: true } }
-        : { authenticationDetails: true },
-      order: { username: 'ASC' },
-    });
-
+    const { users, total } = await this.store.listUsers({ ...options, page, limit });
     this.logger.debug(`Found ${total} total users, returning page ${page} with ${users.length} results`);
-    return {
-      data: users,
-      total,
-      page: paginationOptions.page,
-      limit: paginationOptions.limit,
-    };
+    return { data: users, total, page, limit };
   }
 
-  private applyRoleFilters(query: SelectQueryBuilder<User>, options: UserListOptions): void {
-    const requestedRoleIds = options.roleIds ?? (options.roleId === undefined ? undefined : [options.roleId]);
-    const roleIds = requestedRoleIds ? [...new Set(requestedRoleIds)] : undefined;
-    if (roleIds?.length) {
-      const roleFilter = query
-        .subQuery()
-        .select('userRole.userId')
-        .from(UserRole, 'userRole')
-        .where('userRole.roleId IN (:...roleIds)');
-
-      if (options.roleMatch === 'all') {
-        roleFilter.groupBy('userRole.userId').having('COUNT(DISTINCT userRole.roleId) = :roleCount');
-        query.andWhere(`user.id IN ${roleFilter.getQuery()}`, { roleIds, roleCount: roleIds.length });
-      } else {
-        query.andWhere(`user.id IN ${roleFilter.getQuery()}`, { roleIds });
-      }
-    }
-
-    const excludeRoleIds = options.excludeRoleIds ? [...new Set(options.excludeRoleIds)] : undefined;
-    if (excludeRoleIds?.length) {
-      const excludedRoles = query
-        .subQuery()
-        .select('1')
-        .from(UserRole, 'excludedUserRole')
-        .where('excludedUserRole.userId = user.id')
-        .andWhere('excludedUserRole.roleId IN (:...excludeRoleIds)');
-      query.andWhere(`NOT EXISTS ${excludedRoles.getQuery()}`, { excludeRoleIds });
-    }
-  }
-
-  private applySsoFilters(query: SelectQueryBuilder<User>, options: UserListOptions): void {
-    const ssoProviderIds = options.ssoProviderIds ? [...new Set(options.ssoProviderIds)] : undefined;
-    if (ssoProviderIds?.length || options.ssoProviderNone) {
-      const noSsoProvider = query
-        .subQuery()
-        .select('1')
-        .from(AuthenticationDetail, 'ssoDetail')
-        .where('ssoDetail.userId = user.id')
-        .andWhere('ssoDetail.type = :ssoType')
-        .getQuery();
-      const ssoProviders = ssoProviderIds?.length
-        ? query
-            .subQuery()
-            .select('ssoDetail.userId')
-            .from(AuthenticationDetail, 'ssoDetail')
-            .where('ssoDetail.userId = user.id')
-            .andWhere('ssoDetail.type = :ssoType')
-            .andWhere('ssoDetail.providerId IN (:...ssoProviderIds)')
-        : undefined;
-
-      if (ssoProviders && options.ssoProviderMatch === 'all') {
-        ssoProviders.groupBy('ssoDetail.userId').having('COUNT(DISTINCT ssoDetail.providerId) = :ssoProviderCount');
-      }
-
-      if (ssoProviders && options.ssoProviderNone && options.ssoProviderMatch !== 'all') {
-        query.andWhere(
-          new Brackets((where) =>
-            where.where(`user.id IN ${ssoProviders.getQuery()}`).orWhere(`NOT EXISTS ${noSsoProvider}`),
-          ),
-        );
-      } else if (ssoProviders) {
-        query.andWhere(`user.id IN ${ssoProviders.getQuery()}`);
-        if (options.ssoProviderNone) {
-          query.andWhere(`NOT EXISTS ${noSsoProvider}`);
-        }
-      } else {
-        query.andWhere(`NOT EXISTS ${noSsoProvider}`);
-      }
-
-      query.setParameters({
-        ssoType: AuthenticationType.SSO,
-        ...(ssoProviderIds?.length ? { ssoProviderIds, ssoProviderCount: ssoProviderIds.length } : {}),
-      });
-    }
-
-    if (options.hasSsoProvider !== undefined) {
-      const ssoProviderExists = query
-        .subQuery()
-        .select('1')
-        .from(AuthenticationDetail, 'anySsoDetail')
-        .where('anySsoDetail.userId = user.id')
-        .andWhere('anySsoDetail.type = :anySsoType');
-      query.andWhere(`${options.hasSsoProvider ? 'EXISTS' : 'NOT EXISTS'} ${ssoProviderExists.getQuery()}`, {
-        anySsoType: AuthenticationType.SSO,
-      });
-    }
-
-    const excludeSsoProviderIds = options.excludeSsoProviderIds
-      ? [...new Set(options.excludeSsoProviderIds)]
-      : undefined;
-    if (excludeSsoProviderIds?.length) {
-      const excludedSsoProviders = query
-        .subQuery()
-        .select('1')
-        .from(AuthenticationDetail, 'excludedSsoDetail')
-        .where('excludedSsoDetail.userId = user.id')
-        .andWhere('excludedSsoDetail.type = :excludedSsoType')
-        .andWhere('excludedSsoDetail.providerId IN (:...excludeSsoProviderIds)');
-      query.andWhere(`NOT EXISTS ${excludedSsoProviders.getQuery()}`, {
-        excludedSsoType: AuthenticationType.SSO,
-        excludeSsoProviderIds,
-      });
-    }
-  }
-
-  async updateOne(id: number, updateData: UpdateUserData, manager?: EntityManager): Promise<User> {
+  async updateOne(id: number, updateData: UpdateUserData, context?: TransactionContext): Promise<UserAccount> {
     // An explicit null clears the column; undefined leaves it unchanged.
     const trimOrNull = (value: string | null | undefined) => (value === null ? null : value?.trim());
     const updates: UpdateUserData = {
@@ -282,16 +83,11 @@ export class UserDirectory {
       failedLoginAttempts: updateData.failedLoginAttempts ?? undefined,
       firstFailedLoginAt: 'firstFailedLoginAt' in updateData ? updateData.firstFailedLoginAt : undefined,
     };
-    this.logger.debug(`Updating user with ID: ${id}, updates: ${JSON.stringify(updates)}`);
+    this.logger.debug(`Updating user with ID: ${id}`);
 
-    // If email is being updated, check for uniqueness
-    const userRepo = manager ? manager.getRepository(User) : this.userRepository;
+    await this.store.updateUser(id, updates, context);
 
-    this.logger.debug(`Performing update for user ID: ${id}`);
-    await userRepo.update(id, updates);
-
-    this.logger.debug(`Fetching updated user from database, ID: ${id}`);
-    const updatedUser = await this.accounts.findOne({ id }, undefined, manager);
+    const updatedUser = await this.accounts.findOne({ id }, undefined, context);
     if (!updatedUser) {
       this.logger.error(`User not found after update, ID: ${id}`);
       throw new UserNotFoundException(id);
@@ -301,7 +97,7 @@ export class UserDirectory {
     return updatedUser;
   }
 
-  async changeUsername(targetUserId: number, newUsername: string, executingUser: User): Promise<User> {
+  async changeUsername(targetUserId: number, newUsername: string, executingUser: { id: number }): Promise<UserAccount> {
     const isSSOUser = await this.accounts.isSSOUser(targetUserId);
     if (isSSOUser) {
       throw new SSOUsernameChangeForbiddenException();
@@ -342,10 +138,7 @@ export class UserDirectory {
 
     const lastUsernameChangeAt = isSelf ? new Date() : undefined;
 
-    await this.userRepository.update(targetUserId, {
-      username: newUsername,
-      ...(lastUsernameChangeAt ? { lastUsernameChangeAt } : {}),
-    });
+    await this.store.updateUser(targetUserId, { username: newUsername, lastUsernameChangeAt });
 
     const updated = await this.accounts.findOne({ id: targetUserId });
     if (!updated) {
@@ -360,7 +153,7 @@ export class UserDirectory {
     return updated;
   }
 
-  async changeEmail(targetUserId: number, newEmail: string, executingUser: User): Promise<User> {
+  async changeEmail(targetUserId: number, newEmail: string, executingUser: { id: number }): Promise<UserAccount> {
     const normalizedEmail = normalizeEmail(newEmail ?? '');
     if (!normalizedEmail) {
       throw new BadRequestException('Email cannot be empty');
@@ -393,55 +186,63 @@ export class UserDirectory {
     const token = randomBytes(16).toString('base64url').slice(0, 21);
     const expiresAt = addDays(new Date(), 3);
 
-    let updated: User;
+    // SMTP can take seconds, and while a transaction is open every other request waits for the connection: the mail
+    // goes out after the commit. A failed send takes the change back (unless a newer change replaced it), as the
+    // rollback did when sending ran inside the transaction.
+    const send: { failure?: { error: unknown } } = {};
+    let updated: UserAccount;
     try {
-      updated = await this.dataSource.transaction(async (manager) => {
-        const userRepo = manager.getRepository(User);
+      updated = await this.uow.run(async (scope) => {
+        await this.store.updateUser(
+          targetUserId,
+          {
+            email: normalizedEmail,
+            isEmailVerified: false,
+            emailVerificationToken: token,
+            emailVerificationTokenExpiresAt: expiresAt,
+          },
+          scope,
+        );
 
-        await userRepo.update(targetUserId, {
-          email: normalizedEmail,
-          isEmailVerified: false,
-          emailVerificationToken: token,
-          emailVerificationTokenExpiresAt: expiresAt,
-        });
-
-        const changed = await this.accounts.findOne({ id: targetUserId }, undefined, manager);
+        const changed = await this.accounts.findOne({ id: targetUserId }, undefined, scope);
         if (!changed) {
           throw new UserNotFoundException(targetUserId);
         }
+        scope.afterCommit(async () => {
+          try {
+            await this.emailService.sendVerificationEmail(changed, token);
+          } catch (error) {
+            send.failure = { error };
+            await this.takeBackEmailChange(targetUser, token);
+          }
+        });
         return changed;
       });
     } catch (error) {
-      if (this.accounts.isEmailUniqueConstraintViolation(error)) {
+      if (isUniqueViolation(error)) {
         throw new BadRequestException('Email already exists');
       }
       throw error;
     }
 
-    // SMTP can take seconds, and while a transaction is open every other request waits for the connection: send after
-    // the commit. A failed send takes the change back (unless a newer change replaced it), as the rollback did.
-    try {
-      await this.emailService.sendVerificationEmail(updated, token);
-    } catch (error) {
-      try {
-        await this.userRepository.update(
-          { id: targetUserId, emailVerificationToken: token },
-          {
-            email: targetUser.email,
-            isEmailVerified: targetUser.isEmailVerified,
-            emailVerificationToken: targetUser.emailVerificationToken,
-            emailVerificationTokenExpiresAt: targetUser.emailVerificationTokenExpiresAt,
-          },
-        );
-      } catch (revertError) {
-        this.logger.error('Failed to take back an email change after an email failure', (revertError as Error).stack);
-      }
-      throw error;
-    }
+    if (send.failure) throw send.failure.error;
     return updated;
   }
 
-  async changeBillingFactor(targetUserId: number, newBillingFactor: number): Promise<User> {
+  private async takeBackEmailChange(previous: UserAccount, issuedToken: string): Promise<void> {
+    try {
+      await this.store.revertEmailChange(previous.id, issuedToken, {
+        email: previous.email,
+        isEmailVerified: previous.isEmailVerified,
+        emailVerificationToken: previous.emailVerificationToken,
+        emailVerificationTokenExpiresAt: previous.emailVerificationTokenExpiresAt,
+      });
+    } catch (revertError) {
+      this.logger.error('Failed to take back an email change after an email failure', (revertError as Error).stack);
+    }
+  }
+
+  async changeBillingFactor(targetUserId: number, newBillingFactor: number): Promise<UserAccount> {
     const targetUser = await this.accounts.findOne({ id: targetUserId });
     if (!targetUser) {
       throw new UserNotFoundException(targetUserId);
@@ -451,7 +252,7 @@ export class UserDirectory {
       throw new BadRequestException('Billing factor must be at least 0');
     }
 
-    await this.userRepository.update(targetUserId, { billingFactor: newBillingFactor });
+    await this.store.updateUser(targetUserId, { billingFactor: newBillingFactor });
 
     const updatedUser = await this.accounts.findOne({ id: targetUserId });
     if (!updatedUser) {

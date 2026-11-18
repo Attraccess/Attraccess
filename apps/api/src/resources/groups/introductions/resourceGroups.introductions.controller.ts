@@ -2,7 +2,12 @@ import { Body, Controller, Get, Param, ParseIntPipe, Post, Req } from '@nestjs/c
 import { ResourceGroupsIntroductionsService } from './resourceGroups.introductions.service';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { ResourceIntroduction, ResourceIntroductionHistoryItem } from '@attraccess/database-entities';
+import {
+  ResourceIntroduction,
+  ResourceIntroductionHistoryItem,
+  toIntroductionDto,
+  toIntroductionHistoryDto,
+} from '../../introductions/dtos/introduction-records.dto';
 import { IsResourceGroupIntroducer } from './isIntroducer.decorator';
 import { UpdateResourceGroupIntroductionDto } from './dtos/update.request.dto';
 
@@ -21,7 +26,7 @@ export class ResourceGroupsIntroductionsController {
   })
   @IsResourceGroupIntroducer()
   async getMany(@Param('groupId', ParseIntPipe) groupId: number): Promise<ResourceIntroduction[]> {
-    return await this.resourceGroupsIntroductionsService.getManyByGroupId(groupId);
+    return (await this.resourceGroupsIntroductionsService.getManyByGroupId(groupId)).map(toIntroductionDto);
   }
 
   @Get('/:userId/history')
@@ -39,9 +44,11 @@ export class ResourceGroupsIntroductionsController {
   @IsResourceGroupIntroducer()
   async getHistory(
     @Param('groupId', ParseIntPipe) groupId: number,
-    @Param('userId', ParseIntPipe) userId: number
+    @Param('userId', ParseIntPipe) userId: number,
   ): Promise<ResourceIntroductionHistoryItem[]> {
-    return await this.resourceGroupsIntroductionsService.getHistoryByGroupIdAndUserId(groupId, userId);
+    return (await this.resourceGroupsIntroductionsService.getHistoryByGroupIdAndUserId(groupId, userId)).map(
+      toIntroductionHistoryDto,
+    );
   }
 
   @Post('/:userId/grant')
@@ -63,11 +70,13 @@ export class ResourceGroupsIntroductionsController {
     @Body() data: UpdateResourceGroupIntroductionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem> {
-    return await this.resourceGroupsIntroductionsService.grant(groupId, userId, data, {
-      performedByUserId: req.user.id,
-      authenticationMethod: req.user.authenticationMethod,
-      apiTokenId: req.user.apiTokenId,
-    });
+    return toIntroductionHistoryDto(
+      await this.resourceGroupsIntroductionsService.grant(groupId, userId, data, {
+        performedByUserId: req.user.id,
+        authenticationMethod: req.user.authenticationMethod,
+        apiTokenId: req.user.apiTokenId,
+      }),
+    );
   }
 
   @Post('/:userId/revoke')
@@ -89,10 +98,12 @@ export class ResourceGroupsIntroductionsController {
     @Body() data: UpdateResourceGroupIntroductionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem> {
-    return await this.resourceGroupsIntroductionsService.revoke(groupId, userId, data, {
-      performedByUserId: req.user.id,
-      authenticationMethod: req.user.authenticationMethod,
-      apiTokenId: req.user.apiTokenId,
-    });
+    return toIntroductionHistoryDto(
+      await this.resourceGroupsIntroductionsService.revoke(groupId, userId, data, {
+        performedByUserId: req.user.id,
+        authenticationMethod: req.user.authenticationMethod,
+        apiTokenId: req.user.apiTokenId,
+      }),
+    );
   }
 }

@@ -1,60 +1,35 @@
 import { registerUsersServiceFixture } from '../users.service.users-service.test-fixture';
-import { User } from '@attraccess/database-entities';
-import { DataSource, EntitySchema } from 'typeorm';
 
 describe('UsersService', () => {
   const fixture = registerUsersServiceFixture();
 
   describe('local login identifier lookup', () => {
     it('preserves existing username normalization', async () => {
-      const user = { id: 7 } as User;
-      fixture.userRepository.findOne.mockResolvedValue(user);
-      await expect(fixture.service.findByLoginIdentifier(' Alice ')).resolves.toBe(user);
-      expect(fixture.userRepository.findOne).toHaveBeenCalledWith({
-        where: { username: 'alice' },
-        relations: undefined,
-      });
+      const [user] = fixture.store.seed({ id: 7, username: 'alice' });
+      const spy = jest.spyOn(fixture.store, 'findUser');
+
+      await expect(fixture.service.findByLoginIdentifier(' Alice ')).resolves.toMatchObject({ id: user.id });
+      expect(spy).toHaveBeenCalledWith({ id: undefined, username: 'alice', email: undefined }, false, undefined);
     });
-    describe('email lookup is case-insensitive', () => {
-      const schema = new EntitySchema<User>({
-        name: 'LoginUser',
-        columns: {
-          id: { type: Number, primary: true },
-          email: { type: String, unique: true },
-        },
-      });
-      let db: DataSource;
 
-      beforeEach(async () => {
-        db = await new DataSource({
-          type: 'better-sqlite3',
-          database: ':memory:',
-          entities: [schema],
-          synchronize: true,
-        }).initialize();
-        const repo = db.getRepository(schema);
-        await repo.save([
-          { id: 7, email: 'alice@example.com' },
-          { id: 8, email: 'a_btag@example.com' },
-        ]);
-        fixture.userRepository.findOne.mockImplementation((options) => repo.findOne(options));
-      });
+    it('matches mixed-case input against lowercase stored emails', async () => {
+      fixture.store.seed(
+        { id: 7, username: 'a', email: 'alice@example.com' },
+        { id: 8, username: 'b', email: 'a_btag@example.com' },
+      );
 
-      afterEach(async () => {
-        await db.destroy();
-      });
-
-      it('matches mixed-case input against lowercase stored emails without wildcard matching', async () => {
-        await expect(fixture.service.findByLoginIdentifier(' ALICE@example.COM ')).resolves.toMatchObject({ id: 7 });
-        await expect(fixture.service.findByLoginIdentifier('a_bTAG@example.COM')).resolves.toMatchObject({ id: 8 });
-        await expect(fixture.service.findByLoginIdentifier('a__tag@example.com')).resolves.toBeNull();
-      });
+      await expect(fixture.service.findByLoginIdentifier(' ALICE@example.COM ')).resolves.toMatchObject({ id: 7 });
+      await expect(fixture.service.findByLoginIdentifier('a_bTAG@example.COM')).resolves.toMatchObject({ id: 8 });
+      // an underscore is a literal character, never a wildcard
+      await expect(fixture.service.findByLoginIdentifier('a__tag@example.com')).resolves.toBeNull();
     });
+
     it.each(['', '  ', 'a@', '@example.com', 'a@@example.com'])(
       'rejects malformed identifier %s without a query',
       async (identifier) => {
+        const spy = jest.spyOn(fixture.store, 'findUser');
         await expect(fixture.service.findByLoginIdentifier(identifier)).resolves.toBeNull();
-        expect(fixture.userRepository.findOne).not.toHaveBeenCalled();
+        expect(spy).not.toHaveBeenCalled();
       },
     );
   });

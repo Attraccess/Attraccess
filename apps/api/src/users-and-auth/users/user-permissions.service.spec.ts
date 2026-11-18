@@ -4,7 +4,7 @@ import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserPermissionsService } from './user-permissions.service';
-import { User } from '@attraccess/database-entities';
+import type { UserAccount as User } from '@attraccess/application-models';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
 

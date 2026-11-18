@@ -1,10 +1,9 @@
 import {
   ResourceFlowNodeType,
-  ResourceUsage,
   ResourceHealthStatus,
   ResourceIntroducerType,
   SupervisionMode,
-} from '@attraccess/database-entities';
+} from '@attraccess/application-models';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
 import { getSessionCapacity } from '../../../../resources/usage/sessions/active-usage';
 import type { ResourceListService } from './resource-list.service';
@@ -23,7 +22,17 @@ interface ResourceListServiceResourceListPayloadContext {
   rbacService: ResourceListService['rbacService'];
   logger: ResourceListService['logger'];
 }
-function toReaderSession(session: ResourceUsage, offsetMinutes: (at: Date) => number) {
+/** What the reader's session list reads of a running usage session. */
+interface ReaderSessionSource {
+  id: number;
+  userId: number;
+  startTime: Date;
+  /** Always loaded for the active sessions the reader lists. */
+  user?: { username: string } | null;
+  supervisorUser?: { username: string } | null;
+}
+
+function toReaderSession(session: ReaderSessionSource, offsetMinutes: (at: Date) => number) {
   return {
     id: session.id,
     user: {
@@ -45,9 +54,9 @@ export const MAX_LISTED_READER_SESSIONS = 16;
 
 /** The card holder's own session first, then the others earliest first, capped for the reader's memory. */
 function listedReaderSessions(
-  sessions: ResourceUsage[],
+  sessions: ReaderSessionSource[],
   offsetMinutes: (at: Date) => number,
-  own?: ResourceUsage,
+  own?: ReaderSessionSource,
 ): ReaderSession[] {
   const ordered = own ? [own, ...sessions.filter((session) => session !== own)] : sessions;
   return ordered.slice(0, MAX_LISTED_READER_SESSIONS).map((session) => toReaderSession(session, offsetMinutes));

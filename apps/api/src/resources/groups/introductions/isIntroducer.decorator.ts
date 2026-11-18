@@ -17,6 +17,6 @@ export function IsResourceGroupIntroducer() {
     ApiUnauthorizedResponse({ description: 'User is not authenticated' }),
     ApiForbiddenResponse({
       description: 'User does not have permission to introduce users to this resource group',
-    })
+    }),
   );
 }

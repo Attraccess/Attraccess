@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { ModuleRef } from '@nestjs/core';
-import type { DataSource } from 'typeorm';
 import type { PluginCardChannel, PluginContext, PluginPermission } from '@attraccess/plugins-backend-sdk';
 import { EmulatedCard } from '../../attractap/card-crypto/card-emulator.test-fixture';
 import { CardKind } from '../../attractap/card-crypto/card-operations';
@@ -36,7 +35,7 @@ export function createPluginCardsHost(
       throw new Error(`unexpected host token ${String(token)}`);
     }),
   } as unknown as ModuleRef;
-  new PluginModule({} as DataSource, new EventEmitter2(), moduleRef);
+  new PluginModule({}, new EventEmitter2(), moduleRef);
   const context = pluginModuleInternals().createPluginContext(manifest({ id: PLUGIN_ID, permissions }));
 
   /** Enrolls a card through an Attractap reader, as a user would. */

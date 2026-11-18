@@ -1,4 +1,5 @@
 # Shelly
+
 <!-- llms-description: Das Plugin Shelly führt ein Register der Shelly-Geräte in Ihrem Netzwerk mit Suche, Geräteinformationen, Admin-Passwort-Verwaltung und Firmware-Updates. -->
 
 > [!NOTE]
@@ -9,8 +10,11 @@ Das Hinzufügen oder Entfernen eines Eintrags im Register verändert die Geräte
 
 ## Voraussetzungen
 
-- Attraccess 1.11.0 oder neuer und das Plugin `shelly`, installiert wie unter
-  [Plugins installieren](plugins/installing-plugins.md) beschrieben. Es benötigt die Berechtigung `DATABASE_ACCESS`.
+- Attraccess 2.0 oder neuer und das Plugin `shelly`, installiert wie unter
+  [Plugins installieren](plugins/installing-plugins.md) beschrieben. Es benötigt die Berechtigung `PLUGIN_STORAGE` für seine eigenen Tabellen.
+- Upgrade von 1.x: Die 1.x-Tabellen und -Daten des Plugins bleiben erhalten und werden an Ort und Stelle übernommen.
+  Aktualisieren Sie vorher auf Attraccess 1.11 (siehe
+  [Upgrade auf Attraccess 2.0](installation/updating.md#upgrade-auf-attraccess-20)).
 - Shelly-Geräte, die der Attraccess-Server über das Netzwerk per IP-Adresse erreicht.
 - Nutzer benötigen die Berechtigung **Ressourcen verwalten** (`resources.update`), um die Seite zu öffnen.
 - Läuft Attraccess in einem Container, ist dessen Netzwerk nicht Ihr LAN. Geben Sie beim Suchen das Subnetz Ihrer Geräte

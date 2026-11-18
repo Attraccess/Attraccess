@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { ResourceFormAction } from '@attraccess/database-entities';
+import { ResourceFormAction } from '@attraccess/application-models';
 import { InsufficientBalanceError } from '../../../../billing/errors/insufficient-balance.error';
 import { AlreadyHasActiveSessionError } from '../../../../resources/usage/errors/already-has-active-session.error';
 import { ResourceFullError } from '../../../../resources/usage/errors/resource-full.error';

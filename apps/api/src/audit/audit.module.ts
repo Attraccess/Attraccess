@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+import { AuditPersistenceModule } from '../database/adapters/audit/audit-persistence.module';
 import { SettingsModule } from '../settings/settings.module';
 import { PLUGIN_AUDIT_HOST_PROVIDER } from '@attraccess/plugins-backend-sdk';
 import { AuditService } from './audit.service';
@@ -10,7 +11,7 @@ import { AUDIT_RECORDER } from './recorder/audit-event';
 /** Global, so domain modules depend only on the AUDIT_RECORDER port and never import this module. */
 @Global()
 @Module({
-  imports: [SettingsModule],
+  imports: [SettingsModule, AuditPersistenceModule],
   controllers: [AuditController],
   providers: [
     AuditService,

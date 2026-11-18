@@ -1,5 +1,5 @@
 import { DOMParser } from '@xmldom/xmldom';
-import { SsoSessionContext } from '@attraccess/database-entities';
+import { SsoSessionContext } from '@attraccess/application-models';
 import { Profile as SamlProfile } from '@node-saml/passport-saml';
 
 const ASSERTION = 'urn:oasis:names:tc:SAML:2.0:assertion';

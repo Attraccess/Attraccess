@@ -12,7 +12,8 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ResourceIntroducersService } from './resourceIntroducers.service';
-import { ResourceIntroducer, ResourceIntroducerType } from '@attraccess/database-entities';
+import { ResourceIntroducer, toResourceIntroducerDto } from './dtos/resource-introducer.dto';
+import { ResourceIntroducerType } from '@attraccess/application-models';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { IsResourceIntroducerResponseDto } from './dtos/isIntroducer.response.dto';
 import { GrantIntroducerDto } from './dtos/grantIntroducer.dto';
@@ -95,7 +96,7 @@ export class ResourceIntroducersController {
     if (!(await this.resourceIntroducersService.canViewAccessLists(resourceId, req.user))) {
       throw new ForbiddenException('User cannot view the introducers of this resource');
     }
-    return await this.resourceIntroducersService.getMany(resourceId, type);
+    return (await this.resourceIntroducersService.getMany(resourceId, type)).map(toResourceIntroducerDto);
   }
 
   @Post('/:userId/grant')
@@ -114,7 +115,7 @@ export class ResourceIntroducersController {
     @Param('userId', ParseIntPipe) userId: number,
     @Body() body?: GrantIntroducerDto,
   ): Promise<ResourceIntroducer> {
-    return await this.resourceIntroducersService.grant(resourceId, userId, body?.type);
+    return toResourceIntroducerDto(await this.resourceIntroducersService.grant(resourceId, userId, body?.type));
   }
 
   @Delete('/:userId/revoke')

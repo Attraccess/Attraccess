@@ -1,6 +1,59 @@
 const nx = require('@nx/eslint-plugin');
 const noHookReturnTypeConfig = require('./tools/eslint-rules/no-hook-return-type.config.cjs');
 
+// Plugins have no database access (ATT-1146): no database engine, ORM, host entity or SDK subpath in plugin code,
+// examples and the SDK itself. The list is shared with the host's bundle check, scripts/check-persistence-boundaries.mjs
+// (which also catches dynamic import() and require()) and the packaging check; this rule gives editor feedback on
+// static imports. Plugin tests may open an engine (to compare a declared schema with a 1.x one). A flat-config rule
+// entry replaces an earlier one for the same files, so blocks that set `no-restricted-imports` for plugin code spread
+// these.
+const forbiddenPluginModules = require('./apps/api/src/plugin-system/runtime/forbidden-plugin-modules.json');
+const PLUGIN_STORAGE_BOUNDARY_MESSAGE =
+  'Plugins have no database access: keep data in declared tables through context.storage (see docs/en/plugins/plugin-storage.md). Only the package root of @attraccess/plugins-backend-sdk is public.';
+/** `no-restricted-imports` options forbidding `modules` (an entry ending in /* forbids its whole scope). */
+const restrictedModules = (modules) => ({
+  paths: modules
+    .filter((name) => !name.endsWith('/*'))
+    .map((name) => ({ name, message: PLUGIN_STORAGE_BOUNDARY_MESSAGE })),
+  patterns: [
+    {
+      group: [
+        ...modules.map((name) => (name.endsWith('/*') ? `${name.slice(0, -2)}/**` : `${name}/**`)),
+        '@attraccess/plugins-backend-sdk/**',
+        '!@attraccess/plugins-backend-sdk/package.json',
+      ],
+      message: PLUGIN_STORAGE_BOUNDARY_MESSAGE,
+    },
+  ],
+});
+const pluginStorageBoundary = restrictedModules([
+  ...forbiddenPluginModules.engines,
+  ...forbiddenPluginModules.frameworks,
+  ...forbiddenPluginModules.host,
+]);
+const pluginTestStorageBoundary = restrictedModules([
+  ...forbiddenPluginModules.frameworks,
+  ...forbiddenPluginModules.host,
+]);
+/**
+ * The ORMs and host modules as module-boundary globs (each package with its subpaths, or a whole scope). The engines
+ * are left to `no-restricted-imports`, which lets plugin tests open one; the boundary rule cannot tell tests apart.
+ */
+const PERSISTENCE_PACKAGE_GLOBS = [...forbiddenPluginModules.frameworks, ...forbiddenPluginModules.host].flatMap(
+  (name) => (name.endsWith('/*') ? [name, `${name}*`] : [name, `${name}/**`]),
+);
+/** The boundary for `files`; `testFiles` (their specs and test fixtures) may also import a database engine. */
+const pluginStorageBoundaryConfig = (files, testFiles = []) => [
+  { files, rules: { 'no-restricted-imports': ['error', pluginStorageBoundary] } },
+  ...(testFiles.length > 0
+    ? [{ files: testFiles, rules: { 'no-restricted-imports': ['error', pluginTestStorageBoundary] } }]
+    : []),
+];
+const pluginTestFiles = (root) => [
+  `${root}/**/*.{spec,test}.{ts,tsx,js,mjs,cjs}`,
+  `${root}/**/*.{test-fixture,test-utils}.ts`,
+];
+
 module.exports = [
   // {
   //   files: ['**/*.json'],
@@ -41,6 +94,14 @@ module.exports = [
             {
               sourceTag: 'type:plugin',
               onlyDependOnLibsWithTags: ['scope:plugin-sdk'],
+              bannedExternalImports: PERSISTENCE_PACKAGE_GLOBS,
+            },
+            // The plugin SDK is neutral: it never builds on the persistence libraries (database-entities) or names
+            // an ORM or driver. The host implements the record port; the SDK only declares it.
+            {
+              sourceTag: 'scope:plugin-sdk',
+              notDependOnLibsWithTags: ['scope:persistence'],
+              bannedExternalImports: PERSISTENCE_PACKAGE_GLOBS,
             },
             // The core application must never know any concrete plugin: no core
             // project may depend on anything tagged type:plugin.
@@ -72,6 +133,11 @@ module.exports = [
     'libs/plugins-frontend-*/**/*.{ts,tsx}',
     'apps/companion/renderer/**/*.{ts,tsx}',
   ]),
+  // Plugin code, plugin tests and the examples (the SDK lints from its own folder and adds the block itself).
+  ...pluginStorageBoundaryConfig(
+    ['apps/plugins/**/*.{ts,tsx,js,mjs,cjs}', 'examples/**/*.{ts,tsx,js,mjs,cjs}'],
+    [...pluginTestFiles('apps/plugins'), ...pluginTestFiles('examples')],
+  ),
   {
     // ATT-1224: plugin dialogs use the shared StandardModal / StatusDialog.
     files: ['apps/plugins/*/frontend/**/*.{ts,tsx}'],
@@ -79,7 +145,9 @@ module.exports = [
       'no-restricted-imports': [
         'error',
         {
+          patterns: pluginStorageBoundary.patterns,
           paths: [
+            ...pluginStorageBoundary.paths,
             {
               name: '@heroui/react',
               importNames: ['Modal', 'ModalBackdrop', 'ModalContainer', 'ModalDialog'],
@@ -122,3 +190,4 @@ module.exports = [
 
 // Shared with project configs that lint from their own folder (see no-hook-return-type.config.cjs).
 module.exports.noHookReturnTypeConfig = noHookReturnTypeConfig;
+module.exports.pluginStorageBoundaryConfig = pluginStorageBoundaryConfig;

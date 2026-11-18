@@ -1,7 +1,8 @@
 import { Column, CreateDateColumn, Entity, Index, ManyToOne, PrimaryColumn } from 'typeorm';
+import type { McpOAuthTokenKind } from '@attraccess/application-models';
 import { McpOAuthGrant } from './mcp-oauth-grant.entity';
 
-export type McpOAuthTokenKind = 'request' | 'code' | 'access' | 'refresh';
+export type { McpOAuthTokenKind };
 
 /**
  * Pending authorization requests, authorization codes, access tokens and refresh tokens.

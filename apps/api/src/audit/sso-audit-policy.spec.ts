@@ -1,4 +1,4 @@
-import { SSOProviderType } from '@attraccess/database-entities';
+import { SSOProviderType } from '@attraccess/application-models';
 import { randomUUID } from 'node:crypto';
 import { ssoAuditSnapshot } from '../users-and-auth/auth/sso/audit/provider-audit';
 import { projectSsoAuditEvent } from './audit-policy';

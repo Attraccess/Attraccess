@@ -13,8 +13,9 @@ import {
   type StartBlockedState,
   type StartCapacityResult,
 } from '@attraccess/plugins-backend-sdk';
-import type { EntityManager } from 'typeorm';
+import { resolveDatabaseBackend } from '../../database/backend';
 import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
+import { UNIT_OF_WORK, type TransactionScope, type UnitOfWork } from '../../database/unit-of-work';
 import type { AppConfigType } from '../../config/app.config';
 import {
   cleanPluginText,
@@ -53,8 +54,8 @@ export interface StartCapacityRun {
   occupiedSlots: number;
   /** The users behind `occupiedSlots`. */
   usersInSession: number[];
-  /** The host's serialized start transaction; handed to the plugin. */
-  manager: EntityManager;
+  /** The host's serialized start transaction; handed to the plugin as a read-only transaction scope. */
+  scope: TransactionScope;
   /** plugin -> stepKeys confirmed in this start attempt. */
   satisfied: Map<string, Set<string>>;
 }
@@ -126,6 +127,7 @@ export class ReaderUiHooksService {
     private readonly alerts: ReaderUiAlertsService,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     config: ConfigService,
+    @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
   ) {
     const app = config.get<AppConfigType>('app');
     this.runner = new HookRunner({
@@ -216,7 +218,7 @@ export class ReaderUiHooksService {
             resourceId: run.resourceId,
             userId: run.userId,
             principal: run.principal,
-            manager: run.manager,
+            scope: resolveDatabaseBackend().plugins.hostTransactionScope(this.unitOfWork, run.scope),
             action: run.action,
             origin: run.origin,
             sessionLimit: run.sessionLimit,

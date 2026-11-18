@@ -1,4 +1,5 @@
-import { Resource, ResourceHealthStatus, User } from '@attraccess/database-entities';
+import type { PluginResourceModel, PluginUserModel } from '@attraccess/application-models';
+import { ResourceHealthStatus } from '@attraccess/application-models';
 
 export enum SystemEvent {
   RESOURCE_USAGE_STARTED = 'RESOURCE_USAGE_STARTED',
@@ -86,8 +87,8 @@ export interface ResourceUsageSessionEndedPayload {
 }
 
 export type SystemEventPayload = {
-  [SystemEvent.RESOURCE_USAGE_STARTED]: { resource: Resource; user: User };
-  [SystemEvent.RESOURCE_USAGE_ENDED]: { resource: Resource; user: User };
+  [SystemEvent.RESOURCE_USAGE_STARTED]: { resource: PluginResourceModel; user: PluginUserModel };
+  [SystemEvent.RESOURCE_USAGE_ENDED]: { resource: PluginResourceModel; user: PluginUserModel };
   [SystemEvent.MAINTENANCE_CHANGED]: MaintenanceChangedPayload;
   [SystemEvent.RESOURCE_HEALTH_CHANGED]: ResourceHealthChangedPayload;
   [SystemEvent.RESOURCE_USAGE_SESSION_STARTED]: ResourceUsageSessionStartedPayload;
@@ -123,14 +124,14 @@ export interface SystemEventSubscription {
  * undeclared access. Each value gates exactly one seam of the PluginContext.
  */
 export enum PluginPermission {
-  /** Read the User repository via getRepository(User). */
+  /** Read user data through `hostData.users`. */
   READ_USERS = 'READ_USERS',
-  /** Read/write the Resource repository via getRepository(Resource). */
+  /** Read resources through `hostData.resources` and `resourceAccess`. */
   ACCESS_RESOURCES = 'ACCESS_RESOURCES',
-  /** Read the Setting repository via getRepository(Setting). */
+  /** Read application settings through `hostData.settings`. */
   READ_SETTINGS = 'READ_SETTINGS',
-  /** Access any other repository and the raw dataSource. */
-  DATABASE_ACCESS = 'DATABASE_ACCESS',
+  /** Keep data in the plugin's own declared tables (`context.storage`) and group writes with `persistence.transaction`. */
+  PLUGIN_STORAGE = 'PLUGIN_STORAGE',
   /** Publish events on the shared event bus (events.emit / emitAsync). */
   EMIT_EVENTS = 'EMIT_EVENTS',
   /** Subscribe to events on the shared event bus (events.on / once / ...). */
@@ -164,7 +165,8 @@ export const PLUGIN_PERMISSION_DESCRIPTIONS: Record<PluginPermission, string> = 
   [PluginPermission.ACCESS_RESOURCES]:
     'Read and write resources from the database and query resource access, maintenance windows and active sessions.',
   [PluginPermission.READ_SETTINGS]: 'Read application settings from the database.',
-  [PluginPermission.DATABASE_ACCESS]: 'Access the raw database connection and any other entity repository.',
+  [PluginPermission.PLUGIN_STORAGE]:
+    "Store data in tables of the plugin's own (declared tables and migrations); no access to core tables or the database itself.",
   [PluginPermission.EMIT_EVENTS]: 'Publish events on the shared application event bus.',
   [PluginPermission.LISTEN_EVENTS]: 'Subscribe to events on the shared application event bus.',
   [PluginPermission.RESOLVE_HOST_PROVIDERS]: 'Resolve arbitrary host services by injection token.',

@@ -1,5 +1,5 @@
 import { AuditRecorder } from '../../../../audit/recorder/audit-event';
-import { SSOProvider, SSOProviderOIDCConfiguration } from '@attraccess/database-entities';
+import type { SsoOidcConfigurationRecord, SsoProviderRecord } from '@attraccess/application-models';
 import { ModuleRef } from '@nestjs/core';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { RbacService } from '../../../rbac/rbac.service';
@@ -7,7 +7,6 @@ import { UsersService } from '../../../users/users.service';
 import { AuthService } from '../../auth.service';
 import { SSOService } from '../sso.service';
 import { SsoAccountResolver } from '../account-resolution/sso-account-resolver.service';
-import { DataSource } from 'typeorm';
 import { OidcCookieStateStore } from './oidc-cookie-state-store';
 import { SSOOIDCStrategy } from './oidc.strategy';
 
@@ -28,7 +27,7 @@ export function registerSsooidcstrategyClaimPathResolutionFixture() {
   const mockStateStore = { store: jest.fn(), verify: jest.fn() } as unknown as OidcCookieStateStore;
 
   function createStrategy(
-    config: Partial<SSOProviderOIDCConfiguration>,
+    config: Partial<SsoOidcConfigurationRecord>,
     usersServiceMock: Partial<UsersService>,
     authServiceMock: Partial<AuthService>,
     rbacServiceMock?: Partial<RbacService>,
@@ -36,11 +35,10 @@ export function registerSsooidcstrategyClaimPathResolutionFixture() {
     ssoAuditMock?: Partial<AuditRecorder>,
     metricsServiceMock?: Partial<MetricsService>,
   ) {
-    const dataSource = { transaction: (work: (manager: unknown) => unknown) => work({}) } as unknown as DataSource;
+    const withTransaction = (work: (manager: unknown) => unknown) => work({});
     const resolver = new SsoAccountResolver(
-      { recordCreatedUser: jest.fn(), ...usersServiceMock } as UsersService,
+      { recordCreatedUser: jest.fn(), withTransaction, ...usersServiceMock } as UsersService,
       authServiceMock as AuthService,
-      dataSource,
     );
     const moduleRef = {
       get: jest.fn((token: unknown) => {
@@ -54,7 +52,7 @@ export function registerSsooidcstrategyClaimPathResolutionFixture() {
       }),
     } as unknown as ModuleRef;
 
-    const baseConfig: SSOProviderOIDCConfiguration = {
+    const baseConfig: SsoOidcConfigurationRecord = {
       id: 1,
       ssoProviderId: 1,
       issuer: 'https://issuer',
@@ -68,7 +66,7 @@ export function registerSsooidcstrategyClaimPathResolutionFixture() {
       scopes: null,
       usernameClaimPaths: null,
       emailClaimPaths: null,
-      ssoProvider: {} as SSOProvider,
+      ssoProvider: {} as SsoProviderRecord,
     };
 
     return new SSOOIDCStrategy(moduleRef, { ...baseConfig, ...config }, callbackURL, mockStateStore);

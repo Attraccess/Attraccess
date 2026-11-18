@@ -1,7 +1,8 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PLUGIN_CONTEXT } from '../constants';
-import { ResourceSettingsEntity } from '../entities/resource-settings.entity';
+import { tablesOf } from '../storage';
+import type { ResourceSettingsRow } from '../storage/resource-settings-table';
 import { BookableHours, normalizeBookableHours } from '../time/bookable-hours';
 import {
   ResourceSettings,
@@ -14,7 +15,7 @@ import {
 } from './settings.model';
 import { ReservationError } from '../reservations/errors';
 
-function fromEntity(row: ResourceSettingsEntity): ResourceSettings {
+function fromRow(row: ResourceSettingsRow): ResourceSettings {
   let bookableHours: BookableHours;
   try {
     bookableHours = normalizeBookableHours(JSON.parse(row.bookableHours || '{}') as BookableHours);
@@ -58,6 +59,10 @@ export class ResourceSettingsService implements OnModuleInit {
 
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
 
+  private get rows() {
+    return tablesOf(this.context).resourceSettings;
+  }
+
   async onModuleInit(): Promise<void> {
     await this.warmUp().catch((error) => this.logger.error(`settings cache warm-up failed: ${String(error)}`));
   }
@@ -87,9 +92,9 @@ export class ResourceSettingsService implements OnModuleInit {
   }
 
   private async loadAll(): Promise<void> {
-    const rows = await this.context.getRepository(ResourceSettingsEntity).find();
+    const rows = (await this.rows.find()) as ResourceSettingsRow[];
     this.cache.clear();
-    for (const row of rows) this.cache.set(row.resourceId, fromEntity(row));
+    for (const row of rows) this.cache.set(row.resourceId, fromRow(row));
   }
 
   /**
@@ -107,8 +112,8 @@ export class ResourceSettingsService implements OnModuleInit {
 
   /** Authoritative read from the database (defaults when no row exists). */
   async get(resourceId: number): Promise<ResourceSettings> {
-    const row = await this.context.getRepository(ResourceSettingsEntity).findOneBy({ resourceId });
-    return row ? fromEntity(row) : defaultSettings(resourceId);
+    const row = (await this.rows.get(resourceId)) as ResourceSettingsRow | null;
+    return row ? fromRow(row) : defaultSettings(resourceId);
   }
 
   /** Validates, persists and refreshes the cache. Throws a 400 `INVALID_SETTINGS` on invalid input. */
@@ -125,13 +130,10 @@ export class ResourceSettingsService implements OnModuleInit {
       throw new ReservationError('INVALID_SETTINGS', 'Invalid reservation settings', { errors });
     }
     const merged = finalizeSettings(requested);
-    const entity = new ResourceSettingsEntity();
-    Object.assign(entity, merged, {
-      resourceId,
-      bookableHours: JSON.stringify(merged.bookableHours),
-      updatedAt: new Date(),
-    });
-    await this.context.runSerialized((manager) => manager.getRepository(ResourceSettingsEntity).save(entity));
+    await this.rows.upsert(
+      { ...merged, resourceId, bookableHours: JSON.stringify(merged.bookableHours), updatedAt: new Date() },
+      { conflictOn: ['resourceId'] },
+    );
     const after: ResourceSettings = { resourceId, ...merged };
     this.cache.set(resourceId, after);
     return { before, after };

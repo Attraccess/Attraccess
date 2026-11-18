@@ -6,7 +6,7 @@ import { Request, Response } from 'express';
 import { HTTP_METRICS } from '../../definitions/tokens';
 import { HttpMetrics } from '../../definitions/http.metrics';
 import { MetricsToggleService } from '../../settings/metrics-toggle.service';
-import { AUTHENTICATION_METHODS, type AuthenticationMethod } from '@attraccess/database-entities';
+import { AUTHENTICATION_METHODS, type AuthenticationMethod } from '@attraccess/application-models';
 
 @Injectable()
 export class HttpMetricsInterceptor implements NestInterceptor {

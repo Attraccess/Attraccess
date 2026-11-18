@@ -1,14 +1,14 @@
 import type { SsoSessionRequest } from '../../../users-and-auth/auth/sso/sso-session-request';
 import type { SSOProviderOIDCConfiguration } from '@attraccess/database-entities';
-import { User, entities } from '@attraccess/database-entities';
+import { User } from '@attraccess/database-entities';
 import type { ModuleRef } from '@nestjs/core';
 import { execFileSync } from 'child_process';
 import { promises as fs } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { GenericContainer, StartedTestContainer, Wait } from 'testcontainers';
-import type { Repository } from 'typeorm';
-import { DataSource } from 'typeorm';
+import type { DataSource, Repository } from 'typeorm';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { SSOOIDCStrategy } from '../../../users-and-auth/auth/sso/oidc/oidc.strategy';
 import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 import { createOidcTestServices } from './services.test-fixture';
@@ -77,13 +77,7 @@ export function registerSsoOidcIntegrationE2eWithTestcontainersFixture() {
     const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'att-sso-oidc-e2e-'));
     process.env.AUTH_SESSION_SECRET = 'sso-oidc-e2e-test-secret-must-be-long-enough';
 
-    dataSource = new DataSource({
-      type: 'better-sqlite3',
-      database: path.join(tmpRoot, 'attraccess.sqlite'),
-      entities: Object.values(entities),
-      synchronize: true,
-    });
-    await dataSource.initialize();
+    dataSource = await createTestDataSource({ location: path.join(tmpRoot, 'attraccess.sqlite'), synchronize: true });
 
     ({ userRepo, rbacService, mockModuleRef } = createOidcTestServices(dataSource));
 
@@ -117,7 +111,7 @@ export function registerSsoOidcIntegrationE2eWithTestcontainersFixture() {
 
   afterAll(async () => {
     if (dataSource?.isInitialized) {
-      await dataSource.destroy();
+      await closeTestDataSource(dataSource);
     }
     await container?.stop();
   });

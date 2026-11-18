@@ -112,7 +112,7 @@
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/matter",
-        "command": "node ../scripts/esbuild-backend.mjs --tsconfig backend/tsconfig.json --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js"
+        "command": "node ../scripts/esbuild-backend.mjs --tsconfig backend/tsconfig.json --entry backend/plugin.ts --outfile package/dist/index.js"
       }
     },
     "build-frontend": {
@@ -167,9 +167,9 @@
       ],
       "options": {
         "cwd": "apps/plugins/matter",
-        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js dist/migrations.js frontend/remoteEntry.js frontend/style.css",
+        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js frontend/remoteEntry.js frontend/style.css",
         "env": {
-          "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "1.11.0"
+          "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "2.0.0"
         }
       }
     },

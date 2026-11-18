@@ -1,12 +1,22 @@
-import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginContext, PluginTransactionScope } from '@attraccess/plugins-backend-sdk';
+import { PluginStorageUniqueViolation } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
-import type { EntityManager } from 'typeorm';
 import { PLUGIN_CONTEXT } from '../constants';
-import { NoticeEntity } from '../entities/notice.entity';
-import { REMINDER_FLAGS, ReminderFlag, ReservationEntity, ReservationStatus } from '../entities/reservation.entity';
+import { tablesOf } from '../storage';
+import type { NoticeRow } from '../storage/notice-table';
+import {
+  REMINDER_FLAGS,
+  type ReminderFlag,
+  type ReservationRow,
+  type ReservationStatus,
+  type ReservationWhere,
+} from '../storage/reservation-table';
 
 /** Largest buffer a resource may configure; bounds the candidate query for buffer-aware overlap. */
 export const MAX_BUFFER_MINUTES = 1440;
+
+/** Statuses of a booking that still occupies its slot. */
+const LIVE: ReservationStatus[] = ['pending', 'confirmed'];
 
 export interface ManagedListFilter {
   /** `null` = all resources, otherwise restrict to these ids. */
@@ -20,224 +30,192 @@ export interface ManagedListFilter {
 
 /**
  * Persistence for reservations. Per-resource reads use the (resourceId, status, startTime, endTime)
- * index; the scheduler's cross-resource scans use (status, startTime) and (status, endTime). State transitions are conditional UPDATEs and return whether THIS call changed the row, which is what
- * makes double ticks / concurrent requests idempotent.
+ * index; the scheduler's cross-resource scans use (status, startTime) and (status, endTime). State transitions are
+ * conditional updates (compare-and-set) and return whether THIS call changed the row, which is what makes double
+ * ticks / concurrent requests idempotent.
  */
 @Injectable()
 export class ReservationStore {
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
 
-  private get repo() {
-    return this.context.getRepository(ReservationEntity);
+  private get tables() {
+    return tablesOf(this.context);
   }
 
-  findById(id: number): Promise<ReservationEntity | null> {
-    return this.repo.findOneBy({ id });
+  private get reservations() {
+    return this.tables.reservations;
+  }
+
+  private find(
+    where: ReservationWhere,
+    options: { limit?: number; desc?: boolean; scope?: PluginTransactionScope } = {},
+  ) {
+    return this.reservations.find(
+      { where, orderBy: [{ field: 'startTime', direction: options.desc ? 'desc' : 'asc' }], limit: options.limit },
+      { scope: options.scope },
+    ) as Promise<ReservationRow[]>;
+  }
+
+  async findById(id: number): Promise<ReservationRow | null> {
+    return (await this.reservations.get(id)) as ReservationRow | null;
   }
 
   /** Confirmed bookings of the resource that end after `from` and start before `to` (hook hot path). */
-  findConfirmedOverlapping(resourceId: number, from: Date, to: Date): Promise<ReservationEntity[]> {
-    return this.repo
-      .createQueryBuilder('r')
-      .where('r.resourceId = :resourceId AND r.status = :status', { resourceId, status: 'confirmed' })
-      .andWhere('r.endTime > :from AND r.startTime < :to', { from, to })
-      .orderBy('r.startTime', 'ASC')
-      .getMany();
+  findConfirmedOverlapping(resourceId: number, from: Date, to: Date): Promise<ReservationRow[]> {
+    return this.find({ resourceId, status: 'confirmed', endTime: { gt: from }, startTime: { lt: to } });
   }
 
   /** Confirmed bookings running at `now` ([start, end)). */
-  findActiveForResource(resourceId: number, now: Date): Promise<ReservationEntity[]> {
-    return this.repo
-      .createQueryBuilder('r')
-      .where('r.resourceId = :resourceId AND r.status = :status', { resourceId, status: 'confirmed' })
-      .andWhere('r.startTime <= :now AND r.endTime > :now', { now })
-      .orderBy('r.startTime', 'ASC')
-      .getMany();
+  findActiveForResource(resourceId: number, now: Date): Promise<ReservationRow[]> {
+    return this.find({ resourceId, status: 'confirmed', startTime: { lte: now }, endTime: { gt: now } });
   }
 
   /** Confirmed bookings starting in (from, to] across all resources (reminders, handover, overrun). */
-  findUpcomingConfirmed(from: Date, to: Date): Promise<ReservationEntity[]> {
-    return this.repo
-      .createQueryBuilder('r')
-      .where('r.status = :status AND r.startTime > :from AND r.startTime <= :to', { status: 'confirmed', from, to })
-      .orderBy('r.startTime', 'ASC')
-      .getMany();
+  findUpcomingConfirmed(from: Date, to: Date): Promise<ReservationRow[]> {
+    return this.find({ status: 'confirmed', startTime: { gt: from, lte: to } });
   }
 
   /**
    * Confirmed bookings that started and have no check-in yet (no-show step). Ended ones are included on
    * purpose: a grace period reaching the end must still end in no_show, not in completed.
    */
-  findNoShowCandidates(now: Date): Promise<ReservationEntity[]> {
-    return this.repo
-      .createQueryBuilder('r')
-      .where('r.status = :status AND r.startTime <= :now AND r.checkedInAt IS NULL', { status: 'confirmed', now })
-      .getMany();
+  findNoShowCandidates(now: Date): Promise<ReservationRow[]> {
+    return this.find({ status: 'confirmed', startTime: { lte: now }, checkedInAt: null });
   }
 
   /** Confirmed bookings whose end has passed (to be marked completed). */
-  findConfirmedEnded(now: Date): Promise<ReservationEntity[]> {
-    return this.repo
-      .createQueryBuilder('r')
-      .where('r.status = :status AND r.endTime <= :now', { status: 'confirmed', now })
-      .getMany();
+  findConfirmedEnded(now: Date): Promise<ReservationRow[]> {
+    return this.find({ status: 'confirmed', endTime: { lte: now } });
   }
 
   /** Pending bookings whose start has passed (to be expired). */
-  findPendingStarted(now: Date): Promise<ReservationEntity[]> {
-    return this.repo
-      .createQueryBuilder('r')
-      .where('r.status = :status AND r.startTime <= :now', { status: 'pending', now })
-      .getMany();
+  findPendingStarted(now: Date): Promise<ReservationRow[]> {
+    return this.find({ status: 'pending', startTime: { lte: now } });
   }
 
   /** The holder's confirmed, not yet checked-in booking whose check-in window contains `now`. */
-  findCheckInCandidate(
+  async findCheckInCandidate(
     userId: number,
     resourceId: number,
     now: Date,
     earlyCheckInMinutes: number,
-  ): Promise<ReservationEntity | null> {
+  ): Promise<ReservationRow | null> {
     const windowStart = new Date(now.getTime() + earlyCheckInMinutes * 60_000);
-    return this.repo
-      .createQueryBuilder('r')
-      .where('r.resourceId = :resourceId AND r.userId = :userId AND r.status = :status', {
+    const [first] = await this.find(
+      {
         resourceId,
         userId,
         status: 'confirmed',
-      })
-      .andWhere('r.checkedInAt IS NULL AND r.startTime <= :windowStart AND r.endTime > :now', { windowStart, now })
-      .orderBy('r.startTime', 'ASC')
-      .getOne();
+        checkedInAt: null,
+        startTime: { lte: windowStart },
+        endTime: { gt: now },
+      },
+      { limit: 1 },
+    );
+    return first ?? null;
   }
 
   /** The holder's confirmed, not yet checked-in bookings overlapping [from, to) (a session that ran in them). */
-  findUncheckedOverlapping(userId: number, resourceId: number, from: Date, to: Date): Promise<ReservationEntity[]> {
-    return this.repo
-      .createQueryBuilder('r')
-      .where('r.resourceId = :resourceId AND r.userId = :userId AND r.status = :status', {
-        resourceId,
-        userId,
-        status: 'confirmed',
-      })
-      .andWhere('r.checkedInAt IS NULL AND r.startTime < :to AND r.endTime > :from', { from, to })
-      .orderBy('r.startTime', 'ASC')
-      .getMany();
+  findUncheckedOverlapping(userId: number, resourceId: number, from: Date, to: Date): Promise<ReservationRow[]> {
+    return this.find({
+      resourceId,
+      userId,
+      status: 'confirmed',
+      checkedInAt: null,
+      startTime: { lt: to },
+      endTime: { gt: from },
+    });
   }
 
   /** Pending + confirmed bookings of the resource overlapping [from, to) (maintenance/health notices). */
-  findLiveOverlapping(resourceId: number, from: Date, to: Date | null): Promise<ReservationEntity[]> {
-    const query = this.repo
-      .createQueryBuilder('r')
-      .where('r.resourceId = :resourceId AND r.status IN (:...statuses)', {
-        resourceId,
-        statuses: ['pending', 'confirmed'],
-      })
-      .andWhere('r.endTime > :from', { from });
-    if (to) query.andWhere('r.startTime < :to', { to });
-    return query.orderBy('r.startTime', 'ASC').getMany();
+  findLiveOverlapping(resourceId: number, from: Date, to: Date | null): Promise<ReservationRow[]> {
+    return this.find({
+      resourceId,
+      status: { in: LIVE },
+      endTime: { gt: from },
+      ...(to ? { startTime: { lt: to } } : {}),
+    });
   }
 
-  /** Candidates for buffer-aware overlap checks (pending + confirmed), exact filtering is done by the caller. */
+  /**
+   * Candidates for buffer-aware overlap checks (pending + confirmed), exact filtering is done by the caller. Read
+   * through the scope of the booking transaction.
+   */
   findOverlapCandidates(
-    manager: EntityManager,
+    scope: PluginTransactionScope | undefined,
     resourceId: number,
     from: Date,
     to: Date,
-  ): Promise<ReservationEntity[]> {
-    return manager
-      .getRepository(ReservationEntity)
-      .createQueryBuilder('r')
-      .where('r.resourceId = :resourceId AND r.status IN (:...statuses)', {
+  ): Promise<ReservationRow[]> {
+    return this.find(
+      {
         resourceId,
-        statuses: ['pending', 'confirmed'],
-      })
-      .andWhere('r.startTime < :to AND r.endTime > :from', {
-        from: new Date(from.getTime() - MAX_BUFFER_MINUTES * 60_000),
-        to: new Date(to.getTime() + MAX_BUFFER_MINUTES * 60_000),
-      })
-      .getMany();
+        status: { in: LIVE },
+        startTime: { lt: new Date(to.getTime() + MAX_BUFFER_MINUTES * 60_000) },
+        endTime: { gt: new Date(from.getTime() - MAX_BUFFER_MINUTES * 60_000) },
+      },
+      { scope },
+    );
   }
 
-  /** Confirmed bookings running at `now` ([start, end)), read through the host's transaction (start capacity hook). */
-  findRunningConfirmed(manager: EntityManager, resourceId: number, now: Date): Promise<ReservationEntity[]> {
-    return manager
-      .getRepository(ReservationEntity)
-      .createQueryBuilder('r')
-      .where('r.resourceId = :resourceId AND r.status = :status', { resourceId, status: 'confirmed' })
-      .andWhere('r.startTime <= :now AND r.endTime > :now', { now })
-      .orderBy('r.startTime', 'ASC')
-      .getMany();
+  /** Confirmed bookings running at `now` ([start, end)), read through the host's start transaction (capacity hook). */
+  findRunningConfirmed(scope: PluginTransactionScope, resourceId: number, now: Date): Promise<ReservationRow[]> {
+    return this.find({ resourceId, status: 'confirmed', startTime: { lte: now }, endTime: { gt: now } }, { scope });
   }
 
   /**
    * Pending + confirmed bookings of the resource whose buffer-aware span can still matter at or after `now`
    * (the capacity reconciliation after a lowered limit).
    */
-  findOccupyingFrom(resourceId: number, now: Date): Promise<ReservationEntity[]> {
+  findOccupyingFrom(resourceId: number, now: Date): Promise<ReservationRow[]> {
     return this.findLiveOverlapping(resourceId, new Date(now.getTime() - MAX_BUFFER_MINUTES * 60_000), null);
   }
 
-  countLiveForUser(manager: EntityManager, userId: number, resourceId: number, now: Date): Promise<number> {
-    return manager
-      .getRepository(ReservationEntity)
-      .createQueryBuilder('r')
-      .where('r.userId = :userId AND r.resourceId = :resourceId AND r.status IN (:...statuses)', {
-        userId,
-        resourceId,
-        statuses: ['pending', 'confirmed'],
-      })
-      .andWhere('r.endTime > :now', { now })
-      .getCount();
+  countLiveForUser(
+    scope: PluginTransactionScope | undefined,
+    userId: number,
+    resourceId: number,
+    now: Date,
+  ): Promise<number> {
+    return this.reservations.count({ userId, resourceId, status: { in: LIVE }, endTime: { gt: now } }, { scope });
   }
 
   /** Number of pending/confirmed bookings of the resource starting after `now` (a COUNT, no rows loaded). */
   countFutureLive(resourceId: number, now: Date): Promise<number> {
-    return this.repo
-      .createQueryBuilder('r')
-      .where('r.resourceId = :resourceId AND r.status IN (:...statuses) AND r.startTime > :now', {
-        resourceId,
-        statuses: ['pending', 'confirmed'],
-        now,
-      })
-      .getCount();
+    return this.reservations.count({ resourceId, status: { in: LIVE }, startTime: { gt: now } });
   }
 
   /**
    * Applies `changes` to every pending/confirmed booking of the resource starting after `now`, in one
-   * serialized transaction (select + one UPDATE with the same predicate), and returns the changed rows.
+   * transaction (select + one update with the same predicate), and returns the changed rows.
    */
-  cancelFutureLive(resourceId: number, now: Date, changes: Partial<ReservationEntity>): Promise<ReservationEntity[]> {
-    const where = 'resourceId = :resourceId AND status IN (:...statuses) AND startTime > :now';
-    const parameters = { resourceId, statuses: ['pending', 'confirmed'], now };
-    return this.context.runSerialized(async (manager) => {
-      const repo = manager.getRepository(ReservationEntity);
-      const rows = await repo
-        .createQueryBuilder('r')
-        .where('r.resourceId = :resourceId AND r.status IN (:...statuses) AND r.startTime > :now', parameters)
-        .getMany();
+  cancelFutureLive(resourceId: number, now: Date, changes: Partial<ReservationRow>): Promise<ReservationRow[]> {
+    const where = { resourceId, status: { in: LIVE }, startTime: { gt: now } };
+    return this.context.persistence.transaction(async (scope) => {
+      const rows = await this.find(where, { scope });
       if (rows.length === 0) return [];
-      await repo.createQueryBuilder().update(ReservationEntity).set(changes).where(where, parameters).execute();
+      await this.reservations.update(where, changes, { scope });
       return rows.map((row) => Object.assign(row, changes));
     });
   }
 
   /** Bookings an iCal feed shows (pending, confirmed, ended) in [from, to), optionally only one holder's. */
-  findForCalendar(resourceIds: number[], from: Date, to: Date, userId?: number): Promise<ReservationEntity[]> {
+  findForCalendar(resourceIds: number[], from: Date, to: Date, userId?: number): Promise<ReservationRow[]> {
     if (resourceIds.length === 0) return Promise.resolve([]);
-    const query = this.repo
-      .createQueryBuilder('r')
-      .where('r.resourceId IN (:...resourceIds) AND r.status IN (:...statuses)', {
-        resourceIds,
-        statuses: ['pending', 'confirmed', 'completed'],
-      })
-      .andWhere('r.endTime > :from AND r.startTime < :to', { from, to });
-    if (userId !== undefined) query.andWhere('r.userId = :userId', { userId });
-    return query.orderBy('r.startTime', 'ASC').take(5000).getMany();
+    return this.find(
+      {
+        resourceId: { in: resourceIds },
+        status: { in: ['pending', 'confirmed', 'completed'] },
+        endTime: { gt: from },
+        startTime: { lt: to },
+        ...(userId !== undefined ? { userId } : {}),
+      },
+      { limit: 5000 },
+    );
   }
 
   /** Occupying bookings (pending + confirmed) overlapping [from, to) for availability views. */
-  findOccupying(resourceId: number, from: Date, to: Date): Promise<ReservationEntity[]> {
+  findOccupying(resourceId: number, from: Date, to: Date): Promise<ReservationRow[]> {
     return this.findLiveOverlapping(resourceId, from, to);
   }
 
@@ -246,35 +224,31 @@ export class ReservationStore {
     scope: 'upcoming' | 'past',
     now: Date,
     status?: ReservationStatus,
-  ): Promise<ReservationEntity[]> {
-    const query = this.repo.createQueryBuilder('r').where('r.userId = :userId', { userId });
-    if (scope === 'upcoming') {
-      query.andWhere('r.status IN (:...live) AND r.endTime > :now', { live: ['pending', 'confirmed'], now });
-      query.orderBy('r.startTime', 'ASC');
-    } else {
-      query.andWhere('(r.status NOT IN (:...live) OR r.endTime <= :now)', { live: ['pending', 'confirmed'], now });
-      query.orderBy('r.startTime', 'DESC');
-    }
-    if (status) query.andWhere('r.status = :status', { status });
-    return query.take(200).getMany();
+  ): Promise<ReservationRow[]> {
+    const mine: ReservationWhere[] =
+      scope === 'upcoming'
+        ? [{ userId, status: { in: LIVE }, endTime: { gt: now } }]
+        : [{ userId }, { or: [{ status: { notIn: LIVE } }, { endTime: { lte: now } }] }];
+    return this.find({ and: [...mine, ...(status ? [{ status }] : [])] }, { limit: 200, desc: scope === 'past' });
   }
 
-  async listManaged(filter: ManagedListFilter): Promise<{ items: ReservationEntity[]; total: number }> {
-    const query = this.repo.createQueryBuilder('r');
-    if (filter.resourceIds) {
-      if (filter.resourceIds.length === 0) return { items: [], total: 0 };
-      query.where('r.resourceId IN (:...resourceIds)', { resourceIds: filter.resourceIds });
-    } else {
-      query.where('1 = 1');
-    }
-    if (filter.status) query.andWhere('r.status = :status', { status: filter.status });
-    if (filter.from) query.andWhere('r.endTime > :from', { from: filter.from });
-    if (filter.to) query.andWhere('r.startTime < :to', { to: filter.to });
-    const [items, total] = await query
-      .orderBy('r.startTime', 'DESC')
-      .skip(filter.skip)
-      .take(filter.take)
-      .getManyAndCount();
+  async listManaged(filter: ManagedListFilter): Promise<{ items: ReservationRow[]; total: number }> {
+    if (filter.resourceIds && filter.resourceIds.length === 0) return { items: [], total: 0 };
+    const where: ReservationWhere = {
+      ...(filter.resourceIds ? { resourceId: { in: filter.resourceIds } } : {}),
+      ...(filter.status ? { status: filter.status } : {}),
+      ...(filter.from ? { endTime: { gt: filter.from } } : {}),
+      ...(filter.to ? { startTime: { lt: filter.to } } : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.reservations.find({
+        where,
+        orderBy: [{ field: 'startTime', direction: 'desc' }],
+        limit: filter.take,
+        offset: filter.skip,
+      }) as Promise<ReservationRow[]>,
+      this.reservations.count(where),
+    ]);
     return { items, total };
   }
 
@@ -286,41 +260,29 @@ export class ReservationStore {
   async transition(
     id: number,
     from: ReservationStatus[],
-    changes: Partial<ReservationEntity>,
+    changes: Partial<ReservationRow>,
     options: { notCheckedIn?: boolean } = {},
   ): Promise<boolean> {
-    const where = `id = :id AND status IN (:...from)${options.notCheckedIn ? ' AND checkedInAt IS NULL' : ''}`;
-    // Writes run in the host's serialized transaction queue: on SQLite a second writer would otherwise wait for, and
-    // after the busy timeout fail with SQLITE_BUSY on, the lock another request (or a core write) holds.
-    const result = await this.context.runSerialized((manager) =>
-      manager
-        .getRepository(ReservationEntity)
-        .createQueryBuilder()
-        .update(ReservationEntity)
-        .set(changes)
-        .where(where, { id, from })
-        .execute(),
+    const affected = await this.reservations.update(
+      { id, status: { in: from }, ...(options.notCheckedIn ? { checkedInAt: null } : {}) },
+      changes,
     );
-    return (result.affected ?? 0) === 1;
+    return affected === 1;
   }
 
   /**
-   * Claims a one-shot notification flag: `UPDATE ... SET flag = at WHERE id = ? AND flag IS NULL`.
-   * Only the caller that gets `true` may send. Combine with the send inside the same transaction when
-   * the send can roll the claim back.
+   * Claims a one-shot notification flag: sets `flag = at` where `id = ? AND flag IS NULL` (compare-and-set).
+   * Only the caller that gets `true` may send. Combine with the send inside the same transaction (pass its
+   * `scope`) when the send can roll the claim back.
    */
-  async claimFlag(id: number, flag: ReminderFlag, at: Date, manager?: EntityManager): Promise<boolean> {
+  async claimFlag(id: number, flag: ReminderFlag, at: Date, scope?: PluginTransactionScope): Promise<boolean> {
     if (!REMINDER_FLAGS.includes(flag)) throw new Error(`Unknown reminder flag ${String(flag)}`);
-    const claim = (m: EntityManager) =>
-      m
-        .getRepository(ReservationEntity)
-        .createQueryBuilder()
-        .update(ReservationEntity)
-        .set({ [flag]: at })
-        .where(`id = :id AND ${flag} IS NULL`, { id })
-        .execute();
-    const result = await (manager ? claim(manager) : this.context.runSerialized(claim));
-    return (result.affected ?? 0) === 1;
+    const affected = await this.reservations.update(
+      { id, [flag]: null } as ReservationWhere,
+      { [flag]: at },
+      { scope },
+    );
+    return affected === 1;
   }
 
   /**
@@ -332,38 +294,25 @@ export class ReservationStore {
     kind: string,
     refKey: string,
     at: Date,
-    manager?: EntityManager,
+    scope?: PluginTransactionScope,
   ): Promise<boolean> {
-    const insert = (m: EntityManager) =>
-      m.getRepository(NoticeEntity).insert({ reservationId, kind, refKey, sentAt: at });
     try {
-      await (manager ? insert(manager) : this.context.runSerialized(insert));
+      await this.tables.notices.insert({ reservationId, kind, refKey, sentAt: at }, { scope });
       return true;
     } catch (error) {
-      if (/UNIQUE|constraint/i.test(String((error as { message?: string })?.message))) return false;
+      if (error instanceof PluginStorageUniqueViolation) return false;
       throw error;
     }
   }
 
   /** Notices of the given kind already claimed for these reservations. */
-  async findNotices(reservationIds: number[], kind: string): Promise<NoticeEntity[]> {
+  async findNotices(reservationIds: number[], kind: string): Promise<NoticeRow[]> {
     if (reservationIds.length === 0) return [];
-    return this.context
-      .getRepository(NoticeEntity)
-      .createQueryBuilder('n')
-      .where('n.kind = :kind AND n.reservationId IN (:...reservationIds)', { kind, reservationIds })
-      .getMany();
+    return this.tables.notices.find({ where: { kind, reservationId: { in: reservationIds } } });
   }
 
   /** Release a notice claim (when the send failed and should be retried next tick). */
   async releaseNotice(reservationId: number, kind: string, refKey: string): Promise<void> {
-    await this.context.runSerialized((manager) =>
-      manager
-        .getRepository(NoticeEntity)
-        .createQueryBuilder()
-        .delete()
-        .where('reservationId = :reservationId AND kind = :kind AND refKey = :refKey', { reservationId, kind, refKey })
-        .execute(),
-    );
+    await this.tables.notices.delete({ reservationId, kind, refKey });
   }
 }

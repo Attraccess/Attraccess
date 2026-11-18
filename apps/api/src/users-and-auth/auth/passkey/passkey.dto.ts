@@ -1,4 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiSchema } from '@nestjs/swagger';
+import type { PasskeyRecord } from '@attraccess/application-models';
 import { IsIn, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
 
 // ponytail: the WebAuthn option/response payloads are deep, browser-defined structures. They are
@@ -41,4 +42,52 @@ export class PasskeySessionDto {
   @IsIn(['cookie', 'body'])
   @ApiProperty({ description: 'Where to return the session token', enum: ['cookie', 'body'], example: 'cookie' })
   tokenLocation!: 'cookie' | 'body';
+}
+
+/** A registered passkey as clients see it. The credential id, public key and counter never leave the server. */
+@ApiSchema({ name: 'Passkey' })
+export class PasskeyResponseDto {
+  @ApiProperty({ description: 'The unique identifier of the passkey', example: 1 })
+  id!: number;
+
+  @ApiProperty({ description: 'The ID of the user this passkey belongs to', example: 1 })
+  userId!: number;
+
+  @ApiProperty({
+    description: 'Comma separated list of transports the authenticator supports (usb, nfc, ble, internal, hybrid)',
+    example: 'internal,hybrid',
+    nullable: true,
+  })
+  transports!: string | null;
+
+  @ApiProperty({ description: 'User provided name of the passkey', example: 'MacBook Touch ID' })
+  name!: string;
+
+  @ApiProperty({
+    description: 'Whether the credential is backed up / synced by the authenticator (e.g. iCloud Keychain)',
+    example: true,
+  })
+  backedUp!: boolean;
+
+  @ApiProperty({ description: 'When this passkey was registered', example: '2025-01-18T12:30:00.000Z' })
+  createdAt!: Date;
+
+  @ApiProperty({
+    description: 'When this passkey was last used to sign in',
+    example: '2025-01-18T12:30:00.000Z',
+    nullable: true,
+  })
+  lastUsedAt!: Date | null;
+}
+
+export function toPasskeyResponse(passkey: PasskeyRecord): PasskeyResponseDto {
+  return {
+    id: passkey.id,
+    userId: passkey.userId,
+    transports: passkey.transports,
+    name: passkey.name,
+    backedUp: passkey.backedUp,
+    createdAt: passkey.createdAt,
+    lastUsedAt: passkey.lastUsedAt,
+  };
 }

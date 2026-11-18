@@ -1,8 +1,9 @@
 import { createMock } from '@golevelup/ts-jest';
-import { entities, Role, User, UserRole, UserRoleSource } from '@attraccess/database-entities';
+import { entities, Role, User, UserRole } from '@attraccess/database-entities';
+import { UserRoleSource } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
 import * as migrations from '../../database/migrations';
-import { createDataSource } from '../../database/sqlite-connection';
+import { createDataSource } from '../../database/sqlite/sqlite-connection';
 import { LicenseService } from '../../license/license.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { RbacService } from '../rbac/rbac.service';
@@ -16,6 +17,7 @@ describe('taking back invitations whose email failed', () => {
   beforeAll(async () => {
     source = await createDataSource({
       type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: ':memory:',
       entities: Object.values(entities),
       migrations: Object.values(migrations),

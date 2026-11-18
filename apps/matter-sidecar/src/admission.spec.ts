@@ -8,7 +8,7 @@ const headers = (overrides: Record<string, string | undefined> = {}) => validHea
 describe('checkAdmission', () => {
   it('admits the supported combination, including Attraccess prereleases', () => {
     expect(checkAdmission(headers(), running)).toEqual({ ok: true });
-    expect(checkAdmission(headers({ 'x-attraccess-version': '1.12.0-rc.1' }), running)).toEqual({ ok: true });
+    expect(checkAdmission(headers({ 'x-attraccess-version': '2.1.0-rc.1' }), running)).toEqual({ ok: true });
   });
 
   it.each([[undefined], ['abc'], ['2'], ['0'], ['1.0']])('rejects wire version %p with 426 semantics', (wire) => {
@@ -17,8 +17,8 @@ describe('checkAdmission', () => {
   });
 
   it.each([
-    ['attraccess too old', { 'x-attraccess-version': '1.10.0' }],
-    ['attraccess next major', { 'x-attraccess-version': '2.0.0' }],
+    ['attraccess too old', { 'x-attraccess-version': '1.11.0' }],
+    ['attraccess next major', { 'x-attraccess-version': '3.0.0' }],
     ['plugin mismatch', { 'x-matter-plugin-version': '9.9.9' }],
     ['sidecar mismatch', { 'x-matter-sidecar-version': '9.9.9' }],
     ['attraccess missing', { 'x-attraccess-version': undefined }],

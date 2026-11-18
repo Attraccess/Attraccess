@@ -19,7 +19,9 @@ interface Props {
 export function PluginRow({ plugin, installed, onShowError, onShowDetails, onManageVersion, onDelete }: Props) {
   const { t } = usePluginsTranslations();
   return (
-    <TableRow key={plugin.name} id={plugin.name}>
+    // The id is per plugin directory: a refused 1.x copy and a valid 2.0 copy of the same name are both listed, and
+    // the table drops rows with a duplicate key.
+    <TableRow key={plugin.id} id={plugin.id}>
       <TableCell>
         <div className="flex flex-wrap items-center gap-2">
           <span>{plugin.name}</span>
@@ -67,7 +69,14 @@ export function PluginRow({ plugin, installed, onShowError, onShowDetails, onMan
           <button
             type="button"
             className="rounded-medium outline-none focus-visible:ring-2 focus-visible:ring-focus"
-            onClick={() => onShowError({ id: plugin.id, name: plugin.name, error: plugin.error ?? '' })}
+            onClick={() =>
+              onShowError({
+                id: plugin.id,
+                name: plugin.name,
+                error: plugin.error ?? '',
+                refused: plugin.refused === true,
+              })
+            }
             aria-label={t('status.viewError', { pluginName: plugin.name })}
             data-cy={`plugins-list-status-${plugin.id}`}
           >
@@ -75,7 +84,7 @@ export function PluginRow({ plugin, installed, onShowError, onShowDetails, onMan
               <Chip variant="soft" color="danger">
                 <span className="inline-flex items-center gap-1">
                   <AlertTriangle size={14} />
-                  {t('status.error')}
+                  {plugin.refused ? t('status.refused') : t('status.error')}
                 </span>
               </Chip>
               <TooltipContent>{t('status.errorTooltip')}</TooltipContent>

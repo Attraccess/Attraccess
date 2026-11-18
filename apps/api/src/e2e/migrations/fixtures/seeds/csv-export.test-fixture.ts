@@ -1,5 +1,6 @@
 import type { DataSource } from 'typeorm';
-import { CsvExportTemplate, CsvExportTemplateColumnType, CsvExportType } from '@attraccess/database-entities';
+import { CsvExportTemplate } from '@attraccess/database-entities';
+import { CsvExportTemplateColumnType, CsvExportType } from '@attraccess/application-models';
 import { ensureEntity } from '../seed-storage.test-fixture';
 
 export async function migrationCsvExportSeeds(dataSource: DataSource, seedTag: string) {

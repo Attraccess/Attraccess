@@ -1,25 +1,20 @@
-import { EntityManager, In } from 'typeorm';
-import {
-  Resource,
-  ResourceMeteringSession,
-  ResourceMeteringSessionStatus,
-  ResourceUsage,
-} from '@attraccess/database-entities';
-import { findActiveUsages, getSessionCapacity } from '../usage/sessions/active-usage';
+import type { MeteringUsageRecord, ResourceMeteringSessionRecord } from '@attraccess/application-models';
+import type { TransactionContext } from '../../database/transaction-context';
+import type { MeteringStore } from './metering-store.port';
 
 /** Effective parallel session limit for metering. Doors and unknown resources behave like a limit of 1. */
-export async function getMeteringSessionLimit(manager: EntityManager, resourceId: number): Promise<number> {
-  const resource = await manager.findOne(Resource, {
-    where: { id: resourceId },
-    select: { id: true, type: true, maxParallelSessions: true },
-  });
-  return resource ? getSessionCapacity(resource, 0).maxParallelSessions : 1;
+export function getMeteringSessionLimit(
+  store: MeteringStore,
+  resourceId: number,
+  context?: TransactionContext,
+): Promise<number> {
+  return store.findSessionLimit(resourceId, context);
 }
 
 /** A running session of a machine and its open meter session for one meter, if it has one. */
 export interface ActiveMeterSession {
-  usage: ResourceUsage;
-  session: ResourceMeteringSession | null;
+  usage: MeteringUsageRecord;
+  session: ResourceMeteringSessionRecord | null;
 }
 
 /**
@@ -28,24 +23,25 @@ export interface ActiveMeterSession {
  * not on who started first.
  */
 export async function findActiveMeterSessions(
-  manager: EntityManager,
+  store: MeteringStore,
   resourceId: number,
   meterIds: number[],
-): Promise<{ usages: ResourceUsage[]; byMeter: Map<number, ActiveMeterSession[]> }> {
-  const published = await findActiveUsages(manager, resourceId);
+  context?: TransactionContext,
+): Promise<{ usages: MeteringUsageRecord[]; byMeter: Map<number, ActiveMeterSession[]> }> {
+  const published = await store.findRunningUsages(resourceId, context);
   // A machine limited to one session counts only its newest session, as legacy duplicates always did.
   const usages =
-    published.length > 1 && (await getMeteringSessionLimit(manager, resourceId)) <= 1 ? published.slice(-1) : published;
+    published.length > 1 && (await getMeteringSessionLimit(store, resourceId, context)) <= 1
+      ? published.slice(-1)
+      : published;
   const sessions =
     usages.length && meterIds.length
-      ? await manager.find(ResourceMeteringSession, {
-          where: {
-            resourceId,
-            usageId: In(usages.map((usage) => usage.id)),
-            meterId: In(meterIds),
-            status: ResourceMeteringSessionStatus.Active,
-          },
-        })
+      ? await store.findRunningSessions(
+          resourceId,
+          usages.map((usage) => usage.id),
+          meterIds,
+          context,
+        )
       : [];
   const byMeter = new Map<number, ActiveMeterSession[]>();
   for (const meterId of meterIds) {

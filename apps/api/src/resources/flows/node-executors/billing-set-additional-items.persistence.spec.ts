@@ -1,11 +1,6 @@
 import { Logger } from '@nestjs/common';
-import {
-  BillingTransaction,
-  BillingTransactionItem,
-  BillingTransactionStatus,
-  ResourceFlowNode,
-  ResourceUsage,
-} from '@attraccess/database-entities';
+import { BillingTransaction, BillingTransactionItem, ResourceUsage } from '@attraccess/database-entities';
+import { BillingTransactionStatus, FlowNodeRecord } from '@attraccess/application-models';
 import { DataSource, EntitySchema } from 'typeorm';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -13,11 +8,14 @@ import { tmpdir } from 'node:os';
 import {
   closeResourceTransactionConnection,
   runSerializedTransaction,
-} from '../../../database/run-serialized-transaction';
+} from '../../../database/sqlite/run-serialized-transaction';
+import { unitOfWorkFor } from '../../../database/adapters/shared-unit-of-work';
+import { TypeOrmFlowBillingItemStore } from '../../../database/adapters/flows/typeorm-flow-billing-item.store';
 import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { BillingSetAdditionalItemsExecutor } from './billing-set-additional-items.executor';
 import { NodeExecutionContext } from './node-executor.interface';
+import { legacyEngineTransactionScope } from '../../../database/adapters/common/legacy-engine-transaction';
 
 const schemas = [
   new EntitySchema<ResourceUsage>({
@@ -61,7 +59,7 @@ describe('Additional billing items around finalization', () => {
   let directory: string;
   let executor: BillingSetAdditionalItemsExecutor;
   const item = { name: 'Energy', description: 'Meter', externalReference: 'meter-1', quantity: 3, unitPrice: 5 };
-  const node = { resourceId: 1, data: item } as ResourceFlowNode;
+  const node = { resourceId: 1, data: item } as unknown as FlowNodeRecord;
   const ctx = { compileTemplate: (template: string) => template } as NodeExecutionContext;
 
   beforeEach(async () => {
@@ -69,6 +67,7 @@ describe('Additional billing items around finalization', () => {
     directory = await mkdtemp(join(tmpdir(), 'attraccess-billing-items-'));
     source = await new DataSource({
       type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: join(directory, 'test.sqlite'),
       entities: schemas,
       synchronize: true,
@@ -77,9 +76,11 @@ describe('Additional billing items around finalization', () => {
     await source
       .getRepository(BillingTransaction)
       .save({ id: 1, resourceUsageId: 1, status: BillingTransactionStatus.Pending, amount: 0 });
+    const unitOfWork = unitOfWorkFor(source);
     executor = new BillingSetAdditionalItemsExecutor(
       { getActiveSessionsForResource: jest.fn().mockResolvedValue([{ id: 1 }]) } as unknown as ResourceUsageService,
-      source.getRepository(BillingTransactionItem),
+      new TypeOrmFlowBillingItemStore(source, unitOfWork),
+      unitOfWork,
     );
   });
 
@@ -117,7 +118,8 @@ describe('Additional billing items around finalization', () => {
 
   it('keeps item writes inside the caller-owned transaction and rejects completed bills there too', async () => {
     await expect(
-      source.transaction(async (transactionManager) => {
+      source.transaction(async (manager) => {
+        const transactionManager = legacyEngineTransactionScope(manager);
         await executor.execute(node, { id: 1, quantity: 2 }, { ...ctx, transactionManager });
         throw new Error('caller rolled back');
       }),
@@ -126,8 +128,12 @@ describe('Additional billing items around finalization', () => {
     await source.getRepository(BillingTransaction).update(1, { status: BillingTransactionStatus.Completed });
 
     await expect(
-      source.transaction((transactionManager) =>
-        executor.execute(node, { id: 1, quantity: 2 }, { ...ctx, transactionManager }),
+      source.transaction((manager) =>
+        executor.execute(
+          node,
+          { id: 1, quantity: 2 },
+          { ...ctx, transactionManager: legacyEngineTransactionScope(manager) },
+        ),
       ),
     ).rejects.toBeInstanceOf(NoUsageSessionError);
     expect(await source.getRepository(BillingTransactionItem).count()).toBe(0);

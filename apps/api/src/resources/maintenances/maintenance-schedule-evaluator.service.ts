@@ -1,22 +1,10 @@
-import { runSerializedTransaction } from '../../database/run-serialized-transaction';
+import { MaintenanceScheduleRecord, ResourceMaintenanceScheduleTriggerType } from '@attraccess/application-models';
 
-import {
-  Resource,
-  ResourceMaintenance,
-  ResourceMaintenanceSchedule,
-  ResourceUsage,
-  ResourceMaintenanceScheduleTriggerType,
-} from '@attraccess/database-entities';
-
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 
 import { OnEvent } from '@nestjs/event-emitter';
 
 import { Cron, CronExpression } from '@nestjs/schedule';
-
-import { InjectRepository } from '@nestjs/typeorm';
-
-import { Repository, In, EntityManager } from 'typeorm';
 
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 
@@ -42,22 +30,14 @@ import { ResourceMaintenanceService } from './maintenance.service';
 import { MaintenanceResourceEvaluation } from './evaluation/resource-evaluation';
 
 import {
-  buildScheduleEvaluationQuery,
-  buildScheduleStateQuery,
-  formatDbDate,
-  MAX_PAIRS_PER_QUERY,
-  parseDbDate,
-  WRITE_TRANSACTION_BATCH_SIZE,
-} from './evaluation/schedule-queries';
+  MAINTENANCE_EVALUATION_STORE,
+  type MaintenanceEvaluationStore,
+  type MaintenanceEvaluationView,
+  type ServiceCycleRequest,
+} from './maintenance-evaluation-store.port';
 
-export {
-  MAX_PAIRS_PER_QUERY,
-  WRITE_TRANSACTION_BATCH_SIZE,
-  buildScheduleEvaluationQuery,
-  buildScheduleStateQuery,
-  formatDbDate,
-  parseDbDate,
-} from './evaluation/schedule-queries';
+/** Writes of one transaction when schedules are persisted in bulk (engines without snapshot reads). */
+export const WRITE_TRANSACTION_BATCH_SIZE = 100;
 
 /**
  * Creates the maintenances that schedules ask for: every five minutes for all resources, and debounced after
@@ -68,24 +48,15 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
   private readonly evaluation: MaintenanceResourceEvaluation;
 
   constructor(
-    @InjectRepository(ResourceMaintenanceSchedule)
-    private readonly scheduleRepository: Repository<ResourceMaintenanceSchedule>,
-    @InjectRepository(ResourceMaintenance)
-    private readonly maintenanceRepository: Repository<ResourceMaintenance>,
-    @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(ResourceUsage)
-    private readonly usageRepository: Repository<ResourceUsage>,
+    @Inject(MAINTENANCE_EVALUATION_STORE)
+    private readonly store: MaintenanceEvaluationStore,
     private readonly maintenanceService: ResourceMaintenanceService,
     private readonly cronTimer: CronTimer,
     private readonly metricsService: MetricsService,
     private readonly operatingAttributionService: ResourceOperatingAttributionService,
   ) {
     this.evaluation = new MaintenanceResourceEvaluation(
-      scheduleRepository,
-      maintenanceRepository,
-      resourceRepository,
-      usageRepository,
+      store,
       maintenanceService,
       operatingAttributionService,
       this.logger,
@@ -109,9 +80,9 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
   private readonly usageEvalFirstEventAt = new Map<number, number>();
 
   private async persistTriggeredSchedules(
-    toCreate: Array<{ resourceId: number; schedule: ResourceMaintenanceSchedule }>,
+    toCreate: Array<{ resourceId: number; schedule: MaintenanceScheduleRecord }>,
   ) {
-    if (this.scheduleRepository.manager.connection?.options.type === 'better-sqlite3') {
+    if (this.store.snapshotReads) {
       // Revalidate bulk candidates through the independent snapshot reader. Each
       // resource gets a short write transaction, letting usage proceed between them.
       for (const { resourceId } of toCreate) {
@@ -131,43 +102,14 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
       const batch = toCreate.slice(offset, offset + WRITE_TRANSACTION_BATCH_SIZE);
       const createdMaintenances: Array<{ resourceId: number; maintenanceId: number }> = [];
       try {
-        await runSerializedTransaction(this.scheduleRepository.manager, async (em) => {
-          for (const [index, { resourceId, schedule }] of batch.entries()) {
-            const savepoint = `maintenance_schedule_${offset + index}`;
-            await em.query(`SAVEPOINT ${savepoint}`);
+        await this.store.inTransaction(async (view) => {
+          for (const { resourceId, schedule } of batch) {
             try {
-              // Recheck by resource to prevent a concurrent manual or different-schedule maintenance.
-              if (await this.maintenanceService.hasActiveMaintenance(resourceId, em)) {
-                await em.query(`RELEASE SAVEPOINT ${savepoint}`);
-                continue;
-              }
-
-              // A maintenance may have completed since the bulk read. Re-read the service cycle
-              // and its duration within the write transaction before creating a new obligation.
-              if (
-                schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS &&
-                !(await this.shouldTrigger(schedule, resourceId, em))
-              ) {
-                await em.query(`RELEASE SAVEPOINT ${savepoint}`);
-                continue;
-              }
-
-              const reason = this.evaluation.buildMaintenanceReasonFromScheduleDefinition(schedule);
-              const maintenance = await this.maintenanceService.createMaintenanceFromSchedule(
-                resourceId,
-                schedule.id,
-                reason,
-                em,
-                false,
+              const maintenanceId = await view.atomically('maintenance_schedule', () =>
+                this.createTriggeredMaintenance(view, resourceId, schedule),
               );
-              await em.query(`RELEASE SAVEPOINT ${savepoint}`);
-              createdMaintenances.push({ resourceId, maintenanceId: maintenance.id });
-              this.logger.log(
-                `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
-              );
+              if (maintenanceId !== undefined) createdMaintenances.push({ resourceId, maintenanceId });
             } catch (err) {
-              await em.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
-              await em.query(`RELEASE SAVEPOINT ${savepoint}`);
               this.logger.error(
                 `Error creating scheduled maintenance for resource ${resourceId}: ${err}`,
                 (err as Error)?.stack,
@@ -186,6 +128,38 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
     }
   }
 
+  /** The id of the maintenance a due schedule created, or undefined when a recheck found it no longer due. */
+  private async createTriggeredMaintenance(
+    view: MaintenanceEvaluationView,
+    resourceId: number,
+    schedule: MaintenanceScheduleRecord,
+  ): Promise<number | undefined> {
+    // Recheck by resource to prevent a concurrent manual or different-schedule maintenance.
+    if (await this.maintenanceService.hasActiveMaintenance(resourceId, view.context)) return undefined;
+
+    // A maintenance may have completed since the bulk read. Re-read the service cycle
+    // and its duration within the write transaction before creating a new obligation.
+    if (
+      schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS &&
+      !(await this.shouldTrigger(schedule, resourceId, view))
+    ) {
+      return undefined;
+    }
+
+    const reason = this.evaluation.buildMaintenanceReasonFromScheduleDefinition(schedule);
+    const maintenance = await this.maintenanceService.createMaintenanceFromSchedule(
+      resourceId,
+      schedule.id,
+      reason,
+      view.context,
+      false,
+    );
+    this.logger.log(
+      `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
+    );
+    return maintenance.id;
+  }
+
   async evaluateAll(): Promise<void> {
     if (this.evaluationLock) {
       this.logger.debug('Schedule evaluation already in progress, skipping');
@@ -198,10 +172,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
       // --- BULK READ PHASE ---
 
       // 1. All enabled schedules with trigger configs
-      const allSchedules = await this.scheduleRepository.find({
-        where: { enabled: true },
-        relations: { usageHoursConfig: true, usageCountConfig: true, timeIntervalConfig: true },
-      });
+      const allSchedules = await this.store.listEnabledSchedules();
 
       if (allSchedules.length === 0) return;
 
@@ -235,7 +206,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
   }
 
   private async loadScheduleDurations(
-    allSchedules: ResourceMaintenanceSchedule[],
+    allSchedules: MaintenanceScheduleRecord[],
     pairs: Array<{ resourceId: number; scheduleId: number; triggerType: ResourceMaintenanceScheduleTriggerType }>,
     activeResourceIds: Set<number>,
     getBaseline: (resourceId: number, scheduleId: number) => Date,
@@ -267,7 +238,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
   }
 
   private async selectTriggeringSchedules(
-    allSchedules: ResourceMaintenanceSchedule[],
+    allSchedules: MaintenanceScheduleRecord[],
     knownResourceIds: Set<number>,
     activeResourceIds: Set<number>,
     getBaseline: (resourceId: number, scheduleId: number) => Date,
@@ -278,14 +249,14 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
     // --- IN-MEMORY EVALUATION PHASE ---
 
     // Group schedules by resource (only known resources) to preserve "first trigger wins" per resource
-    const schedulesByResource = new Map<number, ResourceMaintenanceSchedule[]>();
+    const schedulesByResource = new Map<number, MaintenanceScheduleRecord[]>();
     for (const s of allSchedules.filter((s) => knownResourceIds.has(s.resourceId))) {
       const arr = schedulesByResource.get(s.resourceId) ?? [];
       arr.push(s);
       schedulesByResource.set(s.resourceId, arr);
     }
 
-    const toCreate: Array<{ resourceId: number; schedule: ResourceMaintenanceSchedule }> = [];
+    const toCreate: Array<{ resourceId: number; schedule: MaintenanceScheduleRecord }> = [];
 
     for (const [resourceId, schedules] of schedulesByResource) {
       for (const schedule of schedules) {
@@ -312,7 +283,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
   }
 
   private async loadScheduleState(
-    allSchedules: ResourceMaintenanceSchedule[],
+    allSchedules: MaintenanceScheduleRecord[],
     knownResourceIds: Set<number>,
     resourceCreatedAtMap: Map<number, Date>,
     now: Date,
@@ -332,67 +303,18 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
       }));
     if (pairs.length === 0) return;
 
-    const setState = (row: {
-      resourceId: number;
-      scheduleId: number;
-      baseline?: string | Date;
-      hasActiveMaintenance?: number | boolean;
-    }): void => {
-      const key = `${row.scheduleId}:${row.resourceId}`;
-      baselineMap.set(
-        key,
-        row.baseline ? parseDbDate(row.baseline) : (resourceCreatedAtMap.get(row.resourceId) ?? now),
-      );
-      if (row.hasActiveMaintenance) activeResourceIds.add(row.resourceId);
-    };
-
-    const statePairs = pairs.filter(
-      ({ triggerType }) => triggerType !== ResourceMaintenanceScheduleTriggerType.USAGE_COUNT,
-    );
-    for (let offset = 0; offset < statePairs.length; offset += MAX_PAIRS_PER_QUERY) {
-      const chunk = statePairs.slice(offset, offset + MAX_PAIRS_PER_QUERY);
-      const stateRows: Array<{
-        resourceId: number;
-        scheduleId: number;
-        baseline?: string | Date;
-        hasActiveMaintenance?: number | boolean;
-      }> = await this.usageRepository.query(
-        buildScheduleStateQuery(this.maintenanceRepository.metadata.tableName, chunk.length),
-        [
-          ...chunk.flatMap((pair) => [pair.resourceId, pair.scheduleId, formatDbDate(pair.createdAt)]),
-          formatDbDate(now),
-        ],
-      );
-      for (const row of stateRows) setState(row);
-    }
-
-    const usagePairs = pairs.filter(
-      ({ triggerType }) => triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT,
-    );
-    for (let offset = 0; offset < usagePairs.length; offset += MAX_PAIRS_PER_QUERY) {
-      const chunk = usagePairs.slice(offset, offset + MAX_PAIRS_PER_QUERY);
-      const aggregates: Array<{
-        resourceId: number;
-        scheduleId: number;
-        baseline?: string | Date;
-        hasActiveMaintenance?: number | boolean;
-        totalCount: number | string | null;
-      }> = await this.usageRepository.query(
-        buildScheduleEvaluationQuery(
-          this.maintenanceRepository.metadata.tableName,
-          this.usageRepository.metadata.tableName,
-          chunk.length,
-        ),
-        [
-          ...chunk.flatMap((pair) => [pair.resourceId, pair.scheduleId, formatDbDate(pair.createdAt)]),
-          formatDbDate(now),
-        ],
-      );
-      for (const row of aggregates) {
-        setState(row);
-        const key = `${row.scheduleId}:${row.resourceId}`;
-        usageCountBySchedule.set(key, Number(row.totalCount ?? 0));
-      }
+    const requests: ServiceCycleRequest[] = pairs.map(({ resourceId, scheduleId, createdAt, triggerType }) => ({
+      resourceId,
+      scheduleId,
+      createdAt,
+      countSessions: triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT,
+    }));
+    const countedKeys = new Set(requests.filter((r) => r.countSessions).map((r) => `${r.scheduleId}:${r.resourceId}`));
+    for (const state of await this.store.loadServiceCycleStates(requests, now)) {
+      const key = `${state.scheduleId}:${state.resourceId}`;
+      baselineMap.set(key, state.baseline);
+      if (state.hasActiveMaintenance) activeResourceIds.add(state.resourceId);
+      if (countedKeys.has(key)) usageCountBySchedule.set(key, state.completedSessions);
     }
 
     const getBaseline = (resourceId: number, scheduleId: number): Date =>
@@ -410,19 +332,15 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
    * 3. Load completed-maintenance baselines and active state, then usage totals only for usage schedules.
    * 4. Write triggered schedules in bounded transactions.
    */
-  private async loadScheduleResources(allSchedules: ResourceMaintenanceSchedule[]) {
+  private async loadScheduleResources(allSchedules: MaintenanceScheduleRecord[]) {
     // ponytail: reduce+Set avoids intermediate array from map() before Set construction
     const resourceIds = [...allSchedules.reduce((s, a) => s.add(a.resourceId), new Set<number>())];
 
     // 2. Resource createdAt — fallback baseline when no prior maintenance for a schedule
-    const resources = await this.resourceRepository.find({
-      where: { id: In(resourceIds) },
-      select: { id: true, createdAt: true },
-    });
-    const resourceCreatedAtMap = new Map<number, Date>(resources.map((r) => [r.id, r.createdAt]));
+    const resourceCreatedAtMap = await this.store.findResourceCreatedAt(resourceIds);
 
     // Warn and skip schedules for resources missing from DB (orphaned foreign keys)
-    const knownResourceIds = new Set(resources.map((r) => r.id));
+    const knownResourceIds = new Set(resourceCreatedAtMap.keys());
     const orphanedResourceIds = resourceIds.filter((id) => !knownResourceIds.has(id));
     if (orphanedResourceIds.length > 0) {
       this.logger.warn(
@@ -549,14 +467,14 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
   }
 
   async shouldTrigger(
-    schedule: ResourceMaintenanceSchedule,
+    schedule: MaintenanceScheduleRecord,
     resourceId: number,
-    manager?: EntityManager,
+    view?: MaintenanceEvaluationView,
   ): Promise<boolean> {
-    return this.evaluation.shouldTrigger(schedule, resourceId, manager);
+    return this.evaluation.shouldTrigger(schedule, resourceId, view);
   }
 
-  async getBaselineDate(resourceId: number, scheduleId: number, manager?: EntityManager): Promise<Date> {
-    return this.evaluation.getBaselineDate(resourceId, scheduleId, manager);
+  async getBaselineDate(resourceId: number, scheduleId: number, view?: MaintenanceEvaluationView): Promise<Date> {
+    return this.evaluation.getBaselineDate(resourceId, scheduleId, view);
   }
 }

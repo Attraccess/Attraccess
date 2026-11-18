@@ -5,12 +5,13 @@ jest.mock('crypto', () => {
 });
 
 import { registerUsersServiceFixture } from './users.service.users-service.test-fixture';
-import { Role, User, AuthenticationDetail, DashboardPin, ResourceUsage } from '@attraccess/database-entities';
-import { EntityManager, ILike, UpdateResult } from 'typeorm';
+import { aUserRecord } from './fakes/in-memory-user-store.test-fixture';
 import { ForbiddenException, BadRequestException } from '@nestjs/common';
 import { UserNotFoundException } from './../../exceptions/user.notFound.exception';
 import { SSOUsernameChangeForbiddenException } from './errors/ssoUsernameChangeForbidden.exception';
+import { UserHasActiveUsageSessionsException } from './accounts/user-accounts';
 import { randomBytes } from 'crypto';
+import { fakeTransactionScope } from '../../database/fake-transaction-scope.test-fixture';
 
 describe('UsersService', () => {
   const fixture = registerUsersServiceFixture();
@@ -24,28 +25,21 @@ describe('UsersService', () => {
       await expect(fixture.service.findOne({})).rejects.toThrow('At least one search criteria must be provided');
     });
 
-    it('should find a user by id', async () => {
-      const user = { id: 1, username: 'test' } as User;
-      jest.spyOn(fixture.userRepository, 'findOne').mockResolvedValue(user);
+    it('should find a user by id, username and email', async () => {
+      const [user] = fixture.store.seed({ username: 'test', email: 'test@example.com' });
 
-      const result = await fixture.service.findOne({ id: 1 });
-      expect(result).toEqual(user);
+      await expect(fixture.service.findOne({ id: user.id })).resolves.toMatchObject({ id: user.id });
+      await expect(fixture.service.findOne({ username: ' Test ' })).resolves.toMatchObject({ id: user.id });
+      await expect(fixture.service.findOne({ email: 'Test@Example.com' })).resolves.toMatchObject({ id: user.id });
+      await expect(fixture.service.findOne({ id: 999 })).resolves.toBeNull();
     });
 
-    it('should find a user by username', async () => {
-      const user = { id: 1, username: 'test' } as User;
-      jest.spyOn(fixture.userRepository, 'findOne').mockResolvedValue(user);
-
-      const result = await fixture.service.findOne({ username: 'test' });
-      expect(result).toEqual(user);
-    });
-
-    it('should find a user by email', async () => {
-      const user = { id: 1, email: 'test@example.com' } as User;
-      jest.spyOn(fixture.userRepository, 'findOne').mockResolvedValue(user);
-
-      const result = await fixture.service.findOne({ email: 'test@example.com' });
-      expect(result).toEqual(user);
+    it('asks the store for credentials only when the caller names the relation', async () => {
+      const spy = jest.spyOn(fixture.store, 'findUser');
+      await fixture.service.findOne({ id: 1 });
+      await fixture.service.findOne({ id: 1 }, ['authenticationDetails']);
+      expect(spy).toHaveBeenNthCalledWith(1, { id: 1, username: undefined, email: undefined }, false, undefined);
+      expect(spy).toHaveBeenNthCalledWith(2, { id: 1, username: undefined, email: undefined }, true, undefined);
     });
 
     it('should validate email format', async () => {
@@ -55,13 +49,11 @@ describe('UsersService', () => {
 
   describe('rollbackFailedRegistration', () => {
     it('hard-deletes the unregistered user without updating user metrics', async () => {
-      const manager = { delete: jest.fn().mockResolvedValue(undefined) };
-      fixture.dataSource.transaction.mockImplementation(async (callback) => callback(manager as EntityManager));
+      const [user] = fixture.store.seed({ username: 'fresh' });
 
-      await fixture.service.rollbackFailedRegistration(14);
+      await fixture.service.rollbackFailedRegistration(user.id);
 
-      expect(fixture.dataSource.transaction).toHaveBeenCalledTimes(1);
-      expect(manager.delete).toHaveBeenCalledWith(User, 14);
+      expect(fixture.store.users).toHaveLength(0);
       expect(fixture.mockMetricsService.usersTotal.dec).not.toHaveBeenCalled();
       expect(fixture.mockMetricsService.usersPerLocale.dec).not.toHaveBeenCalled();
     });
@@ -69,49 +61,50 @@ describe('UsersService', () => {
 
   describe('createOne', () => {
     it('the first created user should be assigned the administrator role via RBAC', async () => {
-      jest.spyOn(fixture.userRepository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(fixture.userRepository, 'save').mockImplementation(
-        async (data) =>
-          ({
-            id: 1,
-            username: 'test',
-            email: 'test@example.com',
-            externalIdentifier: null,
-            ...data,
-          }) as User,
-      );
-      jest.spyOn(fixture.userRepository, 'count').mockResolvedValue(0);
-
-      await fixture.service.createOne({ username: 'test', email: 'test@example.com', externalIdentifier: null });
-      expect(fixture.mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'administrator', expect.anything());
+      const user = await fixture.service.createOne({
+        username: 'test',
+        email: 'test@example.com',
+        externalIdentifier: null,
+      });
+      expect(fixture.mockRbacService.assignRoleByKey).toHaveBeenCalledWith(user.id, 'administrator', expect.anything());
     });
 
-    it('a subsequent user should be assigned default roles via RBAC', async () => {
-      jest.spyOn(fixture.userRepository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(fixture.userRepository, 'save').mockImplementation(async (data) => {
-        return { id: 1, ...data } as User;
-      });
-      jest.spyOn(fixture.userRepository, 'count').mockResolvedValue(1);
+    it('a subsequent user should be assigned default roles via RBAC, inside one unit of work', async () => {
+      fixture.store.seed({ username: 'first', email: 'first@example.com' });
 
       const result = await fixture.service.createOne({
         username: 'test',
         email: 'test@example.com',
         externalIdentifier: null,
       });
-      expect(result).toEqual({
-        id: 1,
+      expect(result).toMatchObject({
         username: 'test',
         email: 'test@example.com',
         externalIdentifier: null,
         isEmailVerified: false,
         locale: 'und',
       });
-      expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(1, expect.anything());
+      expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(result.id, fixture.uow.scopes[0]);
       expect(fixture.mockRbacService.assignRoleByKey).not.toHaveBeenCalled();
+      expect(fixture.uow.events).toEqual(['begin', 'commit']);
+    });
+
+    it('joins the caller transaction and leaves the metrics to the caller', async () => {
+      fixture.store.seed({ username: 'first', email: 'first@example.com' });
+      const context = fakeTransactionScope();
+
+      const result = await fixture.service.createOne(
+        { username: 'test', email: 'test@example.com', externalIdentifier: null },
+        context,
+      );
+
+      expect(fixture.uow.events).toEqual([]);
+      expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(result.id, context);
+      expect(fixture.mockMetricsService.usersTotal.inc).not.toHaveBeenCalled();
     });
 
     it('should throw if email already exists', async () => {
-      jest.spyOn(fixture.userRepository, 'findOne').mockResolvedValueOnce({ id: 1 } as User);
+      fixture.store.seed({ username: 'someone', email: 'existing@example.com' });
 
       await expect(
         fixture.service.createOne({ username: 'test', email: 'existing@example.com', externalIdentifier: null }),
@@ -119,14 +112,21 @@ describe('UsersService', () => {
     });
 
     it('should throw if username already exists', async () => {
-      jest
-        .spyOn(fixture.userRepository, 'findOne')
-        .mockResolvedValueOnce(null) // email check
-        .mockResolvedValueOnce({ id: 1 } as User); // username check
+      fixture.store.seed({ username: 'existing', email: 'someone@example.com' });
 
       await expect(
         fixture.service.createOne({ username: 'existing', email: 'test@example.com', externalIdentifier: null }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('blocks creation with 403 when the license refuses another user', async () => {
+      const { LicenseError } = jest.requireActual('../../license/license.service');
+      fixture.licenseService.verifyLicense.mockRejectedValue(new LicenseError('limit reached'));
+
+      await expect(
+        fixture.service.createOne({ username: 'test', email: 'test@example.com', externalIdentifier: null }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(fixture.store.users).toHaveLength(0);
     });
   });
 
@@ -149,51 +149,45 @@ describe('UsersService', () => {
 
   describe('updateUser', () => {
     it('should update allowed fields and trim values', async () => {
-      const updatedUser = {
-        id: 1,
-        externalIdentifier: 'ext-updated',
-      } as User;
-      jest.spyOn(fixture.userRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
-      jest.spyOn(fixture.userRepository, 'findOne').mockResolvedValue(updatedUser);
+      const [user] = fixture.store.seed({});
 
-      const result = await fixture.service.updateOne(1, { externalIdentifier: '  ext-updated  ' });
+      const result = await fixture.service.updateOne(user.id, { externalIdentifier: '  ext-updated  ' });
 
-      expect(fixture.userRepository.update).toHaveBeenCalledWith(
-        1,
-        expect.objectContaining({ externalIdentifier: 'ext-updated' }),
-      );
-      expect(result).toEqual(updatedUser);
+      expect(result.externalIdentifier).toBe('ext-updated');
     });
 
     it('should update verification tokens', async () => {
-      const updatedUser = {
-        id: 1,
-        emailVerificationToken: 'token',
-        emailVerificationTokenExpiresAt: new Date(),
-      } as User;
-      jest.spyOn(fixture.userRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
-      jest.spyOn(fixture.userRepository, 'findOne').mockResolvedValue(updatedUser);
-
+      const [user] = fixture.store.seed({});
       const tokenExpiry = new Date();
-      const result = await fixture.service.updateOne(1, {
+
+      const result = await fixture.service.updateOne(user.id, {
         emailVerificationToken: '  token  ',
         emailVerificationTokenExpiresAt: tokenExpiry,
       });
 
-      expect(fixture.userRepository.update).toHaveBeenCalledWith(
-        1,
-        expect.objectContaining({
-          emailVerificationToken: 'token',
-          emailVerificationTokenExpiresAt: tokenExpiry,
-        }),
-      );
-      expect(result).toEqual(updatedUser);
+      expect(result).toMatchObject({ emailVerificationToken: 'token', emailVerificationTokenExpiresAt: tokenExpiry });
+    });
+
+    it('clears a column that is set to null and leaves omitted ones alone', async () => {
+      const [user] = fixture.store.seed({ passwordResetToken: 'x', emailVerificationToken: 'keep' });
+
+      const result = await fixture.service.updateOne(user.id, { passwordResetToken: null });
+
+      expect(result.passwordResetToken).toBeNull();
+      expect(result.emailVerificationToken).toBe('keep');
+    });
+
+    it('passes the caller transaction to the store', async () => {
+      const [user] = fixture.store.seed({});
+      const spy = jest.spyOn(fixture.store, 'updateUser');
+      const context = fakeTransactionScope();
+
+      await fixture.service.updateOne(user.id, { externalIdentifier: 'a' }, context);
+
+      expect(spy).toHaveBeenCalledWith(user.id, expect.objectContaining({ externalIdentifier: 'a' }), context);
     });
 
     it('should throw if user not found after update', async () => {
-      jest.spyOn(fixture.userRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
-      jest.spyOn(fixture.userRepository, 'findOne').mockResolvedValue(null);
-
       await expect(fixture.service.updateOne(1, { externalIdentifier: 'value' })).rejects.toThrow(
         UserNotFoundException,
       );
@@ -202,349 +196,54 @@ describe('UsersService', () => {
 
   describe('findMany', () => {
     it('should return paginated users', async () => {
-      const mockUsers = [
-        {
-          id: 1,
-          username: 'user1',
-          email: 'user1@example.com',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          isEmailVerified: false,
-          emailVerificationToken: null,
-          emailVerificationTokenExpiresAt: null,
-          passwordResetToken: null,
-          passwordResetTokenExpiresAt: null,
-          lastUsernameChangeAt: null,
-          deleteAccountToken: null,
-          deleteAccountTokenExpiresAt: null,
-          deleteAccountRequestedAt: null,
-          deletedAt: null,
-          resourceIntroductions: [],
-          resourceUsages: [],
-          resourceIntroducers: [],
-          groupMemberships: [],
-          nfcCards: [],
-          authenticationDetails: [],
-          resourceIntroducerPermissions: [],
-          externalIdentifier: null,
-          nfcKeySeedToken: null,
-          ownedProjects: [],
-          sessions: [],
-          billingTransactions: [],
-          initiatedBillingTransactions: [],
-          creditBalance: 0,
-          billingFactor: 100,
-          projectMemberships: [],
-          sentProjectInvitations: [],
-          receivedProjectInvitations: [],
-          formSubmissions: [],
-          lockedUntil: null,
-          failedLoginAttempts: 0,
-          firstFailedLoginAt: null,
-          locale: 'en',
-        } as User,
-        {
-          id: 2,
-          username: 'user2',
-          email: 'user2@example.com',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          isEmailVerified: false,
-          emailVerificationToken: null,
-          emailVerificationTokenExpiresAt: null,
-          passwordResetToken: null,
-          passwordResetTokenExpiresAt: null,
-          lastUsernameChangeAt: null,
-          deleteAccountToken: null,
-          deleteAccountTokenExpiresAt: null,
-          deleteAccountRequestedAt: null,
-          deletedAt: null,
-          resourceIntroductions: [],
-          resourceUsages: [],
-          resourceIntroducers: [],
-          groupMemberships: [],
-          nfcCards: [],
-          authenticationDetails: [],
-          resourceIntroducerPermissions: [],
-          externalIdentifier: null,
-          nfcKeySeedToken: null,
-          ownedProjects: [],
-          sessions: [],
-          billingTransactions: [],
-          initiatedBillingTransactions: [],
-          creditBalance: 0,
-          billingFactor: 100,
-          projectMemberships: [],
-          sentProjectInvitations: [],
-          receivedProjectInvitations: [],
-          formSubmissions: [],
-          lockedUntil: null,
-          failedLoginAttempts: 0,
-          firstFailedLoginAt: null,
-          locale: 'en',
-        } as User,
-      ];
-
-      fixture.userRepository.findAndCount.mockResolvedValue([mockUsers, 2]);
+      fixture.store.seed({ username: 'user1' }, { username: 'user2' });
 
       const result = await fixture.service.findMany({ page: 1, limit: 10 });
 
-      expect(result.data).toEqual(mockUsers);
+      expect(result.data.map((user) => user.username)).toEqual(['user1', 'user2']);
       expect(result.total).toEqual(2);
       expect(result.page).toEqual(1);
       expect(result.limit).toEqual(10);
-      expect(fixture.userRepository.findAndCount).toHaveBeenCalled();
     });
 
-    it('should order users by username ascending', async () => {
-      fixture.userRepository.findAndCount.mockResolvedValue([[], 0]);
+    it('hands the validated pagination and every filter to the store', async () => {
+      const spy = jest.spyOn(fixture.store, 'listUsers');
 
-      await fixture.service.findMany({ page: 1, limit: 10 });
-
-      expect(fixture.userRepository.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({ order: { username: 'ASC' } }),
-      );
-    });
-
-    it('should filter users by role assignment', async () => {
-      fixture.userRepository.findAndCount.mockResolvedValue([[], 0]);
-
-      await fixture.service.findMany({ page: 1, limit: 10, roleId: 42 });
-
-      expect(fixture.userRepository.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { userRoles: { roleId: 42 } } }),
-      );
-    });
-
-    it('should retain the role assignment filter when searching', async () => {
-      fixture.userRepository.findAndCount.mockResolvedValue([[], 0]);
-
-      await fixture.service.findMany({ page: 1, limit: 10, roleId: 42, search: 'alice' });
-
-      expect(fixture.userRepository.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.arrayContaining([expect.objectContaining({ userRoles: { roleId: 42 } })]),
-        }),
-      );
-    });
-
-    it('should fold the email search term to lowercase in JS, including non-ASCII letters', async () => {
-      fixture.userRepository.findAndCount.mockResolvedValue([[], 0]);
-
-      await fixture.service.findMany({ page: 1, limit: 10, search: 'ÄRGER@Example.com' });
-
-      expect(fixture.userRepository.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.arrayContaining([expect.objectContaining({ email: ILike('%ärger@example.com%') })]),
-        }),
-      );
-    });
-
-    it('should require every selected role when roleMatch is all', async () => {
-      const query = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        subQuery: jest.fn(),
-        orderBy: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
-      };
-      const roleFilter = {
-        select: jest.fn().mockReturnThis(),
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        groupBy: jest.fn().mockReturnThis(),
-        having: jest.fn().mockReturnThis(),
-        getQuery: jest.fn().mockReturnValue('(SELECT role user IDs)'),
-      };
-      query.subQuery.mockReturnValue(roleFilter);
-      fixture.userRepository.createQueryBuilder.mockReturnValue(query as never);
-
-      await fixture.service.findMany({ page: 1, limit: 10, roleIds: [2, 2, 4], roleMatch: 'all' });
-
-      expect(roleFilter.having).toHaveBeenCalledWith('COUNT(DISTINCT userRole.roleId) = :roleCount');
-      expect(query.andWhere).toHaveBeenCalledWith('user.id IN (SELECT role user IDs)', {
+      await fixture.service.findMany({
+        page: 2,
+        limit: 5,
         roleIds: [2, 4],
-        roleCount: 2,
-      });
-    });
-
-    it('should exclude users assigned any selected role', async () => {
-      const query = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        subQuery: jest.fn(),
-        orderBy: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
-      };
-      const excludedRoles = {
-        select: jest.fn().mockReturnThis(),
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getQuery: jest.fn().mockReturnValue('(SELECT excluded role user IDs)'),
-      };
-      query.subQuery.mockReturnValue(excludedRoles);
-      fixture.userRepository.createQueryBuilder.mockReturnValue(query as never);
-
-      await fixture.service.findMany({ page: 1, limit: 10, excludeRoleIds: [2, 2, 4] });
-
-      expect(query.andWhere).toHaveBeenCalledWith('NOT EXISTS (SELECT excluded role user IDs)', {
-        excludeRoleIds: [2, 4],
-      });
-    });
-
-    it('should combine selected SSO providers with no SSO users for an any match', async () => {
-      const query = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        subQuery: jest.fn(),
-        setParameters: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
-      };
-      const noSsoProvider = {
-        select: jest.fn().mockReturnThis(),
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getQuery: jest.fn().mockReturnValue('(SELECT no SSO provider)'),
-      };
-      const ssoProviders = {
-        select: jest.fn().mockReturnThis(),
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getQuery: jest.fn().mockReturnValue('(SELECT selected SSO providers)'),
-      };
-      query.subQuery.mockReturnValueOnce(noSsoProvider).mockReturnValueOnce(ssoProviders);
-      fixture.userRepository.createQueryBuilder.mockReturnValue(query as never);
-
-      await fixture.service.findMany({ page: 1, limit: 10, ssoProviderIds: [7], ssoProviderNone: true });
-
-      expect(query.andWhere).toHaveBeenCalledWith(expect.anything());
-      expect(query.setParameters).toHaveBeenCalledWith({
-        ssoType: 'sso',
+        roleMatch: 'all',
         ssoProviderIds: [7],
-        ssoProviderCount: 1,
+        hasSsoProvider: true,
+        emailVerified: true,
+        search: 'alice',
       });
+
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          page: 2,
+          limit: 5,
+          roleIds: [2, 4],
+          roleMatch: 'all',
+          ssoProviderIds: [7],
+          hasSsoProvider: true,
+          emailVerified: true,
+          search: 'alice',
+        }),
+      );
     });
 
-    it('should deduplicate SSO providers before applying an all match', async () => {
-      const query = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        subQuery: jest.fn(),
-        setParameters: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
-      };
-      const ssoProviders = {
-        select: jest.fn().mockReturnThis(),
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        groupBy: jest.fn().mockReturnThis(),
-        having: jest.fn().mockReturnThis(),
-        getQuery: jest.fn().mockReturnValue('(SELECT selected SSO providers)'),
-      };
-      query.subQuery
-        .mockReturnValueOnce({
-          select: jest.fn().mockReturnThis(),
-          from: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          andWhere: jest.fn().mockReturnThis(),
-          getQuery: jest.fn().mockReturnValue('(SELECT no SSO provider)'),
-        })
-        .mockReturnValueOnce(ssoProviders);
-      fixture.userRepository.createQueryBuilder.mockReturnValue(query as never);
+    it('answers an empty id filter without asking the store', async () => {
+      const spy = jest.spyOn(fixture.store, 'listUsers');
 
-      await fixture.service.findMany({ page: 1, limit: 10, ssoProviderIds: [7, 7], ssoProviderMatch: 'all' });
-
-      expect(ssoProviders.having).toHaveBeenCalledWith('COUNT(DISTINCT ssoDetail.providerId) = :ssoProviderCount');
-      expect(query.setParameters).toHaveBeenCalledWith({
-        ssoType: 'sso',
-        ssoProviderIds: [7],
-        ssoProviderCount: 1,
+      await expect(fixture.service.findMany({ page: 1, limit: 10, ids: [] })).resolves.toEqual({
+        data: [],
+        total: 0,
+        page: 1,
+        limit: 10,
       });
-    });
-
-    it('should exclude users linked to any selected SSO provider', async () => {
-      const query = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        subQuery: jest.fn(),
-        orderBy: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
-      };
-      const excludedSsoProviders = {
-        select: jest.fn().mockReturnThis(),
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getQuery: jest.fn().mockReturnValue('(SELECT excluded SSO providers)'),
-      };
-      query.subQuery.mockReturnValue(excludedSsoProviders);
-      fixture.userRepository.createQueryBuilder.mockReturnValue(query as never);
-
-      await fixture.service.findMany({ page: 1, limit: 10, excludeSsoProviderIds: [7, 7] });
-
-      expect(query.andWhere).toHaveBeenCalledWith('NOT EXISTS (SELECT excluded SSO providers)', {
-        excludedSsoType: 'sso',
-        excludeSsoProviderIds: [7],
-      });
-    });
-
-    it('should require users with an SSO provider', async () => {
-      const query = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        subQuery: jest.fn(),
-        orderBy: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
-      };
-      const ssoProviderExists = {
-        select: jest.fn().mockReturnThis(),
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getQuery: jest.fn().mockReturnValue('(SELECT any SSO provider)'),
-      };
-      query.subQuery.mockReturnValue(ssoProviderExists);
-      fixture.userRepository.createQueryBuilder.mockReturnValue(query as never);
-
-      await fixture.service.findMany({ page: 1, limit: 10, hasSsoProvider: true });
-
-      expect(query.andWhere).toHaveBeenCalledWith('EXISTS (SELECT any SSO provider)', {
-        anySsoType: 'sso',
-      });
-    });
-
-    it('should filter by email verification status', async () => {
-      const query = {
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
-      };
-      fixture.userRepository.createQueryBuilder.mockReturnValue(query as never);
-
-      await fixture.service.findMany({ page: 1, limit: 10, emailVerified: true });
-
-      expect(query.andWhere).toHaveBeenCalledWith('user.isEmailVerified = :emailVerified', { emailVerified: true });
+      expect(spy).not.toHaveBeenCalled();
     });
 
     it('should throw error for invalid pagination options', async () => {
@@ -558,111 +257,62 @@ describe('UsersService', () => {
       jest.spyOn(fixture.accounts, 'isSSOUser').mockResolvedValue(false);
     });
 
-    const baseUser = (overrides: Partial<User> = {}): User =>
-      ({
-        id: 1,
-        username: 'olduser',
-        email: 'user@example.com',
-
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isEmailVerified: false,
-        emailVerificationToken: null,
-        emailVerificationTokenExpiresAt: null,
-        passwordResetToken: null,
-        passwordResetTokenExpiresAt: null,
-        lastUsernameChangeAt: null,
-        resourceIntroductions: [],
-        resourceUsages: [],
-        resourceIntroducers: [],
-        groupMemberships: [],
-        nfcCards: [],
-        authenticationDetails: [],
-        resourceIntroducerPermissions: [],
-        externalIdentifier: null,
-        nfcKeySeedToken: null,
-        ownedProjects: [],
-        sessions: [],
-        ...overrides,
-      }) as User;
-
     it('should throw if target user not found', async () => {
-      jest.spyOn(fixture.accounts, 'findOne').mockResolvedValueOnce(null);
-
-      await expect(fixture.service.changeUsername(123, 'newuser', baseUser())).rejects.toThrow(UserNotFoundException);
+      await expect(fixture.service.changeUsername(123, 'newuser', { id: 1 })).rejects.toThrow(UserNotFoundException);
     });
 
     it("should forbid changing another user's username without permission", async () => {
-      const target = baseUser({ id: 2 });
-      jest.spyOn(fixture.accounts, 'findOne').mockResolvedValueOnce(target);
+      const [target] = fixture.store.seed({ id: 2, username: 'target' });
 
-      await expect(fixture.service.changeUsername(2, 'newuser', baseUser({ id: 1 }))).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(fixture.service.changeUsername(target.id, 'newuser', { id: 1 })).rejects.toThrow(ForbiddenException);
     });
 
     it('should enforce once-per-day limit for self-change when not admin', async () => {
       const recent = new Date(Date.now() - 1 * 60 * 60 * 1000);
-      const me = baseUser({ id: 10, lastUsernameChangeAt: recent });
-      jest.spyOn(fixture.accounts, 'findOne').mockResolvedValueOnce(me);
+      const [me] = fixture.store.seed({ id: 10, lastUsernameChangeAt: recent });
 
-      await expect(fixture.service.changeUsername(10, 'newuser', me)).rejects.toThrow(BadRequestException);
+      await expect(fixture.service.changeUsername(me.id, 'newuser', me)).rejects.toThrow(BadRequestException);
     });
 
     it('should allow self-change and update lastUsernameChangeAt and send email', async () => {
-      const me = baseUser({ id: 10, username: 'me' });
-      const updated = { ...me, username: 'newuser', lastUsernameChangeAt: new Date() } as User;
-      jest.spyOn(fixture.accounts, 'findOne').mockResolvedValueOnce(me).mockResolvedValueOnce(updated);
-      const updateSpy = jest.spyOn(fixture.userRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
+      const [me] = fixture.store.seed({ id: 10, username: 'me' });
 
-      const result = await fixture.service.changeUsername(10, 'newuser', me);
+      const result = await fixture.service.changeUsername(me.id, 'newuser', me);
 
-      expect(updateSpy).toHaveBeenCalledWith(
-        10,
-        expect.objectContaining({
-          username: 'newuser',
-          lastUsernameChangeAt: expect.any(Date),
-        }),
-      );
-      expect(fixture.emailService.sendUsernameChangedEmail).toHaveBeenCalledWith(updated, 'me');
-      expect(result).toBe(updated);
+      expect(result).toMatchObject({ username: 'newuser', lastUsernameChangeAt: expect.any(Date) });
+      expect(fixture.emailService.sendUsernameChangedEmail).toHaveBeenCalledWith(result, 'me');
     });
 
     it("should allow admin to change another user's username without altering lastUsernameChangeAt", async () => {
-      const target = baseUser({ id: 20, username: 'target', lastUsernameChangeAt: null });
-      const admin = baseUser({
-        id: 1,
-        effectivePermissions: new Set(['users.update']),
-      } as never);
-      const updated = { ...target, username: 'new_admin_set', lastUsernameChangeAt: null } as User;
-      jest.spyOn(fixture.accounts, 'findOne').mockResolvedValueOnce(target).mockResolvedValueOnce(updated);
-      const updateSpy = jest.spyOn(fixture.userRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
+      const [target] = fixture.store.seed({ id: 20, username: 'target', lastUsernameChangeAt: null });
+      const admin = { id: 1, effectivePermissions: new Set(['users.update']) };
 
-      const result = await fixture.service.changeUsername(20, 'new_admin_set', admin);
+      const result = await fixture.service.changeUsername(target.id, 'new_admin_set', admin);
 
-      expect(updateSpy).toHaveBeenCalledWith(
-        20,
-        expect.objectContaining({
-          username: 'new_admin_set',
-        }),
-      );
-      expect(fixture.emailService.sendUsernameChangedEmail).toHaveBeenCalledWith(updated, 'target');
-      expect(result).toBe(updated);
+      expect(result).toMatchObject({ username: 'new_admin_set', lastUsernameChangeAt: null });
+      expect(fixture.emailService.sendUsernameChangedEmail).toHaveBeenCalledWith(result, 'target');
+    });
+
+    it('does not fail the change when the notification mail cannot be sent', async () => {
+      const [me] = fixture.store.seed({ id: 10, username: 'me' });
+      fixture.emailService.sendUsernameChangedEmail.mockRejectedValue(new Error('smtp down'));
+
+      await expect(fixture.service.changeUsername(me.id, 'newuser', me)).resolves.toMatchObject({
+        username: 'newuser',
+      });
     });
 
     it('should validate new username format', async () => {
-      const me = baseUser({ id: 10 });
-      jest.spyOn(fixture.accounts, 'findOne').mockResolvedValueOnce(me);
+      const [me] = fixture.store.seed({ id: 10 });
 
-      await expect(fixture.service.changeUsername(10, 'x', me)).rejects.toThrow(BadRequestException);
+      await expect(fixture.service.changeUsername(me.id, 'x', me)).rejects.toThrow(BadRequestException);
     });
 
     it('should forbid changing username for SSO users', async () => {
-      const me = baseUser({ id: 5 });
-      jest.spyOn(fixture.accounts, 'findOne').mockResolvedValueOnce(me);
+      const [me] = fixture.store.seed({ id: 5 });
       jest.spyOn(fixture.accounts, 'isSSOUser').mockResolvedValueOnce(true);
 
-      await expect(fixture.service.changeUsername(5, 'newuser', me)).rejects.toThrow(
+      await expect(fixture.service.changeUsername(me.id, 'newuser', me)).rejects.toThrow(
         SSOUsernameChangeForbiddenException,
       );
     });
@@ -670,55 +320,56 @@ describe('UsersService', () => {
 
   describe('updateDateTimePreferences', () => {
     it('updates only the selected user format preferences without changing locale', async () => {
-      jest
-        .spyOn(fixture.accounts, 'findOne')
-        .mockResolvedValueOnce(Object.assign(new User(), { id: 42, locale: 'de', dateTimeLocale: 'en-GB' }));
-      const updated = await fixture.service.updateDateTimePreferences(42, { dateTimeLocale: ' en-gb ' });
-      expect(fixture.userRepository.update).toHaveBeenCalledWith(42, { dateTimeLocale: 'en-GB' });
+      const [user] = fixture.store.seed({ id: 42, locale: 'de', dateTimeLocale: null });
+
+      const updated = await fixture.service.updateDateTimePreferences(user.id, { dateTimeLocale: ' en-gb ' });
+
       expect(updated).toMatchObject({ locale: 'de', dateTimeLocale: 'en-GB' });
     });
   });
 
   describe('date/time locale validation and reset', () => {
     it('rejects unsupported locales before writing', async () => {
+      const spy = jest.spyOn(fixture.store, 'updateUser');
       await expect(fixture.service.updateDateTimePreferences(42, { dateTimeLocale: 'zz-ZZ' })).rejects.toThrow(
         BadRequestException,
       );
-      expect(fixture.userRepository.update).not.toHaveBeenCalled();
+      expect(spy).not.toHaveBeenCalled();
     });
     it('persists an explicit null without changing translation language', async () => {
-      jest
-        .spyOn(fixture.accounts, 'findOne')
-        .mockResolvedValueOnce(Object.assign(new User(), { id: 42, locale: 'de', dateTimeLocale: null }));
-      expect(await fixture.service.updateDateTimePreferences(42, { dateTimeLocale: null })).toMatchObject({
+      const [user] = fixture.store.seed({ id: 42, locale: 'de', dateTimeLocale: 'en-GB' });
+
+      expect(await fixture.service.updateDateTimePreferences(user.id, { dateTimeLocale: null })).toMatchObject({
         locale: 'de',
         dateTimeLocale: null,
       });
-      expect(fixture.userRepository.update).toHaveBeenCalledWith(42, { dateTimeLocale: null });
     });
   });
 
   describe('createOne – locale', () => {
     beforeEach(() => {
-      jest.spyOn(fixture.userRepository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(fixture.userRepository, 'count').mockResolvedValue(1);
-      jest.spyOn(fixture.userRepository, 'save').mockImplementation(async (data) => ({ id: 99, ...data }) as User);
+      fixture.store.seed({ username: 'first', email: 'first@example.com' });
     });
 
     it('sets locale when provided', async () => {
-      await fixture.service.createOne({ username: 'usr', email: 'u@x.com', externalIdentifier: null, locale: 'de' });
-      expect(fixture.userRepository.save).toHaveBeenCalledWith(expect.objectContaining({ locale: 'de' }));
+      const user = await fixture.service.createOne({
+        username: 'usr',
+        email: 'u@x.com',
+        externalIdentifier: null,
+        locale: 'de',
+      });
+      expect(user.locale).toBe('de');
       expect(fixture.mockMetricsService.usersPerLocale.inc).toHaveBeenCalledWith({ locale: 'de' });
     });
 
     it('stores a supported full BCP 47 locale tag without lowercasing or truncating', async () => {
-      await fixture.service.createOne({
+      const user = await fixture.service.createOne({
         username: 'usr',
         email: 'u@x.com',
         externalIdentifier: null,
         locale: 'EN-Latn-GB',
       });
-      expect(fixture.userRepository.save).toHaveBeenCalledWith(expect.objectContaining({ locale: 'EN-Latn-GB' }));
+      expect(user.locale).toBe('EN-Latn-GB');
     });
 
     it.each(['fr-FR', 'en-!!!', 'de-u-12', '', ' '])(
@@ -731,35 +382,46 @@ describe('UsersService', () => {
           locale,
         });
         expect(user.locale).toBe('und');
-        expect(fixture.userRepository.save).toHaveBeenCalledWith(expect.objectContaining({ locale: 'und' }));
       },
     );
 
     it('leaves the personal locale undetermined when none was provided', async () => {
-      fixture.settingsService.getDefaultLanguage.mockResolvedValue('de');
-      await fixture.service.createOne({ username: 'usr', email: 'u@x.com', externalIdentifier: null });
-      const saved = (fixture.userRepository.save as jest.Mock).mock.calls[0][0] as Partial<User>;
-      expect(saved.locale).toBe('und');
+      const user = await fixture.service.createOne({ username: 'usr', email: 'u@x.com', externalIdentifier: null });
+      expect(user.locale).toBe('und');
     });
   });
 
   describe('updateLocale', () => {
     it('saves cleaned locale, updates gauge, and returns user', async () => {
-      const existing = { id: 1, locale: 'en' } as User;
-      const updated = { id: 1, locale: 'de' } as User;
-      jest.spyOn(fixture.userRepository, 'update').mockResolvedValue({} as UpdateResult);
-      jest.spyOn(fixture.accounts, 'findOne').mockResolvedValueOnce(existing).mockResolvedValueOnce(updated);
+      const [user] = fixture.store.seed({ locale: 'en' });
 
-      const result = await fixture.service.updateLocale(1, 'de-DE');
-      expect(fixture.userRepository.update).toHaveBeenCalledWith(1, { locale: 'de-DE' });
+      const result = await fixture.service.updateLocale(user.id, 'de-DE');
+
       expect(fixture.mockMetricsService.usersLocaleSyncsTotal.inc).toHaveBeenCalledWith({ locale: 'de-DE' });
       expect(fixture.mockMetricsService.usersPerLocale.dec).toHaveBeenCalledWith({ locale: 'en' });
       expect(fixture.mockMetricsService.usersPerLocale.inc).toHaveBeenCalledWith({ locale: 'de-DE' });
-      expect(result).toEqual(updated);
+      expect(result).toMatchObject({ id: user.id, locale: 'de-DE' });
     });
 
     it('throws BadRequestException for empty locale', async () => {
       await expect(fixture.service.updateLocale(1, '   ')).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws UserNotFoundException for an unknown user', async () => {
+      await expect(fixture.service.updateLocale(1, 'de')).rejects.toThrow(UserNotFoundException);
+    });
+  });
+
+  describe('requestSelfDeletion', () => {
+    it('stores only the hash of the confirmation token and mails the raw token', async () => {
+      const [user] = fixture.store.seed({ username: 'leaver' });
+
+      await fixture.service.requestSelfDeletion(user.id);
+
+      const [recipient, rawToken] = fixture.emailService.sendDeleteAccountConfirmationEmail.mock.calls[0];
+      expect(recipient).toMatchObject({ id: user.id });
+      expect(fixture.store.users[0].deleteAccountToken).toBe(`hashed:${rawToken}`);
+      expect(fixture.store.users[0].deleteAccountTokenExpiresAt).toBeInstanceOf(Date);
     });
   });
 
@@ -767,144 +429,176 @@ describe('UsersService', () => {
     const futureDate = new Date(Date.now() + 86_400_000);
 
     it('throws ForbiddenException when user is the last administrator', async () => {
-      jest.spyOn(fixture.userRepository, 'findOne').mockResolvedValue({
-        id: 1,
+      const [admin] = fixture.store.seed({
         email: 'admin@example.com',
-        deletedAt: null,
         deleteAccountToken: 'hashed:tok',
         deleteAccountTokenExpiresAt: futureDate,
-      } as unknown as User);
+      });
       fixture.mockRbacService.isLastAdministrator.mockResolvedValue(true);
 
       await expect(fixture.service.confirmSelfDeletion(' Admin@Example.COM ', 'tok')).rejects.toThrow(
         ForbiddenException,
       );
-      expect(fixture.userRepository.findOne).toHaveBeenNthCalledWith(1, {
-        where: { email: 'admin@example.com' },
-        withDeleted: true,
-      });
+      expect(fixture.store.users[0].deletedAt).toBeNull();
+      expect(fixture.mockRbacService.isLastAdministrator).toHaveBeenCalledWith(admin.id, expect.anything());
     });
 
     it('treats a repeated confirmation as success after the email has been reused', async () => {
-      const reusedEmailUser = {
-        id: 2,
-        deletedAt: null,
-        deleteAccountToken: 'hashed:different-token',
-        deleteAccountTokenExpiresAt: futureDate,
-      } as User;
-      const deletedUser = {
-        id: 1,
-        deletedAt: new Date(),
-        deleteAccountToken: 'hashed:tok',
-        deleteAccountTokenExpiresAt: futureDate,
-      } as User;
-      fixture.userRepository.findOne.mockResolvedValueOnce(reusedEmailUser).mockResolvedValueOnce(deletedUser);
+      fixture.store.seed(
+        {
+          id: 2,
+          email: 'deleted@example.com',
+          deleteAccountToken: 'hashed:different-token',
+          deleteAccountTokenExpiresAt: futureDate,
+        },
+        {
+          id: 1,
+          email: 'deleted-user-1-x@deleted.local',
+          deletedAt: new Date(),
+          deleteAccountToken: 'hashed:tok',
+          deleteAccountTokenExpiresAt: futureDate,
+        },
+      );
 
       await expect(fixture.service.confirmSelfDeletion('deleted@example.com', 'tok')).resolves.toBeUndefined();
 
-      expect(fixture.userRepository.findOne).toHaveBeenNthCalledWith(2, {
-        where: expect.objectContaining({
-          deleteAccountToken: expect.anything(),
-          deletedAt: expect.anything(),
-        }),
-        withDeleted: true,
-      });
+      expect(fixture.store.users.find((user) => user.id === 2)?.deletedAt).toBeNull();
     });
 
     it('rejects an expired confirmation token for a deleted account', async () => {
-      const deletedUser = {
+      fixture.store.seed({
         id: 1,
         deletedAt: new Date(),
         deleteAccountToken: 'hashed:tok',
         deleteAccountTokenExpiresAt: new Date(Date.now() - 1_000),
-      } as User;
-      fixture.userRepository.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(deletedUser);
+      });
 
       await expect(fixture.service.confirmSelfDeletion('deleted@example.com', 'tok')).rejects.toThrow(
         'DeleteAccountTokenExpiredException',
       );
     });
 
+    it('rejects an unknown or mismatching token', async () => {
+      fixture.store.seed({
+        email: 'a@example.com',
+        deleteAccountToken: 'hashed:other',
+        deleteAccountTokenExpiresAt: futureDate,
+      });
+
+      await expect(fixture.service.confirmSelfDeletion('a@example.com', 'tok')).rejects.toThrow(
+        'DeleteAccountTokenInvalidException',
+      );
+      await expect(fixture.service.confirmSelfDeletion('nobody@example.com', 'tok')).rejects.toThrow(
+        'DeleteAccountTokenInvalidException',
+      );
+    });
+
+    it('accepts a confirmation created before tokens were stored as hashes', async () => {
+      fixture.store.seed({
+        email: 'a@example.com',
+        deleteAccountToken: 'tok',
+        deleteAccountTokenExpiresAt: futureDate,
+      });
+
+      await fixture.service.confirmSelfDeletion('a@example.com', 'tok');
+
+      expect(fixture.store.users[0].deletedAt).toBeInstanceOf(Date);
+    });
+
     it('retains confirmation token evidence while confirming an account deletion', async () => {
-      const user = {
+      fixture.store.seed({
         id: 1,
+        email: 'deleted@example.com',
         locale: 'en',
-        deletedAt: null,
         deleteAccountToken: 'hashed:tok',
         deleteAccountTokenExpiresAt: futureDate,
         deleteAccountRequestedAt: new Date(),
-      } as User;
-      const userRepo = {
-        findOne: jest.fn().mockResolvedValue(user),
-        update: jest.fn().mockResolvedValue({ affected: 1 }),
-        softDelete: jest.fn().mockResolvedValue({ affected: 1 }),
-      };
-      const usageRepo = { findOne: jest.fn().mockResolvedValue(null) };
-      const authRepo = { delete: jest.fn().mockResolvedValue({ affected: 1 }) };
-      const sessionRepo = { delete: jest.fn().mockResolvedValue({ affected: 1 }) };
-      const pinRepo = { delete: jest.fn().mockResolvedValue({ affected: 2 }) };
-      const manager = {
-        getRepository: jest.fn((entity) => {
-          if (entity === User) return userRepo;
-          if (entity === ResourceUsage) return usageRepo;
-          if (entity === AuthenticationDetail) return authRepo;
-          if (entity === DashboardPin) return pinRepo;
-          return sessionRepo;
-        }),
-      } as unknown as EntityManager;
-      fixture.dataSource.transaction.mockImplementation(async (callback) => callback(manager));
-
-      fixture.userRepository.findOne.mockResolvedValue(user);
+      });
       // base64url of these bytes is "ABCDEFGH", so the generated suffix is uppercase before normalisation
       jest.mocked(randomBytes).mockImplementationOnce(() => Buffer.from([0x00, 0x10, 0x83, 0x10, 0x51, 0x87]));
 
       await fixture.service.confirmSelfDeletion('deleted@example.com', 'tok');
 
-      expect(userRepo.update).toHaveBeenCalledWith(
-        1,
-        expect.objectContaining({
-          username: 'deleted-user-1-ABCDEFGH',
-          email: 'deleted-user-1-abcdefgh@deleted.local',
-        }),
-      );
+      expect(fixture.store.users[0]).toMatchObject({
+        username: 'deleted-user-1-ABCDEFGH',
+        email: 'deleted-user-1-abcdefgh@deleted.local',
+        deleteAccountToken: 'hashed:tok',
+        deleteAccountTokenExpiresAt: futureDate,
+        deleteAccountRequestedAt: expect.any(Date),
+      });
+      expect(fixture.mockMetricsService.usersPerLocale.dec).toHaveBeenCalledWith({ locale: 'en' });
+    });
+  });
 
-      expect(userRepo.update).toHaveBeenCalledWith(
-        1,
-        expect.not.objectContaining({
-          deleteAccountToken: expect.anything(),
-          deleteAccountTokenExpiresAt: expect.anything(),
-          deleteAccountRequestedAt: expect.anything(),
-        }),
-      );
-      expect(pinRepo.delete).toHaveBeenCalledWith({ userId: 1 });
+  describe('deleting accounts', () => {
+    it('refuses to delete the last administrator and changes nothing', async () => {
+      const [admin] = fixture.store.seed({});
+      fixture.mockRbacService.isLastAdministrator.mockResolvedValue(true);
+
+      await expect(fixture.service.deleteOne(admin.id)).rejects.toThrow('Cannot delete the last administrator');
+      expect(fixture.store.users[0].deletedAt).toBeNull();
+      expect(fixture.mockMetricsService.usersTotal.dec).not.toHaveBeenCalled();
+    });
+
+    it('refuses while the user has a running usage session', async () => {
+      const [user] = fixture.store.seed({});
+      fixture.store.activeUsageUserIds.add(user.id);
+
+      await expect(fixture.service.deleteOne(user.id)).rejects.toThrow(UserHasActiveUsageSessionsException);
+    });
+
+    it('reports an unknown user and treats a deleted one as done', async () => {
+      await expect(fixture.service.deleteOne(77)).rejects.toThrow(UserNotFoundException);
+      fixture.store.seed({ id: 5, deletedAt: new Date() });
+      await expect(fixture.service.deleteOne(5)).resolves.toBeUndefined();
+    });
+
+    it('deleteMany anonymizes every user in one unit of work, checking each for last administrator', async () => {
+      const users = fixture.store.seed({}, {});
+
+      await fixture.service.deleteMany(users.map((user) => user.id));
+
+      expect(fixture.uow.events).toEqual(['begin', 'commit']);
+      expect(fixture.store.users.every((user) => user.deletedAt)).toBe(true);
+      expect(fixture.mockRbacService.isLastAdministrator).toHaveBeenCalledTimes(2);
+    });
+
+    it('deleteMany does nothing for an empty list', async () => {
+      await fixture.service.deleteMany([]);
+      expect(fixture.uow.events).toEqual([]);
+    });
+  });
+
+  describe('single-use token consumption', () => {
+    it('delegates to the store, which decides which caller wins', async () => {
+      const [user] = fixture.store.seed({
+        emailVerificationToken: 'a',
+        passwordResetToken: 'b',
+        isEmailVerified: false,
+      });
+
+      await expect(fixture.service.consumeEmailVerificationToken(user.id, 'a')).resolves.toBe(true);
+      await expect(fixture.service.consumeEmailVerificationToken(user.id, 'a')).resolves.toBe(false);
+      await expect(fixture.service.consumePasswordResetToken(user.id, 'b')).resolves.toBe(true);
+      await expect(fixture.service.consumePasswordResetToken(user.id, 'b')).resolves.toBe(false);
+      expect(fixture.store.users[0]).toMatchObject({ isEmailVerified: true, emailVerificationToken: null });
     });
   });
 
   describe('bulk user role assignment', () => {
-    function managerForImport(totalExisting = 0, rolePermissions = ['resources.view']) {
-      const roleRepo = {
-        findOne: jest
-          .fn()
-          .mockResolvedValue({ rolePermissions: rolePermissions.map((permissionKey) => ({ permissionKey })) }),
-      };
-      const repo = {
-        count: jest.fn().mockResolvedValue(totalExisting),
-        create: jest.fn(() => new User()),
-        save: jest.fn(async (users: User[]) => users.map((user, index) => Object.assign(user, { id: index + 1 }))),
-      };
-      const manager = {
-        getRepository: jest.fn((entity) => (entity === Role ? roleRepo : repo)),
-      } as unknown as EntityManager;
-      return { manager, repo, roleRepo };
-    }
+    const setRole = (rolePermissions: string[] | null) =>
+      fixture.rbacStore.findRoleByKey.mockResolvedValue(
+        rolePermissions && { rolePermissions: rolePermissions.map((permissionKey) => ({ permissionKey })) },
+      );
+
     it('bootstraps one administrator and assigns defaults to remaining normalized users', async () => {
-      const { manager } = managerForImport();
+      const context = fakeTransactionScope();
       const users = await fixture.service.createMany(
         [
           { username: ' FIRST ', email: ' First@Example.COM ', locale: ' de ' },
           { username: 'second', email: 'second@example.com', locale: ' ' },
         ],
-        { manager, grantAllPermissionsToFirst: true },
+        { context, grantAllPermissionsToFirst: true },
       );
       expect(users).toEqual([
         expect.objectContaining({
@@ -915,50 +609,93 @@ describe('UsersService', () => {
         }),
         expect.objectContaining({ username: 'second', locale: 'und' }),
       ]);
-      expect(fixture.mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'administrator', manager);
+      expect(fixture.mockRbacService.assignRoleByKey).toHaveBeenCalledWith(users[0].id, 'administrator', context);
       expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledTimes(1);
-      expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(2, manager);
+      expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(users[1].id, context);
     });
     it.each(['fr-FR', 'en-!!!', 'de-u-12'])('keeps unsupported imported preference %s undetermined', async (locale) => {
-      const { manager } = managerForImport(3);
-      const [user] = await fixture.service.createMany([{ username: 'member', email: 'member@example.com', locale }], {
-        manager,
-      });
+      fixture.store.seed({}, {}, {});
+      const [user] = await fixture.service.createMany([{ username: 'member', email: 'member@example.com', locale }]);
       expect(user.locale).toBe('und');
     });
+    it('opens its own unit of work when the caller has none and counts the locale metric after commit', async () => {
+      fixture.store.seed({});
+      await fixture.service.createMany([{ username: 'member', email: 'member@example.com', locale: 'de' }]);
+      expect(fixture.uow.events).toEqual(['begin', 'commit']);
+      expect(fixture.mockMetricsService.usersPerLocale.inc).toHaveBeenCalledWith({ locale: 'de' });
+    });
     it('assigns allowed explicit roles alongside defaults without another administrator', async () => {
-      const { manager } = managerForImport(3);
+      fixture.store.seed({}, {}, {});
+      const context = fakeTransactionScope();
+      setRole(['resources.view']);
       const actor = { id: 9, effectivePermissions: new Set(['resources.view']) } as AuthenticatedUser;
-      await fixture.service.createMany([{ username: 'member', email: 'member@example.com', roleKey: 'viewer' }], {
-        manager,
-        grantAllPermissionsToFirst: true,
-        actor,
-      });
+      const [member] = await fixture.service.createMany(
+        [{ username: 'member', email: 'member@example.com', roleKey: 'viewer' }],
+        { context, grantAllPermissionsToFirst: true, actor },
+      );
       expect(fixture.mockRbacService.getGrantCeiling).toHaveBeenCalledWith(actor);
-      expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(1, manager);
-      expect(fixture.mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'viewer', manager);
-      expect(fixture.mockRbacService.assignRoleByKey).not.toHaveBeenCalledWith(1, 'administrator', manager);
+      expect(fixture.mockRbacService.assignDefaultRoles).toHaveBeenCalledWith(member.id, context);
+      expect(fixture.mockRbacService.assignRoleByKey).toHaveBeenCalledWith(member.id, 'viewer', context);
+      expect(fixture.mockRbacService.assignRoleByKey).not.toHaveBeenCalledWith(member.id, 'administrator', context);
     });
     it('refuses an import role above the actor privilege ceiling', async () => {
-      const { manager } = managerForImport(1, ['users.update']);
+      fixture.store.seed({});
+      setRole(['users.update']);
       await expect(
         fixture.service.createMany([{ username: 'member', email: 'member@example.com', roleKey: 'admin' }], {
-          manager,
           actor: { id: 9, effectivePermissions: new Set(['resources.view']) } as AuthenticatedUser,
         }),
       ).rejects.toThrow(ForbiddenException);
       expect(fixture.mockRbacService.assignRoleByKey).not.toHaveBeenCalled();
     });
     it('rejects an unknown role and an empty email', async () => {
-      const { manager, roleRepo } = managerForImport();
-      roleRepo.findOne.mockResolvedValue(null);
+      setRole(null);
+      const context = fakeTransactionScope();
       await expect(
         fixture.service.createMany([{ username: 'member', email: 'member@example.com', roleKey: 'missing' }], {
-          manager,
+          context,
         }),
       ).rejects.toThrow("Role with key 'missing' not found");
-      await expect(fixture.service.createMany([{ username: 'member', email: ' ' }], { manager })).rejects.toThrow(
+      await expect(fixture.service.createMany([{ username: 'member', email: ' ' }], { context })).rejects.toThrow(
         'Email is required',
+      );
+    });
+  });
+
+  describe('first-time setup replacement', () => {
+    it('renames the sole unverified account and puts it back on rollback', async () => {
+      const [setup] = fixture.store.seed({
+        id: 1,
+        username: 'setup',
+        email: 'setup@example.com',
+        isEmailVerified: false,
+      });
+
+      const released = await fixture.service.releaseFirstTimeSetupAdminIdentifiers();
+      expect(released).toMatchObject({ id: 1, username: 'setup' });
+      expect(fixture.store.users[0].username).toMatch(/^first-time-setup-1-/);
+
+      const [replacement] = fixture.store.seed({ id: 2, username: 'new' });
+      await fixture.service.rollbackFirstTimeSetupAdminReplacement(replacement.id, setup);
+
+      expect(fixture.store.users).toHaveLength(1);
+      expect(fixture.store.users[0]).toMatchObject({ username: 'setup', email: 'setup@example.com' });
+    });
+
+    it.each([
+      ['no account exists', []],
+      ['the account is verified', [{ id: 1, isEmailVerified: true }]],
+      [
+        'another active account exists',
+        [
+          { id: 1, isEmailVerified: false },
+          { id: 2, isEmailVerified: false },
+        ],
+      ],
+    ])('refuses when %s', async (_name, seeds) => {
+      fixture.store.seed(...(seeds as Array<Partial<ReturnType<typeof aUserRecord>>>));
+      await expect(fixture.service.releaseFirstTimeSetupAdminIdentifiers()).rejects.toThrow(
+        'First-time setup is already complete',
       );
     });
   });

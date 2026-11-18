@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResourceHealthController } from './resource-health.controller';
 import { ResourceHealthService } from './resource-health.service';
-import { ResourceHealthSource, ResourceHealthStatus } from '@attraccess/database-entities';
+import { ResourceHealthSource, ResourceHealthStatus } from '@attraccess/application-models';
 import { CanManageMaintenanceGuard } from '../maintenances/canManageMaintenance.guard';
 
 describe('ResourceHealthController', () => {

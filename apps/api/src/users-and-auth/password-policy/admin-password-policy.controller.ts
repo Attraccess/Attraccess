@@ -17,7 +17,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { PasswordPolicyOverride, PasswordPolicyRole } from '@attraccess/database-entities';
+import { PasswordPolicyRole, type PasswordPolicyOverrideRecord } from '@attraccess/application-models';
 import { PasswordPolicyConfig } from '@attraccess/shared';
 import { AuditContext, PasswordPolicyService, POLICY_FIELDS } from './password-policy.service';
 import {
@@ -147,7 +147,7 @@ export class AdminPasswordPolicyController {
     return merged;
   }
 
-  private toOverrideDto(row: PasswordPolicyOverride): PasswordPolicyOverrideDto {
+  private toOverrideDto(row: PasswordPolicyOverrideRecord): PasswordPolicyOverrideDto {
     return {
       role: row.role,
       minLength: row.minLength,

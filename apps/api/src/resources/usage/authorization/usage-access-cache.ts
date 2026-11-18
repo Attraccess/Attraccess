@@ -1,4 +1,4 @@
-import { User } from '@attraccess/database-entities';
+import type { UsageSessionUser } from '@attraccess/application-models';
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
@@ -8,7 +8,7 @@ import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 
 import { Redis } from 'ioredis';
 
-import { EntityManager } from 'typeorm';
+import type { TransactionScope } from '../../../database/unit-of-work';
 
 import { MetricsService } from '../../../metrics/metrics.service';
 
@@ -77,11 +77,7 @@ export class UsageAccessCache {
     @Inject(VALKEY_CLIENT) private readonly valkeyClient: Redis | null,
   ) {}
 
-  async canControllResource(
-    resourceId: number,
-    user: User,
-    transactionalEntityManager?: EntityManager,
-  ): Promise<boolean> {
+  async canControllResource(resourceId: number, user: UsageSessionUser, scope?: TransactionScope): Promise<boolean> {
     const requestPermissions = (user as AuthenticatedUser).effectivePermissions;
     // API tokens may have a narrower effective permission set than their owning user session.
     // Keep users without request-scoped permissions separate so their RBAC lookup can be cached too.
@@ -108,14 +104,7 @@ export class UsageAccessCache {
       const canUpdateResource = (requestPermissions ?? (await this.rbacService.getEffectivePermissions(user.id))).has(
         'resources.update',
       );
-      return this.resolveAuthorizationCacheMiss(
-        key,
-        resourceId,
-        user,
-        canUpdateResource,
-        transactionalEntityManager,
-        generation,
-      );
+      return this.resolveAuthorizationCacheMiss(key, resourceId, user, canUpdateResource, scope, generation);
     })();
     this.accessCacheInFlight.set(key, { generation, result });
     try {
@@ -153,12 +142,12 @@ export class UsageAccessCache {
   private async resolveAuthorizationCacheMiss(
     key: string,
     resourceId: number,
-    user: User,
+    user: UsageSessionUser,
     canUpdateResource: boolean,
-    transactionalEntityManager: EntityManager | undefined,
+    scope: TransactionScope | undefined,
     generation: number,
   ): Promise<boolean> {
-    const result = await this.rules.canControl(resourceId, user, canUpdateResource, transactionalEntityManager);
+    const result = await this.rules.canControl(resourceId, user, canUpdateResource, scope);
     let expiresAt = Date.now() + this.ACCESS_CACHE_TTL_MS;
     if (result && !canUpdateResource) {
       const retrainingStatus = await this.resourceRetrainingService.getResourceRetrainingStatus(resourceId, user.id);

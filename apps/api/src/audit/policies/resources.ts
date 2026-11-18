@@ -1,5 +1,5 @@
 import { dataFields, positive, uuid, withinDetailsLimit, isAuthenticationMethod } from './projection';
-import type { AuthenticationMethod } from '@attraccess/database-entities';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 export const RESOURCE_AUDIT_ACTIONS = [
   'resource.created',

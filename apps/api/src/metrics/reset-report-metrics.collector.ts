@@ -1,8 +1,6 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { AttractapCrashReport } from '@attraccess/database-entities';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { MetricsService } from './metrics.service';
+import { RESET_REPORT_COUNT_READER, ResetReportCountReader } from './metrics-readers.port';
 import {
   CRASH_WATCHDOG_REASONS,
   POWER_ON_REASONS,
@@ -15,14 +13,6 @@ import {
 
 export const RESET_REPORT_COUNT_DEADLINE_MS = 5000;
 
-export const COUNT_SQL = `SELECT r."attractapId" AS attractapId, a."name" AS readerName, r."resetReason" AS resetReason, COUNT(*) AS count
-  FROM "attractap_crash_report" r
-  LEFT JOIN "attractap" a ON a."id" = r."attractapId"
-  WHERE r."createdAt" > ? AND r."createdAt" <= ? AND r."resetReason" IN (${[...CRASH_WATCHDOG_REASONS, ...POWER_ON_REASONS]
-    .map(() => '?')
-    .join(', ')})
-  GROUP BY r."attractapId", a."name", r."resetReason"`;
-
 /** Counts stored reset reports of the last hour from the database at every metrics collection. */
 @Injectable()
 export class ResetReportMetricsCollector implements OnModuleInit {
@@ -30,8 +20,8 @@ export class ResetReportMetricsCollector implements OnModuleInit {
 
   constructor(
     private readonly metrics: MetricsService,
-    @InjectRepository(AttractapCrashReport)
-    private readonly reports: Repository<AttractapCrashReport>,
+    @Inject(RESET_REPORT_COUNT_READER)
+    private readonly reports: ResetReportCountReader,
   ) {}
 
   onModuleInit(): void {
@@ -63,14 +53,11 @@ export class ResetReportMetricsCollector implements OnModuleInit {
   }
 
   private async collect(): Promise<void> {
-    const { from, to } = hourWindow(Date.now());
-    const rows = (await this.reports.query(COUNT_SQL, [
-      from,
-      to,
+    const rows = await this.reports.countByReaderAndReason(hourWindow(Date.now()), [
       ...CRASH_WATCHDOG_REASONS,
       ...POWER_ON_REASONS,
-    ])) as ResetReportRow[];
-    this.publish(rows.map((row) => ({ ...row, count: Number(row.count) })));
+    ]);
+    this.publish(rows);
   }
 
   private publish(rows: ResetReportRow[]): void {

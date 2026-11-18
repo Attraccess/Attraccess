@@ -2,7 +2,7 @@ import { Logger, Module, ClassSerializerInterceptor, ValidationPipe } from '@nes
 import { ConfigService, ConfigModule as NestConfigModule } from '@nestjs/config';
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { DataSource } from 'typeorm';
+import { DATABASE_LIFECYCLE, DatabaseLifecycle } from './database/database-lifecycle';
 import appConfiguration, { AppConfigType } from './config/app.config';
 import { StorageConfigType } from './config/storage.config';
 import { initializeProcessLogging, withLoggingLifecycle } from './logging/process-logging';
@@ -18,7 +18,7 @@ import { createWsAdapter } from './common/text-frame-ws-adapter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
-import { SqliteReadonlyFilter } from './exceptions/sqlite-readonly.filter';
+import { PersistenceReadOnlyFilter } from './exceptions/persistence-read-only.filter';
 import { ValkeyUnavailableFilter } from './exceptions/valkey-unavailable.filter';
 import { isValidTrustProxyValue, resolveTrustProxySetting } from './trust-proxy';
 import { HttpsOptions } from '@nestjs/common/interfaces/external/https-options.interface';
@@ -125,7 +125,7 @@ export function configureBootstrapHttp(app: NestExpressApplication, appConfig: A
     app.set('trust proxy', false);
   }
 
-  app.useGlobalFilters(new ValkeyUnavailableFilter(new SqliteReadonlyFilter(app.get(HttpAdapterHost))));
+  app.useGlobalFilters(new ValkeyUnavailableFilter(new PersistenceReadOnlyFilter(app.get(HttpAdapterHost))));
 
   app.use(cookieParser());
 
@@ -218,14 +218,14 @@ async function generateSelfSignedCertificates(storageDir: string, domain: string
 })
 class PluginBootstrapConfigModule {}
 
-type OwnedApplication = { close(): Promise<void>; get?(token: typeof DataSource): DataSource };
+type OwnedApplication = { close(): Promise<void>; get?(token: typeof DATABASE_LIFECYCLE): DatabaseLifecycle };
 
 async function closeOwnedApplication(app: OwnedApplication, logger: Logger): Promise<void> {
   // Capture ownership before closing: an earlier shutdown hook may throw before
   // TypeORM's hook runs, and the application may no longer allow provider lookup.
-  let database: DataSource | undefined;
+  let database: DatabaseLifecycle | undefined;
   try {
-    database = app.get?.(DataSource);
+    database = app.get?.(DATABASE_LIFECYCLE);
   } catch {
     // The early configuration context has no database provider.
   }
@@ -370,7 +370,7 @@ export async function bootstrap() {
       // Run migrations before the app fully starts
       try {
         bootstrapLogger.log('Running database migrations...');
-        const dataSource = app.get(DataSource);
+        const dataSource = app.get<DatabaseLifecycle>(DATABASE_LIFECYCLE);
 
         if (!dataSource.isInitialized) {
           await dataSource.initialize();

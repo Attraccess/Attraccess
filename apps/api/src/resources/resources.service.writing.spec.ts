@@ -1,22 +1,11 @@
 import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import {
-  DashboardPin,
-  DocumentationType,
-  Resource,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  ResourceType,
-} from '@attraccess/database-entities';
+import { DocumentationType, ResourceType, type ResourceRecord } from '@attraccess/application-models';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { Test, TestingModule } from '@nestjs/testing';
-
-import { getRepositoryToken } from '@nestjs/typeorm';
-
-import { Repository } from 'typeorm';
 
 import { projectAuditRow } from './../audit/recorder/audit-row';
 
@@ -38,56 +27,32 @@ import { ResourceSessionLimitChangedEvent } from './events/resource-session-limi
 
 import { ResourcesService } from './resources.service';
 
+import { RESOURCE_STORE } from './resource-store.port';
+
 import { mockMetricsService } from './resources.service.spec.mock-metrics-service';
 
-export type ResourcesServiceTestScope = {
-  resourceRepository: jest.Mocked<Repository<Resource>>;
-  mockResourceImageService: { saveImage: any; deleteImage: any; getPublicPath: any };
-  service: ResourcesService;
-  audit: { record: any };
-  mockResourceRepository: () => {
-    find: any;
-    findOne: any;
-    findAndCount: any;
-    count: any;
-    create: any;
-    save: any;
-    delete: any;
-    softDelete: any;
-    createQueryBuilder: any;
-  };
-};
+type Resource = ResourceRecord;
+type ResourceStoreMock = Record<string, jest.Mock>;
 
 describe('ResourcesService', () => {
   let service: ResourcesService;
 
-  let resourceRepository: jest.Mocked<Repository<Resource>>;
+  let resourceRepository: ResourceStoreMock;
 
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
 
   // ResourceImageService is injected but not directly used in these tests
 
-  const mockResourceRepository = () => ({
-    find: jest.fn(),
-    findOne: jest.fn(),
-    findAndCount: jest.fn(),
+  const mockResourceRepository = (): ResourceStoreMock => ({
+    findDetailed: jest.fn(),
+    list: jest.fn(),
     count: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
-    delete: jest.fn(),
+    setImageFilename: jest.fn(),
+    hardDelete: jest.fn(),
     softDelete: jest.fn(),
-    createQueryBuilder: jest.fn(() => ({
-      leftJoinAndSelect: jest.fn().mockReturnThis(),
-      leftJoin: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      skip: jest.fn().mockReturnThis(),
-      take: jest.fn().mockReturnThis(),
-      getSql: jest.fn().mockReturnValue('SELECT * FROM resource'),
-      getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
-      getOne: jest.fn(),
-    })),
+    countFlowParts: jest.fn().mockResolvedValue({ nodes: 3, edges: 2 }),
   });
 
   const mockResourceImageService = {
@@ -125,7 +90,7 @@ describe('ResourcesService', () => {
       providers: [
         ResourcesService,
         {
-          provide: getRepositoryToken(Resource),
+          provide: RESOURCE_STORE,
           useFactory: mockResourceRepository,
         },
         {
@@ -151,7 +116,7 @@ describe('ResourcesService', () => {
     }).compile();
 
     service = module.get<ResourcesService>(ResourcesService);
-    resourceRepository = module.get(getRepositoryToken(Resource)) as jest.Mocked<Repository<Resource>>;
+    resourceRepository = module.get(RESOURCE_STORE);
     audit.record.mockClear();
     // ResourceImageService is available but not directly used in tests
   });
@@ -168,7 +133,7 @@ describe('ResourcesService', () => {
         get resourceRepository() {
           return scope.resourceRepository;
         },
-        set resourceRepository(value: typeof scope.resourceRepository) {
+        set resourceRepository(value: ResourceStoreMock) {
           scope.resourceRepository = value;
         },
         get audit() {
@@ -393,7 +358,7 @@ describe('ResourcesService', () => {
         get resourceRepository() {
           return scope.resourceRepository;
         },
-        set resourceRepository(value: typeof scope.resourceRepository) {
+        set resourceRepository(value: ResourceStoreMock) {
           scope.resourceRepository = value;
         },
         get service() {
@@ -410,50 +375,17 @@ describe('ResourcesService', () => {
     );
 
     it('should delete a resource', async () => {
-      (deleteResourceScope.resourceRepository.softDelete as jest.Mock).mockResolvedValue({
-        affected: 1,
-        raw: {},
-        generatedMaps: [],
-      });
+      deleteResourceScope.resourceRepository.softDelete.mockResolvedValue(1);
 
       await deleteResourceScope.service.deleteResource(1);
 
       expect(deleteResourceScope.resourceRepository.softDelete).toHaveBeenCalledWith(1);
     });
 
-    it('deletes the dashboard pins of the deleted resource', async () => {
-      (deleteResourceScope.resourceRepository.softDelete as jest.Mock).mockResolvedValue({ affected: 1 });
-
-      await deleteResourceScope.service.deleteResource(1);
-
-      const { delete: deletePins } = (
-        deleteResourceScope.resourceRepository as unknown as { manager: { delete: jest.Mock } }
-      ).manager;
-      expect(deletePins).toHaveBeenCalledWith(DashboardPin, { itemType: 'resource', itemId: '1' });
-    });
-
-    it('keeps the dashboard pins when the resource does not exist', async () => {
-      (deleteResourceScope.resourceRepository.softDelete as jest.Mock).mockResolvedValue({ affected: 0 });
-
-      await expect(deleteResourceScope.service.deleteResource(999)).rejects.toThrow(ResourceNotFoundException);
-
-      const { delete: deletePins } = (
-        deleteResourceScope.resourceRepository as unknown as { manager: { delete: jest.Mock } }
-      ).manager;
-      expect(deletePins).not.toHaveBeenCalled();
-    });
-
-    beforeEach(() => {
-      (deleteResourceScope.resourceRepository as { manager: unknown }).manager = {
-        count: jest.fn().mockResolvedValueOnce(3).mockResolvedValueOnce(2),
-        delete: jest.fn().mockResolvedValue({ affected: 0 }),
-      };
-    });
-
     it('audits deletion with the pre-delete safe projection and the flow it had', async () => {
       const resource = createMockResource({ id: 1, name: 'Lathe', type: ResourceType.Machine });
       jest.spyOn(deleteResourceScope.service, 'getResourceById').mockResolvedValue(resource);
-      deleteResourceScope.resourceRepository.softDelete.mockResolvedValue({ affected: 1 } as never);
+      deleteResourceScope.resourceRepository.softDelete.mockResolvedValue(1);
 
       await deleteResourceScope.service.deleteResource(1, { id: 9 });
 
@@ -465,12 +397,7 @@ describe('ResourcesService', () => {
           details: { 'before.name': 'Lathe', 'before.type': ResourceType.Machine, flowNodeCount: 3, flowEdgeCount: 2 },
         }),
       );
-      const { count } = (deleteResourceScope.resourceRepository as unknown as { manager: { count: jest.Mock } })
-        .manager;
-      expect(count.mock.calls).toEqual([
-        [ResourceFlowNode, { where: { resourceId: 1 } }],
-        [ResourceFlowEdge, { where: { resourceId: 1 } }],
-      ]);
+      expect(deleteResourceScope.resourceRepository.countFlowParts).toHaveBeenCalledWith(1);
     });
 
     it('bounds an oversized resource name in a deletion audit projection', async () => {
@@ -480,7 +407,7 @@ describe('ResourcesService', () => {
         type: ResourceType.Machine,
       });
       jest.spyOn(deleteResourceScope.service, 'getResourceById').mockResolvedValue(resource);
-      deleteResourceScope.resourceRepository.softDelete.mockResolvedValue({ affected: 1 } as never);
+      deleteResourceScope.resourceRepository.softDelete.mockResolvedValue(1);
 
       await deleteResourceScope.service.deleteResource(1, { id: 9 });
 
@@ -491,11 +418,7 @@ describe('ResourcesService', () => {
     });
 
     it('should throw ResourceNotFoundException if resource not found', async () => {
-      (deleteResourceScope.resourceRepository.softDelete as jest.Mock).mockResolvedValue({
-        affected: 0,
-        raw: {},
-        generatedMaps: [],
-      });
+      deleteResourceScope.resourceRepository.softDelete.mockResolvedValue(0);
 
       await expect(deleteResourceScope.service.deleteResource(999)).rejects.toThrow(ResourceNotFoundException);
     });

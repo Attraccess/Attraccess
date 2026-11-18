@@ -1,4 +1,5 @@
 # Reservierungen
+
 <!-- llms-description: Das Plugin Reservierungen lässt Mitglieder eine Ressource für ein Zeitfenster buchen; Überblick, Voraussetzungen und Links zu Mitglieder-, Administrations- und API-Seiten. -->
 
 > [!NOTE]
@@ -22,7 +23,10 @@ Ressource aktiviert. Bei Ressourcen ohne aktivierte Reservierungen ändert sich 
   **Lizenz fehlt**. Speichern Sie einen gültigen Lizenzschlüssel mit dem Modul, startet Attraccess neu und lädt das
   Plugin. Siehe [Plugins installieren](plugins/installing-plugins.md#lizenz-fehlt). Lizenzen:
   [contact@attraccess.org](mailto:contact@attraccess.org).
-- Attraccess 1.11.0 oder neuer.
+- Attraccess 2.0 oder neuer.
+- Upgrade von 1.x: Die 1.x-Tabellen und -Daten des Plugins bleiben erhalten und werden an Ort und Stelle übernommen.
+  Aktualisieren Sie vorher auf Attraccess 1.11 (siehe
+  [Upgrade auf Attraccess 2.0](installation/updating.md#upgrade-auf-attraccess-20)).
 - Das Plugin `reservations`, installiert wie unter [Plugins installieren](plugins/installing-plugins.md) beschrieben.
   Die angeforderten Berechtigungen stehen unter [Reservierungen administrieren](plugins/reservations/administration.md#plugin-installieren).
 - Optional: eine funktionierende [SMTP-Konfiguration](setup/smtp-email.md) für E-Mail-Hinweise. Ohne sie funktionieren

@@ -1,86 +1,127 @@
-import { MigrationExecutor, DataSource, DataSourceOptions } from 'typeorm';
-
 import { LoadedPluginManifest } from './plugin.manifest';
 
-import { type PluginMigrationClass } from '@attraccess/plugins-backend-sdk';
-
-import { join, dirname } from 'path';
+import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 
 import { recordNpmBootMigrationOutcome } from './npm/audit-state';
 
 import { pluginActivationPlan } from './runtime/dependencies';
 
-import { loadPluginEntryExports } from './runtime/module-loader';
-
 import { PluginService } from './plugin.service';
 
 import { Logger } from '@nestjs/common';
 
-import { mkdirSync } from 'fs';
+import { resolveDatabaseBackend } from '../database/backend';
 
-import { dataSourceConfig } from '../database/datasource';
+import type {
+  PluginMigrationEngine,
+  PluginMigrationEngineConfig,
+  PluginStorageMigrationPlan,
+} from './persistence/plugin-migration-engine.port';
 
-import { createDataSource, SQLITE_BUSY_TIMEOUT_MS } from '../database/sqlite-connection';
+import { loadPluginStorage, storagePluginNames } from './plugin-storage/storage-loader';
+
+import { assertStorageNamesFree, claimStorageNames } from './plugin-storage/storage-registry';
+
+import type { CompiledPluginStorage } from './plugin-storage/storage-model';
+
+import { namespaceOf } from './plugin-storage/storage-compile';
+
+import { recordEstablishedStorage } from './plugin-storage/storage-precedence';
 
 function getImplementationClass(): typeof PluginMigrationService {
   return require('./plugin-migration.service').PluginMigrationService;
 }
 
+/**
+ * Brings the tables of plugins that declare storage to the shape of their release, on install, startup and
+ * upgrade, and drops them on uninstall. The declaration (`definePluginStorage`) is read from the plugin's backend
+ * bundle; the engine behind it is the active database backend's.
+ */
 export class PluginMigrationService {
   protected static logger = new Logger('PluginMigrationService');
 
-  protected static baseConfigOverride: Partial<DataSourceOptions> | null = null;
+  protected static baseConfigOverride: PluginMigrationEngineConfig | null = null;
+
+  /** The active backend's migration engine. Built on first use so a test can redirect its connection first. */
+  protected static engine(): PluginMigrationEngine {
+    const owner = getImplementationClass();
+    return (owner.engineInstance ??= resolveDatabaseBackend().plugins.createMigrationEngine(owner.baseConfigOverride));
+  }
+
+  protected static engineInstance: PluginMigrationEngine | null = null;
+
+  /** Whether the plugin may have storage: it requests PLUGIN_STORAGE and has a backend bundle to declare it in. */
+  public static hasStorage(manifest: LoadedPluginManifest): boolean {
+    return (
+      (manifest.permissions ?? []).includes(PluginPermission.PLUGIN_STORAGE) &&
+      Boolean(manifest.main?.backend?.directory && manifest.main?.backend?.entryPoint)
+    );
+  }
 
   /**
-   * Reverts every applied migration for a single plugin, in reverse order, then
-   * drops the plugin's tracking table. Returns the count reverted.
+   * The compiled storage declaration of an installed plugin, or null when it declares none. Throws for a malformed
+   * declaration (outside the plugin's namespace, migrations that do not produce the declared tables).
    */
-  public static async runDownMigrations(manifest: LoadedPluginManifest): Promise<number> {
-    if (!getImplementationClass().hasMigrations(manifest)) {
-      return 0;
+  public static loadStorage(manifest: LoadedPluginManifest): CompiledPluginStorage | null {
+    if (!getImplementationClass().hasStorage(manifest)) return null;
+    return loadPluginStorage(manifest, PluginService.PLUGIN_PATH, storagePluginNames(PluginService.getPlugins()));
+  }
+
+  /**
+   * Drops the tables of the plugin's committed versions together with its version bookkeeping (and the legacy
+   * migrations table of a plugin adopted from 1.x). Returns whether the plugin had storage. Needs the plugin bundle on
+   * disk to know which tables are its own; a declaration that conflicts with another plugin's namespace drops nothing.
+   */
+  public static async dropStorage(manifest: LoadedPluginManifest): Promise<boolean> {
+    const storage = getImplementationClass().loadStorage(manifest);
+    if (!storage) return false;
+    assertStorageNamesFree(storage);
+    await getImplementationClass().engine().dropAll(storage);
+    getImplementationClass().logger.log(`Dropped the storage of plugin "${manifest.name}".`);
+    return true;
+  }
+
+  /**
+   * Reads which installed plugins with storage are established (keep committed storage), whether or not they load,
+   * so a plugin without committed storage can never disable one that has it (see storage-precedence). Runs at boot
+   * before any plugin's storage is compiled.
+   */
+  public static async resolveStoragePrecedence(): Promise<void> {
+    const established: string[] = [];
+    for (const manifest of PluginService.getPlugins().filter((plugin) => getImplementationClass().hasStorage(plugin))) {
+      if (await getImplementationClass().isEstablished(manifest.name)) established.push(manifest.name);
     }
+    recordEstablishedStorage(established);
+  }
 
-    const classes = getImplementationClass().loadMigrationClasses(manifest);
-    const dataSource = getImplementationClass().buildDataSource(manifest, classes);
-    await dataSource.initialize();
-
+  /**
+   * Whether the plugin keeps committed storage. A name without a namespace owns none. A database that cannot be read
+   * counts as established: the plugin keeps its precedence rather than risk yielding its data to a newcomer.
+   */
+  protected static async isEstablished(pluginName: string): Promise<boolean> {
+    let namespace: string;
     try {
-      await getImplementationClass().relaxBusyTimeout(dataSource);
-      const executor = new MigrationExecutor(dataSource);
-      const executed = await executor.getExecutedMigrations();
-
-      for (let i = 0; i < executed.length; i++) {
-        await dataSource.undoLastMigration({ transaction: 'all' });
-      }
-
-      // Nothing left to track — remove the plugin's bookkeeping table too.
-      const tableName = getImplementationClass().migrationsTableName(manifest);
-      await dataSource.query(`DROP TABLE IF EXISTS "${tableName}"`);
-
-      if (executed.length > 0) {
-        getImplementationClass().logger.log(`Reverted ${executed.length} migration(s) for plugin "${manifest.name}".`);
-      }
-      return executed.length;
-    } finally {
-      await dataSource.destroy();
+      namespace = namespaceOf(pluginName);
+    } catch {
+      return false;
+    }
+    try {
+      return await getImplementationClass().engine().hasCommittedStorage({ pluginName, namespace });
+    } catch (error) {
+      getImplementationClass().logger.warn(
+        `Could not read the storage bookkeeping of plugin "${pluginName}"; treating it as established: ${(error as Error).message}`,
+      );
+      return true;
     }
   }
 
   /**
-   * Runs pending up-migrations for every discovered plugin that ships them.
-   * Per-plugin failures are isolated and recorded as a load error so one broken
-   * plugin can never block host boot.
+   * Runs pending migrations for every discovered plugin that declares storage. Per-plugin failures are isolated
+   * and recorded as a load error (the plugin is quarantined and stays disabled) so one broken plugin can never
+   * block host boot.
    */
   public static async runPendingUpMigrationsForAllPlugins(): Promise<void> {
-    for (const manifest of PluginService.getPlugins()) {
-      if (!getImplementationClass().hasMigrations(manifest))
-        await recordNpmBootMigrationOutcome(
-          PluginService.PLUGIN_PATH,
-          manifest.name,
-          manifest.version,
-          'not-applicable',
-        );
-    }
+    await getImplementationClass().resolveStoragePrecedence();
     const { ordered: plugins, failures } = pluginActivationPlan(PluginService.getPlugins());
     for (const [name, error] of failures) {
       const manifest = PluginService.getPlugins().find((plugin) => plugin.name === name);
@@ -109,17 +150,18 @@ export class PluginMigrationService {
         );
         continue;
       }
-      if (!getImplementationClass().hasMigrations(manifest)) {
-        ready.add(manifest.name);
-        continue;
-      }
       try {
-        await getImplementationClass().runUpMigrations(manifest);
+        const applied = await getImplementationClass().runUpMigrations(manifest);
         ready.add(manifest.name);
-        await recordNpmBootMigrationOutcome(PluginService.PLUGIN_PATH, manifest.name, manifest.version, 'succeeded');
+        await recordNpmBootMigrationOutcome(
+          PluginService.PLUGIN_PATH,
+          manifest.name,
+          manifest.version,
+          applied === null ? 'not-applicable' : 'succeeded',
+        );
       } catch (error) {
         getImplementationClass().logger.error(
-          `Failed to run migrations for plugin "${manifest.name}"; the plugin will be flagged as failed.`,
+          `Failed to migrate the storage of plugin "${manifest.name}"; the plugin will be flagged as failed.`,
           error as Error,
         );
         await recordNpmBootMigrationOutcome(PluginService.PLUGIN_PATH, manifest.name, manifest.version, 'failed');
@@ -129,142 +171,45 @@ export class PluginMigrationService {
   }
 
   /**
-   * A replacement may only activate when its migration bundle still knows every
-   * migration already applied for the plugin. Running down migrations here would
-   * discard data, so versions that need a schema rollback are deliberately blocked.
+   * A replacement may only activate when the database can be brought to its shape without losing data: the recorded
+   * versions must be known to the new release, and an unfinished 1.x history must be completed first. Changes
+   * nothing; throws a PluginStorageMigrationRefused naming the reason.
    */
   public static async assertReplacementMigrationHistory(
     manifest: LoadedPluginManifest,
     sourceDirectory: string,
   ): Promise<void> {
-    const dataSource = getImplementationClass().buildDataSource(manifest, []);
-    await dataSource.initialize();
-
-    try {
-      await getImplementationClass().relaxBusyTimeout(dataSource);
-      const executed = await new MigrationExecutor(dataSource).getExecutedMigrations();
-      if (executed.length === 0) return;
-
-      if (!getImplementationClass().hasMigrations(manifest)) {
-        throw new Error(
-          `Replacement blocked: target package does not contain applied migrations: ${executed
-            .map(({ name }) => name)
-            .join(', ')}.`,
-        );
-      }
-
-      const entry = join(sourceDirectory, manifest.main.migrations.directory, manifest.main.migrations.entryPoint);
-      const exports = loadPluginEntryExports(entry);
-      const candidates = Array.isArray(exports.default) ? exports.default : Object.values(exports);
-      const targetMigrationNames = new Set(
-        candidates
-          .filter((value): value is PluginMigrationClass => typeof value === 'function')
-          .map(({ name }) => name),
-      );
-      const missing = executed.map(({ name }) => name).filter((name) => !targetMigrationNames.has(name));
-      if (missing.length > 0) {
-        throw new Error(
-          `Replacement blocked: target package does not contain applied migrations: ${missing.join(', ')}.`,
-        );
-      }
-    } finally {
-      await dataSource.destroy();
-    }
+    if (!getImplementationClass().hasStorage(manifest)) return;
+    const storage = loadPluginStorage(manifest, sourceDirectory, storagePluginNames(PluginService.getPlugins()));
+    if (!storage) return;
+    assertStorageNamesFree(storage);
+    await getImplementationClass().engine().assess(storage);
   }
 
-  public static configureForTesting(config: Partial<DataSourceOptions> | null): void {
+  public static configureForTesting(config: PluginMigrationEngineConfig | null): void {
     getImplementationClass().baseConfigOverride = config;
+    getImplementationClass().engineInstance = null;
   }
 
   /**
-   * Plugin-scoped migrations tracking table. Sanitised so the plugin name can be
-   * dropped into an identifier safely.
+   * Migrates the storage of a single plugin. Returns the number of versions applied (an adopted 1.x database counts
+   * its baseline), or null when the plugin has no storage.
    */
-  public static migrationsTableName(manifest: Pick<LoadedPluginManifest, 'name'>): string {
-    const safeName = manifest.name.replace(/[^a-zA-Z0-9_]/g, '_');
-    return `plugin_migrations_${safeName}`;
-  }
-
-  public static hasMigrations(manifest: LoadedPluginManifest): boolean {
-    return Boolean(manifest.main?.migrations?.directory && manifest.main?.migrations?.entryPoint);
-  }
-
-  protected static migrationsEntryPath(manifest: LoadedPluginManifest): string {
-    return join(PluginService.PLUGIN_PATH, manifest.main.migrations.directory, manifest.main.migrations.entryPoint);
-  }
-
-  /**
-   * Loads the plugin's migration classes from its bundled migrations entry, in
-   * the host's module realm so `instanceof`/TypeORM type identity hold.
-   */
-  public static loadMigrationClasses(manifest: LoadedPluginManifest): PluginMigrationClass[] {
-    const entry = getImplementationClass().migrationsEntryPath(manifest);
-    const exports = loadPluginEntryExports(entry);
-
-    const candidates = Array.isArray(exports.default) ? exports.default : Object.values(exports);
-    const classes = candidates.filter((value): value is PluginMigrationClass => typeof value === 'function');
-
-    if (classes.length === 0) {
-      throw new Error(`Plugin "${manifest.name}" migrations entry "${entry}" exported no migration classes.`);
+  public static async runUpMigrations(manifest: LoadedPluginManifest): Promise<number | null> {
+    const storage = getImplementationClass().loadStorage(manifest);
+    if (!storage) return null;
+    // Names are claimed before anything is created: a plugin whose tables or indexes belong to (or lie in the
+    // namespace of) a plugin that claimed first never touches the database.
+    claimStorageNames(storage);
+    const plan: PluginStorageMigrationPlan = await getImplementationClass().engine().migrate(storage);
+    const count = plan.pending.length + (plan.adopt ? 1 : 0);
+    if (count > 0) {
+      getImplementationClass().logger.log(
+        plan.adopt
+          ? `Adopted the 1.x storage of plugin "${manifest.name}" as version 1 and applied ${plan.pending.length} more.`
+          : `Applied ${plan.pending.length} storage migration(s) for plugin "${manifest.name}": ${plan.pending.join(', ')}.`,
+      );
     }
-
-    return classes;
-  }
-
-  protected static buildDataSource(manifest: LoadedPluginManifest, migrations: PluginMigrationClass[]): DataSource {
-    const base = (getImplementationClass().baseConfigOverride ?? dataSourceConfig) as DataSourceOptions;
-
-    const databaseFile = (base as { database?: unknown }).database;
-    if (typeof databaseFile === 'string') {
-      // The host normally creates the storage dir, but plugin up-migrations may
-      // run before the host DataSource opens on a fresh install.
-      mkdirSync(dirname(databaseFile), { recursive: true });
-    }
-
-    return createDataSource({
-      ...base,
-      entities: [],
-      synchronize: false,
-      migrationsRun: false,
-      migrations,
-      migrationsTableName: getImplementationClass().migrationsTableName(manifest),
-    } as DataSourceOptions);
-  }
-
-  /**
-   * SQLite serialises writers per file. While plugin migrations run, the host
-   * connection is either not open yet (boot) or idle (uninstall), but give the
-   * driver a little patience rather than failing fast on a transient lock.
-   */
-  protected static async relaxBusyTimeout(dataSource: DataSource): Promise<void> {
-    if (dataSource.options.type === 'better-sqlite3') {
-      await dataSource.query(`PRAGMA busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`);
-    }
-  }
-
-  /** Runs all pending up-migrations for a single plugin. Returns the count applied. */
-  public static async runUpMigrations(manifest: LoadedPluginManifest): Promise<number> {
-    if (!getImplementationClass().hasMigrations(manifest)) {
-      return 0;
-    }
-
-    const classes = getImplementationClass().loadMigrationClasses(manifest);
-    const dataSource = getImplementationClass().buildDataSource(manifest, classes);
-    await dataSource.initialize();
-
-    try {
-      await getImplementationClass().relaxBusyTimeout(dataSource);
-      const applied = await dataSource.runMigrations({ transaction: 'all' });
-      if (applied.length > 0) {
-        getImplementationClass().logger.log(
-          `Applied ${applied.length} migration(s) for plugin "${manifest.name}": ${applied
-            .map((migration) => migration.name)
-            .join(', ')}`,
-        );
-      }
-      return applied.length;
-    } finally {
-      await dataSource.destroy();
-    }
+    return count;
   }
 }

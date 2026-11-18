@@ -1,3 +1,4 @@
+import { BillingTransactionStatus } from '@attraccess/application-models';
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -13,12 +14,6 @@ import { ApiProperty } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { ResourceUsage } from './resourceUsage.entity';
 import { BillingTransactionItem as BillingTransactionItems } from './billing-transaction-item.entity';
-
-export enum BillingTransactionStatus {
-  Pending = 'pending',
-  Completed = 'completed',
-  Failed = 'failed',
-}
 
 @Entity()
 export class BillingTransaction {

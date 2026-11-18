@@ -74,7 +74,7 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
   }
 
   protected async claimedController(id: number): Promise<WagoController> {
-    const controller = await this.controllers.findOneBy({ id });
+    const controller = await this.controllers.get(id);
     if (!controller || controller.trustState !== 'claimed')
       throw new NotFoundException(`claimed WAGO controller ${id} not found`);
     if (!controller.mqttServerId) throw new ConflictException(`WAGO controller ${id} has no MQTT server`);
@@ -134,11 +134,11 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
         throw new ConflictException(`Manual credential revocation is required: ${manual.instructions.join(' ')}`);
       await assertOwned();
       enrollment.revokedAt = new Date().toISOString();
-      await this.enrollments.save(enrollment);
+      await this.enrollments.update({ id: enrollment.id }, { revokedAt: enrollment.revokedAt });
     }
     await assertOwned();
     enrollment.consumedAt = new Date().toISOString();
-    await this.enrollments.save(enrollment);
+    await this.enrollments.update({ id: enrollment.id }, { consumedAt: enrollment.consumedAt });
     const timer = this.enrollmentExpiryTimers.get(enrollment.id);
     if (timer) clearTimeout(timer);
     this.enrollmentExpiryTimers.delete(enrollment.id);
@@ -176,17 +176,14 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
   }
 
   protected activeEnrollments(): Promise<WagoEnrollment[]> {
-    return this.enrollments
-      .createQueryBuilder('enrollment')
-      .where('enrollment.consumedAt IS NULL')
-      .andWhere('enrollment.revokedAt IS NULL')
-      .andWhere('enrollment.expiresAt > :now', { now: new Date().toISOString() })
-      .getMany();
+    return this.enrollments.find({
+      where: { consumedAt: null, revokedAt: null, expiresAt: { gt: new Date().toISOString() } },
+    });
   }
 
   protected async activeEnrollment(id: number | null): Promise<WagoEnrollment | null> {
     if (!id) return null;
-    const enrollment = await this.enrollments.findOneBy({ id });
+    const enrollment = await this.enrollments.get(id);
     return enrollment && this.isActiveEnrollment(enrollment) ? enrollment : null;
   }
 
@@ -195,10 +192,8 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
     serverId: number,
     hardwareId: string,
   ): Promise<WagoEnrollment | null> {
-    const enrollment = await this.enrollments.findOneBy({
-      secretHash: hash(secret),
-      mqttServerId: serverId,
-      hardwareId,
+    const enrollment = await this.enrollments.findOne({
+      where: { secretHash: hash(secret), mqttServerId: serverId, hardwareId },
     });
     return enrollment && this.isActiveEnrollment(enrollment) ? enrollment : null;
   }
@@ -212,12 +207,10 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
   }
 
   protected async appliedRevision(controllerId: number): Promise<WagoConfigurationRevision | null> {
-    const [revision] = await this.revisions.find({
+    return this.revisions.findOne({
       where: { controllerId, state: 'applied' },
-      order: { revision: 'DESC' },
-      take: 1,
+      orderBy: [{ field: 'revision', direction: 'desc' }],
     });
-    return revision ?? null;
   }
 
   protected connectivity(controller: WagoController): WagoControllerSummary['connectivity'] {
@@ -263,8 +256,13 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
       }),
       { qos: 1, retain: true },
     );
-    revision.state = 'published';
-    return this.revisions.save(revision);
+    // A report that already settled the revision (applied or rejected) is never moved back to published.
+    const published = await this.revisions.update(
+      { id: revision.id, state: { in: ['pending', 'published'] } },
+      { state: 'published' },
+    );
+    if (published) return { ...revision, state: 'published' };
+    return (await this.revisions.get(revision.id)) ?? revision;
   }
 
   /** Revision a queued report acknowledges; throws for a report outside the controller payload limits. */
@@ -340,13 +338,17 @@ export class WagoService extends WagoSubscriptions implements OnApplicationBoots
       return;
     }
     await this.withConfigurationLock(controllerId, async () => {
-      const revision = await this.revisions.findOneBy({ controllerId, revision: report.revision });
+      const revision = await this.revisions.findOne({ where: { controllerId, revision: report.revision } });
       if (!revision || revision.contentHash !== report.contentHash) return;
       if (revision.state !== 'published') return;
-      revision.state = report.errors.length ? 'rejected' : 'applied';
-      revision.rejectionErrors = report.errors.length ? JSON.stringify(report.errors) : null;
-      revision.reportedAt = new Date().toISOString();
-      await this.revisions.save(revision);
+      await this.revisions.update(
+        { id: revision.id, state: 'published' },
+        {
+          state: report.errors.length ? 'rejected' : 'applied',
+          rejectionErrors: report.errors.length ? JSON.stringify(report.errors) : null,
+          reportedAt: new Date().toISOString(),
+        },
+      );
     });
   }
 

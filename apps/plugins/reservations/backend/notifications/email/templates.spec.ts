@@ -1,4 +1,4 @@
-import type { ReservationEntity } from '../../entities/reservation.entity';
+import type { ReservationRow } from '../../storage/reservation-table';
 import { DEFAULT_SETTINGS } from '../../settings/settings.model';
 import { renderEmail } from '../../testing/email-render.test-utils';
 import * as lifecycle from '../messages';
@@ -21,13 +21,13 @@ const r = {
   note: 'Rush',
   decisionReason: 'Fine',
   cancelReason: 'Broken',
-} as ReservationEntity;
+} as ReservationRow;
 const r2 = {
   ...r,
   id: 8,
   startTime: new Date('2026-06-02T08:00:00Z'),
   endTime: new Date('2026-06-02T09:00:00Z'),
-} as ReservationEntity;
+} as ReservationRow;
 const settings = { ...DEFAULT_SETTINGS, resourceId: 1, enabled: true };
 
 /** One call per message builder: the emails the notifier can send. */

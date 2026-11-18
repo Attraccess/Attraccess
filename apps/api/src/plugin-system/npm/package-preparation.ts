@@ -7,6 +7,8 @@ import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 
 import { PluginMigrationService } from '../plugin-migration.service';
+import { assertBundleCompatible } from '../runtime/plugin-compatibility';
+import { assertInstallableNamespace } from '../plugin-storage/storage-loader';
 
 import { LoadedPluginManifest } from '../plugin.manifest';
 
@@ -99,6 +101,14 @@ export class NpmPackagePreparation {
       if (manifest.name !== name || manifest.version !== version)
         throw new BadRequestException('Tarball package identity does not match the requested package');
       validateEntries(source, manifest);
+      // The bundle is read, never run: a database import refuses the package before any of its code loads. A
+      // storage namespace another installed plugin has is refused here too, before anything is written.
+      try {
+        if (manifest.main.backend) assertBundleCompatible(name, join(source, manifest.main.backend.directory));
+        assertInstallableNamespace(manifest, () => PluginService.getPlugins());
+      } catch (error) {
+        throw new BadRequestException((error as Error).message);
+      }
       await writeFile(join(source, 'plugin.json'), JSON.stringify(manifest));
 
       if (audit)
@@ -121,7 +131,11 @@ export class NpmPackagePreparation {
             `Permission approval required for: ${permissionAdditions.join(', ') || 'none'}`,
           );
         }
-        await PluginMigrationService.assertReplacementMigrationHistory(manifest as LoadedPluginManifest, source);
+        try {
+          await PluginMigrationService.assertReplacementMigrationHistory(manifest as LoadedPluginManifest, source);
+        } catch (error) {
+          throw new BadRequestException(`Replacement blocked: ${(error as Error).message}`);
+        }
       }
 
       const publisher = registryPublisher(packageVersion) ?? registryPublisher(metadata);

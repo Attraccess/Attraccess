@@ -1,3 +1,6 @@
+import { hostDataWithFlows } from '../../backend/persistence.test-utils';
+import { controllerRow, revisionRow } from '../../backend/rows.test-utils';
+import { createWagoTestStorage, type WagoTestStorage } from '../../backend/storage/testing';
 /**
  * Reliability harness. The real WagoService and WagoFlowService run on the host's real MqttClientService and
  * PluginMqttService against a runner-owned RabbitMQ 4 broker. The host's server record (QoS 0 defaults),
@@ -20,17 +23,12 @@ import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 import 'reflect-metadata';
 import { connectAsync, type MqttClient } from 'mqtt';
-import { DataSource } from 'typeorm';
 import { MqttClientService } from '../../../../api/src/mqtt/mqtt-client.service';
 import { PluginMqttService } from '../../../../api/src/plugin-system/plugin-mqtt.service';
-import { WagoConfigurationRevision } from '../../backend/configuration/revision.entity';
-import { WagoController } from '../../backend/controllers/entity';
 import { WagoService } from '../../backend/controllers/service';
-import { WagoSettings } from '../../backend/controllers/settings.entity';
 import { WagoCredentialRotationService } from '../../backend/credentials/service';
 import { WagoFlowService } from '../../backend/flow/service';
 import { WAGO_COMMAND_NODE_TYPE, createWagoCommandNode } from '../../backend/flow/command-node';
-import plugin from '../../backend/plugin';
 import { WagoCommandError } from '../../backend/commands/handler';
 import { hash, type Snapshot } from '../../cc100-runtime/src/runtime';
 import type { CommandRecord, ControllerSnapshot, FarmRequest } from './controller-farm.test-utils';
@@ -87,7 +85,7 @@ const snapshot: Snapshot = {
 const CHANNELS = snapshot.logicalChannels.map((channel) => channel.id);
 
 type Host = {
-  database: DataSource;
+  database: WagoTestStorage;
   mqtt: MqttClientService;
   pluginMqtt: PluginMqttService;
   wago: WagoService;
@@ -126,7 +124,7 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
   const topic = (index: number, suffix: string) => `${prefix}/v1/controllers/${hardwareId(index)}/${suffix}`;
 
   // --- host ---------------------------------------------------------------------------------------
-  async function startHost(database: DataSource): Promise<Host> {
+  async function startHost(database: WagoTestStorage): Promise<Host> {
     const events = new EventEmitter2();
     const server = {
       id: 1,
@@ -142,7 +140,7 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
       defaultPublishRetain: false,
     };
     const mqtt = new MqttClientService(
-      { findOneBy: async () => server, update: async () => undefined } as never,
+      { findServer: async () => server, storeEncryptedPassword: async () => undefined } as never,
       events,
       { isEncrypted: () => false, encrypt: (value: string) => value, decrypt: (value: string) => value } as never,
       { mqttServersHealthy: { set: () => undefined } } as never,
@@ -159,17 +157,10 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
         if (/dropping new messages/.test(message)) hostQueueOverflows += 1;
       },
     };
-    const flowQuery = {
-      select: () => flowQuery,
-      leftJoin: () => flowQuery,
-      addSelect: () => flowQuery,
-      where: () => flowQuery,
-      andWhere: () => flowQuery,
-      getMany: async () => [],
-    };
     const context = {
-      getRepository: (entity: never) => database.getRepository(entity),
-      dataSource: { getRepository: () => ({ createQueryBuilder: () => flowQuery }) },
+      storage: database.storage,
+      persistence: database.persistence,
+      hostData: hostDataWithFlows(() => []),
       logger,
       flows: { trigger: async () => undefined },
       audit: { record: async () => ({ status: 'recorded' }) },
@@ -222,51 +213,42 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
     };
   }
 
-  async function seedDatabase(database: DataSource) {
+  async function seedDatabase(database: WagoTestStorage) {
     const now = new Date().toISOString();
-    await database.getRepository(WagoSettings).save({ id: 1, defaultMqttServerId: 1, operationalPrefix: prefix });
+    await database.tables.settings.insert({ id: 1, defaultMqttServerId: 1, operationalPrefix: prefix });
     for (let index = 0; index < count; index += 1) {
-      const controller = await database.getRepository(WagoController).save({
-        hardwareId: hardwareId(index),
-        trustState: 'claimed',
-        name: `Reliability ${index}`,
-        mqttServerId: 1,
-        pairingCodeHash: 'reliability',
-        protocolVersion: '1.0.0',
-        runtimeVersion: '0.0.0',
-        capabilities: '["claim","heartbeat","configuration-v1"]',
-        lastSequence: 0,
-        lastHeartbeatAt: now,
-        lastSeenAt: now,
-        createdAt: now,
-        updatedAt: now,
-      });
-      await database.getRepository(WagoConfigurationRevision).save({
-        controllerId: controller.id,
-        revision: 1,
-        contentHash: hash(snapshot),
-        snapshot: JSON.stringify(snapshot),
-        state: 'applied',
-        publishedAt: now,
-      });
-      await database.query('UPDATE plugin_wago_controllers SET credential_epoch = ? WHERE id = ?', [
-        CREDENTIAL_EPOCH,
-        controller.id,
-      ]);
+      const controller = await database.tables.controllers.insert(
+        controllerRow({
+          hardwareId: hardwareId(index),
+          trustState: 'claimed',
+          name: `Reliability ${index}`,
+          mqttServerId: 1,
+          pairingCodeHash: 'reliability',
+          runtimeVersion: '0.0.0',
+          capabilities: '["claim","heartbeat","configuration-v1"]',
+          credentialEpoch: CREDENTIAL_EPOCH,
+          lastHeartbeatAt: now,
+          lastSeenAt: now,
+          createdAt: now,
+          updatedAt: now,
+        }),
+      );
+      await database.tables.configurationRevisions.insert(
+        revisionRow({
+          controllerId: controller.id,
+          revision: 1,
+          contentHash: hash(snapshot),
+          snapshot: JSON.stringify(snapshot),
+          state: 'applied',
+          publishedAt: now,
+        }),
+      );
     }
   }
 
-  async function openDatabase(file: string): Promise<DataSource> {
-    const database = await new DataSource({
-      type: 'better-sqlite3',
-      database: file,
-      entities: plugin.entities,
-      synchronize: true,
-    }).initialize();
-    const columns = await database.query('PRAGMA table_info(plugin_wago_controllers)');
-    if (!columns.some((column: { name: string }) => column.name === 'credential_epoch'))
-      await database.query('ALTER TABLE plugin_wago_controllers ADD COLUMN credential_epoch varchar');
-    return database;
+  /** The plugin's storage for one run; the in-memory port stands in for the host's database. */
+  function openDatabase(): WagoTestStorage {
+    return createWagoTestStorage();
   }
 
   // --- farm ---------------------------------------------------------------------------------------
@@ -627,13 +609,13 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
   }
 
   // --- lifecycle ----------------------------------------------------------------------------------
-  async function bringUp(controllers: number, commandsPerSecond: number): Promise<DataSource> {
+  async function bringUp(controllers: number, commandsPerSecond: number): Promise<WagoTestStorage> {
     count = controllers;
     rate = commandsPerSecond;
     prefix = `reliability/${randomUUID()}`;
     toggles.length = 0;
     injectedCommands.length = 0;
-    const database = await openDatabase(join(directory, `host-${randomUUID()}.sqlite`));
+    const database = openDatabase();
     await seedDatabase(database);
     for (let index = 0; index < count; index += 1)
       await publishRaw(
@@ -647,14 +629,13 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
     return database;
   }
 
-  async function bringDown(database: DataSource) {
+  async function bringDown() {
     stopDriver();
     await delay(1_000);
     if (farm) await ask({ op: 'shutdown' }).catch(() => undefined);
     farm = undefined;
     host?.destroy();
     host = undefined;
-    await database.destroy();
   }
 
   const summaryPath = process.env.WAGO_RELIABILITY_SUMMARY;
@@ -693,7 +674,7 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
   });
 
   async function runFailureSuite(): Promise<{ startedAt: number; totals: ReturnType<typeof totalsFromResults> }> {
-    const database = await bringUp(SHORT_MODE.controllers, SHORT_MODE.commandsPerSecond);
+    await bringUp(SHORT_MODE.controllers, SHORT_MODE.commandsPerSecond);
     const startedAt = Date.now();
     startDriver();
     // Failures are injected into a healthy fleet only; a fleet that never got healthy is a broken harness, not a verdict.
@@ -722,7 +703,7 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
       drops,
       failures.filter((failure) => !failure.stateMatches).length,
     );
-    await bringDown(database);
+    await bringDown();
     return { startedAt, totals };
   }
 
@@ -731,7 +712,7 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
     for (const target of SWEEP_STEPS) {
       results.length = 0;
       hostQueueOverflows = 0;
-      const database = await bringUp(target.controllers, target.commandsPerSecond);
+      await bringUp(target.controllers, target.commandsPerSecond);
       const startedAt = Date.now();
       startDriver();
       await delay(SWEEP_STEP_MS);
@@ -754,7 +735,7 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
       process.stdout.write(
         `sweep ${target.controllers} controllers x ${target.commandsPerSecond}/s: ${stepPasses(step) ? 'pass' : 'FAIL'}\n`,
       );
-      await bringDown(database);
+      await bringDown();
       rmSync(join(directory, 'command-records.jsonl'), { force: true });
     }
     return steps;

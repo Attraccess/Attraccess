@@ -1,13 +1,16 @@
 // Sends configurable message notifications to conversation participants.
 // FEATURE: Messaging email fallback for offline recipients
 // FEATURE: Messaging push notifications for offline recipients
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ConversationParticipant, Message, User } from '@attraccess/database-entities';
+import { MessageRecord, NotificationRecipient } from '@attraccess/application-models';
 import { MessageCreatedEvent } from './events/message-created.event';
 import { MessagingLiveService } from './messaging-live.service';
+import {
+  MESSAGE_NOTIFICATION_STORE,
+  MessageNotificationStore,
+  NotifiableParticipant,
+} from './message-notification-store.port';
 import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
 import { NotificationCategory, NotificationChannel } from '../notifications/notification-types';
 
@@ -18,10 +21,8 @@ export class MessageNotificationListener {
   private readonly logger = new Logger(MessageNotificationListener.name);
 
   constructor(
-    @InjectRepository(ConversationParticipant)
-    private readonly participantRepository: Repository<ConversationParticipant>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    @Inject(MESSAGE_NOTIFICATION_STORE)
+    private readonly store: MessageNotificationStore,
     private readonly liveService: MessagingLiveService,
     private readonly notifications: NotificationDispatchService,
   ) {}
@@ -31,18 +32,14 @@ export class MessageNotificationListener {
     const message = event.message;
 
     try {
-      const participants = await this.participantRepository.find({
-        where: { conversationId: message.conversationId },
-        relations: { user: true },
-      });
+      const participants = await this.store.findParticipants(message.conversationId);
 
       const recipients = participants.filter((participant) => participant.userId !== message.senderId);
       if (recipients.length === 0) {
         return;
       }
 
-      const sender = await this.userRepository.findOne({ where: { id: message.senderId } });
-      const senderName = sender?.username ?? 'Someone';
+      const senderName = (await this.store.findUsername(message.senderId)) ?? 'Someone';
 
       await this.dispatchToast(recipients, message, senderName);
 
@@ -66,13 +63,13 @@ export class MessageNotificationListener {
   }
 
   private async dispatchToast(
-    participants: ConversationParticipant[],
-    message: Message,
+    participants: NotifiableParticipant[],
+    message: MessageRecord,
     senderName: string,
   ): Promise<void> {
     const recipients = participants
-      .map((participant) => participant.user)
-      .filter((user): user is User => Boolean(user));
+      .map((participant) => participant.recipient)
+      .filter((user): user is NotificationRecipient => Boolean(user));
     if (recipients.length === 0) {
       return;
     }
@@ -90,11 +87,11 @@ export class MessageNotificationListener {
   }
 
   private async dispatchOfflineNotification(
-    participant: ConversationParticipant,
-    message: Message,
+    participant: NotifiableParticipant,
+    message: MessageRecord,
     senderName: string,
   ): Promise<void> {
-    const recipient = participant.user;
+    const recipient = participant.recipient;
     if (!recipient) {
       return;
     }
@@ -115,10 +112,10 @@ export class MessageNotificationListener {
   }
 
   private async sendEmailFallback(
-    participant: ConversationParticipant,
-    message: Message,
+    participant: NotifiableParticipant,
+    message: MessageRecord,
     senderName: string,
-    recipient: User,
+    recipient: NotificationRecipient,
   ): Promise<void> {
     // Debounce per conversation: only one email per unread burst. If we already notified this
     // participant and they have not read the conversation since, skip until they catch up.
@@ -135,7 +132,7 @@ export class MessageNotificationListener {
     });
 
     // Record the delivery marker so subsequent messages in this burst do not re-send.
-    await this.participantRepository.update({ id: participant.id }, { lastNotifiedAt: message.createdAt });
+    await this.store.markNotified(participant.participantId, message.createdAt);
   }
 
   private truncatePreview(content: string): string {
@@ -144,7 +141,7 @@ export class MessageNotificationListener {
       : content;
   }
 
-  private alreadyNotifiedForCurrentBurst(participant: ConversationParticipant): boolean {
+  private alreadyNotifiedForCurrentBurst(participant: NotifiableParticipant): boolean {
     if (!participant.lastNotifiedAt) {
       return false;
     }

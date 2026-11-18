@@ -34,6 +34,7 @@ function setup(
     alerts as never,
     audit as never,
     config(),
+    {} as never,
   );
   return { service, alerts, audit, settings, cleared };
 }
@@ -126,6 +127,7 @@ describe('ReaderUiHooksService', () => {
         { onCleared: jest.fn(), raise: jest.fn().mockResolvedValue({}), clearWhere: jest.fn() } as never,
         { record: jest.fn().mockResolvedValue(undefined) } as never,
         config(app),
+        {} as never,
       );
     expect(make({ READER_UI_HOOK_TIMEOUT_MS: 9000 }).timeoutMs).toBe(3000);
     expect(make({ READER_UI_HOOK_TIMEOUT_MS: 800 }).timeoutMs).toBe(800);
@@ -370,7 +372,14 @@ describe('ReaderUiHooksService.runSessionEnd', () => {
       clearWhere: jest.fn().mockResolvedValue(undefined),
     };
     const audit = { record: jest.fn().mockResolvedValue(undefined) };
-    return new ReaderUiHooksService(registry as never, settings as never, alerts as never, audit as never, config());
+    return new ReaderUiHooksService(
+      registry as never,
+      settings as never,
+      alerts as never,
+      audit as never,
+      config(),
+      {} as never,
+    );
   }
 
   beforeEach(() => jest.useFakeTimers());

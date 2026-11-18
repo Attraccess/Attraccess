@@ -31,7 +31,7 @@ export function RemovePluginModal({ pluginId, onClose }: Props) {
   const { t } = usePluginsTranslations();
   const toast = useToastMessage();
   const { data: plugins } = useGetPlugins();
-  const { installedByName } = useInstalledNpmPlugins();
+  const { installedByDirectory } = useInstalledNpmPlugins();
   const [approvedRemovalPlan, setApprovedRemovalPlan] = useState<string | null>(null);
   const [removeFailure, setRemoveFailure] = useState<string | null>(null);
 
@@ -59,7 +59,14 @@ export function RemovePluginModal({ pluginId, onClose }: Props) {
   const { mutateAsync: removePackageGraph, isPending: isRemovingGraph } = usePluginControllerRemovePackageGraph();
 
   const deletingPlugin = plugins?.find((plugin) => plugin.id === pluginId);
-  const deletingNpm = Boolean(deletingPlugin && installedByName.has(deletingPlugin.name));
+  const deletingNpm = Boolean(deletingPlugin && installedByDirectory.has(deletingPlugin.pluginDirectory));
+  // What happens to the data depends on the path: npm keeps it, a refused plugin's tables stay (its code never
+  // runs), and deleting an uploaded plugin drops its tables.
+  const removalMessage = deletingNpm
+    ? 'deleteConfirmation.messageRegistry'
+    : deletingPlugin?.refused
+      ? 'deleteConfirmation.messageRefused'
+      : 'deleteConfirmation.messageUploaded';
   const {
     data: removalPlan,
     error: removalPlanError,
@@ -108,7 +115,9 @@ export function RemovePluginModal({ pluginId, onClose }: Props) {
             <ModalHeading>{t('deleteConfirmation.title')}</ModalHeading>
           </ModalHeader>
           <ModalBody>
-            <p>{t('deleteConfirmation.message', { pluginName: deletingPlugin?.name ?? '' })}</p>
+            <p data-cy="plugins-list-delete-confirmation-message">
+              {t(removalMessage, { pluginName: deletingPlugin?.name ?? '' })}
+            </p>
             {deletingNpm && isResolvingRemoval ? <p role="status">{t('dependencies.loading')}</p> : null}
             {dependantsToRemove.length ? (
               <Alert status="warning">

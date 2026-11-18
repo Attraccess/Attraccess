@@ -18,6 +18,8 @@ import { PluginManifestSchema, LoadedPluginManifest, PluginManifest } from './pl
 
 import { type PluginManifestInfo } from '@attraccess/plugins-backend-sdk';
 
+import { assertBundleCompatible, assertManifestCompatible } from './runtime/plugin-compatibility';
+import { assertInstallableNamespace } from './plugin-storage/storage-loader';
 import { PluginBootGuard } from './runtime/boot-guard';
 
 import { PluginSandboxService } from './plugin-sandbox.service';
@@ -27,9 +29,10 @@ import { INTERNAL_PLUGIN_DIRECTORIES } from './runtime/boot-guard';
 import {
   licenseShortfall,
   missingLicenseReason,
-  PluginLicenseDeclarationSchema,
+  parseManifestLicense,
   type PluginLicenseShortfall,
   type PluginLicenseSnapshot,
+  withRequiringPlugins,
 } from './license/plugin-license';
 
 function getImplementationClass(): typeof PluginService {
@@ -41,7 +44,18 @@ export class PluginService {
 
   protected static RESTART_BY_EXIT_FLAG: boolean;
 
+  /** Every discovered manifest, including the ones the host refuses to load (see {@link refusedPlugins}). */
   protected static plugins: LoadedPluginManifest[] | null = null;
+
+  /**
+   * Plugin directories whose manifest the host refuses (an SDK 1.x plugin, an unsupported database engine, invalid
+   * permissions). They stay listed with their error so an admin can see and delete them, but their code is never
+   * loaded, migrated or reverted.
+   */
+  protected static refusedPlugins: Set<string> = new Set();
+
+  /** {@link getPlugins} cached per discovery scan, so callers see one stable array between scans. */
+  protected static loadablePlugins: { source: LoadedPluginManifest[]; plugins: LoadedPluginManifest[] } | null = null;
 
   protected static loadedPlugins: Set<string> = new Set();
 
@@ -78,23 +92,8 @@ export class PluginService {
   /** Plugins the startup license keeps out, plus every plugin that requires one of them (transitively). */
   public static licenseBlockedPluginNames(): Set<string> {
     const plugins = getImplementationClass().getPlugins();
-    const blocked = new Set(
-      plugins
-        .filter((manifest) => getImplementationClass().getLicenseMissingReason(manifest))
-        .map((manifest) => manifest.name),
-    );
-    let grew = blocked.size > 0;
-    while (grew) {
-      grew = false;
-      for (const manifest of plugins) {
-        if (blocked.has(manifest.name)) continue;
-        if (manifest.dependencies?.some((dependency) => dependency.required && blocked.has(dependency.name))) {
-          blocked.add(manifest.name);
-          grew = true;
-        }
-      }
-    }
-    return blocked;
+    const unlicensed = plugins.filter((manifest) => getImplementationClass().getLicenseMissingReason(manifest));
+    return withRequiringPlugins(plugins, new Set(unlicensed.map((manifest) => manifest.name)));
   }
 
   /**
@@ -140,6 +139,7 @@ export class PluginService {
     getImplementationClass().PLUGIN_PATH = config.PLUGIN_DIR; // Assume PLUGIN_DIR from appConfig is already resolved or correct
     getImplementationClass().RESTART_BY_EXIT_FLAG = config.RESTART_BY_EXIT;
     getImplementationClass().plugins = null; // Discovery may have been cached with an unset path before configure() ran; force a re-scan.
+    getImplementationClass().refusedPlugins.clear();
     getImplementationClass().loadedPlugins.clear();
     getImplementationClass().pluginLoadErrors.clear();
     getImplementationClass().licenseGate = null;
@@ -187,10 +187,6 @@ export class PluginService {
       );
   }
 
-  // Returns the discovered plugins enriched with their backend load status so the
-  // admin UI can surface plugins that failed to load (e.g. a missing dependency)
-  // instead of silently showing them as if everything were fine.
-
   protected restartApp() {
     PluginService.logger.log('Restarting app');
     if (PluginService.RESTART_BY_EXIT_FLAG) {
@@ -212,10 +208,6 @@ export class PluginService {
   public requestRestart(): void {
     setTimeout(() => this.restartApp(), 1000);
   }
-
-  // Returns the discovered plugins enriched with their backend load status so the
-  // admin UI can surface plugins that failed to load (e.g. a missing dependency)
-  // instead of silently showing them as if everything were fine.
 
   public async uploadPlugin(zipFile: FileUpload, deferRestart = false) {
     // check if file is a zip file
@@ -244,26 +236,39 @@ export class PluginService {
           throw new BadRequestException(`File could not be extracted: ${error.message}`);
         }
       }
-
       if (extracted === 0) {
         throw new BadRequestException('File could not be extracted, it must be a valid zip file');
       }
-
       // read manifest, tolerating the single wrapper folder that Finder and most GUI zip tools add
       const sourceFolder = PluginService.findManifestFolder(extractFolder);
       PluginService.logger.debug(`Reading manifest from ${sourceFolder}`);
       const manifestContent = JSON.parse(readFileSync(join(sourceFolder, 'plugin.json'), 'utf8'));
 
-      // validate manifest
+      // validate manifest. The SDK 2.0 contract is checked on the raw manifest first, so a plugin still built for
+      // SDK 1.x (the removed DATABASE_ACCESS permission, an engine list, TypeORM migrations, database imports) gets
+      // the refusal that names it instead of a schema error. Refused before anything moves: no files, no database.
       PluginService.logger.debug(`Validating manifest`, manifestContent);
-      const parsedManifest = PluginManifestSchema.safeParse(manifestContent);
-      if (!parsedManifest.success) {
-        const problems = parsedManifest.error.issues
-          .map((issue) => `${issue.path.join('.') || 'plugin.json'}: ${issue.message}`)
-          .join('; ');
-        throw new BadRequestException(`Invalid plugin.json: ${problems}`);
+      try {
+        PluginService.assertManifestCompatible(manifestContent);
+        if (manifestContent?.main?.backend?.directory) {
+          assertBundleCompatible(manifestContent.name, join(sourceFolder, manifestContent.main.backend.directory));
+        }
+      } catch (error) {
+        throw new BadRequestException((error as Error).message);
       }
-      const manifest = parsedManifest.data;
+      const parsed = PluginManifestSchema.safeParse(manifestContent);
+      if (!parsed.success) {
+        // A client error with the offending fields, not a 500: nothing was moved or changed.
+        const issues = parsed.error.issues.map((issue) => `${issue.path.join('.') || 'plugin.json'}: ${issue.message}`);
+        throw new BadRequestException(`Invalid plugin.json: ${issues.join('; ')}`);
+      }
+      const manifest = parsed.data;
+      // A storage namespace another installed plugin has (or keeps tables in) is refused before anything moves.
+      try {
+        assertInstallableNamespace(manifest, () => PluginService.getPlugins());
+      } catch (error) {
+        throw new BadRequestException((error as Error).message);
+      }
 
       const pluginName = PluginService.safePluginName(manifest.name);
       await PluginService.withPluginUploadLock(pluginName, async () => {
@@ -388,7 +393,20 @@ export class PluginService {
     return candidates[0];
   }
 
+  /** The plugins the host may load, migrate and serve. Refused manifests are left out. */
   public static getPlugins(): LoadedPluginManifest[] {
+    const discovered = getImplementationClass().getDiscoveredPlugins();
+    if (getImplementationClass().loadablePlugins?.source !== discovered) {
+      getImplementationClass().loadablePlugins = {
+        source: discovered,
+        plugins: discovered.filter((plugin) => !getImplementationClass().isPluginRefused(plugin)),
+      };
+    }
+    return getImplementationClass().loadablePlugins.plugins;
+  }
+
+  /** Every plugin found in the plugin folder, including refused ones; for listing and removal only. */
+  public static getDiscoveredPlugins(): LoadedPluginManifest[] {
     if (!getImplementationClass().plugins) {
       getImplementationClass().plugins = getImplementationClass().findPluginsInFolder(
         getImplementationClass().PLUGIN_PATH,
@@ -401,9 +419,14 @@ export class PluginService {
     return getImplementationClass().plugins;
   }
 
+  /** Whether discovery refused the manifest: its code must never run (no load, no migration, no revert). */
+  public static isPluginRefused(manifest: Pick<LoadedPluginManifest, 'pluginDirectory'>): boolean {
+    return getImplementationClass().refusedPlugins.has(manifest.pluginDirectory);
+  }
+
   public static getManifestById(id: string): LoadedPluginManifest | undefined {
     return getImplementationClass()
-      .getPlugins()
+      .getDiscoveredPlugins()
       .find((plugin) => plugin.id === id);
   }
 
@@ -412,13 +435,16 @@ export class PluginService {
   // instead of silently showing them as if everything were fine.
   public static getPluginsWithLoadStatus(): LoadedPluginManifest[] {
     return getImplementationClass()
-      .getPlugins()
+      .getDiscoveredPlugins()
       .map((manifest) => {
         const key = `${manifest.name}@${manifest.version}`;
-        const shortfall = getImplementationClass().getLicenseShortfall(manifest);
+        const refused = getImplementationClass().isPluginRefused(manifest);
+        // A refused plugin never loads whatever the license says; its refusal is the actionable error.
+        const shortfall = refused ? null : getImplementationClass().getLicenseShortfall(manifest);
         if (shortfall) {
           return {
             ...manifest,
+            refused,
             status: 'license_missing' as const,
             error: shortfall.message,
             missingLicenseModules: shortfall.missingModules,
@@ -434,7 +460,7 @@ export class PluginService {
           status = 'loaded';
         }
 
-        return { ...manifest, status, error: error ? error.message : null };
+        return { ...manifest, refused, status, error: error ? error.message : null };
       });
   }
 
@@ -524,32 +550,29 @@ export class PluginService {
         }
 
         try {
-          manifest.permissions = PluginSandboxService.validateDeclaredPermissions(manifest.name, manifest.permissions);
-        } catch (error) {
-          getImplementationClass().setPluginLoadError(`${manifest.name}@${manifest.version}`, error as Error);
-          return null;
-        }
-
-        // Like invalid permissions, a malformed license block means the plugin is not loaded: the host could not
-        // tell what the plugin requires, and guessing would risk loading a paid plugin without its license.
-        if (manifest.license !== undefined) {
-          const parsed = PluginLicenseDeclarationSchema.safeParse(manifest.license);
-          if (!parsed.success) {
-            const detail = parsed.error.issues
-              .map((issue) => `${issue.path.join('.') || 'license'}: ${issue.message}`)
-              .join('; ');
-            getImplementationClass().setPluginLoadError(
-              `${manifest.name}@${manifest.version}`,
-              new Error(`Plugin ${manifest.name} declares an invalid license block (${detail})`),
-            );
-            return null;
+          PluginService.assertManifestCompatible(manifest);
+          // The bundle is read, never run: a database import refuses the plugin before any of its code loads.
+          if (manifest.main?.backend?.directory) {
+            assertBundleCompatible(manifest.name, join(rootFolder, manifest.main.backend.directory));
           }
-          manifest.license = parsed.data;
+          manifest.permissions = PluginSandboxService.validateDeclaredPermissions(manifest.name, manifest.permissions);
+          // A malformed license block is refused like invalid permissions: the host cannot tell what it requires.
+          const license = parseManifestLicense(manifest.name, manifest.license);
+          if (license) manifest.license = license;
+        } catch (error) {
+          // Listed with the refusal (and its migration guide) so it can be deleted, but never loaded or migrated.
+          getImplementationClass().setPluginLoadError(`${manifest.name}@${manifest.version}`, error as Error);
+          getImplementationClass().refusedPlugins.add(pluginFolder);
         }
 
         return manifest;
       })
       .filter((manifest) => manifest !== null);
+  }
+
+  /** The SDK 2.0 contract of a manifest, checked before a plugin is installed, started or migrated. */
+  protected static assertManifestCompatible(manifest: Parameters<typeof assertManifestCompatible>[0]): void {
+    assertManifestCompatible(manifest);
   }
 
   protected static findPluginManifestInPluginFolder(rootFolder: string, pluginFolder: string): PluginManifest | null {
@@ -570,9 +593,7 @@ export class PluginService {
       manifest.main.frontend.directory = join(pluginFolder, manifest.main.frontend.directory);
     }
 
-    if (manifest.main.migrations?.directory) {
-      manifest.main.migrations.directory = join(pluginFolder, manifest.main.migrations.directory);
-    }
+    // A legacy migrations entry is kept as written: it is refused (SDK 2.0 has none), never resolved or run.
 
     return manifest;
   }

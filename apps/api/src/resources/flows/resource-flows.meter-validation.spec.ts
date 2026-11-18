@@ -1,15 +1,7 @@
-import { createMock } from '@golevelup/ts-jest';
-import {
-  Resource,
-  ResourceFlowEdge,
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-  ResourceMeter,
-  Flow,
-} from '@attraccess/database-entities';
+import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { EntityManager, Repository } from 'typeorm';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
+import { FakeFlowGraphStore, FakeFlowResourceDirectory } from './fixtures/fake-flow-graph-store.test-fixture';
 import { ResourceFlowsService } from './resource-flows.service';
 
 const testActor = { id: 7, authenticationMethod: 'session' as const };
@@ -25,50 +17,38 @@ describe('resource flow meter validation', () => {
   ];
 
   function fixture(meterBelongsToResource: boolean) {
-    const resource = Object.assign(new Resource(), { id: resourceId });
-    const nodes: ResourceFlowNode[] = types.map((type, index) =>
-      Object.assign(new ResourceFlowNode(), {
+    const graph = new FakeFlowGraphStore();
+    const directory = new FakeFlowResourceDirectory();
+    directory.addResource(resourceId);
+    const nodes: FlowNodeRecord[] = types.map((type, index) =>
+      graph.addNode({
         id: `meter-${index}`,
         type,
         data: { meterId, value: '42' },
         position: { x: index, y: 0 },
-        resource,
+        resourceId,
       }),
     );
-    const manager = createMock<EntityManager>();
-    const meters = meterBelongsToResource ? [Object.assign(new ResourceMeter(), { id: meterId })] : [];
-    manager.find.mockImplementation(async (entity) => (entity === ResourceMeter ? meters : []));
-    manager.save.mockImplementation(async (_entity, entities) => entities);
-    manager.transaction.mockImplementation(
-      async (
-        workOrIsolation: string | ((transaction: EntityManager) => Promise<unknown>),
-        work?: (transaction: EntityManager) => Promise<unknown>,
-      ) => {
-        if (typeof workOrIsolation === 'function') return workOrIsolation(manager);
-        if (!work) throw new Error('Missing transaction callback');
-        return work(manager);
-      },
-    );
+    // Shared by reference: specs change the meters and nodes of the "database" in place.
+    graph.nodes = nodes;
+    const meters = meterBelongsToResource ? [meterId] : [];
+    directory.meters.set(resourceId, meters);
     const service = new ResourceFlowsService(
-      createMock<Repository<ResourceFlowNode>>({ manager, find: jest.fn().mockResolvedValue(nodes) }),
-      createMock<Repository<ResourceFlowEdge>>({ find: jest.fn().mockResolvedValue([]) }),
-      createMock<Repository<Resource>>({ manager, findOne: jest.fn().mockResolvedValue(resource) }),
-      createMock<MqttClientService>(),
+      graph,
+      directory,
+      { subscribe: jest.fn().mockResolvedValue(undefined) } as unknown as MqttClientService,
       new EventEmitter2(),
-      createMock<Repository<Flow>>(),
       { record: jest.fn().mockResolvedValue({}) } as never,
     );
-    return { service, nodes, manager, meters };
+    return { service, nodes, directory, meters };
   }
 
-  function expectOneMeterQuery(manager: ReturnType<typeof fixture>['manager']) {
-    expect(manager.find.mock.calls.filter(([entity]) => entity === ResourceMeter)).toHaveLength(1);
-    expect(manager.find).toHaveBeenCalledWith(ResourceMeter, { where: { resourceId }, select: { id: true } });
-    expect(manager.existsBy).not.toHaveBeenCalled();
+  function expectOneMeterQuery(directory: FakeFlowResourceDirectory) {
+    expect(directory.meterLookups).toBe(1);
   }
 
   it.each(['load', 'save'])('reports meters outside the resource during %s', async (operation) => {
-    const { service, nodes, manager } = fixture(false);
+    const { service, nodes, directory } = fixture(false);
     const result =
       operation === 'load'
         ? await service.getResourceFlow(resourceId)
@@ -82,25 +62,25 @@ describe('resource flow meter validation', () => {
         message: 'Choose a meter belonging to this resource',
       })),
     );
-    expectOneMeterQuery(manager);
+    expectOneMeterQuery(directory);
     // Invalid flows remain editable drafts, with the warnings returned to the editor.
     expect(result.nodes).toHaveLength(types.length);
   });
 
   it.each(['load', 'save'])('accepts meters belonging to the resource during %s', async (operation) => {
-    const { service, nodes, manager } = fixture(true);
+    const { service, nodes, directory } = fixture(true);
     const result =
       operation === 'load'
         ? await service.getResourceFlow(resourceId)
         : await service.saveResourceFlow(resourceId, { nodes, edges: [] }, testActor);
 
     expect(result.validationErrors).toBeUndefined();
-    expectOneMeterQuery(manager);
+    expectOneMeterQuery(directory);
   });
 
   it.each(['load', 'save'])('checks distinct and repeated meters with one query during %s', async (operation) => {
-    const { service, nodes, manager, meters } = fixture(true);
-    meters.push(Object.assign(new ResourceMeter(), { id: meterId + 1 }));
+    const { service, nodes, directory, meters } = fixture(true);
+    meters.push(meterId + 1);
     nodes[1].data = { meterId: meterId + 1 };
     nodes[2].data = { meterId: meterId + 2 };
     const result =
@@ -116,11 +96,11 @@ describe('resource flow meter validation', () => {
         message: 'Choose a meter belonging to this resource',
       },
     ]);
-    expectOneMeterQuery(manager);
+    expectOneMeterQuery(directory);
   });
 
   it.each(['load', 'save'])('refreshes meter ownership on each %s request', async (operation) => {
-    const { service, nodes, manager, meters } = fixture(true);
+    const { service, nodes, directory, meters } = fixture(true);
     const run = () =>
       operation === 'load'
         ? service.getResourceFlow(resourceId)
@@ -129,11 +109,11 @@ describe('resource flow meter validation', () => {
     meters.length = 0;
 
     expect((await run()).validationErrors).toHaveLength(types.length);
-    expect(manager.find.mock.calls.filter(([entity]) => entity === ResourceMeter)).toHaveLength(2);
+    expect(directory.meterLookups).toBe(2);
   });
 
   it.each(['load', 'save'])('skips meter queries for an empty flow during %s', async (operation) => {
-    const { service, nodes, manager } = fixture(true);
+    const { service, nodes, directory } = fixture(true);
     nodes.length = 0;
     const result =
       operation === 'load'
@@ -141,11 +121,11 @@ describe('resource flow meter validation', () => {
         : await service.saveResourceFlow(resourceId, { nodes, edges: [] }, testActor);
 
     expect(result.validationErrors).toBeUndefined();
-    expect(manager.find).not.toHaveBeenCalledWith(ResourceMeter, expect.anything());
+    expect(directory.meterLookups).toBe(0);
   });
 
   it.each(['load', 'save'])('skips meter queries for non-metering nodes during %s', async (operation) => {
-    const { service, nodes, manager } = fixture(true);
+    const { service, nodes, directory } = fixture(true);
     nodes.forEach((node) => {
       node.type = ResourceFlowNodeType.INPUT_BUTTON;
       node.data = { label: 'Start' };
@@ -156,11 +136,11 @@ describe('resource flow meter validation', () => {
         : await service.saveResourceFlow(resourceId, { nodes, edges: [] }, testActor);
 
     expect(result.validationErrors).toBeUndefined();
-    expect(manager.find).not.toHaveBeenCalledWith(ResourceMeter, expect.anything());
+    expect(directory.meterLookups).toBe(0);
   });
 
   it.each(['load', 'save'])('skips meter queries for malformed metering data during %s', async (operation) => {
-    const { service, nodes, manager } = fixture(true);
+    const { service, nodes, directory } = fixture(true);
     nodes.forEach((node) => (node.data = { meterId: 0, value: '42' }));
     const result =
       operation === 'load'
@@ -168,12 +148,12 @@ describe('resource flow meter validation', () => {
         : await service.saveResourceFlow(resourceId, { nodes, edges: [] }, testActor);
 
     expect(result.validationErrors).toHaveLength(types.length);
-    expect(manager.find).not.toHaveBeenCalledWith(ResourceMeter, expect.anything());
+    expect(directory.meterLookups).toBe(0);
   });
 
   it.each(['load', 'save'])('reports a failed lookup without retrying per node during %s', async (operation) => {
-    const { service, nodes, manager } = fixture(true);
-    manager.find.mockRejectedValueOnce(new Error('Meter lookup failed'));
+    const { service, nodes, directory } = fixture(true);
+    directory.meterError = new Error('Meter lookup failed');
     const result =
       operation === 'load'
         ? await service.getResourceFlow(resourceId)
@@ -188,6 +168,6 @@ describe('resource flow meter validation', () => {
         value: node.data,
       })),
     );
-    expectOneMeterQuery(manager);
+    expectOneMeterQuery(directory);
   });
 });

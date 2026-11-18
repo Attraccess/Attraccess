@@ -1,7 +1,17 @@
 import type { StartCapacityHook } from '@attraccess/plugins-backend-sdk';
+import { handleOfScope } from '../persistence/plugin-transaction-scope';
+import { ScopedUnitOfWork, type TransactionScope } from '../../database/unit-of-work';
 import { ReaderUiHooksService, type StartCapacityRun } from './reader-ui-hooks.service';
 
 const reason = { code: 'RESERVED', title: 'Reserved', body: 'Held for a booking' };
+
+// The host's start transaction stays open for the whole file, as it is while the capacity hooks run.
+const unitOfWork = new ScopedUnitOfWork<object>({ transaction: (work) => work({ marker: 'manager' }) });
+let hostScope!: TransactionScope;
+void unitOfWork.run((scope) => {
+  hostScope = scope;
+  return new Promise<void>(() => undefined);
+});
 
 function setup(hooks: Record<string, StartCapacityHook>, policy: 'fail-closed' | 'fail-open' = 'fail-closed') {
   const registry = {
@@ -21,6 +31,7 @@ function setup(hooks: Record<string, StartCapacityHook>, policy: 'fail-closed' |
     alerts as never,
     audit as never,
     { get: () => ({}) } as never,
+    unitOfWork,
   );
   return { service, audit, alerts, cleared };
 }
@@ -35,7 +46,7 @@ const run = (occupiedSlots: number, satisfied: StartCapacityRun['satisfied'] = n
   sessionLimit: 3,
   occupiedSlots,
   usersInSession: [11, 12, 13].slice(0, occupiedSlots),
-  manager: { marker: 'manager' } as never,
+  scope: hostScope,
   satisfied,
 });
 
@@ -43,7 +54,7 @@ describe('ReaderUiHooksService.runStartCapacity', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
-  it('passes the transaction manager, the limit, the occupied slots and only the plugin own step keys', async () => {
+  it('passes the host transaction scope, the limit, the occupied slots and only the plugin own step keys', async () => {
     const hook = jest.fn().mockResolvedValue({ heldSlots: 0 });
     const { service } = setup({ reservations: hook });
     await service.runStartCapacity(
@@ -57,7 +68,7 @@ describe('ReaderUiHooksService.runStartCapacity', () => {
     );
     expect(hook).toHaveBeenCalledWith(
       expect.objectContaining({
-        manager: { marker: 'manager' },
+        scope: expect.objectContaining({ isOpen: true }),
         sessionLimit: 3,
         occupiedSlots: 1,
         usersInSession: [11],
@@ -66,6 +77,11 @@ describe('ReaderUiHooksService.runStartCapacity', () => {
         userId: 7,
       }),
     );
+    // The scope is the host's own transaction: the record port joins it, the plugin cannot commit or defer onto it.
+    const [{ scope }] = hook.mock.calls[0];
+    expect(handleOfScope(scope)).toEqual({ marker: 'manager' });
+    expect(Object.getOwnPropertySymbols(scope)).toEqual([]);
+    expect(() => scope.afterCommit(() => undefined)).toThrow(/owned by the host/);
   });
 
   it('refuses with the plugin reason when occupied + held reaches the limit, and audits it after the fact', async () => {

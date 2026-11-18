@@ -1,16 +1,6 @@
+import { CsvExportTemplateColumnType, CsvExportType } from '@attraccess/application-models';
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, Unique, UpdateDateColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-
-export enum CsvExportType {
-  RESOURCE_USAGE_HOURS = 'resourceUsageHours',
-  BILLING_TRANSACTIONS = 'billingTransactions',
-  RESOURCE_HOURS_SUMMARY = 'resourceHoursSummary',
-}
-
-export enum CsvExportTemplateColumnType {
-  FIELD = 'field',
-  CONSTANT = 'constant',
-}
 
 export class CsvExportTemplateColumn {
   @ApiProperty({

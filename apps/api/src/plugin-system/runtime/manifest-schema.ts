@@ -39,7 +39,6 @@ export const PluginManifestSchema = z.object({
       })
       .optional(),
     backend: mainSchema.optional(),
-    migrations: mainSchema.optional(),
   }),
   version: z.string(),
   attraccessVersion: z

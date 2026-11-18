@@ -54,3 +54,36 @@ export function missingLicenseReason(
 ): string | null {
   return licenseShortfall(license, snapshot)?.message ?? null;
 }
+
+/**
+ * Validates a discovered manifest's `license` block. Throws when it is malformed: the host cannot tell what the plugin
+ * requires, and guessing would risk loading a paid plugin without its license.
+ */
+export function parseManifestLicense(pluginName: string, license: unknown): PluginLicenseDeclaration | undefined {
+  if (license === undefined) return undefined;
+  const parsed = PluginLicenseDeclarationSchema.safeParse(license);
+  if (parsed.success) return parsed.data;
+  const detail = parsed.error.issues
+    .map((issue) => `${issue.path.join('.') || 'license'}: ${issue.message}`)
+    .join('; ');
+  throw new Error(`Plugin ${pluginName} declares an invalid license block (${detail})`);
+}
+
+/** The names of the blocked plugins plus every plugin that requires one of them, transitively. */
+export function withRequiringPlugins(
+  plugins: readonly { name: string; dependencies?: readonly { name: string; required?: boolean }[] }[],
+  blocked: Set<string>,
+): Set<string> {
+  let grew = blocked.size > 0;
+  while (grew) {
+    grew = false;
+    for (const manifest of plugins) {
+      if (blocked.has(manifest.name)) continue;
+      if (manifest.dependencies?.some((dependency) => dependency.required && blocked.has(dependency.name))) {
+        blocked.add(manifest.name);
+        grew = true;
+      }
+    }
+  }
+  return blocked;
+}

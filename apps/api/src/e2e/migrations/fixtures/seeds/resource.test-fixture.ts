@@ -4,9 +4,9 @@ import {
   Resource,
   ResourceGroup,
   ResourceOperatingInterval,
-  ResourceType,
   User,
 } from '@attraccess/database-entities';
+import { ResourceType } from '@attraccess/application-models';
 import type { DataSource } from 'typeorm';
 import { ensureEntity } from '../seed-storage.test-fixture';
 export async function migrationResourceSeeds(dataSource: DataSource, seedTag: string, primaryUser: User) {

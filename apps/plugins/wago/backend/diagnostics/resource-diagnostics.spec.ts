@@ -1,98 +1,121 @@
+import { flowNode, hostDataWithFlows } from '../persistence.test-utils';
+import { controllerRow, revisionRow } from '../rows.test-utils';
+import { spyOnWagoStorage } from '../storage-spy.test-utils';
+import { createWagoTestStorage } from '../storage/testing';
 import { type ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { EffectivePermissionsGuard, type PluginContext } from '@attraccess/plugins-backend-sdk';
 import { WagoDiagnosticsController } from './service';
 import { WagoDiagnosticsService } from './service';
-import { WagoController } from '../controllers/entity';
 import type { WagoService } from '../controllers/service';
 
 describe('resource diagnostics', () => {
-  function setup(ids: unknown[]) {
-    const nodesQuery = {
-      select: jest.fn().mockReturnThis(),
-      leftJoin: jest.fn().mockReturnThis(),
-      addSelect: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      take: jest.fn().mockReturnThis(),
-      getMany: jest.fn().mockResolvedValue(ids.map((controllerId) => ({ data: { controllerId } }))),
-    };
-    const controllersQuery = {
-      select: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      getMany: jest
-        .fn()
-        .mockImplementation(async () =>
-          ids
-            .filter((id): id is number => typeof id === 'number' && Number.isSafeInteger(id) && id > 0)
-            .map((id) => ({ id, name: `Controller ${id}`, hardwareId: `hardware-${id}` })),
-        ),
-    };
-    const revisionsQuery = {
-      select: jest.fn().mockReturnThis(),
-      distinctOn: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      addOrderBy: jest.fn().mockReturnThis(),
-      getMany: jest.fn().mockResolvedValue([]),
-    };
+  async function setup(ids: unknown[]) {
+    // The host flow lookup: the first call lists this resource's nodes, the second the conflicting ones.
+    const findNodes = jest
+      .fn()
+      .mockResolvedValue(ids.map((controllerId) => flowNode({ id: 'n', data: { controllerId } })));
+    const storage = createWagoTestStorage();
+    const valid = [
+      ...new Set(ids.filter((id): id is number => typeof id === 'number' && Number.isSafeInteger(id) && id > 0)),
+    ];
+    await storage.tables.controllers.insertMany(
+      valid.map((id) => controllerRow({ id, name: `Controller ${id}`, hardwareId: `hardware-${id}` })),
+    );
+    const spy = spyOnWagoStorage(storage);
     const service = new WagoDiagnosticsService(
-      {
-        getRepository: (entity: unknown) =>
-          entity === WagoController
-            ? { createQueryBuilder: () => controllersQuery }
-            : { createQueryBuilder: () => revisionsQuery },
-        dataSource: { getRepository: () => ({ createQueryBuilder: () => nodesQuery }) },
-      } as unknown as PluginContext,
+      { ...spy.context, hostData: hostDataWithFlows(findNodes) } as unknown as PluginContext,
       {} as WagoService,
     );
-    return { nodesQuery, controllersQuery, revisionsQuery, service };
+    return {
+      findNodes,
+      controllers: spy.spied.controllers,
+      revisions: spy.spied.configurationRevisions,
+      service,
+      storage,
+    };
   }
 
   it('looks up only the requested resource and batches controller associations', async () => {
-    const { nodesQuery, controllersQuery, revisionsQuery, service } = setup([1, 1, 2]);
+    const { findNodes, controllers, revisions, service } = await setup([1, 1, 2]);
     const result = await service.getResource(42);
-    expect(nodesQuery.where).toHaveBeenCalledWith('node.resourceId = :resourceId', { resourceId: 42 });
-    expect(nodesQuery.andWhere).toHaveBeenCalledWith('node.type LIKE :type', { type: 'plugin.wago.%' });
-    expect(nodesQuery.take).toHaveBeenCalledWith(1001);
-    expect(controllersQuery.where).toHaveBeenCalledWith('controller.id IN (:...controllerIds)', {
-      controllerIds: [1, 2],
+    expect(findNodes).toHaveBeenCalledWith({
+      typePrefix: 'plugin.wago.',
+      resourceId: 42,
+      orderById: true,
+      limit: 1001,
     });
-    expect(revisionsQuery.andWhere).toHaveBeenCalledWith('revision.state = :state', { state: 'applied' });
-    expect(revisionsQuery.orderBy).toHaveBeenCalledWith('revision.controllerId', 'ASC');
+    // One lookup for all controllers and one revision-number aggregate per controller, however many nodes reference
+    // them. Neither controller has an applied revision, so no revision row (and no snapshot) is read.
+    expect(controllers.find).toHaveBeenCalledTimes(1);
+    expect(controllers.find).toHaveBeenCalledWith({ where: { id: { in: [1, 2] } } });
+    expect(revisions.aggregate).toHaveBeenCalledTimes(2);
+    expect(revisions.aggregate).toHaveBeenCalledWith('revision', { controllerId: 1, state: 'applied' });
+    expect(revisions.find).not.toHaveBeenCalled();
     expect(result.controllers.map((controller) => controller.name)).toEqual(['Controller 1', 'Controller 2']);
     expect(result.truncated).toBe(false);
   });
+  it("reads only each controller's latest applied revision, not its older snapshots", async () => {
+    const { findNodes, revisions, service, storage } = await setup([1]);
+    const snapshot = (channel: string) =>
+      JSON.stringify({ logicalChannels: [{ id: channel, capabilities: ['output'] }] });
+    await storage.tables.configurationRevisions.insertMany([
+      revisionRow({ controllerId: 1, revision: 1, state: 'applied', snapshot: snapshot('old') }),
+      revisionRow({ controllerId: 1, revision: 2, state: 'applied', snapshot: snapshot('do1') }),
+      revisionRow({ controllerId: 1, revision: 3, state: 'pending', snapshot: snapshot('next') }),
+    ]);
+    const node = flowNode({
+      id: 'relay-on',
+      resourceId: 42,
+      type: 'plugin.wago.command',
+      data: { controllerId: 1, channelId: 'do1', expectedConfigurationRevision: 2 },
+    });
+    findNodes.mockResolvedValueOnce([node]).mockResolvedValueOnce([node]);
+    revisions.find.mockClear();
+
+    const [controller] = (await service.getResource(42)).controllers;
+
+    expect(revisions.find).toHaveBeenCalledTimes(1);
+    expect(revisions.find).toHaveBeenCalledWith({
+      where: { and: [{ state: 'applied' }, { or: [{ controllerId: 1, revision: 2 }] }] },
+    });
+    expect(controller.references).toEqual([expect.objectContaining({ nodeId: 'relay-on', invalid: false })]);
+  });
   it('does no controller work for unrelated resources', async () => {
-    const { service, controllersQuery } = setup([]);
+    const { service, controllers } = await setup([]);
     expect((await service.getResource(42)).controllers).toEqual([]);
-    expect(controllersQuery.getMany).not.toHaveBeenCalled();
+    expect(controllers.find).not.toHaveBeenCalled();
   });
   it('bounds nodes and controller work and rejects malformed controller IDs', async () => {
-    const { service, controllersQuery } = setup([null, '1', -1, 1.5, ...Array.from({ length: 1000 }, (_, i) => i + 1)]);
+    const { service, controllers } = await setup([
+      null,
+      '1',
+      -1,
+      1.5,
+      ...Array.from({ length: 1000 }, (_, i) => i + 1),
+    ]);
     const result = await service.getResource(42);
     expect(result.invalidControllerReferences).toBe(4);
     expect(result.truncated).toBe(true);
-    expect(controllersQuery.where).toHaveBeenCalledWith('controller.id IN (:...controllerIds)', {
-      controllerIds: Array.from({ length: 20 }, (_, i) => i + 1),
+    expect(controllers.find).toHaveBeenCalledWith({
+      where: { id: { in: Array.from({ length: 20 }, (_, i) => i + 1) } },
     });
   });
   it('lists each own node once while still flagging channels shared with other resources', async () => {
-    const { nodesQuery, service } = setup([1]);
-    const node = (id: string, resourceId: number) => ({
-      id,
-      resourceId,
-      type: 'plugin.wago.command',
-      data: { controllerId: 1, channelId: 'do1' },
-    });
+    const { findNodes, service } = await setup([1]);
+    const node = (id: string, resourceId: number, resourceName: string | null = null) =>
+      flowNode({
+        id,
+        resourceId,
+        resourceName,
+        type: 'plugin.wago.command',
+        data: { controllerId: 1, channelId: 'do1' },
+      });
     const own = [node('relay-on', 42), node('relay-off', 42)];
-    nodesQuery.getMany
+    findNodes
       .mockResolvedValueOnce(own)
-      // The conflict lookup also returns this resource's own nodes.
-      .mockResolvedValueOnce([...own, node('other', 7)])
-      .mockResolvedValueOnce([{ id: 7, name: 'Workbench outlet' }]);
+      // The conflict lookup also returns this resource's own nodes and names the other owners.
+      .mockResolvedValueOnce([...own, node('other', 7, 'Workbench outlet')]);
     const [controller] = (await service.getResource(42)).controllers;
     expect(controller.references.map((reference) => [reference.nodeId, reference.conflictResources])).toEqual([
       ['relay-on', [{ id: 7, name: 'Workbench outlet' }]],
@@ -100,34 +123,30 @@ describe('resource diagnostics', () => {
     ]);
   });
   it('flags channels shared with global flows but never lists global nodes as own references', async () => {
-    const { nodesQuery, service } = setup([1]);
+    const { findNodes, service } = await setup([1]);
     const own = [
-      {
+      flowNode({
         id: 'relay-on',
         resourceId: 42,
-        flowId: null,
         type: 'plugin.wago.command',
         data: { controllerId: 1, channelId: 'do1' },
-      },
+      }),
     ];
-    nodesQuery.getMany.mockResolvedValueOnce(own).mockResolvedValueOnce([
+    findNodes.mockResolvedValueOnce(own).mockResolvedValueOnce([
       ...own,
-      {
+      flowNode({
         id: 'global-on',
-        resourceId: null,
         flowId: 8,
-        flow: { id: 8, name: 'Power off all' },
+        flowName: 'Power off all',
         type: 'plugin.wago.command',
         data: { controllerId: 1, channelId: 'do1' },
-      },
-      {
+      }),
+      flowNode({
         id: 'unnamed-on',
-        resourceId: null,
         flowId: 9,
-        flow: null,
         type: 'plugin.wago.command',
         data: { controllerId: 1, channelId: 'do1' },
-      },
+      }),
     ]);
     const [controller] = (await service.getResource(42)).controllers;
     expect(controller.references.map((reference) => reference.nodeId)).toEqual(['relay-on']);
@@ -139,7 +158,6 @@ describe('resource diagnostics', () => {
         { id: 9, name: null },
       ],
     });
-    expect(nodesQuery.leftJoin).toHaveBeenCalledWith('node.flow', 'flow');
   });
   it('keeps both endpoints behind resources.update', () => {
     const guard = new EffectivePermissionsGuard(new Reflector());
@@ -154,8 +172,8 @@ describe('resource diagnostics', () => {
       expect(guard.canActivate(context(['resources.update']))).toBe(true);
     }
   });
-  it('delegates the resource endpoint without consulting the controller list', () => {
-    const { service } = setup([]);
+  it('delegates the resource endpoint without consulting the controller list', async () => {
+    const { service } = await setup([]);
     const getResource = jest.spyOn(service, 'getResource');
     new WagoDiagnosticsController(service).getResource(42);
     expect(getResource).toHaveBeenCalledWith(42);

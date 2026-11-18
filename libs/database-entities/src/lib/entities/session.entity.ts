@@ -2,7 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { ApiHideProperty, ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
 import { User } from './user.entity';
-import { SsoSessionContext } from '../types/sso-session-context';
+import { SsoSessionContext } from '@attraccess/application-models';
 
 @Entity()
 @Index(['token'], { unique: true })

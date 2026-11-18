@@ -8,7 +8,7 @@
     }
   },
   "attraccessVersion": {
-    "min": "1.0.0"
+    "min": "2.0.0-0"
   },
-  "permissions": ["LISTEN_EVENTS"]
+  "permissions": ["LISTEN_EVENTS", "PLUGIN_STORAGE"]
 }

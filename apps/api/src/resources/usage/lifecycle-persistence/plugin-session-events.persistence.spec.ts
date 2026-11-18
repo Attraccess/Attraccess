@@ -1,9 +1,9 @@
 import { ResourceUsage } from '@attraccess/database-entities';
 import { SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { rm } from 'node:fs/promises';
-import { closeResourceTransactionConnection } from '../../../database/run-serialized-transaction';
-import { resetTestFixture } from './fixtures/setup.test-fixture';
-import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from './fixtures/state.test-fixture';
+import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
+import { resetTestFixture } from '../../../database/adapters/usage/lifecycle-fixtures/setup.test-fixture';
+import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../../../database/adapters/usage/lifecycle-fixtures/state.test-fixture';
 
 /** Plugin SystemEvents for session start, takeover and end, driven through the real lifecycle. */
 describe('Plugin session SystemEvents', () => {
