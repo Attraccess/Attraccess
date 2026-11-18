@@ -134,6 +134,13 @@ export function describeDeclaredTable(physicalName: string, declared: PluginStor
   return { name: physicalName, columns, indexes };
 }
 
+/**
+ * A `text` field matches an unbounded legacy `varchar`: SQLite stores both as TEXT without a length check, so the
+ * adopted column is the same. Declarations use `text` where a value can exceed the 255 characters a `string` field
+ * enforces, so both sides compare as `text`.
+ */
+const storageClassOf = (type: string) => (type === 'varchar' ? 'text' : type);
+
 /** Parsed legacy tables and declared tables, ready for `toEqual`. Both sides are sorted by table name. */
 export function compareBaselineWithLegacy(definition: PluginStorageDefinition, legacyStatements: readonly string[]) {
   const legacy = parseLegacyDdl(legacyStatements);
@@ -147,7 +154,14 @@ export function compareBaselineWithLegacy(definition: PluginStorageDefinition, l
     Object.fromEntries(
       Object.keys(tables)
         .sort()
-        .map((name) => [name, { ...tables[name], indexes: [...tables[name].indexes].sort() }]),
+        .map((name) => [
+          name,
+          {
+            ...tables[name],
+            columns: tables[name].columns.map((column) => ({ ...column, type: storageClassOf(column.type) })),
+            indexes: [...tables[name].indexes].sort(),
+          },
+        ]),
     );
   return { legacy: normalise(legacy), declared: normalise(declared) };
 }
