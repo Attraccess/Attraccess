@@ -46,7 +46,11 @@ describe('Maintenance transaction coordination (file-backed SQLite)', () => {
 
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'maintenance-transactions-'));
-    source = await new DataSource({ type: 'sqlite', database: join(directory, 'test.sqlite') }).initialize();
+    source = await new DataSource({
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database: join(directory, 'test.sqlite'),
+    }).initialize();
     await source.query('CREATE TABLE maintenance_probe (resourceId INTEGER PRIMARY KEY)');
     await source.query('CREATE TABLE usage_probe (id INTEGER PRIMARY KEY)');
     enabled = true;

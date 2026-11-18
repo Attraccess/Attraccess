@@ -1,3 +1,4 @@
+import { findRelations } from '../find-options';
 import {
   BillingTransaction,
   Form,
@@ -123,7 +124,9 @@ describe('usage session mapping against the migrated schema', () => {
   });
 
   const entityRows = (ids: number[], relations: string[]) =>
-    source.getRepository(ResourceUsage).find({ where: ids.map((id) => ({ id })), relations, order: { id: 'ASC' } });
+    source
+      .getRepository(ResourceUsage)
+      .find({ where: ids.map((id) => ({ id })), relations: findRelations(relations), order: { id: 'ASC' } });
 
   it('answers running sessions with the JSON of their entities, without the users mail address or tokens', async () => {
     const sessions = await store.findActiveSessions(1);

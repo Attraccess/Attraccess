@@ -14,6 +14,7 @@ import type {
 import { ScopedUnitOfWork, UNIT_OF_WORK } from '../../unit-of-work';
 import { managerFor } from './persistence-context';
 import { toMaintenanceRecord } from './maintenance-mappers';
+import { findRelations } from '../find-options';
 
 const AUDIT_USERS = ['createdByUser', 'completedByUser'];
 
@@ -70,7 +71,7 @@ export class TypeOrmResourceMaintenanceStore implements ResourceMaintenanceStore
   async findById(maintenanceId: number): Promise<ResourceMaintenanceRecord | null> {
     const entity = await this.dataSource
       .getRepository(ResourceMaintenance)
-      .findOne({ where: { id: maintenanceId }, relations: AUDIT_USERS });
+      .findOne({ where: { id: maintenanceId }, relations: findRelations(AUDIT_USERS) });
     return entity ? toMaintenanceRecord(entity) : null;
   }
 
@@ -153,7 +154,7 @@ export class TypeOrmResourceMaintenanceStore implements ResourceMaintenanceStore
 
     const resource = await manager
       .getRepository(Resource)
-      .findOne({ where: { id: resourceId }, relations: ['groups'] });
+      .findOne({ where: { id: resourceId }, relations: { groups: true } });
     if (!resource) return 'resource-missing';
 
     const group = await introducers.findOne({
@@ -213,7 +214,7 @@ export class TypeOrmResourceMaintenanceStore implements ResourceMaintenanceStore
   private async reload(maintenanceId: number): Promise<ResourceMaintenanceRecord> {
     const entity = await this.dataSource
       .getRepository(ResourceMaintenance)
-      .findOneOrFail({ where: { id: maintenanceId }, relations: AUDIT_USERS });
+      .findOneOrFail({ where: { id: maintenanceId }, relations: findRelations(AUDIT_USERS) });
     return toMaintenanceRecord(entity);
   }
 }

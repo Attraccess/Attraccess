@@ -94,9 +94,13 @@ jobs:
         with:
           esp-idf: 'false'
       - uses: ./.github/actions/setup-browser-tests
-      - name: Test and pack official plugin apps
+      - name: Pack official plugin apps
         env:
           NODE_ENV: production
+        run: pnpm nx run-many --target=pack-test --parallel=3 --projects=tag:type:plugin
+      # Outside the production env: React's production build has no `act`, so the frontend tests cannot run there.
+      # Packing comes first so the later steps reuse the builds and packs made in the production env from the cache.
+      - name: Test official plugin apps
         run: node scripts/ci-test-projects.mjs --group=plugins
       - name: Test packed Hello World fixture
         run: pnpm --dir examples/plugin-hello-world run pack-test

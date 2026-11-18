@@ -27,18 +27,19 @@ vi.mock('@simplewebauthn/browser', () => ({
   startRegistration: state.register,
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  PasskeysService: { getPasskeyRegistrationOptions: state.getOptions, verifyPasskeyRegistration: state.verify },
-  usePasskeysServiceListPasskeys: () => ({ data: state.keys, isLoading: state.loading, refetch: state.refetch }),
-  usePasskeysServiceDeletePasskey: () => ({ mutateAsync: state.remove }),
+  getPasskeyRegistrationOptions: state.getOptions,
+  verifyPasskeyRegistration: state.verify,
+  useListPasskeys: () => ({ data: state.keys, isLoading: state.loading, refetch: state.refetch }),
+  useDeletePasskey: () => ({ mutateAsync: state.remove }),
 }));
 beforeEach(() => {
   vi.clearAllMocks();
   state.supported = true;
   state.loading = false;
   state.keys = [];
-  state.getOptions.mockResolvedValue({ options: { challenge: 'challenge' } });
+  state.getOptions.mockResolvedValue({ data: { options: { challenge: 'challenge' } } });
   state.register.mockResolvedValue({ id: 'credential' });
-  state.verify.mockResolvedValue(undefined);
+  state.verify.mockResolvedValue({ data: undefined });
   state.remove.mockResolvedValue(undefined);
   state.refetch.mockResolvedValue(undefined);
 });
@@ -66,9 +67,9 @@ it.each([' Laptop ', ''])('registers a passkey with name %s and refreshes the li
   fireEvent.click(screen.getByRole('button', { name: 'actions.add' }));
   await waitFor(() => expect(state.toast).toHaveBeenCalledWith({ title: 'success.added', type: 'success' }));
   expect(state.register).toHaveBeenCalledWith({ optionsJSON: { challenge: 'challenge' } });
-  expect(state.verify).toHaveBeenCalledWith({
-    requestBody: { response: { id: 'credential' }, name: name.trim() || undefined },
-  });
+  expect(state.verify).toHaveBeenCalledWith(
+    expect.objectContaining({ body: { response: { id: 'credential' }, name: name.trim() || undefined } }),
+  );
   expect(state.refetch).toHaveBeenCalledOnce();
   expect(screen.getByRole('textbox', { name: 'nameLabel' })).toHaveValue('');
 });
@@ -102,7 +103,7 @@ it('lists last-use information and handles successful and failed deletion', asyn
   expect(screen.getByText('2026-09-01')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'actions.delete:Laptop' }));
   await waitFor(() => expect(state.toast).toHaveBeenCalledWith({ title: 'success.deleted', type: 'success' }));
-  expect(state.remove).toHaveBeenCalledWith({ id: 1 });
+  expect(state.remove).toHaveBeenCalledWith({ path: { id: 1 } });
   expect(state.refetch).toHaveBeenCalledOnce();
   state.remove.mockRejectedValue(new Error('Unavailable'));
   fireEvent.click(screen.getByRole('button', { name: 'actions.delete:Phone' }));

@@ -20,6 +20,7 @@ import { ScopedUnitOfWork, UNIT_OF_WORK } from '../../unit-of-work';
 import { managerFor } from './persistence-context';
 import { toGroupRecord } from './introduction-mappers';
 import { toIntroducerRecord } from './resource-introducer-store.adapter';
+import { findRelations } from '../find-options';
 
 /**
  * SQL fragment (for use against the `group` query-builder alias) that is true when the user has a currently valid
@@ -80,7 +81,7 @@ export class TypeOrmResourceGroupStore implements ResourceGroupStore {
   async findById(groupId: number, withResources = false): Promise<ResourceGroupDetail | null> {
     const group = await this.groups.findOne({
       where: { id: groupId },
-      relations: withResources ? ['resources'] : undefined,
+      relations: findRelations(withResources ? ['resources'] : undefined),
     });
     if (!group) return null;
     return {
@@ -131,14 +132,14 @@ export class TypeOrmResourceGroupStore implements ResourceGroupStore {
   }
 
   async addResource(groupId: number, resourceId: number): Promise<void> {
-    const group = await this.groups.findOneOrFail({ where: { id: groupId }, relations: ['resources'] });
+    const group = await this.groups.findOneOrFail({ where: { id: groupId }, relations: { resources: true } });
     const resource = await this.dataSource.getRepository(Resource).findOneByOrFail({ id: resourceId });
     group.resources.push(resource);
     await this.groups.save(group);
   }
 
   async removeResource(groupId: number, resourceId: number): Promise<void> {
-    const group = await this.groups.findOneOrFail({ where: { id: groupId }, relations: ['resources'] });
+    const group = await this.groups.findOneOrFail({ where: { id: groupId }, relations: { resources: true } });
     group.resources = group.resources.filter((resource) => resource.id !== resourceId);
     await this.groups.save(group);
   }
@@ -162,7 +163,7 @@ export class TypeOrmResourceGroupIntroducerStore implements ResourceGroupIntrodu
   async list(groupId: number): Promise<ResourceIntroducerRecord[]> {
     const rows = await this.repository.find({
       where: { resourceGroup: { id: groupId } },
-      relations: ['user'],
+      relations: { user: true },
     });
     return rows.map(toIntroducerRecord);
   }

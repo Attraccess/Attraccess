@@ -12,7 +12,7 @@ export class TranslateEmailSubjects1782800000000 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     for (const type of Object.values(EmailTemplateType)) {
-      await queryRunner.query(`UPDATE "email_templates" SET "subject" = $1 WHERE "type" = $2`, [
+      await queryRunner.query(`UPDATE "email_templates" SET "subject" = ? WHERE "type" = ?`, [
         EMAIL_TEMPLATE_DEFAULTS[type].subject,
         type,
       ]);

@@ -24,9 +24,9 @@ import { useAuth } from '../../../../hooks/useAuth';
 import {
   BillingTransaction,
   BillingTransactionStatus,
-  useBillingServiceGetBillingBalance,
-  useBillingServiceGetBillingConfiguration,
-  useBillingServiceGetBillingTransactions,
+  useGetBillingBalance,
+  useGetBillingConfiguration,
+  useGetBillingTransactions,
 } from '@attraccess/react-query-client';
 import { useCallback, useMemo, useState } from 'react';
 
@@ -45,9 +45,9 @@ export function SummaryCard(props: Props) {
 
   const userId = useMemo(() => userIdFromProps ?? currentUser?.id, [userIdFromProps, currentUser]);
 
-  const { data: configuration } = useBillingServiceGetBillingConfiguration();
-  const { data: balance, isLoading: isLoadingBalance } = useBillingServiceGetBillingBalance(
-    { userId: userId ?? 0 },
+  const { data: configuration } = useGetBillingConfiguration();
+  const { data: balance, isLoading: isLoadingBalance } = useGetBillingBalance(
+    { path: { userId: userId ?? 0 } },
     undefined,
     {
       enabled: !!userId && !isDisabled,
@@ -56,8 +56,8 @@ export function SummaryCard(props: Props) {
 
   const [transactionsPage] = useState(1);
 
-  const { data: transactions } = useBillingServiceGetBillingTransactions(
-    { userId: userId ?? 0, page: transactionsPage, limit: transactionsPerPage },
+  const { data: transactions } = useGetBillingTransactions(
+    { path: { userId: userId ?? 0 }, query: { page: transactionsPage, limit: transactionsPerPage } },
     undefined,
     {
       enabled: !!userId && !isDisabled,

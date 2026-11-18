@@ -11,7 +11,7 @@ const resources = [
   { id: 2, name: 'Printer' },
 ];
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourcesServiceGetAllResources: ({ search }: { search: string }) => ({
+  useGetAllResources: ({ query: { search } }: { query: { search: string } }) => ({
     isLoading: false,
     data: { data: resources.filter((resource) => resource.name.toLowerCase().includes(search.toLowerCase())) },
   }),

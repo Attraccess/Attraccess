@@ -5,7 +5,7 @@ import { HeartHandshake, Share2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import en from './en.json';
 import de from './de.json';
-import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
+import { useGetLicenseInformation } from '@attraccess/react-query-client';
 import { useLocation } from 'react-router-dom';
 import { USEFUL_ACTION_EVENT } from './usefulAction';
 import { type SystemPermission } from '@attraccess/shared';
@@ -66,7 +66,7 @@ export function DonationPrompt() {
       ).some((p) => hasPermission(p)),
     [hasPermission],
   );
-  const { data: license } = useLicenseServiceGetLicenseInformation();
+  const { data: license } = useGetLicenseInformation();
 
   const [isVisible, setIsVisible] = useState(false);
   const [mounted, setMounted] = useState(false);

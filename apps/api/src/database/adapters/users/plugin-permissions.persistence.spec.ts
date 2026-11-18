@@ -79,7 +79,8 @@ describe('plugin-declared permissions on a real SQLite file', () => {
     resolveDatabaseBackend();
     directory = await mkdtemp(join(tmpdir(), 'plugin-permissions-'));
     source = await createDataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: join(directory, 'test.sqlite'),
       entities: Object.values(entities),
       migrations: Object.values(migrations),

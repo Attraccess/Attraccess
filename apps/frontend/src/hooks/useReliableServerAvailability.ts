@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSystemServiceInfo } from '@attraccess/react-query-client';
+import { useInfo } from '@attraccess/react-query-client';
 
 interface Options {
   consecutiveErrorThreshold?: number;
@@ -11,7 +11,7 @@ export function useReliableServerAvailability(options: Options = {}) {
 
   const [errorStreak, setErrorStreak] = useState(0);
 
-  const query = useSystemServiceInfo(undefined, {
+  const query = useInfo({}, undefined, {
     retry: false,
   });
 

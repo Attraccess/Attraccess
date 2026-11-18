@@ -11,7 +11,11 @@ describe('openSqliteStartupSettings', () => {
 
   beforeEach(() => {
     directory = mkdtempSync(join(tmpdir(), 'startup-settings-'));
-    options = { type: 'sqlite', database: join(directory, 'db.sqlite') };
+    options = {
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database: join(directory, 'db.sqlite'),
+    };
   });
 
   afterEach(() => rmSync(directory, { recursive: true, force: true }));

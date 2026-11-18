@@ -10,9 +10,9 @@ import { useAppTheme } from '@attraccess/ui';
 import { useToastMessage } from '../../components/toastProvider';
 import { CONTENT_PLACEHOLDER, splitHead } from '../email-templates/edit/mjmlLayout';
 import {
-  useEmailLayoutServiceEmailLayoutControllerFindGlobal,
-  useEmailLayoutServiceEmailLayoutControllerUpdate,
-  useEmailLayoutServiceEmailLayoutControllerResetToDefault as useResetLayoutToDefault,
+  useEmailLayoutControllerFindGlobal,
+  useEmailLayoutControllerUpdate,
+  useEmailLayoutControllerResetToDefault as useResetLayoutToDefault,
 } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
@@ -49,7 +49,7 @@ export function EmailLayoutPage() {
   const { resolvedTheme } = useAppTheme();
   const toast = useToastMessage();
 
-  const layout = useEmailLayoutServiceEmailLayoutControllerFindGlobal();
+  const layout = useEmailLayoutControllerFindGlobal();
 
   // Same uncontrolled-canvas setup as the template editor: the canvas reads its
   // initial value once per seed and reports edits into a ref, so typing never
@@ -78,7 +78,7 @@ export function EmailLayoutPage() {
     docRef.current = mjml;
   }, []);
 
-  const updateLayout = useEmailLayoutServiceEmailLayoutControllerUpdate();
+  const updateLayout = useEmailLayoutControllerUpdate();
   const onSave = useCallback(() => {
     const body = toStorable(docRef.current ?? '', headRef.current);
     if (!body.includes(CONTENT_PLACEHOLDER)) {
@@ -86,7 +86,7 @@ export function EmailLayoutPage() {
       return;
     }
     updateLayout.mutate(
-      { requestBody: { body } },
+      { body: { body } },
       {
         onSuccess: () => toast.success({ title: t('toast.saveSuccess') }),
         onError: (error) => {

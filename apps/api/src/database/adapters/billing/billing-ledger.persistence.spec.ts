@@ -77,7 +77,7 @@ describe('TypeOrmBillingLedgerStore on real SQLite', () => {
       // What the controller used to return: the loaded entities, serialized by the global class serializer.
       const entitiesBefore = await db.primary.getRepository(BillingTransaction).find({
         where: { userId: user.id },
-        relations: ['initiator', 'resourceUsage', 'resourceUsage.resource', 'refundOf', 'items'],
+        relations: { initiator: true, resourceUsage: { resource: true }, refundOf: true, items: true },
         order: { createdAt: 'DESC', id: 'DESC' },
       });
       expect(total).toBe(2);
@@ -165,7 +165,7 @@ describe('TypeOrmBillingLedgerStore on real SQLite', () => {
       expect(await balanceOf(user.id)).toBe(75);
       const stored = await db.primary.getRepository(BillingTransaction).findOneOrFail({
         where: { id: charge?.id },
-        relations: ['items'],
+        relations: { items: true },
       });
       expect(stored.items.map((item) => item.name).sort()).toEqual(['PER_MINUTE', 'PER_SESSION']);
       expect(await db.primary.getRepository(Setting).countBy({ parent: 'audit-probe' })).toBeGreaterThan(0);

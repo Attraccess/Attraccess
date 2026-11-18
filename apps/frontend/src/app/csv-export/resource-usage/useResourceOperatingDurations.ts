@@ -1,4 +1,4 @@
-import { AnalyticsService } from '@attraccess/react-query-client';
+import { getResourceOperatingDurations } from '@attraccess/react-query-client';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import {
@@ -20,23 +20,16 @@ export function useResourceOperatingDurations(resourceIds: number[], start: Date
       for (let index = 0; index < resourceIds.length; index += RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST) {
         for (const range of operatingDurationRanges) {
           signal.throwIfAborted();
-          const request = AnalyticsService.getResourceOperatingDurations({
-            requestBody: {
+          const { data } = await getResourceOperatingDurations({
+            body: {
               resourceIds: resourceIds.slice(index, index + RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST),
               start: range.start.toISOString(),
               end: range.end.toISOString(),
             },
+            signal,
+            throwOnError: true,
           });
-          const cancelRequest = () => request.cancel();
-          signal.addEventListener('abort', cancelRequest, { once: true });
-          try {
-            mergeOperatingDurationSummaries(
-              operatingDurations,
-              (await request) as Record<number, OperatingDurationSummary>,
-            );
-          } finally {
-            signal.removeEventListener('abort', cancelRequest);
-          }
+          mergeOperatingDurationSummaries(operatingDurations, data as Record<number, OperatingDurationSummary>);
         }
       }
       return operatingDurations;

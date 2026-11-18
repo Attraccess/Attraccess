@@ -10,7 +10,7 @@ describe('Attractap crash report coredump upload migration', () => {
     (await runner.query(`PRAGMA table_info("attractap_crash_report")`)).map((column: { name: string }) => column.name);
 
   beforeEach(async () => {
-    source = await new DataSource({ type: 'sqlite', database: ':memory:', entities: [] }).initialize();
+    source = await new DataSource({ type: 'better-sqlite3', database: ':memory:', entities: [] }).initialize();
     runner = source.createQueryRunner();
     await runner.query(
       `CREATE TABLE "attractap_crash_report" ("id" INTEGER PRIMARY KEY, "resetReason" TEXT NOT NULL, "coredumpSize" integer, "coredump" blob)`,

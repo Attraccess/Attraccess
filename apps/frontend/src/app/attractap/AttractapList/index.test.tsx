@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
 import { act, render, screen } from '@testing-library/react';
-import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
+import { useGetLicenseInformation } from '@attraccess/react-query-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AttractapList } from './index';
 
@@ -15,10 +15,10 @@ const data = vi.hoisted(() => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useLicenseServiceGetLicenseInformation: vi.fn(),
-  useAttractapServiceGetFirmwares: () => ({ data: [] }),
-  useAttractapServiceGetReaders: () => ({ data: data.readers, error: null }),
-  useAttractapServiceGetReadersToPair: () => ({ data: data.toPair }),
+  useGetLicenseInformation: vi.fn(),
+  useGetFirmwares: () => ({ data: [] }),
+  useGetReaders: () => ({ data: data.readers, error: null }),
+  useGetReadersToPair: () => ({ data: data.toPair }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -74,9 +74,9 @@ vi.mock('./delete', () => ({ AttractapDeleteModal: () => null }));
 vi.mock('../../../hooks/useNow', () => ({ useNow: () => new Date() }));
 
 function mockLicense(modules: string[] | undefined) {
-  vi.mocked(useLicenseServiceGetLicenseInformation).mockReturnValue({
+  vi.mocked(useGetLicenseInformation).mockReturnValue({
     data: modules !== undefined ? { modules } : undefined,
-  } as ReturnType<typeof useLicenseServiceGetLicenseInformation>);
+  } as ReturnType<typeof useGetLicenseInformation>);
 }
 
 describe('AttractapList license gate', () => {

@@ -40,7 +40,8 @@ export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
   }
   scope.directory = await mkdtemp(join(tmpdir(), 'attraccess-metering-'));
   scope.source = await new DataSource({
-    type: 'sqlite',
+    type: 'better-sqlite3',
+    invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
     database: join(scope.directory, 'test.sqlite'),
     synchronize: true,
     entities: scope.schemas,

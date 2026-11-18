@@ -38,7 +38,7 @@ export class TypeOrmRetrainingStore implements RetrainingStore {
   async lastGroupUseAt(groupId: number, userId: number): Promise<Date | null> {
     const group = await this.dataSource
       .getRepository(ResourceGroup)
-      .findOne({ where: { id: groupId }, relations: ['resources'] });
+      .findOne({ where: { id: groupId }, relations: { resources: true } });
     const resourceIds = (group?.resources ?? []).map((resource) => resource.id);
     if (resourceIds.length === 0) {
       return null;

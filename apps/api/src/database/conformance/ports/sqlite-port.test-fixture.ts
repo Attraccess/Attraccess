@@ -59,7 +59,8 @@ function connectPorts(source: DataSource): PortConnection {
 export const openSqlite = (file: string) =>
   sqliteBackend
     .createDataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: file,
       entities: sqliteBackend.entities,
       migrations: sqliteBackend.migrationTrack.migrations,

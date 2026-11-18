@@ -86,7 +86,7 @@ export class TypeOrmPasskeyStore implements PasskeyStore {
   }
 
   // One DELETE ... RETURNING statement: the database hands each stored challenge to exactly one caller.
-  // Lowercase `delete` keeps TypeORM's SQLite runner on sqlite3.all, which returns the rows.
+  // better-sqlite3 marks RETURNING statements as readers, so TypeORM's runner returns their rows.
   async consumeChallenge(challenge: string): Promise<PasskeyChallengeRecord | null> {
     const rows = (await this.challenges.query(
       'delete FROM "passkey_challenge" WHERE "challenge" = ? RETURNING "challenge", "userId", "expiresAt"',

@@ -41,12 +41,12 @@ vi.mock('../../hooks/useRbacCatalogTranslations', () => ({
   }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useMcpOauthServiceGetMcpOauthRequest: () => state.consent,
-  useMcpOauthServiceApproveMcpOauthRequest: (options: (typeof state.options)[string]) => {
+  useGetMcpOAuthRequest: () => state.consent,
+  useApproveMcpOAuthRequest: (_mutationKey: unknown, options: (typeof state.options)[string]) => {
     state.options.approve = options;
     return { mutate: state.approve };
   },
-  useMcpOauthServiceDenyMcpOauthRequest: (options: (typeof state.options)[string]) => {
+  useDenyMcpOAuthRequest: (_mutationKey: unknown, options: (typeof state.options)[string]) => {
     state.options.deny = options;
     return { mutate: state.deny };
   },
@@ -135,7 +135,7 @@ it('explains an all-permissions request and permissions the user does not hold',
 it('approves and sends the browser to the client', () => {
   render(<McpOAuthAuthorizePage />);
   fireEvent.click(screen.getByText('approve'));
-  expect(state.approve).toHaveBeenCalledWith({ requestId: 'mcp_rq_abc' });
+  expect(state.approve).toHaveBeenCalledWith({ path: { requestId: 'mcp_rq_abc' } });
   expect(state.deny).not.toHaveBeenCalled();
   expect((screen.getByText('deny').closest('button') as HTMLButtonElement).disabled).toBe(true);
   act(() => state.options.approve.onSuccess({ redirectUrl: 'http://127.0.0.1:8123/cb?code=c&state=s' }));
@@ -146,7 +146,7 @@ it('approves and sends the browser to the client', () => {
 it('denies and sends the browser to the client with the error redirect', () => {
   render(<McpOAuthAuthorizePage />);
   fireEvent.click(screen.getByText('deny'));
-  expect(state.deny).toHaveBeenCalledWith({ requestId: 'mcp_rq_abc' });
+  expect(state.deny).toHaveBeenCalledWith({ path: { requestId: 'mcp_rq_abc' } });
   act(() => state.options.deny.onSuccess({ redirectUrl: 'http://127.0.0.1:8123/cb?error=access_denied' }));
   expect(state.leave).toHaveBeenCalledWith('http://127.0.0.1:8123/cb?error=access_denied');
   expect(screen.getByText('returningDenied')).toBeTruthy();

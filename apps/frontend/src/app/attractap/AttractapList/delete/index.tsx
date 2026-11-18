@@ -3,11 +3,7 @@ import { DeleteConfirmationModal, useTranslations } from '@attraccess/plugins-fr
 import { useOverlayState } from '@heroui/react';
 import de from './de.json';
 import en from './en.json';
-import {
-  useAttractapServiceDeleteReader,
-  UseAttractapServiceGetReadersKeyFn,
-  UseAttractapServiceGetReadersToPairKeyFn,
-} from '@attraccess/react-query-client';
+import { useDeleteReader, UseGetReadersKeyFn, UseGetReadersToPairKeyFn } from '@attraccess/react-query-client';
 import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -28,17 +24,17 @@ export function AttractapDeleteModal(props: Props) {
 
   const { open, close, isOpen } = useOverlayState();
 
-  const { mutate, isPending } = useAttractapServiceDeleteReader({
+  const { mutate, isPending } = useDeleteReader(undefined, {
     onSuccess: () => {
       // The deleted record can be in either list.
-      queryClient.invalidateQueries({ queryKey: UseAttractapServiceGetReadersKeyFn() });
-      queryClient.invalidateQueries({ queryKey: UseAttractapServiceGetReadersToPairKeyFn() });
+      queryClient.invalidateQueries({ queryKey: UseGetReadersKeyFn() });
+      queryClient.invalidateQueries({ queryKey: UseGetReadersToPairKeyFn() });
       close();
     },
   });
 
   const onConfirm = useCallback(() => {
-    mutate({ readerId });
+    mutate({ path: { readerId } });
   }, [mutate, readerId]);
 
   return (

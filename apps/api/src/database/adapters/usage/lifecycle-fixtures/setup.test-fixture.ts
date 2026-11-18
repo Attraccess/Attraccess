@@ -2,7 +2,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Logger } from '@nestjs/common';
 import { BillingTransaction, Form, Resource, ResourceUsage, User } from '@attraccess/database-entities';
 import { BillingTransactionStatus, ResourceType, SupervisionMode } from '@attraccess/application-models';
-import { DataSource } from 'typeorm';
+import { createDataSource } from '../../../sqlite/sqlite-connection';
 import type { TransactionScope } from '../../../unit-of-work';
 import { unitOfWorkFor } from '../../shared-unit-of-work';
 import { mkdtemp } from 'node:fs/promises';
@@ -19,8 +19,10 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
   jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
   jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
   scope.directory = await mkdtemp(join(tmpdir(), 'attraccess-lifecycle-'));
-  scope.source = await new DataSource({
-    type: 'sqlite',
+  // Guarded like the API's main connection: it shares the file with the resource-lifecycle (and audit) connections.
+  scope.source = await createDataSource({
+    type: 'better-sqlite3',
+    invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
     database: join(scope.directory, 'test.sqlite'),
     synchronize: true,
     entities: scope.schemas,

@@ -20,7 +20,7 @@ describe('Scheduled maintenance commit notification', () => {
 
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'maintenance-commit-'));
-    const options = { type: 'sqlite' as const, database: join(directory, 'test.sqlite') };
+    const options = { type: 'better-sqlite3' as const, database: join(directory, 'test.sqlite') };
     writer = await new DataSource(options).initialize();
     observer = await new DataSource(options).initialize();
     await writer.query('CREATE TABLE maintenance (id INTEGER PRIMARY KEY, resourceId INTEGER)');

@@ -10,7 +10,7 @@ import { join, basename, isAbsolute, relative, resolve } from 'path';
 
 import { randomBytes, createHash } from 'crypto';
 
-import decompress from 'decompress';
+import { extractPluginZip, UnsafeZipEntryError } from './extract-plugin-zip';
 
 import { FileUpload } from '../common/types/file-upload.types';
 
@@ -227,18 +227,18 @@ export class PluginService {
     const extractFolder = join(stagingFolder, 'contents');
 
     try {
-      let extracted: unknown[] = [];
+      let extracted = 0;
       try {
-        extracted = await decompress(zipFile.buffer, extractFolder);
+        extracted = await extractPluginZip(zipFile.buffer, extractFolder);
       } catch (error) {
         PluginService.logger.error(`Failed to extract ${zipFile.originalname}`, error as Error);
+        if (error instanceof UnsafeZipEntryError) {
+          throw new BadRequestException(`File could not be extracted: ${error.message}`);
+        }
       }
-
-      // a non-zip buffer decompresses to nothing instead of throwing
-      if (extracted.length === 0) {
+      if (extracted === 0) {
         throw new BadRequestException('File could not be extracted, it must be a valid zip file');
       }
-
       // read manifest, tolerating the single wrapper folder that Finder and most GUI zip tools add
       const sourceFolder = PluginService.findManifestFolder(extractFolder);
       PluginService.logger.debug(`Reading manifest from ${sourceFolder}`);

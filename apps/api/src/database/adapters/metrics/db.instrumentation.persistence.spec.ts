@@ -19,7 +19,11 @@ describe('DbMetricsInstrumentation on a real SQLite file', () => {
   beforeEach(async () => {
     directory = mkdtempSync(join(tmpdir(), 'db-instrumentation-'));
     source = await backend
-      .createDataSource({ type: 'sqlite', database: join(directory, 'metrics.sqlite') })
+      .createDataSource({
+        type: 'better-sqlite3',
+        invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+        database: join(directory, 'metrics.sqlite'),
+      })
       .initialize();
     await source.query('CREATE TABLE widget (id INTEGER PRIMARY KEY, name TEXT NOT NULL)');
     registry = new Registry();

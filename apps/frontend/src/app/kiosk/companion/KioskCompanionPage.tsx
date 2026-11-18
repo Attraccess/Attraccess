@@ -1,7 +1,7 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Spinner } from '@heroui/react';
 import { ShapesIcon } from 'lucide-react';
-import { useCompanionDevicesServiceGetCompanionDeviceResources } from '@attraccess/react-query-client';
+import { useGetCompanionDeviceResources } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../hooks/useAuth';
 import { KioskLogin } from '../login/KioskLogin';
@@ -41,19 +41,18 @@ function KioskCompanionContent() {
   const deviceId = params.get('deviceId');
   const autoLogoff = params.get('autoLogoff');
 
-  const { data: rawResources, isLoading, error } = useCompanionDevicesServiceGetCompanionDeviceResources(
-    { id: Number(deviceId) },
-    undefined,
-    { enabled: !!deviceId, refetchInterval: 10_000 },
-  );
+  const {
+    data: rawResources,
+    isLoading,
+    error,
+  } = useGetCompanionDeviceResources({ path: { id: Number(deviceId) } }, undefined, {
+    enabled: !!deviceId,
+    refetchInterval: 10_000,
+  });
   const resources = rawResources as CompanionResource[] | undefined;
 
   if (!deviceId) {
-    return (
-      <div className="w-full max-w-lg mx-auto text-center text-default-500 py-12">
-        {t('noDeviceId')}
-      </div>
-    );
+    return <div className="w-full max-w-lg mx-auto text-center text-default-500 py-12">{t('noDeviceId')}</div>;
   }
 
   if (isLoading) {
@@ -65,11 +64,7 @@ function KioskCompanionContent() {
   }
 
   if (error) {
-    return (
-      <div className="w-full max-w-lg mx-auto text-center text-danger py-12">
-        {t('loadError')}
-      </div>
-    );
+    return <div className="w-full max-w-lg mx-auto text-center text-danger py-12">{t('loadError')}</div>;
   }
 
   if (!resources || resources.length === 0) {
@@ -88,7 +83,9 @@ function KioskCompanionContent() {
         <ResourceListItem
           key={r.id}
           resource={r}
-          onPress={() => navigate(`/kiosk/resources/${r.id}?deviceId=${deviceId}${autoLogoff ? `&autoLogoff=${autoLogoff}` : ''}`)}
+          onPress={() =>
+            navigate(`/kiosk/resources/${r.id}?deviceId=${deviceId}${autoLogoff ? `&autoLogoff=${autoLogoff}` : ''}`)
+          }
         />
       ))}
     </div>

@@ -48,7 +48,13 @@ describe('TypeOrmMeteringStore with two independent connections', () => {
   /** One API instance: its own connection, unit of work and store. */
   const connect = async (file: string, first = false) => {
     const source = await resolveDatabaseBackend()
-      .createDataSource({ type: 'sqlite', database: file, entities: schemas, synchronize: first })
+      .createDataSource({
+        type: 'better-sqlite3',
+        invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+        database: file,
+        entities: schemas,
+        synchronize: first,
+      })
       .initialize();
     sources.push(source);
     const unitOfWork = createSqliteUnitOfWork(source);

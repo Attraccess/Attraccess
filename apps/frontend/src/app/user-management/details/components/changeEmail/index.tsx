@@ -1,8 +1,4 @@
-import {
-  UseUsersServiceGetOneUserByIdKeyFn,
-  useUsersServiceChangeUserEmail,
-  useUsersServiceFindManyKey,
-} from '@attraccess/react-query-client';
+import { UseGetOneUserByIdKeyFn, useChangeUserEmail, useFindManyKey } from '@attraccess/react-query-client';
 import { cn, Input, Label, TextField, useOverlayState } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { HTMLAttributes, useCallback, useState } from 'react';
@@ -27,13 +23,13 @@ export function ChangeEmailForm({ userId, ...divProps }: Props & Omit<HTMLAttrib
   const { t } = useTranslations({ en, de });
   const { success: showSuccess, error: showError } = useToastMessage();
 
-  const { mutate, isPending } = useUsersServiceChangeUserEmail({
+  const { mutate, isPending } = useChangeUserEmail(undefined, {
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: UseUsersServiceGetOneUserByIdKeyFn({ id: userId }),
+        queryKey: UseGetOneUserByIdKeyFn({ path: { id: userId } }),
       });
       queryClient.invalidateQueries({
-        queryKey: [useUsersServiceFindManyKey],
+        queryKey: [useFindManyKey],
       });
       showSuccess({ title: t('messages.updated') });
       close();
@@ -62,8 +58,8 @@ export function ChangeEmailForm({ userId, ...divProps }: Props & Omit<HTMLAttrib
 
   const confirmEmailChange = useCallback(() => {
     mutate({
-      id: userId,
-      requestBody: {
+      path: { id: userId },
+      body: {
         email: trimmedEmail,
       },
     });

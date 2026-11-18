@@ -89,7 +89,11 @@ async function openDatabase(): Promise<TransferDatabase> {
       const storage = compilePluginStorage(plugin.id, TRANSFER_PLUGIN_STORAGE, {
         reservedTables: plugins.coreTableNames(),
       });
-      const engineOptions = { type: 'sqlite', database: file } as DataSourceOptions;
+      const engineOptions = {
+        type: 'better-sqlite3',
+        invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+        database: file,
+      } as DataSourceOptions;
       await createSqlitePluginMigrationEngine(engineOptions, () => engineOptions).migrate(storage);
       if (withData) {
         const contexts = createSqlitePluginPersistenceHost(() => source).createContexts(plugin.id, storage);

@@ -489,7 +489,7 @@ describe('desktop simulator against an isolated real API', () => {
     expect(socket().state.verifiedUserId).toBe(owner.id);
     const persistedReader = await db
       .getRepository(Attractap)
-      .findOneOrFail({ where: { id: reader.id }, relations: ['resources'] });
+      .findOneOrFail({ where: { id: reader.id }, relations: { resources: true } });
     expect(persistedReader.resources.map((item) => item.id)).toContain(usage.resourceId);
     await desktop().text('Sitzung beenden');
     await desktop().snapshot('project-session');

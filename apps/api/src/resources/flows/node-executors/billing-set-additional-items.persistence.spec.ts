@@ -66,7 +66,8 @@ describe('Additional billing items around finalization', () => {
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     directory = await mkdtemp(join(tmpdir(), 'attraccess-billing-items-'));
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: join(directory, 'test.sqlite'),
       entities: schemas,
       synchronize: true,

@@ -15,10 +15,10 @@ import en from './translations/edit/en.json';
 import de from './translations/edit/de.json';
 import { useState, useEffect } from 'react';
 import {
-  useMqttServiceMqttServersUpdateOne,
-  useMqttServiceMqttServersGetOneById,
+  useMqttServersUpdateOne,
+  useMqttServersGetOneById,
   CreateMqttServerDto,
-  useMqttServiceMqttServersGetAllKey,
+  useMqttServersGetAllKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -52,7 +52,7 @@ export function EditMqttServerPage() {
     data: server,
     isLoading: isLoadingServer,
     isError,
-  } = useMqttServiceMqttServersGetOneById({ id: Number(serverId) });
+  } = useMqttServersGetOneById({ path: { id: Number(serverId) } });
 
   useEffect(() => {
     if (server) {
@@ -76,14 +76,14 @@ export function EditMqttServerPage() {
     }
   }, [server]);
 
-  const updateMqttServer = useMqttServiceMqttServersUpdateOne({
+  const updateMqttServer = useMqttServersUpdateOne(undefined, {
     onSuccess: () => {
       success({
         title: t('serverUpdated'),
         description: t('serverUpdatedDesc'),
       });
       queryClient.invalidateQueries({
-        queryKey: [useMqttServiceMqttServersGetAllKey],
+        queryKey: [useMqttServersGetAllKey],
       });
       navigate('/devices/mqtt/servers');
     },
@@ -106,10 +106,7 @@ export function EditMqttServerPage() {
     // Omission keeps the saved secret; an explicit empty string clears it.
     if (clearPassword) requestBody.password = '';
     else if (password) requestBody.password = password;
-    updateMqttServer.mutate({
-      id: Number(serverId),
-      requestBody,
-    });
+    updateMqttServer.mutate({ path: { id: Number(serverId) }, body: requestBody });
   };
 
   const handleCancel = () => {

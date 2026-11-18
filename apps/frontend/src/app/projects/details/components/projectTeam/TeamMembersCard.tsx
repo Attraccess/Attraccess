@@ -2,10 +2,10 @@ import { useCallback, useMemo, useState } from 'react';
 import { Card, Chip, Skeleton } from '@heroui/react';
 import {
   ApiError,
-  ProjectsServiceRemoveProjectMemberMutationResult,
-  UseProjectsServiceListProjectMembersKeyFn,
-  useProjectsServiceListProjectMembers,
-  useProjectsServiceRemoveProjectMember,
+  RemoveProjectMemberMutationResult,
+  UseListProjectMembersKeyFn,
+  useListProjectMembers,
+  useRemoveProjectMember,
 } from '@attraccess/react-query-client';
 import { AttraccessUser, Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { UserMinus2Icon } from 'lucide-react';
@@ -32,7 +32,7 @@ export function TeamMembersCard(props: Readonly<TeamMembersCardProps>) {
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
   });
 
-  const { data, isLoading } = useProjectsServiceListProjectMembers({ id: projectId }, undefined, {
+  const { data, isLoading } = useListProjectMembers({ path: { id: projectId } }, undefined, {
     enabled: isOwner,
   });
 
@@ -40,14 +40,11 @@ export function TeamMembersCard(props: Readonly<TeamMembersCardProps>) {
 
   const invalidateMembers = useCallback(async () => {
     await queryClient.invalidateQueries({
-      queryKey: UseProjectsServiceListProjectMembersKeyFn({ id: projectId }),
+      queryKey: UseListProjectMembersKeyFn({ path: { id: projectId } }),
     });
   }, [projectId, queryClient]);
 
-  const { mutateAsync: removeMember } = useProjectsServiceRemoveProjectMember<
-    ProjectsServiceRemoveProjectMemberMutationResult,
-    ApiError
-  >({
+  const { mutateAsync: removeMember } = useRemoveProjectMember<RemoveProjectMemberMutationResult, ApiError>(undefined, {
     onSuccess: () => {
       toast.success({ title: t('success.remove') });
       invalidateMembers();
@@ -90,7 +87,7 @@ export function TeamMembersCard(props: Readonly<TeamMembersCardProps>) {
             isPending={removingMemberId === member.id}
             onPress={async () => {
               setRemovingMemberId(member.id);
-              await removeMember({ id: projectId, memberId: member.id });
+              await removeMember({ path: { id: projectId, memberId: member.id } });
             }}
           >
             <UserMinus2Icon className="size-4" />

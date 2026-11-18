@@ -2,10 +2,7 @@ import { ReactNode } from 'react';
 import { Button, Chip, cn, Link, Spinner } from '@heroui/react';
 import { CircleSlashIcon, Trash2Icon } from 'lucide-react';
 import { StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  useResourcesServiceGetOneResourceById,
-  useResourcesServiceResourceUsageGetActiveSession,
-} from '@attraccess/react-query-client';
+import { useGetOneResourceById, useResourceUsageGetActiveSession } from '@attraccess/react-query-client';
 import { useAuth } from '../../hooks/useAuth';
 import { StatusChip } from '../resourceOverview/resourceGroupCard/statusChip';
 import { ResourceUsageSession } from '../resources/usage/components/ResourceUsageSession';
@@ -221,8 +218,8 @@ export function PendingPinCard({ id, title, size, isEditing, onRemove }: Readonl
 function useResourcePin(pin: DashboardPin) {
   const { user } = useAuth();
   const resourceId = Number(pin.itemId);
-  const resourceQuery = useResourcesServiceGetOneResourceById({ id: resourceId });
-  const { data: activeSession } = useResourcesServiceResourceUsageGetActiveSession({ resourceId });
+  const resourceQuery = useGetOneResourceById({ path: { id: resourceId } });
+  const { data: activeSession } = useResourceUsageGetActiveSession({ path: { resourceId } });
   const sessions = activeSession?.usages ?? (activeSession?.usage ? [activeSession.usage] : []);
   return {
     resourceId,

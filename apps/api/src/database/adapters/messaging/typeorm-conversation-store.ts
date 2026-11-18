@@ -65,7 +65,7 @@ export class TypeOrmConversationStore implements ConversationStore {
   }
 
   async listParticipations(userId: number): Promise<ConversationParticipation[]> {
-    const rows = await this.participants.find({ where: { userId }, relations: ['conversation'] });
+    const rows = await this.participants.find({ where: { userId }, relations: { conversation: true } });
     return rows.map((row) => ({
       participantId: row.id,
       conversationId: row.conversationId,
@@ -135,14 +135,14 @@ export class TypeOrmConversationStore implements ConversationStore {
   async findLastMessage(conversationId: number): Promise<MessageRecord | null> {
     const row = await this.messages.findOne({
       where: { conversationId },
-      relations: ['sender'],
+      relations: { sender: true },
       order: { createdAt: 'DESC' },
     });
     return row ? toMessage(row) : null;
   }
 
   async findMessageWithSender(messageId: number): Promise<MessageRecord | null> {
-    const row = await this.messages.findOne({ where: { id: messageId }, relations: ['sender'] });
+    const row = await this.messages.findOne({ where: { id: messageId }, relations: { sender: true } });
     return row ? toMessage(row) : null;
   }
 
@@ -164,7 +164,7 @@ export class TypeOrmConversationStore implements ConversationStore {
   ): Promise<{ data: MessageRecord[]; total: number }> {
     const [rows, total] = await this.messages.findAndCount({
       where: { conversationId },
-      relations: ['sender'],
+      relations: { sender: true },
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,

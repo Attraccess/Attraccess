@@ -161,7 +161,7 @@ export class TypeOrmMeteringStore implements MeteringStore {
   async findBillableUsage(usageId: number, context?: TransactionContext): Promise<MeteringBillableUsage | null> {
     const row = await this.managers
       .resolve(context)
-      .findOne(ResourceUsage, { where: { id: usageId }, relations: ['user'] });
+      .findOne(ResourceUsage, { where: { id: usageId }, relations: { user: true } });
     return row ? { ...toUsage(row), userBillingFactor: row.user.billingFactor } : null;
   }
 

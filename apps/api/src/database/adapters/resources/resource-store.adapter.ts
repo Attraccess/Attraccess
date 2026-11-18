@@ -32,7 +32,7 @@ export class TypeOrmResourceStore implements ResourceStore {
   async findDetailed(ids: number[]): Promise<ResourceRecord[]> {
     const rows = await this.resources.find({
       where: { id: In(ids) },
-      relations: ['introductions', 'usages', 'groups'],
+      relations: { introductions: true, usages: true, groups: true },
     });
     return rows.map(toResourceRecord);
   }

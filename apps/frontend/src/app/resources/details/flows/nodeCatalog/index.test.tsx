@@ -42,8 +42,8 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@attraccess/react-query-client')>();
   return {
     ...actual,
-    useGlobalFlowsServiceGetGlobalFlowNodeSchemas: () => ({ data: undefined, isLoading: false, isError: false }),
-    useResourceFlowsServiceGetNodeSchemas: () => ({
+    useGetGlobalFlowNodeSchemas: () => ({ data: undefined, isLoading: false, isError: false }),
+    useGetNodeSchemas: () => ({
       isLoading: mockIsLoading,
       data: mockIsLoading
         ? undefined
@@ -114,7 +114,7 @@ describe('NodeCatalogPanel', () => {
     render(<NodeCatalogPanel owner={OWNER} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />, {
       wrapper: TestWrapper,
     });
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Loading nodes…' })).toBeInTheDocument();
     expect(screen.queryByText('Flow control')).toBeNull();
   });
 

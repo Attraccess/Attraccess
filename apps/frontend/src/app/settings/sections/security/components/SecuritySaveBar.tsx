@@ -6,14 +6,14 @@ import {
   PasswordPolicyDto,
   TwoFactorPolicy,
   UpdatePasswordPolicyDto,
-  UsePasswordPolicyAdminServiceGetAdminPasswordPolicyKeyFn,
-  UseSettingsServiceGetAuthRateLimitSettingsKeyFn,
-  UseTwoFactorAuthenticationServiceGetTwoFactorPolicyKeyFn,
-  UseUsersServiceGetLocalSignupDomainWhitelistKeyFn,
-  usePasswordPolicyAdminServiceUpdateAdminPasswordPolicy,
-  useSettingsServiceUpdateAuthRateLimitSettings,
-  useTwoFactorAuthenticationServiceSetTwoFactorPolicy,
-  useUsersServiceSetLocalSignupDomainWhitelist,
+  UseGetAdminPasswordPolicyKeyFn,
+  UseGetAuthRateLimitSettingsKeyFn,
+  UseGetTwoFactorPolicyKeyFn,
+  UseGetLocalSignupDomainWhitelistKeyFn,
+  useUpdateAdminPasswordPolicy,
+  useUpdateAuthRateLimitSettings,
+  useSetTwoFactorPolicy,
+  useSetLocalSignupDomainWhitelist,
 } from '@attraccess/react-query-client';
 import { SettingsSaveBar } from '../../../components/SettingsSaveBar';
 import { useToastMessage } from '../../../../../components/toastProvider';
@@ -70,12 +70,12 @@ export function SecuritySaveBar({ drafts, policy, rateLimit, twoFactorPolicy, sa
       )
     : [];
 
-  const { mutate: savePolicy, isPending: isSavingPolicy } = usePasswordPolicyAdminServiceUpdateAdminPasswordPolicy({
+  const { mutate: savePolicy, isPending: isSavingPolicy } = useUpdateAdminPasswordPolicy(undefined, {
     onSuccess(data) {
       // Prime from the response and release the pin in the same tick — invalidate-then-release
       // flashes the pre-save value for a frame, and holding the pin past the commit makes the field
       // ignore the server for the lifetime of the mount.
-      queryClient.setQueryData(UsePasswordPolicyAdminServiceGetAdminPasswordPolicyKeyFn(), data);
+      queryClient.setQueryData(UseGetAdminPasswordPolicyKeyFn(), data);
       setPolicyDraft({});
       setIsConfirmOpen(false);
       toast.success({ title: t('savedToast.title'), description: t('savedToast.description') });
@@ -85,9 +85,9 @@ export function SecuritySaveBar({ drafts, policy, rateLimit, twoFactorPolicy, sa
     },
   });
 
-  const { mutate: saveRateLimit, isPending: isSavingRateLimit } = useSettingsServiceUpdateAuthRateLimitSettings({
+  const { mutate: saveRateLimit, isPending: isSavingRateLimit } = useUpdateAuthRateLimitSettings(undefined, {
     onSuccess(data) {
-      queryClient.setQueryData(UseSettingsServiceGetAuthRateLimitSettingsKeyFn(), data);
+      queryClient.setQueryData(UseGetAuthRateLimitSettingsKeyFn(), data);
       setRateDraft({});
       toast.success({ title: t('rateLimit.saved.title'), description: t('rateLimit.saved.description') });
     },
@@ -96,9 +96,9 @@ export function SecuritySaveBar({ drafts, policy, rateLimit, twoFactorPolicy, sa
     },
   });
 
-  const { mutate: saveTwoFactor, isPending: isSavingTwoFactor } = useTwoFactorAuthenticationServiceSetTwoFactorPolicy({
+  const { mutate: saveTwoFactor, isPending: isSavingTwoFactor } = useSetTwoFactorPolicy(undefined, {
     onSuccess(data) {
-      queryClient.setQueryData(UseTwoFactorAuthenticationServiceGetTwoFactorPolicyKeyFn(), data);
+      queryClient.setQueryData(UseGetTwoFactorPolicyKeyFn(), data);
       drafts.setTwoFactorDraft(undefined);
       toast.success({ title: t('twoFactor.saved.title'), description: t('twoFactor.saved.description') });
     },
@@ -107,13 +107,13 @@ export function SecuritySaveBar({ drafts, policy, rateLimit, twoFactorPolicy, sa
     },
   });
 
-  const { mutate: saveDomains, isPending: isSavingDomains } = useUsersServiceSetLocalSignupDomainWhitelist({
+  const { mutate: saveDomains, isPending: isSavingDomains } = useSetLocalSignupDomainWhitelist(undefined, {
     onSuccess() {
       // This endpoint answers with no body, so there is nothing to prime the cache with. Releasing
       // the draft *before* the refetch would flash the old list, so the draft is held until the
       // refetch has landed — hence invalidate first, release after it settles.
       queryClient
-        .invalidateQueries({ queryKey: UseUsersServiceGetLocalSignupDomainWhitelistKeyFn() })
+        .invalidateQueries({ queryKey: UseGetLocalSignupDomainWhitelistKeyFn() })
         .finally(() => drafts.setDomainsDraft(undefined));
       toast.success({ title: t('domains.saved.title'), description: t('domains.saved.description') });
     },
@@ -134,14 +134,14 @@ export function SecuritySaveBar({ drafts, policy, rateLimit, twoFactorPolicy, sa
 
   const commit = () => {
     if (isTwoFactorDirty && twoFactorValue) {
-      saveTwoFactor({ requestBody: { policy: twoFactorValue } });
+      saveTwoFactor({ body: { policy: twoFactorValue } });
     }
     if (isDomainsDirty && domainsDraft) {
-      saveDomains({ requestBody: domainsDraft });
+      saveDomains({ body: domainsDraft });
     }
     if (isRateDirty && isRateSavable) {
       saveRateLimit({
-        requestBody: {
+        body: {
           maxAttempts: rateValue('maxAttempts'),
           windowSeconds: rateValue('windowSeconds'),
           lockoutDurationSeconds: rateValue('lockoutDurationSeconds'),
@@ -157,7 +157,7 @@ export function SecuritySaveBar({ drafts, policy, rateLimit, twoFactorPolicy, sa
       policyDiff.forEach(({ field }) => {
         (requestBody as Record<string, unknown>)[field] = policyDraft[field as keyof PasswordPolicyDto];
       });
-      savePolicy({ requestBody });
+      savePolicy({ body: requestBody });
     }
   };
 

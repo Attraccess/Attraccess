@@ -2,10 +2,7 @@ import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, useOverlayState 
 import de from './de.json';
 import en from './en.json';
 import { Button, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  UseAttractapServiceGetAllCardsKeyFn,
-  useAttractapServiceToggleCardActive,
-} from '@attraccess/react-query-client';
+import { UseGetAllCardsKeyFn, useToggleCardActive } from '@attraccess/react-query-client';
 import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -26,15 +23,15 @@ export function NfcCardActivateModal(props: Props) {
 
   const { open, isOpen, setOpen, close } = useOverlayState();
 
-  const { mutate, isPending } = useAttractapServiceToggleCardActive({
+  const { mutate, isPending } = useToggleCardActive(undefined, {
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: UseAttractapServiceGetAllCardsKeyFn({}, []) });
+      queryClient.invalidateQueries({ queryKey: UseGetAllCardsKeyFn({}, []) });
       close();
     },
   });
 
   const onActivate = useCallback(() => {
-    mutate({ id: props.cardId, requestBody: { active: true } });
+    mutate({ path: { id: props.cardId }, body: { active: true } });
   }, [mutate, props.cardId]);
 
   return (

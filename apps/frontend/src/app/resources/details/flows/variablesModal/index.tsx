@@ -22,10 +22,10 @@ import {
   ResourceFlowVariableScope,
   ApiError,
   FlowVariableDto,
-  UseFlowVariablesServiceListFlowVariablesKeyFn,
-  useFlowVariablesServiceDeleteFlowVariable,
-  useFlowVariablesServiceListFlowVariables,
-  useFlowVariablesServiceUpsertFlowVariable,
+  UseListFlowVariablesKeyFn,
+  useDeleteFlowVariable,
+  useListFlowVariables,
+  useUpsertFlowVariable,
 } from '@attraccess/react-query-client';
 import { VariableEditor, EditorMode, VariableFormValues, ValueType } from './editor';
 import { useCallback, useMemo, useState } from 'react';
@@ -78,17 +78,17 @@ export function VariablesModal(props: Props) {
     { open: false } | { open: true; mode: EditorMode; initial?: VariableFormValues }
   >({ open: false });
 
-  const { data: variables } = useFlowVariablesServiceListFlowVariables({ resourceId }, undefined, {
+  const { data: variables } = useListFlowVariables({ path: { resourceId } }, undefined, {
     enabled: isOpen,
   });
 
   const invalidate = useCallback(() => {
     queryClient.invalidateQueries({
-      queryKey: UseFlowVariablesServiceListFlowVariablesKeyFn({ resourceId }),
+      queryKey: UseListFlowVariablesKeyFn({ path: { resourceId } }),
     });
   }, [queryClient, resourceId]);
 
-  const upsert = useFlowVariablesServiceUpsertFlowVariable({
+  const upsert = useUpsertFlowVariable(undefined, {
     onSuccess: () => {
       invalidate();
       toast.success({ title: t('toast.saved.title') });
@@ -99,7 +99,7 @@ export function VariablesModal(props: Props) {
     },
   });
 
-  const remove = useFlowVariablesServiceDeleteFlowVariable({
+  const remove = useDeleteFlowVariable(undefined, {
     onSuccess: () => {
       invalidate();
       toast.success({ title: t('toast.deleted.title') });
@@ -144,10 +144,8 @@ export function VariablesModal(props: Props) {
   const handleSubmit = useCallback(
     (values: VariableFormValues) => {
       upsert.mutate({
-        resourceId,
-        scope: values.scope,
-        key: values.key,
-        requestBody: { value: values.value as never },
+        path: { resourceId, scope: values.scope, key: values.key },
+        body: { value: values.value as never },
       });
     },
     [upsert, resourceId],
@@ -155,7 +153,7 @@ export function VariablesModal(props: Props) {
 
   const handleDelete = useCallback(
     (row: FlowVariableDto) => {
-      remove.mutate({ resourceId, scope: row.scope, key: row.key });
+      remove.mutate({ path: { resourceId, scope: row.scope, key: row.key } });
     },
     [remove, resourceId],
   );

@@ -1,7 +1,7 @@
 import { Alert, AlertContent, AlertTitle, Card, Chip, Spinner } from '@heroui/react';
 import { DownloadIcon, MonitorIcon } from 'lucide-react';
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useCompanionServiceGetCompanionVersions } from '@attraccess/react-query-client';
+import { useGetCompanionVersions } from '@attraccess/react-query-client';
 import { getBaseUrl } from '../../../api/index';
 import en from './en.json';
 import de from './de.json';
@@ -18,7 +18,7 @@ const downloadUrl = (platform: string, arch: string) => `${getBaseUrl()}/api/com
 
 export function CompanionDownloadCard() {
   const { t } = useTranslations({ en, de });
-  const { data: manifest, isLoading: manifestLoading } = useCompanionServiceGetCompanionVersions();
+  const { data: manifest, isLoading: manifestLoading } = useGetCompanionVersions();
   return (
     <Card>
       <Card.Header className="flex flex-col items-start gap-1">

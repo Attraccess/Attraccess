@@ -62,7 +62,7 @@ export class SeedBillingTransactionSummaryTemplate1759800000100 implements Migra
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES ($1, $2, $3, $4)`,
+      `INSERT OR IGNORE INTO "email_templates" ("type", "subject", "body", "variables") VALUES (?, ?, ?, ?)`,
       [
         'resource-usage-billing-transaction-summary',
         'Your usage receipt for {{resource.name}}',

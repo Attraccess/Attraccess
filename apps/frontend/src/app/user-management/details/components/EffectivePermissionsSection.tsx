@@ -1,8 +1,4 @@
-import {
-  useRbacServiceListPermissions,
-  useRbacServiceListRoles,
-  useUsersServiceGetUserRoleAssignments,
-} from '@attraccess/react-query-client';
+import { useListPermissions, useListRoles, useGetUserRoleAssignments } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useMemo } from 'react';
 import { PermissionChipGroups } from '../../../../components/permissionList';
@@ -15,9 +11,9 @@ interface EffectivePermissionsSectionProps {
 
 export function EffectivePermissionsSection({ userId }: EffectivePermissionsSectionProps) {
   const { t } = useTranslations({ en, de });
-  const { data: allRoles, isLoading: isLoadingRoles } = useRbacServiceListRoles();
-  const { data: allPermissions, isLoading: isLoadingPerms } = useRbacServiceListPermissions();
-  const { data: userRoles, isLoading: isLoadingUserRoles } = useUsersServiceGetUserRoleAssignments({ id: userId });
+  const { data: allRoles, isLoading: isLoadingRoles } = useListRoles();
+  const { data: allPermissions, isLoading: isLoadingPerms } = useListPermissions();
+  const { data: userRoles, isLoading: isLoadingUserRoles } = useGetUserRoleAssignments({ path: { id: userId } });
 
   const effectivePermKeys = useMemo(() => {
     if (!allRoles || !userRoles) return new Set<string>();

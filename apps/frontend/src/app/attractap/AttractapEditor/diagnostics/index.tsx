@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useAttractapServiceGetReaderCrashReports } from '@attraccess/react-query-client';
+import { useGetReaderCrashReports } from '@attraccess/react-query-client';
 import { Spinner } from '@heroui/react';
 import de from '../AttractapDiagnostics.de.json';
 import en from '../AttractapDiagnostics.en.json';
@@ -18,7 +18,7 @@ export function AttractapDiagnostics(props: Readonly<Props>) {
     data: reports,
     isLoading,
     isError,
-  } = useAttractapServiceGetReaderCrashReports({ readerId: props.readerId as number }, undefined, {
+  } = useGetReaderCrashReports({ path: { readerId: props.readerId as number } }, undefined, {
     enabled: props.readerId !== undefined,
     refetchInterval: (query) => (hasPendingCoredump(query.state.data) ? PENDING_COREDUMP_POLL_INTERVAL_MS : false),
   });

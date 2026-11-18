@@ -1,9 +1,9 @@
 import {
   EmailTemplateType,
-  useEmailTemplatesServiceEmailTemplateControllerFindOne as useFindOneEmailTemplate,
-  useEmailTemplatesServiceEmailTemplateControllerUpdate as useUpdateEmailTemplate,
-  useEmailTemplatesServiceEmailTemplateControllerResetToDefault as useResetTemplateToDefault,
-  useEmailLayoutServiceEmailLayoutControllerFindGlobal as useFindGlobalEmailLayout,
+  useEmailTemplateControllerFindOne as useFindOneEmailTemplate,
+  useEmailTemplateControllerUpdate as useUpdateEmailTemplate,
+  useEmailTemplateControllerResetToDefault as useResetTemplateToDefault,
+  useEmailLayoutControllerFindGlobal as useFindGlobalEmailLayout,
 } from '@attraccess/react-query-client';
 import {
   DrawerBody,
@@ -38,7 +38,7 @@ export function EditEmailTemplatePage() {
   const { type: templateType } = useParams<{ type: EmailTemplateType }>();
   const toast = useToastMessage();
 
-  const template = useFindOneEmailTemplate({ type: templateType as EmailTemplateType }, undefined, {
+  const template = useFindOneEmailTemplate({ path: { type: templateType as EmailTemplateType } }, undefined, {
     enabled: !!templateType,
   });
   const layout = useFindGlobalEmailLayout();
@@ -93,7 +93,7 @@ export function EditEmailTemplatePage() {
       return;
     }
     updateTemplate.mutate(
-      { type: templateType, requestBody: { subject, body } },
+      { path: { type: templateType }, body: { subject, body } },
       {
         onSuccess: () => toast.success({ title: t('toast.saveSuccess') }),
         onError: (error) => {
@@ -110,7 +110,7 @@ export function EditEmailTemplatePage() {
   const onResetConfirm = useCallback(() => {
     if (!templateType) return;
     resetTemplate.mutate(
-      { type: templateType },
+      { path: { type: templateType } },
       {
         onSuccess: (data) => {
           setSubject(data.subject);

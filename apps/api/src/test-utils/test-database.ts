@@ -7,7 +7,7 @@ import { resolveDatabaseBackend } from '../database/backend';
 /**
  * The one place tests open a real database. It goes through the DatabaseBackend seam selected by DATABASE_TYPE, so a
  * spec runs on whichever backend the suite is pointed at and the connection rules (busy handling, flow ownership,
- * pragmas) are the application's own. Specs must not hand-build `new DataSource({ type: 'sqlite', ... })`.
+ * pragmas) are the application's own. Specs must not hand-build `new DataSource({ type: 'better-sqlite3', ... })`.
  */
 export interface TestDatabaseOptions {
   /** Where the database lives: a file path, or the backend's in-memory location. Defaults to a private in-memory one. */

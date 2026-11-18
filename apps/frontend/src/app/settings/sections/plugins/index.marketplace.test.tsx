@@ -193,7 +193,7 @@ describe('PluginsSection marketplace', () => {
     const callsBeforeRemoval = hoisted.apiMock.mock.calls.length;
     await user.click(await screen.findByRole('button', { name: 'Remove' }));
 
-    expect(hoisted.removeRegistryMock).toHaveBeenCalledWith({ registryId: 'private' });
+    expect(hoisted.removeRegistryMock).toHaveBeenCalledWith({ path: { registryId: 'private' } });
     await waitFor(() => expect(screen.queryByText(/Private · .* · No token/)).not.toBeInTheDocument());
     expect(screen.queryByRole('option', { name: 'Private' })).not.toBeInTheDocument();
     const laterPaths = hoisted.apiMock.mock.calls.slice(callsBeforeRemoval).map(([path]) => path);

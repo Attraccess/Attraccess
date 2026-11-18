@@ -180,8 +180,7 @@ export function SAMLConfigForm({ form }: SAMLConfigFormProps) {
             data-cy="sso-provider-form-saml-sp-private-key-input"
           />
           <p className="text-xs text-default-500">
-            {(providerDetails?.samlConfiguration?.spSigningKeyEncryptionKeyId ??
-            providerDetails?.samlConfiguration?.spSigningKeyEncrypted)
+            {providerDetails?.samlConfiguration?.spSigningKeyEncryptionKeyId
               ? t('spSigningPrivateKeyHintExisting')
               : t('spSigningPrivateKeyHint')}
           </p>

@@ -18,7 +18,8 @@ describe('reader UI persistence adapters on a real database', () => {
 
   beforeEach(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: ':memory:',
       entities: Object.values(entities),
       migrations: Object.values(migrations),

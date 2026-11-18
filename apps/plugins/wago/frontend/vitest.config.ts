@@ -24,6 +24,7 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    setupFiles: [fileURLToPath(new URL('../../scripts/css-escape.test-setup.ts', import.meta.url))],
     include: ['apps/plugins/wago/frontend/src/**/*.test.tsx'],
   },
 });

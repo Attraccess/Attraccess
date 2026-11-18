@@ -1,5 +1,5 @@
 import { Label, ListBox, Select } from '@heroui/react';
-import { useResourceMeteringServiceListResourceMeters } from '@attraccess/react-query-client';
+import { useListResourceMeters } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../../hooks/useAuth';
 import { MeterNameEditor } from './MeterNameEditor';
@@ -17,7 +17,7 @@ export function MeterSelector({
 }) {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
-  const { data: meters = [], isError } = useResourceMeteringServiceListResourceMeters({ resourceId });
+  const { data: meters = [], isError } = useListResourceMeters({ path: { resourceId } });
   return (
     <div className="flex flex-col gap-2">
       <Select

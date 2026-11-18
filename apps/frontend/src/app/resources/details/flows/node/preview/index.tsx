@@ -1,10 +1,6 @@
 import { FLOW_NODE_PREVIEW_QUERY_KEY } from '@attraccess/plugins-frontend-sdk';
 import { TFunction, useTranslationState } from '@attraccess/plugins-frontend-ui';
-import {
-  ResourceFlowNodeType,
-  useResourceMeteringServiceListResourceMeters,
-  ResourceFlowNodeSchemaDto,
-} from '@attraccess/react-query-client';
+import { ResourceFlowNodeType, useListResourceMeters, ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 import { useNodeId, useNodesData } from '@xyflow/react';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -48,7 +44,7 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
   const nodeId = useNodeId();
   const nodeData = useNodesData(nodeId as string);
   const isMeterNode = schema.type.includes('.resource.metering.');
-  const { data: meters } = useResourceMeteringServiceListResourceMeters({ resourceId: resourceId ?? 0 }, undefined, {
+  const { data: meters } = useListResourceMeters({ path: { resourceId: resourceId ?? 0 } }, undefined, {
     enabled: isMeterNode && !!resourceId,
   });
   const resolvePreview = Boolean(

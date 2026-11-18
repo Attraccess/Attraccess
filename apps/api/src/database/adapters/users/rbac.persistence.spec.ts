@@ -29,7 +29,8 @@ describe('RBAC persistence adapter on a real SQLite file', () => {
 
   const open = async (synchronize: boolean): Promise<Stack> => {
     const source = await createDataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: file,
       entities: Object.values(entities),
       synchronize,

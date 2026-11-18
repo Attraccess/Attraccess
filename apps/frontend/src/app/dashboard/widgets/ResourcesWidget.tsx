@@ -4,7 +4,7 @@ import { Button, Link } from '@heroui/react';
 import { PlusIcon } from 'lucide-react';
 import type { DashboardWidgetRenderProps } from '@attraccess/plugins-frontend-sdk';
 import { useDebounce, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useResourcesServiceGetAllResources } from '@attraccess/react-query-client';
+import { useGetAllResources } from '@attraccess/react-query-client';
 import { useAuth } from '../../../hooks/useAuth';
 import { CreateResourceDrawer } from '../../resourceOverview/createResourceDrawer';
 import { StatusChip } from '../../resourceOverview/resourceGroupCard/statusChip';
@@ -16,7 +16,7 @@ const RESULTS_PER_SIZE = { medium: 3, large: 7 };
 
 function Results({ term, limit }: Readonly<{ term: string; limit: number }>) {
   const { t } = useTranslations({ en, de });
-  const { data, isPending, isError } = useResourcesServiceGetAllResources({ search: term, limit });
+  const { data, isPending, isError } = useGetAllResources({ query: { search: term, limit } });
 
   if (isPending) return <WidgetLoading />;
   if (isError || !data) return <WidgetError title={t('loadError')} />;

@@ -21,7 +21,8 @@ import { TypeOrmFlowResourceDirectory } from './typeorm-flow-resource-directory'
 export async function openFlowCanvasDatabase() {
   const directory = await mkdtemp(join(tmpdir(), 'attraccess-flow-canvas-'));
   const source = await new DataSource({
-    type: 'sqlite',
+    type: 'better-sqlite3',
+    invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
     database: join(directory, 'flows.sqlite'),
     entities: Object.values(entities),
     synchronize: true,

@@ -52,7 +52,8 @@ describe('TypeOrmResourceStore on real SQLite', () => {
 
   beforeEach(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: ':memory:',
       synchronize: true,
       entities: Object.values(entities),
@@ -138,7 +139,7 @@ describe('TypeOrmResourceStore on real SQLite', () => {
       ];
       const sawEntity = await source
         .getRepository(Resource)
-        .findOneOrFail({ where: { id: saw.id }, relations: ['groups'] });
+        .findOneOrFail({ where: { id: saw.id }, relations: { groups: true } });
       sawEntity.groups = [wood];
       await source.getRepository(Resource).save(sawEntity);
       expect([laser.id, printer.id]).toHaveLength(2);

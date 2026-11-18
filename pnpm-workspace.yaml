@@ -20,23 +20,45 @@ overrides:
   '@internationalized/date': 3.12.4
   react: 19.3.1
   react-dom: 19.3.1
+  # nestjs-asyncapi only renders HTML docs in setup(), which we never call (its patch loads the generator lazily);
+  # dropping the generator removes simple-git, jsonpath-plus, tar 6, pacote, markdown-it, puppeteer and extract-zip.
+  'nestjs-asyncapi>@asyncapi/generator': '-'
+  'nestjs-asyncapi>@asyncapi/html-template': '-'
+  # crap-score 1.2.1 (latest) is a nest-commander app pinned to Nest 10; it never imports @nestjs/cli.
+  'crap-score>@nestjs/cli': '-'
+  'crap-score>@nestjs/common': ^12.5.1
+  'crap-score>@nestjs/core': ^12.5.1
+  'crap-score>nest-commander': ^3.21.0
+  # monaco-editor 0.57.0 (latest) pins dompurify 3.4.15.
+  'monaco-editor>dompurify': ^3.4.17
+  # @tailwindcss/typography 0.5.20 (latest) pins postcss-selector-parser 6.0.10.
+  '@tailwindcss/typography>postcss-selector-parser': ^6.1.5
+  # sockjs 0.3.24 (latest, via webpack-dev-server 5) asks for uuid ^8; it only calls uuid.v4().
+  'sockjs>uuid': ^11.1.1
+  # @cyclonedx/cdxgen 12.9.2 (latest) pins body-parser 2.3.0 for its optional server mode.
+  '@cyclonedx/cdxgen>body-parser': ^2.4.0
+  # glob 9-14.0.1 has an advisory; js-beautify, test-exclude, mjml-cli, workbox-build and cdxgen (all latest)
+  # still ask for older majors. glob kept the same CJS/ESM exports up to 14.
+  'glob@>=9.0.0 <14.0.2': ^14.0.2
+  # minimatch 11 (the only fixed release) dropped makeRe/AST, which nx, eslint and @angular-devkit still call: one
+  # patched 10.x instead (see patchedDependencies and auditConfig).
+  'minimatch@>=7.0.0 <11.0.1': 10.2.6
+  # @hey-api/json-schema-ref-parser 1.4.4 (latest, via codegen 3) pins js-yaml 4.2.0.
+  '@hey-api/json-schema-ref-parser>js-yaml': ^4.3.2
+  # One picomatch 4 to patch (see patchedDependencies); @angular-devkit/core pins 4.0.4.
+  '@angular-devkit/core>picomatch': 4.0.7
 
 allowBuilds:
   '@balena/compose-parser': true
   '@nestjs/core': true
   '@swc/core': true
   bcrypt: true
+  better-sqlite3: true
   esbuild: true
   electron: true
   nx: true
   sharp: true
-  sqlite3: true
-  typeorm: true
   # Their install scripts are optional (prebuilt binaries, telemetry, download helpers) and stay disabled.
-  '@hyperjump/json-pointer': false
-  '@hyperjump/json-schema-core': false
-  '@hyperjump/json-schema': false
-  '@hyperjump/pact': false
   '@parcel/watcher': false
   '@scarf/scarf': false
   core-js: false
@@ -48,7 +70,6 @@ allowBuilds:
   lmdb: false
   msgpackr-extract: false
   protobufjs: false
-  puppeteer: false
   ssh2: false
   unrs-resolver: false
 
@@ -57,9 +78,29 @@ patchedDependencies:
   # @nestjs/swagger@12.1.2: exports the dist/* internals that nestjs-asyncapi 2 deep-imports.
   # @peculiar/x509@3.1.0: registers in its own tsyringe child container; @simplewebauthn/server brings x509 2,
   #   and two majors in tsyringe's global container break certificate generation (ATT-1312).
+  # nestjs-asyncapi@2.0.1: requires @asyncapi/generator only when rendering HTML, so the override above can drop it.
+  # @7nohe/openapi-react-query-codegen@3.2.1: mutation hooks resolve to the response body like its query hooks do,
+  #   instead of { data, request, response } behind an `as unknown as Promise<TData>` cast.
+  # minimatch@10.2.6: backports the GHSA-g3hv-75wg-m249 fix (isaacs/minimatch@77a0f5c); its only fixed release is
+  #   minimatch 11, which nx/eslint cannot use. scripts/minimatch-patch.test.mjs checks every locked 7-10 copy is patched.
+  # picomatch@4.0.7 / picomatch@2.3.2: backport the GHSA-fc5q-39xc-vjpf ReDoS fix (micromatch/picomatch#237 for v4,
+  #   #246 for v2) until picomatch releases it; scripts/picomatch-patch.test.mjs checks every locked copy is patched.
   ts-api-utils@2.5.0: patches/ts-api-utils@2.5.0.patch
   typescript@7.0.2: patches/typescript@7.0.2.patch
   '@swc-node/register@1.12.1': patches/@swc-node__register@1.12.1.patch
   crap-score@1.2.1: patches/crap-score@1.2.1.patch
   '@nestjs/swagger@12.1.2': patches/@nestjs__swagger@12.1.2.patch
   '@peculiar/x509@3.1.0': patches/@peculiar__x509@3.1.0.patch
+  nestjs-asyncapi@2.0.1: patches/nestjs-asyncapi@2.0.1.patch
+  picomatch@4.0.7: patches/picomatch@4.0.7.patch
+  picomatch@2.3.2: patches/picomatch@2.3.2.patch
+  '@7nohe/openapi-react-query-codegen@3.2.1': patches/@7nohe__openapi-react-query-codegen@3.2.1.patch
+  minimatch@10.2.6: patches/minimatch@10.2.6.patch
+
+auditConfig:
+  ignoreGhsas:
+    # picomatch <=4.0.7 extglob ReDoS: no release yet; patched; remove when picomatch ships a fix.
+    - GHSA-fc5q-39xc-vjpf
+    # minimatch <11.0.1 globparts amplification: fixed only in minimatch 11, which removed makeRe/AST that nx, eslint
+    # and @angular-devkit still call; 10.2.6 patched; remove when they support minimatch 11.
+    - GHSA-g3hv-75wg-m249

@@ -1,5 +1,5 @@
 import { EmptyState } from '@attraccess/plugins-frontend-ui';
-import { usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
+import { useGetPlugins } from '@attraccess/react-query-client';
 import { Table, TableBody, TableColumn, TableContent, TableHeader, TableScrollContainer } from '@heroui/react';
 import type { FailedPlugin, MarketplaceDetailRequest, VersionPlugin } from '../types';
 import { usePluginsTranslations } from '../usePluginsTranslations';
@@ -15,7 +15,7 @@ interface Props {
 
 export function PluginsTable({ onShowError, onShowDetails, onManageVersion, onDelete }: Props) {
   const { t } = usePluginsTranslations();
-  const { data: plugins } = usePluginsServiceGetPlugins();
+  const { data: plugins } = useGetPlugins();
   const { installedByDirectory } = useInstalledNpmPlugins();
 
   return (

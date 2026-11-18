@@ -15,6 +15,7 @@ import type { RbacStore } from '../../../users-and-auth/rbac/rbac.port';
 import { isUniqueViolation } from '../../persistence-errors';
 import type { TransactionContext } from '../../transaction-context';
 import { TransactionContextResolver } from '../transaction-context';
+import { findRelations } from '../find-options';
 
 const toRolePermission = (rp: RolePermission) => ({
   id: rp.id,
@@ -117,7 +118,7 @@ export class TypeOrmRbacStore implements RbacStore {
   }
 
   async findUserRoles(userId: number): Promise<UserRoleRecord[]> {
-    const rows = await this.source.getRepository(UserRole).find({ where: { userId }, relations: ['role'] });
+    const rows = await this.source.getRepository(UserRole).find({ where: { userId }, relations: { role: true } });
     return rows.map(toUserRoleRecord);
   }
 
@@ -134,7 +135,7 @@ export class TypeOrmRbacStore implements RbacStore {
       .getRepository(Role)
       .findOne({
         where: { key },
-        relations: options.withPermissions ? ['rolePermissions'] : [],
+        relations: findRelations(options.withPermissions ? ['rolePermissions'] : []),
       });
     return role ? toRoleRecord(role) : null;
   }
@@ -144,7 +145,7 @@ export class TypeOrmRbacStore implements RbacStore {
       .getRepository(Role)
       .findOne({
         where: { id: roleId },
-        relations: ['rolePermissions'],
+        relations: { rolePermissions: true },
       });
     return role ? toRoleRecord(role) : null;
   }
@@ -243,7 +244,7 @@ export class TypeOrmRbacStore implements RbacStore {
 
     const currentSsoRoles = await userRoleRepository.find({
       where: { userId, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId },
-      relations: ['role'],
+      relations: { role: true },
     });
     const removed: string[] = [];
     const added: string[] = [];
@@ -305,13 +306,13 @@ export class TypeOrmRbacStore implements RbacStore {
   }
 
   async listRoles(): Promise<RoleRecord[]> {
-    const roles = await this.source.getRepository(Role).find({ relations: ['rolePermissions'] });
+    const roles = await this.source.getRepository(Role).find({ relations: { rolePermissions: true } });
     return roles.map(toRoleRecord);
   }
 
   async listRolesWithUserCounts(): Promise<RoleWithUserCount[]> {
     const roles = await this.source.getRepository(Role).find({
-      relations: ['rolePermissions'],
+      relations: { rolePermissions: true },
       order: { isSystemManaged: 'DESC', name: 'ASC' },
     });
     const counts = await this.source
@@ -360,7 +361,7 @@ export class TypeOrmRbacStore implements RbacStore {
         const grants = manager.getRepository(RolePermission);
         await grants.save(permissionKeys.map((permissionKey) => grants.create({ roleId: saved.id, permissionKey })));
       }
-      return toRoleRecord(await roles.findOneOrFail({ where: { id: saved.id }, relations: ['rolePermissions'] }));
+      return toRoleRecord(await roles.findOneOrFail({ where: { id: saved.id }, relations: { rolePermissions: true } }));
     });
   }
 

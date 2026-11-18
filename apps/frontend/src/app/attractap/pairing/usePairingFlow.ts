@@ -1,18 +1,18 @@
 import {
   Attractap,
   PairingDto,
-  useAttractapServiceApprovePairing,
-  useAttractapServiceCancelPairing,
-  useAttractapServiceGetPairing,
-  useAttractapServiceGetPairings,
-  useAttractapServiceGetPairingsKey,
-  useAttractapServiceGetReaderByIdKey,
-  useAttractapServiceGetReaderCredentialHistoryKey,
-  useAttractapServiceGetReaders,
-  useAttractapServiceGetReadersToPair,
-  useAttractapServiceGetReadersToPairKey,
-  useAttractapServiceGetReadersKey,
-  useAttractapServiceResolvePairing,
+  useApprovePairing,
+  useCancelPairing,
+  useGetPairing,
+  useGetPairings,
+  useGetPairingsKey,
+  useGetReaderByIdKey,
+  useGetReaderCredentialHistoryKey,
+  useGetReaders,
+  useGetReadersToPair,
+  useGetReadersToPairKey,
+  useGetReadersKey,
+  useResolvePairing,
 } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';
@@ -111,12 +111,12 @@ function useArrivedPairing(props: PairingFlowProps, running: PairingDto[]) {
 
 /** Finds the request the dialog works on: given, announced by a token reader, picked, or found by code. */
 function useActivePairing(props: PairingFlowProps, resolved: PairingDto | null, pickedId: string | null) {
-  const { data: allPairings } = useAttractapServiceGetPairings(undefined, { refetchInterval: POLL_INTERVAL_MS });
+  const { data: allPairings } = useGetPairings({}, undefined, { refetchInterval: POLL_INTERVAL_MS });
   const running = useMemo(() => (allPairings ?? []).filter((p) => isPairingRunning(p.state)), [allPairings]);
   const { arrivedId, noResponse } = useArrivedPairing(props, running);
 
   const activeId = props.pairingId ?? arrivedId ?? pickedId ?? resolved?.id ?? null;
-  const query = useAttractapServiceGetPairing({ pairingId: activeId ?? '' }, undefined, {
+  const query = useGetPairing({ path: { pairingId: activeId ?? '' } }, undefined, {
     enabled: activeId !== null,
     // Nothing changes any more once the pairing ended.
     refetchInterval: (q) => (isFinished(q.state.data ?? null) ? false : POLL_INTERVAL_MS),
@@ -184,9 +184,10 @@ function useCancelAndClose(
   onClose: () => void,
   refresh: () => unknown,
 ) {
-  const cancelPairing = useAttractapServiceCancelPairing({ onSettled: () => void refresh() });
+  const cancelPairing = useCancelPairing(undefined, { onSettled: () => void refresh() });
   return () => {
-    if (current && isPairingRunning(current.state) && !approving()) cancelPairing.mutate({ pairingId: current.id });
+    if (current && isPairingRunning(current.state) && !approving())
+      cancelPairing.mutate({ path: { pairingId: current.id } });
     onClose();
   };
 }
@@ -262,18 +263,18 @@ export function usePairingFlow(props: PairingFlowProps): PairingFlow {
   const active = useActivePairing(props, resolved, pickedId);
   const { current, resolvedByCode, refetch } = active;
   // The pairing session sees every reader record: paired ones and the ones that are not paired yet.
-  const { data: pairedReaders } = useAttractapServiceGetReaders();
-  const { data: unpairedReaders } = useAttractapServiceGetReadersToPair();
+  const { data: pairedReaders } = useGetReaders();
+  const { data: unpairedReaders } = useGetReadersToPair();
   const readers = useMemo(() => mergeReaderLists(pairedReaders, unpairedReaders), [pairedReaders, unpairedReaders]);
 
   const refreshLists = () =>
     Promise.all(
       [
-        useAttractapServiceGetReadersKey,
-        useAttractapServiceGetReadersToPairKey,
-        useAttractapServiceGetReaderByIdKey,
-        useAttractapServiceGetReaderCredentialHistoryKey,
-        useAttractapServiceGetPairingsKey,
+        useGetReadersKey,
+        useGetReadersToPairKey,
+        useGetReaderByIdKey,
+        useGetReaderCredentialHistoryKey,
+        useGetPairingsKey,
       ].map((key) => queryClient.invalidateQueries({ queryKey: [key] })),
     );
 
@@ -287,7 +288,7 @@ export function usePairingFlow(props: PairingFlowProps): PairingFlow {
   // on mount, and StrictMode's simulated unmount detaches the mutation observer, which then reports
   // "pending" forever and kept Approve disabled. The mutation's own callbacks always run.
   const [resolving, setResolving] = useState(false);
-  const resolve = useAttractapServiceResolvePairing({
+  const resolve = useResolvePairing(undefined, {
     onMutate: () => setResolving(true),
     onSettled: () => setResolving(false),
     onSuccess: (found) => {
@@ -298,7 +299,7 @@ export function usePairingFlow(props: PairingFlowProps): PairingFlow {
     onError: (failure) => failed(classifyPairingError(failure, true)),
   });
 
-  const approve = useAttractapServiceApprovePairing({
+  const approve = useApprovePairing(undefined, {
     onSuccess: async (done) => {
       await refreshLists();
       submitting.current = false;
@@ -338,7 +339,7 @@ export function usePairingFlow(props: PairingFlowProps): PairingFlow {
     if (!canFind || submitting.current) return;
     submitting.current = true;
     setError(null);
-    resolve.mutate({ requestBody: { code: normalizedCode } });
+    resolve.mutate({ body: { code: normalizedCode } });
   };
 
   // `?enroll=CODE` and the web flasher arrive with the code: look the reader up right away.
@@ -348,7 +349,7 @@ export function usePairingFlow(props: PairingFlowProps): PairingFlow {
   useEffect(() => {
     if (autoResolved.current || !presetCode || pairingId || !normalizedCode) return;
     autoResolved.current = true;
-    resolveMutate({ requestBody: { code: normalizedCode } });
+    resolveMutate({ body: { code: normalizedCode } });
   }, [presetCode, pairingId, normalizedCode, resolveMutate]);
 
   const hasProof = byPattern ? current?.round != null && current.pattern != null : normalizedCode !== null;
@@ -363,7 +364,7 @@ export function usePairingFlow(props: PairingFlowProps): PairingFlow {
     const base = approvalBase({ mode, targetReaderId, name, via: props.via });
     if (!byPattern) {
       sentCode.current = normalizedCode;
-      approve.mutate({ pairingId: current.id, requestBody: { ...base, code: normalizedCode ?? undefined } });
+      approve.mutate({ path: { pairingId: current.id }, body: { ...base, code: normalizedCode ?? undefined } });
       return;
     }
     // Read again right before approving: a pattern that rotated while the admin was comparing must be
@@ -374,7 +375,7 @@ export function usePairingFlow(props: PairingFlowProps): PairingFlow {
       setNotice(t('dialog.patternChanged'));
       return;
     }
-    approve.mutate({ pairingId: current.id, requestBody: { ...base, round: fresh.round } });
+    approve.mutate({ path: { pairingId: current.id }, body: { ...base, round: fresh.round } });
   };
 
   // The round on screen, so it always matches what the admin can see.

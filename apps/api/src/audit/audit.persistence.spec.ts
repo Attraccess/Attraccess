@@ -24,7 +24,7 @@ import { AuditQueryService } from './audit-query.service';
 import { PluginAuditHost } from './plugin-audit-host';
 import { MAX_PENDING_AUDIT_WRITES } from './persistence/audit-storage';
 import { AUDIT_BUSY_RETRIES } from '../database/adapters/audit/sqlite-audit-store';
-import { SQLITE_BUSY_TIMEOUT_MS } from '../database/sqlite/sqlite-connection';
+import { createDataSource, SQLITE_BUSY_TIMEOUT_MS } from '../database/sqlite/sqlite-connection';
 import { AUDIT_DROP_REASONS } from '../metrics/definitions/audit.metrics';
 import {
   createTestAuditMetrics,
@@ -47,7 +47,10 @@ describe('durable audit SQLite', () => {
     await fixture.source.query(
       'CREATE TABLE IF NOT EXISTS setting (id integer PRIMARY KEY AUTOINCREMENT, parent varchar NOT NULL, key varchar NOT NULL, value varchar NOT NULL, createdAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP)',
     );
-    fixture.store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(fixture.source.getRepository(Setting)), null);
+    fixture.store = new SettingsStoreService(
+      TypeOrmSettingsRows.forRepository(fixture.source.getRepository(Setting)),
+      null,
+    );
     fixture.service = createSqliteAuditService(fixture.source, fixture.store, fixture.metrics);
     await fixture.service.onModuleInit();
     expect((await fixture.query.list(new AuditQueryDto())).items).toEqual([
@@ -456,7 +459,10 @@ describe('durable audit SQLite', () => {
     await expect(settings.updateAuditSettings({ secret: 'never' } as never)).rejects.toThrow();
     await settings.updateAuditSettings({ enabled: false, domains: [], retention_days: 2 });
     await fixture.service.onModuleDestroy();
-    fixture.store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(fixture.source.getRepository(Setting)), null);
+    fixture.store = new SettingsStoreService(
+      TypeOrmSettingsRows.forRepository(fixture.source.getRepository(Setting)),
+      null,
+    );
     expect(await readAuditSettings(fixture.store)).toEqual({
       enabled: false,
       domains: [],
@@ -541,7 +547,12 @@ describe('durable audit SQLite', () => {
 
   it('waits for a held SQLite write lock instead of dropping the write', async () => {
     expect(SQLITE_BUSY_TIMEOUT_MS).toBe(5000);
-    const lock = await new DataSource({ type: 'sqlite', database: fixture.source.options.database }).initialize();
+    // Guarded like the API's connections: an unguarded better-sqlite3 lock holder would make the audit write
+    // busy-wait on the event loop, so the ROLLBACK below could never run.
+    const lock = await createDataSource({
+      type: 'better-sqlite3',
+      database: fixture.source.options.database as string,
+    }).initialize();
     try {
       await lock.query('BEGIN IMMEDIATE');
       const receipts = Promise.all(Array.from({ length: 8 }, () => fixture.plugins.record(fixture.event())));
@@ -557,7 +568,11 @@ describe('durable audit SQLite', () => {
 
   it('logs and counts storage_unavailable when the audit connection cannot exist', async () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
-    const memory = new DataSource({ type: 'sqlite', database: ':memory:' });
+    const memory = new DataSource({
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database: ':memory:',
+    });
     const metrics = createTestAuditMetrics();
     const sink = createSqliteAuditService(memory, fixture.store, metrics);
     await sink.onModuleInit();
@@ -638,7 +653,12 @@ describe('durable audit SQLite', () => {
   });
 
   it('drops writes still queued when the shutdown drain runs out of time', async () => {
-    const lock = await new DataSource({ type: 'sqlite', database: fixture.source.options.database }).initialize();
+    // Guarded like the API's connections: an unguarded better-sqlite3 lock holder would make the audit write
+    // busy-wait on the event loop, so the ROLLBACK below could never run.
+    const lock = await createDataSource({
+      type: 'better-sqlite3',
+      database: fixture.source.options.database as string,
+    }).initialize();
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     try {
       await lock.query('BEGIN IMMEDIATE');
@@ -664,7 +684,11 @@ describe('durable audit SQLite', () => {
   it('creates zero series for registered plugin domains at startup', async () => {
     const metrics = createTestAuditMetrics();
     const sink = createSqliteAuditService(
-      new DataSource({ type: 'sqlite', database: ':memory:' }),
+      new DataSource({
+        type: 'better-sqlite3',
+        invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+        database: ':memory:',
+      }),
       fixture.store,
       metrics,
     );
@@ -692,7 +716,13 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       migration !== migrations.FullAuditDomains1784100000000,
   );
   const database = join(directory, 'upgrade.sqlite');
-  let source = new DataSource({ type: 'sqlite', database, entities: Object.values(entities), migrations: prior });
+  let source = new DataSource({
+    type: 'better-sqlite3',
+    invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+    database,
+    entities: Object.values(entities),
+    migrations: prior,
+  });
   try {
     await source.initialize();
     await source.runMigrations();
@@ -711,7 +741,8 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
     );
     await source.destroy();
     source = new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database,
       entities: Object.values(entities),
       migrations: Object.values(migrations),
@@ -747,7 +778,10 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
         }),
       },
     ]);
-    const migratedStore = new SettingsStoreService(TypeOrmSettingsRows.forRepository(source.getRepository(Setting)), null);
+    const migratedStore = new SettingsStoreService(
+      TypeOrmSettingsRows.forRepository(source.getRepository(Setting)),
+      null,
+    );
     const migratedAudit = createSqliteAuditService(source, migratedStore, createTestAuditMetrics());
     await migratedAudit.onModuleInit();
     const migratedList = await new AuditController(new AuditQueryService(migratedAudit, migratedStore)).list({

@@ -80,13 +80,14 @@ describe('Matter plugin bundle', () => {
       expect((plugin as unknown as { auditDomains: { domain: string }[] }).auditDomains[0].domain).toBe('matter');
     };
 
-    // ws only asks for utf-8-validate when Node lacks buffer.isUtf8 (before 18.14), so on supported Node versions
-    // bufferutil is the accelerator that is actually looked up.
+    // ws only asks for utf-8-validate when Node lacks buffer.isUtf8 (before 18.14). Since ws 8.23 it also skips
+    // bufferutil when Node has native WebSocket masking (http.websocketMask), so only older runtimes look it up.
+    const looksUpBufferutil = typeof (require('node:http') as { websocketMask?: unknown }).websocketMask !== 'function';
     it('without the optional native modules installed', () => {
       const { plugin, requested } = loadWith((name) => {
         throw Object.assign(new Error(`Cannot find module '${name}'`), { code: 'MODULE_NOT_FOUND' });
       });
-      expect(requested).toContain('bufferutil');
+      expect(requested.includes('bufferutil')).toBe(looksUpBufferutil);
       expectUsable(plugin);
     });
 
@@ -108,7 +109,7 @@ describe('Matter plugin bundle', () => {
     it('with the optional native modules installed', () => {
       const accelerator = { mask: jest.fn(), unmask: jest.fn(), isValidUTF8: jest.fn(() => true) };
       const { plugin, requested } = loadWith(() => accelerator);
-      expect(requested).toContain('bufferutil');
+      expect(requested.includes('bufferutil')).toBe(looksUpBufferutil);
       expectUsable(plugin);
     });
   });

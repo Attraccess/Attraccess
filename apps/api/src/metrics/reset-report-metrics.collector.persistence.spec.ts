@@ -46,7 +46,11 @@ describe('ResetReportMetricsCollector', () => {
 
   beforeEach(async () => {
     jest.useFakeTimers({ now: NOW, doNotFake: ['setImmediate', 'nextTick', 'setTimeout', 'clearTimeout'] });
-    source = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    source = await new DataSource({
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database: ':memory:',
+    }).initialize();
     await source.query(`CREATE TABLE attractap (id integer PRIMARY KEY, name text NOT NULL)`);
     await source.query(`CREATE TABLE attractap_crash_report (
       id integer PRIMARY KEY, attractapId integer NOT NULL, resetReason text NOT NULL,
@@ -215,7 +219,8 @@ describe('reset report count query on the migrated schema', () => {
 
   beforeAll(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: ':memory:',
       entities: Object.values(entities),
       migrations: Object.values(migrations),

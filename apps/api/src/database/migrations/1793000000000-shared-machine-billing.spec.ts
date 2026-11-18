@@ -3,7 +3,7 @@ import { SharedMachineBilling1793000000000 } from './1793000000000-shared-machin
 
 describe('SharedMachineBilling migration', () => {
   async function withDatabase(test: (runner: ReturnType<DataSource['createQueryRunner']>) => Promise<void>) {
-    const database = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    const database = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
     const runner = database.createQueryRunner();
     try {
       await runner.query(`CREATE TABLE "resource" (id integer PRIMARY KEY)`);

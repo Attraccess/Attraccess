@@ -1,8 +1,8 @@
 import { AlertStatusIcon, Button, EmptyState, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
-  useUsersServiceGetLocalSignupDomainWhitelist,
-  useUsersServiceSetLocalSignupDomainWhitelist,
+  useGetLocalSignupDomainWhitelist,
+  useSetLocalSignupDomainWhitelist,
 } from '@attraccess/react-query-client';
 import {
   Alert,
@@ -50,7 +50,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
     },
   });
 
-  const { data: allowedSignupDomains } = useUsersServiceGetLocalSignupDomainWhitelist();
+  const { data: allowedSignupDomains } = useGetLocalSignupDomainWhitelist();
 
   const [domainToAdd, setDomainToAdd] = useState<string>('');
   const [editedDomains, setEditedDomains] = useState<string[]>(allowedSignupDomains ?? []);
@@ -91,7 +91,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
 
   const toast = useToastMessage();
 
-  const { mutate: saveAllowedSignupDomains, isPending: isSaving } = useUsersServiceSetLocalSignupDomainWhitelist({
+  const { mutate: saveAllowedSignupDomains, isPending: isSaving } = useSetLocalSignupDomainWhitelist(undefined, {
     onSuccess: () => {
       toast.success({
         title: t('actions.save.success.title'),
@@ -110,7 +110,7 @@ export function AllowedSignupDomainsEditorModal(props: Props) {
   });
 
   const onSave = useCallback(() => {
-    saveAllowedSignupDomains({ requestBody: editedDomains });
+    saveAllowedSignupDomains({ body: editedDomains });
   }, [editedDomains, saveAllowedSignupDomains]);
 
   return (

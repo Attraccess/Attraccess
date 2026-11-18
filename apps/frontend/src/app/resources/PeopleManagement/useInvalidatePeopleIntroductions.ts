@@ -1,11 +1,11 @@
 import { useCallback } from 'react';
 import {
-  useAccessControlServiceResourceIntroductionsGetPeopleKey,
-  UseAccessControlServiceResourceIntroductionsGetPeopleKeyFn,
-  UseAccessControlServiceResourceGroupIntroductionsGetHistoryKeyFn,
-  UseAccessControlServiceResourceGroupIntroductionsGetManyKeyFn,
-  UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn,
-  UseAccessControlServiceResourceIntroductionsGetManyKeyFn,
+  useResourceIntroductionsGetPeopleKey,
+  UseResourceIntroductionsGetPeopleKeyFn,
+  UseResourceGroupIntroductionsGetHistoryKeyFn,
+  UseResourceGroupIntroductionsGetManyKeyFn,
+  UseResourceIntroductionsGetHistoryKeyFn,
+  UseResourceIntroductionsGetManyKeyFn,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { PeopleTarget } from './types';
@@ -17,18 +17,18 @@ export function useInvalidatePeopleIntroductions(target: PeopleTarget) {
   return useCallback(
     (userId?: number) => {
       const listKey = isResource
-        ? UseAccessControlServiceResourceIntroductionsGetManyKeyFn({ resourceId: target.id })
-        : UseAccessControlServiceResourceGroupIntroductionsGetManyKeyFn({ groupId: target.id });
+        ? UseResourceIntroductionsGetManyKeyFn({ path: { resourceId: target.id } })
+        : UseResourceGroupIntroductionsGetManyKeyFn({ path: { groupId: target.id } });
       queryClient.invalidateQueries({ queryKey: listKey });
       queryClient.invalidateQueries({
         queryKey: isResource
-          ? UseAccessControlServiceResourceIntroductionsGetPeopleKeyFn({ resourceId: target.id })
-          : [useAccessControlServiceResourceIntroductionsGetPeopleKey],
+          ? UseResourceIntroductionsGetPeopleKeyFn({ path: { resourceId: target.id } })
+          : [useResourceIntroductionsGetPeopleKey],
       });
       if (userId !== undefined) {
         const historyKey = isResource
-          ? UseAccessControlServiceResourceIntroductionsGetHistoryKeyFn({ resourceId: target.id, userId })
-          : UseAccessControlServiceResourceGroupIntroductionsGetHistoryKeyFn({ groupId: target.id, userId });
+          ? UseResourceIntroductionsGetHistoryKeyFn({ path: { resourceId: target.id, userId } })
+          : UseResourceGroupIntroductionsGetHistoryKeyFn({ path: { groupId: target.id, userId } });
         queryClient.invalidateQueries({ queryKey: historyKey });
       }
     },

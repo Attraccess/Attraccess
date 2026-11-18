@@ -25,6 +25,7 @@ import {
 } from './maintenance-evaluation-queries';
 import { MaintenanceSnapshotReader, captureDurationState } from './maintenance-snapshot-reader';
 import { toMaintenanceScheduleRecord } from './maintenance-mappers';
+import { findRelations } from '../find-options';
 
 const CONFIG_RELATIONS = ['usageHoursConfig', 'usageCountConfig', 'timeIntervalConfig'];
 
@@ -48,7 +49,7 @@ export class TypeOrmMaintenanceEvaluationView implements MaintenanceEvaluationVi
   async enabledSchedules(resourceId: number): Promise<MaintenanceScheduleRecord[]> {
     const schedules = await this.manager.getRepository(ResourceMaintenanceSchedule).find({
       where: { resourceId, enabled: true },
-      relations: CONFIG_RELATIONS,
+      relations: findRelations(CONFIG_RELATIONS),
     });
     return schedules.map(toMaintenanceScheduleRecord);
   }
@@ -68,7 +69,7 @@ export class TypeOrmMaintenanceEvaluationView implements MaintenanceEvaluationVi
 
     const resource = await this.manager.getRepository(Resource).findOne({
       where: { id: resourceId },
-      select: ['id', 'createdAt'],
+      select: { id: true, createdAt: true },
     });
     return resource?.createdAt ?? new Date(0);
   }
@@ -121,7 +122,7 @@ export class TypeOrmMaintenanceEvaluationStore implements MaintenanceEvaluationS
   }
 
   get snapshotReads(): boolean {
-    return this.dataSource.options.type === 'sqlite';
+    return this.dataSource.options.type === 'better-sqlite3';
   }
 
   current(): MaintenanceEvaluationView {
@@ -135,7 +136,7 @@ export class TypeOrmMaintenanceEvaluationStore implements MaintenanceEvaluationS
   async listEnabledSchedules(): Promise<MaintenanceScheduleRecord[]> {
     const schedules = await this.dataSource.getRepository(ResourceMaintenanceSchedule).find({
       where: { enabled: true },
-      relations: CONFIG_RELATIONS,
+      relations: findRelations(CONFIG_RELATIONS),
     });
     return schedules.map(toMaintenanceScheduleRecord);
   }
@@ -143,7 +144,7 @@ export class TypeOrmMaintenanceEvaluationStore implements MaintenanceEvaluationS
   async findResourceCreatedAt(resourceIds: number[]): Promise<Map<number, Date>> {
     const resources = await this.dataSource.getRepository(Resource).find({
       where: { id: In(resourceIds) },
-      select: ['id', 'createdAt'],
+      select: { id: true, createdAt: true },
     });
     return new Map(resources.map((resource) => [resource.id, resource.createdAt]));
   }

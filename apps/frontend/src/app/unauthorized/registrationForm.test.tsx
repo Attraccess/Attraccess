@@ -43,14 +43,14 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useUsersServiceCreateOneUser: (options: { onSuccess?: () => void }) => {
+  useCreateOneUser: (_mutationKey: unknown, options: { onSuccess?: () => void }) => {
     createAccountOptions.current = options;
     return {
       mutate: mutateMock,
       isPending: pending.createAccount,
     };
   },
-  usePasswordPolicyServiceGetPublicPasswordPolicy: () => ({
+  useGetPublicPasswordPolicy: () => ({
     data: {
       minLength: 12,
       maxLength: 128,
@@ -62,8 +62,8 @@ vi.mock('@attraccess/react-query-client', () => ({
       minZxcvbnScore: 3,
     },
   }),
-  useUsersServiceFindManyKey: 'useUsersServiceFindManyKey',
-  UseUsersServiceFindManyKeyFn: () => ['useUsersServiceFindManyKey'],
+  useFindManyKey: 'useFindManyKey',
+  UseFindManyKeyFn: () => ['useFindManyKey'],
   ApiError: class ApiError extends Error {},
   AuthenticationType: { LOCAL_PASSWORD: 'LOCAL_PASSWORD' },
 }));
@@ -149,7 +149,7 @@ describe('RegistrationForm', () => {
     await user.click(screen.getByRole('button', { name: 'Create account' }));
 
     expect(mutateMock).toHaveBeenCalledWith({
-      requestBody: {
+      body: {
         username: 'Jane_Doe',
         password: 'correct-horse-battery-staple-42',
         email: 'test@example.com',

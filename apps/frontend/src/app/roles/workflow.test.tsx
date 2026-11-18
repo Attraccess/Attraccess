@@ -17,10 +17,10 @@ const state = vi.hoisted(() => ({
   callbacks: undefined as undefined | { onSuccess: () => void; onError: (error: Error) => void },
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useRbacServiceListRoles: () => ({ data: state.roles, isLoading: state.loading }),
-  useRbacServiceListPermissions: () => ({ data: [] }),
-  useRbacServiceListRolesKey: 'roles',
-  useRbacServiceDeleteRole: (callbacks: typeof state.callbacks) => {
+  useListRoles: () => ({ data: state.roles, isLoading: state.loading }),
+  useListPermissions: () => ({ data: [] }),
+  useListRolesKey: 'roles',
+  useDeleteRole: (_mutationKey: unknown, callbacks: typeof state.callbacks) => {
     state.callbacks = callbacks;
     return { mutate: state.remove, isPending: false };
   },
@@ -122,7 +122,7 @@ it('requires a replacement before reassigning users and excludes the deleted rol
   expect(screen.queryByRole('option', { name: 'Workshop member' })).toBeNull();
   fireEvent.click(await screen.findByRole('option', { name: 'System member' }));
   fireEvent.click(screen.getByRole('button', { name: 'Delete role' }));
-  expect(state.remove).toHaveBeenCalledWith({ id: 1, reassignToRoleId: 2 });
+  expect(state.remove).toHaveBeenCalledWith({ path: { id: 1 }, query: { reassignToRoleId: 2 } });
   act(() => state.callbacks?.onSuccess());
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['roles'] });
   expect(state.success).toHaveBeenCalledWith({ title: 'Role deleted' });
@@ -132,7 +132,7 @@ it('removes assignments by default and keeps errors open for retry', () => {
   const close = vi.fn();
   render(<DeleteRoleModal isOpen role={state.roles[0]} allRoles={state.roles} onClose={close} />);
   fireEvent.click(screen.getByRole('button', { name: 'Delete role' }));
-  expect(state.remove).toHaveBeenCalledWith({ id: 1, reassignToRoleId: undefined });
+  expect(state.remove).toHaveBeenCalledWith({ path: { id: 1 }, query: { reassignToRoleId: undefined } });
   const error = new Error('Forbidden');
   act(() => state.callbacks?.onError(error));
   expect(state.apiError).toHaveBeenCalledWith(

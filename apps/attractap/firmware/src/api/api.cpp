@@ -44,6 +44,9 @@ void API::updateSateInfo()
 
 void API::setup()
 {
+    // A freed send slot wakes the BLE proxy at once when it waits for room (bulk transfers), never otherwise. Set
+    // before setup() starts the send task, which reads it unguarded; it does nothing until the proxy is set up.
+    this->transport.setSendSlotFreedCallback([this]() { this->bleProxy.sendSlotFreed(); });
     this->transport.setup();
     this->transport.setMessageCallbackRaw([this](const char *buf, size_t len)
                                           { this->processIncomingMessage(buf, len); });

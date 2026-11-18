@@ -53,7 +53,11 @@ describe('plugin storage ownership', () => {
     root = mkdtempSync(join(tmpdir(), 'plugin-ownership-'));
     dbFile = join(root, 'test.sqlite');
     PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
-    PluginMigrationService.configureForTesting({ type: 'sqlite', database: dbFile });
+    PluginMigrationService.configureForTesting({
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database: dbFile,
+    });
   });
 
   afterEach(() => {
@@ -68,7 +72,11 @@ describe('plugin storage ownership', () => {
   };
 
   async function query(sql: string): Promise<Record<string, unknown>[]> {
-    const probe = new DataSource({ type: 'sqlite', database: dbFile });
+    const probe = new DataSource({
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database: dbFile,
+    });
     await probe.initialize();
     try {
       return await probe.query(sql);

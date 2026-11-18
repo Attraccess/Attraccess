@@ -5,9 +5,9 @@ import { Button, PageHeader, PasswordInput, useTranslations } from '@attraccess/
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ApiError,
-  useSettingsServiceApplyFirstTimeSetupSettings,
-  UseSettingsServiceGetFirstTimeSetupStatusKeyFn,
-  UseSettingsServiceGetSystemSettingsKeyFn,
+  useApplyFirstTimeSetupSettings,
+  UseGetFirstTimeSetupStatusKeyFn,
+  UseGetSystemSettingsKeyFn,
 } from '@attraccess/react-query-client';
 import { CommunityLicenseButton } from '../../../../components/CommunityLicenseButton';
 import { useToastMessage } from '../../../../components/toastProvider';
@@ -37,8 +37,8 @@ export function LicenseStep({ onSuccess }: LicenseStepProps) {
           title: t('success.title'),
           description: t('success.description'),
         });
-        queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetSystemSettingsKeyFn() });
-        queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetFirstTimeSetupStatusKeyFn() });
+        queryClient.invalidateQueries({ queryKey: UseGetSystemSettingsKeyFn() });
+        queryClient.invalidateQueries({ queryKey: UseGetFirstTimeSetupStatusKeyFn() });
         setLicenseKey('');
         onSuccess?.();
       },
@@ -54,13 +54,13 @@ export function LicenseStep({ onSuccess }: LicenseStepProps) {
     [t, tExists, toast, queryClient, onSuccess],
   );
 
-  const { mutate: saveSettings, isPending } = useSettingsServiceApplyFirstTimeSetupSettings(mutateConfig);
+  const { mutate: saveSettings, isPending } = useApplyFirstTimeSetupSettings(undefined, mutateConfig);
 
   const handleSubmit = useCallback(() => {
     const trimmed = licenseKey.trim();
     if (!trimmed) return;
     if (!formRef.current?.checkValidity()) return;
-    saveSettings({ requestBody: { app: { licenseKey: trimmed } } });
+    saveSettings({ body: { app: { licenseKey: trimmed } } });
   }, [licenseKey, saveSettings]);
 
   return (

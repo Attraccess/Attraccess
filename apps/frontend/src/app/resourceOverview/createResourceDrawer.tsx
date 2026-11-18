@@ -13,11 +13,7 @@ import {
   ToggleButtonGroup,
 } from '@heroui/react';
 import { StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  ResourceType,
-  useResourcesServiceCreateOneResource,
-  useResourcesServiceGetAllResourcesKey,
-} from '@attraccess/react-query-client';
+import { ResourceType, useCreateOneResource, useGetAllResourcesKey } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { DoorOpen, Shapes } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -57,14 +53,14 @@ export function CreateResourceDrawer({
     if (isOpen) clearForm();
   }, [isOpen]);
 
-  const createResource = useResourcesServiceCreateOneResource({
+  const createResource = useCreateOneResource(undefined, {
     onSuccess: (resource) => {
       recordUsefulAction();
       toast.success({
         title: t('successTitle'),
         description: t('successDescription', { name: resource.name }),
       });
-      void queryClient.invalidateQueries({ queryKey: [useResourcesServiceGetAllResourcesKey] });
+      void queryClient.invalidateQueries({ queryKey: [useGetAllResourcesKey] });
 
       if (afterCreate.current === 'another') {
         clearForm();
@@ -91,7 +87,7 @@ export function CreateResourceDrawer({
     }
 
     afterCreate.current = action;
-    createResource.mutate({ formData: { name: trimmedName, type } });
+    createResource.mutate({ body: { name: trimmedName, type } });
   };
 
   return (

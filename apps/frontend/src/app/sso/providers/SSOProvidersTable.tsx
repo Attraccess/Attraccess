@@ -11,14 +11,14 @@ import {
   TooltipContent,
 } from '@heroui/react';
 import { Key, Pencil, Trash } from 'lucide-react';
-import { SSOProvider } from '@attraccess/react-query-client';
+import { SsoProvider } from '@attraccess/react-query-client';
 import { Button, EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 
 interface SSOProvidersTableProps {
-  providers: SSOProvider[];
-  onEdit: (provider: SSOProvider) => void;
+  providers: SsoProvider[];
+  onEdit: (provider: SsoProvider) => void;
   onDelete: (id: number) => void;
 }
 

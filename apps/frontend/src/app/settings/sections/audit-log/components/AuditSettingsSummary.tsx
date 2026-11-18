@@ -1,6 +1,6 @@
 import { ShieldCheckIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useSettingsServiceSettingsControllerGetAuditSettings } from '@attraccess/react-query-client';
+import { useSettingsControllerGetAuditSettings } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
 import en from '../en.json';
 import de from '../de.json';
@@ -8,7 +8,7 @@ import de from '../de.json';
 export function AuditSettingsSummary() {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
-  const { data: settings } = useSettingsServiceSettingsControllerGetAuditSettings(undefined, {
+  const { data: settings } = useSettingsControllerGetAuditSettings({}, undefined, {
     enabled: hasPermission('system.settings.manage'),
   });
   return (

@@ -2,9 +2,9 @@
 // FEATURE: Push notifications for messages
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  usePushServicePushGetVapidPublicKey,
-  usePushServicePushUpsertSubscription,
-  usePushServicePushDeleteSubscription,
+  usePushGetVapidPublicKey,
+  usePushUpsertSubscription,
+  usePushDeleteSubscription,
 } from '@attraccess/react-query-client';
 
 const SERVICE_WORKER_READY_TIMEOUT_MS = 3000;
@@ -62,11 +62,11 @@ export function usePushNotifications() {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
 
-  const { data: vapidResponse, isLoading: isLoadingKey } = usePushServicePushGetVapidPublicKey();
+  const { data: vapidResponse, isLoading: isLoadingKey } = usePushGetVapidPublicKey();
   const publicKey = vapidResponse?.publicKey ?? null;
 
-  const { mutateAsync: upsertSubscription } = usePushServicePushUpsertSubscription();
-  const { mutateAsync: deleteSubscription } = usePushServicePushDeleteSubscription();
+  const { mutateAsync: upsertSubscription } = usePushUpsertSubscription();
+  const { mutateAsync: deleteSubscription } = usePushDeleteSubscription();
 
   // Share browser state across the global prompt and account settings. This does
   // not assert that an existing browser subscription is registered to the current account.
@@ -133,7 +133,7 @@ export function usePushNotifications() {
       }
 
       await upsertSubscription({
-        requestBody: {
+        body: {
           endpoint: json.endpoint,
           keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
           userAgent: navigator.userAgent,
@@ -157,7 +157,7 @@ export function usePushNotifications() {
       const registration = await getServiceWorkerRegistration();
       const subscription = await registration?.pushManager.getSubscription();
       if (subscription) {
-        await deleteSubscription({ endpoint: subscription.endpoint });
+        await deleteSubscription({ query: { endpoint: subscription.endpoint } });
         await subscription.unsubscribe();
       }
       announceBrowserPushState({ permission: Notification.permission, isSubscribed: false });

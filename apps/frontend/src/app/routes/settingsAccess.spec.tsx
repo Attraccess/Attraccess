@@ -15,8 +15,8 @@ vi.mock('../../hooks/useAuth', () => ({ useAuth: vi.fn() }));
 
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useLicenseServiceGetLicenseInformation: () => ({ data: { modules: [] } }),
-  useMessagingServiceMessagingGetUnreadCount: () => ({ data: { total: 0 } }),
+  useGetLicenseInformation: () => ({ data: { modules: [] } }),
+  useMessagingGetUnreadCount: () => ({ data: { total: 0 } }),
 }));
 
 const { useAuth } = await import('../../hooks/useAuth');

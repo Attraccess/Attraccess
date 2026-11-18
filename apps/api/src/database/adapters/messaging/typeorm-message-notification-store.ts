@@ -12,7 +12,7 @@ export class TypeOrmMessageNotificationStore implements MessageNotificationStore
   ) {}
 
   async findParticipants(conversationId: number): Promise<NotifiableParticipant[]> {
-    const rows = await this.participants.find({ where: { conversationId }, relations: ['user'] });
+    const rows = await this.participants.find({ where: { conversationId }, relations: { user: true } });
     return rows.map((row) => ({
       participantId: row.id,
       userId: row.userId,

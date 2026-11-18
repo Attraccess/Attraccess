@@ -1,6 +1,6 @@
 import { Input, Label, Spinner, TextField } from '@heroui/react';
 import { Navigate, useParams } from 'react-router-dom';
-import { SSOProviderType, useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
+import { SsoProviderType, useGetLicenseInformation } from '@attraccess/react-query-client';
 import { Button, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../hooks/useAuth';
 import { Select } from '../../../components/select';
@@ -16,7 +16,7 @@ export const SSOProviderFormPage = () => {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
   const canManageSSO = hasPermission('system.sso.manage');
-  const { data: license } = useLicenseServiceGetLicenseInformation();
+  const { data: license } = useGetLicenseInformation();
 
   const { providerId: providerIdParam } = useParams<{ providerId: string }>();
   const parsedProviderId = providerIdParam ? Number(providerIdParam) : undefined;
@@ -75,10 +75,10 @@ export const SSOProviderFormPage = () => {
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium">{t('type')}</label>
             <Select
-              items={Object.values(SSOProviderType).map((type) => ({ key: type, label: type }))}
+              items={Object.values(SsoProviderType).map((type) => ({ key: type, label: type }))}
               value={formValues.type}
               onChange={(key) => {
-                if (key) handleSelectChange(key as SSOProviderType);
+                if (key) handleSelectChange(key as SsoProviderType);
               }}
               isRequired
               isDisabled={isEditing}
@@ -87,9 +87,9 @@ export const SSOProviderFormPage = () => {
           </div>
         </section>
 
-        {formValues.type === SSOProviderType.OIDC && <OIDCConfigForm form={form} />}
+        {formValues.type === SsoProviderType.OIDC && <OIDCConfigForm form={form} />}
 
-        {formValues.type === SSOProviderType.SAML && <SAMLConfigForm form={form} />}
+        {formValues.type === SsoProviderType.SAML && <SAMLConfigForm form={form} />}
 
         <SetupInstructionsSection isSamlProvider={isSamlProvider} setupUrls={setupUrls} onCopy={copyValue} />
 

@@ -13,7 +13,7 @@ export class TypeOrmResourceRecipientStore implements ResourceRecipientStore {
   async findResource(resourceId: number): Promise<{ id: number; name: string; groupIds: number[] } | null> {
     const resource = await this.dataSource
       .getRepository(Resource)
-      .findOne({ where: { id: resourceId }, relations: ['groups'] });
+      .findOne({ where: { id: resourceId }, relations: { groups: true } });
     if (!resource) return null;
     return { id: resource.id, name: resource.name, groupIds: (resource.groups ?? []).map((group) => group.id) };
   }
@@ -26,7 +26,7 @@ export class TypeOrmResourceRecipientStore implements ResourceRecipientStore {
   async findIntroducerUsers(resourceId: number, groupIds: number[]): Promise<ResourceNotificationRecipient[]> {
     const where: Array<Record<string, unknown>> = [{ resourceId }];
     if (groupIds.length > 0) where.push({ resourceGroupId: In(groupIds) });
-    const rows = await this.dataSource.getRepository(ResourceIntroducer).find({ where, relations: ['user'] });
+    const rows = await this.dataSource.getRepository(ResourceIntroducer).find({ where, relations: { user: true } });
     return rows.filter((row) => row.user).map((row) => toNotificationRecipient(row.user));
   }
 }

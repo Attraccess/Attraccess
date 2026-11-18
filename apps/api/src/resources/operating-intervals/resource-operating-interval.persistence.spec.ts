@@ -56,7 +56,8 @@ describe('Operating interval persistence', () => {
     resolveDatabaseBackend();
     directory = await mkdtemp(join(tmpdir(), 'attraccess-operating-'));
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: join(directory, 'test.sqlite'),
       entities: [IntervalSchema],
     }).initialize();
@@ -213,7 +214,12 @@ describe('Operating interval persistence', () => {
 
     beforeEach(async () => {
       other = await resolveDatabaseBackend()
-        .createDataSource({ type: 'sqlite', database: source.options.database as string, entities: [IntervalSchema] })
+        .createDataSource({
+          type: 'better-sqlite3',
+          invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+          database: source.options.database as string,
+          entities: [IntervalSchema],
+        })
         .initialize();
       otherService = serviceOn(other, new EventEmitter2());
     });

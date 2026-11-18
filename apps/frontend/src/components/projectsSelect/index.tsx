@@ -1,4 +1,4 @@
-import { useProjectsServiceFindManyProjects } from '@attraccess/react-query-client';
+import { useFindManyProjects } from '@attraccess/react-query-client';
 import { Select } from '../select';
 
 const UNASSIGNED_KEY = '__unassigned__';
@@ -17,12 +17,19 @@ interface Props {
 }
 
 export function ProjectsSelect(props: Props) {
-  const { value, onValueChange, onChange, includeUnassignedOption, unassignedLabel, isDisabled, includeArchived, ...selectProps } = props;
+  const {
+    value,
+    onValueChange,
+    onChange,
+    includeUnassignedOption,
+    unassignedLabel,
+    isDisabled,
+    includeArchived,
+    ...selectProps
+  } = props;
   const handleChange = onValueChange ?? onChange ?? (() => undefined);
 
-  const { data: projects } = useProjectsServiceFindManyProjects({
-    includeArchived,
-  });
+  const { data: projects } = useFindManyProjects({ query: { includeArchived } });
   const resolvedValue = value ?? undefined;
   const projectItems = (projects?.data ?? []).map((project) => ({ key: project.id.toString(), label: project.name }));
   const items = includeUnassignedOption

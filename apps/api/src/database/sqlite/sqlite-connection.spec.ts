@@ -18,7 +18,8 @@ describe('main SQLite connection', () => {
 
   const open = (options: Partial<DataSourceOptions> = {}) =>
     createDataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: join(directory, 'test.sqlite'),
       entities: [CounterEntity],
       ...options,
@@ -53,14 +54,14 @@ describe('main SQLite connection', () => {
   });
 
   it('configures the shared busy timeout', async () => {
-    expect(source.options).toMatchObject({ busyTimeout: SQLITE_BUSY_TIMEOUT_MS });
+    expect(source.options).toMatchObject({ timeout: SQLITE_BUSY_TIMEOUT_MS });
     expect(await source.query('PRAGMA busy_timeout')).toEqual([{ timeout: SQLITE_BUSY_TIMEOUT_MS }]);
   });
 
   it('waits longer than the driver default for the serialized writer before saving', async () => {
     const { release, holder } = await holdSerializedWriteLock();
     const save = source.getRepository(CounterEntity).save({ id: 2, value: 5 });
-    // node-sqlite3 gives up after its default 1 s busy timeout; the shared timeout outlasts this lock.
+    // The file lock waits up to the shared busy timeout, which outlasts this lock.
     const timer = setTimeout(release, 1500);
     try {
       await expect(Promise.all([holder, save])).resolves.toEqual([undefined, { id: 2, value: 5 }]);
@@ -141,7 +142,7 @@ describe('main SQLite connection', () => {
 
   it('fails with SQLITE_BUSY once a write waited longer than the busy timeout', async () => {
     await source.destroy();
-    source = await open({ busyTimeout: 50 });
+    source = await open({ timeout: 50 });
     const { release, holder } = await holdSerializedWriteLock();
     try {
       await expect(source.getRepository(CounterEntity).save({ id: 2, value: 5 })).rejects.toThrow('SQLITE_BUSY');

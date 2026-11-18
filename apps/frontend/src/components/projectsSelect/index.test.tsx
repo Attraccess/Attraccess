@@ -6,7 +6,7 @@ const state = vi.hoisted(() => ({
   query: vi.fn(),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useProjectsServiceFindManyProjects: (params: unknown) => {
+  useFindManyProjects: (params: unknown) => {
     state.query(params);
     return { data: state.projects };
   },
@@ -26,7 +26,7 @@ it('shows the selected project and emits numeric selections while preserving arc
   const legacyChange = vi.fn();
   render(<ProjectsSelect value={7} onValueChange={change} onChange={legacyChange} includeArchived label="Project" />);
   expect(screen.getByRole('button', { name: /Workshop/ })).toBeTruthy();
-  expect(state.query).toHaveBeenCalledWith({ includeArchived: true });
+  expect(state.query).toHaveBeenCalledWith({ query: { includeArchived: true } });
   fireEvent.click(screen.getByRole('button', { name: /Workshop/ }));
   fireEvent.click(await screen.findByRole('option', { name: 'Research' }));
   expect(change).toHaveBeenCalledWith(8);
@@ -44,5 +44,5 @@ it('renders the placeholder before projects arrive and supports an optional chan
   render(<ProjectsSelect value={null} placeholder="Choose project" includeUnassignedOption />);
   fireEvent.click(screen.getByRole('button', { name: /Choose project/ }));
   fireEvent.click(await screen.findByRole('option', { name: 'Unassigned' }));
-  expect(state.query).toHaveBeenCalledWith({ includeArchived: undefined });
+  expect(state.query).toHaveBeenCalledWith({ query: { includeArchived: undefined } });
 });

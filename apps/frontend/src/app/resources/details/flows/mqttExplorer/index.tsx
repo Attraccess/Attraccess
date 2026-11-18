@@ -4,7 +4,7 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Button, DrawerBody, DrawerHeader, DrawerHeading, Spinner } from '@heroui/react';
 import { StandardDrawer } from '@attraccess/plugins-frontend-ui';
-import { useMqttServiceMqttServersGetAll } from '@attraccess/react-query-client';
+import { useMqttServersGetAll } from '@attraccess/react-query-client';
 import { XIcon } from 'lucide-react';
 import { memo, useMemo, useState, type RefObject } from 'react';
 import { Select } from '../../../../../components/select';
@@ -35,7 +35,7 @@ const ExplorerContent = memo(function ExplorerContent({
   nodesReady,
 }: Pick<Props, 'mqttNodes' | 'nodesReady'>) {
   const { t } = useTranslations({ en, de });
-  const { data: servers = NO_SERVERS, isLoading } = useMqttServiceMqttServersGetAll();
+  const { data: servers = NO_SERVERS, isLoading } = useMqttServersGetAll();
   const [pickedServerId, setPickedServerId] = useState<number | null>(null);
   // Fixed when the panel opens (once the flow is loaded, as a reload can reopen the panel before its nodes
   // arrive), so editing nodes does not swap the server under a running subscription.

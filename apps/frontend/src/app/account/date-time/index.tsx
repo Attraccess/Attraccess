@@ -3,11 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { validateDateTimeLocale, DATE_TIME_LOCALE_MAX_LENGTH } from '@attraccess/shared';
 import { Button, useDateTimeFormatter, useDateTimePreferences, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Description, FieldError, Input, Label, TextField } from '@heroui/react';
-import {
-  useUsersServiceGetCurrent,
-  UseUsersServiceGetCurrentKeyFn,
-  useUsersServiceUpdateMyDateTimePreferences,
-} from '@attraccess/react-query-client';
+import { useGetCurrent, UseGetCurrentKeyFn, useUpdateMyDateTimePreferences } from '@attraccess/react-query-client';
 import { Select } from '../../../components/select';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './en.json';
@@ -17,7 +13,7 @@ const EXAMPLE_DATE = new Date(2026, 10, 23, 17, 45, 30);
 
 export function DateTimePreferencesForm() {
   const { t } = useTranslations({ en, de });
-  const { data: user, isLoading } = useUsersServiceGetCurrent();
+  const { data: user, isLoading } = useGetCurrent();
   const [custom, setCustom] = useState(false);
   const [draft, setDraft] = useState('');
   const queryClient = useQueryClient();
@@ -34,10 +30,10 @@ export function DateTimePreferencesForm() {
   const invalid = custom && !!validation.error;
   const formatPreview = useDateTimeFormatter({ dateTimeLocale: locale ?? null, showSeconds: true });
 
-  const { mutate, isPending } = useUsersServiceUpdateMyDateTimePreferences({
+  const { mutate, isPending } = useUpdateMyDateTimePreferences(undefined, {
     onSuccess: (updated) => {
       if (identity.current !== updated.id || useDateTimePreferences.getState().userId !== updated.id) return;
-      queryClient.setQueryData(UseUsersServiceGetCurrentKeyFn(), updated);
+      queryClient.setQueryData(UseGetCurrentKeyFn(), updated);
       useDateTimePreferences.setState({ dateTimeLocale: updated.dateTimeLocale });
       setCustom(updated.dateTimeLocale !== null);
       setDraft(updated.dateTimeLocale ?? '');
@@ -77,7 +73,7 @@ export function DateTimePreferencesForm() {
         aria-label={t('save')}
         isPending={isPending}
         isDisabled={!user || isLoading || isPending || invalid || locale === saved}
-        onPress={() => mutate({ requestBody: { dateTimeLocale: locale ?? null } })}
+        onPress={() => mutate({ body: { dateTimeLocale: locale ?? null } })}
         data-cy="save-date-time-preferences"
       >
         {t('save')}

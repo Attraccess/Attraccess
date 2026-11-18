@@ -14,7 +14,7 @@ describe('Dashboard pin size migration', () => {
 
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'dashboard-pin-size-'));
-    source = await new DataSource({ type: 'sqlite', database: join(directory, 'test.sqlite') }).initialize();
+    source = await new DataSource({ type: 'better-sqlite3', database: join(directory, 'test.sqlite') }).initialize();
     await source.query(`CREATE TABLE "user" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL)`);
     await new DashboardPins1793300000000().up(source.createQueryRunner());
   });

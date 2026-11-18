@@ -32,10 +32,11 @@ describe('main SQLite connection transaction isolation', () => {
 
   const open = (busyTimeout?: number) =>
     createDataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: join(directory, 'test.sqlite'),
       entities: [CounterEntity, NoteEntity],
-      ...(busyTimeout ? { busyTimeout } : {}),
+      ...(busyTimeout ? { timeout: busyTimeout } : {}),
     }).initialize();
   const values = () => source.query('SELECT id, value FROM counter ORDER BY id');
   // isTransactionActive reads false for every flow but the owner, so also check that a fresh flow is not kept waiting.

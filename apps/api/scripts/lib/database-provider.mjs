@@ -15,17 +15,9 @@ function describe(value) {
   return /^[A-Za-z0-9_-]{1,32}$/.test(value) ? `"${value}"` : '(redacted: not a database type name)';
 }
 
-const call = (db, method, sql, params = []) =>
-  new Promise((resolvePromise, reject) =>
-    db[method](sql, params, function callback(error, result) {
-      if (error) reject(error);
-      else resolvePromise(method === 'run' ? this : result);
-    }),
-  );
-
 /**
- * SQLite: one file under the storage root. A handle is an open sqlite3 Database. `run` resolves to the statement
- * with `lastID`; `begin({ writeLock: true })` takes the write lock at once so a script never fails half way on a busy database.
+ * SQLite: one file under the storage root. A handle is an open better-sqlite3 Database. The helpers stay async so callers keep one
+ * shape; `run` resolves to `{ lastID, changes }`; `begin({ writeLock: true })` takes the write lock at once so a script never fails half way on a busy database.
  */
 export const sqliteProvider = {
   type: 'sqlite',
@@ -35,22 +27,39 @@ export const sqliteProvider = {
     return join(storageRoot, 'attraccess.sqlite');
   },
   async open(location) {
-    const { default: sqlite3 } = await import('sqlite3');
-    return new (sqlite3.verbose().Database)(location);
+    const { default: Database } = await import('better-sqlite3');
+    return new Database(location, { fileMustExist: true, timeout: 5000 });
   },
-  close: (db) =>
-    new Promise((resolvePromise, reject) => db.close((error) => (error ? reject(error) : resolvePromise()))),
-  run: (db, sql, params = []) => call(db, 'run', sql, params),
-  get: (db, sql, params = []) => call(db, 'get', sql, params),
-  all: (db, sql, params = []) => call(db, 'all', sql, params),
-  begin: (db, { writeLock = false } = {}) => call(db, 'run', writeLock ? 'BEGIN IMMEDIATE' : 'BEGIN'),
-  commit: (db) => call(db, 'run', 'COMMIT'),
-  rollback: (db) => call(db, 'run', 'ROLLBACK'),
+  async close(db) {
+    db.close();
+  },
+  async run(db, sql, params = []) {
+    const { lastInsertRowid, changes } = db.prepare(sql).run(...params);
+    return { lastID: Number(lastInsertRowid), changes };
+  },
+  async get(db, sql, params = []) {
+    return db.prepare(sql).get(...params);
+  },
+  async all(db, sql, params = []) {
+    return db.prepare(sql).all(...params);
+  },
+  async begin(db, { writeLock = false } = {}) {
+    db.exec(writeLock ? 'BEGIN IMMEDIATE' : 'BEGIN');
+  },
+  async commit(db) {
+    db.exec('COMMIT');
+  },
+  async rollback(db) {
+    if (db.inTransaction) db.exec('ROLLBACK');
+  },
   async hasTable(db, table) {
-    return Boolean(await call(db, 'get', "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", [table]));
+    return Boolean(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(table));
   },
   async columns(db, table) {
-    return (await call(db, 'all', `PRAGMA table_info("${table}")`)).map((row) => row.name);
+    return db
+      .prepare(`PRAGMA table_info("${table}")`)
+      .all()
+      .map((row) => row.name);
   },
 };
 

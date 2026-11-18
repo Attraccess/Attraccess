@@ -14,7 +14,8 @@ describe('introduction stores on real SQLite', () => {
 
   beforeEach(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: ':memory:',
       synchronize: true,
       entities: Object.values(entities),
@@ -91,7 +92,7 @@ describe('introduction stores on real SQLite', () => {
     const group = await groups.save(groups.create({ name: 'Wood shop' }));
     const resource = await source
       .getRepository(Resource)
-      .findOneOrFail({ where: { id: resourceId }, relations: ['groups'] });
+      .findOneOrFail({ where: { id: resourceId }, relations: { groups: true } });
     resource.groups = [group];
     await source.getRepository(Resource).save(resource);
     const retraining = new TypeOrmRetrainingStore(source);

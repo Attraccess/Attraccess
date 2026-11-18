@@ -12,7 +12,7 @@
 // Stop the API first and keep a copy of attraccess.sqlite.
 //
 // Plain Node only: the production image has no TypeScript sources, so nothing here may import a .ts
-// file (./lib/database-provider.mjs ships beside it). The only dependency is sqlite3, which the deployed API
+// file (./lib/database-provider.mjs ships beside it). The only dependency is better-sqlite3, which the deployed API
 // package ships; the provider selected by DATABASE_TYPE opens the database.
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto';
 import { existsSync, realpathSync } from 'node:fs';

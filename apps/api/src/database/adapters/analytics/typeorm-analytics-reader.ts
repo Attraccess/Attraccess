@@ -37,7 +37,7 @@ export class TypeOrmAnalyticsReader implements AnalyticsReader {
         id: 'DESC',
         userId: 'DESC',
       },
-      relations: ['user', 'resource', 'supervisorUser'],
+      relations: { user: true, resource: true, supervisorUser: true },
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -59,7 +59,7 @@ export class TypeOrmAnalyticsReader implements AnalyticsReader {
         id: 'DESC',
         userId: 'DESC',
       },
-      relations: ['user', 'initiator', 'resourceUsage', 'resourceUsage.resource', 'items'],
+      relations: { user: true, initiator: true, resourceUsage: { resource: true }, items: true },
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -137,7 +137,7 @@ export class TypeOrmAnalyticsReader implements AnalyticsReader {
           { ...usage, endTime: MoreThan(start) },
         ],
         order: { startTime: 'ASC' },
-        select: ['id', 'startTime'],
+        select: { id: true, startTime: true },
       }),
       this.resources.manager.getRepository(ResourceOperatingInterval).findOne({
         where: [
@@ -145,7 +145,7 @@ export class TypeOrmAnalyticsReader implements AnalyticsReader {
           { ...overlapping, endTime: MoreThan(start) },
         ],
         order: { startTime: 'ASC' },
-        select: ['id', 'startTime'],
+        select: { id: true, startTime: true },
       }),
     ]);
     const starts = [firstUsage, firstInterval].flatMap((record) => (record ? [record.startTime.getTime()] : []));

@@ -2,8 +2,8 @@ import { Button, StandardDrawer, useTranslations } from '@attraccess/plugins-fro
 import {
   ApiError,
   TwoFactorPolicy,
-  useTwoFactorAuthenticationServiceGetTwoFactorPolicy,
-  useTwoFactorAuthenticationServiceSetTwoFactorPolicy,
+  useGetTwoFactorPolicy,
+  useSetTwoFactorPolicy,
 } from '@attraccess/react-query-client';
 import {
   Alert,
@@ -43,7 +43,7 @@ export function TwoFactorPolicyModal(props: Props) {
   });
   const toast = useToastMessage();
 
-  const { data: policyData, isLoading } = useTwoFactorAuthenticationServiceGetTwoFactorPolicy(undefined, {
+  const { data: policyData, isLoading } = useGetTwoFactorPolicy({}, undefined, {
     enabled: isOpen,
   });
 
@@ -81,7 +81,7 @@ export function TwoFactorPolicyModal(props: Props) {
     [policyOptions, selectedPolicy],
   );
 
-  const { mutate: savePolicy, isPending: isSaving } = useTwoFactorAuthenticationServiceSetTwoFactorPolicy({
+  const { mutate: savePolicy, isPending: isSaving } = useSetTwoFactorPolicy(undefined, {
     onSuccess: () => {
       toast.success({
         title: t('actions.save.success.title'),
@@ -103,7 +103,7 @@ export function TwoFactorPolicyModal(props: Props) {
     if (!selectedPolicy) {
       return;
     }
-    savePolicy({ requestBody: { policy: selectedPolicy } });
+    savePolicy({ body: { policy: selectedPolicy } });
   }, [savePolicy, selectedPolicy]);
 
   return (

@@ -22,6 +22,7 @@ import { isUniqueViolation } from '../../persistence-errors';
 import type { TransactionContext } from '../../transaction-context';
 import { UNIT_OF_WORK, UnitOfWork } from '../../unit-of-work';
 import { EntityManagerResolver } from '../entity-manager-resolver';
+import { findSelect } from '../find-options';
 
 const SESSION_COLUMNS: (keyof ResourceUsage)[] = [
   'id',
@@ -181,7 +182,7 @@ export class TypeOrmOperatingTimelineStore implements OperatingTimelineStore {
         lifecyclePending: false,
         ...(options.excludeUsageId === undefined ? {} : { id: Not(options.excludeUsageId) }),
       })),
-      select: SESSION_COLUMNS.filter((column) => repository.metadata.findColumnWithPropertyName(column)),
+      select: findSelect(SESSION_COLUMNS.filter((column) => repository.metadata.findColumnWithPropertyName(column))),
       order: { startTime: 'ASC' },
     });
     return rows.map(toSessionRecord);
@@ -205,7 +206,7 @@ export class TypeOrmOperatingTimelineStore implements OperatingTimelineStore {
       .getRepository(ResourceUsageLifecycleAttempt)
       .find({
         where: { resourceId: In(resourceIds), kind: In(['end', 'takeover']) },
-        select: ['previousUsageId', 'transitionTime'],
+        select: { previousUsageId: true, transitionTime: true },
       });
     return new Map(
       attempts.flatMap((attempt) =>

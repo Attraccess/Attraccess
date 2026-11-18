@@ -1,11 +1,11 @@
 import {
   SmtpServiceType,
   ApiError,
-  useSettingsServiceApplyFirstTimeSetupSettings,
-  useSettingsServiceGetSystemSettings,
-  UseSettingsServiceGetFirstTimeSetupStatusKeyFn,
-  useSettingsServiceUpdateSystemSettings,
-  useSettingsServiceGetSystemSettingsKey,
+  useApplyFirstTimeSetupSettings,
+  useGetSystemSettings,
+  UseGetFirstTimeSetupStatusKeyFn,
+  useUpdateSystemSettings,
+  useGetSystemSettingsKey,
 } from '@attraccess/react-query-client';
 import { Form, TextField, Label, Input, Description, Spinner } from '@heroui/react';
 import { Select } from '../../../../components/select/index';
@@ -43,7 +43,7 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
   const [smtpFrom, setSmtpFrom] = useState('');
   const [smtpPass, setSmtpPass] = useState('');
 
-  const { data: settings, isLoading } = useSettingsServiceGetSystemSettings(undefined, {
+  const { data: settings, isLoading } = useGetSystemSettings({}, undefined, {
     enabled: variant === 'standalone',
   });
 
@@ -73,9 +73,9 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
           title: t('success.title'),
           description: t('success.description'),
         });
-        queryClient.invalidateQueries({ queryKey: [useSettingsServiceGetSystemSettingsKey] });
+        queryClient.invalidateQueries({ queryKey: [useGetSystemSettingsKey] });
         if (endpoint === 'first-time-setup') {
-          queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetFirstTimeSetupStatusKeyFn() });
+          queryClient.invalidateQueries({ queryKey: UseGetFirstTimeSetupStatusKeyFn() });
         }
         setSmtpPass('');
         if (variant === 'wizard') onNext?.();
@@ -91,9 +91,11 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
     };
   }, [endpoint, variant, t, tExists, toast, queryClient, onNext]);
 
-  const { mutate: saveSettings, isPending: isSavingNormal } = useSettingsServiceUpdateSystemSettings(mutateConfig);
-  const { mutate: saveSettingsFirstTimeSetup, isPending: isSavingFirstTimeSetup } =
-    useSettingsServiceApplyFirstTimeSetupSettings(mutateConfig);
+  const { mutate: saveSettings, isPending: isSavingNormal } = useUpdateSystemSettings(undefined, mutateConfig);
+  const { mutate: saveSettingsFirstTimeSetup, isPending: isSavingFirstTimeSetup } = useApplyFirstTimeSetupSettings(
+    undefined,
+    mutateConfig,
+  );
 
   const isSaving = endpoint === 'first-time-setup' ? isSavingFirstTimeSetup : isSavingNormal;
 
@@ -102,7 +104,7 @@ export function SmtpSettingsForm({ variant, endpoint, onNext }: SmtpSettingsForm
     if (smtpService !== SmtpServiceType.SMTP && smtpService !== SmtpServiceType.OUTLOOK365) return;
 
     const payload = {
-      requestBody: {
+      body: {
         smtp: {
           service: smtpService,
           host: smtpHost,

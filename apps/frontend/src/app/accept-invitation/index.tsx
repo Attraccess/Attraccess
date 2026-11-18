@@ -5,7 +5,7 @@ import { Alert, AlertContent, AlertDescription, AlertTitle, Form } from '@heroui
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import { ApiError, useUsersServiceAcceptInvitation } from '@attraccess/react-query-client';
+import { ApiError, useAcceptInvitation } from '@attraccess/react-query-client';
 import { PasswordField } from '../../components/PasswordField';
 import { useLogin } from '../../hooks/useAuth';
 import { useToastMessage } from '../../components/toastProvider';
@@ -28,7 +28,7 @@ export function AcceptInvitation() {
 
   const { mutate: login } = useLogin();
 
-  const { mutate: acceptInvitation, isPending } = useUsersServiceAcceptInvitation({
+  const { mutate: acceptInvitation, isPending } = useAcceptInvitation(undefined, {
     onSuccess: (user) => {
       toast.success({
         title: t('success.title'),
@@ -75,7 +75,7 @@ export function AcceptInvitation() {
     }
 
     setServerErrors([]);
-    acceptInvitation({ requestBody: { token, email, password } });
+    acceptInvitation({ body: { token, email, password } });
   }, [password, confirmPassword, token, email, acceptInvitation]);
 
   if (!token || !email) {

@@ -2,9 +2,9 @@ import { Button, LabeledSwitch } from '@attraccess/plugins-frontend-ui';
 import {
   type InstalledNpmPluginDto,
   type InstalledPluginVersionDto,
-  usePluginsServicePluginControllerInstalledPackageVersions,
-  usePluginsServicePluginControllerReplaceInstalledPackage,
-  usePluginsServicePluginControllerUpdateInstalledPackagePolicy,
+  usePluginControllerInstalledPackageVersions,
+  usePluginControllerReplaceInstalledPackage,
+  usePluginControllerUpdateInstalledPackagePolicy,
 } from '@attraccess/react-query-client';
 import { Input, ModalBody, ModalFooter, ModalHeader, ModalHeading, TextField } from '@heroui/react';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
@@ -33,8 +33,8 @@ export function VersionManagementContent({ plugin, isReplacing, onReplacingChang
   const toast = useToastMessage();
   const { installedByName, mergeInstalled } = useInstalledNpmPlugins();
   const installed = installedByName.get(plugin.name);
-  const { mutateAsync: replaceInstalledPlugin } = usePluginsServicePluginControllerReplaceInstalledPackage();
-  const { mutateAsync: updateInstalledPluginPolicy } = usePluginsServicePluginControllerUpdateInstalledPackagePolicy();
+  const { mutateAsync: replaceInstalledPlugin } = usePluginControllerReplaceInstalledPackage();
+  const { mutateAsync: updateInstalledPluginPolicy } = usePluginControllerUpdateInstalledPackagePolicy();
 
   const [requestedSpec, setRequestedSpec] = useState(installed?.requestedSpec ?? plugin.version);
   const [updateOverride, setUpdateOverride] = useState<InstalledNpmPluginDto['updateOverride']>(
@@ -45,11 +45,10 @@ export function VersionManagementContent({ plugin, isReplacing, onReplacingChang
   const [majorApproved, setMajorApproved] = useState(false);
   const [approvedPlanToken, setApprovedPlanToken] = useState<string | null>(null);
 
-  const versionsQuery = usePluginsServicePluginControllerInstalledPackageVersions(
-    { packageName: plugin.name },
-    undefined,
-    { retry: false, refetchOnWindowFocus: false },
-  );
+  const versionsQuery = usePluginControllerInstalledPackageVersions({ path: { packageName: plugin.name } }, undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
   const versions = versionsQuery.data ?? [];
   const reportVersionsError = useEffectEvent(() =>
     toast.error({ title: t('error.versions.title'), description: t('error.versions.description') }),
@@ -88,9 +87,8 @@ export function VersionManagementContent({ plugin, isReplacing, onReplacingChang
     onReplacingChange(true);
     try {
       await replaceInstalledPlugin({
-        packageName: plugin.name,
-        version: selectedVersion.version,
-        requestBody: {
+        path: { packageName: plugin.name, version: selectedVersion.version },
+        body: {
           approvedPermissionAdditions: selectedVersion.permissionAdditions,
           approvedMajorVersion: majorApproved,
           ...(hasVersionDependencies ? { planToken: versionPlan?.token } : {}),
@@ -112,7 +110,10 @@ export function VersionManagementContent({ plugin, isReplacing, onReplacingChang
   const saveVersionPolicy = async () => {
     try {
       mergeInstalled([
-        await updateInstalledPluginPolicy({ packageName: plugin.name, requestBody: { requestedSpec, updateOverride } }),
+        await updateInstalledPluginPolicy({
+          path: { packageName: plugin.name },
+          body: { requestedSpec, updateOverride },
+        }),
       ]);
       toast.success({ title: t('versionManagement.policySaved') });
     } catch {

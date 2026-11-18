@@ -27,12 +27,12 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ApiError: (await importOriginal<typeof import('@attraccess/react-query-client')>()).ApiError,
-  useResourcesServiceResourceUsageGetActiveSession: () => ({
+  useResourceUsageGetActiveSession: () => ({
     data: sessionData,
     error: sessionError,
     isPending: sessionPending,
   }),
-  useResourceMaintenancesServiceFindMaintenances: () => ({ data: maintenanceData }),
+  useFindMaintenances: () => ({ data: maintenanceData }),
 }));
 
 const forbidden = () =>

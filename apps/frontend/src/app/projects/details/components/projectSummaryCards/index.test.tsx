@@ -25,7 +25,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   }))()),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useProjectsServiceGetProjectUsageStats: (params: unknown) => {
+  useGetProjectUsageStats: (params: unknown) => {
     state.query(params);
     return { data: { summary: state.summary }, isLoading: state.loading };
   },
@@ -38,7 +38,7 @@ beforeEach(() => {
 });
 it('shows empty results and loads the requested project', () => {
   render(<ProjectSummaryCards projectId={7} />);
-  expect(state.query).toHaveBeenCalledWith({ id: 7 });
+  expect(state.query).toHaveBeenCalledWith({ path: { id: 7 } });
   expect(screen.getAllByText('summary.empty')).toHaveLength(4);
 });
 it('shows skeletons while loading instead of an empty result', () => {

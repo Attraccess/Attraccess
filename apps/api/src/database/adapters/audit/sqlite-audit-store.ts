@@ -16,7 +16,7 @@ import {
   DurableAppendControl,
 } from '../../../audit/audit-persistence.port';
 
-import { SQLITE_BUSY_TIMEOUT_MS } from '../../sqlite/sqlite-connection';
+import { createDataSource, SQLITE_BUSY_TIMEOUT_MS } from '../../sqlite/sqlite-connection';
 import { engineTransactionOf } from '../common/legacy-engine-transaction';
 import { isSqliteBusyError, sqliteErrorCode } from '../../sqlite/sqlite-errors';
 import {
@@ -129,18 +129,23 @@ export class SqliteAuditStore implements AuditStore {
 
   async open(): Promise<AuditStoreOpenResult> {
     if (this.isOpen) return { status: 'ready' };
-    if (this.source.options.type !== 'sqlite' || this.source.options.database === ':memory:')
+    if (this.source.options.type !== 'better-sqlite3' || this.source.options.database === ':memory:')
       return { status: 'unsupported' };
     // No schema sync: the schema belongs to the migrations of the main connection.
-    const storage = new DataSource({
-      type: 'sqlite',
-      database: this.source.options.database,
-      entities: [AuditLog],
-      synchronize: false,
-      migrationsRun: false,
-      logging: false,
-      busyTimeout: SQLITE_BUSY_TIMEOUT_MS,
-    });
+    // Guarded like the main connection, so its writes wait asynchronously for the file's write lock (better-sqlite3
+    // would busy-wait on the event loop). It never joins a caller's transaction on another connection.
+    const storage = createDataSource(
+      {
+        type: 'better-sqlite3',
+        database: this.source.options.database,
+        entities: [AuditLog],
+        synchronize: false,
+        migrationsRun: false,
+        logging: false,
+        timeout: SQLITE_BUSY_TIMEOUT_MS,
+      },
+      { joinsOwnedTransactions: false },
+    );
     try {
       await storage.initialize();
       await storage.query(`PRAGMA busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`);

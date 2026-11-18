@@ -11,6 +11,7 @@ import type {
 } from '../../../resources/maintenances/maintenance-request-store.port';
 import { toMaintenanceRequestRecord } from './maintenance-mappers';
 import { TypeOrmResourceRecipientStore } from './resource-recipient-store.adapter';
+import { findRelations } from '../find-options';
 
 const REQUEST_RELATIONS = ['createdByUser', 'resolvedByUser', 'resultingMaintenance'];
 
@@ -43,7 +44,7 @@ export class TypeOrmMaintenanceRequestStore implements MaintenanceRequestStore {
   ): Promise<{ data: ResourceMaintenanceRequestRecord[]; total: number }> {
     const [rows, total] = await this.dataSource.getRepository(ResourceMaintenanceRequest).findAndCount({
       where: { resourceId, status },
-      relations: REQUEST_RELATIONS,
+      relations: findRelations(REQUEST_RELATIONS),
       order: { createdAt: 'DESC' },
       skip,
       take,
@@ -54,7 +55,7 @@ export class TypeOrmMaintenanceRequestStore implements MaintenanceRequestStore {
   async findById(requestId: number): Promise<ResourceMaintenanceRequestRecord | null> {
     const entity = await this.dataSource
       .getRepository(ResourceMaintenanceRequest)
-      .findOne({ where: { id: requestId }, relations: REQUEST_RELATIONS });
+      .findOne({ where: { id: requestId }, relations: findRelations(REQUEST_RELATIONS) });
     return entity ? toMaintenanceRequestRecord(entity) : null;
   }
 
@@ -77,7 +78,7 @@ export class TypeOrmMaintenanceRequestStore implements MaintenanceRequestStore {
   private async reload(requestId: number): Promise<ResourceMaintenanceRequestRecord> {
     const entity = await this.dataSource
       .getRepository(ResourceMaintenanceRequest)
-      .findOneOrFail({ where: { id: requestId }, relations: REQUEST_RELATIONS });
+      .findOneOrFail({ where: { id: requestId }, relations: findRelations(REQUEST_RELATIONS) });
     return toMaintenanceRequestRecord(entity);
   }
 }
@@ -92,7 +93,7 @@ export class TypeOrmMaintenanceNotificationStore implements MaintenanceNotificat
   async findRequest(requestId: number): Promise<RequestForNotification | null> {
     const request = await this.dataSource
       .getRepository(ResourceMaintenanceRequest)
-      .findOne({ where: { id: requestId }, relations: ['createdByUser'] });
+      .findOne({ where: { id: requestId }, relations: { createdByUser: true } });
     if (!request) return null;
     return {
       id: request.id,

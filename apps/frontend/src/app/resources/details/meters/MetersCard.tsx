@@ -1,6 +1,6 @@
 import { Spinner } from '@heroui/react';
 import { Gauge } from 'lucide-react';
-import { useResourceMeteringServiceListResourceMeters } from '@attraccess/react-query-client';
+import { useListResourceMeters } from '@attraccess/react-query-client';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { FlatSection } from '../../../../components/flatSection';
 import { useAuth } from '../../../../hooks/useAuth';
@@ -18,7 +18,7 @@ export function MetersCard({ resourceId, className }: { resourceId: number; clas
     data: meters = [],
     isLoading,
     isError,
-  } = useResourceMeteringServiceListResourceMeters({ resourceId }, undefined, { refetchInterval: 10_000 });
+  } = useListResourceMeters({ path: { resourceId } }, undefined, { refetchInterval: 10_000 });
   const manage = hasPermission('resources.update');
   if (!meters.length && !manage && !isLoading && !isError) return null;
   return (

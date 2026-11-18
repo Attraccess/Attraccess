@@ -71,9 +71,8 @@ describe('plugin dependency confirmations', () => {
     hoisted.installPackageMock.mockRejectedValue({ body: { message: 'test complete' } });
     await user.click(within(dialog).getByRole('button', { name: 'Install plugin' }));
     expect(hoisted.installPackageMock).toHaveBeenCalledWith({
-      packageName: provider.name,
-      version: '1.0.0',
-      requestBody: { registryId: 'npm', planToken: 'reviewed-plan' },
+      path: { packageName: provider.name, version: '1.0.0' },
+      body: { registryId: 'npm', planToken: 'reviewed-plan' },
     });
   });
 
@@ -169,8 +168,8 @@ describe('plugin dependency confirmations', () => {
     await user.click(within(dialog).getByRole('switch'));
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
     expect(hoisted.removeGraphMock).toHaveBeenCalledWith({
-      packageName: core.name,
-      requestBody: { approvedDependants: [adapter.name, provider.name] },
+      path: { packageName: core.name },
+      body: { approvedDependants: [adapter.name, provider.name] },
     });
   });
 });
@@ -265,8 +264,8 @@ describe('plugin version management', () => {
     await user.click(screen.getByRole('button', { name: 'Save version policy' }));
     await waitFor(() =>
       expect(hoisted.updateInstalledPackagePolicyMock).toHaveBeenCalledWith({
-        packageName: 'Cool Plugin',
-        requestBody: { requestedSpec: '^2.0.0', updateOverride: 'patch' },
+        path: { packageName: 'Cool Plugin' },
+        body: { requestedSpec: '^2.0.0', updateOverride: 'patch' },
       }),
     );
     expect(screen.getByText('3.0.0: Requires a newer host')).toBeInTheDocument();
@@ -292,9 +291,8 @@ describe('plugin version management', () => {
     await user.click(screen.getByRole('button', { name: 'Update' }));
     await waitFor(() =>
       expect(hoisted.replaceInstalledPackageMock).toHaveBeenCalledWith({
-        packageName: 'Cool Plugin',
-        version: '2.0.0',
-        requestBody: { approvedPermissionAdditions: ['write:users'], approvedMajorVersion: true },
+        path: { packageName: 'Cool Plugin', version: '2.0.0' },
+        body: { approvedPermissionAdditions: ['write:users'], approvedMajorVersion: true },
       }),
     );
     await waitFor(() =>
@@ -395,9 +393,8 @@ describe('plugin version management', () => {
 
     await waitFor(() =>
       expect(hoisted.replaceInstalledPackageMock).toHaveBeenCalledWith({
-        packageName: 'Cool Plugin',
-        version: '1.3.0',
-        requestBody: { approvedPermissionAdditions: [], approvedMajorVersion: false, planToken: 'version-plan' },
+        path: { packageName: 'Cool Plugin', version: '1.3.0' },
+        body: { approvedPermissionAdditions: [], approvedMajorVersion: false, planToken: 'version-plan' },
       }),
     );
   });

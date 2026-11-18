@@ -7,8 +7,8 @@ import en from './en.json';
 import {
   BillingTransaction,
   BillingTransactionStatus,
-  useBillingServiceGetBillingConfiguration,
-  useBillingServiceGetBillingTransaction,
+  useGetBillingConfiguration,
+  useGetBillingTransaction,
 } from '@attraccess/react-query-client';
 import { useEffect, useState } from 'react';
 import { TransactionItemsTable } from './TransactionItemsTable';
@@ -63,8 +63,8 @@ export function TransactionDetailsModalView({
     data: transaction,
     error,
     refetch,
-  } = useBillingServiceGetBillingTransaction({ transactionId }, undefined, { enabled: isOpen });
-  const { data: configuration } = useBillingServiceGetBillingConfiguration(undefined, { enabled: isOpen });
+  } = useGetBillingTransaction({ path: { transactionId } }, undefined, { enabled: isOpen });
+  const { data: configuration } = useGetBillingConfiguration({}, undefined, { enabled: isOpen });
 
   const [isUsageOpen, setUsageOpen] = useState(false);
 

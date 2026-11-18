@@ -12,16 +12,19 @@ export function sqliteErrorCode(error: unknown): string | undefined {
   return candidates.find((code): code is string => typeof code === 'string' && /^SQLITE_[A-Z_]+$/.test(code));
 }
 
-/** A statement gave up waiting: for another connection's write lock, or for another flow's transaction. */
+/**
+ * A statement gave up waiting: for another connection's write lock, or for another flow's transaction. better-sqlite3
+ * reports extended result codes (SQLITE_BUSY_RECOVERY, ...), so any SQLITE_BUSY code counts.
+ */
 export function isSqliteBusyError(error: unknown): boolean {
-  return sqliteErrorCode(error) === 'SQLITE_BUSY';
+  return sqliteErrorCode(error)?.startsWith('SQLITE_BUSY') ?? false;
 }
 
 const UNIQUE_CODES = new Set(['SQLITE_CONSTRAINT_UNIQUE', 'SQLITE_CONSTRAINT_PRIMARYKEY']);
 
 /**
- * The node sqlite3 driver reports constraint failures with the generic code SQLITE_CONSTRAINT and names the kind
- * only in its message. The message is read for classification and never logged (it can contain column values).
+ * A driver may report constraint failures with the generic code SQLITE_CONSTRAINT and name the kind
+ * only in its message (better-sqlite3 reports the extended code, matched above). The message is read for classification and never logged (it can contain column values).
  */
 function constraintKind(error: unknown): PersistenceErrorKind | undefined {
   const messages = [
@@ -51,12 +54,12 @@ export const sqliteErrorClassifier: PersistenceErrorClassifier = {
   classify(error: unknown): PersistenceErrorKind | undefined {
     const code = sqliteErrorCode(error);
     if (!code) return readOnlyByMessage(error) ? 'read-only' : undefined;
-    if (code === 'SQLITE_BUSY') return 'busy';
+    if (code === 'SQLITE_BUSY_SNAPSHOT') return 'conflict';
+    if (code.startsWith('SQLITE_BUSY')) return 'busy';
     // SQLITE_READONLY and its extended codes (SQLITE_READONLY_DBMOVED, ...).
     if (code.startsWith('SQLITE_READONLY')) return 'read-only';
     if (UNIQUE_CODES.has(code)) return 'unique-violation';
     if (code === 'SQLITE_CONSTRAINT_FOREIGNKEY') return 'foreign-key-violation';
-    if (code === 'SQLITE_BUSY_SNAPSHOT') return 'conflict';
     if (code === 'SQLITE_CONSTRAINT') return constraintKind(error);
     return undefined;
   },

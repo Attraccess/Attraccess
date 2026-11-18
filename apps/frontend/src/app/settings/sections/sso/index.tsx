@@ -1,7 +1,7 @@
 import { Navigate, useNavigate } from 'react-router-dom';
 import { PlusIcon } from 'lucide-react';
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
+import { useGetLicenseInformation } from '@attraccess/react-query-client';
 import { SettingsSection } from '../../components/SettingsSection';
 import { SSOProvidersList } from '../../../sso/providers/SSOProvidersList';
 import { useAuth } from '../../../../hooks/useAuth';
@@ -17,7 +17,7 @@ export function SsoSection() {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
-  const { data: license } = useLicenseServiceGetLicenseInformation();
+  const { data: license } = useGetLicenseInformation();
 
   // Belt and braces with the route guard: the rail hides the section, but a typed URL should not
   // reach the list either.

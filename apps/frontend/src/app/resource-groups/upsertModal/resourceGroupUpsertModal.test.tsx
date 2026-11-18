@@ -20,12 +20,12 @@ vi.mock('../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: state.success, error: state.error }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourcesServiceResourceGroupsGetManyKey: 'groups',
-  useResourcesServiceResourceGroupsCreateOne: (options: typeof state.createOptions) => {
+  useResourceGroupsGetManyKey: 'groups',
+  useResourceGroupsCreateOne: (_mutationKey: unknown, options: typeof state.createOptions) => {
     state.createOptions = options;
     return { mutate: state.create, isPending: false };
   },
-  useResourcesServiceResourceGroupsUpdateOne: (options: typeof state.updateOptions) => {
+  useResourceGroupsUpdateOne: (_mutationKey: unknown, options: typeof state.updateOptions) => {
     state.updateOptions = options;
     return { mutate: state.update, isPending: false };
   },
@@ -58,7 +58,7 @@ it('creates a group with retraining and visibility settings and refreshes the li
   fireEvent.click(screen.getByRole('switch', { name: 'visibility.hidden.label' }));
   fireEvent.click(screen.getByRole('button', { name: 'createButton' }));
   expect(state.create).toHaveBeenCalledWith({
-    requestBody: {
+    body: {
       name: 'Workshop',
       description: 'Shared tools',
       retrainingMaxAgeDays: 90,
@@ -92,8 +92,8 @@ it('loads an existing group and clears optional limits in an update', async () =
   });
   fireEvent.click(screen.getByRole('button', { name: 'updateButton' }));
   expect(state.update).toHaveBeenCalledWith({
-    id: 9,
-    requestBody: expect.objectContaining({
+    path: { id: 9 },
+    body: expect.objectContaining({
       description: '',
       retrainingMaxAgeDays: null,
       retrainingMaxInactivityDays: null,

@@ -4,12 +4,12 @@ import de from './ssoLogin.de.json';
 import en from './ssoLogin.en.json';
 import { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useAuthenticationServiceGetAllSsoProviders, SSOProvider } from '@attraccess/react-query-client';
+import { useGetAllSsoProviders, SsoProvider } from '@attraccess/react-query-client';
 import { SSOLinkingRequiredModal } from './ssoLinkingRequiredModal';
 import { useCallbackURL } from './use-sso-callback-url';
 
 interface SSOLoginButtonProps {
-  provider: SSOProvider;
+  provider: SsoProvider;
 }
 
 function SSOLoginButton(props: Readonly<SSOLoginButtonProps>) {
@@ -23,15 +23,13 @@ function SSOLoginButton(props: Readonly<SSOLoginButtonProps>) {
 
   return (
     <a href={loginHref} target="_self" className="block" data-cy={`sso-login-button-${provider.name}`}>
-      <Button className="w-full">
-        {t('loginWith', { provider: provider.name })}
-      </Button>
+      <Button className="w-full">{t('loginWith', { provider: provider.name })}</Button>
     </a>
   );
 }
 
 export function SSOLogin() {
-  const { isLoading, data: providers } = useAuthenticationServiceGetAllSsoProviders();
+  const { isLoading, data: providers } = useGetAllSsoProviders();
   const location = useLocation();
 
   const query = useMemo(() => {

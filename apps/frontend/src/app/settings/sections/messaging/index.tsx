@@ -1,10 +1,7 @@
 import { useState } from 'react';
 import { Spinner } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  usePushServicePushGetVapidConfig,
-  useSettingsServiceGetMessagingRateLimitSettings,
-} from '@attraccess/react-query-client';
+import { usePushGetVapidConfig, useGetMessagingRateLimitSettings } from '@attraccess/react-query-client';
 import { SettingsSection } from '../../components/SettingsSection';
 import { MessagingRateLimits } from './MessagingRateLimits';
 import { MessagingVapidKeyAside } from './MessagingVapidKeyAside';
@@ -24,8 +21,8 @@ export function MessagingSection() {
   const { t } = useTranslations({ en, de });
   // Both queries start here, in parallel, and reach the rows as props: subscribing in the rows
   // delayed VAPID until the limits arrived and refetched the limits on mount (no `staleTime`).
-  const { data: limits, isLoading } = useSettingsServiceGetMessagingRateLimitSettings();
-  const { data: vapidConfig } = usePushServicePushGetVapidConfig();
+  const { data: limits, isLoading } = useGetMessagingRateLimitSettings();
+  const { data: vapidConfig } = usePushGetVapidConfig();
   // Above the gate: a limits refetch after an error flips back to loading and unmounts the rows.
   const [vapidDraft, setVapidDraft] = useState<VapidKeyDraft>(EMPTY_VAPID_KEY_DRAFT);
 

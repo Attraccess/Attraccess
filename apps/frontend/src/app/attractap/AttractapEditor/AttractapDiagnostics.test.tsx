@@ -15,8 +15,8 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => ({ error: state.toast }) }));
 vi.mock('@attraccess/react-query-client', () => ({
-  OpenAPI: { BASE: 'https://api.test' },
-  useAttractapServiceGetReaderCrashReports: (...args: unknown[]) => {
+  client: { getConfig: () => ({ baseUrl: 'https://api.test' }) },
+  useGetReaderCrashReports: (...args: unknown[]) => {
     state.query(...args);
     return { data: state.reports, isLoading: state.loading, isError: state.error };
   },
@@ -65,7 +65,7 @@ it('distinguishes loading, errors, and a reader without reports', () => {
   view.rerender(<AttractapDiagnostics />);
   expect(screen.getByText('empty')).toBeTruthy();
   expect(state.query).toHaveBeenLastCalledWith(
-    { readerId: undefined },
+    { path: { readerId: undefined } },
     undefined,
     expect.objectContaining({ enabled: false }),
   );

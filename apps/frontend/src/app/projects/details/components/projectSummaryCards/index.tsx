@@ -1,7 +1,7 @@
 import { Card, Skeleton } from '@heroui/react';
 import { useTranslations, useNumberFormatter } from '@attraccess/plugins-frontend-ui';
 import { ActivityIcon, CircleDollarSignIcon, Clock3Icon, UsersIcon } from 'lucide-react';
-import { useProjectsServiceGetProjectUsageStats } from '@attraccess/react-query-client';
+import { useGetProjectUsageStats } from '@attraccess/react-query-client';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import en from './en.json';
 import de from './de.json';
@@ -19,7 +19,7 @@ export function ProjectSummaryCards({ projectId }: ProjectSummaryCardsProps) {
   const { t } = useTranslations({ en, de });
   const formatNumber = useNumberFormatter();
   const formatHours = useNumberFormatter(HOURS_FORMAT);
-  const { data, isLoading } = useProjectsServiceGetProjectUsageStats({ id: projectId });
+  const { data, isLoading } = useGetProjectUsageStats({ path: { id: projectId } });
   const summary = data?.summary;
 
   const cards = [

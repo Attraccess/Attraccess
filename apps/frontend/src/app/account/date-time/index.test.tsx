@@ -26,12 +26,12 @@ vi.mock('@attraccess/react-query-client', async () => {
   };
   const useRevision = () => useSyncExternalStore(subscribe, () => state.revision);
   return {
-    UseUsersServiceGetCurrentKeyFn: () => ['current-user'],
-    useUsersServiceGetCurrent: () => {
+    UseGetCurrentKeyFn: () => ['current-user'],
+    useGetCurrent: () => {
       useRevision();
       return { data: state.user, isLoading: state.loading };
     },
-    useUsersServiceUpdateMyDateTimePreferences: (options: typeof state.options) => {
+    useUpdateMyDateTimePreferences: (_mutationKey: unknown, options: typeof state.options) => {
       useRevision();
       state.options = options;
       return { mutate: state.save, isPending: state.pending };
@@ -131,7 +131,7 @@ it('validates drafts and isolates previews; only a canonical successful save cha
   custom(' en-gb ');
   expect(useDateTimePreferences.getState().dateTimeLocale).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  expect(state.save).toHaveBeenCalledWith({ requestBody: { dateTimeLocale: 'en-GB' } });
+  expect(state.save).toHaveBeenCalledWith({ body: { dateTimeLocale: 'en-GB' } });
   act(() => state.options.onError());
   expect(state.error).toHaveBeenCalled();
   expect(screen.getByRole('textbox')).toHaveValue(' en-gb ');
@@ -161,7 +161,7 @@ it('hydrates reloads, resets drafts across account identities, rejects stale sav
   fireEvent.change(screen.getByRole('combobox'), { target: { value: 'language' } });
   act(() => useTranslationState.getState().setLanguage('de'));
   fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-  expect(state.save).toHaveBeenCalledWith({ requestBody: { dateTimeLocale: null } });
+  expect(state.save).toHaveBeenCalledWith({ body: { dateTimeLocale: null } });
   act(() => state.options.onSuccess({ id: 2, dateTimeLocale: null }));
   expect(useDateTimePreferences.getState().dateTimeLocale).toBeNull();
 });
@@ -206,7 +206,7 @@ it('blocks editing and duplicate saves while pending, then retains the draft for
 
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   expect(state.save).toHaveBeenCalledTimes(2);
-  expect(state.save).toHaveBeenLastCalledWith({ requestBody: { dateTimeLocale: 'en-US' } });
+  expect(state.save).toHaveBeenLastCalledWith({ body: { dateTimeLocale: 'en-US' } });
   act(() => state.options.onSuccess({ id: 1, dateTimeLocale: 'en-US' }));
   expect(client.getQueryData(['current-user'])).toEqual({ id: 1, dateTimeLocale: 'en-US' });
   expect(useDateTimePreferences.getState().dateTimeLocale).toBe('en-US');

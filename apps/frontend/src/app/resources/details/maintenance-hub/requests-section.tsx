@@ -4,10 +4,10 @@ import { CheckCircleIcon, XCircleIcon, MessageSquareWarningIcon } from 'lucide-r
 import { useCallback } from 'react';
 import {
   MaintenanceRequestStatus,
-  useResourceMaintenancesServiceListMaintenanceRequests,
-  useResourceMaintenancesServiceListMaintenanceRequestsKey,
-  useResourceMaintenancesServiceResolveMaintenanceRequest,
-  useResourceMaintenancesServiceFindMaintenancesKey,
+  useListMaintenanceRequests,
+  useListMaintenanceRequestsKey,
+  useResolveMaintenanceRequest,
+  useFindMaintenancesKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { MaintenanceReasonDisplay } from '../../../../components/MaintenanceReasonDisplay';
@@ -24,18 +24,18 @@ export function RequestsSection(props: Props) {
   const { t } = useTranslations({ de, en });
   const queryClient = useQueryClient();
 
-  const { data: requests } = useResourceMaintenancesServiceListMaintenanceRequests(
-    { resourceId, status: MaintenanceRequestStatus.OPEN },
+  const { data: requests } = useListMaintenanceRequests(
+    { path: { resourceId }, query: { status: MaintenanceRequestStatus.OPEN } },
     undefined,
     { refetchInterval: 10_000 },
   );
 
   const onSuccess = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: [useResourceMaintenancesServiceListMaintenanceRequestsKey] });
-    queryClient.invalidateQueries({ queryKey: [useResourceMaintenancesServiceFindMaintenancesKey] });
+    queryClient.invalidateQueries({ queryKey: [useListMaintenanceRequestsKey] });
+    queryClient.invalidateQueries({ queryKey: [useFindMaintenancesKey] });
   }, [queryClient]);
 
-  const { mutate: resolveRequest, isPending } = useResourceMaintenancesServiceResolveMaintenanceRequest({ onSuccess });
+  const { mutate: resolveRequest, isPending } = useResolveMaintenanceRequest(undefined, { onSuccess });
 
   const open = requests?.data ?? [];
   if (open.length === 0) return null;
@@ -60,7 +60,9 @@ export function RequestsSection(props: Props) {
               <div className="text-xs text-default-600">
                 <span>
                   {t('activity.requests.reportedBy', {
-                    name: (request.createdByUser as { username?: string } | null)?.username ?? t('activity.requests.someone'),
+                    name:
+                      (request.createdByUser as { username?: string } | null)?.username ??
+                      t('activity.requests.someone'),
                   })}
                 </span>{' '}
                 · <DateTimeDisplay date={request.createdAt} />
@@ -70,7 +72,9 @@ export function RequestsSection(props: Props) {
               <Button
                 variant="primary"
                 isDisabled={isPending}
-                onPress={() => resolveRequest({ resourceId, requestId: request.id, requestBody: { action: 'convert' } })}
+                onPress={() =>
+                  resolveRequest({ path: { resourceId, requestId: request.id }, body: { action: 'convert' } })
+                }
               >
                 <CheckCircleIcon className="w-4 h-4" />
                 {t('activity.requests.convert')}
@@ -78,7 +82,9 @@ export function RequestsSection(props: Props) {
               <Button
                 variant="ghost"
                 isDisabled={isPending}
-                onPress={() => resolveRequest({ resourceId, requestId: request.id, requestBody: { action: 'dismiss' } })}
+                onPress={() =>
+                  resolveRequest({ path: { resourceId, requestId: request.id }, body: { action: 'dismiss' } })
+                }
               >
                 <XCircleIcon className="w-4 h-4" />
                 {t('activity.requests.dismiss')}

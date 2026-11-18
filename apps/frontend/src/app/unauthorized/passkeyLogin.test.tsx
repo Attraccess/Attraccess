@@ -38,11 +38,9 @@ function apiError(message: string): Error {
 
 vi.mock('@attraccess/react-query-client', () => ({
   ApiError: class ApiError extends Error {},
-  UseUsersServiceGetCurrentKeyFn: () => ['currentUser'],
-  PasskeysService: {
-    getPasskeyAuthenticationOptions: () => Promise.resolve({ options: { challenge: 'c' } }),
-    createSessionWithPasskey: (...args: unknown[]) => createSessionWithPasskey(...args),
-  },
+  UseGetCurrentKeyFn: () => ['currentUser'],
+  getPasskeyAuthenticationOptions: () => Promise.resolve({ data: { options: { challenge: 'c' } } }),
+  createSessionWithPasskey: async (...args: unknown[]) => ({ data: await createSessionWithPasskey(...args) }),
 }));
 
 async function clickSignIn() {

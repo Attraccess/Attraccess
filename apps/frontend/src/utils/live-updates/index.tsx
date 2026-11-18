@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { create } from 'zustand';
 import { LiveSubscription } from '@attraccess/shared';
 import { getBaseUrl } from '../../api';
-import { UseUsersServiceGetCurrentKeyFn } from '@attraccess/react-query-client';
+import { UseGetCurrentKeyFn } from '@attraccess/react-query-client';
 import { LivePayloads } from './types';
 import { LiveUpdateClient } from './client';
 import { PluginLiveUpdatesProvider } from '@attraccess/plugins-frontend-sdk';
@@ -41,7 +41,7 @@ export function LiveUpdatesProvider({ userId, children }: { userId?: number; chi
             () => {
               if (useLiveUpdatesAuth.getState().generation !== generation) return;
               stopLiveUpdates();
-              queryClient.setQueryData(UseUsersServiceGetCurrentKeyFn(), null);
+              queryClient.setQueryData(UseGetCurrentKeyFn(), null);
               queryClient.clear();
             },
             () => {

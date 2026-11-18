@@ -28,7 +28,8 @@ describe('new account language persistence', () => {
     // The unit of work commits on its own connection, so the database must be a file.
     directory = await mkdtemp(join(tmpdir(), 'account-language-'));
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: join(directory, 'language.sqlite'),
       entities: Object.values(entities),
       migrations: Object.values(migrations),

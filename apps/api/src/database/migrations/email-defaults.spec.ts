@@ -9,7 +9,7 @@ describe.each([
   let source: DataSource;
   let runner: QueryRunner;
   beforeEach(async () => {
-    source = await new DataSource({ type: 'sqlite', database: ':memory:', entities: [] }).initialize();
+    source = await new DataSource({ type: 'better-sqlite3', database: ':memory:', entities: [] }).initialize();
     runner = source.createQueryRunner();
     await runner.query('CREATE TABLE notification_preference (id INTEGER PRIMARY KEY, categoryChannels TEXT)');
   });

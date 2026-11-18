@@ -1,7 +1,7 @@
 import {
   CsvExportType,
   ResourceUsageExportRowDto,
-  useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite,
+  useGetResourceUsageHoursInDateRangeInfinite,
 } from '@attraccess/react-query-client';
 import { ExportProps } from '../export-props';
 import { CsvExportConfigContent } from '../export-config';
@@ -22,11 +22,8 @@ export function ResourceUsageExport(props: Readonly<ExportProps>) {
   const [fetchAll, setFetchAll] = useState(false);
 
   const { data, status, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } =
-    useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite(
-      {
-        start: props.start.toISOString(),
-        end: props.end.toISOString(),
-      },
+    useGetResourceUsageHoursInDateRangeInfinite(
+      { query: { start: props.start.toISOString(), end: props.end.toISOString() } },
       undefined,
       EXPORT_QUERY_OPTIONS,
     );

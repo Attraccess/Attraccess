@@ -14,7 +14,7 @@ const state = vi.hoisted(() => ({
   resetFails: null as unknown,
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useAttractapServiceGetAllCards: (params: unknown) => {
+  useGetAllCards: (params: unknown) => {
     state.cardsQuery(params);
     return {
       data: [
@@ -23,23 +23,23 @@ vi.mock('@attraccess/react-query-client', () => ({
       ],
     };
   },
-  useAttractapServiceResetNfcCard: (options: { onSuccess: () => void; onError: (error: unknown) => void }) => ({
+  useResetNfcCard: (_mutationKey: unknown, options: { onSuccess: () => void; onError: (error: unknown) => void }) => ({
     mutate: (data: unknown) => {
       state.reset(data);
       if (state.resetFails) options.onError(state.resetFails);
     },
   }),
-  useAttractapServiceEnrollNfcCard: (options: { onSuccess: () => void; onError: (error: unknown) => void }) => ({
+  useEnrollNfcCard: (_mutationKey: unknown, options: { onSuccess: () => void; onError: (error: unknown) => void }) => ({
     mutate: (data: unknown) => {
       state.enroll(data);
       if (state.enrollFails) options.onError(state.enrollFails);
       else options.onSuccess();
     },
   }),
-  useAttractapServiceToggleCardActive: () => ({ mutate: state.toggle }),
-  UseAttractapServiceGetAllCardsKeyFn: () => ['cards'],
-  useUsersServiceGetOneUserById: () => ({ data: undefined }),
-  useLicenseServiceGetLicenseInformation: () => ({ data: { modules: state.licensed ? ['attractap'] : [] } }),
+  useToggleCardActive: () => ({ mutate: state.toggle }),
+  UseGetAllCardsKeyFn: () => ['cards'],
+  useGetOneUserById: () => ({ data: undefined }),
+  useGetLicenseInformation: () => ({ data: { modules: state.licensed ? ['attractap'] : [] } }),
 }));
 vi.mock('../AttractapSelect', () => ({
   AttractapSelect: ({
@@ -100,7 +100,7 @@ it('renders card identities and requires a reader before deleting a card', () =>
   expect(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' })).toBeDisabled();
   fireEvent.change(screen.getByRole('combobox', { name: 'Select Attractap' }), { target: { value: '4' } });
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
-  expect(state.reset).toHaveBeenCalledWith({ requestBody: { readerId: 4, cardId: 7 } });
+  expect(state.reset).toHaveBeenCalledWith({ body: { readerId: 4, cardId: 7 } });
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(screen.queryByRole('dialog')).toBeNull();
 });
@@ -117,7 +117,7 @@ it.each([
   if (!row) throw new Error('Card row not found');
   fireEvent.click(within(row).getByRole('button', { name: action }));
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: action }));
-  expect(state.toggle).toHaveBeenCalledWith({ id, requestBody: { active } });
+  expect(state.toggle).toHaveBeenCalledWith({ path: { id }, body: { active } });
 });
 it('enrolls on the selected reader and hides the page without a license', () => {
   const view = render(
@@ -129,7 +129,7 @@ it('enrolls on the selected reader and hides the page without a license', () => 
   expect(screen.getByRole('button', { name: 'Enroll' })).toBeDisabled();
   fireEvent.change(screen.getByRole('combobox'), { target: { value: '4' } });
   fireEvent.click(screen.getByRole('button', { name: 'Enroll' }));
-  expect(state.enroll).toHaveBeenCalledWith({ requestBody: { readerId: 4 } });
+  expect(state.enroll).toHaveBeenCalledWith({ body: { readerId: 4 } });
   expect(screen.queryByRole('dialog')).toBeNull();
   view.unmount();
   state.licensed = false;
@@ -147,12 +147,12 @@ it('lists and enrolls cards for the selected user instead of the acting admin', 
       <RfidCardList userId={23} />
     </MemoryRouter>,
   );
-  expect(state.cardsQuery).toHaveBeenCalledWith({ userId: 23 });
+  expect(state.cardsQuery).toHaveBeenCalledWith({ query: { userId: 23 } });
   expect(screen.getByRole('heading', { name: 'RFID Cards — #23' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Enroll RFID Card' }));
   fireEvent.change(screen.getByRole('combobox'), { target: { value: '4' } });
   fireEvent.click(screen.getByRole('button', { name: 'Enroll' }));
-  expect(state.enroll).toHaveBeenCalledWith({ requestBody: { readerId: 4, userId: 23 } });
+  expect(state.enroll).toHaveBeenCalledWith({ body: { readerId: 4, userId: 23 } });
 });
 
 it.each([

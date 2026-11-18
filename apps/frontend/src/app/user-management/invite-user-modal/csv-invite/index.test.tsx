@@ -21,12 +21,12 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useRbacServiceListRoles: () => ({ data: [] }),
-  useUsersServiceInviteUsersFromCsv: (options: typeof inviteFromCsvOptions) => {
+  useListRoles: () => ({ data: [] }),
+  useInviteUsersFromCsv: (_mutationKey: unknown, options: typeof inviteFromCsvOptions) => {
     inviteFromCsvOptions = options;
     return { mutate: vi.fn(), isPending: false };
   },
-  useUsersServiceFindManyKey: 'useUsersServiceFindManyKey',
+  useFindManyKey: 'useFindManyKey',
 }));
 
 describe('CsvInvite', () => {

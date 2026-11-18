@@ -38,7 +38,11 @@ type Api = Record<string, (...args: unknown[]) => Promise<unknown>>;
 const api = (name: string): Api => (port as unknown as Record<string, Api>)[name];
 
 beforeAll(async () => {
-  source = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+  source = await new DataSource({
+    type: 'better-sqlite3',
+    invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+    database: ':memory:',
+  }).initialize();
   runner = source.createQueryRunner();
   const compiled = compilePluginStorage(
     'demo',

@@ -2,14 +2,15 @@
 // FEATURE: ATT-1151 Mass introduction
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  AccessControlService,
   ApiError,
   MassIntroductionEndReason,
   MassIntroductionLiveEventDto,
   MassIntroductionLiveEventType,
   MassIntroductionSessionDto,
-  useAccessControlServiceMassIntroductionCancel,
-  useAccessControlServiceMassIntroductionStart,
+  useMassIntroductionCancel,
+  useMassIntroductionStart,
+  massIntroductionGet,
+  massIntroductionCancel,
 } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useLiveUpdates } from '../../../../utils/live-updates';
@@ -81,12 +82,14 @@ export function useMassIntroductionSession(target: PeopleTarget): MassIntroducti
   // Set while the drawer is closed: a start that finishes afterwards must not leave a QR code running.
   const unmountedRef = useRef(false);
 
-  const startMutation = useAccessControlServiceMassIntroductionStart({
+  const startMutation = useMassIntroductionStart(undefined, {
     onSuccess: (started) => {
       if (unmountedRef.current) {
         // React Query still reports a start that finishes after the drawer closed; end it right away
         // (with the plain service call, the mutation hook is gone).
-        void AccessControlService.massIntroductionCancel({ sessionId: started.id }).catch(() => undefined);
+        void massIntroductionCancel({ path: { sessionId: started.id }, throwOnError: true })
+          .then(({ data }) => data)
+          .catch(() => undefined);
         return;
       }
       activeSessionIdRef.current = started.id;
@@ -98,7 +101,7 @@ export function useMassIntroductionSession(target: PeopleTarget): MassIntroducti
     // E.g. READER_FIRMWARE_UPDATE_REQUIRED or READER_BUSY: say why in the user's language.
     onError: (error) => toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' }),
   });
-  const { mutate: cancelMutate } = useAccessControlServiceMassIntroductionCancel();
+  const { mutate: cancelMutate } = useMassIntroductionCancel();
   // The unmount cleanup below must not re-run (and cancel early) if the mutate identity ever changes.
   const cancelMutateRef = useRef(cancelMutate);
   cancelMutateRef.current = cancelMutate;
@@ -106,7 +109,7 @@ export function useMassIntroductionSession(target: PeopleTarget): MassIntroducti
   const start = useCallback(
     (readerId?: number) => {
       startMutation.mutate({
-        requestBody: {
+        body: {
           ...(target.type === 'resource' ? { resourceId: target.id } : { resourceGroupId: target.id }),
           ...(readerId !== undefined ? { readerId } : {}),
         },
@@ -120,7 +123,7 @@ export function useMassIntroductionSession(target: PeopleTarget): MassIntroducti
     const sessionId = activeSessionIdRef.current;
     if (!sessionId) return;
     activeSessionIdRef.current = null;
-    cancelMutate({ sessionId });
+    cancelMutate({ path: { sessionId } });
     setEndReason(MassIntroductionEndReason.CANCELLED);
   }, [cancelMutate]);
 
@@ -140,7 +143,7 @@ export function useMassIntroductionSession(target: PeopleTarget): MassIntroducti
       const sessionId = activeSessionIdRef.current;
       if (sessionId) {
         activeSessionIdRef.current = null;
-        cancelMutateRef.current({ sessionId });
+        cancelMutateRef.current({ path: { sessionId } });
       }
     };
   }, []);
@@ -178,16 +181,18 @@ export function useMassIntroductionSession(target: PeopleTarget): MassIntroducti
   const resync = useCallback(() => {
     const sessionId = activeSessionIdRef.current;
     if (!sessionId) return;
-    AccessControlService.massIntroductionGet({ sessionId }).then(
-      (current) => {
-        if (activeSessionIdRef.current === sessionId) applySession(current);
-      },
-      (error) => {
-        if (activeSessionIdRef.current !== sessionId) return;
-        if ((error as ApiError)?.status === 404) markEnded('unknown');
-        else setRefreshRetry((attempt) => attempt + 1);
-      },
-    );
+    massIntroductionGet({ path: { sessionId }, throwOnError: true })
+      .then(({ data }) => data)
+      .then(
+        (current) => {
+          if (activeSessionIdRef.current === sessionId) applySession(current);
+        },
+        (error) => {
+          if (activeSessionIdRef.current !== sessionId) return;
+          if ((error as ApiError)?.status === 404) markEnded('unknown');
+          else setRefreshRetry((attempt) => attempt + 1);
+        },
+      );
   }, [applySession, markEnded]);
 
   // The join code changes every 15 seconds so a photo of it cannot be passed on; fetch the next one

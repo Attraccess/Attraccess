@@ -1,3 +1,5 @@
+// TypeORM loads the driver at runtime; the static import makes the generated package.json ship it.
+import 'better-sqlite3';
 import { DataSource, DataSourceOptions, DefaultNamingStrategy, getMetadataArgsStorage } from 'typeorm';
 import { entities } from '@attraccess/database-entities';
 import { resolveDatabasePath } from '../../config/storage-path';
@@ -52,8 +54,11 @@ function createDataSourceOptions(): DataSourceOptions {
     // Providers access database-backed settings while Nest constructs AppModule.
     migrationsRun: true,
     entities: entityList,
-    type: 'sqlite',
+    type: 'better-sqlite3',
     database: resolveDatabasePath(),
+    // TypeORM 1.0 throws on null/undefined values in find-option where clauses; 0.3 skipped them. Keep 0.3's behaviour
+    // so code that passes an optional filter does not start failing at runtime.
+    invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
   } as DataSourceOptions;
 }
 

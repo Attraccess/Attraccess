@@ -25,13 +25,13 @@ vi.mock('../../../../../components/toastProvider', () => ({
 }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  UseFlowVariablesServiceListFlowVariablesKeyFn: ({ resourceId }: { resourceId: number }) => ['variables', resourceId],
-  useFlowVariablesServiceListFlowVariables: () => ({ data: state.rows }),
-  useFlowVariablesServiceUpsertFlowVariable: (options: typeof state.upsertOptions) => {
+  UseListFlowVariablesKeyFn: ({ path: { resourceId } }: { path: { resourceId: number } }) => ['variables', resourceId],
+  useListFlowVariables: () => ({ data: state.rows }),
+  useUpsertFlowVariable: (_mutationKey: unknown, options: typeof state.upsertOptions) => {
     state.upsertOptions = options;
     return { mutate: state.upsert };
   },
-  useFlowVariablesServiceDeleteFlowVariable: (options: typeof state.removeOptions) => {
+  useDeleteFlowVariable: (_mutationKey: unknown, options: typeof state.removeOptions) => {
     state.removeOptions = options;
     return { mutate: state.remove };
   },
@@ -73,10 +73,8 @@ it('creates a variable through the real editor and refreshes its resource cache'
   fireEvent.change(screen.getByRole('textbox', { name: 'editor.value' }), { target: { value: 'Hello' } });
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
   expect(state.upsert).toHaveBeenCalledWith({
-    resourceId: 7,
-    scope: Scope.RESOURCE,
-    key: 'greeting',
-    requestBody: { value: 'Hello' },
+    path: { resourceId: 7, scope: Scope.RESOURCE, key: 'greeting' },
+    body: { value: 'Hello' },
   });
   act(() => state.upsertOptions.onSuccess());
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['variables', 7] });
@@ -91,10 +89,8 @@ it('edits existing values without changing their key and reports save failures',
   fireEvent.change(screen.getByRole('textbox', { name: 'editor.value' }), { target: { value: 'Welcome' } });
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
   expect(state.upsert).toHaveBeenCalledWith({
-    resourceId: 7,
-    scope: Scope.RESOURCE,
-    key: 'greeting',
-    requestBody: { value: 'Welcome' },
+    path: { resourceId: 7, scope: Scope.RESOURCE, key: 'greeting' },
+    body: { value: 'Welcome' },
   });
   const error = new Error('Denied');
   act(() => state.upsertOptions.onError(error));
@@ -110,7 +106,7 @@ it('requires confirmation before deletion and handles its success and error call
   expect(state.remove).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'actions.delete' }));
   fireEvent.click(screen.getByRole('button', { name: 'actions.confirmDeleteYes' }));
-  expect(state.remove).toHaveBeenCalledWith({ resourceId: 7, scope: Scope.RESOURCE, key: 'old' });
+  expect(state.remove).toHaveBeenCalledWith({ path: { resourceId: 7, scope: Scope.RESOURCE, key: 'old' } });
   const error = new Error('Denied');
   act(() => state.removeOptions.onError(error));
   expect(state.error).toHaveBeenCalledWith(expect.objectContaining({ error }));

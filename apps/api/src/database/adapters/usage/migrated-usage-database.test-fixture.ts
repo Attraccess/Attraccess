@@ -23,7 +23,8 @@ export async function createMigratedUsageDatabase(prefix: string) {
   const open = async () => {
     const source = await sqliteBackend
       .createDataSource({
-        type: 'sqlite',
+        type: 'better-sqlite3',
+        invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
         database: file,
         entities: Object.values(entities),
         migrations: Object.values(migrations),

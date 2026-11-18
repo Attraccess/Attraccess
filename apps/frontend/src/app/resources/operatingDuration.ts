@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useResourceMaintenancesServiceCanManageMaintenance } from '@attraccess/react-query-client';
+import { useCanManageMaintenance } from '@attraccess/react-query-client';
 import { useAuth } from '../../hooks/useAuth';
 import { getBaseUrl } from '../../api';
 import { useLiveUpdates } from '../../utils/live-updates';
@@ -39,7 +39,7 @@ interface OperatingDurationRange {
 export function useCanViewOperatingDuration(resourceId: number) {
   const { hasPermission, user } = useAuth();
   const canManageResources = hasPermission('resources.update');
-  const { data: maintenance } = useResourceMaintenancesServiceCanManageMaintenance({ resourceId }, undefined, {
+  const { data: maintenance } = useCanManageMaintenance({ path: { resourceId } }, undefined, {
     enabled: !!user?.id && !canManageResources,
   });
   return canManageResources || Boolean(maintenance?.canManage);

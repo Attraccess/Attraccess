@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import {
-  useAccessControlServiceResourceGroupIntroducersGetMany,
-  useAccessControlServiceResourceGroupIntroductionsGetMany,
-  useAccessControlServiceResourceIntroducersGetMany,
-  useAccessControlServiceResourceIntroductionsGetPeople,
+  useResourceGroupIntroducersGetMany,
+  useResourceGroupIntroductionsGetMany,
+  useResourceIntroducersGetMany,
+  useResourceIntroductionsGetPeople,
 } from '@attraccess/react-query-client';
 import { ResourceIntroducerType } from '@attraccess/react-query-client';
 import { PeopleTarget, PersonRow } from './types';
@@ -26,13 +26,13 @@ export function usePeopleRows({ target }: Params): UsePeopleRowsResult {
     data: resourceIntroducers,
     error: resourceIntroducersError,
     isLoading: isResourceIntroducersLoading,
-  } = useAccessControlServiceResourceIntroducersGetMany({ resourceId: target.id }, undefined, { enabled: isResource });
+  } = useResourceIntroducersGetMany({ path: { resourceId: target.id } }, undefined, { enabled: isResource });
 
   const {
     data: resourceIntroductions,
     error: resourceIntroductionsError,
     isLoading: isResourceIntroductionsLoading,
-  } = useAccessControlServiceResourceIntroductionsGetPeople({ resourceId: target.id }, undefined, {
+  } = useResourceIntroductionsGetPeople({ path: { resourceId: target.id } }, undefined, {
     enabled: isResource,
   });
 
@@ -40,13 +40,13 @@ export function usePeopleRows({ target }: Params): UsePeopleRowsResult {
     data: groupIntroducers,
     error: groupIntroducersError,
     isLoading: isGroupIntroducersLoading,
-  } = useAccessControlServiceResourceGroupIntroducersGetMany({ groupId: target.id }, undefined, { enabled: isGroup });
+  } = useResourceGroupIntroducersGetMany({ path: { groupId: target.id } }, undefined, { enabled: isGroup });
 
   const {
     data: groupIntroductions,
     error: groupIntroductionsError,
     isLoading: isGroupIntroductionsLoading,
-  } = useAccessControlServiceResourceGroupIntroductionsGetMany({ groupId: target.id }, undefined, { enabled: isGroup });
+  } = useResourceGroupIntroductionsGetMany({ path: { groupId: target.id } }, undefined, { enabled: isGroup });
 
   const introducers = isResource ? resourceIntroducers : groupIntroducers;
   const introductions = isResource ? resourceIntroductions : groupIntroductions;

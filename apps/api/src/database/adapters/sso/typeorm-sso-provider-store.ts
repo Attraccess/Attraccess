@@ -16,6 +16,7 @@ import type {
 } from '../../../users-and-auth/auth/sso/providers/sso-provider.port';
 import type { AuditEvent } from '../../../audit/recorder/audit-event';
 import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
+import { findRelations } from '../find-options';
 
 const relationOf = (type: SSOProviderType) =>
   type === SSOProviderType.OIDC ? ('oidcConfiguration' as const) : ('samlConfiguration' as const);
@@ -54,7 +55,7 @@ export class TypeOrmSsoProviderStore implements SsoProviderStore {
 
   async findAll(): Promise<SsoProviderRecord[]> {
     const providers = await this.dataSource.getRepository(SSOProvider).find({
-      relations: ['oidcConfiguration', 'samlConfiguration'],
+      relations: { oidcConfiguration: true, samlConfiguration: true },
     });
     return providers.map(toRecord);
   }
@@ -62,7 +63,7 @@ export class TypeOrmSsoProviderStore implements SsoProviderStore {
   async findById(id: number): Promise<SsoProviderRecord | null> {
     const provider = await this.dataSource.getRepository(SSOProvider).findOne({
       where: { id },
-      relations: ['oidcConfiguration', 'samlConfiguration'],
+      relations: { oidcConfiguration: true, samlConfiguration: true },
     });
     return provider ? toRecord(provider) : null;
   }
@@ -70,7 +71,7 @@ export class TypeOrmSsoProviderStore implements SsoProviderStore {
   async findByTypeAndId(type: SSOProviderType, id: number): Promise<SsoProviderRecord | null> {
     const provider = await this.dataSource.getRepository(SSOProvider).findOne({
       where: { type, id },
-      relations: [relationOf(type)],
+      relations: findRelations([relationOf(type)]),
     });
     return provider ? toRecord(provider) : null;
   }
@@ -127,7 +128,7 @@ export class TypeOrmSsoProviderStore implements SsoProviderStore {
     await this.dataSource.transaction(async (manager) => {
       const current = await manager.getRepository(SSOProvider).findOne({
         where: { id },
-        relations: ['oidcConfiguration', 'samlConfiguration'],
+        relations: { oidcConfiguration: true, samlConfiguration: true },
       });
       if (!current) return;
       if (current.oidcConfiguration) {
@@ -146,6 +147,6 @@ export class TypeOrmSsoProviderStore implements SsoProviderStore {
     const providers = manager.getRepository(SSOProvider);
     const header = await providers.findOneBy({ id });
     if (!header) return null;
-    return providers.findOne({ where: { type: header.type, id }, relations: [relationOf(header.type)] });
+    return providers.findOne({ where: { type: header.type, id }, relations: findRelations([relationOf(header.type)]) });
   }
 }

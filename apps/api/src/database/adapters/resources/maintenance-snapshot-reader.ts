@@ -1,5 +1,4 @@
 import { ResourceOperatingInterval, ResourceUsage, ResourceUsageLifecycleAttempt } from '@attraccess/database-entities';
-import { OPEN_CREATE, OPEN_FULLMUTEX, OPEN_READONLY, OPEN_READWRITE } from 'sqlite3';
 import { DataSource, EntityManager, IsNull } from 'typeorm';
 
 /** Reads committed history without borrowing the main connection's in-flight transaction. */
@@ -11,20 +10,22 @@ export class MaintenanceSnapshotReader {
 
   async manager(): Promise<EntityManager> {
     if (this.closed) throw new Error('Maintenance snapshot reader is closed');
-    if (this.source.options.type !== 'sqlite' || this.source.options.database === ':memory:') {
+    if (this.source.options.type !== 'better-sqlite3' || this.source.options.database === ':memory:') {
       throw new Error('Maintenance snapshots require a file-backed SQLite database');
     }
     if (!this.connection) {
+      // Read-only, so it never takes SQLite's write lock: better-sqlite3 reads hold their shared lock only while the
+      // (synchronous) statement runs, and this connection never opens a transaction.
       this.connection = new DataSource({
         ...this.source.options,
-        name: 'maintenance-snapshot',
         synchronize: false,
         migrationsRun: false,
         dropSchema: false,
         subscribers: [],
         // Preserve the file's journal mode; opening a reader must not change it.
         enableWAL: false,
-        flags: ((this.source.options.flags ?? 0) & ~(OPEN_READWRITE | OPEN_CREATE)) | OPEN_READONLY | OPEN_FULLMUTEX,
+        readonly: true,
+        fileMustExist: true,
       })
         .initialize()
         .catch((error) => {
@@ -56,23 +57,23 @@ export class MaintenanceSnapshotReader {
 export async function captureDurationState(resourceId: number, manager: EntityManager): Promise<string> {
   const usages = manager.getRepository(ResourceUsage);
   const [latestUsage, mutableUsages, latestInterval, attempts] = await Promise.all([
-    usages.findOne({ where: { resourceId }, order: { id: 'DESC' }, select: ['id'] }),
+    usages.findOne({ where: { resourceId }, order: { id: 'DESC' }, select: { id: true } }),
     usages.find({
       // Pending candidates are created open and then accepted or deleted; they
       // never become closed while pending. The indexed open-row lookup includes
       // them without scanning closed history for a redundant pending predicate.
       where: { resourceId, endTime: IsNull() },
-      select: ['id', 'startTime', 'endTime', 'lifecyclePending', 'usageAction'],
+      select: { id: true, startTime: true, endTime: true, lifecyclePending: true, usageAction: true },
       order: { id: 'ASC' },
     }),
     manager.getRepository(ResourceOperatingInterval).findOne({
       where: { resourceId },
       order: { startTime: 'DESC', id: 'DESC' },
-      select: ['id', 'startTime', 'endTime'],
+      select: { id: true, startTime: true, endTime: true },
     }),
     manager.getRepository(ResourceUsageLifecycleAttempt).find({
       where: { resourceId },
-      select: ['id', 'previousUsageId', 'transitionTime', 'kind'],
+      select: { id: true, previousUsageId: true, transitionTime: true, kind: true },
       order: { id: 'ASC' },
     }),
   ]);

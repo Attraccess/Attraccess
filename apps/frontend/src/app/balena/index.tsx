@@ -2,12 +2,12 @@ import { PageHeader } from '@attraccess/plugins-frontend-ui';
 import { ComputerIcon, PowerIcon, RefreshCcwIcon } from 'lucide-react';
 import { Button, Card } from '@heroui/react';
 import { BalenaIcon } from './balena-icon';
-import { useSystemServiceRebootHost, useSystemServiceShutdownHost } from '@attraccess/react-query-client';
+import { useRebootHost, useShutdownHost } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useState } from 'react';
 
 export function BalenaPage() {
-  const { mutate: shutdownHost } = useSystemServiceShutdownHost();
-  const { mutate: rebootHost } = useSystemServiceRebootHost();
+  const { mutate: shutdownHost } = useShutdownHost();
+  const { mutate: rebootHost } = useRebootHost();
 
   const [shutdownIsConfirmed, setShutdownIsConfirmed] = useState(false);
   const [rebootIsConfirmed, setRebootIsConfirmed] = useState(false);

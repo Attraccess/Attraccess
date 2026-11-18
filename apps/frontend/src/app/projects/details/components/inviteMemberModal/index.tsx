@@ -3,9 +3,9 @@ import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, useOverlayState 
 import { Select } from '../../../../../components/select';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  UseProjectsServiceListProjectInvitationsKeyFn,
-  UseProjectsServiceListProjectMembersKeyFn,
-  useProjectsServiceCreateProjectInvitation,
+  UseListProjectInvitationsKeyFn,
+  UseListProjectMembersKeyFn,
+  useCreateProjectInvitation,
   ProjectMember,
   ApiError,
   ProjectMemberRole,
@@ -48,15 +48,15 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
   const invalidateCollaboratorQueries = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({
-        queryKey: UseProjectsServiceListProjectMembersKeyFn({ id: projectId }),
+        queryKey: UseListProjectMembersKeyFn({ path: { id: projectId } }),
       }),
       queryClient.invalidateQueries({
-        queryKey: UseProjectsServiceListProjectInvitationsKeyFn({ id: projectId }),
+        queryKey: UseListProjectInvitationsKeyFn({ path: { id: projectId } }),
       }),
     ]);
   }, [projectId, queryClient]);
 
-  const { mutateAsync: createInvitation, isPending } = useProjectsServiceCreateProjectInvitation({
+  const { mutateAsync: createInvitation, isPending } = useCreateProjectInvitation(undefined, {
     onSuccess: (invitation) => {
       toast.success({
         title: t('success.title'),
@@ -82,10 +82,7 @@ export function InviteProjectMemberModal(props: Readonly<InviteProjectMemberModa
     if (!selectedUser) {
       return;
     }
-    await createInvitation({
-      id: projectId,
-      requestBody: { invitedUserId: selectedUser.id, role },
-    });
+    await createInvitation({ path: { id: projectId }, body: { invitedUserId: selectedUser.id, role } });
   }, [createInvitation, projectId, role, selectedUser]);
 
   const handleOpenChange = useCallback(

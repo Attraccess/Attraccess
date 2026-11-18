@@ -204,6 +204,12 @@ jobs:
           exclude="$(node scripts/ci-nx-exclude.mjs lint)"
           echo "Excluding: $exclude"
           pnpm nx affected --target=lint --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude="$exclude"
+      # Blocking, all severities, prod and dev: only GHSAs listed (with a reason) under auditConfig.ignoreGhsas in
+      # pnpm-workspace.yaml may stay open. Last, and also after a failed step: a newly published advisory must not
+      # hide the change's own lint and typecheck results, nor they the advisory.
+      - name: Audit dependencies
+        if: ${{ !cancelled() }}
+        run: pnpm audit
 
   build-all:
     # A fresh job on purpose: typecheck and build in one job would share a warm

@@ -1,5 +1,5 @@
 import { Button } from '@attraccess/plugins-frontend-ui';
-import { usePluginsServicePluginControllerCheckAllInstalledPackages } from '@attraccess/react-query-client';
+import { usePluginControllerCheckAllInstalledPackages } from '@attraccess/react-query-client';
 import { Dropdown, DropdownItem, DropdownMenu, DropdownPopover, DropdownTrigger } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { ChevronDown, Store, Upload } from 'lucide-react';
@@ -17,7 +17,7 @@ export function PluginToolbar({ onOpenMarketplace, onOpenUpload }: Props) {
   const toast = useToastMessage();
   const { installed, mergeInstalled } = useInstalledNpmPlugins();
   const { mutateAsync: checkAllInstalledPackages, isPending: isCheckingForUpdates } =
-    usePluginsServicePluginControllerCheckAllInstalledPackages();
+    usePluginControllerCheckAllInstalledPackages();
 
   const checkForUpdates = async () => {
     try {

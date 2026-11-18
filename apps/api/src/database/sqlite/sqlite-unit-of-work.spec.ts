@@ -12,7 +12,11 @@ describe('createSqliteUnitOfWork on a real file database', () => {
 
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'uow-'));
-    source = await new DataSource({ type: 'sqlite', database: join(directory, 'test.sqlite') }).initialize();
+    source = await new DataSource({
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database: join(directory, 'test.sqlite'),
+    }).initialize();
     await source.query('CREATE TABLE account (id INTEGER PRIMARY KEY, balance INTEGER NOT NULL)');
     await source.query('INSERT INTO account VALUES (1, 0), (2, 0)');
     uow = createSqliteUnitOfWork(source);

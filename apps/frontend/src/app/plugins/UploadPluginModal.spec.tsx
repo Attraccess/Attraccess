@@ -18,7 +18,7 @@ const hoisted = vi.hoisted(() => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  usePluginsServiceUploadPlugin: (options: UploadOptions) => {
+  useUploadPlugin: (_mutationKey: unknown, options: UploadOptions) => {
     hoisted.uploadOptions = options;
     return { mutate: hoisted.uploadMutateMock, isPending: false };
   },
@@ -120,7 +120,7 @@ describe('UploadPluginModal', () => {
     await user.click(uploadButton());
 
     expect(hoisted.uploadMutateMock).toHaveBeenCalledWith({
-      formData: { pluginZip: file },
+      body: { pluginZip: file },
     });
   });
 

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { ConfigService } from '@nestjs/config';
-import { Database } from 'sqlite3';
+import Database from 'better-sqlite3';
 import { EncryptionService } from './encryption.service';
 
 /**
@@ -21,13 +21,12 @@ const encryptionFor = (secret: string) =>
 
 type Row = { id: number; key: string | null; caPrivateKeyEncrypted?: string; serverPrivateKeyEncrypted?: string };
 
-const sql = (db: Database, method: 'run' | 'all', query: string, params: unknown[] = []) =>
-  new Promise<Row[]>((done, fail) =>
-    db[method](query, params, function (this: unknown, error: Error | null, rows?: unknown) {
-      if (error) fail(error);
-      else done((rows as Row[]) ?? []);
-    }),
-  );
+const sql = async (db: Database.Database, method: 'run' | 'all', query: string, params: unknown[] = []) => {
+  const statement = db.prepare(query);
+  if (method === 'all') return statement.all(...params) as Row[];
+  statement.run(...params);
+  return [];
+};
 
 const runScript = (path: string) =>
   promisify(execFile)(process.execPath, [SCRIPT, '--db', path], {
@@ -58,7 +57,7 @@ describe('reencrypt-card-keys command', () => {
     await sql(db, 'run', 'INSERT INTO nfc_card_pending_change (id, key) VALUES (1, ?)', [
       before.encrypt('0f0e0d0c0b0a09080706050403020100'),
     ]);
-    await new Promise((done) => db.close(done));
+    db.close();
 
     const { stdout } = await runScript(path);
     expect(stdout).toContain('{"nfc_card":2,"nfc_card_pending_change":1}');
@@ -67,7 +66,7 @@ describe('reencrypt-card-keys command', () => {
     const check = new Database(path);
     const cards = await sql(check, 'all', 'SELECT id, key FROM nfc_card ORDER BY id');
     const pending = await sql(check, 'all', 'SELECT id, key FROM nfc_card_pending_change');
-    await new Promise((done) => check.close(done));
+    check.close();
 
     expect(cards.every((row) => after.isEncrypted(row.key))).toBe(true);
     expect(cards.map((row) => after.decrypt(row.key as string))).toEqual([
@@ -105,7 +104,7 @@ describe('reencrypt-card-keys command', () => {
       `INSERT INTO "attractap_installation" VALUES (1, 'installation', 'ca cert', ?, 'server cert', ?, datetime('now'))`,
       [before.encrypt(caKey), before.encrypt(serverKey)],
     );
-    await new Promise((done) => db.close(done));
+    db.close();
 
     const { stdout } = await runScript(path);
     expect(stdout).toContain('"attractap_installation.caPrivateKeyEncrypted":1');
@@ -114,7 +113,7 @@ describe('reencrypt-card-keys command', () => {
     const after = encryptionFor(NEW_SECRET);
     const check = new Database(path);
     const [row] = await sql(check, 'all', 'SELECT * FROM attractap_installation');
-    await new Promise((done) => check.close(done));
+    check.close();
 
     expect(after.decrypt(row.caPrivateKeyEncrypted as string)).toBe(caKey);
     expect(after.decrypt(row.serverPrivateKeyEncrypted as string)).toBe(serverKey);

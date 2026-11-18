@@ -17,7 +17,7 @@ import en from './en.json';
 import discoveryDe from '../de.json';
 import discoveryEn from '../en.json';
 import { getDiscoveryErrorMessage } from '../discoveryError';
-import { useAuthenticationServiceDiscoverKeycloakOidc } from '@attraccess/react-query-client';
+import { useDiscoverKeycloakOidc } from '@attraccess/react-query-client';
 
 interface Props {
   onDiscovery: (settings: OpenIDConfiguration) => void;
@@ -37,8 +37,8 @@ export function KeycloakDiscoveryDialog(props: Props) {
   });
 
   const toast = useToastMessage();
-  const { refetch: discoverKeycloak } = useAuthenticationServiceDiscoverKeycloakOidc<OpenIDConfiguration>(
-    { host, realm },
+  const { refetch: discoverKeycloak } = useDiscoverKeycloakOidc<OpenIDConfiguration>(
+    { query: { host, realm } },
     undefined,
     // Discovery runs once per click: retrying a 4xx/502 only delays the error toast (a timeout by ~30 s).
     { enabled: false, retry: false },

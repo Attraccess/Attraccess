@@ -34,6 +34,7 @@ import { EntityManagerResolver } from '../entity-manager-resolver';
 import { activeUsageWhere, countOccupiedSlots, findOccupyingUserIds } from './active-usage-queries';
 import { toUsageLifecycleAttempt, toUsageSession } from './usage-session-mapping';
 import { toResourceRecord } from '../resources/resource-mapping';
+import { findRelations } from '../find-options';
 
 /** Relations of running sessions and of session details (exported for the mapping spec). */
 export const ACTIVE_RELATIONS = ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'];
@@ -136,7 +137,7 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
         .find({
           where: { resourceId, ...activeUsageWhere() },
           order: { startTime: 'ASC', id: 'ASC' },
-          relations: ACTIVE_RELATIONS,
+          relations: findRelations(ACTIVE_RELATIONS),
         }),
     );
   }
@@ -150,7 +151,7 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
       .find({
         where: { resourceId: In(resourceIds), ...activeUsageWhere() },
         order: { startTime: 'ASC', id: 'ASC' },
-        relations: ACTIVE_RELATIONS,
+        relations: findRelations(ACTIVE_RELATIONS),
       });
     for (const session of sessions) map.get(session.resourceId)?.push(toSession(session));
     return map;
@@ -185,7 +186,7 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
       .getRepository(ResourceUsage)
       .findOne({
         where: { id: usageId, resourceId, lifecyclePending: false },
-        relations: DETAIL_RELATIONS,
+        relations: findRelations(DETAIL_RELATIONS),
       });
     return session && toSession(session);
   }
@@ -204,7 +205,7 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
         skip: (page - 1) * limit,
         take: limit,
         order: { startTime: 'DESC' },
-        relations: DETAIL_RELATIONS,
+        relations: findRelations(DETAIL_RELATIONS),
       });
     return { data: toSessions(data), total };
   }
@@ -215,7 +216,7 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
       .getRepository(ResourceUsage)
       .findOne({
         where: { id: usageId, resourceId },
-        relations: ['user', 'project', 'resource'],
+        relations: { user: true, project: true, resource: true },
       });
     return session && toSession(session);
   }
@@ -224,7 +225,10 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     const repository = this.managers.resolve().getRepository(ResourceUsage);
     await repository.update(usageId, { projectId });
     return toSessionWithParties(
-      await repository.findOneOrFail({ where: { id: usageId }, relations: ['resource', 'user', 'project'] }),
+      await repository.findOneOrFail({
+        where: { id: usageId },
+        relations: { resource: true, user: true, project: true },
+      }),
     );
   }
 
@@ -234,7 +238,7 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
       .getRepository(ResourceUsage)
       .findOne({
         where: { id: usageId },
-        relations: ['resource', 'user'],
+        relations: { resource: true, user: true },
       });
     return session && toSessionWithParties(session);
   }
@@ -247,7 +251,7 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     const manager = this.managers.resolve(context);
     const session = await manager.findOne(ResourceUsage, {
       where: { id: usageId, resourceId, ...activeUsageWhere() },
-      relations: ['user'],
+      relations: { user: true },
     });
     if (!session) return null;
     const beingEnded = await manager.exists(ResourceUsageLifecycleAttempt, {
@@ -379,7 +383,7 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     const createdSession = await manager.findOne(ResourceUsage, {
       where: { resourceId, userId, endTime: IsNull(), lifecyclePending: true },
       order: { startTime: 'DESC' },
-      relations: ['resource', 'user', 'project'],
+      relations: { resource: true, user: true, project: true },
     });
     if (!createdSession) throw new Error('Failed to retrieve the newly created session.');
 
@@ -392,7 +396,7 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
   async findPendingSession(usageId: number, context?: TransactionContext): Promise<UsageSessionWithParties | null> {
     const session = await this.managers.resolve(context).findOne(ResourceUsage, {
       where: { id: usageId, lifecyclePending: true },
-      relations: ['resource', 'user', 'project'],
+      relations: { resource: true, user: true, project: true },
     });
     return session && toSessionWithParties(session);
   }
@@ -431,7 +435,7 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     return toSessionWithParties(
       await this.managers.resolve(context).findOneOrFail(ResourceUsage, {
         where: { id: usageId },
-        relations: shape === 'ended' ? ['user', 'resource'] : ['resource', 'user', 'project'],
+        relations: findRelations(shape === 'ended' ? ['user', 'resource'] : ['resource', 'user', 'project']),
       }),
     );
   }
@@ -478,7 +482,7 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     };
     const saved = await repository.save(usageData, { reload: true });
     return toSessionWithParties(
-      await repository.findOneOrFail({ where: { id: saved.id }, relations: ['user', 'resource'] }),
+      await repository.findOneOrFail({ where: { id: saved.id }, relations: { user: true, resource: true } }),
     );
   }
 

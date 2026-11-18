@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource, EntityManager } from 'typeorm';
 import { AuditTransaction, DurableAppendControl } from '../../../audit/audit-persistence.port';
+import { createDataSource } from '../../sqlite/sqlite-connection';
 import { createSqliteUnitOfWork } from '../../sqlite/sqlite-unit-of-work';
 import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { TransactionScopeError, type TransactionScope } from '../../unit-of-work';
@@ -62,7 +63,8 @@ describe('SqliteAuditStore on independent connections', () => {
     const database = join(directory, 'audit.sqlite');
     await copyFile(template.file, database);
     main = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database,
       entities: [AuditLog],
       synchronize: false,
@@ -71,7 +73,13 @@ describe('SqliteAuditStore on independent connections', () => {
     await main.query('DELETE FROM audit_log');
     await main.query('CREATE TABLE business_change (id integer PRIMARY KEY)');
     // A third connection: what a reader (or a restarted process) sees on stable storage.
-    observer = await new DataSource({ type: 'sqlite', database, entities: [AuditLog] }).initialize();
+    // Guarded like the application's connections: the file's write lock it takes is the one the audit store waits for.
+    observer = await createDataSource({
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database,
+      entities: [AuditLog],
+    }).initialize();
     store = new SqliteAuditStore(main);
     expect(await store.open()).toEqual({ status: 'ready' });
   });
@@ -86,7 +94,11 @@ describe('SqliteAuditStore on independent connections', () => {
   const stored = () => observer.getRepository(AuditLog).find({ order: { id: 'ASC' } });
 
   it('is unsupported for an in-memory database and not open before open()', async () => {
-    const memory = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    const memory = await new DataSource({
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database: ':memory:',
+    }).initialize();
     const other = new SqliteAuditStore(memory);
     expect(other.isOpen).toBe(false);
     expect(await other.open()).toEqual({ status: 'unsupported' });

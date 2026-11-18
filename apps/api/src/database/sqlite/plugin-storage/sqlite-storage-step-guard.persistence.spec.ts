@@ -53,7 +53,11 @@ describe('SQLite migrations on adopted 1.x tables', () => {
     root = mkdtempSync(join(tmpdir(), 'step-guard-'));
     database = join(root, 'db.sqlite');
     runner = new StorageMigrationRunner(
-      new SqliteStorageMigrationDriver(() => ({ type: 'sqlite', database })),
+      new SqliteStorageMigrationDriver(() => ({
+        type: 'better-sqlite3',
+        invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+        database,
+      })),
       sqliteStorageDdl,
     );
     await sql(...LEGACY_DDL);
@@ -62,7 +66,11 @@ describe('SQLite migrations on adopted 1.x tables', () => {
   afterEach(() => rmSync(root, { recursive: true, force: true }));
 
   async function sql(...statements: string[]): Promise<Record<string, unknown>[]> {
-    const source = new DataSource({ type: 'sqlite', database });
+    const source = new DataSource({
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database,
+    });
     await source.initialize();
     try {
       let rows: Record<string, unknown>[] = [];

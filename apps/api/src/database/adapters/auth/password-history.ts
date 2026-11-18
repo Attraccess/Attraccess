@@ -22,7 +22,7 @@ export async function appendPasswordHistory(
     where: { userId },
     order: { createdAt: 'DESC', id: 'DESC' },
     take: keep,
-    select: ['id'],
+    select: { id: true },
   });
   const keptIds = kept.map((row) => row.id);
   const prune = history.createQueryBuilder().delete().where('userId = :userId', { userId });

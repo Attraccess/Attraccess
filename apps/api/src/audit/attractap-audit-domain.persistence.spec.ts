@@ -5,7 +5,11 @@ describe('Attractap audit domain rollout', () => {
   let source: DataSource;
   const migration = new AttractapAuditDomain1784000000000();
   beforeEach(async () => {
-    source = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    source = await new DataSource({
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database: ':memory:',
+    }).initialize();
     await source.query('CREATE TABLE setting (parent text, key text, value text, UNIQUE(parent, key))');
   });
   afterEach(async () => {

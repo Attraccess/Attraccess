@@ -40,7 +40,8 @@ describe('persisted audit names', () => {
     ]);
     directory = await mkdtemp(join(tmpdir(), 'audit-labels-'));
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: join(directory, 'fixture.sqlite'),
       entities: Object.values(entities),
       migrations: Object.values(migrations),

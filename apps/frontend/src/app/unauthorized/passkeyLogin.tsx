@@ -6,7 +6,7 @@ import { startAuthentication, browserSupportsWebAuthn } from '@simplewebauthn/br
 import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser';
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';
-import { ApiError, PasskeysService } from '@attraccess/react-query-client';
+import { ApiError, createSessionWithPasskey, getPasskeyAuthenticationOptions } from '@attraccess/react-query-client';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import { getTranslationKeyForApiError } from '../../utils/apiError';
@@ -30,14 +30,15 @@ export function PasskeyLogin() {
     setError(null);
 
     try {
-      const { options } = await PasskeysService.getPasskeyAuthenticationOptions();
+      const { options } = await getPasskeyAuthenticationOptions({ throwOnError: true }).then(({ data }) => data);
       const response = await startAuthentication({
         optionsJSON: options as unknown as PublicKeyCredentialRequestOptionsJSON,
       });
 
-      await PasskeysService.createSessionWithPasskey({
-        requestBody: { response: response as unknown as Record<string, unknown>, tokenLocation: 'cookie' },
-      });
+      await createSessionWithPasskey({
+        body: { response: response as unknown as Record<string, unknown>, tokenLocation: 'cookie' },
+        throwOnError: true,
+      }).then(({ data }) => data);
 
       await restoreAuthentication(queryClient);
     } catch (caught) {

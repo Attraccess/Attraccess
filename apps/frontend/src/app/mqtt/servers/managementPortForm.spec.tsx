@@ -19,10 +19,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useMqttServiceMqttServersCreateOne: () => ({ mutate: mocks.create, isPending: false }),
-  useMqttServiceMqttServersUpdateOne: () => ({ mutate: mocks.update, isPending: false }),
-  useMqttServiceMqttServersGetOneById: () => ({ data: mocks.server, isLoading: false, isError: false }),
-  useMqttServiceMqttServersGetAllKey: 'mqtt-servers',
+  useMqttServersCreateOne: () => ({ mutate: mocks.create, isPending: false }),
+  useMqttServersUpdateOne: () => ({ mutate: mocks.update, isPending: false }),
+  useMqttServersGetOneById: () => ({ data: mocks.server, isLoading: false, isError: false }),
+  useMqttServersGetAllKey: 'mqtt-servers',
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -95,7 +95,7 @@ describe.each(['create', 'edit'] as const)('%s MQTT management port', (mode) => 
     fireEvent.submit(form);
     expect(mutate).toHaveBeenCalledWith(
       expect.objectContaining({
-        requestBody: expect.objectContaining({ managementPort: Number(value), port: 1883 }),
+        body: expect.objectContaining({ managementPort: Number(value), port: 1883 }),
       }),
     );
   });
@@ -105,7 +105,7 @@ describe.each(['create', 'edit'] as const)('%s MQTT management port', (mode) => 
     fireEvent.submit(form);
     expect(mutate).toHaveBeenCalledWith(
       expect.objectContaining({
-        requestBody: expect.objectContaining({ managementPort: mode === 'create' ? null : 18083 }),
+        body: expect.objectContaining({ managementPort: mode === 'create' ? null : 18083 }),
       }),
     );
   });
@@ -117,7 +117,7 @@ describe.each(['create', 'edit'] as const)('%s MQTT management port', (mode) => 
     fireEvent.submit(form);
     expect(mutate).toHaveBeenCalledWith(
       expect.objectContaining({
-        requestBody: expect.objectContaining({ managementPort: null }),
+        body: expect.objectContaining({ managementPort: null }),
       }),
     );
   });
@@ -156,16 +156,16 @@ describe('MQTT edit password intent', () => {
     });
     fireEvent.submit(form);
     expect(mocks.update).toHaveBeenCalledOnce();
-    const { requestBody } = mocks.update.mock.calls[0][0];
-    expect(requestBody).toMatchObject({ managementPort: 18084, port: 1883, username: 'test-user' });
-    expect(requestBody).not.toHaveProperty('password');
+    const { body } = mocks.update.mock.calls[0][0];
+    expect(body).toMatchObject({ managementPort: 18084, port: 1883, username: 'test-user' });
+    expect(body).not.toHaveProperty('password');
   });
 
   it('includes the exact replacement string when supplied', () => {
     const { password, form } = setup();
     fireEvent.change(password, { target: { value: ' test-only replacement ' } });
     fireEvent.submit(form);
-    expect(mocks.update.mock.calls[0][0].requestBody).toHaveProperty('password', ' test-only replacement ');
+    expect(mocks.update.mock.calls[0][0].body).toHaveProperty('password', ' test-only replacement ');
   });
 
   it('omits password after a replacement is typed and erased', () => {
@@ -173,7 +173,7 @@ describe('MQTT edit password intent', () => {
     fireEvent.change(password, { target: { value: 'test-only replacement' } });
     fireEvent.change(password, { target: { value: '' } });
     fireEvent.submit(form);
-    expect(mocks.update.mock.calls[0][0].requestBody).not.toHaveProperty('password');
+    expect(mocks.update.mock.calls[0][0].body).not.toHaveProperty('password');
   });
 
   it('sends an explicit empty string for deliberate clearing and prevents conflicting replacement', () => {
@@ -184,7 +184,7 @@ describe('MQTT edit password intent', () => {
     expect(password).toHaveValue('');
     expect(password).toBeDisabled();
     fireEvent.submit(form);
-    expect(mocks.update.mock.calls[0][0].requestBody).toHaveProperty('password', '');
+    expect(mocks.update.mock.calls[0][0].body).toHaveProperty('password', '');
   });
 
   it('returns to keeping the saved password when clearing is cancelled', () => {
@@ -194,6 +194,6 @@ describe('MQTT edit password intent', () => {
     expect(clear).not.toBeChecked();
     expect(password).toBeEnabled();
     fireEvent.submit(form);
-    expect(mocks.update.mock.calls[0][0].requestBody).not.toHaveProperty('password');
+    expect(mocks.update.mock.calls[0][0].body).not.toHaveProperty('password');
   });
 });

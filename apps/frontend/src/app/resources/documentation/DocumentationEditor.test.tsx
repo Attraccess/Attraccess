@@ -18,14 +18,14 @@ const resource = { id: 7, name: 'Laser Cutter', documentationType: 'markdown', d
 
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...((await importOriginal()) as object),
-  useResourcesServiceGetOneResourceById: () => ({
+  useGetOneResourceById: () => ({
     data: resource,
     isLoading: false,
     isError: false,
     error: null,
     refetch: vi.fn(),
   }),
-  useResourcesServiceUpdateOneResource: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateOneResource: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 describe('DocumentationEditor', () => {

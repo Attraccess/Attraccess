@@ -46,7 +46,8 @@ describe('project persistence adapters on a real SQLite file', () => {
     resolveDatabaseBackend();
     directory = await mkdtemp(join(tmpdir(), 'projects-persistence-'));
     source = await createDataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: join(directory, 'test.sqlite'),
       entities: Object.values(entities),
       synchronize: true,
@@ -298,7 +299,8 @@ describe('project persistence adapters on a real SQLite file', () => {
     it('adds a membership once when two acceptances race on independent connections', async () => {
       const { id: projectId } = await projects.create({ ownerId: 1, name: 'A', description: null });
       const other = await createDataSource({
-        type: 'sqlite',
+        type: 'better-sqlite3',
+        invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
         database: join(directory, 'test.sqlite'),
         entities: Object.values(entities),
       }).initialize();

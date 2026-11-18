@@ -1,0 +1,43 @@
+diff --git a/dist/tsmorph/buildCommon.mjs b/dist/tsmorph/buildCommon.mjs
+index f3da1fa34439aac313f0cf8bc91dd72772f84aad..2b25fdce1bc0aa40e842f25317e8710ae4299517 100644
+--- a/dist/tsmorph/buildCommon.mjs
++++ b/dist/tsmorph/buildCommon.mjs
+@@ -30,14 +30,14 @@ export function buildQueryResultType(op) {
+ }
+ /**
+  * Build the mutation result type alias.
+- * Example: export type AddPetMutationResult = Awaited<ReturnType<typeof addPet>>;
++ * Example: export type AddPetMutationResult = Awaited<ReturnType<typeof addPet<true>>>["data"];
+  */
+ export function buildMutationResultType(op) {
+     return {
+         kind: StructureKind.TypeAlias,
+         isExported: true,
+         name: `${op.capitalizedMethodName}MutationResult`,
+-        type: `Awaited<ReturnType<typeof ${op.methodName}>>`,
++        type: `Awaited<ReturnType<typeof ${op.methodName}<true>>>["data"]`,
+     };
+ }
+ /**
+diff --git a/dist/tsmorph/buildMutationHooks.mjs b/dist/tsmorph/buildMutationHooks.mjs
+index 6013f0e7c6e0eef23148ac2be9073c1d8fe6b34e..e1d3dbe04468e43e324e7cbae69cfa06bf0e9a59 100644
+--- a/dist/tsmorph/buildMutationHooks.mjs
++++ b/dist/tsmorph/buildMutationHooks.mjs
+@@ -9,7 +9,7 @@ import { getDataTypeName, getErrorType } from "./operationNames.mjs";
+  *   options?: Omit<UseMutationOptions<TData, TError, Options<AddPetData, true>, TContext>, "mutationKey" | "mutationFn">
+  * ) => useMutation<TData, TError, Options<AddPetData, true>, TContext>({
+  *   mutationKey: Common.UseAddPetKeyFn(mutationKey),
+- *   mutationFn: clientOptions => addPet(clientOptions) as unknown as Promise<TData>,
++ *   mutationFn: clientOptions => addPet(clientOptions).then(response => response.data) as unknown as Promise<TData>,
+  *   ...options
+  * });
+  */
+@@ -18,7 +18,7 @@ export function buildUseMutationHook(op, ctx) {
+     const errorType = getErrorType(op, ctx);
+     const dataTypeDefault = `Common.${op.capitalizedMethodName}MutationResult`;
+     const optionsType = `Options<${getDataTypeName(op)}, true>`;
+-    const mutationFn = `clientOptions => ${op.methodName}(${SDK_CALL_ARGS}) as unknown as Promise<TData>`;
++    const mutationFn = `clientOptions => ${op.methodName}(${SDK_CALL_ARGS}).then(response => response.data) as unknown as Promise<TData>`;
+     const body = `useMutation<TData, TError, ${optionsType}, TContext>({ mutationKey: Common.Use${op.capitalizedMethodName}KeyFn(mutationKey), mutationFn: ${mutationFn}, ...options })`;
+     return {
+         kind: StructureKind.VariableStatement,

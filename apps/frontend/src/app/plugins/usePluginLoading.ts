@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { LoadedPluginManifest, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
+import { LoadedPluginManifest, useGetPlugins } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
 import { useAuth } from '../../hooks/useAuth';
 import { loadFrontendPlugin } from './loadFrontendPlugin';
@@ -28,7 +28,7 @@ function statusFailure(manifest: LoadedPluginManifest): PluginFailure | null {
  * plugin list usually arrives before the signed-in user does, so failures wait until the permission is known.
  */
 export function usePluginLoading() {
-  const { refetch: refetchPlugins } = usePluginsServiceGetPlugins();
+  const { refetch: refetchPlugins } = useGetPlugins();
   const toast = useToastMessage();
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();

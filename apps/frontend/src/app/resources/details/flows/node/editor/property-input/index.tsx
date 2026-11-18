@@ -1,4 +1,4 @@
-import { useBillingServiceGetBillingConfiguration } from '@attraccess/react-query-client';
+import { useGetBillingConfiguration } from '@attraccess/react-query-client';
 import { Description, Input, Label, TextArea, TextField, Button } from '@heroui/react';
 import { CompanionDeviceSelect } from '../../../../../../../components/companionDeviceSelect/index';
 import { useCallback, useMemo } from 'react';
@@ -241,7 +241,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
     return item.title ?? (tNodeExists?.(key) ? t(key) : String(item.const));
   };
 
-  const { data: configuration } = useBillingServiceGetBillingConfiguration();
+  const { data: configuration } = useGetBillingConfiguration();
 
   const parsedValue = useMemo(() => {
     if (schema.isCurrency) {

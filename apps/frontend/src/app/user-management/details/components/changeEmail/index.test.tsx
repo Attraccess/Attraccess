@@ -11,12 +11,12 @@ let hookOptions: { onSuccess?: () => void; onError?: (error: unknown) => void } 
 
 vi.mock('@attraccess/react-query-client', () => ({
   ApiError: class ApiError extends Error {},
-  UseUsersServiceGetOneUserByIdKeyFn: vi.fn(),
-  useUsersServiceChangeUserEmail: (options: typeof hookOptions) => {
+  UseGetOneUserByIdKeyFn: vi.fn(),
+  useChangeUserEmail: (_mutationKey: unknown, options: typeof hookOptions) => {
     hookOptions = options;
     return { mutate, isPending: false };
   },
-  useUsersServiceFindManyKey: 'users',
+  useFindManyKey: 'users',
 }));
 
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
@@ -121,7 +121,7 @@ describe('ChangeEmailForm', () => {
     expect(mutate).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: 'Change email' }));
-    expect(mutate).toHaveBeenCalledWith({ id: 7, requestBody: { email: 'new@example.com' } });
+    expect(mutate).toHaveBeenCalledWith({ path: { id: 7 }, body: { email: 'new@example.com' } });
 
     // A failed request keeps the dialog open; only success closes it.
     act(() => hookOptions.onError?.(new Error('request failed')));

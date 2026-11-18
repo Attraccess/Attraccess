@@ -18,6 +18,7 @@ import {
 } from '../../../billing/ports/billing-ledger.port';
 import { TransactionContextResolver } from '../transaction-context';
 import { toTransactionDetail, toTransactionRecord, toUsageReceipt } from './billing-mappers';
+import { findRelations } from '../find-options';
 
 const DETAIL_RELATIONS = ['initiator', 'resourceUsage', 'resourceUsage.resource', 'refundOf', 'items'];
 
@@ -38,7 +39,7 @@ export class TypeOrmBillingLedgerStore implements BillingLedgerStore {
   async findTransactionIdForUsage(usageId: number, userId: number): Promise<number | null> {
     const transaction = await this.transactions.findOne({
       where: { resourceUsageId: usageId, userId },
-      select: ['id'],
+      select: { id: true },
     });
     return transaction?.id ?? null;
   }
@@ -51,7 +52,7 @@ export class TypeOrmBillingLedgerStore implements BillingLedgerStore {
       where: { userId },
       skip: (page - 1) * limit,
       take: limit,
-      relations: DETAIL_RELATIONS,
+      relations: findRelations(DETAIL_RELATIONS),
       order: { createdAt: 'DESC', id: 'DESC' },
     });
     return { transactions: rows.map(toTransactionDetail), total };
@@ -60,13 +61,13 @@ export class TypeOrmBillingLedgerStore implements BillingLedgerStore {
   async findTransactionDetail(transactionId: number, ownerId?: number): Promise<BillingTransactionDetail | null> {
     const row = await this.transactions.findOne({
       where: { id: transactionId, userId: ownerId },
-      relations: DETAIL_RELATIONS,
+      relations: findRelations(DETAIL_RELATIONS),
     });
     return row ? toTransactionDetail(row) : null;
   }
 
   async findTransactionWithItems(transactionId: number): Promise<BillingTransactionRecord | null> {
-    const row = await this.transactions.findOne({ where: { id: transactionId }, relations: ['items'] });
+    const row = await this.transactions.findOne({ where: { id: transactionId }, relations: { items: true } });
     return row ? toTransactionRecord(row) : null;
   }
 
@@ -92,7 +93,7 @@ export class TypeOrmBillingLedgerStore implements BillingLedgerStore {
   ): Promise<BillingTransactionRecord | null> {
     const row = await this.contexts
       .manager(context)
-      .findOne(BillingTransaction, { where: { resourceUsageId: usageId }, relations: ['items'] });
+      .findOne(BillingTransaction, { where: { resourceUsageId: usageId }, relations: { items: true } });
     return row ? toTransactionRecord(row) : null;
   }
 
@@ -159,7 +160,7 @@ export class TypeOrmBillingLedgerStore implements BillingLedgerStore {
   async findUsageReceipt(transactionId: number): Promise<UsageReceiptSource | null> {
     const row = await this.transactions.findOne({
       where: { id: transactionId, status: BillingTransactionStatus.Completed },
-      relations: ['items', 'user', 'resourceUsage', 'resourceUsage.resource', 'resourceUsage.user'],
+      relations: { items: true, user: true, resourceUsage: { resource: true, user: true } },
     });
     return row ? toUsageReceipt(row) : null;
   }

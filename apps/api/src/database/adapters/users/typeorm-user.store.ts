@@ -23,6 +23,7 @@ import type { TransactionContext } from '../../transaction-context';
 import { TransactionContextResolver } from '../transaction-context';
 import { toUserAccount, toUserRecord } from './user-mapping';
 import { applyUserListFilters } from './user-list-query';
+import { findRelations } from '../find-options';
 
 /** SQLite lower-cases ASCII only, so the email search term is folded in JavaScript like the stored value. */
 const foldEmail = (value: string) => value.trim().toLowerCase();
@@ -45,7 +46,7 @@ export class TypeOrmUserStore implements UserStore {
   ): Promise<UserAccount | null> {
     const user = await this.manager(context)
       .getRepository(User)
-      .findOne({ where: lookup, relations: withCredentials ? ['authenticationDetails'] : undefined });
+      .findOne({ where: lookup, relations: findRelations(withCredentials ? ['authenticationDetails'] : undefined) });
     return user ? toUserAccount(user) : null;
   }
 
@@ -121,9 +122,9 @@ export class TypeOrmUserStore implements UserStore {
       skip,
       take: query.limit,
       where,
-      relations: query.includeRoles
-        ? ['authenticationDetails', 'userRoles', 'userRoles.role']
-        : ['authenticationDetails'],
+      relations: findRelations(
+        query.includeRoles ? ['authenticationDetails', 'userRoles', 'userRoles.role'] : ['authenticationDetails'],
+      ),
       order: { username: 'ASC' },
     });
     return { users: users.map(toUserAccount), total };

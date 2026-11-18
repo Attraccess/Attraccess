@@ -21,9 +21,10 @@ const quote = (name: string) => `"${name.replace(/"/g, '""')}"`;
 const openSqlite = (file: string, busyTimeout?: number) =>
   sqliteBackend
     .createDataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: file,
-      busyTimeout,
+      timeout: busyTimeout,
       entities: sqliteBackend.entities,
       migrations: sqliteBackend.migrationTrack.migrations,
       migrationsTableName: sqliteBackend.migrationTrack.tableName,
@@ -46,7 +47,11 @@ export const sqliteStorageFixture: StorageBackendFixture = {
     };
     const primary = await open();
     const core = sqliteBackend.plugins.coreTableNames();
-    const engineOptions = { type: 'sqlite', database: file } as DataSourceOptions;
+    const engineOptions = {
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database: file,
+    } as DataSourceOptions;
     const engine = createSqlitePluginMigrationEngine(engineOptions, () => engineOptions);
 
     const query = (sql: string, params: unknown[] = []): Promise<Array<Record<string, unknown>>> =>
@@ -109,7 +114,11 @@ export const sqliteStorageFixture: StorageBackendFixture = {
       },
       async committed(sql) {
         // Outside the guarded connections: a statement of the flow that owns a transaction would join it there.
-        const plain = await new DataSource({ type: 'sqlite', database: file }).initialize();
+        const plain = await new DataSource({
+          type: 'better-sqlite3',
+          invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+          database: file,
+        }).initialize();
         try {
           return await plain.query(sql);
         } finally {
@@ -121,7 +130,11 @@ export const sqliteStorageFixture: StorageBackendFixture = {
       },
       async holdWriteLock() {
         // A plain connection, outside the host's flow guards: it only takes and holds the file's write lock.
-        const holder = await new DataSource({ type: 'sqlite', database: file }).initialize();
+        const holder = await new DataSource({
+          type: 'better-sqlite3',
+          invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+          database: file,
+        }).initialize();
         await holder.query('BEGIN IMMEDIATE');
         return async () => {
           await holder.query('ROLLBACK');

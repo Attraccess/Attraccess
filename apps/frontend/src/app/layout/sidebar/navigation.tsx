@@ -1,7 +1,4 @@
-import {
-  useLicenseServiceGetLicenseInformation,
-  useMessagingServiceMessagingGetUnreadCount,
-} from '@attraccess/react-query-client';
+import { useGetLicenseInformation, useMessagingGetUnreadCount } from '@attraccess/react-query-client';
 import { useMemo } from 'react';
 import {
   CreditCardIcon,
@@ -272,8 +269,8 @@ export const SIDEBAR_ITEMS: (SidebarItem | SidebarItemGroup)[] = [
 ];
 
 export function useSidebarItems(): (SidebarItem | SidebarItemGroup)[] {
-  const { data: license } = useLicenseServiceGetLicenseInformation();
-  const { data: unread } = useMessagingServiceMessagingGetUnreadCount();
+  const { data: license } = useGetLicenseInformation();
+  const { data: unread } = useMessagingGetUnreadCount();
 
   const allItems = useMemo(() => {
     return SIDEBAR_ITEMS.map((item) => ('showsUnreadCount' in item ? { ...item, badgeCount: unread?.total } : item));

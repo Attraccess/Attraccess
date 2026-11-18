@@ -112,6 +112,7 @@ namespace ble
         connectReported = false;
         hasPendingFailure = false;
         mtu = MIN_MTU;
+        link = LinkState();
         services.clear();
         characteristics.clear();
         opToken = 0;
@@ -158,7 +159,16 @@ namespace ble
         peer = address;
         ble_addr_t addr;
         toNimble(address, addr);
-        const int rc = ble_gap_connect(ownAddressType, &addr, static_cast<int32_t>(timeoutMs), nullptr, gapTrampoline,
+        // A shorter interval than NimBLE's 30..50 ms default: fewer milliseconds per write and ack. The peripheral
+        // may refuse it or ask for other values later (accepted, see onGapEvent).
+        struct ble_gap_conn_params params = {};
+        params.scan_itvl = 0x0010;
+        params.scan_window = 0x0010;
+        params.itvl_min = link::INTERVAL_MIN;
+        params.itvl_max = link::INTERVAL_MAX;
+        params.latency = link::LATENCY;
+        params.supervision_timeout = link::SUPERVISION_TIMEOUT;
+        const int rc = ble_gap_connect(ownAddressType, &addr, static_cast<int32_t>(timeoutMs), &params, gapTrampoline,
                                        this);
         if (rc != 0) return mapConnectFailure(rc);
         connecting = true;
@@ -171,6 +181,25 @@ namespace ble
         // deletes it before it reports the disconnect) all end in a disconnect event. Any other failure leaves the
         // link up: connect() asks again before it allows a new one.
         (void)ble_gap_terminate(conn, BLE_ERR_REM_USER_CONN_TERM);
+    }
+
+    void NimbleRadio::tuneLink()
+    {
+        // Requests only: a peripheral that refuses them keeps the link it has, and the session goes on.
+        const int rc = ble_gap_set_data_len(conn, link::DATA_LENGTH_OCTETS, link::DATA_LENGTH_TIME_US);
+        if (rc != 0) reportLink("data-length-refused", rc);
+    }
+
+    void NimbleRadio::reportLink(const char *what, int status)
+    {
+        struct ble_gap_conn_desc desc;
+        if (ble_gap_conn_find(conn, &desc) == 0)
+        {
+            link.interval = desc.conn_itvl;
+            link.latency = desc.conn_latency;
+            link.timeout = desc.supervision_timeout;
+        }
+        events.radioLinkChanged(link, what, status);
     }
 
     void NimbleRadio::cancelConnect()
@@ -269,6 +298,8 @@ namespace ble
                 struct ble_gap_conn_desc desc;
                 if (ble_gap_conn_find(conn, &desc) == 0) peer = fromNimble(desc.peer_id_addr);
             }
+            reportLink("connected", 0);
+            tuneLink();
             startDiscovery();
             return 0;
         case BLE_GAP_EVENT_DISCONNECT:
@@ -297,6 +328,28 @@ namespace ble
         }
         case BLE_GAP_EVENT_MTU:
             if (event->mtu.conn_handle == conn) mtu = event->mtu.value;
+            return 0;
+        case BLE_GAP_EVENT_CONN_UPDATE:
+            if (event->conn_update.conn_handle == conn) reportLink("conn-update", event->conn_update.status);
+            return 0;
+        case BLE_GAP_EVENT_L2CAP_UPDATE_REQ:
+        case BLE_GAP_EVENT_CONN_UPDATE_REQ:
+            // The peripheral asks for other connection parameters: accepted as they are (its battery, its call).
+            return 0;
+        case BLE_GAP_EVENT_DATA_LEN_CHG:
+            // NimBLE leaves data_len_chg.conn_handle at 0; it calls only this link's callback, the one connection.
+            link.txOctets = event->data_len_chg.max_tx_octets;
+            link.rxOctets = event->data_len_chg.max_rx_octets;
+            reportLink("data-length", 0);
+            return 0;
+        case BLE_GAP_EVENT_PHY_UPDATE_COMPLETE:
+            if (event->phy_updated.conn_handle != conn) return 0;
+            if (event->phy_updated.status == 0)
+            {
+                link.txPhy = event->phy_updated.tx_phy;
+                link.rxPhy = event->phy_updated.rx_phy;
+            }
+            reportLink("phy", event->phy_updated.status);
             return 0;
         case BLE_GAP_EVENT_NOTIFY_RX:
         {

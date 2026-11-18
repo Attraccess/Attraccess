@@ -6,9 +6,9 @@ import { RoleOverridesModal } from './RoleOverridesModal';
 
 vi.mock('@attraccess/react-query-client', () => ({
   PasswordPolicyRole: { ADMIN: 'admin' },
-  UsePasswordPolicyAdminServiceListPasswordPolicyOverridesKeyFn: () => ['overrides'],
-  usePasswordPolicyAdminServiceUpsertPasswordPolicyOverride: vi.fn(() => ({ mutate: upsert, isPending: false })),
-  usePasswordPolicyAdminServiceDeletePasswordPolicyOverride: vi.fn(() => ({ mutate: remove, isPending: false })),
+  UseListPasswordPolicyOverridesKeyFn: () => ['overrides'],
+  useUpsertPasswordPolicyOverride: vi.fn(() => ({ mutate: upsert, isPending: false })),
+  useDeletePasswordPolicyOverride: vi.fn(() => ({ mutate: remove, isPending: false })),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -86,8 +86,8 @@ describe('RoleOverridesModal', () => {
 
     expect(upsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        role: 'admin',
-        requestBody: expect.objectContaining({ minLength: 20, requireSpecial: false }),
+        path: { role: 'admin' },
+        body: expect.objectContaining({ minLength: 20, requireSpecial: false }),
       }),
     );
   });
@@ -127,7 +127,7 @@ describe('RoleOverridesModal', () => {
     toggle('override-admin-minLength-toggle');
     await userEvent.click(screen.getByTestId('policy-override-save'));
 
-    expect(remove).toHaveBeenCalledWith({ role: 'admin' });
+    expect(remove).toHaveBeenCalledWith({ path: { role: 'admin' } });
     expect(upsert).not.toHaveBeenCalled();
   });
 });

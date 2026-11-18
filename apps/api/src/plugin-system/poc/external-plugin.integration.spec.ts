@@ -88,10 +88,16 @@ async function bootAndPing(artifactPath: string): Promise<PocPongPayload> {
   );
   expect(compiled?.ownedTables).toEqual(['plugin_poc_backend_plugin_notes']);
   if (!compiled) throw new Error('the poc plugin declares storage');
-  await createSqlitePluginMigrationEngine({ type: 'sqlite', database }, () => ({ type: 'sqlite', database })).migrate(
-    compiled,
-  );
-  const dataSource = await new DataSource({ type: 'sqlite', database, entities: [] }).initialize();
+  await createSqlitePluginMigrationEngine(
+    { type: 'better-sqlite3', invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' }, database },
+    () => ({ type: 'better-sqlite3', database }),
+  ).migrate(compiled);
+  const dataSource = await new DataSource({
+    type: 'better-sqlite3',
+    invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+    database,
+    entities: [],
+  }).initialize();
   const contexts = createSqlitePluginPersistenceHost(() => dataSource).createContexts('poc-backend-plugin', compiled);
 
   const events = new EventEmitter2();

@@ -19,10 +19,10 @@ const state = vi.hoisted(() => ({
   callbacks: undefined as undefined | { onSuccess: () => void; onError: (error: Error) => void; onSettled: () => void },
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  SSOProviderType: { OIDC: 'OIDC', SAML: 'SAML' },
-  useSettingsServiceGetFirstTimeSetupStatus: () => ({ data: { available: state.setup }, isLoading: state.checking }),
-  useAuthenticationServiceGetAllSsoProviders: () => ({ data: state.providers, isLoading: state.loading }),
-  useAuthenticationServiceLinkUserToExternalAccount: (options: typeof state.callbacks) => {
+  SsoProviderType: { OIDC: 'OIDC', SAML: 'SAML' },
+  useGetFirstTimeSetupStatus: () => ({ data: { available: state.setup }, isLoading: state.checking }),
+  useGetAllSsoProviders: () => ({ data: state.providers, isLoading: state.loading }),
+  useLinkUserToExternalAccount: (_mutationKey: unknown, options: typeof state.callbacks) => {
     state.callbacks = options;
     return { mutate: state.link, isPending: false };
   },
@@ -126,7 +126,7 @@ it('decodes an account-link token, submits its password and redirects only on su
   expect(state.callbackUrl).toHaveBeenCalledWith(7, 'SAML', expect.any(String));
   fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'test-password' } });
   fireEvent.click(screen.getByRole('button', { name: 'Link account' }));
-  expect(state.link).toHaveBeenCalledWith({ requestBody: { linkToken: token, password: 'test-password' } });
+  expect(state.link).toHaveBeenCalledWith({ body: { linkToken: token, password: 'test-password' } });
   act(() => state.callbacks?.onError(Object.assign(new Error('Unauthorized'), { body: { message: 'Unauthorized' } })));
   expect(state.toastError).toHaveBeenLastCalledWith({ title: 'Invalid password. Please try again.' });
   act(() =>

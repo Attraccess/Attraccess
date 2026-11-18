@@ -22,16 +22,16 @@ import { MeterNameEditor } from '../../meters/MeterNameEditor';
 import { MeterSetupNotice } from '../metering/MeterNotices';
 import { formatCredits, parseCredits, dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
 import {
-  UseResourceMeteringServiceListResourceMetersKeyFn,
-  useResourceMeteringServiceListResourceMeters,
-  useResourceMeteringServiceSetResourceMeterRate,
-  useResourceMeteringServiceSetResourceMeterAllocation,
-  UseResourceMeteringServiceGetResourceMeteringStatusKeyFn,
+  UseListResourceMetersKeyFn,
+  useListResourceMeters,
+  useSetResourceMeterRate,
+  useSetResourceMeterAllocation,
+  UseGetResourceMeteringStatusKeyFn,
   ResourceMeterAllocation,
-  useBillingServiceGetBillingConfiguration,
-  useBillingServiceGetResourceBillingConfiguration,
-  UseBillingServiceGetResourceBillingConfigurationKeyFn,
-  useBillingServiceUpdateResourceBillingConfiguration,
+  useGetBillingConfiguration,
+  useGetResourceBillingConfiguration,
+  UseGetResourceBillingConfigurationKeyFn,
+  useUpdateResourceBillingConfiguration,
 } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../../../../hooks/useAuth';
@@ -64,16 +64,16 @@ export function ResourceBillingInfoEditor(props: Readonly<ResourceBillingInfoEdi
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { data: configuration } = useBillingServiceGetBillingConfiguration();
-  const { data: resourceBillingConfiguration } = useBillingServiceGetResourceBillingConfiguration({ resourceId });
-  const { mutate: updateConfiguration, isPending: isSaving } = useBillingServiceUpdateResourceBillingConfiguration({
+  const { data: configuration } = useGetBillingConfiguration();
+  const { data: resourceBillingConfiguration } = useGetResourceBillingConfiguration({ path: { resourceId } });
+  const { mutate: updateConfiguration, isPending: isSaving } = useUpdateResourceBillingConfiguration(undefined, {
     onSuccess: () => {
       toast.success({
         title: t('success.toast.title'),
         description: t('success.toast.description'),
       });
       queryClient.invalidateQueries({
-        queryKey: UseBillingServiceGetResourceBillingConfigurationKeyFn({ resourceId }),
+        queryKey: UseGetResourceBillingConfigurationKeyFn({ path: { resourceId } }),
       });
       close();
     },
@@ -107,10 +107,9 @@ export function ResourceBillingInfoEditor(props: Readonly<ResourceBillingInfoEdi
     ),
   );
 
-  const { data: meters = [] } = useResourceMeteringServiceListResourceMeters({ resourceId });
-  const { mutateAsync: setMeterRate, isPending: ratesPending } = useResourceMeteringServiceSetResourceMeterRate();
-  const { mutateAsync: setMeterAllocation, isPending: allocationsPending } =
-    useResourceMeteringServiceSetResourceMeterAllocation();
+  const { data: meters = [] } = useListResourceMeters({ path: { resourceId } });
+  const { mutateAsync: setMeterRate, isPending: ratesPending } = useSetResourceMeterRate();
+  const { mutateAsync: setMeterAllocation, isPending: allocationsPending } = useSetResourceMeterAllocation();
   const [rates, setRates] = useState<Record<number, string>>({});
   const [allocations, setAllocations] = useState<Record<number, ResourceMeterAllocation>>({});
   useEffect(() => {
@@ -182,25 +181,20 @@ export function ResourceBillingInfoEditor(props: Readonly<ResourceBillingInfoEdi
     try {
       for (const rate of parsedRates)
         await setMeterRate({
-          resourceId: resourceId,
-          meterId: rate.meterId,
-          requestBody: { creditsPerUnit: rate.creditsPerUnit },
+          path: { resourceId: resourceId, meterId: rate.meterId },
+          body: { creditsPerUnit: rate.creditsPerUnit },
         });
       for (const meter of meters) {
         const allocation = allocations[meter.id];
         if (allocation && allocation !== meter.allocation)
-          await setMeterAllocation({
-            resourceId: resourceId,
-            meterId: meter.id,
-            requestBody: { allocation },
-          });
+          await setMeterAllocation({ path: { resourceId: resourceId, meterId: meter.id }, body: { allocation } });
       }
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: UseResourceMeteringServiceListResourceMetersKeyFn({ resourceId: resourceId }),
+          queryKey: UseListResourceMetersKeyFn({ path: { resourceId: resourceId } }),
         }),
         queryClient.invalidateQueries({
-          queryKey: UseResourceMeteringServiceGetResourceMeteringStatusKeyFn({ resourceId: resourceId }),
+          queryKey: UseGetResourceMeteringStatusKeyFn({ path: { resourceId: resourceId } }),
         }),
       ]);
     } catch (error) {
@@ -208,8 +202,8 @@ export function ResourceBillingInfoEditor(props: Readonly<ResourceBillingInfoEdi
       return;
     }
     updateConfiguration({
-      resourceId: resourceId,
-      requestBody: {
+      path: { resourceId: resourceId },
+      body: {
         creditsPerUsage: userCurrencyToDbCurrency(creditsPerUsage, configuration.minorUnit),
         creditsPerMinute: userCurrencyToDbCurrency(creditsPerMinute, configuration.minorUnit),
         creditsPerOperatingMinute: userCurrencyToDbCurrency(creditsPerOperatingMinute, configuration.minorUnit),

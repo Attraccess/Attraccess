@@ -3,9 +3,9 @@ import { Button, FieldError, Input, Label, TextField } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ResourceMeterDto,
-  useResourceMeteringServiceCreateResourceMeter,
-  useResourceMeteringServiceUpdateResourceMeter,
-  UseResourceMeteringServiceListResourceMetersKeyFn,
+  useCreateResourceMeter,
+  useUpdateResourceMeter,
+  UseListResourceMetersKeyFn,
 } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../../hooks/useAuth';
@@ -28,18 +28,18 @@ export function MeterNameEditor({
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(meter?.name ?? '');
   const [error, setError] = useState(false);
-  const create = useResourceMeteringServiceCreateResourceMeter();
-  const update = useResourceMeteringServiceUpdateResourceMeter();
+  const create = useCreateResourceMeter();
+  const update = useUpdateResourceMeter();
   const pending = create.isPending || update.isPending;
   const save = async () => {
     if (!canEdit || !name.trim()) return;
     setError(false);
     try {
       const saved = meter
-        ? await update.mutateAsync({ resourceId, meterId: meter.id, requestBody: { name: name.trim() } })
-        : await create.mutateAsync({ resourceId, requestBody: { name: name.trim() } });
+        ? await update.mutateAsync({ path: { resourceId, meterId: meter.id }, body: { name: name.trim() } })
+        : await create.mutateAsync({ path: { resourceId }, body: { name: name.trim() } });
       await queryClient.invalidateQueries({
-        queryKey: UseResourceMeteringServiceListResourceMetersKeyFn({ resourceId }),
+        queryKey: UseListResourceMetersKeyFn({ path: { resourceId } }),
       });
       setEditing(false);
       setName(saved.name);

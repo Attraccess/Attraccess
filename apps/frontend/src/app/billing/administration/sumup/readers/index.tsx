@@ -15,21 +15,18 @@ import {
   TableScrollContainer,
 } from '@heroui/react';
 import { SmartphoneNfcIcon, Trash2Icon } from 'lucide-react';
-import {
-  useBillingServiceGetSumUpConfiguration,
-  useBillingServiceGetSumUpReaders,
-} from '@attraccess/react-query-client';
+import { useGetSumUpConfiguration, useGetSumUpReaders } from '@attraccess/react-query-client';
 import { SumUpReadersPairing } from './pairing';
 import { SumUpReaderDeleteModal } from './remove';
 
 export function SumUpReadersCard(props: Omit<CardProps, 'children'>) {
   const { t, language } = useTranslations({ en, de });
 
-  const { data: readers } = useBillingServiceGetSumUpReaders(undefined, {
+  const { data: readers } = useGetSumUpReaders({}, undefined, {
     refetchInterval: 5000,
   });
 
-  const { data: configuration } = useBillingServiceGetSumUpConfiguration();
+  const { data: configuration } = useGetSumUpConfiguration();
 
   if (!configuration?.enabled) {
     return null;

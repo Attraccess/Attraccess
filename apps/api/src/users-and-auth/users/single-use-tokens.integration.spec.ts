@@ -105,7 +105,8 @@ describe('single-use reset and verification tokens (integration)', () => {
     // The unit of work commits on its own connection, so the database must be a file.
     directory = await mkdtemp(join(tmpdir(), 'single-use-tokens-'));
     source = await createDataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: join(directory, 'tokens.sqlite'),
       entities: Object.values(entities),
       migrations: Object.values(migrations),
@@ -325,9 +326,10 @@ describe('single-use reset and verification tokens (integration)', () => {
 
     beforeAll(async () => {
       secondSource = await createDataSource({
-        type: 'sqlite',
+        type: 'better-sqlite3',
+        invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
         database: join(directory, 'tokens.sqlite'),
-        busyTimeout: 5000,
+        timeout: 5000,
         entities: Object.values(entities),
       }).initialize();
       second = buildStack(secondSource);

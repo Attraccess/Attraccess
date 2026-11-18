@@ -2,12 +2,17 @@ import '@testing-library/jest-dom/vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { LicenseService } from '@attraccess/react-query-client';
 import type { AttraccessFrontendPlugin, PluginDashboardWidget } from '@attraccess/plugins-frontend-sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import usePluginState, { PluginManifestWithPlugin } from '../../plugins/plugin.state';
 import { DashboardWidgetsProvider } from './DashboardWidgetsProvider';
 import { DashboardWidget, useDashboardWidgets } from './widgetsContext';
+import * as sdk from '@attraccess/react-query-client/sdk';
+import { sdkResult } from '../../../test-utils/sdk-mock';
+
+vi.mock('@attraccess/react-query-client/sdk', async (importOriginal) =>
+  (await import('../../../test-utils/sdk-mock')).spyOnSdk(await importOriginal<object>()),
+);
 
 const state = vi.hoisted(() => ({ openable: new Set<string>(), widgets: [] as DashboardWidget[] }));
 
@@ -67,7 +72,7 @@ const reservations: PluginDashboardWidget = {
 beforeEach(() => {
   state.openable = new Set(['/messages', '/resources']);
   usePluginState.setState({ plugins: [], isInitialized: true });
-  vi.spyOn(LicenseService, 'getLicenseInformation').mockResolvedValue({ modules: [] } as never);
+  vi.mocked(sdk.getLicenseInformation).mockResolvedValue(sdkResult({ modules: [] }));
 });
 
 afterEach(() => {
@@ -94,7 +99,7 @@ describe('DashboardWidgetsProvider', () => {
   it('is not ready while the plugins load, even with the license loaded', async () => {
     usePluginState.setState({ isInitialized: false });
     renderProvider();
-    await waitFor(() => expect(LicenseService.getLicenseInformation).toHaveBeenCalled());
+    await waitFor(() => expect(sdk.getLicenseInformation).toHaveBeenCalled());
     // Lets the resolved license reach the query cache.
     await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
     expect(screen.getByRole('status', { name: 'ready' })).toHaveTextContent('false');
@@ -104,13 +109,11 @@ describe('DashboardWidgetsProvider', () => {
 
   it('is not ready while the license loads, even with the plugins loaded', async () => {
     let resolveLicense: (license: unknown) => void = () => undefined;
-    vi.spyOn(LicenseService, 'getLicenseInformation').mockReturnValue(
-      new Promise((resolve) => (resolveLicense = resolve)) as never,
-    );
+    vi.mocked(sdk.getLicenseInformation).mockReturnValue(new Promise((resolve) => (resolveLicense = resolve)) as never);
     renderProvider();
-    await waitFor(() => expect(LicenseService.getLicenseInformation).toHaveBeenCalled());
+    await waitFor(() => expect(sdk.getLicenseInformation).toHaveBeenCalled());
     expect(screen.getByRole('status', { name: 'ready' })).toHaveTextContent('false');
-    await act(async () => resolveLicense({ modules: [] }));
+    await act(async () => resolveLicense(sdkResult({ modules: [] })));
     await waitFor(() => expect(screen.getByRole('status', { name: 'ready' })).toHaveTextContent('true'));
   });
 

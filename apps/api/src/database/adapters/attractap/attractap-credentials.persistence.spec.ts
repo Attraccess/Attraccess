@@ -21,7 +21,8 @@ describe('credential registry on SQLite (atomic reader row and history)', () => 
   const open = async (): Promise<DataSource> => {
     const source = await sqliteBackend
       .createDataSource({
-        type: 'sqlite',
+        type: 'better-sqlite3',
+        invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
         database: join(directory, 'credentials.sqlite'),
         entities: Object.values(entities),
       })

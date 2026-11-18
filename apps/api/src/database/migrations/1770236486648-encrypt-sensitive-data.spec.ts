@@ -16,7 +16,7 @@ describe('sensitive data encryption migration', () => {
   const migration = new EncryptSensitiveData1770236486648();
   beforeEach(async () => {
     process.env.AUTH_SESSION_SECRET = 'migration-secret';
-    source = await new DataSource({ type: 'sqlite', database: ':memory:', entities: [] }).initialize();
+    source = await new DataSource({ type: 'better-sqlite3', database: ':memory:', entities: [] }).initialize();
     runner = source.createQueryRunner();
     for (const [table, column] of columns) {
       await runner.query(`CREATE TABLE "${table}" (id INTEGER PRIMARY KEY, "${column}" TEXT)`);

@@ -67,7 +67,7 @@ export class TypeOrmDashboardPinStore implements DashboardPinStore {
    * transactions in its unit of work; other drivers lock the user's row, which exists even while the user has no pins.
    */
   private async lockUser(manager: EntityManager, userId: number): Promise<void> {
-    if (manager.connection.options.type === 'sqlite') return;
+    if (manager.connection.options.type === 'better-sqlite3') return;
     await manager.getRepository(User).findOneOrFail({ where: { id: userId }, lock: { mode: 'pessimistic_write' } });
   }
 }

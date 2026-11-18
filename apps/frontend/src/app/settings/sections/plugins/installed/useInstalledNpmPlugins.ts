@@ -1,7 +1,7 @@
 import {
   type InstalledNpmPluginDto,
-  usePluginsServicePluginControllerInstalledPackages,
-  UsePluginsServicePluginControllerInstalledPackagesKeyFn,
+  usePluginControllerInstalledPackages,
+  UsePluginControllerInstalledPackagesKeyFn,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
@@ -14,7 +14,7 @@ import { useCallback, useMemo } from 'react';
  */
 export function useInstalledNpmPlugins() {
   const queryClient = useQueryClient();
-  const { data } = usePluginsServicePluginControllerInstalledPackages(undefined, {
+  const { data } = usePluginControllerInstalledPackages({}, undefined, {
     staleTime: Infinity,
     gcTime: 0,
     retryOnMount: false,
@@ -36,14 +36,11 @@ export function useInstalledNpmPlugins() {
 
   const mergeInstalled = useCallback(
     (updated: InstalledNpmPluginDto[]) => {
-      queryClient.setQueryData<InstalledNpmPluginDto[]>(
-        UsePluginsServicePluginControllerInstalledPackagesKeyFn(),
-        (current = []) => {
-          const merged = new Map(current.map((plugin) => [plugin.name, plugin] as const));
-          for (const plugin of updated) merged.set(plugin.name, plugin);
-          return [...merged.values()];
-        },
-      );
+      queryClient.setQueryData<InstalledNpmPluginDto[]>(UsePluginControllerInstalledPackagesKeyFn(), (current = []) => {
+        const merged = new Map(current.map((plugin) => [plugin.name, plugin] as const));
+        for (const plugin of updated) merged.set(plugin.name, plugin);
+        return [...merged.values()];
+      });
     },
     [queryClient],
   );

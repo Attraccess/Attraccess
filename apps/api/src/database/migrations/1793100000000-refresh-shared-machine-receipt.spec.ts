@@ -9,7 +9,7 @@ import { RefreshSharedMachineReceipt1793100000000 } from './1793100000000-refres
 it('refreshes the preceding stock receipt while preserving customized bodies, subjects, and variables', async () => {
   const type = EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY;
   const previous = readFileSync(join(__dirname, '__fixtures__', 'refreshed-meter-receipt-totals.mjml'), 'utf8');
-  const source = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+  const source = await new DataSource({ type: 'better-sqlite3', database: ':memory:' }).initialize();
   const runner = source.createQueryRunner();
   try {
     await new EmailTemplateTranslations1782500000000().up(runner);

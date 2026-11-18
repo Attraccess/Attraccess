@@ -64,9 +64,10 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
       if (backend === 'SQLite') {
         directory = mkdtempSync(join(tmpdir(), 'attraccess-session-'));
         source = await new DataSource({
-          type: 'sqlite',
+          type: 'better-sqlite3',
+          invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
           database: join(directory, 'sessions.sqlite'),
-          busyTimeout: 5000,
+          timeout: 5000,
           entities: Object.values(entities),
           synchronize: true,
         }).initialize();

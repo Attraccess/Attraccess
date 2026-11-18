@@ -4,8 +4,8 @@ import { ClockIcon, GaugeIcon, HashIcon, PencilIcon, TrashIcon } from 'lucide-re
 import {
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleTriggerType,
-  useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey,
-  useResourceMaintenanceSchedulesServiceUpdateMaintenanceSchedule,
+  useFindMaintenanceSchedulesKey,
+  useUpdateMaintenanceSchedule,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { configSummary } from './config-summary';
@@ -32,17 +32,16 @@ export function ScheduleAccordionItem(props: Props) {
   const { t } = useTranslations({ de, en });
   const queryClient = useQueryClient();
 
-  const { mutate: updateSchedule, isPending: isToggling } =
-    useResourceMaintenanceSchedulesServiceUpdateMaintenanceSchedule({
-      onSuccess: () => {
-        queryClient.invalidateQueries({
-          queryKey: [useResourceMaintenanceSchedulesServiceFindMaintenanceSchedulesKey],
-        });
-      },
-    });
+  const { mutate: updateSchedule, isPending: isToggling } = useUpdateMaintenanceSchedule(undefined, {
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [useFindMaintenanceSchedulesKey],
+      });
+    },
+  });
 
   const togglePause = () => {
-    updateSchedule({ resourceId, scheduleId: schedule.id, requestBody: { enabled: !schedule.enabled } });
+    updateSchedule({ path: { resourceId, scheduleId: schedule.id }, body: { enabled: !schedule.enabled } });
   };
 
   return (

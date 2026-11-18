@@ -17,10 +17,10 @@ vi.mock('../dashboard/summary/live-updates', () => ({
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   BillingTransactionStatus: { COMPLETED: 'completed' },
-  useBillingServiceGetBillingTransaction: () => ({
+  useGetBillingTransaction: () => ({
     data: { resourceUsage: { resource: { name: 'Laser cutter' } } },
   }),
-  useBillingServiceGetBillingConfiguration: () => ({
+  useGetBillingConfiguration: () => ({
     data: state.configuration,
     isError: state.isError,
     refetch: state.refetch,

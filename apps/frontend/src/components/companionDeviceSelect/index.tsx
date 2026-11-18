@@ -1,4 +1,4 @@
-import { useCompanionDevicesServiceListCompanionDevices } from '@attraccess/react-query-client';
+import { useListCompanionDevices } from '@attraccess/react-query-client';
 import { Select, Props as SelectProps } from '../select';
 
 interface Props {
@@ -14,7 +14,7 @@ export function CompanionDeviceSelect(
     Omit<SelectProps, 'items' | 'label' | 'placeholder' | 'value' | 'onChange' | 'data-cy' | 'isLoading' | 'children'>,
 ) {
   const { selectedId, onSelectionChange, placeholder, ...selectProps } = props;
-  const { data: devices } = useCompanionDevicesServiceListCompanionDevices();
+  const { data: devices } = useListCompanionDevices();
 
   return (
     <Select

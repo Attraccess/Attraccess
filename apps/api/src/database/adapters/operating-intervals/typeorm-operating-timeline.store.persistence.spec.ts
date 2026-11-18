@@ -43,7 +43,8 @@ describe('TypeOrmOperatingTimelineStore reads', () => {
     resolveDatabaseBackend();
     directory = await mkdtemp(join(tmpdir(), 'attraccess-timeline-store-'));
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: join(directory, 'test.sqlite'),
       synchronize: true,
       entities: schemas,

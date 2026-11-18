@@ -43,7 +43,8 @@ describe('plugin host data adapter on a real database', () => {
 
   beforeAll(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: ':memory:',
       entities: Object.values(entities),
       migrations: Object.values(migrations),

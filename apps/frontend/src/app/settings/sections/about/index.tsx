@@ -1,11 +1,7 @@
 import { Chip, Skeleton } from '@heroui/react';
 import { ArrowUpCircleIcon, CheckCircleIcon, WifiOffIcon } from 'lucide-react';
 import { useFormatedDuration, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  useSystemServiceGetCurrentVersion,
-  useSystemServiceGetSystemInfo,
-  useSystemServiceGetUpdateStatus,
-} from '@attraccess/react-query-client';
+import { useGetCurrentVersion, useGetSystemInfo, useGetUpdateStatus } from '@attraccess/react-query-client';
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsRow } from '../../components/SettingsRow';
 import en from './en.json';
@@ -27,9 +23,9 @@ const GITHUB_REPO = 'https://github.com/Attraccess/Attraccess';
 export function AboutSection() {
   const { t } = useTranslations({ en, de });
 
-  const { data: versionInfo, isLoading: isVersionLoading } = useSystemServiceGetCurrentVersion();
-  const { data: updateStatus } = useSystemServiceGetUpdateStatus();
-  const { data: systemInfo } = useSystemServiceGetSystemInfo();
+  const { data: versionInfo, isLoading: isVersionLoading } = useGetCurrentVersion();
+  const { data: updateStatus } = useGetUpdateStatus();
+  const { data: systemInfo } = useGetSystemInfo();
   const formattedUptime = useFormatedDuration((systemInfo?.uptimeSeconds ?? 0) / 60);
 
   const isDev = !isVersionLoading && (!versionInfo?.version || versionInfo.version === '0.0.0-dev');

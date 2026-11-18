@@ -132,10 +132,19 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
 
     // The host migrates the plugin's declared storage at boot, before the application starts.
     const databaseFile = join(CACHE_DIR, 'host.sqlite');
-    PluginMigrationService.configureForTesting({ type: 'sqlite', database: databaseFile });
+    PluginMigrationService.configureForTesting({
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database: databaseFile,
+    });
     await PluginMigrationService.runPendingUpMigrationsForAllPlugins();
     const pluginModule = PluginModule.forRoot();
-    dataSource = new DataSource({ type: 'sqlite', database: databaseFile, entities: [] });
+    dataSource = new DataSource({
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database: databaseFile,
+      entities: [],
+    });
     await dataSource.initialize();
     hostDataSource = dataSource;
     events = new EventEmitter2();

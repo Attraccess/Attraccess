@@ -1,5 +1,9 @@
 import { useCallback, useRef, useState } from 'react';
-import { FormResponseDto, FormSubmissionRequestDto, ResourceFormsService } from '@attraccess/react-query-client';
+import {
+  FormResponseDto,
+  FormSubmissionRequestDto,
+  resourceFormsGetRequirements,
+} from '@attraccess/react-query-client';
 import { ResourceFormAction } from '../../details/forms/types';
 import { ResourceFormsModal } from '../components/ResourceFormsModal';
 
@@ -26,7 +30,11 @@ export function useResourceFormsSubmission(resourceId: number) {
 
   const requestForms = useCallback(
     async (action: ResourceFormAction): Promise<FormSubmissionRequestDto[]> => {
-      const forms = await ResourceFormsService.resourceFormsGetRequirements({ resourceId, action });
+      const forms = await resourceFormsGetRequirements({
+        path: { resourceId },
+        query: { action },
+        throwOnError: true,
+      }).then(({ data }) => data);
       if (!forms?.length) {
         return [];
       }

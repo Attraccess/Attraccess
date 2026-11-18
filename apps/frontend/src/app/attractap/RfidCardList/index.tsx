@@ -32,12 +32,12 @@ import {
   useTranslations,
 } from '@attraccess/plugins-frontend-ui';
 import {
-  useAttractapServiceGetAllCards,
-  NFCCard,
-  useUsersServiceGetOneUserById,
-  useLicenseServiceGetLicenseInformation,
-  useAttractapServiceEnrollNfcCard,
-  useAttractapServiceResetNfcCard,
+  useGetAllCards,
+  NfcCard,
+  useGetOneUserById,
+  useGetLicenseInformation,
+  useEnrollNfcCard,
+  useResetNfcCard,
   ApiError,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -84,7 +84,7 @@ export const EnrollNfcCard = ({ children, userId }: EnrollNfcCardProps) => {
 
   const close = useCallback(() => setShow(false), []);
   const showError = useCardOperationErrorToast();
-  const { mutate: enrollNfcCardMutation, isPending } = useAttractapServiceEnrollNfcCard({
+  const { mutate: enrollNfcCardMutation, isPending } = useEnrollNfcCard(undefined, {
     onSuccess: close,
     onError: showError,
   });
@@ -94,7 +94,7 @@ export const EnrollNfcCard = ({ children, userId }: EnrollNfcCardProps) => {
       return;
     }
 
-    enrollNfcCardMutation({ requestBody: { readerId, ...(userId !== undefined ? { userId } : {}) } });
+    enrollNfcCardMutation({ body: { readerId, ...(userId !== undefined ? { userId } : {}) } });
   }, [readerId, enrollNfcCardMutation, userId]);
 
   return (
@@ -161,7 +161,7 @@ export const NfcCardDeleteModal = (props: DeleteModalProps) => {
   const [readerId, setReaderId] = useState<number | null>(null);
 
   const showError = useCardOperationErrorToast();
-  const { mutate: resetNfcCard, isPending } = useAttractapServiceResetNfcCard({
+  const { mutate: resetNfcCard, isPending } = useResetNfcCard(undefined, {
     onSuccess: props.close,
     onError: showError,
   });
@@ -171,7 +171,7 @@ export const NfcCardDeleteModal = (props: DeleteModalProps) => {
       return;
     }
 
-    resetNfcCard({ requestBody: { readerId, cardId: props.cardId } });
+    resetNfcCard({ body: { readerId, cardId: props.cardId } });
   }, [props.cardId, resetNfcCard, readerId]);
 
   return (
@@ -222,7 +222,7 @@ export const NfcCardDeleteModal = (props: DeleteModalProps) => {
 
 export interface NfcCardTableCellProps {
   header: string;
-  card: NFCCard;
+  card: NfcCard;
   onDeleteClick: () => void;
 }
 
@@ -232,7 +232,7 @@ export const NfcCardTableCell = (props: NfcCardTableCellProps) => {
     en,
   });
 
-  const { data: user } = useUsersServiceGetOneUserById({ id: props.card.user?.id }, undefined, {
+  const { data: user } = useGetOneUserById({ path: { id: props.card.user?.id } }, undefined, {
     enabled: props.header === 'userId',
   });
 
@@ -302,7 +302,7 @@ export const NfcCardTableCell = (props: NfcCardTableCellProps) => {
     return <AttraccessUser user={props.card.user} />;
   }
 
-  return props.card[props.header as keyof NFCCard] as React.ReactNode;
+  return props.card[props.header as keyof NfcCard] as React.ReactNode;
 };
 
 export function RfidCardList({ userId }: { userId?: number }) {
@@ -311,14 +311,14 @@ export function RfidCardList({ userId }: { userId?: number }) {
     en,
   });
 
-  const { data: license } = useLicenseServiceGetLicenseInformation();
+  const { data: license } = useGetLicenseInformation();
   const { hasPermission } = useAuth();
   const canReadUser = hasPermission('users.read');
-  const { data: owner } = useUsersServiceGetOneUserById({ id: userId }, undefined, {
+  const { data: owner } = useGetOneUserById({ path: { id: userId } }, undefined, {
     enabled: userId !== undefined && canReadUser,
   });
 
-  const { data: cards, error: cardsError } = useAttractapServiceGetAllCards({ userId }, undefined, {
+  const { data: cards, error: cardsError } = useGetAllCards({ query: { userId } }, undefined, {
     refetchInterval: 5000,
     enabled:
       (!license || license.modules.includes('attractap')) &&
@@ -337,7 +337,7 @@ export function RfidCardList({ userId }: { userId?: number }) {
   }, [cardsError, toast, t]);
 
   const headers = useMemo(() => {
-    const headers: Array<keyof NFCCard | 'actions'> = ['id', 'createdAt', 'uid', 'lastSeen', 'actions'];
+    const headers: Array<keyof NfcCard | 'actions'> = ['id', 'createdAt', 'uid', 'lastSeen', 'actions'];
 
     return headers;
   }, []);

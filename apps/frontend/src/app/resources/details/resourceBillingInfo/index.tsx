@@ -2,12 +2,12 @@ import { Button, cn, Skeleton } from '@heroui/react';
 import { CreditCard, Edit2Icon } from 'lucide-react';
 import { Fragment, HTMLAttributes, useEffect, useMemo, useState } from 'react';
 import {
-  useBillingServiceGetBillingBalance,
-  useResourceMeteringServiceListResourceMeters,
-  useBillingServiceGetBillingConfiguration,
-  useBillingServiceGetResourceBillingConfiguration,
-  useLicenseServiceGetLicenseInformation,
-  useResourcesServiceGetOneResourceById,
+  useGetBillingBalance,
+  useListResourceMeters,
+  useGetBillingConfiguration,
+  useGetResourceBillingConfiguration,
+  useGetLicenseInformation,
+  useGetOneResourceById,
 } from '@attraccess/react-query-client';
 import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
@@ -32,16 +32,16 @@ export function ResourceBillingInfo(props: Readonly<ResourceBillingInfoProps>) {
   const { resourceId, onExampleAmountChange, onVisibilityChange, className, ...htmlProps } = props;
 
   const { t } = useTranslations({ en, de });
-  const { data: configuration } = useBillingServiceGetBillingConfiguration();
-  const { data: resourceBillingConfiguration } = useBillingServiceGetResourceBillingConfiguration({ resourceId });
-  const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  const { data: configuration } = useGetBillingConfiguration();
+  const { data: resourceBillingConfiguration } = useGetResourceBillingConfiguration({ path: { resourceId } });
+  const { data: resource } = useGetOneResourceById({ path: { id: resourceId } });
 
-  const { data: license } = useLicenseServiceGetLicenseInformation();
+  const { data: license } = useGetLicenseInformation();
   const formatNumber = useNumberFormatter();
   const formatCredits = useCreditsFormatter(configuration?.minorUnit ?? 2);
 
   const { user: currentUser, hasPermission } = useAuth();
-  const { data: balance } = useBillingServiceGetBillingBalance({ userId: currentUser?.id ?? 0 }, undefined, {
+  const { data: balance } = useGetBillingBalance({ path: { userId: currentUser?.id ?? 0 } }, undefined, {
     refetchInterval: 5000,
   });
 
@@ -87,7 +87,7 @@ export function ResourceBillingInfo(props: Readonly<ResourceBillingInfoProps>) {
     );
   }, [resourceBillingConfiguration, configuration]);
 
-  const { data: meters = [] } = useResourceMeteringServiceListResourceMeters({ resourceId }, undefined, {
+  const { data: meters = [] } = useListResourceMeters({ path: { resourceId } }, undefined, {
     refetchInterval: 10_000,
   });
   const hasMeterRates = meters.some((meter) => meter.creditsPerUnit > 0);

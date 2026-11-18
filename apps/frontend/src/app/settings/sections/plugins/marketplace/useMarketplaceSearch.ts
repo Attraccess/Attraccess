@@ -1,7 +1,7 @@
 import type { MarketplacePluginDto, MarketplaceSearchResponseDto } from '@attraccess/react-query-client';
 import {
-  usePluginsServicePluginControllerMarketplacePackage,
-  usePluginsServicePluginControllerSearchMarketplace,
+  usePluginControllerMarketplacePackage,
+  usePluginControllerSearchMarketplace,
 } from '@attraccess/react-query-client';
 import { keepPreviousData } from '@tanstack/react-query';
 import { useEffect, useEffectEvent, useMemo, useState } from 'react';
@@ -33,14 +33,14 @@ export function useMarketplaceSearch({ isOpen, query, registryId }: Params) {
 
   const exactName = settled.query.trim();
   // The explicit response type is needed: `keepPreviousData` is generic, so it would otherwise infer `unknown`.
-  const search = usePluginsServicePluginControllerSearchMarketplace<MarketplaceSearchResponseDto>(
-    { query: settled.query, registryId: settled.registryId || undefined },
+  const search = usePluginControllerSearchMarketplace<MarketplaceSearchResponseDto>(
+    { query: { query: settled.query, registryId: settled.registryId || undefined } },
     undefined,
     { enabled: isOpen, retry: false, refetchOnWindowFocus: false, placeholderData: keepPreviousData },
   );
   // Registry search results remain useful when an exact package lookup is unavailable.
-  const direct = usePluginsServicePluginControllerMarketplacePackage(
-    { packageName: exactName, registryId: settled.registryId || undefined },
+  const direct = usePluginControllerMarketplacePackage(
+    { path: { packageName: exactName }, query: { registryId: settled.registryId || undefined } },
     undefined,
     { enabled: isOpen && Boolean(settled.registryId && exactName), retry: false, refetchOnWindowFocus: false },
   );

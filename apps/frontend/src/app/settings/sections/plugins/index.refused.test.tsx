@@ -78,7 +78,7 @@ describe('PluginsSection with refused plugins', () => {
     expect(message).toHaveTextContent('Its stored data stays in the database');
     await user.click(document.querySelector('[data-cy="plugins-list-delete-confirmation-delete-button"]') as Element);
 
-    expect(hoisted.deleteMutateMock).toHaveBeenCalledWith({ pluginId: 'legacy-id' });
+    expect(hoisted.deleteMutateMock).toHaveBeenCalledWith({ path: { pluginId: 'legacy-id' } });
     expect(hoisted.removeGraphMock).not.toHaveBeenCalled();
   });
 

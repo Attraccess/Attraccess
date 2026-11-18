@@ -33,9 +33,10 @@ export class SqliteFileFixture {
   /** A new connection to the same file. The first call creates the schema. */
   async open(createSchema = false, busyTimeout = 5000): Promise<DataSource> {
     const source = await createDataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: this.file,
-      busyTimeout,
+      timeout: busyTimeout,
       entities: Object.values(entities),
       synchronize: createSchema,
     }).initialize();
@@ -49,7 +50,11 @@ export class SqliteFileFixture {
    * waiting for the lock.
    */
   async holdWriteLock(): Promise<() => Promise<void>> {
-    const holder = await new DataSource({ type: 'sqlite', database: this.file }).initialize();
+    const holder = await new DataSource({
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+      database: this.file,
+    }).initialize();
     await holder.query('BEGIN IMMEDIATE');
     return async () => {
       await holder.query('ROLLBACK');

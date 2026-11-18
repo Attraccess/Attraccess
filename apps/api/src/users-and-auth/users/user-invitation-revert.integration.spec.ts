@@ -16,7 +16,8 @@ describe('taking back invitations whose email failed', () => {
 
   beforeAll(async () => {
     source = await createDataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: ':memory:',
       entities: Object.values(entities),
       migrations: Object.values(migrations),

@@ -82,7 +82,8 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
     ]);
     directory = await mkdtemp(join(tmpdir(), 'audit-domains-'));
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: join(directory, 'audit.sqlite'),
       entities: Object.values(entities),
       migrations: Object.values(migrations),

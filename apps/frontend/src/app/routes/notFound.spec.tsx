@@ -28,13 +28,13 @@ vi.mock('../../hooks/useAuth', () => ({ useAuth: vi.fn() }));
 
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useLicenseServiceGetLicenseInformation: () => ({ data: { modules: [] } }),
-  useMessagingServiceMessagingGetUnreadCount: () => ({ data: { total: 0 } }),
-  useUsersServiceGetOneUserById: () => ({ data: undefined }),
-  useAuthenticationServiceGetAllSsoProviders: () => ({ data: [] }),
-  useRbacServiceListRoles: () => ({ data: [] }),
-  useRbacServiceListPermissions: () => ({ data: [] }),
-  useUsersServiceGetUserRoleAssignments: () => ({ data: [] }),
+  useGetLicenseInformation: () => ({ data: { modules: [] } }),
+  useMessagingGetUnreadCount: () => ({ data: { total: 0 } }),
+  useGetOneUserById: () => ({ data: undefined }),
+  useGetAllSsoProviders: () => ({ data: [] }),
+  useListRoles: () => ({ data: [] }),
+  useListPermissions: () => ({ data: [] }),
+  useGetUserRoleAssignments: () => ({ data: [] }),
 }));
 
 const { useAuth } = await import('../../hooks/useAuth');

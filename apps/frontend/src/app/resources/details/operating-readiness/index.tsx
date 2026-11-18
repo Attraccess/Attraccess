@@ -1,6 +1,6 @@
 import { Alert, AlertContent, AlertDescription, AlertTitle, Chip, Link } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { useResourcesServiceResourceOperatingDiagnosticsGetDataQuality } from '@attraccess/react-query-client';
+import { useResourceOperatingDiagnosticsGetDataQuality } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useOperatingDuration } from '../../operatingDuration';
 import en from './en.json';
@@ -24,7 +24,7 @@ export function useOperatingTrackingReadinessFromSummary(
 ) {
   const { hasPermission } = useAuth();
   const canConfigure = hasPermission('resources.update');
-  const { data: quality } = useResourcesServiceResourceOperatingDiagnosticsGetDataQuality({ resourceId }, undefined, {
+  const { data: quality } = useResourceOperatingDiagnosticsGetDataQuality({ path: { resourceId } }, undefined, {
     enabled: enabled && canConfigure,
   });
   return operatingTrackingReadiness(operatingDataAvailable, canConfigure ? quality?.trackingConfigured : undefined);

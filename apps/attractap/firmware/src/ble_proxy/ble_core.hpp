@@ -106,6 +106,11 @@ namespace ble
         // Whether the next request may be taken. Answers are never dropped: the outbox keeps room for everything
         // already accepted work still owes, so a request waits (in the proxy's command queue) while it is full.
         bool acceptsRequests() const;
+        // A write without response waits for controller buffers (NimBLE reports none freeing): poll it quickly.
+        bool waitsForRadioBuffers() const
+        {
+            return currentOwner == Owner::Session && session.current.active && session.current.retry;
+        }
         uint16_t mtu() const { return session.mtu; }
         size_t pendingRequests() const { return session.queue.size() + (session.current.active ? 1 : 0); }
 
@@ -166,6 +171,10 @@ namespace ble
             bool announceEnd = false;
             const char *endReason = "";
             char endDetail[sizeof(Error::detail)] = "";
+            // Throughput diagnostics, logged when the session ends: write attempts NimBLE refused for lack of
+            // buffers, and answers that had to wait for room in the websocket send queue.
+            uint32_t writeRetries = 0;
+            uint32_t answersQueued = 0;
         };
 
         struct Scan

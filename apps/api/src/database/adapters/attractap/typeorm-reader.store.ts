@@ -31,7 +31,7 @@ export class TypeOrmAttractapReaderStore implements AttractapReaderStore {
   ) {}
 
   async findById(id: number): Promise<AttractapReaderWithResources | undefined> {
-    const reader = await this.readers.findOne({ where: { id }, relations: ['resources'] });
+    const reader = await this.readers.findOne({ where: { id }, relations: { resources: true } });
     return reader ? (toReader(reader) as AttractapReaderWithResources) : undefined;
   }
 
@@ -41,12 +41,15 @@ export class TypeOrmAttractapReaderStore implements AttractapReaderStore {
     if (filter.paired === false) where.pairingState = Not('paired');
     if (filter.resourceId !== undefined) where.resources = { id: filter.resourceId };
     if (filter.resourceGroupId !== undefined) where.resources = { groups: { id: filter.resourceGroupId } };
-    const readers = await this.readers.find({ where, ...(filter.withResources ? { relations: ['resources'] } : {}) });
+    const readers = await this.readers.find({
+      where,
+      ...(filter.withResources ? { relations: { resources: true } } : {}),
+    });
     return readers.map(toReader);
   }
 
   async listUnpaired(): Promise<AttractapReader[]> {
-    const readers = await this.readers.find({ where: { pairingState: Not('paired') }, relations: ['resources'] });
+    const readers = await this.readers.find({ where: { pairingState: Not('paired') }, relations: { resources: true } });
     return readers.map(toReader);
   }
 

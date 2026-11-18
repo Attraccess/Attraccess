@@ -9,9 +9,9 @@ import { groupUsersByLetter } from './UserSearch.utils';
 
 // Mock the generated api client: its sources do not exist in hermetic test runs,
 // and the component under test only needs the infinite users hook.
-const mocks = vi.hoisted(() => ({ useUsersServiceFindManyInfinite: vi.fn() }));
+const mocks = vi.hoisted(() => ({ useFindManyInfinite: vi.fn() }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useUsersServiceFindManyInfinite: mocks.useUsersServiceFindManyInfinite,
+  useFindManyInfinite: mocks.useFindManyInfinite,
 }));
 
 const user = (id: number, username: string) => ({ id, username }) as User;
@@ -59,14 +59,14 @@ describe('UserSearch', () => {
 
   it('does not fetch until opened, then lists grouped users and selects on click', async () => {
     const result = infiniteQueryResult([user(1, 'alan'), user(2, 'bob')]);
-    mocks.useUsersServiceFindManyInfinite.mockReturnValue(result);
+    mocks.useFindManyInfinite.mockReturnValue(result);
     const onSelectionChange = vi.fn();
     const pointer = userEvent.setup();
 
     render(<UserSearch onSelectionChange={onSelectionChange} />);
 
     // Query is gated on the picker being open
-    expect(mocks.useUsersServiceFindManyInfinite).toHaveBeenLastCalledWith(
+    expect(mocks.useFindManyInfinite).toHaveBeenLastCalledWith(
       expect.anything(),
       undefined,
       expect.objectContaining({ enabled: false }),
@@ -74,7 +74,7 @@ describe('UserSearch', () => {
 
     await pointer.click(screen.getByRole('button', { name: /choose user/i }));
 
-    expect(mocks.useUsersServiceFindManyInfinite).toHaveBeenLastCalledWith(
+    expect(mocks.useFindManyInfinite).toHaveBeenLastCalledWith(
       expect.anything(),
       undefined,
       expect.objectContaining({ enabled: true }),
@@ -96,7 +96,7 @@ describe('UserSearch', () => {
 
   it('fetches the next page when the sentinel intersects', async () => {
     const result = infiniteQueryResult([user(1, 'alan')]);
-    mocks.useUsersServiceFindManyInfinite.mockReturnValue(result);
+    mocks.useFindManyInfinite.mockReturnValue(result);
     const pointer = userEvent.setup();
 
     render(<UserSearch />);
@@ -118,7 +118,7 @@ describe('UserSearch', () => {
     ['a fetch is already in flight', { isFetchingNextPage: true }],
   ])('does not fetch when %s', async (_label, overrides) => {
     const result = infiniteQueryResult([user(1, 'alan')], overrides);
-    mocks.useUsersServiceFindManyInfinite.mockReturnValue(result);
+    mocks.useFindManyInfinite.mockReturnValue(result);
     const pointer = userEvent.setup();
 
     render(<UserSearch />);
@@ -136,7 +136,7 @@ describe('UserSearch', () => {
 
   it('shows a retry-able error state instead of the empty message when loading fails', async () => {
     const result = infiniteQueryResult([], { isError: true });
-    mocks.useUsersServiceFindManyInfinite.mockReturnValue(result);
+    mocks.useFindManyInfinite.mockReturnValue(result);
     const pointer = userEvent.setup();
 
     render(<UserSearch />);
@@ -150,7 +150,7 @@ describe('UserSearch', () => {
   });
 
   it('clears the selection when resetSignal changes identity', async () => {
-    mocks.useUsersServiceFindManyInfinite.mockReturnValue(infiniteQueryResult([user(1, 'alan')]));
+    mocks.useFindManyInfinite.mockReturnValue(infiniteQueryResult([user(1, 'alan')]));
     const onSelectionChange = vi.fn();
     const pointer = userEvent.setup();
 
@@ -168,7 +168,7 @@ describe('UserSearch', () => {
 
   it('keeps loaded users and offers an inline retry when a later page fails', async () => {
     const result = infiniteQueryResult([user(1, 'alan'), user(2, 'bob')], { isError: true });
-    mocks.useUsersServiceFindManyInfinite.mockReturnValue(result);
+    mocks.useFindManyInfinite.mockReturnValue(result);
     const pointer = userEvent.setup();
 
     render(<UserSearch />);
@@ -184,7 +184,7 @@ describe('UserSearch', () => {
   });
 
   it('sends the typed search to the query after the debounce, and never a stale one on quick reopen', async () => {
-    mocks.useUsersServiceFindManyInfinite.mockReturnValue(infiniteQueryResult([user(1, 'alice')]));
+    mocks.useFindManyInfinite.mockReturnValue(infiniteQueryResult([user(1, 'alice')]));
     const pointer = userEvent.setup();
 
     render(<UserSearch />);
@@ -192,16 +192,16 @@ describe('UserSearch', () => {
     await pointer.type(screen.getByPlaceholderText(/search by username/i), 'ali');
 
     // Debounce pending: still unfiltered right after typing
-    expect(mocks.useUsersServiceFindManyInfinite).toHaveBeenLastCalledWith(
-      expect.objectContaining({ search: undefined }),
+    expect(mocks.useFindManyInfinite).toHaveBeenLastCalledWith(
+      { query: expect.objectContaining({ search: undefined }) },
       undefined,
       expect.anything(),
     );
 
     await waitFor(
       () =>
-        expect(mocks.useUsersServiceFindManyInfinite).toHaveBeenLastCalledWith(
-          expect.objectContaining({ search: 'ali' }),
+        expect(mocks.useFindManyInfinite).toHaveBeenLastCalledWith(
+          { query: expect.objectContaining({ search: 'ali' }) },
           undefined,
           expect.anything(),
         ),
@@ -211,15 +211,15 @@ describe('UserSearch', () => {
     // Close and reopen well within the debounce window: the stale filter must not leak
     await pointer.keyboard('{Escape}');
     await pointer.click(screen.getByRole('button', { name: /choose user/i }));
-    expect(mocks.useUsersServiceFindManyInfinite).toHaveBeenLastCalledWith(
-      expect.objectContaining({ search: undefined }),
+    expect(mocks.useFindManyInfinite).toHaveBeenLastCalledWith(
+      { query: expect.objectContaining({ search: undefined }) },
       undefined,
       expect.objectContaining({ enabled: true }),
     );
   });
 
   it('re-observes the sentinel after a retried error clears', async () => {
-    mocks.useUsersServiceFindManyInfinite.mockReturnValue(infiniteQueryResult([user(1, 'alan')], { isError: true }));
+    mocks.useFindManyInfinite.mockReturnValue(infiniteQueryResult([user(1, 'alan')], { isError: true }));
     const pointer = userEvent.setup();
 
     const { rerender } = render(<UserSearch />);
@@ -227,7 +227,7 @@ describe('UserSearch', () => {
     const constructionsWhileErrored = observerConstructions;
 
     // Error clears (successful retry) -> a fresh sentinel mounts and must be observed again.
-    mocks.useUsersServiceFindManyInfinite.mockReturnValue(infiniteQueryResult([user(1, 'alan')]));
+    mocks.useFindManyInfinite.mockReturnValue(infiniteQueryResult([user(1, 'alan')]));
     rerender(<UserSearch />);
 
     expect(observerConstructions).toBeGreaterThan(constructionsWhileErrored);
@@ -238,7 +238,7 @@ describe('UserSearch', () => {
         null as unknown as IntersectionObserver,
       );
     });
-    expect(mocks.useUsersServiceFindManyInfinite.mock.results.at(-1)?.value.fetchNextPage).toHaveBeenCalled();
+    expect(mocks.useFindManyInfinite.mock.results.at(-1)?.value.fetchNextPage).toHaveBeenCalled();
   });
 });
 

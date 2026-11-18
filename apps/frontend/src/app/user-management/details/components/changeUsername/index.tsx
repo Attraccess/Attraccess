@@ -1,8 +1,8 @@
 import {
-  useUsersServiceChangeUserUsername,
-  useUsersServiceFindManyKey,
-  useUsersServiceGetOneUserById,
-  useUsersServiceGetOneUserByIdKey,
+  useChangeUserUsername,
+  useFindManyKey,
+  useGetOneUserById,
+  useGetOneUserByIdKey,
 } from '@attraccess/react-query-client';
 import { cn, TextField, Label, Input } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -25,7 +25,7 @@ export function ChangeUsernameForm({ userId, ...divProps }: Props & Omit<HTMLAtt
   const { t } = useTranslations({ en, de });
   const { success: showSuccess, error: showError } = useToastMessage();
 
-  const { data: user, isLoading: isLoadingUser } = useUsersServiceGetOneUserById({ id: userId });
+  const { data: user, isLoading: isLoadingUser } = useGetOneUserById({ path: { id: userId } });
 
   useEffect(() => {
     if (user) {
@@ -33,13 +33,13 @@ export function ChangeUsernameForm({ userId, ...divProps }: Props & Omit<HTMLAtt
     }
   }, [user]);
 
-  const { mutate, isPending } = useUsersServiceChangeUserUsername({
+  const { mutate, isPending } = useChangeUserUsername(undefined, {
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [useUsersServiceGetOneUserByIdKey],
+        queryKey: [useGetOneUserByIdKey],
       });
       queryClient.invalidateQueries({
-        queryKey: [useUsersServiceFindManyKey],
+        queryKey: [useFindManyKey],
       });
       showSuccess({ title: t('messages.updated') });
     },
@@ -65,8 +65,8 @@ export function ChangeUsernameForm({ userId, ...divProps }: Props & Omit<HTMLAtt
 
   const onSubmit = useCallback(() => {
     mutate({
-      id: userId,
-      requestBody: {
+      path: { id: userId },
+      body: {
         username,
       },
     });

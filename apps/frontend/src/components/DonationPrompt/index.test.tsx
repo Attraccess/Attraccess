@@ -16,7 +16,7 @@ vi.mock('../../hooks/useAuth', () => ({
   }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useLicenseServiceGetLicenseInformation: () => ({ data: { isNonProfit: true } }),
+  useGetLicenseInformation: () => ({ data: { isNonProfit: true } }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),

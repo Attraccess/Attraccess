@@ -23,7 +23,10 @@ export interface GalleryGroupWithEntries extends GalleryGroup {
 
 /** Lowercase, without diacritics, so "uber" finds "Über" and "Ubersicht" finds "Übersicht". */
 export function normalizeSearchText(text: string, language: string): string {
-  return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase(language);
+  return text
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLocaleLowerCase(language);
 }
 
 /** Whether an entry matches the term by title, description, group title or keywords. An empty term matches all. */

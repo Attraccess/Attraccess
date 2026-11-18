@@ -7,7 +7,7 @@ import { useAuth } from '../../../../hooks/useAuth';
 import { FlatSection } from '../../../../components/flatSection';
 import { History, CheckCircle2, CircleDashed } from 'lucide-react';
 import { Spinner } from '@heroui/react';
-import { useResourcesServiceResourceUsageGetHistory } from '@attraccess/react-query-client';
+import { useResourceUsageGetHistory } from '@attraccess/react-query-client';
 import en from './recentSessionsCard.en.json';
 import de from './recentSessionsCard.de.json';
 
@@ -20,8 +20,8 @@ export function RecentSessionsCard({ resourceId, className }: RecentSessionsCard
   const { t } = useTranslations({ en, de });
   const { user } = useAuth();
 
-  const { data, isLoading } = useResourcesServiceResourceUsageGetHistory(
-    { resourceId, page: 1, limit: 3, userId: user?.id },
+  const { data, isLoading } = useResourceUsageGetHistory(
+    { path: { resourceId }, query: { page: 1, limit: 3, userId: user?.id } },
     undefined,
     { enabled: !!user?.id },
   );

@@ -19,10 +19,10 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   }))()),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourcesServiceResourceUsageEndSession: () => ({ mutate: vi.fn(), isPending: false }),
-  useResourcesServiceResourceUsageGetActiveSession: () => ({ data: null }),
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn: () => [],
-  UseResourcesServiceResourceUsageGetHistoryKeyFn: () => [],
+  useResourceUsageEndSession: () => ({ mutate: vi.fn(), isPending: false }),
+  useResourceUsageGetActiveSession: () => ({ data: null }),
+  UseResourceUsageGetActiveSessionKeyFn: () => [],
+  UseResourceUsageGetHistoryKeyFn: () => [],
 }));
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn(), resetQueries: vi.fn() }),

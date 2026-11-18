@@ -68,7 +68,7 @@ export class TypeOrmResourceFormStore implements ResourceFormStore {
   async listForResource(resourceId: number): Promise<FormRecord[]> {
     const forms = await this.dataSource.getRepository(Form).find({
       where: { resourceId },
-      relations: ['fields'],
+      relations: { fields: true },
       order: { name: 'ASC', createdAt: 'ASC' },
     });
     return forms.map(toFormRecord);
@@ -77,7 +77,7 @@ export class TypeOrmResourceFormStore implements ResourceFormStore {
   async findForm(resourceId: number, formId: number, context?: ResourcePersistenceContext): Promise<FormRecord | null> {
     const form = await this.manager(context)
       .getRepository(Form)
-      .findOne({ where: { id: formId, resourceId }, relations: ['fields'] });
+      .findOne({ where: { id: formId, resourceId }, relations: { fields: true } });
     return form ? toFormRecord(form) : null;
   }
 
@@ -89,7 +89,7 @@ export class TypeOrmResourceFormStore implements ResourceFormStore {
     const column = REQUIRED_COLUMN[action];
     const forms = await this.manager(context)
       .getRepository(Form)
-      .find({ where: { resourceId, [column]: true }, relations: ['fields'], order: { createdAt: 'ASC' } });
+      .find({ where: { resourceId, [column]: true }, relations: { fields: true }, order: { createdAt: 'ASC' } });
     return forms.map(toFormRecord).map((form) => ({
       ...form,
       fields: [...form.fields].sort((a, b) => a.position - b.position),
@@ -169,7 +169,7 @@ export class TypeOrmResourceFormStore implements ResourceFormStore {
   private async reload(resourceId: number, formId: number): Promise<FormRecord> {
     const form = await this.dataSource
       .getRepository(Form)
-      .findOneOrFail({ where: { id: formId, resourceId }, relations: ['fields'] });
+      .findOneOrFail({ where: { id: formId, resourceId }, relations: { fields: true } });
     return toFormRecord(form);
   }
 }

@@ -16,11 +16,11 @@ import en from './resourceGroupUpsertModal.en.json';
 import de from './resourceGroupUpsertModal.de.json';
 import {
   ResourceGroup,
-  useResourcesServiceResourceGroupsCreateOne,
+  useResourceGroupsCreateOne,
   CreateResourceGroupDto,
-  useResourcesServiceResourceGroupsUpdateOne,
+  useResourceGroupsUpdateOne,
   UpdateResourceGroupDto,
-  useResourcesServiceResourceGroupsGetManyKey,
+  useResourceGroupsGetManyKey,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
@@ -77,7 +77,7 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
     });
 
     queryClient.invalidateQueries({
-      queryKey: [useResourcesServiceResourceGroupsGetManyKey],
+      queryKey: [useResourceGroupsGetManyKey],
     });
 
     if (!isEditMode) {
@@ -113,14 +113,14 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
   };
 
   // Pass onSuccess and onError directly to the hook options
-  const createMutation = useResourcesServiceResourceGroupsCreateOne({
+  const createMutation = useResourceGroupsCreateOne(undefined, {
     onSuccess: (data) => {
       handleSuccess(data);
     },
     onError: handleError,
   });
 
-  const updateMutation = useResourcesServiceResourceGroupsUpdateOne({
+  const updateMutation = useResourceGroupsUpdateOne(undefined, {
     onSuccess: handleSuccess,
     onError: handleError,
   });
@@ -176,15 +176,10 @@ export function ResourceGroupUpsertModal(props: Readonly<Props>) {
 
       if (isEditMode && props.resourceGroup) {
         // Ensure types match for update mutation
-        updateMutation.mutate({
-          id: props.resourceGroup.id,
-          requestBody: requestBody as UpdateResourceGroupDto,
-        });
+        updateMutation.mutate({ path: { id: props.resourceGroup.id }, body: requestBody as UpdateResourceGroupDto });
       } else {
         // Ensure types match for create mutation
-        createMutation.mutate({
-          requestBody: requestBody as CreateResourceGroupDto,
-        });
+        createMutation.mutate({ body: requestBody as CreateResourceGroupDto });
       }
     },
     // Dependencies should include the specific mutations if used directly

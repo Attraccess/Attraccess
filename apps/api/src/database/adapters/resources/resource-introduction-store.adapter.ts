@@ -12,6 +12,7 @@ import type { ResourceIntroductionStore } from '../../../resources/introductions
 import { ScopedUnitOfWork, UNIT_OF_WORK } from '../../unit-of-work';
 import { managerFor } from './persistence-context';
 import { toHistoryRecord, toIntroductionRecord } from './introduction-mappers';
+import { findRelations } from '../find-options';
 
 @Injectable()
 export class TypeOrmResourceIntroductionStore implements ResourceIntroductionStore {
@@ -57,7 +58,7 @@ export class TypeOrmResourceIntroductionStore implements ResourceIntroductionSto
   async listForGroup(groupId: number): Promise<IntroductionRecord[]> {
     const rows = await this.introductions.find({
       where: { resourceGroup: { id: groupId } },
-      relations: ['receiverUser', 'tutorUser', 'history'],
+      relations: { receiverUser: true, tutorUser: true, history: true },
       cache: false,
     });
     return rows.map(toIntroductionRecord);
@@ -112,7 +113,7 @@ export class TypeOrmResourceIntroductionStore implements ResourceIntroductionSto
       where: includeGroups
         ? [{ resource: { id: resourceId } }, { resourceGroup: { resources: { id: resourceId } } }]
         : { resource: { id: resourceId } },
-      relations: ['receiverUser', 'tutorUser', 'history', ...(includeGroups ? ['resourceGroup'] : [])],
+      relations: findRelations(['receiverUser', 'tutorUser', 'history', ...(includeGroups ? ['resourceGroup'] : [])]),
       cache: false,
     });
     return rows.map(toIntroductionRecord);

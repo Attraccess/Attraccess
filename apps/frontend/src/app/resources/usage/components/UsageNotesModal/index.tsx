@@ -1,9 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  useBillingServiceGetUsageBillingTransaction,
-  useResourcesServiceResourceUsageGetSession,
-} from '@attraccess/react-query-client';
+import { useGetUsageBillingTransaction, useResourceUsageGetSession } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
 import { TransactionDetailsModalView } from '../../../../billing/dashboard/summary/transactionDetailsModal/TransactionDetailsModalView';
 import { UsageNotesDrawer } from './drawer';
@@ -39,13 +36,13 @@ function OpenUsageNotesModal({
   const [transactionId, setTransactionId] = useState<number | null>(null);
   const { t } = useTranslations({ en, de });
   const { user } = useAuth();
-  const { data: session, error, refetch } = useResourcesServiceResourceUsageGetSession({ resourceId, usageId });
+  const { data: session, error, refetch } = useResourceUsageGetSession({ path: { resourceId, usageId } });
   const {
     data: billing,
     error: billingError,
     refetch: refetchBilling,
     isFetching: isFetchingBilling,
-  } = useBillingServiceGetUsageBillingTransaction({ usageId }, undefined, {
+  } = useGetUsageBillingTransaction({ path: { usageId } }, undefined, {
     enabled: !!user && session?.userId === user.id,
   });
   const { resolveProjectId, updatingSessionIds, handleProjectChange } = useUsageSessionProject(resourceId);

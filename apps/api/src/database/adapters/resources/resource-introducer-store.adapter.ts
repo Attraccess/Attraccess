@@ -64,7 +64,7 @@ export class TypeOrmResourceIntroducerStore implements ResourceIntroducerStore {
   async listDirect(resourceId: number, type?: ResourceIntroducerType): Promise<ResourceIntroducerRecord[]> {
     const rows = await this.repository().find({
       where: { resourceId, ...(type ? { type } : {}) },
-      relations: ['user'],
+      relations: { user: true },
     });
     return rows.map(toIntroducerRecord);
   }
@@ -86,7 +86,7 @@ export class TypeOrmResourceIntroducerStore implements ResourceIntroducerStore {
   ): Promise<ResourceIntroducerRecord[]> {
     const rows = await this.repository().find({
       where: { resourceId: In(resourceIds), ...(type ? { type } : {}) },
-      relations: ['user'],
+      relations: { user: true },
     });
     return rows.map(toIntroducerRecord);
   }

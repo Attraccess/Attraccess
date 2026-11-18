@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
-import { useUsersServiceRequestPasswordReset } from '@attraccess/react-query-client';
+import { useRequestPasswordReset } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { TextField, Label, Input } from '@heroui/react';
 
@@ -21,7 +21,7 @@ export function PasswordResetForm({ onGoBack }: PasswordResetFormProps) {
 
   const toast = useToastMessage();
 
-  const { mutate: requestPasswordReset, isPending } = useUsersServiceRequestPasswordReset({
+  const { mutate: requestPasswordReset, isPending } = useRequestPasswordReset(undefined, {
     onError: (error) => {
       toast.error({
         title: t('error.title'),
@@ -57,7 +57,7 @@ export function PasswordResetForm({ onGoBack }: PasswordResetFormProps) {
 
       <Button
         variant="primary"
-        onPress={() => requestPasswordReset({ requestBody: { email } })}
+        onPress={() => requestPasswordReset({ body: { email } })}
         className="w-full"
         isPending={isPending}
         isDisabled={isPending}

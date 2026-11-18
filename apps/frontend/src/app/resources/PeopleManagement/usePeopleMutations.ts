@@ -1,16 +1,16 @@
 import { useCallback, useState } from 'react';
 import {
-  useAccessControlServiceResourceGroupIntroducersGrant,
-  useAccessControlServiceResourceGroupIntroducersRevoke,
-  useAccessControlServiceResourceGroupIntroductionsGrant,
-  useAccessControlServiceResourceGroupIntroductionsRevoke,
-  useAccessControlServiceResourceIntroducersGrant,
-  useAccessControlServiceResourceIntroducersRevoke,
-  useAccessControlServiceResourceIntroductionsGrant,
-  useAccessControlServiceResourceIntroductionsRevoke,
+  useResourceGroupIntroducersGrant,
+  useResourceGroupIntroducersRevoke,
+  useResourceGroupIntroductionsGrant,
+  useResourceGroupIntroductionsRevoke,
+  useResourceIntroducersGrant,
+  useResourceIntroducersRevoke,
+  useResourceIntroductionsGrant,
+  useResourceIntroductionsRevoke,
   ResourceIntroducerType,
-  UseAccessControlServiceResourceGroupIntroducersGetManyKeyFn,
-  UseAccessControlServiceResourceIntroducersGetManyKeyFn,
+  UseResourceGroupIntroducersGetManyKeyFn,
+  UseResourceIntroducersGetManyKeyFn,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -53,16 +53,16 @@ export function usePeopleMutations({ target }: Params): PeopleMutations {
 
   const invalidateIntroducers = useCallback(() => {
     const queryKey = isResource
-      ? UseAccessControlServiceResourceIntroducersGetManyKeyFn({ resourceId: target.id })
-      : UseAccessControlServiceResourceGroupIntroducersGetManyKeyFn({ groupId: target.id });
+      ? UseResourceIntroducersGetManyKeyFn({ path: { resourceId: target.id } })
+      : UseResourceGroupIntroducersGetManyKeyFn({ path: { groupId: target.id } });
     queryClient.invalidateQueries({ queryKey });
   }, [queryClient, target.id, isResource]);
 
   const invalidateIntroductions = useInvalidatePeopleIntroductions(target);
 
   const grantIntroducerToasts = {
-    onSuccess: (_data: unknown, variables: { requestBody?: { type?: ResourceIntroducerType } }) => {
-      const isMaintainer = variables?.requestBody?.type === ResourceIntroducerType.MAINTAINER;
+    onSuccess: (_data: unknown, variables: { body?: { type?: ResourceIntroducerType } }) => {
+      const isMaintainer = variables?.body?.type === ResourceIntroducerType.MAINTAINER;
       toast.success({
         title: isMaintainer ? t('toasts.maintainerGranted.title') : t('toasts.introducerGranted.title'),
         description: isMaintainer
@@ -80,8 +80,8 @@ export function usePeopleMutations({ target }: Params): PeopleMutations {
   };
 
   const revokeIntroducerToasts = {
-    onSuccess: (_data: unknown, variables: { requestBody?: { type?: ResourceIntroducerType } }) => {
-      const isMaintainer = variables?.requestBody?.type === ResourceIntroducerType.MAINTAINER;
+    onSuccess: (_data: unknown, variables: { body?: { type?: ResourceIntroducerType } }) => {
+      const isMaintainer = variables?.body?.type === ResourceIntroducerType.MAINTAINER;
       toast.success({
         title: isMaintainer ? t('toasts.maintainerRevoked.title') : t('toasts.introducerRevoked.title'),
         description: isMaintainer
@@ -99,12 +99,12 @@ export function usePeopleMutations({ target }: Params): PeopleMutations {
   };
 
   const grantIntroductionToasts = {
-    onSuccess: (_data: unknown, variables: { userId: number }) => {
+    onSuccess: (_data: unknown, variables: { path: { userId: number } }) => {
       toast.success({
         title: t('toasts.introductionGranted.title'),
         description: t('toasts.introductionGranted.description'),
       });
-      invalidateIntroductions(variables.userId);
+      invalidateIntroductions(variables.path.userId);
     },
     onError: (err: Error) => {
       toast.error({
@@ -115,12 +115,12 @@ export function usePeopleMutations({ target }: Params): PeopleMutations {
   };
 
   const revokeIntroductionToasts = {
-    onSuccess: (_data: unknown, variables: { userId: number }) => {
+    onSuccess: (_data: unknown, variables: { path: { userId: number } }) => {
       toast.success({
         title: t('toasts.introductionRevoked.title'),
         description: t('toasts.introductionRevoked.description'),
       });
-      invalidateIntroductions(variables.userId);
+      invalidateIntroductions(variables.path.userId);
     },
     onError: (err: Error) => {
       toast.error({
@@ -131,22 +131,22 @@ export function usePeopleMutations({ target }: Params): PeopleMutations {
   };
 
   const { mutateAsync: grantResourceIntroducerMut, isPending: isGrantingResourceIntroducer } =
-    useAccessControlServiceResourceIntroducersGrant(grantIntroducerToasts);
+    useResourceIntroducersGrant(undefined, grantIntroducerToasts);
   const { mutateAsync: revokeResourceIntroducerMut, isPending: isRevokingResourceIntroducer } =
-    useAccessControlServiceResourceIntroducersRevoke(revokeIntroducerToasts);
+    useResourceIntroducersRevoke(undefined, revokeIntroducerToasts);
   const { mutateAsync: grantResourceIntroductionMut, isPending: isGrantingResourceIntroduction } =
-    useAccessControlServiceResourceIntroductionsGrant(grantIntroductionToasts);
+    useResourceIntroductionsGrant(undefined, grantIntroductionToasts);
   const { mutateAsync: revokeResourceIntroductionMut, isPending: isRevokingResourceIntroduction } =
-    useAccessControlServiceResourceIntroductionsRevoke(revokeIntroductionToasts);
+    useResourceIntroductionsRevoke(undefined, revokeIntroductionToasts);
 
   const { mutateAsync: grantGroupIntroducerMut, isPending: isGrantingGroupIntroducer } =
-    useAccessControlServiceResourceGroupIntroducersGrant(grantIntroducerToasts);
+    useResourceGroupIntroducersGrant(undefined, grantIntroducerToasts);
   const { mutateAsync: revokeGroupIntroducerMut, isPending: isRevokingGroupIntroducer } =
-    useAccessControlServiceResourceGroupIntroducersRevoke(revokeIntroducerToasts);
+    useResourceGroupIntroducersRevoke(undefined, revokeIntroducerToasts);
   const { mutateAsync: grantGroupIntroductionMut, isPending: isGrantingGroupIntroduction } =
-    useAccessControlServiceResourceGroupIntroductionsGrant(grantIntroductionToasts);
+    useResourceGroupIntroductionsGrant(undefined, grantIntroductionToasts);
   const { mutateAsync: revokeGroupIntroductionMut, isPending: isRevokingGroupIntroduction } =
-    useAccessControlServiceResourceGroupIntroductionsRevoke(revokeIntroductionToasts);
+    useResourceGroupIntroductionsRevoke(undefined, revokeIntroductionToasts);
 
   const isGrantingIntroducer = isResource ? isGrantingResourceIntroducer : isGrantingGroupIntroducer;
   const isRevokingIntroducer = isResource ? isRevokingResourceIntroducer : isRevokingGroupIntroducer;
@@ -158,9 +158,9 @@ export function usePeopleMutations({ target }: Params): PeopleMutations {
       setPendingIntroducer({ userId, type });
       try {
         if (isResource) {
-          await grantResourceIntroducerMut({ resourceId: target.id, userId, requestBody: { type } });
+          await grantResourceIntroducerMut({ path: { resourceId: target.id, userId }, body: { type } });
         } else {
-          await grantGroupIntroducerMut({ groupId: target.id, userId, requestBody: { type } });
+          await grantGroupIntroducerMut({ path: { groupId: target.id, userId }, body: { type } });
         }
       } finally {
         setPendingIntroducer(null);
@@ -184,9 +184,9 @@ export function usePeopleMutations({ target }: Params): PeopleMutations {
       setPendingIntroducer({ userId, type });
       try {
         if (isResource) {
-          await revokeResourceIntroducerMut({ resourceId: target.id, userId, requestBody: { type } });
+          await revokeResourceIntroducerMut({ path: { resourceId: target.id, userId }, body: { type } });
         } else {
-          await revokeGroupIntroducerMut({ groupId: target.id, userId, requestBody: { type } });
+          await revokeGroupIntroducerMut({ path: { groupId: target.id, userId }, body: { type } });
         }
       } finally {
         setPendingIntroducer(null);
@@ -201,9 +201,9 @@ export function usePeopleMutations({ target }: Params): PeopleMutations {
       try {
         const requestBody = { comment: comment || undefined };
         if (isResource) {
-          await grantResourceIntroductionMut({ resourceId: target.id, userId, requestBody });
+          await grantResourceIntroductionMut({ path: { resourceId: target.id, userId }, body: requestBody });
         } else {
-          await grantGroupIntroductionMut({ groupId: target.id, userId, requestBody });
+          await grantGroupIntroductionMut({ path: { groupId: target.id, userId }, body: requestBody });
         }
       } finally {
         setPendingIntroductionUserId(null);
@@ -218,9 +218,9 @@ export function usePeopleMutations({ target }: Params): PeopleMutations {
       try {
         const requestBody = { comment: comment || undefined };
         if (isResource) {
-          await revokeResourceIntroductionMut({ resourceId: target.id, userId, requestBody });
+          await revokeResourceIntroductionMut({ path: { resourceId: target.id, userId }, body: requestBody });
         } else {
-          await revokeGroupIntroductionMut({ groupId: target.id, userId, requestBody });
+          await revokeGroupIntroductionMut({ path: { groupId: target.id, userId }, body: requestBody });
         }
       } finally {
         setPendingIntroductionUserId(null);

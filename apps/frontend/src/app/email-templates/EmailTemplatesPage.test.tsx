@@ -7,7 +7,7 @@ import { EmailTemplatesPage } from './EmailTemplatesPage';
 const state = vi.hoisted(() => ({ templates: [] as Record<string, unknown>[], language: 'en' }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  useEmailTemplatesServiceEmailTemplateControllerFindAll: () => ({ data: state.templates }),
+  useEmailTemplateControllerFindAll: () => ({ data: state.templates }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),

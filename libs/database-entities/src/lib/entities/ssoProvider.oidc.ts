@@ -111,6 +111,9 @@ export class SSOProviderOIDCConfiguration {
   @ApiProperty({
     description: 'Mapping between Attraccess role keys and IdP role/group claim values',
     required: false,
+    nullable: true,
+    type: Object,
+    additionalProperties: { type: 'array', items: { type: 'string' } },
     example: {
       'resource-manager': ['attraccess_resources'],
       'user-manager': ['attraccess_admin'],

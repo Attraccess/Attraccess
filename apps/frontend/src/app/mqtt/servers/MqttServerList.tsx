@@ -20,11 +20,7 @@ import { useToastMessage } from '../../../components/toastProvider';
 import en from './translations/list/en.json';
 import de from './translations/list/de.json';
 import { useState } from 'react';
-import {
-  useMqttServiceMqttServersGetAll,
-  useMqttServiceMqttServersDeleteOne,
-  useMqttServiceMqttServersGetAllKey,
-} from '@attraccess/react-query-client';
+import { useMqttServersGetAll, useMqttServersDeleteOne, useMqttServersGetAllKey } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { PluginSlot } from '../../plugins/PluginSlot';
 import { MQTT_SERVER_LIST_ROW_SLOT, MqttServerSlotContext } from '../mqtt.slots';
@@ -37,16 +33,16 @@ export function MqttServerList() {
   const { isOpen, open, close: closeDeleteModal } = useOverlayState();
   const [serverToDelete, setServerToDelete] = useState<number | null>(null);
 
-  const { data: servers = [], isLoading, error } = useMqttServiceMqttServersGetAll();
+  const { data: servers = [], isLoading, error } = useMqttServersGetAll();
 
-  const deleteServer = useMqttServiceMqttServersDeleteOne({
+  const deleteServer = useMqttServersDeleteOne(undefined, {
     onSuccess: () => {
       success({
         title: t('serverDeleted'),
         description: t('serverDeletedDesc'),
       });
       queryClient.invalidateQueries({
-        queryKey: [useMqttServiceMqttServersGetAllKey],
+        queryKey: [useMqttServersGetAllKey],
       });
       closeDeleteModal();
     },
@@ -69,7 +65,7 @@ export function MqttServerList() {
 
   const confirmDelete = async () => {
     if (serverToDelete) {
-      deleteServer.mutate({ id: serverToDelete });
+      deleteServer.mutate({ path: { id: serverToDelete } });
     }
   };
 

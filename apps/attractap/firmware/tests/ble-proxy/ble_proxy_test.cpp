@@ -308,8 +308,10 @@ namespace
         f.radio.starts = {IBleRadio::Start::Retry, IBleRadio::Start::Retry, IBleRadio::Start::Done};
         f.request("BLE_WRITE", target("BLE_WRITE", 2, BULK, ",\"value\":\"AAAA\",\"withoutResponse\":true"));
         expect(f.sink.answers(2).empty(), "no answer while the controller buffers are full");
+        expect(f.core.waitsForRadioBuffers(), "the proxy polls quickly while the write waits for buffers");
         f.advance(200);
         expect(f.sink.code(2) == "OK" && f.radio.count("wwr") == 3, "retried until it fit");
+        expect(!f.core.waitsForRadioBuffers(), "and at the deadline pace once it went out");
         f.radio.starts = {IBleRadio::Start::Retry};
         f.request("BLE_WRITE", target("BLE_WRITE", 3, BULK, ",\"value\":\"AAAA\",\"withoutResponse\":true"));
         for (int i = 0; i < 40; i++) f.radio.starts.push_back(IBleRadio::Start::Retry);
@@ -587,5 +589,6 @@ int main()
     errorMapping();
     capabilityFitsTheFirmwareInfo();
     runEdgeTests();
+    runLinkTests();
     std::puts("PASS ble proxy");
 }

@@ -56,7 +56,7 @@ describe('RefreshDefaultUsageReceipt1789900001000', () => {
   let queryRunner: QueryRunner;
 
   beforeEach(async () => {
-    dataSource = new DataSource({ type: 'sqlite', database: ':memory:', synchronize: false, entities: [] });
+    dataSource = new DataSource({ type: 'better-sqlite3', database: ':memory:', synchronize: false, entities: [] });
     await dataSource.initialize();
     queryRunner = dataSource.createQueryRunner();
     await new EmailTemplates1748886859854().up(queryRunner);

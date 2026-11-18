@@ -1,6 +1,10 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 import { EmailTemplateType } from '@attraccess/database-entities';
-import { EMAIL_TEMPLATE_DEFAULTS, readDefaultTemplateBody, SHIPPED_TRANSLATIONS } from '../../email-template/email-defaults';
+import {
+  EMAIL_TEMPLATE_DEFAULTS,
+  readDefaultTemplateBody,
+  SHIPPED_TRANSLATIONS,
+} from '../../email-template/email-defaults';
 
 export class SeedEmailTemplateTranslations1782600000000 implements MigrationInterface {
   name = 'SeedEmailTemplateTranslations1782600000000';
@@ -16,7 +20,7 @@ export class SeedEmailTemplateTranslations1782600000000 implements MigrationInte
     // Replace every template with its {{t}}-based default from the .mjml asset files.
     for (const type of Object.values(EmailTemplateType)) {
       await queryRunner.query(
-        `UPDATE "email_templates" SET "body" = $1, "variables" = $2, "subject" = $3 WHERE "type" = $4`,
+        `UPDATE "email_templates" SET "body" = ?, "variables" = ?, "subject" = ? WHERE "type" = ?`,
         [
           readDefaultTemplateBody(type),
           EMAIL_TEMPLATE_DEFAULTS[type].variables.join(','),

@@ -48,7 +48,8 @@ describe('PluginEmailService.sendPluginTemplate (real template store)', () => {
 
   beforeEach(async () => {
     dataSource = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: ':memory:',
       synchronize: true,
       entities: [EmailTemplate, EmailTemplateTranslation],

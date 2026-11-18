@@ -40,7 +40,8 @@ describe('maintenance stores on real SQLite', () => {
 
   beforeEach(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: ':memory:',
       synchronize: true,
       entities: Object.values(entities),
@@ -193,7 +194,7 @@ describe('maintenance stores on real SQLite', () => {
         .save(source.getRepository(ResourceGroup).create({ name: 'Wood' }));
       const resource = await source
         .getRepository(Resource)
-        .findOneOrFail({ where: { id: resourceId }, relations: ['groups'] });
+        .findOneOrFail({ where: { id: resourceId }, relations: { groups: true } });
       resource.groups = [group];
       await source.getRepository(Resource).save(resource);
       const direct = await newUser('direct');
@@ -251,7 +252,7 @@ describe('maintenance stores on real SQLite', () => {
         .save(source.getRepository(ResourceGroup).create({ name: 'Wood' }));
       const resource = await source
         .getRepository(Resource)
-        .findOneOrFail({ where: { id: resourceId }, relations: ['groups'] });
+        .findOneOrFail({ where: { id: resourceId }, relations: { groups: true } });
       resource.groups = [group];
       await source.getRepository(Resource).save(resource);
       const introducer = await newUser('intro');

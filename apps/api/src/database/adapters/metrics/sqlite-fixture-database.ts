@@ -20,7 +20,7 @@ export interface SqliteFixtureDatabase extends FixtureQueries {
  * alerting stack. Several connections to one file wait for each other's locks instead of failing at once.
  */
 export async function openSqliteFixtureDatabase(file: string): Promise<SqliteFixtureDatabase> {
-  const source = await new DataSource({ type: 'sqlite', database: file, busyTimeout: 5000 }).initialize();
+  const source = await new DataSource({ type: 'better-sqlite3', database: file, timeout: 5000 }).initialize();
   return {
     query: (sql, parameters) => source.query(sql, parameters),
     transaction: (work) =>

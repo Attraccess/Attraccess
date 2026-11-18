@@ -23,7 +23,7 @@ import { ApiTokensCard } from './api-tokens';
 import { McpConnectionCard, useMcpConnection } from './mcp';
 import { DateTimePreferencesForm } from './date-time';
 import { NotificationPreferencesForm } from './notifications';
-import { useUsersServiceRequestDeleteAccount, ApiError } from '@attraccess/react-query-client';
+import { useRequestDeleteAccount, ApiError } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
 import { SettingsDirectory, type SettingsDirectoryGroup } from '../../components/settingsDirectory';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
@@ -41,7 +41,7 @@ export default function AccountPage() {
   const canUseApiTokens = Boolean(me && hasPermission('users.api-tokens.manage'));
   const mcpConnection = useMcpConnection(canUseApiTokens);
 
-  const { mutate: requestDelete, isPending: isRequestingDelete } = useUsersServiceRequestDeleteAccount({
+  const { mutate: requestDelete, isPending: isRequestingDelete } = useRequestDeleteAccount(undefined, {
     onSuccess: () => {
       toast.success({
         title: t('deleteAccount.toast.title'),

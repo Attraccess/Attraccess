@@ -23,6 +23,7 @@ import type {
   NewMaintenanceSchedule,
 } from '../../../resources/maintenances/maintenance-schedule-store.port';
 import { toMaintenanceScheduleRecord } from './maintenance-mappers';
+import { findRelations } from '../find-options';
 
 const CONFIG_RELATIONS = ['usageHoursConfig', 'usageCountConfig', 'timeIntervalConfig'];
 
@@ -41,7 +42,7 @@ export class TypeOrmMaintenanceScheduleStore implements MaintenanceScheduleStore
   async listForResource(resourceId: number): Promise<MaintenanceScheduleRecord[]> {
     const rows = await this.dataSource.getRepository(ResourceMaintenanceSchedule).find({
       where: { resourceId },
-      relations: CONFIG_RELATIONS,
+      relations: findRelations(CONFIG_RELATIONS),
       order: { id: 'ASC' },
     });
     return rows.map(toMaintenanceScheduleRecord);
@@ -50,7 +51,7 @@ export class TypeOrmMaintenanceScheduleStore implements MaintenanceScheduleStore
   async findOne(resourceId: number, scheduleId: number): Promise<MaintenanceScheduleRecord | null> {
     const entity = await this.dataSource
       .getRepository(ResourceMaintenanceSchedule)
-      .findOne({ where: { id: scheduleId, resourceId }, relations: CONFIG_RELATIONS });
+      .findOne({ where: { id: scheduleId, resourceId }, relations: findRelations(CONFIG_RELATIONS) });
     return entity ? toMaintenanceScheduleRecord(entity) : null;
   }
 

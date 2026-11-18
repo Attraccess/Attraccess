@@ -13,11 +13,7 @@ import { HTMLAttributes, useCallback, useEffect, useState } from 'react';
 import en from './en.json';
 import de from './de.json';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  UseUsersServiceGetOneUserByIdKeyFn,
-  useUsersServiceChangeUserBillingFactor,
-  useUsersServiceGetOneUserById,
-} from '@attraccess/react-query-client';
+import { UseGetOneUserByIdKeyFn, useChangeUserBillingFactor, useGetOneUserById } from '@attraccess/react-query-client';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 
@@ -41,14 +37,14 @@ export function ManageBillingFactorCard(props: Props & Omit<HTMLAttributes<HTMLE
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { data: user } = useUsersServiceGetOneUserById({ id: userId as number }, undefined, { enabled: !!userId });
+  const { data: user } = useGetOneUserById({ path: { id: userId as number } }, undefined, { enabled: !!userId });
 
   const [value, setValue] = useState(user?.billingFactor ?? 100);
   useEffect(() => {
     setValue(user?.billingFactor ?? 100);
   }, [user]);
 
-  const { mutate: changeBillingFactor, isPending: isChangingBillingFactor } = useUsersServiceChangeUserBillingFactor({
+  const { mutate: changeBillingFactor, isPending: isChangingBillingFactor } = useChangeUserBillingFactor(undefined, {
     onSuccess: () => {
       toast.success({
         title: t('success.toast.title'),
@@ -56,7 +52,7 @@ export function ManageBillingFactorCard(props: Props & Omit<HTMLAttributes<HTMLE
       });
 
       queryClient.invalidateQueries({
-        queryKey: UseUsersServiceGetOneUserByIdKeyFn({ id: userId as number }),
+        queryKey: UseGetOneUserByIdKeyFn({ path: { id: userId as number } }),
       });
     },
     onError: (error: Error) => {
@@ -74,7 +70,7 @@ export function ManageBillingFactorCard(props: Props & Omit<HTMLAttributes<HTMLE
       return;
     }
 
-    changeBillingFactor({ id: userId, requestBody: { billingFactor: value } });
+    changeBillingFactor({ path: { id: userId }, body: { billingFactor: value } });
   }, [changeBillingFactor, userId, value]);
 
   return (

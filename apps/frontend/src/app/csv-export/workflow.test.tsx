@@ -19,13 +19,13 @@ vi.mock('@attraccess/react-query-client', () => ({
     status = 0;
   },
   CsvExportType: { RESOURCE_USAGE_HOURS: 'resourceUsageHours', BILLING_TRANSACTIONS: 'billingTransactions' },
-  useAnalyticsServiceGetCsvExportTemplatesKey: 'templates',
-  useAnalyticsServiceGetCsvExportTemplates: () => ({ data: state.templates }),
-  useAnalyticsServiceCreateCsvExportTemplate: () => ({ mutate: vi.fn(), isPending: false }),
-  useAnalyticsServiceUpdateCsvExportTemplate: () => ({ mutate: vi.fn(), isPending: false }),
-  useAnalyticsServiceDeleteCsvExportTemplate: () => ({ mutate: vi.fn(), isPending: false }),
-  AnalyticsService: { getResourceOperatingDurations: (...args: unknown[]) => state.analytics(...args) },
-  useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite: (...args: unknown[]) => {
+  useGetCsvExportTemplatesKey: 'templates',
+  useGetCsvExportTemplates: () => ({ data: state.templates }),
+  useCreateCsvExportTemplate: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateCsvExportTemplate: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteCsvExportTemplate: () => ({ mutate: vi.fn(), isPending: false }),
+  getResourceOperatingDurations: (...args: unknown[]) => state.analytics(...args),
+  useGetResourceUsageHoursInDateRangeInfinite: (...args: unknown[]) => {
     state.query(...args);
     return {
       data: { pages: [{ data: state.rows }] },
@@ -57,7 +57,7 @@ beforeEach(() => {
     return 'blob:csv-test';
   });
   vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-  state.analytics.mockImplementation(() => Object.assign(Promise.resolve({}), { cancel: vi.fn() }));
+  state.analytics.mockImplementation(() => Promise.resolve({ data: {} }));
 });
 afterEach(() => {
   cleanup();
@@ -304,12 +304,11 @@ it.each(['success', 'error'] as const)('waits for all pages and handles a final 
 });
 it('includes session and operating duration columns in resource usage downloads', async () => {
   state.analytics.mockImplementation(() =>
-    Object.assign(
-      Promise.resolve({
+    Promise.resolve({
+      data: {
         7: { operatingDataAvailable: true, isProvisional: false, attributions: [{ usageId: 11, durationMs: 123456 }] },
-      }),
-      { cancel: vi.fn() },
-    ),
+      },
+    }),
   );
   state.rows = [
     {
@@ -330,13 +329,16 @@ it('includes session and operating duration columns in resource usage downloads'
   await waitFor(() => expect(screen.getByRole('button', { name: 'Download CSV' })).toBeEnabled());
   // a window refocus must not refetch every page after "fetch all"
   expect(state.query).toHaveBeenCalledWith(
-    { start: '2026-09-01T00:00:00.000Z', end: '2026-09-02T00:00:00.000Z' },
+    { query: { start: '2026-09-01T00:00:00.000Z', end: '2026-09-02T00:00:00.000Z' } },
     undefined,
     { refetchOnWindowFocus: false },
   );
-  expect(state.analytics).toHaveBeenCalledWith({
-    requestBody: { resourceIds: [7], start: '2026-09-01T00:00:00.000Z', end: '2026-09-02T00:00:00.000Z' },
-  });
+  expect(state.analytics).toHaveBeenCalledWith(
+    expect.objectContaining({
+      body: { resourceIds: [7], start: '2026-09-01T00:00:00.000Z', end: '2026-09-02T00:00:00.000Z' },
+      throwOnError: true,
+    }),
+  );
   fireEvent.click(screen.getByRole('button', { name: 'Download CSV' }));
   await waitFor(() => expect(blob).toBeDefined());
   // no template: exactly the export type's default columns, in the historic order

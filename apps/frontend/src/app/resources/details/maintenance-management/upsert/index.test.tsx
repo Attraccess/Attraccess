@@ -8,8 +8,8 @@ import { ResourceMaintenanceUpsertModal } from './index';
 
 const { create } = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useResourceMaintenancesServiceCreateMaintenance: () => ({ mutate: create, isPending: false }),
-  useResourceMaintenancesServiceFindMaintenancesKey: 'maintenances',
+  useCreateMaintenance: () => ({ mutate: create, isPending: false }),
+  useFindMaintenancesKey: 'maintenances',
 }));
 vi.mock('../../../../../hooks/useNow', () => ({ useNow: () => new Date('2026-11-23T16:45:37Z') }));
 afterEach(() => {
@@ -64,7 +64,7 @@ it('blocks incomplete start and enabled end segments until completed or the end 
   await user.click(screen.getByRole('switch', { name: 'End time already known?' }));
   await user.click(save);
   expect(create).toHaveBeenCalledWith(
-    expect.objectContaining({ requestBody: expect.objectContaining({ endTime: undefined }) }),
+    expect.objectContaining({ body: expect.objectContaining({ endTime: undefined }) }),
   );
   client.clear();
 });
@@ -86,8 +86,8 @@ it('edits maintenance time segments and retains the absolute instant across form
   act(() => useDateTimePreferences.setState({ dateTimeLocale: 'en-US' }));
   await user.click(screen.getByRole('button', { name: 'Save' }));
   expect(create).toHaveBeenCalledWith({
-    resourceId: 7,
-    requestBody: { startTime: '2026-11-23T16:46:37.000Z', endTime: undefined, reason: '' },
+    path: { resourceId: 7 },
+    body: { startTime: '2026-11-23T16:46:37.000Z', endTime: undefined, reason: '' },
   });
   client.clear();
 });

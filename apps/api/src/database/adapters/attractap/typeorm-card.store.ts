@@ -20,12 +20,12 @@ export class TypeOrmAttractapCardStore implements AttractapCardStore {
   ) {}
 
   async findById(id: number): Promise<AttractapNfcCard | undefined> {
-    const card = await this.cards.findOne({ where: { id }, relations: ['user'] });
+    const card = await this.cards.findOne({ where: { id }, relations: { user: true } });
     return card ? toNfcCard(card) : undefined;
   }
 
   async findByUid(uid: string): Promise<AttractapNfcCard | undefined> {
-    const card = await this.cards.findOne({ where: { uid }, relations: ['user'] });
+    const card = await this.cards.findOne({ where: { uid }, relations: { user: true } });
     return card ? toNfcCard(card) : undefined;
   }
 
@@ -53,7 +53,7 @@ export class TypeOrmAttractapCardStore implements AttractapCardStore {
 
   async activateExclusively(id: number): Promise<AttractapNfcCard> {
     const saved = await this.cards.manager.transaction(async (manager) => {
-      const card = await manager.findOne(NFCCard, { where: { id }, relations: ['user'] });
+      const card = await manager.findOne(NFCCard, { where: { id }, relations: { user: true } });
       if (!card) throw new Error(`Card with ID ${id} not found`);
       await manager
         .createQueryBuilder()

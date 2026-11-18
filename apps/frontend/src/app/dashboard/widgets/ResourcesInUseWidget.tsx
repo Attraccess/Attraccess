@@ -4,10 +4,10 @@ import type { DashboardWidgetRenderProps } from '@attraccess/plugins-frontend-sd
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Resource,
-  useResourcesServiceGetAllResourcesInUse,
-  UseResourcesServiceGetAllResourcesInUseKeyFn,
-  useResourcesServiceResourceUsageGetActiveSession,
-  UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
+  useGetAllResourcesInUse,
+  UseGetAllResourcesInUseKeyFn,
+  useResourceUsageGetActiveSession,
+  UseResourceUsageGetActiveSessionKeyFn,
 } from '@attraccess/react-query-client';
 import { useLiveUpdates } from '../../../utils/live-updates';
 import { SESSION_EVENTS } from '../../resources/usage/sessionEvents';
@@ -24,16 +24,16 @@ const REFRESH_INTERVAL_MS = 30_000;
 function InUseRow({ resource }: Readonly<{ resource: Resource }>) {
   const queryClient = useQueryClient();
   // The in-use list carries no session details; the active session read does, shared with the status chips.
-  const { data: activeSession } = useResourcesServiceResourceUsageGetActiveSession({ resourceId: resource.id });
+  const { data: activeSession } = useResourceUsageGetActiveSession({ path: { resourceId: resource.id } });
   // Ends of sessions elsewhere (another tab, the reader) refresh the list at once.
   useLiveUpdates({
     topic: 'resource',
     resourceId: resource.id,
     onUpdate: (data) => {
       if (data.eventType && SESSION_EVENTS.has(data.eventType)) {
-        void queryClient.invalidateQueries({ queryKey: UseResourcesServiceGetAllResourcesInUseKeyFn() });
+        void queryClient.invalidateQueries({ queryKey: UseGetAllResourcesInUseKeyFn() });
         void queryClient.invalidateQueries({
-          queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId: resource.id }),
+          queryKey: UseResourceUsageGetActiveSessionKeyFn({ path: { resourceId: resource.id } }),
         });
       }
     },
@@ -62,7 +62,7 @@ function InUseRow({ resource }: Readonly<{ resource: Resource }>) {
 export function ResourcesInUseWidget({ size, isPreview }: Readonly<DashboardWidgetRenderProps>) {
   const { t } = useTranslations({ en, de });
   // The dashboard tile refreshes the shared list; a gallery preview polling too would double the requests.
-  const { data, isPending, isError } = useResourcesServiceGetAllResourcesInUse(undefined, {
+  const { data, isPending, isError } = useGetAllResourcesInUse({}, undefined, {
     refetchInterval: isPreview ? false : REFRESH_INTERVAL_MS,
   });
 

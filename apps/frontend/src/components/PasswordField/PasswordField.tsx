@@ -4,7 +4,7 @@ import { Wand2 } from 'lucide-react';
 import { PasswordInput, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PasswordPolicyHints, generateStrongPassword } from '../PasswordPolicyHints';
 import { useToastMessage } from '../toastProvider';
-import { usePasswordPolicyServiceGetPublicPasswordPolicy } from '@attraccess/react-query-client';
+import { useGetPublicPasswordPolicy } from '@attraccess/react-query-client';
 import { PolicyError, PublicPasswordPolicy } from '@attraccess/shared';
 import en from './PasswordField.en.json';
 import de from './PasswordField.de.json';
@@ -74,7 +74,7 @@ export function PasswordField(props: PasswordFieldProps) {
   const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
 
-  const { data: fetchedPolicy } = usePasswordPolicyServiceGetPublicPasswordPolicy(undefined, {
+  const { data: fetchedPolicy } = useGetPublicPasswordPolicy({}, undefined, {
     enabled: !policy,
   });
 

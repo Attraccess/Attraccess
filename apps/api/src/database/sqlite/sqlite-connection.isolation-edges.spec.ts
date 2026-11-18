@@ -30,10 +30,11 @@ describe('main SQLite connection transaction isolation: edge cases', () => {
 
   const open = (busyTimeout = 300) =>
     createDataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: join(directory, 'test.sqlite'),
       entities: [CounterEntity, NoteEntity],
-      busyTimeout,
+      timeout: busyTimeout,
     }).initialize();
   const values = () => source.query('SELECT id, value FROM counter ORDER BY id');
   /** No flow owns the connection any more: another flow's transaction runs, not failing after the busy timeout. */

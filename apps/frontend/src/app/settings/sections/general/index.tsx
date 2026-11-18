@@ -6,13 +6,13 @@ import { PasswordInput, useTranslations } from '@attraccess/plugins-frontend-ui'
 import {
   ApiError,
   ResourceActivityVisibility,
-  useSettingsServiceGetResourceVisibilitySettings,
-  UseSettingsServiceGetResourceVisibilitySettingsKeyFn,
-  useSettingsServiceGetSystemSettings,
-  UseSettingsServiceGetSystemSettingsKeyFn,
-  UseSettingsServiceGetSystemLanguageKeyFn,
-  useSettingsServiceUpdateResourceVisibilitySettings,
-  useSettingsServiceUpdateSystemSettings,
+  useGetResourceVisibilitySettings,
+  UseGetResourceVisibilitySettingsKeyFn,
+  useGetSystemSettings,
+  UseGetSystemSettingsKeyFn,
+  UseGetSystemLanguageKeyFn,
+  useUpdateResourceVisibilitySettings,
+  useUpdateSystemSettings,
 } from '@attraccess/react-query-client';
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsRow } from '../../components/SettingsRow';
@@ -58,14 +58,14 @@ export function GeneralSection() {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { data: settings, isLoading } = useSettingsServiceGetSystemSettings();
+  const { data: settings, isLoading } = useGetSystemSettings();
   // Stored and saved separately from the system settings. Its loading or failing must not hold up the rest
   // of the page, so only its own select waits for it.
   const {
     data: visibilitySettings,
     isLoading: isVisibilityLoading,
     isError: isVisibilityError,
-  } = useSettingsServiceGetResourceVisibilitySettings();
+  } = useGetResourceVisibilitySettings();
   // Derived draft, not a seeded one: a key absent from `draft` means "untouched in this session",
   // and the displayed value falls back to the server's. The alternative — an effect that reassigns
   // the whole draft whenever the query object changes — overwrites edits the operator has not saved
@@ -87,25 +87,27 @@ export function GeneralSection() {
   const savedActivityVisibility = visibilitySettings?.activityVisibility;
   const activityVisibility = draft.activityVisibility ?? savedActivityVisibility;
 
-  const { mutateAsync: saveSettings, isPending: isSavingSettings } = useSettingsServiceUpdateSystemSettings({
+  const { mutateAsync: saveSettings, isPending: isSavingSettings } = useUpdateSystemSettings(undefined, {
     onSuccess(data) {
       // Prime the cache from the response and release the pin in the same tick. Invalidating and
       // then clearing the draft would flash the pre-save value for a frame while the refetch is in
       // flight, and holding the pin past the commit would make the fields ignore the server for the
       // lifetime of the mount — a later change by another operator would then surface as a phantom
       // "unsaved changes" bar whose Save reverts them.
-      queryClient.setQueryData(UseSettingsServiceGetSystemSettingsKeyFn(), data);
-      queryClient.invalidateQueries({ queryKey: UseSettingsServiceGetSystemLanguageKeyFn() });
+      queryClient.setQueryData(UseGetSystemSettingsKeyFn(), data);
+      queryClient.invalidateQueries({ queryKey: UseGetSystemLanguageKeyFn() });
       setDraft(withoutKeys(['url', 'publicInternetUrl', 'licenseKey', 'defaultLanguage']));
     },
   });
-  const { mutateAsync: saveVisibility, isPending: isSavingVisibility } =
-    useSettingsServiceUpdateResourceVisibilitySettings({
+  const { mutateAsync: saveVisibility, isPending: isSavingVisibility } = useUpdateResourceVisibilitySettings(
+    undefined,
+    {
       onSuccess(data) {
-        queryClient.setQueryData(UseSettingsServiceGetResourceVisibilitySettingsKeyFn(), data);
+        queryClient.setQueryData(UseGetResourceVisibilitySettingsKeyFn(), data);
         setDraft(withoutKeys(['activityVisibility']));
       },
-    });
+    },
+  );
   const isSaving = isSavingSettings || isSavingVisibility;
 
   const isSystemSettingsDirty =
@@ -144,7 +146,7 @@ export function GeneralSection() {
       if (urlError || publicUrlError) return;
       saves.push(
         saveSettings({
-          requestBody: {
+          body: {
             app: {
               url: trimmedUrl,
               // `null`, not `undefined`: the write is gated on the key being present and
@@ -160,7 +162,7 @@ export function GeneralSection() {
       );
     }
     if (isVisibilityDirty && activityVisibility) {
-      saves.push(saveVisibility({ requestBody: { activityVisibility } }));
+      saves.push(saveVisibility({ body: { activityVisibility } }));
     }
     if (saves.length === 0) return;
 

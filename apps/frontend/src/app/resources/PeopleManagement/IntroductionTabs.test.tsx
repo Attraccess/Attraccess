@@ -34,10 +34,10 @@ const state = vi.hoisted(() => ({
 
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/react-query-client')>()),
-  useAccessControlServiceMassIntroductionStart: (options: {
-    onSuccess: (data: unknown) => void;
-    onError: (error: unknown) => void;
-  }) => ({
+  useMassIntroductionStart: (
+    _mutationKey: unknown,
+    options: { onSuccess: (data: unknown) => void; onError: (error: unknown) => void },
+  ) => ({
     isPending: false,
     mutate: (variables: unknown) => {
       state.start(variables);
@@ -47,15 +47,14 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
       else settle();
     },
   }),
-  useAccessControlServiceMassIntroductionCancel: () => ({ mutate: state.cancel }),
-  useAttractapServiceGetResourceAttractaps: (query: unknown, _key: unknown, options: { enabled: boolean }) =>
+  useMassIntroductionCancel: () => ({ mutate: state.cancel }),
+  useGetResourceAttractaps: (query: unknown, _key: unknown, options: { enabled: boolean }) =>
     options.enabled ? ((state.eligibleReadersQuery = query), { data: [{ id: 4 }] }) : { data: undefined },
-  useAttractapServiceGetResourceGroupAttractaps: (query: unknown, _key: unknown, options: { enabled: boolean }) =>
+  useGetResourceGroupAttractaps: (query: unknown, _key: unknown, options: { enabled: boolean }) =>
     options.enabled ? ((state.eligibleReadersQuery = query), { data: [{ id: 4 }] }) : { data: undefined },
-  AccessControlService: {
-    massIntroductionGet: (data: unknown) => state.get(data),
-    massIntroductionCancel: (data: unknown) => state.serviceCancel(data),
-  },
+  // SDK calls resolve to `{ data }`; the stubs answer with the plain body.
+  massIntroductionGet: async (options: unknown) => ({ data: await state.get(options) }),
+  massIntroductionCancel: async (options: unknown) => ({ data: await state.serviceCancel(options) }),
 }));
 vi.mock('./useInvalidatePeopleIntroductions', () => ({ useInvalidatePeopleIntroductions: () => state.invalidate }));
 vi.mock('../../../utils/live-updates', () => ({
@@ -191,7 +190,7 @@ describe('grant-introduction drawer', () => {
 
     startSession();
 
-    expect(state.start).toHaveBeenCalledWith({ requestBody: { resourceId: 7 } });
+    expect(state.start).toHaveBeenCalledWith({ body: { resourceId: 7 } });
     // The QR code only names the session; the code to type is shown next to it.
     expect(screen.getByText(`${window.location.origin}/resources/7?massIntroduction=pub-1`)).toBeInTheDocument();
     expect(screen.getByLabelText('Code', { selector: 'output' })).toHaveTextContent('042 917');
@@ -207,14 +206,14 @@ describe('grant-introduction drawer', () => {
     fireEvent.click(screen.getByRole('switch', { name: /tap their NFC card/ }));
     // Readers before firmware 2.0.0 (no card relay) are refused by the server, so they are not offered.
     expect(state.readerCapabilities).toEqual({ cardEnrollment: true, cardRelay: true });
-    expect(state.eligibleReadersQuery).toEqual({ groupId: 3 });
+    expect(state.eligibleReadersQuery).toEqual({ path: { groupId: 3 } });
     expect(state.readerIds).toEqual([4]);
     expect(screen.getByRole('button', { name: 'Start' })).toBeDisabled();
 
     fireEvent.click(screen.getByText('Pick reader 4'));
     startSession(makeSession({ reader: { id: 4, name: 'Lab reader', state: MassIntroductionReaderState.ACTIVE } }));
 
-    expect(state.start).toHaveBeenCalledWith({ requestBody: { resourceGroupId: 3, readerId: 4 } });
+    expect(state.start).toHaveBeenCalledWith({ body: { resourceGroupId: 3, readerId: 4 } });
     expect(screen.getByText('Lab reader is waiting for NFC cards')).toBeInTheDocument();
   });
 
@@ -315,7 +314,7 @@ describe('grant-introduction drawer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'End mass introduction' }));
 
     expect(state.cancel).toHaveBeenCalledTimes(1);
-    expect(state.cancel).toHaveBeenCalledWith({ sessionId: 'session-1' });
+    expect(state.cancel).toHaveBeenCalledWith({ path: { sessionId: 'session-1' } });
     expect(screen.getByText('The mass introduction was ended. The QR code no longer works.')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'addModal.tabs.individual' })).not.toHaveAttribute('aria-disabled');
     expect(onClose).not.toHaveBeenCalled();
@@ -333,7 +332,7 @@ describe('grant-introduction drawer', () => {
 
     act(() => state.pendingStart?.());
 
-    expect(state.serviceCancel).toHaveBeenCalledWith({ sessionId: 'session-1' });
+    expect(state.serviceCancel).toHaveBeenCalledWith({ path: { sessionId: 'session-1' }, throwOnError: true });
   });
 
   it('cancels a running session on unmount, but not one that never started', () => {
@@ -344,7 +343,7 @@ describe('grant-introduction drawer', () => {
     const second = mount();
     startSession();
     second.unmount();
-    expect(state.cancel).toHaveBeenCalledWith({ sessionId: 'session-1' });
+    expect(state.cancel).toHaveBeenCalledWith({ path: { sessionId: 'session-1' } });
   });
 
   it('shows the next code when the current one changes, while the QR code stays the same', async () => {
@@ -360,7 +359,7 @@ describe('grant-introduction drawer', () => {
       await vi.advanceTimersByTimeAsync(15_500);
     });
 
-    expect(state.get).toHaveBeenCalledWith({ sessionId: 'session-1' });
+    expect(state.get).toHaveBeenCalledWith({ path: { sessionId: 'session-1' }, throwOnError: true });
     expect(code()).toHaveTextContent('222 222');
     expect(screen.getByText(`${window.location.origin}/resources/7?massIntroduction=pub-1`)).toBeInTheDocument();
   });
@@ -388,7 +387,7 @@ describe('grant-introduction drawer', () => {
 
     state.get.mockResolvedValueOnce(makeSession({ participants: [participant(8, 'Dana')] }));
     act(() => state.live?.onReconnect?.());
-    expect(state.get).toHaveBeenCalledWith({ sessionId: 'session-1' });
+    expect(state.get).toHaveBeenCalledWith({ path: { sessionId: 'session-1' }, throwOnError: true });
     expect(await screen.findByText('Dana')).toBeInTheDocument();
 
     state.get.mockRejectedValueOnce({ status: 404 });

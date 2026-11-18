@@ -3,8 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   ApiError,
   StartUsageSessionDto,
-  useResourcesServiceResourceUsageStartBlockedKey,
-  useResourcesServiceResourceUsageStartSession,
+  useResourceUsageStartBlockedKey,
+  useResourceUsageStartSession,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { getConfirmationRequired, getStartBlockedReason, useStartConfirmation } from './useStartConfirmation';
@@ -37,10 +37,10 @@ export function useStartSessionWithConfirmation(resourceId: number, options: Opt
   const queryClient = useQueryClient();
   const optionsRef = useRef(options);
   optionsRef.current = options;
-  const { mutate, isPending } = useResourcesServiceResourceUsageStartSession({
-    onSuccess: (_data, { requestBody }) => optionsRef.current.onSuccess(requestBody),
-    onError: (error, { requestBody }) => {
-      if (!isPluginStartError(error)) optionsRef.current.onError(error as ApiError, requestBody);
+  const { mutate, isPending } = useResourceUsageStartSession(undefined, {
+    onSuccess: (_data, { body }) => optionsRef.current.onSuccess(body),
+    onError: (error, { body }) => {
+      if (!isPluginStartError(error)) optionsRef.current.onError(error as ApiError, body);
     },
   });
   // Per-call error handler of the last start, kept for the confirmed retry (e.g. the missing-forms retry).
@@ -57,7 +57,7 @@ export function useStartSessionWithConfirmation(resourceId: number, options: Opt
     (requestBody: StartUsageSessionDto, onCallError?: StartErrorHandler) => {
       callErrorRef.current = onCallError;
       mutate(
-        { resourceId, requestBody },
+        { path: { resourceId }, body: requestBody },
         {
           onError: (error) => {
             if (handleStartError(error, requestBody)) {
@@ -68,7 +68,7 @@ export function useStartSessionWithConfirmation(resourceId: number, options: Opt
             if (blocked) {
               toast.error({ title: blocked.title, description: blocked.body });
               // The page did not know about the block yet: show the notice now instead of with the next poll.
-              void queryClient.invalidateQueries({ queryKey: [useResourcesServiceResourceUsageStartBlockedKey] });
+              void queryClient.invalidateQueries({ queryKey: [useResourceUsageStartBlockedKey] });
               optionsRef.current.onPluginNotice?.();
               return;
             }

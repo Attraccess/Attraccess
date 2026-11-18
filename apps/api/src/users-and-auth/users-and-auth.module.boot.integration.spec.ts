@@ -31,7 +31,8 @@ const infrastructure = (): NonNullable<ModuleMetadata['imports']> => [
   ConfigModule.forRoot({ load: [appConfiguration, storageConfigObject, sessionConfig, valkeyConfig], isGlobal: true }),
   EventEmitterModule.forRoot(),
   TypeOrmModule.forRoot({
-    type: 'sqlite',
+    type: 'better-sqlite3',
+    invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
     database: ':memory:',
     synchronize: true,
     entities: Object.values(entities),

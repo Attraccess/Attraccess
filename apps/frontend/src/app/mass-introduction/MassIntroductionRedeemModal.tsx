@@ -10,7 +10,7 @@ import {
   MassIntroductionSessionDto,
   MassIntroductionTargetType,
   RedeemMassIntroductionResponseDto,
-  useAccessControlServiceMassIntroductionRedeem,
+  useMassIntroductionRedeem,
 } from '@attraccess/react-query-client';
 import { OneTimeCodeInput } from '../../components/OneTimeCodeInput';
 import { getApiErrorMessage } from '../../utils/apiError';
@@ -55,7 +55,7 @@ export function MassIntroductionRedeemModal({ canRedeem }: Readonly<Props>) {
   const [state, setState] = useState<DialogState | null>(null);
   const [code, setCode] = useState('');
 
-  const { mutate: redeem, isPending } = useAccessControlServiceMassIntroductionRedeem({
+  const { mutate: redeem, isPending } = useMassIntroductionRedeem(undefined, {
     onSuccess: (result) => {
       setState({ status: 'success', result });
       // The page behind the dialog may change with the new introduction (usage controls, people).
@@ -93,7 +93,7 @@ export function MassIntroductionRedeemModal({ canRedeem }: Readonly<Props>) {
   const submit = useCallback(
     (value: string) => {
       if (state?.status !== 'code' || value.length !== CODE_LENGTH || isPending) return;
-      redeem({ requestBody: { publicId: state.publicId, code: value } });
+      redeem({ body: { publicId: state.publicId, code: value } });
     },
     [state, isPending, redeem],
   );

@@ -47,7 +47,7 @@ describe('TypeOrmAnalyticsReader export queries', () => {
           userId: 'DESC',
           startTime: 'DESC',
         },
-        relations: ['user', 'resource', 'supervisorUser'],
+        relations: { user: true, resource: true, supervisorUser: true },
         skip: 0,
         take: 500,
       });
@@ -138,7 +138,7 @@ describe('TypeOrmAnalyticsReader export queries', () => {
       expect(transactions.findAndCount).toHaveBeenCalledWith({
         where: { createdAt: Between(dateRange.start, dateRange.end) },
         order: { createdAt: 'DESC', id: 'DESC', userId: 'DESC' },
-        relations: ['user', 'initiator', 'resourceUsage', 'resourceUsage.resource', 'items'],
+        relations: { user: true, initiator: true, resourceUsage: { resource: true }, items: true },
         skip: 50,
         take: 50,
       });

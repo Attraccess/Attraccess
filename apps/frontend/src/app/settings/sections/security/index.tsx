@@ -1,11 +1,11 @@
 import { Spinner } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
-  usePasswordPolicyAdminServiceGetAdminPasswordPolicy,
-  usePasswordPolicyAdminServiceListPasswordPolicyOverrides,
-  useSettingsServiceGetAuthRateLimitSettings,
-  useTwoFactorAuthenticationServiceGetTwoFactorPolicy,
-  useUsersServiceGetLocalSignupDomainWhitelist,
+  useGetAdminPasswordPolicy,
+  useListPasswordPolicyOverrides,
+  useGetAuthRateLimitSettings,
+  useGetTwoFactorPolicy,
+  useGetLocalSignupDomainWhitelist,
 } from '@attraccess/react-query-client';
 import { SettingsSection } from '../../components/SettingsSection';
 import { PasswordPolicySettings } from './components/PasswordPolicySettings';
@@ -34,11 +34,11 @@ export function SecuritySection() {
   // parallel round and the rows below get their data as props. Subscribing in the rows instead
   // delayed 2FA, the whitelist and the overrides until the gate opened, and refetched the policy
   // and the rate limit a second time on mount (the shared client has no `staleTime`).
-  const { data: policy, isLoading: isPolicyLoading } = usePasswordPolicyAdminServiceGetAdminPasswordPolicy();
-  const { data: rateLimit, isLoading: isRateLimitLoading } = useSettingsServiceGetAuthRateLimitSettings();
-  const { data: twoFactor } = useTwoFactorAuthenticationServiceGetTwoFactorPolicy();
-  const { data: savedDomains, isLoading: isDomainsLoading } = useUsersServiceGetLocalSignupDomainWhitelist();
-  const { data: overrides = [] } = usePasswordPolicyAdminServiceListPasswordPolicyOverrides();
+  const { data: policy, isLoading: isPolicyLoading } = useGetAdminPasswordPolicy();
+  const { data: rateLimit, isLoading: isRateLimitLoading } = useGetAuthRateLimitSettings();
+  const { data: twoFactor } = useGetTwoFactorPolicy();
+  const { data: savedDomains, isLoading: isDomainsLoading } = useGetLocalSignupDomainWhitelist();
+  const { data: overrides = [] } = useListPasswordPolicyOverrides();
 
   // Loading only. Folding `!policy || !rateLimit` in here conflated "not arrived yet" with "arrived
   // empty": on error `isLoading` goes false while the data stays undefined, so the spinner became

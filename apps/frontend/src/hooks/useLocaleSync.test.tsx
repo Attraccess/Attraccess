@@ -6,7 +6,7 @@ import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { useLocaleSync } from './useLocaleSync';
 
 type LocaleSaveContext = { userId: number | null | undefined; generation: number };
-type LocaleVariables = { requestBody: { locale: string } };
+type LocaleVariables = { body: { locale: string } };
 type SavedUser = { id: number; locale: string };
 type MutationOptions = {
   onMutate?: () => LocaleSaveContext;
@@ -28,12 +28,12 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock('./useAuth', () => ({ useAuth: () => ({ user: state.user, isAuthenticated: !!state.user }) }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useSettingsServiceGetSystemLanguage: () => ({
+  useGetSystemLanguage: () => ({
     data: { defaultLanguage: state.defaultLanguage, configured: state.configured },
   }),
-  useSettingsServiceGetFirstTimeSetupStatus: () => ({ data: state.setup }),
-  UseUsersServiceGetCurrentKeyFn: () => ['current-user'],
-  useUsersServiceUpdateMyLocale: (options: typeof state.mutationOptions) => {
+  useGetFirstTimeSetupStatus: () => ({ data: state.setup }),
+  UseGetCurrentKeyFn: () => ['current-user'],
+  useUpdateMyLocale: (_mutationKey: unknown, options: typeof state.mutationOptions) => {
     state.mutationOptions = options;
     return { mutate: state.mutate };
   },
@@ -102,7 +102,7 @@ it('loads each user preference without overwriting it on login, then retains the
   rerender();
   expect(useTranslationState.getState().language).toBe('en');
   act(() => useTranslationState.getState().setLanguage('de'));
-  expect(state.mutate).toHaveBeenCalledExactlyOnceWith({ requestBody: { locale: 'de' } });
+  expect(state.mutate).toHaveBeenCalledExactlyOnceWith({ body: { locale: 'de' } });
   state.user = null;
   rerender();
   expect(useTranslationState.getState().language).toBe('de');
@@ -123,7 +123,7 @@ it('applies refreshed server preferences without writing them back', () => {
   expect(useTranslationState.getState().language).toBe('en');
   expect(state.mutate).not.toHaveBeenCalled();
   act(() => useTranslationState.getState().setLanguage('de'));
-  expect(state.mutate).toHaveBeenCalledExactlyOnceWith({ requestBody: { locale: 'de' } });
+  expect(state.mutate).toHaveBeenCalledExactlyOnceWith({ body: { locale: 'de' } });
   rerender(); // An unchanged server snapshot must not undo a local selection.
   expect(useTranslationState.getState().language).toBe('de');
   state.user = { id: 1, locale: 'de' };
@@ -184,7 +184,7 @@ it('uses browser detection for missing or unsupported user languages, then the s
   state.user = { id: 3, locale: 'en-!!!' };
   rerender();
   expect(useTranslationState.getState().language).toBe('de');
-  expect(state.mutate.mock.calls).toEqual([[{ requestBody: { locale: 'en' } }], [{ requestBody: { locale: 'en' } }]]);
+  expect(state.mutate.mock.calls).toEqual([[{ body: { locale: 'en' } }], [{ body: { locale: 'en' } }]]);
 });
 
 it('returns to the browser language on logout when it differs from the user and system languages', () => {
@@ -221,7 +221,7 @@ it.each(['de', 'en'] as const)(
     });
     const { rerender } = renderLocaleSync();
     act(() => useTranslationState.getState().setLanguage(choice));
-    expect(state.mutate).toHaveBeenCalledExactlyOnceWith({ requestBody: { locale: choice } });
+    expect(state.mutate).toHaveBeenCalledExactlyOnceWith({ body: { locale: choice } });
     state.defaultLanguage = 'en';
     rerender();
     state.defaultLanguage = 'de';

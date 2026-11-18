@@ -4,9 +4,9 @@ import { EmptyState, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { generateHeaderColumns } from './utils/tableHeaders';
 import { generateRowCells } from './utils/tableRows';
 import {
-  useResourcesServiceResourceUsageGetHistory,
+  useResourceUsageGetHistory,
   ResourceUsage,
-  useResourcesServiceGetOneResourceById,
+  useGetOneResourceById,
   ResourceType,
   ResourceUsageAction,
 } from '@attraccess/react-query-client';
@@ -87,20 +87,15 @@ export const HistoryTable = ({
     setPage(newPage);
   }, []);
 
-  const { data: usageHistory, error } = useResourcesServiceResourceUsageGetHistory(
-    {
-      resourceId,
-      page,
-      limit: rowsPerPage,
-      userId: showAllUsers ? undefined : user?.id,
-    },
+  const { data: usageHistory, error } = useResourceUsageGetHistory(
+    { path: { resourceId }, query: { page, limit: rowsPerPage, userId: showAllUsers ? undefined : user?.id } },
     undefined,
     {
       enabled: !!user,
     },
   );
 
-  const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  const { data: resource } = useGetOneResourceById({ path: { id: resourceId } });
 
   const headerColumns = useMemo(() => {
     if (!resource) {

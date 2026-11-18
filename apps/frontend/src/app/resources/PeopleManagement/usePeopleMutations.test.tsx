@@ -11,11 +11,14 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
   for (const scope of ['Resource', 'ResourceGroup'])
     for (const kind of ['Introducers', 'Introductions']) {
       for (const action of ['Grant', 'Revoke']) {
-        const name = `useAccessControlService${scope}${kind}${action}`;
-        hooks[name] = (options: {
-          onSuccess: (data: unknown, variables: unknown) => void;
-          onError: (error: Error) => void;
-        }) => ({
+        const name = `use${scope}${kind}${action}`;
+        hooks[name] = (
+          _mutationKey: unknown,
+          options: {
+            onSuccess: (data: unknown, variables: unknown) => void;
+            onError: (error: Error) => void;
+          },
+        ) => ({
           isPending: state.pending,
           mutateAsync: async (variables: unknown) => {
             state.calls(name, variables);
@@ -29,18 +32,13 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
         });
       }
       for (const action of ['GetMany', 'GetHistory'])
-        hooks[`UseAccessControlService${scope}${kind}${action}KeyFn`] = (params: unknown) => [
-          scope,
-          kind,
-          action,
-          params,
-        ];
+        hooks[`Use${scope}${kind}${action}KeyFn`] = (params: unknown) => [scope, kind, action, params];
     }
   return {
     ...original,
     ...hooks,
-    useAccessControlServiceResourceIntroductionsGetPeopleKey: 'resourceIntroductions',
-    UseAccessControlServiceResourceIntroductionsGetPeopleKeyFn: (params: unknown) => ['resourceIntroductions', params],
+    useResourceIntroductionsGetPeopleKey: 'resourceIntroductions',
+    UseResourceIntroductionsGetPeopleKeyFn: (params: unknown) => ['resourceIntroductions', params],
   };
 });
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
@@ -77,20 +75,18 @@ it.each(['resource', 'group'] as const)(
     const scope = type === 'resource' ? 'Resource' : 'ResourceGroup';
     const target = type === 'resource' ? { resourceId: 7 } : { groupId: 7 };
     await act(() => result.current.grantIntroducer(3));
-    expect(state.calls).toHaveBeenLastCalledWith(`useAccessControlService${scope}IntroducersGrant`, {
-      ...target,
-      userId: 3,
-      requestBody: { type: ResourceIntroducerType.INTRODUCER },
+    expect(state.calls).toHaveBeenLastCalledWith(`use${scope}IntroducersGrant`, {
+      path: { ...target, userId: 3 },
+      body: { type: ResourceIntroducerType.INTRODUCER },
     });
     expect(state.success).toHaveBeenLastCalledWith({
       title: 'toasts.introducerGranted.title',
       description: 'toasts.introducerGranted.description',
     });
     await act(() => result.current.grantMaintainer(3));
-    expect(state.calls).toHaveBeenLastCalledWith(`useAccessControlService${scope}IntroducersGrant`, {
-      ...target,
-      userId: 3,
-      requestBody: { type: ResourceIntroducerType.MAINTAINER },
+    expect(state.calls).toHaveBeenLastCalledWith(`use${scope}IntroducersGrant`, {
+      path: { ...target, userId: 3 },
+      body: { type: ResourceIntroducerType.MAINTAINER },
     });
     expect(state.success).toHaveBeenLastCalledWith({
       title: 'toasts.maintainerGranted.title',
@@ -98,31 +94,28 @@ it.each(['resource', 'group'] as const)(
     });
     for (const role of [ResourceIntroducerType.INTRODUCER, ResourceIntroducerType.MAINTAINER]) {
       await act(() => result.current.revokeIntroducer(3, role));
-      expect(state.calls).toHaveBeenLastCalledWith(`useAccessControlService${scope}IntroducersRevoke`, {
-        ...target,
-        userId: 3,
-        requestBody: { type: role },
+      expect(state.calls).toHaveBeenLastCalledWith(`use${scope}IntroducersRevoke`, {
+        path: { ...target, userId: 3 },
+        body: { type: role },
       });
     }
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: [scope, 'Introducers', 'GetMany', target] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: [scope, 'Introducers', 'GetMany', { path: target }] });
     await act(() => result.current.grantIntroduction(3, 'Safety briefing'));
-    expect(state.calls).toHaveBeenLastCalledWith(`useAccessControlService${scope}IntroductionsGrant`, {
-      ...target,
-      userId: 3,
-      requestBody: { comment: 'Safety briefing' },
+    expect(state.calls).toHaveBeenLastCalledWith(`use${scope}IntroductionsGrant`, {
+      path: { ...target, userId: 3 },
+      body: { comment: 'Safety briefing' },
     });
     await act(() => result.current.revokeIntroduction(3, ''));
-    expect(state.calls).toHaveBeenLastCalledWith(`useAccessControlService${scope}IntroductionsRevoke`, {
-      ...target,
-      userId: 3,
-      requestBody: { comment: undefined },
+    expect(state.calls).toHaveBeenLastCalledWith(`use${scope}IntroductionsRevoke`, {
+      path: { ...target, userId: 3 },
+      body: { comment: undefined },
     });
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: [scope, 'Introductions', 'GetMany', target] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: [scope, 'Introductions', 'GetMany', { path: target }] });
     expect(invalidate).toHaveBeenCalledWith({
-      queryKey: type === 'group' ? ['resourceIntroductions'] : ['resourceIntroductions', { resourceId: 7 }],
+      queryKey: type === 'group' ? ['resourceIntroductions'] : ['resourceIntroductions', { path: { resourceId: 7 } }],
     });
     expect(invalidate).toHaveBeenCalledWith({
-      queryKey: [scope, 'Introductions', 'GetHistory', { ...target, userId: 3 }],
+      queryKey: [scope, 'Introductions', 'GetHistory', { path: { ...target, userId: 3 } }],
     });
     expect(result.current.pendingIntroducer).toBeNull();
     expect(result.current.pendingIntroductionUserId).toBeNull();

@@ -109,7 +109,8 @@ describe('Maintenance snapshots (file-backed SQLite)', () => {
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'maintenance-snapshot-'));
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: join(directory, 'test.sqlite'),
       synchronize: true,
       entities: [UsageSchema, IntervalSchema, AttemptSchema],

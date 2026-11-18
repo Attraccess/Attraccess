@@ -14,7 +14,14 @@ export const sqliteFixture: BackendFixture = {
     const sources: DataSource[] = [];
 
     const open = async (busyTimeout?: number): Promise<DataSource> => {
-      const source = await sqliteBackend.createDataSource({ type: 'sqlite', database: file, busyTimeout }).initialize();
+      const source = await sqliteBackend
+        .createDataSource({
+          type: 'better-sqlite3',
+          invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+          database: file,
+          timeout: busyTimeout,
+        })
+        .initialize();
       sources.push(source);
       return source;
     };
@@ -47,7 +54,11 @@ export const sqliteFixture: BackendFixture = {
       },
       async induceBusy() {
         // A plain connection, outside the backend's flow guard: it only takes and holds the file's write lock.
-        const holder = await new DataSource({ type: 'sqlite', database: file }).initialize();
+        const holder = await new DataSource({
+          type: 'better-sqlite3',
+          invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
+          database: file,
+        }).initialize();
         sources.push(holder);
         await holder.query('BEGIN IMMEDIATE');
         return async () => {

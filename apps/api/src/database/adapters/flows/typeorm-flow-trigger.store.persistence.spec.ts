@@ -25,10 +25,11 @@ describe('TypeOrmFlowTriggerStore (SQLite)', () => {
 
   beforeAll(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
       database: ':memory:',
       entities: Object.values(entities),
       synchronize: true,
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
     }).initialize();
     store = new TypeOrmFlowTriggerStore(source);
     const nodes = source.getRepository(ResourceFlowNode);

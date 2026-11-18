@@ -56,7 +56,8 @@ describe('UsersAndAuthModule with Valkey configured but unreachable', () => {
         }),
         EventEmitterModule.forRoot(),
         TypeOrmModule.forRoot({
-          type: 'sqlite',
+          type: 'better-sqlite3',
+          invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
           database: ':memory:',
           synchronize: true,
           entities: Object.values(entities),

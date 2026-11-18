@@ -1,9 +1,5 @@
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  ApiError,
-  useResourceFlowsServiceGetButtons,
-  useResourceFlowsServicePressButton,
-} from '@attraccess/react-query-client';
+import { ApiError, useGetButtons, usePressButton } from '@attraccess/react-query-client';
 import { useState } from 'react';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../../global-translations/api-errors.en.json';
@@ -27,17 +23,17 @@ export function FlowButtons(props: Props) {
 
   const toast = useToastMessage();
 
-  const { data: buttons } = useResourceFlowsServiceGetButtons({ resourceId });
+  const { data: buttons } = useGetButtons({ path: { resourceId } });
   const [pendingButtons, setPendingButtons] = useState<string[]>([]);
-  const { mutate: pressButton } = useResourceFlowsServicePressButton({
+  const { mutate: pressButton } = usePressButton(undefined, {
     onMutate(variables) {
-      setPendingButtons((prev) => [...prev, variables.buttonId]);
+      setPendingButtons((prev) => [...prev, variables.path.buttonId]);
     },
     onSuccess(_data, variables, _context) {
-      setPendingButtons((prev) => prev.filter((id) => id !== variables.buttonId));
+      setPendingButtons((prev) => prev.filter((id) => id !== variables.path.buttonId));
     },
     onError(_error, variables, _context) {
-      setPendingButtons((prev) => prev.filter((id) => id !== variables.buttonId));
+      setPendingButtons((prev) => prev.filter((id) => id !== variables.path.buttonId));
       toast.apiError({
         error: _error as ApiError,
         t,
@@ -57,7 +53,7 @@ export function FlowButtons(props: Props) {
         <Button
           key={node.id}
           onPress={() => {
-            pressButton({ resourceId, buttonId: node.id });
+            pressButton({ path: { resourceId, buttonId: node.id } });
           }}
           isPending={pendingButtons.includes(node.id)}
           className="w-full min-w-0 max-w-full"

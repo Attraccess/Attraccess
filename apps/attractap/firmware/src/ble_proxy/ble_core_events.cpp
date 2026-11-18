@@ -188,8 +188,9 @@ namespace ble
         session.releaseDeadline = now + RELEASE_DEADLINE_MS;
         char id[9];
         shortId(session.id, id);
-        logf(LogLevel::Info, "ble session=%s ended reason=%s detail=%s after %ums", id, reason, pending.detail,
-             static_cast<unsigned>(now - session.openedMs));
+        logf(LogLevel::Info, "ble session=%s ended reason=%s detail=%s after %ums retries=%u queued=%u", id, reason,
+             pending.detail, static_cast<unsigned>(now - session.openedMs), static_cast<unsigned>(session.writeRetries),
+             static_cast<unsigned>(session.answersQueued));
         if (radioDown)
         {
             finishRelease();
@@ -322,7 +323,8 @@ namespace ble
         // notifications up in their bounded buffer (which overflows with a marker), never into the outbox.
         if (!outbox.empty()) return;
         NotificationBuffer::Entry entry;
-        while (sink.canSendNotification() && notifications.peek(entry))
+        // Asks for room only with a notification to send: an empty buffer must not mark the proxy as waiting.
+        while (notifications.peek(entry) && sink.canSendNotification())
         {
             Subscription *subscription = currentOwner == Owner::Session && session.state == SessionState::Open
                                              ? findSubscription(entry.service, entry.characteristic)
@@ -381,6 +383,7 @@ namespace ble
         // for a lost answer until its own timeout, and a lost session end would leave it holding the reader.
         // acceptsRequests() keeps the outbox bounded.
         if (outbox.empty() && sink.send(message)) return;
+        if (currentOwner == Owner::Session) session.answersQueued++;
         outbox.push_back(std::move(message));
     }
 

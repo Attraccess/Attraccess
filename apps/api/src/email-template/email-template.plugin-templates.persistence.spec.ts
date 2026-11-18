@@ -38,7 +38,8 @@ describe('EmailTemplateService with plugin templates (real SQLite)', () => {
 
   beforeEach(async () => {
     dataSource = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: ':memory:',
       synchronize: true,
       entities: [EmailTemplate, EmailTemplateTranslation],

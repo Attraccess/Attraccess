@@ -34,7 +34,7 @@ function applyConnectionHooks(source: DataSource, connection: DataSource): DataS
 }
 
 async function getResourceConnection(source: DataSource): Promise<DataSource> {
-  if (source.options.type !== 'sqlite') return source;
+  if (source.options.type !== 'better-sqlite3') return source;
   if (source.options.database === ':memory:') {
     throw new Error('Resource transactions require a file-backed SQLite database for independent commits');
   }
@@ -42,7 +42,6 @@ async function getResourceConnection(source: DataSource): Promise<DataSource> {
   if (!connection) {
     connection = createDataSource({
       ...source.options,
-      name: 'resource-lifecycle',
       synchronize: false,
       migrationsRun: false,
       dropSchema: false,
@@ -77,7 +76,7 @@ export async function runSerializedTransaction<T>(
   work: (transaction: EntityManager) => Promise<T>,
 ): Promise<T> {
   const connection = manager.connection;
-  if (connection?.options?.type !== 'sqlite') {
+  if (connection?.options?.type !== 'better-sqlite3') {
     return manager.transaction(work);
   }
   const previous = sqliteTransactions.get(connection) ?? Promise.resolve();

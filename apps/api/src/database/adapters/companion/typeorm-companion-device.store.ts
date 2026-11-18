@@ -43,12 +43,12 @@ export class TypeOrmCompanionDeviceStore implements CompanionDeviceStore {
   }
 
   async findDevice(id: number): Promise<CompanionDeviceRecord | null> {
-    const device = await this.devices.findOne({ where: { id }, relations: ['resources'] });
+    const device = await this.devices.findOne({ where: { id }, relations: { resources: true } });
     return device ? toRecord(device) : null;
   }
 
   async listDevices(): Promise<CompanionDeviceRecord[]> {
-    return (await this.devices.find({ relations: ['resources'] })).map(toRecord);
+    return (await this.devices.find({ relations: { resources: true } })).map(toRecord);
   }
 
   async recordConnection(id: number, appVersion?: string): Promise<void> {

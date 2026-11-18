@@ -5,8 +5,8 @@ import en from './en.json';
 import {
   BillingTransactionExportRowDto,
   CsvExportType,
-  useAnalyticsServiceGetBillingTransactionsInDateRangeInfinite,
-  useBillingServiceGetBillingConfiguration,
+  useGetBillingTransactionsInDateRangeInfinite,
+  useGetBillingConfiguration,
 } from '@attraccess/react-query-client';
 import { CsvExportConfigContent } from '../export-config';
 import { EXPORT_QUERY_OPTIONS } from '../export-config/query-options';
@@ -30,11 +30,8 @@ export function BillingTransactionsExport(props: ExporterProps) {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useAnalyticsServiceGetBillingTransactionsInDateRangeInfinite(
-    {
-      start: start.toISOString(),
-      end: end.toISOString(),
-    },
+  } = useGetBillingTransactionsInDateRangeInfinite(
+    { query: { start: start.toISOString(), end: end.toISOString() } },
     undefined,
     EXPORT_QUERY_OPTIONS,
   );
@@ -50,8 +47,7 @@ export function BillingTransactionsExport(props: ExporterProps) {
 
   const isFetchingAllPages = fetchAll && (hasNextPage || isFetchingNextPage);
 
-  const { data: billingConfiguration, status: billingConfigurationFetchStatus } =
-    useBillingServiceGetBillingConfiguration();
+  const { data: billingConfiguration, status: billingConfigurationFetchStatus } = useGetBillingConfiguration();
 
   const formatDateTimeFull = useDateTimeFormatter({ showDate: true, showTime: true, showSeconds: true });
 

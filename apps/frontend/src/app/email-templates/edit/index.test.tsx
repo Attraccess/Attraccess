@@ -23,18 +23,18 @@ const state = vi.hoisted(() => ({
   refresh: () => undefined as void,
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useEmailTemplatesServiceEmailTemplateControllerFindOne: () => {
+  useEmailTemplateControllerFindOne: () => {
     const [, refresh] = useReducer((n: number) => n + 1, 0);
     state.refresh = refresh;
     return { data: state.loaded ? state.template : undefined };
   },
-  useEmailLayoutServiceEmailLayoutControllerFindGlobal: () => ({
+  useEmailLayoutControllerFindGlobal: () => ({
     data: { body: state.layout },
     isSuccess: state.settled,
     isError: false,
   }),
-  useEmailTemplatesServiceEmailTemplateControllerUpdate: () => ({ mutate: state.update }),
-  useEmailTemplatesServiceEmailTemplateControllerResetToDefault: () => ({ mutate: state.reset }),
+  useEmailTemplateControllerUpdate: () => ({ mutate: state.update }),
+  useEmailTemplateControllerResetToDefault: () => ({ mutate: state.reset }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -101,7 +101,7 @@ it('waits for layout resolution and preserves unsaved canvas changes across back
   expect(editor).toHaveValue('<mj-section>Draft</mj-section>');
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
   expect(state.update).toHaveBeenCalledWith(
-    { type: 'welcome', requestBody: { subject: 'Welcome', body: '<mj-section>Draft</mj-section>' } },
+    { path: { type: 'welcome' }, body: { subject: 'Welcome', body: '<mj-section>Draft</mj-section>' } },
     expect.any(Object),
   );
   act(() => state.update.mock.calls[0][1].onSuccess());
@@ -155,7 +155,7 @@ it('wraps global chrome for display and strips it from saved template content', 
   expect(state.editor.headMjml).toContain('Brand');
   expect(state.editor.initialValue).toContain('Header');
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
-  expect(state.update.mock.calls[0][0].requestBody.body).toBe(state.template.body);
+  expect(state.update.mock.calls[0][0].body.body).toBe(state.template.body);
   fireEvent.click(screen.getByRole('button', { name: 'actions.translations' }));
   expect(await screen.findByText('Translations editor')).toBeTruthy();
   expect(state.liveContent).toBe('Welcome\n' + state.template.body);
@@ -178,7 +178,7 @@ it('requires reset confirmation and reseeds the editor from the reset response',
   await screen.findByRole('textbox');
   fireEvent.click(screen.getByRole('button', { name: 'actions.resetToDefault' }));
   fireEvent.click(await screen.findByRole('button', { name: 'resetConfirm.confirm' }));
-  expect(state.reset).toHaveBeenCalledWith({ type: 'welcome' }, expect.any(Object));
+  expect(state.reset).toHaveBeenCalledWith({ path: { type: 'welcome' } }, expect.any(Object));
   act(() => state.reset.mock.calls[0][1].onError());
   expect(state.error).toHaveBeenCalledWith({ title: 'toast.resetError' });
   act(() =>

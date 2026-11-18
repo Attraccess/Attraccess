@@ -17,7 +17,8 @@ describe('persisted resource introducer aggregation', () => {
   // Migrating is the slow part (every migration, on a busy coverage run): do it once per file.
   beforeAll(async () => {
     source = await new DataSource({
-      type: 'sqlite',
+      type: 'better-sqlite3',
+      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
       database: ':memory:',
       entities: Object.values(entities),
       migrations: Object.values(migrations),
