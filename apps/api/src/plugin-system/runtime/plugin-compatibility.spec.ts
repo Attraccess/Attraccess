@@ -12,6 +12,8 @@ import {
   PluginIncompatibleError,
 } from './plugin-compatibility';
 
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 describe('plugin SDK 2.0 compatibility gate', () => {
   it.each(['2.0.0-0', '2.0.0', '2.3.1', '3.0.0-beta.1'])('accepts attraccessVersion.min %s', (min) => {
     expect(() => assertPluginTargetsSdk2('p', min)).not.toThrow();
@@ -135,7 +137,7 @@ describe('plugin SDK 2.0 compatibility gate', () => {
       ])('refuses a bundle that vendors %s under node_modules', (_label, path, module) => {
         writeFileSync(join(root, 'index.js'), 'module.exports = {};');
         mkdirSync(join(root, ...path), { recursive: true });
-        expect(() => assertBundleCompatible('p', root)).toThrow(new RegExp(`imports "${module.replace('*', '\\*')}"`));
+        expect(() => assertBundleCompatible('p', root)).toThrow(new RegExp(`imports "${escapeRegExp(module)}"`));
       });
 
       it('follows symbolic links to scripts and directories, once each', () => {
