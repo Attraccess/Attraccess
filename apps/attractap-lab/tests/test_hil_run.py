@@ -14,7 +14,10 @@ pytestmark = pytest.mark.skipif(not RUN_SH.is_file(), reason="hil/run.sh is not 
 
 
 def run(tmp_path, env, place_output=None, run_sh=RUN_SH):
-    """Run run.sh with a stand-in labgrid-client that prints ``place_output`` for `show` (None: fails)."""
+    """Run run.sh with a stand-in labgrid-client that prints ``place_output`` for `show` (None: fails).
+
+    The stand-ins go first on PATH, also ahead of a PATH in ``env``, so a real labgrid-client is never reached.
+    """
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     client = bin_dir / "labgrid-client"
@@ -31,7 +34,8 @@ def run(tmp_path, env, place_output=None, run_sh=RUN_SH):
     lab_python.chmod(0o755)
     result = subprocess.run(
         ["bash", str(run_sh)], cwd=run_sh.parents[1], capture_output=True, text=True, timeout=30,
-        env={"PATH": f"{bin_dir}:{os.environ['PATH']}", "LAB_PYTHON": str(lab_python), "TMPDIR": str(tmp_path), **env})
+        env={"LAB_PYTHON": str(lab_python), "TMPDIR": str(tmp_path), **env,
+             "PATH": f"{bin_dir}:{env.get('PATH', os.environ['PATH'])}"})
     return result.returncode, result.stderr
 
 
