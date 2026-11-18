@@ -48,7 +48,13 @@ describe('PluginService.uploadPlugin staging cleanup', () => {
       'a zip-slip entry',
       () => zipFileUpload({ 'plugin.json': JSON.stringify(fixture.VALID_MANIFEST), '../../escaped.js': 'pwned' }),
       BadRequestException,
-      'File could not be extracted',
+      'File could not be extracted: Unsafe zip entry "../../escaped.js": path leaves the target folder',
+    ],
+    [
+      'a duplicate entry',
+      () => zipFileUpload({ 'plugin.json': JSON.stringify(fixture.VALID_MANIFEST), './plugin.json': '{}' }),
+      BadRequestException,
+      'File could not be extracted: Unsafe zip entry "./plugin.json": the archive contains this path more than once',
     ],
     [
       'a symlink entry',

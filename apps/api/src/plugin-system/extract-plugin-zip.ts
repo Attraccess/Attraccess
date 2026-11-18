@@ -11,6 +11,10 @@ import { fromBufferPromise, type Entry } from 'yauzl';
 const S_IFMT = 0o170000;
 const S_IFDIR = 0o040000;
 const S_IFREG = 0o100000;
+// yauzl's own name checks (strictFileNames) fail the entry iterator with these messages before we see the entry.
+const YAUZL_UNSAFE_NAME = /^(?:invalid characters in fileName|absolute path|invalid relative path): (.*)$/s;
+// Writing an entry over one already extracted ('wx'), or a file where a folder is (or the reverse).
+const ENTRY_CONFLICT_CODES = new Set(['EEXIST', 'ENOTDIR', 'EISDIR']);
 
 /** A ZIP entry that must not be written: it escapes the target folder or is not a plain file or folder. */
 export class UnsafeZipEntryError extends Error {
@@ -24,8 +28,8 @@ export class UnsafeZipEntryError extends Error {
  * Extracts a ZIP archive into `targetFolder` and returns the number of entries written.
  *
  * Rejects (before writing that entry) absolute, drive-letter, backslash and `..` paths, symlinks, hardlinks and other
- * special files, and encrypted entries. yauzl validates names and sizes itself; the checks here keep the guarantee
- * independent of its defaults.
+ * special files, encrypted entries and paths that occur twice. yauzl validates names and sizes itself (its name errors
+ * are rethrown as {@link UnsafeZipEntryError}); the checks here keep the guarantee independent of its defaults.
  */
 export async function extractPluginZip(buffer: Buffer, targetFolder: string): Promise<number> {
   const root = resolve(targetFolder);
@@ -34,18 +38,31 @@ export async function extractPluginZip(buffer: Buffer, targetFolder: string): Pr
   try {
     for await (const entry of zipFile.eachEntry()) {
       const target = safeTargetPath(root, entry);
-      if (entry.fileName.endsWith('/')) {
-        await mkdir(target, { recursive: true });
-      } else {
-        await mkdir(dirname(target), { recursive: true });
-        const mode = entryMode(entry) & 0o755;
-        await pipeline(
-          await zipFile.openReadStreamPromise(entry),
-          createWriteStream(target, { flags: 'wx', mode: mode || 0o644 }),
-        );
+      try {
+        if (entry.fileName.endsWith('/')) {
+          await mkdir(target, { recursive: true });
+        } else {
+          await mkdir(dirname(target), { recursive: true });
+          const mode = entryMode(entry) & 0o755;
+          await pipeline(
+            await zipFile.openReadStreamPromise(entry),
+            createWriteStream(target, { flags: 'wx', mode: mode || 0o644 }),
+          );
+        }
+      } catch (error) {
+        if (ENTRY_CONFLICT_CODES.has((error as NodeJS.ErrnoException).code ?? '')) {
+          throw new UnsafeZipEntryError(entry.fileName, 'the archive contains this path more than once');
+        }
+        throw error;
       }
       written++;
     }
+  } catch (error) {
+    const unsafeName = error instanceof Error && !(error instanceof UnsafeZipEntryError) && YAUZL_UNSAFE_NAME.exec(error.message);
+    if (unsafeName) {
+      throw new UnsafeZipEntryError(unsafeName[1], 'path leaves the target folder');
+    }
+    throw error;
   } finally {
     zipFile.close();
   }

@@ -1,7 +1,7 @@
 import { existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { extractPluginZip } from './extract-plugin-zip';
+import { extractPluginZip, UnsafeZipEntryError } from './extract-plugin-zip';
 import { makeZip } from './__test__/make-zip';
 
 describe('extractPluginZip', () => {
@@ -45,7 +45,9 @@ describe('extractPluginZip', () => {
   ])('rejects %s and writes nothing outside the target folder', async (_label, name) => {
     const zip = makeZip({ 'plugin.json': '{}', [name]: 'pwned' });
 
-    await expect(extractPluginZip(zip, target)).rejects.toThrow();
+    await expect(extractPluginZip(zip, target)).rejects.toThrow(
+      new UnsafeZipEntryError(name, 'path leaves the target folder'),
+    );
     expect(existsSync(join(root, 'escaped.txt'))).toBe(false);
     expect(readdirSync(root)).toEqual(expect.not.arrayContaining(['escaped.txt']));
   });
@@ -64,7 +66,17 @@ describe('extractPluginZip', () => {
   it('rejects an archive that repeats an entry instead of overwriting it', async () => {
     const zip = makeZip({ 'plugin.json': '{}', './plugin.json': 'replaced' });
 
-    await expect(extractPluginZip(zip, target)).rejects.toThrow('EEXIST');
+    await expect(extractPluginZip(zip, target)).rejects.toThrow(
+      new UnsafeZipEntryError('./plugin.json', 'the archive contains this path more than once'),
+    );
     expect(readFileSync(join(target, 'plugin.json'), 'utf8')).toBe('{}');
+  });
+
+  it('rejects a file entry where an earlier entry made a folder', async () => {
+    const zip = makeZip({ 'dist/': '', 'dist/index.js': '', dist: 'not a folder' });
+
+    await expect(extractPluginZip(zip, target)).rejects.toThrow(
+      new UnsafeZipEntryError('dist', 'the archive contains this path more than once'),
+    );
   });
 });
