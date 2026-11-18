@@ -41,6 +41,10 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
     assertOwned: () => Promise<void> = async () => undefined,
   ): Promise<void> {
     await assertOwned();
+    // Another claim that took over the controller owns the broker identity now: revoking it or resetting the row
+    // would undo that claim. Only the claim whose credential epoch the row still carries rolls back.
+    const epoch = controller.credentialEpoch;
+    if (!epoch || (await this.controllers.get(controller.id))?.credentialEpoch !== epoch) return;
     const manual = await this.context
       .getMqttCredentialProvisioning()
       .revoke({ mqttServerId, identity, username: identity, vhost: '/' });
@@ -51,7 +55,10 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
     Object.assign(controller, previousController);
     await assertOwned();
     await this.controllers
-      .update({ id: controller.id }, { credentialMqttServerId: null, credentialEpoch: null, ...previousController })
+      .update(
+        { id: controller.id, credentialEpoch: epoch },
+        { credentialMqttServerId: null, credentialEpoch: null, ...previousController },
+      )
       .catch((rollbackError) => {
         this.context.logger.warn(
           `Could not restore WAGO controller ${controller.id} after claim failure: ${String(rollbackError)}`,
@@ -86,9 +93,17 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
     );
   }
 
-  /** Writes claim fields of a controller that is still untrusted; a controller claimed meanwhile is a conflict. */
-  private async requireUnclaimedUpdate(id: number, patch: PluginStoragePatch<WagoController>): Promise<void> {
-    if (!(await this.controllers.update({ id, trustState: 'untrusted' }, patch)))
+  /**
+   * Writes claim fields of a controller that is still untrusted and still carries `credentialEpoch` (the epoch this
+   * claim read, or the one it wrote). A controller claimed meanwhile, or taken over by a concurrent claim on another
+   * instance, is a conflict; the caller then owns nothing to roll back.
+   */
+  private async requireUnclaimedUpdate(
+    id: number,
+    credentialEpoch: string | null,
+    patch: PluginStoragePatch<WagoController>,
+  ): Promise<void> {
+    if (!(await this.controllers.update({ id, trustState: 'untrusted', credentialEpoch }, patch)))
       throw new ConflictException('controller has already been claimed');
   }
 
@@ -148,9 +163,10 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
     // Persist the exact broker before provisioning. Discovery may later update
     // mqttServerId; removal must still revoke this identity on its original broker.
     await assertOwned();
+    const readEpoch = controller.credentialEpoch;
     controller.credentialMqttServerId = selectedServerId;
     controller.credentialEpoch = randomUUID();
-    await this.requireUnclaimedUpdate(controller.id, {
+    await this.requireUnclaimedUpdate(controller.id, readEpoch, {
       credentialMqttServerId: controller.credentialMqttServerId,
       credentialEpoch: controller.credentialEpoch,
     });
@@ -187,7 +203,7 @@ export abstract class WagoControllerEnrollment extends WagoRevisions {
       controller.name = name.trim();
       controller.mqttServerId = selectedServerId;
       controller.updatedAt = new Date().toISOString();
-      await this.requireUnclaimedUpdate(controller.id, {
+      await this.requireUnclaimedUpdate(controller.id, controller.credentialEpoch, {
         trustState: 'claimed',
         name: controller.name,
         mqttServerId: controller.mqttServerId,
