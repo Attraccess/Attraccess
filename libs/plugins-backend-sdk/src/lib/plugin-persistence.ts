@@ -25,13 +25,19 @@ export interface PluginPersistenceContext {
   /**
    * Runs `work` in one atomic, isolated transaction: it commits when `work` resolves and rolls back when it throws.
    * Concurrent transactions (core writes included) never see each other's uncommitted writes, and a check-then-write
-   * sequence inside one transaction (an overlap check, then the insert) cannot be raced by another transaction: the
-   * host either orders the transactions or fails one of them with an error, which rolls it back.
+   * sequence inside one transaction (an overlap check, then the insert) cannot be raced by another transaction.
+   *
+   * The host either orders transactions (one runs after the other) or fails one of them with
+   * `PluginStorageConflict`, also when the database stays busy at the start or the commit; the failed one is rolled
+   * back completely and its `afterCommit` callbacks never run. The host never retries: a caller may retry the whole
+   * transaction, which is safe because `work` keeps every external effect in `afterCommit`. How a backend achieves
+   * isolation (a single writer, serializable transactions) is not part of the contract.
    *
    * Keep `work` short and limited to database work: no HTTP, MQTT, email or other I/O inside. Register such effects
-   * with `scope.afterCommit`; they run only after the commit. Do not nest calls: the host rejects a transaction
-   * started inside `work` with an error; pass the scope down instead. Do not await core services that write (session
-   * start and end) inside `work` either.
+   * with `scope.afterCommit`; they run only after the commit, in registration order. Do not nest calls: a transaction
+   * started inside `work`, or inside a hook the host calls in its own transaction, is refused with
+   * `PluginStorageInvalid`; pass the scope down instead. Do not await core services that write (session start and
+   * end) inside `work` either.
    */
   transaction<T>(work: (scope: PluginTransactionScope) => Promise<T>): Promise<T>;
 }

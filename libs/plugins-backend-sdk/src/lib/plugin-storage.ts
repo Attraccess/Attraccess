@@ -279,7 +279,20 @@ type RequiredOnInsert<T extends PluginStorageTable> = {
 /** Row as written: generated, defaulted and nullable fields are optional. */
 export type PluginStorageInsert<T extends PluginStorageTable> = RequiredOnInsert<T> & OptionalOnInsert<T>;
 
-/** Operators on one field. */
+/**
+ * Operators on one field. Several operators in one object are combined with AND; an empty object is refused.
+ *
+ * Operands are checked for their type and form only (a string, a safe integer, a decimal string, a valid Date, a
+ * `YYYY-MM-DD` day, a boolean), never against the column's limits: a string longer than the field, a decimal with
+ * more fraction digits than the scale or a malformed UUID is a valid operand that compares exactly (an `eq` then
+ * matches nothing). `null` is only an operand of `eq`/`ne` (same as `isNull`); inside `in`/`notIn` and for the other
+ * operators it is refused: combine with `isNull` through `or` instead.
+ *
+ * SQL three-valued logic applies: a row whose field is NULL never matches `ne`, `notIn`, `lt`... or a `not` around
+ * them. `in: []` matches nothing; `notIn: []` matches every row with a value. Booleans support eq, ne, in, notIn and
+ * isNull, not the ordering operators; JSON fields only `isNull` (and `eq: null`). `startsWith` compares
+ * case-sensitively, by characters.
+ */
 export interface PluginStorageOperators<V> {
   eq?: V | null;
   ne?: V | null;
@@ -297,7 +310,11 @@ export interface PluginStorageOperators<V> {
 
 type FieldFilter<V> = V | null | PluginStorageOperators<NonNullable<V>>;
 
-/** Structured filter. Several fields in one object are combined with AND. */
+/**
+ * Structured filter. Several keys in one object (fields, `and`, `or`, `not`) are combined with AND. `and: []` is
+ * true, `or: []` is false. An undefined value and a `null` filter (also inside `and`/`or`/`not`) are refused instead
+ * of matching everything. Lists bind one value each: a call may bind at most a backend limit of values (SQLite 32766).
+ */
 export type PluginStorageWhere<Row> =
   | { [K in keyof Row]?: FieldFilter<Row[K]> }
   | { and: ReadonlyArray<PluginStorageWhere<Row>> }
@@ -311,12 +328,16 @@ export interface PluginStorageOrder<Row> {
 
 export interface PluginStorageQuery<Row> {
   where?: PluginStorageWhere<Row>;
+  /**
+   * Sort order; NULL sorts lowest (first ascending, last descending). The primary key ascending always breaks ties,
+   * also without `orderBy`, so pages of a list are stable. Booleans and JSON cannot be ordered.
+   */
   orderBy?: ReadonlyArray<PluginStorageOrder<Row>>;
   limit?: number;
   offset?: number;
 }
 
-/** Value of an update that adds to the stored number atomically: `{ attempts: increment(1) }`. */
+/** Value of an update that adds to the stored number atomically: `{ attempts: increment(1) }`. NULL counts as 0. */
 export interface PluginStorageIncrement {
   readonly increment: number;
 }
@@ -327,7 +348,15 @@ export type PluginStoragePatch<Row> = {
   [K in keyof Row]?: Row[K] | (Row[K] extends number | null ? PluginStorageIncrement : never);
 };
 
-/** Optional last argument of every call. Pass the scope of `context.persistence.transaction` to join it. */
+/**
+ * Optional last argument of every call. Pass the scope of `context.persistence.transaction` to join it.
+ *
+ * Without a scope, a read runs at once and sees committed rows (inside a transaction callback, pass the scope to
+ * see the transaction's own writes), and a write is a transaction of its own that waits for running ones. A write
+ * without scope inside a transaction callback, or inside a hook the host calls in its own transaction, is refused
+ * with PluginStorageInvalid: it would wait for that transaction. A closed scope, or one the host did not hand out,
+ * is refused too. The scope a hook receives for the host's transaction is read-only.
+ */
 export interface PluginStorageCallOptions {
   readonly scope?: PluginTransactionScope;
 }
@@ -339,6 +368,10 @@ export interface PluginStorageCallOptions {
 export interface PluginStorageTableApi<T extends PluginStorageTable> {
   /** Inserts one row and returns it with generated keys and defaults. Throws {@link PluginStorageUniqueViolation}. */
   insert(row: PluginStorageInsert<T>, options?: PluginStorageCallOptions): Promise<PluginStorageRow<T>>;
+  /**
+   * Inserts the rows in order and returns them like {@link insert}. All or nothing: one transaction, with one
+   * statement per row (not one bulk statement), so keep very large imports in batches.
+   */
   insertMany(rows: readonly PluginStorageInsert<T>[], options?: PluginStorageCallOptions): Promise<PluginStorageRow<T>[]>;
   /** Row by primary key (a single value for one-field keys, an object for composite keys), or null. */
   get(key: PluginStorageKey<T>, options?: PluginStorageCallOptions): Promise<PluginStorageRow<T> | null>;
@@ -351,18 +384,21 @@ export interface PluginStorageTableApi<T extends PluginStorageTable> {
   /**
    * Updates every row matching `where` and returns how many changed. The condition is evaluated atomically with the
    * write, so `update({ id, status: 'pending' }, { status: 'confirmed' })` is a compare-and-set: it returns 0 when
-   * another writer got there first. Use it for leases, claims and state machines.
+   * another writer got there first. Use it for leases, claims and state machines. `where` undefined or `{}`
+   * updates EVERY row of the table; `null` is refused.
    */
   update(
     where: PluginStorageWhere<PluginStorageRow<T>>,
     patch: PluginStoragePatch<PluginStorageRow<T>>,
     options?: PluginStorageCallOptions,
   ): Promise<number>;
-  /** Deletes the matching rows and returns how many were removed. */
+  /** Deletes the matching rows and returns how many were removed. `where` undefined or `{}` deletes EVERY row. */
   delete(where: PluginStorageWhere<PluginStorageRow<T>>, options?: PluginStorageCallOptions): Promise<number>;
   /**
    * Inserts the row, or updates the existing one with the same values of `conflictOn` (a declared unique key or
-   * the primary key). `update` lists the fields to overwrite; the default is every field except the key.
+   * the primary key). The row must give a non-null value for every field of `conflictOn`. `update` lists the fields
+   * to overwrite (not key or generated fields); the default is every field except the key and generated fields, so
+   * fields the row omits take their defaults.
    */
   upsert(
     row: PluginStorageInsert<T>,
@@ -414,7 +450,10 @@ export class PluginStorageUniqueViolation extends PluginStorageError {
   }
 }
 
-/** The operation lost a race or hit a busy database. It is safe to retry the whole transaction. */
+/**
+ * The operation lost a race or hit a busy database, and was rolled back. The host does not retry; retrying the whole
+ * call or transaction is safe when its external effects run in `afterCommit`.
+ */
 export class PluginStorageConflict extends PluginStorageError {
   constructor(message = 'The storage is busy; retry the operation.') {
     super(message, 'CONFLICT');

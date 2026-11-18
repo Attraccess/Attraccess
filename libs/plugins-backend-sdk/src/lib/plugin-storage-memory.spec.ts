@@ -81,11 +81,12 @@ describe('createInMemoryPluginStorage: insert and defaults', () => {
     await expect(db.items.insert(row as never)).rejects.toBeInstanceOf(PluginStorageInvalid);
   });
 
-  it('rejects an uppercase uuid and a non-object row', async () => {
+  it('stores a uuid in lowercase, like the host, and rejects a malformed one and a non-object row', async () => {
     const { db } = setup();
-    await expect(db.children.insert({ id: '00000000-0000-4000-8000-00000000000A', label: 'x' })).rejects.toBeInstanceOf(
-      PluginStorageInvalid,
-    );
+    const row = await db.children.insert({ id: '00000000-0000-4000-8000-00000000000A', label: 'x' });
+    expect(row.id).toBe('00000000-0000-4000-8000-00000000000a');
+    expect(await db.children.get('00000000-0000-4000-8000-00000000000A')).toEqual(row);
+    await expect(db.children.insert({ id: 'not-a-uuid', label: 'y' })).rejects.toBeInstanceOf(PluginStorageInvalid);
     await expect(db.items.insert('x' as never)).rejects.toBeInstanceOf(PluginStorageInvalid);
   });
 
@@ -221,11 +222,14 @@ describe('createInMemoryPluginStorage: upsert', () => {
     expect((await db.items.get(1))?.name).toBe('c');
   });
 
-  it('inserts when the conflict key is NULL, and refuses unknown keys and key overwrites', async () => {
+  it('needs a value for the conflict key, and refuses unknown keys and key overwrites', async () => {
     const { db } = setup();
-    await db.items.upsert({ name: 'a' }, { conflictOn: ['sku'] });
-    await db.items.upsert({ name: 'b' }, { conflictOn: ['sku'] });
-    expect(await db.items.count()).toBe(2);
+    await expect(db.items.upsert({ name: 'a' }, { conflictOn: ['sku'] })).rejects.toBeInstanceOf(PluginStorageInvalid);
+    await expect(db.items.upsert({ name: 'a', sku: null }, { conflictOn: ['sku'] })).rejects.toBeInstanceOf(
+      PluginStorageInvalid,
+    );
+    await expect(db.items.upsert({ name: 'a' }, undefined as never)).rejects.toBeInstanceOf(PluginStorageInvalid);
+    expect(await db.items.count()).toBe(0);
     await expect(db.items.upsert({ name: 'a' }, { conflictOn: ['name'] })).rejects.toBeInstanceOf(PluginStorageInvalid);
     await expect(
       db.items.upsert({ name: 'a', sku: 'k' }, { conflictOn: ['sku'], update: ['sku'] }),
@@ -293,5 +297,25 @@ describe('createInMemoryPluginStorage: lifecycle helpers', () => {
     expect(() => fake.storage.open(definition)).not.toThrow();
     expect(PluginStorageNotFound.prototype).toBeInstanceOf(PluginStorageError);
     expect(PluginStorageConflict.prototype).toBeInstanceOf(PluginStorageError);
+  });
+});
+
+describe('createInMemoryPluginStorage: host parity of declarations and ordering', () => {
+  it('refuses the field names the host reserves for combinators and decimals wider than 15 digits', () => {
+    const declare = (fields: Parameters<typeof table>[0]) =>
+      createInMemoryPluginStorage(definePluginStorage({ tables: { t: table(fields) }, migrations: [] }));
+    expect(() => declare({ id: f.id(), or: f.string() })).toThrow(PluginStorageInvalid);
+    expect(() => declare({ id: f.id(), amount: f.decimal(16, 2) })).toThrow(/precision/);
+    expect(() => declare({ id: f.id(), amount: f.decimal(4, 5) })).toThrow(/precision/);
+    expect(() => declare({ id: f.id(), amount: f.decimal(15, 2) })).not.toThrow();
+  });
+
+  it('orders strings by code point, as the engines do, not by UTF-16 unit', async () => {
+    const { db } = setup();
+    // U+FF5E sorts before U+1F600 by code point, after it by UTF-16 unit (0xFF5E > 0xD83D).
+    await db.items.insertMany([{ name: '😀' }, { name: '～' }, { name: 'a' }]);
+    const names = (await db.items.find({ orderBy: [{ field: 'name' }] })).map((row) => row.name);
+    expect(names).toEqual(['a', '～', '😀']);
+    expect(await db.items.count({ name: { gt: '～' } })).toBe(1);
   });
 });

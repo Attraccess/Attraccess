@@ -5,7 +5,7 @@ import {
   type PluginStorageForeignKey,
   type PluginStorageTable,
 } from '../plugin-storage';
-import { normalizeValue } from './values';
+import { MAX_DECIMAL_PRECISION, normalizeValue } from './values';
 
 /** A declared table with the lookups the in-memory engine needs. */
 export interface TableMeta {
@@ -41,9 +41,32 @@ function validateDefaults(table: string, fields: Record<string, PluginStorageFie
   }
 }
 
+/** Combinators of filters: the host refuses them as field names. */
+const RESERVED_FIELDS = new Set(['and', 'or', 'not']);
+
+/** Like the host: decimals are exact up to 15 digits, with 0 <= scale <= precision. */
+function validateField(table: string, name: string, field: PluginStorageField): void {
+  if (RESERVED_FIELDS.has(name)) throw new PluginStorageInvalid(`${table}: the field name "${name}" is reserved.`);
+  if (field.type !== 'decimal') return;
+  const { precision, scale } = field;
+  const valid =
+    Number.isInteger(precision) &&
+    Number.isInteger(scale) &&
+    (precision as number) >= 1 &&
+    (precision as number) <= MAX_DECIMAL_PRECISION &&
+    (scale as number) >= 0 &&
+    (scale as number) <= (precision as number);
+  if (!valid) {
+    throw new PluginStorageInvalid(
+      `${table}.${name}: a decimal needs 1 <= precision <= ${MAX_DECIMAL_PRECISION} and 0 <= scale <= precision.`,
+    );
+  }
+}
+
 function validateTable(name: string, table: PluginStorageTable): TableMeta {
   const fieldNames = Object.keys(table.fields);
   if (fieldNames.length === 0) throw new PluginStorageInvalid(`${name}: a table needs at least one field.`);
+  for (const fieldName of fieldNames) validateField(name, fieldName, table.fields[fieldName]);
   if (table.primaryKey.length === 0) throw new PluginStorageInvalid(`${name}: a table needs a primary key.`);
   requireFields(name, 'the primary key', table.fields, table.primaryKey);
   for (const key of table.primaryKey) {
@@ -59,7 +82,8 @@ function validateTable(name: string, table: PluginStorageTable): TableMeta {
   validateDefaults(name, table.fields);
   return {
     name,
-    fields: table.fields,
+    // Without a prototype, `name in fields` and `fields[name]` only ever see declared fields.
+    fields: Object.assign(Object.create(null), table.fields),
     fieldNames,
     primaryKey: table.primaryKey,
     uniqueKeys: [table.primaryKey, ...table.indexes.filter((index) => index.unique).map((index) => index.fields)],

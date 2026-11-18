@@ -1,6 +1,6 @@
 import { PluginStorageInvalid, type PluginStorageField, type PluginStorageOrder } from '../plugin-storage';
 import type { TableMeta } from './schema';
-import { compareValues, isComparable, normalizeValue, type Row } from './values';
+import { compareValues, isComparable, isOrderable, normalizeValue, type Row } from './values';
 
 /** SQL three-valued logic: a comparison with a NULL value is unknown (null), which a filter does not match. */
 type Tri = boolean | null;
@@ -17,30 +17,31 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> => {
   return proto === Object.prototype || proto === null;
 };
 
-function requireOrdering(ctx: FieldContext, operator: string): void {
-  if (!isComparable(ctx.field)) {
+/** Equality operators (eq, ne, in, notIn) need a comparable type; ordering operators an orderable one. */
+function requireType(ctx: FieldContext, operator: string, ordering: boolean): void {
+  if (!(ordering ? isOrderable(ctx.field) : isComparable(ctx.field))) {
     throw new PluginStorageInvalid(`${ctx.label}: "${operator}" is not supported on ${ctx.field.type} fields.`);
   }
 }
 
 const operand = (ctx: FieldContext, value: unknown) => normalizeValue(ctx.label, ctx.field, value, true);
 
-function ordered(ctx: FieldContext, operator: string, value: unknown, test: (order: number) => boolean) {
-  requireOrdering(ctx, operator);
+function compared(ctx: FieldContext, operator: string, value: unknown, test: (order: number) => boolean) {
+  requireType(ctx, operator, operator !== 'eq' && operator !== 'ne');
   const wanted = operand(ctx, value);
   return (stored: unknown): Tri => (stored === null ? null : test(compareValues(ctx.field, stored, wanted)));
 }
 
-function operandList(ctx: FieldContext, operator: string, values: unknown): unknown[] {
-  requireOrdering(ctx, operator);
+function operandList(ctx: FieldContext, operator: string, values: unknown, ordering: boolean): unknown[] {
+  requireType(ctx, operator, ordering);
   if (!Array.isArray(values)) throw new PluginStorageInvalid(`${ctx.label}: "${operator}" needs an array.`);
   return values.map((value) => operand(ctx, value));
 }
 
+/** SQL again: a NULL value matches neither `in` nor `notIn`; an empty list matches nothing (in), any value (notIn). */
 function membership(ctx: FieldContext, operator: string, values: unknown, negate: boolean) {
-  const wanted = operandList(ctx, operator, values);
+  const wanted = operandList(ctx, operator, values, false);
   return (stored: unknown): Tri => {
-    if (wanted.length === 0) return negate;
     if (stored === null) return null;
     const found = wanted.some((value) => compareValues(ctx.field, stored, value) === 0);
     return negate ? !found : found;
@@ -48,10 +49,10 @@ function membership(ctx: FieldContext, operator: string, values: unknown, negate
 }
 
 function between(ctx: FieldContext, values: unknown) {
-  const [low, high] = operandList(ctx, 'between', values);
   if (!Array.isArray(values) || values.length !== 2) {
     throw new PluginStorageInvalid(`${ctx.label}: "between" needs [low, high].`);
   }
+  const [low, high] = operandList(ctx, 'between', values, true);
   return (stored: unknown): Tri =>
     stored === null ? null : compareValues(ctx.field, stored, low) >= 0 && compareValues(ctx.field, stored, high) <= 0;
 }
@@ -71,12 +72,12 @@ function nullTest(ctx: FieldContext, wanted: unknown) {
 
 type OperatorCompiler = (ctx: FieldContext, value: unknown) => (stored: unknown) => Tri;
 const OPERATORS: Record<string, OperatorCompiler> = {
-  eq: (ctx, value) => (value === null ? nullTest(ctx, true) : ordered(ctx, 'eq', value, (o) => o === 0)),
-  ne: (ctx, value) => (value === null ? nullTest(ctx, false) : ordered(ctx, 'ne', value, (o) => o !== 0)),
-  lt: (ctx, value) => ordered(ctx, 'lt', value, (o) => o < 0),
-  lte: (ctx, value) => ordered(ctx, 'lte', value, (o) => o <= 0),
-  gt: (ctx, value) => ordered(ctx, 'gt', value, (o) => o > 0),
-  gte: (ctx, value) => ordered(ctx, 'gte', value, (o) => o >= 0),
+  eq: (ctx, value) => (value === null ? nullTest(ctx, true) : compared(ctx, 'eq', value, (o) => o === 0)),
+  ne: (ctx, value) => (value === null ? nullTest(ctx, false) : compared(ctx, 'ne', value, (o) => o !== 0)),
+  lt: (ctx, value) => compared(ctx, 'lt', value, (o) => o < 0),
+  lte: (ctx, value) => compared(ctx, 'lte', value, (o) => o <= 0),
+  gt: (ctx, value) => compared(ctx, 'gt', value, (o) => o > 0),
+  gte: (ctx, value) => compared(ctx, 'gte', value, (o) => o >= 0),
   in: (ctx, value) => membership(ctx, 'in', value, false),
   notIn: (ctx, value) => membership(ctx, 'notIn', value, true),
   between,
@@ -109,7 +110,7 @@ function or(predicates: readonly Predicate[]): Predicate {
 }
 
 function compileFieldFilter(meta: TableMeta, name: string, filter: unknown): Predicate {
-  const field = meta.fields[name];
+  const field = Object.hasOwn(meta.fields, name) ? meta.fields[name] : undefined;
   if (!field) throw new PluginStorageInvalid(`${meta.name}: unknown field "${name}" in a filter.`);
   const ctx: FieldContext = { label: `${meta.name}.${name}`, field };
   if (filter === undefined) {
@@ -125,47 +126,81 @@ function compileFieldFilter(meta: TableMeta, name: string, filter: unknown): Pre
   return and(tests.map((test) => (row: Row) => test(row[name])));
 }
 
-function compileList(meta: TableMeta, key: string, nodes: unknown): Predicate[] {
+const MAX_FILTER_DEPTH = 16;
+
+function compileList(meta: TableMeta, key: string, nodes: unknown, depth: number): Predicate[] {
   if (!Array.isArray(nodes)) throw new PluginStorageInvalid(`${meta.name}: "${key}" needs an array of filters.`);
-  return nodes.map((node) => compileWhere(meta, node));
+  return nodes.map((node) => compileNode(meta, node, depth + 1));
 }
 
-/** Compiles a structured filter into a predicate. Rejects undeclared fields and unsupported operators. */
+/** One key of a filter object: a combinator (`and`, `or`, `not`; never field names) or a field condition. */
+function compileKey(meta: TableMeta, key: string, value: unknown, depth: number): Predicate {
+  if (key === 'and') return and(compileList(meta, key, value, depth));
+  if (key === 'or') return or(compileList(meta, key, value, depth));
+  if (key === 'not') {
+    const inner = compileNode(meta, value, depth + 1);
+    return (row) => {
+      const result = inner(row);
+      return result === null ? null : !result;
+    };
+  }
+  return compileFieldFilter(meta, key, value);
+}
+
+function compileNode(meta: TableMeta, where: unknown, depth: number): Predicate {
+  if (depth > MAX_FILTER_DEPTH) throw new PluginStorageInvalid(`${meta.name}: the filter is nested too deeply.`);
+  if (!isPlainObject(where)) throw new PluginStorageInvalid(`${meta.name}: a filter must be an object.`);
+  return and(Object.keys(where).map((key) => compileKey(meta, key, where[key], depth)));
+}
+
+/**
+ * Compiles a structured filter into a predicate. Rejects undeclared fields and unsupported operators. A missing
+ * filter (or `{}`) matches every row; `null` and other non-objects are rejected at every level. Combinators and
+ * field conditions of one object are combined with AND.
+ */
 export function compileWhere(meta: TableMeta, where: unknown): Predicate {
   if (where === undefined) return () => true;
-  if (!isPlainObject(where)) throw new PluginStorageInvalid(`${meta.name}: a filter must be an object.`);
-  const keys = Object.keys(where);
-  const [only] = keys;
-  if (keys.length === 1 && !(only in meta.fields)) {
-    if (only === 'and') return and(compileList(meta, only, where[only]));
-    if (only === 'or') return or(compileList(meta, only, where[only]));
-    if (only === 'not') {
-      const inner = compileWhere(meta, where[only]);
-      return (row) => {
-        const value = inner(row);
-        return value === null ? null : !value;
-      };
-    }
-  }
-  return and(keys.map((key) => compileFieldFilter(meta, key, where[key])));
+  return compileNode(meta, where, 0);
 }
 
 export function matches(predicate: Predicate, row: Row): boolean {
   return predicate(row) === true;
 }
 
-/** Orders rows by the given fields. NULL sorts first ascending (and last descending); ties keep insertion order. */
+interface OrderKey {
+  readonly name: string;
+  readonly field: PluginStorageField;
+  readonly sign: number;
+}
+
+function orderKey(meta: TableMeta, order: unknown): OrderKey {
+  const { field: name, direction } = (order ?? {}) as { field?: string; direction?: unknown };
+  const field = typeof name === 'string' && Object.hasOwn(meta.fields, name) ? meta.fields[name] : undefined;
+  if (!field) throw new PluginStorageInvalid(`${meta.name}: cannot order by the unknown field "${String(name)}".`);
+  if (!isOrderable(field))
+    throw new PluginStorageInvalid(`${meta.name}.${name}: cannot order by a ${field.type} field.`);
+  if (direction !== undefined && direction !== 'asc' && direction !== 'desc') {
+    throw new PluginStorageInvalid(`${meta.name}: order direction must be "asc" or "desc".`);
+  }
+  return { name: name as string, field, sign: direction === 'desc' ? -1 : 1 };
+}
+
+/**
+ * Orders rows by the given fields, then by the primary key ascending (as the host does), so the order is total. NULL
+ * sorts first ascending (and last descending). A field listed twice counts once.
+ */
 export function compileOrder(meta: TableMeta, orderBy: ReadonlyArray<PluginStorageOrder<Row>> | undefined) {
-  const keys = (orderBy ?? []).map((order) => {
-    const field = meta.fields[order.field];
-    if (!field) throw new PluginStorageInvalid(`${meta.name}: cannot order by the unknown field "${order.field}".`);
-    if (!isComparable(field))
-      throw new PluginStorageInvalid(`${meta.name}.${order.field}: cannot order by a json field.`);
-    if (order.direction !== undefined && order.direction !== 'asc' && order.direction !== 'desc') {
-      throw new PluginStorageInvalid(`${meta.name}: order direction must be "asc" or "desc".`);
-    }
-    return { name: order.field, field, sign: order.direction === 'desc' ? -1 : 1 };
-  });
+  if (orderBy !== undefined && !Array.isArray(orderBy)) {
+    throw new PluginStorageInvalid(`${meta.name}: orderBy is a list of { field, direction }.`);
+  }
+  const keys: OrderKey[] = [];
+  for (const order of orderBy ?? []) {
+    const key = orderKey(meta, order);
+    if (!keys.some((known) => known.name === key.name)) keys.push(key);
+  }
+  for (const name of meta.primaryKey) {
+    if (!keys.some((known) => known.name === name)) keys.push({ name, field: meta.fields[name], sign: 1 });
+  }
   return (a: Row, b: Row): number => {
     for (const { name, field, sign } of keys) {
       const [left, right] = [a[name], b[name]];

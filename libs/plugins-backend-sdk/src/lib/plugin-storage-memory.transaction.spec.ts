@@ -1,5 +1,5 @@
 import { createInMemoryPluginStorage } from './plugin-storage-memory';
-import { PluginStorageInvalid } from './plugin-storage';
+import { PluginStorageConflict, PluginStorageInvalid } from './plugin-storage';
 import { storage as definition } from './plugin-storage-memory.fixtures';
 
 function setup(options = {}) {
@@ -94,7 +94,7 @@ describe('in-memory plugin storage: transactions', () => {
     expect(fake.afterCommitErrors).toHaveLength(1);
   });
 
-  it('serializes transactions and hides uncommitted data from calls outside', async () => {
+  it('serializes transactions; a read outside sees the committed rows at once, never uncommitted ones', async () => {
     const { db, tx } = setup();
     let release: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => (release = resolve));
@@ -107,8 +107,9 @@ describe('in-memory plugin storage: transactions', () => {
     await new Promise((resolve) => setImmediate(resolve));
     release();
     await first;
-    expect(await outsideRead).toBe(1);
+    expect(await outsideRead).toBe(0);
     expect(await second).toBe(1);
+    expect(await db.items.count()).toBe(1);
   });
 
   it('lets a check-then-write sequence run without interleaving', async () => {
@@ -127,8 +128,10 @@ describe('in-memory plugin storage: transactions', () => {
     let ended: Parameters<Parameters<typeof tx>[0]>[0] | undefined;
     await tx(async (scope) => {
       ended = scope;
-      await expect(tx(async () => undefined)).rejects.toThrow(/inside another/);
-      await expect(db.items.count()).rejects.toBeInstanceOf(PluginStorageInvalid);
+      await expect(tx(async () => undefined)).rejects.toThrow(/inside a transaction callback/);
+      await expect(db.items.insert({ name: 'unscoped' })).rejects.toBeInstanceOf(PluginStorageInvalid);
+      // A read without the scope is allowed; pass the scope to see the transaction's own writes.
+      await expect(db.items.count()).resolves.toBe(0);
     });
     expect(ended?.isOpen).toBe(false);
     await expect(db.items.count(undefined, { scope: ended })).rejects.toBeInstanceOf(PluginStorageInvalid);
@@ -151,5 +154,34 @@ describe('in-memory plugin storage: transactions', () => {
     await tx(async (scope) => {
       await expect(db.items.get({ nope: 1 } as never, { scope })).rejects.toBeInstanceOf(PluginStorageInvalid);
     });
+  });
+
+  it('simulates a conflict: the transaction rolls back, skips afterCommit and rejects with PluginStorageConflict', async () => {
+    let conflicts = 1;
+    const { db, tx, fake } = setup({ conflictOnCommit: () => conflicts-- > 0 });
+    const after = jest.fn();
+    const attempt = () =>
+      tx(async (scope) => {
+        await db.items.insert({ name: 'retried' }, { scope });
+        scope.afterCommit(after);
+      });
+    await expect(attempt()).rejects.toBeInstanceOf(PluginStorageConflict);
+    expect(after).not.toHaveBeenCalled();
+    expect(fake.rows('items')).toEqual([]);
+    // A caller's own retry succeeds; the fake, like the host, never retries by itself.
+    await attempt();
+    expect(after).toHaveBeenCalledTimes(1);
+    expect(fake.rows('items').map((row) => row['name'])).toEqual(['retried']);
+  });
+
+  it('shows the committed rows in rows() while a transaction is open', async () => {
+    const { db, tx, fake } = setup();
+    let seen: unknown[] = [];
+    await tx(async (scope) => {
+      await db.items.insert({ name: 'pending' }, { scope });
+      seen = fake.rows('items');
+    });
+    expect(seen).toEqual([]);
+    expect(fake.rows('items')).toHaveLength(1);
   });
 });

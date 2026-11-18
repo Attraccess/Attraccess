@@ -1,6 +1,6 @@
 import type { Row } from './values';
 
-interface Snapshot {
+export interface Snapshot {
   readonly rows: ReadonlyMap<string, readonly Row[]>;
   readonly counters: ReadonlyMap<string, number>;
 }
@@ -42,6 +42,13 @@ export class StorageState {
       rows: new Map([...this.rows].map(([name, rows]) => [name, rows.slice()])),
       counters: new Map(this.counters),
     };
+  }
+
+  /** A separate state holding a snapshot (the committed rows while a transaction runs). */
+  static of(snapshot: Snapshot): StorageState {
+    const state = new StorageState([]);
+    state.restore(snapshot);
+    return state;
   }
 
   restore(snapshot: Snapshot): void {

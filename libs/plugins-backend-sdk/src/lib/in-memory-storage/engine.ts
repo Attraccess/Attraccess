@@ -158,10 +158,10 @@ export class RecordEngine {
     }
     if (field.type !== 'integer') throw new PluginStorageInvalid(`${label}: increment is for integer fields only.`);
     const by = normalizeValue(`${label} increment`, field, value.increment) as number;
+    // Like the host's COALESCE(column, 0) + step: a NULL counts as 0.
     return (row) => {
-      const current = row[name] as number | null;
-      const next = current === null ? null : current + by;
-      if (next !== null && !Number.isSafeInteger(next)) throw new PluginStorageInvalid(`${label} overflowed.`);
+      const next = ((row[name] as number | null) ?? 0) + by;
+      if (!Number.isSafeInteger(next)) throw new PluginStorageInvalid(`${label} overflowed.`);
       return { [name]: next };
     };
   }
@@ -176,18 +176,17 @@ export class RecordEngine {
     });
   }
 
-  upsert(table: string, input: unknown, conflictOn: readonly string[], update?: readonly string[]): Row {
+  upsert(table: string, input: unknown, conflictOn: unknown, update?: unknown): Row {
     const meta = this.meta(table);
     this.assertConflictKey(meta, conflictOn);
-    const refreshed =
-      update ?? meta.fieldNames.filter((name) => !conflictOn.includes(name) && !meta.fields[name].generated);
-    for (const name of refreshed) {
-      if (!meta.fields[name] || meta.fields[name].generated || conflictOn.includes(name)) {
-        throw new PluginStorageInvalid(`${meta.name}: "${name}" cannot be overwritten by an upsert.`);
-      }
-    }
+    const refreshed = this.refreshedFields(meta, conflictOn, update);
     return this.atomic(() => {
       const candidate = this.buildRow(meta, input);
+      for (const name of conflictOn) {
+        if ((input as Row)[name] === undefined || candidate[name] === null) {
+          throw new PluginStorageInvalid(`${meta.name}: upsert needs a value for the key field "${name}".`);
+        }
+      }
       const existing = this.state
         .table(table)
         .find((row) =>
@@ -207,7 +206,26 @@ export class RecordEngine {
     });
   }
 
-  private assertConflictKey(meta: TableMeta, conflictOn: readonly string[]): void {
+  /** The fields an upsert overwrites on conflict: `update`, or every plain field outside the key. */
+  private refreshedFields(meta: TableMeta, conflictOn: readonly string[], update: unknown): readonly string[] {
+    if (update !== undefined && !Array.isArray(update)) {
+      throw new PluginStorageInvalid(`${meta.name}: upsert's update is a list of fields.`);
+    }
+    const refreshed =
+      (update as string[] | undefined) ??
+      meta.fieldNames.filter((name) => !conflictOn.includes(name) && !meta.fields[name].generated);
+    for (const name of refreshed) {
+      if (!meta.fields[name] || meta.fields[name].generated || conflictOn.includes(name)) {
+        throw new PluginStorageInvalid(`${meta.name}: "${name}" cannot be overwritten by an upsert.`);
+      }
+    }
+    return refreshed;
+  }
+
+  private assertConflictKey(meta: TableMeta, conflictOn: unknown): asserts conflictOn is readonly string[] {
+    if (!Array.isArray(conflictOn) || conflictOn.length === 0) {
+      throw new PluginStorageInvalid(`${meta.name}: upsert needs conflictOn, the fields of a unique key.`);
+    }
     const known = meta.uniqueKeys.some(
       (key) => key.length === conflictOn.length && key.every((name) => conflictOn.includes(name)),
     );
@@ -222,8 +240,11 @@ export class RecordEngine {
    * Reads
    * ----------------------------------------------------------------------------------------------------- */
 
-  select(table: string, query: PluginStorageQuery<Row> = {}): Row[] {
+  select(table: string, query: PluginStorageQuery<Row> | null = {}): Row[] {
     const meta = this.meta(table);
+    // Like the host: a missing query is an empty one.
+    query ??= {};
+    if (typeof query !== 'object') throw new PluginStorageInvalid(`${meta.name}: a query is an object.`);
     const predicate = compileWhere(meta, query.where);
     const compare = compileOrder(meta, query.orderBy);
     const { limit, offset } = query;
@@ -255,10 +276,15 @@ export class RecordEngine {
     if (!isObject && pk.length !== 1) {
       throw new PluginStorageInvalid(`${meta.name}: the primary key is composite; pass an object.`);
     }
-    const where = (isObject ? key : { [pk[0]]: key }) as Row;
-    const given = Object.keys(where);
-    if (given.length !== pk.length || !pk.every((name) => given.includes(name))) {
-      throw new PluginStorageInvalid(`${meta.name}: get needs exactly the primary key (${pk.join(', ')}).`);
+    if (!isObject) return this.select(table, { where: { [pk[0]]: key } })[0] ?? null;
+    // Like the host: the key fields of the object count, other fields are ignored.
+    const where: Row = {};
+    for (const name of pk) {
+      const value = (key as Row)[name];
+      if (value === undefined || value === null) {
+        throw new PluginStorageInvalid(`${meta.name}: the key needs the field "${name}".`);
+      }
+      where[name] = value;
     }
     return this.select(table, { where })[0] ?? null;
   }
