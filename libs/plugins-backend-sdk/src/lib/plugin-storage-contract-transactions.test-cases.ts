@@ -114,8 +114,24 @@ export function describeStorageContractTransactions(open: OpenSide, queuesWrites
           await side.items.insert({ name: slot }, { scope });
           return true;
         });
-      const results = await Promise.all(Array.from({ length: 8 }, () => book('tx-race')));
-      expect(results.filter(Boolean)).toHaveLength(1);
+      if (queuesWrites) {
+        const results = await Promise.all(Array.from({ length: 8 }, () => book('tx-race')));
+        expect(results.filter(Boolean)).toHaveLength(1);
+        return;
+      }
+      // Transactions run in parallel: a caller that passed the same check loses at the unique key (or is asked to
+      // retry), but the slot is never booked twice.
+      const results = await Promise.allSettled(Array.from({ length: 8 }, () => book('tx-race')));
+      expect(results.filter((result) => result.status === 'fulfilled' && result.value)).toHaveLength(1);
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          expect(result.reason).toBeInstanceOf(Error);
+          expect(['PluginStorageUniqueViolation', 'PluginStorageConflict']).toContain(
+            (result.reason as Error).constructor.name,
+          );
+        }
+      }
+      expect(await side.items.count({ name: 'tx-race' })).toBe(1);
     });
 
     it('lets a read without scope run at once and see only committed rows while a transaction is open', async () => {

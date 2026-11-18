@@ -140,7 +140,12 @@ export class PostgresAuditStore implements AuditStore {
       migrationsRun: false,
       migrations: [],
       logging: false,
-      extra: { ...(options.extra ?? {}), max: 3 },
+      // A durable write is acknowledged after the commit reached the disk, whatever the server default is.
+      extra: {
+        ...(options.extra ?? {}),
+        max: 3,
+        options: `${(options.extra as { options?: string } | undefined)?.options ?? ''} -c synchronous_commit=on`.trim(),
+      },
     });
     try {
       await storage.initialize();
