@@ -24,7 +24,7 @@ Plugin Bluetooth works only on [paired readers](attractap/pairing.md), which tal
 > [!IMPORTANT]
 > The radio link between the reader and the device has **no Bluetooth-level security**. The reader firmware is built without BLE security (`CONFIG_BT_NIMBLE_SECURITY_ENABLE` is off): it never pairs or bonds with a device, and the BLE link is not encrypted. Anyone in radio range can record the traffic. If payloads are sensitive (user codes, keys, unlock commands), your plugin must encrypt and authenticate them itself, for example with the device's own protocol security.
 
-Administrators stay in control: a reader is closed to plugins by default. An administrator enables **Allow plugins to use Bluetooth** in the reader editor (General tab). Turning it off ends all plugin BLE sessions on that reader immediately; existing endpoints stay, but scans, new endpoints and sessions fail with `READER_ACCESS_DENIED`.
+Administrators stay in control: a reader is closed to plugins by default (an [Attractap BLE Bridge](attractap/ble-bridge.md) starts open, see below). An administrator enables **Allow plugins to use Bluetooth** in the reader editor (General tab). Turning it off ends all plugin BLE sessions on that reader immediately; existing endpoints stay, but scans, new endpoints and sessions fail with `READER_ACCESS_DENIED`.
 
 > [!WARNING]
 > `BLE_TRANSPORT` does not fence off the escape hatches of other permissions. A plugin has no database access, so it cannot read the endpoint table directly, but `RESOLVE_HOST_PROVIDERS` (`context.get`) can reach internal host services. Only install plugins you trust with that permission. The `plugin_ble_endpoint` rows belong to the host: use `context.ble` instead of any other route. Never use `context.get` to reach the BLE transport either: that skips every check on this page.
@@ -106,6 +106,12 @@ const advertisements = await ble.scan(readers[0].readerId, 'door-lock', {
 A reader runs **one BLE job at a time**: one scan or one session, for all plugins together. A `scan` or `openSession` while another scan or session uses the reader rejects at once with `READER_BUSY` (retryable). Nothing is queued. A scan returns at most 32 advertisements, deduplicated by address (on the reader and again in the host).
 
 `scan` has a host-side deadline: if the transport does not answer within `durationMs` plus 5 s, it rejects with `TIMEOUT`. Advertisements the reader reports in a malformed form are skipped; they do not fail the scan.
+
+### BLE bridges
+
+An [Attractap BLE Bridge](attractap/ble-bridge.md) is a headless reader on a GL.iNet GL-S10 that only relays Bluetooth, for places where no Attractap reader is near the device. The host treats it as a reader with the Bluetooth capability: it is listed by `listReaders` and wherever readers with **Allow plugins to use Bluetooth** appear, and your plugin uses it exactly like a reader. No code change is needed. A bridge starts with **Allow plugins to use Bluetooth** on; an administrator can turn it off like on any reader.
+
+Like a reader, a bridge holds **one BLE connection at a time**. It runs on a classic ESP32 where Wi-Fi and Bluetooth share one radio: over Wi-Fi, throughput and range are lower than over Ethernet, so a chunked transfer takes longer. Show the RSSI to administrators so they can place the bridge close enough to the device.
 
 ## Advertisement watch
 

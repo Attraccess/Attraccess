@@ -24,7 +24,7 @@ Plugin-Bluetooth funktioniert nur an [gekoppelten Readern](attractap/pairing.md)
 > [!IMPORTANT]
 > Die Funkverbindung zwischen Reader und Gerät hat **keine Sicherheit auf Bluetooth-Ebene**. Die Reader-Firmware ist ohne BLE-Sicherheit gebaut (`CONFIG_BT_NIMBLE_SECURITY_ENABLE` ist aus): Sie koppelt sich nie mit einem Gerät (kein Pairing, kein Bonding), und die BLE-Verbindung ist nicht verschlüsselt. Jeder in Funkreichweite kann den Verkehr mitschneiden. Sind Nutzdaten sensibel (Benutzercodes, Schlüssel, Entsperrbefehle), muss Ihr Plugin sie selbst verschlüsseln und authentifizieren, zum Beispiel mit der Sicherheit des Geräteprotokolls.
 
-Administratoren behalten die Kontrolle: Ein Reader ist für Plugins standardmäßig gesperrt. Ein Administrator aktiviert **Bluetooth-Nutzung durch Plugins erlauben** im Reader-Editor (Tab Allgemein). Beim Ausschalten enden alle BLE-Sitzungen von Plugins auf diesem Reader sofort; vorhandene Endpunkte bleiben bestehen, aber Scans, neue Endpunkte und Sitzungen scheitern mit `READER_ACCESS_DENIED`.
+Administratoren behalten die Kontrolle: Ein Reader ist für Plugins standardmäßig gesperrt (eine [Attractap BLE Bridge](attractap/ble-bridge.md) ist von Anfang an freigegeben, siehe unten). Ein Administrator aktiviert **Bluetooth-Nutzung durch Plugins erlauben** im Reader-Editor (Tab Allgemein). Beim Ausschalten enden alle BLE-Sitzungen von Plugins auf diesem Reader sofort; vorhandene Endpunkte bleiben bestehen, aber Scans, neue Endpunkte und Sitzungen scheitern mit `READER_ACCESS_DENIED`.
 
 > [!WARNING]
 > `BLE_TRANSPORT` sperrt die Hintertüren anderer Berechtigungen nicht. Ein Plugin hat keinen Datenbankzugriff und kann die Endpunkt-Tabelle daher nicht direkt lesen, aber `RESOLVE_HOST_PROVIDERS` (`context.get`) erreicht interne Host-Dienste. Installieren Sie nur Plugins, denen Sie diese Berechtigung anvertrauen. Die Zeilen von `plugin_ble_endpoint` gehören dem Host: Nutzen Sie `context.ble` und keinen anderen Weg. Nutzen Sie `context.get` auch nie, um an den BLE-Transport zu gelangen: Damit umgehen Sie alle Prüfungen dieser Seite.
@@ -106,6 +106,12 @@ const advertisements = await ble.scan(readers[0].readerId, 'door-lock', {
 Ein Reader erledigt **eine BLE-Aufgabe zur Zeit**: einen Scan oder eine Sitzung, für alle Plugins zusammen. Ein `scan` oder `openSession`, während ein anderer Scan oder eine andere Sitzung den Reader nutzt, endet sofort mit `READER_BUSY` (wiederholbar). Es gibt keine Warteschlange. Ein Scan liefert höchstens 32 Advertisements, nach Adresse dedupliziert (auf dem Reader und noch einmal im Host).
 
 `scan` hat eine Frist im Host: Antwortet der Transport nicht innerhalb von `durationMs` plus 5 s, endet der Scan mit `TIMEOUT`. Advertisements, die der Reader fehlerhaft meldet, werden übersprungen; sie lassen den Scan nicht scheitern.
+
+### BLE-Bridges
+
+Eine [Attractap BLE Bridge](attractap/ble-bridge.md) ist ein Reader ohne Display auf einem GL.iNet GL-S10, der nur Bluetooth weiterleitet, für Orte, an denen kein Attractap-Reader in der Nähe des Geräts hängt. Der Host behandelt sie als Reader mit Bluetooth-Fähigkeit: Sie erscheint in `listReaders` und überall dort, wo Reader mit **Bluetooth-Nutzung durch Plugins erlauben** aufgeführt sind, und Ihr Plugin nutzt sie genau wie einen Reader. Eine Codeänderung ist nicht nötig. Bei einer Bridge ist **Bluetooth-Nutzung durch Plugins erlauben** von Anfang an eingeschaltet; ein Administrator kann es wie bei jedem Reader ausschalten.
+
+Wie ein Reader hält eine Bridge **eine BLE-Verbindung zur Zeit**. Sie läuft auf einem klassischen ESP32, bei dem sich WLAN und Bluetooth ein Funkmodul teilen: Über WLAN sind Datenrate und Reichweite geringer als über Ethernet, eine Übertragung in Blöcken dauert also länger. Zeigen Sie Administratoren den RSSI-Wert an, damit sie die Bridge nah genug am Gerät platzieren können.
 
 ## Advertisement-Beobachtung
 
