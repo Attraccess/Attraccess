@@ -12,10 +12,23 @@ import {
   sqliteHostTransactionScope,
 } from '../../sqlite/plugin-storage/sqlite-plugin-storage';
 import { registerPersistenceErrorClassifier } from '../../persistence-errors';
-import { migratedTemplate, openSqlite } from '../ports/sqlite-port.test-fixture';
+import { migratedTemplate } from '../ports/sqlite-port.test-fixture';
 import type { StorageBackendFixture, StorageConnection, StorageDatabase } from './storage-fixture';
 
 const quote = (name: string) => `"${name.replace(/"/g, '""')}"`;
+
+/** A host connection to `file`, as the application opens it; `busyTimeout` replaces the default wait for the lock. */
+const openSqlite = (file: string, busyTimeout?: number) =>
+  sqliteBackend
+    .createDataSource({
+      type: 'sqlite',
+      database: file,
+      busyTimeout,
+      entities: sqliteBackend.entities,
+      migrations: sqliteBackend.migrationTrack.migrations,
+      migrationsTableName: sqliteBackend.migrationTrack.tableName,
+    } as DataSourceOptions)
+    .initialize();
 
 /** Real SQLite files, one DataSource (own handle, own unit of work and write queue) per `connect()`. */
 export const sqliteStorageFixture: StorageBackendFixture = {
@@ -26,8 +39,8 @@ export const sqliteStorageFixture: StorageBackendFixture = {
     const file = join(directory, 'storage.sqlite');
     await copyFile(await migratedTemplate(), file);
     const sources: DataSource[] = [];
-    const open = async () => {
-      const source = await openSqlite(file);
+    const open = async (busyTimeout?: number) => {
+      const source = await openSqlite(file, busyTimeout);
       sources.push(source);
       return source;
     };
@@ -42,8 +55,8 @@ export const sqliteStorageFixture: StorageBackendFixture = {
     return {
       engine,
       coreTables: () => core,
-      async connect(): Promise<StorageConnection> {
-        const source = await open();
+      async connect(options = {}): Promise<StorageConnection> {
+        const source = await open(options.busyTimeoutMs);
         const unitOfWork = sqliteBackend.createUnitOfWork(source);
         const host = createSqlitePluginPersistenceHost(() => source);
         return {
@@ -105,6 +118,15 @@ export const sqliteStorageFixture: StorageBackendFixture = {
       },
       async execute(sql) {
         await query(sql);
+      },
+      async holdWriteLock() {
+        // A plain connection, outside the host's flow guards: it only takes and holds the file's write lock.
+        const holder = await new DataSource({ type: 'sqlite', database: file }).initialize();
+        await holder.query('BEGIN IMMEDIATE');
+        return async () => {
+          await holder.query('ROLLBACK');
+          await holder.destroy();
+        };
       },
       async seedResource(name) {
         const resource = await primary.getRepository(Resource).save({ name, type: ResourceType.Machine });

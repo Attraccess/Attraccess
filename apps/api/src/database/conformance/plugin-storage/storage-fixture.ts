@@ -36,7 +36,8 @@ export interface ColumnInfo {
  * assertions. ATT-584 adds a PostgreSQL fixture next to the SQLite one; the suite stays as it is.
  */
 export interface StorageDatabase {
-  connect(): Promise<StorageConnection>;
+  /** `busyTimeoutMs` bounds how long the connection waits for another one's write lock (default: the host's). */
+  connect(options?: { busyTimeoutMs?: number }): Promise<StorageConnection>;
   /** The migration engine of the backend, on its own short-lived connections. */
   readonly engine: PluginMigrationEngine;
   /** Tables the host's own schema owns (lowercase). */
@@ -56,6 +57,11 @@ export interface StorageDatabase {
   committed(sql: string): Promise<Array<Record<string, unknown>>>;
   /** A statement in the engine's own syntax, for building states the host itself no longer creates (1.x tables). */
   execute(sql: string): Promise<void>;
+  /**
+   * Takes the database's write lock on a plain connection outside the host and holds it until the returned release
+   * is called: every writer of the host waits for it, up to its busy timeout.
+   */
+  holdWriteLock(): Promise<() => Promise<void>>;
   /** A core resource, committed. Returns its id. */
   seedResource(name: string): Promise<number>;
   close(): Promise<void>;
