@@ -317,6 +317,8 @@ describe('rollback from the history page', () => {
     const publish = screen.getByRole('button', { name: 'Publish rollback as new revision' });
     expect(publish.hasAttribute('disabled')).toBe(true);
     fireEvent.click(publish);
+    // Let a mutation that might have started reach its request before checking that none did.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(api.rollback).not.toHaveBeenCalled();
   });
 

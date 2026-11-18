@@ -21,9 +21,9 @@ through `acceptance/commissioning/browser.spec.ts`. It executes one journey at
 each viewport size: `CommissioningDesktop` (1440x1000) and `CommissioningMobile`
 (390x844), for two Python tests.
 
-This harness permits selected requests to its runner-owned ephemeral loopback API. It uses production commissioning
-controllers/services with an in-memory database and fixture device/enrollment
-transports. Unknown endpoints and other origins are blocked. It does not use a
+This harness permits selected requests to its runner-owned ephemeral loopback API.
+It uses production commissioning controllers/services with an in-memory database
+and fixture device/enrollment transports. Unknown endpoints and other origins are blocked. It does not use a
 shared database, broker or device, host login, or plugin federation. The fixture
 closes its application/database and removes its temporary directory. The static
 build and owned acceptance API are not development servers; if a development
@@ -93,5 +93,5 @@ failures for that tested snapshot. It predates the subsequent host-supervisor,
 identity/descriptor and containment security changes. It does not verify those
 changes or hardware; rerun against the final source and retain a new snapshot
 record. The former two-error baseline documentation was corrected after validation.
-The configuration browser suite counted above was removed with the old configuration
+The configuration tests among those 35 were removed with the old configuration
 editor (ATT-1216).

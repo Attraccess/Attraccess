@@ -66,8 +66,8 @@ export function isBuildCandidate(path) {
 // never build, package or deploy what ships, so
 // their configuration, e.g. a test target's cache inputs, can change without a runtime release.
 const checkOnlyTarget = /^(?:test|lint|typecheck|crap-score|pack-test)(?:-|$)/;
-// `fleet-acceptance` only runs other targets in sequence as the composed release gate; its own command list builds
-// nothing that ships.
+// `fleet-acceptance` is the manual composed release gate: it runs other targets in sequence, no pipeline or target
+// depends on it, and the runtime build targets it runs are gated on their own.
 const checkOnlyTargets = new Set(['fleet-acceptance']);
 // The plugin's `build` target only assembles the npm package: it copies package.json, plugin.json and LICENSE.md next
 // to the bundles built by build-backend and build-frontend. It never builds the CC100 runtime (build-runtime and
