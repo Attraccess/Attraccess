@@ -227,8 +227,12 @@ export function describePluginStorageLifecycle(fixture: StorageBackendFixture): 
 
         expect(await db.engine.migrate(compile(adoptingV1))).toEqual({ pending: [], adopt: true });
 
-        // Nothing but the version table was added.
-        expect((await db.snapshot()).startsWith(before.split('\n')[0])).toBe(true);
+        // Nothing but the version table was added: every other object and row is exactly as 1.x left it.
+        expect(before).not.toContain(VERSIONS);
+        expect(await db.snapshot({ except: [VERSIONS] })).toBe(before);
+        expect(await db.committed(`SELECT "version", "source" FROM "${VERSIONS}"`)).toEqual([
+          { version: 1, source: 'adopted' },
+        ]);
         const side = await db.connect();
         const { items } = openItems(side, compile(adoptingV1), adoptingV1);
         expect(await items.findOne({ where: { name: 'adopted-row' } })).toMatchObject({

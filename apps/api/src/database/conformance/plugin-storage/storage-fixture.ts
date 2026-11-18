@@ -44,8 +44,11 @@ export interface StorageDatabase {
   tables(): Promise<string[]>;
   columns(table: string): Promise<ColumnInfo[]>;
   indexes(table: string): Promise<string[]>;
-  /** Every table that is not part of the host schema, rows included: equal before and after a refusal. */
-  snapshot(): Promise<string>;
+  /**
+   * Every table that is not part of the host schema with its indexes and rows: equal before and after a refusal.
+   * `except` leaves out the named tables and their indexes (a plugin's version bookkeeping, for an adoption).
+   */
+  snapshot(options?: { readonly except?: readonly string[] }): Promise<string>;
   /**
    * Rows as another process would read them: on a plain connection outside the host's flow guards, so uncommitted
    * writes of a running transaction are invisible. `sql` is in the engine's own syntax.

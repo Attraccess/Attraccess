@@ -77,14 +77,16 @@ export const sqliteStorageFixture: StorageBackendFixture = {
         );
         return rows.map((row) => String(row.name)).sort();
       },
-      async snapshot() {
+      async snapshot(options = {}) {
         const objects = await query(
-          `SELECT type, name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name`,
+          `SELECT type, name, tbl_name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name`,
         );
+        const except = new Set((options.except ?? []).map((name) => name.toLowerCase()));
         const lines: string[] = [];
         for (const object of objects) {
           const name = String(object.name);
-          if (core.has(name.toLowerCase()) || (object.type !== 'table' && !/plugin|conf/i.test(name))) continue;
+          const owner = String(object.tbl_name).toLowerCase();
+          if (core.has(owner) || except.has(owner)) continue;
           lines.push(`${object.type} ${name}: ${String(object.sql)}`);
           if (object.type === 'table') {
             lines.push(JSON.stringify(await query(`SELECT * FROM ${quote(name)} ORDER BY rowid`)));
