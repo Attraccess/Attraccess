@@ -1,13 +1,15 @@
-import type { PluginStorageMigrationStep } from '@attraccess/plugins-backend-sdk';
+import type { PluginStorageIndex, PluginStorageMigrationStep } from '@attraccess/plugins-backend-sdk';
 import {
-  compileTable,
+  compileTableBase,
   fail,
   namespaceOf,
   physicalTableName,
   type StorageNaming,
   tableSignature,
+  withForeignKeys,
 } from './storage-compile';
 import {
+  type CompiledIndex,
   type CompiledMigration,
   type CompiledPluginStorage,
   type CompiledSchema,
@@ -29,6 +31,7 @@ function compileMigrations(
   naming: StorageNaming,
   declared: unknown,
   headPhysical: ReadonlyMap<string, string>,
+  adopting: boolean,
 ): CompiledMigration[] {
   if (!Array.isArray(declared)) return fail(naming, 'migrations must be a list');
   if (declared.length > MAX_MIGRATIONS) fail(naming, `at most ${MAX_MIGRATIONS} migrations`);
@@ -47,8 +50,10 @@ function compileMigrations(
       fail(naming, `migration ${version}: at most ${MAX_STEPS_PER_MIGRATION} steps`);
     }
     const resolved: ResolvedStep[] = [];
+    // Only version 1 of an adopting definition creates the 1.x tables, which keep their own names.
+    const stepNaming: StorageNaming = { ...naming, adoptable: adopting && version === 1 };
     ((steps as PluginStorageMigrationStep[] | undefined) ?? []).forEach((step, index) => {
-      const applied = applyStep(naming, schema, step, headPhysical, `migration ${version} step ${index + 1}`);
+      const applied = applyStep(stepNaming, schema, step, headPhysical, `migration ${version} step ${index + 1}`);
       resolved.push(applied.resolved);
       schema = applied.schema;
     });
@@ -105,11 +110,14 @@ export function compilePluginStorage(
   definition: unknown,
   options: CompileOptions,
 ): CompiledPluginStorage {
+  const adopting = isRecord(definition) && definition.adoption !== undefined;
+  // The head may carry the adopted names; the migrations decide where they are allowed (version 1 only).
   const naming: StorageNaming = {
     pluginName,
     namespace: namespaceOf(pluginName),
     reservedTables: options.reservedTables,
     siblingNamespaces: options.siblingNamespaces,
+    adoptable: adopting,
   };
   if (!isRecord(definition) || !isRecord(definition.tables))
     return fail(naming, 'use definePluginStorage({ tables, migrations })');
@@ -124,17 +132,11 @@ export function compilePluginStorage(
     if (taken.has(physical.toLowerCase())) fail(naming, `two tables map to "${physical}"`);
     taken.add(physical.toLowerCase());
   }
-  const tables = new Map<string, CompiledTable>();
-  for (const [logical, decl] of Object.entries(definition.tables)) {
-    tables.set(
-      logical,
-      compileTable(naming, logical, decl, headPhysical.get(logical) as string, (name) => headPhysical.get(name)),
-    );
-  }
-
-  const migrations = compileMigrations(naming, definition.migrations, headPhysical);
+  const migrations = compileMigrations(naming, definition.migrations, headPhysical, adopting);
+  const replayed: CompiledSchema = migrations.at(-1)?.schemaAfter ?? new Map();
+  const tables = alignIndexNames(compileHead(naming, definition.tables, headPhysical), definition.tables, replayed);
   if (tables.size > 0 && migrations.length === 0) fail(naming, 'tables are declared but there is no migration');
-  assertHeadMatches(naming, tables, migrations.at(-1)?.schemaAfter ?? new Map());
+  assertHeadMatches(naming, tables, replayed);
 
   const legacy = readLegacy(naming, definition.adoption);
   return {
@@ -146,6 +148,57 @@ export function compilePluginStorage(
     ownedTables: ownedTablesOf(migrations, tables),
     definition,
   };
+}
+
+/** The declared head tables: every table first, then the foreign keys, which may point at any of them. */
+function compileHead(
+  naming: StorageNaming,
+  declared: Record<string, unknown>,
+  headPhysical: ReadonlyMap<string, string>,
+): Map<string, CompiledTable> {
+  const bases = new Map<string, CompiledTable>();
+  for (const [logical, decl] of Object.entries(declared)) {
+    bases.set(logical, compileTableBase(naming, logical, decl, headPhysical.get(logical) as string));
+  }
+  const tables = new Map<string, CompiledTable>();
+  for (const [logical, base] of bases) {
+    tables.set(
+      logical,
+      withForeignKeys(naming, base, declared[logical], (name) => bases.get(name)),
+    );
+  }
+  return tables;
+}
+
+const sameFields = (a: readonly string[], b: readonly string[]) =>
+  a.length === b.length && a.every((name, position) => b[position] === name);
+
+/**
+ * A head index declared without a name has the name the migrations gave it: generated from the fields it was created
+ * on, which a later rename does not change. Named indexes keep their name and must match exactly.
+ */
+function alignIndexNames(
+  head: Map<string, CompiledTable>,
+  declared: Record<string, unknown>,
+  replayed: CompiledSchema,
+): Map<string, CompiledTable> {
+  for (const [logical, table] of head) {
+    const built = replayed.get(logical);
+    if (!built) continue;
+    const declaredIndexes = (declared[logical] as { indexes?: PluginStorageIndex[] }).indexes ?? [];
+    const taken = new Set<CompiledIndex>();
+    const indexes = table.indexes.map((index, position) => {
+      if (declaredIndexes[position]?.name !== undefined) return index;
+      const match = built.indexes.find(
+        (candidate) =>
+          !taken.has(candidate) && candidate.unique === index.unique && sameFields(candidate.fields, index.fields),
+      );
+      if (match) taken.add(match);
+      return match ? { ...index, name: match.name } : index;
+    });
+    head.set(logical, { ...table, indexes });
+  }
+  return head;
 }
 
 function readLegacy(naming: StorageNaming, adoption: unknown): string[] {

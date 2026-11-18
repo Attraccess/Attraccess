@@ -19,7 +19,7 @@ export const itemsV1 = table(
     ref: f.uuid().optional(),
     status: f.string({ length: 20 }).withDefault('new'),
   },
-  { indexes: [{ name: 'IDX_conformance_plugin_name', fields: ['name'], unique: true }] },
+  { indexes: [{ fields: ['name'], unique: true }] },
 );
 
 export const notes = table(
@@ -38,11 +38,11 @@ export const storageV1 = definePluginStorage({
   migrations: [baselineMigration],
 });
 
-const statusIndex = { name: 'IDX_conformance_plugin_status', fields: ['status'] };
+const statusIndex = { fields: ['status'] };
 
 export const itemsV2 = table(
   { ...itemsV1.fields, note: f.text().optional(), legacy: f.string().optional() },
-  { indexes: [...itemsV1.indexes, { name: 'IDX_conformance_plugin_status', fields: ['status'] }] },
+  { indexes: [...itemsV1.indexes, { fields: ['status'] }] },
 );
 
 /** Head of the full history: `note` added, `legacy` added then renamed then dropped, a scratch table created and dropped. */

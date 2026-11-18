@@ -78,7 +78,7 @@ import { createPluginPersistenceHost } from '../database/adapters/plugins/plugin
 import { PLUGIN_HOST_CONNECTION } from './persistence/plugin-host-data.port';
 import type { PluginPersistenceHost } from './persistence/plugin-persistence-host.port';
 import { assertModuleHasNoDatabaseInjection } from './runtime/module-injection';
-import { compileModuleStorage } from './plugin-storage/storage-loader';
+import { compileModuleStorage, storagePluginNames } from './plugin-storage/storage-loader';
 import { claimStorageNames } from './plugin-storage/storage-registry';
 import type { CompiledPluginStorage } from './plugin-storage/storage-model';
 import { PluginLicenseWatcher } from './license/plugin-license-watcher.service';
@@ -269,13 +269,15 @@ export class PluginModule {
 
     const exported = importedModule.default as PluginBackendModule | DynamicModule;
 
-    // The plugin's storage declaration is validated before anything of it is registered or migrated: every table and
-    // index name must stay in the plugin's namespace and the migrations must produce the declared tables. A plugin
-    // that declares storage without PLUGIN_STORAGE, or leaves its namespace, does not load.
+    // The plugin's storage declaration is validated before anything of it is registered: every table and index name
+    // must stay in the plugin's namespace and the migrations must produce the declared tables. A plugin that declares
+    // storage without PLUGIN_STORAGE, or leaves its namespace, does not load. Its names were claimed before its
+    // migrations ran (PluginMigrationService); claiming again is a no-op for the same plugin and covers a boot that
+    // skipped migrations.
     const storage = compileModuleStorage(
       manifest,
       exported as Partial<PluginBackendModule>,
-      PluginService.getPlugins().map((plugin) => plugin.name),
+      storagePluginNames(PluginService.getPlugins()),
     );
     if (storage) claimStorageNames(storage);
 

@@ -22,7 +22,7 @@ const definitions = {
       note: f.string().optional(),
       moment: f.timestamp().optional(),
     },
-    { indexes: [{ name: 'IDX_demo_items_name', fields: ['name'], unique: true }] },
+    { indexes: [{ fields: ['name'], unique: true }] },
   ),
   pairs: table({ a: f.string(), b: f.integer(), v: f.string().optional() }, { primaryKey: ['a', 'b'] }),
   tags: table({ id: f.uuidId(), label: f.string() }),

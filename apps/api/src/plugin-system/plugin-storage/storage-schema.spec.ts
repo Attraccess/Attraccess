@@ -30,7 +30,7 @@ const rejectSteps = (steps: unknown[], message: RegExp) => {
 
 describe('applyStep through compilePluginStorage', () => {
   it('resolves every operation against the schema as it stands', () => {
-    const statusIndex = { name: 'IDX_demo_status', fields: ['status'] };
+    const statusIndex = { fields: ['status'] };
     const head = {
       items: table(
         { id: f.id(), name: f.string({ length: 40 }), status: f.string().withDefault('new') },
@@ -45,8 +45,8 @@ describe('applyStep through compilePluginStorage', () => {
         step.renameColumn('items', 'legacy', 'label'),
         step.dropColumn('items', 'label'),
         step.addIndex('items', statusIndex),
-        step.addIndex('items', { name: 'IDX_demo_temp', fields: ['name'] }),
-        step.dropIndex('items', 'IDX_demo_temp'),
+        step.addIndex('items', { fields: ['name'] }),
+        step.dropIndex('items', 'idx_plugin_demo_items_name'),
         step.createTable('scratch', table({ id: f.id(), label: f.text() })),
         step.dropTable('children'),
       ],
@@ -66,21 +66,19 @@ describe('applyStep through compilePluginStorage', () => {
     const after = compiled.migrations[1].schemaAfter;
     expect([...after.keys()]).toEqual(['items', 'scratch']);
     expect([...(after.get('items')?.fields.keys() ?? [])]).toEqual(['id', 'name', 'status']);
-    expect(after.get('items')?.indexes.map((index) => index.name)).toEqual(['IDX_demo_status']);
+    expect(after.get('items')?.indexes.map((index) => index.name)).toEqual(['idx_plugin_demo_items_status']);
     expect(compiled.ownedTables).toEqual(['plugin_demo_items', 'plugin_demo_children', 'plugin_demo_scratch']);
   });
 
   it('carries a rename through keys, indexes and foreign keys', () => {
     const head = {
-      items: table(
-        { id: f.id(), title: f.string({ length: 40 }) },
-        { indexes: [{ name: 'IDX_demo_title', fields: ['title'] }] },
-      ),
+      items: table({ id: f.id(), title: f.string({ length: 40 }) }, { indexes: [{ fields: ['title'] }] }),
       children,
     };
     const compiled = compileSteps(
       [
-        step.addIndex('items', { name: 'IDX_demo_title', fields: ['name'] }),
+        // The generated name stays the one of the field it was created on.
+        step.addIndex('items', { fields: ['name'] }),
         step.renameColumn('items', 'name', 'title'),
       ],
       head,
@@ -95,21 +93,28 @@ describe('applyStep through compilePluginStorage', () => {
         items: table({ key: f.id(), name: f.string({ length: 40 }) }, { primaryKey: ['key'] }),
         children: table(
           { id: f.id(), parent: f.integer() },
-          { foreignKeys: [{ fields: ['parent'], references: 'items', referencedFields: ['id'] }] },
+          { foreignKeys: [{ fields: ['parent'], references: 'items', referencedFields: ['key'] }] },
         ),
       },
     );
     expect(keys.migrations[1].schemaAfter.get('items')?.primaryKey).toEqual(['key']);
-    expect(keys.migrations[1].schemaAfter.get('children')?.foreignKeys[0].fields).toEqual(['parent']);
+    // The engine rewrites the referencing table's definition; the compiled key follows the renamed parent field.
+    expect(keys.migrations[1].schemaAfter.get('children')?.foreignKeys[0]).toMatchObject({
+      fields: ['parent'],
+      referencedFields: ['key'],
+      referencedColumns: ['key'],
+    });
   });
 
   it('reads an adopted physical name from the step or the head declaration', () => {
     const adopted = table({ id: f.id() }, { physicalName: 'plugin_demo_legacy' });
+    const adoption = { legacyMigrations: ['CreateLegacy1700000000000'] };
     const compiled = compilePluginStorage(
       'demo',
       {
         tables: { adopted },
         migrations: [{ version: 1, name: 'baseline', steps: [step.createTable('adopted', adopted)] }],
+        adoption,
       },
       options,
     );
@@ -120,6 +125,7 @@ describe('applyStep through compilePluginStorage', () => {
       {
         tables: { adopted },
         migrations: [{ version: 1, name: 'baseline', steps: [step.createTable('adopted', table({ id: f.id() }))] }],
+        adoption,
       },
       options,
     );
@@ -217,7 +223,7 @@ describe('applyStep through compilePluginStorage', () => {
       rejectSteps([step.dropColumn('items', 'id')], /field "id" is part of a key or index; drop that first/);
       rejectSteps([step.dropColumn('children', 'itemId')], /field "itemId" is part of a key or index/);
       rejectSteps(
-        [step.addIndex('items', { name: 'IDX_demo_name', fields: ['name'] }), step.dropColumn('items', 'name')],
+        [step.addIndex('items', { fields: ['name'] }), step.dropColumn('items', 'name')],
         /field "name" is part of a key or index/,
       );
     });
@@ -236,16 +242,10 @@ describe('applyStep through compilePluginStorage', () => {
 
   describe('addIndex', () => {
     it('rejects an unknown field, a clashing name and an unknown table', () => {
+      rejectSteps([step.addIndex('items', { fields: ['ghost'] })], /names the unknown field "ghost"/);
       rejectSteps(
-        [step.addIndex('items', { name: 'IDX_demo_x', fields: ['ghost'] })],
-        /names the unknown field "ghost"/,
-      );
-      rejectSteps(
-        [
-          step.addIndex('items', { name: 'IDX_demo_x', fields: ['name'] }),
-          step.addIndex('children', { name: 'idx_demo_X', fields: ['itemId'] }),
-        ],
-        /index "idx_demo_X" exists/,
+        [step.addIndex('items', { fields: ['name'] }), step.addIndex('items', { fields: ['name'] })],
+        /index "idx_plugin_demo_items_name" exists/,
       );
       rejectSteps([step.addIndex('ghosts', { fields: ['name'] })], /unknown table "ghosts"/);
     });
@@ -317,6 +317,7 @@ describe('compilePluginStorage', () => {
           b: table({ id: f.id() }, { physicalName: 'DEMO_X' }),
         },
         migrations: [],
+        adoption: { legacyMigrations: ['CreateX1700000000000'] },
       },
       /two tables map to "DEMO_X"/,
     ],

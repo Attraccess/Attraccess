@@ -13,6 +13,7 @@ import {
   type CompiledTable,
   PluginStorageDeclarationError,
 } from './storage-model';
+import { foreignNamespaceOf, indexNameBody, namespaceMatch } from './storage-namespace';
 import { MAX_DECIMAL_PRECISION, normalizeValue } from './storage-values';
 
 /** Resolution of names for one plugin: the namespace rules every physical identifier must obey. */
@@ -22,10 +23,16 @@ export interface StorageNaming {
   /** Tables and indexes that exist outside the plugin (core tables); a plugin may not claim them. */
   readonly reservedTables: ReadonlySet<string>;
   /**
-   * Namespaces of the other installed plugins. A namespace is a plain name prefix, so the namespace of `qaiso` is a
-   * prefix of the one of `qaiso-extra`: the plugin with the shorter namespace may not take a name inside the longer one.
+   * Namespaces of the other installed plugins with storage. A namespace is a plain name prefix, so the namespace of
+   * `qaiso` is a prefix of the one of `qaiso-extra`: no name may lie in another plugin's namespace (see
+   * storage-namespace).
    */
   readonly siblingNamespaces?: ReadonlySet<string>;
+  /**
+   * Whether explicit physical table and index names are allowed here: only the tables version 1 of a definition with
+   * `adoption` creates (the 1.x tables adopted in place) keep their own names. Everything else is derived.
+   */
+  readonly adoptable?: boolean;
 }
 
 const FIELD_TYPES: readonly PluginStorageFieldType[] = [
@@ -71,27 +78,17 @@ const snake = (name: string): string => name.replace(/([a-z0-9])([A-Z])/g, '$1_$
 export const derivedTableName = (naming: StorageNaming, logical: string): string =>
   `plugin_${naming.namespace}_${snake(logical)}`;
 
-/** The physical table name: the adopted name when declared (inside the namespace), otherwise the derived one. */
+/** The physical table name: the adopted name when declared (and allowed), otherwise the derived one. */
 export function physicalTableName(naming: StorageNaming, logical: string, explicit: unknown): string {
   if (!IDENTIFIER.test(logical)) fail(naming, `table name "${logical}" must match ${IDENTIFIER.source}`);
-  const name = explicit === undefined ? derivedTableName(naming, logical) : explicit;
+  const derived = derivedTableName(naming, logical);
+  const name = explicit === undefined ? derived : explicit;
   if (typeof name !== 'string' || !IDENTIFIER.test(name)) {
     return fail(naming, `physicalName of table "${logical}" must match ${IDENTIFIER.source}`);
   }
+  if (name !== derived) checkExplicitTableName(naming, logical, name);
+  checkForeignNamespace(naming, `table name "${name}"`, name);
   const lowered = name.toLowerCase();
-  if (explicit !== undefined) {
-    const inside = lowered.startsWith(`plugin_${naming.namespace}_`) || lowered.startsWith(`${naming.namespace}_`);
-    if (!inside) {
-      fail(naming, `physicalName "${name}" must start with "plugin_${naming.namespace}_" or "${naming.namespace}_"`);
-    }
-  }
-  const claimedBy = [...(naming.siblingNamespaces ?? [])].find(
-    (other) =>
-      other.startsWith(`${naming.namespace}_`) && (lowered.startsWith(`plugin_${other}_`) || lowered.startsWith(`${other}_`)),
-  );
-  if (claimedBy !== undefined) {
-    fail(naming, `table name "${name}" lies in the storage namespace "${claimedBy}" of another installed plugin`);
-  }
   if (RESERVED_TABLE_PREFIXES.some((prefix) => lowered.startsWith(prefix))) {
     fail(naming, `table name "${name}" uses a prefix the host reserves`);
   }
@@ -99,6 +96,27 @@ export function physicalTableName(naming: StorageNaming, logical: string, explic
     fail(naming, `table name "${name}" belongs to the host`);
   }
   return name;
+}
+
+function checkExplicitTableName(naming: StorageNaming, logical: string, name: string): void {
+  if (!naming.adoptable) {
+    fail(
+      naming,
+      `physicalName "${name}" of table "${logical}" is only allowed on the 1.x tables version 1 adopts (a definition ` +
+        `with adoption); other tables are always named "${derivedTableName(naming, logical)}"`,
+    );
+  }
+  if (namespaceMatch(name, naming.namespace) === 0) {
+    fail(naming, `physicalName "${name}" must start with "plugin_${naming.namespace}_" or "${naming.namespace}_"`);
+  }
+}
+
+/** Refuses a name that lies in the storage namespace of another installed plugin. */
+function checkForeignNamespace(naming: StorageNaming, label: string, name: string): void {
+  const claimedBy = foreignNamespaceOf(name, naming.namespace, naming.siblingNamespaces ?? []);
+  if (claimedBy !== undefined) {
+    fail(naming, `${label} lies in the storage namespace "${claimedBy}" of another installed plugin`);
+  }
 }
 
 function indexName(
@@ -109,16 +127,35 @@ function indexName(
   given: unknown,
 ): string {
   if (given !== undefined) return checkedIndexName(naming, given);
-  const generated = `${unique ? 'uq' : 'idx'}_${table}_${fields.join('_')}`;
-  if (generated.length <= MAX_IDENTIFIER_LENGTH) return generated;
-  const digest = createHash('sha1').update(generated).digest('hex').slice(0, 10);
-  return `${generated.slice(0, MAX_IDENTIFIER_LENGTH - 11)}_${digest}`;
+  const generated = shortened(`${unique ? 'uq' : 'idx'}_${table}_${fields.join('_')}`);
+  checkForeignNamespace(naming, `index name "${generated}"`, indexNameBody(generated));
+  return generated;
+}
+
+/** An identifier cut to the maximum length, kept unique by a digest of the full form. */
+function shortened(full: string): string {
+  if (full.length <= MAX_IDENTIFIER_LENGTH) return full;
+  const digest = createHash('sha1').update(full).digest('hex').slice(0, 10);
+  return `${full.slice(0, MAX_IDENTIFIER_LENGTH - 11)}_${digest}`;
 }
 
 function checkedIndexName(naming: StorageNaming, given: unknown): string {
-  if (typeof given !== 'string' || !IDENTIFIER.test(given) || !given.toLowerCase().includes(naming.namespace)) {
-    fail(naming, `index name "${String(given)}" must match ${IDENTIFIER.source} and contain "${naming.namespace}"`);
+  if (!naming.adoptable) {
+    fail(
+      naming,
+      `index name "${String(given)}" is only allowed on the 1.x tables version 1 adopts (a definition with adoption); ` +
+        'leave it out and the host names the index idx_<table>_<fields> (uq_ when unique)',
+    );
   }
+  const body = typeof given === 'string' ? indexNameBody(given) : '';
+  if (typeof given !== 'string' || !IDENTIFIER.test(given) || namespaceMatch(body, naming.namespace) === 0) {
+    fail(
+      naming,
+      `index name "${String(given)}" must match ${IDENTIFIER.source} and, after an optional IDX_/UQ_ marker, start ` +
+        `with "plugin_${naming.namespace}_" or "${naming.namespace}_"`,
+    );
+  }
+  checkForeignNamespace(naming, `index name "${given}"`, body);
   return given;
 }
 
@@ -217,22 +254,50 @@ export function defaultInputOf(field: CompiledField, value: string | number | bo
   return value;
 }
 
+/** Resolves a logical table of the same plugin, as a foreign key sees it. */
+export type TableResolver = (logical: string) => CompiledTable | undefined;
+
+/**
+ * Compiles a table. Foreign keys are resolved against `tableOf` (the table itself for a self reference), so their
+ * referenced fields are checked against the referenced table's keys and stored as its physical columns.
+ */
 export function compileTable(
   naming: StorageNaming,
   logical: string,
   decl: unknown,
   physical: string,
-  physicalOf: (logical: string) => string | undefined,
+  tableOf: TableResolver,
+): CompiledTable {
+  const base = compileTableBase(naming, logical, decl, physical);
+  return withForeignKeys(naming, base, decl, (name) => (name === logical ? base : tableOf(name)));
+}
+
+/** A table without its foreign keys: fields, primary key and indexes. */
+export function compileTableBase(
+  naming: StorageNaming,
+  logical: string,
+  decl: unknown,
+  physical: string,
 ): CompiledTable {
   if (!isRecord(decl) || !isRecord(decl.fields)) return fail(naming, `table "${logical}" must be built with table()`);
   const fields = compileFields(naming, logical, decl.fields);
   const primaryKey = readStringList(naming, `primaryKey of "${logical}"`, decl.primaryKey);
   checkPrimaryKey(naming, logical, fields, primaryKey);
   const indexes = compileIndexes(naming, logical, physical, fields, decl.indexes as PluginStorageIndex[] | undefined);
-  const foreignKeys = ((decl.foreignKeys as PluginStorageTable['foreignKeys'] | undefined) ?? []).map((fk) =>
-    compileForeignKey(naming, logical, fields, fk, physicalOf),
+  return { logical, physical, fields, primaryKey, indexes, foreignKeys: [] };
+}
+
+/** Adds the declared foreign keys of `decl` to its compiled base table. */
+export function withForeignKeys(
+  naming: StorageNaming,
+  base: CompiledTable,
+  decl: unknown,
+  tableOf: TableResolver,
+): CompiledTable {
+  const declared = ((decl as { foreignKeys?: PluginStorageTable['foreignKeys'] }).foreignKeys ?? []).map((fk) =>
+    compileForeignKey(naming, base, fk, tableOf),
   );
-  return { logical, physical, fields, primaryKey, indexes, foreignKeys };
+  return { ...base, foreignKeys: declared };
 }
 
 function compileFields(naming: StorageNaming, logical: string, declared: Record<string, unknown>) {
@@ -301,35 +366,67 @@ function compileIndex(
 
 function compileForeignKey(
   naming: StorageNaming,
-  logical: string,
-  fields: ReadonlyMap<string, CompiledField>,
+  table: CompiledTable,
   fk: PluginStorageTable['foreignKeys'][number],
-  physicalOf: (logical: string) => string | undefined,
+  tableOf: TableResolver,
 ): CompiledForeignKey {
-  if (!isRecord(fk)) return fail(naming, `a foreign key of "${logical}" is malformed`);
-  const own = readStringList(naming, `a foreign key of "${logical}"`, fk.fields);
-  const referenced = readStringList(naming, `a foreign key of "${logical}"`, fk.referencedFields);
-  for (const name of own)
-    if (!fields.has(name)) fail(naming, `a foreign key of "${logical}" names the unknown field "${name}"`);
-  if (own.length !== referenced.length) fail(naming, `a foreign key of "${logical}" pairs unequal field lists`);
+  const where = `a foreign key of "${table.logical}"`;
+  if (!isRecord(fk)) return fail(naming, `${where} is malformed`);
+  const own = readStringList(naming, where, fk.fields);
+  const referenced = readStringList(naming, where, fk.referencedFields);
+  for (const name of own) if (!table.fields.has(name)) fail(naming, `${where} names the unknown field "${name}"`);
+  if (own.length !== referenced.length) fail(naming, `${where} pairs unequal field lists`);
   const references = fk.references;
-  const physical = typeof references === 'string' ? physicalOf(references) : undefined;
-  if (!physical) {
-    return fail(
-      naming,
-      `a foreign key of "${logical}" references "${String(references)}", which is not a table of this plugin`,
-    );
+  const target = typeof references === 'string' ? tableOf(references) : undefined;
+  if (!target) {
+    return fail(naming, `${where} references "${String(references)}", which is not a table of this plugin`);
   }
-  if (fk.onDelete !== undefined && !ON_DELETE_ACTIONS.includes(fk.onDelete)) {
-    fail(naming, `a foreign key of "${logical}" has an unknown onDelete`);
-  }
+  if (fk.onDelete !== undefined && !ON_DELETE_ACTIONS.includes(fk.onDelete))
+    fail(naming, `${where} has an unknown onDelete`);
+  const referencedColumns = referencedColumnsOf(naming, where, table, own, target, referenced);
   return {
     fields: own,
-    references: references as string,
-    referencesPhysical: physical,
+    references: target.logical,
+    referencesPhysical: target.physical,
     referencedFields: referenced,
+    referencedColumns,
     onDelete: fk.onDelete,
   };
+}
+
+/**
+ * The physical columns a foreign key references. They must be the primary key or a unique index of the referenced
+ * table (what every engine requires of a parent key), and each must have the type of the field that points at it.
+ */
+function referencedColumnsOf(
+  naming: StorageNaming,
+  where: string,
+  table: CompiledTable,
+  own: readonly string[],
+  target: CompiledTable,
+  referenced: readonly string[],
+): string[] {
+  const columns = referenced.map((name, position) => {
+    const parent = target.fields.get(name);
+    if (!parent) return fail(naming, `${where} references the unknown field "${target.logical}.${name}"`);
+    const child = table.fields.get(own[position]) as CompiledField;
+    if (child.type !== parent.type) {
+      fail(naming, `${where}: "${child.name}" (${child.type}) cannot reference "${name}" (${parent.type})`);
+    }
+    return parent.column;
+  });
+  if (!isKeyOf(target, referenced)) {
+    fail(naming, `${where} must reference the primary key or a unique index of "${target.logical}"`);
+  }
+  return columns;
+}
+
+/** Whether `fields` (in any order) are exactly the primary key or the fields of a unique index of `table`. */
+export function isKeyOf(table: CompiledTable, fields: readonly string[]): boolean {
+  const wanted = new Set(fields);
+  const same = (key: readonly string[]) =>
+    wanted.size === fields.length && key.length === wanted.size && key.every((name) => wanted.has(name));
+  return same(table.primaryKey) || table.indexes.some((index) => index.unique && same(index.fields));
 }
 
 /** Structural form of a field for equality checks of two schemas. */
@@ -354,7 +451,7 @@ export function tableSignature(table: CompiledTable): string {
     primaryKey: table.primaryKey,
     indexes: table.indexes.map((index) => [index.name, index.fields, index.unique]).sort(),
     foreignKeys: table.foreignKeys
-      .map((fk) => [fk.fields, fk.referencesPhysical, fk.referencedFields, fk.onDelete ?? null])
+      .map((fk) => [fk.fields, fk.referencesPhysical, fk.referencedFields, fk.referencedColumns, fk.onDelete ?? null])
       .sort(),
   });
 }

@@ -54,7 +54,7 @@ describe('sqliteStorageDdl', () => {
         config: f.json().withDefault('{"a":1}'),
       },
       {
-        indexes: [{ name: 'IDX_demo_name', fields: ['name'], unique: true }, { fields: ['qty', 'name'] }],
+        indexes: [{ fields: ['name'], unique: true }, { fields: ['qty', 'name'] }],
         foreignKeys: [{ fields: ['parentId'], references: 'parents', referencedFields: ['id'], onDelete: 'set-null' }],
       },
     );
@@ -81,7 +81,7 @@ describe('sqliteStorageDdl', () => {
         'FOREIGN KEY ("parentId") REFERENCES "plugin_demo_parents" ("id") ON DELETE SET NULL)',
     );
     expect(indexes).toEqual([
-      'CREATE UNIQUE INDEX "IDX_demo_name" ON "plugin_demo_items" ("name")',
+      'CREATE UNIQUE INDEX "uq_plugin_demo_items_name" ON "plugin_demo_items" ("name")',
       'CREATE INDEX "idx_plugin_demo_items_qty_name" ON "plugin_demo_items" ("qty", "name")',
     ]);
   });
@@ -117,7 +117,7 @@ describe('sqliteStorageDdl', () => {
     const head = {
       items: table(
         { id: f.id(), name: f.string(), extra: f.integer().withDefault(5) },
-        { indexes: [{ name: 'IDX_demo_a', fields: ['name'] }] },
+        { indexes: [{ fields: ['name'] }] },
       ),
     };
     const statements = statementsOf(
@@ -127,9 +127,9 @@ describe('sqliteStorageDdl', () => {
         step.addColumn('items', 'tmp', f.text().optional()),
         step.renameColumn('items', 'tmp', 'renamed'),
         step.dropColumn('items', 'renamed'),
-        step.addIndex('items', { name: 'IDX_demo_a', fields: ['name'] }),
-        step.addIndex('items', { name: 'IDX_demo_b', fields: ['extra'], unique: true }),
-        step.dropIndex('items', 'IDX_demo_b'),
+        step.addIndex('items', { fields: ['name'] }),
+        step.addIndex('items', { fields: ['extra'], unique: true }),
+        step.dropIndex('items', 'uq_plugin_demo_items_extra'),
         step.createTable('scratch', table({ id: f.id() })),
         step.dropTable('scratch'),
       ],
@@ -140,12 +140,31 @@ describe('sqliteStorageDdl', () => {
       ['ALTER TABLE "plugin_demo_items" ADD COLUMN "tmp" text'],
       ['ALTER TABLE "plugin_demo_items" RENAME COLUMN "tmp" TO "renamed"'],
       ['ALTER TABLE "plugin_demo_items" DROP COLUMN "renamed"'],
-      ['CREATE INDEX "IDX_demo_a" ON "plugin_demo_items" ("name")'],
-      ['CREATE UNIQUE INDEX "IDX_demo_b" ON "plugin_demo_items" ("extra")'],
-      ['DROP INDEX "IDX_demo_b"'],
+      ['CREATE INDEX "idx_plugin_demo_items_name" ON "plugin_demo_items" ("name")'],
+      ['CREATE UNIQUE INDEX "uq_plugin_demo_items_extra" ON "plugin_demo_items" ("extra")'],
+      ['DROP INDEX "uq_plugin_demo_items_extra"'],
       ['CREATE TABLE "plugin_demo_scratch" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL)'],
       ['DROP TABLE "plugin_demo_scratch"'],
     ]);
+  });
+
+  it('references the physical columns of a parent key whose fields map to other columns', () => {
+    const parents = table(
+      { id: f.id({ column: 'parent_pk' }), code: f.string({ column: 'parent_code' }) },
+      { indexes: [{ fields: ['code'], unique: true }] },
+    );
+    const children = table(
+      { id: f.id(), parentId: f.integer(), parentCode: f.string() },
+      {
+        foreignKeys: [
+          { fields: ['parentId'], references: 'parents', referencedFields: ['id'] },
+          { fields: ['parentCode'], references: 'parents', referencedFields: ['code'] },
+        ],
+      },
+    );
+    const [, [create]] = statementsOf({ parents, children });
+    expect(create).toContain('FOREIGN KEY ("parentId") REFERENCES "plugin_demo_parents" ("parent_pk")');
+    expect(create).toContain('FOREIGN KEY ("parentCode") REFERENCES "plugin_demo_parents" ("parent_code")');
   });
 
   it('uses the physical column of an adopted field', () => {

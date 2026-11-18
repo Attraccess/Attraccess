@@ -1,5 +1,14 @@
 import type { PluginStorageMigrationStep } from '@attraccess/plugins-backend-sdk';
-import { compileField, compileTable, fail, physicalTableName, type StorageNaming } from './storage-compile';
+import {
+  compileField,
+  compileTable,
+  compileTableBase,
+  derivedTableName,
+  fail,
+  isKeyOf,
+  physicalTableName,
+  type StorageNaming,
+} from './storage-compile';
 import type { CompiledField, CompiledSchema, CompiledTable, ResolvedStep } from './storage-model';
 
 /** The tables a migration step starts from, the physical names of the head, and where the step sits in its history. */
@@ -44,11 +53,35 @@ function createTable({ naming, schema, step, headPhysical, label }: StepContext<
   if (typeof logical !== 'string' || schema.has(logical))
     return fail(naming, `${label}: table "${String(logical)}" exists`);
   const declared = (step.definition as { physicalName?: unknown } | undefined)?.physicalName;
-  const physical = physicalTableName(naming, logical, declared ?? headPhysical.get(logical) ?? undefined);
-  const table = compileTable(naming, logical, step.definition, physical, (name) =>
-    name === logical ? physical : schema.get(name)?.physical,
-  );
+  const physical = physicalTableName(naming, logical, declared ?? adoptedHeadName(naming, logical, headPhysical));
+  const table = compileTable(naming, logical, step.definition, physical, (name) => schema.get(name));
+  if (physical !== derivedTableName(naming, logical)) checkAdoptedFields(naming, table, label);
   return { resolved: { op: 'createTable', table }, schema: withTable(schema, table) };
+}
+
+/** The explicit name the head gives a table, if any: a table the head names by its derived name has none. */
+function adoptedHeadName(
+  naming: StorageNaming,
+  logical: string,
+  headPhysical: ReadonlyMap<string, string>,
+): string | undefined {
+  const physical = headPhysical.get(logical);
+  return physical === derivedTableName(naming, logical) ? undefined : physical;
+}
+
+/**
+ * An adopted 1.x table keeps the values TypeORM wrote. A 1.x decimal column holds REAL or text, not the scaled
+ * integer the `decimal` type stores, so adopting one as `decimal` would misread every row.
+ */
+function checkAdoptedFields(naming: StorageNaming, table: CompiledTable, label: string): void {
+  const decimal = [...table.fields.values()].find((field) => field.type === 'decimal');
+  if (decimal) {
+    fail(
+      naming,
+      `${label}: the adopted table "${table.physical}" cannot declare the decimal field "${decimal.name}": a 1.x ` +
+        'decimal column does not hold the scaled integers of the decimal type. Declare it as string or text.',
+    );
+  }
 }
 
 function dropTable({ naming, schema, step, label }: StepContext<StepOf<'dropTable'>>): AppliedStep {
@@ -116,18 +149,42 @@ function renameColumn({ naming, schema, step, label }: StepContext<StepOf<'renam
     indexes: table.indexes.map((index) => ({ ...index, fields: index.fields.map(rename) })),
     foreignKeys: table.foreignKeys.map((fk) => ({ ...fk, fields: fk.fields.map(rename) })),
   };
-  return { resolved: { op: 'renameColumn', table, from, to }, schema: withTable(schema, next) };
+  return {
+    resolved: { op: 'renameColumn', table, from, to },
+    schema: renameReferences(withTable(schema, next), table.logical, from, to),
+  };
+}
+
+/**
+ * Foreign keys that reference a renamed field follow it: the engine rewrites the referencing tables' definitions,
+ * so the compiled form of every table that points at the field (the table itself included) must too.
+ */
+function renameReferences(
+  schema: CompiledSchema,
+  parent: string,
+  from: CompiledField,
+  to: CompiledField,
+): CompiledSchema {
+  const next = new Map(schema);
+  for (const table of schema.values()) {
+    if (!table.foreignKeys.some((fk) => fk.references === parent)) continue;
+    const foreignKeys = table.foreignKeys.map((fk) =>
+      fk.references !== parent
+        ? fk
+        : {
+            ...fk,
+            referencedFields: fk.referencedFields.map((name) => (name === from.name ? to.name : name)),
+            referencedColumns: fk.referencedColumns.map((column) => (column === from.column ? to.column : column)),
+          },
+    );
+    next.set(table.logical, { ...table, foreignKeys });
+  }
+  return next;
 }
 
 function addIndex({ naming, schema, step, label }: StepContext<StepOf<'addIndex'>>): AppliedStep {
   const table = tableOf(naming, schema, step.table, label);
-  const probe = compileTable(
-    naming,
-    table.logical,
-    { ...rawOf(table), indexes: [step.index] },
-    table.physical,
-    () => undefined,
-  );
+  const probe = compileTableBase(naming, table.logical, { ...rawOf(table), indexes: [step.index] }, table.physical);
   const index = probe.indexes[0];
   const clash = [...schema.values()].some((other) =>
     other.indexes.some((i) => i.name.toLowerCase() === index.name.toLowerCase()),
@@ -143,9 +200,20 @@ function dropIndex({ naming, schema, step, label }: StepContext<StepOf<'dropInde
   const table = tableOf(naming, schema, step.table, label);
   const index = table.indexes.find((candidate) => candidate.name === step.name);
   if (!index) return fail(naming, `${label}: unknown index "${String(step.name)}" on "${table.logical}"`);
+  const remaining = { ...table, indexes: table.indexes.filter((candidate) => candidate !== index) };
+  const dependent = [...schema.values()].find((other) =>
+    other.foreignKeys.some(
+      (fk) =>
+        fk.references === table.logical &&
+        isKeyOf(table, fk.referencedFields) &&
+        !isKeyOf(remaining, fk.referencedFields),
+    ),
+  );
+  if (dependent)
+    fail(naming, `${label}: a foreign key of "${dependent.logical}" references the fields of "${index.name}"`);
   return {
     resolved: { op: 'dropIndex', table, index },
-    schema: withTable(schema, { ...table, indexes: table.indexes.filter((candidate) => candidate !== index) }),
+    schema: withTable(schema, remaining),
   };
 }
 

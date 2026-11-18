@@ -33,7 +33,10 @@ export interface CompiledForeignKey {
   readonly references: string;
   /** Physical name of the referenced table. */
   readonly referencesPhysical: string;
+  /** Logical names of the referenced fields: the primary key or a unique index of the referenced table. */
   readonly referencedFields: readonly string[];
+  /** Physical columns of the referenced fields, in the order of `fields`. */
+  readonly referencedColumns: readonly string[];
   readonly onDelete?: 'cascade' | 'restrict' | 'set-null';
 }
 
@@ -84,7 +87,7 @@ export interface CompiledPluginStorage {
   readonly migrations: readonly CompiledMigration[];
   /** Class names of every legacy TypeORM migration of the 1.x plugin. Empty when the plugin has no legacy storage. */
   readonly legacyMigrations: readonly string[];
-  /** Every physical table the plugin's migrations ever created, for the uninstall. Parents before children. */
+  /** Every physical table the migrations ever create, parents before children: the table names the plugin claims. */
   readonly ownedTables: readonly string[];
   /** The declaration object itself, to recognise it when the plugin opens its tables. */
   readonly definition: unknown;

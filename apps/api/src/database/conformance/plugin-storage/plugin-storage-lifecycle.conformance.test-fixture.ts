@@ -32,7 +32,7 @@ async function seedLegacy(db: StorageDatabase, applied: readonly string[] = LEGA
       `"created" datetime NOT NULL DEFAULT (datetime('now')), "due" date, "meta" text, "ref" varchar(36), ` +
       `"status" varchar(20) NOT NULL DEFAULT ('new'))`,
   );
-  await db.execute(`CREATE UNIQUE INDEX "IDX_conformance_plugin_name" ON "${ITEMS}" ("name")`);
+  await db.execute(`CREATE UNIQUE INDEX "uq_plugin_conformance_plugin_items_name" ON "${ITEMS}" ("name")`);
   await db.execute(
     `CREATE TABLE "${NOTES}" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "itemId" integer NOT NULL, "body" text NOT NULL, ` +
       `FOREIGN KEY ("itemId") REFERENCES "${ITEMS}" ("id") ON DELETE CASCADE)`,
@@ -84,7 +84,7 @@ export function describePluginStorageLifecycle(fixture: StorageBackendFixture): 
         expect(items.find((column) => column.name === 'id')).toMatchObject({ primaryKey: true, required: true });
         expect(items.find((column) => column.name === 'name')?.required).toBe(true);
         expect(items.find((column) => column.name === 'due')?.required).toBe(false);
-        expect(await db.indexes(ITEMS)).toEqual(['IDX_conformance_plugin_name']);
+        expect(await db.indexes(ITEMS)).toEqual(['uq_plugin_conformance_plugin_items_name']);
       });
 
       it('upgrades release by release: addColumn, addIndex, data step, renameColumn, createTable, dropTable, dropColumn', async () => {
@@ -95,7 +95,10 @@ export function describePluginStorageLifecycle(fixture: StorageBackendFixture): 
 
         await db.engine.migrate(compile(storageV2));
         expect(await columnNames(ITEMS)).toEqual(expect.arrayContaining(['note', 'legacy']));
-        expect(await db.indexes(ITEMS)).toEqual(['IDX_conformance_plugin_name', 'IDX_conformance_plugin_status']);
+        expect(await db.indexes(ITEMS)).toEqual([
+          'idx_plugin_conformance_plugin_items_status',
+          'uq_plugin_conformance_plugin_items_name',
+        ]);
         const v2 = side.contexts(PLUGIN, compile(storageV2)).storage.open(storageV2) as never as { items: any }; // eslint-disable-line @typescript-eslint/no-explicit-any
         // The data step of version 2 ran on the existing row, with the schema of version 2.
         expect(await v2.items.findOne({ where: { name: 'before-upgrade' } })).toMatchObject({
@@ -338,6 +341,7 @@ export function describePluginStorageLifecycle(fixture: StorageBackendFixture): 
                 ],
               },
             ],
+            adoption: { legacyMigrations: LEGACY_MIGRATIONS },
           }),
         );
         expect(adopted.tables.get('legacy')?.physical).toBe('conformance_plugin_legacy_table');
@@ -357,13 +361,15 @@ export function describePluginStorageLifecycle(fixture: StorageBackendFixture): 
         });
 
       it.each([
-        ['a core table of the host', () => [...db.coreTables()][0]],
-        ["another plugin's namespace", () => 'plugin_other_plugin_things'],
-        ['a name outside any namespace', () => 'accounts'],
-        ['an identifier that is no identifier', () => 'conformance_plugin_x"; DROP TABLE y; --'],
-        ['the host migration bookkeeping', () => 'plugin_migrations_conformance_plugin'],
-      ])('refuses a physicalName that claims %s', (_label, name) => {
-        expect(() => compile(declare({ physicalName: name() }))).toThrow(PluginStorageDeclarationError);
+        ['a core table of the host', () => [...db.coreTables()][0], true],
+        ["another plugin's namespace", () => 'plugin_other_plugin_things', true],
+        ['a name outside any namespace', () => 'accounts', true],
+        ['an identifier that is no identifier', () => 'conformance_plugin_x"; DROP TABLE y; --', true],
+        ['the host migration bookkeeping', () => 'plugin_migrations_conformance_plugin', true],
+        ['any name on a table it does not adopt from 1.x', () => 'conformance_plugin_new', false],
+      ])('refuses a physicalName that claims %s', (_label, name, adopting) => {
+        const adoption = adopting ? { adoption: { legacyMigrations: LEGACY_MIGRATIONS } } : {};
+        expect(() => compile(declare({ physicalName: name() }, adoption))).toThrow(PluginStorageDeclarationError);
       });
 
       it.each([

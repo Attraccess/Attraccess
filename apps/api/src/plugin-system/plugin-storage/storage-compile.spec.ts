@@ -12,11 +12,29 @@ import {
 } from './storage-compile';
 import { PluginStorageDeclarationError } from './storage-model';
 
-const naming: StorageNaming = { pluginName: 'demo', namespace: 'demo', reservedTables: new Set(['users']) };
-const physicalOf = (logical: string) => (logical === 'parents' ? 'plugin_demo_parents' : undefined);
+/** Names as version 1 of an adopting definition sees them: explicit names are allowed. */
+const naming: StorageNaming = {
+  pluginName: 'demo',
+  namespace: 'demo',
+  reservedTables: new Set(['users']),
+  adoptable: true,
+};
+const fresh: StorageNaming = { ...naming, adoptable: false };
+const parents = compileTable(
+  naming,
+  'parents',
+  {
+    fields: { id: f.id(), code: f.string({ column: 'parent_code' }), other: f.text() },
+    primaryKey: ['id'],
+    indexes: [{ fields: ['code'], unique: true }],
+  },
+  'plugin_demo_parents',
+  () => undefined,
+);
+const tableOf = (logical: string) => (logical === 'parents' ? parents : undefined);
 
-const compile = (decl: unknown, logical = 'items') =>
-  compileTable(naming, logical, decl, `plugin_demo_${logical}`, physicalOf);
+const compile = (decl: unknown, logical = 'items', names: StorageNaming = naming) =>
+  compileTable(names, logical, decl, `plugin_demo_${logical}`, tableOf);
 const field = (decl: unknown, name = 'value') => compileField(naming, 'items', name, decl);
 const declaration = (extra: Record<string, unknown> = {}, fields: Record<string, unknown> = {}) => ({
   fields: { id: f.id(), name: f.string(), ...fields },
@@ -48,6 +66,13 @@ describe('physicalTableName', () => {
     expect(physicalTableName(naming, 'items', 'demo_old')).toBe('demo_old');
   });
 
+  it('refuses an explicit name outside the adopted 1.x tables, but accepts the derived one spelled out', () => {
+    expect(() => physicalTableName(fresh, 'items', 'demo_old')).toThrow(
+      /physicalName "demo_old" of table "items" is only allowed on the 1.x tables version 1 adopts.*"plugin_demo_items"/,
+    );
+    expect(physicalTableName(fresh, 'items', 'plugin_demo_items')).toBe('plugin_demo_items');
+  });
+
   it.each([
     ['a bad logical name', 'bad name', undefined, /table name "bad name" must match/],
     ['a non-string physical name', 'items', 5, /physicalName of table "items" must match/],
@@ -76,6 +101,28 @@ describe('physicalTableName with sibling plugins', () => {
   const withSiblings: StorageNaming = { ...naming, siblingNamespaces: new Set(['demo_extra', 'other']) };
 
   it.each([
+    // The QA probes: a short or prefixed plugin name claiming a table of a bundled plugin.
+    ['plugin-wago', 'plugin_wago', 'plugin_wago_controllers', 'wago'],
+    ['plugin', 'plugin', 'plugin_wago_controllers', 'wago'],
+    ['demo', 'demo', 'plugin_demo_extra_x', 'demo_extra'],
+  ])('rejects plugin %s adopting %s inside the namespace of %s', (pluginName, namespace, name, other) => {
+    const probe: StorageNaming = { ...naming, pluginName, namespace, siblingNamespaces: new Set([other]) };
+    expect(() => physicalTableName(probe, 'controllers', name)).toThrow(
+      new RegExp(`lies in the storage namespace "${other}" of another installed plugin`),
+    );
+  });
+
+  it('keeps a derived name of a plugin whose namespace is a longer form of a shorter one', () => {
+    const wago: StorageNaming = {
+      ...fresh,
+      pluginName: 'wago',
+      namespace: 'wago',
+      siblingNamespaces: new Set(['plugin']),
+    };
+    expect(physicalTableName(wago, 'controllers', undefined)).toBe('plugin_wago_controllers');
+  });
+
+  it.each([
     ['a derived name that lands in the namespace of a longer-named plugin', 'extra_notes', undefined],
     ['an adopted name in the namespace of a longer-named plugin', 'notes', 'plugin_demo_extra_notes'],
     ['an adopted short-prefix name in that namespace', 'notes', 'demo_extra_notes'],
@@ -88,7 +135,12 @@ describe('physicalTableName with sibling plugins', () => {
   it('keeps names that only share the prefix with an unrelated or shorter-named plugin', () => {
     expect(physicalTableName(withSiblings, 'notes', undefined)).toBe('plugin_demo_notes');
     expect(physicalTableName(withSiblings, 'extras', undefined)).toBe('plugin_demo_extras');
-    const child: StorageNaming = { ...naming, pluginName: 'demo-extra', namespace: 'demo_extra', siblingNamespaces: new Set(['demo']) };
+    const child: StorageNaming = {
+      ...naming,
+      pluginName: 'demo-extra',
+      namespace: 'demo_extra',
+      siblingNamespaces: new Set(['demo']),
+    };
     expect(physicalTableName(child, 'notes', undefined)).toBe('plugin_demo_extra_notes');
   });
 });
@@ -238,6 +290,7 @@ describe('compileTable', () => {
         references: 'parents',
         referencesPhysical: 'plugin_demo_parents',
         referencedFields: ['id'],
+        referencedColumns: ['id'],
         onDelete: 'set-null',
       },
     ]);
@@ -323,7 +376,12 @@ describe('compileTable', () => {
         /index name "bad name" must match/,
       ],
       ['a non-string index name', [{ name: 5, fields: ['name'] }], /index name "5" must match/],
-      ['an index name outside the namespace', [{ name: 'idx_other', fields: ['name'] }], /contain "demo"/],
+      [
+        'an index name outside the namespace',
+        [{ name: 'idx_other', fields: ['name'] }],
+        /after an optional IDX_\/UQ_ marker, start with "plugin_demo_" or "demo_"/,
+      ],
+      ['an index name that only contains the namespace', [{ name: 'idx_x_demo', fields: ['name'] }], /start with/],
       [
         'the same index twice',
         [
@@ -335,11 +393,47 @@ describe('compileTable', () => {
     ])('rejects %s', (_label, indexes, message) => {
       expect(() => compile(declaration({ indexes }))).toThrow(message);
     });
+
+    it('refuses an explicit index name outside the adopted 1.x tables', () => {
+      expect(() =>
+        compile(declaration({ indexes: [{ name: 'IDX_demo_a', fields: ['name'] }] }), 'items', fresh),
+      ).toThrow(/index name "IDX_demo_a" is only allowed on the 1.x tables version 1 adopts/);
+      expect(compile(declaration({ indexes: [{ fields: ['name'] }] }), 'items', fresh).indexes[0].name).toBe(
+        'idx_plugin_demo_items_name',
+      );
+    });
+
+    it('refuses index names inside the namespace of another installed plugin', () => {
+      const sibling: StorageNaming = { ...naming, siblingNamespaces: new Set(['demo_items']) };
+      expect(() => compile(declaration({ indexes: [{ fields: ['name'] }] }), 'items', sibling)).toThrow(
+        /index name "idx_plugin_demo_items_name" lies in the storage namespace "demo_items"/,
+      );
+      const other: StorageNaming = { ...naming, siblingNamespaces: new Set(['demo_extra']) };
+      expect(() =>
+        compile(declaration({ indexes: [{ name: 'UQ_demo_extra_name', fields: ['name'] }] }), 'items', other),
+      ).toThrow(/index name "UQ_demo_extra_name" lies in the storage namespace "demo_extra"/);
+    });
   });
 
   describe('foreign keys', () => {
-    const withKey = (key: unknown) => declaration({ foreignKeys: [key] }, { parentId: f.integer() });
+    const withKey = (key: unknown) =>
+      declaration({ foreignKeys: [key] }, { parentId: f.integer(), parentCode: f.string(), note: f.text() });
     const valid = { fields: ['parentId'], references: 'parents', referencedFields: ['id'] };
+
+    it('stores the physical columns of a referenced unique key, in the order of the own fields', () => {
+      const key = compile(withKey({ ...valid, fields: ['parentCode'], referencedFields: ['code'] })).foreignKeys[0];
+      expect(key).toMatchObject({ referencedFields: ['code'], referencedColumns: ['parent_code'] });
+    });
+
+    it('resolves a reference to the table itself', () => {
+      const tree = compile(
+        declaration(
+          { foreignKeys: [{ fields: ['up'], references: 'items', referencedFields: ['id'] }] },
+          { up: f.integer() },
+        ),
+      );
+      expect(tree.foreignKeys[0]).toMatchObject({ references: 'items', referencesPhysical: 'plugin_demo_items' });
+    });
 
     it('compiles a key without an onDelete action', () => {
       expect(compile(withKey(valid)).foreignKeys[0].onDelete).toBeUndefined();
@@ -361,6 +455,17 @@ describe('compileTable', () => {
       ],
       ['a non-string table', { ...valid, references: 4 }, /references "4", which is not a table/],
       ['an unknown onDelete', { ...valid, onDelete: 'explode' }, /has an unknown onDelete/],
+      ['an unknown referenced field', { ...valid, referencedFields: ['ghost'] }, /unknown field "parents.ghost"/],
+      [
+        'a referenced field that is no key',
+        { ...valid, fields: ['note'], referencedFields: ['other'] },
+        /must reference the primary key or a unique index of "parents"/,
+      ],
+      [
+        'a referenced field of another type',
+        { ...valid, referencedFields: ['code'] },
+        /"parentId" \(integer\) cannot reference "code" \(string\)/,
+      ],
     ])('rejects %s', (_label, key, message) => {
       expect(() => compile(withKey(key))).toThrow(message);
     });

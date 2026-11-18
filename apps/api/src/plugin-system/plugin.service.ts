@@ -19,6 +19,7 @@ import { PluginManifestSchema, LoadedPluginManifest, PluginManifest } from './pl
 import { type PluginManifestInfo } from '@attraccess/plugins-backend-sdk';
 
 import { assertBundleCompatible, assertManifestCompatible } from './runtime/plugin-compatibility';
+import { assertInstallableNamespace } from './plugin-storage/storage-loader';
 import { PluginBootGuard } from './runtime/boot-guard';
 
 import { PluginSandboxService } from './plugin-sandbox.service';
@@ -262,6 +263,12 @@ export class PluginService {
         throw new BadRequestException(`Invalid plugin.json: ${issues.join('; ')}`);
       }
       const manifest = parsed.data;
+      // A storage namespace another installed plugin has (or keeps tables in) is refused before anything moves.
+      try {
+        assertInstallableNamespace(manifest, () => PluginService.getPlugins());
+      } catch (error) {
+        throw new BadRequestException((error as Error).message);
+      }
 
       const pluginName = PluginService.safePluginName(manifest.name);
       await PluginService.withPluginUploadLock(pluginName, async () => {

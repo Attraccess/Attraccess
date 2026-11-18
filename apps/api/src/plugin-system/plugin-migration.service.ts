@@ -18,7 +18,9 @@ import type {
   PluginStorageMigrationPlan,
 } from './persistence/plugin-migration-engine.port';
 
-import { loadPluginStorage } from './plugin-storage/storage-loader';
+import { loadPluginStorage, storagePluginNames } from './plugin-storage/storage-loader';
+
+import { assertStorageNamesFree, claimStorageNames } from './plugin-storage/storage-registry';
 
 import type { CompiledPluginStorage } from './plugin-storage/storage-model';
 
@@ -58,21 +60,18 @@ export class PluginMigrationService {
    */
   public static loadStorage(manifest: LoadedPluginManifest): CompiledPluginStorage | null {
     if (!getImplementationClass().hasStorage(manifest)) return null;
-    return loadPluginStorage(
-      manifest,
-      PluginService.PLUGIN_PATH,
-      PluginService.getPlugins().map((plugin) => plugin.name),
-    );
+    return loadPluginStorage(manifest, PluginService.PLUGIN_PATH, storagePluginNames(PluginService.getPlugins()));
   }
 
   /**
-   * Drops every table of a plugin together with its version bookkeeping (and the legacy migrations table of a
-   * plugin adopted from 1.x). Returns whether the plugin had storage. Needs the plugin bundle on disk to know which
-   * tables are its own.
+   * Drops the tables of the plugin's committed versions together with its version bookkeeping (and the legacy
+   * migrations table of a plugin adopted from 1.x). Returns whether the plugin had storage. Needs the plugin bundle on
+   * disk to know which tables are its own; a declaration that conflicts with another plugin's namespace drops nothing.
    */
   public static async dropStorage(manifest: LoadedPluginManifest): Promise<boolean> {
     const storage = getImplementationClass().loadStorage(manifest);
     if (!storage) return false;
+    assertStorageNamesFree(storage);
     await getImplementationClass().engine().dropAll(storage);
     getImplementationClass().logger.log(`Dropped the storage of plugin "${manifest.name}".`);
     return true;
@@ -142,12 +141,9 @@ export class PluginMigrationService {
     sourceDirectory: string,
   ): Promise<void> {
     if (!getImplementationClass().hasStorage(manifest)) return;
-    const storage = loadPluginStorage(
-      manifest,
-      sourceDirectory,
-      PluginService.getPlugins().map((plugin) => plugin.name),
-    );
+    const storage = loadPluginStorage(manifest, sourceDirectory, storagePluginNames(PluginService.getPlugins()));
     if (!storage) return;
+    assertStorageNamesFree(storage);
     await getImplementationClass().engine().assess(storage);
   }
 
@@ -163,6 +159,9 @@ export class PluginMigrationService {
   public static async runUpMigrations(manifest: LoadedPluginManifest): Promise<number | null> {
     const storage = getImplementationClass().loadStorage(manifest);
     if (!storage) return null;
+    // Names are claimed before anything is created: a plugin whose tables or indexes belong to (or lie in the
+    // namespace of) a plugin that claimed first never touches the database.
+    claimStorageNames(storage);
     const plan: PluginStorageMigrationPlan = await getImplementationClass().engine().migrate(storage);
     const count = plan.pending.length + (plan.adopt ? 1 : 0);
     if (count > 0) {

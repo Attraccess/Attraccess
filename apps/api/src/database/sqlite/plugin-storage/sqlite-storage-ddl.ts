@@ -57,7 +57,7 @@ function createTable(table: CompiledTable): string[] {
       ? ` ON DELETE ${fk.onDelete === 'set-null' ? 'SET NULL' : fk.onDelete.toUpperCase()}`
       : '';
     parts.push(
-      `FOREIGN KEY (${own.join(', ')}) REFERENCES ${quote(fk.referencesPhysical)} (${fk.referencedFields.map(quote).join(', ')})${action}`,
+      `FOREIGN KEY (${own.join(', ')}) REFERENCES ${quote(fk.referencesPhysical)} (${fk.referencedColumns.map(quote).join(', ')})${action}`,
     );
   }
   return [
@@ -85,7 +85,12 @@ const STATEMENTS: StepStatements = {
   dropIndex: (step) => [`DROP INDEX ${quote(step.index.name)}`],
 };
 
-/** SQLite statements of the neutral migration steps. Table rebuilds are never needed: SQLite alters in place. */
+/**
+ * SQLite statements of the neutral migration steps. Every step maps to an in-place ALTER, CREATE or DROP; the host
+ * never rebuilds a table. That is a limit for 1.x tables adopted in place: a UNIQUE or CHECK constraint of their
+ * CREATE TABLE cannot be dropped, nor can a column it uses. The migration session refuses such a step before it runs
+ * (see sqlite-storage-step-guard).
+ */
 export const sqliteStorageDdl: PluginStorageDdl = {
   statements(step: ResolvedStep): string[] {
     return (STATEMENTS[step.op] as (step: ResolvedStep) => string[])(step);
