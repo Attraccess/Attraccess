@@ -145,8 +145,8 @@ describe('parseNpmPluginPackage', () => {
 
   it.each([
     [{ permissions: ['DATABASE_ACCESS'] }, 'DATABASE_ACCESS permission'],
-    [{ persistence: { backends: ['sqlite'] } }, 'persistence.backends'],
-    [{ migrations: 'dist/migrations.js' }, 'migrations entry'],
+    [{ persistence: { backends: ['sqlite'] } }, 'attraccess.persistence in package.json'],
+    [{ migrations: 'dist/migrations.js' }, 'migrations entry (attraccess.migrations in package.json)'],
   ])('refuses a package that still uses the SDK 1.x database contract', (override, message) => {
     const pkg = { ...validPackage, attraccess: { ...validPackage.attraccess, ...override } };
     expect(() => parseNpmPluginPackage(pkg, '2.0.0')).toThrow(message);

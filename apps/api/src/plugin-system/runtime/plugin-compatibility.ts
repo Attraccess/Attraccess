@@ -23,17 +23,41 @@ const refuse = (pluginName: string, reason: string, hint: string): PluginIncompa
     `Plugin ${safeName(pluginName)} ${reason}. ${hint} Migration guide: ${PLUGIN_MIGRATION_GUIDE_URL}`,
   );
 
+/** How the refusals name the fields of the contract: plugin.json for ZIP and local plugins, package.json for npm. */
+export interface ContractFieldLabels {
+  /** What to declare instead of a minimum host version below SDK 2.0. */
+  readonly minimumHostVersion: string;
+  readonly persistence: string;
+  readonly migrations: string;
+}
+
+export const PLUGIN_JSON_FIELDS: ContractFieldLabels = {
+  minimumHostVersion: `attraccessVersion.min >= ${MINIMUM_PLUGIN_HOST_VERSION}`,
+  persistence: 'persistence.backends in plugin.json',
+  migrations: 'main.migrations in plugin.json',
+};
+
+export const NPM_PACKAGE_FIELDS: ContractFieldLabels = {
+  minimumHostVersion: `an attraccess.host range in package.json whose lowest version is ${MINIMUM_PLUGIN_HOST_VERSION} or later`,
+  persistence: 'attraccess.persistence in package.json',
+  migrations: 'attraccess.migrations in package.json',
+};
+
 /**
  * Plugins built for SDK 1.x expose TypeORM and host entities and cannot run on this host. They are recognised by a
  * declared minimum host version below 2.0.0-0 (a missing minimum counts as below).
  */
-export function assertPluginTargetsSdk2(pluginName: string, minimumHostVersion: string | undefined): void {
+export function assertPluginTargetsSdk2(
+  pluginName: string,
+  minimumHostVersion: string | undefined,
+  labels: ContractFieldLabels = PLUGIN_JSON_FIELDS,
+): void {
   const min = minimumHostVersion ? semver.valid(minimumHostVersion) : null;
   if (min && semver.gte(min, MINIMUM_PLUGIN_HOST_VERSION)) return;
   throw new PluginIncompatibleError(
     `Plugin ${safeName(pluginName)} targets Attraccess ${minimumHostVersion ?? '(no minimum version)'} and the ` +
       `plugin SDK 1.x, which this host no longer supports. Rebuild it for SDK 2.0 and declare ` +
-      `attraccessVersion.min >= ${MINIMUM_PLUGIN_HOST_VERSION}. Migration guide: ${PLUGIN_MIGRATION_GUIDE_URL}`,
+      `${labels.minimumHostVersion}. Migration guide: ${PLUGIN_MIGRATION_GUIDE_URL}`,
   );
 }
 
@@ -45,7 +69,7 @@ export function assertHostRangeTargetsSdk2(pluginName: string, hostRange: string
   } catch {
     lowest = undefined;
   }
-  assertPluginTargetsSdk2(pluginName, lowest);
+  assertPluginTargetsSdk2(pluginName, lowest, NPM_PACKAGE_FIELDS);
 }
 
 /** Permissions of SDK 1.x that opened the database. SDK 2.0 has none: data goes through `PLUGIN_STORAGE`. */
@@ -64,7 +88,11 @@ export interface RemovedContractFields {
  * Refuses an SDK 2.0 manifest that still uses the database access of SDK 1.x: the removed permission, the engine
  * list, or a TypeORM migrations entry. Plugins keep data through the declared storage (PLUGIN_STORAGE) instead.
  */
-export function assertNoRemovedContract(pluginName: string, fields: RemovedContractFields): void {
+export function assertNoRemovedContract(
+  pluginName: string,
+  fields: RemovedContractFields,
+  labels: ContractFieldLabels = PLUGIN_JSON_FIELDS,
+): void {
   const removed = (fields.permissions ?? []).find(
     (permission): permission is string => typeof permission === 'string' && REMOVED_PERMISSIONS.includes(permission),
   );
@@ -78,14 +106,14 @@ export function assertNoRemovedContract(pluginName: string, fields: RemovedContr
   if (fields.persistence !== undefined) {
     throw refuse(
       pluginName,
-      'declares persistence.backends in plugin.json, which SDK 2.0 removed: the host owns the database engine',
+      `declares ${labels.persistence}, which SDK 2.0 removed: the host owns the database engine`,
       "Remove the field and describe the plugin's tables with definePluginStorage.",
     );
   }
   if (fields.migrations !== undefined) {
     throw refuse(
       pluginName,
-      'ships a TypeORM migrations entry (main.migrations), which SDK 2.0 removed',
+      `ships a TypeORM migrations entry (${labels.migrations}), which SDK 2.0 removed`,
       "Declare neutral migrations in the plugin's storage definition instead.",
     );
   }
@@ -101,14 +129,24 @@ export interface PluginCompatibilityManifest {
   persistence?: unknown;
 }
 
-/** SDK 2.0 contract of a manifest. Shared by ZIP uploads, npm installs and discovery; call it before parsing. */
-export function assertManifestCompatible(manifest: PluginCompatibilityManifest): void {
-  assertPluginTargetsSdk2(manifest.name, manifest.attraccessVersion?.min);
-  assertNoRemovedContract(manifest.name, {
-    permissions: manifest.permissions,
-    persistence: manifest.persistence,
-    migrations: (manifest.main as { migrations?: unknown } | null | undefined)?.migrations,
-  });
+/**
+ * SDK 2.0 contract of a manifest. Shared by ZIP uploads, npm installs and discovery; call it before parsing. `labels`
+ * names the fields as the plugin's source declares them (an npm manifest is built from package.json).
+ */
+export function assertManifestCompatible(
+  manifest: PluginCompatibilityManifest,
+  labels: ContractFieldLabels = PLUGIN_JSON_FIELDS,
+): void {
+  assertPluginTargetsSdk2(manifest.name, manifest.attraccessVersion?.min, labels);
+  assertNoRemovedContract(
+    manifest.name,
+    {
+      permissions: manifest.permissions,
+      persistence: manifest.persistence,
+      migrations: (manifest.main as { migrations?: unknown } | null | undefined)?.migrations,
+    },
+    labels,
+  );
 }
 
 /**

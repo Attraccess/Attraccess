@@ -5,6 +5,7 @@ import {
   assertHostRangeTargetsSdk2,
   assertManifestCompatible,
   assertNoRemovedContract,
+  NPM_PACKAGE_FIELDS,
 } from '../runtime/plugin-compatibility';
 import { z } from 'zod';
 import { PluginDependenciesSchema } from '../runtime/dependencies';
@@ -120,7 +121,7 @@ export function parseNpmPluginPackage(
   });
   // The SDK 2.0 contract at parse time: before any file move, state row or plugin code load, exactly as a ZIP upload
   // and discovery check it.
-  refuseIncompatible(() => assertManifestCompatible(manifest));
+  refuseIncompatible(() => assertManifestCompatible(manifest, NPM_PACKAGE_FIELDS));
   return { pkg, manifest };
 }
 
@@ -137,11 +138,15 @@ function refuseRemovedContract(value: unknown): void {
     if (typeof root.name === 'string' && typeof attraccess.host === 'string') {
       assertHostRangeTargetsSdk2(root.name, attraccess.host);
     }
-    assertNoRemovedContract(typeof root.name === 'string' ? root.name : '', {
-      permissions: Array.isArray(attraccess.permissions) ? attraccess.permissions : undefined,
-      persistence: attraccess.persistence,
-      migrations: attraccess.migrations,
-    });
+    assertNoRemovedContract(
+      typeof root.name === 'string' ? root.name : '',
+      {
+        permissions: Array.isArray(attraccess.permissions) ? attraccess.permissions : undefined,
+        persistence: attraccess.persistence,
+        migrations: attraccess.migrations,
+      },
+      NPM_PACKAGE_FIELDS,
+    );
   });
 }
 
