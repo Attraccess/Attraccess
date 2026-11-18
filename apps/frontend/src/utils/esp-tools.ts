@@ -379,8 +379,22 @@ export class ESPTools {
       };
     }
 
-    // Without reset wiring the user power-cycles the reader instead.
-    if (manualDownloadMode) return result;
+    // Without reset wiring the user power-cycles the reader instead. The flash may have left the port at the fast
+    // baud rate, but the firmware's Serial Configurator answers on the same port at the ROM baud rate.
+    if (manualDownloadMode) {
+      try {
+        await this.useTransport({
+          blocking: true,
+          fn: async (transport) => {
+            await transport.disconnect();
+            await transport.connect(ROM_BAUD_RATE);
+          },
+        });
+      } catch (err) {
+        console.error('Failed to reopen the serial port at the ROM baud rate', err);
+      }
+      return result;
+    }
 
     return await this.useTransport({
       blocking: true,

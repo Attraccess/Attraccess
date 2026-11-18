@@ -257,3 +257,15 @@ it('flashes through a USB-TTL adapter without auto-reset, falling back to the RO
   // No RTS pulse afterwards: the user power-cycles the bridge.
   expect(state.signals).not.toHaveBeenCalled();
 });
+it('reopens the port at the console baud rate after a USB-TTL flash, even a refused one', async () => {
+  // The bridge firmware's Serial Configurator talks at 115200 over the same port after the power cycle.
+  const esp = await instance();
+  state.chipName = 'ESP32';
+  await esp.flashFirmware({ firmware: new Blob(['image']), chip: 'esp32', manualDownloadMode: true });
+  expect(state.connect).toHaveBeenLastCalledWith(115200);
+  state.connect.mockClear();
+  state.chipName = 'ESP32-S3';
+  const refused = await esp.flashFirmware({ firmware: new Blob(['image']), chip: 'esp32', manualDownloadMode: true });
+  expect(refused.error?.type).toBe('CHIP_MISMATCH');
+  expect(state.connect).toHaveBeenLastCalledWith(115200);
+});
