@@ -132,12 +132,15 @@ if [[ "$READER_PROFILE" == secure-lab ]]; then
         -DATTRACTAP_SECURE_PROFILE=ON -DATTRACTAP_SECURE_LAB=ON ${READER_CMAKE_ARGS:-} build >"$WORK/reader-build.log")
     built_here=1
   fi
+  # Copy the ELF before the OTA build below rebuilds this directory (another version string, so another
+  # ELF and build id): the coredump's build id is the flashed ELF's.
+  cp "$READER_SECURE_BUILD/attractap.elf" "$WORK/reader.elf" 2>/dev/null || true
   # Refuses anything but a lab secure build (a release-mode image would switch the reader to release mode for good).
   python3 "$firmware/tools/secure_lab_reader.py" hex --build-dir "$READER_SECURE_BUILD" --output "$WORK/reader.hex" \
     >"$WORK/reader-sign.log"
   READER_IMAGE="$WORK/reader.hex"
   [[ -z "${built_here:-}" ]] || build_ota_image "$READER_SECURE_BUILD" -DATTRACTAP_SECURE_PROFILE=ON -DATTRACTAP_SECURE_LAB=ON
-  READER_ELF="${READER_ELF:-$READER_SECURE_BUILD/attractap.elf}"
+  READER_ELF="${READER_ELF:-$WORK/reader.elf}"
 elif [[ -z "${READER_IMAGE:-}" ]]; then
   require_idf
   firmware="$ROOT/apps/attractap/firmware"
@@ -148,7 +151,10 @@ elif [[ -z "${READER_IMAGE:-}" ]]; then
       -DATTRACTAP_CRASH_TRIGGER=ON -DATTRACTAP_VERSION_OVERRIDE= ${READER_CMAKE_ARGS:-} build >"$WORK/reader-build.log")
   (cd "$build" && esptool --chip esp32s3 merge-bin -o "$WORK/reader.bin" @flash_args >/dev/null)
   READER_IMAGE="$WORK/reader.bin"
-  READER_ELF="${READER_ELF:-$build/attractap.elf}"
+  # Copy the ELF before the OTA build rebuilds this directory (another version string, so another
+  # ELF and build id): the reader runs this build, and its coredumps carry this ELF's build id.
+  cp "$build/attractap.elf" "$WORK/reader.elf"
+  READER_ELF="${READER_ELF:-$WORK/reader.elf}"
   build_ota_image "$build" -DATTRACTAP_CRASH_TRIGGER=ON
 fi
 if [[ -z "${EMULATOR_IMAGE:-}" ]]; then
