@@ -104,7 +104,12 @@ namespace bletest
             messages.push_back(doc);
             return true;
         }
-        bool canSendNotification() override { return room; }
+        int roomChecks = 0;
+        bool canSendNotification() override
+        {
+            roomChecks++;
+            return room;
+        }
         std::vector<std::string> logs;
         void log(LogLevel, const char *line) override { logs.emplace_back(line); }
 

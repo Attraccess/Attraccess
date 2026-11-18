@@ -51,7 +51,7 @@ namespace ble
         uint8_t rxPhy = link::PHY_1M;
     };
 
-    // "interval=30.00ms latency=0 timeout=2560ms data=tx251/rx251 phy=tx2/rx2"
+    // "interval=15.00ms latency=0 timeout=2560ms data=tx251/rx251 phy=tx1/rx1"
     inline int formatLink(char *out, size_t size, const LinkState &state)
     {
         return std::snprintf(out, size, "interval=%u.%02ums latency=%u timeout=%ums data=tx%u/rx%u phy=tx%u/rx%u",

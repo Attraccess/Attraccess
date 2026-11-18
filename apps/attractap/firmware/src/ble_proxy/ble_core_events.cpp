@@ -323,7 +323,8 @@ namespace ble
         // notifications up in their bounded buffer (which overflows with a marker), never into the outbox.
         if (!outbox.empty()) return;
         NotificationBuffer::Entry entry;
-        while (sink.canSendNotification() && notifications.peek(entry))
+        // Asks for room only with a notification to send: an empty buffer must not mark the proxy as waiting.
+        while (notifications.peek(entry) && sink.canSendNotification())
         {
             Subscription *subscription = currentOwner == Owner::Session && session.state == SessionState::Open
                                              ? findSubscription(entry.service, entry.characteristic)

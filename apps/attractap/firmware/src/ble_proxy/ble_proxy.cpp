@@ -35,6 +35,7 @@ namespace
     // A write without response refused for lack of controller buffers: NimBLE has no event when they free up, and a
     // bulk transfer hits this dozens of times per 256 KiB, so it is retried sooner than the deadline poll.
     constexpr TickType_t RETRY_WAIT = pdMS_TO_TICKS(2);
+    static_assert(RETRY_WAIT > 0, "a 2 ms wait needs a tick rate of at least 500 Hz, else the task spins");
     constexpr uint32_t PSRAM_CAPS = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
 
     QueueHandle_t createQueue(UBaseType_t depth, UBaseType_t itemSize)
@@ -294,11 +295,12 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
         }
     }
 
-    // Answers a request that never reaches the state machine (malformed, or no room). Websocket task.
+    // Answers a request that never reaches the state machine (malformed, or no room). Websocket task: sends without
+    // the room waiter, which only the proxy task may mark or clear.
     void reject(const ble::Command &command, const ble::Error &error)
     {
         const std::string message = ble::refusalMessage(command, error);
-        if (!message.empty()) send(message);
+        if (!message.empty() && hooks.send) hooks.send(message.data(), message.size());
     }
 };
 
