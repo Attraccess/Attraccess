@@ -30,6 +30,7 @@ import {
 import { MqttSubscriptionError } from './model';
 
 import { WagoControllerEnrollment } from './enrollment';
+import type { WagoEnrollment } from './enrollment.entity';
 
 export abstract class WagoSubscriptions extends WagoControllerEnrollment {
   protected async onHeartbeat(hardwareId: string, payload: Buffer): Promise<void> {
@@ -148,6 +149,19 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
   protected async onDiscovery(serverId: number, topic: string, payload: Buffer): Promise<void> {
     const hardwareId = topic.slice(`${DISCOVERY_ROOT}/`.length);
     if (!isValidHardwareId(hardwareId)) return;
+    const announcement = this.readAnnouncement(topic, hardwareId, payload);
+    if (!announcement) return;
+    const enrollment = await this.announcedEnrollment(announcement, serverId, hardwareId, topic);
+    if (!enrollment) return;
+    const existing = await this.controllers.findOne({ where: { hardwareId } });
+    if (existing?.trustState === 'claimed') return; // Discovery can never modify trusted identity or configuration.
+    const stored = await this.storeDiscovered(existing, announcement, enrollment, serverId);
+    if (stored === 'raced') return this.onDiscovery(serverId, topic, payload);
+    if (stored) await this.offerDiscoveredController(stored);
+  }
+
+  /** The valid announcement of a discovery message, or null (with a warning) when it must be ignored. */
+  private readAnnouncement(topic: string, hardwareId: string, payload: Buffer): WagoAnnouncement | null {
     let announcement: WagoAnnouncement;
     try {
       announcement = parseAnnouncement(payload);
@@ -155,21 +169,38 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
       this.context.logger.warn(
         `Ignoring invalid WAGO announcement: ${error instanceof Error ? error.message : String(error)}`,
       );
-      return;
+      return null;
     }
-    if (announcement.hardwareId !== hardwareId) {
-      this.context.logger.warn(`Ignoring WAGO announcement with mismatched hardware ID on ${topic}`);
-      return;
-    }
+    if (announcement.hardwareId === hardwareId) return announcement;
+    this.context.logger.warn(`Ignoring WAGO announcement with mismatched hardware ID on ${topic}`);
+    return null;
+  }
+
+  private async announcedEnrollment(
+    announcement: WagoAnnouncement,
+    serverId: number,
+    hardwareId: string,
+    topic: string,
+  ): Promise<WagoEnrollment | null> {
     const enrollment = announcement.enrollmentSecret
       ? await this.validEnrollment(announcement.enrollmentSecret, serverId, hardwareId)
       : null;
     if (!enrollment) {
       this.context.logger.warn(`Ignoring WAGO announcement without a valid enrollment secret on ${topic}`);
-      return;
     }
-    const existing = await this.controllers.findOne({ where: { hardwareId } });
-    if (existing?.trustState === 'claimed') return; // Discovery can never modify trusted identity or configuration.
+    return enrollment;
+  }
+
+  /**
+   * Records the announcement as an untrusted controller. Returns the stored controller, null when a concurrent claim
+   * won the race, or 'raced' when a concurrent announcement inserted the controller first.
+   */
+  private async storeDiscovered(
+    existing: WagoController | null,
+    announcement: WagoAnnouncement,
+    enrollment: WagoEnrollment,
+    serverId: number,
+  ): Promise<WagoController | 'raced' | null> {
     const now = new Date().toISOString();
     const discovered = {
       mqttServerId: serverId,
@@ -183,7 +214,6 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
       compatibilityError: compatibilityError(announcement),
       updatedAt: now,
     };
-    let candidate: WagoController;
     if (existing) {
       const lastSequence = announcement.sequence ?? existing.lastSequence;
       // Compare-and-set on the untrusted state: a claim that won the race keeps its trusted identity.
@@ -191,33 +221,32 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
         { id: existing.id, trustState: 'untrusted' },
         { ...discovered, lastSequence },
       );
-      if (!updated) return;
-      candidate = { ...existing, ...discovered, lastSequence };
-    } else {
-      try {
-        candidate = await this.controllers.insert({
-          ...discovered,
-          hardwareId,
-          trustState: 'untrusted',
-          name: null,
-          lastSequence: announcement.sequence ?? 0,
-          lastHeartbeatAt: null,
-          createdAt: now,
-        });
-      } catch (error) {
-        // A concurrent announcement created the controller first; handle this one as an update of it.
-        if (error instanceof PluginStorageUniqueViolation) return this.onDiscovery(serverId, topic, payload);
-        throw error;
-      }
+      return updated ? { ...existing, ...discovered, lastSequence } : null;
     }
-    if (this.commissioningDiscoveryHandler) {
-      try {
-        await this.commissioningDiscoveryHandler(candidate);
-      } catch (error) {
-        this.context.logger.warn(
-          `Could not automatically claim commissioned WAGO controller ${candidate.hardwareId}: ${String(error)}`,
-        );
-      }
+    try {
+      return await this.controllers.insert({
+        ...discovered,
+        hardwareId: announcement.hardwareId,
+        trustState: 'untrusted',
+        name: null,
+        lastSequence: announcement.sequence ?? 0,
+        lastHeartbeatAt: null,
+        createdAt: now,
+      });
+    } catch (error) {
+      if (error instanceof PluginStorageUniqueViolation) return 'raced';
+      throw error;
+    }
+  }
+
+  private async offerDiscoveredController(candidate: WagoController): Promise<void> {
+    if (!this.commissioningDiscoveryHandler) return;
+    try {
+      await this.commissioningDiscoveryHandler(candidate);
+    } catch (error) {
+      this.context.logger.warn(
+        `Could not automatically claim commissioned WAGO controller ${candidate.hardwareId}: ${String(error)}`,
+      );
     }
   }
 

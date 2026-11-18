@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  checkAgainstBaseline,
   compareWithBaseline,
   countViolations,
+  describeResult,
   findViolations,
   isChecked,
   isPluginZone,
   pluginDebt,
+  updatedBaseline,
   workingTreeSources,
 } from './check-persistence-boundaries.mjs';
 
@@ -244,4 +247,38 @@ test('reads only checked files that still exist', () => {
     (file) => contents[file],
   );
   assert.deepEqual([...sources.keys()], ['apps/api/src/a.ts']);
+});
+
+test('the updated baseline is sorted and leaves out the files that can never be baselined', () => {
+  const counts = { 'apps/api/src/b.ts': 2, 'apps/api/src/a.ts': 1, 'libs/plugins-backend-sdk/src/lib/x.ts': 3 };
+  assert.deepEqual(Object.entries(updatedBaseline(counts)), [
+    ['apps/api/src/a.ts', 1],
+    ['apps/api/src/b.ts', 2],
+  ]);
+});
+
+test('requiring clean plugins turns the remaining plugin debt into a problem', () => {
+  const plugin = 'apps/plugins/wago/backend/old.ts';
+  const counts = { [plugin]: 1 };
+  const loose = checkAgainstBaseline(counts, counts, false);
+  assert.deepEqual(loose, { problems: [], debt: [plugin] });
+  const strict = checkAgainstBaseline(counts, counts, true);
+  assert.deepEqual(strict.debt, [plugin]);
+  assert.equal(strict.problems.length, 1);
+  assert.match(strict.problems[0], /1 plugin-zone file\(s\) still use the old persistence surface: .*old\.ts/);
+  assert.deepEqual(checkAgainstBaseline({}, {}, true), { problems: [], debt: [] });
+});
+
+test('describes a failed check with every problem, a passing one with the baseline size and plugin debt', () => {
+  const failed = describeResult({ problems: ['a: bad', 'b: bad'], debt: [] }, {});
+  assert.equal(failed.error, 'Persistence boundary check failed:\n  a: bad\n  b: bad');
+  assert.deepEqual(failed.lines, []);
+  const clean = describeResult({ problems: [], debt: [] }, { 'apps/api/src/a.ts': 1 });
+  assert.deepEqual(clean, {
+    error: '',
+    lines: ['Persistence boundaries hold: 1 files remain on the shrinking baseline.'],
+  });
+  const withDebt = describeResult({ problems: [], debt: ['apps/plugins/x.ts'] }, { 'apps/plugins/x.ts': 1 });
+  assert.equal(withDebt.lines.length, 2);
+  assert.match(withDebt.lines[1], /1 of them are transitional plugin-zone files/);
 });

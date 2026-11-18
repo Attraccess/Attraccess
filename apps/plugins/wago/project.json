@@ -477,7 +477,7 @@
       "inputs": ["default"],
       "outputs": ["{workspaceRoot}/coverage/apps/plugins/wago/test-scripts"],
       "options": {
-        "command": "node scripts/crap-score/node-test.mjs apps/plugins/wago coverage/apps/plugins/wago/test-scripts apps/plugins/wago/scripts/check-acceptance.test.mjs"
+        "command": "node scripts/crap-score/node-test.mjs apps/plugins/wago coverage/apps/plugins/wago/test-scripts apps/plugins/wago/scripts/check-acceptance.test.mjs apps/plugins/wago/scripts/legacy-sdk-persistence.test.mjs"
       }
     }
   }

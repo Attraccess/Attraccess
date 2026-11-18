@@ -198,32 +198,55 @@ export function pluginDebt(counts, baseline) {
   return [...new Set([...Object.keys(counts), ...Object.keys(baseline)])].filter(isPluginZone).sort();
 }
 
-function main() {
-  const update = process.argv.includes('--update');
-  const requireCleanPlugins = process.argv.includes('--require-clean-plugins');
-  const counts = countViolations(workingTreeSources());
-  if (update) {
-    const entries = Object.entries(counts).filter(([file]) => !zeroTolerance.some((pattern) => pattern.test(file)));
-    const baseline = Object.fromEntries(entries.sort(([a], [b]) => a.localeCompare(b)));
-    writeFileSync(baselineFile, JSON.stringify(baseline, null, 2) + '\n');
-    console.log(`Wrote ${entries.length} files to the persistence boundary baseline.`);
-    return;
-  }
-  const baseline = JSON.parse(readFileSync(baselineFile, 'utf8'));
+/** The baseline for the current counts: every file that may be baselined, sorted by path. */
+export function updatedBaseline(counts) {
+  const entries = Object.entries(counts).filter(([file]) => !zeroTolerance.some((pattern) => pattern.test(file)));
+  return Object.fromEntries(entries.sort(([a], [b]) => a.localeCompare(b)));
+}
+
+/** The problems of the counts against the baseline, plus the plugin debt they leave. */
+export function checkAgainstBaseline(counts, baseline, requireCleanPlugins) {
   const problems = compareWithBaseline(counts, baseline);
   const debt = pluginDebt(counts, baseline);
   if (requireCleanPlugins && debt.length > 0) {
     problems.push(`${debt.length} plugin-zone file(s) still use the old persistence surface: ${debt.join(', ')}`);
   }
+  return { problems, debt };
+}
+
+/** The console output of a check; an empty `error` means the check passed. */
+export function describeResult({ problems, debt }, baseline) {
   if (problems.length > 0) {
-    console.error(`Persistence boundary check failed:\n${problems.map((problem) => `  ${problem}`).join('\n')}`);
-    process.exitCode = 1;
+    return {
+      error: `Persistence boundary check failed:\n${problems.map((problem) => `  ${problem}`).join('\n')}`,
+      lines: [],
+    };
+  }
+  const lines = [
+    `Persistence boundaries hold: ${Object.keys(baseline).length} files remain on the shrinking baseline.`,
+  ];
+  if (debt.length > 0) {
+    lines.push(`  ${debt.length} of them are transitional plugin-zone files (ports to context.storage pending).`);
+  }
+  return { error: '', lines };
+}
+
+function main() {
+  const counts = countViolations(workingTreeSources());
+  if (process.argv.includes('--update')) {
+    const baseline = updatedBaseline(counts);
+    writeFileSync(baselineFile, JSON.stringify(baseline, null, 2) + '\n');
+    console.log(`Wrote ${Object.keys(baseline).length} files to the persistence boundary baseline.`);
     return;
   }
-  console.log(`Persistence boundaries hold: ${Object.keys(baseline).length} files remain on the shrinking baseline.`);
-  if (debt.length > 0) {
-    console.log(`  ${debt.length} of them are transitional plugin-zone files (ports to context.storage pending).`);
+  const baseline = JSON.parse(readFileSync(baselineFile, 'utf8'));
+  const result = checkAgainstBaseline(counts, baseline, process.argv.includes('--require-clean-plugins'));
+  const { error, lines } = describeResult(result, baseline);
+  if (error) {
+    console.error(error);
+    process.exitCode = 1;
   }
+  lines.forEach((line) => console.log(line));
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main();

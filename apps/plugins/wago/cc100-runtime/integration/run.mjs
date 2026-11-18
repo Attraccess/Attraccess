@@ -1,9 +1,10 @@
-import { mkdtemp, mkdir, readFile, readdir, writeFile, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm, symlink } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { build } from 'esbuild';
+import { usesLegacySdkPersistence } from '../../scripts/legacy-sdk-persistence.mjs';
 
 // Broker dependencies and every simulator identity live outside the checkout.
 const temporary = await mkdtemp(join(tmpdir(), 'wago-simulator-integration-'));
@@ -21,22 +22,9 @@ function backendSource(sourceRoot, currentPath, legacyPath) {
   return existsSync(current) ? current : join(sourceRoot, 'apps/plugins/wago/backend', legacyPath);
 }
 // Plugin SDK 2.0 has no TypeORM entities or repositories: the service talks to the record port (`context.storage`) that
-// the harness fakes in memory. A base revision that still persists through SDK-root decorators, the `/sqlite` subpath or
-// `context.persistence` repositories cannot load against the SDK or the harness of the revision under test, so the
-// "main" service falls back to the current service until the base revision uses the record port too. The simulator
-// itself does not use the SDK.
-const legacyDecoratorNames = /\b(?:PrimaryGeneratedColumn|PrimaryColumn|Entity|Column)\b/;
-async function usesLegacySdkPersistence(directory) {
-  if (!existsSync(join(directory, 'storage/index.ts'))) return true;
-  const files = (await readdir(directory, { recursive: true })).filter((file) => file.endsWith('.ts'));
-  for (const file of files) {
-    const source = await readFile(join(directory, file), 'utf8');
-    if (/from\s*'@attraccess\/plugins-backend-sdk\/sqlite'/.test(source)) return true;
-    for (const statement of source.match(/import\s*\{[^}]*\}\s*from\s*'@attraccess\/plugins-backend-sdk'/g) ?? [])
-      if (legacyDecoratorNames.test(statement)) return true;
-  }
-  return false;
-}
+// the harness fakes in memory. A base revision that still persists through the old surface cannot load against the SDK
+// or the harness of the revision under test, so the "main" service falls back to the current service until the base
+// revision uses the record port too. The simulator itself does not use the SDK.
 async function snapshot(ref, label, directories) {
   const commit = execFileSync('git', ['rev-parse', '--verify', `${ref}^{commit}`], {
     cwd: root,
