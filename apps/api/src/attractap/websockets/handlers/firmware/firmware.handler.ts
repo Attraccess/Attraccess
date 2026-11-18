@@ -90,11 +90,12 @@ export class AttractapFirmwareHandler {
     socket.state.cardRelay = data.payload?.capabilities?.cardRelay === true;
     // Plugin BLE (protocol v1): older or incompatible firmware makes plugins see READER_UNSUPPORTED.
     socket.state.ble = parseBleCapability(data.payload?.capabilities?.ble);
-    await this.attractapService.updateReaderFirmware(socket.readerId, this.withValidatedUi(data.payload));
+    // The eFuse report and the identity upgrade on the control channel wait for the build: hand it over
+    // before the database writes, so a slow write cannot run them into their wait limit.
     const build = parseReportedBuild(data.payload);
-    await this.attractapService.recordReaderBuild(socket.readerId, build);
-    // The eFuse report on the control channel waits for this.
     socket.sessionSecurity?.setBuild(build);
+    await this.attractapService.updateReaderFirmware(socket.readerId, this.withValidatedUi(data.payload));
+    await this.attractapService.recordReaderBuild(socket.readerId, build);
     // Initial full slot sync and crash-loop protection, in the background: it must not stop or delay the OTA check.
     // A reader that is not paired shows nothing from the server.
     if (!socket.state.pairingRequired)

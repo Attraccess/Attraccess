@@ -1,7 +1,6 @@
 import { createPublicKey } from 'crypto';
+import type { AttractapReaderKeyAlgorithm } from '@attraccess/application-models';
 import { canonicalP256Spki } from './pairing-model';
-
-export type ReaderKeyAlgorithm = 'ecdsa-p256' | 'rsa-3072';
 
 export const RSA_BITS = 3072;
 export const RSA_PUBLIC_EXPONENT = 65537n;
@@ -28,7 +27,7 @@ export function validateRsa3072Der(der: Buffer): Buffer {
 }
 
 /** The algorithm of a canonical reader SPKI, or null when it is neither P-256 nor RSA-3072. */
-export function readerKeyAlgorithm(spki: Buffer): ReaderKeyAlgorithm | null {
+export function readerKeyAlgorithm(spki: Buffer): AttractapReaderKeyAlgorithm | null {
   try {
     const key = createPublicKey({ key: spki, format: 'der', type: 'spki' });
     if (key.asymmetricKeyType === 'ec' && key.asymmetricKeyDetails?.namedCurve === 'prime256v1') return 'ecdsa-p256';
@@ -46,7 +45,9 @@ export function readerKeyAlgorithm(spki: Buffer): ReaderKeyAlgorithm | null {
 }
 
 /** A reader key for pairing: canonical P-256 or RSA-3072. Anything else is refused. */
-export async function canonicalReaderSpki(encoded: unknown): Promise<{ spki: Buffer; algorithm: ReaderKeyAlgorithm }> {
+export async function canonicalReaderSpki(
+  encoded: unknown,
+): Promise<{ spki: Buffer; algorithm: AttractapReaderKeyAlgorithm }> {
   if (typeof encoded !== 'string') throw new Error('invalid hello');
   try {
     return { spki: await canonicalP256Spki(encoded), algorithm: 'ecdsa-p256' };

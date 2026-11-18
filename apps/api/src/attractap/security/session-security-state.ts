@@ -1,5 +1,8 @@
-import { ATTRACTAP_FIRMWARE_PROFILES, type AttractapFirmwareProfile } from '@attraccess/application-models';
-import type { ReaderKeyAlgorithm } from './reader-spki';
+import {
+  ATTRACTAP_FIRMWARE_PROFILES,
+  type AttractapFirmwareProfile,
+  type AttractapReaderKeyAlgorithm,
+} from '@attraccess/application-models';
 
 /** What a reader claims about its own build in READER_FIRMWARE_INFO. A claim, never attestation. */
 export interface ReportedBuild {
@@ -10,6 +13,8 @@ export interface ReportedBuild {
 }
 
 const MAX_SECURE_VERSION = 0xffff;
+/** How long a control message that needs the build (eFuse report, identity upgrade) waits for READER_FIRMWARE_INFO. */
+export const FIRMWARE_INFO_WAIT_MS = 5_000;
 
 export function parseReportedBuild(payload: unknown): ReportedBuild {
   const p = (payload ?? {}) as Record<string, unknown>;
@@ -29,11 +34,6 @@ export function parseReportedBuild(payload: unknown): ReportedBuild {
   };
 }
 
-/** A demo build (variant name) or a debug build never becomes secured. */
-export function isDemoVariant(variant: string | null): boolean {
-  return variant === null || /demo|debug/i.test(variant);
-}
-
 /**
  * Per session facts about the reader's credential and its reported build. The eFuse report arrives on the
  * control channel right after READER_FIRMWARE_INFO is sent on the application channel; the two are handled
@@ -47,7 +47,7 @@ export class SessionSecurityState {
     public readonly readerId: number,
     /** SHA-256 hex of the SPKI this session authenticated with. */
     public readonly fingerprint: string,
-    public readonly algorithm: ReaderKeyAlgorithm | null,
+    public readonly algorithm: AttractapReaderKeyAlgorithm | null,
   ) {}
 
   public setBuild(build: ReportedBuild): void {

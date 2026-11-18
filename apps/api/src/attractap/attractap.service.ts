@@ -2,17 +2,18 @@ import type { AuditAuthenticationMethod } from '@attraccess/application-models';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { isDemoVariant } from './security/session-security-state';
+import { isSecurableBuild } from './security/secured-eligibility';
+import type { ReportedBuild } from './security/session-security-state';
 
 import type {
   AttractapCrashReportRecord,
   AttractapCardOwner,
   AttractapFirmwareInfo,
-  AttractapFirmwareProfile,
   AttractapNfcCard,
   AttractapReader,
   AttractapReaderEdit,
   AttractapReaderFilter,
+  AttractapReaderSecurityPatch,
   AttractapReaderWithResources,
   NewAttractapNfcCard,
   NotificationRecipient,
@@ -362,24 +363,21 @@ export class AttractapService {
 
   /**
    * Stores what the reader reported about its build (profile, app secure_version). A claim: it never makes a reader
-   * secured. A reader that is not a release secure build any more loses `secured` right away.
+   * secured. A reader that is not a release secure build any more loses `secured` right away. Every connection
+   * reports its build, so only what differs from the stored columns is written, and usually nothing is.
    */
-  public async recordReaderBuild(
-    id: number,
-    build: {
-      profile: AttractapFirmwareProfile | null;
-      release: boolean;
-      secureVersion: number | null;
-      variant?: string | null;
-    },
-  ) {
-    // Same eligibility as the eFuse report check: a demo or debug variant never stays secured.
-    const eligible = build.profile === 'secure' && build.release && !isDemoVariant(build.variant ?? null);
-    await this.readerStore.applySecurity(id, {
-      firmwareProfile: build.profile,
-      secureVersion: build.secureVersion,
-      ...(eligible ? {} : { secured: false, securedAt: null }),
-    });
+  public async recordReaderBuild(id: number, build: ReportedBuild) {
+    const stored = await this.readerStore.findSecurity(id);
+    if (!stored) return;
+    const patch: AttractapReaderSecurityPatch = {};
+    if (stored.firmwareProfile !== build.profile) patch.firmwareProfile = build.profile;
+    if (stored.secureVersion !== build.secureVersion) patch.secureVersion = build.secureVersion;
+    // Same eligibility as the eFuse report check: a plain, secure-lab, non-release, demo or debug build never stays secured.
+    if (!isSecurableBuild(build) && (stored.secured || stored.securedAt !== null)) {
+      patch.secured = false;
+      patch.securedAt = null;
+    }
+    if (Object.keys(patch).length > 0) await this.readerStore.applySecurity(id, patch);
   }
 
   public async getAllReaders(filter?: AttractapReaderFilter): Promise<AttractapReader[]> {

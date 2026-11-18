@@ -4,6 +4,7 @@ import type {
   AttractapReader,
   AttractapReaderEdit,
   AttractapReaderFilter,
+  AttractapReaderSecurity,
   AttractapReaderSecurityPatch,
   AttractapReaderWithResources,
 } from '@attraccess/application-models';
@@ -15,6 +16,8 @@ import type {
 export interface AttractapReaderStore {
   /** A reader with its linked resources. */
   findById(id: number): Promise<AttractapReaderWithResources | undefined>;
+  /** Only the security columns and recorded Secure Boot digests of a reader: a narrow read, no resources. */
+  findSecurity(id: number): Promise<AttractapReaderSecurity | undefined>;
   /** Readers matching the filter, in storage order. Resources are loaded only when the filter asks for them. */
   list(filter?: AttractapReaderFilter): Promise<AttractapReader[]>;
   /** Readers that are not paired (the pairing session's list), with their linked resources. */

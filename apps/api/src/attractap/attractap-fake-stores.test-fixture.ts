@@ -11,6 +11,7 @@ import type {
   AttractapReader,
   AttractapReaderEdit,
   AttractapReaderFilter,
+  AttractapReaderSecurity,
   AttractapReaderSecurityPatch,
   AttractapReaderWithResources,
   AttractapSecureBootKeyRecord,
@@ -85,6 +86,8 @@ export class FakeReaderStore implements AttractapReaderStore {
   readers = new Map<number, AttractapReader>();
   resources = new Map<number, AttractapLinkedResource>();
   edits: Array<{ id: number; edit: AttractapReaderEdit }> = [];
+  /** Every security write, also the ones the credential condition refused. */
+  securityPatches: Array<{ id: number; patch: AttractapReaderSecurityPatch }> = [];
   private nextId = 1;
 
   add(reader: AttractapReader): AttractapReader {
@@ -130,10 +133,33 @@ export class FakeReaderStore implements AttractapReaderStore {
       reader.resources = edit.resourceIds.map((rid) => this.resources.get(rid) ?? makeResource(rid));
   }
 
+  async findSecurity(id: number): Promise<AttractapReaderSecurity | undefined> {
+    const reader = this.readers.get(id);
+    if (!reader) return undefined;
+    const { secureBootDigest0, secureBootDigest1, secured, securedAt, firmwareProfile, secureVersion } = reader;
+    const { efuseSecureVersion, securityReportCheckedAt, securityReportProblems } = reader;
+    return {
+      id,
+      secureBootDigest0,
+      secureBootDigest1,
+      secured,
+      securedAt,
+      firmwareProfile,
+      secureVersion,
+      efuseSecureVersion,
+      securityReportCheckedAt,
+      securityReportProblems,
+    };
+  }
+
   async applySecurity(id: number, patch: AttractapReaderSecurityPatch, whenCredential?: string): Promise<boolean> {
+    this.securityPatches.push({ id, patch });
     const reader = this.readers.get(id);
     if (!reader) return false;
-    if (whenCredential !== undefined && (reader.pairingState !== 'paired' || reader.credentialFingerprint !== whenCredential)) {
+    if (
+      whenCredential !== undefined &&
+      (reader.pairingState !== 'paired' || reader.credentialFingerprint !== whenCredential)
+    ) {
       return false;
     }
     Object.assign(reader, patch);

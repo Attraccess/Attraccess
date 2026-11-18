@@ -1,3 +1,5 @@
+import { ATTRACTAP_SECURITY_PROBLEMS } from '@attraccess/application-models';
+import { projectAttractapAuditEvent } from '../../audit/policies/attractap';
 import { FakeReaderStore, makeReader } from '../attractap-fake-stores.test-fixture';
 import { EfuseReportService } from './efuse-report.service';
 import { DIGEST0, DIGEST1, releaseReport } from './testing/efuse-report.test-fixture';
@@ -12,13 +14,16 @@ describe('EfuseReportService', () => {
 
   beforeEach(() => {
     readers = new FakeReaderStore();
-    readers.readers.set(5, makeReader({
+    readers.readers.set(
+      5,
+      makeReader({
         id: 5,
         pairingState: 'paired',
         credentialFingerprint: 'a'.repeat(64),
         secureBootDigest0: DIGEST0,
         secureBootDigest1: DIGEST1,
-      }));
+      }),
+    );
     audit = { record: jest.fn().mockResolvedValue(undefined) };
     service = new EfuseReportService(readers, audit);
   });
@@ -78,6 +83,73 @@ describe('EfuseReportService', () => {
     expect(reader()?.secured).toBe(false);
     expect(reader()?.securityReportProblems).toContain(problem);
     expect(actions()).toEqual([]);
+  });
+
+  it('reads only the security columns of the reader, not the reader with its resources', async () => {
+    const findById = jest.spyOn(readers, 'findById');
+    await service.handle(state(release), releaseReport());
+    expect(findById).not.toHaveBeenCalled();
+    expect(reader()?.secured).toBe(true);
+  });
+
+  it('leaves the app secure_version out of the reader.secured event when the reader reported none', async () => {
+    await service.handle(state({ ...release, secureVersion: null }), releaseReport());
+    expect(audit.record.mock.calls[0][0].details).toEqual({
+      fingerprint: 'a'.repeat(64),
+      profile: 'secure',
+      efuseSecureVersion: 1,
+    });
+  });
+
+  it('audits every problem of a report where everything fails, in a form the audit policy accepts', async () => {
+    await service.handle(state(release), releaseReport());
+    const broken = releaseReport({
+      secureBootEn: false,
+      keys: releaseReport().keys.map(() => ({ purpose: 'USER', used: false, readProtected: false })),
+      digest0: null,
+      digest1: null,
+      revoke: [true, true, false],
+      cryptCnt: 0,
+      cryptCntWriteProtected: false,
+      flashEncryptionMode: 'disabled',
+      disDownloadManualEncrypt: false,
+      jtag: { padDisabled: false, usbDisabled: false, softDisJtag: 0 },
+      download: {
+        disDownloadMode: false,
+        enableSecurityDownload: false,
+        disForceDownload: false,
+        disUsbSerialJtagDownload: false,
+      },
+      rdDis: 0,
+      rdDisWriteProtected: false,
+      secureVersion: 0,
+    });
+    const plainDemo = { profile: 'plain' as const, release: false, variant: 'demo', secureVersion: null };
+    await service.handle(state(plainDemo, 'ecdsa-p256'), broken);
+
+    const problems = reader()?.securityReportProblems ?? [];
+    // Every code except the alternatives of other ones: firmware-info-missing, digest*-not-recorded, flash-encryption-not-final.
+    const alternatives = [
+      'firmware-info-missing',
+      'digest0-not-recorded',
+      'digest1-not-recorded',
+      'flash-encryption-not-final',
+    ];
+    expect([...problems].sort()).toEqual(
+      ATTRACTAP_SECURITY_PROBLEMS.filter((code) => !alternatives.includes(code)).sort(),
+    );
+    const failed = audit.record.mock.calls[1][0];
+    expect(failed.action).toBe('attractap.reader.security_check_failed');
+    expect(failed.details).toEqual({ problems: problems.join(',') });
+    expect(
+      projectAttractapAuditEvent({
+        action: 'reader.security_check_failed',
+        actorId: null,
+        authenticationMethod: null,
+        subjectId: 5,
+        details: failed.details,
+      }),
+    ).not.toBeNull();
   });
 
   it('puts a secured reader whose later report fails back to not secured, records the problems and audits it', async () => {

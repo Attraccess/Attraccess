@@ -1,10 +1,14 @@
 import { ApiProperty, ApiSchema, getSchemaPath } from '@nestjs/swagger';
-import type {
-  AttractapFirmwareInfo,
-  AttractapLinkedResource,
-  AttractapPairingState,
-  AttractapReader,
-  AttractapReaderCapabilities,
+import {
+  ATTRACTAP_FIRMWARE_PROFILES,
+  ATTRACTAP_SECURITY_PROBLEMS,
+  type AttractapFirmwareInfo,
+  type AttractapFirmwareProfile,
+  type AttractapLinkedResource,
+  type AttractapPairingState,
+  type AttractapReader,
+  type AttractapReaderCapabilities,
+  type AttractapSecurityProblem,
 } from '@attraccess/application-models';
 
 /** Schema names match the published API: the generated clients know these as AttractapCapabilities etc. */
@@ -131,26 +135,37 @@ export class AttractapReaderDto {
 
   @ApiProperty({
     description: 'Firmware profile the reader reported (a claim, not attestation)',
-    enum: ['plain', 'secure', 'secure-lab'],
+    enum: ATTRACTAP_FIRMWARE_PROFILES,
     nullable: true,
   })
-  firmwareProfile!: 'plain' | 'secure' | 'secure-lab' | null;
+  firmwareProfile!: AttractapFirmwareProfile | null;
 
-  @ApiProperty({ description: "The app's secure_version as the reader reported it", nullable: true })
+  @ApiProperty({
+    description:
+      'Anti-rollback secure_version of the running app image, as the reader reported it in its firmware info. ' +
+      'Compare with efuseSecureVersion: the image runs only while this is at least the eFuse value.',
+    nullable: true,
+  })
   secureVersion!: number | null;
 
-  @ApiProperty({ description: 'The eFuse SECURE_VERSION from the last eFuse report', nullable: true })
+  @ApiProperty({
+    description: "The chip's eFuse SECURE_VERSION (anti-rollback floor), from the reader's last eFuse report",
+    nullable: true,
+  })
   efuseSecureVersion!: number | null;
 
-  @ApiProperty({ description: 'When the last eFuse report was checked', nullable: true })
+  @ApiProperty({ description: 'When the server last checked an eFuse report of the reader', nullable: true })
   securityReportCheckedAt!: Date | null;
 
   @ApiProperty({
-    description: 'Problem codes of the last eFuse report check (empty when it passed)',
-    type: [String],
+    description:
+      'Problem codes of the last security check (build, session identity and eFuse report); empty when it passed, ' +
+      'null when no eFuse report was received',
+    enum: ATTRACTAP_SECURITY_PROBLEMS,
+    isArray: true,
     nullable: true,
   })
-  securityReportProblems!: string[] | null;
+  securityReportProblems!: AttractapSecurityProblem[] | null;
 
   @ApiProperty({
     description: 'The resources that the reader has access to',

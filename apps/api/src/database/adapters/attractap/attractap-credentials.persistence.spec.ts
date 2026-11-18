@@ -205,6 +205,19 @@ describe('credential registry on SQLite (atomic reader row and history)', () => 
       firmwareProfile: 'secure',
       securityReportProblems: [],
     });
+    expect(await readers.findSecurity(readerId)).toEqual({
+      id: readerId,
+      secureBootDigest0: null,
+      secureBootDigest1: null,
+      secured: true,
+      securedAt: checkedAt,
+      firmwareProfile: 'secure',
+      secureVersion: null,
+      efuseSecureVersion: 1,
+      securityReportCheckedAt: checkedAt,
+      securityReportProblems: [],
+    });
+    expect(await readers.findSecurity(readerId + 1000)).toBeUndefined();
 
     await pair('fp-ds'); // an identity upgrade: the new key has to pass the report check again
     expect(await readers.findById(readerId)).toMatchObject({

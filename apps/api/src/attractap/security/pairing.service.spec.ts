@@ -8,46 +8,9 @@ import { spkiFingerprint } from './pki';
 import { EnrollmentLimitsService } from '../../device-enrollment/enrollment-limits.service';
 import { EnrollmentRateLimitedException } from '../../device-enrollment/enrollment-rate-limited.exception';
 import { PAIRING_SUBPROTOCOL } from './session-framing';
+import { PairingClient, deferred, readerKey } from './testing/pairing-client.test-fixture';
 
 const actor = { userId: 1, authenticationMethod: 'session' as const };
-
-function deferred() {
-  let release!: () => void;
-  const promise = new Promise<void>((resolve) => (release = resolve));
-  return { promise, release };
-}
-
-async function readerKey() {
-  const keys = (await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, [
-    'sign',
-    'verify',
-  ])) as CryptoKeyPair;
-  return Buffer.from(await webcrypto.subtle.exportKey('spki', keys.publicKey as unknown as webcrypto.CryptoKey));
-}
-
-class PairingClient {
-  public readonly messages: Array<Record<string, unknown>> = [];
-  public readonly ws: WebSocket;
-  public constructor(url: string, headers: Record<string, string> = {}) {
-    this.ws = new WebSocket(url, PAIRING_SUBPROTOCOL, { headers });
-    this.ws.on('message', (data: Buffer) => this.messages.push(JSON.parse(data.toString())));
-    this.ws.on('error', () => undefined);
-  }
-  public opened() {
-    return new Promise<void>((resolve) => this.ws.once('open', () => resolve()));
-  }
-  public send(message: Record<string, unknown>) {
-    this.ws.send(JSON.stringify(message));
-  }
-  public async next(type: string) {
-    for (let i = 0; i < 100; i++) {
-      const index = this.messages.findIndex((m) => m['type'] === type);
-      if (index >= 0) return this.messages.splice(index, 1)[0];
-      await new Promise((r) => setTimeout(r, 20));
-    }
-    throw new Error(`no ${type} message`);
-  }
-}
 
 describe('PairingService', () => {
   let http: Server;
@@ -306,9 +269,42 @@ describe('PairingService', () => {
     expect(service.list()).toHaveLength(1);
   });
 
-  it('pairs a reader whose key is RSA-3072 (the DS identity)', async () => {
-    const { publicKey } = generateKeyPairSync('rsa', { modulusLength: 3072 });
-    await announce({}, 'touch', publicKey.export({ type: 'spki', format: 'der' }));
+  const rsaSpki = (modulusLength: number) =>
+    generateKeyPairSync('rsa', { modulusLength }).publicKey.export({ type: 'spki', format: 'der' });
+
+  it('pairs a reader whose key is RSA-3072 (the DS identity), and re-pairs it with that key after a revoke', async () => {
+    const key = rsaSpki(3072);
+    const first = await announce({}, 'touch', key);
+    expect(first.checks).toBe(true);
+    const done = await service.approve((await pendingOf()).id, { code: first.code, mode: 'new' }, actor);
+    await first.client.next('accepted');
+    const readerId = done.targetReaderId as number;
+    const fingerprint = spkiFingerprint(key);
+    expect(readers.get(readerId)).toMatchObject({ pairingState: 'paired', credentialFingerprint: fingerprint });
+
+    await service.revoke(readerId, actor);
+    const again = await announce({}, 'touch', key);
+    const target = { code: again.code, mode: 'takeover' as const, targetReaderId: readerId };
+    await service.approve((await pendingOf()).id, target, actor);
+    await again.client.next('accepted');
+    expect(readers.get(readerId)).toMatchObject({ pairingState: 'paired', credentialFingerprint: fingerprint });
+    expect(credentialEvents.map((e) => [e['state'], e['keyFingerprint']])).toEqual([
+      ['paired', fingerprint],
+      ['revoked', fingerprint],
+      ['paired', fingerprint],
+    ]);
+  });
+
+  it.each([2048, 4096])('refuses a reader key that is RSA-%d, before any round', async (modulusLength) => {
+    const client = new PairingClient(url);
+    clients.push(client);
+    const closed = new Promise<number>((resolve) => client.ws.once('close', (code) => resolve(code)));
+    await client.opened();
+    const publicKey = rsaSpki(modulusLength).toString('base64');
+    client.send({ type: 'hello', v: 1, kind: 'touch', publicKey, firmware });
+    expect(await closed).toBe(1008);
+    expect(client.messages).toEqual([]);
+    expect(service.list()).toEqual([]);
   });
 
   it('records the flasher as the method when approving through it', async () => {

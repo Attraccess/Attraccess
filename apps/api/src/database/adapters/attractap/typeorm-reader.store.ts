@@ -7,6 +7,7 @@ import type {
   AttractapReader,
   AttractapReaderEdit,
   AttractapReaderFilter,
+  AttractapReaderSecurity,
   AttractapReaderSecurityPatch,
   AttractapReaderWithResources,
 } from '@attraccess/application-models';
@@ -34,6 +35,37 @@ export class TypeOrmAttractapReaderStore implements AttractapReaderStore {
   async findById(id: number): Promise<AttractapReaderWithResources | undefined> {
     const reader = await this.readers.findOne({ where: { id }, relations: { resources: true } });
     return reader ? (toReader(reader) as AttractapReaderWithResources) : undefined;
+  }
+
+  async findSecurity(id: number): Promise<AttractapReaderSecurity | undefined> {
+    const row = await this.readers.findOne({
+      where: { id },
+      select: {
+        id: true,
+        secureBootDigest0: true,
+        secureBootDigest1: true,
+        secured: true,
+        securedAt: true,
+        firmwareProfile: true,
+        secureVersion: true,
+        efuseSecureVersion: true,
+        securityReportCheckedAt: true,
+        securityReportProblems: true,
+      },
+    });
+    if (!row) return undefined;
+    return {
+      id: row.id,
+      secureBootDigest0: row.secureBootDigest0 ?? null,
+      secureBootDigest1: row.secureBootDigest1 ?? null,
+      secured: row.secured ?? false,
+      securedAt: row.securedAt ?? null,
+      firmwareProfile: row.firmwareProfile ?? null,
+      secureVersion: row.secureVersion ?? null,
+      efuseSecureVersion: row.efuseSecureVersion ?? null,
+      securityReportCheckedAt: row.securityReportCheckedAt ?? null,
+      securityReportProblems: row.securityReportProblems ?? null,
+    };
   }
 
   async list(filter: AttractapReaderFilter = {}): Promise<AttractapReader[]> {
@@ -87,7 +119,10 @@ export class TypeOrmAttractapReaderStore implements AttractapReaderStore {
 
   async applySecurity(id: number, patch: AttractapReaderSecurityPatch, whenCredential?: string): Promise<boolean> {
     if (Object.keys(patch).length === 0) return true;
-    const where = whenCredential === undefined ? { id } : { id, pairingState: 'paired' as const, credentialFingerprint: whenCredential };
+    const where =
+      whenCredential === undefined
+        ? { id }
+        : { id, pairingState: 'paired' as const, credentialFingerprint: whenCredential };
     const result = await this.readers.update(where, { ...patch });
     return Boolean(result.affected);
   }

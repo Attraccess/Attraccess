@@ -1,6 +1,12 @@
 import { Column, Entity, JoinTable, ManyToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
+import {
+  ATTRACTAP_FIRMWARE_PROFILES,
+  ATTRACTAP_SECURITY_PROBLEMS,
+  type AttractapFirmwareProfile,
+  type AttractapSecurityProblem,
+} from '@attraccess/application-models';
 import { Resource } from './resource.entity';
 
 class AttractapCapabilities {
@@ -185,30 +191,34 @@ export class Attractap {
   @Column({ type: 'text', nullable: true })
   @ApiProperty({
     description: 'Firmware profile the reader reported',
-    enum: ['plain', 'secure', 'secure-lab'],
+    enum: ATTRACTAP_FIRMWARE_PROFILES,
     nullable: true,
   })
-  firmwareProfile!: 'plain' | 'secure' | 'secure-lab' | null;
+  firmwareProfile!: AttractapFirmwareProfile | null;
 
   @Column({ type: 'integer', nullable: true })
-  @ApiProperty({ description: "The app's secure_version as the reader reported it", nullable: true })
+  @ApiProperty({
+    description: 'Anti-rollback secure_version of the running app image, as the reader reported it',
+    nullable: true,
+  })
   secureVersion!: number | null;
 
   @Column({ type: 'integer', nullable: true })
-  @ApiProperty({ description: 'The eFuse SECURE_VERSION from the last eFuse report', nullable: true })
+  @ApiProperty({ description: "The chip's eFuse SECURE_VERSION from the reader's last eFuse report", nullable: true })
   efuseSecureVersion!: number | null;
 
   @Column({ type: 'datetime', nullable: true })
-  @ApiProperty({ description: 'When the last eFuse report was checked', nullable: true })
+  @ApiProperty({ description: 'When the server last checked an eFuse report of the reader', nullable: true })
   securityReportCheckedAt!: Date | null;
 
   @Column({ type: 'simple-json', nullable: true })
   @ApiProperty({
-    description: 'Problem codes of the last eFuse report check (empty when it passed)',
-    type: [String],
+    description: 'Problem codes of the last security check (empty when it passed)',
+    enum: ATTRACTAP_SECURITY_PROBLEMS,
+    isArray: true,
     nullable: true,
   })
-  securityReportProblems!: string[] | null;
+  securityReportProblems!: AttractapSecurityProblem[] | null;
 
   @ManyToMany(() => Resource, (resource) => resource.attractapReaders)
   @JoinTable()

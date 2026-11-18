@@ -1,3 +1,5 @@
+import { ATTRACTAP_SECURITY_PROBLEMS_MORE, type AttractapSecurityProblem } from '@attraccess/application-models';
+
 /**
  * Lowest eFuse SECURE_VERSION a secured reader may report. Equal to apps/attractap/firmware/secure-version-floor.txt
  * (a spec test asserts it); raise both together, never lower.
@@ -125,8 +127,8 @@ export function checkEfuseReport(
   report: EfuseReport,
   recorded: RecordedDigests,
   floor = SECURE_VERSION_FLOOR,
-): string[] {
-  const problems: string[] = [];
+): AttractapSecurityProblem[] {
+  const problems: AttractapSecurityProblem[] = [];
   const key = (index: number) => report.keys[index];
   const same = (a: string | null, b: string | null) => a !== null && b !== null && a.toLowerCase() === b.toLowerCase();
 
@@ -156,4 +158,21 @@ export function checkEfuseReport(
   if (!report.download.enableSecurityDownload && !report.download.disDownloadMode) problems.push('rom-download-open');
   if (report.secureVersion < floor) problems.push('secure-version-below-floor');
   return problems;
+}
+
+/** Longest problem list an audit event carries. Every problem code at once fits; the bound is a safeguard only. */
+export const AUDIT_PROBLEMS_MAX_LENGTH = 512;
+
+/** Problem codes joined by commas for the audit, cut only between whole codes (then ending in `more`). */
+export function auditProblemList(problems: readonly string[], maxLength = AUDIT_PROBLEMS_MAX_LENGTH): string {
+  const joined = problems.join(',');
+  if (joined.length <= maxLength) return joined;
+  const kept: string[] = [];
+  let length = ATTRACTAP_SECURITY_PROBLEMS_MORE.length;
+  for (const problem of problems) {
+    if (length + problem.length + 1 > maxLength) break;
+    kept.push(problem);
+    length += problem.length + 1;
+  }
+  return [...kept, ATTRACTAP_SECURITY_PROBLEMS_MORE].join(',');
 }

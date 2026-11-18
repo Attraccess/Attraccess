@@ -8,6 +8,64 @@ export type AttractapPairingState = 'unpaired' | 'paired' | 'revoked';
 export const ATTRACTAP_FIRMWARE_PROFILES = ['plain', 'secure', 'secure-lab'] as const;
 export type AttractapFirmwareProfile = (typeof ATTRACTAP_FIRMWARE_PROFILES)[number];
 
+/**
+ * States of a reader's "Secure this reader" conversion. ATT-1208 (T3) owns and persists the state machine;
+ * ATT-1207 only reads `creating-key` (the identity upgrade gate).
+ */
+export const ATTRACTAP_CONVERSION_STATES = [
+  'preflight',
+  'transferring',
+  'fingerprints-burned',
+  'bootloader-written',
+  'encrypting',
+  'creating-key',
+  'secured',
+  'failed',
+  'interrupted',
+] as const;
+export type AttractapConversionState = (typeof ATTRACTAP_CONVERSION_STATES)[number];
+
+/** Key algorithms of a reader identity: the software P-256 key or the RSA-3072 key held by the DS peripheral. */
+export const ATTRACTAP_READER_KEY_ALGORITHMS = ['ecdsa-p256', 'rsa-3072'] as const;
+export type AttractapReaderKeyAlgorithm = (typeof ATTRACTAP_READER_KEY_ALGORITHMS)[number];
+
+/**
+ * Problem codes of a reader security check: why the reader's build or session cannot be secured, then what in its
+ * eFuse report does not match the release secure profile. Stored in `securityReportProblems` and audited.
+ */
+export const ATTRACTAP_SECURITY_PROBLEMS = [
+  // The reader's build and session
+  'firmware-info-missing',
+  'profile-not-secure',
+  'not-release-build',
+  'demo-or-debug-variant',
+  'software-identity',
+  // The eFuse report
+  'secure-boot-disabled',
+  'key0-purpose',
+  'key1-purpose',
+  'digest0-not-recorded',
+  'digest0-mismatch',
+  'digest1-not-recorded',
+  'digest1-mismatch',
+  'signing-key-revoked',
+  'slot2-not-revoked',
+  'flash-encryption-not-release',
+  'flash-encryption-not-final',
+  'manual-encrypt-enabled',
+  'key2-not-xts',
+  'key3-not-ds',
+  'key4-not-nvs-hmac',
+  'rd-dis-incomplete',
+  'rd-dis-writable',
+  'jtag-enabled',
+  'rom-download-open',
+  'secure-version-below-floor',
+] as const;
+export type AttractapSecurityProblem = (typeof ATTRACTAP_SECURITY_PROBLEMS)[number];
+/** Last token of an audited problem list that had to be shortened. */
+export const ATTRACTAP_SECURITY_PROBLEMS_MORE = 'more';
+
 /** What the reader firmware can do, as reported by the reader. */
 export interface AttractapReaderCapabilities {
   resourceSelection: boolean;
@@ -77,7 +135,7 @@ export interface AttractapReader {
   efuseSecureVersion: number | null;
   securityReportCheckedAt: Date | null;
   /** Problem codes of the last eFuse report check; empty when it passed, null when none was received. */
-  securityReportProblems: string[] | null;
+  securityReportProblems: AttractapSecurityProblem[] | null;
   /** Present only when the read asked for the linked resources. */
   resources?: AttractapLinkedResource[];
   lastConnection: Date;
@@ -96,8 +154,23 @@ export interface AttractapReaderSecurityPatch {
   secureVersion?: number | null;
   efuseSecureVersion?: number | null;
   securityReportCheckedAt?: Date | null;
-  securityReportProblems?: string[] | null;
+  securityReportProblems?: AttractapSecurityProblem[] | null;
 }
+
+/** A reader's security columns and recorded Secure Boot digests: what the security checks compare with. */
+export type AttractapReaderSecurity = Pick<
+  AttractapReader,
+  | 'id'
+  | 'secureBootDigest0'
+  | 'secureBootDigest1'
+  | 'secured'
+  | 'securedAt'
+  | 'firmwareProfile'
+  | 'secureVersion'
+  | 'efuseSecureVersion'
+  | 'securityReportCheckedAt'
+  | 'securityReportProblems'
+>;
 
 /** A reader read together with its linked resources. */
 export type AttractapReaderWithResources = AttractapReader & { resources: AttractapLinkedResource[] };

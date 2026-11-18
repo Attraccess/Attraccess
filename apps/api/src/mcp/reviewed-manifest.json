@@ -1672,12 +1672,12 @@
   "updateReader": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "ef94d0e9"
+    "shape": "1bd9f34e"
   },
   "getReaderById": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "3f0ed148"
+    "shape": "a21516d9"
   },
   "deleteReader": {
     "decision": "allow",
@@ -1687,12 +1687,12 @@
   "getReaders": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "ffa019bb"
+    "shape": "d58bb498"
   },
   "getReadersToPair": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "b5ff2111"
+    "shape": "ae39b7e2"
   },
   "getReaderCrashReports": {
     "decision": "allow",
@@ -1752,12 +1752,12 @@
   "getResourceAttractaps": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "905e265e"
+    "shape": "7ada7d7b"
   },
   "getResourceGroupAttractaps": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "f0cc465b"
+    "shape": "301e3b78"
   },
   "getPairings": {
     "decision": "allow",

@@ -7,6 +7,7 @@ import { CoredumpSymbolicationService } from './coredump-symbolication.service';
 import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../notifications/notification-types';
 import { AttractapFirmwareService } from './firmware.service';
+import { parseReportedBuild } from './security/session-security-state';
 import {
   FakeCardStore,
   FakeCrashReportStore,
@@ -216,6 +217,33 @@ describe('AttractapService reader maintenance and crash reports', () => {
       await service.recordReaderBuild(4, build);
       expect(reader).toMatchObject({ secured: false, securedAt: null, firmwareProfile: build.profile });
     }
+  });
+  it('writes the reported build only when it differs from the stored one', async () => {
+    const { service, reader, readers } = setup();
+    const secure = { profile: 'secure' as const, release: true, secureVersion: 1, variant: 'attractap-touch-v2' };
+    await service.recordReaderBuild(4, secure);
+    expect(readers.securityPatches).toEqual([{ id: 4, patch: { firmwareProfile: 'secure', secureVersion: 1 } }]);
+    // Every reconnect reports the same build again: nothing to write, also for a plain reader.
+    await service.recordReaderBuild(4, secure);
+    expect(readers.securityPatches).toHaveLength(1);
+    const plain = { profile: 'plain' as const, release: true, secureVersion: null, variant: 'attractap-touch-v2' };
+    await service.recordReaderBuild(4, plain);
+    await service.recordReaderBuild(4, plain);
+    expect(readers.securityPatches.slice(1)).toEqual([
+      { id: 4, patch: { firmwareProfile: 'plain', secureVersion: null } },
+    ]);
+    // A plain build of a reader that is still marked secured clears it, and only that changes.
+    reader.secured = true;
+    reader.securedAt = new Date();
+    await service.recordReaderBuild(4, plain);
+    expect(readers.securityPatches[2]).toEqual({ id: 4, patch: { secured: false, securedAt: null } });
+    await service.recordReaderBuild(99, plain);
+    expect(readers.securityPatches).toHaveLength(3);
+  });
+  it('never marks a reader secured because its firmware info says so', async () => {
+    const { service, reader } = setup();
+    await service.recordReaderBuild(4, parseReportedBuild({ profile: 'secure', release: true, secured: true }));
+    expect(reader).toMatchObject({ secured: false, securedAt: null, firmwareProfile: 'secure' });
   });
   it('fails for a reader that does not exist', async () => {
     const { service } = setup();

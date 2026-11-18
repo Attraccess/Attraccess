@@ -1,5 +1,11 @@
 import { dataFields, oneOf, positive, isAuthenticationMethod } from './projection';
-import type { AuthenticationMethod } from '@attraccess/application-models';
+import {
+  ATTRACTAP_FIRMWARE_PROFILES,
+  ATTRACTAP_READER_KEY_ALGORITHMS,
+  ATTRACTAP_SECURITY_PROBLEMS,
+  ATTRACTAP_SECURITY_PROBLEMS_MORE,
+  type AuthenticationMethod,
+} from '@attraccess/application-models';
 
 /** Projection input: the attractap action without its `attractap.` prefix. */
 export interface AttractapAuditInput {
@@ -139,6 +145,11 @@ export const attractapResetReasons = new Set([
 ]);
 type DetailValue = string | number | boolean;
 
+const securityProblemTokens: ReadonlySet<string> = new Set([
+  ...ATTRACTAP_SECURITY_PROBLEMS,
+  ATTRACTAP_SECURITY_PROBLEMS_MORE,
+]);
+
 function isSha256Hex(value: DetailValue): boolean {
   return typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
 }
@@ -159,12 +170,12 @@ const detailValidators: Record<string, (value: DetailValue) => boolean> = {
   oldFingerprint: isSha256Hex,
   newFingerprint: isSha256Hex,
   fingerprint: isSha256Hex,
-  algorithm: oneOf('rsa-3072', 'ecdsa-p256'),
-  profile: oneOf('plain', 'secure', 'secure-lab'),
+  algorithm: oneOf(...ATTRACTAP_READER_KEY_ALGORITHMS),
+  profile: oneOf(...ATTRACTAP_FIRMWARE_PROFILES),
   secureVersion: (value) => Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 0xffff,
   efuseSecureVersion: (value) => Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 0xffff,
-  // Problem codes only: kebab-case tokens joined by commas, never reader-supplied text.
-  problems: (value) => typeof value === 'string' && /^[a-z0-9]+(-[a-z0-9]+)*(,[a-z0-9]+(-[a-z0-9]+)*)*$/.test(value),
+  // Known problem codes only, joined by commas (a shortened list ends in `more`), never reader-supplied text.
+  problems: (value) => typeof value === 'string' && value.split(',').every((code) => securityProblemTokens.has(code)),
   resetReason: (value) => attractapResetReasons.has(value as string),
   hasCoredump: (value) => typeof value === 'boolean',
   readerId: positive,
