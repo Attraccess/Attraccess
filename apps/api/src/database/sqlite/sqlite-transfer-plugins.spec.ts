@@ -18,6 +18,7 @@ const readings = table({
   takenAt: f.timestamp(),
   ok: f.boolean(),
   meta: f.json().optional(),
+  file: f.text().optional(),
 });
 const storage = definePluginStorage({
   tables: { readings },
@@ -77,11 +78,21 @@ describe('SQLite transfer of plugin storage', () => {
       { name: 'takenAt', kind: 'timestamp' },
       { name: 'ok', kind: 'boolean' },
       { name: 'meta', kind: 'text' },
+      { name: 'file', kind: 'text' },
     ]);
     expect(exported?.rows).toEqual([
-      [1, '12.50', '2026-03-02', '2026-03-02T09:00:00.123Z', true, '{"a":1}'],
-      [2, '-0.05', null, '2026-03-03T00:00:00.000Z', false, null],
+      [1, '12.50', '2026-03-02', '2026-03-02T09:00:00.123Z', true, '{"a":1}', null],
+      [2, '-0.05', null, '2026-03-03T00:00:00.000Z', false, null, null],
     ]);
+  });
+
+  it('exports the raw bytes 1.x left in a text field as base64, as the record port reads them', async () => {
+    const source = await database(true);
+    await source.query(`UPDATE "${READINGS}" SET "file" = X'00FF10' WHERE "id" = 1`);
+    const exported = (await transfer.exportSnapshot(source, { plugins: [plugin] })).tables.find(
+      (candidate) => candidate.name === READINGS,
+    );
+    expect(exported?.rows[0]?.[6]).toBe(Buffer.from([0, 255, 16]).toString('base64'));
   });
 
   it('records the storage namespace and versions instead of a 1.x migrations table', () => {

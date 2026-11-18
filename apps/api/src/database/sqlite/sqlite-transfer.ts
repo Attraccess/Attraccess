@@ -145,10 +145,20 @@ function exportValue(plan: ColumnPlan, row: Record<string, unknown>, index: numb
     case 'blob':
       return { blob: Buffer.from(value as Buffer).toString('base64') };
     case 'text':
-      if (typeof value === 'string') return value;
-      if (typeof value === 'number') return String(row[`i${index}`]);
-      throw new SnapshotIncompatibleError(`${where}: unsupported ${storage} value in a text column`);
+      return exportText(plan, value, row[`i${index}`], storage, where);
   }
+}
+
+/**
+ * A text column's value. A declared plugin text field may still hold the raw bytes 1.x wrote into a `blob` column
+ * (Matter backups); the record port reads those as base64, and so does the snapshot.
+ */
+function exportText(plan: ColumnPlan, value: unknown, exactInteger: unknown, storage: unknown, where: string): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(exactInteger);
+  const textField = plan.field?.type === 'text' || plan.field?.type === 'string';
+  if (textField && value instanceof Uint8Array) return Buffer.from(value).toString('base64');
+  throw new SnapshotIncompatibleError(`${where}: unsupported ${String(storage)} value in a text column`);
 }
 
 async function exportTable(source: DataSource, table: string, declared: DeclaredColumns): Promise<TableSnapshot> {
