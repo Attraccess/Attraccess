@@ -73,6 +73,31 @@ describe('WagoService discovery', () => {
     expect(warnings()).toEqual([]);
   });
 
+  it('stores an announcement whose identity, fingerprint and versions exceed 255 characters', async () => {
+    const hardwareId = `cc100-${'h'.repeat(300)}`;
+    const long = (prefix: string) => `${prefix}${'x'.repeat(300)}`;
+    const { test, discover } = await setup([], [enrollment({ hardwareId })]);
+
+    await discover(
+      announcement({
+        hardwareId,
+        fingerprint: long('fp-'),
+        protocolVersion: long('1.0.0+'),
+        runtimeVersion: long('1.2.3+'),
+      }),
+      `attraccess/wago/discovery/${hardwareId}`,
+    );
+
+    expect(test.rows('controllers')).toEqual([
+      expect.objectContaining({
+        hardwareId,
+        fingerprint: long('fp-'),
+        protocolVersion: long('1.0.0+'),
+        runtimeVersion: long('1.2.3+'),
+      }),
+    ]);
+  });
+
   it('starts an announcement without a sequence at zero and without a fingerprint', async () => {
     const { test, discover } = await setup();
 

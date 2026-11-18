@@ -8,7 +8,9 @@ import { f, table } from '@attraccess/plugins-backend-sdk';
  * - Field names are the entity property names, `column` is the existing snake_case column.
  * - Timestamps are ISO-8601 strings in `varchar` columns, compared lexicographically (so `f.string`, not `f.timestamp`).
  * - Snapshots, provenance and metadata are JSON documents in `text` columns, serialized by the plugin (so `f.text`).
- * - Free-form text that can exceed 255 characters is declared `f.text`; SQLite gives both the same TEXT affinity.
+ * - Text that can exceed 255 characters (free-form text, values reported by a controller or set by an administrator
+ *   without a length check) is declared `f.text`; the legacy `varchar` columns are unbounded and SQLite gives both
+ *   the same TEXT affinity, so adoption is unaffected.
  * - Core identifiers (MQTT server ids, user ids) are plain integers. Only plugin tables are referenced.
  * - Lease deadlines are epoch milliseconds in integer columns (`bigint` in the 1.x layout).
  */
@@ -16,7 +18,8 @@ export const wagoTables = {
   controllers: table(
     {
       id: f.id(),
-      hardwareId: f.string({ column: 'hardware_id' }),
+      /** Reported by the controller without a length limit. */
+      hardwareId: f.text({ column: 'hardware_id' }),
       trustState: f.string({ column: 'trust_state' }),
       name: f.text().optional(),
       mqttServerId: f.integer({ column: 'mqtt_server_id' }).optional(),
@@ -26,9 +29,10 @@ export const wagoTables = {
       credentialEpoch: f.string({ column: 'credential_epoch' }).optional(),
       enrollmentId: f.integer({ column: 'enrollment_id' }).optional(),
       pairingCodeHash: f.string({ column: 'pairing_code_hash' }),
-      fingerprint: f.string().optional(),
-      protocolVersion: f.string({ column: 'protocol_version' }),
-      runtimeVersion: f.string({ column: 'runtime_version' }),
+      /** Fingerprint, protocol and runtime version come from the controller's announcement, without a length limit. */
+      fingerprint: f.text().optional(),
+      protocolVersion: f.text({ column: 'protocol_version' }),
+      runtimeVersion: f.text({ column: 'runtime_version' }),
       /** JSON array of capability names. */
       capabilities: f.text(),
       lastSequence: f.integer({ column: 'last_sequence' }).withDefault(0),
@@ -47,7 +51,8 @@ export const wagoTables = {
     {
       id: f.id(),
       defaultMqttServerId: f.integer({ column: 'default_mqtt_server_id' }).optional(),
-      operationalPrefix: f.string({ column: 'operational_prefix' }).withDefault('attraccess/wago'),
+      /** Set by an administrator; only its MQTT segments are validated. */
+      operationalPrefix: f.text({ column: 'operational_prefix' }).withDefault('attraccess/wago'),
     },
     { physicalName: 'plugin_wago_settings' },
   ),
@@ -55,7 +60,7 @@ export const wagoTables = {
     {
       id: f.id(),
       mqttServerId: f.integer({ column: 'mqtt_server_id' }),
-      hardwareId: f.string({ column: 'hardware_id' }),
+      hardwareId: f.text({ column: 'hardware_id' }),
       secretHash: f.string({ column: 'secret_hash' }),
       identity: f.string(),
       createdAt: f.string({ column: 'created_at' }),
@@ -120,7 +125,8 @@ export const wagoTables = {
       mqttServerId: f.integer({ column: 'mqtt_server_id' }),
       targetHost: f.string({ column: 'target_host' }),
       hostKeyFingerprint: f.string({ column: 'host_key_fingerprint' }),
-      firmwareBaseline: f.string({ column: 'firmware_baseline' }),
+      /** From the operator's WAGO_CC100_FIRMWARE_BASELINE setting. */
+      firmwareBaseline: f.text({ column: 'firmware_baseline' }),
       controllerName: f.text({ column: 'controller_name' }).optional(),
       state: f.string(),
       enrollmentExpiresAt: f.string({ column: 'enrollment_expires_at' }).optional(),
@@ -199,7 +205,8 @@ export const wagoTables = {
       credentialEpoch: f.string({ column: 'credential_epoch' }),
       phase: f.string(),
       mqttServerId: f.integer({ column: 'mqtt_server_id' }),
-      prefix: f.string(),
+      /** The operational prefix the rotation was issued for. */
+      prefix: f.text(),
       token: f.string(),
       encryptedCredentials: f.text({ column: 'encrypted_credentials' }).optional(),
     },

@@ -444,6 +444,32 @@ describe('WagoService connection monitoring', () => {
     });
   });
 
+  it('records a heartbeat whose versions are longer than 255 characters, so the controller stays online', async () => {
+    const stale = new Date(Date.now() - 5 * 60_000).toISOString();
+    const claimed = { ...controller(), trustState: 'claimed' as const, lastHeartbeatAt: stale, lastSeenAt: stale };
+    const { service, test } = await createService([claimed]);
+    const onHeartbeat = (Reflect.get(service, 'onHeartbeat') as (id: string, payload: Buffer) => Promise<void>).bind(
+      service,
+    );
+    // The controller reports its versions without a length limit; the columns are unbounded text.
+    const runtimeVersion = `1.0.0+${'r'.repeat(300)}`;
+    const protocolVersion = `1.0.0+${'p'.repeat(300)}`;
+    await onHeartbeat(
+      claimed.hardwareId,
+      Buffer.from(
+        JSON.stringify({
+          hardwareId: claimed.hardwareId,
+          protocolVersion,
+          runtimeVersion,
+          capabilities: ['heartbeat'],
+        }),
+      ),
+    );
+    const [row] = test.rows('controllers');
+    expect(row).toMatchObject({ runtimeVersion, protocolVersion });
+    expect(row.lastSeenAt > stale).toBe(true);
+  });
+
   it('persists a valid canonical heartbeat when the bounded diagnostics cache is full', async () => {
     const claimed = { ...controller(), id: 257, trustState: 'claimed' as const };
     const { service, test } = await createService([claimed]);
