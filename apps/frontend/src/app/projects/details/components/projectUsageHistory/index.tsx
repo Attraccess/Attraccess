@@ -76,7 +76,7 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
                       key={session.id}
                       id={session.id}
                       className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
-                      onClick={() => handleRowAction(session)}
+                      onAction={() => handleRowAction(session)}
                     >
                       <TableCell>{session.resource?.name ?? '—'}</TableCell>
                       <TableCell>
