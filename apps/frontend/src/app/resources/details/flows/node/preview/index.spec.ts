@@ -43,6 +43,18 @@ describe('flow node previews', () => {
     for (const type of Object.values(Type)) getNodePreviewRows(type, translate, { data });
   });
 
+  it.each([en, de])('labels the meter-ready rows differently from the meter row', (translations) => {
+    const translate = (key: string) => String(get(translations, key));
+    const rows = getNodePreviewRows(Type.OUTPUT_RESOURCE_METERING_READY, translate, {
+      data: { baselineValue: '100', source: 'Main meter' },
+    });
+    const labels = [
+      translate('nodes.output.resource.metering.ready.config.meterId.label'),
+      ...rows.map((row) => row.label),
+    ];
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
   it('translates the end-session target and shows the user id only for one user', () => {
     const translate = (key: string) => String(get(en, key));
     const rows = (data: Record<string, unknown>) =>

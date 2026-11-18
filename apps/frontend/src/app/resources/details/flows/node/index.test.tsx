@@ -123,6 +123,39 @@ describe('AttraccessNode', () => {
     expect(screen.getByText('status')).toBeInTheDocument();
   });
 
+  it('renders preview rows and entry fields with repeated labels without duplicate keys', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.mocked(useNodePreviewRows).mockReturnValueOnce([
+      { label: 'Meter', value: 'Main meter' },
+      { label: 'Meter', value: 'Spare meter' },
+      {
+        label: 'Variables',
+        entries: [
+          {
+            fields: [
+              { label: 'Key', value: 'first' },
+              { label: 'Key', value: 'second' },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    render(<AttraccessNode schema={schema} tNodeTranslations={tStub} />);
+
+    const duplicateKeyErrors = consoleError.mock.calls.filter((args) =>
+      args.some((arg) => typeof arg === 'string' && arg.includes('same key')),
+    );
+    consoleError.mockRestore();
+    expect(duplicateKeyErrors).toEqual([]);
+    expect(screen.getAllByText('Meter')).toHaveLength(2);
+    expect(screen.getByText('Main meter')).toBeInTheDocument();
+    expect(screen.getByText('Spare meter')).toBeInTheDocument();
+    expect(screen.getAllByText('Key')).toHaveLength(2);
+    expect(screen.getByText('first')).toBeInTheDocument();
+    expect(screen.getByText('second')).toBeInTheDocument();
+  });
+
   it('uses the brand accent only while an idle node is selected', () => {
     const { container, rerender } = render(
       <AttraccessNode schema={schema} tNodeTranslations={tStub} node={selectedNode} />,
