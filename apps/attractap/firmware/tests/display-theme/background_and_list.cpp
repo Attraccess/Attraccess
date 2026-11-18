@@ -220,4 +220,12 @@ void testAuthenticatedList(Renderer &renderer)
     expect(resourceListAction(resource, "Alex") == ResourceListAction::Takeover, "Foreign session requires explicit takeover");
     resource.allowTakeOver = false;
     expect(resourceListAction(resource, "Alex") == ResourceListAction::None, "Foreign usage is never a quick stop");
+
+    API::ResourceBrief door{};
+    door.type = 1;
+    expect(!resourceListDoorActionUnlatches(door), "A plain door's quick action unlocks");
+    door.separateUnlockAndUnlatch = true;
+    expect(resourceListDoorActionUnlatches(door), "A door with separate unlatch is unlatched");
+    door.accessOnly = true;
+    expect(!resourceListDoorActionUnlatches(door), "An access-only door opens (unlocks) despite a leftover unlatch flag");
 }

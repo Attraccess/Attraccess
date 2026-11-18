@@ -259,8 +259,8 @@ void Application::handleResourceListAction(const API::ResourceBrief &resource, R
   auto type = ResourceDetailsScreen::BUTTON_CLICK_TYPE_START_SESSION;
   if (action == ResourceListAction::Stop) type = ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION;
   if (action == ResourceListAction::OpenDoor)
-    type = current->separateUnlockAndUnlatch && !current->accessOnly ? ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR
-                                                                     : ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR;
+    type = resourceListDoorActionUnlatches(*current) ? ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR
+                                                     : ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR;
   this->handleResourceDetailsButtonClick({&Display::resourceDetailsScreen, type, {}});
 }
 
