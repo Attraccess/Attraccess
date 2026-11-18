@@ -40,5 +40,6 @@
   },
   "connected": "Verbunden",
   "disconnected": "Nicht verbunden",
-  "pairFirst": "Kopple den neuen Reader in der Liste „Nicht gekoppelt“, bevor du ihn einrichtest."
+  "pairFirst": "Kopple den neuen Reader in der Liste „Nicht gekoppelt“, bevor du ihn einrichtest.",
+  "bleBridge": "Bluetooth-Bridge"
 }

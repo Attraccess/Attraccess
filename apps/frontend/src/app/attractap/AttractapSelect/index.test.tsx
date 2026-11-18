@@ -76,6 +76,19 @@ describe('AttractapSelect for card writing', () => {
     expect(await options()).toHaveLength(4);
   });
 
+  it('labels a BLE Bridge in other pickers and never offers it for card writing', async () => {
+    readersQuery([
+      reader(1, 'Entrance', {}),
+      reader(7, 'Hall', { nfc: false, cardRelay: false, cardEnrollment: false }),
+    ]);
+    settingsQuery({ mode: 'all', readerIds: [] });
+    const writing = render(<AttractapSelect selection={null} onSelectionChange={vi.fn()} forCardWriting />);
+    expect(await options()).toEqual(['Entrance']);
+    writing.unmount();
+    render(<AttractapSelect selection={null} onSelectionChange={vi.fn()} />);
+    expect(await options()).toEqual(['Entrance', 'Hall (Bluetooth bridge)']);
+  });
+
   it('lists nothing while the card enrollment setting is still loading', () => {
     settingsQuery(undefined, true);
     render(<AttractapSelect selection={null} onSelectionChange={vi.fn()} forCardWriting />);

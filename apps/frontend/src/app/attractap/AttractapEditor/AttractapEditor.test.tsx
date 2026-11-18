@@ -106,3 +106,50 @@ describe('AttractapEditor plugin Bluetooth opt-in', () => {
     expect(body).not.toHaveProperty('allowPluginBle');
   });
 });
+
+describe('AttractapEditor for a BLE Bridge', () => {
+  const reader = (capabilities: Record<string, unknown>) => ({
+    id: 1,
+    name: 'Bridge',
+    ledBrightness: 255,
+    allowPluginBle: true,
+    resources: [],
+    firmware: { capabilities: { hasLeds: true, ...capabilities } },
+  });
+
+  beforeEach(() => {
+    state.mutate = vi.fn();
+  });
+
+  it('hides resources, reader display and LED settings, and keeps name, plugin Bluetooth and pairing', () => {
+    state.reader = reader({ nfc: false });
+    render(<AttractapEditor readerId={1} isOpen onSave={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.queryByRole('tab', { name: 'tabs.resources' })).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'tabs.readerUi' })).toBeNull();
+    expect(screen.queryByText('ledBrightness')).toBeNull();
+    expect(screen.getByText('bleBridgeDescription')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('enterReaderName')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'allowPluginBle' })).toBeChecked();
+    expect(screen.getByRole('tab', { name: 'tabs.security' })).toBeInTheDocument();
+  });
+
+  it('saves only the bridge settings', () => {
+    state.reader = reader({ nfc: false });
+    render(<AttractapEditor readerId={1} isOpen onSave={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'save' }));
+    const [{ requestBody }] = state.mutate.mock.calls[0];
+    expect(requestBody).toEqual({ name: 'Bridge', connectedResourceIds: [] });
+  });
+
+  it.each([
+    ['reports NFC', { nfc: true }],
+    ['predates the nfc capability', {}],
+  ])('shows every setting for a reader that %s', (_name, capabilities) => {
+    state.reader = reader(capabilities);
+    render(<AttractapEditor readerId={1} isOpen onSave={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.getByRole('tab', { name: 'tabs.resources' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'tabs.readerUi' })).toBeInTheDocument();
+    expect(screen.getByText('ledBrightness')).toBeInTheDocument();
+    expect(screen.queryByText('bleBridgeDescription')).toBeNull();
+  });
+});

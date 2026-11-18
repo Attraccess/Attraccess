@@ -3,6 +3,7 @@ import { Alert } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useEffect, useMemo, useState } from 'react';
 import { Select } from '../../../components/select';
+import { isBleBridge } from '../bleBridge';
 import { cardWritingBlocker, pairedReadersOnly } from '../cardWriting';
 import de from './de.json';
 import en from './en.json';
@@ -85,7 +86,14 @@ export function AttractapSelect(props: Props) {
   return (
     <>
       <Select
-        items={isLoading ? [] : offered.map((r) => ({ key: r.id.toString(), label: r.name }))}
+        items={
+          isLoading
+            ? []
+            : offered.map((r) => ({
+                key: r.id.toString(),
+                label: isBleBridge(r) ? t('bleBridgeLabel', { name: r.name }) : r.name,
+              }))
+        }
         label={props.label}
         aria-label={props.ariaLabel}
         placeholder={isLoading ? t('loading') : (selected?.name ?? props.placeholder)}

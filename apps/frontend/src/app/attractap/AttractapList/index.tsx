@@ -1,3 +1,4 @@
+import { isBleBridge } from '../bleBridge';
 import { pairedReadersOnly } from '../cardWriting';
 import { isReaderStale } from '../readerStaleness';
 import {
@@ -253,7 +254,17 @@ export function AttractapList() {
                           id={reader.id}
                           className={tableIndex === 1 ? 'border-l-8 border-l-warning' : ''}
                         >
-                          <TableCell>{reader.name}</TableCell>
+                          <TableCell>
+                            {reader.name}
+                            {isBleBridge(reader) && (
+                              <>
+                                <br />
+                                <Chip variant="soft" color="accent" data-cy={`attractap-list-ble-bridge-${reader.id}`}>
+                                  {t('bleBridge')}
+                                </Chip>
+                              </>
+                            )}
+                          </TableCell>
                           <TableCell className="whitespace-nowrap">
                             {reader.firmware.name ? (
                               <>

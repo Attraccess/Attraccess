@@ -163,6 +163,20 @@ describe('AttractapList pairing', () => {
     });
   });
 
+  it('labels a BLE Bridge as a Bluetooth bridge', () => {
+    mockLicense(['attractap']);
+    data.toPair = [];
+    const bridge = reader(1, 'Hall bridge', 'paired');
+    data.readers = [
+      { ...bridge, firmware: { ...bridge.firmware, name: 'attractap_bridge', capabilities: { nfc: false } } },
+      { ...reader(2, 'Door', 'paired'), firmware: { ...bridge.firmware, capabilities: { nfc: true } } },
+      reader(3, 'Old door', 'paired'),
+    ];
+    render(<AttractapList />);
+    expect(screen.getAllByText('bleBridge')).toHaveLength(1);
+    expect(screen.getByText('Hall bridge').closest('td')).toHaveTextContent('bleBridge');
+  });
+
   describe('opening the settings', () => {
     beforeEach(() => {
       mockLicense(['attractap']);

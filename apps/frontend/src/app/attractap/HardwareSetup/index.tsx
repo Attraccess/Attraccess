@@ -33,6 +33,7 @@ function ConnectScreen() {
       <div className="flex flex-col gap-2">
         <h3 className="text-lg font-semibold">{t('connect.title')}</h3>
         <p className="max-w-md text-sm text-muted">{t('connect.description')}</p>
+        <p className="max-w-md text-sm text-muted">{t('connect.bleBridgeHint')}</p>
       </div>
       <Button variant="primary" onPress={connect} isPending={isConnecting} className="w-full max-w-xs">
         {t('connect.button.label')}
