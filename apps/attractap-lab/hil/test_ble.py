@@ -9,6 +9,8 @@ the API it starts) and select these tests with ``-k ble``. The devices are confi
   factory CRYPT_OFF mode. The code comes only from the environment and is never committed. Without it, the
   real-lock smoke skips.
 - ``HIL_BLE_LONG=1``: the 10-minute transfer (>= 256 KiB of MTU-sized writes without response with acks).
+- ``HIL_BLE_BULK_RUNS``: how often ``test_ble_bulk_throughput`` repeats each window (default 1; 3 for measurements),
+  ``HIL_BLE_BULK_WINDOWS`` which windows it runs (default ``1,8``; the floor applies to the largest).
 
 Results (throughput, notification rate, heap before and after BLE init) land in ``ble-*.json`` artifacts.
 """
@@ -221,6 +223,65 @@ def test_ble_long_session_throughput(ble, peripheral, reader, artifacts):
     transfer = result["steps"][3]
     assert transfer["bytes"] >= 256 * 1024 and transfer["seconds"] >= 600, transfer
     assert result["closed"] == {"reason": "closed"}, result
+
+
+BULK_BYTES = 256 * 1024
+BULK_WINDOWS = tuple(sorted(int(w) for w in os.environ.get("HIL_BLE_BULK_WINDOWS", "1,8").split(",")))
+# Regression floor for windowed transfers, well below the 8 KiB/s target: the lab's 2.4 GHz band is crowded.
+BULK_FLOOR_KIB_S = 6.0
+BULK_TARGET_KIB_S = 8.0
+
+
+@needs_peripheral
+def test_ble_bulk_throughput(ble, peripheral, artifacts):
+    """256 KiB of MTU-sized writes without response, each acked by a notification, at window 1 and window 8.
+
+    ``HIL_BLE_BULK_RUNS`` (default 1) repeats each window in a new session; the medians land in
+    ``ble-bulk-throughput.json``. Window 8 must stay above a conservative floor; the target is recorded, not asserted.
+    """
+    runs = int(os.environ.get("HIL_BLE_BULK_RUNS", "1"))
+    results = {window: [] for window in BULK_WINDOWS}
+    for _ in range(runs):
+        for window in BULK_WINDOWS:
+            result = run_when_free(ble, peripheral, [
+                {"op": "subscribe", "key": "notify"},
+                control(0x04),
+                control(0x01, 0x01),
+                {"op": "transfer", "bytes": BULK_BYTES, "window": window},
+                control(0x01, 0x00),
+            ], leaseMs=900_000, timeout=1200)
+            results[window].append(result)
+    raw = {str(k): v for k, v in results.items()}
+    # A session that failed to open has no steps: keep its outcome in the artifact and fail on it below.
+    save(artifacts, "bulk-throughput", {"runs": raw})
+    summary = {}
+    for window, outcomes in results.items():
+        transfers = [outcome["steps"][3] for outcome in outcomes if len(outcome["steps"]) > 3]
+        summary[f"window{window}"] = {
+            "runs": len(transfers),
+            "kibPerSecond": sorted(t.get("kibPerSecond", 0) for t in transfers),
+            "medianKibPerSecond": median(t.get("kibPerSecond") for t in transfers),
+            "ackMedianMs": median(t.get("ackMedianMs") for t in transfers),
+            "ackP95Ms": median(t.get("ackP95Ms") for t in transfers),
+        }
+    # The floor and the target apply to the largest window; a window-1-only run records its numbers only.
+    windowed = summary[f"window{BULK_WINDOWS[-1]}"]["medianKibPerSecond"] if BULK_WINDOWS[-1] > 1 else None
+    summary["meetsTarget"] = windowed is not None and windowed >= BULK_TARGET_KIB_S
+    save(artifacts, "bulk-throughput", {"summary": summary, "runs": raw})
+    for outcomes in results.values():
+        for outcome in outcomes:
+            assert outcome["open"]["ok"] and all(step["ok"] for step in outcome["steps"]), outcome
+            transfer = outcome["steps"][3]
+            # Every chunk was acknowledged, in order and with its bytes counted (the step fails otherwise).
+            assert transfer["acked"] == transfer["chunks"] and transfer["bytes"] >= BULK_BYTES, transfer
+            assert outcome["closed"] == {"reason": "closed"}, outcome
+    assert windowed is None or windowed >= BULK_FLOOR_KIB_S, summary
+
+
+def median(values):
+    """The median of the values that are present, or None."""
+    present = sorted(v for v in values if v is not None)
+    return present[len(present) // 2] if present else None
 
 
 @pytest.mark.skipif(not SOLO_CODE, reason="set SOLO_USER_CODE (CRYPT_OFF lock)")

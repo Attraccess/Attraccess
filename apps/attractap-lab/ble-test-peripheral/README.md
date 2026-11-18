@@ -41,8 +41,16 @@ Write one command to `control`. Integers are little-endian. A malformed command 
 Bursts and acks run on a worker task, never in the GATT callback. Up to 64 acks or series can be queued; an ack
 that does not fit is counted as dropped and logged at disconnect.
 
-Per connection it logs the MTU, and on disconnect the reason, duration, received bytes and chunks, receive
-throughput in KiB/s, notifications sent and dropped acks:
+Per connection it logs the link on connect and on every change (interval, latency, supervision timeout, PHY, and
+the LE data length when it changes), so the parameters the reader asked for are visible on both sides:
+
+```
+ble-test: link interval=15.00ms latency=0 timeout=2560ms phy=tx1/rx1
+ble-test: data length tx=251/2120us rx=251/2120us
+```
+
+It also logs the MTU, and on disconnect the reason, duration, received bytes and chunks, receive throughput in
+KiB/s, notifications sent and dropped acks:
 
 ```
 ble-test: disconnected reason=0x213 mtu=517 duration=600512ms rx_bytes=262144 rx_chunks=514 rx=0.43KiB/s notifications=514 acks_dropped=0

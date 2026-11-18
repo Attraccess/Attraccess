@@ -539,6 +539,11 @@ the admin). The devices come from the environment:
   of the unlock write. Vendor names like this one belong in the lab only, never in core docs or code.
 - `HIL_BLE_LONG=1` adds the 10-minute transfer (at least 256 KiB of MTU-sized writes without response, each
   acknowledged by a notification).
+- `test_ble_bulk_throughput` runs with every `HIL_BLE=1` run: 256 KiB of MTU-sized writes without response at
+  window 1 and window 8 (the fixture `transfer` step's `window`: unacknowledged chunks in flight). It asserts
+  in-order acks and window 8 at 6 KiB/s or more; the 8 KiB/s target is recorded as `meetsTarget` in
+  `ble-bulk-throughput.json`. `HIL_BLE_BULK_RUNS` repeats each window in a new session (default 1; use 3 for
+  measurements), and `HIL_BLE_BULK_WINDOWS` picks the windows (default `1,8`; the floor applies to the largest).
 
 ```sh
 HIL_BLE=1 BLE_PERIPHERAL_ADDRESS=AA:BB:CC:DD:EE:FF apps/attractap-lab/hil/run.sh -k ble

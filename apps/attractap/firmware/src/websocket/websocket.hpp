@@ -48,6 +48,7 @@ public:
     bool sendBinary(const uint8_t *data, size_t length) override;
     void setRawBinaryCallback(std::function<bool(const uint8_t *, size_t)> callback) override;
     void setConnectionCallback(std::function<void(bool connected)> callback) override;
+    void setSendSlotFreedCallback(std::function<void()> callback) override;
     bool sendQueueHasRoom(size_t reserve) const override;
 
 private:
@@ -57,6 +58,7 @@ private:
     std::function<void(esp_websocket_event_data_t)> binaryDataCallback;
     std::function<bool(const uint8_t *, size_t)> rawBinaryCallback;
     std::function<void(bool)> connectionCallback;
+    std::function<void()> sendSlotFreedCallback;
     // Requested subprotocol (guarded by ws_client_mutex) and the one the current client uses.
     std::string _subprotocol;
     std::string _clientSubprotocol;

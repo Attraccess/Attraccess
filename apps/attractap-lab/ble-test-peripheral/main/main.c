@@ -295,6 +295,17 @@ static void log_connection_summary(int reason)
              (unsigned long)notifications_sent, (unsigned long)acks_dropped);
 }
 
+// Interval in 1.25 ms units, supervision timeout in 10 ms units (the HCI encodings).
+static void log_link(const char *when, uint16_t conn)
+{
+    struct ble_gap_conn_desc desc;
+    if (ble_gap_conn_find(conn, &desc) != 0) return;
+    uint8_t tx_phy = 0, rx_phy = 0;
+    ble_gap_read_le_phy(conn, &tx_phy, &rx_phy);
+    ESP_LOGI(TAG, "%s interval=%u.%02ums latency=%u timeout=%ums phy=tx%u/rx%u", when, desc.conn_itvl * 5 / 4,
+             desc.conn_itvl * 125 % 100, desc.conn_latency, desc.supervision_timeout * 10, tx_phy, rx_phy);
+}
+
 static int gap_event(struct ble_gap_event *event, void *arg)
 {
     (void)arg;
@@ -310,6 +321,19 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         notify_enabled = indicate_enabled = echo_enabled = false;
         reset_counters();
         ESP_LOGI(TAG, "connected handle=%u", conn_handle);
+        log_link("link", conn_handle);
+        return 0;
+    case BLE_GAP_EVENT_CONN_UPDATE:
+        if (event->conn_update.status != 0) ESP_LOGW(TAG, "conn update failed status=%d", event->conn_update.status);
+        log_link("conn update", event->conn_update.conn_handle);
+        return 0;
+    case BLE_GAP_EVENT_DATA_LEN_CHG:
+        ESP_LOGI(TAG, "data length tx=%u/%uus rx=%u/%uus", event->data_len_chg.max_tx_octets,
+                 event->data_len_chg.max_tx_time, event->data_len_chg.max_rx_octets, event->data_len_chg.max_rx_time);
+        return 0;
+    case BLE_GAP_EVENT_PHY_UPDATE_COMPLETE:
+        ESP_LOGI(TAG, "phy update status=%d tx=%u rx=%u", event->phy_updated.status, event->phy_updated.tx_phy,
+                 event->phy_updated.rx_phy);
         return 0;
     case BLE_GAP_EVENT_DISCONNECT:
         log_connection_summary(event->disconnect.reason);

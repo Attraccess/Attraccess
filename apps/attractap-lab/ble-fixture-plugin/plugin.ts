@@ -12,6 +12,7 @@ import {
   type PluginContext,
 } from '@attraccess/plugins-backend-sdk';
 import { Body, Controller, Inject, Post, type DynamicModule } from '@nestjs/common';
+import { windowedTransfer } from './windowed-transfer.mjs';
 
 const CONTEXT = Symbol('ble-lab-fixture.context');
 
@@ -122,24 +123,24 @@ function stream(state: ScriptState, key: unknown): PluginBleNotificationStream {
   return found;
 }
 
-/** Long transfer: MTU-sized writes without response, each acknowledged by a notification (echo mode). */
+/**
+ * Long transfer: MTU-sized writes without response, each acknowledged by a notification (echo mode). Up to
+ * `window` chunks (default 1) stay unacknowledged; acks must arrive in order and count every byte (see
+ * windowed-transfer.mjs).
+ */
 async function transfer(state: ScriptState, step: Step): Promise<StepResult> {
   const { session } = state;
   const acks = stream(state, 'notify');
   const chunk = Math.min(session.mtu - 3, 512);
-  const total = Number(step.bytes);
-  const startedAt = Date.now();
-  let sent = 0;
-  let chunks = 0;
-  while (sent < total || Date.now() - startedAt < Number(step.minDurationMs ?? 0)) {
-    const size = Math.min(chunk, Math.max(total - sent, chunk));
-    await session.write('wwr', new Uint8Array(size).fill(chunks & 0xff), { withoutResponse: true });
-    await acks.next({ timeoutMs: 10_000 });
-    sent += size;
-    chunks += 1;
-  }
-  const seconds = (Date.now() - startedAt) / 1000;
-  return { ok: true, mtu: session.mtu, chunk, chunks, bytes: sent, seconds, kibPerSecond: sent / 1024 / seconds };
+  const result = await windowedTransfer({
+    chunk,
+    bytes: Number(step.bytes),
+    window: step.window,
+    minDurationMs: Number(step.minDurationMs ?? 0),
+    write: (value) => session.write('wwr', value, { withoutResponse: true }),
+    nextAck: async (signal) => (await acks.next({ timeoutMs: 10_000, signal })).value,
+  });
+  return { ok: true, mtu: session.mtu, chunk, ...result };
 }
 
 /** Reads `count` notifications as fast as they come (burst tests). */

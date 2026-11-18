@@ -208,6 +208,11 @@ void Websocket::setConnectionCallback(std::function<void(bool connected)> callba
     this->connectionCallback = callback;
 }
 
+void Websocket::setSendSlotFreedCallback(std::function<void()> callback)
+{
+    this->sendSlotFreedCallback = callback;
+}
+
 void Websocket::setSubprotocol(const std::string &subprotocol)
 {
     lockWsClient();
@@ -444,6 +449,10 @@ void Websocket::txTaskLoop()
         if (xQueueReceive(tx_queue, &msg, portMAX_DELAY) != pdTRUE)
         {
             continue;
+        }
+        if (this->sendSlotFreedCallback)
+        {
+            this->sendSlotFreedCallback();
         }
 
         lockWsClient();
