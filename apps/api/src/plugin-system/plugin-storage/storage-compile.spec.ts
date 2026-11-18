@@ -71,6 +71,28 @@ describe('physicalTableName', () => {
   });
 });
 
+describe('physicalTableName with sibling plugins', () => {
+  // A namespace is a plain prefix: plugin "demo" and plugin "demo-extra" (namespace demo_extra) share "plugin_demo_".
+  const withSiblings: StorageNaming = { ...naming, siblingNamespaces: new Set(['demo_extra', 'other']) };
+
+  it.each([
+    ['a derived name that lands in the namespace of a longer-named plugin', 'extra_notes', undefined],
+    ['an adopted name in the namespace of a longer-named plugin', 'notes', 'plugin_demo_extra_notes'],
+    ['an adopted short-prefix name in that namespace', 'notes', 'demo_extra_notes'],
+  ])('rejects %s', (_label, logical, explicit) => {
+    expect(() => physicalTableName(withSiblings, logical, explicit)).toThrow(
+      /lies in the storage namespace "demo_extra" of another installed plugin/,
+    );
+  });
+
+  it('keeps names that only share the prefix with an unrelated or shorter-named plugin', () => {
+    expect(physicalTableName(withSiblings, 'notes', undefined)).toBe('plugin_demo_notes');
+    expect(physicalTableName(withSiblings, 'extras', undefined)).toBe('plugin_demo_extras');
+    const child: StorageNaming = { ...naming, pluginName: 'demo-extra', namespace: 'demo_extra', siblingNamespaces: new Set(['demo']) };
+    expect(physicalTableName(child, 'notes', undefined)).toBe('plugin_demo_extra_notes');
+  });
+});
+
 describe('compileField', () => {
   it('compiles a declared field with every option', () => {
     expect(field(f.string({ length: 10, column: 'val' }).withDefault('x'))).toEqual({

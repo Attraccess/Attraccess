@@ -21,6 +21,11 @@ export interface StorageNaming {
   readonly namespace: string;
   /** Tables and indexes that exist outside the plugin (core tables); a plugin may not claim them. */
   readonly reservedTables: ReadonlySet<string>;
+  /**
+   * Namespaces of the other installed plugins. A namespace is a plain name prefix, so the namespace of `qaiso` is a
+   * prefix of the one of `qaiso-extra`: the plugin with the shorter namespace may not take a name inside the longer one.
+   */
+  readonly siblingNamespaces?: ReadonlySet<string>;
 }
 
 const FIELD_TYPES: readonly PluginStorageFieldType[] = [
@@ -79,6 +84,13 @@ export function physicalTableName(naming: StorageNaming, logical: string, explic
     if (!inside) {
       fail(naming, `physicalName "${name}" must start with "plugin_${naming.namespace}_" or "${naming.namespace}_"`);
     }
+  }
+  const claimedBy = [...(naming.siblingNamespaces ?? [])].find(
+    (other) =>
+      other.startsWith(`${naming.namespace}_`) && (lowered.startsWith(`plugin_${other}_`) || lowered.startsWith(`${other}_`)),
+  );
+  if (claimedBy !== undefined) {
+    fail(naming, `table name "${name}" lies in the storage namespace "${claimedBy}" of another installed plugin`);
   }
   if (RESERVED_TABLE_PREFIXES.some((prefix) => lowered.startsWith(prefix))) {
     fail(naming, `table name "${name}" uses a prefix the host reserves`);

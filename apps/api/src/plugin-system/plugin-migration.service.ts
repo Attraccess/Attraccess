@@ -58,7 +58,11 @@ export class PluginMigrationService {
    */
   public static loadStorage(manifest: LoadedPluginManifest): CompiledPluginStorage | null {
     if (!getImplementationClass().hasStorage(manifest)) return null;
-    return loadPluginStorage(manifest, PluginService.PLUGIN_PATH);
+    return loadPluginStorage(
+      manifest,
+      PluginService.PLUGIN_PATH,
+      PluginService.getPlugins().map((plugin) => plugin.name),
+    );
   }
 
   /**
@@ -138,7 +142,11 @@ export class PluginMigrationService {
     sourceDirectory: string,
   ): Promise<void> {
     if (!getImplementationClass().hasStorage(manifest)) return;
-    const storage = loadPluginStorage(manifest, sourceDirectory);
+    const storage = loadPluginStorage(
+      manifest,
+      sourceDirectory,
+      PluginService.getPlugins().map((plugin) => plugin.name),
+    );
     if (!storage) return;
     await getImplementationClass().engine().assess(storage);
   }

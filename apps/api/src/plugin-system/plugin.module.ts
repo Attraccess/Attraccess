@@ -272,7 +272,11 @@ export class PluginModule {
     // The plugin's storage declaration is validated before anything of it is registered or migrated: every table and
     // index name must stay in the plugin's namespace and the migrations must produce the declared tables. A plugin
     // that declares storage without PLUGIN_STORAGE, or leaves its namespace, does not load.
-    const storage = compileModuleStorage(manifest, exported as Partial<PluginBackendModule>);
+    const storage = compileModuleStorage(
+      manifest,
+      exported as Partial<PluginBackendModule>,
+      PluginService.getPlugins().map((plugin) => plugin.name),
+    );
     if (storage) claimStorageNames(storage);
 
     const context = getImplementationClass().createPluginContext(manifest, storage);

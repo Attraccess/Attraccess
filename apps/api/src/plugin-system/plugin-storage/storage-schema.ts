@@ -91,6 +91,8 @@ function assertHeadMatches(naming: StorageNaming, head: CompiledSchema, replayed
 export interface CompileOptions {
   /** Tables the host owns; a plugin may not claim them. */
   readonly reservedTables: ReadonlySet<string>;
+  /** Namespaces of the other installed plugins; see {@link StorageNaming.siblingNamespaces}. */
+  readonly siblingNamespaces?: ReadonlySet<string>;
 }
 
 /**
@@ -107,6 +109,7 @@ export function compilePluginStorage(
     pluginName,
     namespace: namespaceOf(pluginName),
     reservedTables: options.reservedTables,
+    siblingNamespaces: options.siblingNamespaces,
   };
   if (!isRecord(definition) || !isRecord(definition.tables))
     return fail(naming, 'use definePluginStorage({ tables, migrations })');
