@@ -27,13 +27,15 @@ Das Gehäuse öffnen Sie nur für das erste Flashen. Alle späteren Updates lauf
 Der Micro-USB-Anschluss des S10 dient nur der Stromversorgung; einen USB-Seriell-Chip gibt es nicht. Zum Flashen brauchen Sie einen **USB-TTL-Adapter mit 3,3 V**:
 
 1. Öffnen Sie das Gehäuse.
-2. Verbinden Sie den Adapter mit den seriellen Lötpunkten: TX an RX, RX an TX (gekreuzt), GND an GND und 3,3 V an 3,3 V.
-3. Halten Sie die Download-Taste (**GPIO0**) gedrückt, während Sie den S10 mit Strom versorgen. Er startet im Download-Modus.
+2. Verbinden Sie den Adapter mit den seriellen Lötpunkten: TX an RX, RX an TX (gekreuzt) und GND an GND. Lassen Sie den 3,3-V-Pin des Adapters frei.
+3. Versorgen Sie den S10 über seinen Micro-USB-Anschluss mit Strom. Halten Sie die Download-Taste (**GPIO0**) gedrückt, während Sie die Stromversorgung einstecken; er startet dann im Download-Modus.
 
 > [!WARNING]
 > **Versorgen Sie den S10 nie gleichzeitig über USB und PoE mit Strom.** Ziehen Sie das Ethernet-Kabel ab, solange der Adapter angeschlossen ist.
 >
 > **Verwenden Sie nie einen 5-V-Adapter an den Logik-Pins.** 5 V beschädigen den ESP32. Prüfen Sie vor dem Anschließen, dass Ihr Adapter auf 3,3 V steht.
+>
+> **Versorgen Sie den S10 nicht über den Adapter.** Der 3,3-V-Ausgang eines USB-TTL-Adapters kann den Funk nicht versorgen: Die Bridge-Firmware startet dann wenige Sekunden nach jedem Start mit einem Brownout neu.
 
 ### Original-Firmware sichern
 
@@ -51,7 +53,7 @@ Bewahren Sie die Datei privat auf. Mit `esptool.py --chip esp32 --port <port> wr
 2. Öffnen Sie in Attraccess die Leser-Seite (**Geräte** > **Attractap-Lesegeräte**) und wählen Sie **Attractap einrichten**.
 3. Klicken Sie auf **Per USB verbinden** und wählen Sie den seriellen Port Ihres Adapters.
 4. Wählen Sie im Tab **Firmware** die Firmware **Attractap BLE Bridge** (ESP32, GL.iNet GL-S10) und klicken Sie auf **Jetzt Installieren**. Lesen Sie den Warnhinweis und bestätigen Sie ihn. Attraccess verweigert das Flashen, wenn der angeschlossene Chip nicht der erwartete ist.
-5. Trennen Sie den S10 kurz vom Strom und schalten Sie ihn wieder ein, **ohne** GPIO0 zu halten. Er startet jetzt die Bridge-Firmware.
+5. Ziehen Sie die Micro-USB-Stromversorgung ab und stecken Sie sie wieder ein, **ohne** GPIO0 zu halten. Er startet jetzt die Bridge-Firmware.
 6. Klicken Sie auf **Einrichtung fortsetzen**. Die Seite geht auf demselben Port in die Konfiguration über. Legen Sie die PIN, das WLAN (optional) und die API-URL Ihres Attraccess-Servers fest.
 
 > [!NOTE]
