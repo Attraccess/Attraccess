@@ -50,7 +50,7 @@ export class ReaderControlService {
       if (!message || (mode === 'recovery' && message.t === 'efuse.report')) return connection.close();
       if (message.t === 'efuse.report' && ++reports > MAX_EFUSE_REPORTS_PER_SESSION) return connection.close();
       queue = queue
-        .then(() => this.dispatch(connection, state, upgrade, message, mode))
+        .then(() => this.dispatch(connection, state, upgrade, message))
         .catch((error: Error) => {
           // Never log the message: it may hold a proof or a public key.
           this.logger.warn(`Reader control message failed: ${error.message}`);
@@ -64,7 +64,6 @@ export class ReaderControlService {
     state: SessionSecurityState,
     upgrade: IdentityUpgradeSession,
     message: { t: ReaderControlType; body: Record<string, unknown> },
-    mode: UpgradeMode,
   ): Promise<void> {
     if (message.t === 'efuse.report') {
       if ((await this.efuse.handle(state, message.body)) === 'protocol-violation') connection.close();
@@ -76,6 +75,7 @@ export class ReaderControlService {
         : await upgrade.handleUpgrade(message.body);
     if (reply === 'violation') return connection.close();
     connection.sendFrame(FrameType.CONTROL, Buffer.from(JSON.stringify(reply), 'utf8'));
-    if (mode === 'recovery' && reply['t'] === 'identity.upgraded') setTimeout(() => connection.close(), 1000).unref();
+    // The old key is no credential any more: its session ends once the reply had time to leave (the reader reconnects).
+    if (reply['t'] === 'identity.upgraded') setTimeout(() => connection.close(), 1000).unref();
   }
 }

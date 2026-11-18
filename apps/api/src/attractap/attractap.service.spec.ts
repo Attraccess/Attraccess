@@ -196,6 +196,27 @@ describe('AttractapService reader maintenance and crash reports', () => {
       2,
     );
   });
+  it('keeps secured only for a release secure build of a regular variant', async () => {
+    const { service, reader } = setup();
+    const secure = { profile: 'secure' as const, release: true, secureVersion: 1, variant: 'attractap-touch-v2' };
+    const securedReader = () => {
+      reader.secured = true;
+      reader.securedAt = new Date();
+    };
+    securedReader();
+    await service.recordReaderBuild(4, secure);
+    expect(reader.secured).toBe(true);
+    for (const build of [
+      { ...secure, variant: 'attractap-touch-v2-demo' },
+      { ...secure, release: false },
+      { ...secure, profile: 'secure-lab' as const },
+      { ...secure, profile: 'plain' as const },
+    ]) {
+      securedReader();
+      await service.recordReaderBuild(4, build);
+      expect(reader).toMatchObject({ secured: false, securedAt: null, firmwareProfile: build.profile });
+    }
+  });
   it('fails for a reader that does not exist', async () => {
     const { service } = setup();
     await expect(service.updateReader(99, { name: 'x' })).rejects.toThrow('Reader with ID 99 not found');

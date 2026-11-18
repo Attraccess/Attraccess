@@ -40,7 +40,8 @@ bool ReaderLink::selectSecureIdentity()
         return false;
     }
     const DsReaderKeyStore::Status status = DsReaderKeyStore::status();
-    logger.infof("DS identity: %s", DsReaderKeyStore::statusName(status));
+    const char *statusText = DsReaderKeyStore::statusName(status);
+    logger.infof("DS identity: %s", statusText);
     if (status != DsReaderKeyStore::Status::Available)
     {
         // "DS params missing" falls back to the software identity; KEY3 is never burned again.
@@ -210,8 +211,8 @@ void ReaderLink::onIdentityUpgraded(const char *certificatePem)
 
 void ReaderLink::onIdentityRejected(const char *reason)
 {
-    // Keep the P-256 identity. The reason is a fixed code from the server (safe to log).
-    logger.errorf("Identity upgrade rejected: %s", reason);
+    // Keep the P-256 identity. The reason is a short code from the server; bound it anyway.
+    logger.errorf("Identity upgrade rejected: %.32s", reason);
     upgradeProofSent = false;
     if (strcmp(reason, "not-allowed") == 0)
     {

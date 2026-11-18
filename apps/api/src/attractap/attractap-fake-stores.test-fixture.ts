@@ -130,9 +130,14 @@ export class FakeReaderStore implements AttractapReaderStore {
       reader.resources = edit.resourceIds.map((rid) => this.resources.get(rid) ?? makeResource(rid));
   }
 
-  async applySecurity(id: number, patch: AttractapReaderSecurityPatch): Promise<void> {
+  async applySecurity(id: number, patch: AttractapReaderSecurityPatch, whenCredential?: string): Promise<boolean> {
     const reader = this.readers.get(id);
-    if (reader) Object.assign(reader, patch);
+    if (!reader) return false;
+    if (whenCredential !== undefined && (reader.pairingState !== 'paired' || reader.credentialFingerprint !== whenCredential)) {
+      return false;
+    }
+    Object.assign(reader, patch);
+    return true;
   }
 
   async recordConnection(id: number, at: Date): Promise<void> {

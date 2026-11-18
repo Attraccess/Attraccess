@@ -117,6 +117,11 @@ const SAFE_CALLS: Array<{ file: string; call: string; why: string }> = [
     why: 'the provisioning protocol reply channel; replies only carry status fields (pinIsSet, never the PIN or Wi-Fi password)',
   },
   {
+    file: 'apps/attractap/firmware/src/api/security/ds_console.cpp',
+    call: 'DS_RECORD_BEGIN',
+    why: 'the lab-only `ds.export` answer on the serial console (secure-lab builds): the DS record holds the encrypted DS parameters and the public key, never the HMAC key or a plaintext private key',
+  },
+  {
     file: 'apps/attractap/firmware/src/api/handlers/auth.cpp',
     call: '("UNAUTHORIZED: " + message)',
     why: "the server's READER_UNAUTHORIZED reason code (PLEASE_REREGISTER), not the reader's credentials",

@@ -2,6 +2,7 @@ import type { AuditAuthenticationMethod } from '@attraccess/application-models';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { isDemoVariant } from './security/session-security-state';
 
 import type {
   AttractapCrashReportRecord,
@@ -365,12 +366,19 @@ export class AttractapService {
    */
   public async recordReaderBuild(
     id: number,
-    build: { profile: AttractapFirmwareProfile | null; release: boolean; secureVersion: number | null },
+    build: {
+      profile: AttractapFirmwareProfile | null;
+      release: boolean;
+      secureVersion: number | null;
+      variant?: string | null;
+    },
   ) {
+    // Same eligibility as the eFuse report check: a demo or debug variant never stays secured.
+    const eligible = build.profile === 'secure' && build.release && !isDemoVariant(build.variant ?? null);
     await this.readerStore.applySecurity(id, {
       firmwareProfile: build.profile,
       secureVersion: build.secureVersion,
-      ...(build.profile === 'secure' && build.release ? {} : { secured: false, securedAt: null }),
+      ...(eligible ? {} : { secured: false, securedAt: null }),
     });
   }
 

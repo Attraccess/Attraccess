@@ -267,6 +267,26 @@ describe('identity upgrade', () => {
       expect(store.events).toHaveLength(0);
     });
 
+    it('an upgrade that loses a race with a revoke (the revoke wins, nothing is re-paired)', async () => {
+      const s = session();
+      const nonce = await challenge(s);
+      const isActive = registry.isActive.bind(registry);
+      // The revoke lands after the active check and before the credential write.
+      jest.spyOn(registry, 'isActive').mockImplementationOnce(async (id, fingerprint) => {
+        const active = await isActive(id, fingerprint);
+        await registry.revoke(7, 1);
+        return active;
+      });
+      store.events.length = 0;
+      expect(await upgrade(s, dsSpki, proofFor(nonce))).toEqual({
+        t: 'identity.upgrade.rejected',
+        reason: 'not-allowed',
+      });
+      expect(store.rows.get(7)?.pairingState).toBe('revoked');
+      expect(store.events.map((e) => e.state)).toEqual(['revoked']);
+      expect(audit.record).not.toHaveBeenCalled();
+    });
+
     it('a key another reader already holds, and an internal failure, without changing anything', async () => {
       store.addReader({ id: 9, name: 'other', pairingState: 'paired', credentialFingerprint: spkiFingerprint(dsSpki) });
       const s = session();

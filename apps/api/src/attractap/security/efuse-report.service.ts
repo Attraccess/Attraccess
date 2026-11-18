@@ -35,13 +35,19 @@ export class EfuseReportService {
     ];
     const secured = problems.length === 0;
     const now = new Date();
-    await this.readers.applySecurity(reader.id, {
-      secured,
-      securedAt: secured ? (reader.secured ? reader.securedAt : now) : null,
-      efuseSecureVersion: report.secureVersion,
-      securityReportCheckedAt: now,
-      securityReportProblems: problems,
-    });
+    const applied = await this.readers.applySecurity(
+      reader.id,
+      {
+        secured,
+        securedAt: secured ? (reader.secured ? reader.securedAt : now) : null,
+        efuseSecureVersion: report.secureVersion,
+        securityReportCheckedAt: now,
+        securityReportProblems: problems,
+      },
+      // The key of this session must still be the reader's credential (a revoke or re-pair may have landed meanwhile).
+      session.fingerprint,
+    );
+    if (!applied) return 'ignored';
 
     if (secured && !reader.secured) {
       await this.record(reader.id, 'reader.secured', {

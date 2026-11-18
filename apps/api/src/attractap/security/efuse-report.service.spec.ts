@@ -12,7 +12,13 @@ describe('EfuseReportService', () => {
 
   beforeEach(() => {
     readers = new FakeReaderStore();
-    readers.readers.set(5, makeReader({ id: 5, secureBootDigest0: DIGEST0, secureBootDigest1: DIGEST1 }));
+    readers.readers.set(5, makeReader({
+        id: 5,
+        pairingState: 'paired',
+        credentialFingerprint: 'a'.repeat(64),
+        secureBootDigest0: DIGEST0,
+        secureBootDigest1: DIGEST1,
+      }));
     audit = { record: jest.fn().mockResolvedValue(undefined) };
     service = new EfuseReportService(readers, audit);
   });
@@ -24,6 +30,18 @@ describe('EfuseReportService', () => {
   };
   const reader = () => readers.readers.get(5);
   const actions = () => audit.record.mock.calls.map((c) => c[0].action);
+
+  it('writes nothing for a session whose key is no longer the reader credential (revoked or re-paired meanwhile)', async () => {
+    const session = state(release);
+    const row = makeReader({ id: 5, pairingState: 'revoked', credentialFingerprint: 'a'.repeat(64) });
+    readers.readers.set(5, { ...row, secureBootDigest0: DIGEST0, secureBootDigest1: DIGEST1 });
+    expect(await service.handle(session, releaseReport())).toBe('ignored');
+    expect(reader()).toMatchObject({ secured: false, securityReportProblems: null });
+    expect(audit.record).not.toHaveBeenCalled();
+    readers.readers.set(5, { ...row, pairingState: 'paired', credentialFingerprint: 'b'.repeat(64) });
+    expect(await service.handle(session, releaseReport())).toBe('ignored');
+    expect(reader()?.secured).toBe(false);
+  });
 
   it('secures a release secure reader with an RSA identity whose report matches, and audits it once', async () => {
     expect(await service.handle(state(release), releaseReport())).toBe('recorded');
@@ -76,7 +94,7 @@ describe('EfuseReportService', () => {
   });
 
   it('does not trust the digests of the report when the server recorded none for the reader', async () => {
-    readers.readers.set(5, makeReader({ id: 5 }));
+    readers.readers.set(5, makeReader({ id: 5, pairingState: 'paired', credentialFingerprint: 'a'.repeat(64) }));
     await service.handle(state(release), releaseReport());
     expect(reader()?.secured).toBe(false);
     expect(reader()?.securityReportProblems).toEqual(['digest0-not-recorded', 'digest1-not-recorded']);

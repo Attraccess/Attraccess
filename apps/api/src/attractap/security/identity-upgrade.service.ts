@@ -1,7 +1,7 @@
 import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../audit/recorder/audit-event';
-import { CredentialRegistryService } from './credential-registry.service';
+import { CREDENTIAL_CHANGED, CredentialRegistryService } from './credential-registry.service';
 import { isIdentityUpgradeAllowed } from './identity-upgrade-gate';
 import { buildProofTuple, verifyProof } from './identity-upgrade-proof';
 import { InstallationIdentityService } from './installation-identity.service';
@@ -133,13 +133,20 @@ export class IdentityUpgradeService {
       return { t: 'identity.upgraded', certificate: certificate.pem };
     }
     if (!(await this.registry.isActive(readerId, state.fingerprint))) return rejected('not-allowed');
-    await this.registry.markPaired({
-      readerId,
-      fingerprint: newFingerprint,
-      certificate,
-      actorId: null,
-      previousCredentialBecomes: 'replaced',
-    });
+    try {
+      await this.registry.markPaired({
+        readerId,
+        fingerprint: newFingerprint,
+        certificate,
+        actorId: null,
+        previousCredentialBecomes: 'replaced',
+        // A revoke or re-pair between the check above and this write must win.
+        expectedFingerprint: state.fingerprint,
+      });
+    } catch (error) {
+      if (error instanceof ConflictException && error.message === CREDENTIAL_CHANGED) return rejected('not-allowed');
+      throw error;
+    }
     await this.recordUpgrade(readerId, state.fingerprint, newFingerprint);
     return { t: 'identity.upgraded', certificate: certificate.pem };
   }

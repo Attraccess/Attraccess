@@ -19,6 +19,9 @@ export interface IssuedCertificate {
   notAfter: Date;
 }
 
+/** Thrown by `markPaired` when `expectedFingerprint` no longer is the reader's credential. */
+export const CREDENTIAL_CHANGED = 'CredentialChanged';
+
 /** The credential columns of a reader row as `markPaired` found them, so an undo can put them back. */
 export type CredentialSnapshot = AttractapCredentialSnapshot;
 
@@ -80,12 +83,23 @@ export class CredentialRegistryService {
     /** The responsible user; null when the reader itself changes its identity (identity upgrade). */
     actorId: number | null;
     previousCredentialBecomes: 'revoked' | 'replaced';
+    /**
+     * Only when the reader still holds this credential, checked inside the transaction. A reader that changes its
+     * own identity (identity upgrade) must not overwrite a revoke or re-pair that landed in the meantime.
+     */
+    expectedFingerprint?: string;
   }): Promise<{ previousFingerprint: string | null; before: CredentialSnapshot }> {
     const { readerId, fingerprint, certificate, actorId } = input;
     try {
       return await this.unitOfWork.run(async (scope) => {
         const reader = await this.store.readCredential(scope, readerId);
         if (!reader) throw new NotFoundException('Reader not found');
+        if (
+          input.expectedFingerprint !== undefined &&
+          (reader.pairingState !== 'paired' || reader.credentialFingerprint !== input.expectedFingerprint)
+        ) {
+          throw new ConflictException(CREDENTIAL_CHANGED);
+        }
         // One key, one reader: two records must never share an active credential.
         const holderId = await this.store.findPairedReaderIdByFingerprint(fingerprint, scope);
         if (holderId !== null && holderId !== reader.id) throw new ConflictException('PairingKeyInUse');

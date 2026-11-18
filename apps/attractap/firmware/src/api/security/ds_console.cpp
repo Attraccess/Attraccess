@@ -11,10 +11,14 @@
 #include "efuse_snapshot.hpp"
 #include "esp_efuse.h"
 #include "esp_mac.h"
+#include "esp_task_wdt.h"
 #include "pairing_codec.hpp"
 
 namespace
 {
+    // The one lab reader the KEY3 burn is approved for (ATT-1207). Any other chip refuses, even when its own MAC is typed.
+    constexpr const char *APPROVED_MAC = "dc:b4:d9:21:71:c8";
+
     std::string ownMac()
     {
         uint8_t mac[6] = {};
@@ -36,14 +40,14 @@ namespace
     {
         DsRecord::Record record;
         const bool hasRecord = DsStorage::read(record);
-        const auto ds = DsReaderKeyStore::status();
+        const bool dsAvailable = DsReaderKeyStore::status() == DsReaderKeyStore::Status::Available;
         const int purpose = static_cast<int>(esp_efuse_get_key_purpose(EFUSE_BLK_KEY3));
         const bool unused = esp_efuse_key_block_unused(EFUSE_BLK_KEY3) && purpose == 0;
         const char *flash = "disabled";
         const EfuseReport::Snapshot snapshot = EfuseSnapshot::read();
         flash = snapshot.flashEncryptionMode.c_str();
-        printf("DS_STATUS available=%d record=%d key3=%s fe=%s\n", ds == DsReaderKeyStore::Status::Available ? 1 : 0,
-               hasRecord ? 1 : 0, unused ? "unused" : EfuseSnapshot::purposeName(purpose), flash);
+        const char *block3 = unused ? "unused" : EfuseSnapshot::purposeName(purpose);
+        printf("DS_STATUS available=%d record=%d key3=%s fe=%s\n", dsAvailable ? 1 : 0, hasRecord ? 1 : 0, block3, flash);
     }
 
     void create(const std::string &argument)
@@ -51,12 +55,15 @@ namespace
         std::string requested = trimmed(argument);
         std::transform(requested.begin(), requested.end(), requested.begin(),
                        [](unsigned char c) { return static_cast<char>(tolower(c)); });
-        if (requested != ownMac())
+        if (requested != ownMac() || requested != APPROVED_MAC)
         {
             printf("DS_CREATE_RESULT error mac-mismatch\n");
             return;
         }
+        // RSA-3072 key generation takes longer than the task watchdog allows; this task is off the watchdog meanwhile.
+        esp_task_wdt_delete(NULL);
         const DsCreator::Result result = DsCreator::create();
+        esp_task_wdt_add(NULL);
         // Tells the lab tool whether KEY3 may be burned even though creation failed (never retry then).
         printf("DS_CREATE_BURNED %d\n", result.burned ? 1 : 0);
         if (result.ok)

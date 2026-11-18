@@ -39,63 +39,76 @@ const isInt = (v: unknown, max: number): v is number =>
   Number.isInteger(v) && (v as number) >= 0 && (v as number) <= max;
 const isHex64 = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-fA-F]{64}$/.test(v);
 
+type Obj = Record<string, unknown>;
+const isObject = (v: unknown): v is Obj => !!v && typeof v === 'object';
+
+function parseKeys(keys: unknown): EfuseKey[] | null {
+  if (!Array.isArray(keys) || keys.length !== 6) return null;
+  const parsed: EfuseKey[] = [];
+  for (const key of keys as unknown[]) {
+    if (!isObject(key) || typeof key['purpose'] !== 'string' || key['purpose'].length > 48) return null;
+    if (!isBool(key['used']) || !isBool(key['readProtected'])) return null;
+    parsed.push({ purpose: key['purpose'], used: key['used'], readProtected: key['readProtected'] });
+  }
+  return parsed;
+}
+
+function parseJtag(jtag: unknown): EfuseReport['jtag'] | null {
+  if (!isObject(jtag)) return null;
+  if (!isBool(jtag['padDisabled']) || !isBool(jtag['usbDisabled']) || !isInt(jtag['softDisJtag'], 0xff)) return null;
+  return jtag as unknown as EfuseReport['jtag'];
+}
+
+function parseDownload(download: unknown): EfuseReport['download'] | null {
+  if (!isObject(download)) return null;
+  const flags = ['disDownloadMode', 'enableSecurityDownload', 'disForceDownload', 'disUsbSerialJtagDownload'];
+  return flags.every((flag) => isBool(download[flag])) ? (download as unknown as EfuseReport['download']) : null;
+}
+
+function parseDigest(value: unknown): string | null | undefined {
+  const digest = value ?? null;
+  if (digest === null) return null;
+  return isHex64(digest) ? digest : undefined;
+}
+
 /** Strictly shaped or null: anything off is a protocol violation, never half-trusted. */
 export function parseEfuseReport(body: unknown): EfuseReport | null {
-  const b = body as Record<string, unknown> | null;
-  if (!b || typeof b !== 'object') return null;
-  const keys = b['keys'];
-  const revoke = b['revoke'];
-  const jtag = b['jtag'] as Record<string, unknown> | undefined;
-  const download = b['download'] as Record<string, unknown> | undefined;
-  const mode = b['flashEncryptionMode'];
-  if (typeof b['mac'] !== 'string' || !/^([0-9a-f]{2}:){5}[0-9a-f]{2}$/i.test(b['mac'])) return null;
-  if (!Array.isArray(keys) || keys.length !== 6) return null;
-  if (!Array.isArray(revoke) || revoke.length !== 3 || !revoke.every(isBool)) return null;
-  if (!jtag || !download) return null;
-  for (const key of keys as Array<Record<string, unknown>>) {
-    if (!key || typeof key['purpose'] !== 'string' || key['purpose'].length > 48) return null;
-    if (!isBool(key['used']) || !isBool(key['readProtected'])) return null;
-  }
-  const digest0 = b['digest0'] ?? null;
-  const digest1 = b['digest1'] ?? null;
-  const valid =
-    isBool(b['secureBootEn']) &&
-    (digest0 === null || isHex64(digest0)) &&
-    (digest1 === null || isHex64(digest1)) &&
-    isInt(b['cryptCnt'], 7) &&
-    isBool(b['cryptCntWriteProtected']) &&
-    isBool(b['disDownloadManualEncrypt']) &&
-    isBool(jtag['padDisabled']) &&
-    isBool(jtag['usbDisabled']) &&
-    isInt(jtag['softDisJtag'], 0xff) &&
-    isBool(download['disDownloadMode']) &&
-    isBool(download['enableSecurityDownload']) &&
-    isBool(download['disForceDownload']) &&
-    isBool(download['disUsbSerialJtagDownload']) &&
-    isInt(b['rdDis'], 0x7f) &&
-    isBool(b['rdDisWriteProtected']) &&
-    isInt(b['secureVersion'], 0xffff) &&
+  if (!isObject(body)) return null;
+  const mode = body['flashEncryptionMode'];
+  const revoke = body['revoke'];
+  const keys = parseKeys(body['keys']);
+  const jtag = parseJtag(body['jtag']);
+  const download = parseDownload(body['download']);
+  const digest0 = parseDigest(body['digest0']);
+  const digest1 = parseDigest(body['digest1']);
+  const scalarsValid =
+    typeof body['mac'] === 'string' &&
+    /^([0-9a-f]{2}:){5}[0-9a-f]{2}$/i.test(body['mac']) &&
+    isBool(body['secureBootEn']) &&
+    isInt(body['cryptCnt'], 7) &&
+    isBool(body['cryptCntWriteProtected']) &&
+    isBool(body['disDownloadManualEncrypt']) &&
+    isInt(body['rdDis'], 0x7f) &&
+    isBool(body['rdDisWriteProtected']) &&
+    isInt(body['secureVersion'], 0xffff) &&
     (mode === 'disabled' || mode === 'development' || mode === 'release');
-  if (!valid) return null;
+  if (!scalarsValid || !keys || !jtag || !download || digest0 === undefined || digest1 === undefined) return null;
+  if (!Array.isArray(revoke) || revoke.length !== 3 || !revoke.every(isBool)) return null;
   return {
-    mac: (b['mac'] as string).toLowerCase(),
-    secureBootEn: b['secureBootEn'] as boolean,
-    keys: (keys as Array<Record<string, unknown>>).map((k) => ({
-      purpose: k['purpose'] as string,
-      used: k['used'] as boolean,
-      readProtected: k['readProtected'] as boolean,
-    })),
-    digest0: digest0 as string | null,
-    digest1: digest1 as string | null,
+    mac: (body['mac'] as string).toLowerCase(),
+    secureBootEn: body['secureBootEn'] as boolean,
+    keys,
+    digest0,
+    digest1,
     revoke: revoke as boolean[],
-    cryptCnt: b['cryptCnt'] as number,
-    cryptCntWriteProtected: b['cryptCntWriteProtected'] as boolean,
-    disDownloadManualEncrypt: b['disDownloadManualEncrypt'] as boolean,
-    jtag: jtag as EfuseReport['jtag'],
-    download: download as EfuseReport['download'],
-    rdDis: b['rdDis'] as number,
-    rdDisWriteProtected: b['rdDisWriteProtected'] as boolean,
-    secureVersion: b['secureVersion'] as number,
+    cryptCnt: body['cryptCnt'] as number,
+    cryptCntWriteProtected: body['cryptCntWriteProtected'] as boolean,
+    disDownloadManualEncrypt: body['disDownloadManualEncrypt'] as boolean,
+    jtag,
+    download,
+    rdDis: body['rdDis'] as number,
+    rdDisWriteProtected: body['rdDisWriteProtected'] as boolean,
+    secureVersion: body['secureVersion'] as number,
     flashEncryptionMode: mode as EfuseReport['flashEncryptionMode'],
   };
 }

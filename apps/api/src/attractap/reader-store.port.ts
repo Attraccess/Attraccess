@@ -24,8 +24,12 @@ export interface AttractapReaderStore {
   findResourcesByIds(ids: number[]): Promise<AttractapLinkedResource[]>;
   /** Saves name, brightness, firmware and linked resources; credentials stay as they are. */
   applyEdit(id: number, edit: AttractapReaderEdit): Promise<void>;
-  /** Writes the security columns only (firmware profile, eFuse report result, secured); nothing else changes. */
-  applySecurity(id: number, patch: AttractapReaderSecurityPatch): Promise<void>;
+  /**
+   * Writes the security columns only (firmware profile, eFuse report result, secured); nothing else changes.
+   * With `whenCredential` the write happens only while the reader is paired with that key, so a report of a
+   * session whose key was revoked or replaced meanwhile cannot mark the reader secured. False when it did not apply.
+   */
+  applySecurity(id: number, patch: AttractapReaderSecurityPatch, whenCredential?: string): Promise<boolean>;
   recordConnection(id: number, at: Date): Promise<void>;
   /** True when a reader was deleted. */
   delete(id: number): Promise<boolean>;

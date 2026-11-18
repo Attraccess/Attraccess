@@ -85,9 +85,11 @@ export class TypeOrmAttractapReaderStore implements AttractapReaderStore {
     await this.readers.save(changes);
   }
 
-  async applySecurity(id: number, patch: AttractapReaderSecurityPatch): Promise<void> {
-    if (Object.keys(patch).length === 0) return;
-    await this.readers.update(id, { ...patch });
+  async applySecurity(id: number, patch: AttractapReaderSecurityPatch, whenCredential?: string): Promise<boolean> {
+    if (Object.keys(patch).length === 0) return true;
+    const where = whenCredential === undefined ? { id } : { id, pairingState: 'paired' as const, credentialFingerprint: whenCredential };
+    const result = await this.readers.update(where, { ...patch });
+    return Boolean(result.affected);
   }
 
   async recordConnection(id: number, at: Date): Promise<void> {
