@@ -47,12 +47,12 @@ Keep the file private. You can restore the stock firmware later with `esptool.py
 
 ### Flash the bridge firmware
 
-1. In Attraccess, open the readers page (**Devices** > **Attractap Readers**) and choose **Hardware Setup** > **Setup RFID-Reader**.
-2. Choose the firmware **Attractap BLE Bridge — GL.iNet GL-S10** and read the warning.
-3. Click **Connect** and pick the serial port of your adapter. The browser cannot reset the chip, so the S10 must already be in download mode.
-4. Flash the firmware. Attraccess refuses to flash if the connected chip is not the expected one.
+1. Put the S10 into download mode: hold GPIO0 while you power it up. The browser cannot reset the chip, so it must already be in download mode.
+2. In Attraccess, open the readers page (**Devices** > **Attractap Readers**) and choose **Set up Attractap**.
+3. Click **Connect via USB** and pick the serial port of your adapter.
+4. On the **Firmware** tab, choose **Attractap BLE Bridge** (ESP32, GL.iNet GL-S10) and click **Install Now**. Read the warning and confirm it. Attraccess refuses to flash if the connected chip is not the expected one.
 5. Power-cycle the S10 **without** holding GPIO0. It now starts the bridge firmware.
-6. The page continues into the configuration on the same port. Set the PIN, the Wi-Fi network (optional) and the API URL of your Attraccess server.
+6. Click **Continue setup**. The page continues into the configuration on the same port. Set the PIN, the Wi-Fi network (optional) and the API URL of your Attraccess server.
 
 > [!NOTE]
 > There is no known way to install the bridge over the network from the stock GL.iNet firmware. You need the serial adapter for the first flash.
