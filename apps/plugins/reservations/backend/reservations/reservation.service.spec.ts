@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { ReservationError } from './errors';
+import { MAX_TEXT_LENGTH } from './reservation.service';
 import { Harness, at, createHarness, principal } from '../testing/harness.test-utils';
 
 // 2026-06-01T08:00Z is "now"; Berlin is UTC+2 in June. Defaults: 15 min step, 15..240 min, 30 days.
@@ -270,6 +271,16 @@ describe('ReservationService', () => {
       expect(await codeOf(h.reservations.approve(bob, 9999))).toBe('RESERVATION_NOT_FOUND');
       expect(await codeOf(h.reservations.approve(alice, pending.id))).toBe('FORBIDDEN');
       expect((await h.store.findById(pending.id))?.status).toBe('pending');
+    });
+
+    it('keeps a note and decision reason of the full allowed length (MAX_TEXT_LENGTH)', async () => {
+      const text = (char: string) => char.repeat(MAX_TEXT_LENGTH);
+      const pending = await book(alice, [8, 9], 1, `${text('n')}cut`);
+      expect(pending.note).toBe(text('n'));
+      expect(await h.reservations.reject(manager, pending.id, text('r'))).toMatchObject({ decisionReason: text('r') });
+      const other = await book(alice, [10, 11]);
+      expect(await h.reservations.cancel(alice, other.id, text('c'))).toMatchObject({ cancelReason: text('c') });
+      expect((await h.store.findById(pending.id))?.note).toBe(text('n'));
     });
 
     it('cannot decide once the start passed', async () => {
