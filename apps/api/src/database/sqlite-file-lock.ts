@@ -70,8 +70,3 @@ export function releaseFileLock(key: string, holder: FileLockHolder): void {
     next.wake();
   } else fileLocks.delete(key);
 }
-
-/** Whether `holder` holds the lock of `key`. */
-export function holdsFileLock(key: string, holder: FileLockHolder): boolean {
-  return fileLocks.get(key)?.holder === holder;
-}

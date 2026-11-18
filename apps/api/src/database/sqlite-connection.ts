@@ -45,12 +45,14 @@ export function createDataSource(options: DataSourceOptions, guard: CreateDataSo
     joins: guard.joinsOwnedTransactions ?? true,
     isolation,
     inTransaction: () => Boolean((source.driver as SqliteDriverInternals).databaseConnection?.inTransaction),
+    readsOnly: (sql) => isReadOnlyStatement((source.driver as SqliteDriverInternals).databaseConnection, sql),
   };
   connections.add(connection);
   const destroy = source.destroy.bind(source);
   source.destroy = () => {
     connections.delete(connection);
-    return destroy();
+    // Closing ends any open transaction; a write lock it still held would make every other connection time out.
+    return destroy().finally(() => connection.lockKey !== undefined && releaseFileLock(connection.lockKey, connection));
   };
   // The SQLite driver hands every caller the same query runner, so patching it covers all work on the connection.
   const driver = source.driver;
@@ -80,7 +82,19 @@ const newFlow = (): Flow => ({ nested: 0 });
 type Isolation = ReturnType<typeof createIsolation>;
 
 /** better-sqlite3's Database, which the driver opens on initialize: SQLite's own view of the transaction state. */
-type SqliteDriverInternals = { databaseConnection?: { inTransaction?: boolean } };
+type SqliteDriverInternals = { databaseConnection?: SqliteDatabase };
+type SqliteDatabase = { inTransaction?: boolean; prepare?: (sql: string) => { readonly: boolean } };
+
+/** A SELECT, or a statement SQLite itself reports as read-only (`WITH … SELECT`): it needs no write lock. */
+function isReadOnlyStatement(database: SqliteDatabase | undefined, sql: string): boolean {
+  if (/^\s*SELECT\b/i.test(sql)) return true;
+  if (!/^\s*WITH\b/i.test(sql) || !database?.prepare) return false;
+  try {
+    return database.prepare(sql).readonly;
+  } catch {
+    return false; // Not preparable (syntax error, several statements): the real run reports it.
+  }
+}
 
 /**
  * A guarded DataSource: its database file's lock key (none for in-memory databases), its busy timeout, whether it takes
@@ -93,6 +107,7 @@ type Connection = {
   joins: boolean;
   isolation: Isolation;
   inTransaction: () => boolean;
+  readsOnly: (sql: string) => boolean;
   query?: (sql: string, parameters?: unknown[], useStructuredResult?: boolean) => Promise<unknown>;
 };
 
@@ -265,7 +280,7 @@ function nestedCall(isolation: Isolation, flow: Flow, call: () => unknown) {
  * connection holding the write lock can never finish. Every guarded connection to a file therefore first takes the
  * file's asynchronous write lock (sqlite-file-lock): a top-level BEGIN takes it and keeps it until SQLite reports the
  * transaction ended (COMMIT, ROLLBACK, a failed BEGIN, a reset), a write outside a transaction (any statement but a
- * SELECT) takes it for the statement. Waiters queue in arrival order and give up after the busy timeout with code
+ * read-only one) takes it for the statement. Waiters queue in arrival order and give up after the busy timeout with code
  * SQLITE_BUSY. SQLite's own busy handler is left for writers outside this process (and unguarded connections). Reads
  * do not take the lock: in rollback-journal mode they only need SQLite's shared lock, which a writer holding the
  * reserved lock allows, and a synchronous read holds it only while it runs.
@@ -388,10 +403,9 @@ function guardSharedRunner(runner: QueryRunner, connection: Connection): QueryRu
       open();
     }
   };
-  const run = query;
   const runAlone = async (sql: string, parameters?: unknown[], useStructuredResult?: boolean) => {
     while (running > 0) await settled;
-    return run(sql, parameters, useStructuredResult);
+    return query(sql, parameters, useStructuredResult);
   };
   runner.query = async (sql: string, parameters?: unknown[], useStructuredResult?: boolean) => {
     const flow = flows.getStore();
@@ -415,7 +429,7 @@ function guardSharedRunner(runner: QueryRunner, connection: Connection): QueryRu
   };
   connection.query = runner.query;
   const runOnConnection = async (sql: string, parameters?: unknown[], useStructuredResult?: boolean) => {
-    if (sql === 'BEGIN TRANSACTION' || (internals.transactionDepth === 0 && !/^\s*SELECT\b/i.test(sql))) {
+    if (sql === 'BEGIN TRANSACTION' || (internals.transactionDepth === 0 && !connection.readsOnly(sql))) {
       const statement = sql === 'BEGIN TRANSACTION' ? 'BEGIN IMMEDIATE TRANSACTION' : sql;
       const alone = writeLocked(() => runAlone(statement, parameters, useStructuredResult));
       exclusive = alone;
@@ -427,7 +441,7 @@ function guardSharedRunner(runner: QueryRunner, connection: Connection): QueryRu
     }
     if (running++ === 0) settled = new Promise((resolve) => (settle = resolve));
     try {
-      return await run(sql, parameters, useStructuredResult);
+      return await query(sql, parameters, useStructuredResult);
     } finally {
       if (--running === 0) settle();
     }

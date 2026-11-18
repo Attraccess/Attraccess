@@ -104,6 +104,38 @@ describe('SQLite write lock shared by guarded connections to one file', () => {
     expect(await second.query('SELECT value FROM counter WHERE id = 1')).toEqual([{ value: 1 }]);
   });
 
+  it('runs a read-only WITH query on another connection without waiting for the lock', async () => {
+    const holding = defer();
+    const release = defer();
+    const transaction = first.transaction(async (manager) => {
+      await manager.query('UPDATE counter SET value = 1 WHERE id = 1');
+      holding.resolve();
+      await release.promise;
+    });
+    await holding.promise;
+    const read = second.query('WITH current AS (SELECT value FROM counter WHERE id = 1) SELECT value FROM current');
+    await expect(Promise.race([read, pause(BUSY_TIMEOUT_MS / 3).then(() => 'waited')])).resolves.toEqual([
+      { value: 0 },
+    ]);
+    release.resolve();
+    await transaction;
+  });
+
+  it('frees the lock of a connection destroyed while its transaction is open', async () => {
+    const runner = first.createQueryRunner();
+    await runner.startTransaction();
+    await runner.query('UPDATE counter SET value = 1 WHERE id = 1');
+    await first.destroy();
+
+    const startedAt = Date.now();
+    await second.query('UPDATE counter SET value = 2 WHERE id = 2');
+    expect(Date.now() - startedAt).toBeLessThan(BUSY_TIMEOUT_MS);
+    expect(await second.query('SELECT id, value FROM counter ORDER BY id')).toEqual([
+      { id: 1, value: 0 },
+      { id: 2, value: 2 },
+    ]);
+  });
+
   it('fails a waiter with SQLITE_BUSY after the busy timeout, leaving the holder and both connections usable', async () => {
     await second.destroy();
     second = await open(100);
