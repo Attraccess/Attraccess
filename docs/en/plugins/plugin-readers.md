@@ -122,13 +122,13 @@ and the result or reason. The authentication itself is never logged.
 
 `PLUGIN_READER_LIMITS` in the SDK:
 
-| Limit                         | Value               |
-| ----------------------------- | ------------------- |
-| Readers per plugin            | 200                 |
-| Device id                     | 1 to 200 characters |
-| Name                          | 1 to 100 characters |
-| Resources per reader          | 1                   |
-| Validity of an authentication | 30 s                |
+| Limit                         | Value                                      |
+| ----------------------------- | ------------------------------------------ |
+| Readers per plugin            | 200                                        |
+| Device id                     | 1 to 200 characters, no control characters |
+| Name                          | 1 to 100 characters, no control characters |
+| Resources per reader          | 1                                          |
+| Validity of an authentication | 30 s                                       |
 
 Authentications live in memory only: a restart of the API, or disabling the plugin, invalidates them.
 

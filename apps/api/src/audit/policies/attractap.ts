@@ -1,4 +1,4 @@
-import { dataFields, oneOf, positive, isAuthenticationMethod } from './projection';
+import { dataFields, oneOf, positive, printable, isAuthenticationMethod } from './projection';
 import type { AuthenticationMethod } from '@attraccess/application-models';
 
 /** Projection input: the attractap action without its `attractap.` prefix. */
@@ -150,16 +150,6 @@ type DetailValue = string | number | boolean;
 
 function isSha256Hex(value: DetailValue): boolean {
   return typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
-}
-
-/** A non-empty string of at most `maxLength` characters without control characters. */
-function printable(value: DetailValue, maxLength: number): boolean {
-  return (
-    typeof value === 'string' &&
-    value.length > 0 &&
-    value.length <= maxLength &&
-    ![...value].some((ch) => ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f)
-  );
 }
 
 const detailValidators: Record<string, (value: DetailValue) => boolean> = {

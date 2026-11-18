@@ -128,13 +128,13 @@ Inhaber und Ergebnis oder Grund. Die Authentifizierung selbst wird nie protokoll
 
 `PLUGIN_READER_LIMITS` im SDK:
 
-| Grenzwert                          | Wert              |
-| ---------------------------------- | ----------------- |
-| Reader pro Plugin                  | 200               |
-| Geräte-Id                          | 1 bis 200 Zeichen |
-| Name                               | 1 bis 100 Zeichen |
-| Ressourcen pro Reader              | 1                 |
-| Gültigkeit einer Authentifizierung | 30 s              |
+| Grenzwert                          | Wert                                   |
+| ---------------------------------- | -------------------------------------- |
+| Reader pro Plugin                  | 200                                    |
+| Geräte-Id                          | 1 bis 200 Zeichen, keine Steuerzeichen |
+| Name                               | 1 bis 100 Zeichen, keine Steuerzeichen |
+| Ressourcen pro Reader              | 1                                      |
+| Gültigkeit einer Authentifizierung | 30 s                                   |
 
 Authentifizierungen liegen nur im Arbeitsspeicher: Ein Neustart der API oder das Deaktivieren des Plugins macht sie
 ungültig.

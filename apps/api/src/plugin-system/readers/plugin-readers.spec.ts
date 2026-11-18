@@ -85,6 +85,10 @@ describe('context.readers', () => {
       ['a non-string device id', { ...reader(), deviceId: 5 }],
       ['a blank name', { ...reader(), name: '  ' }],
       ['a name over the limit', { ...reader(), name: 'x'.repeat(PLUGIN_READER_LIMITS.nameMaxLength + 1) }],
+      // The audit policy drops events with control characters, so such a reader's taps would go unaudited.
+      ['a device id with a control character', { ...reader(), deviceId: 'device\n1' }],
+      ['a name with a control character', { ...reader(), name: 'Side\u0007entrance' }],
+      ['a name with DEL', { ...reader(), name: 'Side entrance\u007f' }],
       ['no capabilities', { ...reader(), capabilities: undefined }],
       ['empty resource types', { ...reader(), capabilities: { resourceTypes: [], actions: ['open'] } }],
       ['empty actions', { ...reader(), capabilities: { resourceTypes: ['door'], actions: [] } }],
@@ -139,6 +143,7 @@ describe('context.readers', () => {
 
       await rejectsWith(readers.update('device-1', { name: '' }), 'INVALID_ARGUMENT');
       await rejectsWith(readers.update('device-1', null as any), 'INVALID_ARGUMENT');
+      await rejectsWith(readers.update('device-1', { name: 'Tab\tname' }), 'INVALID_ARGUMENT');
       await rejectsWith(readers.update('missing', { name: 'x' }), 'READER_NOT_FOUND');
       await expect(readers.update('device-1', { name: 'New name' })).resolves.toMatchObject({ name: 'New name' });
     });

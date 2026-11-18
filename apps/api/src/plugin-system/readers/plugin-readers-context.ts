@@ -7,6 +7,7 @@ import {
   PluginReadersContext,
 } from '@attraccess/plugins-backend-sdk';
 import { Logger } from '@nestjs/common';
+import { printable } from '../../audit/policies/projection';
 import type { PluginReaderChanges, PluginReadersService } from './plugin-readers.service';
 
 const logger = new Logger('PluginModule');
@@ -16,19 +17,22 @@ const MAX_AUTHENTICATION_LENGTH = 256;
 
 const invalid = (message: string) => new PluginReaderError('INVALID_ARGUMENT', message);
 
+/** Non-blank, and passes the audit policy: a tap audits the reader's device id and name. */
 const isText = (value: unknown, maxLength: number): value is string =>
-  typeof value === 'string' && value.trim().length > 0 && value.length <= maxLength;
+  printable(value, maxLength) && value.trim().length > 0;
 
 function deviceIdOf(value: unknown): string {
   if (!isText(value, PLUGIN_READER_LIMITS.deviceIdMaxLength)) {
-    throw invalid(`deviceId must be 1 to ${PLUGIN_READER_LIMITS.deviceIdMaxLength} characters`);
+    throw invalid(
+      `deviceId must be 1 to ${PLUGIN_READER_LIMITS.deviceIdMaxLength} characters without control characters`,
+    );
   }
   return value;
 }
 
 function nameOf(value: unknown): string {
   if (!isText(value, PLUGIN_READER_LIMITS.nameMaxLength)) {
-    throw invalid(`name must be 1 to ${PLUGIN_READER_LIMITS.nameMaxLength} characters`);
+    throw invalid(`name must be 1 to ${PLUGIN_READER_LIMITS.nameMaxLength} characters without control characters`);
   }
   return value;
 }

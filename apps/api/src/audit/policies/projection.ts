@@ -10,6 +10,17 @@ export const uuid = (v: unknown): v is string =>
 export const isAuthenticationMethod = (v: unknown): v is AuthenticationMethod =>
   (AUTHENTICATION_METHODS as readonly unknown[]).includes(v);
 
+/**
+ * A non-empty string of at most `maxLength` UTF-16 units without control characters (C0, DEL). Values that land in
+ * audit details pass this, so input stored for later audit events (for example plugin reader names) is checked with
+ * it on the way in.
+ */
+export const printable = (v: unknown, maxLength: number): v is string =>
+  typeof v === 'string' &&
+  v.length > 0 &&
+  v.length <= maxLength &&
+  ![...v].some((ch) => ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f);
+
 export const oneOf =
   (...values: string[]) =>
   (v: unknown) =>

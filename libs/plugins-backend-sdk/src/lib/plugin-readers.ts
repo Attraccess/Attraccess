@@ -43,11 +43,11 @@ export const PLUGIN_READER_LIMITS = {
 
 export interface PluginReaderInput {
   /**
-   * Plugin-chosen id of the device, 1 to 200 characters, unique per plugin. Use the same id as `device` in
+   * Plugin-chosen id of the device, 1 to 200 characters without control characters, unique per plugin. Use the same id as `device` in
    * `cards.authenticate`: a tap only accepts an authentication from the same device.
    */
   deviceId: string;
-  /** Shown to administrators, 1 to 100 characters. */
+  /** Shown to administrators, 1 to 100 characters without control characters. */
   name: string;
   capabilities: PluginReaderCapabilities;
 }
