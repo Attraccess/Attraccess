@@ -1,3 +1,28 @@
+## 1.11.0-beta.3 (2026-11-18)
+
+### 🚀 Features
+
+- **attractap:** raise plugin BLE throughput for bulk transfers (ATT-1296) ([#2233](https://github.com/Attraccess/Attraccess/pull/2233))
+- **plugins:** license modules and license terms for plugins (ATT-1282) ([#2220](https://github.com/Attraccess/Attraccess/pull/2220))
+- **plugins:** let plugins authenticate cards over their own card channel (ATT-1310) ([#2232](https://github.com/Attraccess/Attraccess/pull/2232))
+
+### 🩹 Fixes
+
+- **api:** let @peculiar/x509 3 coexist with @simplewebauthn's x509 2 so readers can pair (ATT-1312) ([#2234](https://github.com/Attraccess/Attraccess/pull/2234))
+- **attractap-lab:** count a reader with no resources as idle in the HIL reset ([#2235](https://github.com/Attraccess/Attraccess/pull/2235))
+- **ci:** run plugin tests outside the production env ([#2237](https://github.com/Attraccess/Attraccess/pull/2237))
+- ⚠️  **deps:** get pnpm audit to 0 advisories (ATT-1313) ([#2239](https://github.com/Attraccess/Attraccess/pull/2239))
+- **plugins:** require host 1.11.0-beta.3 for the paid Wago and Reservations plugins (ATT-1282) ([#2236](https://github.com/Attraccess/Attraccess/pull/2236))
+
+### ⚠️  Breaking Changes
+
+- **deps:** get pnpm audit to 0 advisories (ATT-1313)  ([#2239](https://github.com/Attraccess/Attraccess/pull/2239))
+  `@attraccess/react-query-client` is now generated with @7nohe/openapi-react-query-codegen 3. Hooks lose the service prefix, parameters are `{path, query, body}`, mutation hooks take `(mutationKey, options)`, service classes are replaced by SDK functions, and `OpenAPI.*` configuration is replaced by `client.setConfig`. Plugin frontends must migrate their calls.
+
+### ❤️ Thank You
+
+- Jan Jaap @jappyjan
+
 ## 1.11.0-beta.2 (2026-11-17)
 
 ### 🚀 Features
