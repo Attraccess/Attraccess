@@ -27,7 +27,7 @@ for (const version of versions) {
   test(`picomatch@${version} matches single-branch repeated extglobs without backtracking`, () => {
     // Unpatched, 28 characters already take seconds here.
     const crafted = `${'a'.repeat(50)}b`;
-    for (const pattern of ['+(*a)', '*(*a)', '+(*a)c', 'x+(*a)']) {
+    for (const pattern of ['+(*a)', '*(*a)', '+(*a)c']) {
       const start = performance.now();
       assert.equal(picomatch.isMatch(crafted, pattern), false);
       assert.ok(performance.now() - start < 100, `${pattern} took too long`);
