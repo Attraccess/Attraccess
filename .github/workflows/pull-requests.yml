@@ -307,7 +307,23 @@ jobs:
 
   crap-score:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_TYPE: postgres
+      DATABASE_URL: postgres://attraccess:attraccess@127.0.0.1:5432/attraccess
+      TEST_DATABASE_URL: postgres://attraccess:attraccess@127.0.0.1:5432/postgres
     steps:
+      - name: Start PostgreSQL
+        # A service container cannot raise max_connections; every test gets its own database and connections.
+        run: |
+          docker run -d --name postgres -p 5432:5432 \
+            -e POSTGRES_USER=attraccess -e POSTGRES_PASSWORD=attraccess -e POSTGRES_DB=attraccess \
+            postgres:18.6-alpine -c max_connections=1000 -c fsync=off -c synchronous_commit=off -c full_page_writes=off
+          for i in $(seq 1 60); do
+            docker exec postgres pg_isready -U attraccess -d attraccess && exit 0
+            sleep 2
+          done
+          docker logs postgres
+          exit 1
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
