@@ -74,7 +74,7 @@ describe('PluginController', () => {
     const plugins = [frontendPlugin('a'), frontendPlugin('b')];
     jest.spyOn(PluginService, 'getDiscoveredPlugins').mockReturnValue(plugins);
     expect(controller.getAllPlugins()).toEqual(
-      plugins.map((plugin) => ({ ...plugin, status: 'unknown', error: null })),
+      plugins.map((plugin) => ({ ...plugin, refused: false, status: 'unknown', error: null })),
     );
   });
 
