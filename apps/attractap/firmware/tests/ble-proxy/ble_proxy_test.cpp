@@ -436,6 +436,31 @@ namespace
         expect(g.radio.count("stopScan") == 1 && g.core.owner() == BleProxyCore::Owner::None, "a scan stops too");
     }
 
+    // A BLE-only bridge must never stay READER_BUSY (ATT-1315): neither after a websocket drop whose disconnect the
+    // controller never confirms, nor when the peripheral is gone before the connection completes.
+    void neverStuckBusy()
+    {
+        Fixture f;
+        f.open();
+        f.core.linkLost(f.now);
+        f.advance(RELEASE_DEADLINE_MS + 100);
+        expect(f.core.owner() == BleProxyCore::Owner::None, "unconfirmed disconnect: free after the release deadline");
+        f.request("BLE_SESSION_OPEN", openPayload(2, "sess-2"));
+        // Not refused (no answer before the connection completes) and connecting.
+        expect(f.sink.answers(2).empty() && f.core.owner() == BleProxyCore::Owner::Session &&
+                   f.radio.count("connect") == 2,
+               "the next session connects");
+
+        Fixture g;
+        g.request("BLE_SESSION_OPEN", openPayload(1));
+        g.advance(MAX_CONNECT_TIMEOUT_MS + OP_GRACE_MS + RELEASE_DEADLINE_MS);
+        expect(g.sink.code(1) != "OK" && g.core.owner() == BleProxyCore::Owner::None,
+               "a connect that never completes fails and ends");
+        g.request("BLE_SESSION_OPEN", openPayload(2, "sess-2"));
+        expect(g.sink.answers(2).empty() && g.core.owner() == BleProxyCore::Owner::Session,
+               "and the next session is taken");
+    }
+
     void otaRefusesAndEnds()
     {
         Fixture f;
@@ -556,8 +581,12 @@ namespace
         expect(ble["version"] == 1 && ble["maxMtu"] == 517 && ble["maxPayloadBytes"] == 512 &&
                    ble["operations"].size() == 8 && ble["maxConnections"] == 1,
                "capabilities.ble v1 as the API expects");
+        // The real bounds of this build (smaller on boards without PSRAM, BLE_PROXY_INTERNAL_RAM).
+        expect(ble["maxScanResults"] == MAX_SCAN_RESULTS && ble["maxNotificationQueue"] == MAX_NOTIFICATION_QUEUE &&
+                   ble["maxNotificationQueueBytes"] == MAX_NOTIFICATION_QUEUE_BYTES,
+               "capabilities.ble reports the build's bounds");
         JsonObjectConst watch = ble["watch"];
-        expect(watch["version"] == 1 && watch["maxFilters"] == 8 && watch["maxDevices"] == 32 &&
+        expect(watch["version"] == 1 && watch["maxFilters"] == 8 && watch["maxDevices"] == MAX_WATCH_DEVICES &&
                    watch["maxEventsPerSecond"] == 20,
                "capabilities.ble.watch v1 as the API expects");
         std::printf("capabilities.ble: %s\n", bleCaps);
@@ -587,6 +616,7 @@ int main()
     closeWithoutControllerConfirmationStillReleases();
     peripheralLossFailsPendingWork();
     linkLossEndsEverythingSilently();
+    neverStuckBusy();
     otaRefusesAndEnds();
     scanDeduplicatesFiltersAndBounds();
     crowdedBandKeepsRoomForMatches();

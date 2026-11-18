@@ -28,6 +28,9 @@ public:
 
     static void deinit();
 
+    // Link up and an IP address.
+    static bool isConnected() { return _state == ETHERNET_STATE_CONNECTED; }
+
 private:
     static esp_ip4_addr_t getIPAddress();
 
@@ -35,6 +38,18 @@ private:
     static void got_ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
     static esp_err_t initSPI();
     static esp_err_t ethernet_init(esp_eth_handle_t *eth_handles, uint8_t *eth_port_cnt);
+#ifdef ETH_RMII_EMAC
+    static esp_err_t emac_init(esp_eth_handle_t *eth_handle);
+#endif
+    // W5500 on SPI (PIN_ETH_SPI_CS), or the internal EMAC (ETH_RMII_EMAC, BLE bridge).
+    static constexpr bool configured()
+    {
+#ifdef ETH_RMII_EMAC
+        return true;
+#else
+        return PIN_ETH_SPI_CS >= 0;
+#endif
+    }
     static esp_err_t w5500_read_version_register(spi_device_handle_t spi_device, uint8_t *version);
     static void cleanupPartialInit();
 

@@ -96,6 +96,7 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
     TaskHandle_t task = nullptr;
     std::atomic<uint32_t> generation{1};
     std::atomic<bool> otaPending{false};
+    std::atomic<BleProxy::Activity> activity{BleProxy::Activity::Idle};
     uint32_t handledGeneration = 1;
     bool stackUp = false;
 
@@ -308,6 +309,10 @@ struct BleProxy::Impl : public ble::IBleSink, public ble::IRadioEvents
                 stackUp = core.radioReady();
                 logHeap(logger, stackUp ? "after BLE init" : "after BLE shutdown");
             }
+            using Owner = ble::BleProxyCore::Owner;
+            activity = core.owner() == Owner::Session ? BleProxy::Activity::Connected
+                       : core.owner() == Owner::Scan || core.watching() ? BleProxy::Activity::Scanning
+                                                                         : BleProxy::Activity::Idle;
         }
     }
 
@@ -334,10 +339,17 @@ void BleProxy::setup(Hooks hooks)
     impl->commands = createQueue(COMMAND_QUEUE_DEPTH, sizeof(ble::Command *));
     impl->events = createQueue(EVENT_QUEUE_DEPTH, sizeof(Impl::RadioEvent *));
     logHeap(impl->logger, "at boot");
-    // A PSRAM stack costs no internal RAM; the task never touches flash.
-    if (!impl->commands || !impl->events ||
+    // A PSRAM stack costs no internal RAM; the task never touches flash. Boards without PSRAM (the BLE bridge)
+    // take it from internal RAM.
+    if (impl->commands && impl->events &&
         xTaskCreatePinnedToCoreWithCaps(Impl::entry, "ble_proxy", TASK_STACK, impl, TASK_PRIORITY, &impl->task,
                                         tskNO_AFFINITY, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS)
+        impl->task = nullptr;
+    if (impl->commands && impl->events && !impl->task &&
+        xTaskCreatePinnedToCore(Impl::entry, "ble_proxy", TASK_STACK, impl, TASK_PRIORITY, &impl->task,
+                                tskNO_AFFINITY) != pdPASS)
+        impl->task = nullptr;
+    if (!impl->task)
     {
         impl->logger.error("Could not start the BLE proxy task; BLE requests are refused");
         impl->task = nullptr;
@@ -400,6 +412,8 @@ void BleProxy::fillCapability(JsonObject capabilities, char *scratch, size_t siz
     ble::fillCapability(capabilities, scratch, size);
 }
 
+BleProxy::Activity BleProxy::activity() const { return impl ? impl->activity.load() : Activity::Idle; }
+
 #else
 
 // No proxy on this build: no capability, so the API never sends BLE requests; stray ones are dropped.
@@ -412,6 +426,7 @@ bool BleProxy::handleMessage(const char *type, JsonObjectConst payload, bool tru
 void BleProxy::linkLost() {}
 void BleProxy::otaStarted() {}
 void BleProxy::sendSlotFreed() {}
+BleProxy::Activity BleProxy::activity() const { return Activity::Idle; }
 void BleProxy::fillCapability(JsonObject capabilities, char *scratch, size_t size)
 {
     (void)capabilities, (void)scratch, (void)size;

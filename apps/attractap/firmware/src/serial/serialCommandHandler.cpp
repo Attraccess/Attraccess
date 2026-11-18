@@ -6,7 +6,7 @@
 #include <lwip/inet.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/usb_serial_jtag.h"
+#include "console_io.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -34,10 +34,10 @@ void SerialCommandHandler::setup()
 
 void SerialCommandHandler::loop()
 {
-    // Non-blocking drain of the USB-Serial-JTAG RX buffer (driver installed in
-    // main.cpp during startup; 0-tick timeout = don't wait for more bytes).
+    // Non-blocking drain of the console RX buffer (USB-Serial-JTAG, or UART0 on the BLE bridge; driver
+    // installed in main.cpp during startup).
     uint8_t byte;
-    while (usb_serial_jtag_read_bytes(&byte, 1, 0) == 1)
+    while (console_io::readByte(byte))
     {
         char c = static_cast<char>(byte);
 
@@ -133,7 +133,7 @@ void SerialCommandHandler::sendErrorResponse(const std::string &topic, const cha
 #include <lwip/inet.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/usb_serial_jtag.h"
+#include "console_io.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -234,7 +234,7 @@ const char *SerialCommandHandler::encryptionTypeToString(wifi_auth_mode_t mode)
 #include <lwip/inet.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/usb_serial_jtag.h"
+#include "console_io.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -399,7 +399,7 @@ void SerialCommandHandler::handleCommand(const std::string &topic, const std::st
 #include <lwip/inet.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/usb_serial_jtag.h"
+#include "console_io.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>

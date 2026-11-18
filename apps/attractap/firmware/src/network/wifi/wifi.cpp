@@ -24,6 +24,12 @@ const uint32_t Wifi::RECONNECT_INTERVAL_MS = 10000;
 const uint32_t Wifi::WAITING_FOR_IP_TIMEOUT_MS = 15000;
 
 bool Wifi::is_scanning = false;
+#ifdef ATTRACTAP_BLE_BRIDGE
+// The bridge starts on Ethernet; Network::loop lifts the standby after the Ethernet grace period.
+bool Wifi::standby = true;
+#else
+bool Wifi::standby = false;
+#endif
 Wifi::WifiNetwork Wifi::knownWifiNetworks[MAX_KNOWN_WIFI_NETWORKS];
 uint8_t Wifi::knownWifiNetworksCount = 0;
 
@@ -151,8 +157,34 @@ void Wifi::loop()
     }
 }
 
+void Wifi::setStandby(bool on)
+{
+    if (on == standby)
+    {
+        return;
+    }
+    standby = on;
+    if (on)
+    {
+        logger.info("Standby: Ethernet is up");
+        if (is_setup)
+        {
+            esp_wifi_disconnect();
+        }
+        return;
+    }
+    logger.info("Ethernet is down: Wi-Fi takes over");
+    // Connect on the next loop instead of waiting for the reconnect interval.
+    last_reconnect_attempt_time_ms = millis() - RECONNECT_INTERVAL_MS;
+}
+
 void Wifi::ensureConnection()
 {
+    if (standby)
+    {
+        return;
+    }
+
     if (isConnected())
     {
         return;
@@ -217,6 +249,12 @@ bool Wifi::hasSavedCredentials()
 
 void Wifi::connectToNetwork(const std::string &ssid, const std::string &password)
 {
+    if (standby)
+    {
+        logger.infof("Ethernet is up: SSID '%s' is used once Ethernet is gone", ssid.c_str());
+        return;
+    }
+
     logger.infof("Connecting to SSID '%s'", ssid.c_str());
 
     _lastSSID = ssid;

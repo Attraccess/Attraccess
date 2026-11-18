@@ -215,3 +215,8 @@ void Application::showLiteBlocked(const API::ActionResult &result)
   LedFeedback::play(this->led, this->beeper, pattern, 0, thenBlocked);
 }
 #endif
+
+#if !defined(HAS_WS2812_LED) && !defined(HAS_LVGL_DISPLAY)
+// The BLE bridge has neither a screen nor an LED ring: no plugin steps to show.
+void Application::setupUiCallbacks() {}
+#endif

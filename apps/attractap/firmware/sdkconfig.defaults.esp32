@@ -1,0 +1,36 @@
+# Classic ESP32 overlay: the BLE bridge (variants/attractap-bridge-gl-s10.cmake, GL.iNet GL-S10).
+# ESP-IDF applies it after sdkconfig.defaults only when IDF_TARGET is esp32, so the S3 variants never see it.
+# Everything below overrides an S3 default of sdkconfig.defaults or adds what the bridge needs.
+
+# --- Board: ESP32-D0WD (WROOM-32U), 4 MB flash ---
+CONFIG_IDF_TARGET="esp32"
+CONFIG_ESPTOOLPY_FLASHMODE_DIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_40M=y
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+
+# --- PSRAM: none. The S10 drives the 50 MHz RMII clock out on GPIO17, which the ESP32's external PSRAM needs
+# as its clock pin, so PSRAM and Ethernet cannot both run. NimBLE, mbedTLS and the proxy use internal RAM; the
+# proxy reports smaller bounds (BLE_PROXY_INTERNAL_RAM in the variant).
+# CONFIG_SPIRAM is not set
+CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC=y
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_INTERNAL=y
+
+# --- Partition table: 4 MB dual-OTA layout ---
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions-4mb.csv"
+
+# --- Main task: no display or plugin UI on this board, so less stack than the S3 readers ---
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=12288
+
+# --- BLE: BLE-only controller with one connection (the NimBLE host settings come from sdkconfig.defaults) ---
+CONFIG_BTDM_CTRL_MODE_BLE_ONLY=y
+CONFIG_BTDM_CTRL_BLE_MAX_CONN=1
+# Wi-Fi and BLE share the radio; software coexistence arbitrates while the Wi-Fi fallback is in use.
+CONFIG_ESP_COEX_SW_COEXIST_ENABLE=y
+
+# --- Console: UART0 (GPIO1/3, the serial pads). The classic ESP32 has no USB-Serial-JTAG; the Serial
+# Configurator talks to the bridge through a 3.3 V USB-TTL adapter.
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+CONFIG_ESP_CONSOLE_UART_BAUDRATE=115200
+
+# --- Ethernet: internal EMAC (RMII) ---
+CONFIG_ETH_USE_ESP32_EMAC=y

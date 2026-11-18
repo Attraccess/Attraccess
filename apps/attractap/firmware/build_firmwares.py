@@ -38,18 +38,44 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from secure_packaging import package_secure_images  # noqa: E402
 
-CHIP = "esp32s3"
+# IDF target per variant: `set(ATTRACTAP_IDF_TARGET "esp32")` in the variant file, esp32s3 otherwise
+# (CMakeLists.txt applies the same default). It names the esptool --chip and the manifest's boardFamily.
+DEFAULT_CHIP = "esp32s3"
 
-BOARD_FAMILY = "ESP32-S3"
+BOARD_FAMILIES = {
+    "esp32s3": "ESP32-S3",
+    "esp32": "ESP32",
+}
 
 def extract_cmake_value(content, variable):
     """Extract `set(<variable> "<value>")` from a variant .cmake file."""
     match = re.search(rf'set\(\s*{re.escape(variable)}\s+"([^"]*)"\s*\)', content)
     return match.group(1) if match else None
 
+def variant_chip(variant, content):
+    """The variant's IDF target, which is also its esptool chip name."""
+    chip = extract_cmake_value(content, "ATTRACTAP_IDF_TARGET") or DEFAULT_CHIP
+    if chip not in BOARD_FAMILIES:
+        raise ValueError(f"{variant}: unsupported ATTRACTAP_IDF_TARGET \"{chip}\" "
+                         f"(supported: {', '.join(sorted(BOARD_FAMILIES))})")
+    return chip
+
 def is_release_variant(content):
     """Lab-only variants opt out with `set(ATTRACTAP_RELEASE OFF)`."""
     return not re.search(r'set\(\s*ATTRACTAP_RELEASE\s+"?OFF"?\s*\)', content, re.IGNORECASE)
+
+def is_ble_bridge_variant(content):
+    """BLE bridge variants define ATTRACTAP_BLE_BRIDGE=1 (headless BLE proxy, no NFC)."""
+    return re.search(r"^\s*ATTRACTAP_BLE_BRIDGE=1\b", re.sub(r"#[^\n]*", "", content), re.MULTILINE) is not None
+
+def flash_parameters(chip, flasher_args):
+    """Flasher parameters for the manifest. The S3 readers keep the historically conservative values (the
+    frontend esptool-js flasher behavior for them must not change); other chips use the image's own settings."""
+    if chip == DEFAULT_CHIP:
+        return {"flashMode": "dio", "flashFreq": "80m", "flashSize": "16MB"}
+    settings = flasher_args["flash_settings"]
+    return {"flashMode": settings["flash_mode"], "flashFreq": settings["flash_freq"],
+            "flashSize": settings["flash_size"]}
 
 def is_demo_variant(content):
     """Demo builds declare ATTRACTAP_FIRMWARE_VARIANT "demo" (CMakeLists.txt checks the same)."""
@@ -126,7 +152,7 @@ def build_secure_profile(variant, variant_path, python_cmd):
     return build_dir
 
 
-def extract_build_id(firmware_bin_path, esptool_cmd):
+def extract_build_id(firmware_bin_path, esptool_cmd, chip):
     """Best-effort: read app_elf_sha256 from the app image so the server can
     match the exact ELF to a coredump's build id. Returns lowercase hex or None."""
     if not os.path.exists(firmware_bin_path):
@@ -134,8 +160,8 @@ def extract_build_id(firmware_bin_path, esptool_cmd):
     # esptool v4 spells it `image_info --version 2`; v5 renamed the command and
     # dropped the flag. Try both.
     candidates = [
-        [*esptool_cmd, "--chip", CHIP, "image_info", "--version", "2", firmware_bin_path],
-        [*esptool_cmd, "--chip", CHIP, "image-info", firmware_bin_path],
+        [*esptool_cmd, "--chip", chip, "image_info", "--version", "2", firmware_bin_path],
+        [*esptool_cmd, "--chip", chip, "image-info", firmware_bin_path],
     ]
     for info_cmd in candidates:
         try:
@@ -151,10 +177,10 @@ def extract_build_id(firmware_bin_path, esptool_cmd):
     print(f"Warning: Could not extract build id from {firmware_bin_path}")
     return None
 
-def run_merge_bin(esptool_cmd, out_path, flash_files, output_format=None):
+def run_merge_bin(esptool_cmd, out_path, flash_files, output_format=None, chip=DEFAULT_CHIP):
     """esptool merge_bin (v4) / merge-bin (v5); output_format "hex" writes Intel HEX."""
     for subcommand in ("merge_bin", "merge-bin"):
-        merge_cmd = [*esptool_cmd, "--chip", CHIP, subcommand, "-o", out_path]
+        merge_cmd = [*esptool_cmd, "--chip", chip, subcommand, "-o", out_path]
         if output_format:
             merge_cmd.extend(["--format", output_format])
         for offset, path in flash_files:
@@ -267,6 +293,7 @@ RELEASE_VARIANTS = [
     "attractap-touch-v2",
     "attractap-touch-demo",
     "attractap-touch-v2-demo",
+    "attractap-bridge-gl-s10",
     # "attractap-lite-ethernet",
 ]
 
@@ -392,7 +419,7 @@ def build_lab(variants, esptool_cmd):
             print(f"Signed lab secure image created at: {hex_path}")
             continue
         merged_bin_path = os.path.join(output_dir, f"{firmware_name}.bin")
-        run_merge_bin(esptool_cmd, merged_bin_path, flash_files)
+        run_merge_bin(esptool_cmd, merged_bin_path, flash_files, chip=variant_chip(variant, content))
         print(f"Merged lab image created at: {merged_bin_path}")
     print(f"\nLab build completed. Output in {output_dir}")
 
@@ -441,10 +468,14 @@ def main(argv=None):
     # Validate the hardware-tested flags before any expensive build starts.
     secure_tested_by_variant = {}
     secure_build_by_variant = {}
+    chip_by_variant = {}
     for variant, _, content in variants:
         try:
             secure_build_by_variant[variant] = secure_profile_build_enabled(variant, content)
             secure_tested_by_variant[variant] = secure_profile_hardware_tested(variant, content)
+            chip_by_variant[variant] = variant_chip(variant, content)
+            if secure_build_by_variant[variant] and chip_by_variant[variant] != DEFAULT_CHIP:
+                raise ValueError(f"{variant}: the secure profile is only available for {DEFAULT_CHIP}")
         except ValueError as error:
             print(f"Error: {error}", file=sys.stderr)
             sys.exit(1)
@@ -463,6 +494,7 @@ def main(argv=None):
         variant_friendly_name = extract_cmake_value(content, "ATTRACTAP_FIRMWARE_VARIANT_FRIENDLY_NAME")
 
         secure_tested = secure_tested_by_variant[variant]
+        chip = chip_by_variant[variant]
 
         missing = [n for n, v in [
             ("ATTRACTAP_FIRMWARE_NAME", firmware_name),
@@ -484,7 +516,7 @@ def main(argv=None):
         firmware_filename = f"{firmware_name}_{firmware_variant}.bin"
         merged_bin_path = os.path.join(output_dir, firmware_filename)
         print(f"Creating merged firmware for {variant}...")
-        run_merge_bin(esptool_cmd, merged_bin_path, flash_files)
+        run_merge_bin(esptool_cmd, merged_bin_path, flash_files, chip=chip)
         print(f"Merged firmware created at: {merged_bin_path}")
 
         # Unstripped ELF so the server can symbolicate coredumps
@@ -493,7 +525,7 @@ def main(argv=None):
         if os.path.exists(elf_path):
             shutil.copyfile(elf_path, os.path.join(output_dir, elf_filename))
             print(f"ELF copied to: {os.path.join(output_dir, elf_filename)}")
-            build_id = extract_build_id(app_bin, esptool_cmd)
+            build_id = extract_build_id(app_bin, esptool_cmd, chip)
             print(f"  Build id: {build_id}")
         else:
             elf_filename = None
@@ -510,19 +542,17 @@ def main(argv=None):
             "variant": firmware_variant,
             "variantFriendlyName": variant_friendly_name,
             "version": firmware_version,
-            "boardFamily": BOARD_FAMILY,
+            "boardFamily": BOARD_FAMILIES[chip],
             "filename": firmware_filename,
             "filenameOTA": ota_filename,
             "elfFilename": elf_filename,
             "buildId": build_id,
-            "chip": CHIP,
+            "chip": chip,
             # Gate for the admin "Secure this reader" action (ATT-1166).
             "secureProfileHardwareTested": secure_tested,
-            # Keep the historically conservative flasher parameters — the
-            # frontend esptool-js flasher behavior must not change.
-            "flashMode": "dio",
-            "flashFreq": "80m",
-            "flashSize": "16MB",
+            # Headless BLE proxy without NFC (ATT-1315): the flasher warns about the opened-case setup.
+            "bleBridge": is_ble_bridge_variant(content),
+            **flash_parameters(chip, flasher_args),
         })
 
         if secure_build_by_variant[variant]:

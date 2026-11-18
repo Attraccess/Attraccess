@@ -32,7 +32,8 @@ for idf_env in "${IDF_TOOLS_PATH:-$HOME/.espressif}"/python_env/idf"$idf_series"
     fi
 done
 
-"$ESP_IDF_PATH/install.sh" esp32s3
+# esp32s3: the readers; esp32: the BLE bridge (GL.iNet GL-S10, ATT-1315).
+"$ESP_IDF_PATH/install.sh" esp32s3,esp32
 if ! command -v cmake &>/dev/null || ! command -v ninja &>/dev/null; then
     python3 "$ESP_IDF_PATH/tools/idf_tools.py" install cmake ninja
 fi

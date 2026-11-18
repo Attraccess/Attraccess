@@ -295,11 +295,13 @@ namespace bletest
             Command command;
             expect(!parses(scanWith("\"durationMs\":15001" + filter), command), "a scan above 15 s is refused");
             Command bounded;
-            expect(!parses(scanWith("\"durationMs\":1000,\"maxResults\":33" + filter), bounded),
-                   "more than 32 results are refused");
+            expect(!parses(scanWith("\"durationMs\":1000,\"maxResults\":" + std::to_string(MAX_SCAN_RESULTS + 1) +
+                                    filter),
+                           bounded),
+                   "more than MAX_SCAN_RESULTS results are refused");
             Command defaults;
-            expect(parses(scanWith("\"durationMs\":15000" + filter), defaults) && defaults.maxResults == 32,
-                   "15 s is allowed and maxResults defaults to 32");
+            expect(parses(scanWith("\"durationMs\":15000" + filter), defaults) && defaults.maxResults == MAX_SCAN_RESULTS,
+                   "15 s is allowed and maxResults defaults to MAX_SCAN_RESULTS");
 
             Fixture f;
             f.request("BLE_SCAN", scanWith("\"durationMs\":1000" + filter));
