@@ -39,6 +39,12 @@ describe('PluginService.uploadPlugin staging cleanup', () => {
       'Zip file must contain a plugin.json, either at its root or in a single folder',
     ],
     [
+      'an empty zip',
+      () => zipFileUpload({}),
+      BadRequestException,
+      'File could not be extracted, it must be a valid zip file',
+    ],
+    [
       'an unextractable file',
       () => zipFileUpload({ 'plugin.json': '{}' }, { buffer: Buffer.from('nope') }),
       BadRequestException,

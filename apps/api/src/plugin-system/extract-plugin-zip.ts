@@ -28,7 +28,8 @@ export class UnsafeZipEntryError extends Error {
  * Extracts a ZIP archive into `targetFolder` and returns the number of entries written.
  *
  * Rejects (before writing that entry) absolute, drive-letter, backslash and `..` paths, symlinks, hardlinks and other
- * special files, encrypted entries and paths that occur twice. yauzl validates names and sizes itself (its name errors
+ * special files, encrypted entries and paths that occur twice. (A zip has no hardlink entry type; one stored as a
+ * Unix file type is rejected with the special files.) yauzl validates names and sizes itself (its name errors
  * are rethrown as {@link UnsafeZipEntryError}); the checks here keep the guarantee independent of its defaults.
  */
 export async function extractPluginZip(buffer: Buffer, targetFolder: string): Promise<number> {
@@ -58,7 +59,8 @@ export async function extractPluginZip(buffer: Buffer, targetFolder: string): Pr
       written++;
     }
   } catch (error) {
-    const unsafeName = error instanceof Error && !(error instanceof UnsafeZipEntryError) && YAUZL_UNSAFE_NAME.exec(error.message);
+    const unsafeName =
+      error instanceof Error && !(error instanceof UnsafeZipEntryError) && YAUZL_UNSAFE_NAME.exec(error.message);
     if (unsafeName) {
       throw new UnsafeZipEntryError(unsafeName[1], 'path leaves the target folder');
     }
@@ -74,7 +76,8 @@ function entryMode(entry: Entry): number {
   return (entry.externalFileAttributes >>> 16) & 0xffff;
 }
 
-function safeTargetPath(root: string, entry: Entry): string {
+/** Where `entry` lands under `root`; throws {@link UnsafeZipEntryError} for an entry that must not be written. */
+export function safeTargetPath(root: string, entry: Entry): string {
   const name = entry.fileName;
   if (name.includes('\\') || /^[a-zA-Z]:/.test(name) || name.startsWith('/') || name.split('/').includes('..')) {
     throw new UnsafeZipEntryError(name, 'path leaves the target folder');

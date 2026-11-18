@@ -1,7 +1,8 @@
 import { existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { extractPluginZip, UnsafeZipEntryError } from './extract-plugin-zip';
+import type { Entry } from 'yauzl';
+import { extractPluginZip, safeTargetPath, UnsafeZipEntryError } from './extract-plugin-zip';
 import { makeZip } from './__test__/make-zip';
 
 describe('extractPluginZip', () => {
@@ -78,5 +79,42 @@ describe('extractPluginZip', () => {
     await expect(extractPluginZip(zip, target)).rejects.toThrow(
       new UnsafeZipEntryError('dist', 'the archive contains this path more than once'),
     );
+  });
+});
+
+/** yauzl rejects most of these names itself; these cases prove the extractor's own checks hold without it. */
+describe('safeTargetPath', () => {
+  const root = join(tmpdir(), 'safe-target-path');
+  const entry = (fileName: string, { mode = 0, encrypted = false } = {}) =>
+    ({ fileName, externalFileAttributes: mode << 16, isEncrypted: () => encrypted }) as unknown as Entry;
+
+  it.each([
+    ['a parent-folder path', '../escaped.txt'],
+    ['a nested parent-folder path', 'dist/../../escaped.txt'],
+    ['an absolute path', '/etc/passwd'],
+    ['a Windows drive path', 'C:/escaped.txt'],
+    ['a backslash path', 'dist\\..\\..\\escaped.txt'],
+    ['a file named after the target folder itself', '.'],
+  ])('rejects %s', (_label, name) => {
+    expect(() => safeTargetPath(root, entry(name))).toThrow(
+      new UnsafeZipEntryError(name, 'path leaves the target folder'),
+    );
+  });
+
+  it('rejects an encrypted entry', () => {
+    expect(() => safeTargetPath(root, entry('plugin.json', { encrypted: true }))).toThrow(
+      new UnsafeZipEntryError('plugin.json', 'encrypted entries are not supported'),
+    );
+  });
+
+  it('rejects a symlink entry', () => {
+    expect(() => safeTargetPath(root, entry('link', { mode: 0o120777 }))).toThrow(
+      'only regular files and folders are allowed',
+    );
+  });
+
+  it('resolves plain files and folders under the root', () => {
+    expect(safeTargetPath(root, entry('dist/index.js', { mode: 0o100644 }))).toBe(join(root, 'dist', 'index.js'));
+    expect(safeTargetPath(root, entry('./', { mode: 0o040755 }))).toBe(root);
   });
 });
