@@ -15,7 +15,7 @@ namespace bletest
                    "the reader asks for an interval within 15..30 ms");
             expect(link::valid(link::INTERVAL_MIN, link::INTERVAL_MAX, link::LATENCY, link::SUPERVISION_TIMEOUT),
                    "the requested parameters are valid");
-            expect(!link::valid(24, 24, 0, 5), "a timeout below 100 ms is not");
+            expect(!link::valid(6, 6, 0, 5), "a timeout below 100 ms is not");
             expect(!link::valid(800, 800, 0, 150), "nor one shorter than two intervals");
             expect(!link::valid(12, 12, 10, 25), "nor one shorter than two intervals with latency");
             expect(!link::valid(24, 12, 0, 256), "nor is an inverted interval range");
