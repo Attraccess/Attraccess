@@ -1,0 +1,8 @@
+{
+  "disabledTitle": "Plugin „{{name}}“ ist deaktiviert",
+  "refused": "Attraccess hat dieses Plugin abgelehnt: Es wurde für ein älteres Plugin-SDK gebaut oder verletzt dessen Regeln. Unter Einstellungen > Plugins können Sie es entfernen oder eine kompatible Version installieren.",
+  "failed": "Das Plugin konnte nicht geladen werden. Details unter Einstellungen > Plugins.",
+  "frontendFailed": "Die Oberfläche des Plugins konnte nicht geladen werden.",
+  "dependencyFailed": "Das benötigte Plugin {{dependency}} konnte nicht geladen werden, daher ist {{name}} inaktiv.",
+  "dependencyCycle": "Zyklus in den Plugin-Abhängigkeiten: {{cycle}}"
+}

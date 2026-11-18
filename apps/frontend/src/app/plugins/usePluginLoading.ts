@@ -1,25 +1,48 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { LoadedPluginManifest, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
+import { useAuth } from '../../hooks/useAuth';
 import { loadFrontendPlugin } from './loadFrontendPlugin';
 import { onePluginPerName } from './onePluginPerName';
 import usePluginState from './plugin.state';
 import { pluginStore } from './pluginStore';
+import en from './usePluginLoading.en.json';
+import de from './usePluginLoading.de.json';
+
+/** Why a plugin is inactive: a key of usePluginLoading.*.json with its values. */
+interface PluginFailure {
+  key: 'refused' | 'failed' | 'frontendFailed' | 'dependencyFailed' | 'dependencyCycle';
+  values?: Record<string, string>;
+}
+
+/** The failure the server reports for a plugin (refused, failed to load or missing a license), or null. */
+function statusFailure(manifest: LoadedPluginManifest): PluginFailure | null {
+  if (manifest.status === 'error') return { key: manifest.refused ? 'refused' : 'failed' };
+  return manifest.status === 'license_missing' ? { key: 'failed' } : null;
+}
 
 /**
  * Fetches the plugin manifests, loads each plugin's frontend in dependency order, quarantines failures with a toast,
- * and rechecks whenever the tab regains focus.
+ * and rechecks whenever the tab regains focus. Only plugin managers see the toast: nobody else can act on it.
  */
 export function usePluginLoading() {
   const { refetch: refetchPlugins } = usePluginsServiceGetPlugins();
   const toast = useToastMessage();
-  const toastRef = useRef(toast);
-  toastRef.current = toast;
+  const { t } = useTranslations({ en, de });
+  const { hasPermission } = useAuth();
+  const warnedFailures = useRef(new Set<string>());
+  const warnRef = useRef<(manifest: LoadedPluginManifest, failure: PluginFailure) => void>(() => undefined);
+  warnRef.current = (manifest, failure) => {
+    const key = `${manifest.name}@${manifest.version}`;
+    if (!hasPermission('system.plugins.manage') || warnedFailures.current.has(key)) return;
+    warnedFailures.current.add(key);
+    toast.warning({ title: t('disabledTitle', { name: manifest.name }), description: t(failure.key, failure.values) });
+  };
 
   const arePluginsLoaded = useRef(false);
   const loadingPlugins = useRef(false);
   const loadedManifests = useRef(new Map<string, string>());
-  const warnedFailures = useRef(new Set<string>());
 
   const loadAllPlugins = useCallback(async () => {
     if (loadingPlugins.current) return;
@@ -29,32 +52,28 @@ export function usePluginLoading() {
     try {
       const plugins = await refetchPlugins();
       const pluginsArray = plugins.data ?? [];
-      const failedPlugins = pluginsArray.filter((manifest) => manifest.status === 'error');
-      for (const plugin of failedPlugins) {
-        const key = `${plugin.name}@${plugin.version}`;
-        if (warnedFailures.current.has(key)) continue;
-        warnedFailures.current.add(key);
-        toastRef.current.warning({
-          title: `Plugin "${plugin.name}" is disabled`,
-          description: plugin.error ?? 'The plugin failed to load. Open Settings > Plugins for details.',
-        });
+      for (const plugin of pluginsArray.filter((manifest) => manifest.status === 'error')) {
+        warnRef.current(plugin, statusFailure(plugin) ?? { key: 'failed' });
       }
       const candidates = onePluginPerName(pluginsArray);
       const byName = new Map(candidates.map((manifest) => [manifest.name, manifest]));
-      const dependencyFailures = new Map<string, string | null>();
-      const dependencyFailure = (manifest: LoadedPluginManifest, path: string[] = []): string | null => {
-        if (path.includes(manifest.name)) return `Plugin dependency cycle: ${[...path, manifest.name].join(' → ')}`;
+      const dependencyFailures = new Map<string, PluginFailure | null>();
+      const missingDependency = (dependency: string, name: string): PluginFailure => ({
+        key: 'dependencyFailed',
+        values: { dependency, name },
+      });
+      const dependencyFailure = (manifest: LoadedPluginManifest, path: string[] = []): PluginFailure | null => {
+        if (path.includes(manifest.name)) {
+          return { key: 'dependencyCycle', values: { cycle: [...path, manifest.name].join(' → ') } };
+        }
         if (dependencyFailures.has(manifest.name)) return dependencyFailures.get(manifest.name);
-        let failure: string | null =
-          manifest.status === 'error' || manifest.status === 'license_missing'
-            ? (manifest.error ?? 'Plugin failed to load')
-            : null;
+        let failure = statusFailure(manifest);
         if (!failure) {
           for (const dependency of manifest.dependencies ?? []) {
             if (!dependency.required) continue;
             const required = byName.get(dependency.name);
             if (!required || dependencyFailure(required, [...path, manifest.name])) {
-              failure = `Required plugin ${dependency.name} failed to load; ${manifest.name} is inactive.`;
+              failure = missingDependency(dependency.name, manifest.name);
               break;
             }
           }
@@ -74,15 +93,14 @@ export function usePluginLoading() {
             const required = (manifest.dependencies ?? []).filter((dependency) => dependency.required);
             const outcomes = await Promise.all(required.map((dependency) => loadManifest(byName.get(dependency.name))));
             const failedIndex = outcomes.findIndex((loaded) => !loaded);
-            if (failedIndex >= 0)
-              failure = `Required plugin ${required[failedIndex].name} failed to load; ${manifest.name} is inactive.`;
+            if (failedIndex >= 0) failure = missingDependency(required[failedIndex].name, manifest.name);
           }
           const key = `${manifest.name}@${manifest.version}`;
           if (!failure && manifest.main.frontend && loadedManifests.current.get(manifest.name) !== manifest.version) {
             if (await loadFrontendPlugin(manifest)) {
               loadedManifests.current.set(manifest.name, manifest.version);
               warnedFailures.current.delete(key);
-            } else failure = `Plugin ${manifest.name} frontend failed to load.`;
+            } else failure = { key: 'frontendFailed' };
           }
           if (failure) {
             const { plugins: installedPlugins, removePlugin } = usePluginState.getState();
@@ -91,10 +109,7 @@ export function usePluginLoading() {
             removePlugin(manifest.name);
             loadedManifests.current.delete(manifest.name);
             // A missing license is an expected state, shown in Settings > Plugins: no toast.
-            if (manifest.status !== 'license_missing' && !warnedFailures.current.has(key)) {
-              warnedFailures.current.add(key);
-              toastRef.current.warning({ title: `Plugin "${manifest.name}" is disabled`, description: failure });
-            }
+            if (manifest.status !== 'license_missing') warnRef.current(manifest, failure);
           }
           return !failure;
         });

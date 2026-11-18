@@ -15,6 +15,7 @@ const hoisted = vi.hoisted(() => ({
   getBaseUrlMock: vi.fn(() => 'http://test.local'),
   toastWarningMock: vi.fn(),
   user: { id: 1, username: 'admin' } as Record<string, unknown> | null,
+  permissions: ['system.plugins.manage'] as string[],
 }));
 
 vi.mock('virtual:__federation__', () => ({
@@ -27,7 +28,10 @@ vi.mock('@attraccess/react-query-client', () => ({
 }));
 
 vi.mock('../../hooks/useAuth', () => ({
-  useAuth: () => ({ user: hoisted.user }),
+  useAuth: () => ({
+    user: hoisted.user,
+    hasPermission: (permission: string) => hoisted.permissions.includes(permission),
+  }),
 }));
 
 vi.mock('../../api', () => ({
@@ -89,6 +93,7 @@ beforeEach(() => {
   hoisted.getBaseUrlMock.mockReturnValue('http://test.local');
   hoisted.toastWarningMock.mockReset();
   hoisted.user = { id: 1, username: 'admin' };
+  hoisted.permissions = ['system.plugins.manage'];
 });
 
 afterEach(() => {
@@ -330,7 +335,7 @@ describe('PluginProvider', () => {
     expect(screen.getByText('app-shell')).toBeInTheDocument();
   });
 
-  it('does not load a quarantined plugin and warns the user with its failure detail', async () => {
+  it('does not load a quarantined plugin and tells a plugin manager where to look', async () => {
     hoisted.refetchMock.mockResolvedValue({
       data: [
         {
@@ -346,13 +351,46 @@ describe('PluginProvider', () => {
     render(<PluginProvider />);
 
     await waitFor(() => expect(hoisted.toastWarningMock).toHaveBeenCalled());
-    expect(hoisted.toastWarningMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: 'Plugin "BrokenPlugin" is disabled',
-        description: expect.stringContaining('startup failed'),
-      }),
-    );
+    expect(hoisted.toastWarningMock).toHaveBeenCalledWith({
+      title: 'Plugin "BrokenPlugin" is disabled',
+      description: 'The plugin failed to load. Open Settings > Plugins for details.',
+    });
     expect(hoisted.getRemoteMock).not.toHaveBeenCalled();
+  });
+
+  it('explains a refused plugin instead of showing the developer-facing refusal', async () => {
+    hoisted.refetchMock.mockResolvedValue({
+      data: [
+        {
+          name: 'LegacyPlugin',
+          version: '1.0.0',
+          status: 'error',
+          refused: true,
+          error: 'Plugin LegacyPlugin targets Attraccess 1.9.0 and the plugin SDK 1.x. Migration guide: https://x',
+          main: { frontend: { entryPoint: 'index.js' } },
+        },
+      ],
+    });
+
+    render(<PluginProvider />);
+
+    await waitFor(() => expect(hoisted.toastWarningMock).toHaveBeenCalledTimes(1));
+    const [{ description }] = hoisted.toastWarningMock.mock.calls[0];
+    expect(description).toContain('Attraccess refused this plugin');
+    expect(description).not.toContain('Migration guide');
+  });
+
+  it('shows no plugin failure toast to users who cannot manage plugins (or to signed-out visitors)', async () => {
+    hoisted.permissions = [];
+    hoisted.user = null;
+    hoisted.refetchMock.mockResolvedValue({
+      data: [{ name: 'BrokenPlugin', version: '1.0.0', status: 'error', error: 'x', main: {} }],
+    });
+
+    render(<PluginProvider />);
+
+    await waitFor(() => expect(usePluginState.getState().isInitialized).toBe(true));
+    expect(hoisted.toastWarningMock).not.toHaveBeenCalled();
   });
 
   it('neither loads the frontend of a license_missing plugin nor shows a toast for it', async () => {
@@ -498,7 +536,7 @@ describe('required frontend dependencies', () => {
       expect(hoisted.toastWarningMock).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Plugin "provider" is disabled',
-          description: expect.stringContaining('core failed to load'),
+          description: 'Required plugin core failed to load, so provider is inactive.',
         }),
       ),
     );
