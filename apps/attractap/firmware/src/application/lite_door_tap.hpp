@@ -13,3 +13,10 @@ inline LiteDoorAction liteDoorAction(bool accessOnly, bool longTap)
 {
     return longTap && !accessOnly ? LiteDoorAction::Lock : LiteDoorAction::Unlock;
 }
+
+// The beep and LED cue once a tap counts as long say that it now does something else (lock the door, end the
+// session). On an access-only door every tap opens, so there is no cue.
+inline bool liteLongTapCue(bool accessOnlyDoor)
+{
+    return !accessOnlyDoor;
+}
