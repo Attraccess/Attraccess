@@ -33,10 +33,17 @@ describe('throwApiErrors', () => {
     });
   });
 
-  it('falls back to the status when the response has no status text', () => {
-    const error = intercept('boom', new Response(null, { status: 502 }), undefined) as ApiError;
+  it('names a known status without relying on the status text, which HTTP/2 leaves empty', () => {
+    const error = intercept({ message: 'Reader not found' }, new Response(null, { status: 404 }), request) as ApiError;
 
-    expect(error.message).toBe('Request failed with status 502');
+    expect(error.message).toBe('Not Found');
+    expect(error.statusText).toBe('');
+  });
+
+  it('falls back to the status for a status without a known name', () => {
+    const error = intercept('boom', new Response(null, { status: 418 }), undefined) as ApiError;
+
+    expect(error.message).toBe('Request failed with status 418');
     expect(error.request.method).toBe('GET');
     expect(error.body).toBe('boom');
   });

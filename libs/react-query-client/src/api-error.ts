@@ -35,6 +35,25 @@ export class ApiError extends Error {
   }
 }
 
+// v1's fallback messages. statusText is empty over HTTP/2, so it cannot stand in for them.
+const STATUS_MESSAGES: Record<number, string> = {
+  400: 'Bad Request',
+  401: 'Unauthorized',
+  402: 'Payment Required',
+  403: 'Forbidden',
+  404: 'Not Found',
+  405: 'Method Not Allowed',
+  409: 'Conflict',
+  413: 'Payload Too Large',
+  415: 'Unsupported Media Type',
+  422: 'Unprocessable Content',
+  429: 'Too Many Requests',
+  500: 'Internal Server Error',
+  502: 'Bad Gateway',
+  503: 'Service Unavailable',
+  504: 'Gateway Timeout',
+};
+
 /**
  * The hey-api client throws the bare response body. Wraps it in an `ApiError` so callers keep the HTTP status;
  * network failures (no response) and errors of successful responses pass through unchanged.
@@ -45,7 +64,7 @@ export function throwApiErrors(client: Client): void {
     return new ApiError(
       { method: request?.method ?? 'GET', url: request?.url ?? response.url },
       { url: response.url, ok: response.ok, status: response.status, statusText: response.statusText, body: error },
-      response.statusText || `Request failed with status ${response.status}`,
+      STATUS_MESSAGES[response.status] ?? `Request failed with status ${response.status}`,
     );
   });
 }
