@@ -249,7 +249,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Bluetooth-Transport für Plugins](https://docs.attraccess.org/de/plugins/ble-transport.md): Der BLE-Transportvertrag für Backend-Plugins auf Attractap-Readern: Profile, Endpunkte, Sitzungen, Advertisement-Beobachtungen, Fehler, Grenzwerte und Tests mit dem Fake.
 - [Plugin-Speicher](https://docs.attraccess.org/de/plugins/plugin-storage.md): Wie ein Plugin eigene Daten ohne Datenbankzugriff hält: Tabellen deklarieren, neutrale Migrationen mitliefern, den Record-Port context.storage nutzen, Transaktionen, Fehler und Test-Fakes.
 - [Kartenauthentifizierung für Plugins](https://docs.attraccess.org/de/plugins/card-authentication.md): Wie Backend-Plugins mit CARD_AUTHENTICATION eine NFC-Karte an ihrem Gerät über einen Kartenkanal authentifizieren lassen: Grenzwerte, Fehlergründe, BLE-Beispiel.
-- [Plugin-Reader](https://docs.attraccess.org/de/plugins/plugin-readers.md): Wie Backend-Plugins mit READER_DEVICES eigene Kartenleser registrieren, ihnen eine Tür mit reinem Zutritt zuweisen und sie per Karte öffnen.
+- [Plugin-Reader](https://docs.attraccess.org/de/plugins/plugin-readers.md): Wie Backend-Plugins mit READER_DEVICES eigene Kartenleser registrieren, ihnen eine Tür mit der Option „Nur Zutritt“ zuweisen und sie per Karte öffnen.
 
 ## Deutsch: Reservierungen
 - [Überblick](https://docs.attraccess.org/de/plugins/reservations/overview.md): Das Plugin Reservierungen lässt Mitglieder eine Ressource für ein Zeitfenster buchen; Überblick, Voraussetzungen und Links zu Mitglieder-, Administrations- und API-Seiten.

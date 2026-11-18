@@ -46,7 +46,7 @@ Eine Tür bietet standardmäßig **Abschließen** und **Aufschließen**. In den 
 
 Die beiden Optionen lassen sich nicht kombinieren: Ist eine eingeschaltet, ist die andere gesperrt. Nur Türen können „Nur Zutritt“ sein.
 
-Ein Öffnen wird als Aufschließen gespeichert. Die Nutzungshistorie zeigt es als **Geöffnet**, und [Flows](flows/overview.md), die auf das Aufschließen einer Tür reagieren, laufen auch dafür. Attractap-Leser mit älterer Firmware zeigen bei einer Nur-Zutritt-Tür **Aufschließen** an; das öffnet die Tür. Ihr **Abschließen** wird abgelehnt.
+Ein Öffnen wird als Aufschließen gespeichert. Die Nutzungshistorie zeigt es als **Geöffnet**, und [Flows](flows/overview.md) mit dem Auslöser **Tür entriegelt** laufen auch dafür. Die Bezeichnung in der Historie folgt der aktuellen Einstellung der Tür: Solange eine Tür „Nur Zutritt“ ist, erscheint auch ein früher gespeichertes Aufschließen als **Geöffnet**; ist die Option wieder aus, erscheint ihr Öffnen als **Aufgeschlossen**. Attractap-Leser mit älterer Firmware zeigen bei einer Nur-Zutritt-Tür **Aufschließen** an; das öffnet die Tür. Ihr **Abschließen** wird abgelehnt.
 
 ## Ressource bearbeiten
 

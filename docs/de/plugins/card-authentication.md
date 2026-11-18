@@ -64,7 +64,7 @@ async function onCardPresented(
 ### Eine Tür mit dem Ergebnis öffnen
 
 Die Authentifizierung sagt nur, wem die Karte gehört. Um damit eine Aktion von Attraccess auszuführen, zum Beispiel eine
-Tür mit reinem Zutritt zu öffnen, registrieren Sie das Gerät als [Plugin-Reader](plugins/plugin-readers.md)
+Tür mit der Option „Nur Zutritt“ zu öffnen, registrieren Sie das Gerät als [Plugin-Reader](plugins/plugin-readers.md)
 (Berechtigung `READER_DEVICES`). Für ein solches Plugin enthält ein erfolgreiches Ergebnis zusätzlich
 `card.authentication`: einen undurchsichtigen, einmal verwendbaren Nachweis dieser Authentifizierung an diesem `device`,
 30 Sekunden gültig, den `context.readers.tap` entgegennimmt. Ohne `READER_DEVICES` und bei Hosts, die älter als

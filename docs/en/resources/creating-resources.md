@@ -46,7 +46,7 @@ A door offers **Lock** and **Unlock** by default. In the resource settings under
 
 The two options cannot be combined: while one is on, the other is disabled. Only doors can be access only.
 
-An Open is recorded as an unlock, so the usage history shows it as **Opened** and [flows](flows/overview.md) that react to a door being unlocked run for it. Attractap readers with older firmware show **Unlock** for an access-only door; it opens the door. Their **Lock** is refused.
+An Open is recorded as an unlock, so the usage history shows it as **Opened** and [flows](flows/overview.md) with the **Door unlocked** trigger run for it. The history label follows the door's current setting: while a door is access only, the unlocks recorded before also show as **Opened**, and once the option is off again, its Opens show as **Unlocked**. Attractap readers with older firmware show **Unlock** for an access-only door; it opens the door. Their **Lock** is refused.
 
 ## Editing a Resource
 

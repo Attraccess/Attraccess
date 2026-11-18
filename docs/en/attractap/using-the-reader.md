@@ -32,6 +32,8 @@ The signed-out card prompt keeps showing the clock when the selected resource is
 
 In the resource list, tap **Start** next to a machine or **Öffnen** (Open) next to a door. Complete any form or supervision step that appears, then wait for the result on the display.
 
+A door with the [access only](resources/creating-resources.md#door-options) option has a single action: its details show one **Öffnen** (Open) button instead of lock, unlock and unlatch. On an Attractap Lite reader (without a display), any tap of your card opens such a door, short or long, and the reader gives no long-tap signal there.
+
 While the reader processes an action, the controls are temporarily unavailable. Wait until the resource status has updated before tapping again. After a machine starts, its row shows your name and a **Stop** button.
 
 ### Choose a project

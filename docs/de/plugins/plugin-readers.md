@@ -1,6 +1,6 @@
 # Plugin-Reader
 
-<!-- llms-description: Wie Backend-Plugins mit READER_DEVICES eigene Kartenleser registrieren, ihnen eine Tür mit reinem Zutritt zuweisen und sie per Karte öffnen. -->
+<!-- llms-description: Wie Backend-Plugins mit READER_DEVICES eigene Kartenleser registrieren, ihnen eine Tür mit der Option „Nur Zutritt“ zuweisen und sie per Karte öffnen. -->
 
 Ein Backend-Plugin, das einen Kartenleser besitzt (zum Beispiel einen NFC-Leser in einer Türeinheit), kann ihn bei
 Attraccess als **Plugin-Reader** registrieren. Ein Plugin-Reader verhält sich wie ein Attractap-Reader ohne Display: Ihm
@@ -9,8 +9,9 @@ Ressource ausführen darf. Attraccess führt diese Aktion mit denselben Prüfung
 trägt sie für den Karteninhaber in den Verlauf der Ressource ein, startet die Flows der Ressource und schreibt einen
 Audit-Eintrag.
 
-Derzeit bedient ein Plugin-Reader **Türen mit reinem Zutritt**, und seine einzige Aktion ist **Öffnen**. Öffnen wird wie
-das Entriegeln der Tür gespeichert und gemeldet (`DoorUnlock`) und startet die Flows des Auslösers „Tür entriegelt“.
+Derzeit bedient ein Plugin-Reader **Türen mit der Option „Nur Zutritt“**, und seine einzige Aktion ist **Öffnen**.
+Öffnen wird wie das Entriegeln der Tür gespeichert und gemeldet (`DoorUnlock`) und startet die Flows des Auslösers „Tür
+entriegelt“.
 
 ## Berechtigung
 
