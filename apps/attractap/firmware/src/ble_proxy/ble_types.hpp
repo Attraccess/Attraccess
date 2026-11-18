@@ -27,16 +27,24 @@ namespace ble
 
     // Bounds of protocol v1. The capability reports them, so the API never needs to guess.
     constexpr uint32_t MAX_SCAN_MS = 15000;
-    constexpr uint8_t MAX_SCAN_RESULTS = 32;
-    // Distinct addresses tracked during one scan (matching ones are never evicted).
-    constexpr size_t MAX_SCAN_CANDIDATES = 64;
     constexpr uint16_t MAX_MTU = 517;
     constexpr uint16_t MIN_MTU = 23;
     constexpr size_t MAX_PAYLOAD_BYTES = 512;
+#ifdef BLE_PROXY_INTERNAL_RAM
+    // Boards without PSRAM (the BLE bridge): the bulk buffers come from internal RAM, so they are smaller.
+    constexpr uint8_t MAX_SCAN_RESULTS = 16;
+    constexpr size_t MAX_SCAN_CANDIDATES = 32;
+    constexpr size_t MAX_NOTIFICATION_QUEUE = 32;
+    constexpr size_t MAX_NOTIFICATION_QUEUE_BYTES = 8 * 1024;
+#else
+    constexpr uint8_t MAX_SCAN_RESULTS = 32;
+    // Distinct addresses tracked during one scan (matching ones are never evicted).
+    constexpr size_t MAX_SCAN_CANDIDATES = 64;
     // In PSRAM. Over wss:// a secure reader forwards about 120 notifications a second; a burst of 200 backed up
     // to more than 64 there.
     constexpr size_t MAX_NOTIFICATION_QUEUE = 128;
     constexpr size_t MAX_NOTIFICATION_QUEUE_BYTES = 32 * 1024;
+#endif
     constexpr size_t MAX_ALLOWLIST_ENTRIES = 16;
     constexpr size_t MAX_PENDING_REQUESTS = 16;
     constexpr size_t MAX_SESSION_ID_LENGTH = 64;
@@ -65,7 +73,11 @@ namespace ble
     // filter set of its own, reported as change events and keepalives per device.
     constexpr int WATCH_VERSION = 1;
     constexpr size_t MAX_WATCH_FILTERS = 8;
+#ifdef BLE_PROXY_INTERNAL_RAM
+    constexpr size_t MAX_WATCH_DEVICES = 16;
+#else
     constexpr size_t MAX_WATCH_DEVICES = 32;
+#endif
     constexpr uint32_t MAX_WATCH_EVENTS_PER_SECOND = 20;
     constexpr size_t MAX_WATCH_EVENTS_PER_MESSAGE = 8;
     // Events of one batch window go out together; a change waits at most this long for its message.

@@ -227,6 +227,8 @@ public:
     const ResourceUsageFormRequest &getFormRequestScratch() const { return resourceFormsRequestScratch; }
     const ResourceUsageFormFieldsPage &getFormFieldsScratch() const { return resourceFormFieldsScratch; }
     const ResourceUsageFormPageResult &getFormPageResultScratch() const { return resourceFormPageResultScratch; }
+    // What the plugin BLE proxy does (the BLE bridge's BT LED). Any task.
+    BleProxy::Activity bleActivity() const { return bleProxy.activity(); }
 
 private:
     Logger logger;

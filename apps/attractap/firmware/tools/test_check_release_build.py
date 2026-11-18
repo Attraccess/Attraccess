@@ -17,6 +17,19 @@ import build_firmwares as b  # noqa: E402
 SERIAL = "/src/serial/serialCommandHandler.cpp"
 
 
+def partition_table(*app_sizes):
+    """A binary partition table with nvs and one app partition per size."""
+    def row(kind, subtype, offset, size, name):
+        return b"\xaa\x50" + bytes([kind, subtype]) + offset.to_bytes(4, "little") + size.to_bytes(4, "little") + \
+            name.encode().ljust(16, b"\x00") + bytes(4)
+    rows = [row(1, 2, 0x9000, 0x5000, "nvs")]
+    offset = 0x10000
+    for index, size in enumerate(app_sizes):
+        rows.append(row(0, 0x10 + index, offset, size, f"app{index}"))
+        offset += size
+    return b"".join(rows) + b"\xeb\xeb" + bytes(30) + b"\xff" * 32
+
+
 def entry(defines, file=SERIAL):
     return {"file": file, "command": "xtensa-gcc " + " ".join(f"-D{d}" for d in defines) + " -c " + file}
 
@@ -51,6 +64,27 @@ class AppImage(unittest.TestCase):
         self.assertEqual(c.check_app_image(b"\x00 debug.log auth.status.get"), [])
 
 
+class AppHeadroom(unittest.TestCase):
+    def test_image_with_headroom_passes(self):
+        self.assertEqual(c.check_app_headroom(0x174360, partition_table(0x1f0000, 0x1f0000)), [])
+
+    def test_image_without_headroom_fails(self):
+        errors = c.check_app_headroom(0x1c0000, partition_table(0x1f0000, 0x1f0000))
+        self.assertEqual(len(errors), 1)
+        self.assertIn("less than 10%", errors[0])
+
+    def test_smallest_slot_counts(self):
+        self.assertEqual(len(c.check_app_headroom(0x180000, partition_table(0x640000, 0x1a0000))), 1)
+
+    def test_table_without_app_is_a_gate_error(self):
+        with self.assertRaises(c.GateError):
+            c.check_app_headroom(1, partition_table())
+
+    def test_garbage_table_is_a_gate_error(self):
+        with self.assertRaises(c.GateError):
+            c.check_app_headroom(1, b"\x00" * 64)
+
+
 class BuildDirectory(unittest.TestCase):
     def build_dir(self, defines, image):
         tmp = tempfile.TemporaryDirectory()
@@ -59,6 +93,9 @@ class BuildDirectory(unittest.TestCase):
             json.dump([entry(defines)], f)
         with open(os.path.join(tmp.name, c.APP_IMAGE), "wb") as f:
             f.write(image)
+        os.makedirs(os.path.join(tmp.name, "partition_table"))
+        with open(os.path.join(tmp.name, c.PARTITION_TABLE), "wb") as f:
+            f.write(partition_table(0x640000, 0x640000))
         return tmp.name
 
     def run_main(self, build_dir):

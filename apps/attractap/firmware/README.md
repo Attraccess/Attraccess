@@ -1,6 +1,6 @@
 # Attractap Firmware
 
-Firmware for the Attractap NFC readers (ESP32-S3), built on **ESP-IDF v6.0.2** (`idf.py` + CMake — no Arduino, no PlatformIO).
+Firmware for the Attractap NFC readers (ESP32-S3) and the Attractap BLE Bridge (classic ESP32), built on **ESP-IDF v6.0.2** (`idf.py` + CMake — no Arduino, no PlatformIO).
 
 ## Variants
 
@@ -13,6 +13,7 @@ One firmware per hardware flavor, defined by a file in `variants/`:
 | `attractap-lite-ethernet` | Adafruit Qualia S3             | headless, WS2812 24-LED ring, W5500 ethernet                                |
 | `attractap-touch-demo`    | V3 display hardware            | Offline demo API and demo settings                                          |
 | `attractap-touch-v2-demo` | V4 display hardware            | Offline demo API, demo settings and power button                            |
+| `attractap-bridge-gl-s10` | GL.iNet GL-S10 (classic ESP32) | headless BLE proxy, no NFC; EMAC Ethernet, Wi-Fi fallback, 3 LEDs, button   |
 
 Offline demos preserve an already set device clock, including dates before 2025.
 An unset clock is at zero or still counting uptime from the Unix epoch. On a cold
@@ -162,6 +163,81 @@ can open but never lock or unlatch). A Touch reader shows one full-width Open bu
 of Lock, Unlock and Release latch, and a Lite reader opens it on any tap, short or long. Open is sent
 as the existing unlock request; the server records it as the door being opened. A resource list
 without the field (an older server) means a regular door.
+
+## BLE bridge (2.7.0)
+
+`attractap-bridge-gl-s10` turns a GL.iNet GL-S10 BLE gateway into a headless BLE proxy for plugins
+(ATT-1315). The API treats it as a reader that announces `capabilities.ble` v1, so `context.ble` and
+`ReaderBleDriver` work through it unchanged. It reports `capabilities.nfc: false` (and no `cardRelay`),
+so the API never assigns it a resource or sends it card or resource-list traffic. Every other firmware
+reports `nfc: true`; firmware before 2.7.0 omits the field, which means true.
+
+**Target and build.** The variant sets `set(ATTRACTAP_IDF_TARGET "esp32")`; `CMakeLists.txt` passes it to
+ESP-IDF as `IDF_TARGET` (default `esp32s3`), and `build_firmwares.py` reads it for esptool `--chip` and
+the manifest (`chip`, `boardFamily` `ESP32`, `bleBridge: true`, and the image's own flash settings
+`dio`/`40m`/`4MB`). ESP-IDF applies `sdkconfig.defaults.esp32` after `sdkconfig.defaults` for that target
+only, so the generated `sdkconfig` of every S3 variant stays byte-identical. The overlay sets 4 MB DIO
+flash at 40 MHz, no PSRAM, the BLE-only controller with one connection, Wi-Fi/BT software coexistence,
+the UART0 console, the internal EMAC and `partitions-4mb.csv`. The secure profile is refused for this
+target.
+
+**Partition layout (`partitions-4mb.csv`).** `nvs` 20 KB at `0x9000`, `otadata` at `0xe000`, two OTA
+slots of `0x1f0000` (1.94 MB) at `0x10000` and `0x200000`, and a 64 KB `coredump` at `0x3f0000`. No
+SPIFFS. The bootloader sits at `0x1000` on the classic ESP32. `tools/check_release_build.py` fails a
+release image that leaves less than 10 % of its smallest app slot free. Release build (log level
+ERROR, 2.7.0): app image 1,524,458 bytes (25 % of the slot free), static DRAM 66.9 KB, IRAM 91 %,
+bootloader 26,096 bytes (9 % of its 28 KB free). Heap at idle and during a BLE session is measured on
+hardware in the first-deployment QA.
+
+**PSRAM.** Not used. The S10 drives the 50 MHz RMII reference clock out on GPIO17, which the ESP32's
+external PSRAM needs as its clock pin, so PSRAM and Ethernet cannot run together. The proxy's bulk
+buffers, its task stack, NimBLE (`CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_INTERNAL`) and mbedTLS use internal
+RAM, and the variant defines `BLE_PROXY_INTERNAL_RAM`, which lowers the bounds the capability reports:
+16 scan results, 32 scan candidates, a 32-entry / 8 KB notification queue and 16 watched devices
+(MTU 517 and 512-byte payloads stay). `tests/ble-proxy` runs every proxy test with both sets of bounds.
+
+**Ethernet with Wi-Fi fallback.** Internal EMAC over RMII: MDC GPIO23, MDIO GPIO18, clock out on GPIO17
+(`EMAC_CLK_OUT`), PHY power/reset GPIO5. LAN8720 (v1.x units) and IP101 (v2.x units) both run with
+the generic IEEE 802.3 PHY driver at whatever MDIO address answers; the log names the PHY from its ID
+registers. Ethernet is preferred: Wi-Fi stays in standby until Ethernet has had no link or no IP address
+for 30 s and Wi-Fi credentials exist, and it disconnects as soon as Ethernet has a link and an IP again
+(`src/bridge/bridge_logic.hpp`, `Network::loop`). Credentials saved while Ethernet is up are used the
+next time Ethernet is gone.
+
+**LEDs and button** (`src/bridge/`, all active low). Power GPIO14: on while the firmware runs. Network
+GPIO32: on = API websocket connected, 1 s blink = network up without the API, 200 ms blink = no network.
+BT GPIO12: on = a session holds (or opens) a connection, 1 s blink = a scan or the advertisement watch
+runs, off = idle. Button GPIO33: a press shorter than 2 s reboots; after 2 s all LEDs blink fast; at
+10 s the bridge erases NVS (Wi-Fi, API address, pairing credentials, PIN), lights all LEDs and reboots
+unconfigured. Releasing between 2 and 10 s cancels. GPIO0 stays the download button.
+
+**Serial setup.** The classic ESP32 has no USB-Serial-JTAG. The console and the Serial Configurator
+protocol run on UART0 (GPIO1/3, 115200 8N1) through a 3.3 V USB-TTL adapter on the serial pads
+(`src/serial/console_io.hpp`). The micro-USB port only powers the S10.
+
+**Updates.** The first flash goes over the serial pads (GPIO0 held at power-up); every later update is
+the regular websocket OTA of `attractap_bridge_gl_s10_ota.bin`, with rollback/confirm as on the readers.
+
+**Secure boot and flash encryption (plan only, no build).** The bridge runs unfused and without the
+secure profile; development units stay unfused. A later secure bridge build needs:
+
+- Secure Boot v2 (RSA-PSS), which the classic ESP32 supports only from chip revision v3.0 (ECO3).
+  Record each unit's revision before planning (`esptool --chip esp32 chip_id` prints it):
+
+  | Unit | Chip revision | PHY | PSRAM |
+  | ---- | ------------- | --- | ----- |
+  | (filled in during the first-deployment QA) | | | |
+
+- Flash encryption (release mode) with a per-device key, NVS encryption with the flash-encryption-based
+  scheme (the classic ESP32 has no HMAC peripheral), and a disabled ROM download mode / JTAG.
+- Room for the bootloader: it starts at `0x1000` and must end before the partition table at `0x8000`
+  (28 KB). The plain bootloader already uses 26 KB, and the S3 secure bootloader only fits its budget
+  with logs off, so expect to move the partition table (and so change the flash layout of fielded
+  bridges, which needs a serial reflash) or to strip the bootloader hard.
+- Rev < v3.0 units can never get Secure Boot v2; they stay development-only.
+
+Installations that rely on the reader secure profile get bridges without it; physical access to a
+bridge exposes its flash, including its pairing credentials.
 
 ## BLE proxy protocol (2.5.0)
 
@@ -470,11 +546,11 @@ Lab secure readers use public keys and development-mode flash encryption; see
 
 ## Building
 
-Prerequisites: [ESP-IDF v6.0.2](https://docs.espressif.com/projects/esp-idf/en/v6.0.2/esp32s3/get-started/index.html) installed for the `esp32s3` target. Install the project-local toolchain at `.tools/esp-idf` with `pnpm nx run attractap-firmware:setup-toolchain`, or use `INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh --workspace-only` during bootstrap. Local setup and CI share `tools/setup-esp-idf.sh` and the pin in `esp-idf-version.txt`; setup repairs partial installs and verifies `idf.py` can run. No extra Python packages are needed — `esptool` is picked up from your `PATH` or from ESP-IDF's own Python environment, and `cmake`/`ninja` are installed into the IDF tool set automatically if your system lacks them.
+Prerequisites: [ESP-IDF v6.0.2](https://docs.espressif.com/projects/esp-idf/en/v6.0.2/esp32s3/get-started/index.html) installed for the `esp32s3` and `esp32` targets (the BLE bridge is a classic ESP32). Install the project-local toolchain at `.tools/esp-idf` with `pnpm nx run attractap-firmware:setup-toolchain`, or use `INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh --workspace-only` during bootstrap. Local setup and CI share `tools/setup-esp-idf.sh` and the pin in `esp-idf-version.txt`; setup repairs partial installs and verifies `idf.py` can run. No extra Python packages are needed — `esptool` is picked up from your `PATH` or from ESP-IDF's own Python environment, and `cmake`/`ninja` are installed into the IDF tool set automatically if your system lacks them.
 
 NixOS note: Espressif's prebuilt binaries (xtensa toolchain, cmake, ninja) are dynamically linked against FHS paths, so they need `programs.nix-ld.enable = true;` (or an FHS environment like `steam-run`) to execute.
 
-Build the four active variants: `attractap-touch`, `attractap-touch-v2`, `attractap-touch-demo` and `attractap-touch-v2-demo` (also what CI and `pnpm nx run attractap-firmware:build` run). Other variants remain available for manual builds; uncomment them in `build_firmwares.py` to ship them again:
+Build the five active variants: `attractap-touch`, `attractap-touch-v2`, `attractap-touch-demo`, `attractap-touch-v2-demo` and `attractap-bridge-gl-s10` (also what CI and `pnpm nx run attractap-firmware:build` run). Other variants remain available for manual builds; uncomment them in `build_firmwares.py` to ship them again:
 
 ```bash
 python3 build_firmwares.py
@@ -582,6 +658,7 @@ hardware before deployment.
   `.bin` over Web Serial (Chrome/Edge). The device console runs on the ESP32-S3
   USB-Serial-JTAG port.
 - **CLI:** `python -m esptool --chip esp32s3 write_flash 0x0 firmware_output/<name>_<variant>.bin`
+  (`--chip esp32` for `attractap_bridge_gl_s10.bin`, with GPIO0 held at power-up)
 - **OTA:** upload `firmware_output` via the Attraccess server; updates stream to
   the readers over the websocket.
 
@@ -611,7 +688,7 @@ on-device smoke test.
 
 ## Serial provisioning console
 
-The firmware speaks a line protocol on the USB console (115200 8N1):
+The firmware speaks a line protocol on the USB console (UART0 on the BLE bridge; 115200 8N1):
 `CMND <topic> <json>` in, `RESP <topic> <json>` out — used by the frontend's
 hardware setup flow. Log lines have the format `[Module] LEVEL: message`.
 

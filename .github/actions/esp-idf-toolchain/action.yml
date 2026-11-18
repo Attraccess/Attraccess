@@ -1,6 +1,6 @@
 name: 'ESP-IDF Toolchain'
 description: >
-  Restore (or build) the ESP-IDF v6.0.2 esp32s3 toolchain at ~/esp/esp-idf +
+  Restore (or build) the ESP-IDF v6.0.2 esp32s3 + esp32 toolchain at ~/esp/esp-idf +
   ~/.espressif. Single source of the cache key: two copies of it drifting apart
   is how a poisoned entry stayed poisoned. Requires Python to already be set up;
   its version goes in the cache key, since the IDF virtualenv is named after it.
@@ -37,7 +37,7 @@ runs:
         path: |
           ~/esp/esp-idf
           ~/.espressif
-        key: esp-idf-${{ steps.py.outputs.idf }}-esp32s3-py${{ steps.py.outputs.v }}-v1-${{ runner.os }}
+        key: esp-idf-${{ steps.py.outputs.idf }}-esp32s3-esp32-py${{ steps.py.outputs.v }}-v1-${{ runner.os }}
 
     - name: Install and verify ESP-IDF
       # Always run, including cache hits: the shared installer repairs partial restores and stale venvs.
@@ -53,4 +53,4 @@ runs:
         path: |
           ~/esp/esp-idf
           ~/.espressif
-        key: esp-idf-${{ steps.py.outputs.idf }}-esp32s3-py${{ steps.py.outputs.v }}-v1-${{ runner.os }}
+        key: esp-idf-${{ steps.py.outputs.idf }}-esp32s3-esp32-py${{ steps.py.outputs.v }}-v1-${{ runner.os }}

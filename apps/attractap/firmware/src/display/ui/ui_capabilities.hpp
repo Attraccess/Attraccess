@@ -20,6 +20,8 @@ namespace ui
         bool cardConfirm;
         int displayWidth;
         int displayHeight;
+        // false on the BLE bridge (no card reader). Sent as `capabilities.nfc`; older firmware omits it (= true).
+        bool hasNfc = true;
     };
 
     // Rendered as text, then spliced in as raw JSON: ArduinoJson's per-field template code cost ~2.5 KB of flash.
@@ -45,11 +47,11 @@ namespace ui
         snprintf(scratch, n,
                  "{\"schemaVersion\":%d,\"components\":[%s],\"slots\":[%s],\"steps\":[%s],"
                  "\"maxPayloadBytes\":%u,\"maxNodes\":%d,\"maxDepth\":%d,\"maxLiveNodes\":%d,\"display\":%s,"
-                 "\"input\":{\"touch\":%s,\"buttons\":0,\"cardHold\":true},"
+                 "\"input\":{\"touch\":%s,\"buttons\":0,\"cardHold\":%s},"
                  "\"feedback\":{\"leds\":%s,\"beeper\":%s},\"charset\":\"latin1\",\"images\":false}",
                  SCHEMA_VERSION, components, slots, steps, payload, v.hasDisplay ? MAX_NODES : 0,
                  v.hasDisplay ? MAX_DEPTH : 0, v.hasDisplay ? MAX_LIVE_NODES : 0, display,
-                 v.hasDisplay && v.touch ? "true" : "false", v.hasLeds ? "true" : "false",
+                 v.hasDisplay && v.touch ? "true" : "false", v.hasNfc ? "true" : "false", v.hasLeds ? "true" : "false",
                  v.hasBeeper ? "true" : "false");
         caps["ui"] = serialized(scratch);
     }
@@ -92,6 +94,7 @@ namespace ui
         caps["resourceSelection"] = v.hasDisplay;
         caps["cardEnrollment"] = v.hasDisplay;
         caps["hasLeds"] = v.hasLeds;
+        caps["nfc"] = v.hasNfc;
         fillCapabilitiesUi(caps, v, scratch, n);
         // Uptime lets the server tell this boot from a mere re-authentication (crash-loop protection).
         p["uptimeMs"] = id.uptimeMs;
