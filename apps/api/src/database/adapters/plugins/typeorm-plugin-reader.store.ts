@@ -1,6 +1,6 @@
 import { NFCCard, PluginReaderEntity, Resource, User } from '@attraccess/database-entities';
-import type { PluginReaderRecord } from '@attraccess/application-models';
-import type { DataSource } from 'typeorm';
+import type { PluginReaderRecord, PluginReaderResource } from '@attraccess/application-models';
+import { In, type DataSource } from 'typeorm';
 import type { PluginReaderStore } from '../../../plugin-system/readers/plugin-reader-store.port';
 
 function toReader(row: PluginReaderEntity): PluginReaderRecord {
@@ -16,6 +16,18 @@ function toReader(row: PluginReaderEntity): PluginReaderRecord {
     resourceId: row.resourceId ?? null,
     createdAt: new Date(row.createdAt),
     updatedAt: new Date(row.updatedAt),
+  };
+}
+
+const resourceColumns = { id: true, name: true, type: true, separateUnlockAndUnlatch: true, accessOnly: true } as const;
+
+function toResource(row: Resource): PluginReaderResource {
+  return {
+    id: row.id,
+    name: row.name,
+    type: row.type,
+    separateUnlockAndUnlatch: row.separateUnlockAndUnlatch,
+    accessOnly: row.accessOnly,
   };
 }
 
@@ -58,19 +70,15 @@ export function createTypeOrmPluginReaderStore(source: () => DataSource): Plugin
     async findResource(resourceId) {
       const row = await source()
         .getRepository(Resource)
-        .findOne({
-          where: { id: resourceId },
-          select: { id: true, name: true, type: true, separateUnlockAndUnlatch: true, accessOnly: true },
-        });
-      return row
-        ? {
-            id: row.id,
-            name: row.name,
-            type: row.type,
-            separateUnlockAndUnlatch: row.separateUnlockAndUnlatch,
-            accessOnly: row.accessOnly,
-          }
-        : null;
+        .findOne({ where: { id: resourceId }, select: resourceColumns });
+      return row ? toResource(row) : null;
+    },
+
+    async listResources(types) {
+      const rows = await source()
+        .getRepository(Resource)
+        .find({ where: { type: In(types) }, select: resourceColumns, order: { name: 'ASC', id: 'ASC' } });
+      return rows.map(toResource);
     },
 
     async findCardOwner(userId) {

@@ -4,6 +4,7 @@ import type {
   PluginReaderRecord,
   PluginReaderRecordChanges,
   PluginReaderResource,
+  ResourceType,
 } from '@attraccess/application-models';
 
 /**
@@ -25,6 +26,8 @@ export interface PluginReaderStore {
 
   /** The resource, or null when it does not exist or was deleted. */
   findResource(resourceId: number): Promise<PluginReaderResource | null>;
+  /** The resources of these types that are not deleted, by name. */
+  listResources(types: ResourceType[]): Promise<PluginReaderResource[]>;
   /** The user, or null when the account does not exist or was deleted. */
   findCardOwner(userId: number): Promise<PluginReaderCardOwner | null>;
   /** Whether the card still exists, is active and belongs to the user. */

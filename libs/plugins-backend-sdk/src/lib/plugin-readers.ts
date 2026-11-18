@@ -58,6 +58,13 @@ export interface PluginReaderUpdate {
   capabilities?: PluginReaderCapabilities;
 }
 
+/** A resource a reader can be assigned to, as `listAssignableResources` lists it. */
+export interface PluginReaderResourceOption {
+  id: number;
+  name: string;
+  type: PluginReaderResourceType;
+}
+
 export interface PluginReader {
   deviceId: string;
   name: string;
@@ -160,6 +167,11 @@ export interface PluginReadersContext {
   assignResource(deviceId: string, resourceId: number): Promise<PluginReader>;
   /** Idempotent. */
   unassignResource(deviceId: string): Promise<PluginReader>;
+  /**
+   * The resources a reader with these capabilities can be assigned to, by name (for `open`: the doors with the
+   * "access only" option), so an administration page can offer them before the reader exists.
+   */
+  listAssignableResources(capabilities: PluginReaderCapabilities): Promise<PluginReaderResourceOption[]>;
   /**
    * A card authenticated on the reader's device was held to it: runs the reader's action on its resource for the
    * card owner, with the same checks as on an Attractap reader. Consumes the authentication, also on a refusal.

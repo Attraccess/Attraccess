@@ -45,18 +45,20 @@ await readers.register({
 await readers.assignResource('unit-1a2b', resourceId); // zum Beispiel aus Ihrer Verwaltungsseite
 ```
 
-| Aufruf                                       | Bedeutung                                                                                                     |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `register(input)`                            | Legt den Reader an oder aktualisiert Name und Fähigkeiten des Readers mit dieser Geräte-Id.                   |
-| `update(deviceId, { name?, capabilities? })` | Ändert einen Reader. Fähigkeiten, die die zugewiesene Ressource nicht mehr erlauben, heben die Zuweisung auf. |
-| `remove(deviceId)`                           | Entfernt den Reader und seine Zuweisung. Idempotent.                                                          |
-| `get(deviceId)` / `list()`                   | Nur die Reader Ihres Plugins; `get` liefert `null` für eine unbekannte Geräte-Id.                             |
-| `assignResource(deviceId, resourceId)`       | Weist dem Reader seine Ressource zu und ersetzt eine vorherige.                                               |
-| `unassignResource(deviceId)`                 | Hebt die Zuweisung auf. Idempotent.                                                                           |
+| Aufruf                                       | Bedeutung                                                                                                                     |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `register(input)`                            | Legt den Reader an oder aktualisiert Name und Fähigkeiten des Readers mit dieser Geräte-Id.                                   |
+| `update(deviceId, { name?, capabilities? })` | Ändert einen Reader. Fähigkeiten, die die zugewiesene Ressource nicht mehr erlauben, heben die Zuweisung auf.                 |
+| `remove(deviceId)`                           | Entfernt den Reader und seine Zuweisung. Idempotent.                                                                          |
+| `get(deviceId)` / `list()`                   | Nur die Reader Ihres Plugins; `get` liefert `null` für eine unbekannte Geräte-Id.                                             |
+| `assignResource(deviceId, resourceId)`       | Weist dem Reader seine Ressource zu und ersetzt eine vorherige.                                                               |
+| `unassignResource(deviceId)`                 | Hebt die Zuweisung auf. Idempotent.                                                                                           |
+| `listAssignableResources(capabilities)`      | Die Ressourcen, die einem Reader mit diesen Fähigkeiten zugewiesen werden können (`id`, `name`, `type`), nach Namen sortiert. |
 
 Einem Reader kann nur eine Ressource zugewiesen werden, die seine Fähigkeiten erlauben: für `open` eine Tür mit der
 Option **Nur Zutritt**. Alles andere wird mit `RESOURCE_NOT_ALLOWED` abgelehnt. Wird die Ressource gelöscht, bleibt der
-Reader ohne Ressource bestehen.
+Reader ohne Ressource bestehen. `listAssignableResources` listet genau die Ressourcen, die eine Zuweisung annimmt. So kann
+Ihre Verwaltungsseite sie ohne weitere Berechtigung anbieten, auch bevor der Reader registriert ist.
 
 Die Verwaltungsaufrufe werden mit einem `PluginReaderError` mit einem dieser stabilen Codes abgelehnt:
 

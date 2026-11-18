@@ -180,6 +180,24 @@ describe('context.readers', () => {
       await rejectsWith(readers.unassignResource('missing'), 'READER_NOT_FOUND');
     });
 
+    it('lists the resources the capabilities allow, by name, without deleted ones', async () => {
+      const zulu = await host.createDoor({ name: 'Zulu door' });
+      const alpha = await host.createDoor({ name: 'Alpha door' });
+      await host.createDoor({ name: 'Locked door', accessOnly: false });
+      await host.createDoor({ name: 'Lathe', type: ResourceType.Machine, accessOnly: false });
+      const deleted = await host.createDoor({ name: 'Gone door' });
+      await host.database.deleteResource(deleted.id);
+
+      expect(await readers.listAssignableResources(reader().capabilities)).toEqual([
+        { id: alpha.id, name: 'Alpha door', type: 'door' },
+        { id: zulu.id, name: 'Zulu door', type: 'door' },
+      ]);
+      await rejectsWith(
+        readers.listAssignableResources({ resourceTypes: ['machine'], actions: ['open'] } as any),
+        'INVALID_ARGUMENT',
+      );
+    });
+
     it('unassigns a resource that the updated capabilities no longer allow', async () => {
       const door = await host.createDoor();
       await readers.register(reader());

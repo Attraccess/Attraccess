@@ -121,6 +121,10 @@ export function createPluginReadersContext(
       const id = deviceIdOf(deviceId);
       return hostCall(pluginId, 'unassignResource', () => resolveService().unassignResource(pluginId, id));
     },
+    async listAssignableResources(capabilities) {
+      const checked = capabilitiesOf(capabilities);
+      return hostCall(pluginId, 'listAssignableResources', () => resolveService().listAssignableResources(checked));
+    },
     async tap(request) {
       const { deviceId, authentication } = (request ?? {}) as Partial<typeof request>;
       if (!isText(deviceId, PLUGIN_READER_LIMITS.deviceIdMaxLength)) {

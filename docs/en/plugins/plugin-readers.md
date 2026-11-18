@@ -42,17 +42,20 @@ await readers.register({
 await readers.assignResource('unit-1a2b', resourceId); // from your administration page, for example
 ```
 
-| Call                                         | Meaning                                                                                 |
-| -------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `register(input)`                            | Creates the reader, or updates name and capabilities of the reader with this device id. |
-| `update(deviceId, { name?, capabilities? })` | Changes a reader. Capabilities that no longer allow the assigned resource unassign it.  |
-| `remove(deviceId)`                           | Removes the reader and its assignment. Idempotent.                                      |
-| `get(deviceId)` / `list()`                   | Your plugin's readers only; `get` resolves with `null` for an unknown device id.        |
-| `assignResource(deviceId, resourceId)`       | Assigns the reader its resource, replacing a previous one.                              |
-| `unassignResource(deviceId)`                 | Removes the assignment. Idempotent.                                                     |
+| Call                                         | Meaning                                                                                            |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `register(input)`                            | Creates the reader, or updates name and capabilities of the reader with this device id.            |
+| `update(deviceId, { name?, capabilities? })` | Changes a reader. Capabilities that no longer allow the assigned resource unassign it.             |
+| `remove(deviceId)`                           | Removes the reader and its assignment. Idempotent.                                                 |
+| `get(deviceId)` / `list()`                   | Your plugin's readers only; `get` resolves with `null` for an unknown device id.                   |
+| `assignResource(deviceId, resourceId)`       | Assigns the reader its resource, replacing a previous one.                                         |
+| `unassignResource(deviceId)`                 | Removes the assignment. Idempotent.                                                                |
+| `listAssignableResources(capabilities)`      | The resources a reader with these capabilities can be assigned to (`id`, `name`, `type`), by name. |
 
 A reader can only be assigned a resource its capabilities allow: a door with the **access only** option for `open`.
 Anything else rejects with `RESOURCE_NOT_ALLOWED`. When the resource is deleted, the reader stays without a resource.
+`listAssignableResources` lists exactly the resources an assignment accepts, so your administration page can offer them
+without any other permission, also before the reader is registered.
 
 The management calls reject with a `PluginReaderError` carrying one of these stable codes:
 

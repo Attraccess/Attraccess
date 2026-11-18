@@ -4,6 +4,8 @@ import {
   PluginReader,
   PluginReaderCapabilities,
   PluginReaderError,
+  PluginReaderResourceOption,
+  PluginReaderResourceType,
   PluginReaderTapFailureReason,
   PluginReaderTapResult,
 } from '@attraccess/plugins-backend-sdk';
@@ -171,6 +173,14 @@ export class PluginReadersService {
       const reader = await this.requireReader(pluginId, deviceId);
       return toReader(reader.resourceId === null ? reader : await this.store.update(reader.id, { resourceId: null }));
     });
+  }
+
+  async listAssignableResources(capabilities: PluginReaderCapabilities): Promise<PluginReaderResourceOption[]> {
+    const core = coreCapabilities(capabilities);
+    const resources = await this.store.listResources(core.resourceTypes);
+    return resources
+      .filter((resource) => canAssign(core, resource))
+      .map(({ id, name, type }) => ({ id, name, type: type as PluginReaderResourceType }));
   }
 
   /** Uninstall: the plugin's readers and their assignments go. Disabling keeps them. */
