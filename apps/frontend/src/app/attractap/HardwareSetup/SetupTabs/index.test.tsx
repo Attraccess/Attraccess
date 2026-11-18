@@ -68,11 +68,11 @@ it('continues from a flashed BLE Bridge into the serial configurator once it was
   render(<SetupTabs openDeviceSettings={vi.fn()} onClose={vi.fn()} />);
   fireEvent.click(screen.getByRole('button', { name: 'pick bridge' }));
   fireEvent.click(screen.getByRole('button', { name: 'Install Now' }));
-  fireEvent.click(await screen.findByRole('button', { name: 'The bridge is in download mode, install' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Install now' }));
   await waitFor(() => expect(state.flash).toHaveBeenCalledOnce());
   expect(screen.getByRole('tab', { name: 'Firmware' })).toHaveAttribute('aria-selected', 'true');
 
-  fireEvent.click(await screen.findByRole('button', { name: 'The bridge is restarted, continue' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Continue setup' }));
   await waitFor(() => expect(screen.getByRole('tab', { name: 'Network' })).toHaveAttribute('aria-selected', 'true'));
   expect(screen.getByTestId('serial-network')).toBeVisible();
   expect(state.refreshPinStatus).toHaveBeenCalledOnce();

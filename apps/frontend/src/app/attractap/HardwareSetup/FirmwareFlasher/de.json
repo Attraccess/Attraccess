@@ -2,7 +2,7 @@
   "success": {
     "toast": {
       "title": "Installation erfolgreich",
-      "description": "Du kannst den RFID-Leser nun einrichten und verwenden."
+      "description": "Du kannst den Reader nun einrichten und verwenden."
     }
   },
   "action": {
@@ -31,14 +31,14 @@
     "power": "Versorge den GL-S10 nie gleichzeitig über USB und PoE mit Strom.",
     "wiring": "Öffne das Gehäuse und schließe einen 3,3-V-USB-TTL-Adapter an die seriellen Pads an: TX an RX, RX an TX, GND an GND und 3,3 V an 3,3 V. Verwende nie einen 5-V-Adapter.",
     "downloadMode": "Halte den Download-Taster (GPIO0) gedrückt, während du den GL-S10 einschaltest, und starte dann die Installation.",
-    "docsLink": "Schritt-für-Schritt-Anleitung mit Fotos der Pads",
+    "docsLink": "Schritt-für-Schritt-Anleitung zu Pads und Verkabelung",
     "docsUrl": "https://docs.attraccess.org/#/de/attractap/ble-bridge",
-    "confirm": "Die Bridge ist im Download-Modus, installieren"
+    "confirm": "Jetzt installieren"
   },
   "powerCycle": {
     "title": "Bridge neu starten",
     "description": "Die Firmware ist installiert. Die Bridge kann nicht automatisch neu gestartet werden: Schalte ihre Stromversorgung aus und wieder ein, ohne GPIO0 zu halten, und lass den USB-TTL-Adapter verbunden. Richte danach PIN, Netzwerk und Server über dieselbe Verbindung ein.",
-    "continue": "Die Bridge ist neu gestartet, weiter"
+    "continue": "Einrichtung fortsetzen"
   },
   "chipMismatch": {
     "title": "Falscher Chip für diese Firmware",

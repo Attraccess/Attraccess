@@ -111,7 +111,7 @@ it('passes flash settings and terminal callbacks, reporting completion at 100 pe
   );
   expect(state.success).toHaveBeenCalledWith({
     title: 'Installation successful',
-    description: 'You can now set up and use the RFID reader.',
+    description: 'You can now set up and use the reader.',
   });
   fireEvent.click(screen.getByRole('button', { name: 'Terminal Output' }));
   expect(await screen.findByText('Writing image Verified')).toBeTruthy();
@@ -201,13 +201,13 @@ it('warns before flashing the BLE Bridge and flashes it in manual download mode'
   render(<FirmwareFlasher firmware={bridge} onCompleted={completed} />);
   fireEvent.click(screen.getByRole('button', { name: 'Install Now' }));
   expect(await screen.findByText('Never power the GL-S10 through USB and PoE at the same time.')).toBeTruthy();
-  expect(screen.getByRole('link', { name: 'Step-by-step guide with photos of the pads' })).toHaveProperty(
+  expect(screen.getByRole('link', { name: 'Step-by-step guide to the pads and wiring' })).toHaveProperty(
     'href',
     'https://docs.attraccess.org/#/en/attractap/ble-bridge',
   );
   expect(state.connect).not.toHaveBeenCalled();
 
-  fireEvent.click(screen.getByRole('button', { name: 'The bridge is in download mode, install' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Install now' }));
   await waitFor(() => expect(state.flash).toHaveBeenCalledOnce());
   expect(state.flash).toHaveBeenCalledWith(
     expect.objectContaining({ chip: 'esp32', manualDownloadMode: true, flashFreq: '40m', flashSize: '4MB' }),
@@ -215,7 +215,7 @@ it('warns before flashing the BLE Bridge and flashes it in manual download mode'
   // No automatic reset: the user power-cycles the bridge before the configurator continues.
   expect(await screen.findByText('Restart the bridge')).toBeTruthy();
   expect(completed).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button', { name: 'The bridge is restarted, continue' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Continue setup' }));
   expect(completed).toHaveBeenCalledOnce();
 });
 it('flashes other readers without the bridge warning, with auto-reset', async () => {
