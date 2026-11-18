@@ -79,6 +79,9 @@ export class PluginBleWatchManager implements BleWatchListener {
   private readonly readers = new Map<number, ReaderWatch>();
   /** Watches still checking readers, per plugin: they count toward the limit. */
   private readonly creating = new Map<string, number>();
+  /** Counts reader access changes; `accessChangedAt` keeps each reader's last one, so a stale check is noticed. */
+  private accessChanges = 0;
+  private readonly accessChangedAt = new Map<number, number>();
 
   constructor(
     private readonly store: Pick<PluginBleStore, 'findReader' | 'listOpenReaders'>,
@@ -95,10 +98,10 @@ export class PluginBleWatchManager implements BleWatchListener {
     const profile = requirePluginBleProfile(caller.pluginId, validateBleProfileId(profileId));
     const filter = requireBleWatchFilter(profile);
     const resolved = resolveBleWatchOptions(handler, options ?? {});
+    const checkedAt = this.accessChanges;
     const readerIds = await this.reserve(caller.pluginId, async () => {
-      const ids = resolved.readerIds ?? (await this.store.listOpenReaders()).map((reader) => reader.id);
-      const open = await Promise.all(ids.map((readerId) => this.readerOpen(readerId)));
-      return ids.map((readerId, index) => ({ readerId, open: open[index] }));
+      const open = new Set((await this.store.listOpenReaders(resolved.readerIds ?? undefined)).map(({ id }) => id));
+      return (resolved.readerIds ?? [...open]).map((readerId) => ({ readerId, open: open.has(readerId) }));
     });
     if (resolved.signal?.aborted) throw new PluginBleError('CANCELLED', 'watch was cancelled', { operation: 'watch' });
     const id = randomUUID();
@@ -123,8 +126,13 @@ export class PluginBleWatchManager implements BleWatchListener {
     };
     this.watches.set(id, entry);
     this.deps.metrics()?.watchesActive.inc();
-    for (const { readerId, open } of readerIds) this.reader(readerId).open = open;
-    for (const readerId of entry.members) this.syncReader(readerId);
+    // A reader whose access changed while this checked is checked again; one other watches cover is already current.
+    const changed = [...this.accessChangedAt].filter(([, at]) => at > checkedAt).map(([readerId]) => readerId);
+    for (const { readerId, open } of readerIds) {
+      if (!changed.includes(readerId) && !this.readers.has(readerId)) this.reader(readerId).open = open;
+    }
+    for (const readerId of entry.members) if (!changed.includes(readerId)) this.syncReader(readerId);
+    await Promise.all(changed.map((readerId) => this.readerAccessChanged(readerId)));
     this.deps
       .logger()
       .log(
@@ -160,8 +168,12 @@ export class PluginBleWatchManager implements BleWatchListener {
 
   /** A reader was opened, closed or deleted: re-checks it the way scan and connect do. */
   async readerAccessChanged(readerId: number): Promise<void> {
+    const change = ++this.accessChanges;
+    this.accessChangedAt.set(readerId, change);
     if (this.watches.size === 0) return;
     const open = await this.readerOpen(readerId);
+    // A later change of the reader checks it again.
+    if (this.accessChangedAt.get(readerId) !== change) return;
     if (open) for (const entry of this.watches.values()) if (!entry.listed) entry.members.add(readerId);
     this.reader(readerId).open = open;
     this.syncReader(readerId);

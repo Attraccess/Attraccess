@@ -10,6 +10,7 @@ import { createPluginBleMetrics } from '../../metrics/definitions/plugin-ble.met
 import type { BleWatchDriverEvent } from './ble-transport-driver';
 import { createHostBleHarness, type HostBleHarness } from './__test__/ble-host-harness.test-fixture';
 import { closePluginBleSessions, createPluginBleContext } from './plugin-ble-context';
+import type { PluginBleStore } from './plugin-ble-store.port';
 
 /** `context.ble.watch`, which every host of this version has. */
 const watchOf = (ctx: PluginBleContext) => {
@@ -116,6 +117,64 @@ describe('PluginBleWatchManager (host routing and cleanup)', () => {
       expect(set(2)?.filters).toHaveLength(1);
       await harness.removeReader(1);
       expect(set(1)).toBeUndefined();
+    });
+
+    describe('when a reader’s access changes while a watch checks the readers', () => {
+      /** Holds the watch's reader query after it read, until the returned function is called. */
+      const holdReaderCheck = () => {
+        const store = (harness.service as unknown as { store: PluginBleStore }).store;
+        const listOpenReaders = store.listOpenReaders.bind(store);
+        let reached!: () => void;
+        let release!: () => void;
+        const read = new Promise<void>((resolve) => (reached = resolve));
+        const held = new Promise<void>((resolve) => (release = resolve));
+        jest.spyOn(store, 'listOpenReaders').mockImplementationOnce(async (readerIds) => {
+          const rows = await listOpenReaders(readerIds);
+          reached();
+          await held;
+          return rows;
+        });
+        return { read, release };
+      };
+
+      it('keeps a reader closed that was closed during the first watch’s check', async () => {
+        const check = holdReaderCheck();
+        const pending = watch(a, 'by-service', { readerIds: [1] });
+        await check.read;
+        await harness.setReaderAccess(1, false);
+        check.release();
+        const { handle } = await pending;
+
+        expect(set(1)).toBeUndefined();
+        expect(handle.readers()).toEqual([{ readerId: 1, status: 'access-denied' }]);
+      });
+
+      it('keeps a reader closed that was closed while another watch covered it', async () => {
+        const other = await watch(b, 'by-name', { readerIds: [1] });
+        const check = holdReaderCheck();
+        const pending = watch(a, 'by-service', { readerIds: [1] });
+        await check.read;
+        await harness.setReaderAccess(1, false);
+        check.release();
+        const { handle } = await pending;
+
+        expect(set(1)).toBeUndefined();
+        expect(handle.readers()).toEqual([{ readerId: 1, status: 'access-denied' }]);
+        expect(other.handle.readers()).toEqual([{ readerId: 1, status: 'access-denied' }]);
+      });
+
+      it('covers a reader opened during the check of a watch on every reader', async () => {
+        await harness.setReaderAccess(2, false);
+        const check = holdReaderCheck();
+        const pending = watch(a, 'by-service');
+        await check.read;
+        await harness.setReaderAccess(2, true);
+        check.release();
+        const { handle } = await pending;
+
+        expect(set(2)?.filters).toHaveLength(1);
+        expect(handle.readers().map((reader) => reader.readerId)).toEqual([1, 2]);
+      });
     });
   });
 
