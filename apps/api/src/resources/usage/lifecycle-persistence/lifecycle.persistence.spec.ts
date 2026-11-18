@@ -1,5 +1,6 @@
 import {
   BillingTransaction,
+  BillingTransactionItem,
   FormSubmission,
   Resource,
   ResourceOperatingInterval,
@@ -7,7 +8,12 @@ import {
   ResourceUsageLifecycleAttempt,
   User,
 } from '@attraccess/database-entities';
-import { BillingTransactionStatus, ResourceFormAction, ResourceUsageAction } from '@attraccess/application-models';
+import {
+  BillingTransactionStatus,
+  ResourceFlowNodeType,
+  ResourceFormAction,
+  ResourceUsageAction,
+} from '@attraccess/application-models';
 import { rm } from 'node:fs/promises';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { InsufficientBalanceError } from '../../../billing/errors/insufficient-balance.error';
@@ -433,6 +439,28 @@ describe('Usage lifecycle persistence around external flows', () => {
 
     expect(await scope.publishedState()).toEqual(before);
     await scope.expectObservationAndNoAttempt();
+  });
+
+  it('bills items staged by the takeover flow on the outgoing session and never runs the stopped trigger', async () => {
+    const outgoing = await scope.seedActiveSession();
+    const takeoverItem = { ...scope.draftItem, name: 'Takeover consumable', quantity: 1 };
+    scope.flow.runFlow.mockImplementation(async (resourceId, _trigger, payload, _manager, { lifecycleAttemptId }) => {
+      await scope.usage.stageLifecycleBillingItem(lifecycleAttemptId, resourceId, payload.id, takeoverItem);
+    });
+
+    const incoming = await scope.usage.startSession(1, scope.users[1], { forceTakeOver: true });
+
+    const triggers = scope.flow.runFlow.mock.calls.map((call) => call[1]);
+    expect(triggers).toEqual([ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER]);
+    const itemNamesOf = async (resourceUsageId: number) => {
+      const transaction = await scope.source.getRepository(BillingTransaction).findOneByOrFail({ resourceUsageId });
+      const items = await scope.source
+        .getRepository(BillingTransactionItem)
+        .findBy({ billingTransactionId: transaction.id });
+      return items.map((item) => item.name);
+    };
+    expect(await itemNamesOf(outgoing.id)).toContain('Takeover consumable');
+    expect(await itemNamesOf(incoming.id)).not.toContain('Takeover consumable');
   });
 
   it('rejects same-user takeover when the outgoing charge leaves too little balance for replacement', async () => {

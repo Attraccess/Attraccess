@@ -81,14 +81,14 @@
           },
           "stopped": {
             "title": "Nutzung beendet",
-            "description": "Wird ausgelöst, wenn eine Nutzungssitzung endet.",
+            "description": "Wird ausgelöst, wenn eine Nutzungssitzung endet. Läuft nicht, wenn eine Sitzung übernommen wird.",
             "outputs": {
               "output": "Ausgabe"
             }
           },
           "takeover": {
             "title": "Nutzung übernommen",
-            "description": "Wird ausgelöst, wenn eine Nutzungssitzung übernommen wird.",
+            "description": "Wird ausgelöst, wenn eine Nutzungssitzung übernommen wird. Nutzung beendet läuft für die bisherige Sitzung nicht; Posten dafür hier hinzufügen.",
             "outputs": {
               "output": "Ausgabe"
             }
