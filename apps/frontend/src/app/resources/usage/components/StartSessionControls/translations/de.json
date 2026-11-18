@@ -19,9 +19,9 @@
     }
   },
   "door": {
-    "unlock": "aufschließen",
-    "lock": "abschließen",
-    "unlatch": "falle öffnen",
+    "unlock": "Aufschließen",
+    "lock": "Abschließen",
+    "unlatch": "Falle öffnen",
     "open": "Öffnen",
     "success": {
       "title": "Steuerung erfolgreich",

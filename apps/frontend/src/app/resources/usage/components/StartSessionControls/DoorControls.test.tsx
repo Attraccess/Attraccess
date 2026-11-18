@@ -32,8 +32,8 @@ describe('DoorControls', () => {
   it('offers lock and unlock on a regular door', () => {
     renderControls({});
 
-    expect(screen.getByRole('button', { name: 'lock' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'unlock' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Lock' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Unlock' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Open' })).not.toBeInTheDocument();
   });
 });
