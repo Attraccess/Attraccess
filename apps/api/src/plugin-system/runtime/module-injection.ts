@@ -1,9 +1,10 @@
 import type { DynamicModule, Provider, Type } from '@nestjs/common';
-import { isDatabaseToken } from './database-tokens';
+import { databaseAccessRefusal, isDatabaseToken } from './database-tokens';
+import { PLUGIN_MIGRATION_GUIDE_URL } from './plugin-compatibility';
 
 /**
- * A plugin's Nest module may not inject the host's database: the TypeORM connection, an entity manager or a
- * repository. The host does not hand the plugin a connection through its context either; this closes the remaining
+ * A plugin's Nest module may not inject the host's database: the TypeORM connection, an entity manager, a repository,
+ * the unit of work and the persistence adapters behind it, or ModuleRef (see database-tokens). The host does not hand the plugin a connection through its context either; this closes the remaining
  * route, the global TypeORM providers every module can see. Checked on the module a plugin returns from `register`,
  * before it joins the application, so a violating plugin does not load.
  */
@@ -51,7 +52,10 @@ function check(pluginName: string, module: DynamicModule | Type<unknown>, depth:
   if (depth > MAX_DEPTH) return;
   const moduleName = typeof module === 'function' ? module.name : module.module?.name;
   if (moduleName && TYPEORM_MODULES.has(moduleName)) {
-    throw new Error(`Plugin "${pluginName}" imports ${moduleName}: plugins have no database access.`);
+    throw new Error(
+      `Plugin "${pluginName}" imports ${moduleName}: plugins have no database access. ` +
+        `Migration guide: ${PLUGIN_MIGRATION_GUIDE_URL}`,
+    );
   }
   if (typeof module === 'function') return;
   for (const provider of module.providers ?? []) {
@@ -70,10 +74,7 @@ function check(pluginName: string, module: DynamicModule | Type<unknown>, depth:
 }
 
 function fail(pluginName: string, token: unknown): never {
-  throw new Error(
-    `Plugin "${pluginName}" injects a database handle (${String(typeof token === 'function' ? token.name : token)}). ` +
-      'Plugins keep data through context.storage (permission PLUGIN_STORAGE); the host connection is not available.',
-  );
+  throw databaseAccessRefusal(pluginName, 'injects', token);
 }
 
 /** Throws when the plugin's module asks for a database handle. */

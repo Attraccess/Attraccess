@@ -118,6 +118,10 @@ describe('PluginModule', () => {
       ['the connection', 'class DataSource {}'],
       ['an entity manager by token', "'EntityManager'"],
       ['a repository by token', "'WidgetRepository'"],
+      ['the unit of work', "Symbol.for('attraccess.unit-of-work')"],
+      ['the database lifecycle', "Symbol.for('attraccess.database.lifecycle')"],
+      ['the host data port', "Symbol.for('attraccess.plugin-system.host-data')"],
+      ['the host injector', "require('@nestjs/core').ModuleRef"],
     ])('quarantines a plugin module that injects %s', (_label, token) => {
       writeStoragePlugin(
         'injector',
@@ -134,7 +138,7 @@ describe('PluginModule', () => {
       expect(module.imports).toEqual(HOST_IMPORTS);
       expect(PluginService.getPluginsWithLoadStatus().find(({ name }) => name === 'injector')).toMatchObject({
         status: 'error',
-        error: expect.stringContaining('database handle'),
+        error: expect.stringMatching(/database handle.*migrating-to-2/s),
       });
     });
 

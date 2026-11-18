@@ -1,7 +1,12 @@
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PluginContext, PluginPermission, PluginPermissionError, SystemEvent } from '@attraccess/plugins-backend-sdk';
+import { ModuleRef } from '@nestjs/core';
 import { DataSource, EntityManager } from 'typeorm';
+import { TransactionHandles } from '../database/adapters/common/transaction-handles';
+import { EntityManagerResolver } from '../database/adapters/entity-manager-resolver';
+import { TransactionContextResolver } from '../database/adapters/transaction-context';
+import { ScopedUnitOfWork } from '../database/unit-of-work';
 import { PluginSandboxService } from './plugin-sandbox.service';
 import { createHostDataContext } from './runtime/host-contexts';
 
@@ -209,16 +214,33 @@ describe('PluginSandboxService', () => {
       expect(typeof granted.storage.open).toBe('function');
     });
 
-    it.each([DataSource, EntityManager, 'DataSource', 'UserRepository'])(
-      'never resolves a database handle through context.get (%p), whatever the permission',
-      (token) => {
-        const ctx = PluginSandboxService.createGuardedContext(
-          buildBaseContext(events),
-          Object.values(PluginPermission),
-        );
-        expect(() => ctx.get(token as never)).toThrow(/database handle/);
-      },
-    );
+    it.each([
+      DataSource,
+      EntityManager,
+      'DataSource',
+      'UserRepository',
+      Symbol.for('attraccess.unit-of-work'),
+      Symbol.for('attraccess.database.lifecycle'),
+      Symbol.for('attraccess.plugin-system.host-data'),
+      TransactionHandles,
+      EntityManagerResolver,
+      TransactionContextResolver,
+      ModuleRef,
+    ])('never resolves a database handle through context.get (%p), whatever the permission', (token) => {
+      const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), Object.values(PluginPermission));
+      expect(() => ctx.get(token as never)).toThrow(/database handle.*migrating-to-2/s);
+    });
+
+    it.each([
+      ['a connection', () => Object.create(DataSource.prototype)],
+      ['a unit of work', () => new ScopedUnitOfWork({} as never)],
+    ])('refuses %s that context.get resolved under an innocent token', (_label, instance) => {
+      const base = { ...buildBaseContext(events), get: () => instance() as never };
+      const ctx = PluginSandboxService.createGuardedContext(base, Object.values(PluginPermission));
+      expect(() => ctx.get('InnocentService')).toThrow(
+        /Plugin "test-plugin" asked for a database handle \(InnocentService\)/,
+      );
+    });
 
     it('exposes no connection, repository or host entity surface on the guarded context', () => {
       const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), Object.values(PluginPermission));

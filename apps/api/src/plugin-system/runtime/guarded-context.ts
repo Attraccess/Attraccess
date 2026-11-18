@@ -22,7 +22,7 @@ import {
 } from '@attraccess/plugins-backend-sdk';
 import { Type } from '@nestjs/common';
 import type { PluginSandboxService } from '../plugin-sandbox.service';
-import { assertNotDatabaseToken } from './database-tokens';
+import { assertNotDatabaseHandle, assertNotDatabaseToken } from './database-tokens';
 
 interface PluginSandboxServicePluginGuardedContextContext {
   guardEvents: (typeof PluginSandboxService)['guardEvents'];
@@ -105,7 +105,7 @@ export function createGuardedContext(
       require(PluginPermission.RESOLVE_HOST_PROVIDERS, `get(${String(token)})`);
       // No permission opens the database: plugin data goes through `storage`, never through a connection.
       assertNotDatabaseToken(pluginName, token);
-      return base.get<T>(token);
+      return assertNotDatabaseHandle(pluginName, token, base.get<T>(token));
     },
     onEvent<E extends SystemEvent>(event: E, handler: SystemEventHandler<E>): SystemEventSubscription {
       require(PluginPermission.LISTEN_EVENTS, `onEvent(${event})`);
