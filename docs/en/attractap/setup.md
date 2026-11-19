@@ -43,7 +43,7 @@ A reader cannot register itself. It shows a rotating code and an admin approves 
 3. Optionally enter a name (for example "Laser Cutter Reader") and click **Approve**.
 
 The reader connects and is ready. See [Reader Pairing](attractap/pairing.md) for details, the Lite
-LED pattern, security notes and what to do with readers that were registered before.
+LED pattern, security notes and what to do after the upgrade to firmware 2.6.0, when every reader pairs again.
 
 > [!NOTE]
 > You need the `resources.update` permission to approve a reader. Readers running firmware older

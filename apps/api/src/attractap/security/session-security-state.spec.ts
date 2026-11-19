@@ -49,7 +49,7 @@ describe('SessionSecurityState', () => {
   const build = parseReportedBuild(info);
 
   it('hands the build to a waiting report as soon as the firmware info arrives', async () => {
-    const state = new SessionSecurityState(1, 'a'.repeat(64), 'rsa-3072');
+    const state = new SessionSecurityState(1, 'a'.repeat(64));
     const waiting = state.whenBuild(5_000);
     state.setBuild(build);
     await expect(waiting).resolves.toBe(build);
@@ -60,7 +60,7 @@ describe('SessionSecurityState', () => {
   it('gives up waiting with null when no firmware info arrives', async () => {
     jest.useFakeTimers();
     try {
-      const state = new SessionSecurityState(1, 'a'.repeat(64), 'ecdsa-p256');
+      const state = new SessionSecurityState(1, 'a'.repeat(64));
       const waiting = state.whenBuild(1_000);
       jest.advanceTimersByTime(1_000);
       await expect(waiting).resolves.toBeNull();

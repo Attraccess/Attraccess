@@ -2,7 +2,7 @@
 
 #include "efuse_report.hpp"
 
-// Reads the security eFuses of this chip into an EfuseReport::Snapshot (secure builds, device only).
+// Reads the security eFuses of this chip into an EfuseReport::Snapshot (secure builds, device only. It only reads; nothing here writes an eFuse).
 // Key blocks are never read except KEY0/KEY1 when they hold a Secure Boot digest (public data).
 #if defined(ESP_PLATFORM) && defined(ATTRACTAP_SECURE_BUILD)
 namespace EfuseSnapshot

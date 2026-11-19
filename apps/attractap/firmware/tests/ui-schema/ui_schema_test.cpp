@@ -114,7 +114,7 @@ static void roundTrip(const char *name, const ui::VariantTraits &traits, const c
     char uiCaps[ui::CAPABILITIES_UI_SCRATCH];
     ui::buildFirmwareInfo(event,
                           {"attractap_touch_v2_secure_lab_park", "attractap-touch-v2", "1.9.0", "CPU_LOCKUP",
-                           4294967295u, "secure-lab", false, 65535, false, "ds-rsa3072"},
+                           4294967295u, "secure-lab", false, 65535},
                           traits, uiCaps, sizeof uiCaps);
     event["data"]["payload"]["capabilities"]["cardRelay"] = true;
     char bleCaps[ble::CAPABILITY_SCRATCH];
@@ -138,8 +138,7 @@ static void roundTrip(const char *name, const ui::VariantTraits &traits, const c
               payload["uptimeMs"] == 4294967295u && payload["version"] == "1.9.0",
           name << ": fields");
     // ATT-1207: the reader's profile claims (the server never trusts them on their own).
-    CHECK(payload["profile"] == "secure-lab" && payload["release"] == false && payload["secureVersion"] == 65535 &&
-              payload["secured"] == false && payload["identity"] == "ds-rsa3072",
+    CHECK(payload["profile"] == "secure-lab" && payload["release"] == false && payload["secureVersion"] == 65535,
           name << ": profile fields");
     CHECK(payload["capabilities"]["resourceSelection"] == traits.hasDisplay &&
               payload["capabilities"]["cardEnrollment"] == traits.hasDisplay &&
@@ -345,7 +344,7 @@ int main()
     roundTrip("touch", {true, true, false, true, false, 480, 480}, "caps-touch.json");
     roundTrip("lite", {false, false, true, true, true, 0, 0}, "caps-lite.json");
     {
-        // A plain build reports its defaults: profile plain, no secureVersion, software identity.
+        // A plain build reports its defaults: profile plain, no secureVersion.
         JsonDocument event;
         char uiCaps[ui::CAPABILITIES_UI_SCRATCH];
         ui::buildFirmwareInfo(event, {"attractap_touch_v2", "attractap-touch-v2", "2.6.0", "POWERON", 1u},
@@ -353,8 +352,7 @@ int main()
         JsonObject payload = event["data"]["payload"];
         bool hasSecureVersion = false;
         for (JsonPair field : payload) hasSecureVersion = hasSecureVersion || field.key() == "secureVersion";
-        CHECK(payload["profile"] == "plain" && payload["release"] == false && payload["secured"] == false &&
-                  payload["identity"] == "ecdsa-p256" && !hasSecureVersion,
+        CHECK(payload["profile"] == "plain" && payload["release"] == false && !hasSecureVersion,
               "plain build: default profile fields");
     }
     if (failures) { std::cerr << failures << " failure(s)\n"; return 1; }

@@ -57,8 +57,8 @@ public:
 
     PairingClient(const IReaderKey &key, bool lite, Firmware firmware, Clock clock = nullptr);
 
-    // The pairing connection is open: sends `hello` (with the binding ticket, if any).
-    void start(const std::string &ticket, SendText send);
+    // The pairing connection is open: sends `hello`.
+    void start(SendText send);
     // One text frame from the server.
     Outcome onMessage(const char *data, size_t length);
     // The connection went away without a decision.

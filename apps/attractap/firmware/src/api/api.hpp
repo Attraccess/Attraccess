@@ -239,7 +239,6 @@ private:
     void dispatchIncomingEvent(const char *eventType, uint32_t requestId);
     void updateSateInfo();
 
-    bool isRegistered();
 
     void onSupervisionStart(JsonObject data);
 
@@ -270,8 +269,6 @@ private:
     void sendHeartbeat();
 
     void onUnauthorized(JsonObject data);
-    void onStartPairing(JsonObject data);
-    void sendAuthenticationRequest();
     void onReaderAuthenticated(JsonObject data);
     void onServerTime(JsonVariantConst serverTime);
     void sendFirmwareInfo();

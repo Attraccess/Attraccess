@@ -8,34 +8,19 @@
 
 #include "psa/crypto.h"
 
-// The reader's identity key. Everything outside the key classes only sees IReaderKey: the algorithm, the public
-// key (canonical SPKI, as sent in pairing and the identity upgrade) and a PSA key id that TLS and the upgrade proof
-// sign with. Two implementations:
-//  - SoftwareReaderKey: ECDSA P-256 in a PSA volatile slot, persisted in NVS (every build).
-//  - DsReaderKey (ds_reader_key.hpp, secure builds on the device): RSA-3072 held by the ESP32-S3 Digital
-//    Signature peripheral (ATT-1207); the private key is never exportable.
+// The reader's P-256 identity key. Everything outside this file only sees IReaderKey: the public
+// key (canonical SPKI, as sent in pairing) and a PSA key handle that TLS uses for signing. A key
+// held in the ESP32-S3 Digital Signature peripheral (ATT-1166) can implement the same interface
+// without the private key ever being exportable.
 class IReaderKey
 {
 public:
-    enum class Algorithm
-    {
-        // ECDSA P-256 with SHA-256; TLS signs ecdsa_secp256r1_sha256.
-        EcdsaP256,
-        // RSA-3072 in the ESP32-S3 Digital Signature peripheral (ATT-1207): TLS and the upgrade proof sign
-        // RSA-PSS SHA-256 (salt 32).
-        Rsa3072Ds,
-    };
-
     virtual ~IReaderKey() = default;
-    virtual Algorithm algorithm() const = 0;
-    // Canonical SubjectPublicKeyInfo DER: uncompressed P-256 (91 bytes) or RSA-3072 with e = 65537
-    // (RsaDer::SPKI_BYTES).
+    // Canonical uncompressed P-256 SubjectPublicKeyInfo (91 bytes).
     virtual const std::vector<uint8_t> &publicKeySpki() const = 0;
-    // PSA key the signatures run on: ECDSA SHA-256 for P-256, RSA-PSS SHA-256 for the DS key.
+    // PSA key usable for ECDSA with SHA-256 (mbedtls_pk_wrap_psa).
     virtual mbedtls_svc_key_id_t keyId() const = 0;
 };
-
-struct mbedtls_pk_context;
 
 // Software key in a PSA volatile slot, persisted as the raw 32-byte private scalar.
 class SoftwareReaderKey : public IReaderKey
@@ -51,7 +36,6 @@ public:
     // Raw private scalar for NVS. Callers wipe the buffer after use.
     bool exportPrivateKey(std::vector<uint8_t> &out) const;
 
-    Algorithm algorithm() const override { return Algorithm::EcdsaP256; }
     const std::vector<uint8_t> &publicKeySpki() const override { return spki; }
     mbedtls_svc_key_id_t keyId() const override { return key; }
 
@@ -72,14 +56,6 @@ namespace ReaderIdentity
     std::vector<uint8_t> spkiFromPoint(const uint8_t *point, size_t length);
     // True for exactly the canonical uncompressed P-256 SPKI form.
     bool isCanonicalP256Spki(const std::vector<uint8_t> &spki);
-
-    // Wraps the key's PSA handle into `pk`. A Digital Signature key has no exportable public key, so its
-    // public part (from the DS record) is preset in the context and the wrap never asks PSA for it.
-    int wrapKey(mbedtls_pk_context &pk, const IReaderKey &key);
-
-    // RSA-PSS SHA-256 (MGF1-SHA256, salt 32) over `message` with an RSA-3072 key (the identity upgrade proof).
-    // False for any other key or when signing fails.
-    bool signRsaPssSha256(const IReaderKey &key, const std::vector<uint8_t> &message, std::vector<uint8_t> &signature);
 
     // Self-signed certificate over the reader key for the first (bootstrap) session: the server
     // looks the key up by fingerprint and answers with the issued certificate. DER output.

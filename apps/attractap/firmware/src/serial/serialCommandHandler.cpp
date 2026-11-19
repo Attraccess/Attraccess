@@ -12,6 +12,7 @@
 #include <cstring>
 #include <string>
 
+#include "../settings/reader_credentials.hpp"
 #include "../settings/settings.hpp"
 #include "../network/wifi/wifi.hpp"
 #include "../state/state.hpp"
@@ -19,9 +20,6 @@
 #include "../platform.hpp"
 #ifdef ATTRACTAP_TEST_HOOKS
 #include "../testhooks/test_hooks.hpp"
-#endif
-#ifdef ATTRACTAP_SECURE_LAB
-#include "../api/security/ds_console.hpp"
 #endif
 
 std::string SerialCommandHandler::inputBuffer = "";
@@ -141,6 +139,7 @@ void SerialCommandHandler::sendErrorResponse(const std::string &topic, const cha
 #include <cstring>
 #include <string>
 
+#include "../settings/reader_credentials.hpp"
 #include "../settings/settings.hpp"
 #include "../network/wifi/wifi.hpp"
 #include "../state/state.hpp"
@@ -241,6 +240,7 @@ const char *SerialCommandHandler::encryptionTypeToString(wifi_auth_mode_t mode)
 #include <cstring>
 #include <string>
 
+#include "../settings/reader_credentials.hpp"
 #include "../settings/settings.hpp"
 #include "../network/wifi/wifi.hpp"
 #include "../state/state.hpp"
@@ -305,14 +305,6 @@ void SerialCommandHandler::triggerCrash(uint32_t stackBytes)
 
 void SerialCommandHandler::handleCommand(const std::string &topic, const std::string &payload)
 {
-#ifdef ATTRACTAP_SECURE_LAB
-    // Lab-only DS commands (ATT-1207). They take a raw argument (the chip MAC), not JSON, and print
-    // their own result lines; see api/security/ds_console.hpp.
-    if (DsConsole::handle(topic, payload))
-    {
-        return;
-    }
-#endif
     bool hasPin = pinIsSet();
 
     StaticJsonDocument<512> payloadDoc;
@@ -413,6 +405,7 @@ void SerialCommandHandler::handleCommand(const std::string &topic, const std::st
 #include <cstring>
 #include <string>
 
+#include "../settings/reader_credentials.hpp"
 #include "../settings/settings.hpp"
 #include "../network/wifi/wifi.hpp"
 #include "../state/state.hpp"
@@ -502,7 +495,6 @@ void SerialCommandHandler::handleAuthorizedCommand(const std::string &topic, Jso
         auto ws = State::getWebsocketState();
         auto api = State::getApiState();
         auto enrollment = State::getEnrollmentState();
-        AttraccessAuthConfig authCfg = Settings::getAttraccessAuthConfig();
 
         std::string status = "disconnected";
         if (ws.hostname.length() > 0 && ws.port > 0)
@@ -542,7 +534,7 @@ void SerialCommandHandler::handleAuthorizedCommand(const std::string &topic, Jso
         resp["hostname"] = ws.hostname;
         resp["port"] = ws.port;
         resp["useSSL"] = ws.useSSL;
-        resp["deviceId"] = std::to_string(authCfg.readerId);
+        resp["deviceId"] = std::to_string(CredentialStore::load().readerId);
 
         std::string json;
         serializeJson(resp, json);

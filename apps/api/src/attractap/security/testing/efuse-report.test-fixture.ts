@@ -4,7 +4,7 @@ export const DIGEST0 = 'fd0e62812a67e20c36a85321733343e8ebd420e2d7940bbfd49ac9e1
 export const DIGEST1 = '65c97f279aa20b82d134fd6cc0eeb39d51e42a50d9c3d771f25b42e6487fafd9';
 const key = (purpose: string, readProtected = false) => ({ purpose, used: purpose !== 'USER', readProtected });
 
-/** A report as a release secure reader with a DS key sends it. */
+/** A report as a release secure reader sends it. */
 export function releaseReport(overrides: Partial<EfuseReport> = {}): EfuseReport {
   return {
     mac: 'dc:b4:d9:21:71:c8',
@@ -13,7 +13,7 @@ export function releaseReport(overrides: Partial<EfuseReport> = {}): EfuseReport
       key('SECURE_BOOT_DIGEST0'),
       key('SECURE_BOOT_DIGEST1'),
       key('XTS_AES_128_KEY', true),
-      key('HMAC_DOWN_DIGITAL_SIGNATURE', true),
+      key('USER'),
       key('HMAC_UP', true),
       key('USER'),
     ],
@@ -30,7 +30,7 @@ export function releaseReport(overrides: Partial<EfuseReport> = {}): EfuseReport
       disForceDownload: false,
       disUsbSerialJtagDownload: true,
     },
-    rdDis: 0b0011100,
+    rdDis: 0b0010100,
     rdDisWriteProtected: true,
     secureVersion: 1,
     flashEncryptionMode: 'release',

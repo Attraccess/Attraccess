@@ -1,11 +1,5 @@
 import { dataFields, oneOf, positive, isAuthenticationMethod } from './projection';
-import {
-  ATTRACTAP_FIRMWARE_PROFILES,
-  ATTRACTAP_READER_KEY_ALGORITHMS,
-  ATTRACTAP_SECURITY_PROBLEMS,
-  ATTRACTAP_SECURITY_PROBLEMS_MORE,
-  type AuthenticationMethod,
-} from '@attraccess/application-models';
+import type { AuthenticationMethod } from '@attraccess/application-models';
 
 /** Projection input: the attractap action without its `attractap.` prefix. */
 export interface AttractapAuditInput {
@@ -39,9 +33,6 @@ export const attractapDetails = {
   'reader.recovery_key_verified': new Set(['recoveryFingerprint']),
   'reader.signing_key_backup_downloaded': new Set(['signingFingerprint']),
   'reader.secure_keys_restored': new Set(['signingFingerprint', 'recoveryFingerprint', 'source']),
-  'reader.identity_upgraded': new Set(['oldFingerprint', 'newFingerprint', 'algorithm']),
-  'reader.secured': new Set(['fingerprint', 'profile', 'secureVersion', 'efuseSecureVersion']),
-  'reader.security_check_failed': new Set(['problems']),
   'ui.hook_decision': new Set([
     'plugin',
     'readerId',
@@ -145,11 +136,6 @@ export const attractapResetReasons = new Set([
 ]);
 type DetailValue = string | number | boolean;
 
-const securityProblemTokens: ReadonlySet<string> = new Set([
-  ...ATTRACTAP_SECURITY_PROBLEMS,
-  ATTRACTAP_SECURITY_PROBLEMS_MORE,
-]);
-
 function isSha256Hex(value: DetailValue): boolean {
   return typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
 }
@@ -167,15 +153,6 @@ const detailValidators: Record<string, (value: DetailValue) => boolean> = {
   ),
   signingFingerprint: isSha256Hex,
   recoveryFingerprint: isSha256Hex,
-  oldFingerprint: isSha256Hex,
-  newFingerprint: isSha256Hex,
-  fingerprint: isSha256Hex,
-  algorithm: oneOf(...ATTRACTAP_READER_KEY_ALGORITHMS),
-  profile: oneOf(...ATTRACTAP_FIRMWARE_PROFILES),
-  secureVersion: (value) => Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 0xffff,
-  efuseSecureVersion: (value) => Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 0xffff,
-  // Known problem codes only, joined by commas (a shortened list ends in `more`), never reader-supplied text.
-  problems: (value) => typeof value === 'string' && value.split(',').every((code) => securityProblemTokens.has(code)),
   resetReason: (value) => attractapResetReasons.has(value as string),
   hasCoredump: (value) => typeof value === 'boolean',
   readerId: positive,
@@ -251,9 +228,6 @@ export const ATTRACTAP_AUDIT_ACTIONS = [
   'attractap.reader.recovery_key_verified',
   'attractap.reader.signing_key_backup_downloaded',
   'attractap.reader.secure_keys_restored',
-  'attractap.reader.identity_upgraded',
-  'attractap.reader.secured',
-  'attractap.reader.security_check_failed',
   'attractap.ui.hook_decision',
   'attractap.ui.step_issued',
   'attractap.ui.step_answered',

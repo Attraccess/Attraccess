@@ -19,9 +19,6 @@ export interface IssuedCertificate {
   notAfter: Date;
 }
 
-/** Thrown by `markPaired` when `expectedFingerprint` no longer is the reader's credential. */
-export const CREDENTIAL_CHANGED = 'CredentialChanged';
-
 /** The credential columns of a reader row as `markPaired` found them, so an undo can put them back. */
 export type CredentialSnapshot = AttractapCredentialSnapshot;
 
@@ -80,26 +77,14 @@ export class CredentialRegistryService {
     readerId: number;
     fingerprint: string;
     certificate: IssuedCertificate;
-    /** The responsible user; null when the reader itself changes its identity (identity upgrade). */
-    actorId: number | null;
+    actorId: number;
     previousCredentialBecomes: 'revoked' | 'replaced';
-    /**
-     * Only when the reader still holds this credential, checked inside the transaction. A reader that changes its
-     * own identity (identity upgrade) must not overwrite a revoke or re-pair that landed in the meantime.
-     */
-    expectedFingerprint?: string;
   }): Promise<{ previousFingerprint: string | null; before: CredentialSnapshot }> {
     const { readerId, fingerprint, certificate, actorId } = input;
     try {
       return await this.unitOfWork.run(async (scope) => {
         const reader = await this.store.readCredential(scope, readerId);
         if (!reader) throw new NotFoundException('Reader not found');
-        if (
-          input.expectedFingerprint !== undefined &&
-          (reader.pairingState !== 'paired' || reader.credentialFingerprint !== input.expectedFingerprint)
-        ) {
-          throw new ConflictException(CREDENTIAL_CHANGED);
-        }
         // One key, one reader: two records must never share an active credential.
         const holderId = await this.store.findPairedReaderIdByFingerprint(fingerprint, scope);
         if (holderId !== null && holderId !== reader.id) throw new ConflictException('PairingKeyInUse');
@@ -125,7 +110,6 @@ export class CredentialRegistryService {
           pairedAt: new Date(),
           certificateNotAfter: certificate.notAfter,
           certificateSerial: certificate.serial,
-          apiTokenHash: '', // token sign-in is over for this reader
           // A new credential has to pass the eFuse report check again.
           secured: false,
           securedAt: null,
@@ -147,7 +131,7 @@ export class CredentialRegistryService {
 
   /**
    * Takes back a pairing the reader never learned about: the row gets the credential columns
-   * `markPaired` found (`before`) again, with the token hash, so a working reader keeps working.
+   * `markPaired` found (`before`) again.
    * Applied only while `fingerprint` is still the reader's active credential; a change that
    * happened since wins. The history is appended to, never rewritten: the undone key is closed as
    * revoked and a credential that becomes active again is recorded as paired. Returns whether it
@@ -239,6 +223,5 @@ function snapshotOf(reader: AttractapCredentialSnapshot): CredentialSnapshot {
     pairedAt: reader.pairedAt ?? null,
     certificateNotAfter: reader.certificateNotAfter ?? null,
     certificateSerial: reader.certificateSerial ?? null,
-    apiTokenHash: reader.apiTokenHash ?? '',
   };
 }

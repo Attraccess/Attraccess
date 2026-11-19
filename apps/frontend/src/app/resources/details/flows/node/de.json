@@ -786,7 +786,7 @@
             },
             "preview": {
               "baselineValue": "Ausgangsstand",
-              "source": "Zähler"
+              "source": "Quelle"
             }
           },
           "report": {

@@ -7,13 +7,12 @@ import { join, relative } from 'node:path';
  * and the reader firmware for log calls whose *runtime values* (not their fixed text) are such data.
  *
  * A value is a secret when any identifier in it contains a secret word (`keyHex`, `newKey`,
- * `pinCode`, `wifiPassword`, `apduHex`, the identity upgrade's `nonce`/`proof`/`signature`, the DS key's
- * `dsParams`/`hmacKey`, ...), or when it is a whole message, payload or buffer
+ * `pinCode`, `wifiPassword`, `apduHex`, ...), or when it is a whole message, payload or buffer
  * (`data`, `message`, `buf`, `eventData.payload`, `JSON.stringify(...)`).
  */
 const REPOSITORY_ROOT = join(__dirname, '..', '..', '..', '..');
 
-const SECRET_WORD = /key|token|secret|passw|pin|apdu|packetbuffer|credential|psk|nonce|proof|dsparam|signature|hmac/i;
+const SECRET_WORD = /key|token|secret|passw|pin|apdu|packetbuffer|credential|psk/i;
 
 /**
  * Identifiers that contain a secret word but are not secret. Keep this short; every entry needs a reason.
@@ -116,11 +115,6 @@ const SAFE_CALLS: Array<{ file: string; call: string; why: string }> = [
     file: 'apps/attractap/firmware/src/serial/serialCommandHandler.cpp',
     call: '("RESP %s %s',
     why: 'the provisioning protocol reply channel; replies only carry status fields (pinIsSet, never the PIN or Wi-Fi password)',
-  },
-  {
-    file: 'apps/attractap/firmware/src/api/security/ds_console.cpp',
-    call: 'DS_RECORD_BEGIN',
-    why: 'the lab-only `ds.export` answer on the serial console (secure-lab builds): the DS record holds the encrypted DS parameters and the public key, never the HMAC key or a plaintext private key',
   },
   {
     file: 'apps/attractap/firmware/src/api/handlers/auth.cpp',
@@ -311,9 +305,6 @@ describe('secrets in logs', () => {
       'console.log(apdu);',
       'this.logger.debug(`answer ${payload["key"]}`);',
       "this.logger.debug('sending', message);",
-      'this.logger.debug(`challenge ${challenge.nonce}`);',
-      'this.logger.log(`upgrade proof ${proofBase64}`);',
-      "this.logger.warn('bad signature', signature);",
     ])('API: %s', (source) => {
       expect(leak(firstCall(source, API_LOG_CALL))).not.toBeNull();
     });
@@ -329,11 +320,6 @@ describe('secrets in logs', () => {
       'Adafruit_PN532::PrintHex(_key, 6);',
       'PrintHexChar(pn532_packetbuffer, 26);',
       'Serial.println(apduHex);',
-      'logger.debugf("nonce %s", nonceHex.c_str());',
-      'printf("proof %s\\n", proof.c_str());',
-      'ESP_LOGD(TAG, "params %p", dsParams);',
-      'logger.infof("sig %s", signatureHex.c_str());',
-      'this->logger.debugf("hmac %02x", dsHmac[0]);',
     ])('firmware: %s', (source) => {
       expect(leak(firstCall(source, FIRMWARE_LOG_CALL))).not.toBeNull();
     });
@@ -346,7 +332,6 @@ describe('secrets in logs', () => {
       ['logger.infof("I2C init: SDA=%d", PIN_NFC_I2C_SDA);', FIRMWARE_LOG_CALL],
       ['this->logger.error(("card error: " + payload["error"].as<std::string>()).c_str());', FIRMWARE_LOG_CALL],
       ['printf("PN532 InDataExchange status 0x%02X\\n", pn532_packetbuffer[7]);', FIRMWARE_LOG_CALL],
-      ['logger.error("Identity upgrade: could not build the proof");', FIRMWARE_LOG_CALL],
     ])('but not: %s', (source, pattern) => {
       expect(leak(firstCall(source, pattern))).toBeNull();
     });

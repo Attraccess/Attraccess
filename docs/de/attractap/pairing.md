@@ -15,12 +15,11 @@ mehr selbst registrieren: Niemand kann einen Reader hinzufügen, ohne dass ein A
 
 ## Reader-Status
 
-| Status                | Bedeutung                                                                                                                                                                                                        |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Wartet**            | Ein neuer Reader zeigt seinen Code und wartet auf einen Admin. Solange er wartet, steht er als Zeile **Neuer Reader** im Block **Nicht gekoppelt**.                                                              |
-| **Nicht gekoppelt**   | Ein Reader, der vor dieser Version per Token registriert wurde. Er tut nichts, bis ein Admin ihn koppelt: Er bekommt das Firmware-Update, zeigt dann seinen Code und wartet. Die Einstellungen bleiben gesperrt. |
-| **Gekoppelt**         | Der Reader hat einen eigenen Schlüssel und ein Zertifikat und kann genutzt und eingerichtet werden.                                                                                                              |
-| **Kopplung entfernt** | Ein Admin hat die Kopplung entfernt. Der Reader wird innerhalb einer Sekunde getrennt, zeigt „Kopplung entfernt“ und wartet mit einem neuen Schlüssel wieder auf Freigabe.                                       |
+| Status                | Bedeutung                                                                                                                                                                                                                    |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Wartet**            | Ein neuer Reader zeigt seinen Code und wartet auf einen Admin. Solange er wartet, steht er als Zeile **Neuer Reader** im Block **Nicht gekoppelt**.                                                                          |
+| **Gekoppelt**         | Der Reader hat einen eigenen Schlüssel und ein Zertifikat und kann genutzt und eingerichtet werden.                                                                                                                          |
+| **Kopplung entfernt** | Ein Admin hat die Kopplung entfernt. Der Reader wird innerhalb einer Sekunde getrennt, zeigt „Kopplung entfernt“ und wartet mit einem neuen Schlüssel wieder auf Freigabe. Sein Eintrag bleibt im Block **Nicht gekoppelt**. |
 
 Nur gekoppelte Reader stehen in den Tabellen **Aktive Attractaps** und **Veraltete Attractaps** und lassen sich bearbeiten.
 
@@ -82,38 +81,31 @@ Lite-Reader berechnen auch den normalen Code. Öffne den Web-Flasher, verbinde d
 drücke **Freigeben** neben dem angezeigten Code, oder lies die Zeile `Enrollment: code=XXX-XXX`
 auf der seriellen Konsole.
 
-## Bereits vorhandenen Reader koppeln
+## Nach dem Upgrade: jeder Reader koppelt neu
 
-Reader, die vor dieser Version per Token registriert wurden, sind bis zur Kopplung gesperrt. Verbindet
-sich ein solcher Reader, bietet ihm der Server zuerst ein fälliges Firmware-Update an und fordert ihn
-dann zur Kopplung auf; der Reader zeigt einen Code. Ein Reader mit Firmware 1.8.0 oder neuer, für den
-der Server kein Update hat, koppelt mit seiner aktuellen Firmware. Ein Reader mit 1.7.x zeigt seinen
-Code erst nach dem Update; hat der Server kein Update für ihn, aktualisiere ihn mit dem Web-Flasher.
+Reader melden sich nicht mehr mit einem Token an. Die Server-Version, die das einführt, entfernt beim
+ersten Start alle Reader-Einträge: Die Reader-Liste ist danach leer, und der Server verhält sich, als
+hätte er nie einen Reader gekannt. Das gilt auch für Reader, die schon gekoppelt waren. **Jeder Reader
+muss mit den Schritten oben neu gekoppelt werden**; Ressourcen, Namen und Einstellungen pro Reader müssen
+neu eingerichtet werden, und die Einstellung für das Schreiben von Karten nennt keinen Reader mehr.
+Karten, Benutzer und Ressourcen bleiben unberührt.
 
-In ihrer Zeile im Block **Nicht gekoppelt** steht der Button **Koppeln**; er lässt den verbundenen
-Reader seinen Code sofort zeigen (Reader mit Firmware vor 1.8.0 ignorieren ihn). Wird eine Kopplung
-nicht abgeschlossen, fordert der Server den Reader etwa zwei Minuten später von selbst erneut auf.
-Gib den Code wie oben frei. Die Kopplung ist an den bestehenden Eintrag gebunden, Name, Maschinen und
-Einstellungen bleiben also erhalten. Ist der Reader nicht verbunden, erreicht **Koppeln** ihn nicht;
-schalte ihn zuerst ein. Die Einstellungen eines nicht gekoppelten Readers bleiben gesperrt.
+Ein Reader mit Firmware 2.6.0 oder neuer ohne Zertifikat geht direkt in die Kopplung und zeigt seinen
+Code. Ein Reader, der schon über die verschlüsselte Verbindung gekoppelt war (Firmware 1.8.0 bis 2.5.x),
+behält seinen Schlüssel, aber der Server kennt ihn nicht mehr. Bei der nächsten Verbindung teilt der
+Server ihm mit, dass seine Kopplung nicht mehr gilt, und er zeigt seinen Code wieder.
 
-Bis zur Kopplung meldet ein solcher Reader niemanden an und startet und beendet keine Maschinen. Er
-erscheint nur im Block **Nicht gekoppelt**. Dort zeigt seine Zeile die Maschinen, denen er
-zugeordnet ist. Er kann keine Karten registrieren oder zurücksetzen, keinen Start beaufsichtigen und
-keine Sammeleinweisung ausführen.
+**Reader mit Firmware älter als 2.6.0, die nur einen Token kennen, lassen sich nicht mehr per Funk
+aktualisieren**: Das Update läuft über die verschlüsselte Verbindung. Flashe sie per USB mit dem
+Web-Flasher; sie starten dann mit Firmware 2.6.0 und koppeln wie ein neuer Reader. Ein solcher Reader,
+der sich weiter mit einem Token anmelden will, wird schon beim Verbindungsaufbau abgewiesen: Der Server
+protokolliert `token sign-in no longer supported` und legt nichts an.
 
-Ein Token-Reader behält seinen Token, bis die erste verschlüsselte Sitzung sein Zertifikat
-geliefert hat. Erreicht diese Sitzung keinen Server, den der Reader prüfen kann (drei Versuche
-nacheinander), kam die Freigabe womöglich von jemandem, der sich als dein Server ausgibt: Der Reader
-vergisst den gemerkten Server (nicht seinen eigenen Schlüssel) und kehrt zu seinem Token zurück,
-oder zur Kopplung, wenn er keinen Token hat. Du kannst ihn dann erneut koppeln.
-
-Nach der Kopplung fällt ein Reader nie auf seinen Token oder einen unverschlüsselten Kanal
-zurück und löscht seine gespeicherte Zertifizierungsstelle und seinen Schlüssel nie aufgrund einer
-nicht authentifizierten Nachricht. Kann der Server nicht beweisen, dass er deine Installation ist,
-zeigt ein Touch-Reader auf seinem Verbindungsbildschirm **Server konnte nicht überprüft werden**
-und versucht es alle 30 Sekunden erneut; ein Lite-Reader blinkt bei jedem gescheiterten Versuch
-**rot**. Er meldet sich nicht von selbst neu an.
+Kann der Server nicht beweisen, dass er deine Installation ist, zeigt ein Touch-Reader auf seinem
+Verbindungsbildschirm **Server konnte nicht überprüft werden** und versucht es alle 30 Sekunden
+erneut; ein Lite-Reader blinkt bei jedem gescheiterten Versuch **rot**. Er meldet sich nicht von
+selbst neu an und löscht seine gespeicherte Zertifizierungsstelle und seinen Schlüssel nie aufgrund
+einer nicht authentifizierten Nachricht.
 
 ## Kopplung entfernen, erneut koppeln
 
@@ -138,6 +130,17 @@ Wird die Admin-Seite über einfaches HTTP geöffnet (weder HTTPS noch localhost)
 Kopplungsseite eine Warnung: Wer das Netzwerk kontrolliert, könnte dir gefälschte Angaben zeigen,
 auch einen gefälschten Reader, der nicht deiner ist. Nutze HTTPS oder ein vertrauenswürdiges Netz.
 Die Kopplung wird nicht blockiert.
+
+### Sichere Reader
+
+Ein Reader mit einer sicheren Firmware (Secure Boot und Flash-Verschlüsselung) sendet dem Server bei
+jeder Verbindung einen Bericht über seine Sicherheitseinstellungen. Der Server vergleicht ihn mit dem
+sicheren Profil und zeigt im Tab **Kopplung** des Readers **Gesichert** oder **Nicht gesichert** samt
+den Einstellungen, die nicht passen. Nur ein Release-Build einer regulären Variante, der mit seinem
+gekoppelten Schlüssel verbunden ist, kann gesichert werden; Labor-Build (Entwicklungsmodus), einfacher
+Build, Demo- und Debug-Build werden nie gesichert, egal was der Bericht sagt. Ein fehlschlagender
+Bericht und das Entfernen der Kopplung setzen den Status zurück. Der Bericht ist die eigene Aussage des
+Readers und kein Hardware-Nachweis; einfache Reader zeigen hier nichts.
 
 ### Was ein Angreifer kann und was nicht
 
@@ -201,11 +204,11 @@ sich selbst.
 
 ### Ältere Firmware
 
-| Reader-Firmware              | Verhalten mit diesem Server                                                                                                                                                                                                                |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1.7.x und älter, registriert | Wird automatisch per Funk aktualisiert (das Einzige, was er mit seinem Token kann). Danach zeigt er seinen Code und muss in seiner Zeile gekoppelt werden (**Koppeln**). Bis dahin tut er nichts und seine Einstellungen bleiben gesperrt. |
-| 1.7.x und älter, neu         | Kann sich nicht anmelden. Er sendet die alte Registrierungsanfrage und bekommt **keine Antwort**; er wartet. Aktualisiere ihn zuerst mit dem Web-Flasher.                                                                                  |
-| 1.8.0 und neuer              | Koppelt mit dem Ablauf auf dieser Seite.                                                                                                                                                                                                   |
+| Reader-Firmware | Verhalten mit diesem Server                                                                                                                                                          |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| älter als 1.8.0 | Kann sich nicht verbinden: Er kennt nur die Token-Anmeldung oder die alte Registrierungsanfrage. Flashe ihn mit dem Web-Flasher (USB).                                               |
+| 1.8.0 bis 2.5.x | Über die verschlüsselte Verbindung gekoppelt: zeigt nach dem Upgrade seinen Code wieder und koppelt neu. Meldet sich noch per Token an (nie gekoppelt): flashe zuerst 2.6.0 per USB. |
+| 2.6.0 und neuer | Koppelt mit dem Ablauf auf dieser Seite und bietet nie einen Token an.                                                                                                               |
 
 ### Metriken
 

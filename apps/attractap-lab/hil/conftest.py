@@ -192,11 +192,8 @@ def write_secure_image(target):
     flash = target.get_driver(ESPToolDriver, activate=False)
     target.activate(flash)
     try:
-        # Also accepts the DS lab reader after its approved burn (efuse.DS_MAC). The driver writes its
-        # committed DS record back with the erase, and refuses to erase it without one.
-        report = flash.read_efuses()
-        efuse.check(report, profile=efuse.SECURE_LAB)
-        flash.erase_and_flash_encrypted(os.environ["READER_IMAGE"], report=report)
+        efuse.check(flash.read_efuses(), profile=efuse.SECURE_LAB)
+        flash.erase_and_flash_encrypted(os.environ["READER_IMAGE"])
     finally:
         target.deactivate(flash)
 

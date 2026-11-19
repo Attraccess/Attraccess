@@ -62,7 +62,6 @@ export class SecureImageService {
     variantName: string,
     kind: SecureImageKind,
     reader: SecureBootReaderDigests,
-    /** The eFuse SECURE_VERSION from the reader's last eFuse report (`AttractapReader.efuseSecureVersion`). */
     reportedSecureVersion: number,
   ): Promise<SignedSecureImage> {
     const source = this.firmware.getSecureImageSource(firmwareName, variantName);

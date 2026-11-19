@@ -6,11 +6,9 @@ import { AuthenticatedWebSocket } from '../websockets/websocket.types';
 import { CredentialRegistryService } from './credential-registry.service';
 import { HandshakeLimiter } from './handshake-limiter';
 import { InstallationIdentityService } from './installation-identity.service';
-import { BootstrapGrant, PairingService } from './pairing.service';
 import { ReaderControlService } from './reader-control.service';
-import { IdentityUpgradeService } from './identity-upgrade.service';
-import { readerKeyAlgorithm } from './reader-spki';
 import { SessionSecurityState } from './session-security-state';
+import { BootstrapGrant, PairingService } from './pairing.service';
 import { PeerIdentity, SessionConnection, SessionDecision, SessionError } from './session-connection';
 import { Frame, FrameType } from './session-framing';
 import { SessionMetrics } from './session-metrics';
@@ -20,8 +18,8 @@ const AGGREGATE_FLUSH_MS = 60_000;
 
 /**
  * Turns an upgraded WebSocket on the session subprotocol into an authenticated reader socket.
- * It never looks inside application messages: they are passed to the normal handlers as if they
- * had arrived on a legacy connection, and replies leave through the same `send`.
+ * It never looks inside application messages: they are passed to the normal handlers as text
+ * frames, and replies leave through the same `send`.
  */
 @Injectable()
 export class ReaderSessionService implements OnModuleDestroy {
@@ -37,7 +35,6 @@ export class ReaderSessionService implements OnModuleDestroy {
     private readonly authHandler: AttractapAuthHandler,
     private readonly metrics: SessionMetrics,
     private readonly controls: ReaderControlService,
-    private readonly upgrades: IdentityUpgradeService,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {
     this.flushTimer = setInterval(() => void this.flushRejections(), AGGREGATE_FLUSH_MS);
@@ -98,10 +95,6 @@ export class ReaderSessionService implements OnModuleDestroy {
           if (peer.readerId === null) return { kind: 'reject', reason: 'no-reader-id', notifyReader: false };
           rejectedReaderId = peer.readerId;
           if (!(await this.registry.isActive(peer.readerId, peer.spkiFingerprint))) {
-            // A P-256 key replaced by the DS key a moment ago: an upgrade-only session may re-send the certificate.
-            if (await this.upgrades.isRecoverable(peer.readerId, peer.spkiFingerprint)) {
-              return { kind: 'upgrade-recovery', readerId: peer.readerId };
-            }
             return { kind: 'reject', reason: 'inactive-credential', notifyReader: true };
           }
           return { kind: 'reader', readerId: peer.readerId, certificateNotAfter: peer.certificateNotAfter };
@@ -115,35 +108,15 @@ export class ReaderSessionService implements OnModuleDestroy {
         return;
       }
 
-      const fingerprint = peerFingerprint as string | null;
-      const algorithm = peerSpki ? readerKeyAlgorithm(peerSpki) : null;
-      if (decision.kind === 'upgrade-recovery') {
-        if (!fingerprint) {
-          connection.close();
-          return;
-        }
-        // Sends identity.recover (never session.hello): the reader asks for the upgrade again on this key.
-        this.controls.attach(
-          connection,
-          new SessionSecurityState(decision.readerId, fingerprint, algorithm),
-          'recovery',
-        );
-        // No application messages in this session. The reader's keep-alive runs regardless of sign-in and is
-        // ignored; anything else ends the session.
-        connection.on('message', (frame: Frame) => {
-          if (frame.type !== FrameType.HEARTBEAT) connection.close();
-        });
-        return;
-      }
-
       // Known before any await, so a revoke that lands during sign-in finds this socket.
       socket.readerId = decision.readerId;
+      this.attach(socket, connection, onReady);
+      const fingerprint = peerFingerprint as string | null;
       if (fingerprint) {
-        socket.sessionSecurity = new SessionSecurityState(decision.readerId, fingerprint, algorithm);
+        this.pairing.forgetGrant(fingerprint);
+        socket.sessionSecurity = new SessionSecurityState(decision.readerId, fingerprint);
         this.controls.attach(connection, socket.sessionSecurity);
       }
-      this.attach(socket, connection, onReady);
-      if (fingerprint) this.pairing.forgetGrant(fingerprint);
 
       // The server time goes first: it feeds the reader's trusted-time floor before anything else.
       connection.sendFrame(FrameType.CONTROL, this.encode(await this.helloControl()));

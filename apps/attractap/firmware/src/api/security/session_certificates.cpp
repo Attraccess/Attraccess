@@ -104,25 +104,6 @@ namespace SessionCertificates
                time.hour * 3600 + time.min * 60 + time.sec;
     }
 
-    bool certificateSpki(const std::vector<uint8_t> &der, std::vector<uint8_t> &spki)
-    {
-        mbedtls_x509_crt crt;
-        mbedtls_x509_crt_init(&crt);
-        bool ok = mbedtls_x509_crt_parse_der(&crt, der.data(), der.size()) == 0;
-        if (ok)
-        {
-            uint8_t buffer[512];
-            const int length = mbedtls_pk_write_pubkey_der(&crt.pk, buffer, sizeof(buffer));
-            ok = length > 0;
-            if (ok)
-            {
-                spki.assign(buffer + sizeof(buffer) - length, buffer + sizeof(buffer));
-            }
-        }
-        mbedtls_x509_crt_free(&crt);
-        return ok;
-    }
-
     bool isReaderCertificate(const std::vector<uint8_t> &der, const std::vector<uint8_t> &readerSpki,
                              const std::vector<uint8_t> &caSpki, uint32_t readerId)
     {
@@ -131,7 +112,7 @@ namespace SessionCertificates
         bool ok = mbedtls_x509_crt_parse_der(&crt, der.data(), der.size()) == 0;
         if (ok)
         {
-            uint8_t buffer[512]; // an RSA-3072 SPKI is 422 bytes
+            uint8_t buffer[160];
             const int length = mbedtls_pk_write_pubkey_der(&crt.pk, buffer, sizeof(buffer));
             std::string reader;
             ok = length > 0 && static_cast<size_t>(length) == readerSpki.size() &&

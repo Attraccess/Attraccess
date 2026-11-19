@@ -473,7 +473,7 @@ describe('ReadersWidget', () => {
 
   it('says so when no reader is paired yet instead of reporting all connected', async () => {
     vi.mocked(sdk.getReaders).mockResolvedValue(
-      sdkResult([{ id: 3, name: 'New reader', pairingState: 'unpaired', lastConnection: hoursAgo(90) }]),
+      sdkResult([{ id: 3, name: 'New reader', pairingState: 'revoked', lastConnection: hoursAgo(90) }]),
     );
     const { container } = renderWidget(<ReadersWidget {...at('small')} />);
 
@@ -486,7 +486,7 @@ describe('ReadersWidget', () => {
       sdkResult([
         { id: 1, name: 'Door', pairingState: 'paired', lastConnection: hoursAgo(1) },
         { id: 2, name: 'Lathe reader', pairingState: 'paired', lastConnection: hoursAgo(30) },
-        { id: 3, name: 'New reader', pairingState: 'unpaired', lastConnection: hoursAgo(90) },
+        { id: 3, name: 'New reader', pairingState: 'revoked', lastConnection: hoursAgo(90) },
       ]),
     );
     const { container } = renderWidget(<ReadersWidget {...at('small')} />);

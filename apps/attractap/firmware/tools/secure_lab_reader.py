@@ -16,15 +16,6 @@ encryption, so it stays re-flashable over USB with encrypted writes.
   hex        sign a lab secure build and merge it into one Intel HEX image for
              `esptool write-flash --force --erase-all --encrypt 0x0`, the write
              a lab place does (attractap_lab ESPToolDriver.erase_and_flash_encrypted)
-  create-ds  the one approved DS burn (ATT-1207): the lab reader DC:B4:D9:21:71:C8
-             creates its Digital Signature key (KEY3 + RD_DIS lock, IRREVERSIBLE).
-             Without --burn-efuses it only runs the read-only pre-checks. See
-             create_ds.py and lab/ds/README.md.
-
-`flash` and `hex --mac` also write the committed DS record of the reader's MAC
-(lab/ds/<mac>/ds-record.bin, encrypted, at the start of the spiffs partition) when
-there is one, so a wipe does not take the reader's DS identity with it. `flash
---erase-all` refuses a reader whose KEY3 holds a DS key but has no committed record.
 
 Run inside an ESP-IDF environment (espefuse, esptool and espsecure on PATH).
 """
@@ -34,22 +25,12 @@ import json
 import os
 import subprocess
 import sys
-import re
 import tempfile
-
-if __name__ == "__main__":
-    # create_ds imports this module by name; run as a script it must get this one (one LabReaderError).
-    sys.modules.setdefault("secure_lab_reader", sys.modules[__name__])
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import ds_record  # noqa: E402
 
 FIRMWARE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KEY_DIR = os.path.join(FIRMWARE_DIR, "lab", "secure-boot")
 SIGNING_KEY = os.path.join(KEY_DIR, "lab-signing-key.pem")
 RECOVERY_KEY = os.path.join(KEY_DIR, "lab-recovery-key.pem")
-DS_DIR_ENV = "ATTRACTAP_LAB_DS_DIR"
-DEFAULT_DS_DIR = os.path.join(FIRMWARE_DIR, "lab", "ds")
-DS_PURPOSE = "HMAC_DOWN_DIGITAL_SIGNATURE"
 CHIP = "esp32s3"
 BOOTLOADER_OFFSET = "0x0"
 
@@ -118,14 +99,6 @@ def mac(efuses):
     return str(value(efuses, "MAC")).split()[0].lower()
 
 
-def normalise_mac(text):
-    """A MAC typed as DC-B4-D9-21-71-C8, dcb4d92171c8 or dc:b4:... as lowercase aa:bb:cc:dd:ee:ff."""
-    digits = re.sub(r"[:\-\s]", "", text.strip().lower())
-    if not re.fullmatch(r"[0-9a-f]{12}", digits):
-        raise LabReaderError(f"{text!r} is not a MAC address")
-    return ":".join(digits[i:i + 2] for i in range(0, 12, 2))
-
-
 def describe(efuses):
     print(f"  {'MAC':28} {mac(efuses)}")
     names = ["SECURE_BOOT_EN", "SPI_BOOT_CRYPT_CNT", "DIS_DOWNLOAD_MANUAL_ENCRYPT", "ENABLE_SECURITY_DOWNLOAD",
@@ -191,62 +164,20 @@ def signed_images(images, tmp, espsecure=("espsecure",)):
     return out
 
 
-def write_hex_image(build_dir, output, ds_mac=None, ds_directory=None):
+def write_hex_image(build_dir, output):
     """Sign a lab secure build and merge every part into one Intel HEX file.
 
     One encrypted write takes the whole file, so every part (the bootloader too)
     must be one that is written encrypted. HEX leaves the gaps between parts
     unwritten: an encrypted write of a raw merged image would also fill them
-    (NVS included) with encrypted 0xFF.
-
-    ds_mac: also merge that reader's committed DS record at the start of the spiffs partition (a MAC
-    without a record merges nothing, as for any reader without DS)."""
+    (NVS included) with encrypted 0xFF."""
     images = flash_layout(build_dir)
     plain = [offset for offset, _, encrypted, _ in images if not encrypted]
     if plain:
         raise LabReaderError(f"{build_dir} has parts that are not written encrypted at {', '.join(plain)}")
-    ds_mac = normalise_mac(ds_mac) if ds_mac else None
-    directory = ds_directory or ds_dir()
     with tempfile.TemporaryDirectory() as tmp:
         flat = [item for offset, path, _ in signed_images(images, tmp) for item in (offset, path)]
-        sector = restore_sector(ds_mac, directory) if ds_mac else None
-        if ds_mac:
-            print(f"Also merging the DS record for {ds_mac}." if sector else
-                  f"No DS record for {ds_mac} in {directory}: the image has none (right for a reader without DS).")
-        if sector:
-            record = os.path.join(tmp, "ds-record-sector.bin")
-            with open(record, "wb") as f:
-                f.write(sector)
-            flat += [hex(ds_record.DS_RECORD_OFFSET), record]
         run(["esptool", "--chip", CHIP, "merge-bin", "--format", "hex", "-o", output, *flat])
-
-
-def ds_dir(args=None):
-    return getattr(args, "ds_dir", None) or os.environ.get(DS_DIR_ENV) or DEFAULT_DS_DIR
-
-
-def wipe_restore_sector(efuses, directory, erase):
-    """The DS record sector to write with a flash of this reader, or None.
-
-    The one place every tool-side wipe goes through: an erase of a reader whose KEY3 already holds the DS
-    key needs its committed record, because the encrypted DS params in its flash are the only copy."""
-    sector = restore_sector(mac(efuses), directory)
-    if sector is None and erase and value(efuses, "KEY_PURPOSE_3") == DS_PURPOSE:
-        raise LabReaderError(f"KEY3 of {mac(efuses)} holds a DS key but there is no committed DS record in "
-                             f"{directory}; refusing to erase the reader")
-    return sector
-
-
-def restore_sector(chip_mac, directory):
-    """The validated 4096-byte DS record sector committed for this MAC, or None (then nothing is written)."""
-    path = os.path.join(directory, chip_mac.replace(":", ""), "ds-record.bin")
-    if not os.path.isfile(path):
-        return None
-    with open(path, "rb") as f:
-        try:
-            return ds_record.sector(f.read())
-        except ds_record.DsRecordError as error:
-            raise LabReaderError(f"{path}: {error}; refusing to wipe the reader without its DS record") from error
 
 
 def cmd_status(args):
@@ -260,7 +191,7 @@ def cmd_provision(args):
     images = flash_layout(args.build_dir)
     efuses = read_efuses(args.port)
     describe(efuses)
-    expected = normalise_mac(args.expect_mac)
+    expected = args.expect_mac.strip().lower().replace("-", ":")
     if mac(efuses) != expected:
         raise LabReaderError(f"the reader on {args.port} has MAC {mac(efuses)}, not {expected}; refusing to provision it")
     digests = (key_digest(SIGNING_KEY), key_digest(RECOVERY_KEY))
@@ -305,13 +236,6 @@ def cmd_flash(args):
         raise LabReaderError("Flash encryption is not in development mode: this reader only takes signed OTA updates")
     with tempfile.TemporaryDirectory() as tmp:
         files = signed_images(images, tmp)
-        sector = wipe_restore_sector(efuses, ds_dir(args), args.erase_all)
-        if sector:
-            record = os.path.join(tmp, "ds-record-sector.bin")
-            with open(record, "wb") as f:
-                f.write(sector)
-            files.append((hex(ds_record.DS_RECORD_OFFSET), record, True))
-            print(f"Also writing the DS record of {mac(efuses)} at {hex(ds_record.DS_RECORD_OFFSET)}.")
         encrypted = [item for offset, path, enc in files if enc for item in (offset, path)]
         plain = [item for offset, path, enc in files if not enc for item in (offset, path)]
         # --force: esptool refuses writes below 0x8000 once Secure Boot is on;
@@ -327,28 +251,19 @@ def cmd_flash(args):
 
 
 def cmd_hex(args):
-    write_hex_image(args.build_dir, args.output, ds_mac=args.mac)
+    write_hex_image(args.build_dir, args.output)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("status", "provision", "flash", "hex", "create-ds"):
+    for name in ("status", "provision", "flash", "hex"):
         p = sub.add_parser(name)
         if name != "hex":
             p.add_argument("--port", required=True)
-        if name not in ("status", "create-ds"):
+        if name != "status":
             p.add_argument("--build-dir", required=True, help="lab secure build directory")
     sub.choices["hex"].add_argument("--output", required=True, help="Intel HEX file to write")
-    sub.choices["hex"].add_argument("--mac", help="also merge the committed DS record of this reader's MAC")
-    create = sub.choices["create-ds"]
-    create.add_argument("--expect-mac", required=True, help="must be dc:b4:d9:21:71:c8; any other MAC is refused")
-    create.add_argument("--burn-efuses", action="store_true",
-                        help="run the burn (KEY3 + RD_DIS lock, irreversible); without it: read-only pre-checks")
-    create.add_argument("--dump-dir", help="where the eFuse dumps and a backup of the export go (default: a temp dir)")
-    create.add_argument("--out-dir", help=f"where the record and public key go (default: <${DS_DIR_ENV} or "
-                                          "lab/ds>/<mac>)")
-    create.add_argument("--baud", type=int, default=115200, help="console baud rate")
     sub.choices["provision"].add_argument("--expect-mac", required=True,
                                           help="MAC of the reader to provision (see `status`); any other chip is refused")
     sub.choices["provision"].add_argument("--burn-efuses", action="store_true",
@@ -356,11 +271,9 @@ def main():
     sub.choices["flash"].add_argument("--erase-all", action="store_true",
                                       help="erase the whole flash first (drops the reader's settings)")
     args = parser.parse_args()
-    import create_ds  # here, not at the top: it imports this module
     try:
-        {"status": cmd_status, "provision": cmd_provision, "flash": cmd_flash, "hex": cmd_hex,
-         "create-ds": create_ds.cmd_create_ds}[args.command](args)
-    except (LabReaderError, ds_record.DsRecordError) as error:
+        {"status": cmd_status, "provision": cmd_provision, "flash": cmd_flash, "hex": cmd_hex}[args.command](args)
+    except LabReaderError as error:
         print(f"Error: {error}", file=sys.stderr)
         sys.exit(1)
 

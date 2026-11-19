@@ -206,4 +206,4 @@ export * from './1793300000000-plugin-ble-transport';
 export * from './1793400000000-dashboard-pin-size';
 export * from './1793500000000-attractap-crash-report-coredump-upload';
 export * from './1793600000000-plugin-declared-permissions';
-export * from './1793700000000-attractap-reader-security-state';
+export * from './1793700000000-attractap-reader-reset-and-security-state';

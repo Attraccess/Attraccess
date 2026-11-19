@@ -165,7 +165,7 @@ and the reader refuses everything outside it before it touches the radio. The re
 info; the server answers readers without it, or with another version, with `READER_UNSUPPORTED`.
 Demo variants, park images and the desktop simulator announce no `ble`. BLE works only on paired
 readers: the reader accepts BLE requests only on the secure link (see "Pairing and session
-protocol" below) after it signed in, and refuses them on the legacy token channel and before
+protocol" below) after it signed in, and refuses them on the pairing channel and before
 sign-in. The server reports a reader that is not on the secure link as `READER_OFFLINE`
 (`pairing-required`) and sends it no BLE requests.
 
@@ -249,35 +249,39 @@ BLE link itself has no Bluetooth-level security: NimBLE is built without it
 is not encrypted. Plugins must encrypt and authenticate sensitive payloads in their own protocol.
 Only the reader-server hop is protected, by the secure link.
 
-## Pairing and session protocol (1.8.0)
+## Pairing and session protocol (2.6.0: the only way in)
 
-Firmware 1.8.0 no longer registers itself with a token (ATT-1165, ATT-1168, ATT-1170,
-ATT-1171). A new reader joins through one approval by an admin of a rotating code, then talks to
-the server only inside mutually authenticated TLS 1.3. Both run inside the WebSocket at
-`/api/attractap/websocket`; the server selects them by WebSocket subprotocol, so a reverse proxy
-must pass `Sec-WebSocket-Protocol`.
+A reader joins through one approval by an admin of a rotating code, then talks to the server only
+inside mutually authenticated TLS 1.3 with its own P-256 key (ATT-1165, ATT-1168, ATT-1170,
+ATT-1171). Both run inside the WebSocket at `/api/attractap/websocket`; the server selects them by
+WebSocket subprotocol, so a reverse proxy must pass `Sec-WebSocket-Protocol`.
 
-| Protocol / firmware            | Subprotocol            | Behaviour                                                                                                                                                                                                                                                                    |
+**Firmware 2.6.0 has no token sign-in at all** (ATT-1207). There is no token to enter, store or
+send, no serial command or screen field for one, and no plain-text channel. A reader without a
+certificate starts pairing; a paired reader only uses the session. The server no longer knows
+readers that signed in with a token or that paired with an older server: after the upgrade every
+reader pairs again, from the pairing screen, like a new reader.
+
+| Protocol                       | Subprotocol            | Behaviour                                                                                                                                                                                                                                                                    |
 | ------------------------------ | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Token (up to 1.7.x)            | none                   | Plain-text events, token sign-in. Existing token readers keep working and are updated over the air. New readers cannot enroll.                                                                                                                                               |
-| `attractap-pairing.v1` (1.8.0) | `attractap-pairing.v1` | Plain-text JSON frames of at most 4 KiB: `hello`, `round`, `nonce`, `reveal`, `accepted`, `failed`, `cancel`. Used only while pairing.                                                                                                                                       |
-| `attractap-session.v1` (1.8.0) | `attractap-session.v1` | TLS 1.3 only, mutual authentication, AEAD (AES-128-GCM preferred), no resumption, 0-RTT or renegotiation. Binary WebSocket frames with inner length-prefixed framing, 64 KiB messages. The server is identified by the installation ID in the certificate, not by host name. |
-| Legacy `READER_REGISTER`       | none                   | Creates nothing and gets **no reply**, for old and new firmware alike. New firmware without credentials goes straight to pairing.                                                                                                                                            |
+| `attractap-pairing.v1`         | `attractap-pairing.v1` | Plain-text JSON frames of at most 4 KiB: `hello`, `round`, `nonce`, `reveal`, `accepted`, `failed`, `cancel`. Used only while pairing.                                                                                                                                       |
+| `attractap-session.v1`         | `attractap-session.v1` | TLS 1.3 only, mutual authentication, AEAD (AES-128-GCM preferred), no resumption, 0-RTT or renegotiation. Binary WebSocket frames with inner length-prefixed framing, 64 KiB messages. The server is identified by the installation ID in the certificate, not by host name. |
 
-| Reader firmware                   | Server with pairing                                                                                                | Older server                              |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
-| 1.7.x and older, token registered | Works with its token and updates over the air; must then be paired from its row (settings stay locked until then). | Unchanged.                                |
-| 1.7.x and older, never registered | Registration gets no reply; update it with the web flasher first.                                                  | Registers as before.                      |
-| 1.8.0 and newer, no credentials   | Pairing, then the TLS session.                                                                                     | Cannot pair; needs a server with pairing. |
-| 1.8.0 and newer, paired           | TLS session. Never falls back to token or plain channel.                                                           | Cannot connect.                           |
+| Reader firmware                       | Server (2.6.0 generation)                                       |
+| ------------------------------------- | --------------------------------------------------------------- |
+| 2.6.0 and newer, no credentials       | Pairing, then the TLS session.                                  |
+| 2.6.0 and newer, paired               | TLS session. Never falls back to another channel.               |
+| Older than 2.6.0, token registered    | Cannot connect. It cannot update over the air either (the update runs over the authenticated connection): flash 2.6.0 over USB (web flasher), then pair it. |
+| 1.8.0 to 2.5.x, paired with the old server | The server no longer knows its certificate and ends the session (`session.rejected`); the reader shows "Pairing removed" and pairs again. It keeps updating over the air as before. |
+
+A reader moved to another server pairs there with its existing key; clear it on the old server
+and pair it again (pairing screen), nothing else is needed.
 
 Pairing sequence:
 
 1. The reader opens a WebSocket with `attractap-pairing.v1` and sends `hello` within 30 s: kind
    (`touch` or `lite`), its public key (canonical uncompressed P-256 SubjectPublicKeyInfo,
-   91 bytes), firmware name, variant and version. A reader that signed in with a token may add
-   the one-time `ticket` it received through `READER_START_PAIRING` when an admin clicked **Pair**
-   on its row; that binds the pairing to the existing record.
+   91 bytes), firmware name, variant and version.
 2. The server sends a `round` immediately and then every 30 s: the installation CA public key,
    a commitment to the server nonce, the app URL (or `null`) and the times until rotation and
    expiry. The reader answers with its own `nonce` (at least 16 random bytes); the server
@@ -298,9 +302,7 @@ Pairing sequence:
 4. An admin approves the code once. The server issues the reader certificate, sends `accepted`,
    and the reader pins the CA and opens `attractap-session.v1`. The reader takes `accepted` only
    after a round whose reveal it verified (a code was derived). The first session grant carries
-   its reader ID, installation ID and certificate; the reader stores them and the token hash is
-   deleted on the server. A token reader keeps its stored token until that grant is verified and
-   stored, and only then deletes it. A pending request lasts at most 10 minutes; then the server
+   its reader ID, installation ID and certificate; the reader stores them. A pending request lasts at most 10 minutes; then the server
    sends `failed` (`expired`) and the reader asks again with the same key. Expiry is not shown as
    a failure (no "Request failed", no red flash); the screen waits for the next code and the Lite
    ring breathes white until the next round.
@@ -309,16 +311,15 @@ After pairing (once the reader holds its certificate) the reader never erases it
 key because of an unauthenticated message. A TLS failure against the pinned CA shows "Server could
 not be verified" on the connecting screen (Lite: a red error flash per attempt) and retries every
 30 s; the reader does not enroll again by itself. Two failed handshakes in a row (timeouts,
-errors, or a text frame from a server that took the connection for a token reader, as when a
+errors, or a text frame from a server that did not speak TLS to the reader, as when a
 proxy strips `Sec-WebSocket-Protocol`) show "Secure connection failed. Check the server or proxy."
 (Lite: red error flash). Both messages clear when a session opens.
 
 A reader that pinned a CA but never completed the first session (no certificate yet) handles an
 unverifiable server differently: after 3 such handshakes in a row it forgets the pinned CA (not
-its own key) and goes back to its token if it still has one, or to pairing otherwise. The
+its own key) and asks to be paired again. The
 approval may have come from someone posing as the server, and the reader would otherwise stay
-stuck. The channel at boot follows the stored state: a pin means the session, otherwise the token,
-otherwise pairing. When an admin removes the pairing, the session ends within 1 s, the reader shows
+stuck. The channel at boot follows the stored state: a pin means the session, otherwise pairing. When an admin removes the pairing, the session ends within 1 s, the reader shows
 "Pairing removed", generates a **new** key and returns to pending approval.
 
 Touch variants show the code on the pending-approval screen with a countdown and a QR code of
@@ -341,7 +342,7 @@ for its **Approve** button. Each new code is also logged on the UART as
 `Enrollment: code=K7P-3XQ`. Treat that line as a stable contract: the lab tool
 (`apps/attractap-lab/src/attractap_lab/enrollment.py`) parses the `Enrollment: code=` marker
 (`ENROLLMENT_LOG_MARKER`) to approve readers without a screen, so do not reword it. Codes, keys,
-nonces and tokens are never logged otherwise.
+nonces are never logged otherwise.
 
 ## Secure profile (ATT-1166)
 
@@ -380,143 +381,32 @@ python3 tools/check_secure_profile.py build/attractap-touch-v2-secure
 | KEY0 | Secure Boot digest: per-installation signing key |
 | KEY1 | Secure Boot digest: recovery key |
 | KEY2 | Flash encryption key (XTS-AES-128) |
-| KEY3 | DS identity (HMAC key, read-protected) |
+| KEY3 | Spare (no Digital Signature key: the reader identity is a P-256 key) |
 | KEY4 | NVS encryption (HMAC key, read-protected) |
 | KEY5 | Spare |
 
 ### eFuse read protection (RD_DIS)
 
-The bootloader leaves RD_DIS writable. The secure app burns the DS key (KEY3) and the
-NVS key (KEY4) read-protected on first boot and then MUST write-protect RD_DIS
-(`WR_DIS_RD_DIS`). The server marks a reader secured only after its eFuse report
-shows that lock.
+The bootloader leaves RD_DIS writable so the NVS key (KEY4) can be burned read-protected
+after Secure Boot is on; RD_DIS then MUST be write-protected (`WR_DIS_RD_DIS`). The server
+marks a reader secured only after its eFuse report shows that lock.
+
+### eFuse report and profile claims (ATT-1207)
+
+The firmware never writes an eFuse. Secure builds only read them: once per session, right after
+`READER_FIRMWARE_INFO`, the reader sends one `efuse.report` control frame inside the TLS session
+(`src/api/security/efuse_report.cpp`, `efuse_snapshot.cpp`). It lists, per key block, the purpose
+and whether it is used or read-protected, the two public Secure Boot digests (never any key
+material), the revoke bits, the flash-encryption counters and mode, the JTAG and download
+protections, `RD_DIS` and its write protection, and the eFuse `SECURE_VERSION`. Plain builds send
+no report. `READER_FIRMWARE_INFO` adds the build's claims `profile` (`plain`, `secure`,
+`secure-lab`), `release` and, on secure builds, `secureVersion`. The server treats all of it as a
+claim; only a release secure build whose report passes and whose session uses the paired
+certificate counts as secured. The lab reader (`secure-lab`, development-mode flash encryption)
+is expected to report *not secured*. `tests/efuse-report` checks the message format on the host.
 
 Lab secure readers use public keys and development-mode flash encryption; see
 `lab/secure-boot/README.md`.
-
-### Reader identity: RSA-3072 in the Digital Signature peripheral (ATT-1207)
-
-Secure-profile builds (`ATTRACTAP_SECURE_PROFILE`, compile definition `ATTRACTAP_SECURE_BUILD`) can hold the
-reader's server identity as an RSA-3072 key (e = 65537) in the ESP32-S3 Digital Signature (DS) peripheral.
-Plain builds stay ECDSA P-256 only and are unchanged. The private key exists only as encrypted DS parameters;
-the 256-bit HMAC key that decrypts them lives read-protected in eFuse KEY3 (`HMAC_DOWN_DIGITAL_SIGNATURE`) and
-never leaves the chip.
-
-**TLS integration.** ESP-IDF v6.0.2 ships a PSA opaque driver for the DS peripheral
-(`PSA_KEY_LIFETIME_ESP_RSA_DS_VOLATILE`, enabled by `CONFIG_MBEDTLS_HARDWARE_RSA_DS_PERIPHERAL` in
-`sdkconfig.secure`; the same driver esp-tls uses). `DsReaderKey` imports the DS parameters as an opaque PSA RSA
-key pair (PKCS#1 v1.5 as key algorithm, RSA-PSS as enrollment algorithm), so `session_tls.cpp` and the identity
-upgrade sign through the same `IReaderKey`/PSA key id as the software key. The driver cannot export a public
-key, so `ReaderIdentity::wrapKey` presets it from the DS record before `mbedtls_pk_wrap_psa`. The client
-offers `rsa_pss_rsae_sha256` (and still `ecdsa_secp256r1_sha256` for the server's certificate) only when the
-active key is RSA; TLS 1.3 has no PKCS#1 v1.5 CertificateVerify. The CA and server certificates stay P-256.
-
-**DS record and flash layout.** One 4 KiB sector at the start of the `spiffs` partition (0xc90000), written and
-read with flash encryption (`esp_flash_write_encrypted` / `esp_flash_read_encrypted`); the partition table is
-unchanged and the firmware never mounts spiffs:
-
-| Range                              | Use                                                            |
-| ---------------------------------- | -------------------------------------------------------------- |
-| 0xc90000 - 0xc90fff (first sector) | DS record (ATT-1207)                                           |
-| 0xc91000 - 0xfdefff                | unused                                                         |
-| 0xfdf000 - 0xfdffff (last sector)  | conversion staging header (ATT-1208, `migration_pending.hpp`)  |
-
-Record layout (little endian, unused bytes 0xFF): `"ATDS"`, u16 version 1, u16 reserved 0, u32 payload length,
-SHA-256 of the payload, then the payload: u8 key block (3), u8 reserved, u16 RSA length field (95), 16-byte IV,
-u16 length + the encrypted DS parameters (`esp_ds_data_t.c`, 1584 bytes), u16 length + the RSA-3072 SPKI. The
-record is not secret. A valid record plus KEY3 purpose `HMAC_DOWN_DIGITAL_SIGNATURE` means DS is available. A KEY3
-burned for DS without a valid record is "DS params missing": the reader logs it, falls back to its P-256
-software identity and never burns KEY3 again.
-
-**Identity selection (`reader_link_identity.cpp`).**
-
-- DS available and the reader unpaired: it pairs with the DS key.
-- DS available and paired with the P-256 key: the reader runs the upgrade once it is signed in and has sent
-  `READER_FIRMWARE_INFO` (the API calls `IReaderTransport::onFirmwareInfoSent()` right after that send; the server's
-  gate reads the `secure-lab` profile, or T3's `creating-key` conversion state, from that session). Order:
-  `identity.upgrade.request`, the server answers `identity.challenge {nonce}`, the reader sends
-  `identity.upgrade {spki, proof}` (RSA-PSS SHA-256, salt 32, over the domain-separated tuple in
-  `identity_proof.hpp`, shared byte for byte with the API through `tests/identity-upgrade/proof-vector.json`;
-  signed through the key's PSA id by `ReaderIdentity::signRsaPssSha256`), the server replies
-  `identity.upgraded {certificate}` and closes the P-256 session after 1 s. The reader stores the certificate in NVS
-  **before** reconnecting with the DS key. The control channel and the application channel are processed
-  independently on the server, so the server waits up to 5 s for the session's firmware info before it answers a
-  request. `identity.upgrade.rejected`: the P-256 identity stays, the reason code is logged, a new request follows
-  on a later session (`not-allowed`: on a later boot).
-- The software key (`readerpair/key`) is deleted only after a DS session was **signed in**: `READER_AUTHENTICATED`
-  (sent after the server re-checked the credential) and the firmware info that follows it, not already on
-  `session.hello`. Until then a failed DS session still leaves the P-256 key and its history.
-- Crash safety (15 minute window). A reader that lost the certificate (crash or lost frame between
-  `identity.upgraded` and the NVS write) still holds the P-256 key and its old certificate, so it reconnects with
-  that key. The server no longer accepts it as a credential, but for 15 minutes after the upgrade it opens an
-  upgrade-only session for it: no `session.hello`, no sign-in, only the CONTROL `identity.recover`. On it the reader
-  sends `identity.upgrade.request` again (even after an earlier `not-allowed` in this boot), answers the fresh
-  challenge with a fresh proof for the **same** DS key, and gets the certificate of its already active DS key (no new
-  credential history row); then it stores it and reconnects with the DS key as above. Only the key the upgrade
-  replaced qualifies: a key an admin replaced (takeover), a revoke or re-pair since, another SPKI, or a request
-  after the window gets `inactive-credential` / `identity.upgrade.rejected` and the reader has to be re-paired by an
-  admin. Heartbeats are ignored in that session; any application message or `efuse.report` ends it, and it closes
-  after 30 s. Tested in `apps/api/src/attractap/security/identity-upgrade.integration.spec.ts` (gateway, emulated
-  reader) and `tests/identity-upgrade` (`IdentityUpgrade::shouldRequest`).
-- A rejected pairing (`session.rejected`) makes a DS reader pair again with its DS key.
-- Which key a stored certificate belongs to is decided by the certificate's public key (`readerpair/ik` records
-  it for a pairing that has no certificate yet).
-
-**eFuse report.** Secure builds send `efuse.report` (CONTROL frame) once per signed-in session, right after
-`READER_FIRMWARE_INFO` (`onFirmwareInfoSent`; never in an upgrade-only session): key purposes and used/read-protected state for KEY0-KEY5, the two public Secure Boot
-digests, revoke bits, `SPI_BOOT_CRYPT_CNT` (+ write-protect), `DIS_DOWNLOAD_MANUAL_ENCRYPT`, JTAG and download
-bits, RD_DIS (+ write-protect), SECURE_VERSION, flash encryption mode and the MAC. No key blocks are read.
-`READER_FIRMWARE_INFO` also carries `profile` (`plain`/`secure`/`secure-lab`), `release`, `secureVersion`,
-`secured` and `identity` (`ecdsa-p256`/`ds-rsa3072`). The server treats all of it as a claim: the reader is not
-attested.
-
-**NVS erase gate.** `main.cpp` erases the NVS on `NO_FREE_PAGES`/`NEW_VERSION_FOUND` through
-`NvsEraseGate::shouldErase` (host tested). Plain builds are unchanged. Secure builds erase only while
-`migrationPending()` is false, never on encryption/HMAC key errors, and never abort on a failed init: they boot,
-show "Reader storage error. Contact your administrator." on the connecting screen and refuse DS creation and the
-upgrade. `migrationPending()` checks for
-the staging header magic `ATMG` at the start of the last spiffs sector; no staging exists in ATT-1207 (T3 hook).
-
-**DS key creation (irreversible).** `DsCreator::create()` burns KEY3 and write-protects RD_DIS. It refuses unless
-KEY3 and its purpose are unused, KEY2/KEY4 hold XTS/HMAC_UP and are read-protected, RD_DIS is not locked, the
-NVS is up and at least 40 KiB internal RAM is free with a 12 KiB largest block (`low-memory`; an unmeasured
-estimate of creation's ~22 KiB peak plus headroom, see `ds_creator.cpp`). Order: generate HMAC key and RSA-3072
-key in software (in internal RAM, never PSRAM), encrypt the parameters, write the DS record and read it back, burn
-KEY3 (purpose + read protection in one eFuse batch), DS self-test (PSS and PKCS#1 v1.5 verified against the public
-key), lock RD_DIS. The lock runs after a verified burn even when the self-test failed, so the reader always ends
-with KEY3 and RD_DIS locked (the lab janitor's post-burn state); the code is then `self-test-failed` and the lock's
-outcome is logged. All plaintext (HMAC key, RSA private key, DS operands) is wiped on every path. Nothing after
-the burn is retried; a failure returns a code. It is never called on a boot. ATT-1207 triggers it only from the
-secure-lab console below; release secure builds compile it and T3 (`creating-key`) wires the trigger.
-
-Secure-lab console (CMND lines on the USB console, secure-lab builds only; output parsed by
-`tools/secure_lab_reader.py`):
-
-| Command                | Output                                                                                                |
-| ---------------------- | ----------------------------------------------------------------------------------------------------- |
-| `CMND ds.status`       | `DS_STATUS available=<0/1> record=<0/1> key3=<purpose or unused> fe=<mode> spki=<64 hex or ->`        |
-| `CMND ds.create <mac>` | `DS_CREATE_BURNED <0/1>`, then `DS_CREATE_RESULT ok spki=<64 hex>` or `DS_CREATE_RESULT error <code>` |
-| `CMND ds.export`       | `DS_RECORD_BEGIN`, one line of base64 (the record), `DS_RECORD_END`                                   |
-
-`ds.create` takes the lowercase colon MAC and compares it with the chip's own (`error mac-mismatch` otherwise).
-`spki` is the lowercase hex SHA-256 of the DS public key's SPKI DER: in `DS_CREATE_RESULT ok` of the key generated
-in RAM (not re-read from flash), in `DS_STATUS` of the record the DS key was loaded from (`-` when DS is not available; only the `DS_CREATE_RESULT` value is independent of the record). The
-lab compares it with the fingerprint the server shows for the reader.
-Error codes: `nvs-not-ready`, `key3-in-use`, `key2-not-xts`, `key4-not-hmac-up`, `keys-not-read-protected`,
-`rd-dis-locked`, `low-memory`, `crypto-init-failed`, `random-failed`, `keygen-failed`, `params-failed`,
-`fingerprint-failed`, `encrypt-failed`, `record-write-failed`, `record-verify-failed` (all before the burn),
-`burn-failed`, `burn-verify-failed`, `self-test-failed`, `rd-dis-lock-failed` (after it: `DS_CREATE_BURNED 1`,
-never retry). Nothing is printed through
-ESP_LOG: no HMAC key, RSA private part, DS parameters, nonce or proof appears in any log.
-
-Test hooks (`ATTRACTAP_TEST_HOOKS`, never in release): `CMND identity.get` replies `softwareKey`, `paired`,
-`hasCertificate`, `profile`, `ds`; `CMND identity.force-p256` forgets the pairing and the software key, sets a
-one-shot flag and restarts, so the next boot pairs with a fresh P-256 key although DS is available and the
-upgrade can run again.
-
-The firmware embeds `attractap-secure-profile-v1` in every secure app (`build_profile.cpp`) so
-`secure_packaging.py` and the API's `SecureImageService` recognise it. The lab DS burn and restore (committed DS
-record under `lab/ds/`, `secure_lab_reader.py create-ds`) is described in `lab/ds/README.md`.
 
 ## Building
 

@@ -22,14 +22,6 @@ export async function migrationReaderSeeds(dataSource: DataSource, seedTag: stri
 
   const attractap = await ensureEntity(attractapRepo, () => ({
     name: `Seed Reader ${seedTag}`,
-    apiTokenHash: `seed-token-${seedTag}`,
-    secured: true,
-    securedAt: new Date('2026-11-18T10:00:00Z'),
-    firmwareProfile: 'secure' as const,
-    secureVersion: 1,
-    efuseSecureVersion: 1,
-    securityReportCheckedAt: new Date('2026-11-18T10:00:00Z'),
-    securityReportProblems: ['seed-problem'],
     firmware: {
       name: 'Seed Firmware',
       variant: 'seed',

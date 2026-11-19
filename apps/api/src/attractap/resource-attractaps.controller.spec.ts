@@ -18,7 +18,7 @@ describe('ResourceAttractapsController', () => {
     expect(attractapService.getPairedReaders).toHaveBeenCalledWith({ resourceId: 5 });
   });
 
-  it('does not expose the token hash of a reader', async () => {
+  it('does not expose reader credential internals', async () => {
     const [reader] = await controller.getResourceAttractaps(5);
     expect(Object.keys(reader)).not.toContain('apiTokenHash');
   });

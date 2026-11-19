@@ -2,36 +2,16 @@ import type { AutoIntroductionTarget, SupervisionMode } from './resource-supervi
 import type { DocumentationType } from './documentation-type';
 import type { ResourceType } from './resource-type';
 
-export type AttractapPairingState = 'unpaired' | 'paired' | 'revoked';
+/** `revoked` also covers a record that has no credential yet. */
+export type AttractapPairingState = 'paired' | 'revoked';
 
 /** Firmware build profile a reader reports: plain, release secure or the lab's development-mode secure build. */
 export const ATTRACTAP_FIRMWARE_PROFILES = ['plain', 'secure', 'secure-lab'] as const;
 export type AttractapFirmwareProfile = (typeof ATTRACTAP_FIRMWARE_PROFILES)[number];
 
 /**
- * States of a reader's "Secure this reader" conversion. ATT-1208 (T3) owns and persists the state machine;
- * ATT-1207 only reads `creating-key` (the identity upgrade gate).
- */
-export const ATTRACTAP_CONVERSION_STATES = [
-  'preflight',
-  'transferring',
-  'fingerprints-burned',
-  'bootloader-written',
-  'encrypting',
-  'creating-key',
-  'secured',
-  'failed',
-  'interrupted',
-] as const;
-export type AttractapConversionState = (typeof ATTRACTAP_CONVERSION_STATES)[number];
-
-/** Key algorithms of a reader identity: the software P-256 key or the RSA-3072 key held by the DS peripheral. */
-export const ATTRACTAP_READER_KEY_ALGORITHMS = ['ecdsa-p256', 'rsa-3072'] as const;
-export type AttractapReaderKeyAlgorithm = (typeof ATTRACTAP_READER_KEY_ALGORITHMS)[number];
-
-/**
  * Problem codes of a reader security check: why the reader's build or session cannot be secured, then what in its
- * eFuse report does not match the release secure profile. Stored in `securityReportProblems` and audited.
+ * eFuse report does not match the release secure profile. Stored in `securityReportProblems`.
  */
 export const ATTRACTAP_SECURITY_PROBLEMS = [
   // The reader's build and session
@@ -39,7 +19,6 @@ export const ATTRACTAP_SECURITY_PROBLEMS = [
   'profile-not-secure',
   'not-release-build',
   'demo-or-debug-variant',
-  'software-identity',
   // The eFuse report
   'secure-boot-disabled',
   'key0-purpose',
@@ -54,7 +33,6 @@ export const ATTRACTAP_SECURITY_PROBLEMS = [
   'flash-encryption-not-final',
   'manual-encrypt-enabled',
   'key2-not-xts',
-  'key3-not-ds',
   'key4-not-nvs-hmac',
   'rd-dis-incomplete',
   'rd-dis-writable',
@@ -63,8 +41,6 @@ export const ATTRACTAP_SECURITY_PROBLEMS = [
   'secure-version-below-floor',
 ] as const;
 export type AttractapSecurityProblem = (typeof ATTRACTAP_SECURITY_PROBLEMS)[number];
-/** Last token of an audited problem list that had to be shortened. */
-export const ATTRACTAP_SECURITY_PROBLEMS_MORE = 'more';
 
 /** What the reader firmware can do, as reported by the reader. */
 export interface AttractapReaderCapabilities {
@@ -111,11 +87,10 @@ export interface AttractapLinkedResource {
   deletedAt: Date | null;
 }
 
-/** An Attractap reader. `apiTokenHash` is internal: it never belongs in a response. */
+/** An Attractap reader. */
 export interface AttractapReader {
   id: number;
   name: string;
-  apiTokenHash: string;
   pairingState: AttractapPairingState;
   credentialFingerprint: string | null;
   secureBootDigest0: string | null;
@@ -182,7 +157,6 @@ export interface AttractapCredentialSnapshot {
   pairedAt: Date | null;
   certificateNotAfter: Date | null;
   certificateSerial: string | null;
-  apiTokenHash: string;
 }
 
 /** The reader fields an administrator or the reader itself may change; credentials are never part of it. */

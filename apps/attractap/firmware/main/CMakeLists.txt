@@ -75,7 +75,6 @@ idf_component_register(
         nvs_flash
         mbedtls
         efuse
-        esp_security
         bootloader_support
         spi_flash
         esp_rom

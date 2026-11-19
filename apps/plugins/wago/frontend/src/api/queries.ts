@@ -2,29 +2,22 @@ import { FLOW_NODE_PREVIEW_QUERY_KEY } from '@attraccess/plugins-frontend-sdk';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   ClaimControllerInput,
-  ConfigurationEditorMetadata,
   CreateCommissioningSessionInput,
-  DraftIdentity,
   WagoConfigurationSnapshot,
-  WagoPresetApplication,
 } from './client';
 import {
   acknowledgeConfigurationRejection,
-  applyPreset,
   claimController,
   confirmCommissioningHostKey,
   createCommissioningSession,
   deliverCommissioningSession,
-  getConfigurationBaseline,
   getDraft,
   getSettings,
   listCommissioningSessions,
   listConfigurationRevisions,
   listControllers,
   listMqttServers,
-  listPresets,
   previewConfigurationRevision,
-  previewPreset,
   publishConfiguration,
   recoverCommissioningSession,
   removeCommissioningSession,
@@ -32,7 +25,6 @@ import {
   reviewConfiguration,
   revokeCommissioningSession,
   rollbackConfiguration,
-  saveDraft,
   setSettings,
   validateConfiguration,
 } from './client';
@@ -43,7 +35,6 @@ export const queryKeys = {
   settings: ['wago', 'settings'] as const,
   mqttServers: ['mqtt', 'servers'] as const,
   draft: (controllerId: number) => ['wago', 'configuration-draft', controllerId] as const,
-  presets: ['wago', 'configuration-presets'] as const,
   revisions: (controllerId: number) => ['wago', 'configuration-revisions', controllerId] as const,
   commissioningSessions: ['wago', 'commissioning-sessions'] as const,
 };
@@ -63,24 +54,6 @@ export function useUpdateSettingsMutation() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.settings });
     },
-  });
-}
-
-export function useApplyPresetMutation() {
-  return useMutation({
-    mutationFn: ({
-      controllerId,
-      application,
-      selectedPaths,
-      previewedDraftHash,
-      snapshot,
-    }: {
-      controllerId: number;
-      application: WagoPresetApplication;
-      selectedPaths: string[];
-      previewedDraftHash: string;
-      snapshot: WagoConfigurationSnapshot;
-    }) => applyPreset(controllerId, application, selectedPaths, previewedDraftHash, snapshot),
   });
 }
 
@@ -188,20 +161,6 @@ export function useConfigurationActions(controllerId: number) {
   return { validate, review, publish, preview, acknowledgeRejection, rollback };
 }
 
-export function useConfigurationBaselineQuery(controllerId: number, enabled: boolean) {
-  useWagoLiveQuery(
-    ['wago', 'configuration-baseline', controllerId],
-    'configuration-baseline',
-    String(controllerId),
-    enabled,
-  );
-  return useQuery({
-    queryKey: ['wago', 'configuration-baseline', controllerId],
-    queryFn: () => getConfigurationBaseline(controllerId),
-    enabled,
-  });
-}
-
 export function useConfigurationRevisionPreviewQuery(controllerId: number, revision: number, enabled: boolean) {
   return useQuery({
     queryKey: [...queryKeys.revisions(controllerId), 'preview', revision],
@@ -273,22 +232,6 @@ export function useMqttServersQuery() {
   });
 }
 
-export function usePresetsQuery() {
-  return useQuery({ queryKey: queryKeys.presets, queryFn: listPresets });
-}
-
-export function usePreviewPresetMutation(controllerId: number) {
-  return useMutation({
-    mutationFn: ({
-      application,
-      snapshot,
-    }: {
-      application: WagoPresetApplication;
-      snapshot: WagoConfigurationSnapshot;
-    }) => previewPreset(controllerId, application, snapshot),
-  });
-}
-
 export function useRecoverCommissioningSessionMutation() {
   return useCommissioningAttemptMutation(recoverCommissioningSession, 'recovery');
 }
@@ -323,18 +266,3 @@ export function useRevokeCommissioningSessionMutation() {
   });
 }
 
-export function useSaveDraftMutation(controllerId: number) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      snapshot,
-      metadata,
-      expectedDraft,
-    }: {
-      snapshot: WagoConfigurationSnapshot;
-      metadata?: ConfigurationEditorMetadata;
-      expectedDraft?: DraftIdentity | null;
-    }) => saveDraft(controllerId, snapshot, metadata, expectedDraft),
-    onSuccess: (draft) => queryClient.setQueryData(queryKeys.draft(controllerId), draft),
-  });
-}

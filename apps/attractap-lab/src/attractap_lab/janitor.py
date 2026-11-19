@@ -8,9 +8,8 @@ place's `profile` tag (`plain`, the default, or `secure-lab`), erases the whole
 chip, flashes the parking image for the place's `variant` tag (encrypted on a
 `secure-lab` reader) and releases the reader once the image reports it is parked.
 
-A reader whose eFuses were burned, whose DS record (ATT-1207) is missing or
-damaged, or that fails to park repeatedly, stays claimed by the janitor
-(quarantine) until an operator runs `clear`. A reader
+A reader whose eFuses were burned, or that fails to park repeatedly, stays
+claimed by the janitor (quarantine) until an operator runs `clear`. A reader
 on a place tagged `power=switch` or `power=button` is power-cycled before each
 retry, and only quarantined once an attempt after a power cycle failed too.
 Quarantined claims carry no reservation, which maintenance relies on.
@@ -35,7 +34,7 @@ from labgrid.remote.client import start_session
 from labgrid.remote.common import Reservation, ReservationState
 from labgrid.remote.generated import labgrid_coordinator_pb2 as messages
 
-from . import ds_record, efuse
+from . import efuse
 from .workflow import POWER_BUTTON, POWER_SWITCH, attached, park
 
 OWNER_HOST = "attractap-lab-janitor"
@@ -445,11 +444,6 @@ def run_park(args):
         (output / "reason.txt").write_text(
             f"eFuses do not match the {args.profile} reader profile, reader must not be reused: {violation}\n")
         print(f"{args.place}: {violation}", file=sys.stderr)
-        return QUARANTINE_EXIT
-    except ds_record.DsRecordError as error:
-        # A DS reader whose committed record is missing or damaged: no retry or power cycle can fix that.
-        (output / "reason.txt").write_text(f"DS record: {error}\n")
-        print(f"{args.place}: {error}", file=sys.stderr)
         return QUARANTINE_EXIT
     except Exception:
         traceback.print_exc()

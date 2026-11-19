@@ -18,7 +18,6 @@ add_executable(pairing-host-tests
     "${FIRMWARE_DIR}/src/api/security/pairing_codec.cpp"
     "${FIRMWARE_DIR}/src/api/security/pairing_client.cpp"
     "${FIRMWARE_DIR}/src/api/security/reader_identity.cpp"
-    "${FIRMWARE_DIR}/src/api/security/rsa_der.cpp"
     "${FIRMWARE_DIR}/src/api/security/session_framing.cpp"
     "${FIRMWARE_DIR}/src/api/security/session_tls.cpp"
     "${FIRMWARE_DIR}/src/api/security/session_certificates.cpp")

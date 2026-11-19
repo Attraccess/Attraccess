@@ -7,7 +7,7 @@ import { join, relative } from 'path';
  * modules, including calls that span several lines and values passed as extra arguments.
  */
 const SECRET =
-  /token|nonce|ticket|secret|password|privatekey|private_key|\bkey\b|keystring|\bcode\b|payload|plaintext|decrypted|pem\b|passphrase|proof|spki|certificate|signature/i;
+  /token|nonce|ticket|secret|password|privatekey|private_key|\bkey\b|keystring|\bcode\b|payload|plaintext|decrypted|pem\b|passphrase/i;
 /** Extra arguments that are whole message objects carry payloads. */
 const WHOLE_MESSAGE = /^(data|message|event|eventdata|payload|body|frame|request|req)(\.data)?(\.payload)?$/i;
 
@@ -88,31 +88,27 @@ describe('secret hygiene in logs', () => {
     expect(offending).toEqual([]);
   });
 
-  describe('the identity upgrade, the challenge and the eFuse report', () => {
-    it.each([
-      'identity-upgrade.service.ts',
-      'identity-upgrade-proof.ts',
-      'identity-upgrade-gate.ts',
-      'efuse-report.service.ts',
-      'efuse-report.ts',
-      'reader-control.service.ts',
-      'session-security-state.ts',
-    ])('%s is scanned', (name) => {
-      expect(files.map((f) => relative(join(ROOT, 'security'), f))).toContain(name);
-    });
+  describe('the eFuse report and the refusal of token sign-in', () => {
+    it.each(['efuse-report.service.ts', 'efuse-report.ts', 'reader-control.service.ts', 'session-security-state.ts'])(
+      '%s is scanned',
+      (name) => {
+        expect(files.map((f) => relative(join(ROOT, 'security'), f))).toContain(name);
+      },
+    );
 
-    it('catches a nonce, proof, public key, certificate or report put into a log', () => {
+    it('catches a report or a token put into a log', () => {
       for (const example of [
-        'this.logger.debug(`challenge ${this.nonce.value.toString("hex")}`);',
-        'this.logger.warn(`upgrade ${message.proof}`);',
-        'this.logger.debug("upgrade failed", message);',
-        'this.logger.log(`report`, body);',
-        'this.logger.debug(`upgrade spki ${spki.toString("base64")}`, spki);',
+        'this.logger.warn(`report ${JSON.stringify(report)}`, body);',
+        'this.logger.debug("token sign-in", message);',
+        'this.logger.warn(`token ${message.token}`);',
       ]) {
         expect(logCalls(example).flatMap(leaks)).not.toEqual([]);
       }
       expect(
-        logCalls('this.logger.warn(`Identity upgrade failed: ${(error as Error).message}`);').flatMap(leaks),
+        logCalls('this.logger.warn(`Reader control message failed: ${(error as Error).message}`);').flatMap(leaks),
+      ).toEqual([]);
+      expect(
+        logCalls("this.logger.warn('Refused a reader connection: token sign-in no longer supported');").flatMap(leaks),
       ).toEqual([]);
     });
   });

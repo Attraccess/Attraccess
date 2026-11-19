@@ -111,7 +111,7 @@ describe('AttractapList pairing', () => {
   it('lists only paired readers in the tables; the others wait in the Not paired card', () => {
     mockLicense(['attractap']);
     data.readers = [reader(1, 'Paired door', 'paired')];
-    data.toPair = [reader(2, 'New lathe', 'unpaired'), reader(3, 'Old', 'revoked')];
+    data.toPair = [reader(2, 'New lathe', 'revoked'), reader(3, 'Old', 'revoked')];
     render(<AttractapList />);
     expect(screen.getByText('Paired door')).toBeInTheDocument();
     // They are listed in the pairing card, and the reader tables never show them, even if a stale
@@ -119,7 +119,7 @@ describe('AttractapList pairing', () => {
     expect(screen.getByTestId('to-pair')).toHaveTextContent('New lathe');
     expect(screen.getByTestId('to-pair')).toHaveTextContent('Old');
     expect(screen.queryAllByText('New lathe')).toHaveLength(1);
-    data.readers = [reader(1, 'Paired door', 'paired'), reader(5, 'Leaked', 'unpaired')];
+    data.readers = [reader(1, 'Paired door', 'paired'), reader(5, 'Leaked', 'revoked')];
     data.toPair = [];
     render(<AttractapList />);
     expect(screen.queryByText('Leaked')).toBeNull();
@@ -145,9 +145,9 @@ describe('AttractapList pairing', () => {
       expect(data.editor).toHaveBeenLastCalledWith(expect.objectContaining({ readerId, isOpen: true }));
 
     it('opens the settings of a reader the web flasher just paired, although the list does not know it yet', () => {
-      // The token reader is still listed as not paired, and the new reader is not listed at all.
+      // The old record is still listed as not paired, and the new reader is not listed at all.
       data.readers = [];
-      data.toPair = [reader(2, 'Token reader', 'unpaired')];
+      data.toPair = [reader(2, 'Removed reader', 'revoked')];
       render(<AttractapList />);
       act(() => data.openDeviceSettings?.('2', true));
       editorOpenFor(2);
@@ -158,7 +158,7 @@ describe('AttractapList pairing', () => {
 
     it('asks to pair first when the settings of a reader that is not paired are opened', () => {
       data.readers = [];
-      data.toPair = [reader(2, 'Token reader', 'unpaired')];
+      data.toPair = [reader(2, 'Removed reader', 'revoked')];
       render(<AttractapList />);
       act(() => data.openDeviceSettings?.('2'));
       expect(data.toast.info).toHaveBeenCalledWith({ title: 'pairFirst' });

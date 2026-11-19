@@ -21,9 +21,17 @@ Logger Settings::logger("Settings");
 DeviceConfig Settings::_deviceConfig;
 NetworkConfig Settings::_networkConfig;
 AttraccessApiConfig Settings::_attraccessApiConfig;
-AttraccessAuthConfig Settings::_attraccessAuthConfig;
 std::string Settings::_cachedDefaultLanguage;
 std::string Settings::_hostname;
+
+// Readers before 2.6.0 may still hold the retired API token in NVS. Nothing reads it any more; wipe it.
+void Settings::eraseRetiredTokenKeys()
+{
+    preferences.begin("settings", false);
+    preferences.remove("api.key");
+    preferences.remove("api.readerId");
+    preferences.end();
+}
 
 void Settings::setup()
 {
@@ -43,13 +51,12 @@ void Settings::setup()
     _attraccessApiConfig.port = preferences.getUShort("api.port", 0);
     _attraccessApiConfig.useSSL = preferences.getBool("api.useSSL", false);
 
-    _attraccessAuthConfig.apiKey = preferences.getString("api.key", "");
-    _attraccessAuthConfig.readerId = preferences.getUInt("api.readerId", 0);
     _cachedDefaultLanguage = Language::supported(preferences.getString("api.language"), "");
 
     _hostname = preferences.getString("hostname", "");
 
     preferences.end();
+    eraseRetiredTokenKeys();
     State::setDefaultLanguage(_cachedDefaultLanguage);
 
     logger.info("Setup complete.");
@@ -132,39 +139,6 @@ void Settings::saveAttraccessApiConfig(const std::string &hostname, uint16_t por
 
     preferences.putBool("api.useSSL", useSSL);
     _attraccessApiConfig.useSSL = useSSL;
-
-    preferences.end();
-}
-
-AttraccessAuthConfig Settings::getAttraccessAuthConfig()
-{
-    return _attraccessAuthConfig;
-}
-
-void Settings::saveAttraccessAuthConfig(const std::string &apiKey, uint32_t readerId)
-{
-    logger.info("Saving attraccess auth config...");
-    preferences.begin("settings", false);
-
-    preferences.putString("api.key", apiKey);
-    _attraccessAuthConfig.apiKey = apiKey;
-
-    preferences.putUInt("api.readerId", readerId);
-    _attraccessAuthConfig.readerId = readerId;
-
-    preferences.end();
-}
-
-void Settings::clearAttraccessAuthConfig()
-{
-    logger.info("Clearing attraccess auth config...");
-    preferences.begin("settings", false);
-
-    preferences.remove("api.key");
-    _attraccessAuthConfig.apiKey = "";
-
-    preferences.remove("api.readerId");
-    _attraccessAuthConfig.readerId = 0;
 
     preferences.end();
 }

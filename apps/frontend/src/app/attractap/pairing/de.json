@@ -1,6 +1,5 @@
 {
   "state": {
-    "unpaired": "Nicht gekoppelt",
     "paired": "Gekoppelt",
     "revoked": "Kopplung entfernt",
     "waiting": "Wird gekoppelt…"
@@ -37,7 +36,6 @@
       "internal": "Auf dem Server ist ein Fehler aufgetreten.",
       "expired": "Der Reader wurde nicht innerhalb von 10 Minuten freigegeben."
     },
-    "waitingForReader": "Warte auf den Reader…",
     "findHint": "Gib den Code ein, den der Reader zeigt.",
     "codeLabel": "Code am Reader",
     "typeCode": "Gib den Code ein, den der Reader gerade zeigt.",
@@ -55,7 +53,6 @@
     "patternHint": "Segment 1 ist am Reader markiert. Gib nur frei, wenn alle acht Farben übereinstimmen. Die Farben wechseln etwa alle 30 Sekunden.",
     "patternChanged": "Die Farben haben sich während deiner Prüfung geändert. Vergleiche sie erneut und gib dann frei.",
     "segmentStart": "1 (Start)",
-    "noResponse": "Der Reader hat nicht reagiert. Prüfe, ob er eingeschaltet ist und die neueste Software hat, und versuche es erneut.",
     "error": {
       "wrongCode": "Dieser Code passt nicht zum Reader. Prüfe den Code am Reader und versuche es erneut.",
       "codeNotFound": "Kein wartender Reader zeigt diesen Code. Prüfe den Code am Reader; er wechselt etwa alle 30 Sekunden.",
@@ -69,8 +66,7 @@
       "readerGone": "Der Reader hat die Verbindung getrennt, bevor die Kopplung abgeschlossen war. Er zeigt gleich einen neuen Code.",
       "keyInUse": "Dieser Reader ist bereits mit einem anderen Eintrag gekoppelt. Wähle diesen Eintrag zur Übernahme oder entferne zuerst dessen Kopplung.",
       "targetNotFound": "Den Reader, der übernommen werden soll, gibt es nicht mehr. Wähle einen anderen.",
-      "targetMissing": "Wähle, welchen Reader dieser übernimmt.",
-      "wrongMode": "Dieser Reader kann so nicht gekoppelt werden. Schließe dieses Fenster und beginne erneut in der Reader-Liste."
+      "targetMissing": "Wähle, welchen Reader dieser übernimmt."
     },
     "backToList": "Anderen Reader wählen",
     "scanFallback": "Tippe stattdessen den Code ein."
@@ -100,16 +96,12 @@
   },
   "toPair": {
     "title": "Nicht gekoppelt",
-    "description": "Ein neuer Reader zeigt einen Code auf seinem Bildschirm (Lite: Farben auf seinem Ring). Wähle „Koppeln“ und gib dann den Code ein oder vergleiche die Farben. Kopple diese Reader, bevor du sie einrichten kannst. Reader, die sich mit einem Token anmelden, tun bis zur Kopplung nichts: keine Karten, kein Registrieren oder Zurücksetzen von Karten, keine Beaufsichtigung, keine Sammeleinweisung. Sobald der Server sie zur Kopplung auffordert (nach einem fälligen Firmware-Update), zeigen sie wie ein neuer Reader ihren Code, und bis zur Kopplung erscheinen sie nirgends sonst. Der Reader muss eingeschaltet und verbunden sein.",
+    "description": "Ein neuer Reader zeigt einen Code auf seinem Bildschirm (Lite: Farben auf seinem Ring). Wähle „Koppeln“ und gib dann den Code ein oder vergleiche die Farben. Ein Reader, dessen Kopplung entfernt wurde, zeigt seinen Code wie ein neuer Reader und übernimmt seinen alten Eintrag, wenn du ihn auswählst. Der Reader muss eingeschaltet und verbunden sein.",
     "resources": "Ressourcen: {{names}}",
-    "neverPaired": "Noch nicht gekoppelt",
     "pairingRemoved": "Kopplung wurde entfernt",
     "newReader": "Neuer Reader",
     "waitingSince": "Wartet seit {{time}}",
     "pair": "Koppeln",
-    "resume": "Fortsetzen",
-    "requestFailed": "Kopplung konnte nicht gestartet werden",
-    "notConnected": "Der Reader ist gerade nicht verbunden. Schalte ihn ein und versuche es erneut.",
     "delete": "Löschen"
   },
   "kind": {
@@ -119,5 +111,43 @@
   "enrollLink": {
     "noPermissionTitle": "Du kannst keine Reader freigeben",
     "noPermission": "Dein Konto hat keine Berechtigung, Reader freizugeben. Bitte eine Administratorin oder einen Administrator, diesen Reader freizugeben."
+  },
+  "secured": {
+    "title": "Sicherer Reader",
+    "hint": "Der Server prüft den Bericht, den dieser Reader über seine Sicherheitseinstellungen sendet. Die Prüfung läuft bei jeder Verbindung des Readers.",
+    "secured": "Gesichert",
+    "notSecured": "Nicht gesichert",
+    "notChecked": "Noch kein Bericht eingegangen",
+    "checkedAt": "Zuletzt geprüft",
+    "problems": "Was nicht passt",
+    "profile": {
+      "secure": "Sichere Firmware",
+      "secure-lab": "Labor-Firmware (Entwicklungsmodus)"
+    },
+    "problem": {
+      "firmware-info-missing": "Der Reader hat seine Firmware nicht gemeldet.",
+      "profile-not-secure": "Die Firmware ist keine sichere Variante.",
+      "not-release-build": "Die Firmware ist kein Release-Build.",
+      "demo-or-debug-variant": "Die Firmware ist eine Demo- oder Debug-Variante.",
+      "secure-boot-disabled": "Secure Boot ist nicht aktiviert.",
+      "key0-purpose": "Schlüsselplatz 0 ist nicht für Secure Boot eingerichtet.",
+      "key1-purpose": "Schlüsselplatz 1 ist nicht für Secure Boot eingerichtet.",
+      "digest0-not-recorded": "Der Server hat keinen Fingerabdruck des Signaturschlüssels für diesen Reader.",
+      "digest0-mismatch": "Der Fingerabdruck des ersten Signaturschlüssels weicht vom gespeicherten ab.",
+      "digest1-not-recorded": "Der Server hat keinen Fingerabdruck des Wiederherstellungsschlüssels für diesen Reader.",
+      "digest1-mismatch": "Der Fingerabdruck des Wiederherstellungsschlüssels weicht vom gespeicherten ab.",
+      "signing-key-revoked": "Ein Secure-Boot-Schlüssel wurde widerrufen.",
+      "slot2-not-revoked": "Der ungenutzte Secure-Boot-Schlüsselplatz ist nicht widerrufen.",
+      "flash-encryption-not-release": "Die Flash-Verschlüsselung ist nicht im Release-Modus.",
+      "flash-encryption-not-final": "Die Einstellung der Flash-Verschlüsselung ist nicht gesperrt.",
+      "manual-encrypt-enabled": "Manuelle Flash-Verschlüsselung ist noch erlaubt.",
+      "key2-not-xts": "Der Schlüssel für die Flash-Verschlüsselung fehlt.",
+      "key4-not-nvs-hmac": "Der Schlüssel für verschlüsselte Einstellungen fehlt.",
+      "rd-dis-incomplete": "Nicht alle Schlüssel sind vor dem Auslesen geschützt.",
+      "rd-dis-writable": "Der Leseschutz kann noch geändert werden.",
+      "jtag-enabled": "Die Debug-Schnittstelle (JTAG) ist aktiv.",
+      "rom-download-open": "Der ROM-Download-Modus ist offen.",
+      "secure-version-below-floor": "Die Anti-Rollback-Version liegt unter der geforderten."
+    }
   }
 }

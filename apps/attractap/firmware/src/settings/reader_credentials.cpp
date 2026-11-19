@@ -8,17 +8,6 @@ namespace
     constexpr size_t MAX_CERTIFICATE_BYTES = 2048;
     constexpr size_t MAX_KEY_BYTES = 64;
     constexpr size_t MAX_SPKI_BYTES = 128;
-    // Everything bound to one pairing: reader ID, installation ID, certificate, identity kind and (last,
-    // removed by the callers) the pin "ca". A new key or a new pairing drops all of it.
-    constexpr const char *PAIRING_KEYS[] = {"rid", "inst", "cert", "ik"};
-
-    void removePairing(KVStore &store)
-    {
-        for (const char *key : PAIRING_KEYS)
-        {
-            store.remove(key);
-        }
-    }
 
     std::vector<uint8_t> readBlob(KVStore &store, const char *key, size_t maxLength)
     {
@@ -79,73 +68,11 @@ namespace CredentialStore
             return false;
         }
         store.remove("ca");
-        removePairing(store);
+        store.remove("rid");
+        store.remove("inst");
+        store.remove("cert");
         return writeBlob(store, "key", privateKey);
     }
-
-    IdentityKind identityKind()
-    {
-        KVStore store;
-        if (!store.begin(NAMESPACE, true))
-        {
-            return IdentityKind::Unknown;
-        }
-        const uint32_t kind = store.getUInt("ik", 0);
-        return kind == 2 ? IdentityKind::Ds : kind == 1 ? IdentityKind::Software : IdentityKind::Unknown;
-    }
-
-    bool saveIdentityKind(IdentityKind kind)
-    {
-        KVStore store;
-        return store.begin(NAMESPACE, false) &&
-               store.putUInt("ik", kind == IdentityKind::Ds ? 2 : kind == IdentityKind::Software ? 1 : 0) > 0;
-    }
-
-    bool clearPairing()
-    {
-        KVStore store;
-        if (!store.begin(NAMESPACE, false))
-        {
-            return false;
-        }
-        removePairing(store);
-        return store.remove("ca");
-    }
-
-    bool saveUpgradedCertificate(const std::vector<uint8_t> &certificate)
-    {
-        // The certificate first, the kind second: a reader that loses power in between still finds the
-        // DS key by the certificate's public key.
-        return saveCertificate(certificate) && saveIdentityKind(IdentityKind::Ds);
-    }
-
-#ifdef ATTRACTAP_TEST_HOOKS
-    bool setForceSoftwareIdentity(bool force)
-    {
-        KVStore store;
-        if (!store.begin(NAMESPACE, false))
-        {
-            return false;
-        }
-        if (!force)
-        {
-            store.remove("fp256");
-            return true;
-        }
-        return store.putUInt("fp256", 1) > 0;
-    }
-
-    bool consumeForceSoftwareIdentity()
-    {
-        KVStore store;
-        if (!store.begin(NAMESPACE, false) || store.getUInt("fp256", 0) == 0)
-        {
-            return false;
-        }
-        store.remove("fp256");
-        return true;
-    }
-#endif
 
     bool savePin(const std::vector<uint8_t> &caSpki)
     {

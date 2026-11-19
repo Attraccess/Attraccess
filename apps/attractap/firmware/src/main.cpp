@@ -14,8 +14,6 @@
 #include "api/security/reader_link.hpp"
 #endif
 #include "api/security/build_profile.hpp"
-#include "api/security/migration_pending.hpp"
-#include "api/security/nvs_erase_gate.hpp"
 #include "logger/logger.hpp"
 #include "platform.hpp"
 #include "utils.hpp"
@@ -41,7 +39,7 @@ DemoWebsocket websocket;
 API api(websocket);
 #else
 Websocket websocket;
-// Pairing, the TLS 1.3 session and the token channel all run over the one WebSocket.
+// Pairing and the TLS 1.3 session run over the one WebSocket.
 ReaderLink readerLink(websocket, {
 #ifdef HAS_LVGL_DISPLAY
                                      false,
@@ -88,46 +86,18 @@ static void logLoopStackUsage()
 }
 #endif
 
-// Maps nvs_flash_init()'s result for NvsEraseGate (host-tested decision, tests/identity-upgrade).
-static NvsEraseGate::NvsInitResult nvsInitResult(esp_err_t err)
-{
-    switch (err)
-    {
-    case ESP_OK:
-        return NvsEraseGate::NvsInitResult::Ok;
-    case ESP_ERR_NVS_NO_FREE_PAGES:
-        return NvsEraseGate::NvsInitResult::NoFreePages;
-    case ESP_ERR_NVS_NEW_VERSION_FOUND:
-        return NvsEraseGate::NvsInitResult::NewVersionFound;
-    default:
-        return NvsEraseGate::NvsInitResult::OtherError;
-    }
-}
-
 extern "C" void app_main(void)
 {
     // NVS backs all settings (the Arduino core used to initialize it implicitly).
     // The erase path only triggers on a truly incompatible/corrupt partition —
     // same recovery the Arduino core performed.
     esp_err_t nvsErr = nvs_flash_init();
-    if (NvsEraseGate::shouldErase(nvsInitResult(nvsErr), BuildProfile::secureBuild(),
-                                  BuildProfile::secureBuild() && migrationPending()))
+    if (nvsErr == ESP_ERR_NVS_NO_FREE_PAGES || nvsErr == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
         ESP_ERROR_CHECK(nvs_flash_erase());
         nvsErr = nvs_flash_init();
     }
-    NvsEraseGate::initialized() = nvsErr == ESP_OK;
-    if (nvsErr != ESP_OK)
-    {
-        if (!BuildProfile::secureBuild())
-        {
-            ESP_ERROR_CHECK(nvsErr);
-        }
-        // Secure builds never erase on a key error or while a migration is pending, and never abort into
-        // a boot loop either: the reader boots without NVS, ReaderLink shows the error state (SESSION_PROBLEM_STORAGE_FAILED)
-        // and refuses DS creation and the identity upgrade until the next boot.
-        mainLogger.errorf("NVS init failed (0x%x); secure build keeps the partition untouched", (unsigned)nvsErr);
-    }
+    ESP_ERROR_CHECK(nvsErr);
 
 #ifndef ATTRACTAP_SECURE_PROFILE
     // Console input (serialCommandHandler) reads from the USB-Serial-JTAG

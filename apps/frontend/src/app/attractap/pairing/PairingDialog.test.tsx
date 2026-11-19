@@ -12,7 +12,6 @@ const waiting = (overrides: Pairing = {}): Pairing => ({
   state: 'waiting',
   kind: 'touch',
   firmware: { name: 'attractap', variant: 'touch', version: '1.2.3' },
-  boundReaderId: null,
   targetReaderId: null,
   mode: null,
   createdAt: '2026-10-30T07:00:00.000Z',
@@ -129,10 +128,7 @@ describe('PairingDialog', () => {
     mocks.pairing.current = waiting();
     mocks.pairings.current = [];
     mocks.readers.current = [{ id: 7, name: 'Door', pairingState: 'paired' }];
-    mocks.readersToPair.current = [
-      { id: 8, name: 'Old token reader', pairingState: 'unpaired' },
-      { id: 9, name: 'Removed reader', pairingState: 'revoked' },
-    ];
+    mocks.readersToPair.current = [{ id: 9, name: 'Removed reader', pairingState: 'revoked' }];
     mocks.invalidateQueries.mockClear();
     mocks.selects.length = 0;
     mocks.refetchResult.current = undefined;
@@ -154,7 +150,7 @@ describe('PairingDialog', () => {
 
     it('only closes while no request is known yet', async () => {
       mocks.pairing.current = undefined;
-      const { onClose } = open({ waitForReaderId: 8 });
+      const { onClose } = open({});
       await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
       expect(mocks.cancel).not.toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
@@ -213,15 +209,6 @@ describe('PairingDialog', () => {
       expect(approveButton()).toBeEnabled();
       await userEvent.click(approveButton());
       expect(mocks.approve).toHaveBeenCalledWith({ path: { pairingId: 'p1' }, body: { mode: 'new', code: 'K7P3XQ' } });
-    });
-
-    it('pairs a token reader with its own record and skips the question what the reader is', async () => {
-      mocks.pairing.current = waiting({ boundReaderId: 4 });
-      open({ pairingId: 'p1' });
-      expect(screen.queryByText('What is this reader?')).toBeNull();
-      type('K7P-3XQ');
-      await userEvent.click(approveButton());
-      expect(mocks.approve).toHaveBeenCalledWith({ path: { pairingId: 'p1' }, body: { mode: 'pair', code: 'K7P3XQ' } });
     });
 
     it('asks whether the reader is new or takes over one, and offers the name only for a new reader', () => {
@@ -450,58 +437,6 @@ describe('PairingDialog', () => {
         body: { mode: 'new', code: 'K7P3XQ', via: 'flasher' },
       });
     });
-
-    describe('waiting for a token reader', () => {
-      beforeEach(() => vi.useFakeTimers());
-      afterEach(() => vi.useRealTimers());
-
-      it('says the reader did not respond after 30 seconds', async () => {
-        mocks.pairing.current = undefined;
-        open({ waitForReaderId: 4 });
-        expect(screen.getByText('Waiting for the reader…')).toBeInTheDocument();
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(30_000);
-        });
-        expect(screen.getByText(/did not respond/)).toBeInTheDocument();
-      });
-
-      it('lets the admin approve a reader that arrives after 30 seconds', async () => {
-        mocks.pairing.current = undefined;
-        const props = { isOpen: true, waitForReaderId: 4, onClose: vi.fn() };
-        const { rerender } = render(<PairingDialog {...props} />);
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(30_000);
-        });
-        expect(screen.getByText(/did not respond/)).toBeInTheDocument();
-        mocks.pairing.current = waiting({ boundReaderId: 4 });
-        mocks.pairings.current = [waiting({ boundReaderId: 4 })];
-        rerender(<PairingDialog {...props} />);
-        expect(screen.queryByText(/did not respond/)).toBeNull();
-        type('K7P3XQ');
-        expect(approveButton()).toBeEnabled();
-      });
-
-      it('keeps showing the request after it ended, with the reason', () => {
-        mocks.pairing.current = waiting({ boundReaderId: 4 });
-        mocks.pairings.current = [waiting({ boundReaderId: 4 })];
-        const props = { isOpen: true, waitForReaderId: 4, onClose: vi.fn() };
-        const { rerender } = render(<PairingDialog {...props} />);
-        // The list holds running requests only; the detail of the ended one is still there.
-        mocks.pairings.current = [];
-        mocks.pairing.current = waiting({ boundReaderId: 4, state: 'expired', failureReason: 'expired' });
-        rerender(<PairingDialog {...props} />);
-        expect(screen.queryByText('Waiting for the reader…')).toBeNull();
-        expect(screen.getByText('The reader was not approved within 10 minutes.')).toBeInTheDocument();
-      });
-
-      it('continues with the request the reader sends', () => {
-        mocks.pairing.current = waiting({ boundReaderId: 4 });
-        mocks.pairings.current = [waiting({ boundReaderId: 4 })];
-        open({ waitForReaderId: 4 });
-        expect(screen.queryByText('Waiting for the reader…')).toBeNull();
-        expect(approveButton()).toBeDisabled();
-      });
-    });
   });
   describe('server answers', () => {
     const cases: Array<[number, string, RegExp]> = [
@@ -510,7 +445,6 @@ describe('PairingDialog', () => {
       [409, 'PairingKeyInUse', /already paired with another record/],
       [409, 'PairingNotWaiting', /no longer waiting/],
       [404, 'Reader not found', /to take over no longer exists/],
-      [400, 'This reader is bound to a different record', /cannot be paired this way/],
       [400, 'targetReaderId is required', /Choose which reader this one takes over/],
     ];
     it.each(cases)('explains %i %s in its own words', (status, message, text) => {
@@ -661,18 +595,18 @@ describe('PairingDialog', () => {
       return mocks.selects.at(-1)?.items.map((item) => item.label);
     };
 
-    it('offers every reader, also a never-paired token reader and one whose pairing was removed', () => {
+    it('offers every reader, also one whose pairing was removed', () => {
       open({ pairingId: 'p1' });
-      expect(pickerLabels()).toEqual(['Door', 'Old token reader', 'Removed reader']);
+      expect(pickerLabels()).toEqual(['Door', 'Removed reader']);
     });
 
     it('lists a reader that is in both lists (just paired) once, as the paired entry', () => {
       mocks.readers.current = [
         { id: 7, name: 'Door', pairingState: 'paired' },
-        { id: 8, name: 'Old token reader (paired)', pairingState: 'paired' },
+        { id: 9, name: 'Removed reader (paired)', pairingState: 'paired' },
       ];
       open({ pairingId: 'p1' });
-      expect(pickerLabels()).toEqual(['Door', 'Old token reader (paired)', 'Removed reader']);
+      expect(pickerLabels()).toEqual(['Door', 'Removed reader (paired)']);
     });
 
     it('names a preset target that is only in the list of readers to pair', () => {

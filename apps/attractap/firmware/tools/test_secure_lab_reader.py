@@ -19,19 +19,6 @@ MAC = "dc:b4:d9:21:71:c8"
 EMPTY_BLOCK = " ".join(["00"] * 32)
 
 
-_EMPTY_DS_DIR = tempfile.TemporaryDirectory()
-
-
-def setUpModule():
-    """Never pick up the DS record committed for the real lab reader (its MAC is the one used below)."""
-    os.environ["ATTRACTAP_LAB_DS_DIR"] = _EMPTY_DS_DIR.name
-
-
-def tearDownModule():
-    os.environ.pop("ATTRACTAP_LAB_DS_DIR", None)
-    _EMPTY_DS_DIR.cleanup()
-
-
 def spaced(hex_digest):
     return " ".join(hex_digest[i:i + 2] for i in range(0, len(hex_digest), 2))
 
@@ -194,11 +181,11 @@ class Provision(unittest.TestCase):
 
 
 class Flash(unittest.TestCase):
-    def flash(self, fuses, erase_all=False):
+    def flash(self, fuses):
         commands = []
         with tempfile.TemporaryDirectory() as build:
             write_build(build)
-            args = argparse.Namespace(port="/dev/fake", build_dir=build, erase_all=erase_all, ds_dir=build)
+            args = argparse.Namespace(port="/dev/fake", build_dir=build, erase_all=False)
             with mock.patch.object(r, "read_efuses", return_value=fuses), \
                     mock.patch.object(r, "key_digest", side_effect=lambda path: DIGESTS[path == r.RECOVERY_KEY]), \
                     mock.patch.object(r, "signed_images", side_effect=lambda images, tmp: [i[:3] for i in images]), \
@@ -223,15 +210,6 @@ class Flash(unittest.TestCase):
                       efuses(secure_boot=True, crypt_raw="0x1", digests_burned=True, manual_encrypt_disabled=True)):
             with self.assertRaisesRegex(r.LabReaderError, "not in development mode"):
                 self.flash(fuses)
-
-    def test_a_burned_reader_is_not_erased_without_its_ds_record(self):
-        fuses = efuses(secure_boot=True, crypt_raw="0x1", digests_burned=True)
-        fuses["KEY_PURPOSE_3"] = {"value": "HMAC_DOWN_DIGITAL_SIGNATURE"}
-        with self.assertRaisesRegex(r.LabReaderError, "refusing to erase"):
-            self.flash(fuses, erase_all=True)
-        # a flash that keeps the spiffs sector (no --erase-all) is not a wipe
-        (cmd,) = self.flash(fuses)
-        self.assertNotIn("--erase-all", cmd)
 
     def test_non_lab_reader_is_refused(self):
         with self.assertRaisesRegex(r.LabReaderError, "Not a provisioned lab reader"):

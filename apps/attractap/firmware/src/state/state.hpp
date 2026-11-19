@@ -169,9 +169,6 @@ public:
         SESSION_PROBLEM_SERVER_UNTRUSTED = 1,
         // Repeated handshake failures or timeouts, e.g. a proxy that strips Sec-WebSocket-Protocol.
         SESSION_PROBLEM_HANDSHAKE_FAILED = 2,
-        // Secure build whose NVS could not be opened and was deliberately not erased (ATT-1207). Shown
-        // with the "secure connection failed" text on the connecting screen.
-        SESSION_PROBLEM_STORAGE_FAILED = 3,
     };
     static void setSessionProblem(SessionProblem problem);
     static SessionProblem getSessionProblem();

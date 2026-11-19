@@ -2,8 +2,6 @@ import type { AuditAuthenticationMethod } from '@attraccess/application-models';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { isSecurableBuild } from './security/secured-eligibility';
-import type { ReportedBuild } from './security/session-security-state';
 
 import type {
   AttractapCrashReportRecord,
@@ -43,13 +41,13 @@ import { Semaphore } from 'async-mutex';
 
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from './events';
 
-import { securelyHashToken } from './websockets/websocket.utils';
-
 import { ATTRACTAP_CARD_STORE, type AttractapCardStore } from './card-store.port';
 
 import { ATTRACTAP_CRASH_REPORT_STORE, type AttractapCrashReportStore } from './crash-report-store.port';
 
 import { ATTRACTAP_READER_STORE, type AttractapReaderStore } from './reader-store.port';
+import { isSecurableBuild } from './security/secured-eligibility';
+import type { ReportedBuild } from './security/session-security-state';
 
 import { NotificationCategory } from '../notifications/notification-types';
 
@@ -245,20 +243,12 @@ export class AttractapService {
     return await this.readerStore.findById(id);
   }
 
-  public async createNewReader(firmware?: AttractapFirmwareInfo): Promise<{ reader: AttractapReader; token: string }> {
-    const token = randomBytes(12).toString('base64url').slice(0, 16);
-    const apiTokenHash = await securelyHashToken(token);
-
-    const reader = await this.readerStore.create({
-      apiTokenHash,
+  /** A record for a reader the admin approved. It starts without a credential; pairing writes the first one. */
+  public async createNewReader(firmware?: AttractapFirmwareInfo): Promise<AttractapReader> {
+    return await this.readerStore.create({
       name: randomBytes(3).toString('base64url').slice(0, 4),
       firmware,
     });
-
-    return {
-      reader,
-      token,
-    };
   }
 
   public async updateReader(
@@ -357,10 +347,6 @@ export class AttractapService {
    * @param id The reader ID
    * @param firmware The firmware the reader reported
    */
-  public async updateReaderFirmware(id: number, firmware: AttractapFirmwareInfo) {
-    await this.updateReader(id, { firmware }, false);
-  }
-
   /**
    * Stores what the reader reported about its build (profile, app secure_version). A claim: it never makes a reader
    * secured. A reader that is not a release secure build any more loses `secured` right away. Every connection
@@ -380,22 +366,26 @@ export class AttractapService {
     if (Object.keys(patch).length > 0) await this.readerStore.applySecurity(id, patch);
   }
 
+  public async updateReaderFirmware(id: number, firmware: AttractapFirmwareInfo) {
+    await this.updateReader(id, { firmware }, false);
+  }
+
   public async getAllReaders(filter?: AttractapReaderFilter): Promise<AttractapReader[]> {
     return await this.readerStore.list(filter);
   }
 
   /**
-   * Readers that completed pairing. Every list the rest of the product reads (readers page,
-   * pickers, resource assignment, card writer setting) uses this one; unpaired readers belong to
-   * the pairing session only.
+   * Readers that are paired. Every list the rest of the product reads (readers page, pickers,
+   * resource assignment, card writer setting) uses this one; readers whose pairing was removed
+   * belong to the pairing session only.
    */
   public async getPairedReaders(filter: AttractapReaderFilter = {}): Promise<AttractapReader[]> {
     return await this.readerStore.list({ ...filter, paired: true });
   }
 
-  /** Readers that must be paired before they can be used: the pairing session's list. */
+  /** Readers whose pairing was removed and that must be paired again: the pairing session's list. */
   public async getReadersToPair(): Promise<AttractapReader[]> {
-    return await this.readerStore.listUnpaired();
+    return await this.readerStore.listRevoked();
   }
 
   /** A new card key: 16 random bytes from the system CSPRNG, hex encoded. Nothing about it is derivable. */

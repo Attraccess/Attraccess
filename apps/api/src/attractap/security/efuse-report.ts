@@ -1,4 +1,4 @@
-import { ATTRACTAP_SECURITY_PROBLEMS_MORE, type AttractapSecurityProblem } from '@attraccess/application-models';
+import type { AttractapSecurityProblem } from '@attraccess/application-models';
 
 /**
  * Lowest eFuse SECURE_VERSION a secured reader may report. Equal to apps/attractap/firmware/secure-version-floor.txt
@@ -12,7 +12,7 @@ export interface EfuseKey {
   readProtected: boolean;
 }
 
-/** What a secure-profile reader reports about its eFuses. The reader's word; DS is not attestation. */
+/** What a secure-profile reader reports about its eFuses. The reader's word, not attestation. */
 export interface EfuseReport {
   mac: string;
   secureBootEn: boolean;
@@ -148,9 +148,8 @@ export function checkEfuseReport(
   if (!report.disDownloadManualEncrypt) problems.push('manual-encrypt-enabled');
 
   if (key(2).purpose !== 'XTS_AES_128_KEY' || !key(2).used) problems.push('key2-not-xts');
-  if (key(3).purpose !== 'HMAC_DOWN_DIGITAL_SIGNATURE' || !key(3).used) problems.push('key3-not-ds');
   if (key(4).purpose !== 'HMAC_UP' || !key(4).used) problems.push('key4-not-nvs-hmac');
-  const covered = [2, 3, 4].every((index) => (report.rdDis & (1 << index)) !== 0 && key(index).readProtected);
+  const covered = [2, 4].every((index) => (report.rdDis & (1 << index)) !== 0 && key(index).readProtected);
   if (!covered) problems.push('rd-dis-incomplete');
   if (!report.rdDisWriteProtected) problems.push('rd-dis-writable');
 
@@ -158,21 +157,4 @@ export function checkEfuseReport(
   if (!report.download.enableSecurityDownload && !report.download.disDownloadMode) problems.push('rom-download-open');
   if (report.secureVersion < floor) problems.push('secure-version-below-floor');
   return problems;
-}
-
-/** Longest problem list an audit event carries. Every problem code at once fits; the bound is a safeguard only. */
-export const AUDIT_PROBLEMS_MAX_LENGTH = 512;
-
-/** Problem codes joined by commas for the audit, cut only between whole codes (then ending in `more`). */
-export function auditProblemList(problems: readonly string[], maxLength = AUDIT_PROBLEMS_MAX_LENGTH): string {
-  const joined = problems.join(',');
-  if (joined.length <= maxLength) return joined;
-  const kept: string[] = [];
-  let length = ATTRACTAP_SECURITY_PROBLEMS_MORE.length;
-  for (const problem of problems) {
-    if (length + problem.length + 1 > maxLength) break;
-    kept.push(problem);
-    length += problem.length + 1;
-  }
-  return [...kept, ATTRACTAP_SECURITY_PROBLEMS_MORE].join(',');
 }

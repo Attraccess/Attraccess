@@ -1,4 +1,5 @@
 import type { AttractapCardOwner, AttractapNfcCard } from '@attraccess/application-models';
+import { parseReportedBuild } from './security/session-security-state';
 import { AttractapService, SYMBOLICATION_CONCURRENCY } from './attractap.service';
 import { ReaderUpdatedEvent } from './events';
 import { EncryptionService } from '../encryption/encryption.service';
@@ -7,7 +8,6 @@ import { CoredumpSymbolicationService } from './coredump-symbolication.service';
 import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../notifications/notification-types';
 import { AttractapFirmwareService } from './firmware.service';
-import { parseReportedBuild } from './security/session-security-state';
 import {
   FakeCardStore,
   FakeCrashReportStore,
@@ -197,6 +197,17 @@ describe('AttractapService reader maintenance and crash reports', () => {
       2,
     );
   });
+  it('fails for a reader that does not exist', async () => {
+    const { service } = setup();
+    await expect(service.updateReader(99, { name: 'x' })).rejects.toThrow('Reader with ID 99 not found');
+  });
+  it('deletes a reader and announces it only when one was deleted', async () => {
+    const { service, events } = setup();
+    expect(await service.deleteReader(99)).toBe(false);
+    expect(events.emit).not.toHaveBeenCalled();
+    expect(await service.deleteReader(4)).toBe(true);
+    expect(events.emit).toHaveBeenCalledWith('reader.deleted', expect.objectContaining({ readerId: 4 }));
+  });
   it('keeps secured only for a release secure build of a regular variant', async () => {
     const { service, reader } = setup();
     const secure = { profile: 'secure' as const, release: true, secureVersion: 1, variant: 'attractap-touch-v2' };
@@ -245,20 +256,9 @@ describe('AttractapService reader maintenance and crash reports', () => {
     await service.recordReaderBuild(4, parseReportedBuild({ profile: 'secure', release: true, secured: true }));
     expect(reader).toMatchObject({ secured: false, securedAt: null, firmwareProfile: 'secure' });
   });
-  it('fails for a reader that does not exist', async () => {
-    const { service } = setup();
-    await expect(service.updateReader(99, { name: 'x' })).rejects.toThrow('Reader with ID 99 not found');
-  });
-  it('deletes a reader and announces it only when one was deleted', async () => {
-    const { service, events } = setup();
-    expect(await service.deleteReader(99)).toBe(false);
-    expect(events.emit).not.toHaveBeenCalled();
-    expect(await service.deleteReader(4)).toBe(true);
-    expect(events.emit).toHaveBeenCalledWith('reader.deleted', expect.objectContaining({ readerId: 4 }));
-  });
   it('lists paired readers only, keeping resources out unless asked for', async () => {
     const { service, readers } = setup();
-    readers.add(makeReader({ id: 5, pairingState: 'unpaired' }));
+    readers.add(makeReader({ id: 5, pairingState: 'revoked' }));
     expect((await service.getPairedReaders()).map((r) => r.id)).toEqual([4]);
     expect((await service.getReadersToPair()).map((r) => r.id)).toEqual([5]);
   });

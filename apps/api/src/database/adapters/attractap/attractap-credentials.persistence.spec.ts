@@ -70,7 +70,7 @@ describe('credential registry on SQLite (atomic reader row and history)', () => 
   });
 
   const addReader = async (source: DataSource, name: string) =>
-    (await source.getRepository(Attractap).save({ name, apiTokenHash: `hash-${name}` } as Attractap)).id;
+    (await source.getRepository(Attractap).save({ name } as Attractap)).id;
   const certificate = { serial: '0a', notAfter: new Date('2030-01-01T00:00:00Z') };
   const events = async (source: DataSource) =>
     (await source.getRepository(AttractapCredentialEvent).find({ order: { id: 'ASC' } })).map((e) => [
@@ -92,7 +92,7 @@ describe('credential registry on SQLite (atomic reader row and history)', () => 
     });
 
     const row = await source.getRepository(Attractap).findOneByOrFail({ id: readerId });
-    expect(row).toMatchObject({ pairingState: 'paired', credentialFingerprint: 'fp-1', apiTokenHash: '' });
+    expect(row).toMatchObject({ pairingState: 'paired', credentialFingerprint: 'fp-1' });
     expect(await events(source)).toEqual([[readerId, 'paired', 'fp-1']]);
   });
 
@@ -189,7 +189,7 @@ describe('credential registry on SQLite (atomic reader row and history)', () => 
     const readerId = await addReader(source, 'one');
     const readers = new TypeOrmAttractapReaderStore(source.getRepository(Attractap), source.getRepository(Resource));
     const pair = (fingerprint: string) =>
-      registry.markPaired({ readerId, fingerprint, certificate, actorId: null, previousCredentialBecomes: 'replaced' });
+      registry.markPaired({ readerId, fingerprint, certificate, actorId: 1, previousCredentialBecomes: 'replaced' });
     await pair('fp');
     const checkedAt = new Date('2026-11-18T10:00:00Z');
     await readers.applySecurity(readerId, {
@@ -205,21 +205,8 @@ describe('credential registry on SQLite (atomic reader row and history)', () => 
       firmwareProfile: 'secure',
       securityReportProblems: [],
     });
-    expect(await readers.findSecurity(readerId)).toEqual({
-      id: readerId,
-      secureBootDigest0: null,
-      secureBootDigest1: null,
-      secured: true,
-      securedAt: checkedAt,
-      firmwareProfile: 'secure',
-      secureVersion: null,
-      efuseSecureVersion: 1,
-      securityReportCheckedAt: checkedAt,
-      securityReportProblems: [],
-    });
-    expect(await readers.findSecurity(readerId + 1000)).toBeUndefined();
 
-    await pair('fp-ds'); // an identity upgrade: the new key has to pass the report check again
+    await pair('fp-new'); // another key: it has to pass the report check again
     expect(await readers.findById(readerId)).toMatchObject({
       secured: false,
       securedAt: null,
@@ -232,7 +219,26 @@ describe('credential registry on SQLite (atomic reader row and history)', () => 
     expect(await readers.findById(readerId)).toMatchObject({ secured: false, securedAt: null });
   });
 
-  it('gives a token reader its token back when the pairing is undone', async () => {
+  it('writes the security columns only while the session key is the credential', async () => {
+    const { source, registry } = await connect();
+    const readerId = await addReader(source, 'one');
+    const readers = new TypeOrmAttractapReaderStore(source.getRepository(Attractap), source.getRepository(Resource));
+    await registry.markPaired({
+      readerId,
+      fingerprint: 'fp',
+      certificate,
+      actorId: 1,
+      previousCredentialBecomes: 'replaced',
+    });
+
+    expect(await readers.applySecurity(readerId, { secured: true }, 'someone-else')).toBe(false);
+    expect((await readers.findById(readerId))?.secured).toBe(false);
+    expect(await readers.applySecurity(readerId, { secured: true }, 'fp')).toBe(true);
+    await registry.revoke(readerId, 9);
+    expect(await readers.applySecurity(readerId, { secured: true }, 'fp')).toBe(false);
+  });
+
+  it('puts the record back to its state before the pairing when the pairing is undone', async () => {
     const { source, registry } = await connect();
     const readerId = await addReader(source, 'one');
     const { before } = await registry.markPaired({
@@ -246,6 +252,6 @@ describe('credential registry on SQLite (atomic reader row and history)', () => 
     await expect(registry.undoPairing({ readerId, fingerprint: 'fp', before, actorId: 1 })).resolves.toBe(true);
 
     const row = await source.getRepository(Attractap).findOneByOrFail({ id: readerId });
-    expect(row).toMatchObject({ pairingState: 'unpaired', credentialFingerprint: null, apiTokenHash: 'hash-one' });
+    expect(row).toMatchObject({ pairingState: 'revoked', credentialFingerprint: null });
   });
 });

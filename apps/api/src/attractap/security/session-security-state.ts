@@ -1,8 +1,4 @@
-import {
-  ATTRACTAP_FIRMWARE_PROFILES,
-  type AttractapFirmwareProfile,
-  type AttractapReaderKeyAlgorithm,
-} from '@attraccess/application-models';
+import { ATTRACTAP_FIRMWARE_PROFILES, type AttractapFirmwareProfile } from '@attraccess/application-models';
 
 /** What a reader claims about its own build in READER_FIRMWARE_INFO. A claim, never attestation. */
 export interface ReportedBuild {
@@ -13,7 +9,7 @@ export interface ReportedBuild {
 }
 
 const MAX_SECURE_VERSION = 0xffff;
-/** How long a control message that needs the build (eFuse report, identity upgrade) waits for READER_FIRMWARE_INFO. */
+/** How long the eFuse report waits for READER_FIRMWARE_INFO. */
 export const FIRMWARE_INFO_WAIT_MS = 5_000;
 
 export function parseReportedBuild(payload: unknown): ReportedBuild {
@@ -47,7 +43,6 @@ export class SessionSecurityState {
     public readonly readerId: number,
     /** SHA-256 hex of the SPKI this session authenticated with. */
     public readonly fingerprint: string,
-    public readonly algorithm: AttractapReaderKeyAlgorithm | null,
   ) {}
 
   public setBuild(build: ReportedBuild): void {

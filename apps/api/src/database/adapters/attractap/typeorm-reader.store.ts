@@ -81,18 +81,13 @@ export class TypeOrmAttractapReaderStore implements AttractapReaderStore {
     return readers.map(toReader);
   }
 
-  async listUnpaired(): Promise<AttractapReader[]> {
-    const readers = await this.readers.find({ where: { pairingState: Not('paired') }, relations: { resources: true } });
+  async listRevoked(): Promise<AttractapReader[]> {
+    const readers = await this.readers.find({ where: { pairingState: 'revoked' }, relations: { resources: true } });
     return readers.map(toReader);
   }
 
-  async create(input: {
-    apiTokenHash: string;
-    name: string;
-    firmware?: AttractapFirmwareInfo;
-  }): Promise<AttractapReader> {
+  async create(input: { name: string; firmware?: AttractapFirmwareInfo }): Promise<AttractapReader> {
     const saved = await this.readers.save({
-      apiTokenHash: input.apiTokenHash,
       name: input.name,
       firmware: input.firmware ? firmwareColumns(input.firmware) : undefined,
     });

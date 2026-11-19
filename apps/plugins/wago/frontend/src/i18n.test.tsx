@@ -2,7 +2,6 @@ import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { act, cleanup, render, renderHook, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 // Integration test: verify the independent plugin catalogs against the same host language store.
-import userEvent from '@testing-library/user-event';
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import rabbitmqDe from './../../../rabbitmq/frontend/src/de.json';
 // eslint-disable-next-line @nx/enforce-module-boundaries
@@ -22,9 +21,8 @@ import type { Freshness, WagoDiagnostics } from './../../diagnostics-types';
 import type { ModbusConnection, ModbusProfile, RegisterFormat } from '../../modbus/model';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
 import type { CommissioningVerification, WagoConfigurationSnapshot } from './api/client';
-import { ChannelWorkspace } from './configuration/channels/ChannelWorkspace';
 import type { Channel } from './configuration/model';
-import { changeLabel, emptyConfiguration, emptyMetadata, readableChangeValue } from './configuration/model';
+import { changeLabel, emptyConfiguration, readableChangeValue } from './configuration/model';
 import {
   ConfigurationChanges,
   ConfigurationErrors,
@@ -32,7 +30,6 @@ import {
 } from './configuration/ConfigurationChanges';
 import { useWagoTranslations, wagoTranslations } from './i18n';
 import { modbusDisplayName } from './configuration/modbus/modbus-labels';
-import { ModbusChannels } from './configuration/channels/ModbusChannels';
 import germanPresets from './presets.de.json';
 import englishPresets from './presets.en.json';
 
@@ -145,101 +142,6 @@ function leaves(record: Record<string, unknown>, prefix = ''): Record<string, st
     );
     act(() => useTranslationState.getState().setLanguage('en'));
     expect(result.current.tBackendMessage('Confirm controller identity')).toBe('Confirm controller identity');
-  });
-}
-
-{
-  it('localizes Modbus add buttons without saving translated signal names', async () => {
-    const builtin = BUILTIN_MODBUS_PROFILES[0];
-    const custom = duplicateProfile(builtin, 'custom-meter');
-    custom.actions = [
-      { ...custom.measurements[0], id: 'relay', name: 'Active power', functionCode: 5, onValue: 1, offValue: 0 },
-    ];
-    const configuration = {
-      connections: [],
-      profiles: [custom],
-      devices: [builtin, custom].map((profile, index) => ({
-        id: `meter-${index}`,
-        name: `Meter ${index}`,
-        connectionId: 'bus',
-        unitId: index + 1,
-        profileId: profile.id,
-        profileVersion: profile.version,
-      })),
-    };
-    const onAdd = vi.fn();
-    render(<ModbusChannels configuration={configuration} onAdd={onAdd} />);
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Add Active power from Meter 0' }));
-    expect(onAdd).toHaveBeenLastCalledWith(
-      { deviceId: 'meter-0', measurementId: 'active-power' },
-      'Meter 0: Active power',
-    );
-    act(() => useTranslationState.getState().setLanguage('de'));
-    expect(onAdd).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'Wirkleistung von Meter 0 hinzufügen' }));
-    expect(onAdd).toHaveBeenLastCalledWith(
-      { deviceId: 'meter-0', measurementId: 'active-power' },
-      'Meter 0: Active power',
-    );
-    for (const button of screen.getAllByRole('button', { name: 'Active power von Meter 1 hinzufügen' }))
-      await user.click(button);
-    expect(onAdd).toHaveBeenLastCalledWith({ deviceId: 'meter-1', actionId: 'relay' }, 'Meter 1: Active power');
-  });
-}
-
-{
-  it('marks Modbus readings whose channel is disabled in both languages', () => {
-    const builtin = BUILTIN_MODBUS_PROFILES[0];
-    const configuration = {
-      connections: [],
-      profiles: [],
-      devices: [
-        { id: 'meter', name: 'Meter', connectionId: 'bus', unitId: 1, profileId: builtin.id, profileVersion: 1 },
-      ],
-    };
-    const snapshot = {
-      physicalPoints: [
-        {
-          id: 'p1',
-          hardwareProfile: 'modbus' as const,
-          channel: 0,
-          modbus: { deviceId: 'meter', measurementId: 'tariff' },
-        },
-        {
-          id: 'p2',
-          hardwareProfile: 'modbus' as const,
-          channel: 0,
-          modbus: { deviceId: 'meter', measurementId: 'frequency' },
-        },
-      ],
-      logicalChannels: [
-        {
-          id: 'c1',
-          physicalPointId: 'p1',
-          profile: 'generic-monitored-input' as const,
-          capabilities: ['input' as const, 'measurement' as const],
-          disconnectPolicy: { mode: 'hold' as const },
-          enabled: false as const,
-        },
-        {
-          id: 'c2',
-          physicalPointId: 'p2',
-          profile: 'generic-monitored-input' as const,
-          capabilities: ['input' as const, 'measurement' as const],
-          disconnectPolicy: { mode: 'hold' as const },
-        },
-      ],
-    };
-    act(() => useTranslationState.getState().setLanguage('en'));
-    render(<ModbusChannels configuration={configuration} snapshot={snapshot} onAdd={vi.fn()} />);
-    const hint = screen.getByText(/^Disabled: this reading already has a channel/);
-    // No second channel for the disabled reading; the enabled one can still be added again.
-    const blocked = screen.getAllByRole('button').filter((button) => button.hasAttribute('disabled'));
-    expect(blocked).toHaveLength(1);
-    expect(blocked[0].getAttribute('aria-describedby')).toBe(hint.id);
-    act(() => useTranslationState.getState().setLanguage('de'));
-    expect(screen.getAllByText(/^Deaktiviert: Dieser Messwert hat bereits einen Kanal/)).toHaveLength(1);
   });
 }
 
@@ -504,84 +406,6 @@ function leaves(record: Record<string, unknown>, prefix = ''): Record<string, st
       'Second profile',
     );
     expect(readableChangeValue('$', snapshot, snapshot, {}, result.current.t)).toContain('Profile ID: Second profile');
-  });
-}
-
-{
-  it('updates visible labels while preserving a channel creation form and its user-entered name', async () => {
-    render(
-      <ChannelWorkspace
-        snapshot={emptyConfiguration}
-        metadata={emptyMetadata}
-        onChange={() => undefined}
-        onMetadataChange={() => undefined}
-        onExternal={() => undefined}
-      />,
-    );
-    act(() => screen.getByRole('button', { name: 'Add channel' }).click());
-    act(() => screen.getByRole('button', { name: 'Continue' }).click());
-    const input = screen.getByRole('textbox', { name: 'New channel name' }) as HTMLInputElement;
-    await userEvent.setup().type(input, 'Workshop door');
-    act(() => useTranslationState.getState().setLanguage('de'));
-    expect(screen.getByRole('textbox', { name: 'Neuer Kanalname' })).toBe(input);
-    expect(input.value).toBe('Workshop door');
-    expect(screen.getByRole('button', { name: 'Weiter' })).toBeTruthy();
-  });
-}
-
-{
-  it.each([
-    ['751-9301', 'generic-digital-output'],
-    ['879-3000', 'generic-digital-output'],
-    ['751-9301', 'vendor-profile.v2'],
-    ['879-3000', 'vendor-profile.v2'],
-  ])('switches channel preset labels and preserves unknown identifiers (%s, %s)', (hardwareProfile, profile) => {
-    // A future saved profile can be unknown to this frontend version.
-    const snapshot: WagoConfigurationSnapshot = JSON.parse(
-      JSON.stringify({
-        version: 1,
-        physicalPoints: [{ id: 'point', hardwareProfile, channel: 0 }],
-        logicalChannels: [
-          {
-            id: 'channel',
-            physicalPointId: 'point',
-            profile,
-            capabilities: ['output'],
-            disconnectPolicy: { mode: 'immediate' },
-          },
-        ],
-      }),
-    );
-    const onChange = vi.fn();
-    const onMetadataChange = vi.fn();
-    render(
-      <ChannelWorkspace
-        snapshot={snapshot}
-        metadata={emptyMetadata}
-        focusChannelId="channel"
-        onChange={onChange}
-        onMetadataChange={onMetadataChange}
-        onExternal={() => undefined}
-      />,
-    );
-    const builtin = profile === 'generic-digital-output';
-    const english = builtin ? englishPresets.items['generic-digital-output'].name : profile;
-    const german = builtin ? germanPresets.items['generic-digital-output'].name : profile;
-    const sentence = (name: string, language: 'en' | 'de') =>
-      hardwareProfile === '751-9301'
-        ? language === 'en'
-          ? `Setup preset: ${name}. Customize the behavior below.`
-          : `Einrichtungsvorlage: ${name}. Passe das Verhalten unten an.`
-        : language === 'en'
-          ? `Existing ${name} configuration is preserved. This hardware module requires its dedicated editor.`
-          : `Die vorhandene Konfiguration ${name} bleibt erhalten. Dieses Hardware-Modul benötigt seinen eigenen Editor.`;
-    expect(screen.getByText(sentence(english, 'en'))).toBeTruthy();
-    act(() => useTranslationState.getState().setLanguage('de'));
-    expect(screen.getByText(sentence(german, 'de'))).toBeTruthy();
-    act(() => useTranslationState.getState().setLanguage('en'));
-    expect(screen.getByText(sentence(english, 'en'))).toBeTruthy();
-    expect(onChange).not.toHaveBeenCalled();
-    expect(onMetadataChange).not.toHaveBeenCalled();
   });
 }
 

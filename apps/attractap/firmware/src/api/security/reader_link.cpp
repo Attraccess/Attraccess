@@ -21,8 +21,6 @@ namespace
     {
         switch (channel)
         {
-        case ReaderLink::Channel::Legacy:
-            return "token";
         case ReaderLink::Channel::Pairing:
             return "pairing";
         case ReaderLink::Channel::Session:
@@ -38,10 +36,8 @@ namespace
         case ReaderLink::Channel::Pairing:
             return SessionFraming::PAIRING_SUBPROTOCOL;
         case ReaderLink::Channel::Session:
-            return SessionFraming::SESSION_SUBPROTOCOL;
-        case ReaderLink::Channel::Legacy:
         default:
-            return "";
+            return SessionFraming::SESSION_SUBPROTOCOL;
         }
     }
 }
@@ -56,32 +52,11 @@ void ReaderLink::setup()
     loadIdentity();
     timeFloor = TimeFloor(CredentialStore::timeFloorSeconds());
 
-    // A reader with credentials only ever uses the session; one with a token keeps signing in
-    // with it until an admin pairs it; everything else asks to be paired.
-    if (credentials.paired())
-    {
-        channel = Channel::Session;
-    }
-    else if (!Settings::getAttraccessAuthConfig().apiKey.empty())
-    {
-        channel = Channel::Legacy;
-    }
-    else
-    {
-        channel = Channel::Pairing;
-    }
+    // A reader with credentials only ever uses the session; everything else asks to be paired.
+    channel = credentials.paired() ? Channel::Session : Channel::Pairing;
     logger.infof("Reader channel: %s", channelName(channel.load()));
 
     socket.setMessageCallbackRaw([this](const char *data, size_t length) {
-        // The token channel keeps its old threading: the API handles messages where they arrive.
-        if (channel == Channel::Legacy)
-        {
-            if (appMessage)
-            {
-                appMessage(data, length);
-            }
-            return;
-        }
         post(EventType::Text, std::string(data, length));
     });
     socket.setRawBinaryCallback([this](const uint8_t *data, size_t length) {
@@ -120,10 +95,6 @@ void ReaderLink::setup()
 bool ReaderLink::loadIdentity()
 {
     credentials = CredentialStore::load();
-    if (selectSecureIdentity())
-    {
-        return true;
-    }
     key = keyStore.load();
     if (key)
     {
@@ -134,10 +105,6 @@ bool ReaderLink::loadIdentity()
 
 bool ReaderLink::newIdentity()
 {
-    if (newSecureIdentity())
-    {
-        return true;
-    }
     // A new key drops everything bound to the old one (pinned CA, certificate).
     key = keyStore.createNew();
     credentials = CredentialStore::load();
@@ -179,7 +146,7 @@ void ReaderLink::loop()
     {
         // Frames of a connection that belonged to the previous channel are meaningless now. Checked
         // per event: an earlier event of this batch may have switched the channel.
-        if (event.type == EventType::StartPairing || event.generation == liveGeneration())
+        if (event.generation == liveGeneration())
         {
             handle(event);
         }
@@ -228,14 +195,6 @@ void ReaderLink::handle(Event &event)
 {
     switch (event.type)
     {
-    case EventType::StartPairing:
-        if (channel == Channel::Legacy)
-        {
-            pairingTicket = event.data;
-            pairingFromToken = !Settings::getAttraccessAuthConfig().apiKey.empty();
-            useChannel(Channel::Pairing, event.data.empty() ? "no credentials" : "admin started pairing");
-        }
-        return;
     case EventType::Connected:
         connected = true;
         if (channel == Channel::Session)
@@ -256,7 +215,7 @@ void ReaderLink::handle(Event &event)
             std::lock_guard<std::mutex> lock(sessionMutex);
             closeSessionLocked();
             outbox.clear();
-            resetSessionIdentityState();
+            efuseReportSent = false;
             // The sign-in belonged to that session; the next one authenticates again.
             State::setApiState(false, "");
         }
@@ -273,7 +232,7 @@ void ReaderLink::handle(Event &event)
         else if (channel == Channel::Session)
         {
             // A session speaks TLS bytes only. During the handshake this is typically a proxy that
-            // dropped the subprotocol, so the server took us for a token reader.
+            // dropped the subprotocol, so the server did not speak TLS to us.
             logger.error("Text frame on the session channel, reconnecting");
             if (handshakeStartedMs != 0)
             {
@@ -323,7 +282,7 @@ void ReaderLink::useChannel(Channel next, const char *reason)
         closeSessionLocked();
         outbox.clear();
     }
-    resetSessionIdentityState();
+    efuseReportSent = false;
     pairing.reset();
     connected = false;
     handshakeStartedMs = 0;
@@ -361,8 +320,6 @@ void ReaderLink::setMessageCallbackRaw(std::function<void(const char *, size_t)>
 void ReaderLink::setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback)
 {
     appBinary = callback;
-    // Token channel: OTA chunks arrive as plain binary frames, exactly as before.
-    socket.setBinaryDataCallback(std::move(callback));
 }
 #endif
 
@@ -370,8 +327,6 @@ bool ReaderLink::sendMessage(const char *message, size_t length)
 {
     switch (channel)
     {
-    case Channel::Legacy:
-        return socket.sendMessage(message, length);
     case Channel::Session:
     {
         // Nothing to send into before the handshake completed; never wait for a handshake step.
@@ -379,7 +334,7 @@ bool ReaderLink::sendMessage(const char *message, size_t length)
         {
             return false;
         }
-        std::unique_lock<std::mutex> lock(sessionMutex);
+        std::lock_guard<std::mutex> lock(sessionMutex);
         if (!tls.sendFrame(SessionFraming::FrameType::JSON, reinterpret_cast<const uint8_t *>(message), length))
         {
             return false;
@@ -403,8 +358,6 @@ bool ReaderLink::sendHeartbeat(const char *message, size_t length)
 {
     switch (channel)
     {
-    case Channel::Legacy:
-        return socket.sendHeartbeat(message, length);
     case Channel::Session:
     {
         // Heartbeats are droppable: skip one rather than wait for the TLS worker.
@@ -451,12 +404,6 @@ void ReaderLink::forceReconnect(const char *reason)
     socket.forceReconnect(reason);
 }
 
-void ReaderLink::startPairing(const std::string &ticket)
-{
-    // May be called from the transport task (token channel): handled on the main loop.
-    post(EventType::StartPairing, ticket);
-}
-
 // --- pairing channel -------------------------------------------------------------------------
 
 void ReaderLink::onPairingConnected()
@@ -473,10 +420,7 @@ void ReaderLink::onPairingConnected()
                  (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
 #endif
     pairing.reset(new PairingClient(*key, options.lite, options.firmware, options.pairingClock));
-    // A ticket is single-use: a later request of this reader is unbound.
-    const std::string ticket = pairingTicket;
-    pairingTicket.clear();
-    pairing->start(ticket, [this](const std::string &text) { return socket.sendMessage(text.data(), text.size()); });
+    pairing->start([this](const std::string &text) { return socket.sendMessage(text.data(), text.size()); });
 }
 
 void ReaderLink::onPairingText(const std::string &text)
@@ -500,13 +444,6 @@ void ReaderLink::onPairingEnded(PairingClient::Outcome outcome)
             return;
         }
         credentials.caSpki = caSpki;
-        // Remember which key this pairing belongs to until the certificate itself shows it.
-        CredentialStore::saveIdentityKind(key && key->algorithm() == IReaderKey::Algorithm::Rsa3072Ds
-                                              ? CredentialStore::IdentityKind::Ds
-                                              : CredentialStore::IdentityKind::Software);
-        // The token stays until the bootstrap session delivered a verified grant: if this approval
-        // came from someone posing as the server, the reader can still fall back to it.
-        pairingFromToken = false;
         useChannel(Channel::Session, "pairing approved");
         return;
     }
@@ -516,13 +453,5 @@ void ReaderLink::onPairingEnded(PairingClient::Outcome outcome)
     }
     const uint32_t delay = pairing->retryDelayMs();
     pairing.reset();
-    if (pairingFromToken && !Settings::getAttraccessAuthConfig().apiKey.empty())
-    {
-        // An admin-started pairing that did not complete: keep working with the token.
-        pairingFromToken = false;
-        State::clearEnrollment();
-        useChannel(Channel::Legacy, "pairing did not complete");
-        return;
-    }
     reconnectAfter(delay);
 }

@@ -6,7 +6,6 @@ import { HandshakeLimiter } from './handshake-limiter';
 import { Frame, FrameDecoder, FrameType, FramingError, encodeFrame } from './session-framing';
 import { SEND_QUEUE_LIMIT_BYTES, WsByteStream } from './ws-byte-stream';
 import { spkiFingerprint, READER_URI_PREFIX } from './pki';
-import { readerKeyAlgorithm } from './reader-spki';
 
 /** Time for the TLS handshake and the authorization once a handshake slot was granted. */
 export const HANDSHAKE_TIMEOUT_MS = 10_000;
@@ -50,11 +49,6 @@ export type SessionDecision =
   | { kind: 'reader'; readerId: number; certificateNotAfter: Date }
   | { kind: 'bootstrap' }
   /**
-   * The reader's P-256 key was replaced by its DS key a moment ago and the reader may not have stored the new
-   * certificate: an upgrade-only session that can re-send it. No application messages.
-   */
-  | { kind: 'upgrade-recovery'; readerId: number }
-  /**
    * `notifyReader`: tell the reader inside TLS (`session.rejected`). The reader acts on it by
    * erasing its key and pin, so it is only sent for a credential decision, never for a
    * certificate the reader could fix by retrying (e.g. one that looks expired to a wrong clock).
@@ -95,9 +89,7 @@ function contextFor(material: SessionTlsMaterial): { context: SecureContext; ca:
         maxVersion: 'TLSv1.3',
         ciphers: 'TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384',
         ecdhCurve: 'prime256v1',
-        // The server's own signature stays ECDSA. A reader may sign with ECDSA (software key) or RSA-PSS (its DS
-        // key). TLS 1.3 has no PKCS#1 v1.5 in CertificateVerify; the key size is pinned in describePeer.
-        sigalgs: 'ecdsa_secp256r1_sha256:rsa_pss_rsae_sha256',
+        sigalgs: 'ecdsa_secp256r1_sha256',
         // No tickets: every connection performs a full, fresh handshake.
         secureOptions: constants.SSL_OP_NO_TICKET | constants.SSL_OP_NO_RENEGOTIATION,
       }),
@@ -141,7 +133,7 @@ export class SessionConnection extends EventEmitter {
   public async handshake(
     material: () => Promise<SessionTlsMaterial>,
     authorize: (peer: PeerIdentity) => Promise<SessionDecision>,
-  ): Promise<SessionDecision & { kind: 'reader' | 'bootstrap' | 'upgrade-recovery' }> {
+  ): Promise<SessionDecision & { kind: 'reader' | 'bootstrap' }> {
     let release: (() => void) | null = null;
     try {
       await this.within(FIRST_BYTE_TIMEOUT_MS, 'handshake-timeout', 'no data', () => this.firstByte);
@@ -328,8 +320,6 @@ export class SessionConnection extends EventEmitter {
     const cert = tls.getPeerX509Certificate();
     if (!cert) return null;
     const spki = cert.publicKey.export({ type: 'spki', format: 'der' });
-    // Only the two reader key kinds are accepted: P-256, or RSA-3072 with e = 65537.
-    if (!readerKeyAlgorithm(spki)) throw new SessionError('rejected', 'unsupported-key');
     // A TLSSocket without a server does not compute `authorized`, so the chain is verified here.
     const error = verifyAgainstCa(cert, ca);
     return {

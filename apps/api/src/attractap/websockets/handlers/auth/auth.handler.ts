@@ -4,10 +4,8 @@ import type { AttractapReader } from '@attraccess/application-models';
 import { WebsocketService } from '../../websocket.service';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AttractapService } from '../../../attractap.service';
-import { verifyToken } from '../../websocket.utils';
 import { ResourceListService } from '../resource-list/resource-list.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
-import { AUDIT_RECORDER, AuditRecorder } from '../../../../audit/recorder/audit-event';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
 import { ReaderTimeZoneService } from '../../reader-time-zone.service';
 
@@ -18,8 +16,6 @@ const resourceIdsOf = (reader: AttractapReader): number[] | undefined =>
 @Injectable()
 export class AttractapAuthHandler {
   private readonly logger = new Logger(AttractapAuthHandler.name);
-  /** Rejected token sign-ins of paired readers are audited at most once per reader per minute. */
-  private readonly tokenRejectionAuditedAt = new Map<number, number>();
 
   @Inject(AttractapService)
   private attractapService: AttractapService;
@@ -30,9 +26,6 @@ export class AttractapAuthHandler {
   @Inject(MetricsService)
   private metricsService: MetricsService;
 
-  @Inject(AUDIT_RECORDER)
-  private audit: AuditRecorder;
-
   @Inject(ReaderTimeZoneService)
   private readerTimeZone: ReaderTimeZoneService;
 
@@ -41,102 +34,6 @@ export class AttractapAuthHandler {
 
   @Inject(WebsocketService)
   private websocketService: WebsocketService;
-
-  /**
-   * Open token registration ended with reader pairing: a reader that is not known joins only through
-   * an admin approval (attractap-pairing.v1). A legacy REGISTER creates nothing and gets no reply.
-   */
-  public async handleReaderRegister(socket: AuthenticatedWebSocket, _data: AttractapEvent['data']) {
-    this.logger.warn(`Ignoring legacy REGISTER from client ${socket.id}: readers join through pairing`);
-  }
-
-  public async handleAuthentication(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    if (socket.readyState !== WebSocket.OPEN) return;
-    // Never log the payload: it carries the reader's API token.
-    const readerLabel = `client ${socket.id}, reader ${String(data.payload?.id)}`;
-    this.logger.debug(`processing READER_AUTHENTICATE event (${readerLabel})`);
-
-    const unauthorizedResponse = new AttractapEvent(AttractapEventType.READER_UNAUTHORIZED, {
-      message: 'PLEASE_REREGISTER',
-    });
-
-    // Re-authentication must revoke the previous identity before validating new credentials.
-    const attempt = Symbol('reader-authentication');
-    socket.state.readerAuthenticationAttempt = attempt;
-    const isCurrentAttempt = () =>
-      socket.state.readerAuthenticationAttempt === attempt && socket.readyState === WebSocket.OPEN;
-    const previousReaderId = socket.readerId;
-    const previousReaderName = socket.readerName;
-    socket.readerId = null;
-    socket.readerName = null;
-    if (
-      previousReaderId &&
-      !Array.from(this.websocketService.sockets.values()).some(
-        (other) => other.id !== socket.id && other.readerId === previousReaderId,
-      )
-    ) {
-      this.metricsService.attractapReaderConnected.set(
-        { reader_id: String(previousReaderId), reader_name: previousReaderName ?? '' },
-        0,
-      );
-    }
-    // The previous reader's zone state goes with its identity unless another socket still is that reader.
-    if (previousReaderId) this.readerTimeZone.forgetUnlessInUse(previousReaderId, socket.id);
-    this.logger.debug('Checking if reader exists');
-    // Read before the lookup: a reader update after it makes the lookup's resource ids stale.
-    const resourceGeneration = this.readerTimeZone.resourceGeneration(data.payload.id);
-    const reader = await this.attractapService.findReaderById(data.payload.id);
-    if (!isCurrentAttempt()) return;
-    if (!reader) {
-      this.logger.error(`No reader-config found (${readerLabel}), sending UNAUTHORIZED response to client`);
-      return await socket.sendMessage(unauthorizedResponse);
-    }
-
-    // A paired (or revoked) reader authenticates with its certificate only.
-    if (reader.pairingState !== 'unpaired') {
-      this.logger.warn(`Token sign-in rejected for ${reader.pairingState} reader ${reader.id}`);
-      if (this.shouldAuditTokenRejection(reader.id))
-        await this.audit.record({
-          domain: 'attractap',
-          action: 'attractap.reader.token_rejected',
-          actor: { id: null, authenticationMethod: null },
-          subject: { type: 'attractap.reader', id: reader.id },
-          details: { reason: reader.pairingState },
-        });
-      return await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.READER_UNAUTHORIZED, { message: 'PAIRING_REQUIRED' }),
-      );
-    }
-
-    this.logger.debug('Checking if token is valid');
-    const isValidToken = await verifyToken(data.payload.token, reader.apiTokenHash);
-    if (!isCurrentAttempt()) return;
-    if (!isValidToken) {
-      this.logger.error(`Invalid token (${readerLabel}), sending UNAUTHORIZED response to client`);
-      return await socket.sendMessage(unauthorizedResponse);
-    }
-
-    const storedLanguage = await this.settingsService.getDefaultLanguage();
-    if (!isCurrentAttempt()) return;
-    if (!(await this.resolveTimeZone(socket, reader, resourceGeneration, attempt, isCurrentAttempt))) return;
-    // A broadcast during the reads supersedes its snapshot, even before this
-    // socket becomes eligible for language broadcasts.
-    const language = this.websocketService.readerLanguage ?? storedLanguage;
-    socket.readerId = reader.id;
-    socket.readerName = reader.name;
-    // Only unpaired readers sign in by token. It stays connected for the firmware update and the push to
-    // start pairing, but offers no functions until the reader is paired.
-    socket.state.pairingRequired = true;
-    socket.state.updateCheckDone = false;
-    this.metricsService.attractapReaderConnected.set({ reader_id: String(reader.id), reader_name: reader.name }, 1);
-
-    const authenticatedResponse = new AttractapEvent(AttractapEventType.READER_AUTHENTICATED, {
-      name: reader.name,
-      language,
-      serverTime: this.readerTimeZone.serverTimeFor(reader.id),
-    });
-    await socket.sendMessage(authenticatedResponse);
-  }
 
   /**
    * Resolves the reader's time zone before the socket becomes the reader's, so a superseded attempt claims and
@@ -161,17 +58,8 @@ export class AttractapAuthHandler {
     return false;
   }
 
-  private shouldAuditTokenRejection(readerId: number): boolean {
-    const now = Date.now();
-    const last = this.tokenRejectionAuditedAt.get(readerId);
-    if (last !== undefined && now - last < 60_000) return false;
-    this.tokenRejectionAuditedAt.set(readerId, now);
-    return true;
-  }
-
   /**
    * Signs in a reader whose identity was already proven by its TLS client certificate.
-   * Mirrors the token path but without any token.
    */
   public async authenticateSessionReader(socket: AuthenticatedWebSocket, readerId: number): Promise<boolean> {
     const attempt = Symbol('reader-session-authentication');
@@ -189,7 +77,6 @@ export class AttractapAuthHandler {
     const language = this.websocketService.readerLanguage ?? storedLanguage;
     socket.readerId = reader.id;
     socket.readerName = reader.name;
-    socket.state.pairingRequired = false;
     this.metricsService.attractapReaderConnected.set({ reader_id: String(reader.id), reader_name: reader.name }, 1);
 
     await socket.sendMessage(

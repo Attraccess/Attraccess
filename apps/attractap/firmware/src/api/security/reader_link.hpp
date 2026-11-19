@@ -18,15 +18,13 @@
 #include "reader_key_store.hpp"
 #include "session_tls.hpp"
 
-// The reader's connection to the server, as the API sees it. It picks one of three channels on
+// The reader's connection to the server, as the API sees it. It picks one of two channels on
 // the same WebSocket path and switches between them:
 //  - Session (attractap-session.v1): paired readers. TLS 1.3 inside binary frames, mutually
 //    authenticated against the pinned installation CA. A paired reader never leaves it except
 //    after an authenticated "session.rejected" (pairing removed), which starts a new identity.
-//  - Pairing (attractap-pairing.v1): readers without credentials, and token readers an admin
-//    asked to pair. Shows the rotating code until approved.
-//  - Legacy (no subprotocol): readers that still sign in with their token. Unchanged, until an
-//    admin starts pairing.
+//  - Pairing (attractap-pairing.v1): readers without credentials. Shows the rotating code until
+//    approved.
 // The API's messages and heartbeats travel inside the session; on the pairing channel they are
 // dropped. All TLS and pairing work runs on the main loop (loop()); transport callbacks only queue.
 class ReaderLink : public IReaderTransport
@@ -34,7 +32,6 @@ class ReaderLink : public IReaderTransport
 public:
     enum class Channel
     {
-        Legacy,
         Pairing,
         Session,
     };
@@ -52,7 +49,7 @@ public:
     // After the pinned server could not be verified: wait before trying again.
     static constexpr uint32_t UNTRUSTED_RETRY_MS = 30000;
     // A reader whose first (bootstrap) session never came up: after this many consecutive
-    // unverifiable servers it forgets the pinned key (not its own) and asks again (token or pairing).
+    // unverifiable servers it forgets the pinned key (not its own) and asks to be paired again.
     // A reader with a certificate never does this.
     static constexpr int BOOTSTRAP_UNTRUSTED_LIMIT = 3;
     // Consecutive failed handshakes (timeouts, errors, text frames) before the screen shows an error.
@@ -81,11 +78,8 @@ public:
 #ifdef ESP_PLATFORM
     void setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback) override;
 #endif
-    void startPairing(const std::string &ticket) override;
     bool authenticatesReader() const override { return channel == Channel::Session; }
-    const char *identityName() const override { return usingDsKey.load() ? "ds-rsa3072" : "ecdsa-p256"; }
-    // Secure builds: the eFuse report, the software key's removal (DS session) and the identity upgrade request
-    // follow READER_FIRMWARE_INFO of a session. No-op on plain builds and outside a session.
+    // Secure builds: sends the eFuse report once per session. No-op on plain builds and outside a session.
     void onFirmwareInfoSent() override;
 
     Channel currentChannel() const { return channel.load(); }
@@ -101,7 +95,6 @@ private:
         Disconnected,
         Text,
         Binary,
-        StartPairing,
         // Results of session work: one decrypted frame, then the session status after the work.
         SessionFrame,
         SessionStatus,
@@ -148,24 +141,9 @@ private:
     bool loadIdentity();
     bool newIdentity();
 
-    // --- Digital Signature identity (ATT-1207, reader_link_identity.cpp). All of it is a no-op on plain builds.
-    // Picks the DS key or the software key at boot: DS unpaired -> DS; paired with P-256 -> keep it and
-    // upgrade; a certificate on the DS key -> DS. False when the software identity applies.
-    bool selectSecureIdentity();
-    // The pairing is gone (rejected by the server): a DS reader pairs again with its DS key.
-    bool newSecureIdentity();
-    // Sends identity.upgrade.request when IdentityUpgrade::shouldRequest says so. `serverRecover`: the server opened
-    // an upgrade-only session (identity.recover) for this replaced key.
-    void startIdentityUpgrade(bool serverRecover);
-    void onIdentityChallenge(const std::string &nonceBase64);
-    void onIdentityUpgraded(const char *certificatePem);
-    void onIdentityRejected(const char *reason);
-    // The DS session was signed in (READER_AUTHENTICATED, firmware info sent): the software key goes.
-    void onDsSessionConfirmed();
-    // Sends the eFuse report once per session.
+    // Sends the eFuse report once per session (reader_link_report.cpp).
     void sendEfuseReport();
     bool sendControl(const std::string &json);
-    void resetSessionIdentityState();
 
     void onSessionConnected();
     // A handshake did not complete (not an unverifiable server): shown after a few in a row.
@@ -193,23 +171,8 @@ private:
     std::atomic<Channel> channel{Channel::Pairing};
     ReaderCredentials credentials;
     SoftwareReaderKeyStore keyStore;
-    // The key of this boot's sessions: the software key or the DS key (both shared with the two below).
-    std::shared_ptr<IReaderKey> key;
-    std::shared_ptr<IReaderKey> dsKey;
-    std::shared_ptr<IReaderKey> softwareKey;
-    std::atomic<bool> usingDsKey{false};
-    // Paired with the software key although a DS key exists: the identity upgrade moves it.
-    bool upgradeCandidate = false;
-    // One request per session; `not-allowed` stops them until the next boot (except a server recovery).
-    bool upgradeRequested = false;
-    bool upgradeBlocked = false;
-    bool upgradeProofSent = false;
-    bool efuseReportSent = false;
-    bool softwareKeyDropped = false;
+    std::unique_ptr<IReaderKey> key;
     std::unique_ptr<PairingClient> pairing;
-    std::string pairingTicket;
-    // Pairing was started from the token channel: a failure goes back to it.
-    bool pairingFromToken = false;
     TimeFloor timeFloor;
     bool connected = false;
     bool untrusted = false;
@@ -239,4 +202,5 @@ private:
     // tls.open(), readable without sessionMutex: senders on the main loop must not wait for a
     // handshake step on the worker (LVGL, LEDs and NFC would stall).
     std::atomic<bool> sessionReady{false};
+    bool efuseReportSent = false;
 };

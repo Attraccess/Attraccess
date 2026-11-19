@@ -33,29 +33,6 @@ namespace CredentialStore
     // A new identity: stores the key and drops everything bound to the previous one.
     bool saveNewKey(const std::vector<uint8_t> &privateKey);
     bool eraseKey();
-    // Which key the pairing was made with (ATT-1207): the DS key or the P-256 software key. Written when the
-    // pin is saved; the certificate's own public key decides once there is one. Unknown on readers
-    // paired before this existed.
-    enum class IdentityKind
-    {
-        Unknown,
-        Software,
-        Ds,
-    };
-    IdentityKind identityKind();
-    bool saveIdentityKind(IdentityKind kind);
-    // Drops pin, grant and certificate but keeps the key: a new pairing with the same (DS) key.
-    bool clearPairing();
-    // The certificate the server issued for the DS key after an identity upgrade, and the matching kind.
-    bool saveUpgradedCertificate(const std::vector<uint8_t> &certificate);
-#ifdef ATTRACTAP_TEST_HOOKS
-    // Test hook: the next boot ignores the DS key and pairs with a fresh P-256 key. Release builds (no
-    // ATTRACTAP_TEST_HOOKS) contain neither the setter nor the NVS flag check.
-    bool setForceSoftwareIdentity(bool force);
-    bool consumeForceSoftwareIdentity();
-#else
-    inline bool consumeForceSoftwareIdentity() { return false; }
-#endif
     bool savePin(const std::vector<uint8_t> &caSpki);
     // Forgets the pinned CA and everything bound to it; keeps the reader key. Only for a reader
     // whose bootstrap session never reached a verifiable server (no certificate yet).

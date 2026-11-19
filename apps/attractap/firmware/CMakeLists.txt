@@ -62,11 +62,10 @@ if(ATTRACTAP_SECURE_PROFILE)
         set(SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults")
     endif()
     list(APPEND SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.secure")
-    # DS identity, eFuse report and the NVS erase gate (ATT-1207) are compiled only into secure builds.
+    # The eFuse report (ATT-1207) is compiled only into secure builds.
     list(APPEND ATTRACTAP_DEFINES ATTRACTAP_SECURE_BUILD=1)
     if(ATTRACTAP_SECURE_LAB)
-        # Lab readers keep the console and serial config handler for provisioning, and the lab-only
-        # DS console commands (ds.status / ds.create / ds.export).
+        # Lab readers keep the console and serial config handler for provisioning.
         list(APPEND SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.secure-lab")
         list(APPEND ATTRACTAP_DEFINES ATTRACTAP_SECURE_LAB=1)
     else()

@@ -32,7 +32,7 @@ export function withEnabled<T extends { enabled?: false }>(channel: T, enabled: 
   return next;
 }
 
-export function boundMeasurement(configuration: ModbusConfiguration, binding?: ModbusPoint) {
+function boundMeasurement(configuration: ModbusConfiguration, binding?: ModbusPoint) {
   const device = configuration.devices.find((item) => item.id === binding?.deviceId);
   return device && findProfile(configuration, device)?.measurements.find((item) => item.id === binding?.measurementId);
 }

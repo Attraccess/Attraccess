@@ -5,7 +5,6 @@
 #include "mbedtls/pk.h"
 #include "mbedtls/platform_util.h"
 #include "mbedtls/x509_crt.h"
-#include "rsa_der.hpp"
 
 namespace
 {
@@ -101,53 +100,6 @@ namespace ReaderIdentity
                spki[sizeof(P256_SPKI_PREFIX)] == 0x04;
     }
 
-    int wrapKey(mbedtls_pk_context &pk, const IReaderKey &key)
-    {
-        if (key.algorithm() == IReaderKey::Algorithm::Rsa3072Ds)
-        {
-            // psa_export_public_key does not work for a key held in the DS peripheral. pub_raw holds the
-            // key as psa_export_public_key would return it: the PKCS#1 RSAPublicKey, i.e. the SPKI
-            // without its 24-byte algorithm header.
-            constexpr size_t HEADER = RsaDer::SPKI_BYTES - 398;
-            const std::vector<uint8_t> &spki = key.publicKeySpki();
-            static_assert(sizeof(pk.MBEDTLS_PRIVATE(pub_raw)) >= 398, "pk context too small for an RSA-3072 key");
-            if (!RsaDer::isCanonicalRsa3072Spki(spki))
-            {
-                return MBEDTLS_ERR_PK_BAD_INPUT_DATA;
-            }
-            memcpy(pk.MBEDTLS_PRIVATE(pub_raw), spki.data() + HEADER, spki.size() - HEADER);
-            pk.MBEDTLS_PRIVATE(pub_raw_len) = spki.size() - HEADER;
-        }
-        return mbedtls_pk_wrap_psa(&pk, key.keyId());
-    }
-
-    bool signRsaPssSha256(const IReaderKey &key, const std::vector<uint8_t> &message, std::vector<uint8_t> &signature)
-    {
-        signature.clear();
-        if (key.algorithm() != IReaderKey::Algorithm::Rsa3072Ds)
-        {
-            return false;
-        }
-        uint8_t digest[32];
-        size_t digestLength = 0;
-        if (psa_hash_compute(PSA_ALG_SHA_256, message.data(), message.size(), digest, sizeof(digest),
-                             &digestLength) != PSA_SUCCESS)
-        {
-            return false;
-        }
-        // PSA's RSA-PSS uses MGF1 with the same hash and a salt as long as the hash (32 bytes).
-        signature.assign(RsaDer::MODULUS_BYTES, 0);
-        size_t length = 0;
-        if (psa_sign_hash(key.keyId(), PSA_ALG_RSA_PSS(PSA_ALG_SHA_256), digest, digestLength, signature.data(),
-                          signature.size(), &length) != PSA_SUCCESS ||
-            length != RsaDer::MODULUS_BYTES)
-        {
-            signature.clear();
-            return false;
-        }
-        return true;
-    }
-
     bool selfSignedCertificate(const IReaderKey &key, std::vector<uint8_t> &der)
     {
         mbedtls_pk_context pk;
@@ -156,9 +108,8 @@ namespace ReaderIdentity
         mbedtls_x509write_crt_init(&writer);
         // The server ignores everything but the key: it never trusts this certificate.
         const uint8_t serial[] = {0x01};
-        // RSA-3072: public key 422 bytes + signature 384 bytes + names.
-        std::vector<uint8_t> buffer(1536);
-        bool ok = wrapKey(pk, key) == 0;
+        std::vector<uint8_t> buffer(1024);
+        bool ok = mbedtls_pk_wrap_psa(&pk, key.keyId()) == 0;
         if (ok)
         {
             mbedtls_x509write_crt_set_version(&writer, MBEDTLS_X509_CRT_VERSION_3);

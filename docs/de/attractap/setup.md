@@ -38,7 +38,7 @@ Ein Leser kann sich nicht selbst registrieren. Er zeigt einen wechselnden Code, 
 2. Scannen Sie den QR-Code mit Ihrem Smartphone, oder oeffnen Sie in Attraccess die Leser-Seite (**Geraete** > **Attractap-Lesegeraete**), klicken Sie im Block **Nicht gekoppelt** beim wartenden Leser auf **Koppeln** und geben Sie den Code ein.
 3. Geben Sie optional einen Namen ein (z.B. "Lasercutter-Leser") und klicken Sie auf **Freigeben**.
 
-Der Leser verbindet sich und ist einsatzbereit. Details, das LED-Muster der Lite-Variante, Sicherheitshinweise und den Umgang mit frueher registrierten Lesern finden Sie unter [Reader koppeln](attractap/pairing.md).
+Der Leser verbindet sich und ist einsatzbereit. Details, das LED-Muster der Lite-Variante, Sicherheitshinweise und den Ablauf nach dem Upgrade auf Firmware 2.6.0, bei dem jeder Leser neu koppelt, finden Sie unter [Reader koppeln](attractap/pairing.md).
 
 > [!NOTE]
 > Zum Freigeben eines Lesers brauchen Sie die Berechtigung `resources.update`. Leser mit Firmware aelter als 1.8.0 koennen keinen neuen Leser koppeln; aktualisieren Sie sie zuerst mit dem Web-Flasher.

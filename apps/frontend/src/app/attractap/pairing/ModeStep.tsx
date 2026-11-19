@@ -13,14 +13,10 @@ const MODES: Choice[] = ['new', 'takeover'];
 /** New reader (optional name) or a takeover of an existing record. */
 export function ModeStep({ flow }: Readonly<{ flow: PairingFlow }>) {
   const { t } = useTranslations({ de, en });
-  const ownReaderId = flow.current?.boundReaderId ?? null;
   const readerOptions = useMemo(
-    // Any record can be taken over, also a token reader that was never paired (new hardware replaces it).
-    () =>
-      (flow.readers ?? [])
-        .filter((reader) => reader.id !== ownReaderId)
-        .map((reader) => ({ key: reader.id.toString(), label: reader.name })),
-    [flow.readers, ownReaderId],
+    // Any record can be taken over, also one whose pairing was removed (new hardware replaces it).
+    () => (flow.readers ?? []).map((reader) => ({ key: reader.id.toString(), label: reader.name })),
+    [flow.readers],
   );
   return (
     <div className="flex flex-col gap-3">

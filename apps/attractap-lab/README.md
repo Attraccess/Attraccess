@@ -433,6 +433,12 @@ READER_PROFILE=secure-lab pnpm nx run attractap-lab:hil
   profile (`efuse.check`). Then they erase the chip and write the image
   encrypted (`ESPToolDriver.erase_and_flash_encrypted`), the same write the
   janitor uses to park this reader.
+- `hil/test_efuse_report.py` checks the eFuse report the reader sends after its
+  session is up: the server must keep this development-mode reader *not
+  secured* and list `profile-not-secure` and `flash-encryption-not-release`.
+  That is the expected result. Nothing in the lab burns eFuses or puts a
+  release secure image on the reader; the reader identity is the P-256 key it
+  pairs with.
 - When the run ends, also after a failed setup, the tests write the image
   again, so no Wi-Fi, PIN or pairing stays on the reader even where the place
   has no janitor. With `janitor=park`, the janitor then parks it with the
@@ -442,24 +448,6 @@ READER_PROFILE=secure-lab pnpm nx run attractap-lab:hil
   unbootable, and the secure write would not fit a plain reader.
 - The reader's internal heap (before pairing, after the TLS session opened, at
   the end) is written to `reader-heap.jsonl` in the run's artifacts.
-
-**DS identity (ATT-1207).** The reader `attractap-touch-v2-secure-1` (chip
-`DC:B4:D9:21:71:C8`) got one approved burn: KEY3 as `HMAC_DOWN_DIGITAL_SIGNATURE`
-and RD_DIS write-protected. It pairs with an RSA-3072 key in the chip's Digital
-Signature peripheral. Every wipe erases the encrypted DS record at the start of
-the `spiffs` partition, so the suite (`write_secure_image`), `secure_lab_reader.py
-flash` and the janitor write the committed record
-(`apps/attractap/firmware/lab/ds/dcb4d92171c8/ds-record.bin`) back, encrypted, in
-the same esptool call; a chip without a record behaves as before, except that one whose KEY3
-already holds the DS key is never wiped without its record (the driver refuses, the janitor
-quarantines it). `test_ds_identity.py`
-covers the DS session, the identity upgrade (test hook `identity.force-p256`),
-re-pair, reboot and power cycle, and the `efuse.report`. The `modified` image kind in
-`test_ota.py` (lab-signed, a byte changed after signing, checksum and appended hash recomputed)
-must be refused for its signature alone. Anti-rollback
-is not tested on this reader. Heap numbers with DS go to `reader-heap.jsonl`
-(label `ds session`); change `hil/heap_floors.py` only with measured values.
-See `apps/attractap/firmware/lab/ds/README.md`.
 
 If a run is killed before its own wipe, the janitor parks the reader on
 release; on a place without one, run the suite again. A branch that raises
@@ -751,9 +739,8 @@ the third digest slot revoked, JTAG off, flash encryption in development mode
 also compares every raw eFuse block with the first dump recorded for the chip
 (`/var/lib/attractap-lab-janitor/efuse-baselines`). On secure-lab readers the
 `SECURE_VERSION` bits of BLOCK0 are left out and may only grow (anti-rollback
-burns them when the reader boots an image with a higher secure version). A park
-image older than that version no longer boots, so rebuild it from a branch with
-the new version. A mismatch
+burns them when the reader boots an image with a higher secure version). A park image older than that version no
+longer boots, so rebuild it from a branch with the new version. A mismatch
 quarantines the reader immediately, also on a `power=switch` or `power=button`
 place; other failures retry, then quarantine after `janitor.attempts`. On a
 `power=switch` or `power=button` place the janitor power-cycles the reader
@@ -778,18 +765,6 @@ ssh root@lab-host attractap-lab-janitor clear attractap-touch-v2-1  # after repa
 Each attempt keeps `efuse.txt` and `serial.log` under
 `/var/lib/attractap-lab-janitor/runs/PLACE/`, and a power-cycled attempt
 `power-cycle.log`; `journalctl -u attractap-lab-janitor` shows decisions.
-
-For MAC `dc:b4:d9:21:71:c8` only, exactly two eFuse states pass: the state before
-the DS burn and the state after it (KEY_PURPOSE_3 = `HMAC_DOWN_DIGITAL_SIGNATURE`,
-KEY3 read-protected, RD_DIS write-protected). The first time the janitor sees the
-burned state, BLOCK0 may differ from the baseline only by KEY_PURPOSE_3, RD_DIS bit
-3 and the WR_DIS bits 0, 11 and 26 (RD_DIS, KEY_PURPOSE_3, BLOCK_KEY3), plus
-BLOCK_KEY3 itself; it then records the baseline again, keeps the old one as
-`<mac>.pre-ds.json` and logs that. From then on only the exact burned state passes.
-Set `services.attractap-lab.janitor.dsRecordsDir` to
-`apps/attractap/firmware/lab/ds` of the pinned source so parking restores the DS
-record (nix-mac-setup). Without the record the janitor refuses to wipe the burned
-reader and quarantines it at once (reason `DS record: ...`).
 
 A parking image that cannot park prints `ATTRACTAP_PARK_FAILED`, clears the
 I2C bus and retries every 2 s; the attempt fails only if `markerSeconds` pass

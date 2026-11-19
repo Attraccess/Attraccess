@@ -1,13 +1,12 @@
-import { buildEligibilityProblems, isSecurableBuild, securedEligibilityProblems } from './secured-eligibility';
+import { buildEligibilityProblems, isSecurableBuild } from './secured-eligibility';
 import type { ReportedBuild } from './session-security-state';
 
 const release: ReportedBuild = { profile: 'secure', release: true, variant: 'attractap-touch-v2', secureVersion: 1 };
 
 describe('secured eligibility', () => {
-  it('lets only a release secure build of a regular variant on the DS key be secured', () => {
+  it('lets only a release secure build of a regular variant be secured', () => {
     expect(buildEligibilityProblems(release)).toEqual([]);
     expect(isSecurableBuild(release)).toBe(true);
-    expect(securedEligibilityProblems(release, 'rsa-3072')).toEqual([]);
   });
 
   it.each<[string, ReportedBuild | null, string[]]>([
@@ -22,11 +21,5 @@ describe('secured eligibility', () => {
   ])('never secures %s', (_name, build, problems) => {
     expect(buildEligibilityProblems(build)).toEqual(problems);
     expect(isSecurableBuild(build)).toBe(false);
-  });
-
-  it('needs the session to run on the RSA-3072 (DS) key', () => {
-    expect(securedEligibilityProblems(release, 'ecdsa-p256')).toEqual(['software-identity']);
-    expect(securedEligibilityProblems(release, null)).toEqual(['software-identity']);
-    expect(securedEligibilityProblems(null, 'ecdsa-p256')).toEqual(['firmware-info-missing', 'software-identity']);
   });
 });

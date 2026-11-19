@@ -1,14 +1,6 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { ATTRACTAP_SECURITY_PROBLEMS } from '@attraccess/application-models';
-import {
-  AUDIT_PROBLEMS_MAX_LENGTH,
-  auditProblemList,
-  checkEfuseReport,
-  parseEfuseReport,
-  SECURE_VERSION_FLOOR,
-  type EfuseReport,
-} from './efuse-report';
+import { checkEfuseReport, parseEfuseReport, SECURE_VERSION_FLOOR, type EfuseReport } from './efuse-report';
 import { DIGEST0, DIGEST1, releaseReport } from './testing/efuse-report.test-fixture';
 
 const recorded = { digest0: DIGEST0, digest1: DIGEST1 };
@@ -52,14 +44,11 @@ describe('eFuse report check', () => {
     ['manual encrypt allowed', releaseReport({ disDownloadManualEncrypt: false }), 'manual-encrypt-enabled'],
     ['KEY2 purpose', withKey(2, { purpose: 'USER' }), 'key2-not-xts'],
     ['KEY2 unused', withKey(2, { used: false }), 'key2-not-xts'],
-    ['KEY3 not DS', withKey(3, { purpose: 'HMAC_UP' }), 'key3-not-ds'],
-    ['KEY3 unused', withKey(3, { used: false }), 'key3-not-ds'],
     ['KEY4 not HMAC_UP', withKey(4, { purpose: 'HMAC_DOWN_ALL' }), 'key4-not-nvs-hmac'],
     ['KEY4 unused', withKey(4, { used: false }), 'key4-not-nvs-hmac'],
     ['KEY2 readable', withKey(2, { readProtected: false }), 'rd-dis-incomplete'],
-    ['KEY3 readable', withKey(3, { readProtected: false }), 'rd-dis-incomplete'],
     ['KEY4 readable', withKey(4, { readProtected: false }), 'rd-dis-incomplete'],
-    ['RD_DIS misses KEY3', releaseReport({ rdDis: 0b0010100 }), 'rd-dis-incomplete'],
+    ['RD_DIS misses KEY4', releaseReport({ rdDis: 0b0000100 }), 'rd-dis-incomplete'],
     ['RD_DIS writable', releaseReport({ rdDisWriteProtected: false }), 'rd-dis-writable'],
     ['pad JTAG on', releaseReport({ jtag: { padDisabled: false, usbDisabled: true, softDisJtag: 0 } }), 'jtag-enabled'],
     ['USB JTAG on', releaseReport({ jtag: { padDisabled: true, usbDisabled: false, softDisJtag: 0 } }), 'jtag-enabled'],
@@ -92,29 +81,19 @@ describe('eFuse report check', () => {
     ).toEqual([]);
   });
 
+  it('does not look at KEY3: nothing is burned there', () => {
+    expect(checkEfuseReport(withKey(3, { purpose: 'HMAC_DOWN_DIGITAL_SIGNATURE', used: true }), recorded)).toEqual([]);
+    expect(checkEfuseReport(withKey(3, { purpose: 'USER', used: false }), recorded)).toEqual([]);
+  });
+
+  it('reports every failing check, not just the first', () => {
+    const report = releaseReport({ secureBootEn: false, secureVersion: 0 });
+    expect(checkEfuseReport(report, recorded)).toEqual(['secure-boot-disabled', 'secure-version-below-floor']);
+  });
+
   it('keeps the floor equal to the firmware file', () => {
     const file = join(__dirname, '../../../../attractap/firmware/secure-version-floor.txt');
     expect(SECURE_VERSION_FLOOR).toBe(Number(readFileSync(file, 'utf8').trim()));
-  });
-});
-
-describe('audited problem list', () => {
-  it('carries every problem code at once uncut', () => {
-    const all = [...ATTRACTAP_SECURITY_PROBLEMS];
-    expect(all.join(',').length).toBeLessThanOrEqual(AUDIT_PROBLEMS_MAX_LENGTH);
-    expect(auditProblemList(all)).toBe(all.join(','));
-  });
-
-  it('cuts only between whole codes and then ends in `more`', () => {
-    const problems = ['secure-boot-disabled', 'key0-purpose', 'key1-purpose'];
-    // 'secure-boot-disabled,key0-purpose,more' is 38 characters; one less keeps only the first code.
-    expect(auditProblemList(problems, 38)).toBe('secure-boot-disabled,key0-purpose,more');
-    expect(auditProblemList(problems, 37)).toBe('secure-boot-disabled,more');
-    for (let limit = 5; limit < 47; limit++) {
-      const list = auditProblemList(problems, limit);
-      expect(list.length).toBeLessThanOrEqual(limit);
-      expect(list.split(',').every((code) => code === 'more' || problems.includes(code))).toBe(true);
-    }
   });
 });
 

@@ -37,8 +37,8 @@ def other_paired_reader(api):
     """A second paired reader record (never connected): the setting only accepts paired readers."""
     with sqlite3.connect(api.database) as db:
         cursor = db.execute(
-            "INSERT INTO attractap (name, apiTokenHash, pairingState, firmwareCapabilitiesCardrelay) "
-            "VALUES ('HIL other reader', 'unused', 'paired', 1)"
+            "INSERT INTO attractap (name, pairingState, firmwareCapabilitiesCardrelay) "
+            "VALUES ('HIL other reader', 'paired', 1)"
         )
         return cursor.lastrowid
 

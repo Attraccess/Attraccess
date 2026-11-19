@@ -1,25 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EfuseReportService } from './efuse-report.service';
-import { IdentityUpgradeService, type IdentityUpgradeSession, type UpgradeMode } from './identity-upgrade.service';
 import type { SessionConnection } from './session-connection';
-import { FrameType } from './session-framing';
 import type { SessionSecurityState } from './session-security-state';
 
 /** The reader->server CONTROL messages. Anything else is a protocol violation and ends the session. */
-export const READER_CONTROL_TYPES = ['identity.upgrade.request', 'identity.upgrade', 'efuse.report'] as const;
+export const READER_CONTROL_TYPES = ['efuse.report'] as const;
 type ReaderControlType = (typeof READER_CONTROL_TYPES)[number];
 
 const MAX_EFUSE_REPORTS_PER_SESSION = 3;
-/** An upgrade-only (recovery) session has nothing else to do and does not linger. */
-export const RECOVERY_SESSION_MS = 30_000;
-/** After identity.upgraded the old key's session stays open this long, so the reply can leave before the close. */
-export const UPGRADED_CLOSE_DELAY_MS = 1_000;
-/**
- * Server->reader CONTROL that opens an upgrade-only (recovery) session. Never session.hello: the reader must not
- * take it for a normal session. A reader that still holds its replaced P-256 key and has its DS key asks for the
- * upgrade again on it.
- */
-export const IDENTITY_RECOVER_CONTROL = { t: 'identity.recover' } as const;
 
 export function parseReaderControl(payload: Buffer): { t: ReaderControlType; body: Record<string, unknown> } | null {
   try {
@@ -35,62 +23,31 @@ export function parseReaderControl(payload: Buffer): { t: ReaderControlType; bod
 }
 
 /**
- * Handles what a reader sends on the session's control channel. Messages of one session run one after the
- * other, so a nonce cannot be spent twice by racing messages.
+ * Handles what a reader sends on the session's control channel. Messages of one session run one after the other.
  */
 @Injectable()
 export class ReaderControlService {
   private readonly logger = new Logger(ReaderControlService.name);
 
-  public constructor(
-    private readonly upgrades: IdentityUpgradeService,
-    private readonly efuse: EfuseReportService,
-  ) {}
+  public constructor(private readonly efuse: EfuseReportService) {}
 
-  public attach(connection: SessionConnection, state: SessionSecurityState, mode: UpgradeMode = 'session'): void {
-    const upgrade = this.upgrades.createSession(state, mode);
+  public attach(connection: SessionConnection, state: SessionSecurityState): void {
     let reports = 0;
     let queue: Promise<void> = Promise.resolve();
-    if (mode === 'recovery') {
-      setTimeout(() => connection.close(), RECOVERY_SESSION_MS).unref();
-      connection.sendFrame(FrameType.CONTROL, encode(IDENTITY_RECOVER_CONTROL));
-    }
 
     connection.on('control', (payload: Buffer) => {
       const message = parseReaderControl(payload);
-      if (!message || (mode === 'recovery' && message.t === 'efuse.report')) return connection.close();
-      if (message.t === 'efuse.report' && ++reports > MAX_EFUSE_REPORTS_PER_SESSION) return connection.close();
+      if (!message) return connection.close();
+      if (++reports > MAX_EFUSE_REPORTS_PER_SESSION) return connection.close();
       queue = queue
-        .then(() => this.dispatch(connection, state, upgrade, message))
+        .then(async () => {
+          if ((await this.efuse.handle(state, message.body)) === 'protocol-violation') connection.close();
+        })
         .catch((error: Error) => {
-          // Never log the message: it may hold a proof or a public key.
+          // Never log the message: it carries the reader's eFuse report.
           this.logger.warn(`Reader control message failed: ${error.message}`);
           connection.close();
         });
     });
   }
-
-  private async dispatch(
-    connection: SessionConnection,
-    state: SessionSecurityState,
-    upgrade: IdentityUpgradeSession,
-    message: { t: ReaderControlType; body: Record<string, unknown> },
-  ): Promise<void> {
-    if (message.t === 'efuse.report') {
-      if ((await this.efuse.handle(state, message.body)) === 'protocol-violation') connection.close();
-      return;
-    }
-    const reply =
-      message.t === 'identity.upgrade.request'
-        ? await upgrade.handleRequest()
-        : await upgrade.handleUpgrade(message.body);
-    if (reply === 'violation') return connection.close();
-    connection.sendFrame(FrameType.CONTROL, encode(reply));
-    // The old key is no credential any more: its session ends once the reply had time to leave (the reader reconnects).
-    if (reply.t === 'identity.upgraded') setTimeout(() => connection.close(), UPGRADED_CLOSE_DELAY_MS).unref();
-  }
-}
-
-function encode(message: object): Buffer {
-  return Buffer.from(JSON.stringify(message), 'utf8');
 }

@@ -3,11 +3,11 @@
 #include <cstdint>
 
 // What this firmware build is, as READER_FIRMWARE_INFO reports it (ATT-1207). All compile-time:
-//   ATTRACTAP_SECURE_BUILD  secure profile (release or lab): Secure Boot, flash encryption, DS identity code
+//   ATTRACTAP_SECURE_BUILD  secure profile (release or lab): Secure Boot and flash encryption
 //   ATTRACTAP_SECURE_LAB    the lab-only secure test reader (development-mode flash encryption, USB console)
 //   ATTRACTAP_RELEASE       a release build: not a lab variant and without test hooks
 // The server treats all of it as the reader's claim. Only a release secure build whose eFuse report
-// passes and whose session is authenticated with the DS key ever counts as "secured".
+// passes and whose session is authenticated with the paired certificate ever counts as "secured".
 namespace BuildProfile
 {
     constexpr bool secureBuild()

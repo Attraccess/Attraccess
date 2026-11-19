@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { randomBytes, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
 import type { IncomingMessage } from 'http';
 import type { WebSocket } from 'ws';
 import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
@@ -24,7 +24,6 @@ import { EnrollmentLimitsService } from '../../device-enrollment/enrollment-limi
 import { SettingsService } from '../../settings/settings.service';
 import { AttractapService } from '../attractap.service';
 import { BootstrapGrants } from './bootstrap-grants';
-import { canonicalReaderSpki } from './reader-spki';
 import { CredentialRegistryService } from './credential-registry.service';
 import { InstallationIdentityService } from './installation-identity.service';
 import { PairingApproval } from './pairing-approval';
@@ -40,6 +39,7 @@ import {
   PairingRequest,
   PairingView,
   Round,
+  canonicalP256Spki,
   isTerminal,
   roundsOf,
   validFirmware,
@@ -58,15 +58,6 @@ export type {
 
 const HELLO_TIMEOUT_MS = 30_000;
 const MAX_MESSAGE_BYTES = 4096;
-const TICKET_TTL_MS = 5 * 60 * 1000;
-const MAX_TICKETS = 256;
-const TICKET_REUSE_MIN_REMAINING_MS = 60 * 1000;
-/**
- * A token reader is asked on its own to start pairing at most this often. A pairing it started from its
- * token that fails (rate limit, cancel, expiry) sends it straight back to the token, so without this the
- * server would ask again on every reconnect.
- */
-const AUTO_PROMPT_INTERVAL_MS = 2 * 60 * 1000;
 const APP_URL_CACHE_MS = ENROLLMENT_CODE_ROTATION_MS;
 const TERMINAL_VISIBLE_MS = 60_000;
 
@@ -80,10 +71,6 @@ export class PairingService implements OnApplicationShutdown {
   private readonly approval: PairingApproval;
   /** Closes a pairing connection that has no request and sends no `hello` in time. */
   private readonly helloTimers = new WeakMap<WebSocket, NodeJS.Timeout>();
-  /** One-time tickets that let a token reader bind its pairing request to its own record. */
-  private readonly tickets = new Map<string, { readerId: number; expiresAt: number }>();
-  /** When each token reader was last asked on its own (not by the Pair button) to start pairing. */
-  private readonly autoPrompts = new Map<number, number>();
   private appUrl: { value: string | null; fetchedAt: number } | null = null;
 
   public constructor(
@@ -160,16 +147,13 @@ export class PairingService implements OnApplicationShutdown {
     if (message['kind'] !== 'lite' && message['kind'] !== 'touch') throw new Error('invalid hello');
     const kind = message['kind'];
     const firmware = validFirmware(message['firmware']);
-    // P-256, or RSA-3072 for a reader whose identity lives in the DS peripheral.
-    const { spki: readerPublicKey } = await canonicalReaderSpki(message['publicKey']);
+    const readerPublicKey = await canonicalP256Spki(message['publicKey']);
 
-    // Admitted first: a rate-limited hello must not use up the reader's one-time ticket.
     const admission = this.limits.admit(connectionId, address);
     if (!admission.allowed) {
       this.refuse(ws, admission.reason === 'RATE_LIMITED' ? 'rate-limited' : 'busy');
       return null;
     }
-    const boundReaderId = await this.resolveTicket(message['ticket']);
     const serverPublicKey = await this.identity.getCaPublicKeySpki();
     if (ws.readyState !== ws.OPEN) throw new Error('reader went away');
 
@@ -189,7 +173,6 @@ export class PairingService implements OnApplicationShutdown {
       firmware,
       state: 'waiting',
       readerPublicKey,
-      boundReaderId,
       serverPublicKey,
       current: this.newRound(1),
       previous: null,
@@ -197,7 +180,7 @@ export class PairingService implements OnApplicationShutdown {
       approving: false,
       endRequested: null,
       mode: null,
-      targetReaderId: boundReaderId,
+      targetReaderId: null,
       rotationTimer: null,
       expiryTimer: null,
       failureReason: null,
@@ -212,15 +195,6 @@ export class PairingService implements OnApplicationShutdown {
     // first round was being prepared must not leave a request behind that holds its limits.
     if (ws.readyState !== ws.OPEN) await this.fail(request, 'reader-disconnected');
     return request;
-  }
-
-  /** An unknown or already used ticket is refused rather than treated as a new reader. */
-  private async resolveTicket(ticket: unknown): Promise<number | null> {
-    if (ticket === undefined) return null;
-    const readerId = typeof ticket === 'string' ? this.consumeTicket(ticket) : null;
-    const reader = readerId ? await this.attractap.findReaderById(readerId) : null;
-    if (!reader || reader.pairingState !== 'unpaired') throw new Error('invalid ticket');
-    return reader.id;
   }
 
   private refuse(ws: WebSocket, reason: 'rate-limited' | 'busy'): void {
@@ -306,34 +280,6 @@ export class PairingService implements OnApplicationShutdown {
    */
   public resolve(rawCode: string, actor: Actor): PairingView {
     return this.view(this.requestForCode(rawCode, actor), false);
-  }
-
-  /**
-   * Hands a token-signed-in reader a one-time ticket. It presents the ticket in `hello` so its
-   * pairing request is bound to its own record; the token itself never travels in pairing.
-   */
-  public issueBindingTicket(readerId: number): string {
-    const now = Date.now();
-    for (const [key, value] of this.tickets) if (value.expiresAt <= now) this.tickets.delete(key);
-    // A reader asked again (reconnect, Pair button) gets the ticket it already has while it is
-    // good for a while, so repeated requests never pile up tickets.
-    for (const [key, value] of this.tickets) {
-      if (value.readerId === readerId && value.expiresAt - now > TICKET_REUSE_MIN_REMAINING_MS) return key;
-    }
-    if (this.tickets.size >= MAX_TICKETS) this.tickets.delete(this.tickets.keys().next().value as string);
-    const ticket = randomBytes(16).toString('base64url');
-    this.tickets.set(ticket, { readerId, expiresAt: now + TICKET_TTL_MS });
-    return ticket;
-  }
-
-  /** Whether a token reader may be asked on its own to start pairing now; counts the ask when it may. */
-  public claimAutoPrompt(readerId: number): boolean {
-    const now = Date.now();
-    const last = this.autoPrompts.get(readerId);
-    if (last !== undefined && now - last < AUTO_PROMPT_INTERVAL_MS) return false;
-    for (const [id, at] of this.autoPrompts) if (now - at >= AUTO_PROMPT_INTERVAL_MS) this.autoPrompts.delete(id);
-    this.autoPrompts.set(readerId, now);
-    return true;
   }
 
   /** The one admin action: checks the code or pattern, then enrolls and pairs in one go. */
@@ -456,13 +402,13 @@ export class PairingService implements OnApplicationShutdown {
       request.state = 'expired';
       this.send(request, { type: 'failed', reason });
       this.finish(request);
-      await this.record(request.boundReaderId, 'reader.pairing_expired', null, { reason: 'timeout' });
+      await this.record(request.targetReaderId, 'reader.pairing_expired', null, { reason: 'timeout' });
       return;
     }
     request.state = reason === 'cancelled-at-reader' || reason === 'cancelled-by-admin' ? 'cancelled' : 'failed';
     if (reason !== 'cancelled-at-reader') this.send(request, { type: 'failed', reason });
     this.finish(request, reason !== 'cancelled-at-reader');
-    if (!audited) await this.record(request.boundReaderId, 'reader.pairing_failed', actor, { reason });
+    if (!audited) await this.record(request.targetReaderId, 'reader.pairing_failed', actor, { reason });
   }
 
   private clearTimers(request: PairingRequest): void {
@@ -506,12 +452,6 @@ export class PairingService implements OnApplicationShutdown {
     this.helloTimers.delete(ws);
   }
 
-  private consumeTicket(ticket: string): number | null {
-    const entry = this.tickets.get(ticket);
-    this.tickets.delete(ticket);
-    return entry && entry.expiresAt > Date.now() ? entry.readerId : null;
-  }
-
   // --- helpers -----------------------------------------------------------------------------
 
   private record(
@@ -537,7 +477,6 @@ export class PairingService implements OnApplicationShutdown {
       state: request.state,
       kind: request.kind,
       firmware: request.firmware,
-      boundReaderId: request.boundReaderId,
       targetReaderId: request.targetReaderId,
       mode: request.mode,
       createdAt: new Date(request.createdAt),

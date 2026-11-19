@@ -1,5 +1,4 @@
 import { ATTRACTAP_SECURITY_PROBLEMS } from '@attraccess/application-models';
-import { projectAttractapAuditEvent } from '../../audit/policies/attractap';
 import { FakeReaderStore, makeReader } from '../attractap-fake-stores.test-fixture';
 import { EfuseReportService } from './efuse-report.service';
 import { DIGEST0, DIGEST1, releaseReport } from './testing/efuse-report.test-fixture';
@@ -9,7 +8,6 @@ const release: ReportedBuild = { profile: 'secure', release: true, variant: 'att
 
 describe('EfuseReportService', () => {
   let readers: FakeReaderStore;
-  let audit: { record: jest.Mock };
   let service: EfuseReportService;
 
   beforeEach(() => {
@@ -24,17 +22,15 @@ describe('EfuseReportService', () => {
         secureBootDigest1: DIGEST1,
       }),
     );
-    audit = { record: jest.fn().mockResolvedValue(undefined) };
-    service = new EfuseReportService(readers, audit);
+    service = new EfuseReportService(readers);
   });
 
-  const state = (build: ReportedBuild | null, algorithm: 'rsa-3072' | 'ecdsa-p256' = 'rsa-3072') => {
-    const s = new SessionSecurityState(5, 'a'.repeat(64), algorithm);
+  const state = (build: ReportedBuild | null) => {
+    const s = new SessionSecurityState(5, 'a'.repeat(64));
     if (build) s.setBuild(build);
     return s;
   };
   const reader = () => readers.readers.get(5);
-  const actions = () => audit.record.mock.calls.map((c) => c[0].action);
 
   it('writes nothing for a session whose key is no longer the reader credential (revoked or re-paired meanwhile)', async () => {
     const session = state(release);
@@ -42,47 +38,36 @@ describe('EfuseReportService', () => {
     readers.readers.set(5, { ...row, secureBootDigest0: DIGEST0, secureBootDigest1: DIGEST1 });
     expect(await service.handle(session, releaseReport())).toBe('ignored');
     expect(reader()).toMatchObject({ secured: false, securityReportProblems: null });
-    expect(audit.record).not.toHaveBeenCalled();
     readers.readers.set(5, { ...row, pairingState: 'paired', credentialFingerprint: 'b'.repeat(64) });
     expect(await service.handle(session, releaseReport())).toBe('ignored');
     expect(reader()?.secured).toBe(false);
   });
 
-  it('secures a release secure reader with an RSA identity whose report matches, and audits it once', async () => {
+  it('secures a release secure reader whose report matches', async () => {
     expect(await service.handle(state(release), releaseReport())).toBe('recorded');
     expect(reader()).toMatchObject({ secured: true, efuseSecureVersion: 1, securityReportProblems: [] });
     expect(reader()?.securedAt).toBeInstanceOf(Date);
-    expect(actions()).toEqual(['attractap.reader.secured']);
-    expect(audit.record.mock.calls[0][0].details).toEqual({
-      fingerprint: 'a'.repeat(64),
-      profile: 'secure',
-      secureVersion: 1,
-      efuseSecureVersion: 1,
-    });
     // Another passing report changes nothing and writes no second event.
     const at = reader()?.securedAt;
     await service.handle(state(release), releaseReport());
     expect(reader()?.securedAt).toBe(at);
-    expect(actions()).toHaveLength(1);
   });
 
-  it.each<[string, ReportedBuild | null, 'rsa-3072' | 'ecdsa-p256', string]>([
-    ['secure-lab', { ...release, profile: 'secure-lab', release: false }, 'rsa-3072', 'profile-not-secure'],
-    ['a plain build', { ...release, profile: 'plain' }, 'rsa-3072', 'profile-not-secure'],
-    ['a secure build that is not a release build', { ...release, release: false }, 'rsa-3072', 'not-release-build'],
-    ['a demo variant', { ...release, variant: 'demo' }, 'rsa-3072', 'demo-or-debug-variant'],
-    ['a debug variant', { ...release, variant: 'attractap-touch-v2-debug' }, 'rsa-3072', 'demo-or-debug-variant'],
-    ['a P-256 authenticated session', release, 'ecdsa-p256', 'software-identity'],
-    ['no firmware info', null, 'rsa-3072', 'firmware-info-missing'],
-  ])('never secures %s, whatever the report says', async (_name, build, algorithm, problem) => {
+  it.each<[string, ReportedBuild | null, string]>([
+    ['secure-lab', { ...release, profile: 'secure-lab', release: false }, 'profile-not-secure'],
+    ['a plain build', { ...release, profile: 'plain' }, 'profile-not-secure'],
+    ['a secure build that is not a release build', { ...release, release: false }, 'not-release-build'],
+    ['a demo variant', { ...release, variant: 'demo' }, 'demo-or-debug-variant'],
+    ['a debug variant', { ...release, variant: 'attractap-touch-v2-debug' }, 'demo-or-debug-variant'],
+    ['no firmware info', null, 'firmware-info-missing'],
+  ])('never secures %s, whatever the report says', async (_name, build, problem) => {
     jest.useFakeTimers({ advanceTimers: true });
-    const pending = service.handle(state(build, algorithm), releaseReport());
+    const pending = service.handle(state(build), releaseReport());
     await jest.advanceTimersByTimeAsync(6_000);
     await pending;
     jest.useRealTimers();
     expect(reader()?.secured).toBe(false);
     expect(reader()?.securityReportProblems).toContain(problem);
-    expect(actions()).toEqual([]);
   });
 
   it('reads only the security columns of the reader, not the reader with its resources', async () => {
@@ -92,16 +77,7 @@ describe('EfuseReportService', () => {
     expect(reader()?.secured).toBe(true);
   });
 
-  it('leaves the app secure_version out of the reader.secured event when the reader reported none', async () => {
-    await service.handle(state({ ...release, secureVersion: null }), releaseReport());
-    expect(audit.record.mock.calls[0][0].details).toEqual({
-      fingerprint: 'a'.repeat(64),
-      profile: 'secure',
-      efuseSecureVersion: 1,
-    });
-  });
-
-  it('audits every problem of a report where everything fails, in a form the audit policy accepts', async () => {
+  it('lists every problem of a report where everything fails', async () => {
     await service.handle(state(release), releaseReport());
     const broken = releaseReport({
       secureBootEn: false,
@@ -125,10 +101,11 @@ describe('EfuseReportService', () => {
       secureVersion: 0,
     });
     const plainDemo = { profile: 'plain' as const, release: false, variant: 'demo', secureVersion: null };
-    await service.handle(state(plainDemo, 'ecdsa-p256'), broken);
+    await service.handle(state(plainDemo), broken);
 
     const problems = reader()?.securityReportProblems ?? [];
-    // Every code except the alternatives of other ones: firmware-info-missing, digest*-not-recorded, flash-encryption-not-final.
+    // Every code except the alternatives of other ones: firmware-info-missing, digest*-not-recorded,
+    // flash-encryption-not-final, and key3 which is not checked any more.
     const alternatives = [
       'firmware-info-missing',
       'digest0-not-recorded',
@@ -138,21 +115,9 @@ describe('EfuseReportService', () => {
     expect([...problems].sort()).toEqual(
       ATTRACTAP_SECURITY_PROBLEMS.filter((code) => !alternatives.includes(code)).sort(),
     );
-    const failed = audit.record.mock.calls[1][0];
-    expect(failed.action).toBe('attractap.reader.security_check_failed');
-    expect(failed.details).toEqual({ problems: problems.join(',') });
-    expect(
-      projectAttractapAuditEvent({
-        action: 'reader.security_check_failed',
-        actorId: null,
-        authenticationMethod: null,
-        subjectId: 5,
-        details: failed.details,
-      }),
-    ).not.toBeNull();
   });
 
-  it('puts a secured reader whose later report fails back to not secured, records the problems and audits it', async () => {
+  it('puts a secured reader whose later report fails back to not secured and records the problems', async () => {
     await service.handle(state(release), releaseReport());
     await service.handle(state(release), releaseReport({ rdDisWriteProtected: false, secureVersion: 0 }));
     expect(reader()).toMatchObject({
@@ -161,8 +126,6 @@ describe('EfuseReportService', () => {
       efuseSecureVersion: 0,
       securityReportProblems: ['rd-dis-writable', 'secure-version-below-floor'],
     });
-    expect(actions()).toEqual(['attractap.reader.secured', 'attractap.reader.security_check_failed']);
-    expect(audit.record.mock.calls[1][0].details).toEqual({ problems: 'rd-dis-writable,secure-version-below-floor' });
   });
 
   it('does not trust the digests of the report when the server recorded none for the reader', async () => {

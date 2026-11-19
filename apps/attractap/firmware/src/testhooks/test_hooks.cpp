@@ -19,13 +19,6 @@
 #include "../logger/logger.hpp"
 #include "../platform.hpp"
 #include "../serial/serialCommandHandler.hpp"
-#include "../settings/reader_credentials.hpp"
-#include "../api/security/build_profile.hpp"
-#ifdef ATTRACTAP_SECURE_BUILD
-#include "../api/security/ds_reader_key.hpp"
-#endif
-#include "esp_system.h"
-#include "mbedtls/platform_util.h"
 
 namespace TestHooks
 {
@@ -371,49 +364,6 @@ namespace TestHooks
 
     bool handleCommand(const std::string &topic, JsonObject payload)
     {
-        // Identity hooks (ATT-1207): `identity.get` tells HIL which key the reader holds; `identity.force-p256`
-        // makes the NEXT boot pair with a fresh P-256 key although a DS key exists, so the identity upgrade
-        // can be repeated. It forgets the pairing and the old software key, sets a one-shot flag in NVS and restarts.
-        if (topic == "identity.get")
-        {
-            JsonDocument doc;
-            std::vector<uint8_t> scalar = CredentialStore::loadPrivateKey();
-            doc["softwareKey"] = !scalar.empty();
-            if (!scalar.empty())
-            {
-                mbedtls_platform_zeroize(scalar.data(), scalar.size());
-            }
-            const ReaderCredentials credentials = CredentialStore::load();
-            doc["paired"] = credentials.paired();
-            doc["hasCertificate"] = credentials.hasCertificate();
-            doc["profile"] = BuildProfile::name();
-#ifdef ATTRACTAP_SECURE_BUILD
-            doc["ds"] = DsReaderKeyStore::statusName(DsReaderKeyStore::status());
-#else
-            doc["ds"] = "none";
-#endif
-            reply(topic, doc);
-            return true;
-        }
-
-        if (topic == "identity.force-p256")
-        {
-#ifdef ATTRACTAP_SECURE_BUILD
-            CredentialStore::setForceSoftwareIdentity(true);
-            CredentialStore::saveNewKey({}); // no key, no pin, no certificate
-            JsonDocument doc;
-            doc["restarting"] = true;
-            reply(topic, doc);
-            vTaskDelay(pdMS_TO_TICKS(300));
-            esp_restart();
-#else
-            JsonDocument doc;
-            doc["error"] = "NOT_A_SECURE_BUILD";
-            reply(topic, doc);
-#endif
-            return true;
-        }
-
         if (topic == "ui.widgets.get")
         {
             handleWidgetsGet(topic);

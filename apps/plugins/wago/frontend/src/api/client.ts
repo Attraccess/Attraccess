@@ -40,25 +40,6 @@ export interface WagoController {
   connectivity: 'online' | 'stale' | 'untrusted' | 'runtime_check' | 'runtime_update';
 }
 
-export interface WagoPreset {
-  id:
-    | 'metered-switched-load'
-    | 'pulsed-lock-bank'
-    | 'guarded-enable-request'
-    | 'generic-digital-output'
-    | 'generic-monitored-input';
-  name: string;
-  description: string;
-}
-
-export interface WagoPresetApplication {
-  presetId: WagoPreset['id'];
-  channelId: string;
-  physicalPointId: string;
-  guardChannelId?: string;
-  feedbackChannelId?: string;
-}
-
 export interface WagoSettings {
   defaultMqttServerId: number | null;
 }
@@ -151,8 +132,6 @@ export interface ConfigurationValidationResult {
   errors: ConfigurationValidationError[];
 }
 
-export type ConfigurationRevisionSnapshot = ConfigurationRevision & { snapshot: string };
-
 export interface ConfigurationRevisionPage {
   revisions: ConfigurationRevision[];
   offset: number;
@@ -196,13 +175,6 @@ export interface NetworkChangeStatus {
     failure: string | null;
     running: boolean;
   } | null;
-}
-
-export interface PresetPreview {
-  draftHash: string;
-  diff: ConfigurationDiff[];
-  snapshot: WagoConfigurationSnapshot;
-  errors: ConfigurationValidationError[];
 }
 
 export interface RevisionPreview {
@@ -268,18 +240,6 @@ export const acknowledgeConfigurationRejection = (
   api.request<ConfigurationRevision>(`/controllers/${id}/configuration/revisions/${revision}/acknowledge-rejection`, {
     method: 'POST',
     body: { contentHash, reportedAt },
-  });
-
-export const applyPreset = (
-  id: number,
-  application: WagoPresetApplication,
-  selectedPaths: string[],
-  previewedDraftHash: string,
-  snapshot: WagoConfigurationSnapshot,
-) =>
-  api.request<WagoConfigurationDraft>(`/controllers/${id}/configuration/presets/apply`, {
-    method: 'POST',
-    body: { application, selectedPaths, previewedDraftHash, snapshot },
   });
 
 export const changeControllerNetwork = (id: number, input: { targetHost: string; mqttServerId: number | null }) =>
@@ -350,16 +310,8 @@ export const listControllers = () => api.request<WagoController[]>('/controllers
 
 export const listMqttServers = () => hostApi.request<MqttServer[]>('/mqtt/servers');
 
-export const listPresets = () => api.request<WagoPreset[]>('/configuration/presets');
-
 export const previewConfigurationRevision = (id: number, revision: number) =>
   api.request<RevisionPreview>(`/controllers/${id}/configuration/revisions/${revision}/preview`);
-
-export const previewPreset = (id: number, application: WagoPresetApplication, snapshot?: WagoConfigurationSnapshot) =>
-  api.request<PresetPreview>(`/controllers/${id}/configuration/presets/preview`, {
-    method: 'POST',
-    body: { application, snapshot },
-  });
 
 export const publishConfiguration = (id: number, force: boolean, reviewedHash: string) =>
   api.request<ConfigurationRevision>(`/controllers/${id}/configuration/publish`, {

@@ -390,11 +390,9 @@ void InitScreen::loop()
    State::ApiState apiState = State::getApiState();
    // A paired reader whose secure session does not come up says why (it keeps retrying).
    const State::SessionProblem sessionProblem = apiState.authenticated ? State::SESSION_PROBLEM_NONE : State::getSessionProblem();
-   // Storage: the NVS did not come up, so the reader cannot load or keep its identity (no network cause).
    setLabelTextIfChanged(this->apiAuthenticationLabel,
-                         sessionProblem == State::SESSION_PROBLEM_SERVER_UNTRUSTED   ? FirmwareI18n::Message::ServerCouldNotBeVerified
+                         sessionProblem == State::SESSION_PROBLEM_SERVER_UNTRUSTED ? FirmwareI18n::Message::ServerCouldNotBeVerified
                          : sessionProblem == State::SESSION_PROBLEM_HANDSHAKE_FAILED ? FirmwareI18n::Message::SecureConnectionFailed
-                         : sessionProblem == State::SESSION_PROBLEM_STORAGE_FAILED   ? FirmwareI18n::Message::ReaderStorageError
                                                                                      : FirmwareI18n::Message::AuthenticatingWithApi);
    this->applyStage(this->apiAuthenticationSpinner, this->apiAuthenticationLabel,
                     apiState.authenticated                                ? StageState::SUCCESS

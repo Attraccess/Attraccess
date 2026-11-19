@@ -17,14 +17,13 @@ import { CredentialRegistryService } from './credential-registry.service';
 import { HandshakeLimiter } from './handshake-limiter';
 import { InstallationIdentityService } from './installation-identity.service';
 import { CREDENTIAL_CHANGED_EVENT, PairingService } from './pairing.service';
-import { ReaderSessionService } from './reader-session.service';
 import { ReaderControlService } from './reader-control.service';
-import { IdentityUpgradeService } from './identity-upgrade.service';
+import { ReaderSessionService } from './reader-session.service';
 import type { EfuseReportService } from './efuse-report.service';
 import { FrameType, SESSION_SUBPROTOCOL } from './session-framing';
 import { SessionMetrics } from './session-metrics';
 import { EmulatedReader } from './testing/emulated-reader';
-import { TestInstallation, createTestInstallation, createTestReader, createTestRsaReader } from './testing/test-pki';
+import { TestInstallation, createTestInstallation, createTestReader } from './testing/test-pki';
 
 describe('reader session through the real gateway', () => {
   // Real TLS handshakes; under coverage and a busy machine the first one can take several seconds.
@@ -39,15 +38,7 @@ describe('reader session through the real gateway', () => {
   /** 0: the registry answers from its cache; otherwise it reads the database first. */
   let registryReadMs = 0;
   const recordCertificate = jest.fn(async () => undefined);
-  // The upgrade and eFuse services have their own specs; here only the wiring of the control channel counts.
-  const upgradeSession = {
-    handleRequest: jest.fn(async () => ({ t: 'identity.challenge', nonce: 'AAAA' })),
-    handleUpgrade: jest.fn(async () => ({ t: 'identity.upgraded', certificate: 'PEM' })),
-  };
-  const upgrades = {
-    isRecoverable: jest.fn(async () => false),
-    createSession: jest.fn(() => upgradeSession),
-  } as unknown as IdentityUpgradeService;
+  // The eFuse report check has its own specs; here only the wiring of the control channel counts.
   const efuse = { handle: jest.fn(async () => 'recorded') } as unknown as EfuseReportService;
   const issueReaderCertificate = jest.fn(async () => ({
     pem: 'RENEWED-CERT-PEM',
@@ -102,8 +93,7 @@ describe('reader session through the real gateway', () => {
         provide: SessionMetrics,
         useValue: { activeSessions: { inc: jest.fn(), dec: jest.fn() }, handshakeFailures: { inc: jest.fn() } },
       },
-      { provide: ReaderControlService, useFactory: () => new ReaderControlService(upgrades, efuse) },
-      { provide: IdentityUpgradeService, useValue: upgrades },
+      { provide: ReaderControlService, useFactory: () => new ReaderControlService(efuse) },
       ReaderSessionService,
     ];
     const module = await Test.createTestingModule({
@@ -172,89 +162,6 @@ describe('reader session through the real gateway', () => {
     reader.send(FrameType.HEARTBEAT, Buffer.alloc(0));
     const reply = await reader.nextFrame((f) => f.type === FrameType.JSON && json(f).event === 'HEARTBEAT');
     expect(json(reply).event).toBe('HEARTBEAT');
-  });
-
-  describe('RSA reader identity and the reader control channel', () => {
-    const control = (reader: EmulatedReader, message: unknown) =>
-      reader.send(FrameType.CONTROL, typeof message === 'string' ? message : JSON.stringify(message));
-
-    it('signs in a reader that holds an RSA-3072 key (client CertificateVerify with rsa_pss_rsae_sha256)', async () => {
-      const identity = await createTestRsaReader(installation, 21);
-      active.add(`21:${identity.fingerprint}`);
-      const reader = new EmulatedReader({ url, identity });
-      readers.push(reader);
-      await reader.connect();
-      const authenticated = await reader.nextFrame((f) => f.type === FrameType.JSON);
-      expect(json(authenticated).data).toMatchObject({ type: 'READER_AUTHENTICATED' });
-    });
-
-    it('refuses a certified RSA key of another size', async () => {
-      const identity = await createTestRsaReader(installation, 22, { bits: 2048 });
-      active.add(`22:${identity.fingerprint}`);
-      const reader = new EmulatedReader({ url, identity });
-      readers.push(reader);
-      await reader.connect().catch(() => undefined);
-      await reader.closed;
-      expect(reader.frames.filter((f) => f.type === FrameType.JSON)).toEqual([]);
-    });
-
-    it('answers identity.upgrade.request on the control channel', async () => {
-      const { reader } = await connectPaired(23);
-      await reader.nextFrame((f) => f.type === FrameType.JSON);
-      control(reader, { t: 'identity.upgrade.request' });
-      const reply = await reader.nextFrame((f) => f.type === FrameType.CONTROL && json(f).t === 'identity.challenge');
-      expect(json(reply).nonce).toBe('AAAA');
-      control(reader, { t: 'identity.upgrade', spki: 'x', proof: 'y' });
-      const done = await reader.nextFrame((f) => f.type === FrameType.CONTROL && json(f).t === 'identity.upgraded');
-      expect(json(done).certificate).toBe('PEM');
-    });
-
-    it('hands an eFuse report to the checker with the credential of the session', async () => {
-      const { reader, identity } = await connectPaired(24);
-      await reader.nextFrame((f) => f.type === FrameType.JSON);
-      control(reader, { t: 'efuse.report', mac: 'dc:b4:d9:21:71:c8' });
-      await new Promise((r) => setTimeout(r, 200));
-      const [state, body] = (efuse.handle as jest.Mock).mock.calls.at(-1) as [
-        { readerId: number; fingerprint: string; algorithm: string },
-        unknown,
-      ];
-      expect(state).toMatchObject({ readerId: 24, fingerprint: identity.fingerprint, algorithm: 'ecdsa-p256' });
-      expect(body).toMatchObject({ mac: 'dc:b4:d9:21:71:c8' });
-    });
-
-    it.each([
-      ['an unknown type', { t: 'session.hello' }],
-      ['a server-only type', { t: 'identity.challenge', nonce: 'AAAA' }],
-      ['no type', { nonce: 'x' }],
-      ['not JSON', 'not json'],
-      ['a JSON array', '[]'],
-    ])('closes the session on a control message with %s', async (_name, message) => {
-      const { reader } = await connectPaired(25);
-      await reader.nextFrame((f) => f.type === FrameType.JSON);
-      control(reader, message);
-      await reader.closed;
-    });
-
-    it('lets a replaced P-256 key open an upgrade-only session when the upgrade service says it may', async () => {
-      (upgrades.isRecoverable as jest.Mock).mockResolvedValueOnce(true);
-      const identity = await createTestReader(installation, 26); // not in `active`: its credential was replaced
-      const reader = new EmulatedReader({ url, identity });
-      readers.push(reader);
-      await reader.connect();
-      // The server invites the upgrade; it never sends session.hello in such a session.
-      await reader.nextFrame((f) => f.type === FrameType.CONTROL && json(f).t === 'identity.recover');
-      control(reader, { t: 'identity.upgrade.request' });
-      await reader.nextFrame((f) => f.type === FrameType.CONTROL && json(f).t === 'identity.challenge');
-      expect(upgrades.createSession).toHaveBeenLastCalledWith(expect.anything(), 'recovery');
-      // The reader's keep-alive is ignored; nothing of the application protocol is available in it.
-      reader.send(FrameType.HEARTBEAT, Buffer.alloc(0));
-      control(reader, { t: 'identity.upgrade.request' });
-      await reader.nextFrame((f) => f.type === FrameType.CONTROL && json(f).t === 'identity.challenge');
-      expect(reader.frames.filter((f) => f.type === FrameType.JSON)).toEqual([]);
-      expect(reader.frames.some((f) => f.type === FrameType.CONTROL && json(f).t === 'session.hello')).toBe(false);
-      reader.send(FrameType.JSON, JSON.stringify({ event: 'HEARTBEAT', data: {} }));
-      await reader.closed;
-    });
   });
 
   it.each(['READER_AUTHENTICATE', 'READER_REGISTER'])('closes the session on %s inside it', async (type) => {
@@ -437,19 +344,47 @@ describe('reader session through the real gateway', () => {
     expect(reader.frames.map((f) => json(f))).toEqual([{ t: 'session.rejected', reason: 'inactive-credential' }]);
   });
 
-  it('refuses unknown subprotocol versions at upgrade and still serves legacy connections', async () => {
-    const unknown = new WebSocket(url, ['attractap-session.v2']);
-    const status = await new Promise<number>((resolve) => {
-      unknown.on('unexpected-response', (_req, res) => resolve(res.statusCode ?? 0));
-      unknown.on('open', () => resolve(101));
-      unknown.on('error', () => undefined);
-    });
-    expect(status).toBe(400);
-
-    const legacy = new WebSocket(url);
-    const first = await new Promise<string>((resolve) => legacy.once('message', (d) => resolve(d.toString())));
-    expect(JSON.parse(first).data.type).toBe('READER_REQUEST_AUTHENTICATION');
-    legacy.close();
+  it('refuses unknown subprotocol versions and connections without a subprotocol (token readers) at upgrade', async () => {
+    const statusOf = (socket: WebSocket) =>
+      new Promise<number>((resolve) => {
+        socket.on('unexpected-response', (_req, res) => resolve(res.statusCode ?? 0));
+        socket.on('open', () => resolve(101));
+        socket.on('error', () => undefined);
+      });
+    expect(await statusOf(new WebSocket(url, ['attractap-session.v2']))).toBe(400);
+    // A token reader offers no subprotocol: it gets no connection, so nothing is created for it.
+    expect(await statusOf(new WebSocket(url))).toBe(400);
     expect(SESSION_SUBPROTOCOL).toBe('attractap-session.v1');
+  });
+
+  describe('the reader control channel', () => {
+    const control = (reader: EmulatedReader, message: unknown) =>
+      reader.send(FrameType.CONTROL, typeof message === 'string' ? message : JSON.stringify(message));
+
+    it('hands an eFuse report to the checker with the credential of the session', async () => {
+      const { reader, identity } = await connectPaired(24);
+      await reader.nextFrame((f) => f.type === FrameType.JSON);
+      control(reader, { t: 'efuse.report', mac: 'dc:b4:d9:21:71:c8' });
+      await new Promise((r) => setTimeout(r, 200));
+      const [state, body] = (efuse.handle as jest.Mock).mock.calls.at(-1) as [
+        { readerId: number; fingerprint: string },
+        unknown,
+      ];
+      expect(state).toMatchObject({ readerId: 24, fingerprint: identity.fingerprint });
+      expect(body).toMatchObject({ mac: 'dc:b4:d9:21:71:c8' });
+    });
+
+    it.each([
+      ['an unknown type', { t: 'session.hello' }],
+      ['a removed type', { t: 'identity.upgrade.request' }],
+      ['no type', { nonce: 'x' }],
+      ['not JSON', 'not json'],
+      ['a JSON array', '[]'],
+    ])('closes the session on a control message with %s', async (_name, message) => {
+      const { reader } = await connectPaired(25);
+      await reader.nextFrame((f) => f.type === FrameType.JSON);
+      control(reader, message);
+      await reader.closed;
+    });
   });
 });

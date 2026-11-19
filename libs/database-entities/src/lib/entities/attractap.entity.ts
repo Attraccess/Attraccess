@@ -1,6 +1,5 @@
 import { Column, Entity, JoinTable, ManyToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-import { Exclude } from 'class-transformer';
 import {
   ATTRACTAP_FIRMWARE_PROFILES,
   ATTRACTAP_SECURITY_PROBLEMS,
@@ -130,20 +129,13 @@ export class Attractap {
   @ApiProperty({ description: 'The name of the reader' })
   name!: string;
 
-  @Column({
-    type: 'text',
-    nullable: false,
-  })
-  @Exclude()
-  apiTokenHash!: string;
-
-  @Column({ type: 'text', nullable: false, default: 'unpaired' })
+  @Column({ type: 'text', nullable: false, default: 'revoked' })
   @ApiProperty({
-    description: 'Pairing state: unpaired (legacy token sign-in), paired (TLS identity) or revoked',
-    enum: ['unpaired', 'paired', 'revoked'],
-    default: 'unpaired',
+    description: 'Pairing state: paired (TLS identity) or revoked (no active credential)',
+    enum: ['paired', 'revoked'],
+    default: 'revoked',
   })
-  pairingState!: 'unpaired' | 'paired' | 'revoked';
+  pairingState!: 'paired' | 'revoked';
 
   @Column({ type: 'text', nullable: true })
   @ApiProperty({ description: 'SHA-256 fingerprint of the current reader public key', nullable: true })
@@ -179,7 +171,7 @@ export class Attractap {
   @Column({ type: 'boolean', nullable: false, default: false })
   @ApiProperty({
     description:
-      'True when the last eFuse report matched the secure profile on a release build and an RSA (DS) identity. Set by the server only.',
+      'True when the last eFuse report matched the secure profile on a release build and the paired P-256 session. Set by the server only.',
     default: false,
   })
   secured!: boolean;

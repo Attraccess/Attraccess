@@ -16,10 +16,6 @@ exhaustion (secure-lab: 30 KB free and a 15 KB block left of ~64 KB idle; 19.7 K
 Raise a floor when a change gives the headroom back; lower one only with a
 measured reason, in the same commit.
 
-DS identity (ATT-1207): the secure-lab numbers below are from before the DS key; ``test_ds_identity.py``
-records the heap with the DS-backed session (``reader-heap.jsonl``, label ``ds session``). Compare
-before/after there and change a secure-lab floor only with the measured numbers, in the same commit.
-
 Seen (free / largest block), measured 2026-11-06 on firmware 1.11.1:
 
     workload        plain              secure-lab

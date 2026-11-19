@@ -2,7 +2,6 @@
 import 'reflect-metadata';
 import * as x509 from '@peculiar/x509';
 import { createHash, randomBytes, webcrypto } from 'crypto';
-import { readerKeyAlgorithm } from './reader-spki';
 
 const EC = { name: 'ECDSA', namedCurve: 'P-256' } as const;
 const SIGN = { name: 'ECDSA', hash: 'SHA-256' } as const;
@@ -71,20 +70,6 @@ export async function createCaCertificate(installationId: string, now = new Date
   return { cert, keys };
 }
 
-/**
- * A reader public key: P-256 or RSA-3072 (e = 65537). The CA signs with ECDSA either way; an RSA subject key only
- * changes the key in the certificate. Anything else (other RSA sizes, other curves) is refused.
- */
-async function importReaderPublicKey(spki: Buffer): Promise<CryptoKey> {
-  const algorithm = readerKeyAlgorithm(spki);
-  if (algorithm === null) throw new Error('unsupported reader public key');
-  // RSASSA-PKCS1-v1_5 keeps the plain rsaEncryption OID on export; a reader signs TLS with RSA-PSS regardless.
-  const importAs = algorithm === 'rsa-3072' ? ({ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } as const) : EC;
-  return (await webcrypto.subtle.importKey('spki', spki as unknown as NodeJS.BufferSource, importAs, true, [
-    'verify',
-  ])) as unknown as CryptoKey;
-}
-
 export interface LeafOptions {
   caCert: x509.X509Certificate;
   caKey: CryptoKey;
@@ -100,7 +85,9 @@ export async function issueLeaf(options: LeafOptions): Promise<x509.X509Certific
   const now = options.now ?? new Date();
   const publicKey =
     options.subjectPublicKey instanceof Buffer
-      ? await importReaderPublicKey(options.subjectPublicKey)
+      ? await webcrypto.subtle.importKey('spki', options.subjectPublicKey as unknown as NodeJS.BufferSource, EC, true, [
+          'verify',
+        ])
       : options.subjectPublicKey;
   return await x509.X509CertificateGenerator.create({
     serialNumber: serial(),

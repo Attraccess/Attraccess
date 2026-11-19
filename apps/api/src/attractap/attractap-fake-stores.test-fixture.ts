@@ -52,7 +52,6 @@ export function makeReader(overrides: Partial<AttractapReader> = {}): AttractapR
   return {
     id: 1,
     name: 'Reader',
-    apiTokenHash: 'hash',
     pairingState: 'paired',
     credentialFingerprint: null,
     secureBootDigest0: null,
@@ -107,12 +106,12 @@ export class FakeReaderStore implements AttractapReaderStore {
       .map((reader) => (filter.withResources ? reader : { ...reader, resources: undefined }));
   }
 
-  async listUnpaired(): Promise<AttractapReader[]> {
-    return [...this.readers.values()].filter((reader) => reader.pairingState !== 'paired');
+  async listRevoked(): Promise<AttractapReader[]> {
+    return [...this.readers.values()].filter((reader) => reader.pairingState === 'revoked');
   }
 
-  async create(input: { apiTokenHash: string; name: string; firmware?: AttractapFirmwareInfo }) {
-    const reader = makeReader({ id: this.nextId++, ...input, pairingState: 'unpaired', firmware: input.firmware });
+  async create(input: { name: string; firmware?: AttractapFirmwareInfo }) {
+    const reader = makeReader({ id: this.nextId++, ...input, pairingState: 'revoked', firmware: input.firmware });
     this.readers.set(reader.id, reader);
     return reader;
   }
@@ -331,12 +330,11 @@ export class FakeCredentialStore implements AttractapCredentialStore {
   addReader(row: Partial<ReaderCredentialRow> & { id: number }) {
     this.rows.set(row.id, {
       name: 'Reader',
-      pairingState: 'unpaired',
+      pairingState: 'revoked',
       credentialFingerprint: null,
       pairedAt: null,
       certificateNotAfter: null,
       certificateSerial: null,
-      apiTokenHash: 'token-hash',
       ...row,
     });
   }
@@ -370,7 +368,7 @@ export class FakeCredentialStore implements AttractapCredentialStore {
     Object.assign(this.rows.get(readerId), patch);
   }
   async appendEvent(_scope: TransactionScope, event: CredentialEventInput) {
-    this.events.push({ id: this.nextEventId++, createdAt: new Date(), ...event });
+    this.events.push({ id: this.nextEventId++, createdAt: new Date(0), ...event });
   }
   async updateCertificateIfActive(
     readerId: number,

@@ -83,7 +83,7 @@ export class AttractapFirmwareVersionDto {
   capabilities!: AttractapReaderCapabilities;
 }
 
-/** A reader as the API publishes it. The token hash is deliberately not part of it. */
+/** A reader as the API publishes it.  */
 @ApiSchema({ name: 'Attractap' })
 export class AttractapReaderDto {
   @ApiProperty({ description: 'The ID of the reader' })
@@ -93,9 +93,9 @@ export class AttractapReaderDto {
   name!: string;
 
   @ApiProperty({
-    description: 'Pairing state: unpaired (legacy token sign-in), paired (TLS identity) or revoked',
-    enum: ['unpaired', 'paired', 'revoked'],
-    default: 'unpaired',
+    description: 'Pairing state: paired (TLS identity) or revoked (no active credential)',
+    enum: ['paired', 'revoked'],
+    default: 'revoked',
   })
   pairingState!: AttractapPairingState;
 
@@ -125,7 +125,7 @@ export class AttractapReaderDto {
 
   @ApiProperty({
     description:
-      'True when the last eFuse report matched the secure profile on a release build and an RSA (DS) identity',
+      'True when the last eFuse report matched the secure profile on a release build and the paired P-256 session',
     default: false,
   })
   secured!: boolean;
@@ -159,7 +159,7 @@ export class AttractapReaderDto {
 
   @ApiProperty({
     description:
-      'Problem codes of the last security check (build, session identity and eFuse report); empty when it passed, ' +
+      'Problem codes of the last security check (build and eFuse report); empty when it passed, ' +
       'null when no eFuse report was received',
     enum: ATTRACTAP_SECURITY_PROBLEMS,
     isArray: true,
@@ -201,7 +201,7 @@ export class AttractapReaderDto {
   firmware!: AttractapFirmwareInfo;
 }
 
-/** Explicit mapping: the token hash and every other internal field stay behind. */
+/** Explicit mapping: internal fields stay behind. */
 export function toReaderDto(reader: AttractapReader): AttractapReaderDto {
   return {
     id: reader.id,

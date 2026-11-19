@@ -71,7 +71,6 @@ export function toReader(reader: Attractap): AttractapReader {
   return {
     id: reader.id,
     name: reader.name,
-    apiTokenHash: reader.apiTokenHash,
     pairingState: reader.pairingState,
     credentialFingerprint: reader.credentialFingerprint,
     secureBootDigest0: reader.secureBootDigest0,
