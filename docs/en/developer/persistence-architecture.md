@@ -129,7 +129,8 @@ These are accepted limits of this change, not hidden work:
   `EntityManagerResolver`, `managerFor`). All resolve through the one global unit of work and can be merged into one.
 - The built-in plugins use only the record port, so they run on any engine that has a plugin-storage adapter. The port
   has no joins; plugins read over several of their own tables with several calls.
-- Plugin transactions are not serialised per host process; they run in parallel and conflicts are reported as `PluginStorageConflict`.
+- Plugin transactions are not queued per host process. A per-plugin advisory lock orders the transactions of one plugin
+  (across instances too); core work and other plugins run in parallel.
 - Some lifecycle test fixtures build older schemas with `synchronize` on purpose, to test upgrades and recovery from a
   schema before the integrity migrations.
 - Swagger schemas that documented secret or never-populated fields are now accurate (see below).

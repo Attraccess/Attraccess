@@ -9,8 +9,8 @@
  * fake and against the host, so the rules below hold on both.
  *
  * Behaviour a test can rely on, because the host guarantees it too:
- * - Transactions run one at a time here. A host either orders transactions or fails one of them with
- *   PluginStorageConflict (`conflictOnCommit` simulates that); it never retries.
+ * - Transactions run one at a time here. A host either orders the transactions of a plugin or fails one of them
+ *   with PluginStorageConflict (`conflictOnCommit` simulates that); it never retries.
  * - A write without scope waits for a running transaction and is a transaction of its own. Inside a transaction
  *   callback it throws, like a nested transaction and any call with a closed scope.
  * - A read without scope never waits: outside a transaction callback it sees the committed rows (never another
@@ -112,8 +112,8 @@ class FakeTransactionScope implements PluginTransactionScope {
 const UNSCOPED_WRITE =
   'A write inside context.persistence.transaction needs the transaction scope: pass { scope } to the call.';
 const NESTED_TRANSACTION =
-  'A transaction was started inside a transaction callback. Nested calls would wait for locks the outer ' +
-  'transaction holds and take a second connection; pass the callback scope down instead.';
+  'A transaction was started inside a transaction callback. Nested calls would deadlock on the shared write ' +
+  'queue; pass the callback scope down instead.';
 
 class Runtime {
   readonly engine: RecordEngine;

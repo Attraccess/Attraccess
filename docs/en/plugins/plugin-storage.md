@@ -283,15 +283,13 @@ Errors are neutral and identical on every engine; all extend `PluginStorageError
 resolves and rolls back when it throws. Pass `{ scope }` to every storage call (and to host ports that accept a scope,
 such as `hostData.resources.get(id, scope)`) that must take part.
 
-**The contract:** a transaction commits or rolls back as a whole and never sees the uncommitted writes of another one.
-Concurrent transactions run in parallel (`READ COMMITTED`), so a check-then-write sequence **can** be raced: two
-transactions can pass the same check. Back every check that must hold with a unique key (the loser gets
-`PluginStorageUniqueViolation`) or write it as a compare-and-set `update` (see below). The host may also fail a
-transaction with `PluginStorageConflict`, which rolls it back. The host does **not** retry: keep external effects in
-`scope.afterCommit`, so the caller can safely run the whole transaction again after a conflict.
+**The contract:** the host either orders the concurrent transactions of your plugin (one runs after the other) or
+fails one of them with `PluginStorageConflict`, which rolls it back. A check-then-write sequence inside one
+transaction therefore cannot be raced. A write without a scope is a transaction of its own and is ordered the same way.
+The host does **not** retry: keep external effects in `scope.afterCommit`, so the caller can safely run the whole
+transaction again after a conflict.
 
 ```ts
-// `bookings` declares a unique index on (day, slot): two concurrent calls can both pass the count, only one insert wins.
 await context.persistence.transaction(async (scope) => {
   const clash = await bookings.count({ day, slot }, { scope });
   if (clash > 0) throw new ConflictException('OVERLAP');
@@ -309,10 +307,13 @@ Rules:
 - Pass `{ scope }` on every write inside `work`. A write without it is rejected with `PluginStorageInvalid`. Only a
   read without a scope runs outside the transaction, and it does **not** see the uncommitted writes of `work`.
 - Do not await core operations that write (starting or ending a session) inside `work`.
-- The host does not serialise plugin transactions per process: on PostgreSQL they run in parallel, with row-level
-  isolation (`READ COMMITTED`). Use `update` as compare-and-set or a unique key when two writers must not both win, and
-  retry a `PluginStorageConflict`. Exclusion across several API instances still needs a lock of your own; the
-  reservations plugin runs on a single instance for that reason (see
+- How the host orders transactions is an engine detail. On PostgreSQL every transaction of a plugin first takes a
+  lock of that plugin in the database (a transaction-level advisory lock), so the order also holds across several API
+  instances. Core work and other plugins are not queued behind it. A transaction that waits for the lock longer than
+  the database's lock timeout fails with `PluginStorageConflict`. Keep transactions short: the next one of your plugin
+  waits for them.
+- The order covers database work only. State a plugin keeps in its process (an in-process lock, a cache, a scheduler)
+  is not shared between API instances; the reservations plugin runs on a single instance for that reason (see
   [Reservations](plugins/reservations/administration.md#single-instance-operation)).
 
 The scope you get in `startCapacityHook` (`ctx.scope`) is core's own start transaction: read through it with

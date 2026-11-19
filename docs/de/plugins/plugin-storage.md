@@ -293,17 +293,13 @@ Die Fehler sind neutral und auf jeder Engine gleich; alle erweitern `PluginStora
 committet, wenn `work` abschließt, und zurückgerollt, wenn es wirft. Geben Sie `{ scope }` an jeden Speicheraufruf (und
 an Host-Ports, die einen Scope annehmen, etwa `hostData.resources.get(id, scope)`), der teilnehmen soll.
 
-**Der Vertrag:** Eine Transaktion wird als Ganzes committet oder zurückgerollt und sieht nie die uncommitteten
-Schreibvorgänge einer anderen. Gleichzeitige Transaktionen laufen parallel (`READ COMMITTED`); ein
-Prüfen-dann-Schreiben-Ablauf lässt sich daher **überholen**: Zwei Transaktionen können dieselbe Prüfung bestehen.
-Sichern Sie jede Prüfung, die gelten muss, mit einem Unique-Schlüssel ab (der Verlierer erhält
-`PluginStorageUniqueViolation`) oder schreiben Sie sie als Compare-and-Set-`update` (siehe unten). Der Host kann
-außerdem eine Transaktion mit `PluginStorageConflict` scheitern lassen, die dann zurückgerollt wird. Der Host
-wiederholt **nicht**: Halten Sie externe Effekte in `scope.afterCommit`, damit der Aufrufer die ganze Transaktion nach
-einem Konflikt gefahrlos erneut ausführen kann.
+**Der Vertrag:** Der Host ordnet gleichzeitige Transaktionen Ihres Plugins (eine läuft nach der anderen) oder lässt
+eine davon mit `PluginStorageConflict` scheitern, die dann zurückgerollt wird. Ein Prüfen-dann-Schreiben-Ablauf
+innerhalb einer Transaktion lässt sich daher nicht überholen. Ein Schreibvorgang ohne Scope ist eine eigene
+Transaktion und wird genauso eingeordnet. Der Host wiederholt **nicht**: Halten Sie externe Effekte in
+`scope.afterCommit`, damit der Aufrufer die ganze Transaktion nach einem Konflikt gefahrlos erneut ausführen kann.
 
 ```ts
-// `bookings` deklariert einen Unique-Index auf (day, slot): zwei gleichzeitige Aufrufe können beide den Count bestehen, nur ein Insert gewinnt.
 await context.persistence.transaction(async (scope) => {
   const clash = await bookings.count({ day, slot }, { scope });
   if (clash > 0) throw new ConflictException('OVERLAP');
@@ -322,11 +318,14 @@ Regeln:
   abgewiesen. Nur ein Lesezugriff ohne Scope läuft außerhalb der Transaktion, und er sieht die noch nicht committeten
   Schreibvorgänge von `work` **nicht**.
 - In `work` nicht auf Kern-Vorgänge warten, die schreiben (Sitzungsstart oder -ende).
-- Der Host serialisiert Plugin-Transaktionen nicht pro Prozess: Unter PostgreSQL laufen sie parallel, mit
-  Isolation auf Zeilenebene (`READ COMMITTED`). Nutzen Sie `update` als Compare-and-Set oder einen Unique-Schlüssel,
-  wenn nicht zwei Schreiber gewinnen dürfen, und wiederholen Sie einen `PluginStorageConflict`. Ausschluss über mehrere
-  API-Instanzen braucht weiterhin eine eigene Sperre; das Reservierungs-Plugin läuft deshalb mit einer Instanz (siehe
-  [Reservierungen](plugins/reservations/administration.md#betrieb-mit-einer-instanz)).
+- Wie der Host Transaktionen ordnet, ist ein Detail der Engine. Unter PostgreSQL nimmt jede Transaktion eines Plugins
+  zuerst eine Sperre dieses Plugins in der Datenbank (ein Advisory Lock auf Transaktionsebene), daher gilt die
+  Reihenfolge auch über mehrere API-Instanzen hinweg. Arbeit des Kerns und andere Plugins warten nicht darauf. Eine
+  Transaktion, die länger als das Lock-Timeout der Datenbank auf die Sperre wartet, scheitert mit
+  `PluginStorageConflict`. Halten Sie Transaktionen kurz: Die nächste Transaktion Ihres Plugins wartet auf sie.
+- Die Reihenfolge gilt nur für Datenbankarbeit. Zustand, den ein Plugin in seinem Prozess hält (eine Sperre im
+  Prozess, ein Cache, ein Scheduler), teilen API-Instanzen nicht; das Reservierungs-Plugin läuft deshalb mit einer
+  Instanz (siehe [Reservierungen](plugins/reservations/administration.md#betrieb-mit-einer-instanz)).
 
 Der Scope im `startCapacityHook` (`ctx.scope`) ist die Start-Transaktion des Kerns: Lesen Sie darüber mit
 `{ scope: ctx.scope }`, schreiben Sie nie und rufen Sie darauf nie `afterCommit` auf. In einem Host-Hook, der Ihnen

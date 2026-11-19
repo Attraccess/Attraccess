@@ -1185,11 +1185,13 @@ nicht. Halten Sie Effekte in `afterCommit`, damit der Aufrufer die ganze Transak
   abgewiesen; nur ein Lesezugriff ohne Scope läuft außerhalb der Transaktion und sieht die noch nicht committeten
   Schreibvorgänge von `work` nicht.
 
-Der Host serialisiert Plugin-Transaktionen nicht pro Prozess. Unter PostgreSQL laufen sie parallel zu Sitzungsstart und
--ende des Kerns, mit `READ COMMITTED`. Nutzen Sie `update` als Compare-and-Set oder einen Unique-Schlüssel, wenn nicht
-zwei Schreiber gewinnen dürfen, und wiederholen Sie einen `PluginStorageConflict`. Plugins, die Ausschluss über mehrere
-API-Instanzen brauchen, benötigen eine eigene instanzübergreifende Sperre; das Reservierungs-Plugin läuft deshalb
-mit einer Instanz (siehe [Reservierungen](plugins/reservations/administration.md#betrieb-mit-einer-instanz)).
+Der Host ordnet die Transaktionen Ihres Plugins (eine läuft nach der anderen) oder lässt eine mit
+`PluginStorageConflict` scheitern; er wiederholt nie. Unter PostgreSQL nimmt jede Transaktion eines Plugins, und jeder
+Schreibvorgang ohne Scope, zuerst eine Sperre dieses Plugins in der Datenbank, daher gilt die Reihenfolge auch über
+mehrere API-Instanzen hinweg. Sitzungsstart und -ende des Kerns und andere Plugins warten nicht darauf. Zustand, den
+ein Plugin in seinem Prozess hält (eine Sperre im Prozess, ein Cache, ein Scheduler), teilen Instanzen nicht; das
+Reservierungs-Plugin läuft deshalb mit einer Instanz (siehe
+[Reservierungen](plugins/reservations/administration.md#betrieb-mit-einer-instanz)).
 
 ### Flow-Knoten
 

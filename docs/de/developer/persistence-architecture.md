@@ -137,7 +137,8 @@ Das sind akzeptierte Grenzen dieser Änderung, keine versteckte Arbeit:
   `EntityManagerResolver`, `managerFor`). Alle lösen über die eine globale Unit of Work auf und lassen sich vereinen.
 - Die eingebauten Plugins nutzen nur den Record-Port und laufen daher auf jeder Engine mit Plugin-Speicher-Adapter. Der
   Port kennt keine Joins; Plugins lesen über mehrere eigene Tabellen mit mehreren Aufrufen.
-- Plugin-Transaktionen werden nicht pro Host-Prozess serialisiert; sie laufen parallel, und Konflikte werden als `PluginStorageConflict` gemeldet.
+- Plugin-Transaktionen stehen in keiner Warteschlange pro Host-Prozess. Eine Advisory-Sperre pro Plugin ordnet die
+  Transaktionen eines Plugins (auch über Instanzen hinweg); Kernarbeit und andere Plugins laufen parallel.
 - Einige Lifecycle-Test-Fixtures bauen ältere Schemas absichtlich mit `synchronize`, um Upgrades und Wiederherstellung
   aus einem Schema vor den Integritätsmigrationen zu testen.
 - Swagger-Schemas, die geheime oder nie befüllte Felder dokumentierten, sind jetzt korrekt (siehe unten).

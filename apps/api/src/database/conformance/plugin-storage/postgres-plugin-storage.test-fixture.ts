@@ -8,12 +8,13 @@ import {
   createPostgresPluginPersistenceHost,
   postgresHostTransactionScope,
 } from '../../postgres/plugin-storage/postgres-plugin-storage';
-import { postgresPluginErrorClassifier } from '../../postgres/plugin-storage/postgres-storage-errors';
+import { postgresErrorClassifier } from '../../postgres/postgres-errors';
 import {
   createTestPostgresDatabase,
   type TestPostgresDatabase,
 } from '../../postgres/plugin-storage/postgres-test-database.test-fixture';
 import { registerPersistenceErrorClassifier } from '../../persistence-errors';
+import { testAdminUrl } from '../../../test-utils/test-database';
 import { ScopedUnitOfWork } from '../../unit-of-work';
 import type { StorageBackendFixture, StorageConnection, StorageDatabase } from './storage-fixture';
 
@@ -52,9 +53,7 @@ async function cloneCoreDatabase(): Promise<{ database: TestPostgresDatabase; co
   const { name: source, core } = await coreTemplate();
   const database = await createTestPostgresDatabase('plugin_storage');
   const url = new URL(database.url);
-  const admin = new Client({
-    connectionString: process.env.TEST_DATABASE_URL ?? 'postgres://attraccess:attraccess@127.0.0.1:55432/postgres',
-  });
+  const admin = new Client({ connectionString: testAdminUrl() });
   await admin.connect();
   try {
     // CREATE DATABASE ... TEMPLATE needs the target name free: replace the empty database the helper created.
@@ -72,7 +71,7 @@ export const postgresStorageFixture: StorageBackendFixture = {
   name: 'postgres',
   flavor: 'postgres',
   async create(): Promise<StorageDatabase> {
-    registerPersistenceErrorClassifier(postgresPluginErrorClassifier);
+    registerPersistenceErrorClassifier(postgresErrorClassifier);
     const { database, core } = await cloneCoreDatabase();
     const sources: DataSource[] = [];
     const open = async (lockTimeoutMs = DEFAULT_LOCK_TIMEOUT_MS) => {
@@ -111,7 +110,10 @@ export const postgresStorageFixture: StorageBackendFixture = {
       async connect(options = {}): Promise<StorageConnection> {
         const source = await open(options.busyTimeoutMs);
         const unitOfWork = new ScopedUnitOfWork<EntityManager>({ transaction: (work) => source.transaction(work) });
-        const host = createPostgresPluginPersistenceHost(() => source);
+        const host = createPostgresPluginPersistenceHost(
+          () => source,
+          () => unitOfWork,
+        );
         return {
           contexts: (pluginName, storage) => host.createContexts(pluginName, storage),
           unitOfWork,

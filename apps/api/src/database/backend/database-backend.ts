@@ -30,8 +30,11 @@ export interface MigrationTrack {
 export interface DatabaseBackendPluginHooks {
   /** The engine that creates, migrates and drops a plugin's own tables. `config` redirects its connection (tests only). */
   createMigrationEngine(config: PluginMigrationEngineConfig | null): PluginMigrationEngine;
-  /** The plugin persistence host (transactions and record port). `getConnection` resolves the host connection lazily. */
-  createPersistenceHost(getConnection: () => unknown): PluginPersistenceHost;
+  /**
+   * The plugin persistence host (transactions and record port). `getConnection` resolves the host connection lazily;
+   * `unitOfWork` resolves the host's unit of work on it, so a plugin transaction started inside it can be refused.
+   */
+  createPersistenceHost(getConnection: () => unknown, unitOfWork?: () => UnitOfWork | undefined): PluginPersistenceHost;
   /** Tables of the host's own schema, lowercase. A plugin's storage may not claim one. */
   coreTableNames(): ReadonlySet<string>;
   /**
