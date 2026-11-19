@@ -66,6 +66,19 @@ describe('flow adapters on real PostgreSQL', () => {
   };
 
   describe('flow graph store', () => {
+    it('keeps the fractional canvas positions the editor sends (dragging a node never yields whole numbers)', async () => {
+      const { source, graph } = await instance();
+      const resourceId = await newResource(source, 'Dragged');
+      const dragged = canvas('frac', 1);
+      dragged.nodes[0].position = { x: 76.04591836734696, y: 127.94642857142858 };
+
+      const { saved } = await graph.replaceResourceCanvas(resourceId, dragged, () => undefined);
+
+      expect(saved.nodes[0].position).toEqual({ x: 76.04591836734696, y: 127.94642857142858 });
+      const [stored] = await graph.loadResourceCanvas(resourceId).then((result) => result.nodes);
+      expect(stored.position).toEqual({ x: 76.04591836734696, y: 127.94642857142858 });
+    });
+
     it('replaces a canvas and returns the previous and the saved records', async () => {
       const { source, graph } = await instance();
       const resourceId = await newResource(source, 'Laser');

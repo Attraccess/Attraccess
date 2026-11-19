@@ -133,6 +133,10 @@ function exportValue(plan: ColumnPlan, row: Record<string, unknown>, index: numb
       if (value === 0 || value === 1) return value === 1;
       throw new SnapshotIncompatibleError(`${where}: ${String(value)} is not a boolean`);
     case 'integer': {
+      // INTEGER affinity keeps a fractional number as REAL: the flow editor's canvas positions (76.04...) live in
+      // integer columns of old installations. The copy hands the number on; PostgreSQL stores it in a double column
+      // or refuses it for a real integer column, naming the row, with the SQLite file untouched.
+      if (storage === 'real' && typeof value === 'number') return value;
       if (storage !== 'integer') throw new SnapshotIncompatibleError(`${where}: ${String(value)} is not an integer`);
       const exact = String(row[`i${index}`]);
       return Number.isSafeInteger(Number(exact)) ? Number(exact) : { integer: exact };

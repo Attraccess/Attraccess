@@ -138,6 +138,18 @@ describe('SQLite transfer', () => {
       expect(await transfer.exportSnapshot(source)).toEqual(await transfer.exportSnapshot(source));
     });
 
+    it('hands on a fractional number that INTEGER affinity kept as REAL, such as a flow editor canvas position', async () => {
+      const source = await database();
+      await source.query('INSERT INTO a_account (id) VALUES (1)');
+      await source.query('INSERT INTO b_entry (id, accountId, amount) VALUES (1, 1, 76.04591836734696)');
+      expect(await source.query('SELECT typeof(amount) AS storage FROM b_entry')).toEqual([{ storage: 'real' }]);
+
+      const snapshot = await transfer.exportSnapshot(source);
+
+      const entry = snapshot.tables.find((table) => table.name === 'b_entry');
+      expect(entry?.rows[0].slice(0, 3)).toEqual([1, 1, 76.04591836734696]);
+    });
+
     it('refuses a value that is not what its column declares instead of exporting a guess', async () => {
       const source = await database();
       await source.query('INSERT INTO a_account (id) VALUES (1)');

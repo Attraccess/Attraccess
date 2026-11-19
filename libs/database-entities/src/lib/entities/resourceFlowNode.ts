@@ -52,15 +52,16 @@ export {
 } from '@attraccess/application-models';
 export type { ExternalEffectFailureBehavior } from '@attraccess/application-models';
 
+/** Canvas coordinates are fractional (dragging a node yields values like 76.05): double precision, never integer. */
 export class ResourceFlowNodePosition {
-  @Column({ type: 'integer' })
+  @Column({ type: 'float' })
   @ApiProperty({
     description: 'The x position of the node',
     example: 100,
   })
   x!: number;
 
-  @Column({ type: 'integer' })
+  @Column({ type: 'float' })
   @ApiProperty({
     description: 'The y position of the node',
     example: 100,
