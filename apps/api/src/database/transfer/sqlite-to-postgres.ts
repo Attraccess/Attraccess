@@ -1,12 +1,13 @@
 import type { DataSource } from 'typeorm';
 import type { PluginMigrationEngine } from '../../plugin-system/persistence/plugin-migration-engine.port';
+import { legacyMigrationsTableName } from '../../plugin-system/plugin-storage/storage-model';
 import { postgresBackend } from '../postgres/postgres-backend';
 import { postgresIntegrityViolations } from '../postgres/postgres-transfer';
 import { createSqlitePluginMigrationEngine } from '../sqlite/sqlite-plugin-migrations';
 import { migrateFrozenSqlite, openFrozenSqlite, sqliteFrozenTrack } from '../sqlite/sqlite-frozen-track';
 import { createSqliteTransfer } from '../sqlite/sqlite-transfer';
 import type { DatabaseSnapshot, PluginDescriptor } from '../transfer-snapshot';
-import { SqliteTransferError, safeDetail } from './transfer-errors';
+import { SqliteTransferError, safeDetail, type TransferFailureOutcome } from './transfer-errors';
 import { copyToWorkingDirectory, markMigrated } from './sqlite-working-copy';
 
 export interface TransferLog {
@@ -37,13 +38,26 @@ export interface TransferSummary {
   readonly warnings: readonly string[];
 }
 
-async function step<T>(name: string, work: () => Promise<T>): Promise<T> {
+async function step<T>(
+  name: string,
+  work: () => Promise<T>,
+  outcome: TransferFailureOutcome = 'rolled-back',
+): Promise<T> {
   try {
     return await work();
   } catch (error) {
     if (error instanceof SqliteTransferError) throw error;
-    throw new SqliteTransferError(name, safeDetail(error), { cause: error });
+    throw new SqliteTransferError(name, safeDetail(error), { cause: error, outcome });
   }
+}
+
+/**
+ * The 1.x TypeORM history (`plugin_migrations_<name>`) of an installed plugin was adopted into the plugin's storage
+ * bookkeeping on the copy, which the snapshot carries; the target engine never reads it, so it stays behind.
+ */
+function withoutAdoptedHistories(snapshot: DatabaseSnapshot, plugins: readonly PluginDescriptor[]): DatabaseSnapshot {
+  const histories = new Set(plugins.map((plugin) => legacyMigrationsTableName(plugin.storage.pluginName)));
+  return { ...snapshot, tables: snapshot.tables.filter((table) => !histories.has(table.name)) };
 }
 
 /** Exports the SQLite database through a private working copy: the original file is only read. */
@@ -69,9 +83,10 @@ export async function exportSqliteSnapshot(
     }
     const reader = await step('opening the working copy', () => openFrozenSqlite(copy.file));
     try {
-      return await step('exporting the SQLite data', () =>
+      const snapshot = await step('exporting the SQLite data', () =>
         createSqliteTransfer(sqliteFrozenTrack).exportSnapshot(reader, { plugins }),
       );
+      return withoutAdoptedHistories(snapshot, plugins);
     } finally {
       await reader.destroy();
     }
@@ -80,24 +95,66 @@ export async function exportSqliteSnapshot(
   }
 }
 
+/** Derived data that disagrees after the commit is reported, never repaired: the data is in PostgreSQL either way. */
+async function checkImportedData(target: DataSource, logger: TransferLog): Promise<string[]> {
+  try {
+    const warnings = (await postgresIntegrityViolations(target)).map((problem) => `Integrity check: ${problem}`);
+    for (const warning of warnings) logger.warn(warning);
+    return warnings;
+  } catch (error) {
+    const warning =
+      `The data was transferred to PostgreSQL, but the integrity check after the import could not run: ` +
+      `${safeDetail(error)}. Compare the credit balances of the users with their transactions.`;
+    logger.warn(warning);
+    return [warning];
+  }
+}
+
+/** After the commit: a file that cannot be renamed is reported, and the API continues on the transferred data. */
+async function renameSqliteFile(options: SqliteToPostgresOptions): Promise<{ renamedTo?: string; warning?: string }> {
+  try {
+    const renamedTo = await markMigrated(options.sqliteFile, options.now?.());
+    options.logger.log(
+      `The SQLite file was kept as ${renamedTo}. It is no longer used and can be deleted once you are sure.`,
+    );
+    return { renamedTo };
+  } catch (error) {
+    const warning =
+      `The data was transferred to PostgreSQL, but renaming ${options.sqliteFile} failed: ${safeDetail(error)}. ` +
+      `Rename or remove the SQLite file (and its -journal, -wal and -shm files) yourself; it will be ignored on ` +
+      `the next start because PostgreSQL now holds the data.`;
+    options.logger.warn(warning);
+    return { warning };
+  }
+}
+
 /**
- * Moves the data of a SQLite installation into the PostgreSQL database in one transaction. On any failure nothing is
- * imported (the PostgreSQL transaction rolls back) and the SQLite file is untouched, so a retry is safe.
+ * Moves the data of a SQLite installation into the PostgreSQL database in one transaction. A failure before the
+ * commit imports nothing (the PostgreSQL transaction rolls back) and leaves the SQLite file untouched, so a retry is
+ * safe; the storage tables of installed plugins prepared before the import stay and are reused by the retry. After
+ * the commit the transfer counts as done: a failed integrity check or rename is a warning.
  */
 export async function transferSqliteToPostgres(options: SqliteToPostgresOptions): Promise<TransferSummary> {
   const { logger, plugins, target } = options;
   logger.log('Transferring SQLite data to PostgreSQL...');
   const snapshot = await exportSqliteSnapshot(options.sqliteFile, plugins, logger);
 
+  // Each plugin's storage is prepared in its own transaction, before the import transaction opens.
+  const outcome: TransferFailureOutcome = plugins.length > 0 ? 'plugin-storage-kept' : 'rolled-back';
   for (const plugin of plugins) {
-    await step(`preparing the storage of plugin ${plugin.id} in PostgreSQL`, () =>
-      options.targetPluginEngine.migrate(plugin.storage),
+    await step(
+      `preparing the storage of plugin ${plugin.id} in PostgreSQL`,
+      () => options.targetPluginEngine.migrate(plugin.storage),
+      outcome,
     );
   }
-  await step('importing into PostgreSQL', () => postgresBackend.transfer.importSnapshot(target, snapshot, { plugins }));
+  await step(
+    'importing into PostgreSQL',
+    () => postgresBackend.transfer.importSnapshot(target, snapshot, { plugins }),
+    outcome,
+  );
 
-  const warnings = await step('checking the imported data', () => postgresIntegrityViolations(target));
-  for (const warning of warnings) logger.warn(`Integrity check: ${warning}`);
+  const warnings = await checkImportedData(target, logger);
 
   const tables: Record<string, number> = {};
   let totalRows = 0;
@@ -111,8 +168,9 @@ export async function transferSqliteToPostgres(options: SqliteToPostgresOptions)
 
   let renamedTo: string | undefined;
   if (options.markMigrated !== false) {
-    renamedTo = await step('renaming the SQLite file', () => markMigrated(options.sqliteFile, options.now?.()));
-    logger.log(`The SQLite file was kept as ${renamedTo}. It is no longer used and can be deleted once you are sure.`);
+    const renamed = await renameSqliteFile(options);
+    renamedTo = renamed.renamedTo;
+    if (renamed.warning) warnings.push(renamed.warning);
   }
   return { tables, totalRows, plugins: plugins.map((plugin) => plugin.id), renamedTo, warnings };
 }

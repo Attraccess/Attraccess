@@ -15,7 +15,9 @@ const USAGE = `Usage: ${TRANSFER_COMMAND} [--sqlite <path>] [--force] [--keep]
 
 Moves the data of a SQLite installation into the PostgreSQL database of DATABASE_URL.
   --sqlite <path>  The SQLite file (default: <STORAGE_ROOT>/attraccess.sqlite).
-  --force          Replace data that is already in the PostgreSQL database. Without it a non-empty target is refused.
+  --force          Replace data that is already in the PostgreSQL database: every table except the migration history
+                   is emptied (it lists them first). Stop every API instance first; it refuses while one is connected.
+                   Without it a non-empty target is refused.
   --keep           Do not rename the SQLite file after a successful transfer.
 The SQLite file is never modified except for the final rename.`;
 
@@ -56,7 +58,9 @@ export async function runTransferCommand(argv: readonly string[]): Promise<numbe
     if (!transferred) logger.warn('Nothing was transferred: the SQLite file does not exist (anymore).');
     return transferred ? 0 : 1;
   } catch (error) {
-    logger.error(error instanceof SqliteTransferError ? error.message : `Transfer failed: ${(error as Error).message}`);
+    logger.error(
+      error instanceof SqliteTransferError ? error.describe('command') : `Transfer failed: ${(error as Error).message}`,
+    );
     return 1;
   }
 }

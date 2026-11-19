@@ -81,6 +81,19 @@ describe('runTransferCommand', () => {
     runTransferMock.mockRejectedValue(new SqliteTransferError('importing into PostgreSQL', 'boom'));
     await expect(runTransferCommand([])).resolves.toBe(1);
     expect(error).toHaveBeenCalledWith(expect.stringContaining('failed while importing into PostgreSQL: boom'));
+    // The command is run again by hand; no start retries it.
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('run the command again once the cause is fixed'));
+    expect(error).not.toHaveBeenCalledWith(expect.stringContaining('next start'));
+  });
+
+  it('logs a refusal without promising a retry', async () => {
+    runTransferMock.mockRejectedValue(
+      new SqliteTransferError('checking the target', 'pass --force to replace it', { outcome: 'refused' }),
+    );
+    await expect(runTransferCommand([])).resolves.toBe(1);
+    const [[message]] = error.mock.calls;
+    expect(message).toContain('pass --force to replace it. Nothing was changed');
+    expect(message).not.toMatch(/retr|run the command again/);
   });
 
   it('exits 1 for any other failure, prefixed, and never logs the URL', async () => {

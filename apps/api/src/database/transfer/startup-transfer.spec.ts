@@ -1,6 +1,8 @@
 import { PluginMigrationService } from '../../plugin-system/plugin-migration.service';
 import type { LoadedPluginManifest } from '../../plugin-system/plugin.manifest';
 import type { CompiledPluginStorage } from '../../plugin-system/plugin-storage/storage-model';
+import { MissingTargetStorageError } from '../postgres/postgres-transfer';
+import { SnapshotIncompatibleError } from '../transfer-snapshot';
 import { discoverStoragePlugins, explainMissingPlugin, postgresHasUserData } from './startup-transfer';
 import { SqliteTransferError } from './transfer-errors';
 
@@ -65,32 +67,47 @@ describe('startup transfer helpers', () => {
   });
 
   describe('explainMissingPlugin', () => {
-    const refused = (reason: string) =>
-      new SqliteTransferError('importing into PostgreSQL', `SnapshotIncompatibleError: ${reason}`, {
-        cause: new Error(reason),
+    const refused = (cause: Error, outcome?: 'plugin-storage-kept') =>
+      new SqliteTransferError('importing into PostgreSQL', `SnapshotIncompatibleError: ${cause.message}`, {
+        cause,
+        outcome,
       });
+    const missingTable = (table: string) =>
+      new MissingTargetStorageError('missing-table', table, `The database has no table ${table}`);
 
-    it('names the missing table and ends without a doubled full stop', () => {
-      const explained = explainMissingPlugin(refused('The database has no table reservations_reservation'), []);
+    it('names the missing table, asks for the build for this version, and ends without a doubled full stop', () => {
+      const explained = explainMissingPlugin(refused(missingTable('reservations_reservation')), []);
 
       expect(explained).toBeInstanceOf(SqliteTransferError);
       const message = (explained as Error).message;
-      expect(message).toContain('reservations_reservation');
-      expect(message).toContain('plugin that is not installed or not loadable');
+      expect(message).toContain(
+        'the SQLite data holds data of a plugin that is not installed or not loadable (table reservations_reservation). ' +
+          "Install that plugin's build for this Attraccess version in the plugin directory first.",
+      );
+      expect(message).not.toContain('same version');
       expect(message).not.toContain('..');
     });
 
-    it('lists the plugins that were installed but could not be loaded', () => {
-      const explained = explainMissingPlugin(refused('Plugin bookings is not installed in the target; install 1.4.0'), [
+    it('names a missing plugin, lists the plugins that could not be loaded and keeps the outcome', () => {
+      const cause = new MissingTargetStorageError('missing-plugin', 'bookings', 'Plugin bookings is not installed');
+      const explained = explainMissingPlugin(refused(cause, 'plugin-storage-kept'), [
         { name: 'bookings', reason: 'broken declaration' },
-      ]);
-      expect((explained as Error).message).toContain('bookings (broken declaration)');
+      ]) as SqliteTransferError;
+      expect(explained.message).toContain('(plugin bookings)');
+      expect(explained.message).toContain('plugins that could not be loaded: bookings (broken declaration)');
+      expect(explained.outcome).toBe('plugin-storage-kept');
+    });
+
+    it('decides by the kind of the cause, not by its text', () => {
+      const lookalike = refused(new SnapshotIncompatibleError('The database has no table ghost'));
+      expect(explainMissingPlugin(lookalike, [])).toBe(lookalike);
     });
 
     it('passes every other error through unchanged', () => {
       const other = new SqliteTransferError('opening the working copy', 'disk is full');
       expect(explainMissingPlugin(other, [])).toBe(other);
-      expect(explainMissingPlugin(new Error('boom'), [])).toBeInstanceOf(Error);
+      const plain = new Error('boom');
+      expect(explainMissingPlugin(plain, [])).toBe(plain);
     });
   });
 });

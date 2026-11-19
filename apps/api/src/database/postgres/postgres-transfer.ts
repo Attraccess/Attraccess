@@ -30,6 +30,21 @@ const quote = (identifier: string): string => `"${identifier.replace(/"/g, '""')
 /** Tables whose content belongs to a source engine's bookkeeping and never crosses engines. */
 const ENGINE_BOOKKEEPING = new Set(['migrations', 'typeorm_metadata']);
 
+/**
+ * The target lacks storage the snapshot needs: a plugin that is not installed, or a table no installed plugin (or
+ * release) creates. `reason` and the name let callers explain it without parsing the message.
+ */
+export class MissingTargetStorageError extends SnapshotIncompatibleError {
+  constructor(
+    readonly reason: 'missing-plugin' | 'missing-table',
+    /** The plugin id (`missing-plugin`) or the table name (`missing-table`). */
+    readonly subject: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 export async function userTables(manager: Query): Promise<string[]> {
   const rows: { table_name: string }[] = await manager.query(
     `SELECT table_name FROM information_schema.tables
@@ -146,7 +161,9 @@ async function assertPluginsRestorable(
   for (const plugin of snapshot.plugins) {
     const installed = options.plugins?.find((candidate) => candidate.id === plugin.id);
     if (!installed) {
-      throw new SnapshotIncompatibleError(
+      throw new MissingTargetStorageError(
+        'missing-plugin',
+        plugin.id,
         `Plugin ${plugin.id} is not installed in the target; install version ${plugin.version} first`,
       );
     }
@@ -207,7 +224,9 @@ async function assertRestorable(
   for (const table of snapshot.tables) {
     if (foreign && ENGINE_BOOKKEEPING.has(table.name)) continue;
     if (!existing.includes(table.name)) {
-      throw new SnapshotIncompatibleError(
+      throw new MissingTargetStorageError(
+        'missing-table',
+        table.name,
         `The database has no table ${table.name}${
           foreign ? ' (data of a plugin that is not installed, or a table of an older release)' : ''
         }`,
@@ -275,6 +294,11 @@ async function orphans(manager: Query, key: ForeignKey): Promise<string> {
        AND NOT EXISTS (SELECT 1 FROM ${quote(key.parent)} p WHERE ${join}) LIMIT 5`,
   );
   return JSON.stringify(rows);
+}
+
+/** The tables an import empties and fills: every base table except the migration bookkeeping. */
+export async function replacedTables(manager: Query): Promise<string[]> {
+  return (await userTables(manager)).filter((name) => !ENGINE_BOOKKEEPING.has(name));
 }
 
 async function userTriggerTables(manager: Query): Promise<string[]> {
@@ -364,7 +388,7 @@ export function createPostgresTransfer(track: MigrationTrack): DatabaseTransfer<
         // The migration bookkeeping stays as it is: assertRestorable verified a snapshot of this engine carries the
         // same migration state, and a snapshot of another engine carries that engine's, which has no meaning here.
         const loaded = snapshot.tables.filter((table) => plans.has(table.name) && !ENGINE_BOOKKEEPING.has(table.name));
-        const wipe = (await userTables(manager)).filter((name) => !ENGINE_BOOKKEEPING.has(name));
+        const wipe = await replacedTables(manager);
         if (wipe.length > 0) await manager.query(`TRUNCATE ${wipe.map(quote).join(', ')} RESTART IDENTITY`);
         for (const table of loaded) {
           const tablePlans = plans.get(table.name) as ColumnPlan[];

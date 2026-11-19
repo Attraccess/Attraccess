@@ -110,10 +110,32 @@ describe('runTransfer (persistence)', () => {
     expect(await files()).toEqual(['attraccess.sqlite']);
   });
 
-  it('replaces what the target holds when asked to', async () => {
+  it('replaces what the target holds when asked to, naming every table it empties first', async () => {
     await installSqlite();
     await fillTarget();
     await expect(runTransfer({ sqliteFile: sqliteFile(), whenTargetHasData: 'replace' })).resolves.toBe(true);
     expect(await usernames()).toEqual(['ada']);
+    const listed = warn.mock.calls.map(([message]) => String(message)).find((m) => m.startsWith('--force:'));
+    expect(listed).toMatch(/^--force: deleting the content of \d+ table\(s\) of the PostgreSQL database/);
+    expect(listed).toContain('audit_log');
+    expect(listed).toMatch(/\buser\b/);
+    expect(listed).not.toMatch(/\bmigrations\b|typeorm_metadata/);
+  });
+
+  it('refuses to replace the data while a running API is connected to the database', async () => {
+    await installSqlite();
+    await fillTarget();
+    // A connection like the API's own (same application_name).
+    const api = await createTestDataSource({ location: database.location, migrationsRun: false });
+    try {
+      const error = await runTransfer({ sqliteFile: sqliteFile(), whenTargetHasData: 'replace' }).catch((e) => e);
+      expect(error).toBeInstanceOf(SqliteTransferError);
+      expect(error.outcome).toBe('refused');
+      expect(error.message).toMatch(/connection\(s\) of a running Attraccess API use the PostgreSQL database/);
+    } finally {
+      await closeTestDataSource(api);
+    }
+    expect(await usernames()).toEqual(['resident']);
+    expect(await files()).toEqual(['attraccess.sqlite']);
   });
 });

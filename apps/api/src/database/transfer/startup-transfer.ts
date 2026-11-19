@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { stat } from 'node:fs/promises';
-import type { DataSource } from 'typeorm';
+import type { DataSource, DataSourceOptions } from 'typeorm';
 import { resolveDatabasePath } from '../../config/storage-path';
 import type { LoadedPluginManifest } from '../../plugin-system/plugin.manifest';
 import { PluginMigrationService } from '../../plugin-system/plugin-migration.service';
@@ -11,8 +11,10 @@ import { postgresBackend } from '../postgres/postgres-backend';
 import { acquireAdvisoryLock, SQLITE_TRANSFER_LOCK_KEY } from '../postgres/postgres-advisory-lock';
 import { parsePostgresConfig, redactDatabaseUrl } from '../postgres/postgres-config';
 import { waitForPostgres } from '../postgres/postgres-connection';
+import { MissingTargetStorageError } from '../postgres/postgres-transfer';
 import type { PluginDescriptor } from '../transfer-snapshot';
 import { SqliteTransferError } from './transfer-errors';
+import { assertNoRunningApi, logReplacedTables, TRANSFER_APPLICATION_NAME } from './replace-target';
 import { transferSqliteToPostgres } from './sqlite-to-postgres';
 
 const logger = new Logger('SqliteTransfer');
@@ -61,18 +63,17 @@ export function discoverStoragePlugins(manifests: readonly LoadedPluginManifest[
 
 /** Explains a refused import when the SQLite data holds plugin tables that no loadable installed plugin declares. */
 export function explainMissingPlugin(error: unknown, unloadable: DiscoveredPlugins['unloadable']): unknown {
-  const message = error instanceof Error ? error.message : '';
-  if (!(error instanceof SqliteTransferError) || !/has no table|is not installed/.test(message)) return error;
-  // The cause names the missing table or plugin, for example "The database has no table reservations_reservation".
-  const reason = error.cause instanceof Error ? error.cause.message.replace(/^\w+Error: /, '') : '';
+  if (!(error instanceof SqliteTransferError) || !(error.cause instanceof MissingTargetStorageError)) return error;
+  const { reason, subject } = error.cause;
+  const which = reason === 'missing-plugin' ? `plugin ${subject}` : `table ${subject}`;
   const hint = unloadable.length
     ? `; plugins that could not be loaded: ${unloadable.map((p) => `${p.name} (${p.reason})`).join(', ')}`
     : '';
   return new SqliteTransferError(
     'importing into PostgreSQL',
-    `the SQLite data holds data of a plugin that is not installed or not loadable${reason ? ` (${reason})` : ''}. ` +
-      `Install that plugin in the plugin directory first, in the same version as before${hint}`,
-    { cause: error },
+    `the SQLite data holds data of a plugin that is not installed or not loadable (${which}). ` +
+      `Install that plugin's build for this Attraccess version in the plugin directory first${hint}`,
+    { cause: error, outcome: error.outcome },
   );
 }
 
@@ -97,18 +98,22 @@ export async function runTransfer(options: RunTransferOptions): Promise<boolean>
   try {
     // Another instance may have transferred while this one waited for the lock.
     if (!(await exists(sqliteFile))) return false;
+    const base = backend.createDataSourceOptions() as DataSourceOptions & { extra?: Record<string, unknown> };
     source = backend.createDataSource({
-      ...backend.createDataSourceOptions(),
+      ...base,
       entities: [],
       migrationsRun: false,
-    });
+      extra: { ...base.extra, application_name: TRANSFER_APPLICATION_NAME },
+    } as DataSourceOptions);
     await source.initialize();
+    if (options.whenTargetHasData === 'replace') await assertNoRunningApi(source);
     await source.runMigrations();
     if (options.whenTargetHasData !== 'replace' && (await postgresHasUserData(source))) {
       if (options.whenTargetHasData === 'refuse') {
         throw new SqliteTransferError(
           'checking the target',
           'the PostgreSQL database already holds data; pass --force to replace it with the SQLite data',
+          { outcome: 'refused' },
         );
       }
       logger.warn(
@@ -117,6 +122,7 @@ export async function runTransfer(options: RunTransferOptions): Promise<boolean>
       );
       return false;
     }
+    if (options.whenTargetHasData === 'replace') await logReplacedTables(source, logger);
     const discovered = discoverStoragePlugins(PluginService.getPlugins());
     try {
       await transferSqliteToPostgres({
