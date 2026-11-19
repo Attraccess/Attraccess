@@ -26,6 +26,11 @@ from test_nfc_cards import (
 PROFILE_USERS = {"alice": "alice", "bob": "bob", "carol": "carol"}
 ATTRACCESS_AID_LE = "55ceac"  # ACCE55, little endian on the wire
 FOREIGN_KEY = "a5" * 16
+# The reader closes its enroll and reset screens after ENROLLMENT_TIMEOUT_MS / RESET_TIMEOUT_MS
+# (30 s, firmware src/application/state) and logs these lines (application.cpp).
+SCREEN_OPEN_S = 30
+ENROLL_SCREEN_CLOSED = "Enrollment timeout reached"
+RESET_SCREEN_CLOSED = "Reset timeout reached"
 
 
 def rows(api, sql, *args):
@@ -113,46 +118,55 @@ def start_reset(api, admin, reader, card_id):
     return status, body, mark
 
 
+def open_screen(start, line, reader):
+    """Open an enroll or reset screen with ``start()``; the console mark from before the request.
+
+    The reader sends its cancel for a screen it just closed over the WebSocket, so a new request
+    can briefly find the server still busy with the old one (409 READER_BUSY).
+    """
+    deadline = time.monotonic() + 15
+    status, body, mark = start()
+    while status == 409 and time.monotonic() < deadline:
+        time.sleep(1)
+        status, body, mark = start()
+    assert status in (200, 201), body
+    reader["console"].expect(line, mark, 15)
+    return mark
+
+
 def arm_enroll(api, admin, reader, user_id):
     """Open the enrollment screen; the console mark from before the request."""
-    status, body, mark = start_enroll(api, admin, reader, user_id)
-    assert status in (200, 201), body
-    reader["console"].expect(r"Received enroll new card available key no", mark, 15)
-    return mark
+    return open_screen(lambda: start_enroll(api, admin, reader, user_id), r"Received enroll new card available key no", reader)
 
 
 def arm_reset(api, admin, reader, card_id):
     """Open the reset screen; the console mark from before the request."""
-    status, body, mark = start_reset(api, admin, reader, card_id)
-    assert status in (200, 201), body
-    reader["console"].expect(r"Transitioning to screen: ResetScreen", mark, 15)
-    return mark
-
-
-ENROLL_SCREEN_CLOSED = "Enrollment timeout reached"
-RESET_SCREEN_CLOSED = "Reset timeout reached"
+    return open_screen(lambda: start_reset(api, admin, reader, card_id), r"Transitioning to screen: ResetScreen", reader)
 
 
 def present_armed(emulator, reader, hooks, arm, closed, profile, done, window, tries):
-    """``present_until`` on an enroll or reset screen, arming a new one whenever the reader closed the last.
+    """``present_until`` on an enroll or reset screen, arming a new one when the last cannot hold a try.
 
-    The reader closes the screen 30 s after it opened and logs ``closed``. On the Touch V1 one exchange
-    takes 12 to 13 s, so a few dropped exchanges use up a screen, and further presentations would be
-    plain login taps that can never finish the operation.
+    The reader closes the screen ``SCREEN_OPEN_S`` after it opened and logs ``closed``. On the Touch V1
+    one exchange takes 12 to 13 s, so a few dropped exchanges use up a screen, and further
+    presentations would be plain login taps that can never finish the operation. A try therefore
+    starts on a new screen once the old one closed or has less than ``window`` seconds left.
     """
-    since = arm()
+    since, armed_at = arm(), time.monotonic()
     for _ in range(tries):
-        if closed in reader["console"].since(since):
+        if closed in reader["console"].since(since) or time.monotonic() - armed_at + window > SCREEN_OPEN_S - 1:
+            if done():  # finished just after the last check; a new reset request would find no card
+                return True
             emulator.command("remove")
             idle_reader(hooks)
-            since = arm()
+            since, armed_at = arm(), time.monotonic()
         if present_until(emulator, profile, done, window, tries=1):
             return True
     return done()
 
 
 def enroll_card(api, admin, reader, emulator, hooks, user_id, profile, tries=6):
-    """Enroll through the reader; True once the server recorded the card."""
+    """Enroll through the reader; the card id once the server recorded the card."""
     uid = uid_of(emulator, profile)
     try:
         assert present_armed(emulator, reader, hooks, lambda: arm_enroll(api, admin, reader, user_id),
