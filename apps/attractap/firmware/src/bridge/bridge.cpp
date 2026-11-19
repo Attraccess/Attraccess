@@ -10,19 +10,41 @@
 
 #include "../logger/logger.hpp"
 #include "../platform.hpp"
+#include "../settings/reader_credentials.hpp"
 #include "../state/state.hpp"
+#include "provisioning.hpp"
+#include "provisioning_logic.hpp"
 
 namespace bridge
 {
     namespace
     {
         constexpr uint32_t TICK_MS = 50;
-        constexpr uint32_t TASK_STACK = 3072;
+        // Also brings NimBLE up and down for the Bluetooth setup (esp_bt_controller_init runs on this task).
+        constexpr uint32_t TASK_STACK = 4096;
         // Time the "all LEDs on" of a factory reset stays visible before the reboot.
         constexpr uint32_t RESET_SHOW_MS = 1000;
 
         Logger logger("Bridge");
         std::function<BleActivity()> activitySource;
+        SetupWindow setupWindow;
+
+        void requestSetup(uint32_t now)
+        {
+            const bool paired = CredentialStore::load().paired();
+            if (paired)
+            {
+                logger.info("Button held 3 s: Bluetooth setup is only available before the bridge is paired");
+                return;
+            }
+            if (setupWindow.request(paired, now) != SetupWindow::Change::Open) return;
+            if (!provisioning::open())
+            {
+                setupWindow = SetupWindow();
+                return;
+            }
+            logger.info("Button held 3 s: Bluetooth setup open for 10 minutes");
+        }
 
         // The S10's LEDs are active low.
         void setLed(int pin, bool on) { gpio_set_level(static_cast<gpio_num_t>(pin), on ? 0 : 1); }
@@ -35,7 +57,7 @@ namespace bridge
         }
 
         // Clears Wi-Fi, the API address, the pairing credentials and the PIN (all of NVS), then reboots
-        // unconfigured. Setup starts again over the serial pads.
+        // unconfigured. Setup starts again over Bluetooth (hold 3 s) or the serial pads.
         [[noreturn]] void factoryReset()
         {
             logger.warn("Button held 10 s: factory reset");
@@ -64,9 +86,15 @@ namespace bridge
                     esp_restart();
                 case Button::Action::FactoryReset:
                     factoryReset();
+                case Button::Action::Setup:
+                    requestSetup(now);
+                    break;
                 case Button::Action::None:
                     break;
                 }
+
+                if (setupWindow.update(State::getApiState().authenticated, now) == SetupWindow::Change::Close)
+                    provisioning::close();
 
                 const State::NetworkState network = State::getNetworkState();
                 LedInputs in;
@@ -74,6 +102,8 @@ namespace bridge
                 in.apiConnected = State::getWebsocketState().connected;
                 in.ble = activitySource ? activitySource() : BleActivity::Idle;
                 in.buttonHeldMs = button.heldMs(now);
+                in.setupWindow = setupWindow.isOpen();
+                in.setupLinked = provisioning::linked();
                 show(ledLevels(in, now));
                 vTaskDelay(pdMS_TO_TICKS(TICK_MS));
             }
@@ -83,6 +113,7 @@ namespace bridge
     void start(std::function<BleActivity()> bleActivity)
     {
         activitySource = std::move(bleActivity);
+        SerialCommandHandler::setChannel(&provisioning::channel());
 
         gpio_config_t leds = {};
         leds.pin_bit_mask = (1ULL << PIN_LED_POWER) | (1ULL << PIN_LED_NETWORK) | (1ULL << PIN_LED_BT);

@@ -24,6 +24,8 @@
 
 std::string SerialCommandHandler::inputBuffer = "";
 Logger SerialCommandHandler::logger("SerialCmd");
+SerialCommandHandler::Channel *SerialCommandHandler::extraChannel = nullptr;
+SerialCommandHandler::Channel *SerialCommandHandler::replyChannel = nullptr;
 
 void SerialCommandHandler::setup()
 {
@@ -64,6 +66,17 @@ void SerialCommandHandler::loop()
         }
 
         inputBuffer += c;
+    }
+
+    if (extraChannel)
+    {
+        std::string line;
+        while (extraChannel->nextLine(line))
+        {
+            replyChannel = extraChannel;
+            processLine(line);
+            replyChannel = nullptr;
+        }
     }
 }
 
@@ -115,6 +128,11 @@ void SerialCommandHandler::processLine(const std::string &line)
 void SerialCommandHandler::sendJsonResponse(const std::string &topic, const std::string &payload)
 {
     // Exact wire format "RESP <topic> <payload>\n" — the provisioning tooling parses it.
+    if (replyChannel)
+    {
+        replyChannel->reply("RESP " + topic + " " + payload + "\n");
+        return;
+    }
     printf("RESP %s %s\n", topic.c_str(), payload.c_str());
 }
 
@@ -330,6 +348,10 @@ void SerialCommandHandler::handleCommand(const std::string &topic, const std::st
         triggerCrash(payloadObj["stackBytes"] | 0u);
         return;
     }
+#endif
+
+#ifdef ATTRACTAP_BLE_BRIDGE
+    if (topic == "heap") return sendHeapStatus(topic); // read-only, no PIN: release logs no heap (ATT-1315)
 #endif
 
     if (topic == "auth.status.get")
@@ -575,3 +597,4 @@ void SerialCommandHandler::handleAuthorizedCommand(const std::string &topic, Jso
 }
 
 #endif
+

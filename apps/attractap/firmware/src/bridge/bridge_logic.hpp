@@ -45,6 +45,8 @@ namespace bridge
         BleActivity ble = BleActivity::Idle;
         uint32_t buttonHeldMs = 0; // how long the button is held now (0: released)
         bool factoryReset = false; // the reset runs; the board reboots shortly
+        bool setupWindow = false;  // the Bluetooth setup window is open (provisioning_logic.hpp)
+        bool setupLinked = false;  // ... and the web app is connected to it
     };
 
     struct LedLevels
@@ -56,14 +58,25 @@ namespace bridge
 
     constexpr uint32_t SLOW_BLINK_MS = 1000;
     constexpr uint32_t FAST_BLINK_MS = 200;
-    // Holding the button this long shows the factory-reset countdown on all LEDs.
-    constexpr uint32_t HOLD_FEEDBACK_MS = 2000;
+    // Holding the button this long shows on all LEDs that releasing now opens the Bluetooth setup and that holding
+    // on factory-resets (Button::SETUP_HOLD_MS).
+    constexpr uint32_t HOLD_FEEDBACK_MS = 3000;
+    // The BT LED while the Bluetooth setup window waits for the web app: two short flashes every 1.5 s.
+    constexpr uint32_t DOUBLE_FLASH_PERIOD_MS = 1500;
+    constexpr uint32_t DOUBLE_FLASH_ON_MS = 100;
 
     inline bool blink(uint32_t now, uint32_t periodMs) { return now % periodMs < periodMs / 2; }
 
+    inline bool doubleFlash(uint32_t now)
+    {
+        const uint32_t t = now % DOUBLE_FLASH_PERIOD_MS;
+        return t < DOUBLE_FLASH_ON_MS || (t >= 2 * DOUBLE_FLASH_ON_MS && t < 3 * DOUBLE_FLASH_ON_MS);
+    }
+
     // Power: on while the firmware runs. Network: on = API connected, slow blink = network up without the API,
-    // fast blink = no network. BT: on = connection open, slow blink = scan or watch, off = idle. While the button
-    // is held for a factory reset all three blink fast, and stay on once the reset runs.
+    // fast blink = no network. BT: on = connection open, slow blink = scan or watch, off = idle; while the Bluetooth
+    // setup window is open: double flash = waiting for the web app, on = the web app is connected. While the button
+    // is held past HOLD_FEEDBACK_MS all three blink fast, and stay on once a factory reset runs.
     inline LedLevels ledLevels(const LedInputs &in, uint32_t now)
     {
         if (in.factoryReset) return {true, true, true};
@@ -76,13 +89,15 @@ namespace bridge
         out.power = true;
         if (in.apiConnected) out.network = true;
         else out.network = blink(now, in.networkUp ? SLOW_BLINK_MS : FAST_BLINK_MS);
-        if (in.ble == BleActivity::Connected) out.bt = true;
+        if (in.setupWindow) out.bt = in.setupLinked || doubleFlash(now);
+        else if (in.ble == BleActivity::Connected) out.bt = true;
         else if (in.ble == BleActivity::Scanning) out.bt = blink(now, SLOW_BLINK_MS);
         return out;
     }
 
-    // The button: a short press reboots, holding it FACTORY_RESET_HOLD_MS factory-resets (while still held).
-    // Releasing between SHORT_PRESS_MAX_MS and the reset cancels; presses shorter than DEBOUNCE_MS are bounces.
+    // The button: a short press reboots, releasing it after SETUP_HOLD_MS (but before the reset) asks for the
+    // Bluetooth setup window, holding it FACTORY_RESET_HOLD_MS factory-resets (while still held). Releasing between
+    // SHORT_PRESS_MAX_MS and SETUP_HOLD_MS does nothing; presses shorter than DEBOUNCE_MS are bounces.
     class Button
     {
     public:
@@ -91,10 +106,12 @@ namespace bridge
             None,
             Reboot,
             FactoryReset,
+            Setup,
         };
 
         static constexpr uint32_t DEBOUNCE_MS = 50;
         static constexpr uint32_t SHORT_PRESS_MAX_MS = 2000;
+        static constexpr uint32_t SETUP_HOLD_MS = HOLD_FEEDBACK_MS;
         static constexpr uint32_t FACTORY_RESET_HOLD_MS = 10000;
 
         Action update(bool pressed, uint32_t now)
@@ -115,7 +132,9 @@ namespace bridge
             if (!down) return Action::None;
             down = false;
             const uint32_t held = now - pressedAt;
-            return !fired && held >= DEBOUNCE_MS && held < SHORT_PRESS_MAX_MS ? Action::Reboot : Action::None;
+            if (fired || held < DEBOUNCE_MS) return Action::None;
+            if (held < SHORT_PRESS_MAX_MS) return Action::Reboot;
+            return held >= SETUP_HOLD_MS ? Action::Setup : Action::None;
         }
 
         uint32_t heldMs(uint32_t now) const { return down ? now - pressedAt : 0; }
