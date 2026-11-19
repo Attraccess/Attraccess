@@ -7,6 +7,9 @@ import {
   FlashSizeValues,
 } from 'esptool-js';
 import { Mutex } from 'async-mutex';
+import type { Command, ConfiguratorTransport, ConnectionStateEvent } from './configurator-transport';
+
+export type { Command, ConnectionStateEvent } from './configurator-transport';
 
 export enum ESPToolsErrorType {
   NO_PORT_SELECTED = 'NO_PORT_SELECTED',
@@ -19,16 +22,6 @@ export enum ESPToolsErrorType {
   CHIP_MISMATCH = 'CHIP_MISMATCH',
   UNKNOWN_ERROR = 'UNKNOWN_ERROR',
   NO_TRANSPORT_AVAILABLE = 'NO_TRANSPORT_AVAILABLE',
-}
-
-export interface Command {
-  topic: string;
-  payload?: string;
-}
-
-export interface ConnectionStateEvent {
-  connected: boolean;
-  timestamp: number;
 }
 
 export type ESPToolsEventData = {
@@ -68,7 +61,9 @@ export interface UseTransportOptionsNonBlocking<TResult = unknown> {
   fn: (transport: Transport) => Promise<TResult>;
 }
 
-export class ESPTools {
+export class ESPTools implements ConfiguratorTransport {
+  public readonly kind = 'serial' as const;
+
   private constructor() {
     // Private constructor to prevent instantiation
   }

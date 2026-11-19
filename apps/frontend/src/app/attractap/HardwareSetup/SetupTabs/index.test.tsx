@@ -50,7 +50,9 @@ vi.mock('../SerialConfigurator/Network', () => ({
   AttractapSerialConfiguratorNetwork: () => <div data-testid="serial-network" />,
 }));
 vi.mock('../SerialConfigurator/Api', () => ({ AttractapSerialConfiguratorApi: () => null }));
-vi.mock('../SerialConfigurator/Pin', () => ({ AttractapSerialConfiguratorPin: () => null }));
+vi.mock('../SerialConfigurator/Pin', () => ({
+  AttractapSerialConfiguratorPin: () => <div data-testid="serial-pin" />,
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -76,4 +78,13 @@ it('continues from a flashed BLE Bridge into the serial configurator once it was
   await waitFor(() => expect(screen.getByRole('tab', { name: 'Network' })).toHaveAttribute('aria-selected', 'true'));
   expect(screen.getByTestId('serial-network')).toBeVisible();
   expect(state.refreshPinStatus).toHaveBeenCalledOnce();
+});
+
+it('hides the Firmware tab over Bluetooth and starts with the PIN', () => {
+  render(<SetupTabs transport="bluetooth" openDeviceSettings={vi.fn()} onClose={vi.fn()} />);
+  expect(screen.queryByRole('tab', { name: 'Firmware' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'pick bridge' })).toBeNull();
+  expect(screen.getByRole('tab', { name: 'PIN' })).toHaveAttribute('aria-selected', 'true');
+  expect(screen.getByTestId('serial-pin')).toBeVisible();
+  expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Network', 'Server', 'PIN']);
 });

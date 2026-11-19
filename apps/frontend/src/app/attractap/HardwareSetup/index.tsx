@@ -1,46 +1,12 @@
-import { Button, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Chip, DrawerBody, DrawerHeader, DrawerHeading, useOverlayState } from '@heroui/react';
-import { UsbIcon } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ConnectionStateEvent, ESPTools } from '../../../utils/esp-tools';
+import { ConnectScreen } from './ConnectScreen';
 import { SetupTabs } from './SetupTabs';
+import { useConfiguratorConnection } from './useConfiguratorConnection';
 import type { OpenDeviceSettings } from './SerialConfigurator/Api';
 
 import de from './de.json';
 import en from './en.json';
-
-function ConnectScreen() {
-  const { t } = useTranslations({ de, en });
-  const espTools = useRef(ESPTools.getInstance());
-  const [isConnecting, setIsConnecting] = useState(false);
-
-  const connect = useCallback(async () => {
-    setIsConnecting(true);
-    try {
-      await espTools.current.connectToDevice();
-    } catch (err) {
-      console.error('Failed to connect to device', err);
-    } finally {
-      setIsConnecting(false);
-    }
-  }, []);
-
-  return (
-    <div className="flex flex-col items-center gap-6 py-10 text-center">
-      <div className="rounded-full bg-primary-100 p-4 dark:bg-primary-900/40">
-        <UsbIcon className="w-8 h-8 text-primary-600 dark:text-primary-300" />
-      </div>
-      <div className="flex flex-col gap-2">
-        <h3 className="text-lg font-semibold">{t('connect.title')}</h3>
-        <p className="max-w-md text-sm text-muted">{t('connect.description')}</p>
-        <p className="max-w-md text-sm text-muted">{t('connect.bleBridgeHint')}</p>
-      </div>
-      <Button variant="primary" onPress={connect} isPending={isConnecting} className="w-full max-w-xs">
-        {t('connect.button.label')}
-      </Button>
-    </div>
-  );
-}
 
 interface SetupContentProps {
   openDeviceSettings: OpenDeviceSettings;
@@ -48,21 +14,14 @@ interface SetupContentProps {
 }
 
 function SetupContent({ openDeviceSettings, onClose }: SetupContentProps) {
-  const espTools = useRef(ESPTools.getInstance());
-  const [isConnected, setIsConnected] = useState(espTools.current.isConnected);
+  const { kind, closedAfterPairing } = useConfiguratorConnection();
 
-  useEffect(() => {
-    const tools = espTools.current;
-    const onConnectionState = (event: ConnectionStateEvent) => setIsConnected(event.connected);
-    tools.on('connectionState', onConnectionState);
-    return () => tools.off('connectionState', onConnectionState);
-  }, []);
-
-  if (!isConnected) {
-    return <ConnectScreen />;
+  if (!kind) {
+    return <ConnectScreen closedAfterPairing={closedAfterPairing} />;
   }
 
-  return <SetupTabs openDeviceSettings={openDeviceSettings} onClose={onClose} />;
+  // Keyed so switching between USB and Bluetooth starts a fresh session (PIN, tabs).
+  return <SetupTabs key={kind} transport={kind} openDeviceSettings={openDeviceSettings} onClose={onClose} />;
 }
 
 interface Props {
@@ -76,15 +35,7 @@ export function AttractapHardwareSetup(props: Props) {
   const { t } = useTranslations({ de, en });
   const { isOpen, open, setOpen, close } = useOverlayState();
 
-  const espTools = useRef(ESPTools.getInstance());
-  const [isConnected, setIsConnected] = useState(espTools.current.isConnected);
-
-  useEffect(() => {
-    const tools = espTools.current;
-    const onConnectionState = (event: ConnectionStateEvent) => setIsConnected(event.connected);
-    tools.on('connectionState', onConnectionState);
-    return () => tools.off('connectionState', onConnectionState);
-  }, []);
+  const { kind } = useConfiguratorConnection();
 
   return (
     <>
@@ -97,8 +48,8 @@ export function AttractapHardwareSetup(props: Props) {
               <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
               <p className="text-sm text-muted">{t('subtitle')}</p>
             </div>
-            <Chip color={isConnected ? 'success' : 'default'}>
-              {isConnected ? t('connection.connected') : t('connection.disconnected')}
+            <Chip color={kind ? 'success' : 'default'} data-cy="attractap-setup-connection-chip">
+              {kind ? t(`connection.connected.${kind}`) : t('connection.disconnected')}
             </Chip>
           </div>
         </DrawerHeader>
