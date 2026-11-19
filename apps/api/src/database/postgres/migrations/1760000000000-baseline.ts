@@ -14,8 +14,8 @@ const quote = (identifier: string) => `"${identifier.replace(/"/g, '""')}"`;
  * indexes, partial indexes, constraints, balance and integrity triggers, seed rows). Every later schema change is a
  * migration after this one.
  */
-export class PostgresBaseline1800000000000 implements MigrationInterface {
-  name = 'PostgresBaseline1800000000000';
+export class PostgresBaseline1760000000000 implements MigrationInterface {
+  name = 'PostgresBaseline1760000000000';
 
   async up(queryRunner: QueryRunner): Promise<void> {
     for (const statements of [

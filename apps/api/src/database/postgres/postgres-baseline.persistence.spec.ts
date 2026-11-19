@@ -15,7 +15,7 @@ describe('PostgreSQL baseline migration', () => {
 
   it('records the baseline and seeds the defaults', async () => {
     const migrations = await source.query('SELECT name FROM migrations');
-    expect(migrations.map((m: { name: string }) => m.name)).toEqual(['PostgresBaseline1800000000000']);
+    expect(migrations.map((m: { name: string }) => m.name)).toEqual(['PostgresBaseline1760000000000']);
     const [{ count }] = await source.query('SELECT COUNT(*)::int AS count FROM role');
     expect(count).toBeGreaterThanOrEqual(6);
     const [setting] = await source.query(

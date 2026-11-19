@@ -73,7 +73,7 @@ describe('migration track selection for the migration datasource build', () => {
         const { entry } = loadConfig('postgres');
         expect(entry.main).toBe('./apps/api/src/database/datasource.ts');
         expect(entry['./postgres/migrations/index.ts']).toBe('apps/api/src/database/postgres/migrations/index.ts');
-        expect(entry['./postgres/migrations/1800000000000-baseline.ts']).toBeDefined();
+        expect(entry['./postgres/migrations/1760000000000-baseline.ts']).toBeDefined();
         // The frozen SQLite track is not a migration track of the build: it only runs on a copy during the import.
         expect(Object.keys(entry).some((key) => key.startsWith('./migrations/'))).toBe(false);
       } finally {
