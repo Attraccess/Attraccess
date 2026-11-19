@@ -10,8 +10,8 @@ import { createTransactionScope } from './plugin-transaction-scope';
 export interface PluginTransactionsOptions {
   pluginName: string;
   /**
-   * Runs `work` in one transaction of the engine and passes its handle. The host supplies its serialized write path,
-   * so plugin transactions queue with every core session start and end.
+   * Runs `work` in one transaction of the engine and passes its handle. Plugin transactions run on their own pooled
+   * connection and are not queued behind core session starts and ends.
    */
   runInTransaction<T>(work: (handle: unknown) => Promise<T>): Promise<T>;
   /**
@@ -35,7 +35,7 @@ function startRefusal(options: PluginTransactionsOptions, nested: boolean): stri
   if (nested) {
     return (
       `Plugin "${options.pluginName}" started a transaction inside a transaction callback. Nested calls would ` +
-      'deadlock on the shared write queue; pass the callback scope down instead.'
+      'wait for locks the outer transaction holds and take a second connection; pass the callback scope down instead.'
     );
   }
   if (options.insideHostTransaction?.()) {
@@ -62,7 +62,7 @@ async function runCallbacks(callbacks: ReadonlyArray<() => void | Promise<void>>
  * The transaction capability of one plugin, independent of the engine. The engine decides how a transaction runs; this
  * owns the rules the SDK promises: scope lifetime, post-commit callbacks in registration order (after the commit, a
  * failure logged and never undoing it), no nesting (a transaction started inside a callback would wait for the
- * callback itself on the shared write queue, so it is rejected with an error), and neutral errors at the transaction
+ * callback itself for locks and a second connection, so it is rejected with an error), and neutral errors at the transaction
  * boundary: a busy database or a serialization failure at BEGIN or COMMIT reaches the plugin as
  * PluginStorageConflict, never as the engine's error. The host does not retry.
  */

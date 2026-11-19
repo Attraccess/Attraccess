@@ -112,8 +112,8 @@ class FakeTransactionScope implements PluginTransactionScope {
 const UNSCOPED_WRITE =
   'A write inside context.persistence.transaction needs the transaction scope: pass { scope } to the call.';
 const NESTED_TRANSACTION =
-  'A transaction was started inside a transaction callback. Nested calls would deadlock on the shared write ' +
-  'queue; pass the callback scope down instead.';
+  'A transaction was started inside a transaction callback. Nested calls would wait for locks the outer ' +
+  'transaction holds and take a second connection; pass the callback scope down instead.';
 
 class Runtime {
   readonly engine: RecordEngine;

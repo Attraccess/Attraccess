@@ -293,12 +293,17 @@ Die Fehler sind neutral und auf jeder Engine gleich; alle erweitern `PluginStora
 committet, wenn `work` abschließt, und zurückgerollt, wenn es wirft. Geben Sie `{ scope }` an jeden Speicheraufruf (und
 an Host-Ports, die einen Scope annehmen, etwa `hostData.resources.get(id, scope)`), der teilnehmen soll.
 
-**Der Vertrag:** Der Host ordnet gleichzeitige Transaktionen oder lässt eine davon mit `PluginStorageConflict`
-scheitern, die dann zurückgerollt wird. Ein Prüfen-dann-Schreiben-Ablauf innerhalb einer Transaktion lässt sich daher
-nicht überholen. Der Host wiederholt **nicht**: Halten Sie externe Effekte in `scope.afterCommit`, damit der Aufrufer
-die ganze Transaktion nach einem Konflikt gefahrlos erneut ausführen kann.
+**Der Vertrag:** Eine Transaktion wird als Ganzes committet oder zurückgerollt und sieht nie die uncommitteten
+Schreibvorgänge einer anderen. Gleichzeitige Transaktionen laufen parallel (`READ COMMITTED`); ein
+Prüfen-dann-Schreiben-Ablauf lässt sich daher **überholen**: Zwei Transaktionen können dieselbe Prüfung bestehen.
+Sichern Sie jede Prüfung, die gelten muss, mit einem Unique-Schlüssel ab (der Verlierer erhält
+`PluginStorageUniqueViolation`) oder schreiben Sie sie als Compare-and-Set-`update` (siehe unten). Der Host kann
+außerdem eine Transaktion mit `PluginStorageConflict` scheitern lassen, die dann zurückgerollt wird. Der Host
+wiederholt **nicht**: Halten Sie externe Effekte in `scope.afterCommit`, damit der Aufrufer die ganze Transaktion nach
+einem Konflikt gefahrlos erneut ausführen kann.
 
 ```ts
+// `bookings` deklariert einen Unique-Index auf (day, slot): zwei gleichzeitige Aufrufe können beide den Count bestehen, nur ein Insert gewinnt.
 await context.persistence.transaction(async (scope) => {
   const clash = await bookings.count({ day, slot }, { scope });
   if (clash > 0) throw new ConflictException('OVERLAP');

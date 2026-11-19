@@ -283,12 +283,15 @@ Errors are neutral and identical on every engine; all extend `PluginStorageError
 resolves and rolls back when it throws. Pass `{ scope }` to every storage call (and to host ports that accept a scope,
 such as `hostData.resources.get(id, scope)`) that must take part.
 
-**The contract:** the host either orders concurrent transactions or fails one of them with `PluginStorageConflict`,
-which rolls it back. A check-then-write sequence inside one transaction therefore cannot be raced. The host does
-**not** retry: keep external effects in `scope.afterCommit`, so the caller can safely run the whole transaction again
-after a conflict.
+**The contract:** a transaction commits or rolls back as a whole and never sees the uncommitted writes of another one.
+Concurrent transactions run in parallel (`READ COMMITTED`), so a check-then-write sequence **can** be raced: two
+transactions can pass the same check. Back every check that must hold with a unique key (the loser gets
+`PluginStorageUniqueViolation`) or write it as a compare-and-set `update` (see below). The host may also fail a
+transaction with `PluginStorageConflict`, which rolls it back. The host does **not** retry: keep external effects in
+`scope.afterCommit`, so the caller can safely run the whole transaction again after a conflict.
 
 ```ts
+// `bookings` declares a unique index on (day, slot): two concurrent calls can both pass the count, only one insert wins.
 await context.persistence.transaction(async (scope) => {
   const clash = await bookings.count({ day, slot }, { scope });
   if (clash > 0) throw new ConflictException('OVERLAP');
