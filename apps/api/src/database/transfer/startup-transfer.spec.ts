@@ -1,7 +1,8 @@
 import { PluginMigrationService } from '../../plugin-system/plugin-migration.service';
 import type { LoadedPluginManifest } from '../../plugin-system/plugin.manifest';
 import type { CompiledPluginStorage } from '../../plugin-system/plugin-storage/storage-model';
-import { discoverStoragePlugins, postgresHasUserData } from './startup-transfer';
+import { discoverStoragePlugins, explainMissingPlugin, postgresHasUserData } from './startup-transfer';
+import { SqliteTransferError } from './transfer-errors';
 
 const manifest = (name: string, version = '1.0.0') => ({ name, version }) as unknown as LoadedPluginManifest;
 const storage = (namespace: string) => ({ namespace }) as unknown as CompiledPluginStorage;
@@ -60,6 +61,36 @@ describe('startup transfer helpers', () => {
       jest.spyOn(PluginMigrationService, 'hasStorage').mockReturnValue(true);
       jest.spyOn(PluginMigrationService, 'loadStorage').mockReturnValue(null);
       expect(discoverStoragePlugins([manifest('none')])).toEqual({ descriptors: [], unloadable: [] });
+    });
+  });
+
+  describe('explainMissingPlugin', () => {
+    const refused = (reason: string) =>
+      new SqliteTransferError('importing into PostgreSQL', `SnapshotIncompatibleError: ${reason}`, {
+        cause: new Error(reason),
+      });
+
+    it('names the missing table and ends without a doubled full stop', () => {
+      const explained = explainMissingPlugin(refused('The database has no table reservations_reservation'), []);
+
+      expect(explained).toBeInstanceOf(SqliteTransferError);
+      const message = (explained as Error).message;
+      expect(message).toContain('reservations_reservation');
+      expect(message).toContain('plugin that is not installed or not loadable');
+      expect(message).not.toContain('..');
+    });
+
+    it('lists the plugins that were installed but could not be loaded', () => {
+      const explained = explainMissingPlugin(refused('Plugin bookings is not installed in the target; install 1.4.0'), [
+        { name: 'bookings', reason: 'broken declaration' },
+      ]);
+      expect((explained as Error).message).toContain('bookings (broken declaration)');
+    });
+
+    it('passes every other error through unchanged', () => {
+      const other = new SqliteTransferError('opening the working copy', 'disk is full');
+      expect(explainMissingPlugin(other, [])).toBe(other);
+      expect(explainMissingPlugin(new Error('boom'), [])).toBeInstanceOf(Error);
     });
   });
 });

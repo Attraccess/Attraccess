@@ -60,16 +60,18 @@ export function discoverStoragePlugins(manifests: readonly LoadedPluginManifest[
 }
 
 /** Explains a refused import when the SQLite data holds plugin tables that no loadable installed plugin declares. */
-function explainMissingPlugin(error: unknown, unloadable: DiscoveredPlugins['unloadable']): unknown {
+export function explainMissingPlugin(error: unknown, unloadable: DiscoveredPlugins['unloadable']): unknown {
   const message = error instanceof Error ? error.message : '';
   if (!(error instanceof SqliteTransferError) || !/has no table|is not installed/.test(message)) return error;
+  // The cause names the missing table or plugin, for example "The database has no table reservations_reservation".
+  const reason = error.cause instanceof Error ? error.cause.message.replace(/^\w+Error: /, '') : '';
   const hint = unloadable.length
-    ? ` Plugins that could not be loaded: ${unloadable.map((p) => p.name).join(', ')}.`
+    ? `; plugins that could not be loaded: ${unloadable.map((p) => `${p.name} (${p.reason})`).join(', ')}`
     : '';
   return new SqliteTransferError(
     'importing into PostgreSQL',
-    `the SQLite data holds data of a plugin that is not installed or not loadable (install it in the plugin directory ` +
-      `first, same version as before).${hint}`,
+    `the SQLite data holds data of a plugin that is not installed or not loadable${reason ? ` (${reason})` : ''}. ` +
+      `Install that plugin in the plugin directory first, in the same version as before${hint}`,
     { cause: error },
   );
 }
