@@ -56,8 +56,33 @@ Keep the file private. You can restore the stock firmware later with `esptool.py
 5. Unplug the micro-USB power and plug it in again **without** holding GPIO0. It now starts the bridge firmware.
 6. Click **Continue setup**. The page continues into the configuration on the same port. Set the PIN, the Wi-Fi network (optional) and the API URL of your Attraccess server.
 
+You can also skip step 6, disconnect the adapter, close the case and set the bridge up over Bluetooth instead (see below).
+
 > [!NOTE]
 > There is no known way to install the bridge over the network from the stock GL.iNet firmware. You need the serial adapter for the first flash.
+
+## Setup over Bluetooth
+
+A bridge that is not paired yet (freshly flashed, or after a factory reset) can be set up over Bluetooth from the browser, without opening the case.
+
+1. Hold the button on the case for **3 seconds**. After 3 seconds all LEDs blink fast; release the button then (holding it for 10 seconds would factory-reset the bridge).
+2. The **BT** LED now flashes twice every 1.5 seconds: the setup is open for 10 minutes.
+3. In Attraccess, open **Devices** > **Attractap Readers**, choose **Set up Attractap** and click **Set up over Bluetooth**.
+4. Pick **Attractap Bridge XXXX** in the browser's device list. Your computer or phone pairs with the bridge on the first command; confirm the pairing prompt if one appears. The BT LED stays on while the browser is connected.
+5. Set the PIN, the Wi-Fi network (optional with Ethernet) and the server, then approve the bridge with the code shown in the setup.
+
+The setup closes after 10 minutes, about 10 seconds after the bridge is paired, or when the bridge restarts. It does not open again by itself. On a bridge that is already paired, holding the button for 3 seconds does nothing.
+
+The connection is encrypted (Bluetooth LE Secure Connections), so the Wi-Fi password is never sent in clear text. The same PIN rules apply as over the serial port.
+
+| Browser                                 | Bluetooth setup                       |
+| --------------------------------------- | ------------------------------------- |
+| Chrome or Edge on Windows, macOS, Linux | Supported                             |
+| Chrome on Android                       | Supported                             |
+| Firefox, Safari, any browser on iOS     | Not supported: use the serial adapter |
+
+> [!NOTE]
+> The page must be opened over HTTPS (or `localhost`); browsers only offer Bluetooth to secure pages.
 
 ## Setup and Pairing
 
@@ -79,29 +104,32 @@ Ethernet (with PoE) is the preferred connection.
 
 The three LEDs are on the front of the S10.
 
-| LED         | State      | Meaning                                        |
-| ----------- | ---------- | ---------------------------------------------- |
-| **Power**   | On         | The firmware is running                        |
-| **Network** | On         | Connected to Attraccess                        |
-| **Network** | Slow blink | Network is up, but not connected to Attraccess |
-| **Network** | Fast blink | No network                                     |
-| **BT**      | On         | A plugin has an open Bluetooth connection      |
-| **BT**      | Blinking   | A scan or advertisement watch is active        |
-| **BT**      | Off        | Idle                                           |
+| LED         | State             | Meaning                                           |
+| ----------- | ----------------- | ------------------------------------------------- |
+| **Power**   | On                | The firmware is running                           |
+| **Network** | On                | Connected to Attraccess                           |
+| **Network** | Slow blink        | Network is up, but not connected to Attraccess    |
+| **Network** | Fast blink        | No network                                        |
+| **BT**      | On                | A plugin has an open Bluetooth connection         |
+| **BT**      | Blinking          | A scan or advertisement watch is active           |
+| **BT**      | Double flash      | Bluetooth setup is open and waits for the browser |
+| **BT**      | On (during setup) | The browser is connected to the Bluetooth setup   |
+| **BT**      | Off               | Idle                                              |
 
 ## Button
 
 The button is the reset button on the case, not GPIO0.
 
-| Action                  | Result                                                               |
-| ----------------------- | -------------------------------------------------------------------- |
-| **Short press**         | The bridge restarts                                                  |
-| **Hold for 10 seconds** | Factory reset: clears Wi-Fi, the API URL and the pairing credentials |
+| Action                  | Result                                                                             |
+| ----------------------- | ---------------------------------------------------------------------------------- |
+| **Short press**         | The bridge restarts                                                                |
+| **Hold for 3 seconds**  | Opens the Bluetooth setup for 10 minutes (only on a bridge that is not paired yet) |
+| **Hold for 10 seconds** | Factory reset: clears Wi-Fi, the API URL and the pairing credentials               |
 
-After 2 seconds all three LEDs blink fast. Release the button before 10 seconds to cancel. At 10 seconds the factory reset runs: all LEDs light up and the bridge restarts unconfigured.
+After 3 seconds all three LEDs blink fast. Releasing the button between 3 and 10 seconds opens the Bluetooth setup. At 10 seconds the factory reset runs: all LEDs light up and the bridge restarts unconfigured.
 
 > [!WARNING]
-> After a factory reset, the bridge must be set up again over the serial port, which means opening the case again. It also has to be paired again.
+> After a factory reset, the bridge must be set up again (over Bluetooth, or over the serial port with the case open) and paired again.
 
 ## Mounting and Bluetooth Range
 
@@ -121,7 +149,7 @@ The bridge runs **without** the Attractap secure profile: no Secure Boot, no fla
 - If your installation relies on the secure profile for readers (see [Reader Security](attractap/reader-security.md)), note that bridges do not have it.
 - Anyone with physical access to a bridge can read its flash, including its pairing credentials. Mount bridges where they cannot easily be taken. If a bridge is lost, remove its pairing in Attraccess.
 
-Secure Boot for the bridge is planned. It needs ESP32 chip revision v3.0 or later.
+Secure Boot for the bridge is planned. It needs ESP32 chip revision v3.0 or later; units with an older chip (for example revision v1.0) can never get it.
 
 ## See Also
 
