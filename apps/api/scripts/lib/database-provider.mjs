@@ -34,12 +34,27 @@ export function toPositionalParameters(sql) {
   return out;
 }
 
-/** DATABASE_SSL: unset/false/disable = no TLS, true/require = TLS without verification, verify-full = verified TLS. */
+// DATABASE_SSL exactly as the API reads it (apps/api/src/database/postgres/postgres-config.ts, parseSsl and
+// sslOption). A copy, because this folder may not import TypeScript: change both together.
+const SSL_MODES = ['off', 'require', 'verify-ca', 'verify-full'];
+const SSL_ALIASES = { '': 'off', false: 'off', 0: 'off', disable: 'off', true: 'require', 1: 'require' };
+const SSL_OPTIONS = {
+  off: undefined,
+  // Encrypted, the certificate is not verified.
+  require: { rejectUnauthorized: false },
+  // The chain is verified, the host name on the certificate is not.
+  'verify-ca': { rejectUnauthorized: true, checkServerIdentity: () => undefined },
+  'verify-full': { rejectUnauthorized: true },
+};
+
+/** The pg `ssl` option for DATABASE_SSL (undefined = no TLS). Throws for a value the API would refuse. */
 export function resolveSsl(env = process.env) {
-  const raw = env.DATABASE_SSL?.trim().toLowerCase();
-  if (!raw || ['false', '0', 'off', 'disable', 'no'].includes(raw)) return undefined;
-  if (['verify-full', 'verify-ca'].includes(raw)) return { rejectUnauthorized: true };
-  return { rejectUnauthorized: false };
+  const raw = (env.DATABASE_SSL ?? '').trim().toLowerCase();
+  const mode = Object.hasOwn(SSL_ALIASES, raw) ? SSL_ALIASES[raw] : raw;
+  if (!SSL_MODES.includes(mode)) {
+    throw new Error(`DATABASE_SSL must be one of ${SSL_MODES.join(', ')} (value not shown).`);
+  }
+  return SSL_OPTIONS[mode];
 }
 
 /** Host and database name of a connection URL, without credentials. */

@@ -1,7 +1,13 @@
 import { Logger } from '@nestjs/common';
 import type { DataSource } from 'typeorm';
 import type { PostgresConfig } from './postgres-config';
-import { initializeWithRetry, postgresConnectionOptions, waitForPostgres } from './postgres-connection';
+import { postgresErrorClassifier } from './postgres-errors';
+import {
+  initializeWithRetry,
+  POSTGRES_CONNECT_TIMEOUT_MS,
+  postgresConnectionOptions,
+  waitForPostgres,
+} from './postgres-connection';
 
 const SECRET_URL = 'postgres://someone:hunter2@db.internal:5432/attraccess';
 const config = { url: SECRET_URL, ssl: 'off', poolMax: 1, schema: 'public' } as PostgresConfig;
@@ -9,7 +15,7 @@ const coded = (code: string) => Object.assign(new Error('failed'), { code });
 
 describe('postgres startup retry', () => {
   let warn: jest.SpyInstance;
-  const sleep = jest.fn(async () => undefined);
+  const sleep = jest.fn(async (_ms: number) => undefined);
   beforeEach(() => {
     sleep.mockClear();
     warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
@@ -52,6 +58,19 @@ describe('postgres startup retry', () => {
       ]);
       await expect(initializeWithRetry(source, { sleep })).resolves.toBe(source);
       expect(initialize).toHaveBeenCalledTimes(3);
+    });
+
+    it('retries a new connection that missed the connect timeout while PostgreSQL boots, and only that', async () => {
+      // pg-pool's message when establishing a new client exceeds connectionTimeoutMillis.
+      const { source, initialize } = sourceFailing([new Error('Connection terminated due to connection timeout')]);
+      await expect(initializeWithRetry(source, { sleep })).resolves.toBe(source);
+      expect(initialize).toHaveBeenCalledTimes(2);
+      // An exhausted pool is a runtime condition (busy), not a starting server: startup does not wait it out.
+      const exhausted = new Error('timeout exceeded when trying to connect');
+      expect(postgresErrorClassifier.classify(exhausted)).toBe('busy');
+      const failing = sourceFailing([exhausted]);
+      await expect(initializeWithRetry(failing.source, { sleep })).rejects.toBe(exhausted);
+      expect(failing.initialize).toHaveBeenCalledTimes(1);
     });
 
     it('recognises a transient code on the wrapped driver error', async () => {
@@ -143,6 +162,14 @@ describe('postgres startup retry', () => {
       expect(startupOptions('qa_schema')).toContain('-c search_path="qa_schema"');
       expect(startupOptions('QaMixed')).toContain('-c search_path="QaMixed"');
       expect(startupOptions('public')).toContain('-c search_path="public"');
+    });
+
+    it('bounds the wait for a pooled or new connection instead of hanging forever', () => {
+      const options = postgresConnectionOptions(config) as { connectTimeoutMS?: number; extra: { options: string } };
+      expect(options.connectTimeoutMS).toBe(POSTGRES_CONNECT_TIMEOUT_MS);
+      expect(POSTGRES_CONNECT_TIMEOUT_MS).toBe(10_000);
+      // No statement_timeout: long reports and migrations must not be cut off.
+      expect(options.extra.options).not.toContain('statement_timeout');
     });
 
     it('keeps the UTC session and the lock timeouts', () => {

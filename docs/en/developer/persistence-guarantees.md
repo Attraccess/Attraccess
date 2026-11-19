@@ -23,12 +23,15 @@ There is no process-wide write lock: independent transactions run in parallel, a
 - **Lock timeout.** Every connection sets `lock_timeout` to 10 s, so a statement that waits for a lock fails instead of
   waiting forever. Time zone is `UTC`.
 - **Retries.** A transaction that PostgreSQL aborts with `40001` (serialization failure) or `40P01` (deadlock) is a
-  `conflict`; `runWithRetry` runs it again (see below). External effects are never replayed because they run in
-  `afterCommit`.
+  `conflict`; `runWithRetry` runs it again (see below). The usage lifecycle phases (session start and end, staged
+  billing items, recovery) and the flow billing node retry this way. External effects are never replayed because they
+  run in `afterCommit`.
 - **Error classification** (`database/postgres/postgres-errors.ts`): `40001` and `40P01` are conflicts; `55P03` (lock
   not available), `57014` (timeout), `53300` (too many connections), `08xxx` (connection) and `57P01` (admin shutdown)
-  are busy; `23505` is a unique violation; `23503` a foreign key violation; `25006` read-only. A busy database answers
-  `503`.
+  are busy, as is a pool that has no free connection within 10 s; `23505` is a unique violation; `23503` a foreign key
+  violation; `25006` read-only; `22003`, `22P02`, `22021`, `22007` and `22008` are invalid input. A global exception
+  filter answers a busy or conflicting database with `503` and invalid input with `400`, never with the driver
+  message.
 - **Types.** Points in time are `timestamptz` (UTC). Credits and meter values are `bigint` or exact decimals, never
   floating point.
 - **Migrations.** The PostgreSQL track is one baseline migration (`apps/api/src/database/postgres/migrations`); later
@@ -46,7 +49,8 @@ There is no process-wide write lock: independent transactions run in parallel, a
 - A scope is closed after commit or rollback. Using a closed scope, or a scope that belongs to another unit of work
   (another connection), is rejected with `TransactionScopeError`.
 - `runWithRetry` is the sanctioned way to retry database work. It re-runs the outermost unit when the database
-  reports a transient failure (busy, conflict: `40001`, `40P01`): three attempts by default, never more than ten, with a jittered
+  reports a failure that PostgreSQL rolled back completely (`40001`, `40P01`, `55P03`, `57014`). A lost connection
+  (`08xxx`, `57P01`) is not retried: the commit may already have happened. Three attempts by default, never more than ten, with a jittered
   exponential backoff (50 ms base, 1 s cap). It refuses to start inside an open unit, where a retry could not undo the
   parent's writes. The work runs again from the start, so it must not perform external effects. Effects belong in `afterCommit`: only the attempt that committed runs them. Device commands, payment calls,
   MQTT publishes and emails are therefore never replayed by a database retry.
@@ -56,28 +60,30 @@ the commit and compensated if sending fails.
 
 ## Guarantees and their tests
 
-| Guarantee                                                                  | Where it is enforced                                                                                                | Test                                                                                                                                                                                                                                                                                |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| No lost update on one account from independent connections                 | Row locks and balance triggers in the PostgreSQL baseline | `database/conformance` (`persistence.conformance.test-fixture.ts`, `ports/billing-ledger`), `e2e/migrations/billing-balance-triggers`                                                                                                                                               |
-| Independent resources are not forced through an application-wide mutex     | No global mutex: row locks and per-resource advisory locks (`pg_advisory_xact_lock`) only                          | `conformance/ports`: a read on another connection proceeds while a unit is open, a write on another account runs during an open unit, and a second writer commits without deadlock |
-| Atomic multi-write units, rollback leaves nothing                          | `UnitOfWork`                                                                                                        | `unit-of-work.spec.ts`, `conformance`                                                                                                                                                                                                                |
-| Post-commit work after commit, never after rollback                        | `UnitOfWork.afterCommit`                                                                                            | same, plus visibility from a second connection                                                                                                                                                                                                                                      |
-| Bounded retry without replaying external effects                           | `runWithRetry`                                                                                                      | `conformance`: a real lock timeout or deadlock induced from another connection, classified as `busy` or `conflict`; effects run once                                                                                                                                                                            |
-| Duplicate claims on one key: exactly one wins, loser is a unique violation | Unique constraints, `isUniqueViolation`                                                                             | `conformance`                                                                                                                                                                                                                                                                       |
-| No duplicate active session or conflicting reservation on one resource     | Usage integrity triggers and partial indexes (PostgreSQL baseline), per-resource advisory locks in the lifecycle transactions           | `resources/usage/lifecycle-persistence/*.spec.ts`                                                                                                                                                                                                                                   |
-| Audit acknowledgement durability and ordering (ATT-1212)                   | Audit store (`database/adapters/audit`), records immutable by trigger                                              | `audit/*.spec.ts`                                                                                                                                                                                                                                                                   |
-| Token rotation, logout receipt, SSO revocation atomic and idempotent       | `SessionStore` (PostgreSQL, Valkey)                                                                                     | `conformance/ports/session-store`, `adapters/sessions/postgres-session-store.persistence.spec.ts`                                                                                                                                                                                     |
-| Passkey challenge consumed exactly once                                    | `PasskeyStore` (`DELETE … RETURNING`)                                                                               | `conformance/ports/passkey-store`                                                                                                                                                                                                                                                   |
-| Busy database answers 503 and is not counted as a brute-force failure      | `persistence-errors.ts`, session strategy, rate limiters (ATT-1269)                                                 | `session.strategy.spec.ts`, rate-limit specs                                                                                                                                                                                                                                        |
+| Guarantee                                                                  | Where it is enforced                                                                                                          | Test                                                                                                                                                                               |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No lost update on one account from independent connections                 | Row locks and balance triggers in the PostgreSQL baseline                                                                     | `database/conformance` (`persistence.conformance.test-fixture.ts`, `ports/billing-ledger`), `e2e/migrations/billing-balance-triggers`                                              |
+| Independent resources are not forced through an application-wide mutex     | No global mutex: row locks and per-resource advisory locks (`pg_advisory_xact_lock`) only                                     | `conformance/ports`: a read on another connection proceeds while a unit is open, a write on another account runs during an open unit, and a second writer commits without deadlock |
+| Atomic multi-write units, rollback leaves nothing                          | `UnitOfWork`                                                                                                                  | `unit-of-work.spec.ts`, `conformance`                                                                                                                                              |
+| Post-commit work after commit, never after rollback                        | `UnitOfWork.afterCommit`                                                                                                      | same, plus visibility from a second connection                                                                                                                                     |
+| Bounded retry without replaying external effects                           | `runWithRetry`                                                                                                                | `conformance`: a real lock timeout or deadlock induced from another connection, classified as `busy` or `conflict`; effects run once                                               |
+| Duplicate claims on one key: exactly one wins, loser is a unique violation | Unique constraints, `isUniqueViolation`                                                                                       | `conformance`                                                                                                                                                                      |
+| No duplicate active session or conflicting reservation on one resource     | Usage integrity triggers and partial indexes (PostgreSQL baseline), per-resource advisory locks in the lifecycle transactions | `resources/usage/lifecycle-persistence/*.spec.ts`                                                                                                                                  |
+| Audit acknowledgement durability and ordering (ATT-1212)                   | Audit store (`database/adapters/audit`), records immutable by trigger                                                         | `audit/*.spec.ts`                                                                                                                                                                  |
+| Token rotation, logout receipt, SSO revocation atomic and idempotent       | `SessionStore` (PostgreSQL, Valkey)                                                                                           | `conformance/ports/session-store`, `adapters/sessions/postgres-session-store.persistence.spec.ts`                                                                                  |
+| Passkey challenge consumed exactly once                                    | `PasskeyStore` (`DELETE … RETURNING`)                                                                                         | `conformance/ports/passkey-store`                                                                                                                                                  |
+| Busy database answers 503 and is not counted as a brute-force failure      | `persistence-errors.ts`, session strategy, rate limiters (ATT-1269)                                                           | `session.strategy.spec.ts`, rate-limit specs                                                                                                                                       |
 
 Existing durable-audit, balance, usage-recovery and device-effect tests stay where they are; the conformance suite adds
 the engine-independent contract next to them.
 
 ## Plugin transactions
 
-Plugin transactions are no longer serialised per host process. Two plugin transactions, or a plugin transaction and a
-core session start, can run at the same time; conflicts surface as `PluginStorageConflict` and are the plugin's to
-retry. Plugins that need exclusion use `update` as compare-and-set or a unique key.
+There is no process-wide queue for plugin transactions. The transactions (and the writes without scope) of **one**
+plugin are ordered by a transaction-level advisory lock on the plugin's name, so the SDK contract holds: a
+check-then-write sequence inside a plugin transaction cannot be raced, also across API instances. Core work and other
+plugins never wait for that lock. A wait that reaches `lock_timeout` fails the transaction with
+`PluginStorageConflict`; the host does not retry.
 
 ## Plugin storage
 

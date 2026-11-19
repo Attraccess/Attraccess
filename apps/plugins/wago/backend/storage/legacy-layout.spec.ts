@@ -24,7 +24,12 @@ interface ForeignKeyInfo {
   onDelete: string;
 }
 
-const ADMIN_URL = process.env.TEST_DATABASE_URL ?? 'postgres://attraccess:attraccess@127.0.0.1:55432/postgres';
+// The same server as the host's specs (testAdminUrl in apps/api/src/test-utils/test-database.ts, which a plugin may
+// not import): TEST_DATABASE_URL, then DATABASE_URL, then the shared dev PostgreSQL on its default port.
+const ADMIN_URL =
+  process.env.TEST_DATABASE_URL ||
+  process.env.DATABASE_URL ||
+  'postgres://attraccess:attraccess@127.0.0.1:5432/postgres';
 
 /**
  * The 1.x migrations were written for SQLite; the fixture keeps their statements verbatim. The only construct

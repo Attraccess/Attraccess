@@ -4,6 +4,9 @@
  */
 export const UPGRADE_DOCS_URL =
   'https://docs.attraccess.org/#/en/installation/updating?id=moving-from-sqlite-to-postgresql';
+/** The database settings reference (docsify: only `/#/<lang>/<page>?id=<heading>` resolves). */
+export const DATABASE_SETTINGS_DOCS_URL =
+  'https://docs.attraccess.org/#/en/installation/environment-variables?id=database';
 
 export type DatabaseSslMode = 'off' | 'require' | 'verify-ca' | 'verify-full';
 
@@ -24,6 +27,16 @@ export class DatabaseConfigError extends Error {
 export const DEFAULT_POOL_MAX = 10;
 const SSL_MODES: readonly DatabaseSslMode[] = ['off', 'require', 'verify-ca', 'verify-full'];
 const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]{0,62}$/;
+/**
+ * TLS query parameters pg reads from the connection string. pg merges them over the explicit `ssl` option, so
+ * `?sslmode=disable` would silently turn off the TLS that DATABASE_SSL asks for: DATABASE_SSL is the only TLS setting.
+ */
+const SSL_URL_PARAMETERS = ['ssl', 'sslmode', 'sslrootcert', 'sslcert', 'sslkey', 'sslpassword', 'sslcompat'];
+/**
+ * Session query parameters pg merges over the API's own: `options` would drop the time zone, lock timeout and search
+ * path the API sets, and `application_name` would hide a running API from `transfer-sqlite --force`.
+ */
+const SESSION_URL_PARAMETERS = ['options', 'application_name'];
 
 function parseSsl(raw: string | undefined): DatabaseSslMode {
   const value = raw?.trim().toLowerCase();
@@ -47,7 +60,7 @@ function parseUrl(raw: string | undefined): string {
   if (!value) {
     throw new DatabaseConfigError(
       'DATABASE_URL is required, for example postgres://user:password@host:5432/attraccess. ' +
-        `See ${UPGRADE_DOCS_URL}.`,
+        `See ${DATABASE_SETTINGS_DOCS_URL}.`,
     );
   }
   let parsed: URL;
@@ -63,6 +76,25 @@ function parseUrl(raw: string | undefined): string {
     throw new DatabaseConfigError('DATABASE_URL has no host.');
   }
   if (parsed.pathname.length <= 1) throw new DatabaseConfigError('DATABASE_URL names no database.');
+  const sslParameters = SSL_URL_PARAMETERS.filter((name) =>
+    [...parsed.searchParams.keys()].some((key) => key.toLowerCase() === name),
+  );
+  if (sslParameters.length > 0) {
+    throw new DatabaseConfigError(
+      `DATABASE_URL must not set TLS options (${sslParameters.join(', ')}): use DATABASE_SSL ` +
+        `(off, require, verify-ca, verify-full), and NODE_EXTRA_CA_CERTS for a private certificate authority. ` +
+        `See ${DATABASE_SETTINGS_DOCS_URL}.`,
+    );
+  }
+  const sessionParameters = SESSION_URL_PARAMETERS.filter((name) =>
+    [...parsed.searchParams.keys()].some((key) => key.toLowerCase() === name),
+  );
+  if (sessionParameters.length > 0) {
+    throw new DatabaseConfigError(
+      `DATABASE_URL must not set session options (${sessionParameters.join(', ')}): the API sets its own ` +
+        `(time zone, lock timeout, search path, application name; DATABASE_SCHEMA selects the schema). See ${DATABASE_SETTINGS_DOCS_URL}.`,
+    );
+  }
   return value;
 }
 

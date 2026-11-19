@@ -18,6 +18,7 @@ import { createWsAdapter } from './common/text-frame-ws-adapter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
+import { PersistenceErrorFilter } from './exceptions/persistence-error.filter';
 import { PersistenceReadOnlyFilter } from './exceptions/persistence-read-only.filter';
 import { ValkeyUnavailableFilter } from './exceptions/valkey-unavailable.filter';
 import { isValidTrustProxyValue, resolveTrustProxySetting } from './trust-proxy';
@@ -125,7 +126,9 @@ export function configureBootstrapHttp(app: NestExpressApplication, appConfig: A
     app.set('trust proxy', false);
   }
 
-  app.useGlobalFilters(new ValkeyUnavailableFilter(new PersistenceReadOnlyFilter(app.get(HttpAdapterHost))));
+  app.useGlobalFilters(
+    new ValkeyUnavailableFilter(new PersistenceErrorFilter(new PersistenceReadOnlyFilter(app.get(HttpAdapterHost)))),
+  );
 
   app.use(cookieParser());
 

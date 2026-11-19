@@ -8,6 +8,13 @@ const logger = new Logger('PostgresConnection');
 /** Statement and lock waits are bounded so a stuck transaction shows up as a retryable error, not a hang. */
 export const POSTGRES_LOCK_TIMEOUT_MS = 10_000;
 const IDLE_IN_TRANSACTION_TIMEOUT_MS = 120_000;
+/**
+ * How long a query waits for a pooled connection (pool exhausted) or for a new connection to be established. Unset,
+ * pg waits forever and every request, session authentication included, hangs while the pool is used up. Past it,
+ * pg-pool rejects with an error the classifier reports as busy (503); a new connection that does not come up in time
+ * fails with "Connection terminated due to connection timeout", which the startup retry treats as transient.
+ */
+export const POSTGRES_CONNECT_TIMEOUT_MS = 10_000;
 
 let parsersInstalled = false;
 
@@ -33,6 +40,8 @@ export function postgresConnectionOptions(config: PostgresConfig = parsePostgres
     url: config.url,
     schema: config.schema,
     ssl: sslOption(config.ssl),
+    // TypeORM passes it to pg as `connectionTimeoutMillis`.
+    connectTimeoutMS: POSTGRES_CONNECT_TIMEOUT_MS,
     synchronize: false,
     // gen_random_uuid() is built in since PostgreSQL 13: no extension has to be installed (or be installable).
     uuidExtension: 'pgcrypto',

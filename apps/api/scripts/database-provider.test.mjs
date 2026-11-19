@@ -59,11 +59,30 @@ test('converts ? placeholders but leaves quoted question marks alone', () => {
   );
 });
 
-test('reads DATABASE_SSL and the location of a connection URL without leaking credentials', () => {
-  assert.equal(resolveSsl({}), undefined);
-  assert.equal(resolveSsl({ DATABASE_SSL: 'false' }), undefined);
-  assert.deepEqual(resolveSsl({ DATABASE_SSL: 'true' }), { rejectUnauthorized: false });
+test('reads DATABASE_SSL with the values and meaning the API gives it', () => {
+  for (const off of [undefined, '', ' ', 'off', 'false', '0', 'disable', 'OFF']) {
+    assert.equal(resolveSsl({ DATABASE_SSL: off }), undefined, `DATABASE_SSL=${off}`);
+  }
+  for (const require of ['true', '1', 'require', ' Require ']) {
+    assert.deepEqual(resolveSsl({ DATABASE_SSL: require }), { rejectUnauthorized: false }, `DATABASE_SSL=${require}`);
+  }
+  // verify-ca checks the chain, not the host name; verify-full checks both.
+  const verifyCa = resolveSsl({ DATABASE_SSL: 'verify-ca' });
+  assert.equal(verifyCa.rejectUnauthorized, true);
+  assert.equal(verifyCa.checkServerIdentity(), undefined);
   assert.deepEqual(resolveSsl({ DATABASE_SSL: 'verify-full' }), { rejectUnauthorized: true });
+  for (const refused of ['no', 'yes', 'on', 'prefer', 'verify', 'postgres://u:secret@h/db']) {
+    assert.throws(
+      () => resolveSsl({ DATABASE_SSL: refused }),
+      (error) =>
+        /DATABASE_SSL must be one of off, require, verify-ca, verify-full/.test(error.message) &&
+        !error.message.includes('secret'),
+      `DATABASE_SSL=${refused}`,
+    );
+  }
+});
+
+test('reads the location of a connection URL without leaking credentials', () => {
   assert.deepEqual(describeLocation('postgres://u:secret@db.example:5432/my%20db'), {
     host: 'db.example',
     database: 'my db',
