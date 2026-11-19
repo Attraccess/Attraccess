@@ -1,6 +1,7 @@
 import type { InstalledNpmPluginDto, LoadedPluginManifest } from '@attraccess/react-query-client';
 import {
   Chip,
+  cn,
   Dropdown,
   DropdownItem,
   DropdownMenu,
@@ -140,7 +141,10 @@ export function PluginRow({ plugin, installed, onShowError, onShowDetails, onMan
           <Dropdown>
             {/* HeroUI's .dropdown__trigger sets display:inline-block, which beats the inline-flex from .button. */}
             <DropdownTrigger
-              className={`${buttonVariants({ variant: 'ghost', size: 'sm', isIconOnly: true })} !inline-flex items-center justify-center`}
+              className={cn(
+                buttonVariants({ variant: 'ghost', size: 'sm', isIconOnly: true }),
+                '!inline-flex items-center justify-center',
+              )}
               aria-label={t('rowActions', { pluginName: plugin.name })}
               data-cy={`plugins-list-actions-button-${plugin.id}`}
             >

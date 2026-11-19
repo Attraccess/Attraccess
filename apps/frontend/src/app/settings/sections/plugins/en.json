@@ -7,7 +7,7 @@
   },
   "installPlugin": "Install plugin",
   "uploadButton": "Upload ZIP file",
-  "docsButton": "Documentation",
+  "docsButton": "Developer guide",
   "manageVersion": "Manage version",
   "classification": {
     "official": {

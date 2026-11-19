@@ -1,3 +1,4 @@
+import { cn } from '@heroui/react';
 import type { ReactNode } from 'react';
 
 interface SettingsSectionProps {
@@ -19,10 +20,7 @@ interface SettingsSectionProps {
 export function SettingsSection({ title, description, aside, fullWidth = false, children }: SettingsSectionProps) {
   return (
     <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
-      <div
-        className={`flex w-full min-w-0 flex-col gap-6 ${fullWidth ? '' : 'max-w-2xl'}`}
-        data-slot="settings-content"
-      >
+      <div className={cn('flex w-full min-w-0 flex-col gap-6', !fullWidth && 'max-w-2xl')} data-slot="settings-content">
         <div className="flex flex-col gap-1">
           <h2 className="text-lg font-semibold text-foreground">{title}</h2>
           {description ? <p className="text-sm text-muted">{description}</p> : null}

@@ -80,10 +80,10 @@ trotz gültiger Lizenz **Lizenz fehlt**, konnte die Lizenz beim Start nicht gepr
 
 ## Plugin entfernen
 
-1. Oeffnen Sie **Einstellungen** in der Seitenleiste und waehlen Sie den Bereich **Plugins**
+1. Öffnen Sie **Einstellungen** in der Seitenleiste und wählen Sie den Bereich **Plugins**
 2. Finden Sie das Plugin in der Liste
 3. Öffnen Sie das Aktionsmenü des Plugins (**⋯**) und wählen Sie **Plugin entfernen**
-4. Bestaetigen Sie die Entfernung
+4. Bestätigen Sie die Entfernung
 
 Was mit den Daten des Plugins geschieht, hängt davon ab, wie es installiert wurde. Der Bestätigungsdialog nennt den
 zutreffenden Fall.
