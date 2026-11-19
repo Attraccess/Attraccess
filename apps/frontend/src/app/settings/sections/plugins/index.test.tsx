@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 // Register the shared API mocks before loading the component's feature modules.
-import { chooseRowAction, deferred, hoisted, makePlugin, renderWithQuery } from './index.test.hoisted';
+import { chooseRowAction, deferred, hoisted, makePlugin, pickRegistry, renderWithQuery } from './index.test.hoisted';
 import { PluginsSection } from './index';
 
 import { describe } from 'vitest';
@@ -254,7 +254,7 @@ describe('PluginsSection', () => {
     renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
-    await user.selectOptions(screen.getByLabelText('Registry'), 'private');
+    await pickRegistry(user, 'Private');
     await user.type(screen.getByLabelText('Search plugins'), '@private/plugin');
 
     expect(await screen.findByText('Private plugin')).toBeInTheDocument();
@@ -285,7 +285,7 @@ describe('PluginsSection', () => {
     renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
-    await user.selectOptions(screen.getByLabelText('Registry'), 'private');
+    await pickRegistry(user, 'Private');
     await user.type(screen.getByLabelText('Search plugins'), 'first');
 
     await waitFor(() =>
@@ -400,7 +400,7 @@ describe('PluginsSection', () => {
     renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
-    await user.selectOptions(screen.getByLabelText('Registry'), 'private');
+    await pickRegistry(user, 'Private');
     await user.type(screen.getByLabelText('Search plugins'), '@private/plugin');
     await user.click(await screen.findByText('Private plugin'));
     await user.click(await screen.findByRole('button', { name: 'Install' }));

@@ -178,7 +178,7 @@ export function ImageUpload({
       </label>
       <div
         className={`relative ${
-          isDragActive ? 'border-accent' : 'border-gray-300 dark:border-gray-700'
+          isDragActive ? 'border-accent' : 'border-field-border'
         } border-2 border-dashed rounded-lg p-4 transition-colors`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}

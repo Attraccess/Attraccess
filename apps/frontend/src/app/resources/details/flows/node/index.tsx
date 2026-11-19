@@ -236,8 +236,8 @@ export function AttraccessNode(props: Props) {
               {!previewMode && previewRows.length > 0 && (
                 <Card.Content className="pt-0">
                   <div className="flex flex-col gap-2">
-                    {previewRows.map((row) => (
-                      <div className="flex flex-col gap-1" key={row.label}>
+                    {previewRows.map((row, rowIdx) => (
+                      <div className="flex flex-col gap-1" key={`${rowIdx}-${row.label}`}>
                         <small className="text-muted">{row.label}</small>
                         {'entries' in row ? (
                           row.entries.length === 0 ? (
@@ -249,9 +249,9 @@ export function AttraccessNode(props: Props) {
                                   key={idx}
                                   className="flex flex-col gap-0.5 rounded-md border border-border px-2 py-1"
                                 >
-                                  {entry.fields.map((field) => (
+                                  {entry.fields.map((field, fieldIdx) => (
                                     <div
-                                      key={field.label}
+                                      key={`${fieldIdx}-${field.label}`}
                                       className="grid grid-cols-[auto_1fr] gap-x-2 items-baseline min-w-0"
                                     >
                                       <small className="text-muted whitespace-nowrap">{field.label}</small>

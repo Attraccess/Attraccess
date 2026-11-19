@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 // Register the shared API mocks before loading the component's feature modules.
-import { deferred, hoisted, renderWithQuery } from './index.test.hoisted';
+import { deferred, hoisted, renderWithQuery, pickRegistry } from './index.test.hoisted';
 import { PluginsSection } from './index';
 
 const LOAD_ERROR = 'Could not load the marketplace.';
@@ -98,7 +98,7 @@ describe('PluginsSection marketplace', () => {
     await openMarketplace(user);
 
     await user.type(screen.getByLabelText('Search plugins'), '@private/plugin');
-    await user.selectOptions(screen.getByLabelText('Registry'), 'private');
+    await pickRegistry(user, 'Private');
 
     expect(await screen.findByText('@private/plugin', { selector: 'h3' })).toBeInTheDocument();
     await waitFor(() => expect(callsTo('search?query=%40private%2Fplugin&registryId=private')).toHaveLength(1));
@@ -118,7 +118,7 @@ describe('PluginsSection marketplace', () => {
     renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
-    await user.selectOptions(screen.getByLabelText('Registry'), 'private');
+    await pickRegistry(user, 'Private');
     await user.type(screen.getByLabelText('Search plugins'), 'first');
 
     await waitFor(() => expect(screen.getAllByText('first', { selector: 'h3' })).toHaveLength(2));
@@ -187,7 +187,7 @@ describe('PluginsSection marketplace', () => {
     renderWithQuery(<PluginsSection />);
     await openMarketplace(user);
 
-    await user.selectOptions(screen.getByLabelText('Registry'), 'private');
+    await pickRegistry(user, 'Private');
     await waitFor(() => expect(callsTo('registryId=private')).toHaveLength(1));
     await user.click(screen.getByText('Manage registries'));
     const callsBeforeRemoval = hoisted.apiMock.mock.calls.length;
