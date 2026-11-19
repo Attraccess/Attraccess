@@ -1,10 +1,14 @@
 import type { MarketplacePluginDto } from '@attraccess/react-query-client';
 import { Card, Input, TextField } from '@heroui/react';
 import { cardVariants } from '@heroui/styles';
+import { Select } from '../../../../../components/select';
 import { PluginClassificationBadge } from '../PluginClassificationBadge';
 import type { MarketplaceDetailRequest } from '../types';
 import { usePluginsTranslations } from '../usePluginsTranslations';
 import { useRegistries } from './useRegistries';
+
+// React Aria keys must not be empty; the API uses an empty registry id for "all".
+const ALL_REGISTRIES = 'all';
 
 interface Props {
   query: string;
@@ -33,20 +37,18 @@ export function MarketplaceSearchResults({
         <TextField value={query} onChange={onQueryChange} className="w-full">
           <Input placeholder={t('marketplace.searchPlaceholder')} aria-label={t('marketplace.search')} />
         </TextField>
-        <select
+        <Select
           aria-label={t('marketplace.registry')}
-          value={registryId}
-          onChange={(event) => onRegistryIdChange(event.target.value)}
-          className="h-10 rounded-medium border border-divider bg-content1 px-3 text-sm"
-        >
-          <option value="">{t('marketplace.allRegistries')}</option>
-          <option value="npm">npm</option>
-          {registries.map((registry) => (
-            <option key={registry.id} value={registry.id}>
-              {registry.name}
-            </option>
-          ))}
-        </select>
+          value={registryId || ALL_REGISTRIES}
+          onChange={(key) => onRegistryIdChange(key === ALL_REGISTRIES ? '' : key)}
+          className="sm:w-56"
+          data-cy="marketplace-registry-select"
+          items={[
+            { key: ALL_REGISTRIES, label: t('marketplace.allRegistries') },
+            { key: 'npm', label: 'npm' },
+            ...registries.map((registry) => ({ key: registry.id, label: registry.name })),
+          ]}
+        />
       </div>
       {isLoading ? (
         <p role="status" className="text-sm text-muted">

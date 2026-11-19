@@ -104,6 +104,66 @@ describe('diagnostics isolation', () => {
     expect(screen.getByRole('alert').textContent).toContain('Diagnostics unavailable');
     expect(screen.queryByText('Controller: online')).toBeNull();
   });
+
+  it('lists every configuration problem, fault and missing piece of evidence of a struggling controller', () => {
+    const data = fixture();
+    data.heartbeatAt = null;
+    data.heartbeatFreshness = 'stale';
+    data.connectivity = 'offline';
+    data.incompatible = true;
+    data.capabilities = ['configuration-v1'];
+    data.stateConnected = false;
+    data.stateHardwareAvailable = false;
+    data.stateSourceAt = null;
+    data.sequenceGaps = null;
+    data.activeStream = null;
+    data.trackingExhausted = true;
+    data.configuration = {
+      ...data.configuration,
+      draftUpdatedAt: '2026-09-30T10:00:00.000Z',
+      draftChanged: true,
+      publishedRevision: null,
+      publishedState: null,
+      appliedRevision: null,
+      reportedRevision: null,
+      revisionMismatch: true,
+      rejected: true,
+      validationErrorCount: 2,
+      validationCodes: ['missing_name', 'duplicate_name'],
+      validationErrors: [{ path: '$.logicalChannels[0].id', code: 'duplicate_name' }],
+      rejectionErrors: [{ path: '$.logicalChannels[1]', code: 'unsupported_capability' }],
+    };
+    data.faults = [
+      { channelId: 'output', code: 'write_failed', receivedAt: '2026-09-30T10:05:00.000Z' },
+    ] as WagoDiagnostics['faults'];
+    render(<WagoStatus diagnostics={data} />);
+    const page = document.body.textContent ?? '';
+    expect(page).toContain('Controller: offline');
+    expect(page).toMatch(/Permanent heartbeat: Not seen yet/);
+    expect(page).toContain('Draft: unpublished changes · Published: none (none) · Applied: none · Reported: unknown');
+    expect(page).toContain(
+      'Configuration needs attention: controller rejected publication. revisions do not match. 2 draft validation errors.',
+    );
+    expect(page).toContain('Runtime reports hardware unavailable.');
+    expect(page).toContain('Draft errors: missing_name, duplicate_name');
+    expect(page).toContain('Draft $.logicalChannels[0].id: duplicate_name.');
+    expect(page).toContain('Rejected $.logicalChannels[1]: unsupported_capability.');
+    expect(page).toContain('Observed source connection: disconnected · Source state time: unavailable');
+    expect(page).toContain('Sequence gaps: unavailable · Boot: legacy/unavailable');
+    expect(page).toContain('Stream tracking limit reached.');
+    expect(page).toContain('incompatible; update the runtime');
+    expect(page).toContain('Recent fault on output: write_failed');
+    expect(screen.getAllByRole('alert').length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('reports an unknown source connection when the runtime has not said anything yet', () => {
+    const data = fixture();
+    data.stateConnected = null;
+    render(<WagoStatus diagnostics={data} />);
+    expect(document.body.textContent).toContain('Observed source connection: unknown');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('shows canonical input separately and never promotes unknown hardware readiness', () => {
     const data = fixture();
     data.channels = [

@@ -13,6 +13,8 @@
         "{workspaceRoot}/jest.preset.js",
         "{workspaceRoot}/tools/eslint-rules/**/*",
         "{workspaceRoot}/.github/workflows/*.yml",
+        "{workspaceRoot}/apps/plugins/**/*.{ts,tsx,css}",
+        "{workspaceRoot}/apps/attractap/firmware/src/display/theme.hpp",
         { "externalDependencies": ["jest"] }
       ]
     },

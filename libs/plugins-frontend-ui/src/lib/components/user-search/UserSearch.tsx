@@ -249,12 +249,6 @@ function UserSearchTrigger({
   );
 }
 
-// Field-contrast vars so fields inside this modal match the other modals in the app.
-const FIELD_CONTRAST_STYLE: React.CSSProperties = {
-  ['--field-border' as never]: 'var(--border-secondary)',
-  ['--border-width-field' as never]: '1px',
-};
-
 export function UserSearch(props: Readonly<UserSearchProps>) {
   const { label, placeholder, size, resetSignal, onSelectionChange, afterAutocomplete, wrapperProps, afterSelection } =
     props;
@@ -308,7 +302,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
         isOpen={isOpen}
         onOpenChange={handleOpenChange}
         size="md"
-        dialogProps={{ style: FIELD_CONTRAST_STYLE, 'aria-label': t('modalTitle') }}
+        dialogProps={{ 'aria-label': t('modalTitle') }}
       >
         {() => (
           <>
