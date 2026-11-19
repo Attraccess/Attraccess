@@ -297,14 +297,21 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     );
   }
 
+  /**
+   * Inside a unit of work the attempt row is locked (FOR UPDATE) until commit: the transactions that change an attempt
+   * (staging billing items from parallel flow branches, commit, abort, cancel, recovery) read it, decide and write it
+   * back one after the other, so none overwrites another's staged items or acts on an attempt another one removed.
+   * The query has no relations, so no outer join ends up under the lock.
+   */
   async findAttempt(
     attemptId: string,
     resourceId: number,
     context?: TransactionContext,
   ): Promise<UsageLifecycleAttempt | null> {
-    const attempt = await this.managers
-      .resolve(context)
-      .findOne(ResourceUsageLifecycleAttempt, { where: { id: attemptId, resourceId } });
+    const attempt = await this.managers.resolve(context).findOne(ResourceUsageLifecycleAttempt, {
+      where: { id: attemptId, resourceId },
+      ...(context ? { lock: { mode: 'pessimistic_write' as const } } : {}),
+    });
     return attempt && toAttempt(attempt);
   }
 
@@ -356,11 +363,15 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     return attempts.map(({ id, createdAt }) => ({ id, createdAt }));
   }
 
+  /** Locked like `findAttempt` inside a unit of work, in id order so two recoveries cannot deadlock each other. */
   async findAttemptsByIds(ids: string[], context?: TransactionContext): Promise<UsageLifecycleAttempt[]> {
     if (ids.length === 0) return [];
-    return (await this.managers.resolve(context).find(ResourceUsageLifecycleAttempt, { where: { id: In(ids) } })).map(
-      toAttempt,
-    );
+    const attempts = await this.managers.resolve(context).find(ResourceUsageLifecycleAttempt, {
+      where: { id: In(ids) },
+      order: { id: 'ASC' },
+      ...(context ? { lock: { mode: 'pessimistic_write' as const } } : {}),
+    });
+    return attempts.map(toAttempt);
   }
 
   async createPendingSession(
@@ -414,8 +425,11 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     return result.affected !== 0;
   }
 
-  async publishSession(usageId: number, context?: TransactionContext): Promise<void> {
-    await this.managers.resolve(context).update(ResourceUsage, usageId, { isFinalized: true, lifecyclePending: false });
+  async publishSession(usageId: number, context?: TransactionContext): Promise<boolean> {
+    const result = await this.managers
+      .resolve(context)
+      .update(ResourceUsage, { id: usageId, lifecyclePending: true }, { isFinalized: true, lifecyclePending: false });
+    return result.affected !== 0;
   }
 
   async endSessionIfOpen(

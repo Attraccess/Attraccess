@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { NFCCard, NFCCardPendingChange } from '@attraccess/database-entities';
+import { NFCCard, NFCCardPendingChange, User } from '@attraccess/database-entities';
 import type {
   AttractapCardOwner,
   AttractapNfcCard,
@@ -8,9 +8,23 @@ import type {
   NewAttractapNfcCard,
   NewAttractapNfcCardPendingChange,
 } from '@attraccess/application-models';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import type { AttractapCardStore } from '../../../attractap/card-store.port';
 import { toCardOwner, toNfcCard, toPendingChange } from './attractap-mappers';
+
+/**
+ * Activating a card deactivates the owner's other cards first. The owner's row is locked (FOR NO KEY UPDATE) for the
+ * rest of the transaction, so two overlapping activations take turns and never leave two active cards. The no-key
+ * variant leaves the FOR KEY SHARE locks of inserts referencing the user (sessions, bills) unblocked.
+ */
+async function lockCardOwner(manager: EntityManager, userId: number): Promise<void> {
+  await manager
+    .createQueryBuilder(User, 'user')
+    .select('user.id')
+    .where('user.id = :userId', { userId })
+    .setLock('for_no_key_update')
+    .getOne();
+}
 
 @Injectable()
 export class TypeOrmAttractapCardStore implements AttractapCardStore {
@@ -43,7 +57,10 @@ export class TypeOrmAttractapCardStore implements AttractapCardStore {
 
   async create(owner: AttractapCardOwner, card: NewAttractapNfcCard, activate: boolean): Promise<AttractapNfcCard> {
     const saved = await this.cards.manager.transaction(async (manager) => {
-      if (activate) await manager.update(NFCCard, { user: { id: owner.id } }, { isActive: false });
+      if (activate) {
+        await lockCardOwner(manager, owner.id);
+        await manager.update(NFCCard, { user: { id: owner.id } }, { isActive: false });
+      }
       return await manager.save(NFCCard, { ...card, user: { id: owner.id }, isActive: activate });
     });
     // The owner the caller loaded is the user the notification of the new card is addressed to; it is
@@ -53,6 +70,10 @@ export class TypeOrmAttractapCardStore implements AttractapCardStore {
 
   async activateExclusively(id: number): Promise<AttractapNfcCard> {
     const saved = await this.cards.manager.transaction(async (manager) => {
+      const owner = await manager.findOne(NFCCard, { where: { id }, relations: { user: true } });
+      if (!owner) throw new Error(`Card with ID ${id} not found`);
+      await lockCardOwner(manager, owner.user.id);
+      // Read again under the lock: a card the owner changed meanwhile is saved as it is now.
       const card = await manager.findOne(NFCCard, { where: { id }, relations: { user: true } });
       if (!card) throw new Error(`Card with ID ${id} not found`);
       await manager

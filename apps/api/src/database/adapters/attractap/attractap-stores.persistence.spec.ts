@@ -113,6 +113,21 @@ describe('Attractap persistence adapters on PostgreSQL', () => {
       expect(await cards.delete(third.id)).toBe(false);
     });
 
+    it('leaves one active card when activations of the same owner overlap', async () => {
+      const user = await source.getRepository(User).save({ username: 'racer', email: 'racer@example.test' });
+      const cards = store();
+      const enrolled = await Promise.all(
+        ['11', '12', '13', '14'].map((uid) => cards.create(user, { uid, keyNo: 1, key: `k${uid}` }, false)),
+      );
+
+      await Promise.all([
+        ...enrolled.map((card) => cards.activateExclusively(card.id)),
+        cards.create(user, { uid: '15', keyNo: 1, key: 'k15' }, true),
+      ]);
+
+      expect((await cards.listForUser(user.id)).filter((card) => card.isActive)).toHaveLength(1);
+    });
+
     it('keeps pending key changes apart by kind and removes them by id or uid', async () => {
       const cards = store();
       const enroll = await cards.savePending({

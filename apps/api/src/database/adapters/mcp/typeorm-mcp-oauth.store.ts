@@ -14,8 +14,8 @@ import { EntityManager, LessThan, Repository } from 'typeorm';
 import { ScopedUnitOfWork, UNIT_OF_WORK } from '../../unit-of-work';
 import type { McpOAuthStore } from '../../../mcp/mcp-oauth.port';
 
-/** Advisory lock key serialising OAuth client registrations. */
-const MCP_CLIENT_REGISTRATION_LOCK = 584_201;
+/** Advisory lock key serialising OAuth client registrations (unique among the keys listed in `resource-locks.ts`). */
+const MCP_CLIENT_REGISTRATION_LOCK = 584_601;
 
 const toClient = (row: McpOAuthClient): McpOAuthClientRecord => ({
   clientId: row.clientId,

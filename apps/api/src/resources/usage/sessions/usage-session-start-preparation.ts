@@ -83,10 +83,15 @@ export class UsageSessionStartPreparation {
     options: StartSessionOptions = {},
   ) {
     // Runs after the transaction ended (commit or rollback): audit rows inside it would wait for the transaction.
-    let flushCapacityAudit: (() => Promise<void>) | undefined;
+    // A retried transaction asks the hooks again; the audit of every attempt is kept.
+    const capacityAudits: Array<() => Promise<void>> = [];
     const capacityLanguage = this.pluginHooks?.hasStartCapacityHooks()
       ? (options.language ?? (await this.settings?.resolveLanguage(user.locale)) ?? 'en')
       : null;
+    // Resolved before the transaction: the projects store reads on a connection of its own, and waiting for a second
+    // connection while this one holds the lifecycle lock would starve the pool under parallel starts.
+    const projectId =
+      dto.projectId === undefined ? undefined : (await this.projectsService.findOneById(user.id, dto.projectId)).id;
     return this.lifecycle
       .transaction(async (scope) => {
         const sessionLimit = await this.lifecycle.getSessionLimit(scope, resourceId);
@@ -142,7 +147,7 @@ export class UsageSessionStartPreparation {
               { resourceId, user, options, supervisorUserId },
               { language: capacityLanguage, sessionLimit, usersInSession, scope },
             );
-            flushCapacityAudit = outcome?.flush;
+            if (outcome?.flush) capacityAudits.push(outcome.flush);
             if (outcome?.refusal) throw new StartBlockedException(outcome.refusal.reason);
           }
         } else {
@@ -176,8 +181,6 @@ export class UsageSessionStartPreparation {
         const startTime = new Date();
         const billingConfiguration = await this.billingService.getResourceBillingConfiguration(resourceId, scope);
         const meterRates = this.lifecycle.metered ? await this.sessions.findMeterRates(resourceId, scope) : [];
-        const projectId =
-          dto.projectId === undefined ? undefined : (await this.projectsService.findOneById(user.id, dto.projectId)).id;
 
         this.logger.debug(`Creating new usage session for resource ${resourceId}`, { resourceId, userId: user.id });
 
@@ -242,7 +245,9 @@ export class UsageSessionStartPreparation {
           activeSessions: activeSessionCounts,
         };
       })
-      .finally(() => flushCapacityAudit?.());
+      .finally(async () => {
+        for (const flush of capacityAudits) await flush();
+      });
   }
 
   /**
