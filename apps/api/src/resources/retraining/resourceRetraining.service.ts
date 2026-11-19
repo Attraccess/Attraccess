@@ -7,6 +7,7 @@ import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event'
 import { EmailService } from '../../email/email.service';
 
 import { ResourceGroupsService } from '../groups/resourceGroups.service';
+import type { ResourcePersistenceContext } from '../resource-persistence-context';
 import { Cron } from '@nestjs/schedule';
 import {
   RESOURCE_INTRODUCTION_STORE,
@@ -91,18 +92,26 @@ export class ResourceRetrainingService {
     };
   }
 
-  public async getResourceRetrainingStatus(resourceId: number, userId: number): Promise<ResourceRetrainingStatus> {
+  /**
+   * Pass `context` when called inside a unit of work: the reads then join its transaction instead of taking a second
+   * pooled connection while the transaction (and its locks) is held.
+   */
+  public async getResourceRetrainingStatus(
+    resourceId: number,
+    userId: number,
+    context?: ResourcePersistenceContext,
+  ): Promise<ResourceRetrainingStatus> {
     const now = new Date();
     const evaluations: RetrainingEvaluation[] = [];
 
-    const resourceEval = await this.evaluateResourceIntroduction(resourceId, userId, now);
+    const resourceEval = await this.evaluateResourceIntroduction(resourceId, userId, now, context);
     if (resourceEval) {
       evaluations.push(resourceEval);
     }
 
-    const groups = await this.resourceGroupsService.getGroupsOfResource(resourceId);
+    const groups = await this.resourceGroupsService.getGroupsOfResource(resourceId, context);
     for (const group of groups) {
-      const groupEval = await this.evaluateGroupIntroduction(group.id, userId, now);
+      const groupEval = await this.evaluateGroupIntroduction(group.id, userId, now, context);
       if (groupEval) {
         evaluations.push(groupEval);
       }
@@ -120,13 +129,21 @@ export class ResourceRetrainingService {
     return evaluation ? { ...evaluation, hasIntroduction: true } : { ...EMPTY_EVALUATION, hasIntroduction: false };
   }
 
-  public async isResourceIntroductionBlocked(resourceId: number, userId: number): Promise<boolean> {
-    const evaluation = await this.evaluateResourceIntroduction(resourceId, userId, new Date());
+  public async isResourceIntroductionBlocked(
+    resourceId: number,
+    userId: number,
+    context?: ResourcePersistenceContext,
+  ): Promise<boolean> {
+    const evaluation = await this.evaluateResourceIntroduction(resourceId, userId, new Date(), context);
     return Boolean(evaluation && evaluation.applies && evaluation.isDue && evaluation.blocksAccess);
   }
 
-  public async isGroupIntroductionBlocked(groupId: number, userId: number): Promise<boolean> {
-    const evaluation = await this.evaluateGroupIntroduction(groupId, userId, new Date());
+  public async isGroupIntroductionBlocked(
+    groupId: number,
+    userId: number,
+    context?: ResourcePersistenceContext,
+  ): Promise<boolean> {
+    const evaluation = await this.evaluateGroupIntroduction(groupId, userId, new Date(), context);
     return Boolean(evaluation && evaluation.applies && evaluation.isDue && evaluation.blocksAccess);
   }
 
@@ -147,19 +164,20 @@ export class ResourceRetrainingService {
     resourceId: number,
     userId: number,
     now: Date,
+    context?: ResourcePersistenceContext,
   ): Promise<RetrainingEvaluation | null> {
-    const introduction = await this.introductionStore.findOfUser(resourceId, userId);
-    if (!introduction || !(await this.isValid(introduction.id))) {
+    const introduction = await this.introductionStore.findOfUser(resourceId, userId, context);
+    if (!introduction || !(await this.isValid(introduction.id, context))) {
       return null;
     }
 
-    const resource = await this.retrainingStore.findResourceTarget(resourceId);
+    const resource = await this.retrainingStore.findResourceTarget(resourceId, context);
     if (!resource) {
       return null;
     }
 
-    const trainedAt = await this.getTrainedAt(introduction);
-    const lastUsedAt = await this.getResourceLastUsedAt(resourceId, userId);
+    const trainedAt = await this.getTrainedAt(introduction, context);
+    const lastUsedAt = await this.getResourceLastUsedAt(resourceId, userId, context);
     return this.evaluate(resource, trainedAt, lastUsedAt, now);
   }
 
@@ -167,19 +185,20 @@ export class ResourceRetrainingService {
     groupId: number,
     userId: number,
     now: Date,
+    context?: ResourcePersistenceContext,
   ): Promise<RetrainingEvaluation | null> {
-    const introduction = await this.introductionStore.findOfGroupUser(groupId, userId);
-    if (!introduction || !(await this.isValid(introduction.id))) {
+    const introduction = await this.introductionStore.findOfGroupUser(groupId, userId, context);
+    if (!introduction || !(await this.isValid(introduction.id, context))) {
       return null;
     }
 
-    const group = await this.retrainingStore.findGroupTarget(groupId);
+    const group = await this.retrainingStore.findGroupTarget(groupId, context);
     if (!group) {
       return null;
     }
 
-    const trainedAt = await this.getTrainedAt(introduction);
-    const lastUsedAt = await this.getGroupLastUsedAt(groupId, userId);
+    const trainedAt = await this.getTrainedAt(introduction, context);
+    const lastUsedAt = await this.getGroupLastUsedAt(groupId, userId, context);
     return this.evaluate(group, trainedAt, lastUsedAt, now);
   }
 
@@ -224,22 +243,33 @@ export class ResourceRetrainingService {
     return null;
   }
 
-  protected async getTrainedAt(introduction: IntroductionRecord): Promise<Date | null> {
-    const latestGrant = await this.introductionStore.latestGrant(introduction.id);
+  protected async getTrainedAt(
+    introduction: IntroductionRecord,
+    context?: ResourcePersistenceContext,
+  ): Promise<Date | null> {
+    const latestGrant = await this.introductionStore.latestGrant(introduction.id, context);
     return latestGrant?.createdAt ?? introduction.completedAt ?? introduction.createdAt ?? null;
   }
 
-  protected async isValid(introductionId: number): Promise<boolean> {
-    const lastHistoryItem = await this.introductionStore.lastHistoryItem(introductionId);
+  protected async isValid(introductionId: number, context?: ResourcePersistenceContext): Promise<boolean> {
+    const lastHistoryItem = await this.introductionStore.lastHistoryItem(introductionId, context);
     return lastHistoryItem?.action === IntroductionHistoryAction.GRANT;
   }
 
-  protected async getResourceLastUsedAt(resourceId: number, userId: number): Promise<Date | null> {
-    return this.retrainingStore.lastResourceUseAt(resourceId, userId);
+  protected async getResourceLastUsedAt(
+    resourceId: number,
+    userId: number,
+    context?: ResourcePersistenceContext,
+  ): Promise<Date | null> {
+    return this.retrainingStore.lastResourceUseAt(resourceId, userId, context);
   }
 
-  protected async getGroupLastUsedAt(groupId: number, userId: number): Promise<Date | null> {
-    return this.retrainingStore.lastGroupUseAt(groupId, userId);
+  protected async getGroupLastUsedAt(
+    groupId: number,
+    userId: number,
+    context?: ResourcePersistenceContext,
+  ): Promise<Date | null> {
+    return this.retrainingStore.lastGroupUseAt(groupId, userId, context);
   }
 
   protected addDays(date: Date, days: number): Date {

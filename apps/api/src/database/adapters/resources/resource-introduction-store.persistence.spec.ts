@@ -1,6 +1,6 @@
 import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import type { DataSource } from 'typeorm';
-import { Resource, ResourceGroup, User } from '@attraccess/database-entities';
+import { Resource, ResourceGroup, ResourceIntroductionHistoryItem, User } from '@attraccess/database-entities';
 import { IntroductionHistoryAction, ResourceType } from '@attraccess/application-models';
 import { TypeOrmResourceIntroductionStore } from './resource-introduction-store.adapter';
 import { TypeOrmMassIntroductionTargetStore, TypeOrmRetrainingStore } from './retraining-store.adapter';
@@ -101,5 +101,35 @@ describe('introduction stores on real PostgreSQL', () => {
     expect(await targets.resourceIdsOfGroup(group.id)).toEqual([resourceId]);
     expect(await targets.findResourceName(resourceId)).toEqual({ id: resourceId, name: 'Laser' });
     expect(await targets.findGroupName(999)).toBeNull();
+  });
+
+  it('reads retraining data and the latest grant on the connection of the caller transaction', async () => {
+    const retraining = new TypeOrmRetrainingStore(source);
+    const created = await store.create(resourceId, userId);
+    await expect(
+      source.transaction(async (manager) => {
+        const scope = legacyEngineTransactionScope(manager);
+        // Uncommitted rows are only visible on the transaction's own connection. A read that took a second pooled
+        // connection instead would see nothing, and would starve the pool while sessions wait for a resource lock.
+        const resources = manager.getRepository(Resource);
+        const inside = await resources.save(
+          resources.create({ name: 'Uncommitted', type: ResourceType.Machine, retrainingMaxAgeDays: 7 }),
+        );
+        const grant = await manager.getRepository(ResourceIntroductionHistoryItem).save(
+          manager.getRepository(ResourceIntroductionHistoryItem).create({
+            introduction: { id: created.id },
+            performedByUser: { id: tutorId },
+            action: IntroductionHistoryAction.GRANT,
+          }),
+        );
+
+        expect(await retraining.findResourceTarget(inside.id, scope)).toMatchObject({ name: 'Uncommitted' });
+        expect(await retraining.findResourceTarget(inside.id)).toBeNull();
+        expect((await store.latestGrant(created.id, scope))?.id).toBe(grant.id);
+        expect(await store.latestGrant(created.id)).toBeNull();
+        expect(await retraining.lastResourceUseAt(inside.id, userId, scope)).toBeNull();
+        throw new Error('roll back');
+      }),
+    ).rejects.toThrow('roll back');
   });
 });

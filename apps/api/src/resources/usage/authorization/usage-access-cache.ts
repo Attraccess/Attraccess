@@ -150,7 +150,11 @@ export class UsageAccessCache {
     const result = await this.rules.canControl(resourceId, user, canUpdateResource, scope);
     let expiresAt = Date.now() + this.ACCESS_CACHE_TTL_MS;
     if (result && !canUpdateResource) {
-      const retrainingStatus = await this.resourceRetrainingService.getResourceRetrainingStatus(resourceId, user.id);
+      const retrainingStatus = await this.resourceRetrainingService.getResourceRetrainingStatus(
+        resourceId,
+        user.id,
+        scope,
+      );
       if (retrainingStatus.dueAt && retrainingStatus.dueAt.getTime() > Date.now()) {
         expiresAt = Math.min(expiresAt, retrainingStatus.dueAt.getTime());
       }
