@@ -152,7 +152,8 @@ class CommissioningDesktop(unittest.TestCase):
         expect(self.page.get_by_role("checkbox", name=re.compile(pattern))).to_be_checked()
 
     def open_saved_session(self):
-        self.button("Details for Workshop fixture").click()
+        self.button("Actions for Workshop fixture").click()
+        self.page.get_by_role("menuitem", name="Details", exact=True).click()
         details = self.page.get_by_role("dialog", name="Details for Workshop fixture", exact=True)
         details.get_by_role("button", name="Setup progress", exact=True).click()
         expect(self.page.get_by_role("dialog", name="Commission a controller")).to_be_visible()
