@@ -3,6 +3,7 @@ import { Tab, TabList, TabPanel, Tabs } from '@heroui/react';
 import { AttractapFirmware } from '@attraccess/react-query-client';
 import { ArrowLeft } from 'lucide-react';
 import { Key, useEffect, useRef, useState } from 'react';
+import type { ConfiguratorTransportKind } from '../../../../utils/configurator-transport';
 import { FirmwareFlasher } from '../FirmwareFlasher';
 import { FirmwareSelector } from '../FirmwareSelector';
 import { AttractapSerialConfiguratorApi, type OpenDeviceSettings } from '../SerialConfigurator/Api';
@@ -68,11 +69,14 @@ function AutoFetchConfiguration() {
 interface Props {
   openDeviceSettings: OpenDeviceSettings;
   onClose: () => void;
+  /** Over Bluetooth the bridge already runs its firmware: no Firmware tab, start with the PIN. */
+  transport?: ConfiguratorTransportKind;
 }
 
-export function SetupTabs({ openDeviceSettings }: Props) {
+export function SetupTabs({ openDeviceSettings, transport = 'serial' }: Props) {
   const { t } = useTranslations({ de, en });
-  const [selectedTab, setSelectedTab] = useState<TabKey>('firmware');
+  const canFlash = transport === 'serial';
+  const [selectedTab, setSelectedTab] = useState<TabKey>(canFlash ? 'firmware' : 'security');
 
   return (
     <AttractapSerialCommProvider>
@@ -86,10 +90,12 @@ export function SetupTabs({ openDeviceSettings }: Props) {
       >
         <Tabs.ListContainer>
           <TabList>
-            <Tab id="firmware" data-cy="attractap-setup-firmware-tab">
-              <Tabs.Indicator />
-              {t('tabs.firmware')}
-            </Tab>
+            {canFlash && (
+              <Tab id="firmware" data-cy="attractap-setup-firmware-tab">
+                <Tabs.Indicator />
+                {t('tabs.firmware')}
+              </Tab>
+            )}
             <Tab id="network" data-cy="attractap-setup-network-tab">
               <Tabs.Indicator />
               {t('tabs.network')}
@@ -105,9 +111,11 @@ export function SetupTabs({ openDeviceSettings }: Props) {
           </TabList>
         </Tabs.ListContainer>
 
-        <TabPanel id="firmware" className="pt-4">
-          <FirmwareTab onFlashed={() => setSelectedTab('network')} />
-        </TabPanel>
+        {canFlash && (
+          <TabPanel id="firmware" className="pt-4">
+            <FirmwareTab onFlashed={() => setSelectedTab('network')} />
+          </TabPanel>
+        )}
 
         <TabPanel id="network" className="pt-4">
           <AttractapSerialCommGate>

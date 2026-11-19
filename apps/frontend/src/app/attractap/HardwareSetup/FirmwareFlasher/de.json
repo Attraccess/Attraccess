@@ -37,7 +37,7 @@
   },
   "powerCycle": {
     "title": "Bridge neu starten",
-    "description": "Die Firmware ist installiert. Die Bridge kann nicht automatisch neu gestartet werden: Zieh ihre Micro-USB-Stromversorgung ab und steck sie wieder ein, ohne GPIO0 zu halten, und lass den USB-TTL-Adapter verbunden. Richte danach PIN, Netzwerk und Server über dieselbe Verbindung ein.",
+    "description": "Die Firmware ist installiert. Die Bridge kann nicht automatisch neu gestartet werden: Zieh ihre Micro-USB-Stromversorgung ab und steck sie wieder ein, ohne GPIO0 zu halten, und lass den USB-TTL-Adapter verbunden. Richte danach PIN, Netzwerk und Server über dieselbe Verbindung ein. Spätere Änderungen gehen auch per Bluetooth: Halte den Taster der Bridge 3 Sekunden gedrückt und wähle „Per Bluetooth einrichten“.",
     "continue": "Einrichtung fortsetzen"
   },
   "chipMismatch": {
