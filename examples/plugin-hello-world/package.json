@@ -41,7 +41,9 @@
     ],
     "permissions": [
       "READ_USERS",
-      "LISTEN_EVENTS"
+      "LISTEN_EVENTS",
+      "ACCESS_MQTT_SERVERS",
+      "TRIGGER_FLOWS"
     ],
     "sdk": {
       "backend": "^2.0.0-0",
