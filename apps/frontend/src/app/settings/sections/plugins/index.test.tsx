@@ -26,7 +26,7 @@ describe('PluginsSection', () => {
 
     expect(container.querySelector('[data-slot="settings-aside"]')).toBeNull();
     expect(container.querySelector('[data-slot="settings-content"]')).not.toHaveClass('max-w-2xl');
-    const docs = screen.getByRole('link', { name: 'Documentation' });
+    const docs = screen.getByRole('link', { name: 'Developer guide' });
     expect(docs).toHaveAttribute('data-cy', 'plugins-list-docs-link');
     expect(docs).toHaveAttribute('href', 'https://docs.attraccess.org/#/plugins/developing-plugins');
     expect(docs).toHaveAttribute('target', '_blank');
@@ -91,6 +91,26 @@ describe('PluginsSection', () => {
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
     expect(trigger).toHaveFocus();
+  });
+
+  it('moves focus into the remove confirmation and back to the row actions trigger after cancelling', async () => {
+    hoisted.plugins = [makePlugin()];
+    const user = userEvent.setup();
+    renderWithQuery(<PluginsSection />);
+
+    await chooseRowAction(user, 'plugin-1', 'Remove plugin');
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(dialog).toContainElement(document.activeElement as HTMLElement));
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Actions for Cool Plugin' })).toHaveFocus());
+  });
+
+  it('keeps quotes and ampersands in the plugin name of the actions trigger', () => {
+    hoisted.plugins = [makePlugin({ name: `Max's Tools & Co` })];
+    renderWithQuery(<PluginsSection />);
+
+    expect(screen.getByRole('button', { name: `Actions for Max's Tools & Co` })).toBeInTheDocument();
   });
 
   it('checks marketplace plugins for updates and takes the admin to the in-place update flow', async () => {

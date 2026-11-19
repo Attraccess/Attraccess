@@ -23,7 +23,8 @@ interface SSOProvidersTableProps {
 }
 
 export const SSOProvidersTable = ({ providers, onEdit, onDelete }: SSOProvidersTableProps) => {
-  const { t } = useTranslations({ en, de });
+  // React escapes the output; Handlebars escaping would put `&#x27;` into the provider names in aria-labels.
+  const { t } = useTranslations({ en, de }, { escapeValues: false });
 
   if (!providers || providers.length === 0) {
     return (

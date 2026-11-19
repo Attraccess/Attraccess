@@ -3,31 +3,15 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SsoProvider } from '@attraccess/react-query-client';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { SSOProvidersTable } from './SSOProvidersTable';
-import en from './en.json';
-import de from './de.json';
-
-const translations = vi.hoisted(() => ({ language: 'en' as 'en' | 'de' }));
-vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => {
-  const { get } = await import('lodash-es');
-  return {
-    ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
-    useTranslations: (strings: Record<'en' | 'de', object>) => ({
-      t: (key: string, params?: Record<string, string>) =>
-        String(get(strings[translations.language], key, key)).replace(
-          /{{(\w+)}}/g,
-          (_, name: string) => params?.[name] ?? '',
-        ),
-    }),
-  };
-});
 
 const provider = { id: 7, name: 'Company', type: 'OIDC' } as SsoProvider;
 
 describe('SSOProvidersTable', () => {
   afterEach(() => {
     cleanup();
-    translations.language = 'en';
+    useTranslationState.setState({ language: 'en' });
   });
 
   it('names the icon-only row actions after the provider', async () => {
@@ -42,12 +26,18 @@ describe('SSOProvidersTable', () => {
   });
 
   it('names the row actions in German', () => {
-    translations.language = 'de';
+    useTranslationState.setState({ language: 'de' });
     render(<SSOProvidersTable providers={[provider]} onEdit={vi.fn()} onDelete={vi.fn()} />);
 
     expect(screen.getByRole('button', { name: 'Anbieter Company bearbeiten' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Anbieter Company löschen' })).toBeInTheDocument();
-    expect(en.editProviderLabel).toBe('Edit {{name}}');
-    expect(de.deleteProviderLabel).toBe('Anbieter {{name}} löschen');
+  });
+
+  it('keeps quotes and ampersands in the provider name as typed', () => {
+    const named = { ...provider, name: `Max's Keycloak & Co` } as SsoProvider;
+    render(<SSOProvidersTable providers={[named]} onEdit={vi.fn()} onDelete={vi.fn()} />);
+
+    expect(screen.getByRole('button', { name: `Edit Max's Keycloak & Co` })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `Delete Max's Keycloak & Co` })).toBeInTheDocument();
   });
 });
