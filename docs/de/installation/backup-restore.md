@@ -47,6 +47,9 @@ docker run --rm \
 
 `pg_dump` erstellt einen konsistenten Schnappschuss, ohne Attraccess anzuhalten. Für die beste Übereinstimmung von Datenbank und Dateien führen Sie beide Befehle direkt nacheinander aus oder stoppen den Dienst `attraccess` während der Sicherung.
 
+> [!NOTE]
+> Solange `pg_dump` läuft, hält es auf jeder Tabelle eine Share-Sperre, bis der Dump fertig ist. Die normale Nutzung von Attraccess läuft weiter, aber Schemaänderungen warten: Ein Plugin während eines Backups zu installieren oder zu aktualisieren oder Attraccess zu aktualisieren, kann mit einem Lock-Timeout fehlschlagen. Wiederholen Sie den Vorgang nach dem Backup, und legen Sie automatische Backups (auch den balena-Sidecar und Coolify-Backups) außerhalb der Zeiten, in denen Sie Plugins installieren oder aktualisieren.
+
 ### Automatisches Backup
 
 Erstellen Sie ein Cronjob-Skript `/etc/cron.daily/attraccess-backup`:
@@ -110,29 +113,32 @@ Setzen Sie diese Werte als balena-Geräte- oder Flottenvariablen:
 | `BACKUP_SCHEDULE`                                                | `0 3 * * *`   | Cron-Ausdruck mit 5 Feldern in der Zeitzone des Containers (`TZ`): täglich um 03:00 Uhr         |
 | `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_KEEP_MONTHLY` | `7`, `4`, `6` | Aufbewahrung: Wie viele tägliche, wöchentliche und monatliche Snapshots bleiben                 |
 
-Ein Lauf protokolliert `backup started` und danach entweder `backup SUCCEEDED in …s` oder `BACKUP FAILED`. Nach einem Erfolg enthält die Datei `/var/lib/backup/backup_last_success_timestamp_seconds.prom` den Zeitpunkt des letzten Erfolgs im Prometheus-Textfile-Format, sodass Sie auf ein ausbleibendes Backup alarmieren können.
+Ein Lauf protokolliert `backup started` und danach entweder `backup SUCCEEDED in …s` oder `BACKUP FAILED`. Nach einem Erfolg schreibt der Sidecar den Zeitpunkt des letzten Erfolgs in die Datei `backup_last_success_timestamp_seconds.prom` im Volume `backup-state` (Prometheus-Textfile-Format). Standardmäßig liest niemand diese Datei, und es ist kein Alarm eingerichtet: Um bei einem ausbleibenden Backup alarmiert zu werden, binden Sie das Volume in einen Textfile-Collector von node-exporter ein (`--collector.textfile.directory`) und legen selbst eine Alarmregel an.
 
-Ein Backup sofort ausführen:
+Der Datenbank-Dump liegt nur während eines laufenden Backups im Volume `backup-state`; am Ende des Laufs wird er gelöscht. Das Datenbankpasswort steht nicht in der Befehlszeile der PostgreSQL-Werkzeuge.
+
+Ein Backup sofort ausführen oder die Snapshots im Repository auflisten (ID, Zeitpunkt, Pfade):
 
 ```bash
 balena-engine exec -it <backup-container> attraccess-backup backup
+balena-engine exec -it <backup-container> attraccess-backup snapshots
 ```
 
 ### Wiederherstellen mit dem Sidecar
 
 1. Stoppen Sie alle Dienste außer `postgres` und `backup`.
-2. Stellen Sie den neuesten Snapshot wieder her oder nennen Sie eine Snapshot-ID:
+2. Suchen Sie den gewünschten Snapshot mit `attraccess-backup snapshots` heraus und stellen Sie ihn über seine ID wieder her:
 
    ```bash
-   balena-engine exec -it <backup-container> attraccess-backup restore [snapshot-id]
-   # anderswo: docker compose run --rm backup restore [snapshot-id]
+   balena-engine exec -it <backup-container> attraccess-backup restore <snapshot-id>
+   # anderswo: docker compose run --rm backup restore <snapshot-id>
    ```
 
-   Der Befehl schreibt die Volumes an ihren ursprünglichen Ort zurück und lädt den Dump mit `pg_restore` in die Datenbank aus `DATABASE_URL`. Er lehnt eine Datenbank ab, die schon Tabellen enthält; mit `--force` ersetzen Sie deren Inhalt.
+   Der Befehl lädt zuerst den Dump mit `pg_restore` in die Datenbank aus `DATABASE_URL` und schreibt danach die Volumes an ihren ursprünglichen Ort zurück. Lässt sich die Datenbank nicht wiederherstellen, bleiben die Volumes unverändert. Er lehnt eine Datenbank ab, die schon Tabellen enthält; mit `--force` ersetzen Sie deren Inhalt. Ohne ID stellt er `latest` wieder her, den neuesten Snapshot, der nicht immer der gewünschte ist (siehe unten).
 
 3. Starten Sie die übrigen Dienste wieder.
 
-Für eine Wiederherstellung auf einem neuen Gerät starten Sie den Stack, setzen dieselben `BACKUP_*`-Variablen, stoppen die übrigen Dienste und führen die Wiederherstellung mit `--force` aus: Der erste Start von Attraccess hat die (leeren) Tabellen bereits angelegt, `--force` ersetzt sie.
+Für eine Wiederherstellung auf einem neuen Gerät starten Sie den Stack, setzen dieselben `BACKUP_*`-Variablen, stoppen die übrigen Dienste und führen die Wiederherstellung mit `--force` und der Snapshot-ID aus: Der erste Start von Attraccess hat die (leeren) Tabellen bereits angelegt, `--force` ersetzt sie. Tun Sie das, **bevor** das erste geplante Backup des neuen Geräts läuft (standardmäßig um 03:00 Uhr): Dieses Backup sichert die leere neue Installation und wird zu `latest`. Ist es schon gelaufen, wählen Sie den Snapshot des alten Geräts anhand seines Zeitpunkts in der Liste von `snapshots`.
 
 ## Coolify
 
@@ -140,7 +146,7 @@ Das Coolify-Template enthält einen PostgreSQL-Dienst. Nutzen Sie dafür die eig
 
 Das Coolify-Backup umfasst nur die Datenbank. Sichern Sie das Storage-Volume (`/app/storage`: Uploads und Plugins) getrennt, etwa mit dem `tar`-Befehl von oben auf dem Coolify-Host oder mit den Volume-Backup-Funktionen von Coolify.
 
-Alternativ betreiben Sie denselben restic-Sidecar als zusätzlichen Dienst in Ihrem Coolify-Stack: Verwenden Sie den Dienst `backup` aus `docker-compose.balena.yml` und die oben genannten `BACKUP_*`-Variablen und binden Sie die Volumes ein, die enthalten sein sollen.
+Alternativ betreiben Sie denselben restic-Sidecar als zusätzlichen Dienst in Ihrem Coolify-Stack. Ein fertiges Image davon wird nicht veröffentlicht: Bauen Sie es aus dem Repository (`docker build -t attraccess-backup docker/backup` oder ein `build:`-Eintrag, der wie beim Dienst `backup` in `docker-compose.balena.yml` auf `docker/backup` zeigt), setzen Sie die oben genannten `BACKUP_*`-Variablen und `DATABASE_URL` und binden Sie die Volumes, die enthalten sein sollen, unterhalb von `/external-storage` ein. Andernfalls bleiben Sie bei den eigenen PostgreSQL-Backups von Coolify plus einer Sicherung des Storage-Volumes.
 
 ## Speicher des Matter-Sidecars
 

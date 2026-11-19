@@ -1,5 +1,6 @@
 #!/bin/sh
-# Commands: run (default: scheduler), backup (one run now), restore [--force] [snapshot], any other command is executed.
+# Commands: run (default: scheduler), backup (one run now), restore [--force] [snapshot], snapshots (list them),
+# restic <args> (restic with the repository settings), any other command is executed.
 set -eu
 LIB="$(dirname "$(readlink -f "$0")")"
 # shellcheck source=lib.sh
@@ -21,6 +22,16 @@ case "${1:-run}" in
   restore)
     shift
     exec "$LIB/restore.sh" "$@"
+    ;;
+  snapshots)
+    shift
+    configure_restic || fail "BACKUP_REPOSITORY is not set"
+    exec restic snapshots --host "$RESTIC_HOST" --tag attraccess "$@"
+    ;;
+  restic)
+    shift
+    configure_restic || fail "BACKUP_REPOSITORY is not set"
+    exec restic "$@"
     ;;
   run)
     if [ -z "${BACKUP_REPOSITORY:-}" ]; then

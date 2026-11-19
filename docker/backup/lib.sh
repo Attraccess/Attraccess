@@ -2,6 +2,9 @@
 # Shared helpers of the backup sidecar (POSIX sh, busybox ash compatible). Sourced, never executed.
 # shellcheck disable=SC2034 # the variables are used by the scripts that source this file
 
+# Dumps, the restic cache and restored files are readable by root only, also for manual runs (docker exec).
+umask 077
+
 STATE_DIR="${BACKUP_STATE_DIR:-/var/lib/backup}"
 DATA_DIR="${BACKUP_DATA_DIR:-/external-storage}"
 DUMP_DIR="$STATE_DIR/dump"
@@ -28,18 +31,58 @@ configure_restic() {
   mkdir -p "$RESTIC_CACHE_DIR" "$DUMP_DIR"
 }
 
-database_url() {
+# Decodes %XX escapes (the password part of a connection URL). Bytes, not characters: LC_ALL=C.
+percent_decode() {
+  printf '%s' "$1" | LC_ALL=C awk '
+    BEGIN { hex = "0123456789abcdef" }
+    {
+      s = $0
+      while ((i = match(s, /%[0-9A-Fa-f][0-9A-Fa-f]/)) > 0) {
+        code = (index(hex, tolower(substr(s, i + 1, 1))) - 1) * 16 + index(hex, tolower(substr(s, i + 2, 1))) - 1
+        printf "%s%c", substr(s, 1, i - 1), code
+        s = substr(s, i + 3)
+      }
+      printf "%s", s
+    }'
+}
+
+# Reads DATABASE_URL (or BACKUP_DATABASE_URL) and sets PG_URL to the same URL WITHOUT the password, and exports the
+# (percent-decoded) password as PGPASSWORD. The PostgreSQL tools get PG_URL on their command line, which every process
+# on the host can read (ps); libpq takes the password from the environment. Call it in the main shell, not in $(...).
+connect_database() {
   url="${BACKUP_DATABASE_URL:-${DATABASE_URL:-}}"
   [ -n "$url" ] || fail "DATABASE_URL (or BACKUP_DATABASE_URL) is required"
-  printf '%s' "$url"
+  case "$url" in
+    postgres://* | postgresql://*) ;;
+    *) fail "DATABASE_URL must be a postgres:// or postgresql:// URL" ;;
+  esac
+  scheme="${url%%://*}"
+  rest="${url#*://}"
+  # The authority (user:password@host:port) ends at the first / or ?, like libpq reads it.
+  authority="${rest%%/*}"
+  authority="${authority%%\?*}"
+  tail="${rest#"$authority"}"
+  case "$authority" in
+    *@*)
+      userinfo="${authority%@*}"
+      case "$userinfo" in
+        *:*)
+          PGPASSWORD="$(percent_decode "${userinfo#*:}")"
+          export PGPASSWORD
+          userinfo="${userinfo%%:*}"
+          ;;
+      esac
+      authority="$userinfo@${authority##*@}"
+      ;;
+  esac
+  PG_URL="$scheme://$authority$tail"
 }
 
 # Waits until PostgreSQL accepts connections; fails loudly after BACKUP_PG_WAIT_SECONDS (default 120).
 wait_for_postgres() {
-  url="$(database_url)"
   limit="${BACKUP_PG_WAIT_SECONDS:-120}"
   waited=0
-  while ! pg_isready -q -d "$url"; do
+  while ! pg_isready -q -d "$PG_URL"; do
     [ "$waited" -lt "$limit" ] || fail "PostgreSQL did not become ready within ${limit}s"
     [ "$waited" -ne 0 ] || log "waiting for PostgreSQL"
     sleep 2

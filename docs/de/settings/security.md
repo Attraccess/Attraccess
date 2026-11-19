@@ -69,7 +69,7 @@ Wird das Secret geändert, sind die gespeicherten Kartenschlüssel und Kopplungs
      attraccess node /app/dist/apps/api/scripts/reencrypt-card-keys.mjs --dry-run
    ```
 
-   **Installation aus dem Quellcode** (im Wurzelverzeichnis des Repositorys, mit demselben `STORAGE_ROOT` wie die API):
+   **Installation aus dem Quellcode** (im Wurzelverzeichnis des Repositorys, mit derselben `DATABASE_URL` und, falls gesetzt, demselben `DATABASE_SCHEMA` / `DATABASE_SSL` wie die API; der Befehl liest sie aus der Umgebung oder aus `.env`):
 
    ```bash
    pnpm nx run api:reencrypt-card-keys -- --dry-run

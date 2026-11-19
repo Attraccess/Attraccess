@@ -87,6 +87,7 @@ jobs:
         attractap-firmware-version,
         wago-runtime-version,
         balena-compose-check,
+        backup-sidecar,
         fail2ban-smoke,
         grafana-provisioning-smoke,
       ]
@@ -444,6 +445,46 @@ jobs:
           esp-idf: 'false'
       - name: Validate docker-compose.balena.yml with balena's parser
         run: pnpm nx run @attraccess/source:check-balena-compose
+
+  backup-sidecar:
+    # Builds the restic backup sidecar (docker/backup) and runs its backup/restore round trip against a real
+    # PostgreSQL. The job always runs (it is gated above); the steps only do work when the sidecar changed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Detect sidecar changes
+        id: changes
+        run: |
+          if git diff --quiet "$NX_AFFECTED_BASE"...HEAD -- docker/backup .github/workflows/pull-requests.yml; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Start PostgreSQL
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          docker run -d --name backup-test-postgres -p 127.0.0.1:55432:5432 \
+            -e POSTGRES_USER=attraccess -e POSTGRES_PASSWORD=attraccess -e POSTGRES_DB=attraccess \
+            postgres:18.6-alpine
+          for _ in $(seq 1 60); do
+            docker exec backup-test-postgres pg_isready -h 127.0.0.1 -U attraccess -d attraccess && exit 0
+            sleep 2
+          done
+          docker logs backup-test-postgres
+          exit 1
+      - name: Build the backup sidecar image
+        if: steps.changes.outputs.changed == 'true'
+        run: docker build -t attraccess-backup docker/backup
+      - name: Run the backup/restore round trip
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          docker run --rm --network host \
+            -e TEST_DATABASE_URL=postgres://attraccess:attraccess@127.0.0.1:55432/postgres \
+            -v "$PWD/docker/backup/test:/test:ro" --entrypoint sh attraccess-backup /test/backup-restore.test.sh
 
   build-companion:
     uses: ./.github/workflows/build-companion-binaries.yml

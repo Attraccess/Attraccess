@@ -47,6 +47,9 @@ docker run --rm \
 
 `pg_dump` takes a consistent snapshot without stopping Attraccess. For the best match between database and files, run both commands directly after each other, or stop the `attraccess` service while you back up.
 
+> [!NOTE]
+> While `pg_dump` runs it holds a share lock on every table until the dump is complete. Normal use of Attraccess continues, but schema changes wait: installing or upgrading a plugin, or updating Attraccess, during a backup can fail with a lock timeout. Retry once the backup has finished, and schedule automatic backups (including the balena sidecar and Coolify backups) outside the times when you install plugins or update.
+
 ### Automated backup
 
 Create a cron job script at `/etc/cron.daily/attraccess-backup`:
@@ -110,29 +113,32 @@ Set these as balena device or fleet variables:
 | `BACKUP_SCHEDULE`                                                | `0 3 * * *`   | 5-field cron expression in the container time zone (`TZ`): daily at 03:00              |
 | `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_KEEP_MONTHLY` | `7`, `4`, `6` | Retention: how many daily, weekly and monthly snapshots are kept                       |
 
-A run logs `backup started`, then either `backup SUCCEEDED in …s` or `BACKUP FAILED`. After a success the file `/var/lib/backup/backup_last_success_timestamp_seconds.prom` holds the time of the last success in Prometheus textfile format, so you can alert on a missing backup.
+A run logs `backup started`, then either `backup SUCCEEDED in …s` or `BACKUP FAILED`. After a success the sidecar writes the time of the last success to `backup_last_success_timestamp_seconds.prom` in the `backup-state` volume (Prometheus textfile format). Nothing collects this file by default and no alert is set up: to alert on a missing backup, attach the volume to a node-exporter textfile collector (`--collector.textfile.directory`) and add an alert rule yourself.
 
-Run a backup right away:
+The database dump only exists in the `backup-state` volume while a run is busy; it is deleted when the run ends. The database password is not passed on the command line of the PostgreSQL tools.
+
+Run a backup right away, or list the snapshots in the repository (id, time, paths):
 
 ```bash
 balena-engine exec -it <backup container> attraccess-backup backup
+balena-engine exec -it <backup container> attraccess-backup snapshots
 ```
 
 ### Restoring with the sidecar
 
 1. Stop every service except `postgres` and `backup`.
-2. Restore the latest snapshot, or name a snapshot id:
+2. Look up the snapshot you want with `attraccess-backup snapshots`, and restore it by its id:
 
    ```bash
-   balena-engine exec -it <backup container> attraccess-backup restore [snapshot-id]
-   # elsewhere: docker compose run --rm backup restore [snapshot-id]
+   balena-engine exec -it <backup container> attraccess-backup restore <snapshot-id>
+   # elsewhere: docker compose run --rm backup restore <snapshot-id>
    ```
 
-   The command writes the volumes back to their original place and loads the dump with `pg_restore` into the database of `DATABASE_URL`. It refuses a database that already has tables; add `--force` to replace its contents.
+   The command first loads the dump with `pg_restore` into the database of `DATABASE_URL`, then writes the volumes back to their original place. If the database cannot be restored, the volumes are left untouched. It refuses a database that already has tables; add `--force` to replace its contents. Without an id it restores `latest`, the newest snapshot, which is not always the one you want (see below).
 
 3. Start the other services again.
 
-To restore onto a new device, bring the stack up, set the same `BACKUP_*` variables, stop the other services and run the restore with `--force`: the first start of Attraccess has already created the (empty) tables, which `--force` replaces.
+To restore onto a new device, bring the stack up, set the same `BACKUP_*` variables, stop the other services and run the restore with `--force` and the snapshot id: the first start of Attraccess has already created the (empty) tables, which `--force` replaces. Do this **before** the first scheduled backup of the new device runs (by default at 03:00): that backup saves the empty new installation and becomes `latest`. If it has already run, pick the snapshot of the old device by its time in the `snapshots` list.
 
 ## Coolify
 
@@ -140,7 +146,7 @@ The Coolify template contains a PostgreSQL service. Use Coolify's own database b
 
 Coolify's backup covers the database only. Back up the storage volume (`/app/storage`: uploads and plugins) separately, for example with the `tar` command above on the Coolify host, or with Coolify's volume backup features.
 
-Instead you can run the same restic sidecar as an additional service in your Coolify stack: use the `backup` service from `docker-compose.balena.yml` and the `BACKUP_*` variables above, and mount the volumes you want to include.
+Instead you can run the same restic sidecar as an additional service in your Coolify stack. No image of it is published: build it from the repository (`docker build -t attraccess-backup docker/backup`, or a `build:` entry pointing at `docker/backup` like the `backup` service in `docker-compose.balena.yml`), set the `BACKUP_*` variables above and `DATABASE_URL`, and mount the volumes you want to include below `/external-storage`. Otherwise stay with Coolify's own PostgreSQL backups plus a backup of the storage volume.
 
 ## Matter Sidecar Storage
 

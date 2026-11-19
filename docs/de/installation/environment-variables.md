@@ -61,19 +61,47 @@ Attraccess speichert alle Daten in PostgreSQL. Eine andere Laufzeitdatenbank gib
 
 Fehlt eine Einstellung oder ist sie ungültig, bricht der Start mit einer klaren Meldung ab, die nie das Passwort enthält. Das Image enthält kein PostgreSQL: Betreiben Sie es als eigenen Dienst (alle mitgelieferten Compose-Dateien enthalten bereits einen, festgelegt auf `postgres:18.6-alpine`). Zur Sicherung siehe [Backup & Wiederherstellung](installation/backup-restore.md).
 
+TLS wird ausschließlich mit `DATABASE_SSL` eingestellt. TLS-Parameter in `DATABASE_URL` (`ssl`, `sslmode`, `sslrootcert`, `sslcert`, `sslkey`, `sslpassword`, `sslcompat`) werden beim Start abgelehnt, weil sie `DATABASE_SSL` stillschweigend überschreiben würden. Ist das Serverzertifikat von einer privaten CA signiert, verwenden Sie `verify-ca` oder `verify-full` und lassen `NODE_EXTRA_CA_CERTS` auf die CA-Datei (PEM) zeigen, z. B. `NODE_EXTRA_CA_CERTS=/certs/db-ca.pem` mit der in den Container eingebundenen Datei. Auch die Sitzungsparameter `options` und `application_name` werden abgelehnt: Die API setzt Zeitzone, Lock-Timeout, Suchpfad (siehe `DATABASE_SCHEMA`) und Anwendungsnamen selbst.
+
+### PostgreSQL auf balena
+
+Der balena-Stack (`docker-compose.balena.yml`) startet einen Dienst `postgres` mit dem Benutzer und der Datenbank `attraccess`. balena kann Werte nicht aus anderen Variablen zusammensetzen, daher liest der Stack die Datenbankeinstellungen aus `.env.docker-compose`, die mit dem Platzhalter-Passwort `change-me` ausgeliefert wird. **Ersetzen Sie es vor dem ersten Start** (bzw. vor dem Upgrade, das PostgreSQL hinzufügt): Das `postgres`-Image legt das Passwort fest, wenn es das Volume `postgres-data` anlegt, und eine spätere Änderung der Variable wirkt auf ein bestehendes Volume nicht mehr.
+
+Setzen Sie diese Werte als balena-Geräte- oder Flottenvariablen (sie überschreiben `.env.docker-compose`):
+
+| Variable            | Wert                                                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `POSTGRES_PASSWORD` | Ein zufälliges Passwort, nur Buchstaben und Ziffern (z. B. `openssl rand -hex 24`).                          |
+| `DATABASE_URL`      | `postgres://attraccess:<dasselbe Passwort>@postgres:5432/attraccess`, genutzt von Attraccess und vom Backup. |
+
+So ändern Sie das Passwort später:
+
+1. Öffnen Sie eine Shell im Container `postgres` (Terminal im balenaCloud-Dashboard oder `balena ssh <geräte-uuid> postgres`) und setzen Sie das neue Passwort:
+
+   ```bash
+   psql -U attraccess -d attraccess -c "ALTER USER attraccess WITH PASSWORD '<neues Passwort>'"
+   ```
+
+2. Setzen Sie `POSTGRES_PASSWORD` und `DATABASE_URL` auf das neue Passwort. balena startet die Dienste mit den neuen Werten neu.
+
 Zur Engine-Naht siehe [Datenbank-Backend hinzufügen](developer/adding-a-database-backend.md).
 
 ### Backup-Sidecar (balena)
 
 Der balena-Stack enthält einen Dienst `backup`, der Datenbank und Volumes mit restic sichert. Er wird mit den folgenden Variablen konfiguriert, siehe [Backup & Wiederherstellung](installation/backup-restore.md#balena-restic-sidecar).
 
-| Variable                                                         | Standard      | Beschreibung                                                                                     |
-| ---------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------ |
-| `BACKUP_REPOSITORY`                                              | –             | restic-Repository, z. B. `s3:s3.amazonaws.com/bucket/attraccess`. Ohne Angabe läuft kein Backup. |
-| `BACKUP_PASSWORD`                                                | –             | Verschlüsselt das Repository. Pflicht; ohne es sind die Backups nicht lesbar.                    |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `B2_*`, …          | –             | Zugangsdaten des Backup-Ziels, unverändert an restic weitergereicht.                             |
-| `BACKUP_SCHEDULE`                                                | `0 3 * * *`   | Cron-Ausdruck (5 Felder); standardmäßig jede Nacht um 03:00 Uhr.                                 |
-| `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_KEEP_MONTHLY` | `7`, `4`, `6` | Wie viele tägliche, wöchentliche und monatliche Snapshots behalten werden.                       |
+| Variable                                                         | Standard            | Beschreibung                                                                                                                                                                                          |
+| ---------------------------------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BACKUP_REPOSITORY`                                              | –                   | restic-Repository, z. B. `s3:s3.amazonaws.com/bucket/attraccess`. Ohne Angabe läuft kein Backup.                                                                                                      |
+| `BACKUP_PASSWORD`                                                | –                   | Verschlüsselt das Repository. Pflicht; ohne es sind die Backups nicht lesbar.                                                                                                                         |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `B2_*`, …          | –                   | Zugangsdaten des Backup-Ziels, unverändert an restic weitergereicht.                                                                                                                                  |
+| `BACKUP_SCHEDULE`                                                | `0 3 * * *`         | Cron-Ausdruck (5 Felder); standardmäßig jede Nacht um 03:00 Uhr.                                                                                                                                      |
+| `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_KEEP_MONTHLY` | `7`, `4`, `6`       | Wie viele tägliche, wöchentliche und monatliche Snapshots behalten werden.                                                                                                                            |
+| `BACKUP_DATABASE_URL`                                            | `DATABASE_URL`      | Zu sichernde und wiederherzustellende Datenbank, wenn sie von `DATABASE_URL` abweicht (andere Zugangsdaten oder libpq-TLS-Parameter wie `?sslmode=require`, die `DATABASE_URL` nicht enthalten darf). |
+| `BACKUP_PG_WAIT_SECONDS`                                         | `120`               | Wie lange ein Lauf auf PostgreSQL wartet, bevor er fehlschlägt.                                                                                                                                       |
+| `BACKUP_FORCE`                                                   | –                   | `true` lässt jede Wiederherstellung eine nicht leere Datenbank ersetzen, wie `restore --force`.                                                                                                       |
+| `BACKUP_STATE_DIR`                                               | `/var/lib/backup`   | Arbeitsverzeichnis des Sidecars (Volume `backup-state`): der Dump während eines Laufs, der restic-Cache, die Sperre und die Metrik des letzten Erfolgs.                                               |
+| `BACKUP_DATA_DIR`                                                | `/external-storage` | Verzeichnis, unter dem die zu sichernden Volumes eingebunden sind.                                                                                                                                    |
 
 ## Speicher
 

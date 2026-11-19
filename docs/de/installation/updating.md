@@ -35,12 +35,14 @@ Setzen Sie nicht `DATABASE_TYPE=sqlite`: Der Start schlägt dann mit einer Meldu
 
 ### Was beim ersten Start passiert
 
-Enthält das Storage-Verzeichnis `attraccess.sqlite` und ist die PostgreSQL-Datenbank leer, übernimmt Attraccess die Daten, **bevor** es Migrationen ausliefert, Plugins startet, HTTP öffnet oder mit Geräten spricht:
+Enthält das Storage-Verzeichnis `attraccess.sqlite` und ist die PostgreSQL-Datenbank leer, übernimmt Attraccess die Daten, **bevor** es HTTP-Anfragen annimmt, mit Geräten spricht oder Plugins startet:
 
 1. Die SQLite-Datei (mit ihren `-wal`- und `-shm`-Dateien) wird in eine temporäre Arbeitskopie kopiert. **Das Original wird nie verändert.** Jede unterstützte ältere Version funktioniert als Quelle: Eine eingefrorene Kopie der alten SQLite-Migrationen bringt die Arbeitskopie zunächst auf das letzte SQLite-Schema.
 2. Die Daten, einschließlich der Tabellen installierter Plugins und ihrer Storage-Versionen, werden in einen neutralen Snapshot gelesen.
-3. Der Snapshot wird in **einer Transaktion** in PostgreSQL importiert. Bezeichner und Sequenzen, UTC-Zeitpunkte und exakte Dezimalwerte bleiben erhalten, und Guthaben werden nicht doppelt angewendet. Integritätsprüfungen laufen, bevor die Transaktion abgeschlossen wird.
+3. Der Snapshot wird in **einer Transaktion** in PostgreSQL importiert. Bezeichner und Sequenzen, UTC-Zeitpunkte und exakte Dezimalwerte bleiben erhalten, und Guthaben werden nicht doppelt angewendet. Fremdschlüssel werden innerhalb der Transaktion geprüft; eine Zeile, die auf eine fehlende Zeile verweist, rollt den gesamten Import zurück. Nach dem Commit vergleicht eine Guthabenprüfung die gespeicherten Guthaben mit den Abrechnungsbuchungen; sie protokolliert nur Warnungen (`Integrity check: …`) und macht die Übernahme nicht rückgängig.
 4. Bei Erfolg wird die Datei in `attraccess.sqlite.migrated-to-postgres-<Zeitstempel>` umbenannt, und das Log zeigt die Zeilenzahl je Tabelle. Die umbenannte Datei wird von Attraccess **aufbewahrt und nie gelöscht**; löschen Sie sie selbst, sobald Sie die Installation geprüft und ein PostgreSQL-Backup haben. Der nächste Start übernimmt nicht erneut.
+
+Schlägt das Umbenennen nach einer erfolgreichen Übernahme fehl (etwa auf einem schreibgeschützten Storage-Volume), protokolliert die API eine Warnung und startet trotzdem: Die Daten liegen bereits in PostgreSQL. Bei späteren Starts wird die Datei ignoriert, weil PostgreSQL nun Daten enthält. Benennen Sie `attraccess.sqlite` selbst um oder entfernen Sie sie.
 
 Die Logzeilen stammen von `SqliteTransfer`; verfolgen Sie sie mit `docker compose logs -f attraccess`. Große Installationen brauchen beim ersten Start länger.
 
@@ -48,23 +50,25 @@ Die Logzeilen stammen von `SqliteTransfer`; verfolgen Sie sie mit `docker compos
 
 Schlägt etwas fehl, wird die PostgreSQL-Transaktion zurückgerollt, die SQLite-Datei bleibt unberührt, und die API beendet sich mit einer klaren Fehlermeldung und einem Link auf diese Seite. Beheben Sie die Ursache und starten Sie erneut: Der nächste Start wiederholt die Übernahme von vorn.
 
-- **Ein Plugin fehlt.** Ein Plugin, das Daten in der SQLite-Datei hat, aber nicht installiert ist, stoppt die Übernahme mit einer klaren Fehlermeldung, und nichts wird importiert. Installieren Sie das Plugin (seinen 2.0-Build, siehe [Upgrade auf Attraccess 2.0](#upgrade-auf-attraccess-20)) und starten Sie erneut.
+- **Ein Plugin fehlt.** Ein Plugin, das Daten in der SQLite-Datei hat, aber nicht installiert ist, stoppt die Übernahme mit einer klaren Fehlermeldung, und nichts wird importiert. Die Fehlermeldung nennt das Plugin. Installieren Sie seinen Build für diese Attraccess-Version (siehe [Upgrade auf Attraccess 2.0](#upgrade-auf-attraccess-20)) und starten Sie erneut.
 - **Zwei Instanzen starten gleichzeitig.** Eine PostgreSQL-Advisory-Lock stellt sicher, dass nur eine übernimmt; die andere wartet.
 - **PostgreSQL enthält bereits Daten.** Ist die Datenbank nicht leer und die SQLite-Datei noch vorhanden, protokolliert Attraccess eine Warnung und übernimmt nichts. Nutzen Sie den manuellen Befehl unten, wenn Sie die Daten ersetzen wollen.
 
 ### Übernahme manuell ausführen
 
-Führen Sie sie im Container aus (die API darf nicht gegen dieselbe Datenbank laufen):
+Stoppen Sie zuerst die API (`docker compose stop attraccess`) und führen Sie den Befehl dann in einem einmaligen Container aus:
 
 ```bash
 docker compose run --rm attraccess node dist/apps/api/main.js transfer-sqlite [--sqlite <Pfad>] [--force] [--keep]
 ```
 
-| Option            | Bedeutung                                                                                       |
-| ----------------- | ----------------------------------------------------------------------------------------------- |
-| `--sqlite <Pfad>` | Die SQLite-Datei; Standard `<STORAGE_ROOT>/attraccess.sqlite`                                   |
-| `--force`         | Ersetzt Daten, die schon in der PostgreSQL-Datenbank liegen. Ohne sie wird ein nicht leeres Ziel abgelehnt |
-| `--keep`          | Benennt die SQLite-Datei nach erfolgreicher Übernahme nicht um                                  |
+| Option            | Bedeutung                                                                                                               |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `--sqlite <Pfad>` | Die SQLite-Datei; Standard `<STORAGE_ROOT>/attraccess.sqlite`                                                           |
+| `--force`         | Ersetzt Daten, die schon in der PostgreSQL-Datenbank liegen. Ohne sie wird ein nicht leeres Ziel abgelehnt. Siehe unten |
+| `--keep`          | Benennt die SQLite-Datei nach erfolgreicher Übernahme nicht um                                                          |
+
+`--force` leert vor dem Import **jede** Attraccess-Tabelle der Zieldatenbank, auch das Audit-Log und die Tabellen der Plugins; der Befehl listet die Tabellen auf, die er leert. Er verweigert die Ausführung, solange die API (oder ein anderer Client) mit dieser Datenbank verbunden ist. Erstellen Sie vorher ein PostgreSQL-Backup, wenn die Daten darin wichtig sind.
 
 In einem Entwicklungs-Checkout lautet das Gegenstück `pnpm nx run api:transfer-sqlite -- --sqlite <Pfad>`.
 

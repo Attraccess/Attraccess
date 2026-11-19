@@ -195,20 +195,27 @@ The examples below seed a new installation. To change the key after setup, use *
 export LICENSE_KEY="I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md"
 ```
 
-- Docker Compose
+Attraccess needs a PostgreSQL database and does not start without `DATABASE_URL`. The snippets below only show where
+`LICENSE_KEY` goes; add it to a complete setup such as the Compose file (with its `postgres` service and `DATABASE_URL`)
+from the [Docker Compose installation guide](docs/en/installation/docker-compose.md).
+
+- Docker Compose (the `attraccess` service of that file)
 
 ```yaml
 services:
   attraccess:
     image: attraccess/attraccess:latest
     environment:
+      DATABASE_URL: postgres://attraccess:${POSTGRES_PASSWORD}@postgres:5432/attraccess
       LICENSE_KEY: 'I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md'
+  # postgres: ... (see the installation guide)
 ```
 
-- Docker CLI
+- Docker CLI (with a PostgreSQL server that the container can reach)
 
 ```bash
-docker run -e LICENSE_KEY="I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md" attraccess/attraccess:latest
+docker run -e DATABASE_URL="postgres://attraccess:<password>@<postgres-host>:5432/attraccess" \
+  -e LICENSE_KEY="I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md" attraccess/attraccess:latest
 ```
 
 Licensed features require a valid configured key. Qualifying non-commercial users can enter the special key above in the setup wizard or application settings.

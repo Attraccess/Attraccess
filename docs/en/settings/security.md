@@ -69,7 +69,7 @@ Changing the secret makes the stored card keys and reader pairing keys unreadabl
      attraccess node /app/dist/apps/api/scripts/reencrypt-card-keys.mjs --dry-run
    ```
 
-   **Source installation** (run from the repository root with the same `STORAGE_ROOT` as the API):
+   **Source installation** (run from the repository root with the same `DATABASE_URL`, and `DATABASE_SCHEMA` / `DATABASE_SSL` if you set them, as the API; the command reads them from the environment or `.env`):
 
    ```bash
    pnpm nx run api:reencrypt-card-keys -- --dry-run

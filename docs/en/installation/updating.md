@@ -35,12 +35,14 @@ Do not set `DATABASE_TYPE=sqlite`: the start fails with a message that links to 
 
 ### What happens on the first start
 
-When the storage directory contains `attraccess.sqlite` and the PostgreSQL database is empty, Attraccess transfers the data **before** it serves migrations, starts plugins, opens HTTP or talks to devices:
+When the storage directory contains `attraccess.sqlite` and the PostgreSQL database is empty, Attraccess transfers the data **before** it accepts HTTP requests, talks to devices or starts plugins:
 
 1. The SQLite file (with its `-wal` and `-shm` files) is copied to a temporary working copy. **The original is never modified.** Any supported older release works as the source: a frozen copy of the old SQLite migrations first brings the working copy up to the last SQLite schema.
 2. The data, including the tables of installed plugins and their storage versions, is read into a neutral snapshot.
-3. The snapshot is imported into PostgreSQL in **one transaction**. Identifiers and sequences, UTC points in time and exact decimal values are preserved, and balances are not applied twice. Integrity checks run before the transaction commits.
+3. The snapshot is imported into PostgreSQL in **one transaction**. Identifiers and sequences, UTC points in time and exact decimal values are preserved, and balances are not applied twice. Foreign keys are checked inside the transaction, so a row that points to a missing row rolls the whole import back. After the commit a balance check compares the stored balances with the billing transactions; it only logs warnings (`Integrity check: …`) and does not undo the transfer.
 4. On success the file is renamed to `attraccess.sqlite.migrated-to-postgres-<timestamp>`, and the log shows a row count per table. The renamed file is **kept and never deleted** by Attraccess; delete it yourself once you have verified the installation and have a PostgreSQL backup. The next start does not transfer again.
+
+If renaming the file fails after a successful transfer (for example on a read-only storage volume), the API logs a warning and starts anyway: the data is already in PostgreSQL. On later starts the file is ignored because PostgreSQL now holds data. Rename or remove `attraccess.sqlite` yourself.
 
 The log lines come from `SqliteTransfer`; follow them with `docker compose logs -f attraccess`. Large installations take longer to start the first time.
 
@@ -48,23 +50,25 @@ The log lines come from `SqliteTransfer`; follow them with `docker compose logs 
 
 If anything fails, the PostgreSQL transaction is rolled back, the SQLite file is untouched, and the API stops with a clear error and a link to this page. Fix the cause and start again: the next start retries the transfer from the beginning.
 
-- **A plugin is missing.** A plugin that has data in the SQLite file but is not installed stops the transfer with a clear error and nothing is imported. Install the plugin (its 2.0 build, see [Upgrading to Attraccess 2.0](#upgrading-to-attraccess-20)) and start again.
+- **A plugin is missing.** A plugin that has data in the SQLite file but is not installed stops the transfer with a clear error and nothing is imported. The error names the plugin. Install its build for this Attraccess version (see [Upgrading to Attraccess 2.0](#upgrading-to-attraccess-20)) and start again.
 - **Two instances start at once.** A PostgreSQL advisory lock makes sure only one of them transfers; the other waits.
 - **PostgreSQL already holds data.** If the database is not empty and the SQLite file still exists, Attraccess logs a warning and transfers nothing. Use the manual command below if you want to replace the data.
 
 ### Running the transfer manually
 
-Run it inside the container (the API must be stopped or not running against the same database):
+Stop the API first (`docker compose stop attraccess`), then run the command in a one-off container:
 
 ```bash
 docker compose run --rm attraccess node dist/apps/api/main.js transfer-sqlite [--sqlite <path>] [--force] [--keep]
 ```
 
-| Option            | Meaning                                                                                      |
-| ----------------- | -------------------------------------------------------------------------------------------- |
-| `--sqlite <path>` | The SQLite file; default `<STORAGE_ROOT>/attraccess.sqlite`                                  |
-| `--force`         | Replace data that is already in the PostgreSQL database. Without it a non-empty target is refused |
-| `--keep`          | Do not rename the SQLite file after a successful transfer                                    |
+| Option            | Meaning                                                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------------------------------ |
+| `--sqlite <path>` | The SQLite file; default `<STORAGE_ROOT>/attraccess.sqlite`                                                  |
+| `--force`         | Replace data that is already in the PostgreSQL database. Without it a non-empty target is refused. See below |
+| `--keep`          | Do not rename the SQLite file after a successful transfer                                                    |
+
+`--force` empties **every** Attraccess table in the target database before the import, including the audit log and the tables of plugins; the command lists the tables it empties. It refuses to run while the API (or another client) is connected to that database. Take a PostgreSQL backup first if the data in it matters.
 
 In a development checkout the equivalent is `pnpm nx run api:transfer-sqlite -- --sqlite <path>`.
 
