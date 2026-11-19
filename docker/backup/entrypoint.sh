@@ -32,8 +32,8 @@ case "${1:-run}" in
       idle
     fi
     schedule="${BACKUP_SCHEDULE:-0 3 * * *}"
-    if [ "$(printf '%s' "$schedule" | wc -w)" -ne 5 ]; then
-      log "ERROR: BACKUP_SCHEDULE must be a 5-field cron expression (minute hour day month weekday), got: $schedule - backups are DISABLED."
+    if ! schedule_valid "$schedule"; then
+      log "ERROR: BACKUP_SCHEDULE must be a 5-field cron expression (minute hour day month weekday) with values in range, got: $schedule - backups are DISABLED."
       idle
     fi
     mkdir -p "$STATE_DIR" /etc/crontabs

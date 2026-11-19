@@ -4,10 +4,10 @@
 
 Attraccess keeps its data in two places. A backup must contain both, taken at about the same time:
 
-| What                                         | Where                                                                  | Contents                                                                                      |
-| -------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| **PostgreSQL database** (`attraccess`)       | The `postgres` service of your stack (volume `postgres-data`)          | All settings, users, resources, usage, billing, audit log, **and the tables of all plugins** |
-| **Storage directory** (`/app/storage`)       | The `attraccess-storage` volume                                        | `cdn/` (uploaded files), `plugins/` (installed plugins), `cache/` (can be regenerated)       |
+| What                                   | Where                                                         | Contents                                                                                     |
+| -------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **PostgreSQL database** (`attraccess`) | The `postgres` service of your stack (volume `postgres-data`) | All settings, users, resources, usage, billing, audit log, **and the tables of all plugins** |
+| **Storage directory** (`/app/storage`) | The `attraccess-storage` volume                               | `cdn/` (uploaded files), `plugins/` (installed plugins), `cache/` (can be regenerated)       |
 
 > [!NOTE]
 > The database is the most important part. Without it, all configuration and data is lost. A copy of the data directory of a running PostgreSQL is **not** a valid backup: use `pg_dump`, as described below.
@@ -102,13 +102,13 @@ Without `BACKUP_REPOSITORY` the service logs one warning and does nothing: **no 
 
 Set these as balena device or fleet variables:
 
-| Variable                                                          | Default       | Meaning                                                                       |
-| ----------------------------------------------------------------- | ------------- | ----------------------------------------------------------------------------- |
-| `BACKUP_REPOSITORY`                                               | – (off)       | restic repository, e.g. `s3:s3.amazonaws.com/bucket/attraccess` or `sftp:…`   |
-| `BACKUP_PASSWORD`                                                 | –             | Encrypts the repository. **Required**; lost together with the backups if you forget it |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `B2_*`, …           | –             | Credentials of the target, passed to restic unchanged                         |
-| `BACKUP_SCHEDULE`                                                 | `0 3 * * *`   | 5-field cron expression in the container time zone (`TZ`): daily at 03:00     |
-| `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_KEEP_MONTHLY`  | `7`, `4`, `6` | Retention: how many daily, weekly and monthly snapshots are kept              |
+| Variable                                                         | Default       | Meaning                                                                                |
+| ---------------------------------------------------------------- | ------------- | -------------------------------------------------------------------------------------- |
+| `BACKUP_REPOSITORY`                                              | – (off)       | restic repository, e.g. `s3:s3.amazonaws.com/bucket/attraccess` or `sftp:…`            |
+| `BACKUP_PASSWORD`                                                | –             | Encrypts the repository. **Required**; lost together with the backups if you forget it |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `B2_*`, …          | –             | Credentials of the target, passed to restic unchanged                                  |
+| `BACKUP_SCHEDULE`                                                | `0 3 * * *`   | 5-field cron expression in the container time zone (`TZ`): daily at 03:00              |
+| `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_KEEP_MONTHLY` | `7`, `4`, `6` | Retention: how many daily, weekly and monthly snapshots are kept                       |
 
 A run logs `backup started`, then either `backup SUCCEEDED in …s` or `BACKUP FAILED`. After a success the file `/var/lib/backup/backup_last_success_timestamp_seconds.prom` holds the time of the last success in Prometheus textfile format, so you can alert on a missing backup.
 
@@ -129,9 +129,10 @@ balena-engine exec -it <backup container> attraccess-backup backup
    ```
 
    The command writes the volumes back to their original place and loads the dump with `pg_restore` into the database of `DATABASE_URL`. It refuses a database that already has tables; add `--force` to replace its contents.
+
 3. Start the other services again.
 
-To restore onto a new device, bring the stack up, set the same `BACKUP_*` variables, stop the other services and run the restore.
+To restore onto a new device, bring the stack up, set the same `BACKUP_*` variables, stop the other services and run the restore with `--force`: the first start of Attraccess has already created the (empty) tables, which `--force` replaces.
 
 ## Coolify
 

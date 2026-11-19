@@ -45,6 +45,23 @@ fi
 
 log "restoring the database"
 if [ "$force" = true ]; then
+  # pg_restore --clean only drops what the dump contains. Tables, types and functions that a newer Attraccess version
+  # added after the snapshot would survive, and their migrations would then fail on the next start ("already exists").
+  # Drop every schema first (and recreate an empty public one), so --force really replaces the contents.
+  if [ "$tables" -gt 0 ]; then
+    log "removing the current contents of the database"
+    psql -X -q -v ON_ERROR_STOP=1 -d "$url" <<'SQL'
+DO $$
+DECLARE schema_name text;
+BEGIN
+  FOR schema_name IN SELECT nspname FROM pg_namespace WHERE nspname NOT LIKE 'pg\_%' AND nspname <> 'information_schema' LOOP
+    EXECUTE format('DROP SCHEMA %I CASCADE', schema_name);
+  END LOOP;
+  EXECUTE 'CREATE SCHEMA public';
+END
+$$;
+SQL
+  fi
   pg_restore --clean --if-exists --no-owner --no-privileges --exit-on-error --dbname="$url" "$dump"
 else
   pg_restore --no-owner --no-privileges --exit-on-error --dbname="$url" "$dump"

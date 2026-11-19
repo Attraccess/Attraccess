@@ -64,9 +64,10 @@ pass "restore recreates the database and the volumes"
 # 4. A non-empty database is refused unless forced.
 if sh "$lib/restore.sh" >"$work/refuse.log" 2>&1; then die "restore into a non-empty database must fail"; fi
 grep -q 'not empty' "$work/refuse.log" || die "missing non-empty message"
-psql -X -q -d "$DATABASE_URL" -c "INSERT INTO item (name) VALUES ('gamma')"
-sh "$lib/restore.sh" --force >/dev/null 2>&1 || die "forced restore failed"
+psql -X -q -d "$DATABASE_URL" -c "INSERT INTO item (name) VALUES ('gamma')" -c 'CREATE TABLE added_after_snapshot (id int)'
+sh "$lib/restore.sh" --force >"$work/force.log" 2>&1 || { cat "$work/force.log"; die "forced restore failed"; }
 [ "$(psql -X -A -t -d "$DATABASE_URL" -c 'SELECT count(*) FROM item')" = "2" ] || die "forced restore did not replace the data"
+[ "$(psql -X -A -t -d "$DATABASE_URL" -c "SELECT to_regclass('added_after_snapshot') IS NULL")" = "t" ] || die "forced restore left a table that is not in the snapshot"
 pass "restore refuses a non-empty database and replaces it with --force"
 
 # 5. Without BACKUP_REPOSITORY the scheduler logs one warning and idles; backup fails loudly.
@@ -78,4 +79,17 @@ pass "no repository: one warning, idle, backup refuses"
 # 6. A wrong password fails loudly and reports failure.
 if BACKUP_PASSWORD=wrong sh "$lib/backup.sh" >"$work/wrong.log" 2>&1; then die "wrong password must fail"; fi
 grep -q 'BACKUP FAILED' "$work/wrong.log" || die "missing failure line"
-pass "a failing backup logs BACKUP FAILED"
+grep -q 'wrong BACKUP_PASSWORD' "$work/wrong.log" || die "a wrong password must be named as the cause"
+if grep -q 'initialising the restic repository' "$work/wrong.log"; then die "a wrong password must not attempt restic init"; fi
+pass "a failing backup logs BACKUP FAILED and names the wrong password"
+
+# 7. An invalid BACKUP_SCHEDULE is reported and disables the scheduler (crond would skip such a line silently).
+for bad in 'bad' '* * * *' '61 25 * * *' '0 24 * * *' '0 3 32 * *' '0 3 * 13 *' '0 3 * * 8'; do
+  out="$(BACKUP_SCHEDULE="$bad" timeout 3 "$lib/entrypoint.sh" run 2>&1 || true)"
+  printf '%s\n' "$out" | grep -q 'BACKUP_SCHEDULE must be' || die "schedule '$bad' must be rejected, got: $out"
+done
+for good in '0 3 * * *' '*/5 * * * *' '0,30 6-18 * * 1-5' '15 2 1 jan mon'; do
+  out="$(BACKUP_SCHEDULE="$good" timeout 3 "$lib/entrypoint.sh" run 2>&1 || true)"
+  if printf '%s\n' "$out" | grep -q 'BACKUP_SCHEDULE must be'; then die "schedule '$good' must be accepted, got: $out"; fi
+done
+pass "an invalid BACKUP_SCHEDULE is rejected, valid ones are accepted"

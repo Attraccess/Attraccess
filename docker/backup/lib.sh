@@ -46,3 +46,18 @@ wait_for_postgres() {
     waited=$((waited + 2))
   done
 }
+
+# True for a 5-field cron expression whose numbers are in range (minute 0-59, hour 0-23, day 1-31, month 1-12,
+# weekday 0-7). crond silently skips a line it cannot parse, which would turn into backups that never run.
+schedule_valid() {
+  printf '%s\n' "$1" | awk '{
+    if (NF != 5) exit 1
+    split("0 0 1 1 0", low, " "); split("59 23 31 12 7", high, " ")
+    for (i = 1; i <= 5; i++) {
+      if ($i !~ /^[0-9A-Za-z*,\/-]+$/) exit 1
+      n = split($i, parts, /[*,\/-]/)
+      for (j = 1; j <= n; j++)
+        if (parts[j] ~ /^[0-9]+$/ && (parts[j] + 0 < low[i] || parts[j] + 0 > high[i])) exit 1
+    }
+  }'
+}

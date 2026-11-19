@@ -4,10 +4,10 @@
 
 Attraccess hält seine Daten an zwei Orten. Ein Backup muss beide enthalten, zu ungefähr gleicher Zeit gesichert:
 
-| Was                                          | Wo                                                                     | Inhalt                                                                                                  |
-| -------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| **PostgreSQL-Datenbank** (`attraccess`)      | Der Dienst `postgres` Ihres Stacks (Volume `postgres-data`)            | Alle Einstellungen, Benutzer, Ressourcen, Nutzung, Abrechnung, Audit-Log **und die Tabellen aller Plugins** |
-| **Storage-Verzeichnis** (`/app/storage`)     | Das Volume `attraccess-storage`                                        | `cdn/` (hochgeladene Dateien), `plugins/` (installierte Plugins), `cache/` (kann regeneriert werden)    |
+| Was                                      | Wo                                                          | Inhalt                                                                                                      |
+| ---------------------------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **PostgreSQL-Datenbank** (`attraccess`)  | Der Dienst `postgres` Ihres Stacks (Volume `postgres-data`) | Alle Einstellungen, Benutzer, Ressourcen, Nutzung, Abrechnung, Audit-Log **und die Tabellen aller Plugins** |
+| **Storage-Verzeichnis** (`/app/storage`) | Das Volume `attraccess-storage`                             | `cdn/` (hochgeladene Dateien), `plugins/` (installierte Plugins), `cache/` (kann regeneriert werden)        |
 
 > [!NOTE]
 > Die Datenbank ist der wichtigste Teil. Ohne sie sind alle Konfigurationen und Daten verloren. Eine Kopie des Datenverzeichnisses eines laufenden PostgreSQL ist **kein** gültiges Backup: Verwenden Sie `pg_dump`, wie unten beschrieben.
@@ -102,13 +102,13 @@ Ohne `BACKUP_REPOSITORY` meldet der Dienst einmal eine Warnung und tut nichts: *
 
 Setzen Sie diese Werte als balena-Geräte- oder Flottenvariablen:
 
-| Variable                                                          | Standard      | Bedeutung                                                                          |
-| ----------------------------------------------------------------- | ------------- | ---------------------------------------------------------------------------------- |
-| `BACKUP_REPOSITORY`                                               | – (aus)       | restic-Repository, z. B. `s3:s3.amazonaws.com/bucket/attraccess` oder `sftp:…`     |
-| `BACKUP_PASSWORD`                                                 | –             | Verschlüsselt das Repository. **Pflicht**; geht mit den Backups verloren, wenn Sie es vergessen |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `B2_*`, …           | –             | Zugangsdaten des Ziels, unverändert an restic weitergereicht                       |
-| `BACKUP_SCHEDULE`                                                 | `0 3 * * *`   | Cron-Ausdruck mit 5 Feldern in der Zeitzone des Containers (`TZ`): täglich um 03:00 Uhr |
-| `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_KEEP_MONTHLY`  | `7`, `4`, `6` | Aufbewahrung: Wie viele tägliche, wöchentliche und monatliche Snapshots bleiben    |
+| Variable                                                         | Standard      | Bedeutung                                                                                       |
+| ---------------------------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------- |
+| `BACKUP_REPOSITORY`                                              | – (aus)       | restic-Repository, z. B. `s3:s3.amazonaws.com/bucket/attraccess` oder `sftp:…`                  |
+| `BACKUP_PASSWORD`                                                | –             | Verschlüsselt das Repository. **Pflicht**; geht mit den Backups verloren, wenn Sie es vergessen |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `B2_*`, …          | –             | Zugangsdaten des Ziels, unverändert an restic weitergereicht                                    |
+| `BACKUP_SCHEDULE`                                                | `0 3 * * *`   | Cron-Ausdruck mit 5 Feldern in der Zeitzone des Containers (`TZ`): täglich um 03:00 Uhr         |
+| `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_KEEP_MONTHLY` | `7`, `4`, `6` | Aufbewahrung: Wie viele tägliche, wöchentliche und monatliche Snapshots bleiben                 |
 
 Ein Lauf protokolliert `backup started` und danach entweder `backup SUCCEEDED in …s` oder `BACKUP FAILED`. Nach einem Erfolg enthält die Datei `/var/lib/backup/backup_last_success_timestamp_seconds.prom` den Zeitpunkt des letzten Erfolgs im Prometheus-Textfile-Format, sodass Sie auf ein ausbleibendes Backup alarmieren können.
 
@@ -129,9 +129,10 @@ balena-engine exec -it <backup-container> attraccess-backup backup
    ```
 
    Der Befehl schreibt die Volumes an ihren ursprünglichen Ort zurück und lädt den Dump mit `pg_restore` in die Datenbank aus `DATABASE_URL`. Er lehnt eine Datenbank ab, die schon Tabellen enthält; mit `--force` ersetzen Sie deren Inhalt.
+
 3. Starten Sie die übrigen Dienste wieder.
 
-Für eine Wiederherstellung auf einem neuen Gerät starten Sie den Stack, setzen dieselben `BACKUP_*`-Variablen, stoppen die übrigen Dienste und führen die Wiederherstellung aus.
+Für eine Wiederherstellung auf einem neuen Gerät starten Sie den Stack, setzen dieselben `BACKUP_*`-Variablen, stoppen die übrigen Dienste und führen die Wiederherstellung mit `--force` aus: Der erste Start von Attraccess hat die (leeren) Tabellen bereits angelegt, `--force` ersetzt sie.
 
 ## Coolify
 

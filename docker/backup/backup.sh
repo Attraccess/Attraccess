@@ -20,8 +20,16 @@ rm -f "$DUMP_FILE.partial"
 pg_dump --format=custom --no-owner --dbname="$(database_url)" --file="$DUMP_FILE.partial"
 mv "$DUMP_FILE.partial" "$DUMP_FILE"
 
-if ! restic cat config >/dev/null 2>&1; then
-  log "initialising the restic repository"
+# A repository that cannot be opened is initialised (first run, also creates a missing bucket) - except when the
+# password is wrong (restic exit code 12): `restic init` would only report "config file already exists" there.
+probe=0
+log "checking the restic repository"
+restic cat config >/dev/null 2>"$STATE_DIR/restic-probe.err" || probe=$?
+if [ "$probe" -eq 12 ]; then
+  cat "$STATE_DIR/restic-probe.err" >&2
+  fail "cannot open the restic repository: wrong BACKUP_PASSWORD for the existing repository"
+elif [ "$probe" -ne 0 ]; then
+  log "initialising the restic repository (opening it failed with restic exit code $probe)"
   restic init
 fi
 

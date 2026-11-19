@@ -36,7 +36,7 @@ On a balena device: `balena-engine exec -it <backup container> attraccess-backup
 `restore` writes the volumes back to their original place and loads the dump with `pg_restore` into the database of
 `DATABASE_URL`. It refuses a database that already has tables unless `--force` (which replaces its contents).
 Stop the other services first (everything except `postgres` and `backup`), restore, then start them again.
-Restoring onto a new device: bring up the stack, set the same `BACKUP_*` variables, stop the other services, restore.
+Restoring onto a new device: bring up the stack, set the same `BACKUP_*` variables, stop the other services, `restore --force` (the first start already created the empty tables).
 
 ## Tests
 
