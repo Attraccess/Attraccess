@@ -46,7 +46,7 @@ Typ: `input.resource.door.unlocked` · Türen
 
 Läuft bei einer Entriegelungsaktion. Keine Einstellungen. Die Payload enthält `event.timestamp`, `usage.start`, `usage.end`, `user.id`, `user.username`, `user.externalIdentifier`. Beispiel: Entriegelungsbefehl mit **MQTT-Nachricht senden** versenden.
 
-Eine Türaktion wartet auf ihre Flows. Schlägt ein Knoten mit **Flow abbrechen** fehl, sieht die Person an der Tür den Fehler in der Web-App, am Attractap oder am Leser des Plugins. Die Aktion bleibt im Nutzungsverlauf. Das gilt ebenso für **Tür verriegelt** und **Tür-Falle geöffnet**.
+Eine Türaktion wartet auf ihre Flows. Schlägt ein Knoten mit **Flow abbrechen** fehl oder läuft ein **Fehler**-Knoten, sieht die Person an der Tür den Fehler in der Web-App, am Attractap oder am Leser des Plugins. Die Aktion bleibt im Nutzungsverlauf. Das gilt ebenso für **Tür verriegelt** und **Tür-Falle geöffnet**.
 
 ### Tür verriegelt
 
@@ -256,7 +256,7 @@ Aktionen mit **Ausgang** können nachfolgende Knoten ausführen. Abrechnungspost
 
 ### Fehlerverhalten
 
-**HTTP-Anfrage**, **MQTT-Nachricht senden**, **Auf MQTT-Nachricht warten** und **Nutzungssitzung beenden** bieten **Bei Fehler** (`failureBehavior`):
+**HTTP-Anfrage**, **MQTT-Nachricht senden**, **Auf MQTT-Nachricht warten** und **Nutzungssitzung beenden** bieten **Bei Fehler** (`failureBehavior`). Plugin-Knoten können dieselbe Auswahl anbieten:
 
 | Auswahl                                                          | Ergebnis                                                                                                                          |
 | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |

@@ -31,7 +31,7 @@ function registerFailingNode(overrides: Partial<PluginFlowNodeDefinition> = {}):
       getFailureBehavior: (config) => config.failureBehavior as PluginFlowFailureBehavior | undefined,
       getFailureKind: (error) => (error instanceof DeviceFaultError ? 'controller-rejection' : 'node-failure'),
       execute: async () => {
-        throw new DeviceFaultError('The device could not move: motor unit not connected');
+        throw new DeviceFaultError('The device could not move: actuator not connected');
       },
       ...overrides,
     } as PluginFlowNodeDefinition,
@@ -96,7 +96,7 @@ describe('plugin node failure behaviour', () => {
 
     await expect(result).rejects.toBeInstanceOf(ExternalEffectFailureError);
     await expect(result).rejects.toMatchObject({
-      message: 'The device could not move: motor unit not connected',
+      message: 'The device could not move: actuator not connected',
       failureKind: 'controller-rejection',
       status: 503,
     });
@@ -115,7 +115,7 @@ describe('plugin node failure behaviour', () => {
       expect.objectContaining({
         flowError: {
           kind: 'controller-rejection',
-          message: 'The device could not move: motor unit not connected',
+          message: 'The device could not move: actuator not connected',
         },
       }),
       expect.anything(),
