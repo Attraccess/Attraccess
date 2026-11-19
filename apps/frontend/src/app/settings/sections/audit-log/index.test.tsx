@@ -107,8 +107,8 @@ const meta: AuditMetaDto = {
   actions: ['resource.updated', 'demo.publication'],
 };
 let client: QueryClient;
-function mount() {
-  client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } });
+function mount(queries: { retry: number | false; retryDelay?: number } = { retry: false }) {
+  client = new QueryClient({ defaultOptions: { queries: { ...queries, gcTime: 0 }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <AuditLogSection />
@@ -461,6 +461,29 @@ describe('audit admin workflows', () => {
     await user.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(await screen.findByRole('button', { name: 'View event #52' })).toBeInTheDocument();
     expect(list.mock.lastCall?.[0]).not.toHaveProperty('eventPrefix');
+  });
+
+  it('does not retry a rejected event prefix, so the message shows without the retry backoff', async () => {
+    const user = userEvent.setup();
+    mount({ retry: 3, retryDelay: 0 });
+    await screen.findByRole('button', { name: 'View event #52' });
+    list.mockRejectedValue(
+      new ApiError(
+        { method: 'GET', url: '/api/audit' },
+        {
+          body: { message: ['eventPrefix must start with a recognized audit event prefix'], statusCode: 400 },
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          url: '/api/audit',
+        },
+        'Bad Request',
+      ),
+    );
+    fireEvent.change(screen.getByLabelText('Event prefix'), { target: { value: 'demo.' } });
+    await user.click(screen.getByRole('button', { name: 'Apply filters' }));
+    expect(await screen.findByText('Enter a valid event prefix.')).toBeInTheDocument();
+    expect(list.mock.calls.filter(([query]) => query?.eventPrefix === 'demo.')).toHaveLength(1);
   });
 
   it('does not fall back to an unfiltered list when applied filters turn invalid once meta loads', async () => {
