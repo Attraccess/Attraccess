@@ -1,15 +1,8 @@
-import { ApiError, useAuditControllerList } from '@attraccess/react-query-client';
+import { useAuditControllerList } from '@attraccess/react-query-client';
 import { type DefaultOptions, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../../hooks/useAuth';
-import { AuditFilters, filterRequest, filterVocabulary } from './audit-log-model';
+import { AuditFilters, filterRequest, filterVocabulary, rejectsEventPrefix } from './audit-log-model';
 import { useAuditLogMeta } from './useAuditLogMeta';
-
-/** The API rejected the event prefix, e.g. a plugin domain that was unloaded after meta loaded. */
-export function rejectsEventPrefix(error: unknown): boolean {
-  if (!(error instanceof ApiError) || error.status !== 400) return false;
-  const message = (error.body as { message?: string | string[] } | undefined)?.message;
-  return [message ?? []].flat().some((text) => text.includes('eventPrefix'));
-}
 
 /** Applies the client's default retry option, which may be a boolean, a count or a function. */
 function defaultRetries(
@@ -41,7 +34,11 @@ export function useAuditLogActivity({
     enabled: hasPermission('system.audit.read') && !parsed.error,
     // A rejected prefix stays rejected: retrying only delays the validation message by the retry backoff.
     retry: (failureCount, error) => !rejectsEventPrefix(error) && defaultRetries(defaultRetry, failureCount, error),
+    // Nor does asking again on window focus or reconnect; clearing or changing the filter starts a new query.
+    refetchOnWindowFocus: (query) => !rejectsEventPrefix(query.state.error),
+    refetchOnReconnect: (query) => !rejectsEventPrefix(query.state.error),
   });
-  const filterError = parsed.error ?? (rejectsEventPrefix(activity.error) ? 'invalidEventPrefix' : undefined);
-  return { activity, filterError };
+  const appliedFilterError = parsed.error ?? (rejectsEventPrefix(activity.error) ? 'invalidEventPrefix' : undefined);
+  /** `filterQuery` is the applied filters as list query parameters; undefined while they are invalid. */
+  return { activity, appliedFilterError, filterQuery: parsed.request };
 }

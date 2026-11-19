@@ -19,16 +19,16 @@ interface AuditLogActivityPanelProps {
 export function AuditLogActivityPanel({ filterState, exportError, onInspect }: AuditLogActivityPanelProps) {
   const { t } = useTranslations({ en, de });
   const { cursors, setCursors, activeFilterCount, clearFilters } = filterState;
-  const { activity, filterError } = useAuditLogActivity(filterState);
+  const { activity, appliedFilterError } = useAuditLogActivity(filterState);
   const items = activity.data?.items ?? [];
   return (
     <Tabs.Panel id="activity" className="space-y-5 pt-5">
       <AuditLogFilters filterState={filterState} isRefreshing={activity.isFetching} />
       {exportError && <StatusAlert status="danger" title={t('exportError')} />}
-      {filterError ? (
+      {appliedFilterError ? (
         // Retrying cannot fix an invalid filter, so offer to clear it instead.
         <div className="space-y-3">
-          <StatusAlert status="danger" title={t(filterError)} />
+          <StatusAlert status="danger" title={t(appliedFilterError)} />
           <Button variant="secondary" onPress={clearFilters}>
             {t('clear')}
           </Button>
@@ -62,7 +62,7 @@ export function AuditLogActivityPanel({ filterState, exportError, onInspect }: A
           <MobileEntries items={items} onInspect={onInspect} />
         </>
       )}
-      {!activity.isError && !filterError && (
+      {!activity.isError && !appliedFilterError && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-separator pt-4">
           <p className="text-xs text-muted">
             {t('page')} {cursors.length} · {items.length} {t('eventsOnPage')}

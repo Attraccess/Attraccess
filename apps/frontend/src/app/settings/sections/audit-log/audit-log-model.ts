@@ -1,4 +1,5 @@
 import {
+  ApiError,
   AuditEntryDto,
   AuditControllerListData,
   AuditPageDto,
@@ -7,6 +8,7 @@ import {
   AuditMetaDto,
   AuditSettingsDto,
 } from '@attraccess/react-query-client';
+import { getApiErrorMessage } from '../../../../utils/apiError';
 
 export type AuditDomain = AuditSettingsDto['domains'][number];
 
@@ -221,6 +223,11 @@ export function knownEventPrefixes(actions: readonly string[]): string[] {
 
 export function filterVocabulary(meta: AuditMetaDto | undefined): AuditFilterVocabulary {
   return meta ? { subjectTypes: meta.subjectTypes, eventPrefixes: knownEventPrefixes(meta.actions) } : {};
+}
+
+/** The API rejected the event prefix, e.g. a plugin domain that was unloaded after meta loaded. */
+export function rejectsEventPrefix(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 400 && getApiErrorMessage(error).includes('eventPrefix');
 }
 
 function validEventPrefix(prefix: string, eventPrefixes: readonly string[] | undefined): boolean {

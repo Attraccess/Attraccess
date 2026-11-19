@@ -3,7 +3,7 @@ import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError } from '@attraccess/react-query-client';
+import { ApiError, UseAuditControllerMetaKeyFn } from '@attraccess/react-query-client';
 import type { AuditEntryDto, AuditMetaDto, AuditSettingsDto } from '@attraccess/react-query-client';
 import { AuditLogSection } from './index';
 import { auditLabel } from './components/auditLabel';
@@ -425,7 +425,8 @@ describe('audit admin workflows', () => {
     const user = userEvent.setup();
     mount();
     await screen.findByRole('button', { name: 'View event #52' });
-    await waitFor(() => expect(getMeta).toHaveBeenCalled());
+    // Wait for meta to settle, not just to be requested: before it loads, only the shape check applies.
+    await waitFor(() => expect(client.getQueryState(UseAuditControllerMetaKeyFn())?.status).toBe('success'));
     fireEvent.change(screen.getByLabelText('Event prefix'), { target: { value: prefix } });
     await user.click(screen.getByRole('button', { name: 'Apply filters' }));
     expect(await screen.findByText('Enter a valid event prefix.')).toBeInTheDocument();
@@ -500,6 +501,28 @@ describe('audit admin workflows', () => {
     expect(await screen.findByText('Enter a valid event prefix.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'View event #52' })).not.toBeInTheDocument();
     expect(list).toHaveBeenCalledTimes(requestsBefore);
+    // The list query is off, not failed, so only the filter error keeps the export from running unfiltered.
+    expect(screen.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
+  });
+
+  it('keeps the load error and retry for a 400 that is not about the event prefix', async () => {
+    list.mockRejectedValueOnce(
+      new ApiError(
+        { method: 'GET', url: '/api/audit' },
+        {
+          body: { message: ['actorId must be a positive integer'], statusCode: 400 },
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          url: '/api/audit',
+        },
+        'Bad Request',
+      ),
+    );
+    mount();
+    expect(await screen.findByText('Activity could not be loaded.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    expect(screen.queryByText('Enter a valid event prefix.')).not.toBeInTheDocument();
   });
 });
 
