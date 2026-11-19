@@ -185,9 +185,8 @@ target.
 slots of `0x1f0000` (1.94 MB) at `0x10000` and `0x200000`, and a 64 KB `coredump` at `0x3f0000`. No
 SPIFFS. The bootloader sits at `0x1000` on the classic ESP32. `tools/check_release_build.py` fails a
 release image that leaves less than 10 % of its smallest app slot free. Release build (log level
-ERROR, 2.7.0): app image 1,524,458 bytes (25 % of the slot free), static DRAM 66.9 KB, IRAM 91 %,
-bootloader 26,096 bytes (9 % of its 28 KB free). Heap at idle and during a BLE session is measured on
-hardware in the first-deployment QA.
+ERROR, 2.7.0, with the Bluetooth setup): app image 1,544,880 bytes (24 % of the slot free, 476 KB),
+static DRAM 67.5 KB, IRAM 91 %, bootloader 26,096 bytes (9 % of its 28 KB free).
 
 **PSRAM.** Not used. The S10 drives the 50 MHz RMII reference clock out on GPIO17, which the ESP32's
 external PSRAM needs as its clock pin, so PSRAM and Ethernet cannot run together. The proxy's bulk
@@ -195,6 +194,22 @@ buffers, its task stack, NimBLE (`CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_INTERNAL`) and
 RAM, and the variant defines `BLE_PROXY_INTERNAL_RAM`, which lowers the bounds the capability reports:
 16 scan results, 32 scan candidates, a 32-entry / 8 KB notification queue and 16 watched devices
 (MTU 517 and 512-byte payloads stay). `tests/ble-proxy` runs every proxy test with both sets of bounds.
+
+**RAM budget.** Without PSRAM, Wi-Fi, lwIP, two TLS contexts (the wss connection and the reader
+session), the websocket tasks and NimBLE share roughly 160 KB of heap. With the stock sizes the first
+plugin BLE scan could not even create the 4 KB NimBLE host task (`ble init failed detail=host-task`),
+and the websocket then ran out of memory too. `sdkconfig.defaults.esp32` trims the bridge only (each line
+there says why): 5 static Wi-Fi RX buffers and 12 dynamic RX/TX, no TX aggregation, an RX block-ack
+window of 4, no soft-AP; mbedTLS dynamic buffers (records allocated per use instead of 8 + 4 KB held per
+context) with 2 KB outgoing records, and no IDF certificate bundle (the wss connection uses the
+firmware's own CA list); NimBLE mbuf pools of 8x256 + 12x320 B, 10 ACL and 16 HCI event buffers. The
+incoming TLS record limit stays 8 KB because reverse proxies in front of the API do not negotiate a
+smaller one. A NimBLE init that runs out of memory now hands everything back at once
+(`ble_radio_nimble.cpp`), so the websocket keeps its memory and the next request retries. The bridge
+skips the beeper task. `CMND heap` (no PIN, release builds too) answers with the internal heap now, its
+minimum since boot, its largest block, the DMA-capable heap and the unused stack of the firmware's
+tasks; the bridge logs no heap figures at log level ERROR. First release build on a GL-S10 (rev v1.0),
+Wi-Fi up, no API session: 73,068 B free, 53,896 B minimum, largest block 69,632 B.
 
 **Ethernet with Wi-Fi fallback.** Internal EMAC over RMII: MDC GPIO23, MDIO GPIO18, clock out on GPIO17
 (`EMAC_CLK_OUT`), PHY power/reset GPIO5. LAN8720 (v1.x units) and IP101 (v2.x units) both run with
@@ -207,11 +222,27 @@ next time Ethernet is gone.
 **LEDs and button** (`src/bridge/`, all active low). Power GPIO14: on while the firmware runs. Network
 GPIO32: on = API websocket connected, 1 s blink = network up without the API, 200 ms blink = no network.
 BT GPIO12: on = a session holds (or opens) a connection, 1 s blink = a scan or the advertisement watch
-runs, off = idle. Button GPIO33: a press shorter than 2 s reboots; after 2 s all LEDs blink fast; at
-10 s the bridge erases NVS (Wi-Fi, API address, pairing credentials, PIN), lights all LEDs and reboots
-unconfigured. Releasing between 2 and 10 s cancels. GPIO0 stays the download button.
+runs, off = idle; during the Bluetooth setup two short flashes every 1.5 s = waiting, on = the web app is
+connected. Button GPIO33: a press shorter than 2 s reboots; after 3 s all LEDs blink fast; releasing
+between 3 and 10 s asks for the Bluetooth setup; at 10 s the bridge erases NVS (Wi-Fi, API address,
+pairing credentials, PIN), lights all LEDs and reboots unconfigured. Releasing between 2 and 3 s does
+nothing. GPIO0 stays the download button.
 
-**Serial setup.** The classic ESP32 has no USB-Serial-JTAG. The console and the Serial Configurator
+**Bluetooth setup** (`src/bridge/provisioning*`). On a bridge without pairing credentials, releasing the
+button after 3 s opens a 10-minute window: NimBLE comes up as a peripheral under a new random static
+address and advertises `Attractap Bridge XXXX` (last two bytes of the BT MAC) with service
+`2665a001-44cd-4fe2-a450-916b627619d7`. RX `...a002` (write, encrypted link required) takes the bytes
+of Serial Configurator lines (`CMND <topic> <json>\n`, a line may span several writes, at most 256
+bytes); TX `...a003` notifies the replies (`RESP <topic> <json>\n`, split into ATT MTU - 3 pieces).
+The lines run through `SerialCommandHandler` on the main loop with the serial PIN rules
+(`SerialCommandHandler::Channel`). Pairing is LE Secure Connections, Just Works, without stored bonds.
+The window closes after 10 minutes, 10 s after the reader is authenticated with the server (so the web
+app can show the enrollment code and the approval like over serial), or on a reboot; closing frees all
+of NimBLE. While it is open the BLE proxy refuses to start (`bt-setup`, retryable); a bridge that is
+paired ignores the 3 s hold. If the proxy already holds NimBLE (a bridge unpaired at runtime), the setup
+fails to open until a reboot.
+
+**Serial setup.** The Bluetooth setup is the alternative that needs no open case. The classic ESP32 has no USB-Serial-JTAG. The console and the Serial Configurator
 protocol run on UART0 (GPIO1/3, 115200 8N1) through a 3.3 V USB-TTL adapter on the serial pads
 (`src/serial/console_io.hpp`). The micro-USB port only powers the S10.
 
