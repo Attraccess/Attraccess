@@ -36,8 +36,11 @@ export async function verifyPackedPlugin(
     const pkg = JSON.parse(readFileSync(join(extracted, 'package.json'), 'utf8'));
     validatePackageContract(pkg, hostVersion);
     validateLicenseFile(pkg, paths);
-    const manifestPath = join(root, 'plugin.json');
-    if (existsSync(manifestPath)) validatePermissionsMatch(pkg, JSON.parse(readFileSync(manifestPath, 'utf8')));
+    // Nx plugins copy plugin.json into the package dir; the examples keep it next to it.
+    const manifestPath = [join(root, 'plugin.json'), join(dirname(root), 'plugin.json')].find((path) =>
+      existsSync(path),
+    );
+    if (manifestPath) validatePermissionsMatch(pkg, JSON.parse(readFileSync(manifestPath, 'utf8')));
 
     for (const entry of Object.values(pkg.attraccess ?? {})) {
       if (typeof entry === 'string' && entry.includes('/') && !existsSync(join(extracted, entry))) {
