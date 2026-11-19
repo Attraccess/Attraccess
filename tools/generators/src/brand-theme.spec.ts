@@ -23,6 +23,12 @@ function contrast(first: string, second: string) {
   return (values[0] + 0.05) / (values[1] + 0.05);
 }
 
+function themeColors(theme: string) {
+  const split = tokens.indexOf('  .dark,');
+  const css = theme === 'light' ? tokens.slice(0, split) : tokens.slice(split);
+  return Object.fromEntries([...css.matchAll(/--([\w-]+):\s*(#[\da-f]{6});/gi)].map((match) => [match[1], match[2]]));
+}
+
 describe('Attraccess brand theme', () => {
   it('keeps the application, browser chrome, and installed app on the same brand color', () => {
     const accent = tokens.match(/--accent:\s*(#[\da-f]{6});/i)?.[1];
@@ -34,11 +40,7 @@ describe('Attraccess brand theme', () => {
   });
 
   it.each(['light', 'dark'])('keeps %s brand text and charts above WCAG AA contrast', (theme) => {
-    const split = tokens.indexOf('  .dark,');
-    const css = theme === 'light' ? tokens.slice(0, split) : tokens.slice(split);
-    const colors = Object.fromEntries(
-      [...css.matchAll(/--([\w-]+):\s*(#[\da-f]{6});/gi)].map((match) => [match[1], match[2]]),
-    );
+    const colors = themeColors(theme);
     for (const background of ['accent', 'accent-hover']) {
       expect(contrast(colors[background], colors['accent-foreground'])).toBeGreaterThanOrEqual(4.5);
     }
@@ -48,31 +50,54 @@ describe('Attraccess brand theme', () => {
   });
 
   it.each(['light', 'dark'])('keeps %s field borders above WCAG non-text contrast on every surface', (theme) => {
-    const split = tokens.indexOf('  .dark,');
-    const css = theme === 'light' ? tokens.slice(0, split) : tokens.slice(split);
-    const colors = Object.fromEntries(
-      [...css.matchAll(/--([\w-]+):\s*(#[\da-f]{6});/gi)].map((match) => [match[1], match[2]]),
-    );
-    const surfaces = ['background', 'surface', 'surface-secondary', 'surface-tertiary', 'overlay'];
+    const colors = themeColors(theme);
+    const surfaces = ['background', 'surface', 'surface-secondary', 'surface-tertiary', 'overlay', 'default'];
     for (const token of ['field-border', 'field-border-hover', ...surfaces]) {
       expect({ token, value: colors[token] }).toEqual({ token, value: expect.stringMatching(/^#/) });
     }
-    for (const border of ['field-border', 'field-border-hover']) {
-      for (const surface of surfaces) {
-        expect(contrast(colors[border], colors[surface])).toBeGreaterThanOrEqual(3);
-      }
-    }
+    const failures = ['field-border', 'field-border-hover'].flatMap((border) =>
+      surfaces
+        .map((surface) => ({ pair: `${border} on ${surface}`, ratio: contrast(colors[border], colors[surface]) }))
+        .filter(({ ratio }) => ratio < 3),
+    );
+    expect(failures).toEqual([]);
     expect(contrast(colors['field-border'], colors['field-border-hover'])).toBeGreaterThanOrEqual(1.4);
   });
 
+  it('keeps the Attractap display field border on the dark web token', () => {
+    const hex = themeColors('dark')['field-border'].slice(1).toUpperCase();
+    expect(read('apps/attractap/firmware/src/display/theme.hpp')).toContain(
+      `fieldBorder() { return lv_color_hex(0x${hex}); }`,
+    );
+  });
+
   it('leaves field borders to the shared tokens instead of component overrides', () => {
+    // Matches assignments (`--field-border:` in CSS or Tailwind, `'--field-border'` as a style key), not reads.
     const overrides = spawnSync(
       'git',
-      ['grep', '-l', '-E', 'field-border|border-width-field', '--', 'libs/*.ts', 'libs/*.tsx', 'apps/*.ts', 'apps/*.tsx'],
+      [
+        'grep',
+        '-n',
+        '-E',
+        '-e',
+        '--(color-field-border|field-border|border-width-field)[a-z-]*([\'"]|[[:space:]]*:)',
+        '--',
+        'libs/*.ts',
+        'libs/*.tsx',
+        'libs/*.css',
+        'apps/*.ts',
+        'apps/*.tsx',
+        'apps/*.css',
+        ':!libs/ui/src/tokens.css',
+      ],
       { cwd: root, encoding: 'utf8' },
     );
-    expect(overrides.status).toBe(1);
-    expect(overrides.stdout).toBe('');
+    expect({
+      status: overrides.status,
+      stdout: overrides.stdout,
+      stderr: overrides.stderr,
+      error: overrides.error,
+    }).toEqual({ status: 1, stdout: '', stderr: '', error: undefined });
   });
 
   it('shares tokens across both applications while following the system appearance by default', () => {
