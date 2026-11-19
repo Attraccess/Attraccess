@@ -6,6 +6,7 @@ import {
   DropdownMenu,
   DropdownPopover,
   DropdownTrigger,
+  Label,
   TableCell,
   TableRow,
   Tooltip,
@@ -49,7 +50,9 @@ export function PluginRow({ plugin, installed, onShowError, onShowDetails, onMan
               : t('status.licenseMissingRequired')}
           </p>
         ) : null}
-        {installed?.registryUrl ? <p className="mt-1 text-xs text-muted md:hidden">{installed.registryUrl}</p> : null}
+        {installed?.registryUrl ? (
+          <p className="mt-1 break-all text-xs text-muted md:hidden">{installed.registryUrl}</p>
+        ) : null}
       </TableCell>
       <TableCell>
         <Chip variant="soft" color="accent">
@@ -61,7 +64,9 @@ export function PluginRow({ plugin, installed, onShowError, onShowDetails, onMan
           </Chip>
         ) : null}
       </TableCell>
-      <TableCell className="hidden sm:table-cell">{plugin.pluginDirectory || '-'}</TableCell>
+      {/* npm directories are an opaque `npm-<base64>` token and registry URLs have no spaces: let both break anywhere so
+          they do not set the column's minimum width. */}
+      <TableCell className="hidden sm:table-cell break-all">{plugin.pluginDirectory || '-'}</TableCell>
       <TableCell className="hidden sm:table-cell">
         {plugin.permissions && plugin.permissions.length > 0 ? (
           <div className="flex flex-wrap gap-1" data-cy={`plugins-list-permissions-${plugin.id}`}>
@@ -75,7 +80,9 @@ export function PluginRow({ plugin, installed, onShowError, onShowDetails, onMan
           <span className="text-muted">{t('noPermissions')}</span>
         )}
       </TableCell>
-      <TableCell className="hidden md:table-cell text-xs text-muted">{installed?.registryUrl ?? '-'}</TableCell>
+      <TableCell className="hidden md:table-cell break-all text-xs text-muted">
+        {installed?.registryUrl ?? '-'}
+      </TableCell>
       <TableCell>
         {plugin.status === 'error' ? (
           <button
@@ -148,7 +155,7 @@ export function PluginRow({ plugin, installed, onShowError, onShowDetails, onMan
                     data-cy={`plugins-list-details-button-${plugin.id}`}
                   >
                     <Info size={16} />
-                    {t('marketplace.details')}
+                    <Label>{t('marketplace.details')}</Label>
                   </DropdownItem>
                 ) : null}
                 {installed ? (
@@ -158,7 +165,7 @@ export function PluginRow({ plugin, installed, onShowError, onShowDetails, onMan
                     data-cy={`plugins-list-manage-version-button-${plugin.id}`}
                   >
                     <History size={16} />
-                    {t('manageVersion')}
+                    <Label>{t('manageVersion')}</Label>
                   </DropdownItem>
                 ) : null}
                 <DropdownItem
@@ -167,8 +174,9 @@ export function PluginRow({ plugin, installed, onShowError, onShowDetails, onMan
                   onPress={() => onDelete(plugin.id)}
                   data-cy={`plugins-list-delete-plugin-button-${plugin.id}`}
                 >
-                  <Trash2 size={16} />
-                  {t('deleteTooltip')}
+                  {/* The danger variant colours only the item's Label slot, so the icon takes the colour itself. */}
+                  <Trash2 size={16} className="text-danger" />
+                  <Label>{t('deleteTooltip')}</Label>
                 </DropdownItem>
               </DropdownMenu>
             </DropdownPopover>

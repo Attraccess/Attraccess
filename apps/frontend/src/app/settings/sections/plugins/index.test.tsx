@@ -76,6 +76,21 @@ describe('PluginsSection', () => {
     await user.click(screen.getByRole('button', { name: 'Actions for Cool Plugin' }));
     const items = await screen.findAllByRole('menuitem');
     expect(items.map((item) => item.textContent)).toEqual(['Remove plugin']);
+    // HeroUI's danger variant colours only the item's label slot: plain text would stay in the default colour.
+    expect(items[0].querySelector('[data-slot="label"]')).toHaveTextContent('Remove plugin');
+  });
+
+  it('returns focus to the row actions trigger when its menu closes', async () => {
+    hoisted.plugins = [makePlugin()];
+    const user = userEvent.setup();
+    renderWithQuery(<PluginsSection />);
+
+    const trigger = screen.getByRole('button', { name: 'Actions for Cool Plugin' });
+    await user.click(trigger);
+    await screen.findAllByRole('menuitem');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+    expect(trigger).toHaveFocus();
   });
 
   it('checks marketplace plugins for updates and takes the admin to the in-place update flow', async () => {
