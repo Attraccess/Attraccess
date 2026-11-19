@@ -45,7 +45,10 @@ export function postgresConnectionOptions(config: PostgresConfig = parsePostgres
       application_name: 'attraccess',
       options:
         `-c timezone=UTC -c lock_timeout=${POSTGRES_LOCK_TIMEOUT_MS} ` +
-        `-c idle_in_transaction_session_timeout=${IDLE_IN_TRANSACTION_TIMEOUT_MS}`,
+        `-c idle_in_transaction_session_timeout=${IDLE_IN_TRANSACTION_TIMEOUT_MS} ` +
+        // The baseline migration, its triggers and the plugin storage DDL use unqualified names: the search_path
+        // decides which schema they land in. The schema is a validated identifier, quoted to keep its case.
+        `-c search_path="${config.schema}"`,
     },
   } as DataSourceOptions;
 }
@@ -91,7 +94,10 @@ function isStartupTransient(error: unknown): boolean {
     code === 'ETIMEDOUT' ||
     code === 'ECONNRESET' ||
     code === '57P03' || // the database system is starting up
-    code === '53300'
+    code === '53300' ||
+    // A published port (docker-proxy, a load balancer) accepts the TCP connection before PostgreSQL listens and then
+    // drops it; node-postgres reports that, and its own connect timeout, without an error code.
+    /Connection terminated (unexpectedly|due to connection timeout)/.test((error as Error | undefined)?.message ?? '')
   );
 }
 
@@ -109,7 +115,20 @@ async function probe(config: PostgresConfig): Promise<void> {
   });
   client.on('error', () => undefined);
   await client.connect();
-  await client.end();
+  try {
+    await ensureSchema(client, config.schema);
+  } finally {
+    await client.end();
+  }
+}
+
+/** DATABASE_SCHEMA other than `public` is created when missing (the role needs CREATE on the database then). */
+async function ensureSchema(client: Client, schema: string): Promise<void> {
+  if (schema === 'public') return;
+  const { rowCount } = await client.query('SELECT 1 FROM pg_namespace WHERE nspname = $1', [schema]);
+  if (rowCount) return;
+  await client.query(`CREATE SCHEMA IF NOT EXISTS "${schema}"`);
+  logger.log(`Created the database schema "${schema}"`);
 }
 
 /**

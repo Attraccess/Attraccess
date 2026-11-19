@@ -4,7 +4,8 @@ export type DatabaseType = (typeof SUPPORTED_DATABASE_TYPES)[number];
 export const DEFAULT_DATABASE_TYPE: DatabaseType = 'postgres';
 
 /** Where the upgrade from SQLite is described. */
-export const UPGRADE_DOCS_URL = 'https://docs.attraccess.org/installation/updating#moving-from-sqlite-to-postgresql';
+export const UPGRADE_DOCS_URL =
+  'https://docs.attraccess.org/#/en/installation/updating?id=moving-from-sqlite-to-postgresql';
 
 export class UnsupportedDatabaseTypeError extends Error {
   constructor(readonly received: string) {

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { UPGRADE_DOCS_URL as POSTGRES_CONFIG_DOCS_URL } from '../postgres/postgres-config';
 import { postgresBackend } from '../postgres/postgres-backend';
 import { UPGRADE_DOCS_URL } from './database-type';
 import { parseDatabaseType, resolveDatabaseBackend, UnsupportedDatabaseTypeError } from './resolve-database-backend';
@@ -25,6 +28,22 @@ describe('database backend selection', () => {
     expect(() => resolveDatabaseBackend({ DATABASE_TYPE: 'sqlite' })).toThrow(UPGRADE_DOCS_URL);
     // Any spelling of the value is refused, and the docs are linked.
     expect(() => resolveDatabaseBackend({ DATABASE_TYPE: ' SQLite ' })).toThrow(UPGRADE_DOCS_URL);
+  });
+
+  it('links a page and heading that exist in the hash-routed docs site', () => {
+    // docs.attraccess.org is a docsify single-page app: only `/#/<lang>/<page>?id=<heading>` resolves, a path URL is a 404.
+    expect(UPGRADE_DOCS_URL).toBe(POSTGRES_CONFIG_DOCS_URL);
+    const [, route, id] = /^https:\/\/docs\.attraccess\.org\/#\/en\/(.+)\?id=(.+)$/.exec(UPGRADE_DOCS_URL) ?? [];
+    expect(route).toBe('installation/updating');
+    const page = readFileSync(join(__dirname, '../../../../../docs/en', `${route}.md`), 'utf8');
+    const slugs = [...page.matchAll(/^#{2,4} (.+)$/gm)].map(([, heading]) =>
+      heading
+        .toLowerCase()
+        .replace(/[^a-z0-9 -]/g, '')
+        .trim()
+        .replace(/ +/g, '-'),
+    );
+    expect(slugs).toContain(id);
   });
 
   it('rejects another unsupported type naming the supported values and the docs', () => {

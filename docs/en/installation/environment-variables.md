@@ -51,13 +51,13 @@ In containers, give the API write access to the file path and mount its director
 
 Attraccess stores all data in PostgreSQL. There is no other runtime database: SQLite is only read once when an existing 1.x installation is moved, see [Updating](installation/updating.md#moving-from-sqlite-to-postgresql).
 
-| Variable             | Default    | Description                                                                                                                                                                                              |
-| -------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`       | –          | **Required.** Connection URL of the PostgreSQL database, e.g. `postgres://user:password@postgres:5432/attraccess`. Percent-encode special characters in the password.                                     |
-| `DATABASE_SSL`       | `off`      | TLS to PostgreSQL: `off`, `require`, `verify-ca` or `verify-full`. `true` and `1` mean `require`; `false` and `0` mean `off`.                                                                            |
-| `DATABASE_POOL_MAX`  | `10`       | Maximum connections in the pool of one API process, an integer from 1 to 500. Keep it below the `max_connections` of the server divided by the number of API instances.                                   |
-| `DATABASE_SCHEMA`    | `public`   | PostgreSQL schema that holds the tables. A plain SQL identifier.                                                                                                                                         |
-| `DATABASE_TYPE`      | `postgres` | Database engine. Only `postgres` is supported. `sqlite` stops the start with a message that links to the [upgrade guide](installation/updating.md); any other value also stops the start.                |
+| Variable            | Default    | Description                                                                                                                                                                                                                     |
+| ------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`      | –          | **Required.** Connection URL of the PostgreSQL database, e.g. `postgres://user:password@postgres:5432/attraccess`. Percent-encode special characters in the password.                                                           |
+| `DATABASE_SSL`      | `off`      | TLS to PostgreSQL: `off`, `require`, `verify-ca` or `verify-full`. `true` and `1` mean `require`; `false` and `0` mean `off`.                                                                                                   |
+| `DATABASE_POOL_MAX` | `10`       | Maximum connections in the pool of one API process, an integer from 1 to 500. Keep it below the `max_connections` of the server divided by the number of API instances.                                                         |
+| `DATABASE_SCHEMA`   | `public`   | PostgreSQL schema that holds the tables and the migrations table. A plain SQL identifier. A schema other than `public` is created on start when it is missing (the database user needs the `CREATE` privilege on the database). |
+| `DATABASE_TYPE`     | `postgres` | Database engine. Only `postgres` is supported. `sqlite` stops the start with a message that links to the [upgrade guide](installation/updating.md); any other value also stops the start.                                       |
 
 A missing or invalid setting stops the start with a clear message that never contains the password. The image does not include PostgreSQL: run it as its own service (all shipped Compose files already contain one, pinned to `postgres:18.6-alpine`). See [Backup & Restore](installation/backup-restore.md) for backing it up.
 
@@ -67,13 +67,13 @@ See [Adding a Database Backend](developer/adding-a-database-backend.md) for the 
 
 The balena stack contains a `backup` service that backs up the database and the volumes with restic. It is configured with the variables below, see [Backup & Restore](installation/backup-restore.md#balena-restic-sidecar).
 
-| Variable                                                  | Default     | Description                                                                          |
-| --------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------ |
-| `BACKUP_REPOSITORY`                                       | –           | restic repository, e.g. `s3:s3.amazonaws.com/bucket/attraccess`. Without it no backup runs. |
-| `BACKUP_PASSWORD`                                         | –           | Encrypts the repository. Required; without it the backups cannot be read.            |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `B2_*`, … | –           | Credentials of the backup target, passed to restic unchanged.                        |
-| `BACKUP_SCHEDULE`                                         | `0 3 * * *` | Cron expression (5 fields); by default every night at 03:00.                         |
-| `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_KEEP_MONTHLY` | `7`, `4`, `6` | How many daily, weekly and monthly snapshots are kept.                       |
+| Variable                                                         | Default       | Description                                                                                 |
+| ---------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------- |
+| `BACKUP_REPOSITORY`                                              | –             | restic repository, e.g. `s3:s3.amazonaws.com/bucket/attraccess`. Without it no backup runs. |
+| `BACKUP_PASSWORD`                                                | –             | Encrypts the repository. Required; without it the backups cannot be read.                   |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `B2_*`, …          | –             | Credentials of the backup target, passed to restic unchanged.                               |
+| `BACKUP_SCHEDULE`                                                | `0 3 * * *`   | Cron expression (5 fields); by default every night at 03:00.                                |
+| `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_KEEP_MONTHLY` | `7`, `4`, `6` | How many daily, weekly and monthly snapshots are kept.                                      |
 
 ## Storage
 
@@ -111,10 +111,10 @@ The balena stack contains a `backup` service that backs up the database and the 
 
 ## Session
 
-| Variable                 | Default     | Description                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AUTH_SESSION_SECRET`    | –           | **Required.** Secret key for session encryption                                                                                                                                                                                                                                                                                                             |
-| `SESSION_COOKIE_MAX_AGE` | `604800000` | Maximum session duration in milliseconds (default: 7 days)                                                                                                                                                                                                                                                                                                  |
+| Variable                 | Default     | Description                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AUTH_SESSION_SECRET`    | –           | **Required.** Secret key for session encryption                                                                                                                                                                                                                                                                                                                     |
+| `SESSION_COOKIE_MAX_AGE` | `604800000` | Maximum session duration in milliseconds (default: 7 days)                                                                                                                                                                                                                                                                                                          |
 | `VALKEY_URL`             | –           | Connection URL for a Valkey/Redis-compatible session store (e.g. `redis://valkey:6379`). When set, sessions are stored in Valkey with native TTL instead of PostgreSQL — required for horizontal scaling. Falls back to PostgreSQL when unset. Accepts any `ioredis`-compatible URL including `rediss://` (TLS), Redis Cluster, Sentinel, ElastiCache, and Upstash. |
 
 > [!NOTE]

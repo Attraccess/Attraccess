@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import type { DataSource } from 'typeorm';
 import type { PostgresConfig } from './postgres-config';
-import { initializeWithRetry, waitForPostgres } from './postgres-connection';
+import { initializeWithRetry, postgresConnectionOptions, waitForPostgres } from './postgres-connection';
 
 const SECRET_URL = 'postgres://someone:hunter2@db.internal:5432/attraccess';
 const config = { url: SECRET_URL, ssl: 'off', poolMax: 1, schema: 'public' } as PostgresConfig;
@@ -43,6 +43,15 @@ describe('postgres startup retry', () => {
       expect(initialize).toHaveBeenCalledTimes(11);
       expect(sleep.mock.calls.map(([ms]) => ms)).toEqual([250, 500, 1000, 2000, 4000, 5000, 5000, 5000, 5000, 5000]);
       expect(warn).toHaveBeenCalledTimes(10);
+    });
+
+    it('retries a connection the proxy of a starting container dropped (no error code)', async () => {
+      const { source, initialize } = sourceFailing([
+        new Error('Connection terminated unexpectedly'),
+        new Error('Connection terminated due to connection timeout'),
+      ]);
+      await expect(initializeWithRetry(source, { sleep })).resolves.toBe(source);
+      expect(initialize).toHaveBeenCalledTimes(3);
     });
 
     it('recognises a transient code on the wrapped driver error', async () => {
@@ -123,6 +132,23 @@ describe('postgres startup retry', () => {
     it('reports the error class when the failure has no code', async () => {
       const connect = jest.fn().mockRejectedValue(new RangeError('x'));
       await expect(waitForPostgres(config, { connect, sleep })).rejects.toThrow('x');
+    });
+  });
+
+  describe('postgresConnectionOptions', () => {
+    const startupOptions = (schema: string) =>
+      String((postgresConnectionOptions({ ...config, schema }) as { extra: { options: string } }).extra.options);
+
+    it('puts the session in the configured schema so unqualified DDL (baseline, triggers, plugin storage) lands there', () => {
+      expect(startupOptions('qa_schema')).toContain('-c search_path="qa_schema"');
+      expect(startupOptions('QaMixed')).toContain('-c search_path="QaMixed"');
+      expect(startupOptions('public')).toContain('-c search_path="public"');
+    });
+
+    it('keeps the UTC session and the lock timeouts', () => {
+      expect(startupOptions('public')).toMatch(
+        /-c timezone=UTC -c lock_timeout=\d+ -c idle_in_transaction_session_timeout=\d+/,
+      );
     });
   });
 });
