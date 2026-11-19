@@ -56,8 +56,33 @@ Bewahren Sie die Datei privat auf. Mit `esptool.py --chip esp32 --port <port> wr
 5. Ziehen Sie die Micro-USB-Stromversorgung ab und stecken Sie sie wieder ein, **ohne** GPIO0 zu halten. Er startet jetzt die Bridge-Firmware.
 6. Klicken Sie auf **Einrichtung fortsetzen**. Die Seite geht auf demselben Port in die Konfiguration über. Legen Sie die PIN, das WLAN (optional) und die API-URL Ihres Attraccess-Servers fest.
 
+Sie können Schritt 6 auch auslassen, den Adapter abziehen, das Gehäuse schließen und die Bridge stattdessen über Bluetooth einrichten (siehe unten).
+
 > [!NOTE]
 > Ein Weg, die Bridge aus der Original-Firmware von GL.iNet heraus über das Netzwerk zu installieren, ist nicht bekannt. Für das erste Flashen brauchen Sie den seriellen Adapter.
+
+## Einrichtung über Bluetooth
+
+Eine noch nicht gekoppelte Bridge (frisch geflasht oder nach einem Werksreset) lässt sich im Browser über Bluetooth einrichten, ohne das Gehäuse zu öffnen.
+
+1. Halten Sie die Taste am Gehäuse **3 Sekunden** gedrückt. Nach 3 Sekunden blinken alle LEDs schnell; lassen Sie die Taste dann los (nach 10 Sekunden würde die Bridge auf Werkseinstellungen zurückgesetzt).
+2. Die **BT**-LED blinkt jetzt alle 1,5 Sekunden zweimal kurz: Die Einrichtung ist 10 Minuten lang offen.
+3. Öffnen Sie in Attraccess **Geräte** > **Attractap-Lesegeräte**, wählen Sie **Attractap einrichten** und klicken Sie auf **Über Bluetooth einrichten**.
+4. Wählen Sie in der Geräteliste des Browsers **Attractap Bridge XXXX**. Ihr Computer oder Smartphone koppelt sich beim ersten Befehl mit der Bridge; bestätigen Sie die Kopplungsabfrage, falls eine erscheint. Solange der Browser verbunden ist, leuchtet die BT-LED dauerhaft.
+5. Legen Sie die PIN, das WLAN (mit Ethernet optional) und den Server fest und geben Sie die Bridge dann mit dem angezeigten Code frei.
+
+Die Einrichtung schließt nach 10 Minuten, etwa 10 Sekunden nachdem die Bridge gekoppelt ist, oder bei einem Neustart der Bridge. Von selbst öffnet sie nicht wieder. Bei einer bereits gekoppelten Bridge bewirkt das 3-Sekunden-Halten nichts.
+
+Die Verbindung ist verschlüsselt (Bluetooth LE Secure Connections); das WLAN-Passwort wird also nie im Klartext übertragen. Es gelten dieselben PIN-Regeln wie über die serielle Schnittstelle.
+
+| Browser                                      | Einrichtung über Bluetooth                          |
+| -------------------------------------------- | --------------------------------------------------- |
+| Chrome oder Edge unter Windows, macOS, Linux | Unterstützt                                         |
+| Chrome unter Android                         | Unterstützt                                         |
+| Firefox, Safari, jeder Browser unter iOS     | Nicht unterstützt: Nutzen Sie den seriellen Adapter |
+
+> [!NOTE]
+> Die Seite muss über HTTPS (oder `localhost`) geöffnet sein; Browser bieten Bluetooth nur sicheren Seiten an.
 
 ## Einrichtung und Kopplung
 
@@ -79,29 +104,32 @@ Ethernet (mit PoE) ist die bevorzugte Verbindung.
 
 Die drei LEDs sitzen auf der Vorderseite des S10.
 
-| LED          | Zustand        | Bedeutung                                           |
-| ------------ | -------------- | --------------------------------------------------- |
-| **Power**    | An             | Die Firmware läuft                                  |
-| **Netzwerk** | An             | Mit Attraccess verbunden                            |
-| **Netzwerk** | Blinkt langsam | Netzwerk steht, aber keine Verbindung zu Attraccess |
-| **Netzwerk** | Blinkt schnell | Kein Netzwerk                                       |
-| **BT**       | An             | Ein Plugin hat eine offene Bluetooth-Verbindung     |
-| **BT**       | Blinkt         | Ein Scan oder eine Advertisement-Beobachtung läuft  |
-| **BT**       | Aus            | Leerlauf                                            |
+| LED          | Zustand                      | Bedeutung                                                      |
+| ------------ | ---------------------------- | -------------------------------------------------------------- |
+| **Power**    | An                           | Die Firmware läuft                                             |
+| **Netzwerk** | An                           | Mit Attraccess verbunden                                       |
+| **Netzwerk** | Blinkt langsam               | Netzwerk steht, aber keine Verbindung zu Attraccess            |
+| **Netzwerk** | Blinkt schnell               | Kein Netzwerk                                                  |
+| **BT**       | An                           | Ein Plugin hat eine offene Bluetooth-Verbindung                |
+| **BT**       | Blinkt                       | Ein Scan oder eine Advertisement-Beobachtung läuft             |
+| **BT**       | Blinkt doppelt               | Die Bluetooth-Einrichtung ist offen und wartet auf den Browser |
+| **BT**       | An (während der Einrichtung) | Der Browser ist mit der Bluetooth-Einrichtung verbunden        |
+| **BT**       | Aus                          | Leerlauf                                                       |
 
 ## Taste
 
 Die Taste ist die Reset-Taste am Gehäuse, nicht GPIO0.
 
-| Aktion                 | Ergebnis                                            |
-| ---------------------- | --------------------------------------------------- |
-| **Kurz drücken**       | Die Bridge startet neu                              |
-| **10 Sekunden halten** | Werksreset: löscht WLAN, API-URL und Kopplungsdaten |
+| Aktion                 | Ergebnis                                                                                      |
+| ---------------------- | --------------------------------------------------------------------------------------------- |
+| **Kurz drücken**       | Die Bridge startet neu                                                                        |
+| **3 Sekunden halten**  | Öffnet die Bluetooth-Einrichtung für 10 Minuten (nur bei einer noch nicht gekoppelten Bridge) |
+| **10 Sekunden halten** | Werksreset: löscht WLAN, API-URL und Kopplungsdaten                                           |
 
-Nach 2 Sekunden blinken alle drei LEDs schnell. Lassen Sie die Taste vor Ablauf der 10 Sekunden los, um abzubrechen. Nach 10 Sekunden läuft der Werksreset: Alle LEDs leuchten, und die Bridge startet unkonfiguriert neu.
+Nach 3 Sekunden blinken alle drei LEDs schnell. Lassen Sie die Taste zwischen 3 und 10 Sekunden los, öffnet sich die Bluetooth-Einrichtung. Nach 10 Sekunden läuft der Werksreset: Alle LEDs leuchten, und die Bridge startet unkonfiguriert neu.
 
 > [!WARNING]
-> Nach einem Werksreset muss die Bridge erneut über die serielle Schnittstelle eingerichtet werden. Dafür müssen Sie das Gehäuse wieder öffnen. Außerdem muss sie neu gekoppelt werden.
+> Nach einem Werksreset muss die Bridge neu eingerichtet (über Bluetooth oder bei geöffnetem Gehäuse über die serielle Schnittstelle) und neu gekoppelt werden.
 
 ## Montage und Bluetooth-Reichweite
 
@@ -121,7 +149,7 @@ Die Bridge läuft **ohne** das Attractap-Sicherheitsprofil: ohne Secure Boot, oh
 - Wenn Ihre Installation für Leser auf das Sicherheitsprofil setzt (siehe [Reader-Sicherheit](attractap/reader-security.md)), beachten Sie, dass Bridges es nicht haben.
 - Wer physischen Zugriff auf eine Bridge hat, kann ihren Flash auslesen, einschließlich ihrer Kopplungsdaten. Montieren Sie Bridges so, dass sie nicht einfach mitgenommen werden können. Geht eine Bridge verloren, entfernen Sie ihre Kopplung in Attraccess.
 
-Secure Boot für die Bridge ist geplant. Es setzt die ESP32-Chiprevision v3.0 oder neuer voraus.
+Secure Boot für die Bridge ist geplant. Es setzt die ESP32-Chiprevision v3.0 oder neuer voraus; Geräte mit älterem Chip (zum Beispiel Revision v1.0) können es nie bekommen.
 
 ## Siehe auch
 
