@@ -338,8 +338,11 @@ def test_refused_card_is_answered_once_per_presentation(reader, resource, emulat
             time.sleep(0.4)
         assert console.since(mark).count(verdict) == 1, console.since(mark)[-800:]
         assert "Refused card still present, ignored" in console.since(mark), console.since(mark)[-800:]
-        # Away for at least 2 s: checked again, one more answer.
+        # Away for at least 2 s: checked again, one more answer. Back on the resource list first, so
+        # the presentation does not land while "Sign-in failed" closes by itself (after 6 s).
         emulator.command("remove")
+        dismiss_popup(hooks)
+        wait_idle(hooks)
         time.sleep(2.6)
         present(emulator, "alice")
         deadline = time.monotonic() + 20

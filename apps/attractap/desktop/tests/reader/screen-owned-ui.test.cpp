@@ -108,18 +108,19 @@ void ReaderWorkflow::testScreenOwnedUi()
     server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_AUTHENTICATION_FAILED","username":"Wrong card","language":"de"})"); pump();
     assert(lv_screen_active() == Display::statusScreen.getScreen() && label(lv_screen_active(), "Anmeldung fehlgeschlagen"));
     display.capture(output, "sign-in-failed");
-    // A card tapped meanwhile dismisses it and signs in as usual.
-    // (The refused card itself is ignored until it was away for 2 s: ATT-882.)
+    // Another card tapped meanwhile dismisses it at once and signs in as usual. (The refused card
+    // itself is ignored until it was away for 2 s: ATT-882.)
     const auto requests = server.count("CARD_DETECTED");
-    nfc.setPresent(0, false); pump(2100); nfc.setPresent(0, true); pump();
+    nfc.setPresent(0, false); pump(); nfc.setPresent(1, true); pump();
     assert(lv_screen_active() != Display::statusScreen.getScreen());
     assert(server.count("CARD_DETECTED") == requests + 1);
-    nfc.setPresent(0, false); pump();
+    nfc.setPresent(1, false); pump();
     server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_REMOVED"})"); pump();
     assert(lv_screen_active() == Display::statusScreen.getScreen() && label(lv_screen_active(), "Karte zu früh entfernt"));
     clearStatus();
     assert(lv_screen_active() == Display::lockscreen.getScreen());
     click(LV_SYMBOL_LEFT);
+    pump(2100); // the refused card 0 signs in next: away for 2 s first
     login();
 
     // The project list could not be loaded: the list area says so and offers another try.

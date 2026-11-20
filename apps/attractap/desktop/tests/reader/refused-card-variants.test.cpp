@@ -143,7 +143,7 @@ void ReaderWorkflow::testRefusedCardVariants()
     pump(250);
     nfc.setPresent(1, false); pump(); list();
     refuse("CARD_NOT_FOUND", true); // A's verdict, far too late: B is signed in
-    assert(hostErrorBeepCount == beeps && label(lv_screen_active(), "Abmelden"));
+    assert(hostErrorBeepCount == beeps && State::getApiState().userAuthenticated);
     click("Abmelden");
     nfc.setPresent(1, true); pump(); // B again at once: checked, not suppressed
     assert(server.count("CARD_DETECTED") == detected + 3);
