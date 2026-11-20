@@ -9,6 +9,7 @@ import {
   type TableSnapshot,
 } from '../transfer-snapshot';
 import { postgresBackend } from './postgres-backend';
+import { MissingTargetStorageError } from './postgres-transfer';
 
 jest.setTimeout(120_000);
 
@@ -152,6 +153,42 @@ describe('postgres transfer (persistence)', () => {
       }
     });
 
+    it('leaves every sequence where it was when an import over existing data fails at the commit', async () => {
+      await transfer.importSnapshot(target, snapshot, { plugins: [PLUGIN] });
+      await target.query(`INSERT INTO "user" (id, username, email) VALUES (500, 'late', 'late@example.com')`);
+      await target.query(`SELECT setval(pg_get_serial_sequence('"user"', 'id'), 500)`);
+      const sequences = async () =>
+        Object.fromEntries(
+          await Promise.all(
+            (
+              await target.query(
+                `SELECT sequencename AS name FROM pg_sequences WHERE schemaname = current_schema() ORDER BY 1`,
+              )
+            ).map(async ({ name }: { name: string }) => {
+              const [state] = await target.query(`SELECT last_value::text AS v, is_called FROM "${name}"`);
+              return [name, `${state.v}/${state.is_called}`];
+            }),
+          ),
+        );
+      const before = await sequences();
+      // Checked only at the commit, after the sequences were set: both entries of this snapshot share a note.
+      const clash = clone(snapshot);
+      const note = column(clash, ENTRY_TABLE, 'note');
+      for (const row of tableOf(clash, ENTRY_TABLE).rows) row[note] = 'same';
+      await target.query(
+        `ALTER TABLE "${ENTRY_TABLE}" ADD CONSTRAINT probe_note UNIQUE (note) DEFERRABLE INITIALLY DEFERRED`,
+      );
+      try {
+        await expect(transfer.importSnapshot(target, clash, { plugins: [PLUGIN] })).rejects.toThrow(/probe_note/);
+        expect(await sequences()).toEqual(before);
+        expect(before['user_id_seq']).toBe('500/true');
+        expect(await usernames(target)).toEqual(['ada', 'bob', 'late']);
+      } finally {
+        await target.query(`ALTER TABLE "${ENTRY_TABLE}" DROP CONSTRAINT probe_note`);
+      }
+      await transfer.importSnapshot(target, snapshot, { plugins: [PLUGIN] });
+    });
+
     describe('refusals, which change nothing', () => {
       const refuses = async (bad: DatabaseSnapshot, message: RegExp | string, plugins = [PLUGIN]) => {
         await transfer.importSnapshot(target, snapshot, { plugins: [PLUGIN] });
@@ -238,6 +275,27 @@ describe('postgres transfer (persistence)', () => {
           ],
         };
         await refuses(foreign, 'data of a plugin that is not installed, or a table of an older release');
+      });
+
+      it('every snapshot table the database does not have at once, with the row counts of the snapshot', async () => {
+        const foreign: DatabaseSnapshot = {
+          ...snapshot,
+          backend: 'sqlite',
+          tables: [
+            ...snapshot.tables,
+            { name: 'plugin_gone_a', columns: [{ name: 'id', kind: 'integer' }], rows: [[1], [2]] },
+            { name: 'plugin_gone_b', columns: [], rows: [] },
+          ],
+        };
+        const error = (await refuses(
+          foreign,
+          'The database has no table plugin_gone_a, plugin_gone_b',
+        )) as MissingTargetStorageError;
+        expect(error).toBeInstanceOf(MissingTargetStorageError);
+        expect(error.tables).toEqual([
+          { name: 'plugin_gone_a', rows: 2 },
+          { name: 'plugin_gone_b', rows: 0 },
+        ]);
       });
 
       it('a row that breaks a unique constraint: names table, row and constraint, never the data', async () => {

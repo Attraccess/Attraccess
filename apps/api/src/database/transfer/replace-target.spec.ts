@@ -3,6 +3,7 @@ import type { PostgresConfig } from '../postgres/postgres-config';
 import {
   API_APPLICATION_NAME,
   assertNoRunningApi,
+  IDLE_API_WARNING,
   logReplacedTables,
   TRANSFER_APPLICATION_NAME,
 } from './replace-target';
@@ -26,8 +27,8 @@ describe('replacing the target with transfer-sqlite --force', () => {
     expect(error).toBeInstanceOf(SqliteTransferError);
     expect(error.outcome).toBe('refused');
     expect(error.message).toContain(
-      '2 connection(s) of a running Attraccess API use the PostgreSQL database; stop every API instance before ' +
-        'replacing its data with --force. Nothing was changed',
+      '2 connection(s) of a running Attraccess API use the PostgreSQL database right now; stop every API instance ' +
+        'before replacing its data with --force. Nothing was changed',
     );
     expect(query).toHaveBeenCalledWith(expect.stringContaining('pg_backend_pid()'), [API_APPLICATION_NAME]);
   });
@@ -54,5 +55,8 @@ describe('replacing the target with transfer-sqlite --force', () => {
       '--force: deleting the content of 3 table(s) of the PostgreSQL database and replacing it with the SQLite ' +
         'data: audit_log, plugin_ledger_entry, user',
     );
+    // The connection check cannot see an idle API: the operator is told so before anything is deleted.
+    expect(warn).toHaveBeenNthCalledWith(1, IDLE_API_WARNING);
+    expect(IDLE_API_WARNING).toContain('no API connection is open right now');
   });
 });

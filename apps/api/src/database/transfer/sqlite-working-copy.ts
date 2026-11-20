@@ -15,11 +15,30 @@ export interface WorkingCopy {
   remove(): Promise<void>;
 }
 
-async function exists(path: string): Promise<boolean> {
-  return stat(path).then(
-    () => true,
-    () => false,
-  );
+/** Error codes that mean "there is no such file"; ENOTDIR: a path component is a file, so nothing can be below it. */
+const ABSENT = new Set(['ENOENT', 'ENOTDIR']);
+
+/**
+ * Whether a file exists. Only "no such file" counts as absent: a storage mount that cannot be read (EACCES, EIO) must
+ * stop the caller, never look like an installation without SQLite data or a database without a hot journal.
+ */
+export async function fileExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException)?.code;
+    if (code && ABSENT.has(code)) return false;
+    throw new Error(
+      `cannot tell whether ${path} exists (${code ?? safeErrorName(error)}); make the storage directory readable by ` +
+        'the API',
+      { cause: error },
+    );
+  }
+}
+
+function safeErrorName(error: unknown): string {
+  return error instanceof Error ? error.name : 'unknown error';
 }
 
 async function assertSqliteFile(path: string): Promise<void> {
@@ -45,7 +64,7 @@ export async function copyToWorkingDirectory(original: string): Promise<WorkingC
   try {
     await copyFile(original, file);
     for (const suffix of SIDE_FILES) {
-      if (await exists(original + suffix)) await copyFile(original + suffix, file + suffix);
+      if (await fileExists(original + suffix)) await copyFile(original + suffix, file + suffix);
     }
   } catch (error) {
     await rm(directory, { recursive: true, force: true });
@@ -84,9 +103,9 @@ export async function markMigrated(original: string, now: Date = new Date()): Pr
     .replace(/\.\d+Z$/, 'Z');
   const target = `${original}.migrated-to-postgres-${stamp}`;
   const sides: string[] = [];
-  for (const suffix of SIDE_FILES) if (await exists(original + suffix)) sides.push(suffix);
+  for (const suffix of SIDE_FILES) if (await fileExists(original + suffix)) sides.push(suffix);
   for (const name of [target, ...sides.map((suffix) => target + suffix)]) {
-    if (await exists(name)) throw new Error(`${name} already exists; the SQLite file was not renamed`);
+    if (await fileExists(name)) throw new Error(`${name} already exists; the SQLite file was not renamed`);
   }
   const pairs = [[original, target] as const, ...sides.map((suffix) => [original + suffix, target + suffix] as const)];
   if (await linkAll(pairs)) {

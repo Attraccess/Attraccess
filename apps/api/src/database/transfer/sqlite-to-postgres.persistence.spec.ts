@@ -253,6 +253,52 @@ describe('SQLite -> PostgreSQL transfer (persistence)', () => {
     }
   });
 
+  describe('tables of the SQLite data that no installed plugin creates', () => {
+    const addTables = (sql: string) => {
+      const sqlite = new Database(workspace.file);
+      sqlite.exec(sql);
+      sqlite.close();
+    };
+
+    it('leaves empty ones behind with a warning naming them, and transfers the rest', async () => {
+      addTables(`CREATE TABLE plugin_gone_entry (id integer PRIMARY KEY, note text);
+        CREATE TABLE plugin_migrations_gone (id integer PRIMARY KEY, timestamp bigint, name varchar)`);
+
+      await run({ markMigrated: false });
+
+      expect(await usernames(target.source)).toEqual(['ada', 'bob']);
+      expect(warnings).toContain(
+        'Not imported: empty tables of the SQLite data that no installed plugin creates: plugin_gone_entry, ' +
+          'plugin_migrations_gone.',
+      );
+    });
+
+    it('refuses once, naming every one that holds rows with its row count, and imports nothing', async () => {
+      addTables(`CREATE TABLE plugin_gone_entry (id integer PRIMARY KEY);
+        INSERT INTO plugin_gone_entry (id) VALUES (1), (2);
+        CREATE TABLE legacy_notes (id integer PRIMARY KEY);
+        INSERT INTO legacy_notes (id) VALUES (1);
+        CREATE TABLE plugin_gone_empty (id integer PRIMARY KEY)`);
+      const before = await sha256(workspace.file);
+
+      const error = await run().catch((e) => e);
+
+      expect(error).toBeInstanceOf(SqliteTransferError);
+      expect(error.step).toBe('importing into PostgreSQL');
+      expect(error.cause).toBeInstanceOf(postgresTransfer.MissingTargetStorageError);
+      expect(error.cause.tables).toEqual([
+        { name: 'legacy_notes', rows: 1 },
+        { name: 'plugin_gone_entry', rows: 2 },
+      ]);
+      expect(warnings).toEqual([
+        'Not imported: empty tables of the SQLite data that no installed plugin creates: plugin_gone_empty.',
+      ]);
+      expect(await usernames(target.source)).toEqual([]);
+      expect(await sha256(workspace.file)).toBe(before);
+      expect(await readdir(dirname(workspace.file))).toEqual(['attraccess.sqlite']);
+    });
+  });
+
   it('fails on a SQLite file that does not exist', async () => {
     const error = await run({ sqliteFile: `${workspace.file}.missing` }).catch((e) => e);
     expect(error).toBeInstanceOf(SqliteTransferError);

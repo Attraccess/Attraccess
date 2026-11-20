@@ -1,5 +1,4 @@
 import { Logger } from '@nestjs/common';
-import { stat } from 'node:fs/promises';
 import type { DataSource, DataSourceOptions } from 'typeorm';
 import { resolveDatabasePath } from '../../config/storage-path';
 import type { LoadedPluginManifest } from '../../plugin-system/plugin.manifest';
@@ -8,23 +7,22 @@ import { PluginService } from '../../plugin-system/plugin.service';
 import { UPGRADE_DOCS_URL } from '../backend/database-type';
 import { resolveDatabaseBackend } from '../backend/resolve-database-backend';
 import { postgresBackend } from '../postgres/postgres-backend';
-import { acquireAdvisoryLock, SQLITE_TRANSFER_LOCK_KEY } from '../postgres/postgres-advisory-lock';
-import { parsePostgresConfig, redactDatabaseUrl } from '../postgres/postgres-config';
+import {
+  acquireAdvisoryLock,
+  POSTGRES_MIGRATION_LOCK_KEY,
+  SQLITE_TRANSFER_LOCK_KEY,
+} from '../postgres/postgres-advisory-lock';
+import { parsePostgresConfig, redactDatabaseUrl, type PostgresConfig } from '../postgres/postgres-config';
 import { waitForPostgres } from '../postgres/postgres-connection';
 import { MissingTargetStorageError } from '../postgres/postgres-transfer';
 import type { PluginDescriptor } from '../transfer-snapshot';
-import { SqliteTransferError } from './transfer-errors';
+import { describeMissingPluginData } from './missing-plugin-tables';
 import { assertNoRunningApi, logReplacedTables, TRANSFER_APPLICATION_NAME } from './replace-target';
+import { fileExists } from './sqlite-working-copy';
 import { transferSqliteToPostgres } from './sqlite-to-postgres';
+import { SqliteTransferError } from './transfer-errors';
 
 const logger = new Logger('SqliteTransfer');
-
-async function exists(path: string): Promise<boolean> {
-  return stat(path).then(
-    () => true,
-    () => false,
-  );
-}
 
 /** Whether the target holds Attraccess data: any user or resource. A freshly applied baseline holds none. */
 export async function postgresHasUserData(source: Pick<DataSource, 'query'>): Promise<boolean> {
@@ -64,17 +62,45 @@ export function discoverStoragePlugins(manifests: readonly LoadedPluginManifest[
 /** Explains a refused import when the SQLite data holds plugin tables that no loadable installed plugin declares. */
 export function explainMissingPlugin(error: unknown, unloadable: DiscoveredPlugins['unloadable']): unknown {
   if (!(error instanceof SqliteTransferError) || !(error.cause instanceof MissingTargetStorageError)) return error;
-  const { reason, subject } = error.cause;
-  const which = reason === 'missing-plugin' ? `plugin ${subject}` : `table ${subject}`;
-  const hint = unloadable.length
-    ? `; plugins that could not be loaded: ${unloadable.map((p) => `${p.name} (${p.reason})`).join(', ')}`
-    : '';
-  return new SqliteTransferError(
-    'importing into PostgreSQL',
-    `the SQLite data holds data of a plugin that is not installed or not loadable (${which}). ` +
-      `Install that plugin's build for this Attraccess version in the plugin directory first${hint}`,
-    { cause: error, outcome: error.outcome },
-  );
+  const { reason, subject, tables } = error.cause;
+  let detail: string;
+  if (reason === 'missing-table' && tables.length > 0) {
+    detail = describeMissingPluginData(tables, unloadable);
+  } else {
+    const which = reason === 'missing-plugin' ? `plugin ${subject}` : `table ${subject}`;
+    const hint = unloadable.length
+      ? `; plugins that could not be loaded: ${unloadable.map((p) => `${p.name} (${p.reason})`).join(', ')}`
+      : '';
+    detail =
+      `the SQLite data holds data of a plugin that is not installed or not loadable (${which}). ` +
+      `Install that plugin's build for this Attraccess version in the plugin directory first${hint}`;
+  }
+  return new SqliteTransferError('importing into PostgreSQL', detail, { cause: error, outcome: error.outcome });
+}
+
+/** A connection of its own for startup work: no entities, migrations run only when asked. */
+function openStartupSource(applicationName?: string): DataSource {
+  const backend = resolveDatabaseBackend();
+  const base = backend.createDataSourceOptions() as DataSourceOptions & { extra?: Record<string, unknown> };
+  return backend.createDataSource({
+    ...base,
+    entities: [],
+    migrationsRun: false,
+    extra: applicationName ? { ...base.extra, application_name: applicationName } : base.extra,
+  } as DataSourceOptions);
+}
+
+/**
+ * Applies the pending core migrations while holding the migration lock: instances that start together take turns,
+ * and the later ones find nothing pending. TypeORM itself takes no lock.
+ */
+async function runMigrationsLocked(config: PostgresConfig, source: DataSource): Promise<void> {
+  const lock = await acquireAdvisoryLock(config, POSTGRES_MIGRATION_LOCK_KEY);
+  try {
+    await source.runMigrations();
+  } finally {
+    await lock.release();
+  }
 }
 
 export interface RunTransferOptions {
@@ -90,24 +116,19 @@ export interface RunTransferOptions {
  * Returns false when nothing was transferred because another instance did it first, or the target holds data.
  */
 export async function runTransfer(options: RunTransferOptions): Promise<boolean> {
-  const backend = resolveDatabaseBackend();
+  resolveDatabaseBackend();
   const config = parsePostgresConfig();
   const { sqliteFile } = options;
+  // Lock order: the transfer lock, then (for the migrations) the migration lock; never the other way round.
   const lock = await acquireAdvisoryLock(config, SQLITE_TRANSFER_LOCK_KEY);
   let source: DataSource | undefined;
   try {
     // Another instance may have transferred while this one waited for the lock.
-    if (!(await exists(sqliteFile))) return false;
-    const base = backend.createDataSourceOptions() as DataSourceOptions & { extra?: Record<string, unknown> };
-    source = backend.createDataSource({
-      ...base,
-      entities: [],
-      migrationsRun: false,
-      extra: { ...base.extra, application_name: TRANSFER_APPLICATION_NAME },
-    } as DataSourceOptions);
+    if (!(await fileExists(sqliteFile))) return false;
+    source = openStartupSource(TRANSFER_APPLICATION_NAME);
     await source.initialize();
     if (options.whenTargetHasData === 'replace') await assertNoRunningApi(source);
-    await source.runMigrations();
+    await runMigrationsLocked(config, source);
     if (options.whenTargetHasData !== 'replace' && (await postgresHasUserData(source))) {
       if (options.whenTargetHasData === 'refuse') {
         throw new SqliteTransferError(
@@ -143,17 +164,45 @@ export async function runTransfer(options: RunTransferOptions): Promise<boolean>
   }
 }
 
+/** Applies the pending core migrations on a connection of its own, under the migration lock. */
+async function migrateAtStartup(config: PostgresConfig): Promise<void> {
+  const source = openStartupSource();
+  await source.initialize();
+  try {
+    await runMigrationsLocked(config, source);
+  } finally {
+    await source.destroy().catch(() => undefined);
+  }
+}
+
+/** Whether the SQLite file is there. A storage directory that cannot be read stops the start instead of hiding it. */
+async function sqliteFilePresent(sqliteFile: string): Promise<boolean> {
+  try {
+    return await fileExists(sqliteFile);
+  } catch (error) {
+    throw new SqliteTransferError('looking for the SQLite file', (error as Error).message, {
+      cause: error,
+      outcome: 'refused',
+    });
+  }
+}
+
 /**
- * Runs before migrations finish serving, before any plugin starts and before HTTP or devices are accepted: waits for
- * PostgreSQL and moves the data of an existing SQLite installation when the database holds no Attraccess data yet. No
- * SQLite file, or data already in PostgreSQL: nothing is transferred.
+ * Runs before the application connection opens, before any plugin starts and before HTTP or devices are accepted:
+ * waits for PostgreSQL, applies the pending core migrations under the migration lock (so instances that start
+ * together never run one twice; the application connection then finds nothing pending) and moves the data of an
+ * existing SQLite installation when the database holds no Attraccess data yet. No SQLite file, or data already in
+ * PostgreSQL: nothing is transferred. SKIP_DATABASE_MIGRATIONS=true (a process that never uses the database): nothing.
  */
 export async function prepareDatabaseAtStartup(): Promise<void> {
+  if (process.env.SKIP_DATABASE_MIGRATIONS === 'true') return;
   resolveDatabaseBackend();
   const config = parsePostgresConfig();
   logger.log(`Database: PostgreSQL ${redactDatabaseUrl(config.url)} (schema ${config.schema})`);
   await waitForPostgres(config);
   const sqliteFile = resolveDatabasePath();
-  if (!(await exists(sqliteFile))) return;
+  const transfer = await sqliteFilePresent(sqliteFile);
+  await migrateAtStartup(config);
+  if (!transfer) return;
   await runTransfer({ sqliteFile, whenTargetHasData: 'skip' });
 }

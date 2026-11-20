@@ -22,24 +22,27 @@ import {
   type ColumnPlan,
 } from './postgres-transfer-values';
 import { describePostgresError, loadTableRows } from './postgres-transfer-load';
+import { cellLocation, rowLocation } from '../transfer/row-location';
 
 type Query = Pick<EntityManager, 'query'>;
 
 const quote = (identifier: string): string => `"${identifier.replace(/"/g, '""')}"`;
 
 /** Tables whose content belongs to a source engine's bookkeeping and never crosses engines. */
-const ENGINE_BOOKKEEPING = new Set(['migrations', 'typeorm_metadata']);
+export const ENGINE_BOOKKEEPING: ReadonlySet<string> = new Set(['migrations', 'typeorm_metadata']);
 
 /**
- * The target lacks storage the snapshot needs: a plugin that is not installed, or a table no installed plugin (or
- * release) creates. `reason` and the name let callers explain it without parsing the message.
+ * The target lacks storage the snapshot needs: a plugin that is not installed, or tables no installed plugin (or
+ * release) creates. `reason`, the subject and the tables let callers explain it without parsing the message.
  */
 export class MissingTargetStorageError extends SnapshotIncompatibleError {
   constructor(
     readonly reason: 'missing-plugin' | 'missing-table',
-    /** The plugin id (`missing-plugin`) or the table name (`missing-table`). */
+    /** The plugin id (`missing-plugin`) or the missing table names, comma separated (`missing-table`). */
     readonly subject: string,
     message: string,
+    /** `missing-table`: every snapshot table the target lacks, with its row count in the snapshot. */
+    readonly tables: readonly { name: string; rows: number }[] = [],
   ) {
     super(message);
   }
@@ -140,12 +143,18 @@ async function exportTable(
   const order = keys.length > 0 ? keys.map(quote).join(', ') : plans.map((plan) => quote(plan.name)).join(', ');
   const rows: Record<string, unknown>[] =
     plans.length === 0 ? [] : await source.query(`SELECT ${selects.join(', ')} FROM ${quote(table)} ORDER BY ${order}`);
+  const keyIndexes = keys.map((key) => plans.findIndex((plan) => plan.name === key));
   return {
     name: table,
     columns: plans.map(({ name, kind }) => ({ name, kind })),
-    rows: rows.map((row, rowIndex) =>
-      plans.map((plan, index) => exportValue(plan, row[`c${index}`], `${table}[${rowIndex}].${plan.name}`)),
-    ),
+    rows: rows.map((row, rowIndex) => {
+      const at = rowLocation(
+        table,
+        rowIndex + 1,
+        keyIndexes.filter((index) => index >= 0).map((index) => [plans[index].name, row[`c${index}`]] as const),
+      );
+      return plans.map((plan, index) => exportValue(plan, row[`c${index}`], cellLocation(at, plan.name)));
+    }),
   };
 }
 
@@ -219,19 +228,22 @@ async function assertRestorable(
       );
     }
   }
+  const relevant = snapshot.tables.filter((table) => !(foreign && ENGINE_BOOKKEEPING.has(table.name)));
+  const missing = relevant.filter((table) => !existing.includes(table.name));
+  if (missing.length > 0) {
+    const names = missing.map((table) => table.name).join(', ');
+    throw new MissingTargetStorageError(
+      'missing-table',
+      names,
+      `The database has no table ${names}${
+        foreign ? ' (data of a plugin that is not installed, or a table of an older release)' : ''
+      }`,
+      missing.map((table) => ({ name: table.name, rows: table.rows.length })),
+    );
+  }
   const declared = declaredColumns(options.plugins);
   const plans = new Map<string, ColumnPlan[]>();
-  for (const table of snapshot.tables) {
-    if (foreign && ENGINE_BOOKKEEPING.has(table.name)) continue;
-    if (!existing.includes(table.name)) {
-      throw new MissingTargetStorageError(
-        'missing-table',
-        table.name,
-        `The database has no table ${table.name}${
-          foreign ? ' (data of a plugin that is not installed, or a table of an older release)' : ''
-        }`,
-      );
-    }
+  for (const table of relevant) {
     const columns = await columnPlans(target, table.name, declared);
     if (!sameNames(columns.map((c) => c.name).sort(), table.columns.map((c) => c.name).sort())) {
       const known = new Set(columns.map((c) => c.name));
@@ -310,10 +322,19 @@ async function userTriggerTables(manager: Query): Promise<string[]> {
   return rows.map((row) => row.relname);
 }
 
-async function resetSequences(manager: Query, snapshot: DatabaseSnapshot): Promise<void> {
+/**
+ * setval is not transactional by itself, but these sequences were restarted by the import's `TRUNCATE ... RESTART
+ * IDENTITY` in the same transaction: PostgreSQL then rolls every later change to them back with it. Only those are
+ * set, so a failed import (a --force over existing data included) never leaves a sequence below the ids in use.
+ */
+async function resetSequences(
+  manager: Query,
+  snapshot: DatabaseSnapshot,
+  restarted: ReadonlySet<string>,
+): Promise<void> {
   for (const { table, column, sequence } of await ownedSequences(manager)) {
     // Migration bookkeeping stays as it is: its ids belong to this database's own track.
-    if (ENGINE_BOOKKEEPING.has(table)) continue;
+    if (ENGINE_BOOKKEEPING.has(table) || !restarted.has(table)) continue;
     const issued = snapshot.sequences[table] ?? 0;
     const [{ top }]: { top: string }[] = await manager.query(
       `SELECT COALESCE(MAX(${quote(column)}), 0)::text AS top FROM ${quote(table)}`,
@@ -410,8 +431,8 @@ export function createPostgresTransfer(track: MigrationTrack): DatabaseTransfer<
             );
           }
         }
-        // Last, before the commit: sequence changes are not rolled back, so a failed import must not have made any.
-        await resetSequences(manager, snapshot);
+        // Last, before the commit; rolled back with the transaction because the TRUNCATE above restarted them.
+        await resetSequences(manager, snapshot, new Set(wipe));
         for (const table of triggered) await manager.query(`ALTER TABLE ${quote(table)} ENABLE TRIGGER USER`);
       });
     },

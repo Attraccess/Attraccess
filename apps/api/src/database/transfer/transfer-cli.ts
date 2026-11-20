@@ -16,8 +16,9 @@ const USAGE = `Usage: ${TRANSFER_COMMAND} [--sqlite <path>] [--force] [--keep]
 Moves the data of a SQLite installation into the PostgreSQL database of DATABASE_URL.
   --sqlite <path>  The SQLite file (default: <STORAGE_ROOT>/attraccess.sqlite).
   --force          Replace data that is already in the PostgreSQL database: every table except the migration history
-                   is emptied (it lists them first). Stop every API instance first; it refuses while one is connected.
-                   Without it a non-empty target is refused.
+                   is emptied (it lists them first). Stop every API instance first. It refuses while an API
+                   connection is open, but an idle API may have none open right now: it cannot prove that every API
+                   instance is stopped. Without it a non-empty target is refused.
   --keep           Do not rename the SQLite file after a successful transfer.
 The SQLite file is never modified except for the final rename.`;
 

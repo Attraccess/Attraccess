@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type { DataSource } from 'typeorm';
-import type { PostgresConfig } from './postgres-config';
+import { DATABASE_SETTINGS_DOCS_URL, type PostgresConfig } from './postgres-config';
 import { postgresErrorClassifier } from './postgres-errors';
 import {
   initializeWithRetry,
@@ -134,10 +134,29 @@ describe('postgres startup retry', () => {
     });
 
     it('does not retry a configuration error', async () => {
-      const failure = coded('3D000');
+      const failure = coded('28000');
       const connect = jest.fn().mockRejectedValue(failure);
       await expect(waitForPostgres(config, { connect, sleep })).rejects.toBe(failure);
       expect(connect).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['28P01', 'DATABASE_URL must use the password the PostgreSQL volume was created with'],
+      ['3D000', 'The database named in DATABASE_URL does not exist'],
+    ])('explains %s once, with the settings reference and without the URL', async (code, hint) => {
+      const failure = Object.assign(new Error('password authentication failed for user "someone"'), { code });
+      const connect = jest.fn().mockRejectedValue(failure);
+
+      const error = await waitForPostgres(config, { connect, sleep }).catch((e) => e);
+
+      expect(connect).toHaveBeenCalledTimes(1);
+      expect(error.message).toContain(hint);
+      expect(error.message).toContain(`(SQLSTATE ${code})`);
+      expect(error.message).toContain(DATABASE_SETTINGS_DOCS_URL);
+      expect(error.message).not.toContain('hunter2');
+      expect(error.message).not.toContain('db.internal');
+      expect(error.code).toBe(code);
+      expect(error.cause).toBe(failure);
     });
 
     it('gives up after the bounded attempts', async () => {

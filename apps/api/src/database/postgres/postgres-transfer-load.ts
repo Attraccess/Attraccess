@@ -1,6 +1,7 @@
 import type { EntityManager } from 'typeorm';
 import { SnapshotIncompatibleError, type SnapshotValue, type TableSnapshot } from '../transfer-snapshot';
 import type { ColumnPlan } from './postgres-transfer-values';
+import { cellLocation, rowLocation } from '../transfer/row-location';
 
 const quote = (identifier: string): string => `"${identifier.replace(/"/g, '""')}"`;
 
@@ -37,6 +38,12 @@ function insertSql(table: TableSnapshot, plans: readonly ColumnPlan[], rows: num
   return `INSERT INTO ${quote(table.name)} (${names}) VALUES ${tuples.join(', ')}`;
 }
 
+/** The snapshot carries no key information: a row is named by its `id` column when the table has one. */
+function rowKey(table: TableSnapshot, rowIndex: number): Array<readonly [string, unknown]> {
+  const idColumn = table.columns.findIndex((column) => column.name === 'id');
+  return idColumn >= 0 ? [['id', table.rows[rowIndex][idColumn]]] : [];
+}
+
 /** The columns of `table.columns` in the order of the target's plans (the snapshot may list them differently). */
 function arrange(table: TableSnapshot, plans: readonly ColumnPlan[]): number[] {
   return plans.map((plan) => table.columns.findIndex((column) => column.name === plan.name));
@@ -55,10 +62,10 @@ export async function loadTableRows(
   if (plans.length === 0 || table.rows.length === 0) return;
   const order = arrange(table, plans);
   const perStatement = Math.max(1, Math.floor(MAX_PARAMETERS / plans.length));
-  const params = (rowIndex: number): unknown[] =>
-    plans.map((plan, col) =>
-      options.bind(plan, table.rows[rowIndex][order[col]], `${table.name}[${rowIndex}].${plan.name}`),
-    );
+  const params = (rowIndex: number): unknown[] => {
+    const at = rowLocation(table.name, rowIndex + 1, rowKey(table, rowIndex));
+    return plans.map((plan, col) => options.bind(plan, table.rows[rowIndex][order[col]], cellLocation(at, plan.name)));
+  };
   for (let start = 0; start < table.rows.length; start += perStatement) {
     const end = Math.min(table.rows.length, start + perStatement);
     const values: unknown[] = [];
@@ -84,7 +91,6 @@ async function locateFailure(
   params: (rowIndex: number) => unknown[],
   chunkError: unknown,
 ): Promise<never> {
-  const idColumn = table.columns.findIndex((column) => column.name === 'id');
   for (let row = start; row < end; row++) {
     try {
       await manager.query('SAVEPOINT load_row');
@@ -92,9 +98,9 @@ async function locateFailure(
       await manager.query('RELEASE SAVEPOINT load_row');
     } catch (rowError) {
       await manager.query('ROLLBACK TO SAVEPOINT load_row');
-      const id = idColumn >= 0 ? ` (id ${JSON.stringify(table.rows[row][idColumn])})` : '';
+      const at = rowLocation(table.name, row + 1, rowKey(table, row));
       throw new SnapshotIncompatibleError(
-        `Table ${table.name}, row ${row + 1}${id} cannot be imported: ${describePostgresError(rowError)}`,
+        `${at[0].toUpperCase()}${at.slice(1)} cannot be imported: ${describePostgresError(rowError)}`,
       );
     }
   }

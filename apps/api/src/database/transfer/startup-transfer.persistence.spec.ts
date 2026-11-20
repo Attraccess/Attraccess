@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { copyFile, mkdtemp, readdir, rm } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PluginService } from '../../plugin-system/plugin.service';
@@ -10,7 +10,9 @@ import {
   type TestDatabaseLocation,
 } from '../../test-utils/test-database';
 import { createSqliteWorkspace, migrateSqliteTo, type SqliteWorkspace } from './sqlite-import.test-fixture';
-import { runTransfer } from './startup-transfer';
+import { postgresMigrations } from '../postgres/migrations';
+import { prepareDatabaseAtStartup, runTransfer } from './startup-transfer';
+import { IDLE_API_WARNING } from './replace-target';
 import { SqliteTransferError } from './transfer-errors';
 
 jest.setTimeout(300_000);
@@ -71,6 +73,51 @@ describe('runTransfer (persistence)', () => {
     await closeTestDataSource(source);
   };
 
+  it('applies the core migrations once when two instances start together on a fresh database', async () => {
+    await Promise.all([prepareDatabaseAtStartup(), prepareDatabaseAtStartup()]);
+
+    const applied = await query<{ name: string }>(`SELECT name FROM migrations ORDER BY id`);
+    expect(applied.map((row) => row.name)).toEqual(postgresMigrations.map((migration) => migration.name));
+    expect(await files()).toEqual([]);
+  });
+
+  it('applies the core migrations and transfers once when two instances start together with a SQLite file', async () => {
+    await installSqlite();
+
+    await Promise.all([prepareDatabaseAtStartup(), prepareDatabaseAtStartup()]);
+
+    expect(await usernames()).toEqual(['ada']);
+    expect(await files()).toEqual([expect.stringMatching(/^attraccess\.sqlite\.migrated-to-postgres-/)]);
+  });
+
+  it('stops the start when the storage directory cannot be read, instead of starting without the SQLite data', async () => {
+    const storage = join(storageRoot, 'locked');
+    await mkdir(storage);
+    process.env.STORAGE_ROOT = storage;
+    await chmod(storage, 0o000);
+    try {
+      const error = await prepareDatabaseAtStartup().catch((e) => e);
+      expect(error).toBeInstanceOf(SqliteTransferError);
+      expect(error.message).toContain(
+        `failed while looking for the SQLite file: cannot tell whether ${join(storage, 'attraccess.sqlite')} ` +
+          'exists (EACCES); make the storage directory readable by the API. Nothing was changed',
+      );
+      expect(error.message).not.toContain('attraccess@');
+    } finally {
+      await chmod(storage, 0o700);
+    }
+    // Nothing was applied: the check runs before the migrations.
+    expect(await query(`SELECT 1 FROM information_schema.tables WHERE table_name = 'migrations'`)).toEqual([]);
+  });
+
+  it('does nothing when SKIP_DATABASE_MIGRATIONS=true', async () => {
+    process.env.SKIP_DATABASE_MIGRATIONS = 'true';
+    await installSqlite();
+    await prepareDatabaseAtStartup();
+    expect(await query(`SELECT 1 FROM information_schema.tables WHERE table_name = 'migrations'`)).toEqual([]);
+    expect(await files()).toEqual(['attraccess.sqlite']);
+  });
+
   it('returns false without touching anything when the SQLite file is gone', async () => {
     await expect(runTransfer({ sqliteFile: sqliteFile(), whenTargetHasData: 'skip' })).resolves.toBe(false);
     expect(await files()).toEqual([]);
@@ -115,7 +162,9 @@ describe('runTransfer (persistence)', () => {
     await fillTarget();
     await expect(runTransfer({ sqliteFile: sqliteFile(), whenTargetHasData: 'replace' })).resolves.toBe(true);
     expect(await usernames()).toEqual(['ada']);
-    const listed = warn.mock.calls.map(([message]) => String(message)).find((m) => m.startsWith('--force:'));
+    const warned = warn.mock.calls.map(([message]) => String(message));
+    expect(warned).toContain(IDLE_API_WARNING);
+    const listed = warned.find((m) => m.startsWith('--force: deleting'));
     expect(listed).toMatch(/^--force: deleting the content of \d+ table\(s\) of the PostgreSQL database/);
     expect(listed).toContain('audit_log');
     expect(listed).toMatch(/\buser\b/);
@@ -131,7 +180,9 @@ describe('runTransfer (persistence)', () => {
       const error = await runTransfer({ sqliteFile: sqliteFile(), whenTargetHasData: 'replace' }).catch((e) => e);
       expect(error).toBeInstanceOf(SqliteTransferError);
       expect(error.outcome).toBe('refused');
-      expect(error.message).toMatch(/connection\(s\) of a running Attraccess API use the PostgreSQL database/);
+      expect(error.message).toMatch(
+        /connection\(s\) of a running Attraccess API use the PostgreSQL database right now/,
+      );
     } finally {
       await closeTestDataSource(api);
     }

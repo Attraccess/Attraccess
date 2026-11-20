@@ -114,6 +114,27 @@ describe('loadTableRows', () => {
     expect(statements.map(({ sql }) => sql)).toContain('ROLLBACK TO SAVEPOINT load_row');
   });
 
+  it('hands the binder the 1-based row number and the id of each value, as the errors name rows', async () => {
+    const { manager } = recorder();
+    const where: string[] = [];
+    const binding: LoadOptions = { ...options, bind: (_plan, value, at) => (where.push(at), value) };
+    await loadTableRows(
+      manager,
+      table([
+        [7, 'a'],
+        [9, 'b'],
+      ]),
+      plans,
+      binding,
+    );
+    expect(where).toEqual([
+      'table thing, row 1 (id 7), column id',
+      'table thing, row 1 (id 7), column name',
+      'table thing, row 2 (id 9), column id',
+      'table thing, row 2 (id 9), column name',
+    ]);
+  });
+
   it('omits the id for a table without an id column', async () => {
     const { manager } = recorder((sql) => (sql.startsWith('INSERT') ? { code: '22P02' } : undefined));
     const noId: ColumnPlan[] = [{ name: 'name', kind: 'text', pgType: 'text' }];

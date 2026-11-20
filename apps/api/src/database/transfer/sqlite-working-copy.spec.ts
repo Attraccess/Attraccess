@@ -1,8 +1,21 @@
-import { link, mkdtemp, readFile, readdir, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  link,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  stat,
+  symlink,
+  unlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteTransferError } from './transfer-errors';
-import { copyToWorkingDirectory, markMigrated } from './sqlite-working-copy';
+import { copyToWorkingDirectory, fileExists, markMigrated } from './sqlite-working-copy';
 
 // rename, link and unlink call through to the real ones; the order of the calls is recorded.
 jest.mock('node:fs/promises', () => {
@@ -82,6 +95,42 @@ describe('SQLite working copy', () => {
 
     it('fails for a file that does not exist', async () => {
       await expect(copyToWorkingDirectory(join(directory, 'missing.sqlite'))).rejects.toThrow(/ENOENT/);
+    });
+
+    it('fails, leaving no copy behind, when a side file cannot be checked instead of dropping a hot journal', async () => {
+      const original = join(directory, 'attraccess.sqlite');
+      await writeFile(original, HEADER);
+      // A journal name that cannot be stat'ed (ELOOP), like an unreadable storage mount (EACCES, EIO).
+      await symlink(`${original}-journal`, `${original}-journal`);
+
+      await expect(copyToWorkingDirectory(original)).rejects.toThrow(
+        `cannot tell whether ${original}-journal exists (ELOOP); make the storage directory readable by the API`,
+      );
+      expect(await readFile(original)).toEqual(HEADER);
+    });
+  });
+
+  describe('fileExists', () => {
+    it('is true for a file and false only when there is no such file', async () => {
+      const file = join(directory, 'present');
+      await writeFile(file, 'x');
+      await expect(fileExists(file)).resolves.toBe(true);
+      await expect(fileExists(join(directory, 'absent'))).resolves.toBe(false);
+      // A path below a file: nothing can exist there (ENOTDIR).
+      await expect(fileExists(join(file, 'below'))).resolves.toBe(false);
+    });
+
+    it('throws when the directory cannot be read, naming the path and the code', async () => {
+      const locked = join(directory, 'locked');
+      await mkdir(locked);
+      await chmod(locked, 0o000);
+      try {
+        await expect(fileExists(join(locked, 'attraccess.sqlite'))).rejects.toThrow(
+          `cannot tell whether ${join(locked, 'attraccess.sqlite')} exists (EACCES)`,
+        );
+      } finally {
+        await chmod(locked, 0o700);
+      }
     });
   });
 

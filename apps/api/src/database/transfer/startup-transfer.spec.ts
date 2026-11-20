@@ -98,6 +98,26 @@ describe('startup transfer helpers', () => {
       expect(explained.outcome).toBe('plugin-storage-kept');
     });
 
+    it('lists every missing table with its rows, grouped by plugin, and keeps the outcome', () => {
+      const cause = new MissingTargetStorageError(
+        'missing-table',
+        'plugin_wago_controllers, legacy_notes',
+        'The database has no table plugin_wago_controllers, legacy_notes',
+        [
+          { name: 'plugin_wago_controllers', rows: 3 },
+          { name: 'legacy_notes', rows: 1 },
+        ],
+      );
+      const explained = explainMissingPlugin(refused(cause, 'plugin-storage-kept'), []) as SqliteTransferError;
+      expect(explained.outcome).toBe('plugin-storage-kept');
+      expect(explained.message).toContain(
+        'the SQLite data holds data of a plugin that is not installed or not loadable: plugin "wago" ' +
+          '(plugin_wago_controllers: 3 rows), and tables not from any installed plugin: legacy_notes: 1 row. ' +
+          'Nothing was imported.',
+      );
+      expect(explained.message).toContain('See https://docs.attraccess.org/');
+    });
+
     it('decides by the kind of the cause, not by its text', () => {
       const lookalike = refused(new SnapshotIncompatibleError('The database has no table ghost'));
       expect(explainMissingPlugin(lookalike, [])).toBe(lookalike);

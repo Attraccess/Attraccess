@@ -1,8 +1,11 @@
 import type { DataSource } from 'typeorm';
 import type { PluginMigrationEngine } from '../../plugin-system/persistence/plugin-migration-engine.port';
-import { legacyMigrationsTableName } from '../../plugin-system/plugin-storage/storage-model';
+import {
+  legacyMigrationsTableName,
+  PluginStorageMigrationRefused,
+} from '../../plugin-system/plugin-storage/storage-model';
 import { postgresBackend } from '../postgres/postgres-backend';
-import { postgresIntegrityViolations } from '../postgres/postgres-transfer';
+import { ENGINE_BOOKKEEPING, postgresIntegrityViolations, userTables } from '../postgres/postgres-transfer';
 import { createSqlitePluginMigrationEngine } from '../sqlite/sqlite-plugin-migrations';
 import { migrateFrozenSqlite, openFrozenSqlite, sqliteFrozenTrack } from '../sqlite/sqlite-frozen-track';
 import { createSqliteTransfer } from '../sqlite/sqlite-transfer';
@@ -60,6 +63,40 @@ function withoutAdoptedHistories(snapshot: DatabaseSnapshot, plugins: readonly P
   return { ...snapshot, tables: snapshot.tables.filter((table) => !histories.has(table.name)) };
 }
 
+/**
+ * The working copy holds a plugin history this release will not adopt (a partial 1.x history). Retrying never helps:
+ * the SQLite file has to go through the last 1.x release first. It was only read, so no backup needs restoring.
+ */
+function refusedOnCopy(name: string, error: PluginStorageMigrationRefused): SqliteTransferError {
+  const detail = error.message.replace(
+    'Restore the backup taken before this upgrade, update to',
+    'The SQLite file was not changed and needs no restore: update to',
+  );
+  return new SqliteTransferError(name, detail, { cause: error, outcome: 'refused' });
+}
+
+/**
+ * Tables of the SQLite data that the target lacks (no installed plugin creates them) but that hold no row are left
+ * behind with a warning: there is nothing to lose. Tables with rows stay in the snapshot, and the import refuses them,
+ * naming every one.
+ */
+async function withoutEmptyLeftovers(
+  target: DataSource,
+  snapshot: DatabaseSnapshot,
+  logger: TransferLog,
+): Promise<DatabaseSnapshot> {
+  const existing = new Set(await userTables(target));
+  const leftovers = snapshot.tables.filter(
+    (table) => table.rows.length === 0 && !existing.has(table.name) && !ENGINE_BOOKKEEPING.has(table.name),
+  );
+  if (leftovers.length === 0) return snapshot;
+  const names = new Set(leftovers.map((table) => table.name));
+  logger.warn(
+    `Not imported: empty tables of the SQLite data that no installed plugin creates: ${[...names].join(', ')}.`,
+  );
+  return { ...snapshot, tables: snapshot.tables.filter((table) => !names.has(table.name)) };
+}
+
 /** Exports the SQLite database through a private working copy: the original file is only read. */
 export async function exportSqliteSnapshot(
   sqliteFile: string,
@@ -77,8 +114,11 @@ export async function exportSqliteSnapshot(
     }
     const sqliteEngine = createSqlitePluginMigrationEngine(copy.file);
     for (const plugin of plugins) {
-      await step(`migrating the storage of plugin ${plugin.id} in the copy`, () =>
-        sqliteEngine.migrate(plugin.storage),
+      const name = `migrating the storage of plugin ${plugin.id} in the copy`;
+      await step(name, () =>
+        sqliteEngine.migrate(plugin.storage).catch((error: unknown) => {
+          throw error instanceof PluginStorageMigrationRefused ? refusedOnCopy(name, error) : error;
+        }),
       );
     }
     const reader = await step('opening the working copy', () => openFrozenSqlite(copy.file));
@@ -150,7 +190,10 @@ export async function transferSqliteToPostgres(options: SqliteToPostgresOptions)
   }
   await step(
     'importing into PostgreSQL',
-    () => postgresBackend.transfer.importSnapshot(target, snapshot, { plugins }),
+    async () =>
+      postgresBackend.transfer.importSnapshot(target, await withoutEmptyLeftovers(target, snapshot, logger), {
+        plugins,
+      }),
     outcome,
   );
 

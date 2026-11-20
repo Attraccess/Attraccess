@@ -23,6 +23,7 @@ import {
   fieldKind,
   type DeclaredColumns,
 } from './sqlite-transfer-plugins';
+import { cellLocation, rowLocation } from '../transfer/row-location';
 
 interface ColumnInfo {
   name: string;
@@ -182,10 +183,19 @@ async function exportTable(source: DataSource, table: string, declared: Declared
     columns.length === 0
       ? []
       : await source.query(`SELECT ${selects.join(', ')} FROM ${quote(table)} ORDER BY ${order}`);
+  const keyIndexes = keys.map((key) => columns.indexOf(key));
   return {
     name: table,
     columns: plans.map(({ name, kind }) => ({ name, kind })),
-    rows: rows.map((row) => plans.map((plan, index) => exportValue(plan, row, index, `${table}.${plan.name}`))),
+    rows: rows.map((row, rowIndex) => {
+      // Integer keys by their exact digits (the i<n> column); other keys as stored.
+      const key = keyIndexes.map((index) => {
+        const exact = row[`i${index}`];
+        return [columns[index].name, exact == null ? row[`v${index}`] : { integer: exact }] as const;
+      });
+      const at = rowLocation(table, rowIndex + 1, key);
+      return plans.map((plan, index) => exportValue(plan, row, index, cellLocation(at, plan.name)));
+    }),
   };
 }
 

@@ -1,8 +1,13 @@
 import { Client } from 'pg';
 import { sslOption, type PostgresConfig } from './postgres-config';
 
-/** Advisory lock keys (one per kind of exclusive startup work). */
+/**
+ * Advisory lock keys (one per kind of exclusive startup work). Whoever holds both takes the transfer lock first and
+ * the migration lock second; the migration lock alone is never held while waiting for the transfer lock.
+ */
 export const SQLITE_TRANSFER_LOCK_KEY = 584_584;
+/** Applying the core migrations: two instances that start together must not run the same migration twice. */
+export const POSTGRES_MIGRATION_LOCK_KEY = 584_585;
 
 export interface AdvisoryLock {
   release(): Promise<void>;

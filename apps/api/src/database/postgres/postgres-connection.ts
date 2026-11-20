@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { Client, types } from 'pg';
 import { DataSource, DataSourceOptions } from 'typeorm';
-import { parsePostgresConfig, sslOption, type PostgresConfig } from './postgres-config';
+import { DATABASE_SETTINGS_DOCS_URL, parsePostgresConfig, sslOption, type PostgresConfig } from './postgres-config';
 
 const logger = new Logger('PostgresConnection');
 
@@ -143,7 +143,7 @@ async function ensureSchema(client: Client, schema: string): Promise<void> {
 /**
  * Waits until PostgreSQL accepts connections (it may still be starting: balena allows no healthy-condition
  * depends_on). Bounded exponential backoff, one log line per attempt, never the URL. Other failures (wrong password,
- * missing database) are not retried: they are configuration errors.
+ * missing database) are not retried: they are configuration errors, and these two say what to fix.
  */
 export async function waitForPostgres(
   config: PostgresConfig,
@@ -159,7 +159,7 @@ export async function waitForPostgres(
       return;
     } catch (error) {
       const code = (error as { code?: string }).code ?? (error as Error).name;
-      if (attempt >= attempts || !isStartupTransient(error)) throw error;
+      if (attempt >= attempts || !isStartupTransient(error)) throw explainConfigurationError(error);
       const delay = Math.min(5000, 250 * 2 ** (attempt - 1));
       logger.warn(
         `PostgreSQL is not reachable yet (${code}); retrying in ${delay} ms (attempt ${attempt}/${attempts})`,
@@ -167,4 +167,23 @@ export async function waitForPostgres(
       await sleep(delay);
     }
   }
+}
+
+/** What to fix for the configuration errors an operator meets first. Never quotes the URL or its password. */
+const CONFIGURATION_HINTS: Record<string, string> = {
+  '28P01':
+    'PostgreSQL refused the password of DATABASE_URL (SQLSTATE 28P01). DATABASE_URL must use the password the ' +
+    'PostgreSQL volume was created with: POSTGRES_PASSWORD only takes effect when the volume is first created',
+  '3D000':
+    'The database named in DATABASE_URL does not exist (SQLSTATE 3D000). Create it, or correct the database name ' +
+    'in DATABASE_URL',
+};
+
+/** A wrong password or a missing database, explained with the settings reference; every other error unchanged. */
+function explainConfigurationError(error: unknown): unknown {
+  const code = (error as { code?: unknown } | undefined)?.code;
+  const hint =
+    typeof code === 'string' && Object.hasOwn(CONFIGURATION_HINTS, code) ? CONFIGURATION_HINTS[code] : undefined;
+  if (!hint) return error;
+  return Object.assign(new Error(`${hint}. See ${DATABASE_SETTINGS_DOCS_URL}`, { cause: error }), { code });
 }

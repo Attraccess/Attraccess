@@ -171,12 +171,18 @@ describe.each(BUNDLED_PLUGINS)(
 
       expect(error).toBeInstanceOf(SqliteTransferError);
       expect(error.step).toBe(`migrating the storage of plugin ${pluginName} in the copy`);
-      expect(error.outcome).toBe('rolled-back');
+      // A partial history is refused for good (the SQLite file needs 1.11 first); a failed migration may pass on retry.
+      expect(error.outcome).toBe(legacy.length > 1 ? 'refused' : 'rolled-back');
       // With a single 1.x migration, an empty history is a fresh install: creating the existing tables fails.
       expect(error.cause).toBeInstanceOf(
         legacy.length > 1 ? PluginStorageMigrationRefused : PluginStorageMigrationFailed,
       );
-      if (legacy.length > 1) expect(error.message).toMatch(/update to Attraccess 1\.11 and start it once/);
+      if (legacy.length > 1) {
+        expect(error.message).toMatch(/update to Attraccess 1\.11 and start it once/);
+        expect(error.message).toContain('The SQLite file was not changed and needs no restore');
+        expect(error.message).toContain('Nothing was changed: neither the SQLite file nor the PostgreSQL database.');
+        expect(error.message).not.toMatch(/Restore the backup|the next start retries/);
+      }
       expect(await sha256(workspace.file)).toBe(before);
       expect(await pluginTablesInTarget()).toEqual([]);
       expect(await appliedStorageVersions(target, compiled.namespace)).toEqual([]);

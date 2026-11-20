@@ -154,7 +154,20 @@ describe('SQLite transfer', () => {
       const source = await database();
       await source.query('INSERT INTO a_account (id) VALUES (1)');
       await source.query("INSERT INTO b_entry (id, accountId, amount, bookedAt) VALUES (1, 1, 1, 'last tuesday')");
-      await expect(transfer.exportSnapshot(source)).rejects.toThrow(/b_entry\.bookedAt/);
+      await expect(transfer.exportSnapshot(source)).rejects.toThrow(
+        'table b_entry, row 1 (id 1), column bookedAt: "last tuesday" is not an instant',
+      );
+    });
+
+    it('names the row of a bad value by its 1-based number and its primary key', async () => {
+      const source = await database();
+      await source.query('INSERT INTO a_account (id) VALUES (1)');
+      await source.query(
+        "INSERT INTO b_entry (id, accountId, amount, bookedAt) VALUES (4, 1, 1, '2026-01-01 00:00:00'), (9, 1, 1, 'soon')",
+      );
+      await expect(transfer.exportSnapshot(source)).rejects.toThrow(
+        /^table b_entry, row 2 \(id 9\), column bookedAt: /,
+      );
     });
   });
 
