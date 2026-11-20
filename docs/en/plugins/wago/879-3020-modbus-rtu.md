@@ -44,15 +44,21 @@ firmware's direction control; it does not toggle GPIOs or require privileged mod
 
 ## Configure measurements
 
-1. Open the controller's **Configure** page, then **External devices**.
-2. Add an RTU connection using the settings above. Start with a 2000 ms response
-   timeout and one shared connection for the RS-485 bus.
-3. Add the meter with unit address 1 and profile **WAGO 879-3020 (4PS) — Modbus RTU**.
-4. Add measurement channels bound to the signals you need. On the **Inputs & outputs** page,
-   **Add Modbus device** creates every channel at once with the recommended readings enabled (see
+1. In **WAGO controllers**, select **Configure** for the controller. The **Inputs & outputs**
+   front panel opens.
+2. On the **CC100 onboard I/O** card, select the RS-485 port summary (for example
+   `RS-485 port · 9600 E1`) to open **RS-485 port settings**. Set baud rate, parity and stop bits
+   to the meter's settings; the defaults (9600, even, 1) match its factory settings. These settings
+   apply to every device on the CC100 RS-485 port, which uses a 1000 ms response timeout.
+3. Select **Add Modbus device**. The new device uses the **WAGO 879-3020 (4PS) — Modbus RTU**
+   profile on the CC100 RS-485 port, the next free Modbus address and a 5-second read interval.
+   It gets every channel at once, with the recommended readings enabled (see
    [Default readings](#default-readings-and-enabling-more)).
-5. Save, review, and publish. Wait for the revision to be applied, then inspect
-   fresh measurements in **Diagnostics**.
+4. In the device settings, enter a **Name**, set **Modbus address** to the meter's address
+   (factory default 1), adjust the readings if needed, and select **Done**.
+5. Select **Apply to controller**, check the current output levels and any affected flows, and
+   confirm. When the controller has applied the configuration, the device card shows live
+   readings.
 
 The profile exposes all 131 documented, non-reserved FC03 values from appendix
 A3.2, pages 34–38. The controller front panel groups them into expandable sections:
