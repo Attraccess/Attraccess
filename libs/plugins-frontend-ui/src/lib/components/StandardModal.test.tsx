@@ -13,7 +13,7 @@ function pressResponderWarnings(...spies: MockInstance[]) {
     .filter((args) => args.some((arg) => String(arg).includes('PressResponder')));
 }
 
-function ControlledModal(props: { isDismissable?: boolean }) {
+function ControlledModal(props: { isDismissable?: boolean; backdropDataCy?: string }) {
   const [isOpen, setIsOpen] = useState(false);
   return (
     <>
@@ -22,7 +22,10 @@ function ControlledModal(props: { isDismissable?: boolean }) {
         isOpen={isOpen}
         onOpenChange={setIsOpen}
         data-cy="standard-modal"
-        backdropProps={props.isDismissable === undefined ? undefined : { isDismissable: props.isDismissable }}
+        backdropProps={{
+          ...(props.isDismissable === undefined ? {} : { isDismissable: props.isDismissable }),
+          ...(props.backdropDataCy === undefined ? {} : { 'data-cy': props.backdropDataCy }),
+        }}
       >
         {({ close }) => (
           <>
@@ -65,6 +68,21 @@ describe('StandardModal', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
+  it('closes on an outside click by default', async () => {
+    render(<ControlledModal />);
+    await userEvent.click(screen.getByRole('button', { name: 'Open' }));
+
+    await userEvent.click(document.querySelector('[data-slot="modal-backdrop"]') as HTMLElement);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('lets backdropProps override the root props', async () => {
+    render(<ControlledModal backdropDataCy="from-backdrop" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Open' }));
+    expect(document.querySelector('[data-cy="from-backdrop"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-cy="standard-modal"]')).not.toBeInTheDocument();
+  });
+
   it('stays open on an outside click when backdropProps turn dismissal off', async () => {
     render(<ControlledModal isDismissable={false} />);
     await userEvent.click(screen.getByRole('button', { name: 'Open' }));
@@ -87,6 +105,23 @@ describe('StandardModal', () => {
 
     await userEvent.keyboard('{Escape}');
     expect(setOpen).toHaveBeenCalledWith(false);
+  });
+
+  it('calls onOpenChange as well when a state is given', async () => {
+    const setOpen = vi.fn();
+    const onOpenChange = vi.fn();
+    render(
+      <StandardModal
+        state={{ isOpen: true, setOpen, open: vi.fn(), close: vi.fn(), toggle: vi.fn() }}
+        onOpenChange={onOpenChange}
+      >
+        <ModalHeading>From state</ModalHeading>
+      </StandardModal>,
+    );
+
+    await userEvent.keyboard('{Escape}');
+    expect(setOpen).toHaveBeenCalledWith(false);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it('logs no PressResponder warning, closed or open', async () => {
