@@ -26,4 +26,11 @@ async function main() {
   }
 }
 
-main();
+if (process.argv[2] === 'transfer-sqlite') {
+  // `node main.js transfer-sqlite [--sqlite <path>] [--force]`: the manual SQLite -> PostgreSQL transfer.
+  import('./database/transfer/transfer-cli')
+    .then(({ runTransferCommand }) => runTransferCommand(process.argv.slice(3)))
+    .then((code) => process.exit(code));
+} else {
+  main();
+}

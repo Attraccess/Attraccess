@@ -11,11 +11,10 @@ import {
   PushSubscription,
   Setting,
   User,
-  entities,
 } from '@attraccess/database-entities';
 import { CsvExportTemplateColumnType, CsvExportType, EmailTemplateType } from '@attraccess/application-models';
 import { CsvExportTemplateNameTakenError } from '../../analytics/csv-export-template-store.port';
-import { resolveDatabaseBackend } from '../backend';
+import { closeTestDataSource, createTestDataSource } from '../../test-utils/test-database';
 import { TransactionHandles } from './common/transaction-handles';
 import { TypeOrmCsvExportTemplateStore } from './analytics/typeorm-csv-export-template-store';
 import { TypeOrmEmailTemplateStore } from './email/typeorm-email-template-store';
@@ -26,23 +25,16 @@ import { TypeOrmPushSubscriptionStore } from './push/typeorm-push-subscription-s
 import { TypeOrmSettingsRows, TypeOrmSetupAccountStats } from './settings/typeorm-settings-rows';
 import { legacyEngineTransactionScope } from './common/legacy-engine-transaction';
 
-/** The area adapters against a real SQLite database with the application's schema. */
-describe('area persistence adapters (real SQLite)', () => {
+/** The area adapters against a real PostgreSQL database with the application's schema. */
+describe('area persistence adapters (real PostgreSQL)', () => {
   let source: DataSource;
 
   beforeAll(async () => {
-    resolveDatabaseBackend({ DATABASE_TYPE: 'sqlite' });
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      entities: Object.values(entities),
-      synchronize: true,
-    }).initialize();
+    source = await createTestDataSource();
   }, 60_000);
 
   afterAll(async () => {
-    if (source?.isInitialized) await source.destroy();
+    await closeTestDataSource(source);
   });
 
   const addUser = (username: string, patch: Partial<User> = {}) =>

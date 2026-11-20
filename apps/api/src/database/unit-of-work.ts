@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Logger } from '@nestjs/common';
-import { isDatabaseBusyError, isWriteConflict } from './persistence-errors';
+import { isSafeToRetry } from './persistence-errors';
 
 /**
  * The explicit scope of one atomic unit of work: every persistence write made through it commits or rolls back
@@ -123,7 +123,11 @@ export class ScopedUnitOfWork<THandle> implements UnitOfWork {
 export interface RetryOptions {
   /** Total attempts including the first. Defaults to 3, at most 10; never unbounded. */
   readonly attempts?: number;
-  /** Which failures are worth another attempt. Defaults to the busy and write-conflict categories. */
+  /**
+   * Which failures are worth another attempt. Defaults to the ones the backend reports as safe to run again
+   * (`isSafeToRetry`: write conflicts, lock and statement timeouts). Not a lost connection or a server shutdown: a
+   * COMMIT whose connection dropped may have committed, and running the work again would apply it twice.
+   */
   readonly isTransient?: (error: unknown) => boolean;
   /** Upper bound of the wait before the first retry; it doubles per retry. Defaults to 50 ms. */
   readonly baseDelayMs?: number;
@@ -148,8 +152,9 @@ export function retryDelayMs(retry: number, options: RetryOptions = {}): number 
 
 /**
  * The sanctioned way to retry database work. Runs a unit of work again when the database reports a transient failure
- * (busy, write conflict), a bounded number of times, with a short jittered exponential backoff between attempts. The
- * work must be free of external effects: a retry runs it again from the start. Effects belong in
+ * that guarantees the attempt left nothing behind (write conflict, lock or statement timeout), a bounded number of
+ * times, with a short jittered exponential backoff between attempts. The work must be free of external effects: a
+ * retry runs it again from the start. Effects belong in
  * `scope.afterCommit`, which only runs for the attempt that committed, so retries never replay device commands,
  * payments, MQTT publishes or emails.
  *
@@ -166,7 +171,7 @@ export async function runWithRetry<T>(
     throw new TransactionScopeError('runWithRetry cannot run inside an open unit of work; retry the outermost one');
   }
   const attempts = Math.max(1, Math.min(options.attempts ?? 3, MAX_ATTEMPTS));
-  const isTransient = options.isTransient ?? ((error) => isDatabaseBusyError(error) || isWriteConflict(error));
+  const isTransient = options.isTransient ?? isSafeToRetry;
   const sleep = options.sleep ?? defaultSleep;
   for (let attempt = 1; ; attempt++) {
     try {

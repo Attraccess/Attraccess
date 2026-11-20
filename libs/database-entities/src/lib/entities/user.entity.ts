@@ -46,7 +46,7 @@ export class User {
   @Exclude()
   emailVerificationToken!: string | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @Exclude()
   emailVerificationTokenExpiresAt!: Date | null;
 
@@ -54,15 +54,15 @@ export class User {
   @Exclude()
   passwordResetToken!: string | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @Exclude()
   passwordResetTokenExpiresAt!: Date | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @Exclude()
   lastUsernameChangeAt!: Date | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @Exclude()
   lockedUntil!: Date | null;
 
@@ -70,7 +70,7 @@ export class User {
   @Exclude()
   failedLoginAttempts!: number;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @Exclude()
   firstFailedLoginAt!: Date | null;
 
@@ -78,11 +78,11 @@ export class User {
   @Exclude()
   deleteAccountToken!: string | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @Exclude()
   deleteAccountTokenExpiresAt!: Date | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @Exclude()
   deleteAccountRequestedAt!: Date | null;
 
@@ -132,19 +132,19 @@ export class User {
   @Column({ default: false, type: 'boolean' })
   isDisabled!: boolean;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the user was created',
   })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the user was last updated',
   })
   updatedAt!: Date;
 
-  @DeleteDateColumn({ type: 'datetime' })
+  @DeleteDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the user was soft-deleted',
     required: false,
@@ -205,7 +205,7 @@ export class User {
   })
   initiatedBillingTransactions!: BillingTransaction[];
 
-  @Column({ type: 'integer', default: 0 })
+  @Column({ type: 'bigint', default: 0 })
   @ApiProperty({ description: 'The credit balance of the user' })
   creditBalance!: number;
 

@@ -1,6 +1,6 @@
 import { Button, Card, Code, cn, Tooltip, TooltipContent, TooltipTrigger } from '@heroui/react';
 import { Handle, NodeToolbar, Position, useNodeId, NodeProps } from '@xyflow/react';
-import { Edit2Icon, Trash2Icon, TriangleAlertIcon } from 'lucide-react';
+import { Edit2Icon, Trash2Icon } from 'lucide-react';
 import { NodeEditor } from './editor/index';
 import { ResourceFlowLogType, ResourceFlowLog, ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 import { useFlowContext } from '../context/flowContext';
@@ -8,6 +8,8 @@ import { schemaSupportsOwner } from '../flowOwner';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNodePreviewRows } from './preview/index';
 import { ConfirmableButton, TExists, TFunction } from '@attraccess/plugins-frontend-ui';
+import { NodeValidationError, validationMessages } from './validationMessages';
+import { NodeNotice } from './NodeNotice';
 
 export interface Props {
   tNodeTranslations: TFunction;
@@ -19,7 +21,7 @@ export interface Props {
     forceToolbarVisible?: boolean;
     toolbarPosition?: Position;
   };
-  validationError?: string;
+  validationErrors?: readonly NodeValidationError[];
 }
 export enum ProcessingState {
   IDLE = 'idle',
@@ -29,7 +31,7 @@ export enum ProcessingState {
 }
 
 export function AttraccessNode(props: Props) {
-  const { schema, previewMode, tNodeTranslations: t, tNodeExists, data, validationError } = props;
+  const { schema, previewMode, tNodeTranslations: t, tNodeExists, data, validationErrors } = props;
 
   const nodeId = useNodeId();
 
@@ -86,6 +88,11 @@ export function AttraccessNode(props: Props) {
   }, [removeNode, nodeId]);
 
   const isSelected = props.node?.selected ?? false;
+  const hasValidationErrors = Boolean(validationErrors?.length);
+  const validationLines = useMemo(
+    () => validationMessages(validationErrors ?? [], { schema, t, tExists: tNodeExists }),
+    [validationErrors, schema, t, tNodeExists],
+  );
 
   const cardClasses = useMemo(() => {
     const baseClasses = 'bg-surface w-64 overflow-visible';
@@ -96,10 +103,10 @@ export function AttraccessNode(props: Props) {
       'animate-pulse border-2 border-accent': processingState === ProcessingState.PROCESSING,
       'border-2 border-red-500': processingState === ProcessingState.FAILED,
       'border-2 border-green-500': processingState === ProcessingState.COMPLETED,
-      'border-2 border-warning': Boolean(validationError),
+      'border-2 border-warning': hasValidationErrors,
       'opacity-60 grayscale border-dashed': !supportedByOwner,
     });
-  }, [processingState, supportedByOwner, isSelected, validationError]);
+  }, [processingState, supportedByOwner, isSelected, hasValidationErrors]);
 
   const targetHandlesWithStyles = useMemo((): { id: string; label?: string; style: React.CSSProperties }[] => {
     return schema.inputs.map((inputName, index) => {
@@ -320,15 +327,14 @@ export function AttraccessNode(props: Props) {
           </div>
 
           {!previewMode && !supportedByOwner && (
-            <div className="text-xs text-warning mt-1 px-1 flex flex-row items-center gap-1">
-              <TriangleAlertIcon size={12} /> {t(unsupportedMessageKey)}
-            </div>
+            <NodeNotice className="text-warning">{t(unsupportedMessageKey)}</NodeNotice>
           )}
-          {!previewMode && validationError && (
-            <div className="text-xs text-danger mt-1 px-1 flex flex-row items-center gap-1">
-              <TriangleAlertIcon size={12} /> {validationError}
-            </div>
-          )}
+          {!previewMode &&
+            validationLines.map((line, index) => (
+              <NodeNotice key={`${index}-${line}`} className="text-danger">
+                {line}
+              </NodeNotice>
+            ))}
         </div>
       )}
     </NodeEditor>

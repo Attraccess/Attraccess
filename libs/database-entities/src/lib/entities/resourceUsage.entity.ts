@@ -1,16 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  Index,
-  JoinColumn,
-  ManyToOne,
-  OneToMany,
-  OneToOne,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, OneToMany, OneToOne, PrimaryGeneratedColumn } from 'typeorm';
 
 import { BillingTransaction } from './billing-transaction.entity';
 
@@ -28,9 +18,13 @@ import { User } from './user.entity';
 @Index('IDX_resource_usage_endTime', ['endTime'])
 @Index('IDX_resource_usage_userId', ['userId'])
 @Index('IDX_resource_usage_resourceId_endTime', ['resourceId', 'endTime'])
+@Index('IDX_resource_usage_pending_resource_user', ['resourceId', 'userId'], {
+  unique: true,
+  where: '"lifecyclePending" = true AND "endTime" IS NULL',
+})
 @Entity()
 export class ResourceUsage {
-  @Column({ type: 'integer', nullable: true })
+  @Column({ type: 'bigint', nullable: true })
   @ApiProperty({
     description: 'Snapshot of the session-duration rate when this usage session started',
     required: false,
@@ -38,7 +32,7 @@ export class ResourceUsage {
   })
   sessionDurationCreditsPerMinute!: number | null;
 
-  @Column({ type: 'integer', nullable: true })
+  @Column({ type: 'bigint', nullable: true })
   @ApiProperty({
     description: 'Snapshot of the attributable-operating-duration rate when this usage session started',
     required: false,
@@ -46,7 +40,7 @@ export class ResourceUsage {
   })
   operatingDurationCreditsPerMinute!: number | null;
 
-  @Column({ type: 'integer', nullable: true })
+  @Column({ type: 'bigint', nullable: true })
   @ApiProperty({
     description: 'Fixed usage fee snapshotted at session start; null for legacy sessions',
     nullable: true,
@@ -62,7 +56,7 @@ export class ResourceUsage {
   })
   billingFactor!: number | null;
 
-  @Column({ type: 'simple-json', nullable: true })
+  @Column({ type: 'jsonb', nullable: true })
   @ApiProperty({
     type: [Object],
     nullable: true,
@@ -112,7 +106,7 @@ export class ResourceUsage {
   })
   userId!: number | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the usage session started',
   })
@@ -126,7 +120,7 @@ export class ResourceUsage {
   })
   startNotes!: string | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @ApiProperty({
     description: 'When the usage session ended',
     required: false,
@@ -161,13 +155,13 @@ export class ResourceUsage {
 
   @Column({
     generatedType: 'STORED',
-    asExpression: `CASE 
+    asExpression: `CASE
       WHEN "endTime" IS NULL THEN -1
-      ELSE (julianday("endTime") - julianday("startTime")) * 1440
+      ELSE EXTRACT(EPOCH FROM ("endTime" - "startTime")) / 60.0
     END`,
     insert: false,
     update: false,
-    type: 'integer',
+    type: 'float',
   })
   @ApiProperty({
     description: 'The duration of the usage session in minutes',

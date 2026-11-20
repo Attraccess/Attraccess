@@ -7,7 +7,6 @@ the run left open through the API, cancels armed screens, dismisses notices and 
 reader, reconnects or re-approves the reader, and reboots it as the last resort.
 """
 
-import sqlite3
 import time
 
 from attractap_lab.reader_screen import ReaderCommandError, ReaderTestHooks
@@ -39,8 +38,7 @@ def call_retrying(api, method, path, body, token, tries=5):
 
 def end_open_usages(api, admin):
     """End every usage session the run left open (the database is this run's own)."""
-    with sqlite3.connect(api.database) as db:
-        rows = db.execute("SELECT id, resourceId, userId FROM resource_usage WHERE endTime IS NULL").fetchall()
+    rows, _ = api.sql('SELECT id, "resourceId", "userId" FROM resource_usage WHERE "endTime" IS NULL')
     actions = []
     for usage_id, resource_id, user_id in rows:
         status, body = call_retrying(api, "PUT", f"/resources/{resource_id}/usage/end", {"usageId": usage_id}, admin)

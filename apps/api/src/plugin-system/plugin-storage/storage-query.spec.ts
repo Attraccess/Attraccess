@@ -1,5 +1,5 @@
 import { f, PluginStorageInvalid, table } from '@attraccess/plugins-backend-sdk';
-import { sqliteStorageDialect } from '../../database/sqlite/plugin-storage/sqlite-storage-dialect';
+import { postgresStorageDialect } from '../../database/postgres/plugin-storage/postgres-storage-dialect';
 import { compileTable, type StorageNaming } from './storage-compile';
 import { compileQuery, compileWhere, fieldOf, StorageParams } from './storage-query';
 
@@ -29,9 +29,11 @@ const composite = compileTable(
   () => undefined,
 );
 
+/** The statement with its numbered markers (`$1`, `$2::bigint`) as plain `?`, so the expectations read by shape. */
+const plain = (sql: string) => sql.replace(/\$\d+(::bigint)?/g, '?');
 const where = (filter: unknown) => {
-  const params = new StorageParams(sqliteStorageDialect);
-  return { sql: compileWhere(items, sqliteStorageDialect, params, filter), params: params.values };
+  const params = new StorageParams(postgresStorageDialect);
+  return { sql: plain(compileWhere(items, postgresStorageDialect, params, filter)), params: params.values };
 };
 const rejects = (filter: unknown, message: RegExp) => {
   expect(() => where(filter)).toThrow(PluginStorageInvalid);
@@ -57,11 +59,13 @@ describe('compileWhere', () => {
   it('joins several fields with AND and binds the encoded values in order', () => {
     const { sql, params } = where({ name: 'a', qty: 3, active: false, price: '1.5' });
     expect(sql).toBe('("name" = ? AND "qty" = ? AND "active" = ? AND "price" = ?)');
-    expect(params).toEqual(['a', 3, 0, 150]);
+    expect(params).toEqual(['a', 3, false, '1.50']);
   });
 
   it('encodes timestamps and dates', () => {
-    expect(where({ created: new Date('2026-01-02T03:04:05.006Z') }).params).toEqual(['2026-01-02 03:04:05.006']);
+    expect(where({ created: new Date('2026-01-02T03:04:05.006Z') }).params).toEqual([
+      new Date('2026-01-02T03:04:05.006Z'),
+    ]);
     expect(where({ due: '2026-02-03' }).params).toEqual(['2026-02-03']);
   });
 
@@ -93,10 +97,10 @@ describe('compileWhere', () => {
     });
 
     it('startsWith binds the prefix and asks the dialect', () => {
-      expect(where({ name: { startsWith: 'ab' } })).toEqual({ sql: 'substr("name", 1, 2) = ?', params: ['ab'] });
-      expect(where({ note: { startsWith: 'x' } }).sql).toBe('substr("memo", 1, 1) = ?');
-      // The length in characters (code points), as SQLite's substr counts: an emoji is one, not two UTF-16 units.
-      expect(where({ note: { startsWith: '😀a' } })).toEqual({ sql: 'substr("memo", 1, 2) = ?', params: ['😀a'] });
+      expect(where({ name: { startsWith: 'ab' } })).toEqual({ sql: 'starts_with("name", ?)', params: ['ab'] });
+      expect(where({ note: { startsWith: 'x' } }).sql).toBe('starts_with("memo", ?)');
+      // The prefix is compared exactly, whatever characters it holds.
+      expect(where({ note: { startsWith: '😀a' } })).toEqual({ sql: 'starts_with("memo", ?)', params: ['😀a'] });
       rejects({ name: { startsWith: 3 } }, /"startsWith" takes a string/);
       rejects({ qty: { startsWith: 'a' } }, /applies to string and text fields/);
     });
@@ -164,7 +168,7 @@ describe('compileWhere', () => {
     it('takes lists only, of valid values, up to the parameter limit of the dialect', () => {
       rejects({ qty: { in: 1 } }, /"in" on "qty" takes a list/);
       rejects({ qty: { notIn: 'x' } }, /"notIn" on "qty" takes a list/);
-      const limit = sqliteStorageDialect.maxParameters;
+      const limit = postgresStorageDialect.maxParameters;
       expect(where({ qty: { in: new Array(limit).fill(1) } }).params).toHaveLength(limit);
       rejects({ qty: { in: new Array(limit + 1).fill(1) } }, new RegExp(`binds at most ${limit} values`));
       rejects({ name: 'a', qty: { in: new Array(limit).fill(1) } }, /binds at most/);
@@ -191,7 +195,7 @@ describe('compileWhere', () => {
     it('nests, and combines with field conditions', () => {
       const { sql, params } = where({ name: 'a', or: [{ qty: 1 }, { and: [{ qty: 2 }, { not: { active: true } }] }] });
       expect(sql).toBe('("name" = ? AND ("qty" = ? OR ("qty" = ? AND (NOT "active" = ?))))');
-      expect(params).toEqual(['a', 1, 2, 1]);
+      expect(params).toEqual(['a', 1, 2, true]);
     });
 
     it('rejects a combinator without a list', () => {
@@ -221,28 +225,29 @@ describe('compileWhere', () => {
     rejects({ qty: { gt: '1' } }, /expected a safe integer/);
     const long = 'x'.repeat(300);
     expect(where({ name: long })).toEqual({ sql: '"name" = ?', params: [long] });
-    expect(where({ due: '2026-02-30' })).toEqual({ sql: '"due" = ?', params: ['2026-02-30'] });
+    // A day that does not exist cannot be bound as a date: it is bound as a value no row holds.
+    expect(where({ due: '2026-02-30' }).sql).toBe('"due" = ?');
   });
 
   it('compares a decimal finer than the scale with the stored value just below it', () => {
     expect(where({ price: '1.234' })).toEqual({ sql: '0 = 1', params: [] });
-    expect(where({ price: '1.230' })).toEqual({ sql: '"price" = ?', params: [123] });
+    expect(where({ price: '1.230' })).toEqual({ sql: '"price" = ?', params: ['1.23'] });
     expect(where({ price: { ne: '1.234' } })).toEqual({ sql: '"price" IS NOT NULL', params: [] });
-    expect(where({ price: { lt: '1.234' } })).toEqual({ sql: '"price" <= ?', params: [123] });
-    expect(where({ price: { lte: '1.234' } })).toEqual({ sql: '"price" <= ?', params: [123] });
-    expect(where({ price: { gt: '1.234' } })).toEqual({ sql: '"price" > ?', params: [123] });
-    expect(where({ price: { gte: '-1.234' } })).toEqual({ sql: '"price" > ?', params: [-124] });
-    expect(where({ price: { gte: '1.23' } })).toEqual({ sql: '"price" >= ?', params: [123] });
+    expect(where({ price: { lt: '1.234' } })).toEqual({ sql: '"price" <= ?', params: ['1.23'] });
+    expect(where({ price: { lte: '1.234' } })).toEqual({ sql: '"price" <= ?', params: ['1.23'] });
+    expect(where({ price: { gt: '1.234' } })).toEqual({ sql: '"price" > ?', params: ['1.23'] });
+    expect(where({ price: { gte: '-1.234' } })).toEqual({ sql: '"price" > ?', params: ['-1.24'] });
+    expect(where({ price: { gte: '1.23' } })).toEqual({ sql: '"price" >= ?', params: ['1.23'] });
     expect(where({ price: { between: ['1.001', '2.009'] } })).toEqual({
       sql: '("price" > ? AND "price" <= ?)',
-      params: [100, 200],
+      params: ['1.00', '2.00'],
     });
-    expect(where({ price: { in: ['1.001', '2.00'] } })).toEqual({ sql: '"price" IN (?)', params: [200] });
+    expect(where({ price: { in: ['1.001', '2.00'] } })).toEqual({ sql: '"price" IN (?)', params: ['2.00'] });
     expect(where({ price: { in: ['1.001'] } })).toEqual({ sql: '0 = 1', params: [] });
     expect(where({ price: { notIn: ['1.001'] } })).toEqual({ sql: '"price" IS NOT NULL', params: [] });
   });
 
-  it('lowercases a uuid operand without checking its form', () => {
+  it('lowercases a uuid operand and binds a malformed one as null, which matches no row', () => {
     const refs = compileTable(
       naming,
       'refs',
@@ -250,17 +255,21 @@ describe('compileWhere', () => {
       'plugin_demo_refs',
       () => undefined,
     );
-    const params = new StorageParams(sqliteStorageDialect);
-    expect(compileWhere(refs, sqliteStorageDialect, params, { ref: { in: ['ABC', 'Not-A-Uuid'] } })).toBe(
-      '"ref" IN (?, ?)',
-    );
-    expect(params.values).toEqual(['abc', 'not-a-uuid']);
+    const params = new StorageParams(postgresStorageDialect);
+    expect(
+      plain(
+        compileWhere(refs, postgresStorageDialect, params, {
+          ref: { in: ['0A1B2C3D-0000-4000-8000-00000000000F', 'Not-A-Uuid'] },
+        }),
+      ),
+    ).toBe('"ref" IN (?, ?)');
+    expect(params.values).toEqual(['0a1b2c3d-0000-4000-8000-00000000000f', null]);
   });
 });
 
 describe('compileQuery', () => {
   const query = (input?: unknown, table = items) =>
-    compileQuery(table, sqliteStorageDialect, new StorageParams(sqliteStorageDialect), input as never);
+    compileQuery(table, postgresStorageDialect, new StorageParams(postgresStorageDialect), input as never);
 
   it('orders by the primary key and has no limit by default', () => {
     expect(query()).toEqual({ where: '1 = 1', orderBy: 'ORDER BY "id" ASC NULLS FIRST', limit: '' });
@@ -301,7 +310,7 @@ describe('compileQuery', () => {
   it('builds limit and offset', () => {
     expect(query({ limit: 10 }).limit).toBe('LIMIT 10');
     expect(query({ limit: 10, offset: 5 }).limit).toBe('LIMIT 10 OFFSET 5');
-    expect(query({ offset: 5 }).limit).toBe('LIMIT -1 OFFSET 5');
+    expect(query({ offset: 5 }).limit).toBe('OFFSET 5');
     expect(query({ limit: 0 }).limit).toBe('LIMIT 0');
   });
 
@@ -320,9 +329,9 @@ describe('compileQuery', () => {
   });
 
   it('compiles the filter into the same parameter list', () => {
-    const params = new StorageParams(sqliteStorageDialect);
-    const parts = compileQuery(items, sqliteStorageDialect, params, { where: { qty: { gt: 2 } }, limit: 1 });
-    expect(parts.where).toBe('"qty" > ?');
+    const params = new StorageParams(postgresStorageDialect);
+    const parts = compileQuery(items, postgresStorageDialect, params, { where: { qty: { gt: 2 } }, limit: 1 });
+    expect(plain(parts.where)).toBe('"qty" > ?');
     expect(params.values).toEqual([2]);
   });
 });

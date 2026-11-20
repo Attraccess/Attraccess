@@ -6,7 +6,7 @@ import type { TransactionContext } from '../transaction-context';
 import { ScopedUnitOfWork, UNIT_OF_WORK, UnitOfWork } from '../unit-of-work';
 
 /**
- * Adapter-side interpretation of a {@link TransactionContext}. A scope of the SQLite unit of work resolves to its
+ * Adapter-side interpretation of a {@link TransactionContext}. A scope of the unit of work resolves to its
  * transaction's EntityManager (an adapter's own legacy transaction resolves to itself), and no context
  * resolves to the manager of the unit of work still open in this async flow, or to the application connection for
  * plain reads. A continuation that outlives its unit of work (post-commit work started inside it) still sees the

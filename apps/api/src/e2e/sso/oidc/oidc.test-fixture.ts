@@ -3,9 +3,6 @@ import type { SSOProviderOIDCConfiguration } from '@attraccess/database-entities
 import { User } from '@attraccess/database-entities';
 import type { ModuleRef } from '@nestjs/core';
 import { execFileSync } from 'child_process';
-import { promises as fs } from 'fs';
-import * as os from 'os';
-import * as path from 'path';
 import { GenericContainer, StartedTestContainer, Wait } from 'testcontainers';
 import type { DataSource, Repository } from 'typeorm';
 import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
@@ -73,11 +70,10 @@ export function registerSsoOidcIntegrationE2eWithTestcontainersFixture() {
     const containerPort = container.getMappedPort(8080);
     oidcBaseUrl = `http://${container.getHost()}:${containerPort}/${ISSUER_ID}`;
 
-    // ── 2. Set up SQLite database ────────────────────────────────────────────
-    const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'att-sso-oidc-e2e-'));
+    // ── 2. Set up the PostgreSQL database ───────────────────────────────────────
     process.env.AUTH_SESSION_SECRET = 'sso-oidc-e2e-test-secret-must-be-long-enough';
 
-    dataSource = await createTestDataSource({ location: path.join(tmpRoot, 'attraccess.sqlite'), synchronize: true });
+    dataSource = await createTestDataSource({ synchronize: true });
 
     ({ userRepo, rbacService, mockModuleRef } = createOidcTestServices(dataSource));
 

@@ -92,7 +92,7 @@ the normal workspace dependencies (`scripts/setup-dev-dependencies.sh`) and the
 native prerequisites above. The first CMake build downloads pinned LVGL and
 ArduinoJson sources. Ordinary API unit and E2E targets exclude this suite.
 
-Each invocation creates its own SQLite database, storage, empty plugin folder,
+Each invocation creates its own PostgreSQL database, storage, empty plugin folder,
 control directory and reader profiles. The dedicated Jest setup ignores `.env`
 and inherited application settings, uses a random session secret and disables
 plugins. Real migrations, authentication and permissions remain enabled.
@@ -126,7 +126,7 @@ retain separate artifacts and disposable data. Native builds share the normal
 build directory, so run this target serially.
 
 The fixture waits for owned processes to exit before deleting their temporary
-profiles and controls. Nest and SQLite close before storage is removed. Tests may
+profiles and controls. Nest closes and the database is dropped before storage is removed. Tests may
 explicitly restart a reader with its own profile to check persistence. Build and
 probe waits are bounded. If startup fails, inspect the error and retained launch
 log. A moved worktree may need a fresh CMake build directory: preserve any desired

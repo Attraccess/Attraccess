@@ -1,11 +1,7 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { createMock } from '@golevelup/ts-jest';
 import { ForbiddenException } from '@nestjs/common';
 import {
   AuthenticationDetail,
-  entities,
   PasswordHistory,
   PasswordPolicy,
   PasswordPolicyOverride,
@@ -17,9 +13,12 @@ import { TypeOrmCredentialStore } from '../../database/adapters/auth/typeorm-cre
 import { TypeOrmPasswordPolicyStore } from '../../database/adapters/auth/typeorm-password-policy.store';
 import { unitOfWorkFor } from '../../database/adapters/shared-unit-of-work';
 import { TransactionContextResolver } from '../../database/adapters/transaction-context';
-import * as migrations from '../../database/migrations';
-import { closeResourceTransactionConnection } from '../../database/sqlite/run-serialized-transaction';
-import { createDataSource } from '../../database/sqlite/sqlite-connection';
+import {
+  closeTestDataSource,
+  createTestDatabaseLocation,
+  createTestDataSource,
+  type TestDatabaseLocation,
+} from '../../test-utils/test-database';
 import { EmailService } from '../../email/email.service';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { LicenseService } from '../../license/license.service';
@@ -39,7 +38,7 @@ const FIRST_RESET_PASSWORD = 'Tr0ub4dor-Hummingbird-9!plate';
 const SECOND_RESET_PASSWORD = 'Diff3rent-Hummingbird-9!plate';
 const TOO_SHORT_PASSWORD = 'a1!';
 
-/** One application stack (services and stores) on its own connection to the database file. */
+/** One application stack (services and stores) on its own connection to the database. */
 function buildStack(db: DataSource) {
   const rbac = createMock<RbacService>({ getEffectivePermissions: async () => new Set<string>() });
   const emailService = createMock<EmailService>();
@@ -94,7 +93,7 @@ function buildStack(db: DataSource) {
 
 describe('single-use reset and verification tokens (integration)', () => {
   let source: DataSource;
-  let directory: string;
+  let database: TestDatabaseLocation;
   let users: UsersService;
   let auth: AuthService;
   let passwords: UserPasswordService;
@@ -102,16 +101,8 @@ describe('single-use reset and verification tokens (integration)', () => {
   let userCount = 0;
 
   beforeAll(async () => {
-    // The unit of work commits on its own connection, so the database must be a file.
-    directory = await mkdtemp(join(tmpdir(), 'single-use-tokens-'));
-    source = await createDataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: join(directory, 'tokens.sqlite'),
-      entities: Object.values(entities),
-      migrations: Object.values(migrations),
-    }).initialize();
-    await source.runMigrations();
+    database = await createTestDatabaseLocation();
+    source = await createTestDataSource({ location: database.location });
 
     ({ users, auth, passwords, emailService } = buildStack(source));
     // Keep password history on so a rejected reset can be shown not to archive anything.
@@ -124,9 +115,8 @@ describe('single-use reset and verification tokens (integration)', () => {
   });
 
   afterAll(async () => {
-    if (source) await closeResourceTransactionConnection(source);
-    if (source?.isInitialized) await source.destroy();
-    if (directory) await rm(directory, { recursive: true, force: true });
+    await closeTestDataSource(source);
+    await database?.remove();
   });
 
   async function createLocalUser(): Promise<User> {
@@ -325,19 +315,12 @@ describe('single-use reset and verification tokens (integration)', () => {
     let second: ReturnType<typeof buildStack>;
 
     beforeAll(async () => {
-      secondSource = await createDataSource({
-        type: 'better-sqlite3',
-        invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-        database: join(directory, 'tokens.sqlite'),
-        timeout: 5000,
-        entities: Object.values(entities),
-      }).initialize();
+      secondSource = await createTestDataSource({ location: database.location });
       second = buildStack(secondSource);
     });
 
     afterAll(async () => {
-      if (secondSource) await closeResourceTransactionConnection(secondSource);
-      if (secondSource?.isInitialized) await secondSource.destroy();
+      await closeTestDataSource(secondSource);
     });
 
     it('lets exactly one of two concurrent resets with the same token change the password', async () => {

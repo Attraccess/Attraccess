@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { Session, User } from '@attraccess/database-entities';
 import { TokenHashService } from '../../../encryption/token-hash.service';
 import { SESSION_USER_DIRECTORY } from '../../../users-and-auth/auth/session-store/session-user-directory.port';
-import { SqliteSessionStore } from './sqlite-session-store';
+import { PostgresSessionStore } from './postgres-session-store';
 import { TypeOrmSessionUserDirectory } from './typeorm-session-user-directory';
 
 /** The database-backed session store: sessions in the SQL database, used unless Valkey is configured. */
@@ -20,7 +20,7 @@ export const DATABASE_SESSION_STORE = Symbol.for('attraccess.auth.database-sessi
       provide: DATABASE_SESSION_STORE,
       inject: [getRepositoryToken(Session), TokenHashService],
       useFactory: (sessions: Repository<Session>, tokenHashService: TokenHashService) =>
-        new SqliteSessionStore(sessions, tokenHashService),
+        new PostgresSessionStore(sessions, tokenHashService),
     },
   ],
   exports: [DATABASE_SESSION_STORE, SESSION_USER_DIRECTORY],

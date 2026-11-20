@@ -214,8 +214,12 @@ it.each(['failed', 'partial', 'returned'])(
 
 it('does not claim sign-out for a valid old result when the browser has signed in again', async () => {
   mockReturn('partial', true);
+  // The router's entry state survives, so navigation blockers still see browser Back on this entry.
+  const routerState = { usr: null, key: 'k', idx: 3 };
+  window.history.replaceState(routerState, '', window.location.href);
   const hook = mount();
   await waitFor(() => expect(window.location.search).toBe(''));
+  expect(window.history.state).toEqual(routerState);
   expect(hook.result.current[0].isAuthenticated).toBe(true);
   expect(messages.info).not.toHaveBeenCalled();
 });

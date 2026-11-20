@@ -9,16 +9,12 @@ import {
   User,
 } from '@attraccess/database-entities';
 import { BillingTransactionStatus, ResourceUsageAction } from '@attraccess/application-models';
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
+import { withoutIntegrityTriggers } from '../integrity-triggers.test-fixture';
 import { ResourceUsageService } from '../../../../resources/usage/sessions/resource-usage.service';
 import { ResourceOperatingIntervalService } from '../../../../resources/operating-intervals/resource-operating-interval.service';
 import { ExternalEffectFailureError } from '../../../../resources/flows/errors/external-effect-failure.error';
-import { ResourceUsageIntegrity1790100000000 } from '../../../migrations/1790100000000-resource-usage-integrity';
-import { ParallelMachineSessions1792000000000 } from '../../../migrations/1792000000000-parallel-machine-sessions';
-import { schemas } from './schemas.test-fixture';
 export function createUsageLifecyclePersistenceAroundExternalFlowsFixture() {
-  let directory: string;
-
   let source: DataSource;
 
   let usage: ResourceUsageService;
@@ -86,28 +82,38 @@ export function createUsageLifecyclePersistenceAroundExternalFlowsFixture() {
     };
   }
 
-  /** Applies the production integrity migrations in order: the single-session guards, then their per-person successors. */
-  async function migrateIntegrity() {
-    const runner = source.createQueryRunner();
-    try {
-      await runner.startTransaction();
-      await new ResourceUsageIntegrity1790100000000().up(runner);
-      // The synchronized test schema already has the column the parallel-sessions migration adds.
-      const limits: { id: number; maxParallelSessions: number }[] = await runner.query(
-        'SELECT id, maxParallelSessions FROM resource',
-      );
-      await runner.query('ALTER TABLE "resource" DROP COLUMN "maxParallelSessions"');
-      await new ParallelMachineSessions1792000000000().up(runner);
-      for (const { id, maxParallelSessions } of limits) {
-        await runner.query('UPDATE resource SET maxParallelSessions = ? WHERE id = ?', [maxParallelSessions, id]);
-      }
-      await runner.commitTransaction();
-    } catch (error) {
-      await runner.rollbackTransaction();
-      throw error;
-    } finally {
-      await runner.release();
-    }
+  /** Stores legacy rows (orphans, duplicate sessions) the integrity guards refuse; see `withoutIntegrityTriggers`. */
+  const withoutGuards = <T>(work: () => Promise<T>) => withoutIntegrityTriggers(source, work);
+
+  /** A BEFORE row trigger whose plpgsql `body` runs for `event` (e.g. `INSERT`, `UPDATE OF "billingFactor"`); returns its removal. */
+  async function installTrigger(options: { name: string; table: string; event: string; body: string; when?: string }) {
+    const { name, table, event, body, when } = options;
+    await source.query(
+      `CREATE FUNCTION "${name}_fn"() RETURNS trigger LANGUAGE plpgsql AS $fn$ BEGIN ${body} RETURN NEW; END $fn$`,
+    );
+    await source.query(
+      `CREATE TRIGGER "${name}" BEFORE ${event} ON "${table}" FOR EACH ROW ${when ? `WHEN (${when}) ` : ''}EXECUTE FUNCTION "${name}_fn"()`,
+    );
+    return async () => {
+      await source.query(`DROP TRIGGER "${name}" ON "${table}"`);
+      await source.query(`DROP FUNCTION "${name}_fn"()`);
+    };
+  }
+
+  /** Stores a legacy orphan: open, neither finalized nor pending (a state the database no longer accepts). */
+  function seedLegacyOrphan(fields: Partial<ResourceUsage> = {}) {
+    return withoutGuards(() =>
+      source.getRepository(ResourceUsage).save({
+        resourceId: 1,
+        userId: 1,
+        usageAction: ResourceUsageAction.Usage,
+        startTime: new Date(),
+        endTime: null,
+        isFinalized: false,
+        lifecyclePending: false,
+        ...fields,
+      }),
+    );
   }
 
   function failAfterObservation() {
@@ -198,14 +204,21 @@ export function createUsageLifecyclePersistenceAroundExternalFlowsFixture() {
     set billing(value: typeof billing) {
       billing = value;
     },
-    get migrateIntegrity() {
-      return migrateIntegrity;
+    /** The database has the complete released schema; kept as an empty list for fixtures that spread it. */
+    get schemas(): unknown[] {
+      return [];
+    },
+    get withoutIntegrityTriggers() {
+      return withoutGuards;
+    },
+    get installTrigger() {
+      return installTrigger;
+    },
+    get seedLegacyOrphan() {
+      return seedLegacyOrphan;
     },
     get seedActiveSession() {
       return seedActiveSession;
-    },
-    get schemas() {
-      return schemas;
     },
     get failAfterObservation() {
       return failAfterObservation;
@@ -239,12 +252,6 @@ export function createUsageLifecyclePersistenceAroundExternalFlowsFixture() {
     },
     set introducers(value: typeof introducers) {
       introducers = value;
-    },
-    get directory() {
-      return directory;
-    },
-    set directory(value: typeof directory) {
-      directory = value;
     },
   };
   return scope;

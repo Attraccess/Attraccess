@@ -34,13 +34,13 @@ export class SSOProvider {
   @IsEnum(SSOProviderType)
   type!: SSOProviderType;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the user was created',
   })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the user was last updated',
   })

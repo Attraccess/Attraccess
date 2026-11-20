@@ -39,12 +39,21 @@ import { getNodeFlowScopes } from './schemas/node-flow-scopes';
 
 import type { TransactionScope } from '../../database/unit-of-work';
 
+import { ZodError } from 'zod';
+
+import {
+  INVALID_NODE_CONFIGURATION_MESSAGE,
+  ValidationErrorCode,
+  zodErrorToFieldErrors,
+} from './node-validation-errors';
+
 export interface ValidationError {
   nodeId: string;
   nodeType: string;
   field: string;
+  /** Always set by this API; the editor treats a missing code (older APIs) as `invalid`. */
+  code?: ValidationErrorCode;
   message: string;
-  value?: unknown;
 }
 
 export interface ResourceFlowResponse {
@@ -291,6 +300,18 @@ export class ResourceFlowsService {
     );
   }
 
+  /** Not a schema problem: log it, and keep internal details out of the editor. */
+  private unexpectedValidationFailure(nodeData: { id: string; type: string }, error: unknown): ValidationError {
+    this.logger.error(`Failed to validate node ${nodeData.id} (${nodeData.type})`, (error as Error)?.stack);
+    return {
+      nodeId: nodeData.id,
+      nodeType: nodeData.type,
+      field: 'data',
+      code: 'invalid',
+      message: INVALID_NODE_CONFIGURATION_MESSAGE,
+    };
+  }
+
   public async validateNodeData(
     nodeData: { id: string; type: string; data: unknown },
     validationContext = new Map<string, unknown>(),
@@ -304,22 +325,30 @@ export class ResourceFlowsService {
           nodeId: nodeData.id,
           nodeType: nodeData.type,
           field: 'type',
+          code: 'invalid',
           message: `Unknown node type: ${nodeData.type}`,
         });
       }
       const plugin = getPluginFlowNode(nodeData.type);
       if (plugin?.validateConfig) {
-        const validationErrors = await plugin.validateConfig(
-          nodeData.data as Record<string, unknown>,
-          validationContext,
-        );
-        errors.push(
-          ...validationErrors.map((error) => ({
-            nodeId: nodeData.id,
-            nodeType: nodeData.type,
-            ...error,
-          })),
-        );
+        try {
+          const validationErrors = await plugin.validateConfig(
+            nodeData.data as Record<string, unknown>,
+            validationContext,
+          );
+          // Only the field and message: the host owns the ids and the code, and node values stay out of responses.
+          errors.push(
+            ...validationErrors.map(({ field, message }) => ({
+              nodeId: nodeData.id,
+              nodeType: nodeData.type,
+              field,
+              code: 'invalid' as const,
+              message,
+            })),
+          );
+        } catch (error) {
+          errors.push(this.unexpectedValidationFailure(nodeData, error));
+        }
       }
       return errors;
     }
@@ -337,32 +366,22 @@ export class ResourceFlowsService {
             nodeId: nodeData.id,
             nodeType: nodeData.type,
             field: 'meterId',
+            code: 'invalid',
             message: 'Choose a meter belonging to this resource',
           });
         }
       }
     } catch (error) {
-      // Handle Zod validation errors
-      if (error.errors) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        error.errors.forEach((zodError: any) => {
-          errors.push({
+      if (error instanceof ZodError) {
+        errors.push(
+          ...zodErrorToFieldErrors(error, nodeData.data).map((fieldError) => ({
             nodeId: nodeData.id,
             nodeType: nodeData.type,
-            field: zodError.path?.join('.') || 'data',
-            message: zodError.message,
-            value: zodError.received,
-          });
-        });
+            ...fieldError,
+          })),
+        );
       } else {
-        // Fallback for other types of errors
-        errors.push({
-          nodeId: nodeData.id,
-          nodeType: nodeData.type,
-          field: 'data',
-          message: error.message || 'Invalid node data',
-          value: nodeData.data,
-        });
+        errors.push(this.unexpectedValidationFailure(nodeData, error));
       }
     }
 

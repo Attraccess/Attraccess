@@ -23,6 +23,7 @@ import type { TransactionContext } from '../../transaction-context';
 import { UNIT_OF_WORK, UnitOfWork } from '../../unit-of-work';
 import { EntityManagerResolver } from '../entity-manager-resolver';
 import { findSelect } from '../find-options';
+import { RESOURCE_LOCK, lockResource } from '../resources/resource-locks';
 
 const SESSION_COLUMNS: (keyof ResourceUsage)[] = [
   'id',
@@ -114,15 +115,16 @@ export class TypeOrmOperatingTimelineStore implements OperatingTimelineStore {
     state: OperatingState,
     provenance?: OperatingTransitionProvenance,
   ): Promise<ResourceOperatingInterval | null> {
-    // Updating the parent row acquires a database-backed per-resource write lock.
-    await manager.query('UPDATE "resource" SET "id" = "id" WHERE "id" = ?', [resourceId]);
+    // Per-resource transaction lock: transitions of one resource queue here (read committed would otherwise let two
+    // of them both see the same latest interval); it is released at commit or rollback.
+    await lockResource(manager, RESOURCE_LOCK.operatingTimeline, resourceId);
 
     const repository = manager.getRepository(ResourceOperatingInterval);
     const latestInterval = await repository.findOne({
       where: { resourceId },
       order: { startTime: 'DESC', id: 'DESC' },
     });
-    // Read the clock after obtaining the write lock so queued assignments use their application time.
+    // Read the clock after obtaining the lock so queued assignments use their application time.
     const transitionTime = new Date();
     const lastTransitionTime = latestInterval?.endTime ?? latestInterval?.startTime;
     if (lastTransitionTime && transitionTime < lastTransitionTime) throw new OperatingClockRegressionError();

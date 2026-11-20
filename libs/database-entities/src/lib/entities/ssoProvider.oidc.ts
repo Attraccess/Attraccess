@@ -107,7 +107,7 @@ export class SSOProviderOIDCConfiguration {
   roleClaimPaths?: string[] | null;
 
   // ponytail: keeps the legacy 'permissionMappings' DB column — renaming it would need a migration for zero gain
-  @Column({ type: 'json', nullable: true, name: 'permissionMappings' })
+  @Column({ type: 'jsonb', nullable: true, name: 'permissionMappings' })
   @ApiProperty({
     description: 'Mapping between Attraccess role keys and IdP role/group claim values',
     required: false,
@@ -148,13 +148,13 @@ export class SSOProviderOIDCConfiguration {
   })
   permissionSyncTtlMinutes?: number | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the user was created',
   })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the user was last updated',
   })

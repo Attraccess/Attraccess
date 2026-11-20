@@ -17,7 +17,8 @@ import {
   UserRole,
 } from '@attraccess/database-entities';
 import { DataSource } from 'typeorm';
-import { SqliteFileFixture } from '../sqlite-file.test-fixture';
+import { publishedState } from '../../../resources/usage/sessions/published-state';
+import { PostgresDatabaseFixture } from '../postgres-database.test-fixture';
 import { unitOfWorkFor } from '../shared-unit-of-work';
 import { TransactionContextResolver } from '../transaction-context';
 import { TypeOrmUserStore } from './typeorm-user.store';
@@ -34,13 +35,13 @@ const aNewUser = (username: string, overrides: Partial<NewUser> = {}): NewUser =
   ...overrides,
 });
 
-describe('user store on a real SQLite file', () => {
-  let fixture: SqliteFileFixture;
+describe('user store on real PostgreSQL', () => {
+  let fixture: PostgresDatabaseFixture;
   let source: DataSource;
   let store: TypeOrmUserStore;
 
   beforeAll(async () => {
-    fixture = await SqliteFileFixture.create();
+    fixture = await PostgresDatabaseFixture.create();
     source = await fixture.open();
     store = storeFor(source);
   }, 30_000);
@@ -458,6 +459,7 @@ describe('user store on a real SQLite file', () => {
       const [user] = await store.insertUsers([aNewUser('busy')]);
       const resource = await source.getRepository(Resource).save({ name: 'Lathe', type: ResourceType.Machine });
       await source.getRepository(ResourceUsage).save({
+        ...publishedState,
         usageAction: ResourceUsageAction.Usage,
         resourceId: resource.id,
         userId: user.id,

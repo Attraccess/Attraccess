@@ -1,23 +1,27 @@
 # Adding a Database Backend
 
-<!-- llms-description: Exact steps to add another relational backend to Attraccess, the export, import and backup contract, and the concrete deliverables that remain for PostgreSQL (ATT-584). -->
+<!-- llms-description: How the PostgreSQL backend is structured and the exact steps to add another relational backend to Attraccess, including the export, import and backup contract that the SQLite transfer implements. -->
 
-Only SQLite is implemented. This page lists what a new backend has to provide so that no feature rule and no public
-contract has to change. PostgreSQL (ATT-584) is the first intended target; nothing below is a claim that it works.
+PostgreSQL is the implemented backend and the only one that runs. SQLite is **import-only**: its released migrations
+are frozen and run only on a temporary copy during the one-time [transfer to PostgreSQL](installation/updating.md#moving-from-sqlite-to-postgresql).
+This page lists what a further backend has to provide so that no feature rule and no public contract has to change,
+using the PostgreSQL backend (`apps/api/src/database/postgres`) as the reference.
 
 ## Steps
 
 1. **Declare the type.** Add the value to `SUPPORTED_DATABASE_TYPES` in `database/backend/database-backend.ts` and to the
    `DatabaseBackend` registry in `resolve-database-backend.ts`. Until then `DATABASE_TYPE` fails at startup.
 2. **Write the adapter** in `apps/api/src/database/<engine>/`: connection options and pooling, the connection factory,
-   the error classifier (`PersistenceErrorClassifier`: busy, conflict, unique and foreign key violations), shutdown of
+   the error classifier (`PersistenceErrorClassifier`: busy, conflict, unique and foreign key violations; PostgreSQL maps SQLSTATEs `40001`, `40P01`, `55P03`, `57014`, `23505`, `23503`), shutdown of
    extra connections, and a `UnitOfWork` built with `ScopedUnitOfWork`.
 3. **Write the schema** next to the entities: engine-specific column types, generated columns (for example the usage
-   duration expression that SQLite computes with `julianday`), indexes, partial indexes, constraints and triggers or
+   duration expression), indexes, partial indexes, constraints and triggers or
    their equivalent for balance maintenance and usage integrity.
-4. **Add a migration track.** Do not run SQLite migrations on another engine. Create a new ordered track
+4. **Add a migration track.** Never run another engine's migrations. Create a new ordered track
    (`MigrationTrack`) with its own migrations table and register its directory in `apps/api/migration-tracks.cjs`, which
-   selects the track for the migration build by `DATABASE_TYPE`. Released SQLite migrations are never changed.
+   selects the track for the migration build by `DATABASE_TYPE`. The PostgreSQL track is one baseline migration in
+   `apps/api/src/database/postgres/migrations`, and later migrations are PostgreSQL-only. The released SQLite
+   migrations (`apps/api/src/database/migrations`) are frozen and never changed.
 5. **Wire seeding and tooling** to the selected backend: add a provider to `apps/api/scripts/lib/database-provider.mjs`
    (dev seed, `reencrypt-card-keys`), keep `scripts/check-database-type.sh` and the migration Nx targets selecting by
    `DATABASE_TYPE`, and let `apps/api/src/test-utils/test-database.ts` open the new engine.
@@ -33,9 +37,9 @@ contract has to change. PostgreSQL (ATT-584) is the first intended target; nothi
    step (`createTable`, `dropTable`, `addColumn`, `dropColumn`, `renameColumn`, `addIndex`, `dropIndex`) into DDL for
    the engine, including the physical type mapping (decimals exact, timestamps UTC, `date`, `json`, `uuid`), generated
    keys, namespacing and the adoption baseline. Run the plugin-storage conformance suite against it.
-9. **Document operations**: configuration, backup and restore for the engine.
+9. **Document operations**: configuration, backup and restore for the engine (for PostgreSQL see [Environment Variables](installation/environment-variables.md#database) and [Backup & Restore](installation/backup-restore.md)).
 
-## Export, import and backup contract (for ATT-584)
+## Export, import and backup contract
 
 A transfer or restore, whatever its tooling, must preserve:
 
@@ -54,8 +58,10 @@ A transfer or restore, whatever its tooling, must preserve:
 - **Derived data:** balances and usage invariants are checked after import by running the engine's integrity checks;
   triggers or equivalent must not double-apply during import.
 
-SQLite conformance for this contract: a fresh install, an upgrade from older migration states with data and the
-migration track's unchanged table name are tested (`apps/api/src/e2e/migrations`). The contract itself is a neutral
+The SQLite to PostgreSQL transfer implements this contract (`apps/api/src/database/transfer`): the SQLite file is
+copied to a working copy, the frozen SQLite track brings the copy to the last SQLite migration, a snapshot is read and
+imported into PostgreSQL in one transaction, then integrity checks run. A fresh install and the upgrade from older
+migration states with data are tested (`apps/api/src/e2e/migrations`). The contract itself is a neutral
 snapshot (`database/transfer-snapshot.ts`: tables, stored columns in neutral kinds, instants as ISO-8601 UTC, integers
 beyond 2^53 and decimal text exactly, sequences, core migration state, and per plugin its storage namespace and applied
 storage versions) that a backend exports and imports through `DatabaseBackend.transfer`. Plugin columns are typed from
@@ -64,16 +70,11 @@ the plugin's storage declaration, not from the engine's column type: decimals as
 descriptors (`{ plugins }`) and refuses a plugin that is missing there or at other storage versions. `describeTransferConformance` (`database/conformance`, run by `api:test-conformance`)
 checks it per backend: stable ids and relationships, instants, exact monetary and meter values, plugin tables and
 plugin storage versions, core migration state, derived balances not applied twice, and an atomic restore that refuses a
-snapshot written for another migration state. A backend adds a `TransferBackendFixture`. The cross-engine transfer
-command itself is not part of this work.
+snapshot written for another migration state. A backend adds a `TransferBackendFixture`.
 
-## Remaining ATT-584 deliverables
+## Not implemented
 
-- The PostgreSQL adapter, schema, migration track and `docker-compose`/deployment configuration.
-- A PostgreSQL fixture for `describePersistenceConformance` and the other engine-parameterised suites, run in CI.
-- The SQLite to PostgreSQL transfer command honouring the contract above.
-- Ports and adapters for the feature areas still on the baseline (see
-  [Persistence architecture](developer/persistence-architecture.md)).
-- The PostgreSQL plugin-storage adapter and DDL generator and its tests, with the
-  plugin-storage conformance suite run in CI. The plugin side is engine-neutral and needs no change.
-- Multi-replica guarantees (locks, scheduler leadership, shared live updates), tracked separately.
+- Further engines. Nothing in the application depends on PostgreSQL-only behaviour outside the adapters and the
+  PostgreSQL track, but no second engine is planned.
+- Multi-replica guarantees (scheduler leadership, shared live updates), tracked separately; see
+  [Persistence guarantees](developer/persistence-guarantees.md).

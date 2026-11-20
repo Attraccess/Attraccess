@@ -1,15 +1,18 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { DataSource, EntityManager } from 'typeorm';
+import { EntityManager, type DataSource } from 'typeorm';
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 import { ResourceMaintenanceSchedule } from '@attraccess/database-entities';
 import { MaintenanceResourceEvaluation } from './evaluation/resource-evaluation';
 import { TypeOrmMaintenanceEvaluationStore } from '../../database/adapters/resources/maintenance-evaluation-store.adapter';
 import { unitOfWorkFor } from '../../database/adapters/shared-unit-of-work';
+import {
+  closeTestDataSource,
+  createTestDatabaseLocation,
+  createTestDataSource,
+  type TestDatabaseLocation,
+} from '../../test-utils/test-database';
 
 describe('Scheduled maintenance commit notification', () => {
-  let directory: string;
+  let database: TestDatabaseLocation;
   let writer: DataSource;
   let observer: DataSource;
   let service: MaintenanceScheduleEvaluatorService;
@@ -19,11 +22,10 @@ describe('Scheduled maintenance commit notification', () => {
   let enabled: boolean;
 
   beforeEach(async () => {
-    directory = await mkdtemp(join(tmpdir(), 'maintenance-commit-'));
-    const options = { type: 'better-sqlite3' as const, database: join(directory, 'test.sqlite') };
-    writer = await new DataSource(options).initialize();
-    observer = await new DataSource(options).initialize();
-    await writer.query('CREATE TABLE maintenance (id INTEGER PRIMARY KEY, resourceId INTEGER)');
+    database = await createTestDatabaseLocation();
+    writer = await createTestDataSource({ location: database.location });
+    observer = await createTestDataSource({ location: database.location });
+    await writer.query('CREATE TABLE maintenance (id integer PRIMARY KEY, "resourceId" integer)');
     reads = [];
     rollback = false;
     enabled = true;
@@ -36,7 +38,7 @@ describe('Scheduled maintenance commit notification', () => {
     const publish = () => {
       reads.push(observer.query('SELECT COUNT(*) AS count FROM maintenance'));
     };
-    // Only schedule discovery is a fixture; writes and commit boundaries use real SQLite.
+    // Only schedule discovery is a fixture; writes and commit boundaries use real PostgreSQL.
     const getRepository = EntityManager.prototype.getRepository;
     jest.spyOn(EntityManager.prototype, 'getRepository').mockImplementation(function (this: EntityManager, target) {
       if (target !== ResourceMaintenanceSchedule) return getRepository.call(this, target) as never;
@@ -45,8 +47,6 @@ describe('Scheduled maintenance commit notification', () => {
       return { find: scheduleReads } as never;
     });
     const store = new TypeOrmMaintenanceEvaluationStore(writer, unitOfWorkFor(writer));
-    // This spec covers the engine-neutral path: the whole evaluation runs inside one transaction.
-    Object.defineProperty(store, 'snapshotReads', { get: () => false });
     jest.spyOn(store, 'hasEnabledSchedules').mockResolvedValue(true);
     const inTransaction = store.inTransaction.bind(store);
     jest.spyOn(store, 'inTransaction').mockImplementation((work) =>
@@ -67,7 +67,7 @@ describe('Scheduled maintenance commit notification', () => {
         context: object,
         notify = true,
       ) => {
-        await handle(context).query('INSERT INTO maintenance (id, resourceId) VALUES (1, ?)', [resourceId]);
+        await handle(context).query('INSERT INTO maintenance (id, "resourceId") VALUES (1, $1)', [resourceId]);
         if (notify) {
           publish();
           await reads[reads.length - 1];
@@ -89,9 +89,9 @@ describe('Scheduled maintenance commit notification', () => {
   });
 
   afterEach(async () => {
-    await observer.destroy();
-    await writer.destroy();
-    await rm(directory, { recursive: true, force: true });
+    await closeTestDataSource(observer);
+    await closeTestDataSource(writer);
+    await database.remove();
     jest.restoreAllMocks();
   });
 
@@ -99,7 +99,7 @@ describe('Scheduled maintenance commit notification', () => {
     await service.evaluateResource(9);
     expect(scheduleReads).toHaveBeenCalledTimes(1);
     expect(await Promise.all(reads)).toEqual([[{ count: 1 }]]);
-    expect(await observer.query('SELECT resourceId FROM maintenance')).toEqual([{ resourceId: 9 }]);
+    expect(await observer.query('SELECT "resourceId" FROM maintenance')).toEqual([{ resourceId: 9 }]);
   });
 
   it('re-reads schedules inside the transaction even if the positive precheck becomes stale', async () => {

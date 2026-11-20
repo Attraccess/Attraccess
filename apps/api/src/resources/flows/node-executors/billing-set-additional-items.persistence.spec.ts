@@ -2,13 +2,6 @@ import { Logger } from '@nestjs/common';
 import { BillingTransaction, BillingTransactionItem, ResourceUsage } from '@attraccess/database-entities';
 import { BillingTransactionStatus, FlowNodeRecord } from '@attraccess/application-models';
 import { DataSource, EntitySchema } from 'typeorm';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import {
-  closeResourceTransactionConnection,
-  runSerializedTransaction,
-} from '../../../database/sqlite/run-serialized-transaction';
 import { unitOfWorkFor } from '../../../database/adapters/shared-unit-of-work';
 import { TypeOrmFlowBillingItemStore } from '../../../database/adapters/flows/typeorm-flow-billing-item.store';
 import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
@@ -16,6 +9,7 @@ import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { BillingSetAdditionalItemsExecutor } from './billing-set-additional-items.executor';
 import { NodeExecutionContext } from './node-executor.interface';
 import { legacyEngineTransactionScope } from '../../../database/adapters/common/legacy-engine-transaction';
+import { createTestDataSource, closeTestDataSource } from '../../../test-utils/test-database';
 
 const schemas = [
   new EntitySchema<ResourceUsage>({
@@ -56,7 +50,6 @@ const schemas = [
 
 describe('Additional billing items around finalization', () => {
   let source: DataSource;
-  let directory: string;
   let executor: BillingSetAdditionalItemsExecutor;
   const item = { name: 'Energy', description: 'Meter', externalReference: 'meter-1', quantity: 3, unitPrice: 5 };
   const node = { resourceId: 1, data: item } as unknown as FlowNodeRecord;
@@ -64,14 +57,7 @@ describe('Additional billing items around finalization', () => {
 
   beforeEach(async () => {
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
-    directory = await mkdtemp(join(tmpdir(), 'attraccess-billing-items-'));
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: join(directory, 'test.sqlite'),
-      entities: schemas,
-      synchronize: true,
-    }).initialize();
+    source = await createTestDataSource({ synchronize: true, entities: schemas });
     await source.getRepository(ResourceUsage).save({ id: 1, resourceId: 1 });
     await source
       .getRepository(BillingTransaction)
@@ -85,9 +71,7 @@ describe('Additional billing items around finalization', () => {
   });
 
   afterEach(async () => {
-    await closeResourceTransactionConnection(source);
-    await source.destroy();
-    await rm(directory, { recursive: true, force: true });
+    await closeTestDataSource(source);
     jest.restoreAllMocks();
   });
 
@@ -139,7 +123,7 @@ describe('Additional billing items around finalization', () => {
     expect(await source.getRepository(BillingTransactionItem).count()).toBe(0);
   });
 
-  it('rejects a delayed item queued behind finalization without changing its frozen bill', async () => {
+  it('rejects a delayed item that waits for finalization without changing its frozen bill', async () => {
     let entered!: () => void;
     let release!: () => void;
     const phaseEntered = new Promise<void>((resolve) => {
@@ -148,25 +132,28 @@ describe('Additional billing items around finalization', () => {
     const finishPhase = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const finalization = runSerializedTransaction(source.manager, async (manager) => {
+    // Finalization changes the bill and keeps its transaction (and the row lock) open for a while.
+    const finalization = source.transaction(async (manager) => {
+      await manager.update(BillingTransaction, 1, { status: BillingTransactionStatus.Completed, amount: -15 });
       entered();
       await finishPhase;
-      await manager.update(BillingTransaction, 1, { status: BillingTransactionStatus.Completed, amount: -15 });
     });
     await phaseEntered;
-    const eventLookup = jest.spyOn(source.manager, 'findOne');
+    let settled = false;
     const delayedItem = executor.execute(node, { id: 1, quantity: 2 }, ctx).then(
       () => null,
       (error: unknown) => error,
     );
-    // With an explicit usage ID the unqueued path reaches findOne synchronously.
-    // It must not even read Pending while finalization owns the serialized phase.
-    const lookupsBeforeFinalization = eventLookup.mock.calls.length;
+    void delayedItem.then(() => {
+      settled = true;
+    });
+    // The delayed event must wait for the open finalization instead of passing the Pending check before its commit.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(settled).toBe(false);
     release();
     await finalization;
     const result = await delayedItem;
 
-    expect(lookupsBeforeFinalization).toBe(0);
     expect(result).toBeInstanceOf(NoUsageSessionError);
 
     expect(await source.getRepository(BillingTransactionItem).count()).toBe(0);

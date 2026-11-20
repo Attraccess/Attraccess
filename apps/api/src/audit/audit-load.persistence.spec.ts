@@ -6,7 +6,7 @@ import { droppedRecords } from '../database/adapters/audit/audit.test-fixture';
 const MACHINES = 6;
 const CYCLES_PER_MACHINE = 10;
 const ADMIN_EVENTS = 25;
-/** Well below the 5 s busy timeout, so waiting writers must outlast it rather than give up. */
+/** How long the unrelated write transaction stays open while the load runs. */
 const HOLD_MS = 400;
 /** The load normally finishes in about two seconds; a coverage-instrumented CI run under full parallel load took 36 s. */
 const WORK_DEADLINE_MS = 90_000;
@@ -14,7 +14,7 @@ const WORK_DEADLINE_MS = 90_000;
 /**
  * Acceptance gate for ATT-1212: the real usage-session service (start, end and take-over, each writing its audit
  * row inside its resource-lifecycle transaction), administration changes recorded without a transaction, and an
- * unrelated long write transaction on the main connection run concurrently on one file-backed SQLite database.
+ * unrelated long write transaction on the main connection run concurrently on one PostgreSQL database.
  * Not a single audit record may be lost.
  */
 describe('audit under concurrent load', () => {
@@ -67,25 +67,24 @@ describe('audit under concurrent load', () => {
       return Promise.all(receipts);
     };
 
-    // An unrelated request takes the main connection's write lock before anything else runs.
+    // An unrelated request holds a write transaction open: PostgreSQL does not make anything wait for it.
     const held = source.createQueryRunner();
     await held.startTransaction();
-    await held.query('INSERT INTO project (id) VALUES (99)');
+    await held.query(`INSERT INTO project (id, name) VALUES (99, 'Held project')`);
 
     const machines = Promise.allSettled(fixture.machines.map(runMachine));
     const deadline = setTimeout(() => (stopped = true), WORK_DEADLINE_MS);
     const administration = runAdministration();
     await delay(HOLD_MS);
-    // The load is waiting on the lock: calls are in flight, yet nothing else has written.
-    expect(sessionCalls).toBe(MACHINES);
+    // The load runs beside the open transaction: calls are in flight and their audit rows are already committed.
+    expect(sessionCalls).toBeGreaterThanOrEqual(MACHINES);
     expect(adminCalls).toBeGreaterThan(0);
-    expect(await held.query('SELECT count(*) AS n FROM audit_log')).toEqual([{ n: 0 }]);
-    expect(await held.query('SELECT count(*) AS n FROM resource_usage')).toEqual([{ n: 0 }]);
+    expect(await source.query('SELECT 1 FROM audit_log LIMIT 1')).toHaveLength(1);
+    expect(await source.query('SELECT 1 FROM project WHERE id = 99')).toEqual([]);
     await held.commitTransaction();
     await held.release();
 
-    // A main-connection deferred read-then-write (save of an existing row) while sessions keep running. It may
-    // lose SQLite's deadlock check against a committing writer; that is the caller's error, never the audit's.
+    // A read-then-write (save of an existing row) while sessions keep running.
     const machine = await source.getRepository(Resource).findOneByOrFail({ id: 1 });
     const renamed = source
       .getRepository(Resource)
@@ -102,7 +101,7 @@ describe('audit under concurrent load', () => {
     expect(machineResults.filter((result) => result.status === 'rejected')).toEqual([]);
     expect(stopped).toBe(false);
     expect(receipts.map((receipt) => receipt.status)).toEqual(Array(ADMIN_EVENTS).fill('recorded'));
-    expect(['saved', 'SQLITE_BUSY']).toContain(renameOutcome);
+    expect(renameOutcome).toBe('saved');
     expect(await source.query('SELECT id FROM project WHERE id = 99')).toEqual([{ id: 99 }]);
 
     // Every cycle is one session, plus the taker's session on each machine; all of them ended.
@@ -122,6 +121,6 @@ describe('audit under concurrent load', () => {
     expect(usageIds('usage_session.started')).toEqual(allUsageIds);
     expect(usageIds('usage_session.ended')).toEqual(allUsageIds);
     expect(rows.filter((row) => row.domain === 'administration')).toHaveLength(ADMIN_EVENTS);
-    // Passes in about a second. A regression fails slowly: every dropped write first waits the full busy timeout.
+    // Passes in about a second.
   }, 120_000);
 });

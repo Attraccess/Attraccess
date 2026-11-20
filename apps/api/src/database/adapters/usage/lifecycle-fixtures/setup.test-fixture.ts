@@ -1,46 +1,34 @@
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Logger } from '@nestjs/common';
-import { BillingTransaction, Form, Resource, ResourceUsage, User } from '@attraccess/database-entities';
+import { BillingTransaction, Resource, ResourceUsage, User } from '@attraccess/database-entities';
 import { BillingTransactionStatus, ResourceType, SupervisionMode } from '@attraccess/application-models';
-import { createDataSource } from '../../../sqlite/sqlite-connection';
+import { closeTestDataSource, createTestDataSource } from '../../../../test-utils/test-database';
 import type { TransactionScope } from '../../../unit-of-work';
 import { unitOfWorkFor } from '../../shared-unit-of-work';
-import { mkdtemp } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { createOperatingTimelineStore } from '../../operating-intervals/typeorm-operating-timeline.store';
 import { ResourceOperatingIntervalService } from '../../../../resources/operating-intervals/resource-operating-interval.service';
 import { ResourceOperatingAttributionService } from '../../../../resources/operating-intervals/resource-operating-attribution.service';
-import { USAGE_RECOVERY_TABLE_SQL } from '../../../resource-usage-integrity';
+import { insertRow } from '../migrated-usage-database.test-fixture';
 import type { UsageLifecyclePersistenceAroundExternalFlowsTestScope } from '../../../../resources/usage/lifecycle-persistence/lifecycle.persistence.spec';
 import { composeResourceUsageService } from '../../../../resources/usage/sessions/fixtures/compose.test-fixture';
 export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExternalFlowsTestScope) {
   jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
   jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
   jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
-  scope.directory = await mkdtemp(join(tmpdir(), 'attraccess-lifecycle-'));
-  // Guarded like the API's main connection: it shares the file with the resource-lifecycle (and audit) connections.
-  scope.source = await createDataSource({
-    type: 'better-sqlite3',
-    invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-    database: join(scope.directory, 'test.sqlite'),
-    synchronize: true,
-    entities: scope.schemas,
-  }).initialize();
-  await scope.source.query(USAGE_RECOVERY_TABLE_SQL);
+  // The released schema with its triggers and indexes, in a database of its own (dropped by `closeLifecycleFixture`).
+  scope.source = await createTestDataSource();
   await scope.source.getRepository(Resource).save({
-    id: 1,
     name: 'Machine',
     type: ResourceType.Machine,
     allowTakeOver: true,
     supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED,
   });
   scope.users = await scope.source.getRepository(User).save([
-    { id: 1, username: 'owner' },
-    { id: 2, username: 'next-user' },
+    { username: 'owner', email: 'owner@example.test' },
+    { username: 'next-user', email: 'next-user@example.test' },
   ]);
   scope.users.forEach((user) => Object.assign(user, { effectivePermissions: new Set(['resources.update']) }));
-  await scope.source.getRepository(Form).save({ id: 11, name: 'Safety checklist' });
+  await insertRow(scope.source, 'form', { id: 11, name: 'Safety checklist', resourceId: 1 });
   scope.events = new EventEmitter2();
   scope.operating = new ResourceOperatingIntervalService(
     createOperatingTimelineStore(scope.source),
@@ -71,11 +59,11 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
     chargeForResourceUsage: jest.fn(async (session: ResourceUsage, unitOfWorkScope: TransactionScope) => {
       const manager = managerOf(unitOfWorkScope);
       const transaction = await manager.findOneByOrFail(BillingTransaction, { resourceUsageId: session.id });
+      // The balance follows the completed transaction through the database trigger.
       await manager.update(BillingTransaction, transaction.id, {
-        amount: 23,
+        amount: -23,
         status: BillingTransactionStatus.Completed,
       });
-      await manager.decrement(User, { id: session.userId }, 'creditBalance', 23);
       return transaction;
     }),
     notifyResourceUsageCharge: jest.fn().mockResolvedValue(undefined),
@@ -130,4 +118,10 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
     { record: jest.fn().mockResolvedValue(undefined) } as never,
     null,
   );
+}
+
+/** Releases the database of the fixture and drops it. */
+export async function closeLifecycleFixture(scope: UsageLifecyclePersistenceAroundExternalFlowsTestScope) {
+  scope.usage?.onModuleDestroy();
+  await closeTestDataSource(scope.source);
 }

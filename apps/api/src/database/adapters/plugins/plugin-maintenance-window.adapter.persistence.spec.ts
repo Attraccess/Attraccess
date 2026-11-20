@@ -6,10 +6,11 @@ import { createPluginMaintenanceWindows } from './plugin-maintenance-window.adap
 
 describe('plugin maintenance window adapter on a real database', () => {
   let source: DataSource;
+  let resourceId: number;
 
   beforeEach(async () => {
     source = await createTestDataSource({ synchronize: true });
-    await source.getRepository(Resource).save({ id: 1, name: 'Laser', type: ResourceType.Machine });
+    resourceId = (await source.getRepository(Resource).save({ name: 'Laser', type: ResourceType.Machine })).id;
   });
 
   afterEach(async () => {
@@ -20,7 +21,7 @@ describe('plugin maintenance window adapter on a real database', () => {
 
   it('returns the start and end of a finished window as dates', async () => {
     const { id } = await source.getRepository(ResourceMaintenance).save({
-      resourceId: 1,
+      resourceId,
       startTime: new Date('2026-11-17T08:00:00.000Z'),
       endTime: new Date('2026-11-17T10:30:00.000Z'),
       reason: 'Lens cleaning',
@@ -35,7 +36,7 @@ describe('plugin maintenance window adapter on a real database', () => {
   it('reports a window that is still open with a null end', async () => {
     const { id } = await source
       .getRepository(ResourceMaintenance)
-      .save({ resourceId: 1, startTime: new Date('2026-11-17T08:00:00.000Z'), endTime: null });
+      .save({ resourceId, startTime: new Date('2026-11-17T08:00:00.000Z'), endTime: null });
 
     expect(await windows().findWindow(id)).toEqual({ startTime: new Date('2026-11-17T08:00:00.000Z'), endTime: null });
   });

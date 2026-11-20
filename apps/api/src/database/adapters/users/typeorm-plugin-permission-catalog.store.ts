@@ -40,9 +40,11 @@ export class TypeOrmPluginPermissionCatalogStore implements PluginPermissionCata
     const keys = [...new Set(roleKeys)];
     if (keys.length === 0) return;
     await this.tx.manager(scope).query(
-      `INSERT OR IGNORE INTO "role_permission" ("roleId", "permissionKey")
-       SELECT "id", ? FROM "role" WHERE "isSystemManaged" = 1 AND "key" IN (${keys.map(() => '?').join(', ')})`,
-      [permissionKey, ...keys],
+      `INSERT INTO "role_permission" ("roleId", "permissionKey")
+       SELECT r."id", $1 FROM "role" r WHERE r."isSystemManaged" = true AND r."key" = ANY($2::text[])
+         AND NOT EXISTS (SELECT 1 FROM "role_permission" rp WHERE rp."roleId" = r."id" AND rp."permissionKey" = $1)
+       ON CONFLICT DO NOTHING`,
+      [permissionKey, keys],
     );
   }
 }

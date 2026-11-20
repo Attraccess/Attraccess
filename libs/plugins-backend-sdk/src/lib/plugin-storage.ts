@@ -324,7 +324,7 @@ type FieldFilter<V> = V | null | PluginStorageOperators<NonNullable<V>>;
 /**
  * Structured filter. Several keys in one object (fields, `and`, `or`, `not`) are combined with AND. `and: []` is
  * true, `or: []` is false. An undefined value and a `null` filter (also inside `and`/`or`/`not`) are refused instead
- * of matching everything. Lists bind one value each: a call may bind at most a backend limit of values (SQLite 32766).
+ * of matching everything. Lists bind one value each: a call may bind at most a backend limit of values (PostgreSQL 65535).
  */
 export type PluginStorageWhere<Row> =
   | { [K in keyof Row]?: FieldFilter<Row[K]> }

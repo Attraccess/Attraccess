@@ -31,7 +31,7 @@ Routine API/frontend work needs:
 
 | Dependency  | Purpose                                              |
 | ----------- | ---------------------------------------------------- |
-| **Docker**  | `pnpm services` – mailpit, authentik, keycloak, etc. |
+| **Docker**  | `pnpm services` – PostgreSQL, mailpit, authentik, etc. |
 | **Node.js** | Exact version pinned in `.nvmrc`                     |
 | **pnpm**    | Exact version pinned in `package.json`               |
 
@@ -42,12 +42,18 @@ Routine API/frontend work needs:
 ```
 
 This checks the pinned Node and pnpm versions, installs missing host tools, and
-sets up the workspace (dependencies, `.env`, submodules and database migrations).
+sets up the workspace (dependencies, `.env`, submodules, the PostgreSQL database and its migrations).
+PostgreSQL is the only supported database. Every checkout gets its own database
+`attraccess_<folder>` inside the shared development PostgreSQL
+(`pnpm services up postgres`, host port `POSTGRES_PORT`, default 5432); the
+bootstrap starts that service when nothing answers, creates the database and writes
+`DATABASE_URL` into `.env` (`scripts/setup-dev-database.mjs`).
 Host installation is in `scripts/setup-host-dependencies.sh`; workspace setup is
 in `scripts/setup-workspace.sh`. To repeat workspace setup without installing
 global tools, run `./scripts/setup-dev-dependencies.sh --workspace-only`.
-Docker is optional for API/frontend setup, but services and container tests need
-a running Docker daemon and the `docker compose` plugin. Install **Docker** manually if missing:
+Docker (or any PostgreSQL reachable through `DATABASE_URL` / `DEV_POSTGRES_URL`) is needed for the
+development database; services and container tests need a running Docker daemon and the
+`docker compose` plugin. Install **Docker** manually if missing:
 
 - **Docker:** `curl -fsSL https://get.docker.com | sh` then `sudo usermod -aG docker $USER` (log out/in)
 
@@ -64,9 +70,11 @@ INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh --workspace-only
    ```bash
    pnpm install
    ```
-3. Set up environment variables:
+3. Set up environment variables and the development database (creates `attraccess_<folder>`, writes `DATABASE_URL`):
    ```bash
    cp .env.example .env
+   pnpm services up postgres
+   node scripts/setup-dev-database.mjs
    ```
 4. Run database migrations:
    ```bash
@@ -85,9 +93,10 @@ pnpm nx run api:test-scripts
 Core CI discovers these targets automatically. `api:test` also runs the seeding
 regressions. `pnpm seed:dev -- --demo` creates a local administrator and demo
 resources after migrations. Seeding and migrations read `.env`; process variables
-take precedence. Both resolve `STORAGE_ROOT` through the API's shared path helper.
-Seeding configured storage outside the repository requires `--allow-external-db`,
-and local database paths cannot follow symlinks outside configured storage.
+take precedence. Both use `DATABASE_URL`; seeding a database on a host other than
+localhost requires `--allow-external-db`. API and script tests that need PostgreSQL read
+`TEST_DATABASE_URL` (an admin connection such as
+`postgres://attraccess:attraccess@127.0.0.1:5432/postgres`) and create one database per test.
 
 Repository checks and generators are available through Nx:
 
@@ -186,20 +195,27 @@ The examples below seed a new installation. To change the key after setup, use *
 export LICENSE_KEY="I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md"
 ```
 
-- Docker Compose
+Attraccess needs a PostgreSQL database and does not start without `DATABASE_URL`. The snippets below only show where
+`LICENSE_KEY` goes; add it to a complete setup such as the Compose file (with its `postgres` service and `DATABASE_URL`)
+from the [Docker Compose installation guide](docs/en/installation/docker-compose.md).
+
+- Docker Compose (the `attraccess` service of that file)
 
 ```yaml
 services:
   attraccess:
     image: attraccess/attraccess:latest
     environment:
+      DATABASE_URL: postgres://attraccess:${POSTGRES_PASSWORD}@postgres:5432/attraccess
       LICENSE_KEY: 'I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md'
+  # postgres: ... (see the installation guide)
 ```
 
-- Docker CLI
+- Docker CLI (with a PostgreSQL server that the container can reach)
 
 ```bash
-docker run -e LICENSE_KEY="I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md" attraccess/attraccess:latest
+docker run -e DATABASE_URL="postgres://attraccess:<password>@<postgres-host>:5432/attraccess" \
+  -e LICENSE_KEY="I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMPLY TO ALL TERMS OF THE LICENSE.md at https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md" attraccess/attraccess:latest
 ```
 
 Licensed features require a valid configured key. Qualifying non-commercial users can enter the special key above in the setup wizard or application settings.

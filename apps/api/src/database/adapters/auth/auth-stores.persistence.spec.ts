@@ -10,7 +10,7 @@ import {
 } from '@attraccess/database-entities';
 import { AuthenticationType, PasswordPolicyRole, SSOProviderType } from '@attraccess/application-models';
 import { DEFAULT_PASSWORD_POLICY } from '@attraccess/shared';
-import { SqliteFileFixture } from '../sqlite-file.test-fixture';
+import { PostgresDatabaseFixture } from '../postgres-database.test-fixture';
 import { unitOfWorkFor } from '../shared-unit-of-work';
 import { TransactionContextResolver } from '../transaction-context';
 import { TypeOrmApiTokenStore } from './typeorm-api-token.store';
@@ -38,8 +38,8 @@ const policyStoreOn = (source: DataSource) =>
 
 const inAnHour = () => new Date(Date.now() + 3_600_000);
 
-describe('auth persistence adapters on a real SQLite file', () => {
-  let fixture: SqliteFileFixture;
+describe('auth persistence adapters on a real PostgreSQL database', () => {
+  let fixture: PostgresDatabaseFixture;
   let first: DataSource;
   let second: DataSource;
 
@@ -52,7 +52,7 @@ describe('auth persistence adapters on a real SQLite file', () => {
       ?.password;
 
   beforeAll(async () => {
-    fixture = await SqliteFileFixture.create();
+    fixture = await PostgresDatabaseFixture.create();
     first = await fixture.open();
     second = await fixture.open();
     await first.getRepository(User).save([
@@ -74,11 +74,11 @@ describe('auth persistence adapters on a real SQLite file', () => {
   });
 
   beforeEach(async () => {
-    await first.getRepository(ApiToken).clear();
-    await first.getRepository(AuthenticationDetail).clear();
-    await first.getRepository(PasswordHistory).clear();
-    await first.getRepository(PasswordPolicyOverride).clear();
-    await first.getRepository(PasswordPolicy).clear();
+    await first.getRepository(ApiToken).createQueryBuilder().delete().execute();
+    await first.getRepository(AuthenticationDetail).createQueryBuilder().delete().execute();
+    await first.getRepository(PasswordHistory).createQueryBuilder().delete().execute();
+    await first.getRepository(PasswordPolicyOverride).createQueryBuilder().delete().execute();
+    await first.getRepository(PasswordPolicy).createQueryBuilder().delete().execute();
   });
 
   describe('API tokens', () => {
@@ -321,8 +321,13 @@ describe('auth persistence adapters on a real SQLite file', () => {
       await expect(
         unitOfWork.run(async (scope) => {
           await store.replaceLocalPassword(1, 'hash-2', { rememberPrevious: 3 }, scope);
-          // A main-connection read of the flow that owns the transaction joins it instead of waiting for its lock.
-          expect(await storedHash(1)).toBe('hash-2');
+          // The transaction sees its own change; other connections do not before the commit.
+          const inside = await unitOfWork
+            .handleOf(scope)
+            .getRepository(AuthenticationDetail)
+            .findOneByOrFail({ userId: 1, type: AuthenticationType.LOCAL_PASSWORD });
+          expect(inside.password).toBe('hash-2');
+          expect(await storedHash(1)).toBe('hash-1');
           throw new Error('rollback after the change');
         }),
       ).rejects.toThrow('rollback after the change');

@@ -28,12 +28,6 @@ export class TypeOrmSumUpCredentialStore implements SumUpCredentialStore {
   }
 
   private async upsert(manager: EntityManager, key: string, value: string): Promise<void> {
-    const repository = manager.getRepository(Setting);
-    const existing = await repository.findOneBy({ parent: 'sumup', key });
-    if (existing) {
-      await repository.update(existing.id, { value });
-    } else {
-      await repository.insert({ parent: 'sumup', key, value });
-    }
+    await manager.getRepository(Setting).upsert({ parent: 'sumup', key, value }, ['parent', 'key']);
   }
 }

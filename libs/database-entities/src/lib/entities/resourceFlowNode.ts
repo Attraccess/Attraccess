@@ -52,15 +52,16 @@ export {
 } from '@attraccess/application-models';
 export type { ExternalEffectFailureBehavior } from '@attraccess/application-models';
 
+/** Canvas coordinates are fractional (dragging a node yields values like 76.05): double precision, never integer. */
 export class ResourceFlowNodePosition {
-  @Column({ type: 'integer' })
+  @Column({ type: 'float' })
   @ApiProperty({
     description: 'The x position of the node',
     example: 100,
   })
   x!: number;
 
-  @Column({ type: 'integer' })
+  @Column({ type: 'float' })
   @ApiProperty({
     description: 'The y position of the node',
     example: 100,
@@ -99,7 +100,7 @@ export class ResourceFlowNode {
   })
   position!: ResourceFlowNodePosition;
 
-  @Column({ type: 'json', nullable: true })
+  @Column({ type: 'jsonb', nullable: true })
   @ApiProperty({
     description: 'The data of the node, depending on the type of the node',
     example: {
@@ -109,7 +110,7 @@ export class ResourceFlowNode {
   })
   data!: Record<string, unknown>;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the node was created',
     type: String,
@@ -118,7 +119,7 @@ export class ResourceFlowNode {
   })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the node was last updated',
     type: String,

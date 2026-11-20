@@ -19,6 +19,16 @@ type CanvasOwner = { resourceId: number } | { flowId: number };
 
 const GLOBAL_SCOPE = { scope: 'global' } as const;
 
+/** Advisory lock namespaces (first key of the two-key form) for the canvases of resources and of global flows. */
+const RESOURCE_CANVAS_LOCK = 584_301;
+const FLOW_CANVAS_LOCK = 584_302;
+
+async function lockCanvasOwner(manager: EntityManager, owner: CanvasOwner): Promise<void> {
+  const [namespace, id] =
+    'resourceId' in owner ? [RESOURCE_CANVAS_LOCK, owner.resourceId] : [FLOW_CANVAS_LOCK, owner.flowId];
+  await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [namespace, id]);
+}
+
 const ownerColumns = (owner: CanvasOwner) => ({
   resourceId: 'resourceId' in owner ? owner.resourceId : null,
   flowId: 'flowId' in owner ? owner.flowId : null,
@@ -124,6 +134,9 @@ export class TypeOrmFlowGraphStore implements FlowGraphStore {
   ): Promise<{ previous: FlowCanvas; saved: FlowCanvas }> {
     return this.unitOfWork.run(async (scope) => {
       const manager = this.unitOfWork.handleOf(scope);
+      // Two saves of one canvas must not interleave their delete and insert (the second delete cannot see the first
+      // save's new rows), so they queue on an advisory lock of the owner until the first transaction ends.
+      await lockCanvasOwner(manager, owner);
       const previous = await this.loadCanvas(manager, owner);
 
       // Delete the existing rows first (cascading handles relationships), then check the new ids.

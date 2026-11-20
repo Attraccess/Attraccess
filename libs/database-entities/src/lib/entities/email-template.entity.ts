@@ -26,10 +26,10 @@ export class EmailTemplate {
   variables!: string[];
 
   @ApiProperty({ description: 'Timestamp of when the template was created' })
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
   @ApiProperty({ description: 'Timestamp of when the template was last updated' })
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
 }

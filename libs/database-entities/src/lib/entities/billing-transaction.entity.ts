@@ -38,15 +38,15 @@ export class BillingTransaction {
   @ApiProperty({ description: 'The user who the billing transaction belongs to', type: () => User })
   user!: User;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'The date and time the billing transaction was created' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'The date and time the billing transaction was last updated' })
   updatedAt!: Date;
 
-  @Column({ type: 'integer' })
+  @Column({ type: 'bigint' })
   @ApiProperty({ description: 'The credit amount of the billing transaction (negative for refunds/top-ups)' })
   amount!: number;
 

@@ -36,10 +36,16 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_TYPE: postgres
+      DATABASE_URL: postgres://attraccess:attraccess@127.0.0.1:5432/attraccess
+      # Admin connection the tests create one database per test from.
+      TEST_DATABASE_URL: postgres://attraccess:attraccess@127.0.0.1:5432/postgres
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - uses: ./.github/actions/start-postgres
       - uses: ./.github/actions/setup
       - uses: ./.github/actions/setup-browser-tests
       - name: Test all core projects and plugins

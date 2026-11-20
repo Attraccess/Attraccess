@@ -61,14 +61,14 @@ describe('GlobalFlowsService with a database', () => {
   it('enforces exactly one owner per node and edge in the schema', async () => {
     const base = { type: T.INPUT_RESOURCE_USAGE_STARTED, position: { x: 0, y: 0 }, data: {} };
     await expect(db.nodes.insert({ ...base, id: 'none', resourceId: null, flowId: null })).rejects.toThrow(
-      /CHECK constraint failed/,
+      /violates check constraint/,
     );
     await expect(
       db.nodes.insert({ ...base, id: 'both', resourceId: db.resource.id, flowId: db.flow.id }),
-    ).rejects.toThrow(/CHECK constraint failed/);
+    ).rejects.toThrow(/violates check constraint/);
     await expect(
       db.edges.insert({ id: 'none', source: 'a', target: 'b', resourceId: null, flowId: null }),
-    ).rejects.toThrow(/CHECK constraint failed/);
+    ).rejects.toThrow(/violates check constraint/);
   });
 
   it('does not list, count or open flows of another scope', async () => {

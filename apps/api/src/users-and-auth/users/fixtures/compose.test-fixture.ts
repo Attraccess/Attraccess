@@ -7,7 +7,7 @@ import { UserDirectory } from '../directory/user-directory';
 import { UsersService } from '../users.service';
 
 /**
- * Builds UsersService and its collaborators on a real SQLite connection without Nest. The connection comes from the
+ * Builds UsersService and its collaborators on a real database connection without Nest. The connection comes from the
  * user repository the caller already holds; the other positional arguments keep the order the service's constructor
  * had before it was split into collaborators and put behind the user store (the unused ones are ignored).
  */

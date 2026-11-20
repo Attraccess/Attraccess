@@ -80,7 +80,7 @@ export class AuthenticationDetail {
   })
   totpSecret?: string | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @Exclude()
   @ApiProperty({
     description: 'When TOTP was enabled for the user',

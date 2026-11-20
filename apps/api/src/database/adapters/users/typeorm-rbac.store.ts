@@ -12,7 +12,6 @@ import {
 import { Permission, Role, RolePermission, User, UserRole } from '@attraccess/database-entities';
 import { DataSource, EntityManager, In } from 'typeorm';
 import type { RbacStore } from '../../../users-and-auth/rbac/rbac.port';
-import { isUniqueViolation } from '../../persistence-errors';
 import type { TransactionContext } from '../../transaction-context';
 import { TransactionContextResolver } from '../transaction-context';
 import { findRelations } from '../find-options';
@@ -68,6 +67,9 @@ const toPermissionRecord = (permission: Permission): PermissionRecord => ({
   updatedAt: permission.updatedAt,
 });
 
+/** Advisory lock key of the "never leave the system without an administrator" guards. */
+const ADMINISTRATOR_GUARD_LOCK = 584_101;
+
 @Injectable()
 export class TypeOrmRbacStore implements RbacStore {
   constructor(
@@ -93,7 +95,7 @@ export class TypeOrmRbacStore implements RbacStore {
       .createQueryBuilder('ur')
       .innerJoin('ur.role', 'r')
       .innerJoin('r.rolePermissions', 'rp')
-      .innerJoin('rp.permission', 'p', 'p.available = :available', { available: available ? 1 : 0 })
+      .innerJoin('rp.permission', 'p', 'p.available = :available', { available })
       .select('rp.permissionKey', 'permissionKey')
       .distinct(true)
       .where('ur.userId = :userId', { userId })
@@ -105,12 +107,12 @@ export class TypeOrmRbacStore implements RbacStore {
     const rows = await this.source
       .getRepository(UserRole)
       .createQueryBuilder('ur')
-      .innerJoin('role_permission', 'rp', 'rp.roleId = ur.roleId')
+      .innerJoin('role_permission', 'rp', '"rp"."roleId" = ur."roleId"')
       // Soft-deleted users keep their user_role rows (anonymizeAndSoftDelete only drops auth
       // details and sessions), so without this a deleted admin still counts as a permission
       // holder forever — e.g. as a supervisor who provably cannot supervise (ATT-867).
       .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
-      .innerJoin('permission', 'p', 'p.key = rp.permissionKey AND p.available = 1')
+      .innerJoin('permission', 'p', '"p"."key" = "rp"."permissionKey" AND "p"."available" = true')
       .select('DISTINCT ur.userId', 'userId')
       .where('rp.permissionKey = :permKey', { permKey: permissionKey })
       .getRawMany<{ userId: number }>();
@@ -185,7 +187,17 @@ export class TypeOrmRbacStore implements RbacStore {
     return !!result.affected;
   }
 
+  /**
+   * The guards below count administrators and the caller then removes one. Under READ COMMITTED two transactions
+   * could both count two and both remove, so inside a transaction the guards queue on one advisory lock that is held
+   * until that transaction ends; the second one then counts the committed result of the first.
+   */
+  private async lockAdministratorGuard(context?: TransactionContext): Promise<void> {
+    if (context) await this.manager(context).query('SELECT pg_advisory_xact_lock($1)', [ADMINISTRATOR_GUARD_LOCK]);
+  }
+
   async isLastAdministrator(userId: number, context?: TransactionContext): Promise<boolean> {
+    await this.lockAdministratorGuard(context);
     const manager = this.manager(context);
     const administratorRole = await manager.getRepository(Role).findOne({ where: { key: 'administrator' } });
     if (!administratorRole) return false;
@@ -203,6 +215,7 @@ export class TypeOrmRbacStore implements RbacStore {
   }
 
   async countActiveRoleHolders(roleId: number, context?: TransactionContext): Promise<number> {
+    await this.lockAdministratorGuard(context);
     return this.manager(context)
       .createQueryBuilder(UserRole, 'ur')
       .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
@@ -213,13 +226,14 @@ export class TypeOrmRbacStore implements RbacStore {
   async countAdministratorEquivalentUsers(excludeRoleId?: number, context?: TransactionContext): Promise<number> {
     // the permissions table itself is never modified by role CRUD, so the total always comes from the plain connection.
     // Only available keys count: an unloaded plugin's keys grant nothing, so they cannot make anyone less of an admin.
+    await this.lockAdministratorGuard(context);
     const totalPermissions = await this.source.getRepository(Permission).count({ where: { available: true } });
     if (totalPermissions === 0) return 0;
     const qb = this.manager(context)
       .createQueryBuilder(UserRole, 'ur')
       .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
-      .innerJoin('role_permission', 'rp', 'rp.roleId = ur.roleId')
-      .innerJoin('permission', 'p', 'p.key = rp.permissionKey AND p.available = 1')
+      .innerJoin('role_permission', 'rp', '"rp"."roleId" = ur."roleId"')
+      .innerJoin('permission', 'p', '"p"."key" = "rp"."permissionKey" AND "p"."available" = true')
       .select('ur.userId', 'userId')
       .groupBy('ur.userId')
       .having('COUNT(DISTINCT rp.permissionKey) = :totalPermissions', { totalPermissions });
@@ -254,6 +268,7 @@ export class TypeOrmRbacStore implements RbacStore {
       if (!targetByKey.has(ur.role.key)) {
         // ponytail: last-administrator guardrail — transient IdP claim omission must not silently strip the last administrator
         if (ur.role.key === 'administrator') {
+          await this.lockAdministratorGuard(context);
           const otherAdministratorCount = await userRoleRepository
             .createQueryBuilder('ur2')
             .innerJoin('ur2.user', 'u', 'u.deletedAt IS NULL')
@@ -285,22 +300,16 @@ export class TypeOrmRbacStore implements RbacStore {
         where: { userId, roleId: role.id, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId },
       });
       if (existing) continue;
-      try {
-        await userRoleRepository.save(
-          userRoleRepository.create({
-            userId,
-            roleId: role.id,
-            source: UserRoleSource.SSO,
-            ssoProviderType,
-            ssoProviderId,
-            externalValue,
-          }),
-        );
-        added.push(roleKey);
-      } catch (err) {
-        // Another SSO provider already granted this role — unique(userId, roleId, source) violated; ignore
-        if (!isUniqueViolation(err)) throw err;
-      }
+      // ON CONFLICT DO NOTHING instead of catching a unique violation: in PostgreSQL a failed statement would abort the
+      // whole transaction. Another SSO provider may already have granted this role (unique(userId, roleId, source)).
+      const inserted = await userRoleRepository
+        .createQueryBuilder()
+        .insert()
+        .values({ userId, roleId: role.id, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId, externalValue })
+        .orIgnore()
+        .returning('id')
+        .execute();
+      if (inserted.raw.length > 0) added.push(roleKey);
     }
     return { added, removed, updated };
   }

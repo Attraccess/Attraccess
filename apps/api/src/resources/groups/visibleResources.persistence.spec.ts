@@ -1,10 +1,11 @@
 import { DataSource } from 'typeorm';
-import { entities, Resource, ResourceGroup } from '@attraccess/database-entities';
+import { Resource, ResourceGroup } from '@attraccess/database-entities';
 import { ResourceType } from '@attraccess/application-models';
 import { ResourceGroupsService } from './resourceGroups.service';
 import { ResourceGroupsController } from './resourceGroups.controller';
 import { TypeOrmResourceGroupStore } from '../../database/adapters/resources/resource-group-store.adapter';
 import type { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { createTestDataSource, closeTestDataSource } from '../../test-utils/test-database';
 
 describe('visible resource existence', () => {
   let source: DataSource;
@@ -12,17 +13,11 @@ describe('visible resource existence', () => {
   const member = { userId: 7, canUpdateResources: false };
 
   beforeEach(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      entities: Object.values(entities),
-      synchronize: true,
-    }).initialize();
+    source = await createTestDataSource();
     service = new ResourceGroupsService(new TypeOrmResourceGroupStore(source), {} as never, {} as never, {} as never);
   });
   afterEach(async () => {
-    await source.destroy();
+    await closeTestDataSource(source);
   });
 
   async function addResource(groups: Array<{ id: number; isHidden: boolean }>) {
@@ -31,6 +26,11 @@ describe('visible resource existence', () => {
     }
     await source.getRepository(Resource).save({ id: 1, name: 'Laser', type: ResourceType.Machine, groups });
   }
+
+  const addUsers = () =>
+    source.query(
+      `INSERT INTO "user" (id, username, email) VALUES (7, 'member', 'member@example.test'), (8, 'other', 'other@example.test')`,
+    );
 
   it('returns false for an empty installation and true for ungrouped resources', async () => {
     expect(await service.hasVisibleResources(member)).toBe(false);
@@ -56,32 +56,33 @@ describe('visible resource existence', () => {
 
   it('uses introducer membership for hidden-group visibility', async () => {
     await addResource([{ id: 10, isHidden: true }]);
-    await source.query('PRAGMA foreign_keys = OFF');
-    await source.query("INSERT INTO resource_introducer (resourceGroupId, userId, type) VALUES (10, 7, 'introducer')");
+    await addUsers();
+    await source.query(
+      `INSERT INTO resource_introducer ("resourceGroupId", "userId", type) VALUES (10, 7, 'introducer')`,
+    );
     expect(await service.hasVisibleResources(member)).toBe(true);
     expect(await service.hasVisibleResources({ ...member, userId: 8 })).toBe(false);
   });
 
   it('uses the latest introduction grant, including revoke and same-time tie ordering', async () => {
     await addResource([{ id: 10, isHidden: true }]);
-    await source.query('PRAGMA foreign_keys = OFF');
-    await source.query('INSERT INTO resource_introduction (id, resourceGroupId, receiverUserId) VALUES (1, 10, 7)');
+    await addUsers();
+    await source.query('INSERT INTO resource_introduction (id, "resourceGroupId", "receiverUserId") VALUES (1, 10, 7)');
     await source.query(
-      "INSERT INTO resource_introduction_history_item (id, introductionId, action, performedByUserId, createdAt) VALUES (1, 1, 'grant', 7, '2026-01-01')",
+      `INSERT INTO resource_introduction_history_item (id, "introductionId", action, "performedByUserId", "createdAt") VALUES (1, 1, 'grant', 7, '2026-01-01')`,
     );
     expect(await service.hasVisibleResources(member)).toBe(true);
     await source.query(
-      "INSERT INTO resource_introduction_history_item (id, introductionId, action, performedByUserId, createdAt) VALUES (2, 1, 'revoke', 7, '2026-01-01')",
+      `INSERT INTO resource_introduction_history_item (id, "introductionId", action, "performedByUserId", "createdAt") VALUES (2, 1, 'revoke', 7, '2026-01-01')`,
     );
     expect(await service.hasVisibleResources(member)).toBe(false);
     expect(await service.getMany(member)).toHaveLength(0);
   });
 
   it('executes one bounded existence query even with many groups', async () => {
-    await source.query(`
-      WITH RECURSIVE ids(id) AS (SELECT 1 UNION ALL SELECT id + 1 FROM ids WHERE id < 1100)
-      INSERT INTO resource_group (id, name, isHidden) SELECT id, 'g', 0 FROM ids
-    `);
+    await source.query(
+      `INSERT INTO resource_group (id, name, "isHidden") SELECT id, 'g', false FROM generate_series(1, 1100) AS id`,
+    );
     const query = jest.spyOn(source, 'query');
     const runnerQuery = jest.spyOn(source.driver, 'createQueryRunner');
     expect(await service.hasVisibleResources(member)).toBe(false);

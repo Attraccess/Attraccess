@@ -60,6 +60,10 @@ echo "building the API and the replay chip ..."
 # --- API behind the wiretap, plus the raw wire proxy ----------------------------------------------
 API_PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1])')"
 STORAGE="$RUN_DIR/storage"; mkdir -p "$STORAGE"
+# The run's own PostgreSQL database (server: HIL_DATABASE_ADMIN_URL, else DATABASE_URL, else .env); it overrides
+# the DATABASE_URL of .env for the API, the seed and the session. Dropped with the API unless KEEP_API=1.
+DATABASE_URL="$(node "$HERE/../hil/throwaway-db.mjs" create)" || { echo "Cannot create the throwaway database: set HIL_DATABASE_ADMIN_URL" >&2; exit 1; }
+export DATABASE_URL
 export WIRETAP_FILE="$RUN_DIR/wiretap.jsonl" WIRETAP_DROP="$RUN_DIR/drop.arm"
 (cd "$ROOT" && STORAGE_ROOT="$STORAGE" PORT="$API_PORT" LOG_LEVELS=error,warn,log,debug LOG_DESTINATIONS=console \
   nohup node -r "$HERE/wiretap.cjs" --env-file="$ROOT/.env" dist/apps/api/main.js >"$RUN_DIR/api.log" 2>&1 &
@@ -69,11 +73,13 @@ echo $! >"$RUN_DIR/proxy.pid"
 stop_api() { kill "$(cat "$RUN_DIR/proxy.pid")" "$(cat "$RUN_DIR/api.pid")" 2>/dev/null || true; }
 cleanup() {
   if [[ "${KEEP_API:-}" == 1 && "${api_ready:-0}" == 1 ]]; then
-    echo "KEEP_API=1: the API (http://127.0.0.1:$API_PORT, database $STORAGE/attraccess.sqlite) and the wire proxy keep running."
-    echo "Stop them with: kill $(cat "$RUN_DIR/proxy.pid") $(cat "$RUN_DIR/api.pid")"
+    echo "KEEP_API=1: the API (http://127.0.0.1:$API_PORT, database $DATABASE_URL) and the wire proxy keep running."
+    echo "Stop them with: kill $(cat "$RUN_DIR/proxy.pid") $(cat "$RUN_DIR/api.pid"); node $HERE/../hil/throwaway-db.mjs drop \"$DATABASE_URL\""
     return
   fi
   stop_api
+  sleep 1
+  node "$HERE/../hil/throwaway-db.mjs" drop "$DATABASE_URL" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 api_deadline=$((SECONDS + ${API_START_TIMEOUT:-120}))
@@ -97,7 +103,7 @@ until [[ -s "$RUN_DIR/proxy.json" ]]; do
 done
 api_ready=1
 PROXY_PORT="$(python3 -c "import json; print(json.load(open('$RUN_DIR/proxy.json'))['port'])")"
-(cd "$ROOT" && STORAGE_ROOT="$STORAGE" node --env-file="$ROOT/.env" --experimental-strip-types apps/api/scripts/seed-dev-user.mjs \
+(cd "$ROOT" && STORAGE_ROOT="$STORAGE" node --env-file="$ROOT/.env" apps/api/scripts/seed-dev-user.mjs \
   --username admin --password password --allow-external-db >"$RUN_DIR/seed.log" 2>&1)
 
 # The labgrid client's own interpreter (has labgrid and pytest).
@@ -113,7 +119,7 @@ echo "API on :$API_PORT (reader connects through the proxy on :$PROXY_PORT). Cla
 status=0
 cd "$RUN_DIR"  # labgrid writes its session artifacts to ./lab-artifacts
 GRPC_ENABLE_FORK_SUPPORT=0 RUN_DIR="$RUN_DIR" READER_IMAGE="$READER_IMAGE" EMULATOR_IMAGE="${EMULATOR_IMAGE:-}" \
-  API_URL="http://127.0.0.1:$API_PORT" API_DB="$STORAGE/attraccess.sqlite" API_PORT="$API_PORT" READER_API_PORT="$PROXY_PORT" \
+  API_URL="http://127.0.0.1:$API_PORT" API_PORT="$API_PORT" READER_API_PORT="$PROXY_PORT" \
   API_HOST="${API_HOST:-}" AUTH_SESSION_SECRET="$AUTH_SESSION_SECRET" READER_VARIANT="$VARIANT" \
   labgrid-client -x "$COORDINATOR" -p "$PLACE" session --purpose "Attractap real-card session ($STAMP)" \
     --wait-timeout "${WAIT_TIMEOUT:-900}" -- "$LAB_PYTHON" "$HERE/session.py" "$@" || status=$?

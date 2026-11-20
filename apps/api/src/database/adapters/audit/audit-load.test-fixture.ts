@@ -1,8 +1,7 @@
-import { createSqliteAuditService } from './sqlite-audit-service.test-fixture';
+import { createPostgresAuditService } from './postgres-audit-service.test-fixture';
 import { AuditLog, Resource, Setting, User } from '@attraccess/database-entities';
 import { ResourceType, SupervisionMode } from '@attraccess/application-models';
-import { rm } from 'node:fs/promises';
-import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-transaction';
+import { closeTestDataSource } from '../../../test-utils/test-database';
 import { AuditMetrics } from '../../../metrics/definitions/audit.metrics';
 import { resetTestFixture } from '../usage/lifecycle-fixtures/setup.test-fixture';
 import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../usage/lifecycle-fixtures/state.test-fixture';
@@ -20,12 +19,12 @@ export interface LoadMachine {
 }
 
 /**
- * The real usage lifecycle (ResourceUsageService on file-backed SQLite, see the lifecycle-persistence fixture)
- * wired to a real AuditService on the same database file, with the audit tables and default audit settings.
+ * The real usage lifecycle (ResourceUsageService on PostgreSQL, see the lifecycle-persistence fixture)
+ * wired to a real AuditService on the same database, with the audit tables and default audit settings.
  */
 export function setupAuditLoadFixture(machineCount: number) {
   const lifecycle = createUsageLifecyclePersistenceAroundExternalFlowsFixture();
-  // The lifecycle fixture builds its database from `schemas`; the audit tables join the same file. Every other
+  // The lifecycle fixture builds its database from `schemas`; the audit tables join the same database. Every other
   // property resolves to the lifecycle fixture, so its setters keep working.
   const scope: typeof lifecycle = Object.create(lifecycle, {
     schemas: { value: [...lifecycle.schemas, AuditLog, Setting] },
@@ -38,7 +37,7 @@ export function setupAuditLoadFixture(machineCount: number) {
     await resetTestFixture(scope);
     metrics = createTestAuditMetrics();
     // No stored audit settings: the defaults record the resource and administration domains.
-    audit = createSqliteAuditService(
+    audit = createPostgresAuditService(
       scope.source,
       new SettingsStoreService(TypeOrmSettingsRows.forRepository(scope.source.getRepository(Setting)), null),
       metrics,
@@ -61,8 +60,8 @@ export function setupAuditLoadFixture(machineCount: number) {
     );
     const people = await scope.source.getRepository(User).save(
       resources.flatMap((id) => [
-        { id: 100 + id, username: `owner-${id}` },
-        { id: 200 + id, username: `taker-${id}` },
+        { id: 100 + id, username: `owner-${id}`, email: `owner-${id}@example.invalid` },
+        { id: 200 + id, username: `taker-${id}`, email: `taker-${id}@example.invalid` },
       ]),
     );
     people.forEach((person) => Object.assign(person, { effectivePermissions: new Set(['resources.update']) }));
@@ -75,13 +74,9 @@ export function setupAuditLoadFixture(machineCount: number) {
 
   afterEach(async () => {
     scope.usage?.onModuleDestroy();
-    // Drain the audit connection and close the resource-lifecycle connection before the file goes away.
+    // Drain the audit connection before the lifecycle's database is dropped.
     await audit?.onModuleDestroy();
-    if (scope.source) {
-      await closeResourceTransactionConnection(scope.source);
-      if (scope.source.isInitialized) await scope.source.destroy();
-    }
-    if (scope.directory) await rm(scope.directory, { recursive: true, force: true });
+    await closeTestDataSource(scope.source);
     jest.restoreAllMocks();
   });
 

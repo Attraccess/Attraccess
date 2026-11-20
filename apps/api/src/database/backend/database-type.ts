@@ -1,11 +1,21 @@
 /** Backends the application can run on. A new backend is added here and as one object in the backend registry. */
-export const SUPPORTED_DATABASE_TYPES = ['sqlite'] as const;
+export const SUPPORTED_DATABASE_TYPES = ['postgres'] as const;
 export type DatabaseType = (typeof SUPPORTED_DATABASE_TYPES)[number];
-export const DEFAULT_DATABASE_TYPE: DatabaseType = 'sqlite';
+export const DEFAULT_DATABASE_TYPE: DatabaseType = 'postgres';
+
+/** Where the upgrade from SQLite is described. */
+export const UPGRADE_DOCS_URL =
+  'https://docs.attraccess.org/#/en/installation/updating?id=moving-from-sqlite-to-postgresql';
 
 export class UnsupportedDatabaseTypeError extends Error {
   constructor(readonly received: string) {
-    super(`Unsupported DATABASE_TYPE ${received}. Supported values: ${SUPPORTED_DATABASE_TYPES.join(', ')}.`);
+    super(
+      received.toLowerCase() === '"sqlite"'
+        ? `DATABASE_TYPE "sqlite" is no longer supported: Attraccess runs on PostgreSQL. Set DATABASE_URL to a ` +
+            `PostgreSQL database; existing SQLite data is moved automatically on the first start. See ${UPGRADE_DOCS_URL}.`
+        : `Unsupported DATABASE_TYPE ${received}. Supported values: ${SUPPORTED_DATABASE_TYPES.join(', ')}. ` +
+            `See ${UPGRADE_DOCS_URL}.`,
+    );
     this.name = 'UnsupportedDatabaseTypeError';
   }
 }

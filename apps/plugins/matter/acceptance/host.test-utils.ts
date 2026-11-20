@@ -1,7 +1,7 @@
 // Boots the Matter plugin inside a Nest app with the host pieces that matter for it: the record port of the plugin
 // storage (the in-memory fake, which applies the same contract as the host's), the host's encryption service, the
 // host's plugin audit projection over a recording sink, and the SDK's permission guard. The engine behind the record
-// port (SQLite, DDL, migrations, adoption) is the host's and is covered by the host's own conformance tests.
+// port (PostgreSQL, DDL, migrations, adoption) is the host's and is covered by the host's own conformance tests.
 import {
   createInMemoryPluginStorage,
   DualAuthGuard,

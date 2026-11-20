@@ -416,8 +416,11 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     return this.sessions.length !== before;
   }
 
-  async publishSession(usageId: number, _context?: TransactionScope): Promise<void> {
-    Object.assign(this.required(usageId), { isFinalized: true, lifecyclePending: false });
+  async publishSession(usageId: number, _context?: TransactionScope): Promise<boolean> {
+    const stored = this.sessions.find((candidate) => candidate.id === usageId && candidate.lifecyclePending);
+    if (!stored) return false;
+    Object.assign(stored, { isFinalized: true, lifecyclePending: false });
+    return true;
   }
 
   async endSessionIfOpen(

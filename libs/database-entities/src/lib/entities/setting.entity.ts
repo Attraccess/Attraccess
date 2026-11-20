@@ -32,11 +32,11 @@ export class Setting {
   @ApiProperty({ description: 'The value of the setting' })
   value!: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'The date and time the setting was created' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'The date and time the setting was last updated' })
   updatedAt!: Date;
 }

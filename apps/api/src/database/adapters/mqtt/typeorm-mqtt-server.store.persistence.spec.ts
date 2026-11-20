@@ -1,23 +1,18 @@
 import { MqttServer } from '@attraccess/database-entities';
 import { DataSource } from 'typeorm';
+import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { TypeOrmMqttServerStore } from './typeorm-mqtt-server.store';
 
-describe('TypeOrmMqttServerStore on real SQLite', () => {
+describe('TypeOrmMqttServerStore on real PostgreSQL', () => {
   let source: DataSource;
   let store: TypeOrmMqttServerStore;
 
   beforeEach(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      entities: [MqttServer],
-      synchronize: true,
-    }).initialize();
+    source = await createTestDataSource();
     store = new TypeOrmMqttServerStore(source.getRepository(MqttServer));
   });
 
-  afterEach(() => source.destroy());
+  afterEach(() => closeTestDataSource(source));
 
   it('creates a server with stored defaults and neutral nulls', async () => {
     const created = await store.createServer({ name: 'Broker', host: 'b.invalid', port: 1883 });

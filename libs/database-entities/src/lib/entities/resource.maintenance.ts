@@ -23,13 +23,13 @@ export class ResourceMaintenance {
   })
   id!: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the maintenance was created',
   })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the maintenance was last updated',
   })
@@ -45,7 +45,7 @@ export class ResourceMaintenance {
   @ManyToOne(() => Resource, (resource) => resource.maintenances)
   resource!: Resource;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: 'timestamptz' })
   @ApiProperty({
     description: 'When the maintenance started',
     type: String,
@@ -54,7 +54,7 @@ export class ResourceMaintenance {
   })
   startTime!: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @ApiProperty({
     description: 'When the maintenance ended (null if not ended yet)',
     required: false,
@@ -86,7 +86,7 @@ export class ResourceMaintenance {
   })
   completedByUser!: User | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @ApiProperty({
     description: 'When the maintenance was marked as done',
     required: false,

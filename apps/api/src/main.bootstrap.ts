@@ -18,6 +18,7 @@ import { createWsAdapter } from './common/text-frame-ws-adapter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
+import { PersistenceErrorFilter } from './exceptions/persistence-error.filter';
 import { PersistenceReadOnlyFilter } from './exceptions/persistence-read-only.filter';
 import { ValkeyUnavailableFilter } from './exceptions/valkey-unavailable.filter';
 import { isValidTrustProxyValue, resolveTrustProxySetting } from './trust-proxy';
@@ -125,7 +126,9 @@ export function configureBootstrapHttp(app: NestExpressApplication, appConfig: A
     app.set('trust proxy', false);
   }
 
-  app.useGlobalFilters(new ValkeyUnavailableFilter(new PersistenceReadOnlyFilter(app.get(HttpAdapterHost))));
+  app.useGlobalFilters(
+    new ValkeyUnavailableFilter(new PersistenceErrorFilter(new PersistenceReadOnlyFilter(app.get(HttpAdapterHost)))),
+  );
 
   app.use(cookieParser());
 
@@ -295,6 +298,13 @@ export async function bootstrap() {
   // code left behind by an interrupted npm plugin replacement.
   if (earlyConfig.PLUGIN_DIR) await NpmPluginService.recoverBackups();
   bootstrapLogger.log('PluginSystem configured.');
+
+  // PostgreSQL is the only database. Before anything reads it: wait for it to accept connections, apply the baseline
+  // and move the data of an existing SQLite installation (nothing is served, no plugin runs, until that is done).
+  if (!skipDatabaseMigrations) {
+    const { prepareDatabaseAtStartup } = await import('./database/transfer/startup-transfer');
+    await prepareDatabaseAtStartup();
+  }
 
   const shouldGuardPluginLifecycle = !earlyConfig.DISABLE_PLUGINS && Boolean(earlyConfig.PLUGIN_DIR);
 

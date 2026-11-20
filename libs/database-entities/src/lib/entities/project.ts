@@ -12,16 +12,16 @@ export class Project {
   @ApiProperty({ description: 'The ID of the project' })
   id!: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'The date and time the NFC card was created' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   @ApiProperty({ description: 'The date and time the NFC card was last updated' })
   updatedAt!: Date;
 
   @Column({
-    type: 'datetime',
+    type: 'timestamptz',
     nullable: true,
   })
   @ApiProperty({

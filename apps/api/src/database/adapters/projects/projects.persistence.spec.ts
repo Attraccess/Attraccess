@@ -1,6 +1,3 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import {
   BillingTransactionStatus,
   ProjectInvitationStatus,
@@ -10,7 +7,6 @@ import {
 } from '@attraccess/application-models';
 import {
   BillingTransaction,
-  entities,
   Project,
   ProjectInvitation,
   ProjectMember,
@@ -18,41 +14,36 @@ import {
   Setting,
   User,
 } from '@attraccess/database-entities';
-import { DataSource } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import { toProjectInvitationDto } from '../../../projects/dto/project.dto';
 import { ProjectsService } from '../../../projects/projects.service';
-import { resolveDatabaseBackend } from '../../backend';
-import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-transaction';
-import { createDataSource } from '../../sqlite/sqlite-connection';
-import { createSqliteUnitOfWork } from '../../sqlite/sqlite-unit-of-work';
+import {
+  closeTestDataSource,
+  createTestDatabaseLocation,
+  createTestDataSource,
+  type TestDatabaseLocation,
+} from '../../../test-utils/test-database';
+import { unitOfWorkFor } from '../shared-unit-of-work';
 import type { TransactionScope } from '../../unit-of-work';
 import { TypeOrmProjectInvitationStore } from './typeorm-project-invitation.store';
 import { TypeOrmProjectStore } from './typeorm-project.store';
 import { TypeOrmProjectUsageStore } from './typeorm-project-usage.store';
 import { getProjectUsageStats } from '../../../projects/project-usage-statistics';
 
-describe('project persistence adapters on a real SQLite file', () => {
-  let directory: string;
+describe('project persistence adapters on real PostgreSQL', () => {
+  let database: TestDatabaseLocation;
   let source: DataSource;
-  let uow: ReturnType<typeof createSqliteUnitOfWork>;
+  let uow: ReturnType<typeof unitOfWorkFor>;
   let projects: TypeOrmProjectStore;
   let invitations: TypeOrmProjectInvitationStore;
   let usage: TypeOrmProjectUsageStore;
 
   const query = (sql: string, parameters?: unknown[]) => source.query(sql, parameters);
 
-  // Schema synchronization under CI coverage can exceed Jest's five-second default.
   beforeAll(async () => {
-    resolveDatabaseBackend();
-    directory = await mkdtemp(join(tmpdir(), 'projects-persistence-'));
-    source = await createDataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: join(directory, 'test.sqlite'),
-      entities: Object.values(entities),
-      synchronize: true,
-    }).initialize();
-    uow = createSqliteUnitOfWork(source);
+    database = await createTestDatabaseLocation();
+    source = await createTestDataSource({ location: database.location });
+    uow = unitOfWorkFor(source);
     projects = new TypeOrmProjectStore(source.getRepository(Project), source.getRepository(ProjectMember), uow);
     invitations = new TypeOrmProjectInvitationStore(
       source.getRepository(ProjectInvitation),
@@ -64,37 +55,27 @@ describe('project persistence adapters on a real SQLite file', () => {
       source.getRepository(BillingTransaction),
       source.getRepository(Setting),
     );
-  }, 30_000);
+  }, 60_000);
 
   afterAll(async () => {
-    await closeResourceTransactionConnection(source);
-    await source.destroy();
-    await rm(directory, { recursive: true, force: true });
+    await closeTestDataSource(source);
+    await database.remove();
   });
 
   beforeEach(async () => {
-    await query('PRAGMA foreign_keys = OFF');
-    for (const table of [
-      'billing_transaction',
-      'resource_usage',
-      'project_invitations',
-      'project_members',
-      'project',
-      'resource',
-      'user',
-      'setting',
-    ]) {
-      await query(`DELETE FROM "${table}"`);
-    }
-    await query("INSERT INTO user (id, username, email) VALUES (1, 'owner', 'owner@example.test')");
-    await query("INSERT INTO user (id, username, email) VALUES (2, 'member', 'member@example.test')");
-    await query("INSERT INTO user (id, username, email) VALUES (3, 'stranger', 'stranger@example.test')");
+    await query(
+      'TRUNCATE "billing_transaction", "resource_usage", "project_invitations", "project_members", "project", "resource", "user", "setting" RESTART IDENTITY CASCADE',
+    );
+    await query(`INSERT INTO "user" ("id", "username", "email") VALUES
+      (1, 'owner', 'owner@example.test'), (2, 'member', 'member@example.test'), (3, 'stranger', 'stranger@example.test')`);
+    // The rows above carry fixed ids: keep the sequence behind them.
+    await query(`SELECT setval(pg_get_serial_sequence('"user"', 'id'), 3)`);
   });
 
   describe('ProjectStore', () => {
     it('maps a project with its owner and never copies private user fields', async () => {
       await query(
-        "UPDATE user SET passwordResetToken = 'reset-secret', emailVerificationToken = 'verify-secret' WHERE id = 1",
+        'UPDATE "user" SET "passwordResetToken" = \'reset-secret\', "emailVerificationToken" = \'verify-secret\' WHERE id = 1',
       );
       const created = await projects.create({ ownerId: 1, name: 'Workshop', description: null });
 
@@ -116,7 +97,7 @@ describe('project persistence adapters on a real SQLite file', () => {
 
     it('answers ownership and membership lookups', async () => {
       const { id } = await projects.create({ ownerId: 1, name: 'A', description: null });
-      await query('INSERT INTO project_members (projectId, userId, role) VALUES (?, 2, ?)', [id, 'viewer']);
+      await query('INSERT INTO project_members ("projectId", "userId", role) VALUES ($1, 2, $2)', [id, 'viewer']);
 
       expect((await projects.findOwned(1, id))?.id).toBe(id);
       expect(await projects.findOwned(2, id)).toBeNull();
@@ -131,7 +112,10 @@ describe('project persistence adapters on a real SQLite file', () => {
       const shared = await projects.create({ ownerId: 3, name: 'Gamma', description: null });
       await projects.create({ ownerId: 3, name: 'Hidden', description: null });
       const archived = await projects.create({ ownerId: 1, name: 'Delta', description: null });
-      await query('INSERT INTO project_members (projectId, userId, role) VALUES (?, 1, ?)', [shared.id, 'viewer']);
+      await query('INSERT INTO project_members ("projectId", "userId", role) VALUES ($1, 1, $2)', [
+        shared.id,
+        'viewer',
+      ]);
       await projects.archive(archived.id, new Date());
 
       const names = async (extra: object = {}) =>
@@ -184,19 +168,24 @@ describe('project persistence adapters on a real SQLite file', () => {
 
     it('rolls the usage detachment back when the delete aborts, and commits both together otherwise', async () => {
       const { id } = await projects.create({ ownerId: 1, name: 'Doomed', description: null });
+      await query("INSERT INTO resource (id, name, type) VALUES (1, 'Lathe', 'machine')");
       await query(
-        "INSERT INTO resource_usage (id, usageAction, resourceId, startTime, projectId) VALUES (1, 'usage', 1, CURRENT_TIMESTAMP, ?)",
+        `INSERT INTO resource_usage (id, "usageAction", "resourceId", "startTime", "isFinalized", "projectId")
+         VALUES (1, 'usage', 1, CURRENT_TIMESTAMP, true, $1)`,
         [id],
       );
+      await query(`CREATE FUNCTION abort_project_delete_fn() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN RAISE EXCEPTION 'delete aborted'; END $$`);
       await query(
-        "CREATE TRIGGER abort_project_delete BEFORE DELETE ON project BEGIN SELECT RAISE(ABORT, 'delete aborted'); END",
+        'CREATE TRIGGER abort_project_delete BEFORE DELETE ON project FOR EACH ROW EXECUTE FUNCTION abort_project_delete_fn()',
       );
-      const attached = async () => (await query('SELECT projectId FROM resource_usage WHERE id = 1'))[0].projectId;
+      const attached = async () => (await query('SELECT "projectId" FROM resource_usage WHERE id = 1'))[0].projectId;
 
       await expect(uow.run((scope) => projects.deleteProject(id, scope))).rejects.toThrow('delete aborted');
       expect(await attached()).toBe(id);
 
-      await query('DROP TRIGGER abort_project_delete');
+      await query('DROP TRIGGER abort_project_delete ON project');
+      await query('DROP FUNCTION abort_project_delete_fn()');
       expect(await uow.run((scope) => projects.deleteProject(id, scope))).toBe(true);
       expect(await attached()).toBeNull();
       expect(await uow.run((scope) => projects.deleteProject(id, scope))).toBe(false);
@@ -237,7 +226,10 @@ describe('project persistence adapters on a real SQLite file', () => {
 
     it('lists members with their public user and removes one membership', async () => {
       const { id } = await projects.create({ ownerId: 1, name: 'A', description: null });
-      await query('INSERT INTO project_members (id, projectId, userId, role) VALUES (5, ?, 2, ?)', [id, 'viewer']);
+      await query('INSERT INTO project_members (id, "projectId", "userId", role) VALUES (5, $1, 2, $2)', [
+        id,
+        'viewer',
+      ]);
 
       const [member] = await projects.listMembers(id);
       expect(member).toMatchObject({ id: 5, userId: 2 });
@@ -278,7 +270,7 @@ describe('project persistence adapters on a real SQLite file', () => {
 
     it('does not put the private user fields or any email into the HTTP shape of an invitation', async () => {
       const { id: projectId } = await projects.create({ ownerId: 1, name: 'A', description: null });
-      await query("UPDATE user SET passwordResetToken = 'reset-secret' WHERE id IN (1, 2)");
+      await query('UPDATE "user" SET "passwordResetToken" = \'reset-secret\' WHERE id IN (1, 2)');
       const created = await invitations.create({
         projectId,
         inviterId: 1,
@@ -298,12 +290,7 @@ describe('project persistence adapters on a real SQLite file', () => {
 
     it('adds a membership once when two acceptances race on independent connections', async () => {
       const { id: projectId } = await projects.create({ ownerId: 1, name: 'A', description: null });
-      const other = await createDataSource({
-        type: 'better-sqlite3',
-        invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-        database: join(directory, 'test.sqlite'),
-        entities: Object.values(entities),
-      }).initialize();
+      const other = await createTestDataSource({ location: database.location });
       try {
         const racing = new TypeOrmProjectInvitationStore(
           other.getRepository(ProjectInvitation),
@@ -318,11 +305,11 @@ describe('project persistence adapters on a real SQLite file', () => {
 
         expect(results.filter((member) => member !== null)).toHaveLength(1);
         expect(await invitations.addMemberIfMissing(projectId, 2, ProjectMemberRole.VIEWER)).toBeNull();
-        expect(await query('SELECT COUNT(*) AS count FROM project_members WHERE projectId = ?', [projectId])).toEqual([
-          { count: 1 },
-        ]);
+        expect(
+          await query('SELECT COUNT(*) AS count FROM project_members WHERE "projectId" = $1', [projectId]),
+        ).toEqual([{ count: 1 }]);
       } finally {
-        await other.destroy();
+        await closeTestDataSource(other);
       }
     });
   });
@@ -335,9 +322,9 @@ describe('project persistence adapters on a real SQLite file', () => {
         userId: 1,
         usageAction: ResourceUsageAction.Usage,
         lifecyclePending: false,
+        isFinalized: true,
         startTime: new Date(startTime),
         endTime: endTime ? new Date(endTime) : null,
-        usageInMinutes: endTime ? (new Date(endTime).getTime() - new Date(startTime).getTime()) / 60_000 : 0,
       } as ResourceUsage);
 
     const stats = (projectId: number, range: { startDate?: Date; endDate?: Date } = {}) =>
@@ -350,7 +337,7 @@ describe('project persistence adapters on a real SQLite file', () => {
       );
 
     beforeEach(async () => {
-      await query("INSERT INTO project (id, userId, name) VALUES (1, 1, 'Project'), (2, 1, 'Other')");
+      await query("INSERT INTO project (id, \"userId\", name) VALUES (1, 1, 'Project'), (2, 1, 'Other')");
       await query("INSERT INTO resource (id, name, type) VALUES (1, 'Lathe', 'machine'), (2, 'Laser', 'machine')");
     });
 

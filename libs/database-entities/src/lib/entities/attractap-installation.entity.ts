@@ -22,9 +22,9 @@ export class AttractapInstallation {
   @Column({ type: 'text' })
   serverPrivateKeyEncrypted!: string;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: 'timestamptz' })
   serverCertificateNotAfter!: Date;
 
-  @CreateDateColumn({ type: 'datetime' })
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 }

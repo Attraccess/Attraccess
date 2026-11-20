@@ -36,7 +36,7 @@ export class AttractapCredentialEvent {
   @ApiProperty({ description: 'The user responsible for the event', nullable: true })
   actorId!: number | null;
 
-  @CreateDateColumn({ type: 'datetime' })
+  @CreateDateColumn({ type: 'timestamptz' })
   @ApiProperty()
   createdAt!: Date;
 }

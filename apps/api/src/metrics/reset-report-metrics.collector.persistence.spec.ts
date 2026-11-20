@@ -1,11 +1,12 @@
-import { DataSource } from 'typeorm';
-import { AttractapCrashReport, entities } from '@attraccess/database-entities';
+import type { DataSource } from 'typeorm';
+import { AttractapCrashReport } from '@attraccess/database-entities';
+import { closeTestDataSource, createTestDataSource } from '../test-utils/test-database';
 import { MetricsService } from './metrics.service';
 import { RESET_REPORT_COUNT_DEADLINE_MS, ResetReportMetricsCollector } from './reset-report-metrics.collector';
 import {
   TypeOrmResetReportCountReader,
+  resetReportBounds,
   resetReportCountSql,
-  sqliteResetReportBounds,
 } from '../database/adapters/metrics/typeorm-metrics-readers';
 import {
   CRASH_WATCHDOG_REASONS,
@@ -14,8 +15,6 @@ import {
   describeReaders,
   hourWindow,
 } from './reset-report-metrics';
-import { AttractapCrashReportCreatedAtIndex1791700000000 } from '../database/migrations/1791700000000-attractap-crash-report-created-at-index';
-import * as migrations from '../database/migrations';
 
 const NOW = Date.parse('2026-10-29T12:00:00.000Z');
 
@@ -34,7 +33,7 @@ describe('ResetReportMetricsCollector', () => {
 
   async function insert(reader: number, reason: string, createdAt: string) {
     await source.query(
-      `INSERT INTO attractap_crash_report (id, attractapId, resetReason, createdAt) VALUES (?, ?, ?, ?)`,
+      `INSERT INTO attractap_crash_report (id, "attractapId", "resetReason", "createdAt") VALUES ($1, $2, $3, $4)`,
       [nextId++, reader, reason, createdAt],
     );
   }
@@ -46,17 +45,8 @@ describe('ResetReportMetricsCollector', () => {
 
   beforeEach(async () => {
     jest.useFakeTimers({ now: NOW, doNotFake: ['setImmediate', 'nextTick', 'setTimeout', 'clearTimeout'] });
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-    }).initialize();
-    await source.query(`CREATE TABLE attractap (id integer PRIMARY KEY, name text NOT NULL)`);
-    await source.query(`CREATE TABLE attractap_crash_report (
-      id integer PRIMARY KEY, attractapId integer NOT NULL, resetReason text NOT NULL,
-      createdAt datetime NOT NULL DEFAULT (datetime('now')))`);
-    await new AttractapCrashReportCreatedAtIndex1791700000000().up(source.createQueryRunner());
-    await source.query(`INSERT INTO attractap VALUES (1, 'Door'), (2, 'Laser')`);
+    source = await createTestDataSource();
+    await source.query(`INSERT INTO attractap (id, name) VALUES (1, 'Door'), (2, 'Laser')`);
     registry.clear();
     gauges = {
       attractapResetReportsLastHour: new Gauge({
@@ -81,7 +71,7 @@ describe('ResetReportMetricsCollector', () => {
 
   afterEach(async () => {
     jest.useRealTimers();
-    await source.destroy();
+    await closeTestDataSource(source);
   });
 
   it('excludes a report exactly one hour old and includes one second newer', async () => {
@@ -218,31 +208,29 @@ describe('reset report count query on the migrated schema', () => {
   let source: DataSource;
 
   beforeAll(async () => {
-    source = await new DataSource({
-      type: 'better-sqlite3',
-      invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-      database: ':memory:',
-      entities: Object.values(entities),
-      migrations: Object.values(migrations),
-    }).initialize();
-    await source.runMigrations();
+    source = await createTestDataSource();
   }, 60_000);
 
   afterAll(async () => {
-    if (source?.isInitialized) await source.destroy();
+    await closeTestDataSource(source);
   });
 
   it('uses the createdAt index for the real hourly count query', async () => {
-    const { from, to } = sqliteResetReportBounds(hourWindow(NOW));
+    const { from, to } = resetReportBounds(hourWindow(NOW));
     const reasons = [...CRASH_WATCHDOG_REASONS, ...POWER_ON_REASONS];
-    const plan = (await source.query(`EXPLAIN QUERY PLAN ${resetReportCountSql(reasons.length)}`, [
-      from,
-      to,
-      ...reasons,
-    ])) as Array<{ detail: string }>;
-    const details = plan.map((p) => p.detail).join(' ');
-    expect(details).toContain('SEARCH r USING INDEX IDX_attractap_crash_report_created_at');
-    expect(details).not.toMatch(/SCAN r/);
+    const runner = source.createQueryRunner();
+    try {
+      // The planner prefers a sequential scan of an empty table; the question is whether the index can serve it.
+      await runner.query('SET enable_seqscan = off');
+      const plan = (await runner.query(`EXPLAIN ${resetReportCountSql()}`, [from, to, reasons])) as Array<
+        Record<string, string>
+      >;
+      const details = plan.map((row) => Object.values(row)[0]).join(' ');
+      expect(details).toContain('IDX_attractap_crash_report_created_at');
+      expect(details).not.toMatch(/Seq Scan on attractap_crash_report/);
+    } finally {
+      await runner.release();
+    }
   });
 });
 

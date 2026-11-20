@@ -12,21 +12,43 @@ import {
 } from '@attraccess/application-models';
 import { AuthenticationDetail, DashboardPin, ResourceUsage, Session, User } from '@attraccess/database-entities';
 import { DataSource, EntityManager, FindOptionsWhere, ILike, In, IsNull, Not } from 'typeorm';
-import type {
-  DeleteAccountRequest,
-  EmailChangeSnapshot,
-  UserIdentity,
-  UserLookup,
-  UserStore,
+import {
+  UserIdentityTakenError,
+  type DeleteAccountRequest,
+  type EmailChangeSnapshot,
+  type UserIdentity,
+  type UserIdentityField,
+  type UserLookup,
+  type UserStore,
 } from '../../../users-and-auth/users/user-store.port';
+import { isUniqueViolation } from '../../persistence-errors';
 import type { TransactionContext } from '../../transaction-context';
 import { TransactionContextResolver } from '../transaction-context';
 import { toUserAccount, toUserRecord } from './user-mapping';
 import { applyUserListFilters } from './user-list-query';
 import { findRelations } from '../find-options';
 
-/** SQLite lower-cases ASCII only, so the email search term is folded in JavaScript like the stored value. */
+/** Emails are stored trimmed and lower-cased, so the email search term is folded the same way. */
 const foldEmail = (value: string) => value.trim().toLowerCase();
+
+/**
+ * Advisory lock key (one key, transaction-scoped) that serialises account creation and the first-time-setup claim
+ * across connections and API instances. Listed with the other keys in `../resources/resource-locks.ts`.
+ */
+const ACCOUNT_CREATION_LOCK = 584_102;
+
+/** The identity column whose unique constraint rejected a user insert, when that was the reason. */
+function takenIdentity(manager: EntityManager, error: unknown): UserIdentityField | undefined {
+  if (!isUniqueViolation(error)) return undefined;
+  const constraint =
+    (error as { driverError?: { constraint?: unknown } }).driverError?.constraint ??
+    (error as { constraint?: unknown }).constraint;
+  const unique = manager.connection
+    .getMetadata(User)
+    .uniques.find((candidate) => candidate.name === constraint && candidate.columns.length === 1);
+  const column = unique?.columns[0].propertyName;
+  return column === 'email' || column === 'username' ? column : undefined;
+}
 
 @Injectable()
 export class TypeOrmUserStore implements UserStore {
@@ -130,6 +152,10 @@ export class TypeOrmUserStore implements UserStore {
     return { users: users.map(toUserAccount), total };
   }
 
+  async lockAccountCreation(context: TransactionContext): Promise<void> {
+    await this.manager(context).query('SELECT pg_advisory_xact_lock($1)', [ACCOUNT_CREATION_LOCK]);
+  }
+
   async insertUser(user: NewUser, context?: TransactionContext): Promise<UserRecord> {
     const [saved] = await this.insertUsers([user], context);
     return saved;
@@ -148,8 +174,14 @@ export class TypeOrmUserStore implements UserStore {
         entity.locale = data.locale;
         return entity;
       });
-      const saved = await repository.save(entities);
-      return saved.map(toUserRecord);
+      try {
+        const saved = await repository.save(entities);
+        return saved.map(toUserRecord);
+      } catch (error) {
+        const field = takenIdentity(manager, error);
+        if (field) throw new UserIdentityTakenError(field);
+        throw error;
+      }
     });
   }
 
@@ -165,15 +197,18 @@ export class TypeOrmUserStore implements UserStore {
     identity: UserIdentity,
     context?: TransactionContext,
   ): Promise<boolean> {
-    // The conditional update is atomic across API instances, unlike an in-process mutex or count-then-update.
+    // Callers hold lockAccountCreation first: under READ COMMITTED a claim that waited for the row lock of a
+    // concurrent claim re-checks only the row, while NOT EXISTS keeps its old snapshot and would let both through.
     const claim = await this.manager(context)
       .getRepository(User)
       .createQueryBuilder()
       .update(User)
       .set({ username: identity.username, email: identity.email })
-      .where('id = :id', { id: userId })
-      .andWhere('isEmailVerified = :isEmailVerified', { isEmailVerified: false })
-      .andWhere('NOT EXISTS (SELECT 1 FROM user AS other WHERE other.id != :id AND other.deletedAt IS NULL)')
+      .where('"id" = :id', { id: userId })
+      .andWhere('"isEmailVerified" = :isEmailVerified', { isEmailVerified: false })
+      .andWhere(
+        'NOT EXISTS (SELECT 1 FROM "user" AS "other" WHERE "other"."id" != :id AND "other"."deletedAt" IS NULL)',
+      )
       .execute();
     return claim.affected === 1;
   }

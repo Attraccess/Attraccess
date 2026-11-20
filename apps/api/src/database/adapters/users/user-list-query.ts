@@ -26,7 +26,7 @@ export function applyUserListFilters(query: SelectQueryBuilder<User>, options: U
       new Brackets((where) =>
         where.where('LOWER(user.username) LIKE LOWER(:search)').orWhere('LOWER(user.email) LIKE :emailSearch'),
       ),
-      // SQLite LOWER() only folds ASCII, so fold the email term in JS like the stored value.
+      // Emails are stored lower-cased, so the email term is trimmed and lower-cased like the stored value.
       { search: `%${options.search}%`, emailSearch: `%${options.search.trim().toLowerCase()}%` },
     );
   }

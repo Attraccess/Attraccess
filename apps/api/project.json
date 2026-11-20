@@ -271,7 +271,7 @@
       "options": {
         "cwd": ".",
         "commands": [
-          "node --env-file-if-exists=.env node_modules/typeorm/cli.js -d dist/apps/migrations/main.js migration:generate ./apps/api/src/database/migrations/{args.name}"
+          "node --env-file-if-exists=.env node_modules/typeorm/cli.js -d dist/apps/migrations/main.js migration:generate ./apps/api/src/database/postgres/migrations/{args.name}"
         ]
       }
     },
@@ -329,6 +329,14 @@
       "cache": false,
       "options": {
         "command": "node apps/api/scripts/reencrypt-card-keys.mjs"
+      }
+    },
+    "transfer-sqlite": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["build"],
+      "options": {
+        "command": "node --env-file-if-exists=.env dist/apps/api/main.js transfer-sqlite"
       }
     },
     "seed-dev": {

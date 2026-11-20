@@ -21,7 +21,7 @@ Attraccess/
 │   ├── plugins-frontend-sdk/ # Plugin-SDK für Frontend-Erweiterungen
 │   ├── plugins-frontend-ui/  # Gemeinsame UI-Komponenten für Plugins
 │   └── env/                  # Umgebungskonfiguration
-└── storage/                  # SQLite-Datenbankdateien (Laufzeit)
+└── storage/                  # Uploads und Plugins (Laufzeit)
 ```
 
 ## Anwendungen
@@ -87,10 +87,10 @@ Nach Änderungen an der API müssen diese Bibliotheken neu generiert werden, um 
 
 ## Datenbank
 
-Attraccess verwendet **SQLite** als Datenbank, verwaltet über **TypeORM**. Wichtige Eigenschaften:
+Attraccess verwendet **PostgreSQL** als einzige Datenbank, verwaltet über **TypeORM**. Wichtige Eigenschaften:
 
-- Kein separater Datenbankserver erforderlich
-- Datenbankdatei wird im Verzeichnis `storage/` gespeichert
+- Ein separater PostgreSQL-Server, konfiguriert über `DATABASE_URL` (siehe [Umgebungsvariablen](installation/environment-variables.md#datenbank))
+- Uploads und Plugins liegen im Verzeichnis `storage/`
 - Migrationen werden beim Anwendungsstart automatisch ausgeführt
 - Entity-Definitionen befinden sich in der Bibliothek `database-entities`
 

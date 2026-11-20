@@ -106,6 +106,7 @@ export interface UsageSessionStore {
 
   /** Whether another lifecycle operation blocks this one (any on an exclusive machine, a takeover on a shared one). */
   isLifecycleBlocked(resourceId: number, sharedMachine: boolean, context?: TransactionScope): Promise<boolean>;
+  /** The attempt; inside a unit of work it stays locked until commit, so attempt changes never interleave. */
   findAttempt(attemptId: string, resourceId: number, context?: TransactionScope): Promise<UsageLifecycleAttempt | null>;
   /** Whether a stop or takeover attempt is already working on this running session. */
   isSessionBeingEnded(usageId: number, context?: TransactionScope): Promise<boolean>;
@@ -117,6 +118,7 @@ export interface UsageSessionStore {
   setBillingItems(attemptId: string, items: UsageBillingItemDraft[], context?: TransactionScope): Promise<void>;
   /** Attempt ids with their creation time, for the recovery of interrupted lifecycles. */
   listAttemptIds(): Promise<{ id: string; createdAt: Date }[]>;
+  /** The attempts that still exist; locked like `findAttempt` inside a unit of work. */
   findAttemptsByIds(ids: string[], context?: TransactionScope): Promise<UsageLifecycleAttempt[]>;
 
   /** Reserves a session for a start or takeover: pending, never visible, with the owner's billing factor. */
@@ -125,8 +127,8 @@ export interface UsageSessionStore {
   findPendingSession(usageId: number, context?: TransactionScope): Promise<UsageSessionWithParties | null>;
   /** Removes a tentative session. Reports whether one was removed; a published session is never touched. */
   deletePendingSession(usageId: number, context?: TransactionScope): Promise<boolean>;
-  /** Makes the tentative session visible. */
-  publishSession(usageId: number, context?: TransactionScope): Promise<void>;
+  /** Makes the tentative session visible. Reports `false` when no tentative session with this id is left. */
+  publishSession(usageId: number, context?: TransactionScope): Promise<boolean>;
   /** Ends a running session once. Reports `false` when it had already ended. */
   endSessionIfOpen(
     usageId: number,

@@ -53,6 +53,7 @@ export type PluginFlowFailureBehavior = 'fail-flow' | 'failure-output' | 'log-an
 export interface PluginFlowNodeValidationError {
   field: string;
   message: string;
+  /** @deprecated Ignored: the host sends only `field` and `message` to the editor, never node values. */
   value?: unknown;
 }
 

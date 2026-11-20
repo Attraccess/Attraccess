@@ -26,7 +26,7 @@ import { LicenseService } from '../license/license.service';
 import { bootstrap } from '../main.bootstrap';
 import { DesktopFixture, buildProbe, waitFor } from './desktop-simulator.fixture';
 import { withDesktopCleanup } from './desktop-simulator-cleanup';
-import { disposeStorage } from '../test/desktop-real-api.test-fixture';
+import { disposeStorage, provisionDatabase } from '../test/desktop-real-api.test-fixture';
 import { TestReaderUiScenario, registerTestReaderUi } from '../test/reader-ui-test-hooks.test-fixture';
 
 // ATT-1187: pre-start hooks, steps and slots through the real API and the real desktop simulator.
@@ -54,6 +54,7 @@ describe('reader UI against an isolated real API and the desktop simulator', () 
 
   beforeAll(async () => {
     await buildProbe();
+    await provisionDatabase();
     const boot = await bootstrap();
     app = boot.app;
     prefix = `/${boot.globalPrefix}`;

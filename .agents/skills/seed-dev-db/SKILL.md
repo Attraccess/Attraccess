@@ -5,10 +5,10 @@ Use this skill when local work needs a login or repeatable database fixtures wit
 ## Prerequisites
 
 1. Ensure dependencies are installed with `pnpm install`.
-2. Create `.env` from `.env.example` if it is missing. Set `AUTH_SESSION_SECRET` and `LICENSE_KEY`. The non-profit `LICENSE_KEY` in `.env.example` is valid for local qualifying development.
+2. Create `.env` from `.env.example` if it is missing. Set `AUTH_SESSION_SECRET`, `LICENSE_KEY` and `DATABASE_URL` (PostgreSQL; the worktree bootstrap writes this worktree's own database). The non-profit `LICENSE_KEY` in `.env.example` is valid for local qualifying development.
 3. Start the API with `pnpm serve --only=api`. Do not use `pnpm nx serve api`.
 4. Read the API URL from `.dev-serve-ports.json`, set `ATTRACCESS_URL` in `.env` to that URL, then restart the API so generated links use this worktree's actual port.
-5. Wait until migrations have created `storage/attraccess.sqlite`, then run `pnpm seed:dev`.
+5. Wait until the API has finished its startup migrations on the PostgreSQL database `DATABASE_URL` names, then run `pnpm seed:dev`.
 
 The seed command prints the credentials. Tell the user:
 
@@ -21,7 +21,7 @@ When the frontend is required, start it with `pnpm serve` and read `.dev-serve-p
 
 ## Safety
 
-The seed command only accepts databases within this repository's `storage/` directory by default. Do not use `--allow-external-db` for shared, staging, or production databases. The fixed credentials are for local development only.
+The seed command only accepts a PostgreSQL server on this machine (localhost) by default. Do not use `--allow-external-db` for shared, staging, or production databases; pass it only for an isolated, throwaway development database on another host. The fixed credentials are for local development only.
 
 The command upserts its own records. It never clears existing data.
 

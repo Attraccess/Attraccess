@@ -1,10 +1,7 @@
 import { AuditRecorder } from '../../../audit/recorder/audit-event';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
-import { DataSource } from 'typeorm';
-import { Session, User, entities } from '@attraccess/database-entities';
+import { createTestDataSource, closeTestDataSource } from '../../../test-utils/test-database';
+import type { DataSource } from 'typeorm';
+import { Session, User } from '@attraccess/database-entities';
 import { SsoSessionContext } from '@attraccess/application-models';
 import { GenericContainer, StartedTestContainer } from 'testcontainers';
 import Redis from 'ioredis';
@@ -25,7 +22,7 @@ import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { Response } from 'express';
 import { MetricsService } from '../../../metrics/metrics.service';
 import { CronTimer } from '../../../metrics/instrumentation/cron/cron.helper';
-import { SqliteSessionStore } from '../../../database/adapters/sessions/sqlite-session-store';
+import { PostgresSessionStore } from '../../../database/adapters/sessions/postgres-session-store';
 import { ValkeySessionStore } from './valkey.session-store';
 import { TokenHashService } from '../../../encryption/token-hash.service';
 import { SSOService } from '../sso/sso.service';
@@ -53,31 +50,19 @@ const saml: SsoSessionContext = {
   sessionIndexes: ['first', 'second'],
 };
 
-for (const backend of ['SQLite', 'Valkey'] as const) {
+for (const backend of ['PostgreSQL', 'Valkey'] as const) {
   describe(`${backend} SSO session persistence`, () => {
     let store: SessionStore;
-    let directory: string;
     let source: DataSource;
     let client: Redis;
     let container: StartedTestContainer;
     beforeAll(async () => {
-      if (backend === 'SQLite') {
-        directory = mkdtempSync(join(tmpdir(), 'attraccess-session-'));
-        source = await new DataSource({
-          type: 'better-sqlite3',
-          invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-          database: join(directory, 'sessions.sqlite'),
-          timeout: 5000,
-          entities: Object.values(entities),
-          synchronize: true,
-        }).initialize();
+      if (backend === 'PostgreSQL') {
+        source = await createTestDataSource();
         await source
           .getRepository(User)
           .save({ id: 7, username: 'fixture', email: 'fixture@example.com', isEmailVerified: true });
-        await source.query(
-          'CREATE TABLE sso_logout_state (key text PRIMARY KEY, value text NOT NULL, expiresAt integer NOT NULL)',
-        );
-        store = new SqliteSessionStore(source.getRepository(Session), hash);
+        store = new PostgresSessionStore(source.getRepository(Session), hash);
       } else {
         container = await new GenericContainer('valkey/valkey:9-alpine').withExposedPorts(6379).start();
         client = new Redis(container.getMappedPort(6379), container.getHost());
@@ -89,11 +74,7 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
       }
     });
     afterAll(async () => {
-      if (source?.isInitialized) {
-        await closeResourceTransactionConnection(source);
-        await source.destroy();
-      }
-      if (directory) rmSync(directory, { recursive: true, force: true });
+      await closeTestDataSource(source);
       if (client) await client.quit();
       if (container) await container.stop();
     });

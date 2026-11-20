@@ -10,7 +10,6 @@ conversation therefore uses a bounded re-present loop, while the assertions on w
 recorded and on the key versions on the emulated card stay exact.
 """
 
-import sqlite3
 import threading
 import time
 
@@ -34,23 +33,21 @@ RESET_SCREEN_CLOSED = "Reset timeout reached"
 
 
 def rows(api, sql, *args):
-    with sqlite3.connect(api.database) as db:
-        return db.execute(sql, args).fetchall()
+    found, _ = api.sql(sql, *args)
+    return [tuple(row) for row in found]
 
 
 def other_paired_reader(api):
     """A second paired reader record (never connected): the setting only accepts paired readers."""
-    with sqlite3.connect(api.database) as db:
-        cursor = db.execute(
-            "INSERT INTO attractap (name, pairingState, firmwareCapabilitiesCardrelay) "
-            "VALUES ('HIL other reader', 'paired', 1)"
-        )
-        return cursor.lastrowid
+    found, _ = api.sql(
+        'INSERT INTO attractap (name, "pairingState", "firmwareCapabilitiesCardrelay") '
+        "VALUES ('HIL other reader', 'paired', true) RETURNING id"
+    )
+    return found[0][0]
 
 
 def delete_reader(api, reader_id):
-    with sqlite3.connect(api.database) as db:
-        db.execute("DELETE FROM attractap WHERE id = ?", (reader_id,))
+    api.sql("DELETE FROM attractap WHERE id = ?", reader_id)
 
 
 def pending(api, uid, kind):
@@ -58,7 +55,7 @@ def pending(api, uid, kind):
 
 
 def stored_card(api, uid):
-    found = rows(api, "SELECT id, keyNo, isActive FROM nfc_card WHERE uid = ?", uid)
+    found = rows(api, 'SELECT id, "keyNo", "isActive" FROM nfc_card WHERE uid = ?', uid)
     return found[0] if found else None
 
 
@@ -73,9 +70,8 @@ def key_versions(emulator, profile):
 def make_factory(api, emulator, profile):
     """Forget any card record for the profile and give the emulated card its factory state back."""
     uid = uid_of(emulator, profile)
-    with sqlite3.connect(api.database) as db:
-        db.execute("DELETE FROM nfc_card WHERE uid = ?", (uid,))
-        db.execute("DELETE FROM nfc_card_pending_change WHERE uid = ?", (uid,))
+    api.sql("DELETE FROM nfc_card_pending_change WHERE uid = ?", uid)
+    api.sql("DELETE FROM nfc_card WHERE uid = ?", uid)
     emulator.command("remove")
     emulator.command("behavior.clear")
     emulator.command("profiles.select", {"id": profile})

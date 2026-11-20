@@ -106,8 +106,8 @@ export class TypeOrmApiTokenStore implements ApiTokenStore {
       .update(ApiToken)
       .set({ lastUsedAt: usedAt })
       .where('id = :id', { id: tokenId })
-      .andWhere('revokedAt IS NULL')
-      .andWhere('(expiresAt IS NULL OR expiresAt > :now)', { now: usedAt })
+      .andWhere('"revokedAt" IS NULL')
+      .andWhere('("expiresAt" IS NULL OR "expiresAt" > :now)', { now: usedAt })
       .execute();
     return result.affected === 1;
   }

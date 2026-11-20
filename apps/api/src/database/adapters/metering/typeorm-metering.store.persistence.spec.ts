@@ -12,11 +12,13 @@ import {
   ResourceUsage,
   User,
 } from '@attraccess/database-entities';
-import { ResourceMeteringSessionStatus, ResourceType, SupervisionMode } from '@attraccess/application-models';
-import { DataSource } from 'typeorm';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import {
+  ResourceMeteringSessionStatus,
+  ResourceType,
+  ResourceUsageAction,
+  SupervisionMode,
+} from '@attraccess/application-models';
+import type { DataSource } from 'typeorm';
 import { MeteringReadings } from '../../../resources/metering/metering-readings';
 import { MeteringSegments } from '../../../resources/metering/metering-segments';
 import { MeteringSettlement } from '../../../resources/metering/metering-settlement';
@@ -25,11 +27,15 @@ import {
   MeteringStartSettingsSchema,
 } from '../../../resources/metering/metering-definition';
 import { MeterNameTakenError } from '../../../resources/metering/metering-store.port';
-import { resolveDatabaseBackend } from '../../backend';
-import { closeResourceTransactionConnection } from '../../sqlite/run-serialized-transaction';
-import { createSqliteUnitOfWork } from '../../sqlite/sqlite-unit-of-work';
+import {
+  closeTestDataSource,
+  createTestDatabaseLocation,
+  createTestDataSource,
+  type TestDatabaseLocation,
+} from '../../../test-utils/test-database';
 import { EntityManagerResolver } from '../entity-manager-resolver';
-import { schemas } from './fixtures/schemas.test-fixture';
+import { unitOfWorkFor } from '../shared-unit-of-work';
+import { insertRow } from '../usage/migrated-usage-database.test-fixture';
 import { TypeOrmMeteringStore } from './typeorm-metering.store';
 
 jest.setTimeout(60_000);
@@ -38,26 +44,18 @@ const START = new Date('2026-08-28T10:00:00.000Z');
 const END = new Date('2026-08-28T10:30:00.000Z');
 
 /**
- * The guarantees of the metering store against a real database, with two independent connections to one file:
+ * The guarantees of the metering store against a real database, with two independent connections to one database:
  * what the application relies on when several API instances (or several requests) meter one machine.
  */
 describe('TypeOrmMeteringStore with two independent connections', () => {
-  let directory: string;
+  let database: TestDatabaseLocation;
   const sources: DataSource[] = [];
 
   /** One API instance: its own connection, unit of work and store. */
-  const connect = async (file: string, first = false) => {
-    const source = await resolveDatabaseBackend()
-      .createDataSource({
-        type: 'better-sqlite3',
-        invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-        database: file,
-        entities: schemas,
-        synchronize: first,
-      })
-      .initialize();
+  const connect = async () => {
+    const source = await createTestDataSource({ location: database.location });
     sources.push(source);
-    const unitOfWork = createSqliteUnitOfWork(source);
+    const unitOfWork = unitOfWorkFor(source);
     const store = new TypeOrmMeteringStore(new EntityManagerResolver(unitOfWork, source));
     return { source, unitOfWork, store };
   };
@@ -78,6 +76,7 @@ describe('TypeOrmMeteringStore with two independent connections', () => {
       id: 1,
       resourceId: 1,
       userId: 1,
+      usageAction: ResourceUsageAction.Usage,
       startTime: START,
       endTime: END,
       isFinalized: true,
@@ -116,28 +115,26 @@ describe('TypeOrmMeteringStore with two independent connections', () => {
     for (const method of ['debug', 'log', 'warn', 'error'] as const) {
       jest.spyOn(Logger.prototype, method).mockImplementation(() => undefined);
     }
-    directory = await mkdtemp(join(tmpdir(), 'metering-store-'));
-    const file = join(directory, 'metering.sqlite');
-    a = await connect(file, true);
-    b = await connect(file);
+    database = await createTestDatabaseLocation();
+    a = await connect();
+    b = await connect();
     await a.source.getRepository(Resource).save({
       id: 1,
       name: 'Laser',
       type: ResourceType.Machine,
       supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED,
     });
-    await a.source.getRepository(User).save([{ id: 1, username: 'first' }]);
+    await a.source.getRepository(User).save([{ id: 1, username: 'first', email: 'first@example.test' }]);
+    // The initiator of the corrections (id 7) is a real user: the bill references it.
+    await insertRow(a.source, 'user', { id: 7, username: 'initiator', email: 'initiator@example.test' });
     await a.source.getRepository(ResourceMeter).save({ id: 1, resourceId: 1, name: 'Energy', creditsPerUnit: 30 });
     audit = { record: jest.fn().mockResolvedValue({}) };
     live = { notifyTransactionUpdate: jest.fn().mockResolvedValue(undefined) };
   });
 
   afterEach(async () => {
-    for (const source of sources.splice(0)) {
-      await closeResourceTransactionConnection(source);
-      if (source.isInitialized) await source.destroy();
-    }
-    await rm(directory, { recursive: true, force: true });
+    for (const source of sources.splice(0)) await closeTestDataSource(source);
+    await database.remove();
     jest.restoreAllMocks();
   });
 
@@ -319,7 +316,16 @@ describe('TypeOrmMeteringStore with two independent connections', () => {
 
   describe('mapping', () => {
     it('hands out complete session and operation records with their defaults', async () => {
-      await a.source.getRepository(ResourceUsage).save({ id: 1, resourceId: 1, userId: 1, startTime: START });
+      await a.source
+        .getRepository(ResourceUsage)
+        .save({
+          id: 1,
+          resourceId: 1,
+          userId: 1,
+          usageAction: ResourceUsageAction.Usage,
+          startTime: START,
+          endTime: END,
+        });
       const session = await a.store.createSession({
         id: 'new-session',
         resourceId: 1,
@@ -354,8 +360,6 @@ describe('TypeOrmMeteringStore with two independent connections', () => {
     });
 
     it('refuses a second meter of the same name with the port error', async () => {
-      // The entity declares this index; the hand-written test schema does not.
-      await a.source.query('CREATE UNIQUE INDEX IDX_resource_meter_name ON resource_meter (resourceId, name)');
       await expect(a.store.createMeter(1, 'Energy')).rejects.toBeInstanceOf(MeterNameTakenError);
       const created = await a.store.createMeter(1, 'Water');
       expect(created).toMatchObject({ name: 'Water', allocation: 'shared', lifetimeValue: '0' });
@@ -364,9 +368,9 @@ describe('TypeOrmMeteringStore with two independent connections', () => {
 
     it('picks pending sessions by what they may no longer be settled against', async () => {
       await a.source.getRepository(ResourceUsage).save([
-        { id: 1, resourceId: 1, userId: 1, startTime: START },
-        { id: 2, resourceId: 1, userId: 1, startTime: START },
-        { id: 3, resourceId: 1, userId: 1, startTime: START },
+        { id: 1, resourceId: 1, userId: 1, usageAction: ResourceUsageAction.Usage, startTime: START, endTime: END },
+        { id: 2, resourceId: 1, userId: 1, usageAction: ResourceUsageAction.Usage, startTime: START, endTime: END },
+        { id: 3, resourceId: 1, userId: 1, usageAction: ResourceUsageAction.Usage, startTime: START, endTime: END },
       ]);
       const pending = (id: string, usageId: number, accounting: 'own' | 'segmented' | 'per-session') =>
         a.source.getRepository(ResourceMeteringSession).save({

@@ -1,5 +1,5 @@
 import { ResourceMeteringSession, ResourceUsage } from '@attraccess/database-entities';
-import { ResourceMeteringSessionStatus } from '@attraccess/application-models';
+import { ResourceMeteringSessionStatus, ResourceUsageAction } from '@attraccess/application-models';
 import { inheritTestScope } from '../../../../test-utils/inherit-test-scope';
 import type { FlowDefinedMeteringTestScope } from '../flow-defined-meters.persistence.spec';
 
@@ -11,6 +11,7 @@ export function createGenericMetersFixture(parentScope: FlowDefinedMeteringTestS
     const newest = await usages.save({
       resourceId: 1,
       userId: 1,
+      usageAction: ResourceUsageAction.Usage,
       startTime: new Date(Date.now() - 1_800_000),
       isFinalized: true,
       meterRates: [{ meterId: 1, name: 'Newest', creditsPerUnit: 0 }],
@@ -18,6 +19,7 @@ export function createGenericMetersFixture(parentScope: FlowDefinedMeteringTestS
     const older = await usages.save({
       resourceId: 1,
       userId: 2,
+      usageAction: ResourceUsageAction.Usage,
       startTime: new Date(Date.now() - 3_600_000),
       isFinalized: true,
       meterRates: [{ meterId: 1, name: 'Older', creditsPerUnit: 30 }],
@@ -27,6 +29,8 @@ export function createGenericMetersFixture(parentScope: FlowDefinedMeteringTestS
         id: `meter-${session.id}`,
         resourceId: 1,
         usageId: session.id,
+        meterId: 1,
+        meterName: 'Energy',
         status: ResourceMeteringSessionStatus.Active,
         creditsPerUnit: session.meterRates?.[0].creditsPerUnit,
         latestValue: '0',

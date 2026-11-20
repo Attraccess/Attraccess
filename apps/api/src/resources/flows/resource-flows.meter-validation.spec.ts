@@ -1,4 +1,5 @@
 import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
+import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import { FakeFlowGraphStore, FakeFlowResourceDirectory } from './fixtures/fake-flow-graph-store.test-fixture';
@@ -59,6 +60,7 @@ describe('resource flow meter validation', () => {
         nodeId: node.id,
         nodeType: node.type,
         field: 'meterId',
+        code: 'invalid',
         message: 'Choose a meter belonging to this resource',
       })),
     );
@@ -93,6 +95,7 @@ describe('resource flow meter validation', () => {
         nodeId: nodes[2].id,
         nodeType: nodes[2].type,
         field: 'meterId',
+        code: 'invalid',
         message: 'Choose a meter belonging to this resource',
       },
     ]);
@@ -151,23 +154,29 @@ describe('resource flow meter validation', () => {
     expect(directory.meterLookups).toBe(0);
   });
 
-  it.each(['load', 'save'])('reports a failed lookup without retrying per node during %s', async (operation) => {
-    const { service, nodes, directory } = fixture(true);
-    directory.meterError = new Error('Meter lookup failed');
-    const result =
-      operation === 'load'
-        ? await service.getResourceFlow(resourceId)
-        : await service.saveResourceFlow(resourceId, { nodes, edges: [] }, testActor);
+  it.each(['load', 'save'])(
+    'reports a failed lookup generically, without retrying per node, during %s',
+    async (operation) => {
+      const { service, nodes, directory } = fixture(true);
+      directory.meterError = new Error('Meter lookup failed');
+      const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const result =
+        operation === 'load'
+          ? await service.getResourceFlow(resourceId)
+          : await service.saveResourceFlow(resourceId, { nodes, edges: [] }, testActor);
 
-    expect(result.validationErrors).toEqual(
-      nodes.map((node) => ({
-        nodeId: node.id,
-        nodeType: node.type,
-        field: 'data',
-        message: 'Meter lookup failed',
-        value: node.data,
-      })),
-    );
-    expectOneMeterQuery(directory);
-  });
+      expect(result.validationErrors).toEqual(
+        nodes.map((node) => ({
+          nodeId: node.id,
+          nodeType: node.type,
+          field: 'data',
+          code: 'invalid',
+          message: 'Invalid node configuration',
+        })),
+      );
+      expectOneMeterQuery(directory);
+      expect(logError).toHaveBeenCalledTimes(nodes.length);
+      logError.mockRestore();
+    },
+  );
 });

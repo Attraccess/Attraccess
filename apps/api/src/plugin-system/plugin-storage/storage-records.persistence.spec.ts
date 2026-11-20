@@ -1,13 +1,14 @@
-import { DataSource, type QueryRunner } from 'typeorm';
+import type { DataSource, QueryRunner } from 'typeorm';
 import { f, PluginStorageInvalid, step, table } from '@attraccess/plugins-backend-sdk';
-import { ManagerExecutor } from '../../database/sqlite/plugin-storage/sqlite-storage-sessions';
-import { sqliteStorageDdl } from '../../database/sqlite/plugin-storage/sqlite-storage-ddl';
-import { sqliteStorageDialect } from '../../database/sqlite/plugin-storage/sqlite-storage-dialect';
+import { PostgresManagerExecutor } from '../../database/postgres/plugin-storage/postgres-storage-sessions';
+import { postgresStorageDdl } from '../../database/postgres/plugin-storage/postgres-storage-ddl';
+import { postgresStorageDialect } from '../../database/postgres/plugin-storage/postgres-storage-dialect';
+import { createTestDataSource, closeTestDataSource } from '../../test-utils/test-database';
 import type { PluginStorageSessions } from './storage-dialect.port';
 import { createRecordPort } from './storage-records';
 import { compilePluginStorage } from './storage-schema';
 
-/** The record port on an in-memory SQLite database: statements are real, nothing is mocked. */
+/** The record port on a PostgreSQL database: statements are real, nothing is mocked. */
 const definitions = {
   items: table(
     {
@@ -38,11 +39,7 @@ type Api = Record<string, (...args: unknown[]) => Promise<unknown>>;
 const api = (name: string): Api => (port as unknown as Record<string, Api>)[name];
 
 beforeAll(async () => {
-  source = await new DataSource({
-    type: 'better-sqlite3',
-    invalidWhereValuesBehavior: { null: 'ignore', undefined: 'ignore' },
-    database: ':memory:',
-  }).initialize();
+  source = await createTestDataSource({ entities: [], synchronize: false, empty: true });
   runner = source.createQueryRunner();
   const compiled = compilePluginStorage(
     'demo',
@@ -60,22 +57,22 @@ beforeAll(async () => {
   );
   for (const migration of compiled.migrations) {
     for (const resolved of migration.steps) {
-      for (const statement of sqliteStorageDdl.statements(resolved)) await runner.query(statement);
+      for (const statement of postgresStorageDdl.statements(resolved)) await runner.query(statement);
     }
   }
-  const executor = new ManagerExecutor(runner.manager);
+  const executor = new PostgresManagerExecutor(runner.manager);
   const sessions: PluginStorageSessions = { run: (_access, _scope, work) => work(executor) };
-  port = createRecordPort(compiled.tables, sqliteStorageDialect, sessions);
+  port = createRecordPort(compiled.tables, postgresStorageDialect, sessions);
 });
 
 afterAll(async () => {
   await runner.release();
-  await source.destroy();
+  await closeTestDataSource(source);
 });
 
 beforeEach(async () => {
-  for (const name of Object.keys(definitions)) await runner.query(`DELETE FROM "plugin_demo_${name}"`);
-  await runner.query('DELETE FROM sqlite_sequence');
+  const tables = Object.keys(definitions).map((name) => `"plugin_demo_${name}"`);
+  await runner.query(`TRUNCATE ${tables.join(', ')} RESTART IDENTITY`);
 });
 
 const rejects = (promise: Promise<unknown>, message: RegExp) =>
@@ -417,7 +414,7 @@ describe('createRecordPort', () => {
     const sessions: PluginStorageSessions = {
       run: (access, given, work) => {
         calls.push(`${access}:${given === scope}`);
-        return work(new ManagerExecutor(runner.manager));
+        return work(new PostgresManagerExecutor(runner.manager));
       },
     };
     const scoped = createRecordPort(
@@ -431,7 +428,7 @@ describe('createRecordPort', () => {
           { reservedTables: new Set() },
         ).tables,
       ]),
-      sqliteStorageDialect,
+      postgresStorageDialect,
       sessions,
     ) as unknown as Record<string, Api>;
     await scoped.bare.insert({}, { scope });
@@ -451,7 +448,7 @@ describe('createRecordPort', () => {
         },
         { reservedTables: new Set() },
       ).tables,
-      sqliteStorageDialect,
+      postgresStorageDialect,
       failing,
     ) as unknown as Record<string, Api>;
     await expect(broken.bare.find()).rejects.toBeInstanceOf(PluginStorageInvalid);

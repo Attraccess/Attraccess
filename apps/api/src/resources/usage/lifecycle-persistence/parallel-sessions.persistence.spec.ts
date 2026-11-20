@@ -7,8 +7,6 @@ import {
 } from '@attraccess/application-models';
 import { NoUsageSessionError } from '../../flows/errors/no-usage-session.error';
 import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
-import { rm } from 'node:fs/promises';
-import { closeResourceTransactionConnection } from '../../../database/sqlite/run-serialized-transaction';
 import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../../exceptions/resource.maintenance.inUse.exception';
 import { ResourceUnhealthyException } from '../../../exceptions/resource.unhealthy.exception';
 import { FlowExecutionError } from '../../flows/errors/flow-execution.error';
@@ -17,7 +15,10 @@ import { NoOwnActiveSessionError } from '../errors/no-own-active-session.error';
 import { ResourceFullError } from '../errors/resource-full.error';
 import { ResourceInUseError } from '../errors/resource-in-use.error';
 import { TentativeSessionCancelledError } from '../errors/tentative-session-cancelled.error';
-import { resetTestFixture } from '../../../database/adapters/usage/lifecycle-fixtures/setup.test-fixture';
+import {
+  closeLifecycleFixture,
+  resetTestFixture,
+} from '../../../database/adapters/usage/lifecycle-fixtures/setup.test-fixture';
 import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../../../database/adapters/usage/lifecycle-fixtures/state.test-fixture';
 import { usageInternals } from '../sessions/fixtures/compose.test-fixture';
 
@@ -30,7 +31,11 @@ describe('Parallel sessions on one machine', () => {
     const users = await scope.source
       .getRepository(User)
       .save(
-        Array.from({ length: count }, (_, index) => ({ id: firstId + index, username: `user-${firstId + index}` })),
+        Array.from({ length: count }, (_, index) => ({
+          id: firstId + index,
+          username: `user-${firstId + index}`,
+          email: `user-${firstId + index}@example.test`,
+        })),
       );
     users.forEach((user) => Object.assign(user, { effectivePermissions: new Set(permissions) }));
     return users;
@@ -67,12 +72,7 @@ describe('Parallel sessions on one machine', () => {
   });
 
   afterEach(async () => {
-    scope.usage?.onModuleDestroy();
-    if (scope.source) {
-      await closeResourceTransactionConnection(scope.source);
-      if (scope.source.isInitialized) await scope.source.destroy();
-    }
-    if (scope.directory) await rm(scope.directory, { recursive: true, force: true });
+    await closeLifecycleFixture(scope);
     jest.restoreAllMocks();
   });
 
@@ -120,8 +120,7 @@ describe('Parallel sessions on one machine', () => {
       expect((await scope.usage.getActiveSessionsForResource(1)).map((session) => session.userId)).toEqual([1, 2]);
     });
 
-    it('works with the production integrity migrations applied: different people may publish side by side', async () => {
-      await scope.migrateIntegrity();
+    it('enforces the integrity guards in the database: different people may publish side by side', async () => {
       await setLimit(2);
       await scope.usage.startSession(1, scope.users[0], {});
       await scope.usage.startSession(1, scope.users[1], {});

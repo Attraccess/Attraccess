@@ -70,7 +70,7 @@ class AttractapCapabilities {
     default: false,
   })
   cardRelay!: boolean;
-  @Column({ type: 'simple-json', nullable: true })
+  @Column({ type: 'jsonb', nullable: true })
   @ApiProperty({
     description:
       'Reader UI capabilities (schema version, components, slots, steps, display, input, feedback). Null means schemaVersion 0 (no plugin UI).',
@@ -156,11 +156,11 @@ export class Attractap {
   })
   secureBootSignerDigest!: string | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @ApiProperty({ description: 'When the reader was paired', nullable: true })
   pairedAt!: Date | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @ApiProperty({ description: 'Expiry of the current reader certificate', nullable: true })
   certificateNotAfter!: Date | null;
 
@@ -176,7 +176,7 @@ export class Attractap {
   })
   secured!: boolean;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @ApiProperty({ description: 'When the reader last became secured', nullable: true })
   securedAt!: Date | null;
 
@@ -199,11 +199,11 @@ export class Attractap {
   @ApiProperty({ description: "The chip's eFuse SECURE_VERSION from the reader's last eFuse report", nullable: true })
   efuseSecureVersion!: number | null;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   @ApiProperty({ description: 'When the server last checked an eFuse report of the reader', nullable: true })
   securityReportCheckedAt!: Date | null;
 
-  @Column({ type: 'simple-json', nullable: true })
+  @Column({ type: 'jsonb', nullable: true })
   @ApiProperty({
     description: 'Problem codes of the last security check (empty when it passed)',
     enum: ATTRACTAP_SECURITY_PROBLEMS,
@@ -218,14 +218,14 @@ export class Attractap {
   resources!: Resource[];
 
   @Column({
-    type: 'datetime',
+    type: 'timestamptz',
     default: () => 'CURRENT_TIMESTAMP',
   })
   @ApiProperty({ description: 'The last time the reader connected to the server' })
   lastConnection!: Date;
 
   @Column({
-    type: 'datetime',
+    type: 'timestamptz',
     default: () => 'CURRENT_TIMESTAMP',
   })
   @ApiProperty({ description: 'The first time the reader connected to the server' })
