@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getFabricStatus, type FabricBackupStatus } from './api';
+import { errorMessage } from '../errorMessage';
 
 export const FABRIC_POLL_MS = 10_000;
 /** The longest pause between polls while the status keeps failing. */
 export const FABRIC_POLL_MAX_BACKOFF_MS = 5 * 60_000;
-
-const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /** How long to wait before the next poll after `failures` failed polls in a row: doubling, capped. */
 export const pollBackoffMs = (failures: number) =>
@@ -34,7 +33,7 @@ export function useFabricBackup() {
       }
       return true;
     } catch (caught) {
-      if (mounted.current && mine === seq.current) setError(messageOf(caught));
+      if (mounted.current && mine === seq.current) setError(errorMessage(caught));
       return false;
     }
   }, []);

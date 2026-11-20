@@ -45,7 +45,7 @@ describe('backup and restore over the HTTP client', () => {
     const audit = new DeviceAuditService(h.context);
     const keys = new RecoveryKeyService(h.context, audit);
     const reader = storageSchemaReader();
-    const reconciliation = new MatterReconciliationService(h.context, connection, audit, guard);
+    const reconciliation = new MatterReconciliationService(h.context, connection, audit, guard, h.bus);
     backups = new MatterBackupService(h.context, connection, keys, audit, guard, reader);
     fabric = new MatterFabricService(h.context, connection, guard, keys, backups, audit, reconciliation);
     restore = new MatterRestoreService(
@@ -57,6 +57,7 @@ describe('backup and restore over the HTTP client', () => {
       guard,
       audit,
       reconciliation,
+      h.bus,
       reader,
     );
     await connection.onModuleInit();

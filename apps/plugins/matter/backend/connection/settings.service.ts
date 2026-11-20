@@ -108,7 +108,7 @@ export class MatterSettingsService {
 
   /** Records a settings change. Details are flags only. A missing or failing audit sink never fails the request. */
   async audit(
-    action: 'matter.connection_saved' | 'matter.connection_removed',
+    action: 'matter.connection_saved' | 'matter.connection_removed' | 'matter.connection_reconnect_requested',
     principal: PluginAuditPrincipal,
     details: Record<string, string | boolean> = {},
   ): Promise<void> {

@@ -1,75 +1,66 @@
-import {
-  Button,
-  ConfirmableButton,
-  PasswordInput,
-  StatusDialog,
-  useDateTimeFormatter,
-} from '@attraccess/plugins-frontend-ui';
-import { Description, Form, Input, Label, TextArea, TextField } from '@heroui/react';
-import { useState, type FormEvent } from 'react';
+import { Button, ConfirmableButton, StatusAlert } from '@attraccess/plugins-frontend-ui';
+import { Description, FieldError, Form, Input, Label, TextField } from '@heroui/react';
+import { useRef, useState, type FormEvent, type RefObject } from 'react';
 import type { ConnectionSettings, SettingsInput } from './api';
 import { useMatterTranslations } from './i18n';
+import { CaField } from './settings/CaField';
+import { CredentialField } from './settings/CredentialField';
+import { SettingsDialogs, type SettingsNotice } from './settings/SettingsDialogs';
+import { useSettingsDraft } from './settings/useSettingsDraft';
+import { errorMessage } from './errorMessage';
 
 type Props = Readonly<{
+  /** The settings as the server has them now. They are polled: a change made elsewhere arrives here as a new value. */
   settings: ConnectionSettings;
   /** Resolves with the settings as stored, which the form then shows. */
   onSave: (input: SettingsInput) => Promise<ConnectionSettings>;
   onRemove: () => Promise<void>;
 }>;
 
-type Notice = { kind: 'saved' } | { kind: 'error'; title: string; message: string } | null;
-
-const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
-
-/** The URL as the backend stores it (origin and path without trailing slashes), so a respelling is no change. */
-function normalizedUrl(value: string): string {
-  try {
-    const parsed = new URL(value.trim());
-    return `${parsed.origin}${parsed.pathname.replace(/\/+$/, '')}`;
-  } catch {
-    return value.trim();
-  }
-}
+const EMPTY: ConnectionSettings = {
+  url: null,
+  credentialConfigured: false,
+  credentialUpdatedAt: null,
+  caCertificate: null,
+  updatedAt: null,
+};
 
 /**
- * The token is write-only: once saved, the form only shows that one is configured and offers to replace it. The
- * backend never sends it back. Changing the URL or the CA certificate needs the token again, so a stored token never
- * goes to a new endpoint; the backend refuses such a save without it.
+ * The connection settings form. The token is write-only (see CredentialField); changing the URL or the CA certificate
+ * needs it again, so a stored token never goes to a new endpoint.
+ *
+ * The form is a draft of the settings it was loaded from (see useSettingsDraft). When another administrator saves
+ * meanwhile, an untouched form adopts the new settings; a form with edits keeps them, says so and blocks Save until the
+ * administrator reloads, so nothing is overwritten silently. URL, token and CA certificate are checked while typing.
+ * After a dialog closes, the focus returns to the control that started the action.
  */
 export function SettingsForm({ settings, onSave, onRemove }: Props) {
   const { t } = useMatterTranslations();
-  const formatDateTime = useDateTimeFormatter({});
-  const [url, setUrl] = useState(settings.url ?? '');
-  const [replacing, setReplacing] = useState(!settings.credentialConfigured);
-  const [credential, setCredential] = useState('');
-  const [ca, setCa] = useState(settings.caCertificate ?? '');
-  const [caCleared, setCaCleared] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<Notice>(null);
+  const [notice, setNotice] = useState<SettingsNotice>(null);
+  const draft = useSettingsDraft(settings, busy);
+  const saveRef = useRef<HTMLButtonElement>(null);
+  const removeRef = useRef<HTMLButtonElement>(null);
+  const urlRef = useRef<HTMLInputElement>(null);
 
-  const caChanged = caCleared || ca.trim() !== (settings.caCertificate ?? '').trim();
-  const endpointChanged =
-    settings.credentialConfigured &&
-    (caChanged || (settings.url !== null && normalizedUrl(url) !== normalizedUrl(settings.url)));
-  const needsCredential = replacing || endpointChanged;
-  const canSave = url.trim() !== '' && (!needsCredential || credential !== '') && !busy;
+  // The browser may have dropped the focus meanwhile (the button was disabled while the request ran, or it is gone), so
+  // the focus is put back explicitly, after the dialog has closed.
+  const focusLater = (target: RefObject<HTMLElement | null>) => setTimeout(() => target.current?.focus(), 0);
+
+  /** Closes a dialog and puts the focus back where the action started. */
+  const closeNotice = (returnTo: RefObject<HTMLElement | null>) => {
+    setNotice(null);
+    focusLater(returnTo);
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    const input: SettingsInput = { url: url.trim() };
-    if (needsCredential) input.credential = credential;
-    if (caChanged) input.caCertificate = ca.trim() === '' || caCleared ? null : ca.trim();
     setBusy(true);
     try {
-      const saved = await onSave(input);
-      setUrl(saved.url ?? '');
-      setCa(saved.caCertificate ?? '');
-      setCaCleared(false);
-      setCredential('');
-      setReplacing(!saved.credentialConfigured);
+      draft.load(await onSave(draft.input()));
       setNotice({ kind: 'saved' });
     } catch (error) {
-      setNotice({ kind: 'error', title: t('form.saveError'), message: messageOf(error) });
+      setNotice({ kind: 'error', title: t('form.saveError'), message: errorMessage(error), returnTo: 'save' });
     } finally {
       setBusy(false);
     }
@@ -79,14 +70,11 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
     setBusy(true);
     try {
       await onRemove();
-      setUrl('');
-      setCa('');
-      setCaCleared(false);
-      setCredential('');
-      setReplacing(true);
-      setNotice(null);
+      draft.load(EMPTY);
+      // Remove is gone now (nothing is configured): the focus goes to the URL, where the next step starts.
+      focusLater(urlRef);
     } catch (error) {
-      setNotice({ kind: 'error', title: t('form.removeError'), message: messageOf(error) });
+      setNotice({ kind: 'error', title: t('form.removeError'), message: errorMessage(error), returnTo: 'remove' });
     } finally {
       setBusy(false);
     }
@@ -95,97 +83,76 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
   return (
     <section className="mt:flex mt:flex-col mt:gap-4" data-cy="matter-settings">
       <h2 className="mt:text-lg mt:font-semibold">{t('form.title')}</h2>
-      <div>
-        <Form onSubmit={submit} className="mt:flex mt:flex-col mt:gap-4">
-          <TextField value={url} onChange={setUrl} className="mt:w-full" isRequired>
-            <Label>{t('form.url')}</Label>
-            <Input placeholder={t('form.urlPlaceholder')} autoComplete="off" data-cy="matter-url-input" />
-            <Description>{t('form.urlDescription')}</Description>
-          </TextField>
-
-          {needsCredential ? (
-            <div className="mt:flex mt:flex-col mt:gap-2">
-              <PasswordInput
-                label={t('form.credential')}
-                description={endpointChanged ? t('form.credentialReenter') : t('form.credentialDescription')}
-                autoComplete="new-password"
-                value={credential}
-                onValueChange={setCredential}
-                data-cy="matter-credential-input"
-              />
-              {settings.credentialConfigured && !endpointChanged && (
-                <Button variant="tertiary" onPress={() => setReplacing(false)} data-cy="matter-keep-credential">
-                  {t('form.cancelReplace')}
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div
-              className="mt:flex mt:flex-wrap mt:items-center mt:justify-between mt:gap-2"
-              data-cy="matter-credential-configured"
-            >
-              <span>
-                {t('form.credential')}:{' '}
-                {t('form.credentialConfigured', { time: formatDateTime(settings.credentialUpdatedAt) })}
-              </span>
-              <Button variant="secondary" onPress={() => setReplacing(true)} data-cy="matter-replace-credential">
-                {t('form.replace')}
-              </Button>
-            </div>
-          )}
-
-          <TextField value={caCleared ? '' : ca} onChange={setCa} isDisabled={caCleared} className="mt:w-full">
-            <Label>{t('form.ca')}</Label>
-            <TextArea rows={5} spellCheck={false} data-cy="matter-ca-input" />
-            <Description>{caCleared ? t('form.caCleared') : t('form.caDescription')}</Description>
-          </TextField>
-          {settings.caCertificate && !caCleared && (
-            <Button variant="tertiary" onPress={() => setCaCleared(true)} data-cy="matter-clear-ca">
-              {t('form.caClear')}
+      {draft.changedElsewhere && draft.dirty && (
+        <StatusAlert status="warning" title={t('form.changedElsewhere')} data-cy="matter-settings-stale">
+          {t('form.changedElsewhereText')}
+          <span className="mt:mt-2 mt:block">
+            <Button size="sm" variant="secondary" onPress={() => draft.load(settings)} data-cy="matter-settings-reload">
+              {t('form.reload')}
             </Button>
+          </span>
+        </StatusAlert>
+      )}
+      <Form onSubmit={submit} className="mt:flex mt:flex-col mt:gap-4">
+        <TextField
+          value={draft.url}
+          onChange={draft.setUrl}
+          className="mt:w-full"
+          isRequired
+          isInvalid={draft.urlError !== null}
+        >
+          <Label>{t('form.url')}</Label>
+          <Input ref={urlRef} placeholder={t('form.urlPlaceholder')} autoComplete="off" data-cy="matter-url-input" />
+          <Description>{t('form.urlDescription')}</Description>
+          {draft.urlError && (
+            <FieldError data-cy="matter-url-error">{t(`form.validation.${draft.urlError}`)}</FieldError>
           )}
-
-          <div className="mt:flex mt:flex-wrap mt:gap-2">
-            <Button type="submit" isDisabled={!canSave} isPending={busy} data-cy="matter-save">
-              {t('form.save')}
-            </Button>
-            {settings.url !== null && (
-              <ConfirmableButton
-                label={t('form.remove')}
-                status="error"
-                isDisabled={busy}
-                onConfirm={remove}
-                confirm={{
-                  title: t('form.removeTitle'),
-                  message: t('form.removeText'),
-                  confirmLabel: t('form.removeConfirm'),
-                  'data-cy': 'matter-remove-dialog',
-                }}
-                data-cy="matter-remove"
-              />
-            )}
-          </div>
-        </Form>
-      </div>
-
-      <StatusDialog
-        isOpen={notice?.kind === 'saved'}
-        status="success"
-        title={t('form.saved')}
-        onClose={() => setNotice(null)}
-        data-cy="matter-saved-dialog"
-      >
-        {t('form.savedText')}
-      </StatusDialog>
-      <StatusDialog
-        isOpen={notice?.kind === 'error'}
-        status="error"
-        title={notice?.kind === 'error' ? notice.title : ''}
-        onClose={() => setNotice(null)}
-        data-cy="matter-error-dialog"
-      >
-        {notice?.kind === 'error' ? notice.message : ''}
-      </StatusDialog>
+        </TextField>
+        <CredentialField
+          configured={draft.base.credentialConfigured}
+          configuredAt={draft.base.credentialUpdatedAt}
+          needed={draft.needsCredential}
+          endpointChanged={draft.endpointChanged}
+          value={draft.credential}
+          error={draft.credentialError}
+          onChange={draft.setCredential}
+          onReplacingChange={draft.setReplacing}
+        />
+        <CaField
+          value={draft.ca}
+          stored={draft.base.caCertificate !== null}
+          cleared={draft.caCleared}
+          error={draft.caError}
+          onChange={draft.setCa}
+          onClearedChange={draft.setCaCleared}
+        />
+        <div className="mt:flex mt:flex-wrap mt:gap-2">
+          <Button ref={saveRef} type="submit" isDisabled={!draft.canSave} isPending={busy} data-cy="matter-save">
+            {t('form.save')}
+          </Button>
+          {draft.base.url !== null && (
+            <ConfirmableButton
+              label={t('form.remove')}
+              status="error"
+              isDisabled={busy}
+              onConfirm={remove}
+              confirm={{
+                title: t('form.removeTitle'),
+                message: t('form.removeText'),
+                confirmLabel: t('form.removeConfirm'),
+                'data-cy': 'matter-remove-dialog',
+              }}
+              buttonProps={{ ref: removeRef, variant: 'danger-soft' }}
+              data-cy="matter-remove"
+            />
+          )}
+        </div>
+      </Form>
+      <SettingsDialogs
+        notice={notice}
+        onCloseSaved={() => closeNotice(saveRef)}
+        onCloseError={() => closeNotice(notice?.kind === 'error' && notice.returnTo === 'remove' ? removeRef : saveRef)}
+      />
     </section>
   );
 }

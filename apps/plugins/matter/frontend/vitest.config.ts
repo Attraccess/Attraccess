@@ -11,6 +11,10 @@ export default defineConfig({
       '@attraccess/react-query-client': fileURLToPath(
         new URL('../../scripts/react-query-client.test-stub.ts', import.meta.url),
       ),
+      // Only constantsParity.spec.ts: the page copies a few contract constants and the spec keeps them equal.
+      '@attraccess/matter-contract': fileURLToPath(
+        new URL('../../../../libs/matter-contract/src/index.ts', import.meta.url),
+      ),
       '@attraccess/plugins-frontend-sdk': fileURLToPath(
         new URL('../../../../libs/plugins-frontend-sdk/src/index.ts', import.meta.url),
       ),
@@ -18,7 +22,10 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    setupFiles: [fileURLToPath(new URL('../../scripts/css-escape.test-setup.ts', import.meta.url))],
+    setupFiles: [
+      fileURLToPath(new URL('../../scripts/css-escape.test-setup.ts', import.meta.url)),
+      fileURLToPath(new URL('../../scripts/dom-stubs.test-setup.ts', import.meta.url)),
+    ],
     include: ['src/**/*.spec.{ts,tsx}'],
     testTimeout: 20_000,
     coverage: {

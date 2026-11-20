@@ -20,4 +20,5 @@ export * from './file-input/FileInput';
 export * from './password-input/PasswordInput';
 export * from './status-dialog';
 export * from './string-list-field/StringListField';
+export * from './routed-tabs';
 export * from './table-row-actions';

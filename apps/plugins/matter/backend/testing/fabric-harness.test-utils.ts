@@ -31,7 +31,7 @@ export async function createFabricHarness(
   const keys = new RecoveryKeyService(h.context, audit);
   /** The identity of the layout the plugin's storage definition ends at. */
   const migrationReader: PluginMigrationReader = storageSchemaReader();
-  const reconciliation = new MatterReconciliationService(h.context, connectionService, audit, guard);
+  const reconciliation = new MatterReconciliationService(h.context, connectionService, audit, guard, h.bus);
   const backups = new MatterBackupService(h.context, connectionService, keys, audit, guard, migrationReader);
   const fabric = new MatterFabricService(h.context, connectionService, guard, keys, backups, audit, reconciliation);
   const restore = new MatterRestoreService(
@@ -43,6 +43,7 @@ export async function createFabricHarness(
     guard,
     audit,
     reconciliation,
+    h.bus,
     migrationReader,
     options.validationTtlMs,
     options.rollbackTiming ?? TEST_ROLLBACK_TIMING,

@@ -19,6 +19,7 @@ import { MatterReconciliationService } from './devices/reconciliation.service';
 import { MatterStateService } from './devices/state.service';
 import { MatterFabricController } from './fabric/controller';
 import { MatterFabricService } from './fabric/fabric.service';
+import { MatterFabricGuard } from './fabric/guard';
 import { RecoveryKeyService } from './fabric/recovery-key.service';
 import { MATTER_PAGE_PERMISSIONS } from './permission-keys';
 import {
@@ -51,6 +52,7 @@ const ROUTES: Route[] = [
   [MatterConnectionController, 'get', 'connectionSettings', 'get', '/matter/connection'],
   [MatterConnectionController, 'put', 'connectionSave', 'put', '/matter/connection'],
   [MatterConnectionController, 'remove', 'connectionRemove', 'delete', '/matter/connection'],
+  [MatterConnectionController, 'reconnect', 'connectionReconnect', 'post', '/matter/connection/reconnect'],
   [MatterConnectionController, 'status', 'connectionStatus', 'get', '/matter/connection/status'],
   [MatterFabricController, 'status', 'fabricStatus', 'get', '/matter/fabric'],
   [MatterFabricController, 'create', 'fabricCreate', 'post', '/matter/fabric/create'],
@@ -125,6 +127,7 @@ describe('Matter permission declaration', () => {
     expect(MATTER_OPERATIONS.threadStatus).toEqual(['thread.network.read']);
     expect(MATTER_OPERATIONS.threadDatasetExport).toEqual(['thread.network.manage']);
     expect(MATTER_OPERATIONS.developmentOverrides).toEqual(['matter.devices.manage']);
+    expect(MATTER_OPERATIONS.liveDeviceInventory).toEqual(['matter.devices.read']);
     expect(MATTER_OPERATIONS.liveDeviceState).toEqual(['matter.devices.read']);
     expect(MATTER_OPERATIONS.liveThread).toEqual(['thread.network.read']);
     expect(SESSION_ONLY_OPERATIONS).toEqual(['threadDatasetExport']);
@@ -256,7 +259,11 @@ describe('Matter routes over HTTP', () => {
     ];
     const moduleRef = await Test.createTestingModule({
       controllers: REGISTERED,
-      providers: services.map((service) => ({ provide: service, useValue: stub(service.name, calls) })),
+      providers: [
+        ...services.map((service) => ({ provide: service, useValue: stub(service.name, calls) })),
+        // In-memory flags only (no sidecar, no database): the real guard, idle.
+        { provide: MatterFabricGuard, useValue: new MatterFabricGuard() },
+      ],
     })
       .overrideGuard(DualAuthGuard)
       .useValue({

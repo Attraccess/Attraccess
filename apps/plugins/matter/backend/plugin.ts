@@ -16,9 +16,11 @@ import { MatterConnectionController } from './connection/controller';
 import { MatterConnectionService } from './connection/connection.service';
 import { MatterSettingsService } from './connection/settings.service';
 import { DeviceAuditService } from './devices/audit.service';
+import { MatterChangeBus } from './devices/change-bus';
 import { MatterDevicesController } from './devices/controller';
 import { MatterIngestionService } from './devices/ingestion.service';
 import { MatterLifecycleService } from './devices/lifecycle.service';
+import { MatterLiveUpdatesService } from './devices/live-updates.service';
 import { MatterReconciliationService } from './devices/reconciliation.service';
 import { MatterStateService } from './devices/state.service';
 import { MatterFabricController } from './fabric/controller';
@@ -53,10 +55,12 @@ const plugin: PluginBackendModule = {
         MatterSettingsService,
         MatterConnectionService,
         DeviceAuditService,
+        MatterChangeBus,
         MatterStateService,
         MatterReconciliationService,
         MatterLifecycleService,
         MatterIngestionService,
+        MatterLiveUpdatesService,
         // ATT-998: fabric persistence, encrypted backups and restore.
         { provide: PLUGIN_MIGRATION_READER, useValue: storageSchemaReader() },
         MatterFabricGuard,

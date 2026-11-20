@@ -104,6 +104,8 @@ export const MATTER_OPERATIONS = {
   connectionSettings: [MATTER_MANAGE],
   connectionSave: [MATTER_MANAGE],
   connectionRemove: [MATTER_MANAGE],
+  /** "Retry now": reconnect to the sidecar at once with the saved settings (ATT-997). */
+  connectionReconnect: [MATTER_MANAGE],
   fabricCreate: [MATTER_MANAGE],
   recoveryKeyGenerate: [MATTER_MANAGE],
   recoveryKeyAcknowledge: [MATTER_MANAGE],

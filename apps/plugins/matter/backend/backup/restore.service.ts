@@ -10,6 +10,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { MatterConnectionService } from '../connection/connection.service';
 import { DeviceAuditService, type AuditActor } from '../devices/audit.service';
+import { MatterChangeBus } from '../devices/change-bus';
 import { MatterReconciliationService } from '../devices/reconciliation.service';
 import { conflict, sidecarCode, unprocessable } from '../fabric/errors';
 import type { SidecarFabric } from '../fabric/facts';
@@ -18,6 +19,7 @@ import { MatterFabricGuard } from '../fabric/guard';
 import { RecoveryKeyService } from '../fabric/recovery-key.service';
 import { PLUGIN_MIGRATION_READER, type PluginMigrationReader } from '../fabric/tokens';
 import { PLUGIN_CONTEXT } from '../plugin-context';
+import { matterStorage } from '../plugin-storage/access';
 import { BACKUP_TIMEOUT_MS, MatterBackupService } from './backup.service';
 import {
   BackupFormatError,
@@ -84,6 +86,7 @@ export class MatterRestoreService implements OnModuleDestroy {
     @Inject(MatterFabricGuard) private readonly guard: MatterFabricGuard,
     @Inject(DeviceAuditService) private readonly audit: DeviceAuditService,
     @Inject(MatterReconciliationService) private readonly reconciliation: MatterReconciliationService,
+    @Inject(MatterChangeBus) private readonly changes: MatterChangeBus,
     @Inject(PLUGIN_MIGRATION_READER) private readonly migrationReader: PluginMigrationReader,
     @Optional() @Inject(RESTORE_VALIDATION_TTL) private readonly validationTtlMs: number = VALIDATION_TTL_MS,
     @Optional()
@@ -394,11 +397,27 @@ export class MatterRestoreService implements OnModuleDestroy {
     if (needsBackup) await this.preRestoreBackup(pending.stageId, actor, refuse);
 
     await this.committer.commitAndRecord(pending, preflight.sidecarState, actor);
+    await this.announceRestoredTables();
     await this.keepSuppliedKey(pending, actor);
     await this.fabric.detect('connect');
     await this.reconciliation.request(actor).catch(() => undefined);
     await this.backups.backup('restore', actor).catch(() => undefined);
     return { outcome: 'succeeded', status: await this.fabric.status() };
+  }
+
+  /**
+   * The restore replaced the device tables: open device views refetch the inventory, and every restored endpoint's
+   * state. Even when the reconciliation that follows finds nothing to change.
+   */
+  private async announceRestoredTables(): Promise<void> {
+    this.changes.inventoryChanged();
+    try {
+      const endpoints = await matterStorage(this.context).tables.endpoints.find({ where: { removedAt: null } });
+      this.changes.stateChanged(endpoints.map((endpoint) => endpoint.id));
+    } catch {
+      // Only a refresh hint: a restore that committed must not fail on it.
+      this.context.logger.debug?.('The restored Matter endpoints could not be listed for live updates.');
+    }
   }
 
   /**

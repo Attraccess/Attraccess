@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { errorMessage } from './errorMessage';
+import type { MatterConnectionValue } from './MatterConnectionContext';
 import type { MatterPermissions } from './permissions';
+import { useDocumentVisible } from './useDocumentVisible';
 import {
   getSettings,
   getStatus,
+  reconnect,
   removeSettings,
   saveSettings,
   type ConnectionSettings,
@@ -16,8 +20,6 @@ export const STATUS_POLL_MS = 5_000;
 /** A request still pending after this long counts as failed, so one hung request cannot stop the polling. */
 export const REQUEST_TIMEOUT_MS = 2 * STATUS_POLL_MS;
 
-const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
-
 function withTimeout<T>(request: Promise<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('The request timed out.')), REQUEST_TIMEOUT_MS);
@@ -26,26 +28,33 @@ function withTimeout<T>(request: Promise<T>): Promise<T> {
 }
 
 /**
- * Loads the settings and polls the status while the page is open. Saving and removing refresh both. If the first
- * settings load failed (API briefly down), the poll retries it so the form appears without a manual reload.
+ * Polls the connection status while the page is open (`canRead`), and the settings while the Infrastructure tab, which
+ * edits them, is open (`settingsActive`, `canManage`): a change another administrator saved reaches the open form (see
+ * SettingsForm), and a first load that failed (API briefly down) is retried without a manual reload. Saving and
+ * removing refresh both. Both polls pause while the browser tab is hidden and load once when it is visible again.
  *
  * A poll tick is skipped while an earlier request is still pending, so a hanging API does not pile up requests, and
- * only the newest status request may update the page, so a late answer never overwrites a newer one.
+ * only the newest request may update the page, so a late poll answer never overwrites a newer one (or a save).
  *
  * Nothing is requested that the API would refuse: the status needs `canRead`, the settings need `canManage`. Until the
  * host has pushed the auth state (`known`), nothing is requested and the page keeps loading.
  */
-export function useMatterPage({ known, canRead, canManage }: MatterPermissions) {
+export function useMatterPage(
+  { known, canRead, canManage }: MatterPermissions,
+  settingsActive: boolean,
+): MatterConnectionValue {
   const [settings, setSettings] = useState<ConnectionSettings | null>(null);
   const [status, setStatus] = useState<ConnectionStatus | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [statusLoading, setStatusLoading] = useState(true);
+  const visible = useDocumentVisible();
   const mounted = useRef(true);
-  const settingsLoaded = useRef(false);
   const statusSeq = useRef(0);
   const statusPending = useRef(0);
-  const settingsPending = useRef(false);
+  const hasStatus = useRef(false);
+  const settingsSeq = useRef(0);
+  const settingsPending = useRef(0);
 
   const refreshStatus = useCallback(async () => {
     const seq = ++statusSeq.current;
@@ -53,27 +62,28 @@ export function useMatterPage({ known, canRead, canManage }: MatterPermissions) 
     try {
       const next = await withTimeout(getStatus());
       if (!mounted.current || seq !== statusSeq.current) return;
+      hasStatus.current = true;
       setStatus(next);
       setStatusError(null);
     } catch (error) {
-      if (mounted.current && seq === statusSeq.current) setStatusError(messageOf(error));
+      if (mounted.current && seq === statusSeq.current) setStatusError(errorMessage(error));
     } finally {
       statusPending.current -= 1;
     }
   }, []);
 
   const refreshSettings = useCallback(async () => {
-    settingsPending.current = true;
+    const seq = ++settingsSeq.current;
+    settingsPending.current += 1;
     try {
       const next = await withTimeout(getSettings());
-      if (!mounted.current) return;
-      settingsLoaded.current = true;
+      if (!mounted.current || seq !== settingsSeq.current) return;
       setSettings(next);
       setSettingsError(null);
     } catch (error) {
-      if (mounted.current) setSettingsError(messageOf(error));
+      if (mounted.current && seq === settingsSeq.current) setSettingsError(errorMessage(error));
     } finally {
-      settingsPending.current = false;
+      settingsPending.current -= 1;
     }
   }, []);
 
@@ -86,28 +96,42 @@ export function useMatterPage({ known, canRead, canManage }: MatterPermissions) 
 
   useEffect(() => {
     if (!known) return;
-    // Per run: when the permissions change, the previous run's late answer must not end the new run's loading.
+    if (!canRead) {
+      setStatusLoading(false);
+      return;
+    }
+    if (!visible) return;
+    // Per run: when the permissions change, the previous run's late answer must not end the new run's loading. A run
+    // that starts without a status (read was just granted) loads again; one that resumes a visible tab does not.
     let cancelled = false;
-    setLoading(canRead || canManage);
-    void Promise.all([canManage && refreshSettings(), canRead && refreshStatus()]).finally(
-      () => !cancelled && setLoading(false),
-    );
+    if (!hasStatus.current) setStatusLoading(true);
+    void refreshStatus().finally(() => !cancelled && setStatusLoading(false));
     const timer = setInterval(() => {
-      if (canRead && statusPending.current === 0) void refreshStatus();
-      if (canManage && !settingsLoaded.current && !settingsPending.current) void refreshSettings();
+      if (statusPending.current === 0) void refreshStatus();
     }, STATUS_POLL_MS);
     return () => {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [known, canRead, canManage, refreshSettings, refreshStatus]);
+  }, [known, canRead, visible, refreshStatus]);
+
+  useEffect(() => {
+    if (!known || !canManage || !settingsActive || !visible) return;
+    void refreshSettings();
+    const timer = setInterval(() => {
+      if (settingsPending.current === 0) void refreshSettings();
+    }, STATUS_POLL_MS);
+    return () => clearInterval(timer);
+  }, [known, canManage, settingsActive, visible, refreshSettings]);
 
   const save = useCallback(
     async (input: SettingsInput) => {
       const saved = await saveSettings(input);
       if (mounted.current) {
-        settingsLoaded.current = true;
+        // A poll that started before the save must not bring the old settings back.
+        settingsSeq.current += 1;
         setSettings(saved);
+        setSettingsError(null);
       }
       await refreshStatus();
       return saved;
@@ -120,5 +144,21 @@ export function useMatterPage({ known, canRead, canManage }: MatterPermissions) 
     await Promise.all([refreshSettings(), refreshStatus()]);
   }, [refreshSettings, refreshStatus]);
 
-  return { settings, settingsError, status, statusError, loading, save, remove };
+  /** "Retry now": reconnects at once and shows the status right after. Needs `canManage`. */
+  const retryNow = useCallback(async () => {
+    const next = await withTimeout(reconnect());
+    if (!mounted.current) return;
+    statusSeq.current += 1;
+    hasStatus.current = true;
+    setStatus(next);
+    setStatusError(null);
+  }, []);
+
+  // The settings are loading while the tab that shows them waits for their first answer.
+  const settingsLoading = canManage && settingsActive && settings === null && settingsError === null;
+  const loading = !known || (canRead && statusLoading) || settingsLoading;
+  return useMemo(
+    () => ({ settings, settingsError, status, statusError, loading, save, remove, retryNow }),
+    [settings, settingsError, status, statusError, loading, save, remove, retryNow],
+  );
 }

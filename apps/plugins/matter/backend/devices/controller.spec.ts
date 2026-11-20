@@ -42,6 +42,8 @@ describe('Matter devices controller', () => {
       lifecycleState: 'unclaimed',
       identity: { vendorName: 'Acme', attestation: { status: 'verified' } },
       metadata: { displayName: null },
+      // The list carries the live endpoint count (endpoint 0 and 1 of the fixture).
+      endpointCount: 2,
     });
     expect(await controller.listNodes({ lifecycleState: 'claimed' })).toEqual([]);
     const detail = await controller.getNode(listed.id);
