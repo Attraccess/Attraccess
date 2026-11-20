@@ -615,9 +615,9 @@ HIL_WSS=1 READER_PROFILE=secure-lab pnpm nx run attractap-lab:hil -- -k ram
   session takes another 10 to 15 KB of internal RAM there.
 - **BLE notification bursts.** On the secure-lab reader a `wss://` send takes about
   8 ms, so it forwards about 120 notifications a second (150 over `ws://`).
-  `test_ble_notification_burst_and_overflow` sends 200 as fast as the link allows
-  into the reader's buffer of 64, and over `wss://` that sometimes overflows (1 of 4
-  runs).
+  `test_ble_notification_burst_and_overflow` sends 200 as fast as the link allows;
+  over `wss://` up to 77 of them waited in the reader's buffer of 128 (a buffer of 64
+  overflowed in 1 of 4 runs).
 
 ### In CI
 
