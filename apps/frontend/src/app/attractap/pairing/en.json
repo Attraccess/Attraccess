@@ -40,6 +40,7 @@
     "findHint": "Enter the code shown on the reader.",
     "codeLabel": "Code on the reader",
     "typeCode": "Enter the code the reader shows right now.",
+    "typeBridgeCode": "Enter the code the bridge's setup page shows on its Server tab right now.",
     "scan": "Scan",
     "scanTitle": "Scan the QR code on the reader",
     "find": "Continue",

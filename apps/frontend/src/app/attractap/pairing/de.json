@@ -40,6 +40,7 @@
     "findHint": "Gib den Code ein, den der Reader zeigt.",
     "codeLabel": "Code am Reader",
     "typeCode": "Gib den Code ein, den der Reader gerade zeigt.",
+    "typeBridgeCode": "Gib den Code ein, den die Einrichtungsseite der Bridge gerade im Tab „Server“ zeigt.",
     "scan": "Scannen",
     "scanTitle": "QR-Code am Reader scannen",
     "find": "Weiter",

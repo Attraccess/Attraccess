@@ -19,6 +19,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToastMessage } from '../../../components/toastProvider';
 import { normalizeEnrollmentCode } from './enrollmentCode';
+import { readerTypeOf } from './PairingRow';
 import { useRetryCountdown } from './useRetryCountdown';
 import { classifyPairingError, isPairingRunning, PairingError, TERMINAL_PAIRING_STATES } from './pairingUtils';
 import de from './de.json';
@@ -185,6 +186,8 @@ export interface PairingFlow {
   notice: string | null;
   idle: boolean;
   normalizedCode: string | null;
+  /** A BLE bridge: no screen or ring, its code is on its setup page. */
+  bleBridge: boolean;
   byPattern: boolean;
   finished: boolean;
   canFind: boolean;
@@ -293,8 +296,10 @@ export function usePairingFlow(props: PairingFlowProps): PairingFlow {
   const normalizedCode = normalizeEnrollmentCode(codeInput);
   const mode = modeOf(!!props.presetTargetReaderId, choice);
   const targetReaderId = props.presetTargetReaderId ?? pickedTarget;
-  // A Lite reader that was not found by its code is compared by its colour pattern.
-  const byPattern = current?.kind === 'lite' && !resolvedByCode;
+  // A Lite reader that was not found by its code is compared by its colour pattern. A BLE bridge pairs like a
+  // Lite but has no ring: its code is on its setup page, so it is always proved by code.
+  const bleBridge = !!current && readerTypeOf(current.firmware, current.kind) === 'bridge';
+  const byPattern = current?.kind === 'lite' && !resolvedByCode && !bleBridge;
   const finished = isFinished(current);
   const canFind = normalizedCode !== null && idle && !blocked;
 
@@ -381,6 +386,7 @@ export function usePairingFlow(props: PairingFlowProps): PairingFlow {
     notice,
     idle,
     normalizedCode,
+    bleBridge,
     byPattern,
     finished,
     canFind,
