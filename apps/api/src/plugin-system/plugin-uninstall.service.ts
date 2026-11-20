@@ -10,6 +10,8 @@ import { PluginMigrationService } from './plugin-migration.service';
 
 import { PluginBleService } from './ble/plugin-ble.service';
 
+import { PluginReadersService } from './readers/plugin-readers.service';
+
 import { PluginService } from './plugin.service';
 
 import { releaseStorageNames } from './plugin-storage/storage-registry';
@@ -25,6 +27,7 @@ export class PluginUninstallService {
   constructor(
     private readonly pluginService: PluginService,
     private readonly ble: PluginBleService,
+    private readonly readers: PluginReadersService,
   ) {}
 
   async deletePlugin(pluginId: string, deferRestart = false) {
@@ -64,6 +67,13 @@ export class PluginUninstallService {
       await this.ble.deleteAllForPlugin(plugin.id);
     } catch (error) {
       PluginUninstallService.logger.error(`Failed to delete BLE endpoints of plugin ${plugin.name}`, error as Error);
+    }
+
+    // The plugin's readers and their assignments go with it (disabling keeps them). A failure never blocks.
+    try {
+      await this.readers.deleteAllForPlugin(plugin.id);
+    } catch (error) {
+      PluginUninstallService.logger.error(`Failed to delete the readers of plugin ${plugin.name}`, error as Error);
     }
 
     // delete folder. The plugin's RBAC permission rows stay: deleting them would cascade to every role and

@@ -13,6 +13,7 @@ import {
   PluginPermission,
   PluginPermissionError,
   PluginReaderUiApi,
+  PluginReadersContext,
   PluginStartBlockedApi,
   PluginSecretsContext,
   SystemEvent,
@@ -141,6 +142,11 @@ export function createGuardedContext(
       require(PluginPermission.CARD_AUTHENTICATION, 'cards');
       if (!base.cards) throw new Error('Card authentication is unavailable in this host');
       return base.cards;
+    },
+    get readers(): PluginReadersContext {
+      require(PluginPermission.READER_DEVICES, 'readers');
+      if (!base.readers) throw new Error('Plugin readers are unavailable in this host');
+      return base.readers;
     },
     get secrets(): PluginSecretsContext {
       require(PluginPermission.MANAGE_SECRETS, 'secrets');

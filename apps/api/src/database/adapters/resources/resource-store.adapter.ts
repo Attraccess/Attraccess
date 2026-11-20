@@ -188,6 +188,7 @@ export class TypeOrmResourceStore implements ResourceStore {
       name: record.name,
       type: record.type,
       separateUnlockAndUnlatch: record.separateUnlockAndUnlatch,
+      accessOnly: record.accessOnly,
       description: record.description,
       imageFilename: record.imageFilename,
       documentationType: record.documentationType,

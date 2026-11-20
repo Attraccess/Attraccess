@@ -60,6 +60,7 @@ export const CONSTRAINT_STATEMENTS: readonly string[] = [
   `ALTER TABLE "mcp_oauth_token" ADD CONSTRAINT "FK_a26c0f0e6ed433a5d099fcc38df" FOREIGN KEY ("grantId") REFERENCES "mcp_oauth_grant"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
   `ALTER TABLE "attractap_crash_report" ADD CONSTRAINT "FK_e17715caff09f035d3c630b1b88" FOREIGN KEY ("attractapId") REFERENCES "attractap"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
   `ALTER TABLE "plugin_ble_endpoint" ADD CONSTRAINT "FK_6ce41351a6bbe45f32555c7de2a" FOREIGN KEY ("readerId") REFERENCES "attractap"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+  `ALTER TABLE "plugin_reader" ADD CONSTRAINT "FK_07af2bb2ec6dbb5e128e3adc735" FOREIGN KEY ("resourceId") REFERENCES "resource"("id") ON DELETE SET NULL ON UPDATE NO ACTION`,
   `ALTER TABLE "conversation_participant" ADD CONSTRAINT "FK_b1a75fd6cdb0ab0a82c5b01c34f" FOREIGN KEY ("conversationId") REFERENCES "conversation"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
   `ALTER TABLE "conversation_participant" ADD CONSTRAINT "FK_dd90174e375c888d7f431cf829e" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
   `ALTER TABLE "message" ADD CONSTRAINT "FK_7cf4a4df1f2627f72bf6231635f" FOREIGN KEY ("conversationId") REFERENCES "conversation"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,

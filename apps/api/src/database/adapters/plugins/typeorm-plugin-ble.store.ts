@@ -1,6 +1,6 @@
 import { Attractap, PluginBleEndpointEntity } from '@attraccess/database-entities';
 import type { PluginBleEndpointRecord, PluginBleReaderAccess } from '@attraccess/application-models';
-import type { DataSource } from 'typeorm';
+import { In, type DataSource } from 'typeorm';
 import type { PluginBleStore } from '../../../plugin-system/ble/plugin-ble-store.port';
 
 /** The endpoint id is a `uuid` column: PostgreSQL rejects any other text (22P02) instead of finding no row. */
@@ -32,9 +32,9 @@ export function createTypeOrmPluginBleStore(source: () => DataSource): PluginBle
   const readerColumns = { id: true, name: true, allowPluginBle: true } as const;
 
   return {
-    async listOpenReaders() {
+    async listOpenReaders(readerIds) {
       const rows = await readers().find({
-        where: { allowPluginBle: true },
+        where: readerIds ? { allowPluginBle: true, id: In(readerIds) } : { allowPluginBle: true },
         select: readerColumns,
         order: { id: 'ASC' },
       });

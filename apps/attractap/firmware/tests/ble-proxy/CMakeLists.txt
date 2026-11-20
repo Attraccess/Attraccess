@@ -10,9 +10,9 @@ FetchContent_MakeAvailable(ArduinoJson)
 
 set(BLE_DIR "${FIRMWARE_DIR}/src/ble_proxy")
 # The pure part of the proxy only: no NimBLE, no FreeRTOS (ble_proxy.cpp and ble_radio_nimble.cpp stay out).
-add_executable(ble-proxy-test ble_proxy_test.cpp ble_proxy_edge_test.cpp ble_link_test.cpp
-    "${BLE_DIR}/ble_core.cpp" "${BLE_DIR}/ble_core_events.cpp" "${BLE_DIR}/ble_codec.cpp" "${BLE_DIR}/ble_adv.cpp" "${BLE_DIR}/ble_errors.cpp"
-    "${BLE_DIR}/ble_notification_buffer.cpp")
+add_executable(ble-proxy-test ble_proxy_test.cpp ble_proxy_edge_test.cpp ble_link_test.cpp ble_watch_test.cpp
+    "${BLE_DIR}/ble_core.cpp" "${BLE_DIR}/ble_core_events.cpp" "${BLE_DIR}/ble_core_watch.cpp" "${BLE_DIR}/ble_codec.cpp"
+    "${BLE_DIR}/ble_adv.cpp" "${BLE_DIR}/ble_errors.cpp" "${BLE_DIR}/ble_notification_buffer.cpp" "${BLE_DIR}/ble_watch.cpp")
 target_compile_features(ble-proxy-test PRIVATE cxx_std_17)
 target_compile_options(ble-proxy-test PRIVATE -Wall -Wextra -Wpedantic)
 target_include_directories(ble-proxy-test PRIVATE "${BLE_DIR}" "${FIRMWARE_DIR}/src/display/ui")

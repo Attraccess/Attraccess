@@ -49,7 +49,34 @@ export interface BleReaderCapability {
   maxAllowlistEntries: number;
   /** GATT requests the reader queues per session; the API keeps at most this many in flight. */
   maxPendingRequests: number;
+  /** The advertisement watch (`capabilities.ble.watch`), or why the reader has none. */
+  watch: BleWatchCapabilityState;
 }
+
+/** What a reader announced in `capabilities.ble.watch`, clamped to what the API supports. */
+export interface BleWatchCapability {
+  version: number;
+  /** Filters in one BLE_WATCH_SET. */
+  maxFilters: number;
+  /** Devices the reader tracks for `changed`/keepalive. */
+  maxDevices: number;
+  /** Events the reader sends per second at most. */
+  maxEventsPerSecond: number;
+}
+
+export type BleWatchCapabilityState =
+  { supported: true; capability: BleWatchCapability } | { supported: false; detail: string };
+
+/** Advertisement watch protocol version (inside BLE protocol v1). */
+export const BLE_WATCH_VERSION = 1;
+/** A reader sends at most this many events per BLE_WATCH_EVENT; more are dropped. */
+export const BLE_WATCH_MAX_EVENTS_PER_MESSAGE = 8;
+/** The API never sends a reader more filters than this, whatever it announces. */
+export const BLE_WATCH_MAX_FILTERS = 16;
+/** What one reader filter takes (the scan filter limits of the firmware). */
+export const BLE_FILTER_MAX_SERVICE_UUIDS = 8;
+export const BLE_FILTER_MAX_MANUFACTURER_IDS = 8;
+export const BLE_FILTER_MAX_NAME_PREFIX_BYTES = 64;
 
 /** `undefined` on the socket: firmware info not received yet. */
 export type BleCapabilityState =
@@ -58,6 +85,27 @@ export type BleCapabilityState =
 function boundedInt(value: unknown, min: number, max: number, fallback: number): number {
   if (typeof value !== 'number' || !Number.isInteger(value)) return fallback;
   return Math.min(Math.max(value, min), max);
+}
+
+/** Negotiates `capabilities.ble.watch`. Never throws: anything unusable is `unsupported`. */
+export function parseBleWatchCapability(raw: unknown): BleWatchCapabilityState {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return { supported: false, detail: 'no-watch-capability' };
+  }
+  const watch = raw as Record<string, unknown>;
+  if (watch.version !== BLE_WATCH_VERSION) {
+    const version = typeof watch.version === 'number' && Number.isInteger(watch.version) ? watch.version : 'invalid';
+    return { supported: false, detail: `watch-version:${version}` };
+  }
+  return {
+    supported: true,
+    capability: {
+      version: BLE_WATCH_VERSION,
+      maxFilters: boundedInt(watch.maxFilters, 1, BLE_WATCH_MAX_FILTERS, 8),
+      maxDevices: boundedInt(watch.maxDevices, 1, 256, 32),
+      maxEventsPerSecond: boundedInt(watch.maxEventsPerSecond, 1, 100, 20),
+    },
+  };
 }
 
 /** Negotiates `capabilities.ble` from READER_FIRMWARE_INFO. Never throws: anything unusable is `unsupported`. */
@@ -84,6 +132,7 @@ export function parseBleCapability(raw: unknown): BleCapabilityState {
       maxScanResults: boundedInt(ble.maxScanResults, 1, 32, 32),
       maxAllowlistEntries: boundedInt(ble.maxAllowlistEntries, 1, 64, 16),
       maxPendingRequests: boundedInt(ble.maxPendingRequests, 1, BLE_MAX_PENDING_REQUESTS, BLE_MAX_PENDING_REQUESTS),
+      watch: parseBleWatchCapability(ble.watch),
     },
   };
 }

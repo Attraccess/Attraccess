@@ -11,7 +11,8 @@ import {
   type PluginBleAdvertisement,
   type PluginBleErrorCode,
 } from '@attraccess/plugins-backend-sdk';
-import type { BleDriverLink, BleReaderStatus, BleTransportDriver } from '../ble-transport-driver';
+import { bleWatchPayloadKey, matchesBleWatchFilter } from '@attraccess/plugins-backend-sdk/internal';
+import type { BleDriverLink, BleReaderStatus, BleTransportDriver, BleWatchState } from '../ble-transport-driver';
 
 /** Deterministic clock shared by the test driver and the service under test. */
 export class ManualClock {
@@ -83,6 +84,12 @@ export class BleTestDriver implements BleTransportDriver {
   connectHonoursAbort = true;
   /** ATT MTU of the next links. */
   mtu = FAKE_BLE_DEFAULT_MTU;
+  /** Readers whose firmware has no advertisement watch, with the detail the driver reports. */
+  readonly watchUnsupported = new Map<number, string>();
+  /** The watch set per reader, as the host last pushed it. */
+  readonly watchSets = new Map<number, Parameters<NonNullable<BleTransportDriver['setWatch']>>[0]>();
+  /** Per reader, the payload key last reported per address (what a reader keeps to send `changed`). */
+  private readonly watchSeen = new Map<number, Map<string, string>>();
 
   constructor(private readonly clock: ManualClock) {}
 
@@ -142,6 +149,57 @@ export class BleTestDriver implements BleTransportDriver {
   /** Number of links the driver still holds (a leaked link stays counted). */
   get liveLinks(): number {
     return this.links.size;
+  }
+
+  setWatch(request: Parameters<NonNullable<BleTransportDriver['setWatch']>>[0]): void {
+    if (request.filters.length === 0) this.watchSets.delete(request.readerId);
+    else this.watchSets.set(request.readerId, request);
+    request.listener.onWatchState(request.readerId, this.watchState(request.readerId));
+  }
+
+  /** Reader availability changed: a watching reader reports its new state, like the reader driver on (re)connect. */
+  setAvailable(readerId: number, available: boolean): void {
+    this.available.set(readerId, available);
+    this.reportWatch(readerId);
+  }
+
+  setUnsupported(readerId: number, detail: string | undefined): void {
+    if (detail === undefined) this.unsupported.delete(readerId);
+    else this.unsupported.set(readerId, detail);
+    this.reportWatch(readerId);
+  }
+
+  setWatchUnsupported(readerId: number, detail: string | undefined): void {
+    if (detail === undefined) this.watchUnsupported.delete(readerId);
+    else this.watchUnsupported.set(readerId, detail);
+    this.reportWatch(readerId);
+  }
+
+  private reportWatch(readerId: number): void {
+    this.watchSets.get(readerId)?.listener.onWatchState(readerId, this.watchState(readerId));
+  }
+
+  private watchState(readerId: number): BleWatchState {
+    const status = this.readerStatus(readerId);
+    if (status.status !== 'available') return status;
+    const detail = this.watchUnsupported.get(readerId);
+    return detail === undefined ? { status: 'watching' } : { status: 'unsupported', detail };
+  }
+
+  /** The reader sees an advertisement: it reports it with the ids of the filters it matches (any criterion). */
+  advertise(readerId: number, advertisement: PluginBleAdvertisement, changed?: boolean): void {
+    const set = this.watchSets.get(readerId);
+    if (!set || this.watchState(readerId).status !== 'watching') return;
+    const filterIds = set.filters.filter((filter) => matchesBleWatchFilter(filter, advertisement)).map((f) => f.id);
+    if (filterIds.length === 0) return;
+    const seen = this.watchSeen.get(readerId) ?? new Map<string, string>();
+    this.watchSeen.set(readerId, seen);
+    const key = bleWatchPayloadKey(advertisement);
+    const isChanged = changed ?? seen.get(advertisement.address) !== key;
+    seen.set(advertisement.address, key);
+    set.listener.onWatchEvents(readerId, [
+      { ...advertisement, filterIds, changed: isChanged, receivedAt: new Date(this.clock.now()) },
+    ]);
   }
 
   readerStatus(readerId: number): BleReaderStatus {

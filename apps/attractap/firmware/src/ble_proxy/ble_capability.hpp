@@ -11,7 +11,7 @@
 namespace ble
 {
     // Rendered as text and spliced in raw like `capabilities.ui` (smaller than ArduinoJson's per-field code).
-    constexpr size_t CAPABILITY_SCRATCH = 360;
+    constexpr size_t CAPABILITY_SCRATCH = 448;
 
     inline void fillCapability(JsonObject caps, char *scratch, size_t n)
     {
@@ -19,11 +19,14 @@ namespace ble
                  "{\"version\":%d,\"operations\":[\"scan\",\"connect\",\"read\",\"write\",\"writeWithoutResponse\","
                  "\"subscribe\",\"unsubscribe\",\"cancel\"],\"maxConnections\":1,\"maxMtu\":%u,\"maxPayloadBytes\":%u,"
                  "\"maxNotificationQueue\":%u,\"maxNotificationQueueBytes\":%u,\"maxScanMs\":%u,\"maxScanResults\":%u,"
-                 "\"maxAllowlistEntries\":%u,\"maxPendingRequests\":%u}",
+                 "\"maxAllowlistEntries\":%u,\"maxPendingRequests\":%u,"
+                 "\"watch\":{\"version\":%d,\"maxFilters\":%u,\"maxDevices\":%u,\"maxEventsPerSecond\":%u}}",
                  PROTOCOL_VERSION, static_cast<unsigned>(MAX_MTU), static_cast<unsigned>(MAX_PAYLOAD_BYTES),
                  static_cast<unsigned>(MAX_NOTIFICATION_QUEUE), static_cast<unsigned>(MAX_NOTIFICATION_QUEUE_BYTES),
                  static_cast<unsigned>(MAX_SCAN_MS), static_cast<unsigned>(MAX_SCAN_RESULTS),
-                 static_cast<unsigned>(MAX_ALLOWLIST_ENTRIES), static_cast<unsigned>(MAX_PENDING_REQUESTS));
+                 static_cast<unsigned>(MAX_ALLOWLIST_ENTRIES), static_cast<unsigned>(MAX_PENDING_REQUESTS),
+                 WATCH_VERSION, static_cast<unsigned>(MAX_WATCH_FILTERS), static_cast<unsigned>(MAX_WATCH_DEVICES),
+                 static_cast<unsigned>(MAX_WATCH_EVENTS_PER_SECOND));
         caps["ble"] = serialized(scratch);
     }
 }

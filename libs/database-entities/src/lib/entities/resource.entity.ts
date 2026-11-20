@@ -181,6 +181,15 @@ export class Resource {
   })
   separateUnlockAndUnlatch!: boolean | null;
 
+  @Column({ type: 'boolean', default: false })
+  @ApiProperty({
+    description:
+      '(only for doors) whether the door is access only: its only action is Open (stored as a door unlock); lock and unlatch are refused',
+    example: false,
+    default: false,
+  })
+  accessOnly!: boolean;
+
   @Column({ type: 'text', nullable: true })
   @ApiProperty({
     description: 'A detailed description of the resource',

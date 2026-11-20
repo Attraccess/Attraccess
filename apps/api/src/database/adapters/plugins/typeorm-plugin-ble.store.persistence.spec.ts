@@ -38,6 +38,11 @@ describe('TypeORM plugin BLE store on PostgreSQL', () => {
       ]);
     });
 
+    it('lists only the open readers among the given ids', async () => {
+      expect(await db.store.listOpenReaders([2, 3, 99])).toEqual([{ id: 3, name: 'Back door', allowPluginBle: true }]);
+      expect(await db.store.listOpenReaders([])).toEqual([]);
+    });
+
     it('finds one reader whatever its opt-in, and null for an unknown one', async () => {
       expect(await db.store.findReader(2)).toEqual({ id: 2, name: 'Workshop', allowPluginBle: false });
       expect(await db.store.findReader(99)).toBeNull();

@@ -1,6 +1,6 @@
 import { createMock } from '@golevelup/ts-jest';
 import type { PluginFlowTriggerNodeDefinition } from '@attraccess/plugins-backend-sdk';
-import { ResourceFlowNodeType } from '@attraccess/application-models';
+import { ResourceFlowNodeType, ResourceType } from '@attraccess/application-models';
 import { BadRequestException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
@@ -24,6 +24,17 @@ const newService = (
   events,
   audit,
   service: new ResourceFlowsService(graph, resources, mqtt, events, audit as never),
+});
+
+// Before the plugin nodes below are registered: one of them has no configuration schema.
+it("offers an access-only door's flow only the door trigger it fires", async () => {
+  const { resources, service } = newService();
+  resources.addResource(1, { type: ResourceType.Door, accessOnly: true });
+  const supported = (await service.getNodeSchemas(1))
+    .filter((schema) => schema.type.startsWith('input.resource.door.'))
+    .filter((schema) => schema.supportedByResource)
+    .map((schema) => schema.type);
+  expect(supported).toEqual([ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED]);
 });
 
 it('reports invalid plugin trigger configuration when loading a saved flow', async () => {

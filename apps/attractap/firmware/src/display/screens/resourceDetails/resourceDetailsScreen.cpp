@@ -288,6 +288,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
       lv_obj_add_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN);
       lv_obj_add_flag(this->stopSessionButton, LV_OBJ_FLAG_HIDDEN);
       lv_obj_remove_flag(this->doorControls, LV_OBJ_FLAG_HIDDEN);
+      this->showDoorButtons(resource.accessOnly);
       break;
    }
 

@@ -52,11 +52,14 @@
         "flowsWarningOpen": "Flows prüfen"
       }
     },
-
     "door": {
       "separateUnlockAndUnlatch": {
         "label": "Aufsperren und Falle öffnen separat",
         "description": "Kann sinnvoll sein, wenn die Tür nicht nur aufsperren muss, sondern auch die Falle öffnen muss"
+      },
+      "accessOnly": {
+        "label": "Nur Zutritt",
+        "description": "Die Tür hat nur eine Aktion, Öffnen: Sie öffnet und schließt danach von selbst. Abschließen und Falle öffnen werden nicht angeboten. Nicht mit „Aufsperren und Falle öffnen separat“ kombinierbar."
       }
     },
     "retraining": {

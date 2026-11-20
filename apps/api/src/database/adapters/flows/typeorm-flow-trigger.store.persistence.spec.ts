@@ -202,6 +202,7 @@ describe('TypeOrmFlowTriggerStore (PostgreSQL)', () => {
       name: 'Laser',
       type: ResourceType.Machine,
       metadata: { zone: 'A' },
+      accessOnly: false,
     });
     expect((await store.findResource(drillId))?.metadata).toBeNull();
     expect(await store.findResource(999_999)).toBeNull();
@@ -211,7 +212,7 @@ describe('TypeOrmFlowTriggerStore (PostgreSQL)', () => {
     const findOne = jest.spyOn(source.manager.getRepository(Resource), 'findOne');
     await store.findResource(laserId);
     expect(findOne).toHaveBeenCalledWith(
-      expect.objectContaining({ select: { id: true, name: true, type: true, metadata: true } }),
+      expect.objectContaining({ select: { id: true, name: true, type: true, metadata: true, accessOnly: true } }),
     );
   });
 });

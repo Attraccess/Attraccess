@@ -34,6 +34,7 @@ describe('TypeOrmResourceStore on real PostgreSQL', () => {
     maxParallelSessions: 1,
     type: ResourceType.Machine,
     separateUnlockAndUnlatch: false,
+    accessOnly: false,
     metadata: null,
     retrainingMaxAgeDays: null,
     retrainingMaxInactivityDays: null,
@@ -86,6 +87,16 @@ describe('TypeOrmResourceStore on real PostgreSQL', () => {
     const other = await store.create(base('Mill'));
     await store.hardDelete(other.id);
     expect(await store.existingIds([other.id, created.id])).toEqual([]);
+  });
+
+  it('stores whether a door is access only', async () => {
+    const door = await store.create(base('Side door', { type: ResourceType.Door, accessOnly: true }));
+    expect(door.accessOnly).toBe(true);
+
+    const [detailed] = await store.findDetailed([door.id]);
+    expect(detailed.accessOnly).toBe(true);
+    await store.save({ ...detailed, accessOnly: false });
+    expect((await store.findDetailed([door.id]))[0].accessOnly).toBe(false);
   });
 
   it('deletes the dashboard pins of a soft-deleted resource only', async () => {

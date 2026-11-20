@@ -8,6 +8,7 @@ export function createMockResource(overrides: Partial<Resource> = {}): Resource 
     name: 'Test Resource',
     type: ResourceType.Machine,
     separateUnlockAndUnlatch: false,
+    accessOnly: false,
     description: 'Test Description',
     imageFilename: null,
     documentationType: DocumentationType.MARKDOWN,

@@ -89,8 +89,8 @@ import { ResourceFlowsExecutorService } from '../resources/flows/execution/resou
 
 import { createPluginAuditContext } from './runtime/audit-context';
 import { closePluginBleSessions, createPluginBleContext } from './ble/plugin-ble-context';
-import { cancelPluginCardConversations, createPluginCardsContext } from './cards/plugin-cards-context';
-import { CardOperationsService } from '../attractap/websockets/card-operations.service';
+import { READER_PROVIDERS, createHostCardsContext, createHostReadersContext } from './readers/plugin-readers-host';
+import { cancelPluginCardConversations } from './cards/plugin-cards-context';
 import { PluginBleService } from './ble/plugin-ble.service';
 import { preparePluginNotifications } from './runtime/plugin-notifications';
 import { preparePluginPermissions } from './runtime/plugin-permissions';
@@ -157,6 +157,7 @@ export class PluginModule {
           PluginLiveUpdatesService,
           PluginSystemEventsBridge,
           PluginBleService,
+          ...READER_PROVIDERS,
         ],
         exports: [PluginEventsService],
         controllers: [PluginController],
@@ -246,6 +247,7 @@ export class PluginModule {
         PluginSystemEventsBridge,
         PluginLicenseWatcher,
         PluginBleService,
+        ...READER_PROVIDERS,
         ReaderUiWiring,
       ],
       exports: [PluginEventsService],
@@ -366,7 +368,7 @@ export class PluginModule {
               getImplementationClass().pluginLiveUpdates().clearPlugin(manifest.id);
               unregisterReaderUi(manifest.name);
               categories.unregister();
-              // Ends this plugin's card conversations with CANCELLED; a plugin that never got host refs has none.
+              // Ends its card conversations (CANCELLED), drops its card authentications; none without host refs.
               cancelPluginCardConversations(getImplementationClass().moduleRef, manifest.id);
               // Closes this plugin's BLE sessions with `shutdown`; a plugin that never got host refs has none.
               return closePluginBleSessions(
@@ -412,9 +414,8 @@ export class PluginModule {
       ble: createPluginBleContext({ id: manifest.id, logger: new Logger(`Plugin:${manifest.name}`) }, () =>
         getImplementationClass().hostRefs().get(PluginBleService),
       ),
-      cards: createPluginCardsContext(manifest.id, () =>
-        getImplementationClass().hostRefs().get(CardOperationsService),
-      ),
+      cards: createHostCardsContext(manifest, getImplementationClass().hostRefs()),
+      readers: createHostReadersContext(manifest.id, getImplementationClass().hostRefs()),
       startBlocked: {
         invalidate: ({ resourceId }) => {
           if (!Number.isInteger(resourceId)) return;

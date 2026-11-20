@@ -39,6 +39,7 @@ namespace bletest
         std::deque<Start> starts;
         Error initError;
         Error connectError;
+        Error watchError;
         Error failError = Error(Code::GattError, "att:0x0e");
         uint32_t lastToken = 0;
         int initCalls = 0;
@@ -65,6 +66,11 @@ namespace bletest
         {
             calls.push_back("scan");
             return Error();
+        }
+        Error startWatchScan(bool connected) override
+        {
+            calls.push_back(connected ? "watch-connected" : "watch");
+            return watchError;
         }
         void stopScan() override { calls.push_back("stopScan"); }
         Error connect(const Address &, uint32_t, const PsVector<AllowEntry> &) override
@@ -246,4 +252,6 @@ namespace bletest
     void runEdgeTests();
     // ble_link_test.cpp: the requested link and the send-slot wakeup.
     void runLinkTests();
+    // ble_watch_test.cpp: the advertisement watch.
+    void runWatchTests();
 }

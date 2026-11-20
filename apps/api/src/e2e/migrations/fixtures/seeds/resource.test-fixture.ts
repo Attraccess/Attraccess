@@ -46,6 +46,20 @@ export async function migrationResourceSeeds(dataSource: DataSource, seedTag: st
     separateUnlockAndUnlatch: false,
   }));
 
+  // An access-only door (DoorAccessOnly1793750000000), which the plugin reader seed is assigned to.
+  const accessOnlyDoor =
+    (await resourceRepo.findOne({ where: { accessOnly: true } })) ??
+    (await resourceRepo.save(
+      resourceRepo.create({
+        name: `Seed Access-Only Door ${seedTag}`,
+        type: ResourceType.Door,
+        description: 'Seed access-only door',
+        allowTakeOver: false,
+        separateUnlockAndUnlatch: false,
+        accessOnly: true,
+      }),
+    ));
+
   await ensureEntity(operatingIntervalRepo, () => ({
     resourceId: resource.id,
     startTime: new Date(),
@@ -57,5 +71,5 @@ export async function migrationResourceSeeds(dataSource: DataSource, seedTag: st
     description: 'Seed project',
     owner: primaryUser,
   }));
-  return { resourceGroup, resource, project };
+  return { resourceGroup, resource, accessOnlyDoor, project };
 }

@@ -61,5 +61,6 @@ export const toFlowResourceRecord = (resource: Resource): FlowResourceRecord => 
   id: resource.id,
   name: resource.name,
   type: resource.type,
+  accessOnly: resource.accessOnly,
   metadata: resource.metadata ?? null,
 });

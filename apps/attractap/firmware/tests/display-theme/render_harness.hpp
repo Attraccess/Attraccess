@@ -252,6 +252,7 @@ void testWallClock(Renderer &renderer);
 void testAuthenticatedList(Renderer &renderer);
 void testUsageStatsExpiry(Renderer &renderer);
 void testIntroducerDetails(Renderer &renderer);
+void testAccessOnlyDoorDetails(Renderer &renderer);
 void testReaderUiClauseLines();
 void testParallelSessionPolicy();
 void testParallelSessionList(Renderer &renderer);

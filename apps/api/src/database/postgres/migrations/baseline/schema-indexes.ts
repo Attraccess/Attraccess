@@ -46,6 +46,8 @@ export const INDEX_STATEMENTS: readonly string[] = [
   `CREATE INDEX "IDX_plugin_ble_endpoint_plugin" ON "plugin_ble_endpoint"  ("pluginId")`,
   `CREATE INDEX "IDX_plugin_ble_endpoint_address" ON "plugin_ble_endpoint"  ("address")`,
   `CREATE UNIQUE INDEX "UQ_plugin_ble_endpoint_plugin_reader_address" ON "plugin_ble_endpoint"  ("pluginId", "readerId", "address")`,
+  `CREATE INDEX "IDX_plugin_reader_plugin" ON "plugin_reader"  ("pluginId")`,
+  `CREATE UNIQUE INDEX "UQ_plugin_reader_plugin_device" ON "plugin_reader"  ("pluginId", "deviceId")`,
   `CREATE UNIQUE INDEX "IDX_attractap_secure_boot_key_digest" ON "attractap_secure_boot_key"  ("digest")`,
   `CREATE INDEX "IDX_audit_log_domain_at" ON "audit_log"  ("domain", "at")`,
   `CREATE INDEX "IDX_audit_log_operation_id" ON "audit_log"  ("operationId", "id")`,

@@ -217,7 +217,14 @@ export class FakeFlowResourceDirectory implements FlowResourceDirectory {
   meterLookups = 0;
 
   addResource(id: number, partial: Partial<FlowResourceRecord> = {}): FlowResourceRecord {
-    const resource = { id, name: `Resource ${id}`, type: ResourceType.Machine, metadata: null, ...partial };
+    const resource = {
+      id,
+      name: `Resource ${id}`,
+      type: ResourceType.Machine,
+      accessOnly: false,
+      metadata: null,
+      ...partial,
+    };
     this.resources.set(id, resource);
     return resource;
   }

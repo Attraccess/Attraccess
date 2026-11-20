@@ -2,6 +2,7 @@ import {
   ResourceFlowNodeType,
   ResourceHealthStatus,
   ResourceIntroducerType,
+  ResourceType,
   SupervisionMode,
 } from '@attraccess/application-models';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
@@ -124,6 +125,8 @@ export async function sendResourceListToSockets(
         name: resource.name,
         type: resource.type,
         separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch,
+        // Doors only; old firmware ignores it and shows unlock, which the API takes as the Open of the door.
+        accessOnly: resource.type === ResourceType.Door && resource.accessOnly === true,
         description: resource.description,
         allowTakeOver: resource.allowTakeOver,
         introducers: (introducersByResourceId.get(resource.id) ?? []).flatMap((introducer) =>

@@ -16,9 +16,13 @@ import { migrationSsoSeeds } from './seeds/sso.test-fixture';
 export async function seedAllEntities(dataSource: DataSource): Promise<void> {
   const seedTag = Date.now().toString(36);
   const { primaryUser, secondaryUser } = await ensureUsers(dataSource, seedTag);
-  const { resourceGroup, resource, project } = await migrationResourceSeeds(dataSource, seedTag, primaryUser);
+  const { resourceGroup, resource, accessOnlyDoor, project } = await migrationResourceSeeds(
+    dataSource,
+    seedTag,
+    primaryUser,
+  );
   await migrationSsoSeeds(dataSource, seedTag, primaryUser);
-  await migrationReaderSeeds(dataSource, seedTag, resource);
+  await migrationReaderSeeds(dataSource, seedTag, resource, accessOnlyDoor);
   await migrationMaintenanceSeeds(dataSource, seedTag, primaryUser, resource);
   const { usage } = await migrationFlowUsageSeeds(dataSource, seedTag, primaryUser, secondaryUser, resource, project);
   await migrationMembershipFormSeeds(

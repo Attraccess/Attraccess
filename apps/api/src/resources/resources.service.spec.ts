@@ -227,6 +227,7 @@ describe('ResourcesService', () => {
         allowTakeOver: createDto.allowTakeOver || false,
         maxParallelSessions: createDto.maxParallelSessions ?? 1,
         separateUnlockAndUnlatch: false,
+        accessOnly: false,
         metadata: createDto.metadata ?? null,
         retrainingMaxAgeDays: createDto.retrainingMaxAgeDays ?? null,
         retrainingMaxInactivityDays: createDto.retrainingMaxInactivityDays ?? null,

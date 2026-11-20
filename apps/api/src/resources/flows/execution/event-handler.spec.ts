@@ -3,6 +3,9 @@ import { ResourceFlowsExecutorService } from './resource-flows-executor.service'
 import { ResourceSessionStartedEvent } from '../../usage/events/resource-usage.events';
 import { ResourceType, ResourceUsageAction, UsageSession } from '@attraccess/application-models';
 import { FlowExecutionError } from '../errors/flow-execution.error';
+import { ExternalEffectFailureError } from '../errors/external-effect-failure.error';
+import { Test } from '@nestjs/testing';
+import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
 
 describe('ResourceFlowsExecutorService – handleResourceSessionStartedEvent', () => {
   let service: ResourceFlowsExecutorService;
@@ -113,10 +116,40 @@ describe('ResourceFlowsExecutorService – handleResourceSessionStartedEvent', (
     await expect(service.handleResourceSessionStartedEvent(event)).rejects.toThrow(FlowExecutionError);
   });
 
-  it('should re-throw generic errors from door flow', async () => {
+  it('re-throws a failed external effect set to fail the flow', async () => {
+    triggerResourceUsageNodeSpy.mockRejectedValueOnce(
+      new ExternalEffectFailureError('The device reported a fault', new Error('fault')),
+    );
+    const event = new ResourceSessionStartedEvent(makeUsage(ResourceUsageAction.DoorUnlock));
+    await expect(service.handleResourceSessionStartedEvent(event)).rejects.toThrow(ExternalEffectFailureError);
+  });
+
+  it('logs other flow errors without failing the door action, like a usage start', async () => {
     triggerResourceUsageNodeSpy.mockRejectedValueOnce(new Error('Database unavailable'));
     const event = new ResourceSessionStartedEvent(makeUsage(ResourceUsageAction.DoorLock));
-    await expect(service.handleResourceSessionStartedEvent(event)).rejects.toThrow('Database unavailable');
+    await expect(service.handleResourceSessionStartedEvent(event)).resolves.toBeUndefined();
+    expect((service as any).logger.error).toHaveBeenCalledWith('Failed to handle resource usage event', expect.any(String));
+  });
+
+  it('hands a failed external effect back to the door action that emitted the event', async () => {
+    jest.spyOn(service, 'onModuleInit').mockResolvedValue(undefined);
+    const module = await Test.createTestingModule({
+      imports: [EventEmitterModule.forRoot()],
+      providers: [{ provide: ResourceFlowsExecutorService, useValue: service }],
+    }).compile();
+    await module.init();
+    try {
+      triggerResourceUsageNodeSpy.mockRejectedValueOnce(
+        new ExternalEffectFailureError('The device reported a fault', new Error('fault')),
+      );
+      const event = new ResourceSessionStartedEvent(makeUsage(ResourceUsageAction.DoorUnlock));
+
+      await expect(module.get(EventEmitter2).emitAsync(ResourceSessionStartedEvent.EVENT_NAME, event)).rejects.toThrow(
+        'The device reported a fault',
+      );
+    } finally {
+      await module.close();
+    }
   });
 
   it('should log error before re-throwing', async () => {

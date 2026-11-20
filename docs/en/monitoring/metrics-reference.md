@@ -187,6 +187,10 @@ Plugins with the `BLE_TRANSPORT` permission talk to Bluetooth devices through At
 | `attraccess_plugin_ble_session_closes_total` | Counter | `reason` | Closed sessions by reason (`closed`, `lease-expired`, `disconnected`, `cancelled`, ...) |
 | `attraccess_plugin_ble_rejections_total` | Counter | `code` | Calls refused by the profile, the reader allowlist or a payload bound (`OPERATION_NOT_ALLOWED`, `UNKNOWN_CHARACTERISTIC`, `PAYLOAD_TOO_LARGE`) |
 | `attraccess_plugin_ble_notifications_total` | Counter | `outcome` | Notifications by outcome: `delivered` (handed to the plugin's stream), `overflow` (the reader's buffer or the API's per-subscription queue overflowed; the stream fails with `NOTIFICATION_OVERFLOW`), `oversized` (above the profile's `maxNotificationBytes`; `PAYLOAD_TOO_LARGE`), `malformed` (bad encoding or a sequence gap or duplicate from the reader; `INTERNAL`). Every outcome other than `delivered` fails that stream |
+| `attraccess_plugin_ble_watches_active` | Gauge | -- | Open advertisement watches (`context.ble.watch`) |
+| `attraccess_plugin_ble_watch_events_received_total` | Counter | -- | Advertisement watch events the API accepted from readers |
+| `attraccess_plugin_ble_watch_events_routed_total` | Counter | -- | Watch events handed to plugin watches; one event can reach several watches |
+| `attraccess_plugin_ble_watch_events_dropped_total` | Counter | `reason` | Watch events that reached no plugin: `malformed`, `batch-too-large` (more than 8 per message), `rate-limit` (far above the rate the reader announced), `stale-connection` (from a connection the set was not sent to), `access-denied` (reader not open for plugins), `no-watch` (no watch for the named filter), `filter-mismatch` (the profile filter does not match), `queue-full` (the oldest queued event of a busy watch) |
 
 **Operation duration buckets:** 10ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s, 30s, 60s
 

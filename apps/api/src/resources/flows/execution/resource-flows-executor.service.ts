@@ -46,6 +46,10 @@ import { FlowExecutionContext } from './flow-execution-context';
 
 import { ResourceSessionStartedEvent } from '../../usage/events/resource-usage.events';
 
+import { ExternalEffectFailureError } from '../errors/external-effect-failure.error';
+
+import { FlowExecutionError } from '../errors/flow-execution.error';
+
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../../mqtt/mqtt-message.event';
@@ -308,7 +312,11 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     }
   }
 
-  @OnEvent(ResourceSessionStartedEvent.EVENT_NAME)
+  /**
+   * Door actions wait for their flows (`emitAsync`). As with a usage start, a failed external effect set to fail
+   * the flow, or a flow error, fails the action, so the person who opened the door sees it; the stored action stays.
+   */
+  @OnEvent(ResourceSessionStartedEvent.EVENT_NAME, { suppressErrors: false })
   async handleResourceSessionStartedEvent(event: ResourceSessionStartedEvent) {
     try {
       const { usage } = event;
@@ -337,7 +345,9 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       }
     } catch (error) {
       this.logger.error(`Failed to handle resource usage event`, error.stack);
-      throw error;
+      if (error instanceof ExternalEffectFailureError || error instanceof FlowExecutionError) {
+        throw error;
+      }
     }
   }
 

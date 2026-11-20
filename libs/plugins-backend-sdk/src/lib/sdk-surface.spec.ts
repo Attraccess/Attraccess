@@ -29,7 +29,7 @@ function sourceFiles(dir: string): string[] {
 /** Files that are part of the published surface: everything but the host-internal entry and its building blocks. */
 const publishedFiles = () =>
   sourceFiles(SRC).filter(
-    (file) => !/(?:^|\/)internal\.ts$|plugin-ble-session-engine\.ts$|in-memory-storage\//.test(file),
+    (file) => !/(?:^|\/)internal\.ts$|plugin-ble-(?:session|watch)-engine\.ts$|in-memory-storage\//.test(file),
   );
 
 describe('plugin SDK 2.0 published surface', () => {

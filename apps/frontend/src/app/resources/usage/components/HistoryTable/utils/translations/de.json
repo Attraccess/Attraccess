@@ -24,7 +24,8 @@
         "door": {
           "lock": "Abgeschlossen",
           "unlock": "Aufgeschlossen",
-          "unlatch": "Falle geöffnet"
+          "unlatch": "Falle geöffnet",
+          "open": "Geöffnet"
         }
       }
     },

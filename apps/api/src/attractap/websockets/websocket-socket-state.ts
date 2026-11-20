@@ -139,6 +139,13 @@ export enum AttractapEventType {
   BLE_NOTIFICATION = 'BLE_NOTIFICATION',
   /** Reader → server: the reader ended the session itself (peripheral lost, lease, OTA), with `reason` and `detail`. */
   BLE_SESSION_ENDED = 'BLE_SESSION_ENDED',
+  // Advertisement watch (capabilities.ble.watch): a passive scan beside sessions, without sessionId.
+  /** Server → reader: replace the whole watch set (`requestId`, `filters` `{id, …}`, `keepaliveMs`); `[]` stops it. */
+  BLE_WATCH_SET = 'BLE_WATCH_SET',
+  /** Reader → server: answer to BLE_WATCH_SET (`requestId`, `ok`, `active` or `error`), or unsolicited without `requestId`. */
+  BLE_WATCH_STATE = 'BLE_WATCH_STATE',
+  /** Reader → server: up to 8 `events` (advertisement + matched `filters` + `changed`) per message. */
+  BLE_WATCH_EVENT = 'BLE_WATCH_EVENT',
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
