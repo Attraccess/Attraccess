@@ -1,4 +1,4 @@
-import { Attractap, AttractapCredentialEvent } from '@attraccess/database-entities';
+import { Attractap, AttractapCredentialEvent, Resource } from '@attraccess/database-entities';
 import { DataSource } from 'typeorm';
 import { CredentialRegistryService } from '../../../attractap/security/credential-registry.service';
 import { PostgresDatabaseFixture } from '../postgres-database.test-fixture';
