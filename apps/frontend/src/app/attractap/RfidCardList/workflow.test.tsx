@@ -104,6 +104,8 @@ it('renders card identities and requires a reader before deleting a card', async
   );
   expect(screen.getByText('AA-BB')).toBeInTheDocument();
   expect(screen.getByText('CC-DD')).toBeInTheDocument();
+  expect(within(screen.getByText('AA-BB').closest('tr') as HTMLElement).getByText('Active')).toBeInTheDocument();
+  expect(within(screen.getByText('CC-DD').closest('tr') as HTMLElement).getByText('Inactive')).toBeInTheDocument();
   await userEvent.click(within(await openRowMenu('AA-BB')).getByRole('menuitem', { name: 'Delete' }));
   expect(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' })).toBeDisabled();
   fireEvent.change(screen.getByRole('combobox', { name: 'Select Attractap' }), { target: { value: '4' } });

@@ -10,7 +10,6 @@ import {
   TableHeader,
   TableRow,
   TableScrollContainer,
-  cn,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
@@ -50,6 +49,7 @@ import { PlusIcon, ServerIcon, XIcon } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
 import { AttractapSelect } from '../AttractapSelect/index';
 import { NfcCardRowActions } from './NfcCardRowActions';
+import { NfcCardStatusChip } from './NfcCardStatusChip';
 
 export interface EnrollNfcCardProps {
   children: (onOpen: () => void) => React.ReactNode;
@@ -243,6 +243,10 @@ export const NfcCardTableCell = (props: NfcCardTableCellProps) => {
     return props.card.uid;
   }
 
+  if (props.header === 'status') {
+    return <NfcCardStatusChip isActive={props.card.isActive} />;
+  }
+
   if (props.header === 'id') {
     return props.card.id;
   }
@@ -294,7 +298,14 @@ export function RfidCardList({ userId }: { userId?: number }) {
   }, [cardsError, toast, t]);
 
   const headers = useMemo(() => {
-    const headers: Array<keyof NfcCard | 'actions'> = ['id', 'createdAt', 'uid', 'lastSeen', 'actions'];
+    const headers: Array<keyof NfcCard | 'status' | 'actions'> = [
+      'id',
+      'createdAt',
+      'uid',
+      'lastSeen',
+      'status',
+      'actions',
+    ];
 
     return headers;
   }, []);
@@ -355,11 +366,7 @@ export function RfidCardList({ userId }: { userId?: number }) {
             </TableHeader>
             <TableBody items={cards ?? []} renderEmptyState={() => <EmptyState />}>
               {(card) => (
-                <TableRow
-                  key={card.id}
-                  id={card.id}
-                  className={cn('border-l-4', card.isActive ? 'border-l-success' : 'border-l-warning')}
-                >
+                <TableRow key={card.id} id={card.id}>
                   {headers.map((header) => (
                     <TableCell key={header}>
                       <NfcCardTableCell header={header} card={card} onDeleteClick={() => setCardToDeleteId(card.id)} />

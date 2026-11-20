@@ -7,7 +7,8 @@
       "id": "ID",
       "uid": "UID",
       "lastSeen": "Zuletzt gesehen",
-      "createdAt": "Erstellt am"
+      "createdAt": "Erstellt am",
+      "status": "Status"
     },
     "actions": {
       "delete": "Löschen",
@@ -30,6 +31,10 @@
       "readerPlaceholder": "Wählen Sie einen Attractap aus",
       "cancel": "Abbrechen",
       "delete": "Löschen"
+    },
+    "status": {
+      "active": "Aktiv",
+      "inactive": "Inaktiv"
     }
   },
   "enroll": "RFID-Karte registrieren",

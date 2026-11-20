@@ -7,7 +7,8 @@
       "id": "ID",
       "uid": "UID",
       "lastSeen": "Last seen",
-      "createdAt": "Created at"
+      "createdAt": "Created at",
+      "status": "Status"
     },
     "actions": {
       "delete": "Delete",
@@ -30,6 +31,10 @@
       "readerPlaceholder": "Select an Attractap",
       "cancel": "Cancel",
       "delete": "Delete"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive"
     }
   },
   "enroll": "Enroll RFID Card",
